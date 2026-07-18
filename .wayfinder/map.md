@@ -28,6 +28,7 @@ A production-quality STRIDE threat-modeling service in this repo: Python, Google
 - [Decide graph topology and quality pattern](tickets/004-graph-topology-quality-pattern.md) — six parallel STRIDE-category analysts + one grounded critic pass (verdicts, dedupe, severity calibration); no debate/voting; static ADK Workflow: extract → validate/repair → prepare → 6 analysts → join → critic → router → assemble, with deterministic FunctionNode bookends and a reserved REVISE route.
 - [Implement System Model schema and validator](tickets/012-implement-system-model-schema.md) — shipped as `stride_service` package (Pydantic 2, src layout, uv): five element types + typed-slug ID helpers, derived `boundary_crossings()`, mechanical gate returning structured `ValidationIssue`s, `parse_and_validate()` for the repair pass; 29 tests green.
 - [STRIDE report schema and severity model](tickets/005-report-schema.md) — likelihood×impact with matrix-derived band (DREAD rejected); per-threat critic-calibrated confidence; verdicts with unknown-refs; `rejected_threats` audit array; self-contained payload embedding the System Model; job/nodes/summary metadata. Prototype on `prototype/report-schema`.
+- [Skills-as-SME design and injection](tickets/006-skills-sme-design.md) — two-axis library: six per-analyst category skills + shared severity rubric, mechanical domain-pack hook (empty in v1); five fixed sections per skill, exemplars stay in prompts; repo Markdown baked into image via PromptLoader-mirroring SkillLoader; full text in system instruction with CI token caps; critic gets rubric + mechanically assembled boundary digest.
 
 ## Not yet specified
 
@@ -35,7 +36,8 @@ A production-quality STRIDE threat-modeling service in this repo: Python, Google
 - Error handling in the graph: partial results, retries, timeouts, poison inputs.
 - CI/CD pipeline and Cloud Run deployment details (Ping middleware specifics follow org patterns).
 - Cost/quota controls per model tier.
-- Implementation build-out tickets — graduate once topology, report schema, and contracts close. (System Model schema graduated and shipped via [Implement System Model schema and validator](tickets/012-implement-system-model-schema.md); report schema graduated as [Implement report schema in stride_service](tickets/014-implement-report-schema.md).)
+- Technology-domain skill packs: authoring + the pack-selection rule table in `prepare` — graduate when evals show domain-specific recall gaps.
+- Implementation build-out tickets — graduate once topology, report schema, and contracts close. (System Model schema graduated and shipped via [Implement System Model schema and validator](tickets/012-implement-system-model-schema.md); report schema graduated as [Implement report schema in stride_service](tickets/014-implement-report-schema.md); skills design graduated as [Author v1 STRIDE category skills and severity rubric](tickets/015-author-skill-files.md) and [Implement SkillLoader, boundary-digest assembly, and CI skill lints](tickets/016-implement-skill-loader.md).)
 
 ## Out of scope
 
