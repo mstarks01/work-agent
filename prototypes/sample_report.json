@@ -1,0 +1,489 @@
+{
+  "schema_version": "0.1-prototype",
+  "disclaimer": "AI-generated threat model. Not reviewed by a human security analyst.",
+  "job": {
+    "id": "job-8f3a2c91",
+    "status": "complete",
+    "created_at": "2026-07-18T14:03:21Z",
+    "completed_at": "2026-07-18T14:04:09Z",
+    "revise_rounds": 0
+  },
+  "input": {
+    "system_name": "Order & Payments Service",
+    "source_sha256": "9ea453924d6aa3d00aed8fb6ac0f1ffc3a0064dd46e5ac6af7d21ee6d2fa73c6"
+  },
+  "nodes": [
+    {
+      "node": "extract",
+      "model": "gemini-2.5-flash",
+      "duration_ms": 3200
+    },
+    {
+      "node": "validate",
+      "model": null,
+      "duration_ms": 12
+    },
+    {
+      "node": "prepare",
+      "model": null,
+      "duration_ms": 8
+    },
+    {
+      "node": "analyst-spoofing",
+      "model": "gemini-2.5-pro",
+      "duration_ms": 9000
+    },
+    {
+      "node": "analyst-tampering",
+      "model": "gemini-2.5-pro",
+      "duration_ms": 9000
+    },
+    {
+      "node": "analyst-repudiation",
+      "model": "gemini-2.5-pro",
+      "duration_ms": 9000
+    },
+    {
+      "node": "analyst-information-disclosure",
+      "model": "gemini-2.5-pro",
+      "duration_ms": 9000
+    },
+    {
+      "node": "analyst-denial-of-service",
+      "model": "gemini-2.5-pro",
+      "duration_ms": 9000
+    },
+    {
+      "node": "analyst-elevation-of-privilege",
+      "model": "gemini-2.5-pro",
+      "duration_ms": 9000
+    },
+    {
+      "node": "join",
+      "model": null,
+      "duration_ms": 5
+    },
+    {
+      "node": "critic",
+      "model": "gemini-2.5-pro",
+      "duration_ms": 14500
+    },
+    {
+      "node": "assemble",
+      "model": null,
+      "duration_ms": 20
+    }
+  ],
+  "system_model": {
+    "external_entities": [
+      {
+        "id": "entity:customer",
+        "name": "Customer",
+        "description": "Shopper using the web storefront.",
+        "assets": [
+          "pii"
+        ],
+        "source_excerpt": "customers place orders through the web store",
+        "notes": "",
+        "kind": "human",
+        "trust_zone": "boundary:internet"
+      },
+      {
+        "id": "entity:payment-gateway",
+        "name": "Payment Gateway",
+        "description": "Third-party card processor.",
+        "assets": [
+          "financial"
+        ],
+        "source_excerpt": "we charge cards via a hosted payment gateway",
+        "notes": "",
+        "kind": "external-system",
+        "trust_zone": "boundary:internet"
+      }
+    ],
+    "processes": [
+      {
+        "id": "process:storefront-api",
+        "name": "Storefront API",
+        "description": "Public API serving the storefront.",
+        "assets": [
+          "business-critical-data",
+          "availability-critical"
+        ],
+        "source_excerpt": "a FastAPI service handles all storefront traffic",
+        "notes": "",
+        "technology": "Python/FastAPI on Cloud Run",
+        "trust_zone": "boundary:dmz",
+        "exposure": "internet-facing"
+      },
+      {
+        "id": "process:auth-service",
+        "name": "Auth Service",
+        "description": "Issues and verifies session tokens.",
+        "assets": [
+          "credentials"
+        ],
+        "source_excerpt": "an internal auth service signs session JWTs",
+        "notes": "",
+        "technology": "Node.js",
+        "trust_zone": "boundary:internal",
+        "exposure": "internal"
+      }
+    ],
+    "data_stores": [
+      {
+        "id": "store:orders-db",
+        "name": "Orders DB",
+        "description": "Orders, customer profiles, payment references.",
+        "assets": [
+          "pii",
+          "financial",
+          "business-critical-data"
+        ],
+        "source_excerpt": "orders and customer data live in Postgres",
+        "notes": "",
+        "technology": "PostgreSQL 15",
+        "trust_zone": "boundary:internal",
+        "data_classification": "confidential",
+        "encryption_at_rest": "unknown"
+      }
+    ],
+    "data_flows": [
+      {
+        "id": "flow:customer-to-storefront-api:place-order",
+        "name": "Place Order",
+        "description": "",
+        "assets": [],
+        "source_excerpt": "",
+        "notes": "",
+        "source": "entity:customer",
+        "destination": "process:storefront-api",
+        "protocol": "HTTPS",
+        "authentication": "session JWT cookie",
+        "data_description": "cart contents, shipping address; order confirmation in response",
+        "encryption_in_transit": "TLS 1.3"
+      },
+      {
+        "id": "flow:storefront-api-to-auth-service:verify-session",
+        "name": "Verify Session",
+        "description": "",
+        "assets": [],
+        "source_excerpt": "",
+        "notes": "",
+        "source": "process:storefront-api",
+        "destination": "process:auth-service",
+        "protocol": "gRPC",
+        "authentication": "service account JWT",
+        "data_description": "session token; validity claims in response",
+        "encryption_in_transit": "TLS 1.2"
+      },
+      {
+        "id": "flow:storefront-api-to-orders-db:read-write-orders",
+        "name": "Read Write Orders",
+        "description": "",
+        "assets": [],
+        "source_excerpt": "",
+        "notes": "",
+        "source": "process:storefront-api",
+        "destination": "store:orders-db",
+        "protocol": "PostgreSQL wire protocol",
+        "authentication": "database user/password",
+        "data_description": "order rows, customer profiles",
+        "encryption_in_transit": "none"
+      },
+      {
+        "id": "flow:storefront-api-to-payment-gateway:charge-card",
+        "name": "Charge Card",
+        "description": "",
+        "assets": [],
+        "source_excerpt": "",
+        "notes": "",
+        "source": "process:storefront-api",
+        "destination": "entity:payment-gateway",
+        "protocol": "HTTPS",
+        "authentication": "API key",
+        "data_description": "charge requests; charge results in response",
+        "encryption_in_transit": "TLS 1.2"
+      },
+      {
+        "id": "flow:payment-gateway-to-storefront-api:payment-webhook",
+        "name": "Payment Webhook",
+        "description": "",
+        "assets": [],
+        "source_excerpt": "",
+        "notes": "",
+        "source": "entity:payment-gateway",
+        "destination": "process:storefront-api",
+        "protocol": "HTTPS",
+        "authentication": "unknown",
+        "data_description": "asynchronous payment status events",
+        "encryption_in_transit": "TLS 1.2"
+      }
+    ],
+    "trust_boundaries": [
+      {
+        "id": "boundary:internet",
+        "name": "Internet",
+        "description": "",
+        "assets": [],
+        "source_excerpt": "",
+        "notes": "",
+        "kind": "network"
+      },
+      {
+        "id": "boundary:dmz",
+        "name": "DMZ",
+        "description": "",
+        "assets": [],
+        "source_excerpt": "",
+        "notes": "",
+        "kind": "network"
+      },
+      {
+        "id": "boundary:internal",
+        "name": "Internal",
+        "description": "",
+        "assets": [],
+        "source_excerpt": "",
+        "notes": "",
+        "kind": "network"
+      }
+    ],
+    "assumptions": [
+      {
+        "assumption": "Session cookies are JWTs signed by the auth service",
+        "element_id": "flow:customer-to-storefront-api:place-order",
+        "basis": "input says 'auth service signs session JWTs'"
+      }
+    ]
+  },
+  "boundary_crossings": [
+    {
+      "flow_id": "flow:customer-to-storefront-api:place-order",
+      "source_zone": "boundary:internet",
+      "destination_zone": "boundary:dmz"
+    },
+    {
+      "flow_id": "flow:storefront-api-to-auth-service:verify-session",
+      "source_zone": "boundary:dmz",
+      "destination_zone": "boundary:internal"
+    },
+    {
+      "flow_id": "flow:storefront-api-to-orders-db:read-write-orders",
+      "source_zone": "boundary:dmz",
+      "destination_zone": "boundary:internal"
+    },
+    {
+      "flow_id": "flow:storefront-api-to-payment-gateway:charge-card",
+      "source_zone": "boundary:dmz",
+      "destination_zone": "boundary:internet"
+    },
+    {
+      "flow_id": "flow:payment-gateway-to-storefront-api:payment-webhook",
+      "source_zone": "boundary:internet",
+      "destination_zone": "boundary:dmz"
+    }
+  ],
+  "threats": [
+    {
+      "id": "S-01",
+      "category": "spoofing",
+      "title": "Forged payment webhook confirms unpaid orders",
+      "description": "The payment webhook endpoint's authentication is unknown. If events are not verified, anyone who discovers the URL can post a fabricated 'payment succeeded' event and receive goods without paying.",
+      "affected_element_ids": [
+        "flow:payment-gateway-to-storefront-api:payment-webhook",
+        "process:storefront-api"
+      ],
+      "severity": {
+        "likelihood": "high",
+        "impact": "high",
+        "level": "critical",
+        "justification": "Internet-reachable endpoint; a forged event directly converts to financial loss."
+      },
+      "confidence": "medium",
+      "mitigations": [
+        {
+          "summary": "Verify webhook signatures",
+          "detail": "Validate the gateway's event signature (e.g. HMAC header) before acting; reject unsigned events."
+        },
+        {
+          "summary": "Reconcile against the gateway API",
+          "detail": "Treat webhooks as hints; confirm payment status with an authenticated API read before fulfilment."
+        }
+      ],
+      "verdict": {
+        "status": "needs-info",
+        "reason": "Webhook authentication is unknown; confirm whether signature verification exists.",
+        "related_unknowns": [
+          {
+            "element_id": "flow:payment-gateway-to-storefront-api:payment-webhook",
+            "attribute": "authentication"
+          }
+        ]
+      }
+    },
+    {
+      "id": "T-01",
+      "category": "tampering",
+      "title": "Order rows alterable on the unencrypted database link",
+      "description": "Traffic between the Storefront API and the Orders DB is unencrypted. An attacker on the network path can modify order rows in flight — prices, shipping addresses, payment references.",
+      "affected_element_ids": [
+        "flow:storefront-api-to-orders-db:read-write-orders",
+        "store:orders-db"
+      ],
+      "severity": {
+        "likelihood": "medium",
+        "impact": "high",
+        "level": "high",
+        "justification": "Requires internal network position, but business-critical order data is fully exposed to it."
+      },
+      "confidence": "high",
+      "mitigations": [
+        {
+          "summary": "Enforce TLS to PostgreSQL",
+          "detail": "Set sslmode=verify-full on clients and ssl=on/hostssl rules on the server."
+        }
+      ],
+      "verdict": {
+        "status": "confirmed",
+        "reason": "",
+        "related_unknowns": []
+      }
+    },
+    {
+      "id": "R-01",
+      "category": "repudiation",
+      "title": "Order placement lacks an attributable audit trail",
+      "description": "No audit logging is described for order placement. A customer can dispute having placed an order, and the business cannot prove otherwise; insiders can modify orders untraced.",
+      "affected_element_ids": [
+        "process:storefront-api",
+        "store:orders-db"
+      ],
+      "severity": {
+        "likelihood": "medium",
+        "impact": "medium",
+        "level": "medium",
+        "justification": "Disputes are routine in commerce; losses are bounded per order."
+      },
+      "confidence": "medium",
+      "mitigations": [
+        {
+          "summary": "Append-only order audit log",
+          "detail": "Log actor, action, timestamp, and request ID for every order mutation to tamper-evident storage."
+        }
+      ],
+      "verdict": {
+        "status": "confirmed",
+        "reason": "",
+        "related_unknowns": []
+      }
+    },
+    {
+      "id": "I-01",
+      "category": "information-disclosure",
+      "title": "Customer PII exposed if database storage is compromised",
+      "description": "Orders DB holds PII and payment references; encryption at rest is unknown. Stolen disks, snapshots, or backups would expose customer data.",
+      "affected_element_ids": [
+        "store:orders-db"
+      ],
+      "severity": {
+        "likelihood": "low",
+        "impact": "high",
+        "level": "medium",
+        "justification": "Storage-level compromise is uncommon but exposes the full customer dataset."
+      },
+      "confidence": "high",
+      "mitigations": [
+        {
+          "summary": "Confirm and enforce encryption at rest",
+          "detail": "Verify disk/tablespace encryption and encrypted backups; document key management."
+        }
+      ],
+      "verdict": {
+        "status": "needs-info",
+        "reason": "Encryption at rest is unknown for the Orders DB.",
+        "related_unknowns": [
+          {
+            "element_id": "store:orders-db",
+            "attribute": "encryption_at_rest"
+          }
+        ]
+      }
+    },
+    {
+      "id": "D-01",
+      "category": "denial-of-service",
+      "title": "Storefront API can be saturated from the internet",
+      "description": "The Storefront API is internet-facing and availability-critical; no rate limiting or DDoS protection is described. Request floods take the store offline.",
+      "affected_element_ids": [
+        "process:storefront-api"
+      ],
+      "severity": {
+        "likelihood": "medium",
+        "impact": "medium",
+        "level": "medium",
+        "justification": "Commodity attack; Cloud Run absorbs some load but cost and quota limits still bite."
+      },
+      "confidence": "medium",
+      "mitigations": [
+        {
+          "summary": "Rate limiting at the edge",
+          "detail": "Put Cloud Armor (or equivalent) in front; set per-client quotas and Cloud Run max instances."
+        }
+      ],
+      "verdict": {
+        "status": "confirmed",
+        "reason": "",
+        "related_unknowns": []
+      }
+    }
+  ],
+  "rejected_threats": [
+    {
+      "id": "E-01",
+      "category": "elevation-of-privilege",
+      "title": "SQL injection grants admin on the Orders DB",
+      "description": "Crafted input reaches dynamic SQL in the Storefront API and escalates to database superuser.",
+      "affected_element_ids": [
+        "process:storefront-api",
+        "store:orders-db"
+      ],
+      "severity": {
+        "likelihood": "medium",
+        "impact": "high",
+        "level": "high",
+        "justification": "Analyst-asserted; not calibrated by critic."
+      },
+      "confidence": "low",
+      "mitigations": [
+        {
+          "summary": "Parameterize all queries",
+          "detail": ""
+        }
+      ],
+      "verdict": {
+        "status": "rejected",
+        "reason": "Not grounded in model facts: no evidence of dynamic SQL construction, and superuser escalation assumes privileges the model does not describe.",
+        "related_unknowns": []
+      }
+    }
+  ],
+  "summary": {
+    "threat_count": 5,
+    "by_category": {
+      "spoofing": 1,
+      "tampering": 1,
+      "repudiation": 1,
+      "information-disclosure": 1,
+      "denial-of-service": 1
+    },
+    "by_severity": {
+      "critical": 1,
+      "high": 1,
+      "medium": 3
+    },
+    "needs_info_count": 2,
+    "rejected_count": 1,
+    "elements_analyzed": 13
+  }
+}
