@@ -26,6 +26,7 @@ A production-quality STRIDE threat-modeling service in this repo: Python, Google
 - [Research: ADK graph features and per-agent Vertex model config](tickets/002-research-adk-graph.md) — ADK 2.5.0 Workflow Runtime: directed graph with conditional edges/JoinNode fan-in, per-node model strings, `include_contents='none'` + state templating for context scoping, SSE streaming, `get_fast_api_app()` on Cloud Run. Findings on `research/adk-graph`.
 - [Domain model: canonical system representation](tickets/003-domain-model-system-representation.md) — classic five DFD element types, typed-slug IDs, flat trust zones with derived boundary crossings, fixed security-relevant attributes with explicit `unknown` + assumptions list, controlled asset-tag enum, mechanical validity gate with one repair pass. Glossary in `CONTEXT.md`.
 - [Decide graph topology and quality pattern](tickets/004-graph-topology-quality-pattern.md) — six parallel STRIDE-category analysts + one grounded critic pass (verdicts, dedupe, severity calibration); no debate/voting; static ADK Workflow: extract → validate/repair → prepare → 6 analysts → join → critic → router → assemble, with deterministic FunctionNode bookends and a reserved REVISE route.
+- [Implement System Model schema and validator](tickets/012-implement-system-model-schema.md) — shipped as `stride_service` package (Pydantic 2, src layout, uv): five element types + typed-slug ID helpers, derived `boundary_crossings()`, mechanical gate returning structured `ValidationIssue`s, `parse_and_validate()` for the repair pass; 29 tests green.
 
 ## Not yet specified
 
@@ -33,7 +34,7 @@ A production-quality STRIDE threat-modeling service in this repo: Python, Google
 - Error handling in the graph: partial results, retries, timeouts, poison inputs.
 - CI/CD pipeline and Cloud Run deployment details (Ping middleware specifics follow org patterns).
 - Cost/quota controls per model tier.
-- Implementation build-out tickets — graduate once topology, report schema, and contracts close. (System Model schema graduated to [Implement System Model schema and validator](tickets/012-implement-system-model-schema.md).)
+- Implementation build-out tickets — graduate once topology, report schema, and contracts close. (System Model schema graduated and shipped via [Implement System Model schema and validator](tickets/012-implement-system-model-schema.md).)
 
 ## Out of scope
 
