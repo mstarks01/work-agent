@@ -27,6 +27,7 @@ A production-quality STRIDE threat-modeling service in this repo: Python, Google
 - [Domain model: canonical system representation](tickets/003-domain-model-system-representation.md) — classic five DFD element types, typed-slug IDs, flat trust zones with derived boundary crossings, fixed security-relevant attributes with explicit `unknown` + assumptions list, controlled asset-tag enum, mechanical validity gate with one repair pass. Glossary in `CONTEXT.md`.
 - [Decide graph topology and quality pattern](tickets/004-graph-topology-quality-pattern.md) — six parallel STRIDE-category analysts + one grounded critic pass (verdicts, dedupe, severity calibration); no debate/voting; static ADK Workflow: extract → validate/repair → prepare → 6 analysts → join → critic → router → assemble, with deterministic FunctionNode bookends and a reserved REVISE route.
 - [Implement System Model schema and validator](tickets/012-implement-system-model-schema.md) — shipped as `stride_service` package (Pydantic 2, src layout, uv): five element types + typed-slug ID helpers, derived `boundary_crossings()`, mechanical gate returning structured `ValidationIssue`s, `parse_and_validate()` for the repair pass; 29 tests green.
+- [STRIDE report schema and severity model](tickets/005-report-schema.md) — likelihood×impact with matrix-derived band (DREAD rejected); per-threat critic-calibrated confidence; verdicts with unknown-refs; `rejected_threats` audit array; self-contained payload embedding the System Model; job/nodes/summary metadata. Prototype on `prototype/report-schema`.
 
 ## Not yet specified
 
@@ -34,7 +35,7 @@ A production-quality STRIDE threat-modeling service in this repo: Python, Google
 - Error handling in the graph: partial results, retries, timeouts, poison inputs.
 - CI/CD pipeline and Cloud Run deployment details (Ping middleware specifics follow org patterns).
 - Cost/quota controls per model tier.
-- Implementation build-out tickets — graduate once topology, report schema, and contracts close. (System Model schema graduated and shipped via [Implement System Model schema and validator](tickets/012-implement-system-model-schema.md).)
+- Implementation build-out tickets — graduate once topology, report schema, and contracts close. (System Model schema graduated and shipped via [Implement System Model schema and validator](tickets/012-implement-system-model-schema.md); report schema graduated as [Implement report schema in stride_service](tickets/014-implement-report-schema.md).)
 
 ## Out of scope
 
