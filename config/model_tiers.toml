@@ -1,0 +1,29 @@
+# Model-tier configuration (wayfinder ticket 007) — source of truth for
+# tier -> pinned Vertex model string and LLM node -> tier.
+#
+# Tier strings must be pinned version strings (no -latest aliases): regional
+# Vertex endpoints may reject aliases, and evals are only reproducible against
+# a pinned model. Upgrades change a pinned string only after the golden-case
+# eval suite passes on the candidate.
+#
+# STRIDE_MODEL_FLASH / STRIDE_MODEL_PRO env vars override the tier strings at
+# deploy time (ops retune on Cloud Run without an image rebuild). The
+# node -> tier mapping below is file-only and must cover exactly the LLM nodes
+# of the graph; deterministic FunctionNodes carry no model.
+
+version = 1
+
+[tiers]
+flash = "gemini-2.5-flash-002"
+pro = "gemini-2.5-pro-002"
+
+[nodes]
+extract = "flash"
+repair = "flash"
+"analyst/spoofing" = "pro"
+"analyst/tampering" = "pro"
+"analyst/repudiation" = "pro"
+"analyst/information-disclosure" = "pro"
+"analyst/denial-of-service" = "pro"
+"analyst/elevation-of-privilege" = "pro"
+critic = "pro"

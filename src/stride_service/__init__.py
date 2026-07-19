@@ -1,5 +1,16 @@
 """Agentic STRIDE threat-modeling service."""
 
+from stride_service.model_tiers import (
+    ANALYST_NODES,
+    LLM_NODES,
+    TIER_NAMES,
+    ModelConfigError,
+    ModelTierConfig,
+    TierName,
+    env_var_for,
+    load_model_tiers,
+    validate_model_string,
+)
 from stride_service.report import (
     DEFAULT_DISCLAIMER,
     SCHEMA_VERSION,
@@ -59,15 +70,18 @@ from stride_service.validation import (
 )
 
 __all__ = [
+    "ANALYST_NODES",
     "CATEGORY_SKILL_TOKEN_CAP",
     "CORE_ASSET_TAGS",
     "DEFAULT_DISCLAIMER",
     "DOMAIN_PACK_TOKEN_CAP",
+    "LLM_NODES",
     "SCHEMA_VERSION",
     "SEVERITY_MATRIX",
     "SEVERITY_RUBRIC_TOKEN_CAP",
     "SKILL_SECTION_HEADINGS",
     "STRIDE_CATEGORIES",
+    "TIER_NAMES",
     "UNKNOWN",
     "Assumption",
     "BoundaryCrossing",
@@ -78,6 +92,8 @@ __all__ = [
     "InputRef",
     "Job",
     "Mitigation",
+    "ModelConfigError",
+    "ModelTierConfig",
     "NodeRun",
     "Process",
     "Severity",
@@ -89,6 +105,7 @@ __all__ = [
     "Summary",
     "SystemModel",
     "Threat",
+    "TierName",
     "TrustBoundary",
     "UnknownRef",
     "ValidationIssue",
@@ -100,12 +117,15 @@ __all__ = [
     "compose_analyst_skills",
     "compose_critic_skills",
     "derive_severity_level",
+    "env_var_for",
     "estimate_tokens",
     "extract_section",
+    "load_model_tiers",
     "make_element_id",
     "make_flow_id",
     "normalize_name",
     "parse_and_validate",
     "split_sections",
     "validate",
+    "validate_model_string",
 ]
