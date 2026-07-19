@@ -30,15 +30,17 @@ A production-quality STRIDE threat-modeling service in this repo: Python, Google
 - [STRIDE report schema and severity model](tickets/005-report-schema.md) — likelihood×impact with matrix-derived band (DREAD rejected); per-threat critic-calibrated confidence; verdicts with unknown-refs; `rejected_threats` audit array; self-contained payload embedding the System Model; job/nodes/summary metadata. Prototype on `prototype/report-schema`.
 - [Skills-as-SME design and injection](tickets/006-skills-sme-design.md) — two-axis library: six per-analyst category skills + shared severity rubric, mechanical domain-pack hook (empty in v1); five fixed sections per skill, exemplars stay in prompts; repo Markdown baked into image via PromptLoader-mirroring SkillLoader; full text in system instruction with CI token caps; critic gets rubric + mechanically assembled boundary digest.
 - [Per-agent Vertex model tier assignment](tickets/007-model-tier-assignment.md) — two named tiers, pinned version strings (no aliases): flash → extract/repair, pro → six analysts + critic; versioned config file with env-var override on tier strings only; no cross-tier auto-degrade, upgrades eval-gated.
+- [Front-end API contract (async jobs, Ping auth)](tickets/008-api-contract.md) — custom `/v1` job API wrapping the ADK Runner (stock ADK routes non-prod only): POST /v1/jobs → poll GET /v1/jobs/{id} + SSE /events → GET /v1/jobs/{id}/report; lifecycle queued→running→completed|failed|rejected with ValidationIssues on rejection; RFC 9457 errors; Ping JWT dependency, owner-only reads (404); storage/TTL deferred.
 
 ## Not yet specified
 
 - Observability: wiring the custom logging library, tracing/OTel across graph nodes.
 - Error handling in the graph: partial results, retries, timeouts, poison inputs.
 - CI/CD pipeline and Cloud Run deployment details (Ping middleware specifics follow org patterns).
+- Job store backend and retention TTL (report JSON at rest; contract reserves 404-after-expiry — see [Front-end API contract](tickets/008-api-contract.md)).
 - Cost/quota controls per model tier.
 - Technology-domain skill packs: authoring + the pack-selection rule table in `prepare` — graduate when evals show domain-specific recall gaps.
-- Implementation build-out tickets — graduate once topology, report schema, and contracts close. (System Model schema graduated and shipped via [Implement System Model schema and validator](tickets/012-implement-system-model-schema.md); report schema graduated as [Implement report schema in stride_service](tickets/014-implement-report-schema.md); skills design graduated as [Author v1 STRIDE category skills and severity rubric](tickets/015-author-skill-files.md) and [Implement SkillLoader, boundary-digest assembly, and CI skill lints](tickets/016-implement-skill-loader.md); model tiering graduated as [Implement model-tier config in stride_service](tickets/017-implement-model-config.md).)
+- Implementation build-out tickets — graduate once topology, report schema, and contracts close. (System Model schema graduated and shipped via [Implement System Model schema and validator](tickets/012-implement-system-model-schema.md); report schema graduated as [Implement report schema in stride_service](tickets/014-implement-report-schema.md); skills design graduated as [Author v1 STRIDE category skills and severity rubric](tickets/015-author-skill-files.md) and [Implement SkillLoader, boundary-digest assembly, and CI skill lints](tickets/016-implement-skill-loader.md); model tiering graduated as [Implement model-tier config in stride_service](tickets/017-implement-model-config.md); API contract graduated as [Implement job API in stride_service](tickets/018-implement-job-api.md).)
 
 ## Out of scope
 

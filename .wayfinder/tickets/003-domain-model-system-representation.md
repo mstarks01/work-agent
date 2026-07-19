@@ -3,7 +3,7 @@ id: 003
 title: "Domain model: canonical system representation"
 label: wayfinder:grilling
 status: closed
-assignee: claude.ai@michaelstarks.com
+assignee: github@michaelstarks.com
 blocked-by: []
 ---
 

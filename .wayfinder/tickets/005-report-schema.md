@@ -3,7 +3,7 @@ id: 005
 title: "STRIDE report schema and severity model"
 label: wayfinder:prototype
 status: closed
-assignee: claude.ai@michaelstarks.com
+assignee: github@michaelstarks.com
 blocked-by: [003]
 ---
 

@@ -3,7 +3,7 @@ id: 012
 title: "Implement System Model schema and validator"
 label: wayfinder:task
 status: closed
-assignee: claude.ai@michaelstarks.com
+assignee: github@michaelstarks.com
 blocked-by: []
 ---
 

@@ -3,7 +3,7 @@ id: 004
 title: "Decide graph topology and quality pattern"
 label: wayfinder:grilling
 status: closed
-assignee: claude.ai@michaelstarks.com
+assignee: github@michaelstarks.com
 blocked-by: [001, 002, 003]
 ---
 
