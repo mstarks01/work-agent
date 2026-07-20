@@ -9,6 +9,7 @@ from datetime import UTC, datetime
 from typing import Any
 
 from stride_service.report import (
+    DraftThreat,
     InputRef,
     Job,
     Mitigation,
@@ -109,6 +110,18 @@ def valid_model() -> SystemModel:
                 basis="customers reach it directly from the browser",
             )
         ],
+    )
+
+
+def sample_draft(
+    threat_id: str = "S-01",
+    category: str = "spoofing",
+    **overrides: Any,
+) -> DraftThreat:
+    """One analyst draft against valid_model(), before the critic rules on it."""
+    threat = sample_threat(threat_id, category, **overrides)
+    return DraftThreat.model_validate(
+        threat.model_dump(exclude={"confidence", "verdict"})
     )
 
 

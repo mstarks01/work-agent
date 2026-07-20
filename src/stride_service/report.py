@@ -16,7 +16,7 @@ from __future__ import annotations
 
 from collections import Counter
 from datetime import datetime
-from typing import Literal, Self
+from typing import Literal, Self, get_args
 
 from pydantic import BaseModel, ConfigDict, Field, model_validator
 
@@ -36,6 +36,10 @@ StrideCategory = Literal[
     "denial-of-service",
     "elevation-of-privilege",
 ]
+
+# The six categories in canonical STRIDE order, derived from the type itself
+# so the two can never drift.
+STRIDE_CATEGORIES: tuple[StrideCategory, ...] = get_args(StrideCategory)
 
 Rating = Literal["low", "medium", "high"]
 SeverityLevel = Literal["low", "medium", "high", "critical"]
@@ -140,8 +144,14 @@ class Verdict(BaseModel):
         return self
 
 
-class Threat(BaseModel):
-    """One STRIDE finding, traceable to the elements it affects."""
+class DraftThreat(BaseModel):
+    """One analyst's draft finding: the seven fields an analyst owns.
+
+    Everything a category analyst produces and nothing it may rule on —
+    ``verdict`` and ``confidence`` are the critic's, and appear only once a
+    draft is promoted to a :class:`Threat`. This is the shape the prompt
+    exemplars are lint-parsed against (ticket 013).
+    """
 
     model_config = ConfigDict(extra="forbid")
 
@@ -151,9 +161,7 @@ class Threat(BaseModel):
     description: str = Field(min_length=1, max_length=4000)
     affected_element_ids: list[str] = Field(min_length=1)
     severity: Severity
-    confidence: Rating  # critic-calibrated grounding in model facts
     mitigations: list[Mitigation] = Field(default_factory=list)
-    verdict: Verdict
 
     @model_validator(mode="after")
     def _check_id_matches_category(self) -> Self:
@@ -164,6 +172,17 @@ class Threat(BaseModel):
                 f" category letter {letter!r}"
             )
         return self
+
+
+class Threat(DraftThreat):
+    """One STRIDE finding, traceable to the elements it affects.
+
+    A draft plus the critic's two judgments; the category-letter rule is
+    inherited, so a draft and the threat it becomes are checked identically.
+    """
+
+    confidence: Rating  # critic-calibrated grounding in model facts
+    verdict: Verdict
 
 
 class NodeRun(BaseModel):

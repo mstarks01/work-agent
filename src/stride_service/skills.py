@@ -1,28 +1,51 @@
-"""Skill loading and composition for the STRIDE analysis nodes.
+"""Skill composition for the STRIDE analysis nodes.
 
-Implements the skills-as-SME design from wayfinder ticket 006: a
-:class:`SkillLoader` reading a directory of Markdown files, mechanical
+Implements the skills-as-SME design from wayfinder ticket 006: mechanical
 assembly of the critic's category-boundary digest from the ``## Scope``
 section of the six category skills, and composition of a node's skill text in
 the stable-first order category -> shared rubric -> selected domain packs.
 
-Skill files are trusted repo content baked into the image, but loading still
-fails closed: a missing skill, a heading that deviates from the fixed set, or
-a name escaping the skills root raises instead of degrading silently — a
-skill that silently drops out of an analyst's context is a recall loss no one
-would notice. The fixed section headings and token caps here are enforced by
-the CI lint tests over ``skills/**/*.md``.
+Loading itself lives in :mod:`stride_service.markdown_loader`, shared with
+prompt loading (ticket 020). ``SkillLoader`` and the ``Skill*Error`` names
+are aliases of it, kept because the skills tree, its lints and ticket 016
+were written against them. The fixed section headings and token caps here are
+enforced by the CI lint tests over ``skills/**/*.md``.
 """
 
 from __future__ import annotations
 
-import math
-from pathlib import Path
-from typing import get_args
+from stride_service.markdown_loader import (
+    MarkdownFormatError,
+    MarkdownLoader,
+    MarkdownNotFoundError,
+    estimate_tokens,
+    extract_section,
+    split_sections,
+)
+from stride_service.report import STRIDE_CATEGORIES, StrideCategory
 
-from stride_service.report import StrideCategory
+# Skill-flavored aliases of the one loader implementation.
+SkillLoader = MarkdownLoader
+SkillNotFoundError = MarkdownNotFoundError
+SkillFormatError = MarkdownFormatError
 
-STRIDE_CATEGORIES: tuple[StrideCategory, ...] = get_args(StrideCategory)
+__all__ = [
+    "CATEGORY_SKILL_TOKEN_CAP",
+    "DOMAIN_PACK_TOKEN_CAP",
+    "SEVERITY_RUBRIC_NAME",
+    "SEVERITY_RUBRIC_TOKEN_CAP",
+    "SKILL_SECTION_HEADINGS",
+    "STRIDE_CATEGORIES",
+    "SkillFormatError",
+    "SkillLoader",
+    "SkillNotFoundError",
+    "category_boundary_digest",
+    "compose_analyst_skills",
+    "compose_critic_skills",
+    "estimate_tokens",
+    "extract_section",
+    "split_sections",
+]
 
 # The five fixed H2 sections of a category skill, in order. The lints enforce
 # these exact strings; digest extraction depends on "Scope" being first.
@@ -40,91 +63,6 @@ SEVERITY_RUBRIC_TOKEN_CAP = 1000
 DOMAIN_PACK_TOKEN_CAP = 2000
 
 SEVERITY_RUBRIC_NAME = "shared/severity_rubric"
-
-
-class SkillNotFoundError(LookupError):
-    """No skill file exists for the requested name."""
-
-
-class SkillFormatError(ValueError):
-    """A skill file deviates from the fixed section structure."""
-
-
-def estimate_tokens(text: str) -> int:
-    """Coarse token estimate (words x 4/3), the convention the caps assume."""
-    return math.ceil(len(text.split()) * 4 / 3)
-
-
-def split_sections(text: str) -> dict[str, str]:
-    """Split a skill file into its H2 sections, preserving order.
-
-    Headings are taken verbatim (everything after ``## ``) so the lints can
-    enforce exact strings. Duplicate or empty headings raise
-    :class:`SkillFormatError`.
-    """
-    sections: dict[str, str] = {}
-    heading: str | None = None
-    body: list[str] = []
-    for line in text.splitlines():
-        if line.startswith("## "):
-            if heading is not None:
-                sections[heading] = "\n".join(body).strip()
-            heading = line[3:]
-            if not heading.strip():
-                raise SkillFormatError("empty H2 heading")
-            if heading in sections:
-                raise SkillFormatError(f"duplicate section '## {heading}'")
-            body = []
-        elif heading is not None:
-            body.append(line)
-    if heading is not None:
-        sections[heading] = "\n".join(body).strip()
-    return sections
-
-
-def extract_section(text: str, heading: str) -> str:
-    """The body of one named H2 section; missing or empty is a format error."""
-    sections = split_sections(text)
-    if heading not in sections:
-        raise SkillFormatError(f"missing section '## {heading}'")
-    if not sections[heading]:
-        raise SkillFormatError(f"section '## {heading}' is empty")
-    return sections[heading]
-
-
-class SkillLoader:
-    """Loads skills from a directory of Markdown files.
-
-    Names are root-relative POSIX paths without the ``.md`` suffix, e.g.
-    ``"stride/spoofing"`` or ``"shared/severity_rubric"``. This is the
-    canonical directory-in, named-items-out interface for the service (ticket
-    011: no external PromptLoader was available to mirror); prompt loading
-    follows the same shape.
-    """
-
-    def __init__(self, root: Path | str) -> None:
-        self._root = Path(root).resolve()
-        if not self._root.is_dir():
-            raise FileNotFoundError(f"skills root is not a directory: {root}")
-
-    @property
-    def root(self) -> Path:
-        return self._root
-
-    def names(self) -> list[str]:
-        """All loadable skill names, sorted."""
-        return sorted(
-            path.relative_to(self._root).with_suffix("").as_posix()
-            for path in self._root.rglob("*.md")
-        )
-
-    def load(self, name: str) -> str:
-        path = (self._root / f"{name}.md").resolve()
-        # A name resolving outside the root (traversal) is treated the same
-        # as absent — deny, don't reveal what lies outside.
-        if not path.is_relative_to(self._root) or not path.is_file():
-            raise SkillNotFoundError(f"no skill named {name!r} under {self._root}")
-        return path.read_text(encoding="utf-8")
 
 
 def _category_title(category: StrideCategory) -> str:
