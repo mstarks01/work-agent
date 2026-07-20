@@ -9,6 +9,7 @@ description = "Agentic STRIDE threat-modeling service"
 requires-python = ">=3.11"
 dependencies = [
     "fastapi>=0.115",
+    "google-adk==2.5.0",
     "pydantic>=2.7",
     "pyjwt[crypto]>=2.9",
 ]

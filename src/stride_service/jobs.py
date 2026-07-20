@@ -8,9 +8,10 @@ deliberately leaves open:
 
 * :class:`JobStore` — persistence is a deferred storage decision; the API only
   ever talks to this interface. :class:`InMemoryJobStore` is the v1 backend.
-* :class:`PipelineRunner` — the ADK graph is not built yet; the API runs jobs
-  through this interface. :class:`StubPipelineRunner` produces a minimal but
-  fully valid report so the contract is exercisable end to end.
+* :class:`PipelineRunner` — the API runs jobs through this interface, never
+  against a graph directly. :class:`stride_service.pipeline.AdkPipelineRunner`
+  is the implementation (ticket 021); :class:`StubPipelineRunner` stays as the
+  no-model stand-in that exercises the contract end to end.
 
 A ``failed`` job stores only a generic error message — internal detail is
 logged, never surfaced (ticket 008 rule 5).
@@ -202,7 +203,7 @@ NodeCallback = Callable[[str], Awaitable[None]]
 
 
 class PipelineRunner(Protocol):
-    """Execution seam for the (not yet built) ADK analysis graph."""
+    """Execution seam for the ADK analysis graph."""
 
     async def run(self, job: JobRecord, on_node: NodeCallback) -> PipelineOutcome: ...
 

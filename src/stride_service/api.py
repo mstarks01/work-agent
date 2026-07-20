@@ -46,9 +46,9 @@ from stride_service.jobs import (
     JobStatus,
     JobStore,
     PipelineRunner,
-    StubPipelineRunner,
     execute_job,
 )
+from stride_service.pipeline import default_pipeline_runner
 from stride_service.validation import ValidationIssue
 
 logger = logging.getLogger(__name__)
@@ -179,7 +179,9 @@ def create_app(
     """Build the service app; production defaults, injectable seams for tests."""
     app = FastAPI(title="STRIDE Threat-Modeling Service")
     app.state.store = store if store is not None else InMemoryJobStore()
-    app.state.runner = runner if runner is not None else StubPipelineRunner()
+    app.state.runner = (
+        runner if runner is not None else default_pipeline_runner()
+    )
     app.state.verifier = (
         verifier
         if verifier is not None

@@ -23,11 +23,18 @@ uv run --with uvicorn python <script that sets env, then uvicorn.run(create_app(
 uvicorn is not a project dependency — always `--with uvicorn`.
 Set the env vars **before** importing `stride_service.api`.
 
+`create_app()` now defaults to the real ADK graph
+(`stride_service.pipeline.default_pipeline_runner`), so a submitted job calls
+Vertex and fails without credentials. To drive the HTTP surface offline, pass
+`create_app(runner=StubPipelineRunner())`; to exercise the real graph with
+canned model output, build a pipeline with a `resolve_model` returning a
+`BaseLlm` stand-in, as `tests/test_pipeline.py` does.
+
 ## Flows worth driving
 
 - `GET /healthz` unauthenticated → 200.
 - `POST /v1/jobs` (Bearer token, `{"description": ...}`) → 201 + Location;
-  the stub runner completes the job in the background almost instantly.
+  with the stub runner the job completes in the background almost instantly.
 - `GET /v1/jobs/{id}` → completed + per-node progress; never contains the report.
 - `GET /v1/jobs/{id}/report` → full report JSON; `/events` → SSE stream that
   replays and closes on terminal jobs (`curl -N`, `Last-Event-ID` resumes).
