@@ -1,12 +1,10 @@
 """Skill loading and composition for the STRIDE analysis nodes.
 
 Implements the skills-as-SME design from wayfinder ticket 006: a
-:class:`SkillLoader` that mirrors the PromptLoader directory-of-files
-interface (stubbed with the obvious signature until ticket 011 delivers the
-real interface, then reconciled), mechanical assembly of the critic's
-category-boundary digest from the ``## Scope`` section of the six category
-skills, and composition of a node's skill text in the stable-first order
-category -> shared rubric -> selected domain packs.
+:class:`SkillLoader` reading a directory of Markdown files, mechanical
+assembly of the critic's category-boundary digest from the ``## Scope``
+section of the six category skills, and composition of a node's skill text in
+the stable-first order category -> shared rubric -> selected domain packs.
 
 Skill files are trusted repo content baked into the image, but loading still
 fails closed: a missing skill, a heading that deviates from the fixed set, or
@@ -98,9 +96,10 @@ class SkillLoader:
     """Loads skills from a directory of Markdown files.
 
     Names are root-relative POSIX paths without the ``.md`` suffix, e.g.
-    ``"stride/spoofing"`` or ``"shared/severity_rubric"``. Mirrors the
-    PromptLoader interface (directory in, named items out); reconcile the
-    signature once ticket 011 provides the real one.
+    ``"stride/spoofing"`` or ``"shared/severity_rubric"``. This is the
+    canonical directory-in, named-items-out interface for the service (ticket
+    011: no external PromptLoader was available to mirror); prompt loading
+    follows the same shape.
     """
 
     def __init__(self, root: Path | str) -> None:

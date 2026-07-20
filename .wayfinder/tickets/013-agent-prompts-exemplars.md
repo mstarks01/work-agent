@@ -4,7 +4,7 @@ title: "Author agent prompts and few-shot exemplars"
 label: wayfinder:grilling
 status: open
 assignee:
-blocked-by: [006, 011]
+blocked-by: [006]
 ---
 
 ## Question
