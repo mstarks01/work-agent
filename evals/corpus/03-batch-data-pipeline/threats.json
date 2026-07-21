@@ -1,0 +1,138 @@
+[
+  {
+    "category": "spoofing",
+    "affected_element_ids": ["flow:insurance-partner-to-landing-bucket:push-daily-extract", "entity:insurance-partner"],
+    "claim": "An attacker who obtains a partner's never-rotated static SFTP key uploads extracts as that partner.",
+    "tier": "must-find",
+    "severity": {"likelihood": "medium", "impact": "high"},
+    "notes": "Long-lived shared secret held by a third party; the primary identity weakness on the ingest path."
+  },
+  {
+    "category": "spoofing",
+    "affected_element_ids": ["process:ingest-scheduler", "store:landing-bucket"],
+    "claim": "An attacker deposits a file into another partner's folder and the scheduler processes it as that partner's extract, because it never checks the depositor.",
+    "tier": "must-find",
+    "severity": {"likelihood": "medium", "impact": "high"},
+    "notes": "Stated absence, not an unknown: the source says the check does not happen. Attribution of data to a source is the whole point of the folder layout."
+  },
+  {
+    "category": "spoofing",
+    "affected_element_ids": ["flow:ingest-scheduler-to-transform-job:trigger-transform"],
+    "claim": "An attacker submits a transform run impersonating the scheduler, since authentication on the trigger path is unverified.",
+    "tier": "expected",
+    "severity": {"likelihood": "low", "impact": "medium"},
+    "notes": "Crosses landing into warehouse with unknown authentication."
+  },
+  {
+    "category": "tampering",
+    "affected_element_ids": ["store:landing-bucket", "process:transform-job"],
+    "claim": "An attacker who can write to the landing bucket alters claim records before the nightly run, and only the schema is checked before they reach the warehouse.",
+    "tier": "must-find",
+    "severity": {"likelihood": "medium", "impact": "high"},
+    "notes": "Content validation is stated as absent; the case's headline integrity finding."
+  },
+  {
+    "category": "tampering",
+    "affected_element_ids": ["store:airflow-metadata-db", "flow:ingest-scheduler-to-airflow-metadata-db:read-connections"],
+    "claim": "An attacker who can write to the Airflow metadata database rewrites a connection string to redirect the pipeline to infrastructure they control.",
+    "tier": "expected",
+    "severity": {"likelihood": "low", "impact": "high"},
+    "notes": "The metadata database is a control plane, not just a data store — worth its own finding."
+  },
+  {
+    "category": "tampering",
+    "affected_element_ids": ["store:claims-warehouse", "flow:transform-job-to-claims-warehouse:load-records"],
+    "claim": "An attacker who compromises the transform job writes fabricated claim rows into the warehouse alongside genuine ones.",
+    "tier": "expected",
+    "severity": {"likelihood": "low", "impact": "high"},
+    "notes": "The load path has unverified authentication and no downstream reconciliation."
+  },
+  {
+    "category": "repudiation",
+    "affected_element_ids": ["store:landing-bucket", "entity:insurance-partner"],
+    "claim": "A partner denies having sent an extract and nothing binds a landed file to the key that uploaded it.",
+    "tier": "must-find",
+    "severity": {"likelihood": "medium", "impact": "medium"},
+    "notes": "Direct consequence of the unchecked depositor: provenance exists only as folder convention."
+  },
+  {
+    "category": "repudiation",
+    "affected_element_ids": ["store:claims-warehouse", "process:transform-job"],
+    "claim": "A dispute over a warehouse row cannot be traced back to the extract it came from, because no lineage from file to loaded record is described.",
+    "tier": "expected",
+    "severity": {"likelihood": "medium", "impact": "medium"},
+    "notes": "Batch pipelines lose attribution at the normalization step unless it is deliberately carried."
+  },
+  {
+    "category": "information-disclosure",
+    "affected_element_ids": ["store:claims-warehouse", "flow:data-analyst-to-claims-warehouse:run-queries"],
+    "claim": "An analyst who needs only aggregate figures reads member names and dates of birth, because the grant covers the whole dataset.",
+    "tier": "must-find",
+    "severity": {"likelihood": "high", "impact": "high"},
+    "notes": "Stated absence of column-level restriction over health data; the highest-likelihood disclosure in the model."
+  },
+  {
+    "category": "information-disclosure",
+    "affected_element_ids": ["store:airflow-metadata-db"],
+    "claim": "An attacker who reaches the Airflow metadata database recovers every partner key and connection string it holds, since its protection at rest is unverified.",
+    "tier": "must-find",
+    "severity": {"likelihood": "medium", "impact": "high"},
+    "notes": "Single store concentrating credentials for the entire ingest path."
+  },
+  {
+    "category": "information-disclosure",
+    "affected_element_ids": ["store:landing-bucket"],
+    "claim": "An attacker who reaches the landing bucket's storage reads raw partner extracts, whose protection at rest is unverified.",
+    "tier": "expected",
+    "severity": {"likelihood": "medium", "impact": "high"},
+    "notes": "The source explicitly flags this as unknown and on defaults; needs-info is an acceptable verdict."
+  },
+  {
+    "category": "information-disclosure",
+    "affected_element_ids": ["flow:transform-job-to-claims-warehouse:load-records"],
+    "claim": "An attacker observing the load path reads claim records in transit, because transport encryption on it is unverified.",
+    "tier": "expected",
+    "severity": {"likelihood": "low", "impact": "high"},
+    "notes": "Intra-zone, so lower likelihood than the crossing flows."
+  },
+  {
+    "category": "denial-of-service",
+    "affected_element_ids": ["store:landing-bucket", "process:ingest-scheduler"],
+    "claim": "An attacker deposits an enormous or malformed file that consumes the nightly window and prevents genuine extracts from being processed.",
+    "tier": "must-find",
+    "severity": {"likelihood": "medium", "impact": "medium"},
+    "notes": "The batch shape is the vulnerability: a missed window is a lost day, not a slow request."
+  },
+  {
+    "category": "denial-of-service",
+    "affected_element_ids": ["process:transform-job", "store:claims-warehouse"],
+    "claim": "An attacker crafts input that makes the transform job fail repeatedly, leaving the warehouse stale without any request-level error surfacing.",
+    "tier": "expected",
+    "severity": {"likelihood": "medium", "impact": "medium"},
+    "notes": "Silent staleness rather than visible downtime — the failure mode analysts under-report on pipelines."
+  },
+  {
+    "category": "elevation-of-privilege",
+    "affected_element_ids": ["store:airflow-metadata-db", "process:ingest-scheduler"],
+    "claim": "An attacker with a foothold in the landing network reads the metadata database and escalates to every credential the pipeline holds.",
+    "tier": "must-find",
+    "severity": {"likelihood": "medium", "impact": "high"},
+    "notes": "Escalation framing of the credential concentration: one foothold to all downstream systems."
+  },
+  {
+    "category": "elevation-of-privilege",
+    "affected_element_ids": ["process:transform-job", "flow:ingest-scheduler-to-transform-job:trigger-transform"],
+    "claim": "An attacker who can plant a file in the landing bucket gains execution in the warehouse network through the job it triggers.",
+    "tier": "must-find",
+    "severity": {"likelihood": "medium", "impact": "high"},
+    "notes": "Data crossing into a compute zone that acts on it is the boundary crossing that matters here."
+  },
+  {
+    "category": "elevation-of-privilege",
+    "affected_element_ids": ["entity:data-analyst", "store:claims-warehouse"],
+    "claim": "An analyst uses their dataset-wide grant to reach claim data belonging to partners outside their remit.",
+    "tier": "expected",
+    "severity": {"likelihood": "medium", "impact": "medium"},
+    "notes": "Authorization scope, distinct from the disclosure entry about which columns are readable."
+  }
+]

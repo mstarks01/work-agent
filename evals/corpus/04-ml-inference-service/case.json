@@ -1,0 +1,10 @@
+{
+  "id": "04-ml-inference-service",
+  "title": "Hosted model inference gateway",
+  "domain": "ml-serving",
+  "exemplar_proximity": "far",
+  "provenance": "internal-system (synthetic, sanitized)",
+  "bootstrap": "agent-stand-in",
+  "source_sha256": "3da14d8d61e45baa73b0a7ee2b6935b0da3c1d47c62fdf9cb30ef4a09d6c67b6",
+  "notes": "Far-domain case (ticket 009 decision 6). The external entities are machines rather than people, the crown-jewel asset is a model artifact loaded as code rather than a record set, and two threat shapes have no analogue in the payments exemplar at all: artifact-integrity supply chain, and model-mediated disclosure across tenants. Also the only case where a store created for debugging (the inference log) is more sensitive than the system's nominal data."
+}

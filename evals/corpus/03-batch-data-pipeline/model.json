@@ -1,0 +1,194 @@
+{
+  "external_entities": [
+    {
+      "id": "entity:insurance-partner",
+      "name": "insurance partner",
+      "description": "One of three partner organisations pushing a daily claims extract.",
+      "assets": ["pii", "health"],
+      "source_excerpt": "Three insurance partners drop a daily extract for us.",
+      "kind": "external-system",
+      "trust_zone": "boundary:partner-network"
+    },
+    {
+      "id": "entity:data-analyst",
+      "name": "data analyst",
+      "description": "Internal analyst querying the warehouse directly.",
+      "assets": [],
+      "source_excerpt": "Analysts query the warehouse directly.",
+      "kind": "human",
+      "trust_zone": "boundary:warehouse-network"
+    }
+  ],
+  "processes": [
+    {
+      "id": "process:ingest-scheduler",
+      "name": "ingest scheduler",
+      "description": "Airflow scheduler that lists the landing bucket nightly and triggers a transform per file. Does not verify which partner a file came from.",
+      "assets": ["business-critical-data"],
+      "source_excerpt": "An Airflow scheduler running in the landing network wakes up at 02:00, lists the bucket, and reads whatever is there.",
+      "technology": "Airflow",
+      "trust_zone": "boundary:landing-network",
+      "exposure": "internal"
+    },
+    {
+      "id": "process:transform-job",
+      "name": "transform job",
+      "description": "Spark job that normalizes claim records and loads them into the warehouse. Validates schema only.",
+      "assets": ["pii", "health"],
+      "source_excerpt": "the scheduler triggers a Spark transform job in the warehouse network",
+      "technology": "Spark",
+      "trust_zone": "boundary:warehouse-network",
+      "exposure": "internal"
+    }
+  ],
+  "data_stores": [
+    {
+      "id": "store:landing-bucket",
+      "name": "landing bucket",
+      "description": "Object store receiving partner extracts, one folder per partner.",
+      "assets": ["pii", "health"],
+      "source_excerpt": "They push files into a landing bucket over SFTP.",
+      "technology": "object storage with an SFTP front end",
+      "trust_zone": "boundary:landing-network",
+      "data_classification": "confidential",
+      "encryption_at_rest": "unknown"
+    },
+    {
+      "id": "store:airflow-metadata-db",
+      "name": "airflow metadata db",
+      "description": "Airflow's own database, holding connection strings and the partner SFTP keys.",
+      "assets": ["credentials", "secrets"],
+      "source_excerpt": "Airflow keeps its connection strings and the partner keys in its own metadata database.",
+      "technology": "PostgreSQL",
+      "trust_zone": "boundary:landing-network",
+      "data_classification": "confidential",
+      "encryption_at_rest": "unknown"
+    },
+    {
+      "id": "store:claims-warehouse",
+      "name": "claims warehouse",
+      "description": "BigQuery dataset of normalized claim records, including member names and dates of birth.",
+      "assets": ["pii", "health", "business-critical-data"],
+      "source_excerpt": "The transform normalizes the records and loads them into BigQuery.",
+      "technology": "BigQuery",
+      "trust_zone": "boundary:warehouse-network",
+      "data_classification": "confidential",
+      "encryption_at_rest": "unknown"
+    }
+  ],
+  "data_flows": [
+    {
+      "id": "flow:insurance-partner-to-landing-bucket:push-daily-extract",
+      "name": "push daily extract",
+      "description": "Partner uploads its daily claims extract into its folder.",
+      "assets": ["pii", "health"],
+      "source_excerpt": "Each partner has a static key we issued when they onboarded; the keys have not changed since.",
+      "source": "entity:insurance-partner",
+      "destination": "store:landing-bucket",
+      "protocol": "SFTP",
+      "authentication": "static per-partner key issued at onboarding, never rotated",
+      "data_description": "claim records with member names and dates of birth",
+      "encryption_in_transit": "SSH transport (SFTP)"
+    },
+    {
+      "id": "flow:ingest-scheduler-to-landing-bucket:list-and-read-files",
+      "name": "list and read files",
+      "description": "Scheduler lists the bucket nightly and reads every file present, without checking which partner deposited it.",
+      "assets": ["pii", "health"],
+      "source_excerpt": "It does not check that a file came from the partner whose folder it landed in.",
+      "source": "process:ingest-scheduler",
+      "destination": "store:landing-bucket",
+      "protocol": "object storage API",
+      "authentication": "unknown",
+      "data_description": "partner extract files",
+      "encryption_in_transit": "unknown"
+    },
+    {
+      "id": "flow:ingest-scheduler-to-airflow-metadata-db:read-connections",
+      "name": "read connections",
+      "description": "Scheduler reads its connection strings and the partner keys.",
+      "assets": ["credentials", "secrets"],
+      "source_excerpt": "Airflow keeps its connection strings and the partner keys in its own metadata database.",
+      "source": "process:ingest-scheduler",
+      "destination": "store:airflow-metadata-db",
+      "protocol": "PostgreSQL wire protocol",
+      "authentication": "unknown",
+      "data_description": "connection strings, partner SFTP keys",
+      "encryption_in_transit": "unknown"
+    },
+    {
+      "id": "flow:ingest-scheduler-to-transform-job:trigger-transform",
+      "name": "trigger transform",
+      "description": "Scheduler starts one transform run per landed file.",
+      "assets": [],
+      "source_excerpt": "For each file the scheduler triggers a Spark transform job in the warehouse network.",
+      "source": "process:ingest-scheduler",
+      "destination": "process:transform-job",
+      "protocol": "unknown",
+      "authentication": "unknown",
+      "data_description": "run request naming the file to process",
+      "encryption_in_transit": "unknown"
+    },
+    {
+      "id": "flow:transform-job-to-claims-warehouse:load-records",
+      "name": "load records",
+      "description": "Transform writes normalized claim rows into the warehouse.",
+      "assets": ["pii", "health"],
+      "source_excerpt": "Nothing validates the row contents beyond the schema.",
+      "source": "process:transform-job",
+      "destination": "store:claims-warehouse",
+      "protocol": "BigQuery API",
+      "authentication": "unknown",
+      "data_description": "normalized claim records",
+      "encryption_in_transit": "unknown"
+    },
+    {
+      "id": "flow:data-analyst-to-claims-warehouse:run-queries",
+      "name": "run queries",
+      "description": "Analyst queries the warehouse under a dataset-wide grant.",
+      "assets": ["pii", "health"],
+      "source_excerpt": "they authenticate with SSO, but the grant is dataset-wide — we have not split member-identifying columns out",
+      "source": "entity:data-analyst",
+      "destination": "store:claims-warehouse",
+      "protocol": "BigQuery API",
+      "authentication": "company SSO; dataset-wide grant with no column-level restriction",
+      "data_description": "claim records including member identifiers",
+      "encryption_in_transit": "unknown"
+    }
+  ],
+  "trust_boundaries": [
+    {
+      "id": "boundary:partner-network",
+      "name": "partner network",
+      "description": "The three partner organisations, outside this system's control.",
+      "source_excerpt": "Three insurance partners drop a daily extract for us.",
+      "kind": "network"
+    },
+    {
+      "id": "boundary:landing-network",
+      "name": "landing network",
+      "description": "Ingest tier holding the landing bucket, the scheduler and its metadata database.",
+      "source_excerpt": "An Airflow scheduler running in the landing network",
+      "kind": "network"
+    },
+    {
+      "id": "boundary:warehouse-network",
+      "name": "warehouse network",
+      "description": "Analytics tier holding the transform job, the warehouse and its analysts.",
+      "source_excerpt": "the scheduler triggers a Spark transform job in the warehouse network",
+      "kind": "network"
+    }
+  ],
+  "assumptions": [
+    {
+      "assumption": "SFTP traffic from partners is protected by the SSH transport it runs over.",
+      "element_id": "flow:insurance-partner-to-landing-bucket:push-daily-extract",
+      "basis": "The text names SFTP, whose transport encryption is intrinsic to the protocol; no other transport claim is made."
+    },
+    {
+      "assumption": "The claims data is health-related personal data.",
+      "element_id": "store:claims-warehouse",
+      "basis": "Described as insurance claim records carrying member names and dates of birth."
+    }
+  ]
+}

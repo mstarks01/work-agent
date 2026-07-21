@@ -1,0 +1,242 @@
+{
+  "external_entities": [
+    {
+      "id": "entity:player",
+      "name": "player",
+      "description": "A person playing the game on their own machine.",
+      "assets": ["pii"],
+      "source_excerpt": "Players run our game client on their own machines. We do not control those machines.",
+      "kind": "human",
+      "trust_zone": "boundary:player-local-machine"
+    },
+    {
+      "id": "entity:customer-support",
+      "name": "customer support",
+      "description": "Staff member who reviews and acts on player accounts.",
+      "assets": [],
+      "source_excerpt": "our customer support staff work from the corporate network and use a moderation website",
+      "kind": "human",
+      "trust_zone": "boundary:corp-network"
+    }
+  ],
+  "processes": [
+    {
+      "id": "process:game-client",
+      "name": "game client",
+      "description": "The game client, running on hardware the operator does not control.",
+      "assets": [],
+      "source_excerpt": "Players run our game client on their own machines. We do not control those machines.",
+      "technology": "unknown",
+      "trust_zone": "boundary:player-local-machine",
+      "exposure": "unknown"
+    },
+    {
+      "id": "process:lobby",
+      "name": "lobby",
+      "description": "Matchmaking service that clients connect to and that hands matches to the game servers.",
+      "assets": ["availability-critical"],
+      "source_excerpt": "It talks to the lobby on TCP 1234 for matchmaking",
+      "technology": "unknown",
+      "trust_zone": "boundary:prod-network",
+      "exposure": "internet-facing"
+    },
+    {
+      "id": "process:game-servers",
+      "name": "game servers",
+      "description": "Match servers that clients connect to directly and that record match outcomes.",
+      "assets": ["availability-critical", "business-critical-data"],
+      "source_excerpt": "once a match starts it talks directly to the game servers on TCP 1235",
+      "technology": "unknown",
+      "trust_zone": "boundary:prod-network",
+      "exposure": "internet-facing"
+    },
+    {
+      "id": "process:moderation-website",
+      "name": "moderation website",
+      "description": "Internal tool used by customer support to view and act on player accounts.",
+      "assets": ["pii"],
+      "source_excerpt": "use a moderation website to look at and act on player accounts",
+      "technology": "unknown",
+      "trust_zone": "boundary:prod-network",
+      "exposure": "unknown"
+    }
+  ],
+  "data_stores": [
+    {
+      "id": "store:player-database",
+      "name": "player database",
+      "description": "Player accounts, written by the game servers and the moderation website and read by the lobby.",
+      "assets": ["pii", "business-critical-data"],
+      "source_excerpt": "The lobby reads the player database to set up a match",
+      "technology": "unknown",
+      "trust_zone": "boundary:prod-network",
+      "data_classification": "unknown",
+      "encryption_at_rest": "unknown"
+    },
+    {
+      "id": "store:stats-database",
+      "name": "stats database",
+      "description": "Match statistics written during and after a match.",
+      "assets": ["business-critical-data"],
+      "source_excerpt": "The game servers read and write the stats database during and after a match",
+      "technology": "unknown",
+      "trust_zone": "boundary:prod-network",
+      "data_classification": "unknown",
+      "encryption_at_rest": "unknown"
+    }
+  ],
+  "data_flows": [
+    {
+      "id": "flow:player-to-game-client:launch-and-play",
+      "name": "launch and play",
+      "description": "Player launches the client and plays through it.",
+      "assets": [],
+      "source_excerpt": "The player launches the client and plays through it.",
+      "source": "entity:player",
+      "destination": "process:game-client",
+      "protocol": "local",
+      "authentication": "unknown",
+      "data_description": "player input and game output",
+      "encryption_in_transit": "unknown"
+    },
+    {
+      "id": "flow:game-client-to-lobby:matchmaking",
+      "name": "matchmaking",
+      "description": "Client connects out to the lobby to be placed in a match.",
+      "assets": [],
+      "source_excerpt": "It talks to the lobby on TCP 1234 for matchmaking",
+      "source": "process:game-client",
+      "destination": "process:lobby",
+      "protocol": "TCP 1234",
+      "authentication": "unknown",
+      "data_description": "matchmaking requests and match assignments",
+      "encryption_in_transit": "unknown"
+    },
+    {
+      "id": "flow:game-client-to-game-servers:gameplay-traffic",
+      "name": "gameplay traffic",
+      "description": "Client connects directly to the match server for the duration of a match.",
+      "assets": [],
+      "source_excerpt": "once a match starts it talks directly to the game servers on TCP 1235",
+      "source": "process:game-client",
+      "destination": "process:game-servers",
+      "protocol": "TCP 1235",
+      "authentication": "unknown",
+      "data_description": "gameplay actions and state updates",
+      "encryption_in_transit": "unknown"
+    },
+    {
+      "id": "flow:lobby-to-game-servers:hand-over-match",
+      "name": "hand over match",
+      "description": "Lobby hands a formed match to a game server.",
+      "assets": [],
+      "source_excerpt": "hands the match over to the game servers",
+      "source": "process:lobby",
+      "destination": "process:game-servers",
+      "protocol": "unknown",
+      "authentication": "unknown",
+      "data_description": "match composition and player identifiers",
+      "encryption_in_transit": "unknown"
+    },
+    {
+      "id": "flow:lobby-to-player-database:read-players",
+      "name": "read players",
+      "description": "Lobby reads player records to form a match.",
+      "assets": ["pii"],
+      "source_excerpt": "The lobby reads the player database to set up a match",
+      "source": "process:lobby",
+      "destination": "store:player-database",
+      "protocol": "unknown",
+      "authentication": "unknown",
+      "data_description": "player account records",
+      "encryption_in_transit": "unknown"
+    },
+    {
+      "id": "flow:game-servers-to-stats-database:read-write-stats",
+      "name": "read write stats",
+      "description": "Game servers record match statistics.",
+      "assets": ["business-critical-data"],
+      "source_excerpt": "The game servers read and write the stats database during and after a match",
+      "source": "process:game-servers",
+      "destination": "store:stats-database",
+      "protocol": "unknown",
+      "authentication": "unknown",
+      "data_description": "match statistics",
+      "encryption_in_transit": "unknown"
+    },
+    {
+      "id": "flow:game-servers-to-player-database:update-players",
+      "name": "update players",
+      "description": "Game servers write match outcomes back onto player records.",
+      "assets": ["pii", "business-critical-data"],
+      "source_excerpt": "they also write back to the player database",
+      "source": "process:game-servers",
+      "destination": "store:player-database",
+      "protocol": "unknown",
+      "authentication": "unknown",
+      "data_description": "player progression and match results",
+      "encryption_in_transit": "unknown"
+    },
+    {
+      "id": "flow:customer-support-to-moderation-website:moderate-accounts",
+      "name": "moderate accounts",
+      "description": "Support staff review and act on player accounts.",
+      "assets": ["pii"],
+      "source_excerpt": "customer support staff work from the corporate network and use a moderation website",
+      "source": "entity:customer-support",
+      "destination": "process:moderation-website",
+      "protocol": "unknown",
+      "authentication": "unknown",
+      "data_description": "moderation actions on player accounts",
+      "encryption_in_transit": "unknown"
+    },
+    {
+      "id": "flow:moderation-website-to-player-database:read-write-players",
+      "name": "read write players",
+      "description": "Moderation website reads and writes player records directly.",
+      "assets": ["pii"],
+      "source_excerpt": "That website reads and writes the player database directly.",
+      "source": "process:moderation-website",
+      "destination": "store:player-database",
+      "protocol": "unknown",
+      "authentication": "unknown",
+      "data_description": "player account records and moderation state",
+      "encryption_in_transit": "unknown"
+    }
+  ],
+  "trust_boundaries": [
+    {
+      "id": "boundary:player-local-machine",
+      "name": "player local machine",
+      "description": "Hardware owned by the player; outside the operator's control.",
+      "source_excerpt": "Players run our game client on their own machines. We do not control those machines.",
+      "kind": "other"
+    },
+    {
+      "id": "boundary:corp-network",
+      "name": "corp network",
+      "description": "Corporate network where customer support staff work.",
+      "source_excerpt": "our customer support staff work from the corporate network",
+      "kind": "network"
+    },
+    {
+      "id": "boundary:prod-network",
+      "name": "prod network",
+      "description": "Production network holding the lobby, the game servers, the moderation website and both databases.",
+      "source_excerpt": "The client connects out to two things in our production network.",
+      "kind": "network"
+    }
+  ],
+  "assumptions": [
+    {
+      "assumption": "The lobby and the game servers accept connections from arbitrary networks.",
+      "element_id": "process:lobby",
+      "basis": "Stated to be reachable \"from wherever a player is, so they are exposed\"."
+    },
+    {
+      "assumption": "Player records constitute personal data.",
+      "element_id": "store:player-database",
+      "basis": "Described as player accounts acted on by customer support moderation."
+    }
+  ]
+}

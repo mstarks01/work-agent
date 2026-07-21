@@ -1,0 +1,1034 @@
+[
+  {
+    "case": "01-payments-checkout",
+    "category": "spoofing",
+    "reference_claim": "An attacker who obtains a shopper's session cookie replays it against the storefront API and places orders as that shopper.",
+    "candidate_claim": "An attacker steals a shopper's session cookie and uses it to submit orders on that shopper's account.",
+    "label": "match",
+    "note": "Pure paraphrase: same action (replaying a stolen session), same target."
+  },
+  {
+    "case": "01-payments-checkout",
+    "category": "spoofing",
+    "reference_claim": "An attacker who obtains a shopper's session cookie replays it against the storefront API and places orders as that shopper.",
+    "candidate_claim": "An attacker guesses a shopper's password because no MFA is enforced on shopper accounts.",
+    "label": "no-match",
+    "note": "Same element and same weakness area, different attacker action: credential guessing is not session replay."
+  },
+  {
+    "case": "01-payments-checkout",
+    "category": "spoofing",
+    "reference_claim": "An attacker POSTs a forged settlement webhook to the storefront API, impersonating the card processor to mark an unpaid order as paid.",
+    "candidate_claim": "An attacker sends a fake payment-settlement callback so an unpaid order is recorded as paid.",
+    "label": "match",
+    "note": "Same action against the same target; the candidate omits 'impersonating the processor' but that is how the action is performed."
+  },
+  {
+    "case": "01-payments-checkout",
+    "category": "spoofing",
+    "reference_claim": "An attacker POSTs a forged settlement webhook to the storefront API, impersonating the card processor to mark an unpaid order as paid.",
+    "candidate_claim": "An attacker replays a genuine settlement webhook the processor sent earlier.",
+    "label": "no-match",
+    "note": "Replay of an authentic message is a distinct action from forging one; the corpus files replay under tampering."
+  },
+  {
+    "case": "01-payments-checkout",
+    "category": "spoofing",
+    "reference_claim": "Any workload that can reach the order service impersonates the storefront API on the unauthenticated gRPC channel and submits orders.",
+    "candidate_claim": "A compromised workload in the internal network calls the order service's gRPC endpoint, which accepts it without authentication.",
+    "label": "match",
+    "note": "Same action and target; the candidate cites the process where the reference cites the flow, which is an element-agreement difference, not a claim difference."
+  },
+  {
+    "case": "01-payments-checkout",
+    "category": "spoofing",
+    "reference_claim": "An attacker holding the shared application password connects to orders-db as the order service.",
+    "candidate_claim": "An attacker reads the database password out of the order service's environment and logs in to orders-db.",
+    "label": "no-match",
+    "note": "The reference is about using a held credential; this candidate's action is recovering it. The corpus files recovery separately under information-disclosure."
+  },
+  {
+    "case": "01-payments-checkout",
+    "category": "tampering",
+    "reference_claim": "An attacker positioned in the storefront tier modifies order contents in flight on the gRPC channel, whose transport protection is unverified.",
+    "candidate_claim": "An attacker intercepts the gRPC call between the storefront API and the order service and rewrites the order before it is captured.",
+    "label": "match",
+    "note": "Same action, same flow."
+  },
+  {
+    "case": "01-payments-checkout",
+    "category": "tampering",
+    "reference_claim": "An attacker with the shared full read/write database account alters order rows, changing prices or payment status directly.",
+    "candidate_claim": "An attacker with database access rewrites order prices directly in orders-db.",
+    "label": "match",
+    "note": "Narrower instance of the same action against the same target; still the same finding."
+  },
+  {
+    "case": "01-payments-checkout",
+    "category": "tampering",
+    "reference_claim": "An attacker with the shared full read/write database account alters order rows, changing prices or payment status directly.",
+    "candidate_claim": "An attacker deletes order rows from orders-db to destroy records of a purchase.",
+    "label": "no-match",
+    "note": "Destruction rather than alteration, and the corpus does not carry it; a judge that matches this inflates recall."
+  },
+  {
+    "case": "01-payments-checkout",
+    "category": "repudiation",
+    "reference_claim": "A shopper denies having placed an order, and the receipt archive cannot contradict them because receipts record only the order service as the writer.",
+    "candidate_claim": "A shopper claims they never placed an order and the system cannot prove otherwise, because receipts identify only the writing service.",
+    "label": "match",
+    "note": "Paraphrase with the same mechanism."
+  },
+  {
+    "case": "01-payments-checkout",
+    "category": "repudiation",
+    "reference_claim": "A shopper denies having placed an order, and the receipt archive cannot contradict them because receipts record only the order service as the writer.",
+    "candidate_claim": "An attacker deletes receipts from the archive so an order cannot be proven.",
+    "label": "no-match",
+    "note": "Deleting evidence is tampering with the archive, a different action from the absence of shopper identity in it."
+  },
+  {
+    "case": "01-payments-checkout",
+    "category": "information-disclosure",
+    "reference_claim": "An attacker who reaches the database storage or its backups reads shopper addresses and card last-four, because protection at rest is unverified.",
+    "candidate_claim": "An attacker who gets hold of a database backup reads shopper addresses and card last-four, since at-rest protection is unverified.",
+    "label": "match",
+    "note": "Backups are named in the reference; same action, same target."
+  },
+  {
+    "case": "01-payments-checkout",
+    "category": "information-disclosure",
+    "reference_claim": "An attacker with access to the internal network reads order contents and shopper identifiers off the gRPC channel, whose encryption is unverified.",
+    "candidate_claim": "An attacker sniffing internal traffic reads customer identifiers from the storefront-to-order-service call.",
+    "label": "match",
+    "note": "Same read action on the same flow."
+  },
+  {
+    "case": "01-payments-checkout",
+    "category": "information-disclosure",
+    "reference_claim": "An attacker with access to the internal network reads order contents and shopper identifiers off the gRPC channel, whose encryption is unverified.",
+    "candidate_claim": "An attacker sniffing the shopper's HTTPS connection reads their card details.",
+    "label": "no-match",
+    "note": "Same lane and a plausible finding, but a different flow and a different target; the corpus does not list it."
+  },
+  {
+    "case": "01-payments-checkout",
+    "category": "denial-of-service",
+    "reference_claim": "An attacker floods the unauthenticated settlement webhook endpoint until the storefront API stops serving shoppers.",
+    "candidate_claim": "An attacker sends a high volume of requests to the webhook endpoint until the storefront API becomes unresponsive.",
+    "label": "match",
+    "note": "Same action, same target."
+  },
+  {
+    "case": "01-payments-checkout",
+    "category": "elevation-of-privilege",
+    "reference_claim": "An attacker with any foothold in the storefront tier gains order-writing privilege in the core zone, because the order service grants it on network position alone.",
+    "candidate_claim": "An attacker who lands anywhere in the storefront tier can write orders in the core zone, because the order service trusts network position.",
+    "label": "match",
+    "note": "Same escalation, same mechanism."
+  },
+  {
+    "case": "01-payments-checkout",
+    "category": "elevation-of-privilege",
+    "reference_claim": "An attacker with any foothold in the storefront tier gains order-writing privilege in the core zone, because the order service grants it on network position alone.",
+    "candidate_claim": "An attacker compromises the storefront API and moves into the core network.",
+    "label": "match",
+    "note": "Coarser phrasing of the same escalation; the corpus also carries a separate pivot entry, so bipartite assignment decides which one it consumes."
+  },
+  {
+    "case": "02-iot-fleet-telemetry",
+    "category": "spoofing",
+    "reference_claim": "An attacker who extracts the fleet-wide pre-shared key from any one node publishes readings to the gateway as any other device in the fleet.",
+    "candidate_claim": "An attacker recovers the shared key from one device and publishes telemetry impersonating any other node.",
+    "label": "match",
+    "note": "Same action, same mechanism."
+  },
+  {
+    "case": "02-iot-fleet-telemetry",
+    "category": "spoofing",
+    "reference_claim": "An attacker who extracts the fleet-wide pre-shared key from any one node publishes readings to the gateway as any other device in the fleet.",
+    "candidate_claim": "An attacker brute-forces the fleet pre-shared key against the broker.",
+    "label": "no-match",
+    "note": "Recovering the key by physical extraction and guessing it are different attacker actions."
+  },
+  {
+    "case": "02-iot-fleet-telemetry",
+    "category": "spoofing",
+    "reference_claim": "An attacker with physical access presents themselves as a field technician on the node's serial console, whose authentication is unverified.",
+    "candidate_claim": "Someone with physical access to a node uses the serial console, whose authentication the model does not establish.",
+    "label": "match",
+    "note": "Same action and target; hedged phrasing does not change the claim."
+  },
+  {
+    "case": "02-iot-fleet-telemetry",
+    "category": "tampering",
+    "reference_claim": "An attacker who can write to the firmware bucket plants a malicious image that every polling node installs, since image signature verification is unverified.",
+    "candidate_claim": "An attacker uploads a malicious firmware image to the bucket and every node that polls installs it.",
+    "label": "match",
+    "note": "Same action, same target."
+  },
+  {
+    "case": "02-iot-fleet-telemetry",
+    "category": "tampering",
+    "reference_claim": "An attacker who can write to the firmware bucket plants a malicious image that every polling node installs, since image signature verification is unverified.",
+    "candidate_claim": "An attacker modifies firmware in transit between the bucket and a node.",
+    "label": "no-match",
+    "note": "In-transit modification is a distinct action from planting the artifact at rest."
+  },
+  {
+    "case": "02-iot-fleet-telemetry",
+    "category": "tampering",
+    "reference_claim": "An attacker holding the fleet key injects fabricated readings that the normalizer loads into the lake as genuine customer data.",
+    "candidate_claim": "An attacker with the fleet key sends bogus sensor readings that end up stored as genuine customer data.",
+    "label": "match",
+    "note": "Same action, same target."
+  },
+  {
+    "case": "02-iot-fleet-telemetry",
+    "category": "tampering",
+    "reference_claim": "An attacker holding the fleet key injects fabricated readings that the normalizer loads into the lake as genuine customer data.",
+    "candidate_claim": "An attacker with the fleet key publishes readings as another device.",
+    "label": "no-match",
+    "note": "This is the spoofing claim, not the data-integrity one; keeping them distinct is what the two lanes are for."
+  },
+  {
+    "case": "02-iot-fleet-telemetry",
+    "category": "repudiation",
+    "reference_claim": "A customer disputes a reading attributed to their site and no per-device identity exists to establish which node actually sent it.",
+    "candidate_claim": "There is no way to tell which physical device produced a disputed reading, because every node presents the same credential.",
+    "label": "match",
+    "note": "Same claim, stated as the condition rather than the dispute."
+  },
+  {
+    "case": "02-iot-fleet-telemetry",
+    "category": "information-disclosure",
+    "reference_claim": "An attacker who reaches the telemetry lake reads customer site addresses and occupancy patterns, whose protection at rest is unverified.",
+    "candidate_claim": "An attacker reading the telemetry lake learns when customer sites are unoccupied.",
+    "label": "match",
+    "note": "Same read action against the same target; the candidate names the consequence the reference's notes give."
+  },
+  {
+    "case": "02-iot-fleet-telemetry",
+    "category": "information-disclosure",
+    "reference_claim": "An attacker on the path between a node and the gateway reads readings and the presented key, because transport encryption on the MQTT session is unverified.",
+    "candidate_claim": "An attacker on the network path between a node and the broker captures the pre-shared key from an unencrypted MQTT session.",
+    "label": "match",
+    "note": "Same action, same flow."
+  },
+  {
+    "case": "02-iot-fleet-telemetry",
+    "category": "information-disclosure",
+    "reference_claim": "An attacker downloads firmware images from the public bucket and reverse-engineers them to recover embedded fleet credentials or logic.",
+    "candidate_claim": "Anyone on the internet downloads the firmware images because the bucket allows unauthenticated reads.",
+    "label": "match",
+    "note": "Same action, same target; the reference adds the reverse-engineering motive."
+  },
+  {
+    "case": "02-iot-fleet-telemetry",
+    "category": "information-disclosure",
+    "reference_claim": "An attacker downloads firmware images from the public bucket and reverse-engineers them to recover embedded fleet credentials or logic.",
+    "candidate_claim": "An attacker writes a new firmware image to the public bucket.",
+    "label": "no-match",
+    "note": "Read and write are different actions, and the write is a separate corpus entry."
+  },
+  {
+    "case": "02-iot-fleet-telemetry",
+    "category": "denial-of-service",
+    "reference_claim": "An attacker floods the internet-exposed MQTT broker with connections until genuine nodes can no longer publish readings.",
+    "candidate_claim": "An attacker opens huge numbers of MQTT connections to the gateway so real devices cannot connect.",
+    "label": "match",
+    "note": "Same action, same target."
+  },
+  {
+    "case": "02-iot-fleet-telemetry",
+    "category": "denial-of-service",
+    "reference_claim": "An attacker publishes a firmware image that bricks every node that installs it, taking the fleet offline with no remote recovery path.",
+    "candidate_claim": "An attacker publishes firmware that permanently disables the nodes that install it.",
+    "label": "match",
+    "note": "Same action, same target."
+  },
+  {
+    "case": "02-iot-fleet-telemetry",
+    "category": "elevation-of-privilege",
+    "reference_claim": "An attacker turns an unsigned firmware update into code execution on every node, escalating from bucket write access to control of the physical fleet.",
+    "candidate_claim": "An attacker who can write firmware runs their own code on every device in the fleet.",
+    "label": "match",
+    "note": "Same escalation."
+  },
+  {
+    "case": "02-iot-fleet-telemetry",
+    "category": "elevation-of-privilege",
+    "reference_claim": "An attacker who compromises one physically accessible node uses its fleet-wide credential to act as the whole fleet against the ingest edge.",
+    "candidate_claim": "An attacker who physically takes one node extracts its credential and then acts with the authority of the entire fleet.",
+    "label": "match",
+    "note": "Same escalation, same mechanism."
+  },
+  {
+    "case": "02-iot-fleet-telemetry",
+    "category": "elevation-of-privilege",
+    "reference_claim": "An operator signed in for dashboards queries raw customer records beyond what their role needs, because no narrower grant on the lake is described.",
+    "candidate_claim": "A fleet operator's SSO account is phished and the attacker queries the telemetry lake.",
+    "label": "no-match",
+    "note": "The reference is about an authorized operator's over-broad grant; account takeover is a different action the corpus does not list."
+  },
+  {
+    "case": "03-batch-data-pipeline",
+    "category": "spoofing",
+    "reference_claim": "An attacker who obtains a partner's never-rotated static SFTP key uploads extracts as that partner.",
+    "candidate_claim": "An attacker who steals a partner's SFTP key uploads extracts in that partner's name.",
+    "label": "match",
+    "note": "Same action, same target."
+  },
+  {
+    "case": "03-batch-data-pipeline",
+    "category": "spoofing",
+    "reference_claim": "An attacker deposits a file into another partner's folder and the scheduler processes it as that partner's extract, because it never checks the depositor.",
+    "candidate_claim": "An attacker drops a file into a partner folder and the nightly run ingests it as that partner's data, since the depositor is never checked.",
+    "label": "match",
+    "note": "Same action, same mechanism."
+  },
+  {
+    "case": "03-batch-data-pipeline",
+    "category": "spoofing",
+    "reference_claim": "An attacker deposits a file into another partner's folder and the scheduler processes it as that partner's extract, because it never checks the depositor.",
+    "candidate_claim": "An attacker with a valid partner key uploads a file to a folder belonging to a different partner.",
+    "label": "match",
+    "note": "Same action against the same target; the candidate only specifies how the attacker got write access."
+  },
+  {
+    "case": "03-batch-data-pipeline",
+    "category": "tampering",
+    "reference_claim": "An attacker who can write to the landing bucket alters claim records before the nightly run, and only the schema is checked before they reach the warehouse.",
+    "candidate_claim": "An attacker edits claim records sitting in the landing bucket before the 02:00 run picks them up.",
+    "label": "match",
+    "note": "Same action, same target and the same timing."
+  },
+  {
+    "case": "03-batch-data-pipeline",
+    "category": "tampering",
+    "reference_claim": "An attacker who can write to the landing bucket alters claim records before the nightly run, and only the schema is checked before they reach the warehouse.",
+    "candidate_claim": "An attacker injects SQL through a claim record field that the transform does not sanitize.",
+    "label": "no-match",
+    "note": "Injection through unvalidated content is a distinct action the corpus does not carry; a judge that matches it hides a real gap."
+  },
+  {
+    "case": "03-batch-data-pipeline",
+    "category": "tampering",
+    "reference_claim": "An attacker who can write to the Airflow metadata database rewrites a connection string to redirect the pipeline to infrastructure they control.",
+    "candidate_claim": "An attacker changes an Airflow connection string so the pipeline reads from or writes to a system they control.",
+    "label": "match",
+    "note": "Same action, same target."
+  },
+  {
+    "case": "03-batch-data-pipeline",
+    "category": "repudiation",
+    "reference_claim": "A partner denies having sent an extract and nothing binds a landed file to the key that uploaded it.",
+    "candidate_claim": "Nothing ties an uploaded file to the key that uploaded it, so a partner can disown an extract.",
+    "label": "match",
+    "note": "Same claim stated cause-first."
+  },
+  {
+    "case": "03-batch-data-pipeline",
+    "category": "information-disclosure",
+    "reference_claim": "An analyst who needs only aggregate figures reads member names and dates of birth, because the grant covers the whole dataset.",
+    "candidate_claim": "An analyst with dataset-wide access views member names and dates of birth they have no need for.",
+    "label": "match",
+    "note": "Same action, same target."
+  },
+  {
+    "case": "03-batch-data-pipeline",
+    "category": "information-disclosure",
+    "reference_claim": "An analyst who needs only aggregate figures reads member names and dates of birth, because the grant covers the whole dataset.",
+    "candidate_claim": "An analyst exports member records out of the warehouse to an unmanaged device.",
+    "label": "no-match",
+    "note": "Exfiltration by an authorized user is a different action from over-broad read access; the corpus does not carry it."
+  },
+  {
+    "case": "03-batch-data-pipeline",
+    "category": "information-disclosure",
+    "reference_claim": "An attacker who reaches the Airflow metadata database recovers every partner key and connection string it holds, since its protection at rest is unverified.",
+    "candidate_claim": "An attacker who reaches Airflow's metadata database reads every partner key and connection string stored in it.",
+    "label": "match",
+    "note": "Same action, same target."
+  },
+  {
+    "case": "03-batch-data-pipeline",
+    "category": "information-disclosure",
+    "reference_claim": "An attacker who reaches the Airflow metadata database recovers every partner key and connection string it holds, since its protection at rest is unverified.",
+    "candidate_claim": "An attacker reads the partner keys out of the landing bucket.",
+    "label": "no-match",
+    "note": "The keys are not in the bucket; the candidate asserts a fact the model does not support and should be adjudicated ungrounded, not matched."
+  },
+  {
+    "case": "03-batch-data-pipeline",
+    "category": "denial-of-service",
+    "reference_claim": "An attacker deposits an enormous or malformed file that consumes the nightly window and prevents genuine extracts from being processed.",
+    "candidate_claim": "An attacker uploads a file large enough that the nightly job never finishes and genuine extracts go unprocessed.",
+    "label": "match",
+    "note": "Same action, same target."
+  },
+  {
+    "case": "03-batch-data-pipeline",
+    "category": "denial-of-service",
+    "reference_claim": "An attacker crafts input that makes the transform job fail repeatedly, leaving the warehouse stale without any request-level error surfacing.",
+    "candidate_claim": "An attacker crafts an extract that crashes the Spark job on every retry, so the warehouse silently stops being updated.",
+    "label": "match",
+    "note": "Same action, same consequence."
+  },
+  {
+    "case": "03-batch-data-pipeline",
+    "category": "elevation-of-privilege",
+    "reference_claim": "An attacker with a foothold in the landing network reads the metadata database and escalates to every credential the pipeline holds.",
+    "candidate_claim": "An attacker in the landing network reads Airflow's metadata database and obtains credentials for the systems downstream of it.",
+    "label": "match",
+    "note": "Same escalation; distinguished from the disclosure entry by what the attacker does with the credentials."
+  },
+  {
+    "case": "03-batch-data-pipeline",
+    "category": "elevation-of-privilege",
+    "reference_claim": "An attacker who can plant a file in the landing bucket gains execution in the warehouse network through the job it triggers.",
+    "candidate_claim": "An attacker who can place a file in the landing bucket obtains code execution in the warehouse network via the job that processes it.",
+    "label": "match",
+    "note": "Same escalation, same mechanism."
+  },
+  {
+    "case": "03-batch-data-pipeline",
+    "category": "elevation-of-privilege",
+    "reference_claim": "An analyst uses their dataset-wide grant to reach claim data belonging to partners outside their remit.",
+    "candidate_claim": "An analyst queries claims belonging to partners outside their assigned remit.",
+    "label": "match",
+    "note": "Same action, same target."
+  },
+  {
+    "case": "03-batch-data-pipeline",
+    "category": "elevation-of-privilege",
+    "reference_claim": "An analyst uses their dataset-wide grant to reach claim data belonging to partners outside their remit.",
+    "candidate_claim": "An analyst escalates to a warehouse administrator role.",
+    "label": "no-match",
+    "note": "Role escalation is a different action from using an over-broad grant, and nothing in the model supports it."
+  },
+  {
+    "case": "04-ml-inference-service",
+    "category": "spoofing",
+    "reference_claim": "An attacker who obtains a never-expiring API key calls the inference gateway as that team indefinitely.",
+    "candidate_claim": "An attacker with a leaked API key keeps calling the inference gateway indefinitely, since keys are never expired.",
+    "label": "match",
+    "note": "Same action, same target."
+  },
+  {
+    "case": "04-ml-inference-service",
+    "category": "spoofing",
+    "reference_claim": "An attacker who obtains a never-expiring API key calls the inference gateway as that team indefinitely.",
+    "candidate_claim": "An attacker brute-forces a valid API key against the gateway.",
+    "label": "no-match",
+    "note": "Guessing a key and using a leaked one are different actions."
+  },
+  {
+    "case": "04-ml-inference-service",
+    "category": "spoofing",
+    "reference_claim": "Any workload inside the model network submits inference requests posing as the gateway, which the model server accepts on network position alone.",
+    "candidate_claim": "Anything already inside the model network can send requests straight to the model server, which authenticates nothing.",
+    "label": "match",
+    "note": "Same action, same target."
+  },
+  {
+    "case": "04-ml-inference-service",
+    "category": "tampering",
+    "reference_claim": "An attacker who can write to the registry swaps the model artifact and the model server loads it without any integrity verification.",
+    "candidate_claim": "An attacker replaces the model artifact in the registry and the model server loads the substituted model without checking it.",
+    "label": "match",
+    "note": "Same action, same target."
+  },
+  {
+    "case": "04-ml-inference-service",
+    "category": "tampering",
+    "reference_claim": "An attacker who can write to the registry swaps the model artifact and the model server loads it without any integrity verification.",
+    "candidate_claim": "An attacker poisons the training data so the published model behaves incorrectly.",
+    "label": "no-match",
+    "note": "Training-time poisoning is outside this model entirely \u2014 no training pipeline exists in it \u2014 so this is ungrounded, not a match."
+  },
+  {
+    "case": "04-ml-inference-service",
+    "category": "tampering",
+    "reference_claim": "An attacker with model-network access writes to the unauthenticated Redis feature store and changes the features a decision is made on.",
+    "candidate_claim": "An attacker with access to the model network writes new values into Redis and changes the features the model scores on.",
+    "label": "match",
+    "note": "Same action, same target."
+  },
+  {
+    "case": "04-ml-inference-service",
+    "category": "tampering",
+    "reference_claim": "An attacker with model-network access writes to the unauthenticated Redis feature store and changes the features a decision is made on.",
+    "candidate_claim": "An attacker reads customer features out of the unauthenticated Redis store.",
+    "label": "no-match",
+    "note": "Reading is the disclosure entry; writing is this one. Same element, different action."
+  },
+  {
+    "case": "04-ml-inference-service",
+    "category": "repudiation",
+    "reference_claim": "Nobody can establish which engineer published a given model artifact, because publication runs through a shared account.",
+    "candidate_claim": "Because artifacts are published from a shared account, there is no record of which individual published a given model.",
+    "label": "match",
+    "note": "Same claim."
+  },
+  {
+    "case": "04-ml-inference-service",
+    "category": "information-disclosure",
+    "reference_claim": "An attacker who reaches the inference log reads raw end-user prompts, whose protection at rest is unverified.",
+    "candidate_claim": "An attacker who reaches the BigQuery inference log reads the raw prompts end users typed.",
+    "label": "match",
+    "note": "Same action, same target."
+  },
+  {
+    "case": "04-ml-inference-service",
+    "category": "information-disclosure",
+    "reference_claim": "An attacker who reaches the inference log reads raw end-user prompts, whose protection at rest is unverified.",
+    "candidate_claim": "An attacker reads model responses out of the inference log.",
+    "label": "match",
+    "note": "Same action, same target; requests and responses are stored together and the reference covers the store."
+  },
+  {
+    "case": "04-ml-inference-service",
+    "category": "information-disclosure",
+    "reference_claim": "A caller crafts a request that makes the model emit customer features or training data belonging to a different tenant.",
+    "candidate_claim": "A caller crafts an input that makes the model reveal another tenant's customer features in its output.",
+    "label": "match",
+    "note": "Same action, same target."
+  },
+  {
+    "case": "04-ml-inference-service",
+    "category": "information-disclosure",
+    "reference_claim": "A caller crafts a request that makes the model emit customer features or training data belonging to a different tenant.",
+    "candidate_claim": "A caller sends a prompt that makes the model ignore its instructions and produce disallowed output.",
+    "label": "no-match",
+    "note": "Instruction-following failure is not disclosure of another tenant's data; the corpus does not carry it."
+  },
+  {
+    "case": "04-ml-inference-service",
+    "category": "denial-of-service",
+    "reference_claim": "A caller holding a valid key floods the gateway with inference requests and exhausts the shared GPU capacity behind it.",
+    "candidate_claim": "A caller with a valid key sends enough inference requests to starve every other team of GPU capacity.",
+    "label": "match",
+    "note": "Same action, same target."
+  },
+  {
+    "case": "04-ml-inference-service",
+    "category": "denial-of-service",
+    "reference_claim": "An attacker with model-network access flushes or fills the unauthenticated Redis store, stalling every request that needs features.",
+    "candidate_claim": "An attacker with model-network access issues a Redis command that wipes the feature store, stalling inference.",
+    "label": "match",
+    "note": "Same action, same target."
+  },
+  {
+    "case": "04-ml-inference-service",
+    "category": "elevation-of-privilege",
+    "reference_claim": "An attacker who can write to the registry turns an unverified artifact load into code execution on the GPU nodes.",
+    "candidate_claim": "An attacker who can publish to the registry achieves code execution on the GPU nodes when the artifact is loaded.",
+    "label": "match",
+    "note": "Same escalation."
+  },
+  {
+    "case": "04-ml-inference-service",
+    "category": "elevation-of-privilege",
+    "reference_claim": "An attacker who compromises the internet-facing gateway inherits unauthenticated access to everything in the model network.",
+    "candidate_claim": "An attacker who takes over the gateway reaches the model server, the feature store and the registry, none of which authenticate it.",
+    "label": "match",
+    "note": "Same escalation; the candidate enumerates what the reference states generally."
+  },
+  {
+    "case": "04-ml-inference-service",
+    "category": "elevation-of-privilege",
+    "reference_claim": "A caller uses its key to reach models or capabilities its team was never entitled to, because the key authenticates without scoping what it may invoke.",
+    "candidate_claim": "A calling team invokes a model endpoint their key was never meant to reach.",
+    "label": "match",
+    "note": "Same action, same target."
+  },
+  {
+    "case": "05-cookbook-queue-webapp",
+    "category": "spoofing",
+    "reference_claim": "An attacker who reaches the queue enqueues jobs as if they came from the web application, since queue authentication is unverified.",
+    "candidate_claim": "An attacker who can reach the message queue writes job messages that the worker treats as coming from the web application.",
+    "label": "match",
+    "note": "Same action, same target."
+  },
+  {
+    "case": "05-cookbook-queue-webapp",
+    "category": "tampering",
+    "reference_claim": "An attacker places a poisoned message on the queue and the worker processes it as legitimate work.",
+    "candidate_claim": "An attacker puts a crafted message on the queue and the background worker processes it as if it were legitimate work.",
+    "label": "match",
+    "note": "Same action, same target."
+  },
+  {
+    "case": "05-cookbook-queue-webapp",
+    "category": "tampering",
+    "reference_claim": "An attacker places a poisoned message on the queue and the worker processes it as legitimate work.",
+    "candidate_claim": "An attacker enqueues jobs as the web application, since the queue does not authenticate producers.",
+    "label": "no-match",
+    "note": "This is the spoofing claim about producer identity; the reference is about the content the worker acts on."
+  },
+  {
+    "case": "05-cookbook-queue-webapp",
+    "category": "tampering",
+    "reference_claim": "An attacker who can write to the web application config changes the queue endpoint or credentials and redirects the application's work.",
+    "candidate_claim": "An attacker who can write the web application's config points it at a queue they control.",
+    "label": "match",
+    "note": "Same action, same target; the candidate names one instance of 'changes the endpoint or credentials'."
+  },
+  {
+    "case": "05-cookbook-queue-webapp",
+    "category": "repudiation",
+    "reference_claim": "An attacker who compromises the worker erases or edits the log records that would show what it did, because the logs live in the same database the worker writes.",
+    "candidate_claim": "An attacker who controls the worker deletes the log entries recording their activity, because those logs sit in the database the worker writes.",
+    "label": "match",
+    "note": "Same action, same mechanism."
+  },
+  {
+    "case": "05-cookbook-queue-webapp",
+    "category": "repudiation",
+    "reference_claim": "An attacker who compromises the worker erases or edits the log records that would show what it did, because the logs live in the same database the worker writes.",
+    "candidate_claim": "An attacker floods the database so logging stops.",
+    "label": "no-match",
+    "note": "Availability against the log store is a different action from erasing entries, and the corpus files it under denial-of-service."
+  },
+  {
+    "case": "05-cookbook-queue-webapp",
+    "category": "information-disclosure",
+    "reference_claim": "An attacker who compromises the background worker reads the database credentials from its config store.",
+    "candidate_claim": "An attacker who compromises the background worker recovers the database credentials held in its config.",
+    "label": "match",
+    "note": "Same action, same target."
+  },
+  {
+    "case": "05-cookbook-queue-webapp",
+    "category": "information-disclosure",
+    "reference_claim": "An attacker who compromises the internet-facing web application reads the queue credentials from its config store.",
+    "candidate_claim": "An attacker who compromises the web application recovers the message-queue credentials from its config store.",
+    "label": "match",
+    "note": "Same action, same target."
+  },
+  {
+    "case": "05-cookbook-queue-webapp",
+    "category": "information-disclosure",
+    "reference_claim": "An attacker who compromises the internet-facing web application reads the queue credentials from its config store.",
+    "candidate_claim": "An attacker who compromises the web application recovers the database credentials from its config store.",
+    "label": "no-match",
+    "note": "The web application's config holds queue credentials, not database ones; asserting otherwise is ungrounded in the model."
+  },
+  {
+    "case": "05-cookbook-queue-webapp",
+    "category": "information-disclosure",
+    "reference_claim": "An attacker who reaches the database storage reads application and log records, whose protection at rest is unverified.",
+    "candidate_claim": "An attacker with access to the database's storage reads the records it holds, since nothing states it is encrypted at rest.",
+    "label": "match",
+    "note": "Same action, same target."
+  },
+  {
+    "case": "05-cookbook-queue-webapp",
+    "category": "information-disclosure",
+    "reference_claim": "An attacker on the internal network reads job contents in transit, because transport encryption between the tiers is unverified.",
+    "candidate_claim": "An attacker on the internal network reads job messages moving between the application, the queue and the worker.",
+    "label": "match",
+    "note": "Same action; the reference cites two flows and the candidate covers both."
+  },
+  {
+    "case": "05-cookbook-queue-webapp",
+    "category": "denial-of-service",
+    "reference_claim": "An attacker floods the queue with jobs until the worker cannot keep up and queued work stops completing.",
+    "candidate_claim": "An attacker enqueues far more jobs than the worker can process, so queued work stops completing.",
+    "label": "match",
+    "note": "Same action, same target."
+  },
+  {
+    "case": "05-cookbook-queue-webapp",
+    "category": "denial-of-service",
+    "reference_claim": "An attacker floods the queue with jobs until the worker cannot keep up and queued work stops completing.",
+    "candidate_claim": "An attacker deletes messages from the queue so submitted work is silently dropped.",
+    "label": "no-match",
+    "note": "Deletion is a distinct action the corpus does not carry; it is grounded, so it belongs in the valid-unlisted bucket rather than matched."
+  },
+  {
+    "case": "05-cookbook-queue-webapp",
+    "category": "elevation-of-privilege",
+    "reference_claim": "An attacker who compromises the internet-facing web application uses its queue credentials to reach the backend tier.",
+    "candidate_claim": "An attacker who compromises the web application uses its queue credentials to act inside the backend tier.",
+    "label": "match",
+    "note": "Same escalation, same route."
+  },
+  {
+    "case": "05-cookbook-queue-webapp",
+    "category": "elevation-of-privilege",
+    "reference_claim": "An attacker who gets code execution in the worker inherits whatever database privilege its credentials carry, which is unverified and may be unrestricted.",
+    "candidate_claim": "An attacker who achieves execution in the worker gets whatever database rights the worker holds, which are not stated to be restricted.",
+    "label": "match",
+    "note": "Same escalation."
+  },
+  {
+    "case": "05-cookbook-queue-webapp",
+    "category": "elevation-of-privilege",
+    "reference_claim": "An attacker who gets code execution in the worker inherits whatever database privilege its credentials carry, which is unverified and may be unrestricted.",
+    "candidate_claim": "An attacker who achieves execution in the worker reads its config file.",
+    "label": "no-match",
+    "note": "Reading the config is the disclosure entry; inheriting database privilege is this one."
+  },
+  {
+    "case": "05-cookbook-queue-webapp",
+    "category": "spoofing",
+    "reference_claim": "An attacker interacts with the web application as a legitimate user, because how the application authenticates the browser is unverified.",
+    "candidate_claim": "An attacker accesses the application as a signed-in user because the model does not establish how users are authenticated.",
+    "label": "match",
+    "note": "Same action, same target, same unverified-control basis."
+  },
+  {
+    "case": "06-cookbook-online-game",
+    "category": "spoofing",
+    "reference_claim": "An attacker connects to the exposed lobby port as another player, because how the lobby authenticates a client is unverified.",
+    "candidate_claim": "An attacker connects to the lobby's exposed port and is accepted as another player, since client authentication is unverified.",
+    "label": "match",
+    "note": "Same action, same target."
+  },
+  {
+    "case": "06-cookbook-online-game",
+    "category": "spoofing",
+    "reference_claim": "An attacker connects directly to a game server on its exposed port, bypassing the lobby, as a player who was never assigned to that match.",
+    "candidate_claim": "An attacker connects straight to a game server without going through matchmaking and joins a match they were not assigned to.",
+    "label": "match",
+    "note": "Same action, same target."
+  },
+  {
+    "case": "06-cookbook-online-game",
+    "category": "spoofing",
+    "reference_claim": "An attacker connects directly to a game server on its exposed port, bypassing the lobby, as a player who was never assigned to that match.",
+    "candidate_claim": "An attacker floods a game server's port so the match cannot proceed.",
+    "label": "no-match",
+    "note": "Same element, availability action rather than identity; the corpus files it under denial-of-service."
+  },
+  {
+    "case": "06-cookbook-online-game",
+    "category": "tampering",
+    "reference_claim": "A player modifies the game client on their own machine and sends manipulated gameplay actions that the servers accept.",
+    "candidate_claim": "A player patches their local game client and sends gameplay messages the server accepts as valid.",
+    "label": "match",
+    "note": "Same action, same target."
+  },
+  {
+    "case": "06-cookbook-online-game",
+    "category": "tampering",
+    "reference_claim": "A player modifies the game client on their own machine and sends manipulated gameplay actions that the servers accept.",
+    "candidate_claim": "A player uses their modified client to see other players' positions through walls.",
+    "label": "no-match",
+    "note": "Disclosure through the client is a separate corpus entry; modifying outbound actions and observing extra state are different actions."
+  },
+  {
+    "case": "06-cookbook-online-game",
+    "category": "tampering",
+    "reference_claim": "An attacker alters match statistics in the stats database to change rankings or rewards.",
+    "candidate_claim": "An attacker rewrites entries in the stats database to inflate their ranking.",
+    "label": "match",
+    "note": "Same action, same target."
+  },
+  {
+    "case": "06-cookbook-online-game",
+    "category": "repudiation",
+    "reference_claim": "A support agent's action on a player account cannot be attributed to them, because nothing records who performed a moderation change.",
+    "candidate_claim": "Nothing records which support agent performed a given moderation action on a player account.",
+    "label": "match",
+    "note": "Same claim."
+  },
+  {
+    "case": "06-cookbook-online-game",
+    "category": "repudiation",
+    "reference_claim": "A support agent's action on a player account cannot be attributed to them, because nothing records who performed a moderation change.",
+    "candidate_claim": "A support agent bans a player account without justification.",
+    "label": "no-match",
+    "note": "Misuse of legitimate privilege is a different claim from the absence of attribution; the corpus's elevation entry covers scope, not this."
+  },
+  {
+    "case": "06-cookbook-online-game",
+    "category": "information-disclosure",
+    "reference_claim": "An attacker who reaches the player database reads player account data, whose protection at rest is unverified.",
+    "candidate_claim": "An attacker who reaches the player database reads player account records, since nothing states how the store is protected.",
+    "label": "match",
+    "note": "Same action, same target."
+  },
+  {
+    "case": "06-cookbook-online-game",
+    "category": "information-disclosure",
+    "reference_claim": "An attacker on the network path reads matchmaking and gameplay traffic, including player identifiers, because encryption on both client links is unverified.",
+    "candidate_claim": "An attacker capturing traffic on the client's connections reads player identifiers, because neither client link is stated to be encrypted.",
+    "label": "match",
+    "note": "Same action, same flows."
+  },
+  {
+    "case": "06-cookbook-online-game",
+    "category": "information-disclosure",
+    "reference_claim": "A player extracts information from their own client that the server sends but should not reveal, such as other players' positions.",
+    "candidate_claim": "A player reads state from their own client that the server sent but should not have exposed, such as opponents' locations.",
+    "label": "match",
+    "note": "Same action, same target."
+  },
+  {
+    "case": "06-cookbook-online-game",
+    "category": "information-disclosure",
+    "reference_claim": "A support agent reads player account data beyond what a moderation decision requires, because the website's access to the database is unscoped.",
+    "candidate_claim": "A support agent browses player account data unrelated to any moderation case they are working.",
+    "label": "match",
+    "note": "Same action, same target."
+  },
+  {
+    "case": "06-cookbook-online-game",
+    "category": "denial-of-service",
+    "reference_claim": "An attacker floods the exposed lobby until players can no longer be matched into games.",
+    "candidate_claim": "An attacker overwhelms the lobby with connections and players can no longer get into matches.",
+    "label": "match",
+    "note": "Same action, same target."
+  },
+  {
+    "case": "06-cookbook-online-game",
+    "category": "denial-of-service",
+    "reference_claim": "An attacker floods a game server's exposed port and disrupts a match in progress for every player in it.",
+    "candidate_claim": "An attacker floods a game server mid-match and disrupts play for everyone in that match.",
+    "label": "match",
+    "note": "Same action, same target."
+  },
+  {
+    "case": "06-cookbook-online-game",
+    "category": "elevation-of-privilege",
+    "reference_claim": "An attacker who compromises an internet-exposed game server gains write access to player records across the production network.",
+    "candidate_claim": "An attacker who takes over a game server writes to player records across production.",
+    "label": "match",
+    "note": "Same escalation."
+  },
+  {
+    "case": "06-cookbook-online-game",
+    "category": "elevation-of-privilege",
+    "reference_claim": "An attacker who compromises an internet-exposed game server gains write access to player records across the production network.",
+    "candidate_claim": "An attacker who takes over a game server reads match statistics.",
+    "label": "no-match",
+    "note": "Reading stats is neither the escalation claimed nor the target claimed; the reference is about write access to player records."
+  },
+  {
+    "case": "06-cookbook-online-game",
+    "category": "elevation-of-privilege",
+    "reference_claim": "An attacker who gets any access to the moderation website acquires privilege over every player account it can reach.",
+    "candidate_claim": "An attacker who gets into the moderation website gains control over every player account it can act on.",
+    "label": "match",
+    "note": "Same escalation, same target."
+  },
+  {
+    "case": "06-cookbook-online-game",
+    "category": "elevation-of-privilege",
+    "reference_claim": "A player uses their control over the client to obtain a match assignment or account state they are not entitled to.",
+    "candidate_claim": "A player manipulates their client to obtain a match placement or account state they should not have.",
+    "label": "match",
+    "note": "Same escalation, same target."
+  },
+  {
+    "case": "01-payments-checkout",
+    "category": "spoofing",
+    "reference_claim": "An attacker who obtains a shopper's session cookie replays it against the storefront API and places orders as that shopper.",
+    "candidate_claim": "An attacker fixes a shopper's session identifier before they log in and then reuses it.",
+    "label": "no-match",
+    "note": "Session fixation is a distinct action from replaying a stolen cookie."
+  },
+  {
+    "case": "01-payments-checkout",
+    "category": "spoofing",
+    "reference_claim": "Any workload that can reach the order service impersonates the storefront API on the unauthenticated gRPC channel and submits orders.",
+    "candidate_claim": "An attacker sends malformed gRPC messages that crash the order service.",
+    "label": "no-match",
+    "note": "Same flow, availability action rather than identity."
+  },
+  {
+    "case": "01-payments-checkout",
+    "category": "information-disclosure",
+    "reference_claim": "An attacker who reaches the database storage or its backups reads shopper addresses and card last-four, because protection at rest is unverified.",
+    "candidate_claim": "An attacker with database access reads shopper addresses and card last-four by querying orders-db.",
+    "label": "no-match",
+    "note": "The reference is about protection at rest of the stored data; querying with a valid credential is the elevation/spoofing path, not this one."
+  },
+  {
+    "case": "01-payments-checkout",
+    "category": "denial-of-service",
+    "reference_claim": "An attacker drives enough order submissions to exhaust the order service's database connections and halt order capture.",
+    "candidate_claim": "An attacker causes the order service to leak memory until it restarts.",
+    "label": "no-match",
+    "note": "Resource exhaustion inside the process is not the database-connection exhaustion the reference claims, and nothing in the model supports it."
+  },
+  {
+    "case": "01-payments-checkout",
+    "category": "elevation-of-privilege",
+    "reference_claim": "An attacker who compromises the internet-facing storefront API pivots from the DMZ into the core zone.",
+    "candidate_claim": "An attacker compromises the card processor and uses its access to reach the core zone.",
+    "label": "no-match",
+    "note": "Third-party compromise as an escalation route is not the DMZ-to-core pivot the reference states."
+  },
+  {
+    "case": "02-iot-fleet-telemetry",
+    "category": "spoofing",
+    "reference_claim": "An attacker serves a node a firmware image that impersonates an official release, because the node authenticates neither the bucket nor the image's origin.",
+    "candidate_claim": "An attacker registers a device that was never manufactured by the operator.",
+    "label": "no-match",
+    "note": "Device enrolment is not described anywhere in the model; ungrounded rather than matched."
+  },
+  {
+    "case": "02-iot-fleet-telemetry",
+    "category": "tampering",
+    "reference_claim": "An attacker who can write to the device registry reassigns a node to a different customer, redirecting or corrupting that customer's data.",
+    "candidate_claim": "An attacker deletes a device's entry from the registry so it can no longer connect.",
+    "label": "no-match",
+    "note": "Deletion for availability is a different action from reassigning a node's customer."
+  },
+  {
+    "case": "02-iot-fleet-telemetry",
+    "category": "information-disclosure",
+    "reference_claim": "An attacker who reaches the device registry reads the key material and customer assignments it holds, whose protection at rest is unverified.",
+    "candidate_claim": "An attacker reads customer occupancy patterns from the device registry.",
+    "label": "no-match",
+    "note": "Occupancy data lives in the lake, not the registry; the candidate asserts a fact the model does not support."
+  },
+  {
+    "case": "02-iot-fleet-telemetry",
+    "category": "denial-of-service",
+    "reference_claim": "An attacker holding the fleet key floods the ingest path with readings until the normalizer falls behind and dashboards stop reflecting the fleet.",
+    "candidate_claim": "An attacker disables the Pub/Sub topic so readings never reach the normalizer.",
+    "label": "no-match",
+    "note": "Destroying the transport is a different action from flooding it, and the model does not describe who can administer it."
+  },
+  {
+    "case": "03-batch-data-pipeline",
+    "category": "spoofing",
+    "reference_claim": "An attacker submits a transform run impersonating the scheduler, since authentication on the trigger path is unverified.",
+    "candidate_claim": "An attacker cancels a scheduled Airflow run so the extract is never processed.",
+    "label": "no-match",
+    "note": "Availability against the scheduler, not impersonation of it."
+  },
+  {
+    "case": "03-batch-data-pipeline",
+    "category": "tampering",
+    "reference_claim": "An attacker who compromises the transform job writes fabricated claim rows into the warehouse alongside genuine ones.",
+    "candidate_claim": "An attacker modifies the Spark job's code so every future run transforms records incorrectly.",
+    "label": "no-match",
+    "note": "Job code deployment is not modelled; grounded findings must attach to elements that exist."
+  },
+  {
+    "case": "03-batch-data-pipeline",
+    "category": "repudiation",
+    "reference_claim": "A dispute over a warehouse row cannot be traced back to the extract it came from, because no lineage from file to loaded record is described.",
+    "candidate_claim": "An analyst cannot reproduce a warehouse figure because the transform logic is undocumented.",
+    "label": "no-match",
+    "note": "A documentation gap is not an attacker action at all; a judge that matches this is matching on topic, not on claim."
+  },
+  {
+    "case": "03-batch-data-pipeline",
+    "category": "information-disclosure",
+    "reference_claim": "An attacker who reaches the landing bucket's storage reads raw partner extracts, whose protection at rest is unverified.",
+    "candidate_claim": "An attacker intercepts partner uploads and reads claim records in transit over SFTP.",
+    "label": "no-match",
+    "note": "The reference is about data at rest in the bucket; the flow is also stated to carry SSH transport encryption."
+  },
+  {
+    "case": "04-ml-inference-service",
+    "category": "spoofing",
+    "reference_claim": "An attacker publishes a model artifact under a shared group account with no individual identity behind it.",
+    "candidate_claim": "An attacker steals an ML engineer's laptop and publishes an artifact from it.",
+    "label": "no-match",
+    "note": "Device theft is not described in the model; the reference is about the shared account behind publication."
+  },
+  {
+    "case": "04-ml-inference-service",
+    "category": "tampering",
+    "reference_claim": "An attacker inside the model network alters request payloads in flight on the unauthenticated, unencrypted forward path.",
+    "candidate_claim": "An attacker replays a previously captured inference request against the model server.",
+    "label": "no-match",
+    "note": "Replay is a distinct action from altering a payload in flight."
+  },
+  {
+    "case": "04-ml-inference-service",
+    "category": "information-disclosure",
+    "reference_claim": "An attacker with model-network access reads per-customer account age and spend bands from the unauthenticated feature store.",
+    "candidate_claim": "An attacker reads customer features from the inference log.",
+    "label": "no-match",
+    "note": "Features are held in Redis; the log holds prompts and responses. Wrong target, and unsupported by the model."
+  },
+  {
+    "case": "04-ml-inference-service",
+    "category": "denial-of-service",
+    "reference_claim": "An attacker deletes or corrupts the registry artifact so the model server cannot start after a restart.",
+    "candidate_claim": "An attacker corrupts the feature store so the model server cannot start.",
+    "label": "no-match",
+    "note": "The startup dependency in the reference is the registry artifact, not the feature store."
+  },
+  {
+    "case": "04-ml-inference-service",
+    "category": "elevation-of-privilege",
+    "reference_claim": "A caller uses its key to reach models or capabilities its team was never entitled to, because the key authenticates without scoping what it may invoke.",
+    "candidate_claim": "A calling team exceeds the request quota assigned to its key.",
+    "label": "no-match",
+    "note": "No quota is described in the model, and exceeding one is not reaching an unentitled capability."
+  },
+  {
+    "case": "05-cookbook-queue-webapp",
+    "category": "spoofing",
+    "reference_claim": "An attacker holding the worker's database credentials connects to the database as the worker.",
+    "candidate_claim": "An attacker who reaches the database queries it directly without any credential.",
+    "label": "no-match",
+    "note": "Asserts an absent control the model never states; the reference is about using the worker's credentials."
+  },
+  {
+    "case": "05-cookbook-queue-webapp",
+    "category": "tampering",
+    "reference_claim": "An attacker with the worker's database access alters application records or the log records stored alongside them.",
+    "candidate_claim": "An attacker alters the message queue's contents after the worker has read them.",
+    "label": "no-match",
+    "note": "Incoherent against the model's flows and not the database-record tampering the reference claims."
+  },
+  {
+    "case": "05-cookbook-queue-webapp",
+    "category": "denial-of-service",
+    "reference_claim": "An attacker floods the internet-facing web application until it stops serving browsers.",
+    "candidate_claim": "An attacker exploits a vulnerability in the web application framework to crash it.",
+    "label": "no-match",
+    "note": "The model names no framework; the reference's action is flooding, not exploiting."
+  },
+  {
+    "case": "05-cookbook-queue-webapp",
+    "category": "elevation-of-privilege",
+    "reference_claim": "An attacker who compromises the internet-facing web application uses its queue credentials to reach the backend tier.",
+    "candidate_claim": "An attacker who compromises the web application reads the database directly.",
+    "label": "no-match",
+    "note": "The web application has no path to the database in this model; the escalation route the reference states is the queue."
+  },
+  {
+    "case": "06-cookbook-online-game",
+    "category": "spoofing",
+    "reference_claim": "An attacker connects to the exposed lobby port as another player, because how the lobby authenticates a client is unverified.",
+    "candidate_claim": "An attacker takes over a player's account by resetting its password.",
+    "label": "no-match",
+    "note": "No account-recovery path exists in the model; ungrounded rather than a match."
+  },
+  {
+    "case": "06-cookbook-online-game",
+    "category": "tampering",
+    "reference_claim": "An attacker who influences a game server writes fabricated progression onto player records.",
+    "candidate_claim": "An attacker modifies the game client to report fabricated match results.",
+    "label": "match",
+    "note": "Same action and target as the reference's fabricated progression, reached through the client the model already marks untrusted."
+  },
+  {
+    "case": "06-cookbook-online-game",
+    "category": "repudiation",
+    "reference_claim": "A player disputes a change to their record and no log distinguishes whether the lobby, a game server or the moderation website made it.",
+    "candidate_claim": "A player disputes a moderation decision and no record shows which agent made it.",
+    "label": "no-match",
+    "note": "That is the support-attribution reference; this one is about which writer changed a player record."
+  },
+  {
+    "case": "06-cookbook-online-game",
+    "category": "denial-of-service",
+    "reference_claim": "An attacker drives enough matchmaking requests to exhaust the player database and stall both matchmaking and moderation.",
+    "candidate_claim": "An attacker corrupts the player database so matchmaking returns wrong results.",
+    "label": "no-match",
+    "note": "Integrity action, not the resource exhaustion the reference claims."
+  }
+]

@@ -1,0 +1,146 @@
+[
+  {
+    "category": "spoofing",
+    "affected_element_ids": ["flow:sensor-node-to-device-gateway:publish-readings", "entity:sensor-node"],
+    "claim": "An attacker who extracts the fleet-wide pre-shared key from any one node publishes readings to the gateway as any other device in the fleet.",
+    "tier": "must-find",
+    "severity": {"likelihood": "high", "impact": "high"},
+    "notes": "The defining finding of this case: one shared, never-rotated key across physically exposed devices."
+  },
+  {
+    "category": "spoofing",
+    "affected_element_ids": ["flow:field-technician-to-sensor-node:local-service-session", "entity:sensor-node"],
+    "claim": "An attacker with physical access presents themselves as a field technician on the node's serial console, whose authentication is unverified.",
+    "tier": "must-find",
+    "severity": {"likelihood": "medium", "impact": "high"},
+    "notes": "Physical exposure is stated in the source; console authentication is unknown, so it must be reported unverified."
+  },
+  {
+    "category": "spoofing",
+    "affected_element_ids": ["store:firmware-bucket", "flow:sensor-node-to-firmware-bucket:poll-firmware"],
+    "claim": "An attacker serves a node a firmware image that impersonates an official release, because the node authenticates neither the bucket nor the image's origin.",
+    "tier": "expected",
+    "severity": {"likelihood": "medium", "impact": "high"},
+    "notes": "Origin authentication, as distinct from the tampering entry about modifying an image in place."
+  },
+  {
+    "category": "tampering",
+    "affected_element_ids": ["store:firmware-bucket", "entity:sensor-node"],
+    "claim": "An attacker who can write to the firmware bucket plants a malicious image that every polling node installs, since image signature verification is unverified.",
+    "tier": "must-find",
+    "severity": {"likelihood": "high", "impact": "high"},
+    "notes": "Fleet-wide code execution; the source explicitly flags signature checking as unknown."
+  },
+  {
+    "category": "tampering",
+    "affected_element_ids": ["flow:sensor-node-to-device-gateway:publish-readings", "store:telemetry-lake"],
+    "claim": "An attacker holding the fleet key injects fabricated readings that the normalizer loads into the lake as genuine customer data.",
+    "tier": "must-find",
+    "severity": {"likelihood": "high", "impact": "medium"},
+    "notes": "Data integrity downstream of a spoofable device identity; distinct from the spoofing lane's identity claim."
+  },
+  {
+    "category": "tampering",
+    "affected_element_ids": ["store:device-registry", "flow:device-gateway-to-device-registry:look-up-device"],
+    "claim": "An attacker who can write to the device registry reassigns a node to a different customer, redirecting or corrupting that customer's data.",
+    "tier": "expected",
+    "severity": {"likelihood": "low", "impact": "high"},
+    "notes": "The registry is the authority for tenancy; its own access control is unverified."
+  },
+  {
+    "category": "repudiation",
+    "affected_element_ids": ["entity:sensor-node", "store:telemetry-lake"],
+    "claim": "A customer disputes a reading attributed to their site and no per-device identity exists to establish which node actually sent it.",
+    "tier": "must-find",
+    "severity": {"likelihood": "medium", "impact": "medium"},
+    "notes": "Follows directly from a fleet-wide rather than per-device credential."
+  },
+  {
+    "category": "repudiation",
+    "affected_element_ids": ["flow:field-technician-to-sensor-node:local-service-session"],
+    "claim": "A technician denies having made a configuration change on a node, and the unauthenticated local console records no actor to contradict them.",
+    "tier": "expected",
+    "severity": {"likelihood": "medium", "impact": "medium"},
+    "notes": "No logging is described anywhere on the service path."
+  },
+  {
+    "category": "information-disclosure",
+    "affected_element_ids": ["store:telemetry-lake"],
+    "claim": "An attacker who reaches the telemetry lake reads customer site addresses and occupancy patterns, whose protection at rest is unverified.",
+    "tier": "must-find",
+    "severity": {"likelihood": "medium", "impact": "high"},
+    "notes": "Occupancy data is unusually sensitive: it reveals when a physical site is empty."
+  },
+  {
+    "category": "information-disclosure",
+    "affected_element_ids": ["flow:sensor-node-to-device-gateway:publish-readings"],
+    "claim": "An attacker on the path between a node and the gateway reads readings and the presented key, because transport encryption on the MQTT session is unverified.",
+    "tier": "must-find",
+    "severity": {"likelihood": "medium", "impact": "high"},
+    "notes": "The same wire carries the credential and the data; a needs-info verdict on encryption is acceptable."
+  },
+  {
+    "category": "information-disclosure",
+    "affected_element_ids": ["store:firmware-bucket"],
+    "claim": "An attacker downloads firmware images from the public bucket and reverse-engineers them to recover embedded fleet credentials or logic.",
+    "tier": "expected",
+    "severity": {"likelihood": "high", "impact": "medium"},
+    "notes": "Public read is stated, not inferred; pairs with the fleet-key finding."
+  },
+  {
+    "category": "information-disclosure",
+    "affected_element_ids": ["store:device-registry"],
+    "claim": "An attacker who reaches the device registry reads the key material and customer assignments it holds, whose protection at rest is unverified.",
+    "tier": "expected",
+    "severity": {"likelihood": "medium", "impact": "high"},
+    "notes": "The registry is tagged credentials; disclosure here is equivalent to fleet compromise."
+  },
+  {
+    "category": "denial-of-service",
+    "affected_element_ids": ["process:device-gateway", "flow:sensor-node-to-device-gateway:publish-readings"],
+    "claim": "An attacker floods the internet-exposed MQTT broker with connections until genuine nodes can no longer publish readings.",
+    "tier": "must-find",
+    "severity": {"likelihood": "high", "impact": "high"},
+    "notes": "The gateway is the single ingest point for the whole fleet and is tagged availability-critical."
+  },
+  {
+    "category": "denial-of-service",
+    "affected_element_ids": ["entity:sensor-node", "store:firmware-bucket"],
+    "claim": "An attacker publishes a firmware image that bricks every node that installs it, taking the fleet offline with no remote recovery path.",
+    "tier": "expected",
+    "severity": {"likelihood": "medium", "impact": "high"},
+    "notes": "Availability consequence of the same unverified update path; the devices are physically remote."
+  },
+  {
+    "category": "denial-of-service",
+    "affected_element_ids": ["process:telemetry-normalizer", "store:telemetry-lake"],
+    "claim": "An attacker holding the fleet key floods the ingest path with readings until the normalizer falls behind and dashboards stop reflecting the fleet.",
+    "tier": "expected",
+    "severity": {"likelihood": "medium", "impact": "medium"},
+    "notes": "Cost-amplification against a metered analytics store as well as an availability effect."
+  },
+  {
+    "category": "elevation-of-privilege",
+    "affected_element_ids": ["entity:sensor-node", "flow:sensor-node-to-firmware-bucket:poll-firmware"],
+    "claim": "An attacker turns an unsigned firmware update into code execution on every node, escalating from bucket write access to control of the physical fleet.",
+    "tier": "must-find",
+    "severity": {"likelihood": "high", "impact": "high"},
+    "notes": "The escalation framing of the firmware finding: privilege gained, not just data changed."
+  },
+  {
+    "category": "elevation-of-privilege",
+    "affected_element_ids": ["entity:sensor-node", "process:device-gateway"],
+    "claim": "An attacker who compromises one physically accessible node uses its fleet-wide credential to act as the whole fleet against the ingest edge.",
+    "tier": "must-find",
+    "severity": {"likelihood": "high", "impact": "high"},
+    "notes": "One-device compromise to fleet-scope privilege; the shared key is the escalation mechanism."
+  },
+  {
+    "category": "elevation-of-privilege",
+    "affected_element_ids": ["entity:fleet-operator", "store:telemetry-lake"],
+    "claim": "An operator signed in for dashboards queries raw customer records beyond what their role needs, because no narrower grant on the lake is described.",
+    "tier": "expected",
+    "severity": {"likelihood": "medium", "impact": "medium"},
+    "notes": "SSO is stated but authorization scope is not; report as unverified rather than absent."
+  }
+]

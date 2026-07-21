@@ -1,0 +1,223 @@
+{
+  "external_entities": [
+    {
+      "id": "entity:sensor-node",
+      "name": "sensor node",
+      "description": "Deployed sensor on a customer site, outside the operator's physical control. Publishes readings and self-installs firmware.",
+      "assets": ["availability-critical"],
+      "source_excerpt": "They are outside our physical control — a technician can be standing next to one with a laptop.",
+      "kind": "external-system",
+      "trust_zone": "boundary:field-network"
+    },
+    {
+      "id": "entity:field-technician",
+      "name": "field technician",
+      "description": "Person who services deployed nodes over a local serial console.",
+      "assets": [],
+      "source_excerpt": "Field technicians service nodes over a local serial console.",
+      "kind": "human",
+      "trust_zone": "boundary:field-network"
+    },
+    {
+      "id": "entity:fleet-operator",
+      "name": "fleet operator",
+      "description": "Internal staff member reading fleet dashboards.",
+      "assets": [],
+      "source_excerpt": "Our own fleet operators look at dashboards over BigQuery from the corporate network, signed in with company SSO.",
+      "kind": "human",
+      "trust_zone": "boundary:corporate-network"
+    }
+  ],
+  "processes": [
+    {
+      "id": "process:device-gateway",
+      "name": "device gateway",
+      "description": "Internet-exposed MQTT broker on GKE; authenticates nodes against the registry and forwards accepted readings.",
+      "assets": ["availability-critical", "reputation"],
+      "source_excerpt": "an MQTT broker we run on GKE and expose to the internet because the nodes dial in from anywhere",
+      "technology": "MQTT broker on GKE",
+      "trust_zone": "boundary:ingest-edge",
+      "exposure": "internet-facing"
+    },
+    {
+      "id": "process:telemetry-normalizer",
+      "name": "telemetry normalizer",
+      "description": "Python Pub/Sub consumer that normalizes readings and loads them into the lake.",
+      "assets": ["pii"],
+      "source_excerpt": "picked up by the telemetry normalizer, a Python consumer in our analytics network",
+      "technology": "Python Pub/Sub consumer",
+      "trust_zone": "boundary:analytics-core",
+      "exposure": "internal"
+    }
+  ],
+  "data_stores": [
+    {
+      "id": "store:device-registry",
+      "name": "device registry",
+      "description": "Firestore collection holding the fleet pre-shared key check and each node's customer assignment.",
+      "assets": ["credentials"],
+      "source_excerpt": "The gateway looks up the device in a device registry (Firestore) to check the key",
+      "technology": "Firestore",
+      "trust_zone": "boundary:ingest-edge",
+      "data_classification": "confidential",
+      "encryption_at_rest": "unknown"
+    },
+    {
+      "id": "store:telemetry-lake",
+      "name": "telemetry lake",
+      "description": "BigQuery dataset of normalized readings, including site addresses and occupancy patterns.",
+      "assets": ["pii", "business-critical-data"],
+      "source_excerpt": "The lake has site addresses and occupancy patterns in it, so it is customer data.",
+      "technology": "BigQuery",
+      "trust_zone": "boundary:analytics-core",
+      "data_classification": "customer data",
+      "encryption_at_rest": "unknown"
+    },
+    {
+      "id": "store:firmware-bucket",
+      "name": "firmware bucket",
+      "description": "Cloud Storage bucket the nodes poll for firmware images. Public read.",
+      "assets": ["business-critical-data"],
+      "source_excerpt": "The bucket is public read, because making the nodes authenticate to it was awkward.",
+      "technology": "Cloud Storage bucket",
+      "trust_zone": "boundary:ingest-edge",
+      "data_classification": "public",
+      "encryption_at_rest": "unknown"
+    }
+  ],
+  "data_flows": [
+    {
+      "id": "flow:sensor-node-to-device-gateway:publish-readings",
+      "name": "publish readings",
+      "description": "Node publishes sensor readings to the broker.",
+      "assets": ["pii"],
+      "source_excerpt": "Nodes authenticate to the broker with a pre-shared key. The key is per fleet, not per device. Nobody has rotated it since deployment.",
+      "source": "entity:sensor-node",
+      "destination": "process:device-gateway",
+      "protocol": "MQTT",
+      "authentication": "fleet-wide pre-shared key, shared by every device and never rotated",
+      "data_description": "sensor readings tagged with a device identifier",
+      "encryption_in_transit": "unknown"
+    },
+    {
+      "id": "flow:device-gateway-to-device-registry:look-up-device",
+      "name": "look up device",
+      "description": "Gateway checks the presented key and resolves the node's customer.",
+      "assets": ["credentials"],
+      "source_excerpt": "The gateway looks up the device in a device registry (Firestore) to check the key and to find out which customer the node belongs to.",
+      "source": "process:device-gateway",
+      "destination": "store:device-registry",
+      "protocol": "Firestore API",
+      "authentication": "unknown",
+      "data_description": "device identifier, key material, customer assignment",
+      "encryption_in_transit": "unknown"
+    },
+    {
+      "id": "flow:device-gateway-to-telemetry-normalizer:forward-readings",
+      "name": "forward readings",
+      "description": "Accepted readings are published onto Pub/Sub for the normalizer.",
+      "assets": ["pii"],
+      "source_excerpt": "Readings the gateway accepts are forwarded onto Pub/Sub and picked up by the telemetry normalizer",
+      "source": "process:device-gateway",
+      "destination": "process:telemetry-normalizer",
+      "protocol": "Pub/Sub",
+      "authentication": "unknown",
+      "data_description": "normalized sensor readings",
+      "encryption_in_transit": "unknown"
+    },
+    {
+      "id": "flow:telemetry-normalizer-to-telemetry-lake:load-readings",
+      "name": "load readings",
+      "description": "Normalizer writes readings into the lake.",
+      "assets": ["pii"],
+      "source_excerpt": "which writes them into the telemetry lake in BigQuery",
+      "source": "process:telemetry-normalizer",
+      "destination": "store:telemetry-lake",
+      "protocol": "BigQuery API",
+      "authentication": "unknown",
+      "data_description": "site addresses, occupancy patterns, readings",
+      "encryption_in_transit": "unknown"
+    },
+    {
+      "id": "flow:sensor-node-to-firmware-bucket:poll-firmware",
+      "name": "poll firmware",
+      "description": "Node polls for a new firmware image and installs what it finds.",
+      "assets": ["business-critical-data"],
+      "source_excerpt": "nodes poll a Cloud Storage bucket for a new image and install what they find",
+      "source": "entity:sensor-node",
+      "destination": "store:firmware-bucket",
+      "protocol": "HTTPS",
+      "authentication": "none; the bucket is public read",
+      "data_description": "firmware image",
+      "encryption_in_transit": "unknown"
+    },
+    {
+      "id": "flow:field-technician-to-sensor-node:local-service-session",
+      "name": "local service session",
+      "description": "Technician attaches to a node's serial console on site.",
+      "assets": [],
+      "source_excerpt": "Field technicians service nodes over a local serial console. I don't know what authentication that console has, if any.",
+      "source": "entity:field-technician",
+      "destination": "entity:sensor-node",
+      "protocol": "local serial console",
+      "authentication": "unknown",
+      "data_description": "device configuration and diagnostics",
+      "encryption_in_transit": "unknown"
+    },
+    {
+      "id": "flow:fleet-operator-to-telemetry-lake:query-dashboards",
+      "name": "query dashboards",
+      "description": "Operator reads fleet dashboards over BigQuery.",
+      "assets": ["pii"],
+      "source_excerpt": "look at dashboards over BigQuery from the corporate network, signed in with company SSO",
+      "source": "entity:fleet-operator",
+      "destination": "store:telemetry-lake",
+      "protocol": "BigQuery API",
+      "authentication": "company SSO",
+      "data_description": "aggregated and raw customer readings",
+      "encryption_in_transit": "unknown"
+    }
+  ],
+  "trust_boundaries": [
+    {
+      "id": "boundary:field-network",
+      "name": "field network",
+      "description": "Customer sites where nodes and technicians sit; outside the operator's physical control.",
+      "source_excerpt": "They are outside our physical control",
+      "kind": "network"
+    },
+    {
+      "id": "boundary:ingest-edge",
+      "name": "ingest edge",
+      "description": "Internet-exposed ingest tier: the broker, the registry it reads, and the firmware bucket.",
+      "source_excerpt": "expose to the internet because the nodes dial in from anywhere",
+      "kind": "network"
+    },
+    {
+      "id": "boundary:analytics-core",
+      "name": "analytics core",
+      "description": "Internal analytics network holding the normalizer and the lake.",
+      "source_excerpt": "a Python consumer in our analytics network",
+      "kind": "network"
+    },
+    {
+      "id": "boundary:corporate-network",
+      "name": "corporate network",
+      "description": "Staff network from which operators reach dashboards.",
+      "source_excerpt": "from the corporate network, signed in with company SSO",
+      "kind": "network"
+    }
+  ],
+  "assumptions": [
+    {
+      "assumption": "The firmware bucket accepts unauthenticated reads from anywhere.",
+      "element_id": "store:firmware-bucket",
+      "basis": "Described as \"public read\" and polled by devices that hold no credential for it."
+    },
+    {
+      "assumption": "The telemetry lake holds personal data about customer sites.",
+      "element_id": "store:telemetry-lake",
+      "basis": "Stated to contain \"site addresses and occupancy patterns\", described as customer data."
+    }
+  ]
+}

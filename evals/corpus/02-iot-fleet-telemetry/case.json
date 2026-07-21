@@ -1,0 +1,10 @@
+{
+  "id": "02-iot-fleet-telemetry",
+  "title": "Sensor fleet telemetry and firmware distribution",
+  "domain": "iot",
+  "exemplar_proximity": "far",
+  "provenance": "internal-system (synthetic, sanitized)",
+  "bootstrap": "agent-stand-in",
+  "source_sha256": "fc745e273aff8be740a814f0a9b4a45d6f3c6fe39dc7c8efa2b879d4f270ac74",
+  "notes": "Far-domain case (ticket 009 decision 6). Structurally unlike the payments exemplar in the ways that matter for recall: the external entities are physically accessible devices rather than browser users, the highest-severity path is a pull-based firmware update rather than a request/response API, identity is one shared key across thousands of principals, and the worst outcome is code execution on hardware rather than disclosure of records. If exemplar anchoring biases recall, the firmware and physical-access lanes are where it should show."
+}

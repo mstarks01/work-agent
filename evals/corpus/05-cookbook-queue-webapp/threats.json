@@ -1,0 +1,138 @@
+[
+  {
+    "category": "spoofing",
+    "affected_element_ids": ["flow:browser-to-web-application:page-request", "entity:browser"],
+    "claim": "An attacker interacts with the web application as a legitimate user, because how the application authenticates the browser is unverified.",
+    "tier": "must-find",
+    "severity": {"likelihood": "medium", "impact": "medium"},
+    "notes": "Authentication on the one internet-crossing flow is unknown; needs-info is an acceptable verdict, silence is not."
+  },
+  {
+    "category": "spoofing",
+    "affected_element_ids": ["flow:web-application-to-message-queue:enqueue-job", "store:message-queue"],
+    "claim": "An attacker who reaches the queue enqueues jobs as if they came from the web application, since queue authentication is unverified.",
+    "tier": "must-find",
+    "severity": {"likelihood": "medium", "impact": "high"},
+    "notes": "The queue is the trust hand-off in this design; nothing states how a producer is identified."
+  },
+  {
+    "category": "spoofing",
+    "affected_element_ids": ["flow:background-worker-to-database:read-write-records"],
+    "claim": "An attacker holding the worker's database credentials connects to the database as the worker.",
+    "tier": "expected",
+    "severity": {"likelihood": "medium", "impact": "high"},
+    "notes": "Credentials are stated to exist in the worker config; their protection is not."
+  },
+  {
+    "category": "tampering",
+    "affected_element_ids": ["store:message-queue", "process:background-worker"],
+    "claim": "An attacker places a poisoned message on the queue and the worker processes it as legitimate work.",
+    "tier": "must-find",
+    "severity": {"likelihood": "medium", "impact": "high"},
+    "notes": "The canonical queue-decoupling threat: the worker's input is only as trustworthy as write access to the queue."
+  },
+  {
+    "category": "tampering",
+    "affected_element_ids": ["store:web-application-config", "process:web-application"],
+    "claim": "An attacker who can write to the web application config changes the queue endpoint or credentials and redirects the application's work.",
+    "tier": "must-find",
+    "severity": {"likelihood": "low", "impact": "high"},
+    "notes": "Config stores are control planes; protection on this one is entirely unstated."
+  },
+  {
+    "category": "tampering",
+    "affected_element_ids": ["store:database", "flow:background-worker-to-database:read-write-records"],
+    "claim": "An attacker with the worker's database access alters application records or the log records stored alongside them.",
+    "tier": "expected",
+    "severity": {"likelihood": "medium", "impact": "high"},
+    "notes": "Records and their own audit log share one store — tampering with one covers the other."
+  },
+  {
+    "category": "repudiation",
+    "affected_element_ids": ["store:database", "process:background-worker"],
+    "claim": "An attacker who compromises the worker erases or edits the log records that would show what it did, because the logs live in the same database the worker writes.",
+    "tier": "must-find",
+    "severity": {"likelihood": "medium", "impact": "high"},
+    "notes": "The strongest finding available from the diagram: no separation between the audit record and the audited actor."
+  },
+  {
+    "category": "repudiation",
+    "affected_element_ids": ["store:message-queue", "flow:web-application-to-message-queue:enqueue-job"],
+    "claim": "The origin of a processed job cannot be established, because nothing records which producer enqueued it.",
+    "tier": "expected",
+    "severity": {"likelihood": "medium", "impact": "medium"},
+    "notes": "Decoupling removes the request context that would otherwise attribute the work."
+  },
+  {
+    "category": "information-disclosure",
+    "affected_element_ids": ["store:worker-config"],
+    "claim": "An attacker who compromises the background worker reads the database credentials from its config store.",
+    "tier": "must-find",
+    "severity": {"likelihood": "medium", "impact": "high"},
+    "notes": "This is the threat the original cookbook model records against this element; protection at rest is unstated."
+  },
+  {
+    "category": "information-disclosure",
+    "affected_element_ids": ["store:web-application-config"],
+    "claim": "An attacker who compromises the internet-facing web application reads the queue credentials from its config store.",
+    "tier": "must-find",
+    "severity": {"likelihood": "medium", "impact": "high"},
+    "notes": "Same shape as the worker finding, but reachable from the internet-facing tier, so likelier."
+  },
+  {
+    "category": "information-disclosure",
+    "affected_element_ids": ["store:database"],
+    "claim": "An attacker who reaches the database storage reads application and log records, whose protection at rest is unverified.",
+    "tier": "expected",
+    "severity": {"likelihood": "medium", "impact": "medium"},
+    "notes": "Data classification is unknown here, so impact cannot be rated higher than medium on the facts given."
+  },
+  {
+    "category": "information-disclosure",
+    "affected_element_ids": ["flow:web-application-to-message-queue:enqueue-job", "flow:background-worker-to-message-queue:consume-job"],
+    "claim": "An attacker on the internal network reads job contents in transit, because transport encryption between the tiers is unverified.",
+    "tier": "expected",
+    "severity": {"likelihood": "medium", "impact": "medium"},
+    "notes": "Only the browser link is marked encrypted; the rest is explicitly silent."
+  },
+  {
+    "category": "denial-of-service",
+    "affected_element_ids": ["store:message-queue", "process:background-worker"],
+    "claim": "An attacker floods the queue with jobs until the worker cannot keep up and queued work stops completing.",
+    "tier": "must-find",
+    "severity": {"likelihood": "medium", "impact": "medium"},
+    "notes": "A single worker behind an unbounded queue; the backlog is invisible to the user who submitted the work."
+  },
+  {
+    "category": "denial-of-service",
+    "affected_element_ids": ["process:web-application", "flow:browser-to-web-application:page-request"],
+    "claim": "An attacker floods the internet-facing web application until it stops serving browsers.",
+    "tier": "expected",
+    "severity": {"likelihood": "medium", "impact": "medium"},
+    "notes": "Generic but grounded: it is the only internet-facing element."
+  },
+  {
+    "category": "denial-of-service",
+    "affected_element_ids": ["store:database", "process:background-worker"],
+    "claim": "An attacker submits work that makes the worker exhaust database capacity, stalling both job processing and logging.",
+    "tier": "expected",
+    "severity": {"likelihood": "low", "impact": "medium"},
+    "notes": "Shared store means one saturation affects the audit trail too."
+  },
+  {
+    "category": "elevation-of-privilege",
+    "affected_element_ids": ["process:web-application", "store:message-queue"],
+    "claim": "An attacker who compromises the internet-facing web application uses its queue credentials to reach the backend tier.",
+    "tier": "must-find",
+    "severity": {"likelihood": "medium", "impact": "high"},
+    "notes": "The queue is the only path across the tier boundary, so it is the escalation route by construction."
+  },
+  {
+    "category": "elevation-of-privilege",
+    "affected_element_ids": ["process:background-worker", "store:database"],
+    "claim": "An attacker who gets code execution in the worker inherits whatever database privilege its credentials carry, which is unverified and may be unrestricted.",
+    "tier": "must-find",
+    "severity": {"likelihood": "medium", "impact": "high"},
+    "notes": "Job content is attacker-influenceable via the queue, so worker execution is a realistic starting point."
+  }
+]
