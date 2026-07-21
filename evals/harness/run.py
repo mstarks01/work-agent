@@ -32,12 +32,16 @@ from typing import Any
 
 from evals.harness import modes
 from evals.harness.calibration import AGREEMENT_BAR, load_pairs, measure_agreement
-from evals.harness.judge import VertexJudge, load_judge_config
+from evals.harness.critic_yield import (
+    CriticYield,
+    aggregate_yield,
+    score_case_with_yield,
+)
+from evals.harness.judge import Judge, VertexJudge, load_judge_config
 from evals.harness.reference import GoldenCase, load_corpus
 from evals.harness.scorer import (
     CaseScore,
     exemplar_delta,
-    score_case,
     unlisted_for_promotion,
 )
 from evals.harness.structural import report_issues
@@ -60,12 +64,12 @@ def _select(cases: Sequence[GoldenCase], wanted: Sequence[str]) -> list[GoldenCa
 
 async def _run_mode(
     cases: Sequence[GoldenCase], mode: str
-) -> tuple[list[dict[str, Any]], list[str], dict[str, Any]]:
+) -> tuple[list[dict[str, Any]], list[str], dict[str, modes.AnalysisRun]]:
     """Run one mode over the selected cases, collecting Tier 1 failures."""
     pipeline = modes.build_eval_pipeline(modes.MODE_ENTRIES[mode])
     failures: list[str] = []
     payloads: list[dict[str, Any]] = []
-    reports: dict[str, Any] = {}
+    runs: dict[str, modes.AnalysisRun] = {}
 
     for case in cases:
         if mode == "extraction":
@@ -79,27 +83,43 @@ async def _run_mode(
             ]
             continue
 
-        report = (
+        run = (
             await modes.run_analysis(case, pipeline)
             if mode == "analysis"
             else await modes.run_end_to_end(case, pipeline)
         )
-        reports[case.id] = report
-        issues = report_issues(report)
+        runs[case.id] = run
+        issues = report_issues(run.report)
         failures += [f"{case.id}: {issue}" for issue in issues]
         payloads.append({"case": case.id, "structural_issues": issues})
 
-    return payloads, failures, reports
+    return payloads, failures, runs
 
 
-def _score_reports(
-    cases: Sequence[GoldenCase], reports: dict[str, Any], judge: VertexJudge
-) -> list[CaseScore]:
-    return [
-        score_case(case, reports[case.id].threats, judge)
+def _score_runs(
+    cases: Sequence[GoldenCase],
+    runs: dict[str, modes.AnalysisRun],
+    judge: Judge,
+) -> tuple[list[CaseScore], list[CriticYield]]:
+    """Score every case on both sides of the critic (ticket 028).
+
+    Yield comes out of the same pass rather than a second sweep: the pre-critic
+    drafts are a superset of the report's threats, so scoring them first leaves
+    the post-critic pass replaying memoized rulings. The returned ``CaseScore``
+    is the post-critic one — what every metric in this harness has always
+    meant.
+    """
+    scored = [
+        score_case_with_yield(
+            case, runs[case.id].merged_drafts, runs[case.id].report.threats, judge
+        )
         for case in cases
-        if case.id in reports
+        if case.id in runs
     ]
+    return (
+        [entry.score for entry in scored],
+        [entry.critic_yield for entry in scored],
+    )
 
 
 def _models_record(judge: VertexJudge | None) -> dict[str, Any]:
@@ -140,16 +160,43 @@ def _print_scores(scores: Sequence[CaseScore]) -> None:
         )
 
 
+def _print_yields(yields: Sequence[CriticYield]) -> None:
+    """Both sides of the critic, always printed together.
+
+    ``killed-real`` is deliberately on the same line as ``killed-ungrounded``:
+    a kill count read on its own says nothing about whether the critic is
+    filtering noise or destroying findings.
+    """
+    for entry in yields:
+        print(
+            f"{entry.case_id:<26} critic {entry.drafts_in}->{entry.threats_out}"
+            f"  killed-ungrounded {entry.ungrounded_killed}/{entry.ungrounded_before}"
+            f"  killed-real {entry.matched_killed}/{entry.matched_before}"
+            f"  (must-find {entry.must_find_killed})"
+        )
+    if yields:
+        totals = aggregate_yield(yields)
+        print(
+            f"critic yield: killed {totals['killed']}/{totals['drafts_in']}"
+            f" ({totals['kill_rate']:.0%}),"
+            f" ungrounded caught {totals['ungrounded_kill_rate']:.0%},"
+            f" real destroyed {totals['matched_kill_rate']:.0%}"
+            " (instrument, non-gating)"
+        )
+
+
 def command_run(args: argparse.Namespace) -> int:
     cases = _select(load_corpus(args.corpus), args.case)
-    payloads, failures, reports = asyncio.run(_run_mode(cases, args.mode))
+    payloads, failures, runs = asyncio.run(_run_mode(cases, args.mode))
 
     scores: list[CaseScore] = []
+    yields: list[CriticYield] = []
     judge: VertexJudge | None = None
-    if reports and not args.no_scoring:
+    if runs and not args.no_scoring:
         judge = VertexJudge(load_judge_config())
-        scores = _score_reports(cases, reports, judge)
+        scores, yields = _score_runs(cases, runs, judge)
         _print_scores(scores)
+        _print_yields(yields)
 
     artifact = {
         "mode": args.mode,
@@ -160,6 +207,8 @@ def command_run(args: argparse.Namespace) -> int:
         "mode_output": payloads,
         "scores": [score.to_json() for score in scores],
         "exemplar_delta": exemplar_delta(scores) if scores else None,
+        "critic_yield": [entry.to_json() for entry in yields],
+        "critic_yield_aggregate": aggregate_yield(yields) if yields else None,
         "unlisted_for_promotion": unlisted_for_promotion(scores),
     }
     if args.out:

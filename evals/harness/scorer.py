@@ -29,6 +29,15 @@ category teaches, and get their own bucket.
 Every number here is **judge-relative**. Valid for tracking movement and
 comparing configurations; not an absolute, and not comparable to published
 figures from other tools.
+
+The scorer takes :class:`~stride_service.report.DraftThreat`, not
+:class:`~stride_service.report.Threat`, so the *same* function scores the
+pre-critic union and the post-critic report (ticket 028). Nothing is promoted
+to make that work: ``verdict`` and ``confidence`` are the critic's outputs, and
+synthesizing them to measure the critic would decide the answer by fiat. The
+one field a draft cannot supply — the ``needs-info`` adjudication bypass — is
+therefore simply inactive before the critic has ruled, which is the honest
+reading of a set nobody has ruled on yet.
 """
 
 from __future__ import annotations
@@ -45,10 +54,10 @@ from evals.harness.judge import (
     UnmatchedThreat,
 )
 from evals.harness.reference import GoldenCase, ReferenceThreat
-from stride_service.report import SeverityLevel, StrideCategory, Threat
+from stride_service.report import DraftThreat, SeverityLevel, StrideCategory, Threat
 
 
-def candidate_claim(threat: Threat) -> str:
+def candidate_claim(threat: DraftThreat) -> str:
     """The produced threat's claim, as the judge sees it.
 
     The ``title``: ticket 019 defines it as one scannable line naming the
@@ -57,9 +66,20 @@ def candidate_claim(threat: Threat) -> str:
     ``description`` instead would grade prose no one asked the model to
     reproduce, and it is what the hand-labelled calibration fixtures were
     written against — so the judged task offline and the judged task in a live
-    run are the same task.
+    run are the same task. It is defined on the *draft* base class for the same
+    reason: a draft and the threat it becomes are judged on the same string, or
+    critic yield compares two numbers that were never comparable.
     """
     return threat.title
+
+
+def _is_needs_info(threat: DraftThreat) -> bool:
+    """Whether a produced threat carries the critic's ``needs-info`` verdict.
+
+    Only a ruled :class:`Threat` can: a draft has no verdict yet, so the
+    decision-9 bypass is inactive on the pre-critic side rather than guessed at.
+    """
+    return isinstance(threat, Threat) and threat.verdict.status == "needs-info"
 
 
 @dataclass(frozen=True)
@@ -164,6 +184,7 @@ class CaseScore:
 
     case_id: str
     exemplar_proximity: str
+    produced_ids: tuple[str, ...]
     produced_count: int
     reference_count: int
     must_find_total: int
@@ -183,17 +204,17 @@ class CaseScore:
 
     @property
     def must_find_recall(self) -> float:
-        return _ratio(self.must_find_matched, self.must_find_total)
+        return ratio(self.must_find_matched, self.must_find_total)
 
     @property
     def expected_recall(self) -> float:
         expected_total = self.reference_count - self.must_find_total
         matched = sum(1 for pair in self.matched if pair.tier == "expected")
-        return _ratio(matched, expected_total)
+        return ratio(matched, expected_total)
 
     @property
     def recall(self) -> float:
-        return _ratio(len(self.matched), self.reference_count)
+        return ratio(len(self.matched), self.reference_count)
 
     # --- Tier 3: tracked, never absolute ---------------------------------
 
@@ -202,19 +223,19 @@ class CaseScore:
         """Of the produced threats that correspond to a reference at all, the
         fraction filed in the right lane. Categorization is a documented
         failure mode (arXiv:2505.04101) and otherwise invisible."""
-        return _ratio(len(self.matched), len(self.matched) + len(self.lane_errors))
+        return ratio(len(self.matched), len(self.matched) + len(self.lane_errors))
 
     @property
     def element_accuracy(self) -> float:
         """Of matched pairs, the fraction citing at least one shared element.
         Traceability is the property the whole report schema exists for."""
-        return _ratio(
+        return ratio(
             sum(1 for pair in self.matched if pair.element_overlap), len(self.matched)
         )
 
     @property
     def element_jaccard(self) -> float:
-        return _ratio(
+        return ratio(
             sum(pair.element_jaccard for pair in self.matched), len(self.matched)
         )
 
@@ -226,14 +247,14 @@ class CaseScore:
     @property
     def ungrounded_rate(self) -> float:
         """The one gating Tier 3 number: hallucination is what destroys trust."""
-        return _ratio(self.bucket_counts["ungrounded"], self.produced_count)
+        return ratio(self.bucket_counts["ungrounded"], self.produced_count)
 
     @property
     def severity_exact_rate(self) -> float:
         exact = sum(
             1 for pair in self.matched if pair.reference_level == pair.produced_level
         )
-        return _ratio(exact, len(self.matched))
+        return ratio(exact, len(self.matched))
 
     def to_json(self) -> dict[str, Any]:
         return {
@@ -273,18 +294,20 @@ class CaseScore:
 _BUCKETS: tuple[Bucket, ...] = ("ungrounded", "valid-unlisted", "noise")
 
 
-def _ratio(numerator: float, denominator: float) -> float:
+def ratio(numerator: float, denominator: float) -> float:
     """Zero denominators are 0.0, never a crash and never a silent 100%."""
     return numerator / denominator if denominator else 0.0
 
 
 def score_case(
-    case: GoldenCase, produced: Sequence[Threat], judge: Judge
+    case: GoldenCase, produced: Sequence[DraftThreat], judge: Judge
 ) -> CaseScore:
     """Score one case's produced threats against its reference set.
 
-    ``produced`` is a threat list rather than a report so the same scorer can
-    run over the pre-critic merged drafts when critic yield lands (ticket 025).
+    ``produced`` is a bare threat list rather than a report, and typed at the
+    draft base class, so this one function scores both sides of the critic
+    (ticket 028): the merged drafts going in, and the report's threats coming
+    out.
     """
     rulings: list[PairRuling] = []
     in_lane = _judge_in_lane(case, produced, judge, rulings)
@@ -318,6 +341,7 @@ def score_case(
     return CaseScore(
         case_id=case.id,
         exemplar_proximity=case.meta.exemplar_proximity,
+        produced_ids=tuple(threat.id for threat in produced),
         produced_count=len(produced),
         reference_count=len(case.references),
         must_find_total=len(case.must_find),
@@ -333,7 +357,7 @@ def score_case(
 
 def _judge_in_lane(
     case: GoldenCase,
-    produced: Sequence[Threat],
+    produced: Sequence[DraftThreat],
     judge: Judge,
     rulings: list[PairRuling],
 ) -> dict[int, list[int]]:
@@ -375,7 +399,7 @@ def _judge_in_lane(
 def _assign(
     candidates: dict[int, list[int]],
     references: Sequence[ReferenceThreat],
-    produced: Sequence[Threat],
+    produced: Sequence[DraftThreat],
 ) -> dict[int, int]:
     """Step 3: maximum one-to-one assignment, deterministically.
 
@@ -410,7 +434,7 @@ def _assign(
 
 
 def _matched_pair(
-    reference_index: int, reference: ReferenceThreat, threat: Threat
+    reference_index: int, reference: ReferenceThreat, threat: DraftThreat
 ) -> MatchedPair:
     reference_ids = set(reference.affected_element_ids)
     produced_ids = set(threat.affected_element_ids)
@@ -420,7 +444,7 @@ def _matched_pair(
         threat_id=threat.id,
         tier=reference.tier,
         element_overlap=bool(shared),
-        element_jaccard=_ratio(len(shared), len(reference_ids | produced_ids)),
+        element_jaccard=ratio(len(shared), len(reference_ids | produced_ids)),
         reference_level=reference.severity.level,
         produced_level=threat.severity.level,
         likelihood_agrees=reference.severity.likelihood == threat.severity.likelihood,
@@ -430,7 +454,7 @@ def _matched_pair(
 
 def _find_lane_errors(
     case: GoldenCase,
-    produced: Sequence[Threat],
+    produced: Sequence[DraftThreat],
     judge: Judge,
     rulings: list[PairRuling],
     unmatched_positions: Sequence[int],
@@ -487,7 +511,7 @@ def _find_lane_errors(
 
 def _adjudicate(
     case: GoldenCase,
-    produced: Sequence[Threat],
+    produced: Sequence[DraftThreat],
     judge: Judge,
     unmatched_positions: Sequence[int],
     misfiled: set[str],
@@ -507,7 +531,7 @@ def _adjudicate(
         threat = produced[position]
         if threat.id in misfiled:
             continue
-        if threat.verdict.status == "needs-info":
+        if _is_needs_info(threat):
             needs_info.append(threat.id)
             continue
         ruling = judge.adjudicate(
@@ -550,10 +574,10 @@ def _severity_confusion(matched: Iterable[MatchedPair]) -> dict[str, int]:
 def severity_axis_agreement(matched: Sequence[MatchedPair]) -> dict[str, float]:
     """Which axis the model gets wrong, since the band hides it."""
     return {
-        "likelihood": _ratio(
+        "likelihood": ratio(
             sum(1 for pair in matched if pair.likelihood_agrees), len(matched)
         ),
-        "impact": _ratio(
+        "impact": ratio(
             sum(1 for pair in matched if pair.impact_agrees), len(matched)
         ),
     }
@@ -567,8 +591,8 @@ def exemplar_delta(scores: Sequence[CaseScore]) -> dict[str, float]:
     """
     near = [score for score in scores if score.exemplar_proximity == "near"]
     far = [score for score in scores if score.exemplar_proximity == "far"]
-    near_recall = _ratio(sum(score.recall for score in near), len(near))
-    far_recall = _ratio(sum(score.recall for score in far), len(far))
+    near_recall = ratio(sum(score.recall for score in near), len(near))
+    far_recall = ratio(sum(score.recall for score in far), len(far))
     return {
         "near_recall": round(near_recall, 3),
         "far_recall": round(far_recall, 3),

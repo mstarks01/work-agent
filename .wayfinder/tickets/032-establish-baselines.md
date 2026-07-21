@@ -39,6 +39,18 @@ Then promote the gates:
 
 Tier 1 structural gates already gate day one and stay as they are.
 
+**Critic yield arrives instrumented but un-thresholded**
+([Instrument and score critic yield](028-critic-yield-instrumentation.md)): the
+sweeps will print and record `ungrounded_killed` and `matched_killed` per case
+and pooled, and whether either becomes a gate is this ticket's call, from the
+observed spread. Read them as a pair. `matched_killed` — and especially
+`must_find_killed` — is the one number here that can veto ticket 004's
+generator-critic pattern rather than merely tune it, so if it is non-trivial,
+that finding outranks the gate-promotion work in this ticket. Yield costs
+almost nothing on top of a sweep: the pre-critic pass memoizes its judge
+rulings for the post-critic pass, so it does not change the quota arithmetic
+below.
+
 Also settle what the sweeps make answerable and nothing else can: the
 **near-vs-far exemplar recall delta** — tracked, deliberately **non-gating**,
 since a large delta is a finding to act on, not a build to break. Recording that

@@ -161,6 +161,56 @@ class Judge(Protocol):
     ) -> BucketRuling: ...
 
 
+class MemoJudge:
+    """A judge that answers a repeated question with its first answer.
+
+    Exists for critic yield (ticket 028), which scores the pre-critic drafts
+    and the post-critic threats against the *same* references. The post-critic
+    set is a subset of the pre-critic one, so without memoization the second
+    pass re-asks — and re-pays for — a question already answered, and a judge
+    at non-zero temperature could answer it differently the second time. That
+    would show up as critic yield rather than as judge variance, which is the
+    one thing this instrument must not manufacture.
+
+    **Scope it to one case.** ``adjudicate`` takes a system model that is not
+    part of the key, so a memo shared across cases could hand one case's ruling
+    to another; per-case instances make that impossible by construction rather
+    than by a digest nobody would maintain.
+    """
+
+    def __init__(self, inner: Judge) -> None:
+        self._inner = inner
+        self._claims: dict[ClaimPair, ClaimRuling] = {}
+        self._buckets: dict[tuple[UnmatchedThreat, tuple[str, ...]], BucketRuling] = {}
+        self.hits = 0
+
+    def equivalent(self, pair: ClaimPair) -> ClaimRuling:
+        if pair in self._claims:
+            self.hits += 1
+        else:
+            self._claims[pair] = self._inner.equivalent(pair)
+        return self._claims[pair]
+
+    def adjudicate(
+        self,
+        threat: UnmatchedThreat,
+        system_model: SystemModel,
+        sibling_claims: tuple[str, ...],
+    ) -> BucketRuling:
+        # ``sibling_claims`` is part of the key on purpose: the pre-critic set
+        # carries the drafts the critic went on to kill, so the same threat is
+        # genuinely being adjudicated against a different field of siblings on
+        # each side, and reusing one ruling for both would be wrong.
+        key = (threat, sibling_claims)
+        if key in self._buckets:
+            self.hits += 1
+        else:
+            self._buckets[key] = self._inner.adjudicate(
+                threat, system_model, sibling_claims
+            )
+        return self._buckets[key]
+
+
 def claim_payload(pair: ClaimPair, *, rng: random.Random) -> dict[str, object]:
     """The pair as the judge sees it, in randomized presentation order.
 

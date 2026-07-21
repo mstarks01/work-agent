@@ -17,7 +17,13 @@ from evals.harness.judge import (
     UnmatchedThreat,
 )
 from evals.harness.reference import ReferenceThreat
-from stride_service.report import Severity, StrideCategory, Threat, Verdict
+from stride_service.report import (
+    DraftThreat,
+    Severity,
+    StrideCategory,
+    Threat,
+    Verdict,
+)
 from stride_service.system_model import SystemModel
 
 CATEGORY_LETTERS = {
@@ -92,6 +98,32 @@ class LabelReplayJudge:
         raise AssertionError("calibration never adjudicates")
 
 
+def draft_threat(
+    sequence: int,
+    category: StrideCategory,
+    title: str,
+    *,
+    element_ids: Iterable[str] = ("entity:shopper",),
+    likelihood: str = "high",
+    impact: str = "high",
+) -> DraftThreat:
+    """One analyst's draft, as ``merge_drafts`` parks it for the critic.
+
+    No verdict and no confidence: those are the critic's, and critic yield
+    exists to measure what the critic did with drafts exactly this shape.
+    """
+    return DraftThreat(
+        id=f"{CATEGORY_LETTERS[category]}-{sequence:02d}",
+        category=category,
+        title=title,
+        description=f"{title} Details for the scorer's adjudication step.",
+        affected_element_ids=list(element_ids),
+        severity=Severity(
+            likelihood=likelihood, impact=impact, justification="scripted"
+        ),
+    )
+
+
 def produced_threat(
     sequence: int,
     category: StrideCategory,
@@ -114,17 +146,23 @@ def produced_threat(
             ],
         )
     )
+    draft = draft_threat(
+        sequence,
+        category,
+        title,
+        element_ids=element_ids,
+        likelihood=likelihood,
+        impact=impact,
+    )
+    return promote(draft, verdict=verdict)
+
+
+def promote(draft: DraftThreat, *, verdict: Verdict | None = None) -> Threat:
+    """The draft as the critic would return it: same claim, plus its rulings."""
     return Threat(
-        id=f"{CATEGORY_LETTERS[category]}-{sequence:02d}",
-        category=category,
-        title=title,
-        description=f"{title} Details for the scorer's adjudication step.",
-        affected_element_ids=list(element_ids),
-        severity=Severity(
-            likelihood=likelihood, impact=impact, justification="scripted"
-        ),
+        **draft.model_dump(),
         confidence="high",
-        verdict=verdict,
+        verdict=verdict or Verdict(status="confirmed"),
     )
 
 

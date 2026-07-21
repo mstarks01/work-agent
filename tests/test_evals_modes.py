@@ -122,7 +122,7 @@ def test_analysis_mode_injects_the_blessed_model_at_prepare(case):
     models: dict[str, ScriptedLlm] = {}
     pipeline = build(case, ENTRY_PREPARE, models)
 
-    report = asyncio.run(modes.run_analysis(case, pipeline))
+    report = asyncio.run(modes.run_analysis(case, pipeline)).report
 
     # No extraction ran, and the analysts saw exactly the blessed model — the
     # whole point of the mode (ticket 009 decision 1).
@@ -135,7 +135,7 @@ def test_analysis_mode_injects_the_blessed_model_at_prepare(case):
 def test_analysis_mode_output_passes_the_tier_1_gates(case):
     pipeline = build(case, ENTRY_PREPARE, {})
 
-    report = asyncio.run(modes.run_analysis(case, pipeline))
+    report = asyncio.run(modes.run_analysis(case, pipeline)).report
 
     assert report_issues(report) == []
     assert len(report.threats) == len(STRIDE_CATEGORIES)
@@ -146,7 +146,7 @@ def test_analysis_mode_scores_against_the_reference_set(case):
     from evals.harness.scorer import score_case
 
     pipeline = build(case, ENTRY_PREPARE, {})
-    report = asyncio.run(modes.run_analysis(case, pipeline))
+    report = asyncio.run(modes.run_analysis(case, pipeline)).report
     # The scripted threats are titled with reference claims verbatim, so a
     # judge that matches identical strings is the honest stand-in here.
     judge = ScriptedJudge(
@@ -158,6 +158,29 @@ def test_analysis_mode_scores_against_the_reference_set(case):
     assert len(score.matched) == len(STRIDE_CATEGORIES)
     assert score.element_accuracy == 1.0
     assert score.severity_exact_rate == 1.0
+
+
+def test_analysis_mode_surfaces_the_pre_critic_drafts(case):
+    # Ticket 028: the union the critic was handed, read off the state key
+    # ``merge_drafts`` already writes — no production seam moves for it.
+    pipeline = build(case, ENTRY_PREPARE, {})
+
+    run = asyncio.run(modes.run_analysis(case, pipeline))
+
+    assert len(run.merged_drafts) == len(STRIDE_CATEGORIES)
+    assert {draft.id for draft in run.merged_drafts} == {
+        threat.id for threat in run.report.threats
+    }
+    # Drafts, not threats: the critic's two rulings are absent by construction.
+    assert not any(hasattr(draft, "verdict") for draft in run.merged_drafts)
+
+
+def test_end_to_end_mode_surfaces_the_pre_critic_drafts(case):
+    pipeline = build(case, ENTRY_EXTRACT, {})
+
+    run = asyncio.run(modes.run_end_to_end(case, pipeline))
+
+    assert len(run.merged_drafts) == len(STRIDE_CATEGORIES)
 
 
 def test_extraction_mode_runs_extract_alone(case):
@@ -203,7 +226,7 @@ def test_end_to_end_mode_runs_the_production_entry(case):
     models: dict[str, ScriptedLlm] = {}
     pipeline = build(case, ENTRY_EXTRACT, models)
 
-    report = asyncio.run(modes.run_end_to_end(case, pipeline))
+    report = asyncio.run(modes.run_end_to_end(case, pipeline)).report
 
     assert "extract" in models
     assert report_issues(report) == []

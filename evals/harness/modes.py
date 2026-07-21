@@ -46,6 +46,7 @@ from stride_service.graph import (
     STATE_ANALYSIS,
     STATE_EXTRACTED_MODEL,
     STATE_INPUT_TEXT,
+    STATE_MERGED_DRAFTS,
     STATE_REJECTION,
     STATE_VALID_MODEL,
     Analysis,
@@ -58,6 +59,7 @@ from stride_service.graph import (
 from stride_service.markdown_loader import MarkdownLoader
 from stride_service.model_tiers import load_model_tiers
 from stride_service.report import (
+    DraftThreat,
     InputRef,
     Job,
     NodeRun,
@@ -83,6 +85,23 @@ class ExtractionResult:
     case_id: str
     extracted: SystemModel | None
     issues: tuple[ValidationIssue, ...]
+
+
+@dataclass(frozen=True)
+class AnalysisRun:
+    """A graph run's report, plus the draft union the critic was handed.
+
+    The drafts are read straight off ``merged_drafts`` in the final session
+    state, which is where :func:`~stride_service.graph.merge_drafts` parks them
+    on the way into the critic — so critic yield (ticket 028) costs one extra
+    state key here and no change to the production seam. Reading them back as
+    :class:`DraftThreat` rather than passing the raw dicts on keeps the scorer
+    typed against the shipped model, and revalidates on the way out of state
+    exactly as :func:`~stride_service.graph.assemble_report` does.
+    """
+
+    report: StrideReport
+    merged_drafts: tuple[DraftThreat, ...]
 
 
 @dataclass(frozen=True)
@@ -214,7 +233,7 @@ def _crossings_match(blessed: SystemModel, extracted: SystemModel | None) -> boo
         return False
 
 
-async def run_analysis(case: GoldenCase, pipeline: Pipeline) -> StrideReport:
+async def run_analysis(case: GoldenCase, pipeline: Pipeline) -> AnalysisRun:
     """Mode 2: the blessed model injected at ``prepare``.
 
     The seeded ``valid_model`` is the blessed one, so the analysts see exactly
@@ -225,18 +244,18 @@ async def run_analysis(case: GoldenCase, pipeline: Pipeline) -> StrideReport:
         {STATE_VALID_MODEL: case.model.model_dump(mode="json")},
         case.source_text,
     )
-    return _report_from_state(case, state)
+    return _run_from_state(case, state)
 
 
-async def run_end_to_end(case: GoldenCase, pipeline: Pipeline) -> StrideReport:
+async def run_end_to_end(case: GoldenCase, pipeline: Pipeline) -> AnalysisRun:
     """Mode 3: text in, report out — the integration smoke test."""
     state = await run_graph(
         pipeline, {STATE_INPUT_TEXT: case.source_text}, case.source_text
     )
-    return _report_from_state(case, state)
+    return _run_from_state(case, state)
 
 
-def _report_from_state(case: GoldenCase, state: Mapping[str, Any]) -> StrideReport:
+def _run_from_state(case: GoldenCase, state: Mapping[str, Any]) -> AnalysisRun:
     """Complete the graph's :class:`Analysis` into a report, as production does.
 
     The eval stamps the same job/input/node metadata
@@ -251,10 +270,12 @@ def _report_from_state(case: GoldenCase, state: Mapping[str, Any]) -> StrideRepo
         raise EvalRunError(f"{case.id}: the graph rejected the model: {detail}")
     if STATE_ANALYSIS not in state:
         raise EvalRunError(f"{case.id}: graph produced neither analysis nor rejection")
+    if STATE_MERGED_DRAFTS not in state:
+        raise EvalRunError(f"{case.id}: graph produced an analysis with no drafts")
 
     analysis = Analysis.from_state(state[STATE_ANALYSIS])
     now = datetime.now(UTC)
-    return StrideReport(
+    report = StrideReport(
         job=Job(id=f"eval-{case.id}", created_at=now, completed_at=now),
         input=InputRef(
             system_name=case.meta.title,
@@ -269,6 +290,10 @@ def _report_from_state(case: GoldenCase, state: Mapping[str, Any]) -> StrideRepo
         rejected_threats=analysis.rejected_threats,
         summary=analysis.summary,
     )
+    drafts = tuple(
+        DraftThreat.model_validate(draft) for draft in state[STATE_MERGED_DRAFTS]
+    )
+    return AnalysisRun(report=report, merged_drafts=drafts)
 
 
 MODE_ENTRIES: dict[str, Entry] = {

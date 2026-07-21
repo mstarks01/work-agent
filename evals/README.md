@@ -74,9 +74,9 @@ python -m evals.harness.run calibrate --out agreement.json
 
 `run` exits non-zero only on **Tier 1 structural** failures. Must-find recall,
 lane and element accuracy, the ungrounded rate, the severity confusion and the
-near/far exemplar delta are all computed, printed and written to the artifact —
-and none of them block, until ticket 025 has the ~5 baseline sweeps that say
-what normal looks like. `calibrate` exits non-zero below the 90% agreement bar;
+near/far exemplar delta and critic yield are all computed, printed and written
+to the artifact — and none of them block, until ticket 032 has the ~5 baseline
+sweeps that say what normal looks like. `calibrate` exits non-zero below the 90% agreement bar;
 failing it means the judge prompt needs work, not a lowered bar.
 
 ## Metrics, and what they are not
@@ -93,6 +93,16 @@ failing it means the judge prompt needs work, not a lowered bar.
   `valid-unlisted` is explicitly *not* a failure, and recurring entries are
   surfaced in the artifact for promotion into the reference set.
 - **`needs-info`** — never a false positive. Its own bucket, never adjudicated.
+- **critic yield** — always read as a *pair*. `killed-ungrounded` is the critic
+  earning the most expensive node in the graph; `killed-real` is the same critic
+  destroying findings that matched a reference, and it is the number that can
+  veto ticket 004's generator-critic pattern outright. A kill count on its own
+  says neither. Both come from scoring the pre-critic draft union and the
+  report through the *same* scorer on the same claim string (the title), so the
+  two sides are comparable by construction; the second pass replays memoized
+  judge rulings and costs almost nothing. Comparators: Semgrep's assistant
+  kills ~20% at 92–96% agreement with human triage, unfiltered LLM enumeration
+  runs ~86% raw false positives.
 
 ## Phase-1 corpus
 
