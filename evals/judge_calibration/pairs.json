@@ -1288,6 +1288,262 @@
     "note": "Same action at build time, which is what separates it from the tampering claim on the same flow."
   },
   {
+    "case": "08-sso-identity-broker",
+    "category": "spoofing",
+    "reference_claim": "An attacker holding the signing key mints a token for any staff id carrying any groups, and every application accepts it as a genuine sign-in.",
+    "candidate_claim": "An attacker who has the signing key issues themselves a token with whatever groups they like and every application honours it.",
+    "label": "match",
+    "note": "Same action, same target."
+  },
+  {
+    "case": "08-sso-identity-broker",
+    "category": "spoofing",
+    "reference_claim": "An attacker holding the signing key mints a token for any staff id carrying any groups, and every application accepts it as a genuine sign-in.",
+    "candidate_claim": "An attacker reads the signing key out of the key store.",
+    "label": "no-match",
+    "note": "Hard negative: recovering the key is the information-disclosure reference, and using it to mint tokens is this one."
+  },
+  {
+    "case": "08-sso-identity-broker",
+    "category": "spoofing",
+    "reference_claim": "The franchise identity provider vouches for someone who is not a franchise colleague and the broker signs them in as that person, since nothing records which colleagues it may vouch for.",
+    "candidate_claim": "The franchise provider asserts an identity it should not be able to assert and the broker signs that person in.",
+    "label": "match",
+    "note": "Paraphrase with the same stated mechanism."
+  },
+  {
+    "case": "08-sso-identity-broker",
+    "category": "spoofing",
+    "reference_claim": "The franchise identity provider vouches for someone who is not a franchise colleague and the broker signs them in as that person, since nothing records which colleagues it may vouch for.",
+    "candidate_claim": "An attacker intercepts the franchise provider's assertion and replays it later to sign in.",
+    "label": "no-match",
+    "note": "Hard negative: replaying an authentic assertion is a distinct action from the provider asserting something it should not."
+  },
+  {
+    "case": "08-sso-identity-broker",
+    "category": "spoofing",
+    "reference_claim": "An attacker signs in to the broker as a colleague, because whether colleagues are asked for a second factor is unverified.",
+    "candidate_claim": "An attacker who has a colleague's password signs in to the broker as them, since a second factor is not established.",
+    "label": "match",
+    "note": "Same action, same target; the candidate names the credential where the reference names the unverified control."
+  },
+  {
+    "case": "08-sso-identity-broker",
+    "category": "spoofing",
+    "reference_claim": "An attacker who obtains a colleague's token acts as that colleague for the rest of its twelve hours, because nothing calls back to the broker and there is no way to pull a token back.",
+    "candidate_claim": "An attacker who steals a colleague's token keeps using it until it expires, because it cannot be revoked.",
+    "label": "match",
+    "note": "Same action and the same two stated qualifiers."
+  },
+  {
+    "case": "08-sso-identity-broker",
+    "category": "spoofing",
+    "reference_claim": "An attacker who obtains a colleague's token acts as that colleague for the rest of its twelve hours, because nothing calls back to the broker and there is no way to pull a token back.",
+    "candidate_claim": "An attacker who steals a colleague's token changes the groups inside it to become a store manager.",
+    "label": "no-match",
+    "note": "Ungrounded: the tokens are signed, so editing claims is not available without the key, and the model supports no such action."
+  },
+  {
+    "case": "08-sso-identity-broker",
+    "category": "spoofing",
+    "reference_claim": "An attacker serves the console a signing public key of their own so that tokens the attacker signed verify, since how the console fetches and trusts that key is unverified.",
+    "candidate_claim": "An attacker gets the console to trust a signing key of the attacker's own so forged tokens verify.",
+    "label": "match",
+    "note": "Same action, same target."
+  },
+  {
+    "case": "08-sso-identity-broker",
+    "category": "tampering",
+    "reference_claim": "An attacker writes a group into the broker's directory and the next token issued to that colleague carries it into every application.",
+    "candidate_claim": "An attacker adds a group to a colleague's record in the directory and their next token carries it.",
+    "label": "match",
+    "note": "Same action, same target."
+  },
+  {
+    "case": "08-sso-identity-broker",
+    "category": "tampering",
+    "reference_claim": "An attacker writes a group into the broker's directory and the next token issued to that colleague carries it into every application.",
+    "candidate_claim": "An attacker reads everyone's group membership out of the directory.",
+    "label": "no-match",
+    "note": "Hard negative: the read against the same store is its own reference in the information-disclosure lane."
+  },
+  {
+    "case": "08-sso-identity-broker",
+    "category": "tampering",
+    "reference_claim": "An attacker alters what the nightly pull returns so that groups are granted, or so that leavers are never removed.",
+    "candidate_claim": "An attacker tampers with the overnight feed from HR so a leaver is never removed.",
+    "label": "match",
+    "note": "Same action, and the candidate names one of the two outcomes the reference gives."
+  },
+  {
+    "case": "08-sso-identity-broker",
+    "category": "tampering",
+    "reference_claim": "An attacker alters what the nightly pull returns so that groups are granted, or so that leavers are never removed.",
+    "candidate_claim": "An attacker prevents the overnight feed from running so no group changes arrive.",
+    "label": "no-match",
+    "note": "Hard negative: stopping the pull is the denial-of-service reference; altering what it returns is this one."
+  },
+  {
+    "case": "08-sso-identity-broker",
+    "category": "tampering",
+    "reference_claim": "An attacker alters or removes sign-in records in the audit log so a sign-in leaves no trace.",
+    "candidate_claim": "An attacker deletes their own sign-in from the audit log.",
+    "label": "match",
+    "note": "Narrower instance of the same action against the same target."
+  },
+  {
+    "case": "08-sso-identity-broker",
+    "category": "repudiation",
+    "reference_claim": "A franchise sign-in cannot be attributed to a person, because the identity was asserted by a provider we do not run and whether the log covers that route at all is unverified.",
+    "candidate_claim": "When a franchise sign-in is disputed there is nobody to hold to it, because another company asserted the identity and the log may not cover it at all.",
+    "label": "match",
+    "note": "Paraphrase carrying both halves of the reference's mechanism."
+  },
+  {
+    "case": "08-sso-identity-broker",
+    "category": "repudiation",
+    "reference_claim": "A price change or a void cannot be tied to the store it belongs to, because the console never establishes which store the token holder is from.",
+    "candidate_claim": "A price change cannot be pinned to a store, because the console never learns which store the token holder works in.",
+    "label": "match",
+    "note": "Same claim, same mechanism."
+  },
+  {
+    "case": "08-sso-identity-broker",
+    "category": "repudiation",
+    "reference_claim": "A price change or a void cannot be tied to the store it belongs to, because the console never establishes which store the token holder is from.",
+    "candidate_claim": "A store manager changes prices in a store that is not theirs.",
+    "label": "no-match",
+    "note": "Hard negative and the pair this case turns on: the elevation reference is the act, this lane is the inability to attribute it afterwards."
+  },
+  {
+    "case": "08-sso-identity-broker",
+    "category": "repudiation",
+    "reference_claim": "A disputed sign-in may have no evidence behind it, since what the audit log records is unverified.",
+    "candidate_claim": "A colleague denies signing in and the log cannot settle it, since what it records is unverified.",
+    "label": "match",
+    "note": "Same claim, stated as the dispute rather than as the condition."
+  },
+  {
+    "case": "08-sso-identity-broker",
+    "category": "information-disclosure",
+    "reference_claim": "An attacker who reaches the key store reads the signing key, since protection of what it holds at rest is unverified.",
+    "candidate_claim": "An attacker who reaches the key store walks away with the token signing key.",
+    "label": "match",
+    "note": "Same action, same target."
+  },
+  {
+    "case": "08-sso-identity-broker",
+    "category": "information-disclosure",
+    "reference_claim": "An attacker who reaches the directory reads colleague records and everyone's group membership, since protection at rest is unverified.",
+    "candidate_claim": "An attacker who reaches the directory reads colleague records and who is in which group.",
+    "label": "match",
+    "note": "Same read action, same target."
+  },
+  {
+    "case": "08-sso-identity-broker",
+    "category": "information-disclosure",
+    "reference_claim": "An attacker who reaches the audit log reads when and from where colleagues signed in, since protection at rest is unverified.",
+    "candidate_claim": "An attacker who reaches the audit log alters the sign-in records in it.",
+    "label": "no-match",
+    "note": "Hard negative: reading and altering the same store are two claims, and the alteration is its own reference in the tampering lane."
+  },
+  {
+    "case": "08-sso-identity-broker",
+    "category": "information-disclosure",
+    "reference_claim": "An attacker on the path between a colleague and the broker reads the sign-in and the token that comes back, since protection of that traffic is unverified.",
+    "candidate_claim": "An attacker on the network path between a colleague at home and the broker captures the token issued to them.",
+    "label": "match",
+    "note": "Same action, same flow; the token riding back on the sign-in interaction is what the reference claims."
+  },
+  {
+    "case": "08-sso-identity-broker",
+    "category": "information-disclosure",
+    "reference_claim": "An attacker on the path between a colleague and the broker reads the sign-in and the token that comes back, since protection of that traffic is unverified.",
+    "candidate_claim": "An attacker reads the public half of the signing key as the console fetches it.",
+    "label": "no-match",
+    "note": "Hard negative: a different flow, and reading a value the source calls public is not a disclosure this model supports."
+  },
+  {
+    "case": "08-sso-identity-broker",
+    "category": "denial-of-service",
+    "reference_claim": "An attacker makes the broker unavailable and no colleague can sign in to anything, because everything colleagues use signs them in through it.",
+    "candidate_claim": "An attacker takes the broker down and nobody can sign in anywhere.",
+    "label": "match",
+    "note": "Same action, same estate-wide consequence."
+  },
+  {
+    "case": "08-sso-identity-broker",
+    "category": "denial-of-service",
+    "reference_claim": "An attacker makes the broker unavailable and no colleague can sign in to anything, because everything colleagues use signs them in through it.",
+    "candidate_claim": "An attacker takes the store admin console down so prices cannot be changed.",
+    "label": "no-match",
+    "note": "Hard negative: same lane, a different target, and a consequence confined to one application rather than to every sign-in."
+  },
+  {
+    "case": "08-sso-identity-broker",
+    "category": "denial-of-service",
+    "reference_claim": "An attacker stops the nightly pull and group changes silently stop reaching the directory while everything else keeps working.",
+    "candidate_claim": "The nightly pull stops running and the directory quietly keeps serving group membership that is out of date.",
+    "label": "match",
+    "note": "Same action, same silent-staleness consequence."
+  },
+  {
+    "case": "08-sso-identity-broker",
+    "category": "denial-of-service",
+    "reference_claim": "An attacker destroys or replaces the signing key so that every application rejects every token at once.",
+    "candidate_claim": "An attacker replaces the signing key so that tokens already issued stop verifying everywhere at once.",
+    "label": "match",
+    "note": "Same action, same target."
+  },
+  {
+    "case": "08-sso-identity-broker",
+    "category": "elevation-of-privilege",
+    "reference_claim": "A colleague who is a store manager in one store changes prices and voids transactions in every store, because the console decides from the group alone and never checks which store they belong to.",
+    "candidate_claim": "A colleague holding a store-manager token voids transactions in a store they have nothing to do with, because only the group is checked.",
+    "label": "match",
+    "note": "Same escalation, same stated mechanism."
+  },
+  {
+    "case": "08-sso-identity-broker",
+    "category": "elevation-of-privilege",
+    "reference_claim": "A colleague who is a store manager in one store changes prices and voids transactions in every store, because the console decides from the group alone and never checks which store they belong to.",
+    "candidate_claim": "An attacker adds themselves to the store-manager group to gain the console's powers.",
+    "label": "no-match",
+    "note": "Hard negative: acquiring the group is the tampering reference against the directory; this lane is about what the group already grants."
+  },
+  {
+    "case": "08-sso-identity-broker",
+    "category": "elevation-of-privilege",
+    "reference_claim": "A leaver keeps their access until the nightly pull runs, and a token issued before it goes on working for twelve hours after that.",
+    "candidate_claim": "Someone who has left keeps working access until the overnight sync catches up, and a token they already hold outlives even that.",
+    "label": "match",
+    "note": "Same escalation, and the candidate assembles the same three stated facts."
+  },
+  {
+    "case": "08-sso-identity-broker",
+    "category": "elevation-of-privilege",
+    "reference_claim": "A leaver keeps their access until the nightly pull runs, and a token issued before it goes on working for twelve hours after that.",
+    "candidate_claim": "A colleague who changes role keeps the groups from their old one until the nightly sync runs.",
+    "label": "no-match",
+    "note": "Hard negative: a plausible neighbouring claim about the same window, but the corpus enumerates the leaver and not the mover."
+  },
+  {
+    "case": "08-sso-identity-broker",
+    "category": "elevation-of-privilege",
+    "reference_claim": "An attacker who controls the franchise provider reaches internal applications on the corporate network, because a sign-in it vouches for is treated like any other.",
+    "candidate_claim": "An attacker who takes over the franchise provider signs in to our internal applications.",
+    "label": "match",
+    "note": "Same escalation, same mechanism."
+  },
+  {
+    "case": "08-sso-identity-broker",
+    "category": "elevation-of-privilege",
+    "reference_claim": "An attacker who controls the franchise provider reaches internal applications on the corporate network, because a sign-in it vouches for is treated like any other.",
+    "candidate_claim": "An attacker on the franchise network reaches the corporate network directly.",
+    "label": "no-match",
+    "note": "Ungrounded, and the point of the case: the model gives the franchise party no network path in, only the right to assert an identity."
+  },
+  {
     "case": "11-sparse-shift-scheduling",
     "category": "spoofing",
     "reference_claim": "An attacker signs in to the scheduling web app as a colleague and reads that colleague's shifts and details, because how colleagues are authenticated is unverified.",

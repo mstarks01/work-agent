@@ -1,0 +1,316 @@
+[
+  {
+    "category": "spoofing",
+    "affected_element_ids": [
+      "store:key-store",
+      "process:identity-broker"
+    ],
+    "claim": "An attacker holding the signing key mints a token for any staff id carrying any groups, and every application accepts it as a genuine sign-in.",
+    "tier": "must-find",
+    "severity": {
+      "likelihood": "low",
+      "impact": "high"
+    },
+    "notes": "The source states one key signs the tokens for every application, so the key is the whole authorization system and not merely one application's."
+  },
+  {
+    "category": "spoofing",
+    "affected_element_ids": [
+      "flow:franchise-identity-provider-to-identity-broker:vouch-for-colleague",
+      "entity:franchise-identity-provider"
+    ],
+    "claim": "The franchise identity provider vouches for someone who is not a franchise colleague and the broker signs them in as that person, since nothing records which colleagues it may vouch for.",
+    "tier": "must-find",
+    "severity": {
+      "likelihood": "medium",
+      "impact": "high"
+    },
+    "notes": "A stated gap rather than an unknown: the source says outright that the restriction has not been written down, which is what makes this grounded rather than speculative."
+  },
+  {
+    "category": "spoofing",
+    "affected_element_ids": [
+      "flow:colleague-to-identity-broker:sign-in",
+      "entity:colleague"
+    ],
+    "claim": "An attacker signs in to the broker as a colleague, because whether colleagues are asked for a second factor is unverified.",
+    "tier": "expected",
+    "severity": {
+      "likelihood": "medium",
+      "impact": "high"
+    },
+    "notes": "The front door, and explicitly undocumented in the closing paragraph; needs-info is the right verdict, not a confident finding either way."
+  },
+  {
+    "category": "spoofing",
+    "affected_element_ids": [
+      "flow:colleague-to-identity-broker:sign-in",
+      "process:store-admin-console"
+    ],
+    "claim": "An attacker who obtains a colleague's token acts as that colleague for the rest of its twelve hours, because nothing calls back to the broker and there is no way to pull a token back.",
+    "tier": "must-find",
+    "severity": {
+      "likelihood": "medium",
+      "impact": "high"
+    },
+    "notes": "Two stated qualifiers compound here, and neither is an unknown; the twelve-hour window is the stated blast radius of every other spoofing claim in this case."
+  },
+  {
+    "category": "spoofing",
+    "affected_element_ids": [
+      "flow:store-admin-console-to-identity-broker:fetch-public-key",
+      "process:store-admin-console"
+    ],
+    "claim": "An attacker serves the console a signing public key of their own so that tokens the attacker signed verify, since how the console fetches and trusts that key is unverified.",
+    "tier": "expected",
+    "severity": {
+      "likelihood": "low",
+      "impact": "high"
+    },
+    "notes": "The hinge of a claims-based design: the key fetch is what makes a signature mean anything, and the source describes it in one clause without saying how it is protected."
+  },
+  {
+    "category": "tampering",
+    "affected_element_ids": [
+      "store:directory",
+      "process:identity-broker"
+    ],
+    "claim": "An attacker writes a group into the broker's directory and the next token issued to that colleague carries it into every application.",
+    "tier": "must-find",
+    "severity": {
+      "likelihood": "low",
+      "impact": "high"
+    },
+    "notes": "The directory is where authorization actually lives in this design; writing to it grants durable authority without touching a key or a token."
+  },
+  {
+    "category": "tampering",
+    "affected_element_ids": [
+      "flow:identity-broker-to-hr-system:nightly-group-pull",
+      "entity:hr-system"
+    ],
+    "claim": "An attacker alters what the nightly pull returns so that groups are granted, or so that leavers are never removed.",
+    "tier": "expected",
+    "severity": {
+      "likelihood": "low",
+      "impact": "high"
+    },
+    "notes": "The pull crosses out of the corporate network to a system the source never locates, and it is the only stated path by which access is taken away."
+  },
+  {
+    "category": "tampering",
+    "affected_element_ids": [
+      "flow:colleague-to-store-admin-console:change-prices-and-void"
+    ],
+    "claim": "An attacker on the path to the console alters a colleague's price change or void in flight, since protection of that traffic is unverified.",
+    "tier": "expected",
+    "severity": {
+      "likelihood": "low",
+      "impact": "medium"
+    },
+    "notes": "Kept distinct from the elevation claim on the same flow: this one is about altering a legitimate action, not about who is allowed to take it."
+  },
+  {
+    "category": "tampering",
+    "affected_element_ids": [
+      "store:audit-log",
+      "flow:identity-broker-to-audit-log:write-sign-ins"
+    ],
+    "claim": "An attacker alters or removes sign-in records in the audit log so a sign-in leaves no trace.",
+    "tier": "expected",
+    "severity": {
+      "likelihood": "low",
+      "impact": "medium"
+    },
+    "notes": "Filed here as an integrity claim against the store; the consequence for attribution is a separate reference in the repudiation lane."
+  },
+  {
+    "category": "repudiation",
+    "affected_element_ids": [
+      "flow:franchise-identity-provider-to-identity-broker:vouch-for-colleague",
+      "store:audit-log"
+    ],
+    "claim": "A franchise sign-in cannot be attributed to a person, because the identity was asserted by a provider we do not run and whether the log covers that route at all is unverified.",
+    "tier": "must-find",
+    "severity": {
+      "likelihood": "medium",
+      "impact": "medium"
+    },
+    "notes": "The source raises the franchise coverage question itself, which is the clearest signal in the text that this is the attribution gap worth reporting."
+  },
+  {
+    "category": "repudiation",
+    "affected_element_ids": [
+      "process:store-admin-console",
+      "flow:colleague-to-store-admin-console:change-prices-and-void"
+    ],
+    "claim": "A price change or a void cannot be tied to the store it belongs to, because the console never establishes which store the token holder is from.",
+    "tier": "must-find",
+    "severity": {
+      "likelihood": "high",
+      "impact": "medium"
+    },
+    "notes": "High likelihood because it is the described steady state rather than an attack condition, and it is the accountability face of the case's central authorization gap."
+  },
+  {
+    "category": "repudiation",
+    "affected_element_ids": [
+      "store:audit-log"
+    ],
+    "claim": "A disputed sign-in may have no evidence behind it, since what the audit log records is unverified.",
+    "tier": "expected",
+    "severity": {
+      "likelihood": "medium",
+      "impact": "medium"
+    },
+    "notes": "The existence of a log is stated and its contents are not; treating an unknown log as an adequate one is exactly the error the unknown value exists to prevent."
+  },
+  {
+    "category": "information-disclosure",
+    "affected_element_ids": [
+      "store:key-store"
+    ],
+    "claim": "An attacker who reaches the key store reads the signing key, since protection of what it holds at rest is unverified.",
+    "tier": "must-find",
+    "severity": {
+      "likelihood": "low",
+      "impact": "high"
+    },
+    "notes": "Recovering the key is a separate action from using it, and the corpus files the use under spoofing; one key for every application is what makes the recovery worth this severity."
+  },
+  {
+    "category": "information-disclosure",
+    "affected_element_ids": [
+      "store:directory"
+    ],
+    "claim": "An attacker who reaches the directory reads colleague records and everyone's group membership, since protection at rest is unverified.",
+    "tier": "expected",
+    "severity": {
+      "likelihood": "low",
+      "impact": "medium"
+    },
+    "notes": "Named as unverified in the source's closing line, and the group list doubles as a map of who is worth attacking."
+  },
+  {
+    "category": "information-disclosure",
+    "affected_element_ids": [
+      "store:audit-log"
+    ],
+    "claim": "An attacker who reaches the audit log reads when and from where colleagues signed in, since protection at rest is unverified.",
+    "tier": "expected",
+    "severity": {
+      "likelihood": "low",
+      "impact": "low"
+    },
+    "notes": "Paired with the directory in the same closing sentence; kept separate because they are different stores holding different things."
+  },
+  {
+    "category": "information-disclosure",
+    "affected_element_ids": [
+      "flow:colleague-to-identity-broker:sign-in"
+    ],
+    "claim": "An attacker on the path between a colleague and the broker reads the sign-in and the token that comes back, since protection of that traffic is unverified.",
+    "tier": "expected",
+    "severity": {
+      "likelihood": "medium",
+      "impact": "high"
+    },
+    "notes": "Colleagues are stated to sign in from their own devices at home, so this path is the least controlled one in the model and the token it carries is a bearer credential."
+  },
+  {
+    "category": "information-disclosure",
+    "affected_element_ids": [
+      "flow:identity-broker-to-hr-system:nightly-group-pull"
+    ],
+    "claim": "An attacker on the path of the nightly pull reads colleague and leaver records as they cross out of the corporate network.",
+    "tier": "expected",
+    "severity": {
+      "likelihood": "low",
+      "impact": "medium"
+    },
+    "notes": "A boundary crossing carrying personal data that the source describes without saying anything about how it is protected."
+  },
+  {
+    "category": "denial-of-service",
+    "affected_element_ids": [
+      "process:identity-broker"
+    ],
+    "claim": "An attacker makes the broker unavailable and no colleague can sign in to anything, because everything colleagues use signs them in through it.",
+    "tier": "must-find",
+    "severity": {
+      "likelihood": "medium",
+      "impact": "high"
+    },
+    "notes": "The source's first sentence states the single point of failure, and the twelve-hour token is the only thing that softens it for colleagues already signed in."
+  },
+  {
+    "category": "denial-of-service",
+    "affected_element_ids": [
+      "flow:identity-broker-to-hr-system:nightly-group-pull",
+      "store:directory"
+    ],
+    "claim": "An attacker stops the nightly pull and group changes silently stop reaching the directory while everything else keeps working.",
+    "tier": "expected",
+    "severity": {
+      "likelihood": "medium",
+      "impact": "medium"
+    },
+    "notes": "The failure is silent by construction: nothing in the described system reads the pull's success, so the first visible symptom is a leaver who still has access."
+  },
+  {
+    "category": "denial-of-service",
+    "affected_element_ids": [
+      "store:key-store",
+      "process:identity-broker"
+    ],
+    "claim": "An attacker destroys or replaces the signing key so that every application rejects every token at once.",
+    "tier": "expected",
+    "severity": {
+      "likelihood": "low",
+      "impact": "high"
+    },
+    "notes": "The same single-key fact that makes the confidentiality claim severe makes this one estate-wide; kept distinct from reading the key, which is a different action."
+  },
+  {
+    "category": "elevation-of-privilege",
+    "affected_element_ids": [
+      "process:store-admin-console",
+      "flow:colleague-to-store-admin-console:change-prices-and-void"
+    ],
+    "claim": "A colleague who is a store manager in one store changes prices and voids transactions in every store, because the console decides from the group alone and never checks which store they belong to.",
+    "tier": "must-find",
+    "severity": {
+      "likelihood": "high",
+      "impact": "high"
+    },
+    "notes": "The case's signature claim and the only one the source states as a completed fact rather than as a gap. High likelihood because no attacker step is required: a legitimate token already carries the authority."
+  },
+  {
+    "category": "elevation-of-privilege",
+    "affected_element_ids": [
+      "flow:identity-broker-to-hr-system:nightly-group-pull",
+      "entity:colleague"
+    ],
+    "claim": "A leaver keeps their access until the nightly pull runs, and a token issued before it goes on working for twelve hours after that.",
+    "tier": "must-find",
+    "severity": {
+      "likelihood": "high",
+      "impact": "high"
+    },
+    "notes": "Three stated facts compound into one window — nightly removal, twelve-hour tokens, no revocation — and no single sentence of the source contains it, which is what makes it the hardest claim in this case to reach."
+  },
+  {
+    "category": "elevation-of-privilege",
+    "affected_element_ids": [
+      "entity:franchise-identity-provider",
+      "process:store-admin-console"
+    ],
+    "claim": "An attacker who controls the franchise provider reaches internal applications on the corporate network, because a sign-in it vouches for is treated like any other.",
+    "tier": "expected",
+    "severity": {
+      "likelihood": "low",
+      "impact": "high"
+    },
+    "notes": "The one crossing in this model where trust is granted to a party rather than to a network position, which is the shape this case exists to grade."
+  }
+]
