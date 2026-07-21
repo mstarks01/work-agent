@@ -1544,6 +1544,590 @@
     "note": "Ungrounded, and the point of the case: the model gives the franchise party no network path in, only the right to assert an identity."
   },
   {
+    "case": "09-cookbook-sokify-retail",
+    "category": "spoofing",
+    "reference_claim": "An attacker submits orders to the web API as if they came from the mobile app, since how the API authenticates callers is unverified.",
+    "candidate_claim": "An attacker calls the web API directly and it accepts the orders as though the app had sent them.",
+    "label": "match",
+    "note": "Same action, same target; the candidate states the outcome where the reference states the unknown behind it."
+  },
+  {
+    "case": "09-cookbook-sokify-retail",
+    "category": "spoofing",
+    "reference_claim": "An attacker submits orders to the web API as if they came from the mobile app, since how the API authenticates callers is unverified.",
+    "candidate_claim": "Anything that can reach the web API can act as the mobile app, since the API's authentication is unverified.",
+    "label": "match",
+    "note": "Same claim; the candidate cites the process where the reference cites the flow, which is an element-agreement difference, not a claim difference."
+  },
+  {
+    "case": "09-cookbook-sokify-retail",
+    "category": "spoofing",
+    "reference_claim": "An attacker submits orders to the web API as if they came from the mobile app, since how the API authenticates callers is unverified.",
+    "candidate_claim": "An attacker guesses a customer's password in the mobile app and places orders on their account.",
+    "label": "no-match",
+    "note": "Hard negative: same lane and the same end state, but credential guessing against a customer account is a different action, and no account login is modelled."
+  },
+  {
+    "case": "09-cookbook-sokify-retail",
+    "category": "spoofing",
+    "reference_claim": "An attacker who obtains a copy of the catalogue spreadsheet sends SQL to the web API as the catalogue tool.",
+    "candidate_claim": "An attacker with a copy of the catalogue spreadsheet drives its macros and the web API takes the SQL as the catalogue tool.",
+    "label": "match",
+    "note": "Pure paraphrase: same action, same mechanism."
+  },
+  {
+    "case": "09-cookbook-sokify-retail",
+    "category": "spoofing",
+    "reference_claim": "An attacker who obtains a copy of the catalogue spreadsheet sends SQL to the web API as the catalogue tool.",
+    "candidate_claim": "An attacker steals a marketing employee's password and signs in to the catalogue tool.",
+    "label": "no-match",
+    "note": "Ungrounded: the model describes no login on the spreadsheet, and inventing one turns a file-possession claim into a credential claim."
+  },
+  {
+    "case": "09-cookbook-sokify-retail",
+    "category": "spoofing",
+    "reference_claim": "An attacker faxes a customer what appears to be a Sokify order confirmation, since nothing on the fax leg identifies the sender.",
+    "candidate_claim": "An attacker sends a customer a forged dispatch fax that appears to come from Sokify.",
+    "label": "match",
+    "note": "Same action, same target."
+  },
+  {
+    "case": "09-cookbook-sokify-retail",
+    "category": "spoofing",
+    "reference_claim": "An attacker faxes a customer what appears to be a Sokify order confirmation, since nothing on the fax leg identifies the sender.",
+    "candidate_claim": "An attacker intercepts the confirmation fax in transit and reads the customer's address.",
+    "label": "no-match",
+    "note": "Hard negative: the same leg and the same stated weakness, but reading is not impersonating, and the corpus files the read separately."
+  },
+  {
+    "case": "09-cookbook-sokify-retail",
+    "category": "tampering",
+    "reference_claim": "An attacker on the network path alters order details in flight between the app and the web API, because that traffic runs over plain HTTP.",
+    "candidate_claim": "An attacker modifies an order in transit over the app's unencrypted connection to the API.",
+    "label": "match",
+    "note": "Same action, same flow."
+  },
+  {
+    "case": "09-cookbook-sokify-retail",
+    "category": "tampering",
+    "reference_claim": "An attacker on the network path alters order details in flight between the app and the web API, because that traffic runs over plain HTTP.",
+    "candidate_claim": "An attacker reads order details out of the app's HTTP traffic.",
+    "label": "no-match",
+    "note": "Hard negative: same flow, same stated absence of TLS, but reading and altering are two claims and the corpus carries both."
+  },
+  {
+    "case": "09-cookbook-sokify-retail",
+    "category": "tampering",
+    "reference_claim": "An attacker drives the spreadsheet's macros to change catalogue prices through the web API.",
+    "candidate_claim": "An attacker uses the spreadsheet's macros to push a price change into the catalogue through the web API.",
+    "label": "match",
+    "note": "Same action, same path."
+  },
+  {
+    "case": "09-cookbook-sokify-retail",
+    "category": "tampering",
+    "reference_claim": "An attacker drives the spreadsheet's macros to change catalogue prices through the web API.",
+    "candidate_claim": "An attacker appends extra SQL to the macro traffic so the API also updates customer rows.",
+    "label": "no-match",
+    "note": "Hard negative: same path, different target; using the path as intended and smuggling statements through it are separate corpus entries."
+  },
+  {
+    "case": "09-cookbook-sokify-retail",
+    "category": "tampering",
+    "reference_claim": "An attacker appends further SQL to the statements the macros send so the web API executes changes beyond prices and product copy.",
+    "candidate_claim": "An attacker smuggles additional SQL statements into what the macros send so the web API executes them.",
+    "label": "match",
+    "note": "Same action, same mechanism."
+  },
+  {
+    "case": "09-cookbook-sokify-retail",
+    "category": "tampering",
+    "reference_claim": "An attacker appends further SQL to the statements the macros send so the web API executes changes beyond prices and product copy.",
+    "candidate_claim": "An attacker changes catalogue prices using the macros the way they were meant to be used.",
+    "label": "no-match",
+    "note": "Hard negative: this is the neighbouring reference about in-scope authority, not the injection claim."
+  },
+  {
+    "case": "09-cookbook-sokify-retail",
+    "category": "tampering",
+    "reference_claim": "An attacker who can write to the flat file rewrites a delivery address so goods are dispatched somewhere else.",
+    "candidate_claim": "An attacker with write access to the flat file alters a delivery address so the parcel goes elsewhere.",
+    "label": "match",
+    "note": "Same action, same target."
+  },
+  {
+    "case": "09-cookbook-sokify-retail",
+    "category": "tampering",
+    "reference_claim": "An attacker who can write to the flat file rewrites a delivery address so goods are dispatched somewhere else.",
+    "candidate_claim": "An attacker deletes the flat file so the warehouse has no addresses to pick from.",
+    "label": "no-match",
+    "note": "Destruction rather than alteration, and the corpus does not carry it."
+  },
+  {
+    "case": "09-cookbook-sokify-retail",
+    "category": "tampering",
+    "reference_claim": "An attacker changes the number stored against an order so the confirmation is faxed to a machine they control.",
+    "candidate_claim": "An attacker edits the fax number held against an order so the confirmation reaches a machine they control.",
+    "label": "match",
+    "note": "Same action, same target."
+  },
+  {
+    "case": "09-cookbook-sokify-retail",
+    "category": "tampering",
+    "reference_claim": "An attacker changes the number stored against an order so the confirmation is faxed to a machine they control.",
+    "candidate_claim": "An attacker changes the delivery address on an order before SIMS writes it out.",
+    "label": "no-match",
+    "note": "Hard negative: same order record, different field and different consequence; the address claim is the flat-file entry."
+  },
+  {
+    "case": "09-cookbook-sokify-retail",
+    "category": "repudiation",
+    "reference_claim": "A customer denies placing an order and Sokify cannot show who submitted it, because how the API authenticates callers is unverified.",
+    "candidate_claim": "A customer disputes an order and nothing records which caller submitted it.",
+    "label": "match",
+    "note": "Same claim, stated as the condition rather than the dispute."
+  },
+  {
+    "case": "09-cookbook-sokify-retail",
+    "category": "repudiation",
+    "reference_claim": "A customer denies placing an order and Sokify cannot show who submitted it, because how the API authenticates callers is unverified.",
+    "candidate_claim": "An attacker deletes order records so a purchase cannot be proven afterwards.",
+    "label": "no-match",
+    "note": "Destroying evidence is a different action from never having captured it, and the corpus does not list it."
+  },
+  {
+    "case": "09-cookbook-sokify-retail",
+    "category": "repudiation",
+    "reference_claim": "Nobody can show who made a price change, because the changes arrive at the web API as SQL from a spreadsheet rather than from an identified user.",
+    "candidate_claim": "There is no way to tell which person made a catalogue change, because the API only ever sees SQL arriving from a spreadsheet.",
+    "label": "match",
+    "note": "Same claim, same mechanism."
+  },
+  {
+    "case": "09-cookbook-sokify-retail",
+    "category": "repudiation",
+    "reference_claim": "Sokify cannot show a confirmation ever reached the customer, because nobody checks the fax arrived at the right place.",
+    "candidate_claim": "Sokify has no evidence a confirmation reached the customer, since delivery to the dialled number is never confirmed.",
+    "label": "match",
+    "note": "Same claim; the candidate names the evidentiary gap the reference states."
+  },
+  {
+    "case": "09-cookbook-sokify-retail",
+    "category": "repudiation",
+    "reference_claim": "Sokify cannot show a confirmation ever reached the customer, because nobody checks the fax arrived at the right place.",
+    "candidate_claim": "The confirmation fax exposes the customer's name and address to whoever holds the dialled number.",
+    "label": "no-match",
+    "note": "The most valuable negative in this case: identical stated fact, different claim. One is the absence of proof of delivery, the other is disclosure to the wrong recipient, and a judge that merges them collapses two lanes."
+  },
+  {
+    "case": "09-cookbook-sokify-retail",
+    "category": "information-disclosure",
+    "reference_claim": "An attacker on the network path reads customer details out of the app's plain-HTTP traffic to the web API.",
+    "candidate_claim": "An attacker sniffing the network reads customer details out of the app's plain HTTP calls to the API.",
+    "label": "match",
+    "note": "Same action, same flow."
+  },
+  {
+    "case": "09-cookbook-sokify-retail",
+    "category": "information-disclosure",
+    "reference_claim": "An attacker on the network path reads customer details out of the app's plain-HTTP traffic to the web API.",
+    "candidate_claim": "Customer details leaving the mobile app are readable in transit, because the app talks to the API over HTTP.",
+    "label": "match",
+    "note": "Same read against the same traffic; the candidate cites the app where the reference cites the flow."
+  },
+  {
+    "case": "09-cookbook-sokify-retail",
+    "category": "information-disclosure",
+    "reference_claim": "An attacker on the network path reads customer details out of the app's plain-HTTP traffic to the web API.",
+    "candidate_claim": "An attacker reads customers' card numbers out of the app's HTTP traffic.",
+    "label": "no-match",
+    "note": "Ungrounded, and deliberately so: the source states only that the database holds the card they paid with, never that cards cross this link. This is the invented fact the bootstrap made, preserved as a fixture."
+  },
+  {
+    "case": "09-cookbook-sokify-retail",
+    "category": "information-disclosure",
+    "reference_claim": "An attacker who reaches the user database reads customers' names, addresses and the cards they paid with, since at-rest protection is unverified.",
+    "candidate_claim": "An attacker who obtains a copy of the user database reads names, addresses and card details.",
+    "label": "match",
+    "note": "Same action, same target."
+  },
+  {
+    "case": "09-cookbook-sokify-retail",
+    "category": "information-disclosure",
+    "reference_claim": "An attacker who reaches the user database reads customers' names, addresses and the cards they paid with, since at-rest protection is unverified.",
+    "candidate_claim": "An attacker queries customer records through the web API rather than reaching the database itself.",
+    "label": "no-match",
+    "note": "Hard negative: same data, different action and different element; the corpus does not carry API-mediated retrieval."
+  },
+  {
+    "case": "09-cookbook-sokify-retail",
+    "category": "information-disclosure",
+    "reference_claim": "An attacker who reaches the flat file reads every delivery address written into it.",
+    "candidate_claim": "An attacker who can read the flat file obtains every delivery address written into it.",
+    "label": "match",
+    "note": "Same action, same target."
+  },
+  {
+    "case": "09-cookbook-sokify-retail",
+    "category": "information-disclosure",
+    "reference_claim": "An attacker who reaches the flat file reads every delivery address written into it.",
+    "candidate_claim": "An attacker reads customers' card details out of the flat file.",
+    "label": "no-match",
+    "note": "Ungrounded: the source is explicit that only addresses go in that file, so the candidate asserts contents the model denies."
+  },
+  {
+    "case": "09-cookbook-sokify-retail",
+    "category": "information-disclosure",
+    "reference_claim": "The confirmation fax discloses a customer's name and address to whoever holds the dialled number, because nobody checks it arrived at the right place.",
+    "candidate_claim": "A confirmation carrying a customer's name and address arrives at a stranger's fax machine and nothing detects it.",
+    "label": "match",
+    "note": "Same disclosure, same cause."
+  },
+  {
+    "case": "09-cookbook-sokify-retail",
+    "category": "information-disclosure",
+    "reference_claim": "The confirmation fax discloses a customer's name and address to whoever holds the dialled number, because nobody checks it arrived at the right place.",
+    "candidate_claim": "An attacker taps the phone line and reads the fax while it is being transmitted.",
+    "label": "no-match",
+    "note": "Hard negative: same leg, same data, different action; interception of the channel is not misdelivery through it."
+  },
+  {
+    "case": "09-cookbook-sokify-retail",
+    "category": "denial-of-service",
+    "reference_claim": "An attacker floods the internet-facing web API until customers cannot place orders.",
+    "candidate_claim": "An attacker floods the web API with requests until customers cannot place orders.",
+    "label": "match",
+    "note": "Same action, same target."
+  },
+  {
+    "case": "09-cookbook-sokify-retail",
+    "category": "denial-of-service",
+    "reference_claim": "An attacker sends SQL through the macro path that locks catalogue rows so the app cannot serve the catalogue.",
+    "candidate_claim": "An attacker uses the macro path to lock catalogue rows so the app cannot show products.",
+    "label": "match",
+    "note": "Same action, same mechanism."
+  },
+  {
+    "case": "09-cookbook-sokify-retail",
+    "category": "denial-of-service",
+    "reference_claim": "An attacker sends SQL through the macro path that locks catalogue rows so the app cannot serve the catalogue.",
+    "candidate_claim": "An attacker floods the web API until the catalogue is unavailable.",
+    "label": "no-match",
+    "note": "Hard negative: same outcome reached by the exposure claim, not by the macro path; keeping them apart is what makes the two entries worth carrying."
+  },
+  {
+    "case": "09-cookbook-sokify-retail",
+    "category": "denial-of-service",
+    "reference_claim": "An attacker who stops SIMS accepting order handovers halts dispatch for every order placed.",
+    "candidate_claim": "An attacker stops SIMS accepting handovers, so orders are still taken and nothing ships.",
+    "label": "match",
+    "note": "Same action, same consequence."
+  },
+  {
+    "case": "09-cookbook-sokify-retail",
+    "category": "denial-of-service",
+    "reference_claim": "An attacker who stops SIMS accepting order handovers halts dispatch for every order placed.",
+    "candidate_claim": "An attacker floods the fax gateway so dispatch notes never go out.",
+    "label": "no-match",
+    "note": "Hard negative: a plausible neighbouring denial against the next element along, which the corpus does not enumerate."
+  },
+  {
+    "case": "09-cookbook-sokify-retail",
+    "category": "elevation-of-privilege",
+    "reference_claim": "An attacker who reaches the marketing laptop gains a write path into the web API from the office zone, because the spreadsheet's macros speak SQL to it.",
+    "candidate_claim": "An attacker who compromises the marketing laptop inherits a standing write path into the server-side systems.",
+    "label": "match",
+    "note": "Same escalation, same mechanism."
+  },
+  {
+    "case": "09-cookbook-sokify-retail",
+    "category": "elevation-of-privilege",
+    "reference_claim": "An attacker who reaches the marketing laptop gains a write path into the web API from the office zone, because the spreadsheet's macros speak SQL to it.",
+    "candidate_claim": "An attacker on the office network reaches the web API's data through the spreadsheet's macros.",
+    "label": "match",
+    "note": "Coarser phrasing of the same escalation across the same zone boundary."
+  },
+  {
+    "case": "09-cookbook-sokify-retail",
+    "category": "elevation-of-privilege",
+    "reference_claim": "An attacker whose SQL reaches the web API through the catalogue path acts against customer records the catalogue tool has no business touching.",
+    "candidate_claim": "An attacker whose SQL reaches the API through the catalogue path acts on customer records that path was never meant to touch.",
+    "label": "match",
+    "note": "Same escalation, same mechanism."
+  },
+  {
+    "case": "09-cookbook-sokify-retail",
+    "category": "elevation-of-privilege",
+    "reference_claim": "An attacker whose SQL reaches the web API through the catalogue path acts against customer records the catalogue tool has no business touching.",
+    "candidate_claim": "An attacker with catalogue access changes product prices.",
+    "label": "no-match",
+    "note": "Hard negative: staying inside the path's intended authority is the tampering reference, not an escalation."
+  },
+  {
+    "case": "10-cookbook-generic-cms",
+    "category": "spoofing",
+    "reference_claim": "An attacker holding the admin's database credentials connects to MySQL as the admin from anywhere on the internet, since there is no jump host in the way.",
+    "candidate_claim": "An attacker holding the admin's MySQL credentials connects to the database from the public internet.",
+    "label": "match",
+    "note": "Same action, same target."
+  },
+  {
+    "case": "10-cookbook-generic-cms",
+    "category": "spoofing",
+    "reference_claim": "An attacker holding the admin's database credentials connects to MySQL as the admin from anywhere on the internet, since there is no jump host in the way.",
+    "candidate_claim": "Anyone with the admin's credentials can administer the database, because nothing stands between it and the internet.",
+    "label": "match",
+    "note": "Same claim; the candidate cites the store where the reference cites the flow and the admin."
+  },
+  {
+    "case": "10-cookbook-generic-cms",
+    "category": "spoofing",
+    "reference_claim": "An attacker holding the admin's database credentials connects to MySQL as the admin from anywhere on the internet, since there is no jump host in the way.",
+    "candidate_claim": "An attacker brute-forces the admin's database password.",
+    "label": "no-match",
+    "note": "Hard negative: holding a credential and guessing one are different actions, and the corpus carries only the first."
+  },
+  {
+    "case": "10-cookbook-generic-cms",
+    "category": "spoofing",
+    "reference_claim": "An attacker publishes assets into the CDN bucket as if they came from the web server, because how that push is authenticated is unverified.",
+    "candidate_claim": "An attacker uploads assets into the CDN bucket and the CDN serves them as if the web server had published them.",
+    "label": "match",
+    "note": "Same action, same target."
+  },
+  {
+    "case": "10-cookbook-generic-cms",
+    "category": "spoofing",
+    "reference_claim": "An attacker publishes assets into the CDN bucket as if they came from the web server, because how that push is authenticated is unverified.",
+    "candidate_claim": "An attacker replaces an asset already sitting in the bucket.",
+    "label": "no-match",
+    "note": "Hard negative: publishing as the web server and overwriting what is there are separate entries in separate lanes."
+  },
+  {
+    "case": "10-cookbook-generic-cms",
+    "category": "spoofing",
+    "reference_claim": "An attacker takes over a signed-in reader's session, since nothing is stated about how those sessions are handled.",
+    "candidate_claim": "An attacker rides a signed-in reader's session and acts as that reader on the site.",
+    "label": "match",
+    "note": "Same action, same target."
+  },
+  {
+    "case": "10-cookbook-generic-cms",
+    "category": "spoofing",
+    "reference_claim": "An attacker takes over a signed-in reader's session, since nothing is stated about how those sessions are handled.",
+    "candidate_claim": "An attacker registers a reader account in someone else's name.",
+    "label": "no-match",
+    "note": "Different action against a different target, and registration is nowhere in the model."
+  },
+  {
+    "case": "10-cookbook-generic-cms",
+    "category": "tampering",
+    "reference_claim": "An attacker on the network path rewrites a stylesheet or script in flight before it reaches the reader, because assets are fetched over plain HTTP.",
+    "candidate_claim": "An attacker on the network path injects modified script into an asset the reader is loading over HTTP.",
+    "label": "match",
+    "note": "Same action, same flow."
+  },
+  {
+    "case": "10-cookbook-generic-cms",
+    "category": "tampering",
+    "reference_claim": "An attacker on the network path rewrites a stylesheet or script in flight before it reaches the reader, because assets are fetched over plain HTTP.",
+    "candidate_claim": "An attacker replaces the asset in the CDN bucket so every reader receives the modified file.",
+    "label": "no-match",
+    "note": "The distinction this case exists to teach: modifying in transit and planting at rest are two claims, and both are in the corpus."
+  },
+  {
+    "case": "10-cookbook-generic-cms",
+    "category": "tampering",
+    "reference_claim": "An attacker who can write to the CDN bucket replaces a published asset and every reader of the site loads it.",
+    "candidate_claim": "An attacker who can write to the bucket swaps a published file and every visitor loads it.",
+    "label": "match",
+    "note": "Same action, same target."
+  },
+  {
+    "case": "10-cookbook-generic-cms",
+    "category": "tampering",
+    "reference_claim": "An attacker who can write to the CDN bucket replaces a published asset and every reader of the site loads it.",
+    "candidate_claim": "An attacker deletes the published assets from the bucket.",
+    "label": "no-match",
+    "note": "Hard negative: same access, denial rather than alteration; the corpus files that separately."
+  },
+  {
+    "case": "10-cookbook-generic-cms",
+    "category": "tampering",
+    "reference_claim": "An attacker on the network path modifies the admin's statements in flight, because the connection carries no TLS.",
+    "candidate_claim": "An attacker on the network alters the admin's SQL in transit, since that connection carries no TLS.",
+    "label": "match",
+    "note": "Same action, same flow."
+  },
+  {
+    "case": "10-cookbook-generic-cms",
+    "category": "tampering",
+    "reference_claim": "An attacker on the network path modifies the admin's statements in flight, because the connection carries no TLS.",
+    "candidate_claim": "An attacker reads the admin's SQL traffic because there is no TLS on the connection.",
+    "label": "no-match",
+    "note": "Hard negative: identical stated absence, and reading it is the disclosure entry rather than this one."
+  },
+  {
+    "case": "10-cookbook-generic-cms",
+    "category": "tampering",
+    "reference_claim": "An attacker with database access edits page content directly and the web server serves the altered page.",
+    "candidate_claim": "An attacker with database access rewrites an article and the web server serves the altered page.",
+    "label": "match",
+    "note": "Same action, same target."
+  },
+  {
+    "case": "10-cookbook-generic-cms",
+    "category": "repudiation",
+    "reference_claim": "Content is changed directly in the database and no CMS record shows who changed it, because that path bypasses the CMS entirely.",
+    "candidate_claim": "A change made straight in the database leaves no CMS record of who made it.",
+    "label": "match",
+    "note": "Same claim, same stated mechanism."
+  },
+  {
+    "case": "10-cookbook-generic-cms",
+    "category": "repudiation",
+    "reference_claim": "Content is changed directly in the database and no CMS record shows who changed it, because that path bypasses the CMS entirely.",
+    "candidate_claim": "The CMS cannot attribute direct database edits to anyone, because that path does not pass through it.",
+    "label": "match",
+    "note": "Same claim; the candidate cites the store where the reference cites the flow and the web server."
+  },
+  {
+    "case": "10-cookbook-generic-cms",
+    "category": "repudiation",
+    "reference_claim": "Content is changed directly in the database and no CMS record shows who changed it, because that path bypasses the CMS entirely.",
+    "candidate_claim": "An attacker deletes the CMS audit log to hide the change they made.",
+    "label": "no-match",
+    "note": "Ungrounded: the model describes no log to delete, and the reference's point is that the path was never recorded in the first place."
+  },
+  {
+    "case": "10-cookbook-generic-cms",
+    "category": "repudiation",
+    "reference_claim": "A reader disputes a comment recorded against their account and the site cannot show it came from their session, since nothing about how sign-in is handled is stated.",
+    "candidate_claim": "A reader denies writing a comment and nothing shows the comment came from their session.",
+    "label": "match",
+    "note": "Same claim, same mechanism."
+  },
+  {
+    "case": "10-cookbook-generic-cms",
+    "category": "information-disclosure",
+    "reference_claim": "An attacker sniffing the admin's unsecured MySQL connection reads account and comment records in clear text.",
+    "candidate_claim": "An attacker on the network path reads accounts and comments off the admin's unencrypted MySQL session.",
+    "label": "match",
+    "note": "Same action, same flow."
+  },
+  {
+    "case": "10-cookbook-generic-cms",
+    "category": "information-disclosure",
+    "reference_claim": "An attacker sniffing the admin's unsecured MySQL connection reads account and comment records in clear text.",
+    "candidate_claim": "An attacker reads readers' page requests in transit.",
+    "label": "no-match",
+    "note": "Ungrounded: that link is stated to be HTTPS, so the candidate asserts a weakness the model contradicts."
+  },
+  {
+    "case": "10-cookbook-generic-cms",
+    "category": "information-disclosure",
+    "reference_claim": "An attacker who reaches the database reads reader account records, since at-rest protection is unverified.",
+    "candidate_claim": "An attacker who obtains the database files reads reader account records, since nothing establishes disk encryption.",
+    "label": "match",
+    "note": "Same action, same target."
+  },
+  {
+    "case": "10-cookbook-generic-cms",
+    "category": "information-disclosure",
+    "reference_claim": "An attacker who reaches the database reads reader account records, since at-rest protection is unverified.",
+    "candidate_claim": "An attacker reads account records off the wire from the admin's connection.",
+    "label": "no-match",
+    "note": "Hard negative: same records, at rest versus in transit, and the corpus carries both as distinct entries."
+  },
+  {
+    "case": "10-cookbook-generic-cms",
+    "category": "information-disclosure",
+    "reference_claim": "An attacker watching a reader's plain-HTTP asset fetches learns which pages that reader is viewing.",
+    "candidate_claim": "An attacker watching plain HTTP asset requests can tell which articles a reader opened.",
+    "label": "match",
+    "note": "Same action, same inference."
+  },
+  {
+    "case": "10-cookbook-generic-cms",
+    "category": "information-disclosure",
+    "reference_claim": "An attacker watching a reader's plain-HTTP asset fetches learns which pages that reader is viewing.",
+    "candidate_claim": "An attacker reads the reader's session cookie out of the HTTP asset request.",
+    "label": "no-match",
+    "note": "Ungrounded: the model says nothing about cookie scope, and the candidate turns a traffic-analysis claim into a session-theft one."
+  },
+  {
+    "case": "10-cookbook-generic-cms",
+    "category": "denial-of-service",
+    "reference_claim": "An attacker floods the internet-facing web server with page requests until the public site stops responding.",
+    "candidate_claim": "An attacker overwhelms the web server with requests and the public site stops responding.",
+    "label": "match",
+    "note": "Same action, same target."
+  },
+  {
+    "case": "10-cookbook-generic-cms",
+    "category": "denial-of-service",
+    "reference_claim": "An attacker who can write to the CDN bucket removes the assets the site depends on so pages render broken.",
+    "candidate_claim": "An attacker with bucket write access removes assets and pages render broken.",
+    "label": "match",
+    "note": "Same action, same consequence."
+  },
+  {
+    "case": "10-cookbook-generic-cms",
+    "category": "denial-of-service",
+    "reference_claim": "An attacker who can write to the CDN bucket removes the assets the site depends on so pages render broken.",
+    "candidate_claim": "An attacker replaces the bucket's assets with malicious ones.",
+    "label": "no-match",
+    "note": "Hard negative: same access, the tampering entry rather than the denial one."
+  },
+  {
+    "case": "10-cookbook-generic-cms",
+    "category": "denial-of-service",
+    "reference_claim": "An attacker on the direct MySQL path runs queries expensive enough that the web server cannot serve pages.",
+    "candidate_claim": "An attacker uses the direct database path to run queries heavy enough that the site cannot serve pages.",
+    "label": "match",
+    "note": "Same action, same target."
+  },
+  {
+    "case": "10-cookbook-generic-cms",
+    "category": "elevation-of-privilege",
+    "reference_claim": "An attacker who intercepts the admin's unencrypted session obtains database authority that bypasses every control the CMS applies.",
+    "candidate_claim": "An attacker who gets onto the admin's plaintext connection ends up with database powers the CMS would never grant.",
+    "label": "match",
+    "note": "Same escalation, same mechanism."
+  },
+  {
+    "case": "10-cookbook-generic-cms",
+    "category": "elevation-of-privilege",
+    "reference_claim": "An attacker who intercepts the admin's unencrypted session obtains database authority that bypasses every control the CMS applies.",
+    "candidate_claim": "An attacker signs in to the CMS as an editor and publishes a page.",
+    "label": "no-match",
+    "note": "Hard negative: an escalation inside the application, which is precisely the path this reference is about going around."
+  },
+  {
+    "case": "10-cookbook-generic-cms",
+    "category": "elevation-of-privilege",
+    "reference_claim": "An attacker who plants a script in the CDN bucket runs code in every reader's browser in the site's own context.",
+    "candidate_claim": "An attacker who writes a script into the CDN bucket executes code in visitors' browsers under the site's origin.",
+    "label": "match",
+    "note": "Same escalation, same mechanism."
+  },
+  {
+    "case": "10-cookbook-generic-cms",
+    "category": "elevation-of-privilege",
+    "reference_claim": "An attacker who plants a script in the CDN bucket runs code in every reader's browser in the site's own context.",
+    "candidate_claim": "Write access to the bucket becomes code execution in every reader's browser.",
+    "label": "match",
+    "note": "Coarser phrasing of the same escalation."
+  },
+  {
+    "case": "10-cookbook-generic-cms",
+    "category": "elevation-of-privilege",
+    "reference_claim": "An attacker who plants a script in the CDN bucket runs code in every reader's browser in the site's own context.",
+    "candidate_claim": "An attacker uses the planted script to steal the admin's database credentials.",
+    "label": "no-match",
+    "note": "Ungrounded: the admin never uses the site, so nothing in the model connects browser execution to that credential."
+  },
+  {
     "case": "11-sparse-shift-scheduling",
     "category": "spoofing",
     "reference_claim": "An attacker signs in to the scheduling web app as a colleague and reads that colleague's shifts and details, because how colleagues are authenticated is unverified.",
