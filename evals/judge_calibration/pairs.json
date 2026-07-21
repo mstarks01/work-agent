@@ -1032,6 +1032,262 @@
     "note": "Integrity action, not the resource exhaustion the reference claims."
   },
   {
+    "case": "07-cicd-store-deploy",
+    "category": "spoofing",
+    "reference_claim": "An attacker holding the shared build token calls the deploy controller as if it were the build runner and names an image sha of their own choosing as the current release.",
+    "candidate_claim": "An attacker who has the build token names any image sha as the current release and the controller accepts it as the runner.",
+    "label": "match",
+    "note": "Pure paraphrase: same action against the same target."
+  },
+  {
+    "case": "07-cicd-store-deploy",
+    "category": "spoofing",
+    "reference_claim": "An attacker holding the shared build token calls the deploy controller as if it were the build runner and names an image sha of their own choosing as the current release.",
+    "candidate_claim": "Someone in possession of the pipeline's build token instructs the deploy controller to change the estate's release.",
+    "label": "match",
+    "note": "Same action; the candidate cites the controller where the reference also cites the flow, which is element agreement rather than a claim difference."
+  },
+  {
+    "case": "07-cicd-store-deploy",
+    "category": "spoofing",
+    "reference_claim": "An attacker holding the shared build token calls the deploy controller as if it were the build runner and names an image sha of their own choosing as the current release.",
+    "candidate_claim": "An attacker guesses the build token because it is short.",
+    "label": "no-match",
+    "note": "Hard negative: holding a shared token and guessing one are different actions, and the corpus files credential recovery separately under information-disclosure."
+  },
+  {
+    "case": "07-cicd-store-deploy",
+    "category": "spoofing",
+    "reference_claim": "An attacker on the retail WAN presents itself to the image registry as a store server and pulls the estate's container images.",
+    "candidate_claim": "An attacker on the WAN downloads the estate's container images from the registry by presenting whatever a store server presents.",
+    "label": "match",
+    "note": "Same action, same target."
+  },
+  {
+    "case": "07-cicd-store-deploy",
+    "category": "spoofing",
+    "reference_claim": "An attacker on the retail WAN presents itself to the image registry as a store server and pulls the estate's container images.",
+    "candidate_claim": "An attacker pushes a new image into the registry while claiming to be the build runner.",
+    "label": "no-match",
+    "note": "Hard negative: same store and lane, but pushing as the runner is a different action on a different flow from pulling as a store server."
+  },
+  {
+    "case": "07-cicd-store-deploy",
+    "category": "spoofing",
+    "reference_claim": "An attacker polls the deploy controller while claiming to be a store server, since what a store server presents to the controller is unverified.",
+    "candidate_claim": "An attacker uses the store server's expired client certificate to poll the controller.",
+    "label": "no-match",
+    "note": "Ungrounded: the model records what a store server presents as unknown, and no certificate exists in it."
+  },
+  {
+    "case": "07-cicd-store-deploy",
+    "category": "spoofing",
+    "reference_claim": "An attacker pushes branches to the git server as a developer, because how developers authenticate to it is unverified.",
+    "candidate_claim": "An attacker bypasses the multi-factor authentication on the git server to push as a developer.",
+    "label": "no-match",
+    "note": "Ungrounded: authentication on that flow is unknown, so a candidate asserting MFA is present is claiming a control the model does not support."
+  },
+  {
+    "case": "07-cicd-store-deploy",
+    "category": "tampering",
+    "reference_claim": "An attacker alters the deploy controller's current-release record so that every store server pulls and runs an image of the attacker's choosing within a minute.",
+    "candidate_claim": "An attacker rewrites the current-release record so the whole estate restarts onto an image the attacker chose.",
+    "label": "match",
+    "note": "Same action, same target."
+  },
+  {
+    "case": "07-cicd-store-deploy",
+    "category": "tampering",
+    "reference_claim": "An attacker alters the deploy controller's current-release record so that every store server pulls and runs an image of the attacker's choosing within a minute.",
+    "candidate_claim": "An attacker deletes the current-release record so no store knows what to run.",
+    "label": "no-match",
+    "note": "Hard negative: destroying the record and substituting it are different actions, and the corpus does not carry the deletion."
+  },
+  {
+    "case": "07-cicd-store-deploy",
+    "category": "tampering",
+    "reference_claim": "An attacker publishes a package that the lockfile resolves to and the runner bakes it into the image unchecked, because signatures on downloads are not verified.",
+    "candidate_claim": "An attacker gets a backdoored dependency into the build because downloads are not signature-checked.",
+    "label": "match",
+    "note": "Same action and same stated mechanism."
+  },
+  {
+    "case": "07-cicd-store-deploy",
+    "category": "tampering",
+    "reference_claim": "An attacker publishes a package that the lockfile resolves to and the runner bakes it into the image unchecked, because signatures on downloads are not verified.",
+    "candidate_claim": "An attacker modifies a package in transit between the public registry and the runner.",
+    "label": "no-match",
+    "note": "Hard negative: in-transit modification is a distinct action from publishing the package the lockfile resolves to."
+  },
+  {
+    "case": "07-cicd-store-deploy",
+    "category": "tampering",
+    "reference_claim": "An attacker replaces the image stored under a commit-sha tag in the registry, so store servers pull attacker content while the recorded release is unchanged.",
+    "candidate_claim": "An attacker overwrites the image behind a commit sha in the registry so stores pull attacker content.",
+    "label": "match",
+    "note": "Same action, same target."
+  },
+  {
+    "case": "07-cicd-store-deploy",
+    "category": "tampering",
+    "reference_claim": "An attacker replaces the image stored under a commit-sha tag in the registry, so store servers pull attacker content while the recorded release is unchanged.",
+    "candidate_claim": "An attacker deletes images from the registry so store servers cannot pull.",
+    "label": "no-match",
+    "note": "Hard negative: destruction rather than replacement, and the corpus files registry unavailability in the denial-of-service lane instead."
+  },
+  {
+    "case": "07-cicd-store-deploy",
+    "category": "tampering",
+    "reference_claim": "An attacker on the retail WAN alters the container image as a store server pulls it, since protection of that traffic is unverified.",
+    "candidate_claim": "An attacker sitting on the retail WAN modifies the image while a store is pulling it.",
+    "label": "match",
+    "note": "Same action, same flow."
+  },
+  {
+    "case": "07-cicd-store-deploy",
+    "category": "tampering",
+    "reference_claim": "An attacker on the retail WAN alters the container image as a store server pulls it, since protection of that traffic is unverified.",
+    "candidate_claim": "An attacker reads the container image as it crosses the WAN.",
+    "label": "no-match",
+    "note": "Hard negative and the pair this case exists to teach: reading and altering the same flow are two claims, and the read is its own reference."
+  },
+  {
+    "case": "07-cicd-store-deploy",
+    "category": "repudiation",
+    "reference_claim": "A build that reached the estate cannot be attributed to the developer who started it, because any developer can trigger a manual rebuild on an unreviewed path whose authentication is unverified.",
+    "candidate_claim": "There is no way to tell which developer started a build, because manual rebuilds bypass the merge and are not reviewed.",
+    "label": "match",
+    "note": "Same claim, stated as the condition rather than as the dispute."
+  },
+  {
+    "case": "07-cicd-store-deploy",
+    "category": "repudiation",
+    "reference_claim": "The deploy controller cannot tell which pipeline set a release, because every pipeline presents the same shared build token.",
+    "candidate_claim": "Release records cannot distinguish one pipeline from another, since they all present the same token.",
+    "label": "match",
+    "note": "Paraphrase with the same mechanism."
+  },
+  {
+    "case": "07-cicd-store-deploy",
+    "category": "information-disclosure",
+    "reference_claim": "An attacker who reads the build runner's configuration recovers the shared build token and can thereafter set the estate's release.",
+    "candidate_claim": "An attacker who reads the runner's config files walks away with the build token.",
+    "label": "match",
+    "note": "Same action, same target."
+  },
+  {
+    "case": "07-cicd-store-deploy",
+    "category": "information-disclosure",
+    "reference_claim": "An attacker who reads the build runner's configuration recovers the shared build token and can thereafter set the estate's release.",
+    "candidate_claim": "An attacker uses the build token to set the estate's release.",
+    "label": "no-match",
+    "note": "Hard negative: using a held credential is the spoofing reference, not the recovery this one claims."
+  },
+  {
+    "case": "07-cicd-store-deploy",
+    "category": "information-disclosure",
+    "reference_claim": "An attacker who reaches the git server's storage reads the estate's source code, since protection of what it stores is unverified.",
+    "candidate_claim": "An attacker reads source code out of images stored in the registry.",
+    "label": "no-match",
+    "note": "Hard negative: a different store, and the registry read is its own reference."
+  },
+  {
+    "case": "07-cicd-store-deploy",
+    "category": "information-disclosure",
+    "reference_claim": "An attacker who reaches the image registry's storage reads the built images and whatever is baked into them, since protection at rest is unverified.",
+    "candidate_claim": "An attacker recovers the registry's AES-256 encryption key and reads the images.",
+    "label": "no-match",
+    "note": "Ungrounded: encryption at rest is unknown in the model, so the candidate invents the control it then defeats."
+  },
+  {
+    "case": "07-cicd-store-deploy",
+    "category": "information-disclosure",
+    "reference_claim": "An attacker on the retail WAN reads the container image as a store server pulls it, since protection of that traffic is unverified.",
+    "candidate_claim": "An attacker alters the container image as it crosses the WAN.",
+    "label": "no-match",
+    "note": "The mirror of the tampering hard negative; matching it in this direction is the same collapse."
+  },
+  {
+    "case": "07-cicd-store-deploy",
+    "category": "denial-of-service",
+    "reference_claim": "An attacker sets the current release to an image that does not start, and every store server restarts into it and stops serving tills.",
+    "candidate_claim": "An attacker pushes a release that fails to start and tills across the estate go down.",
+    "label": "match",
+    "note": "Same action, same estate-wide consequence."
+  },
+  {
+    "case": "07-cicd-store-deploy",
+    "category": "denial-of-service",
+    "reference_claim": "An attacker sets the current release to an image that does not start, and every store server restarts into it and stops serving tills.",
+    "candidate_claim": "An attacker floods the deploy controller so store servers cannot poll.",
+    "label": "no-match",
+    "note": "Hard negative: that is the flooding reference, and it has a materially lower impact because a store keeps running the image it has."
+  },
+  {
+    "case": "07-cicd-store-deploy",
+    "category": "denial-of-service",
+    "reference_claim": "An attacker floods the deploy controller until the estate's polls fail and no new release can reach any store.",
+    "candidate_claim": "An attacker sets a release that crashes on start so stores stop trading.",
+    "label": "no-match",
+    "note": "The inverse of the previous pair, and no-match for the same reason."
+  },
+  {
+    "case": "07-cicd-store-deploy",
+    "category": "denial-of-service",
+    "reference_claim": "An attacker makes the image registry unreachable over the WAN so store servers cannot complete a pull and the estate is left split across two releases.",
+    "candidate_claim": "Stores cannot finish pulling because the registry is unreachable and the estate ends up on two different releases.",
+    "label": "match",
+    "note": "Same action, and the candidate names the divergence the reference's notes give."
+  },
+  {
+    "case": "07-cicd-store-deploy",
+    "category": "elevation-of-privilege",
+    "reference_claim": "Any developer turns code of their own choosing into the software running in 1,200 stores by triggering the manual rebuild, a path the source states requires no merge and receives no review.",
+    "candidate_claim": "A developer ships code to every store without anyone reviewing it, using the by-hand rebuild.",
+    "label": "match",
+    "note": "Same escalation, same stated path."
+  },
+  {
+    "case": "07-cicd-store-deploy",
+    "category": "elevation-of-privilege",
+    "reference_claim": "Any developer turns code of their own choosing into the software running in 1,200 stores by triggering the manual rebuild, a path the source states requires no merge and receives no review.",
+    "candidate_claim": "An attacker who is not a developer signs in to the build runner and starts a rebuild.",
+    "label": "no-match",
+    "note": "Hard negative: an outsider becoming a developer is the spoofing reference; this lane is about the authority a developer legitimately has."
+  },
+  {
+    "case": "07-cicd-store-deploy",
+    "category": "elevation-of-privilege",
+    "reference_claim": "An attacker who compromises the build runner controls what every store server runs, because the runner both writes the image and holds the token that names the release.",
+    "candidate_claim": "An attacker who owns the build runner decides what runs in every store.",
+    "label": "match",
+    "note": "Coarser phrasing of the same escalation."
+  },
+  {
+    "case": "07-cicd-store-deploy",
+    "category": "elevation-of-privilege",
+    "reference_claim": "An attacker who takes one store server uses whatever it presents to reach the deploy controller on the corporate network and the registry in the build environment.",
+    "candidate_claim": "An attacker who compromises a back-office store server pivots to the deploy controller.",
+    "label": "match",
+    "note": "Same escalation; the candidate names one of the two boundaries the reference names."
+  },
+  {
+    "case": "07-cicd-store-deploy",
+    "category": "elevation-of-privilege",
+    "reference_claim": "An attacker who takes one store server uses whatever it presents to reach the deploy controller on the corporate network and the registry in the build environment.",
+    "candidate_claim": "An attacker who compromises the build runner reaches the store estate.",
+    "label": "no-match",
+    "note": "Hard negative: the same two zones in the opposite direction, which is a different reference entirely."
+  },
+  {
+    "case": "07-cicd-store-deploy",
+    "category": "elevation-of-privilege",
+    "reference_claim": "A malicious dependency executes with the build runner's authority during the build, carrying an attacker from the public internet into the build environment.",
+    "candidate_claim": "A poisoned package runs code on the build runner during the build.",
+    "label": "match",
+    "note": "Same action at build time, which is what separates it from the tampering claim on the same flow."
+  },
+  {
     "case": "11-sparse-shift-scheduling",
     "category": "spoofing",
     "reference_claim": "An attacker signs in to the scheduling web app as a colleague and reads that colleague's shifts and details, because how colleagues are authenticated is unverified.",

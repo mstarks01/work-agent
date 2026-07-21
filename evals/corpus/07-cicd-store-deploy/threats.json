@@ -1,0 +1,331 @@
+[
+  {
+    "category": "spoofing",
+    "affected_element_ids": [
+      "flow:build-runner-to-deploy-controller:set-current-release",
+      "process:deploy-controller"
+    ],
+    "claim": "An attacker holding the shared build token calls the deploy controller as if it were the build runner and names an image sha of their own choosing as the current release.",
+    "tier": "must-find",
+    "severity": {
+      "likelihood": "medium",
+      "impact": "high"
+    },
+    "notes": "The one credential the source describes in full, and it describes it as shared across every pipeline and never rotated. Holding it is indistinguishable from being the runner."
+  },
+  {
+    "category": "spoofing",
+    "affected_element_ids": [
+      "flow:store-server-to-image-registry:pull-image",
+      "store:image-registry"
+    ],
+    "claim": "An attacker on the retail WAN presents itself to the image registry as a store server and pulls the estate's container images.",
+    "tier": "must-find",
+    "severity": {
+      "likelihood": "medium",
+      "impact": "medium"
+    },
+    "notes": "The source says the registry allows the pull and that nobody has written down what a store server presents to it; needs-info is the right verdict, not silence."
+  },
+  {
+    "category": "spoofing",
+    "affected_element_ids": [
+      "flow:store-server-to-deploy-controller:poll-current-release",
+      "process:deploy-controller"
+    ],
+    "claim": "An attacker polls the deploy controller while claiming to be a store server, since what a store server presents to the controller is unverified.",
+    "tier": "expected",
+    "severity": {
+      "likelihood": "medium",
+      "impact": "low"
+    },
+    "notes": "Lower impact than the registry pull because the poll returns one sha, but it is the same undocumented identity and belongs on the record."
+  },
+  {
+    "category": "spoofing",
+    "affected_element_ids": [
+      "flow:developer-to-git-server:push-branches",
+      "entity:developer"
+    ],
+    "claim": "An attacker pushes branches to the git server as a developer, because how developers authenticate to it is unverified.",
+    "tier": "expected",
+    "severity": {
+      "likelihood": "medium",
+      "impact": "medium"
+    },
+    "notes": "Pushing a branch alone does not reach the estate — a merge to main is what starts a build — which is why this sits below the release-setting claims."
+  },
+  {
+    "category": "spoofing",
+    "affected_element_ids": [
+      "flow:developer-to-build-runner:manual-rebuild",
+      "process:build-runner"
+    ],
+    "claim": "An attacker logs in to the build runner as a developer and triggers a rebuild of main, since how that login is authenticated is unverified.",
+    "tier": "expected",
+    "severity": {
+      "likelihood": "medium",
+      "impact": "high"
+    },
+    "notes": "Distinct from the elevation claim on the same flow: this is an outsider becoming a developer, not a developer using the authority they legitimately have."
+  },
+  {
+    "category": "tampering",
+    "affected_element_ids": [
+      "process:deploy-controller",
+      "process:store-server"
+    ],
+    "claim": "An attacker alters the deploy controller's current-release record so that every store server pulls and runs an image of the attacker's choosing within a minute.",
+    "tier": "must-find",
+    "severity": {
+      "likelihood": "medium",
+      "impact": "high"
+    },
+    "notes": "The single record is the whole control plane of the estate, and the poll loop turns one write into 1,200 restarts with no further attacker action."
+  },
+  {
+    "category": "tampering",
+    "affected_element_ids": [
+      "flow:build-runner-to-public-package-registry:resolve-dependencies",
+      "process:build-runner"
+    ],
+    "claim": "An attacker publishes a package that the lockfile resolves to and the runner bakes it into the image unchecked, because signatures on downloads are not verified.",
+    "tier": "must-find",
+    "severity": {
+      "likelihood": "medium",
+      "impact": "high"
+    },
+    "notes": "A stated absence, not an unknown — the source says outright that the runner does not verify signatures, so this is grounded rather than needs-info."
+  },
+  {
+    "category": "tampering",
+    "affected_element_ids": [
+      "store:image-registry",
+      "process:store-server"
+    ],
+    "claim": "An attacker replaces the image stored under a commit-sha tag in the registry, so store servers pull attacker content while the recorded release is unchanged.",
+    "tier": "must-find",
+    "severity": {
+      "likelihood": "medium",
+      "impact": "high"
+    },
+    "notes": "Worth keeping separate from the controller-record claim: this one leaves the release record honest, so nothing in the described system would show a change."
+  },
+  {
+    "category": "tampering",
+    "affected_element_ids": [
+      "store:git-server"
+    ],
+    "claim": "An attacker modifies source held on the git server so the change is carried into the next image the runner builds.",
+    "tier": "expected",
+    "severity": {
+      "likelihood": "low",
+      "impact": "high"
+    },
+    "notes": "The slowest path to the estate of the three tampering entry points, since it waits for a build, but the source states no protection on the content at rest."
+  },
+  {
+    "category": "tampering",
+    "affected_element_ids": [
+      "flow:store-server-to-image-registry:pull-image"
+    ],
+    "claim": "An attacker on the retail WAN alters the container image as a store server pulls it, since protection of that traffic is unverified.",
+    "tier": "expected",
+    "severity": {
+      "likelihood": "low",
+      "impact": "high"
+    },
+    "notes": "The image crosses from the build environment to the store estate over a WAN the source describes without saying anything about how it is protected."
+  },
+  {
+    "category": "tampering",
+    "affected_element_ids": [
+      "flow:store-server-to-deploy-controller:poll-current-release"
+    ],
+    "claim": "An attacker on the retail WAN alters the answer to a store server's poll so that store installs a different image sha from the rest of the estate.",
+    "tier": "expected",
+    "severity": {
+      "likelihood": "low",
+      "impact": "medium"
+    },
+    "notes": "Per-store rather than estate-wide, which is what separates it from writing the controller's record."
+  },
+  {
+    "category": "repudiation",
+    "affected_element_ids": [
+      "flow:developer-to-build-runner:manual-rebuild",
+      "process:build-runner"
+    ],
+    "claim": "A build that reached the estate cannot be attributed to the developer who started it, because any developer can trigger a manual rebuild on an unreviewed path whose authentication is unverified.",
+    "tier": "must-find",
+    "severity": {
+      "likelihood": "medium",
+      "impact": "medium"
+    },
+    "notes": "The source states the path is not reviewed and does not require a merge, so the git history that would otherwise carry attribution is bypassed by construction."
+  },
+  {
+    "category": "repudiation",
+    "affected_element_ids": [
+      "flow:build-runner-to-deploy-controller:set-current-release",
+      "process:deploy-controller"
+    ],
+    "claim": "The deploy controller cannot tell which pipeline set a release, because every pipeline presents the same shared build token.",
+    "tier": "must-find",
+    "severity": {
+      "likelihood": "high",
+      "impact": "medium"
+    },
+    "notes": "High likelihood because it is not an attack condition but the described steady state — the token is stated to be the same for every pipeline."
+  },
+  {
+    "category": "information-disclosure",
+    "affected_element_ids": [
+      "process:build-runner",
+      "flow:build-runner-to-deploy-controller:set-current-release"
+    ],
+    "claim": "An attacker who reads the build runner's configuration recovers the shared build token and can thereafter set the estate's release.",
+    "tier": "must-find",
+    "severity": {
+      "likelihood": "medium",
+      "impact": "high"
+    },
+    "notes": "Recovering the credential is a separate action from using it, and the corpus files the use under spoofing; the never-rotated qualifier is what makes recovery durable."
+  },
+  {
+    "category": "information-disclosure",
+    "affected_element_ids": [
+      "store:git-server"
+    ],
+    "claim": "An attacker who reaches the git server's storage reads the estate's source code, since protection of what it stores is unverified.",
+    "tier": "expected",
+    "severity": {
+      "likelihood": "low",
+      "impact": "medium"
+    },
+    "notes": "The source names this gap explicitly in its closing line, which is the sentence most likely to be dropped in extraction."
+  },
+  {
+    "category": "information-disclosure",
+    "affected_element_ids": [
+      "store:image-registry"
+    ],
+    "claim": "An attacker who reaches the image registry's storage reads the built images and whatever is baked into them, since protection at rest is unverified.",
+    "tier": "expected",
+    "severity": {
+      "likelihood": "low",
+      "impact": "medium"
+    },
+    "notes": "Paired with the git-server claim in the same closing sentence; kept separate because they are different stores with different reachability."
+  },
+  {
+    "category": "information-disclosure",
+    "affected_element_ids": [
+      "flow:store-server-to-image-registry:pull-image"
+    ],
+    "claim": "An attacker on the retail WAN reads the container image as a store server pulls it, since protection of that traffic is unverified.",
+    "tier": "expected",
+    "severity": {
+      "likelihood": "low",
+      "impact": "medium"
+    },
+    "notes": "Reading the image in transit and altering it in transit are two claims on one flow, and the pair is the distinction the judge most often collapses."
+  },
+  {
+    "category": "denial-of-service",
+    "affected_element_ids": [
+      "process:deploy-controller",
+      "process:store-server"
+    ],
+    "claim": "An attacker sets the current release to an image that does not start, and every store server restarts into it and stops serving tills.",
+    "tier": "must-find",
+    "severity": {
+      "likelihood": "medium",
+      "impact": "high"
+    },
+    "notes": "The estate-wide blast radius is the poll loop working as designed; this is the availability face of the same write the tampering lane files as integrity."
+  },
+  {
+    "category": "denial-of-service",
+    "affected_element_ids": [
+      "process:deploy-controller"
+    ],
+    "claim": "An attacker floods the deploy controller until the estate's polls fail and no new release can reach any store.",
+    "tier": "expected",
+    "severity": {
+      "likelihood": "medium",
+      "impact": "low"
+    },
+    "notes": "Impact is low because a store server that cannot poll keeps running the image it has; what stops is deployment, not selling."
+  },
+  {
+    "category": "denial-of-service",
+    "affected_element_ids": [
+      "flow:store-server-to-image-registry:pull-image",
+      "store:image-registry"
+    ],
+    "claim": "An attacker makes the image registry unreachable over the WAN so store servers cannot complete a pull and the estate is left split across two releases.",
+    "tier": "expected",
+    "severity": {
+      "likelihood": "low",
+      "impact": "medium"
+    },
+    "notes": "The interesting consequence is not downtime but divergence: the source describes no ordering or rollback across 1,200 independent pullers."
+  },
+  {
+    "category": "elevation-of-privilege",
+    "affected_element_ids": [
+      "flow:developer-to-build-runner:manual-rebuild",
+      "process:store-server"
+    ],
+    "claim": "Any developer turns code of their own choosing into the software running in 1,200 stores by triggering the manual rebuild, a path the source states requires no merge and receives no review.",
+    "tier": "must-find",
+    "severity": {
+      "likelihood": "medium",
+      "impact": "high"
+    },
+    "notes": "The case's signature shape: authority flows upward through the build, so the weakest gate on the input side is the real authority over the estate."
+  },
+  {
+    "category": "elevation-of-privilege",
+    "affected_element_ids": [
+      "process:build-runner",
+      "process:store-server"
+    ],
+    "claim": "An attacker who compromises the build runner controls what every store server runs, because the runner both writes the image and holds the token that names the release.",
+    "tier": "must-find",
+    "severity": {
+      "likelihood": "medium",
+      "impact": "high"
+    },
+    "notes": "The runner concentrates both halves of the deploy path, so the build environment is effectively a higher-privilege zone than the estate it feeds."
+  },
+  {
+    "category": "elevation-of-privilege",
+    "affected_element_ids": [
+      "process:store-server",
+      "process:deploy-controller"
+    ],
+    "claim": "An attacker who takes one store server uses whatever it presents to reach the deploy controller on the corporate network and the registry in the build environment.",
+    "tier": "expected",
+    "severity": {
+      "likelihood": "low",
+      "impact": "high"
+    },
+    "notes": "A back-office box in one of 1,200 stores is the least defensible element in the model and it is stated to reach across two boundaries."
+  },
+  {
+    "category": "elevation-of-privilege",
+    "affected_element_ids": [
+      "flow:build-runner-to-public-package-registry:resolve-dependencies",
+      "process:build-runner"
+    ],
+    "claim": "A malicious dependency executes with the build runner's authority during the build, carrying an attacker from the public internet into the build environment.",
+    "tier": "expected",
+    "severity": {
+      "likelihood": "medium",
+      "impact": "high"
+    },
+    "notes": "Distinct from the tampering claim on the same flow: that one is about what ends up in the image, this one is about code running on the runner at build time."
+  }
+]
