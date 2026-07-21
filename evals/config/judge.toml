@@ -1,0 +1,27 @@
+# The eval judge (wayfinder ticket 009, decision 12) — pinned and versioned
+# SEPARATELY from config/model_tiers.toml, and deliberately with no env-var
+# override.
+#
+# A judge upgrade silently re-scores every historical number and turns a
+# comparison into a phantom regression, so changing anything in this file is a
+# re-baselining event, not a dependency bump: bump `version`, re-run the
+# judge-vs-human agreement check over evals/judge_calibration/pairs.json
+# (>= 90%, ticket 009 decision 13), and re-baseline the tracked metrics.
+#
+# `pro` tier, Google-only. Self-preference bias is tolerable here specifically
+# because the judge rules on claim *equivalence* — a near-symmetric relation,
+# not a quality preference, which is where self-enhancement bias bites.
+#
+# temperature is pinned with the judge rather than read from
+# config/sampling.toml: that file is the configuration under test, and a judge
+# whose decoding moved with it would re-score history every time the suite
+# measured a new production temperature.
+#
+# order_seed seeds the presentation-order shuffle that kills position bias, so
+# a scoring run is reproducible while order stays uncorrelated with which side
+# of a pair is the reference.
+
+version = 1
+model = "gemini-2.5-pro-002"
+temperature = 0.0
+order_seed = 20260721

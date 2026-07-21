@@ -25,3 +25,7 @@ packages = ["src/stride_service"]
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]
+# The eval harness (evals/harness) is imported by the offline eval tests but
+# is deliberately not part of the wheel — nothing under evals/ ships in the
+# production image (wayfinder ticket 009 decision 14).
+pythonpath = ["."]

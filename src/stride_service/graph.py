@@ -52,7 +52,7 @@ from __future__ import annotations
 import json
 from collections.abc import Callable, Sequence
 from dataclasses import dataclass
-from typing import Any
+from typing import Any, Literal
 
 from google.adk.agents import LlmAgent
 from google.adk.events.event import Event
@@ -75,6 +75,7 @@ from stride_service.report import (
     Threat,
     build_summary,
 )
+from stride_service.sampling import SamplingConfig
 from stride_service.skills import compose_analyst_skills, compose_critic_skills
 from stride_service.system_model import BoundaryCrossing, SystemModel
 from stride_service.validation import ValidationIssue, parse_and_validate
@@ -120,6 +121,21 @@ TIER_NODE_BY_GRAPH_NODE: dict[str, str] = {
 }
 
 # --- Routes -----------------------------------------------------------------
+
+Entry = Literal["extract", "prepare", "extract-only"]
+
+ENTRY_EXTRACT: Entry = "extract"
+ENTRY_PREPARE: Entry = "prepare"
+"""The analysis eval mode's entry (ticket 009 decision 1): start at
+``prepare`` over a blessed model seeded in state, so a recall miss cannot be
+blamed on an element ``extract`` never produced."""
+
+ENTRY_EXTRACT_ONLY: Entry = "extract-only"
+"""The extraction eval mode: run ``extract`` and stop, leaving its emission at
+:data:`STATE_EXTRACTED_MODEL` for the caller to put through the same
+:func:`~stride_service.validation.parse_and_validate` gate ``validate`` uses.
+Spending six analysts and a critic to score an extraction would be six kinds
+of noise on one number."""
 
 ROUTE_VALID = "valid"
 ROUTE_INVALID = "invalid"
@@ -349,12 +365,15 @@ def _llm_node(
     output_schema: Any,
     output_key: str,
     resolve_model: ModelResolver,
+    sampling: SamplingConfig,
 ) -> LlmAgent:
     """One LLM node: its model, its full instruction, its emitted schema.
 
     ``include_contents='none'`` is set explicitly (ticket 002): a node sees
     its instruction and the state templated into it, never the transcript of
-    the nodes before it.
+    the nodes before it. Sampling comes from the config shared with the eval
+    suite (ticket 009 decision 15), so no node runs on library defaults the
+    eval numbers were not taken against.
     """
     return LlmAgent(
         name=name,
@@ -363,6 +382,23 @@ def _llm_node(
         output_schema=output_schema,
         output_key=output_key,
         include_contents="none",
+        generate_content_config=sampling.to_generate_content_config(),
+    )
+
+
+def _extract_node(
+    prompt_loader: MarkdownLoader,
+    resolve_model: ModelResolver,
+    sampling: SamplingConfig,
+) -> LlmAgent:
+    """The extraction node, shared by the production graph and eval mode 1."""
+    return _llm_node(
+        name=EXTRACT_NODE,
+        instruction=compose_extract_prompt(prompt_loader),
+        output_schema=SystemModel,
+        output_key=STATE_EXTRACTED_MODEL,
+        resolve_model=resolve_model,
+        sampling=sampling,
     )
 
 
@@ -398,7 +434,9 @@ def build_pipeline(
     skill_loader: MarkdownLoader,
     prompt_loader: MarkdownLoader,
     resolve_model: ModelResolver,
+    sampling: SamplingConfig,
     domain_packs: Sequence[str] = (),
+    entry: Entry = ENTRY_EXTRACT,
     name: str = "stride_pipeline",
 ) -> Pipeline:
     """Wire the whole graph: prompts, skills, and models onto the topology.
@@ -406,21 +444,26 @@ def build_pipeline(
     ``resolve_model`` takes a canonical LLM node name and returns the model
     to bind — :meth:`ModelTierConfig.resolve_model` in production, so a node
     silently running on the wrong tier stays impossible.
+
+    ``entry`` selects where the graph starts. ``"extract"`` is production and
+    the end-to-end eval mode. ``"prepare"`` is the **analysis** eval mode of
+    ticket 009 decision 1: a blessed System Model is seeded at
+    :data:`STATE_VALID_MODEL` and the extraction half is left out entirely,
+    so threat numbers are attributable to the analysts and critic rather than
+    to an element ``extract`` never produced. It is a parameter here, not a
+    second topology in the eval tree, because two definitions of the same
+    graph drift.
     """
-    extract = _llm_node(
-        name=EXTRACT_NODE,
-        instruction=compose_extract_prompt(prompt_loader),
-        output_schema=SystemModel,
-        output_key=STATE_EXTRACTED_MODEL,
-        resolve_model=resolve_model,
-    )
-    repair = _llm_node(
-        name=REPAIR_NODE,
-        instruction=compose_repair_prompt(prompt_loader),
-        output_schema=SystemModel,
-        output_key=STATE_EXTRACTED_MODEL,
-        resolve_model=resolve_model,
-    )
+    if entry not in (ENTRY_EXTRACT, ENTRY_PREPARE, ENTRY_EXTRACT_ONLY):
+        raise ValueError(f"unknown graph entry point: {entry!r}")
+
+    if entry == ENTRY_EXTRACT_ONLY:
+        extract = _extract_node(prompt_loader, resolve_model, sampling)
+        return Pipeline(
+            workflow=Workflow(name=name, edges=[(START, extract)]),
+            node_models={extract.name: _model_name(extract.model)},
+        )
+
     critic = _llm_node(
         name=CRITIC_NODE,
         instruction=_instruction(
@@ -429,6 +472,7 @@ def build_pipeline(
         output_schema=list[Threat],
         output_key=STATE_REVIEWED_THREATS,
         resolve_model=resolve_model,
+        sampling=sampling,
     )
     analysts = [
         _llm_node(
@@ -439,33 +483,52 @@ def build_pipeline(
             output_schema=list[DraftThreat],
             output_key=analyst_state_key(category),
             resolve_model=resolve_model,
+            sampling=sampling,
         )
         for category in STRIDE_CATEGORIES
     ]
 
-    validate = FunctionNode(func=validate_extraction, name=VALIDATE_NODE)
-    revalidate = FunctionNode(func=validate_extraction, name=REVALIDATE_NODE)
-    reject = FunctionNode(func=reject_model, name=REJECT_NODE)
     prepare = FunctionNode(func=prepare_analysis, name=PREPARE_NODE)
     join = JoinNode(name=JOIN_NODE)
     merge = FunctionNode(func=merge_drafts, name=MERGE_NODE)
     router = FunctionNode(func=route_review, name=ROUTER_NODE)
     assemble = FunctionNode(func=assemble_report, name=ASSEMBLE_NODE)
 
-    workflow = Workflow(
-        name=name,
-        edges=[
+    extraction_nodes: list[LlmAgent] = []
+    if entry == ENTRY_EXTRACT:
+        extract = _extract_node(prompt_loader, resolve_model, sampling)
+        repair = _llm_node(
+            name=REPAIR_NODE,
+            instruction=compose_repair_prompt(prompt_loader),
+            output_schema=SystemModel,
+            output_key=STATE_EXTRACTED_MODEL,
+            resolve_model=resolve_model,
+            sampling=sampling,
+        )
+        validate = FunctionNode(func=validate_extraction, name=VALIDATE_NODE)
+        revalidate = FunctionNode(func=validate_extraction, name=REVALIDATE_NODE)
+        reject = FunctionNode(func=reject_model, name=REJECT_NODE)
+        extraction_nodes = [extract, repair]
+        head_edges = [
             (START, extract, validate),
             (validate, {ROUTE_VALID: prepare, ROUTE_INVALID: repair}),
             (repair, revalidate),
             (revalidate, {ROUTE_VALID: prepare, ROUTE_INVALID: reject}),
+        ]
+    else:
+        head_edges = [(START, prepare)]
+
+    workflow = Workflow(
+        name=name,
+        edges=[
+            *head_edges,
             (prepare, tuple(analysts)),
             *((analyst, join) for analyst in analysts),
             (join, merge, critic, router),
             (router, {ROUTE_ACCEPT: assemble}),
         ],
     )
-    llm_nodes = [extract, repair, *analysts, critic]
+    llm_nodes = [*extraction_nodes, *analysts, critic]
     return Pipeline(
         workflow=workflow,
         node_models={node.name: _model_name(node.model) for node in llm_nodes},

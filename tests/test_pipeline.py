@@ -29,6 +29,7 @@ from stride_service.pipeline import (
     build_default_pipeline,
 )
 from stride_service.report import STRIDE_CATEGORIES
+from stride_service.sampling import load_sampling
 from tests.factories import sample_draft, sample_threat, valid_model
 
 PROJECT_ROOT = Path(__file__).resolve().parents[1]
@@ -79,6 +80,7 @@ def build(replies: dict[str, str]) -> tuple[graph.Pipeline, dict[str, ScriptedLl
         skill_loader=MarkdownLoader(PROJECT_ROOT / "skills"),
         prompt_loader=MarkdownLoader(PROJECT_ROOT / "prompts"),
         resolve_model=resolve,
+        sampling=load_sampling(PROJECT_ROOT / "config" / "sampling.toml"),
     )
     return pipeline, models
 

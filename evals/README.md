@@ -23,10 +23,68 @@ evals/
   judge_calibration/
     build_pairs.py              the hand labels (edit this)
     pairs.json                  generated fixtures (never hand-edit)
+  config/judge.toml             the separately-pinned judge (ticket 009 dec. 12)
+  prompts/                      the judge's prompts — NOT the shipped prompts/
+  harness/                      the scorer and the eval modes (ticket 023)
 ```
 
-Ticket 023 fits its loader to this layout, not the reverse — content before
-code, the same order tickets 019/020 used.
+The harness was fitted to this layout, not the reverse — content before code,
+the same order tickets 019/020 used.
+
+## The harness
+
+| Module | What it owns |
+|---|---|
+| `harness/reference.py` | `ReferenceThreat` and the fail-closed corpus loader |
+| `harness/structural.py` | Tier 1 gates — the only ones that block in phase 1 |
+| `harness/judge.py` | the pinned judge, its two calls, and the `Judge` seam |
+| `harness/scorer.py` | lane prefilter → judge → assignment → buckets → severity |
+| `harness/calibration.py` | judge-vs-human agreement over `judge_calibration/` |
+| `harness/modes.py` | the three eval modes over the shipped graph |
+| `harness/run.py` | the CLI |
+
+Sampling is **not** here: `config/sampling.toml` at the repo root is read by
+production and the eval suite alike (ticket 009 decision 15), because grading a
+configuration you do not ship is how a suite goes green while production
+drifts. The judge's own model and temperature are pinned separately in
+`evals/config/judge.toml`, since a judge upgrade re-scores history.
+
+## Running
+
+```sh
+python evals/verify_corpus.py                 # check every case and the fixtures
+python evals/verify_corpus.py --write-sha     # restamp source_sha256
+python evals/judge_calibration/build_pairs.py # regenerate pairs.json
+
+pytest tests/test_evals_*.py tests/test_corpus_lints.py   # offline, no credentials
+
+# live: needs ADC for Vertex (IAM, never API keys)
+python -m evals.harness.run run --mode analysis --out artifact.json
+python -m evals.harness.run run --mode extraction --case 01-payments-checkout
+python -m evals.harness.run calibrate --out agreement.json
+```
+
+`run` exits non-zero only on **Tier 1 structural** failures. Must-find recall,
+lane and element accuracy, the ungrounded rate, the severity confusion and the
+near/far exemplar delta are all computed, printed and written to the artifact —
+and none of them block, until ticket 025 has the ~5 baseline sweeps that say
+what normal looks like. `calibrate` exits non-zero below the 90% agreement bar;
+failing it means the judge prompt needs work, not a lowered bar.
+
+## Metrics, and what they are not
+
+- **must-find recall** — per case, not aggregate: an aggregate hides one case
+  failing completely, which is the failure that matters.
+- **lane accuracy** — observable only because unmatched threats get a
+  cross-lane pass. A misfiled threat is recorded as a lane error and the
+  reference stays a miss; ticket 013 rejects misfiled threats rather than
+  recategorizing them.
+- **element accuracy** — scored, never a prefilter. A threat that cites the
+  process where the SME cited the flow at its endpoint still matches.
+- **ungrounded rate** — the only gating bucket among unmatched threats.
+  `valid-unlisted` is explicitly *not* a failure, and recurring entries are
+  surfaced in the artifact for promotion into the reference set.
+- **`needs-info`** — never a false positive. Its own bucket, never adjudicated.
 
 ## Phase-1 corpus
 
@@ -51,16 +109,10 @@ far-exemplar recall. Without case 01 there is nothing to subtract from.
 The delta is a tracked, deliberately **non-gating** number: a large delta is a
 finding to act on, not a build to break.
 
-## Running the checks
-
-```sh
-python evals/verify_corpus.py            # check every case and the fixtures
-python evals/verify_corpus.py --write-sha  # restamp source_sha256 after editing source.md
-python evals/judge_calibration/build_pairs.py  # regenerate pairs.json from the labels
-```
-
-Credential-free and deterministic, so it runs on every PR (ticket 009 decision
-17). Ticket 023 ports these checks into the offline test job.
+The corpus checks are credential-free and deterministic, so they run on every
+PR (ticket 009 decision 17); `tests/test_corpus_lints.py` runs
+`verify_corpus.py`'s checks in the test job, and the script stays runnable by
+hand for corpus authors.
 
 ## Caveats to carry forward
 

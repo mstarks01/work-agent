@@ -19,6 +19,7 @@ from stride_service.critic import CriticOutputError, DraftJoinError
 from stride_service.markdown_loader import MarkdownLoader
 from stride_service.model_tiers import LLM_NODES, load_model_tiers
 from stride_service.report import STRIDE_CATEGORIES, DraftThreat, Threat
+from stride_service.sampling import load_sampling
 from stride_service.system_model import SystemModel
 from tests.factories import sample_draft, sample_threat, valid_model
 
@@ -62,6 +63,7 @@ def pipeline(skill_loader: MarkdownLoader, prompt_loader: MarkdownLoader):
         skill_loader=skill_loader,
         prompt_loader=prompt_loader,
         resolve_model=tiers.resolve_model,
+        sampling=load_sampling(PROJECT_ROOT / "config" / "sampling.toml"),
     )
 
 

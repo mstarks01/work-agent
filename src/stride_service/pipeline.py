@@ -53,6 +53,7 @@ from stride_service.jobs import (
 from stride_service.markdown_loader import MarkdownLoader
 from stride_service.model_tiers import load_model_tiers
 from stride_service.report import InputRef, Job, NodeRun, StrideReport
+from stride_service.sampling import load_sampling
 
 logger = logging.getLogger(__name__)
 
@@ -68,10 +69,12 @@ _REPO_ROOT = Path(__file__).resolve().parents[2]
 DEFAULT_SKILLS_DIR = _REPO_ROOT / "skills"
 DEFAULT_PROMPTS_DIR = _REPO_ROOT / "prompts"
 DEFAULT_MODEL_TIERS_PATH = _REPO_ROOT / "config" / "model_tiers.toml"
+DEFAULT_SAMPLING_PATH = _REPO_ROOT / "config" / "sampling.toml"
 
 SKILLS_DIR_VAR = "STRIDE_SKILLS_DIR"
 PROMPTS_DIR_VAR = "STRIDE_PROMPTS_DIR"
 MODEL_TIERS_VAR = "STRIDE_MODEL_TIERS"
+SAMPLING_VAR = "STRIDE_SAMPLING"
 
 
 class PipelineError(RuntimeError):
@@ -203,10 +206,11 @@ class AdkPipelineRunner:
 
 
 def build_default_pipeline(env: Mapping[str, str] | None = None) -> Pipeline:
-    """The production graph: repo Markdown, repo tier config, pinned models.
+    """The production graph: repo Markdown, repo config, pinned models.
 
-    Fails closed on a missing or invalid tier config rather than starting a
-    service whose nodes would run on whatever model happened to be default.
+    Fails closed on a missing or invalid tier or sampling config rather than
+    starting a service whose nodes would run on whatever model or decoding
+    parameters happened to be default.
     """
     if env is None:
         env = os.environ
@@ -217,6 +221,7 @@ def build_default_pipeline(env: Mapping[str, str] | None = None) -> Pipeline:
         skill_loader=MarkdownLoader(env.get(SKILLS_DIR_VAR, DEFAULT_SKILLS_DIR)),
         prompt_loader=MarkdownLoader(env.get(PROMPTS_DIR_VAR, DEFAULT_PROMPTS_DIR)),
         resolve_model=tiers.resolve_model,
+        sampling=load_sampling(env.get(SAMPLING_VAR, DEFAULT_SAMPLING_PATH)),
     )
 
 

@@ -1,0 +1,19 @@
+# Sampling configuration (wayfinder ticket 009, decision 15) — read by both
+# the production graph and the eval suite, from this one file. Grading a
+# configuration you do not ship is how a suite goes green while production
+# drifts, so there is no eval-only override and no env-var override: changing
+# sampling is a reviewable diff here.
+#
+# temperature = 0 is a starting point, not a settled answer. Greedy decoding
+# reproduces the anchored exemplar pattern most closely (plausibly amplifying
+# the exemplar-domain bias the corpus measures as a near/far delta) and rules
+# out the Self-MoA recall lever (k = 2-3 at temperature > 0, union-merged and
+# critic-deduped). Ticket 025 measures 0 vs. the model default vs. k = 3 and
+# moves this number on evidence.
+#
+# Anything not listed is left to the model's own default deliberately: this
+# project has measured neither top_p nor thinking budget, and pinning an
+# unmeasured value would look like a decision that was never made.
+
+version = 1
+temperature = 0.0
