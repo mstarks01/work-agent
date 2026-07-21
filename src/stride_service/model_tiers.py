@@ -2,14 +2,14 @@
 
 Implements the tier assignment from wayfinder ticket 007: exactly two named
 tiers (``flash`` for extraction/normalization, ``pro`` for the six STRIDE
-analysts and the critic), each a single pinned Vertex model version string. A
+analysts and the critic), each a single pinned Vertex model identifier. A
 versioned TOML file is the source of truth for both the tier strings and the
 node -> tier mapping; ``STRIDE_MODEL_FLASH`` / ``STRIDE_MODEL_PRO`` override
 the tier strings at deploy time, while the node -> tier mapping is file-only.
 
-Loading fails closed: an alias or unpinned model string (from the file *or*
-an env var), an unknown tier or node name, or a node missing from the mapping
-raises :class:`ModelConfigError` instead of degrading — a node silently
+Loading fails closed: an auto-updating alias or pre-GA model string (from the
+file *or* an env var), an unknown tier or node name, or a node missing from the
+mapping raises :class:`ModelConfigError` instead of degrading — a node silently
 running on the wrong model would invalidate every eval result. There is no
 cross-tier fallback anywhere here by design.
 """
@@ -17,7 +17,6 @@ cross-tier fallback anywhere here by design.
 from __future__ import annotations
 
 import os
-import re
 import tomllib
 from collections.abc import Mapping
 from pathlib import Path
@@ -38,11 +37,20 @@ ANALYST_NODES: tuple[str, ...] = tuple(
 )
 LLM_NODES: tuple[str, ...] = ("extract", "repair", *ANALYST_NODES, "critic")
 
-# A pinned Vertex model string ends in a numeric version suffix such as
-# "-002". This mechanically excludes "-latest" and bare aliases like
-# "gemini-2.5-pro", plus dated preview builds — none of which are
-# eval-reproducible or safe on regional endpoints.
-_PINNED_SUFFIX = re.compile(r"-\d{3,}$")
+# What "pinned" means on Vertex, restated by ticket 026 after ticket 007's
+# original rule turned out to describe a naming convention Google retired.
+#
+# Gemini 1.5 shipped numbered stable builds ("gemini-1.5-pro-002"); Gemini
+# 2.5 and later do not — their most specific *stable* identifier is the bare
+# "gemini-2.5-pro", and the numbered strings this repo first pinned do not
+# resolve at all. So the rule is not "must carry version digits" (which no
+# current generation can satisfy) but "must be the stable GA identifier":
+# auto-updating aliases and pre-GA builds are rejected, numbered builds are
+# still accepted where a generation offers them, and reproducibility is
+# defended downstream by recording the *served* model version on every eval
+# run rather than by trusting the string alone.
+_ALIAS_SUFFIX = "-latest"
+_PRE_GA_MARKERS = ("-preview", "-exp")
 
 _ENV_PREFIX = "STRIDE_MODEL_"
 
@@ -57,19 +65,23 @@ def env_var_for(tier: TierName) -> str:
 
 
 def validate_model_string(value: str, source: str) -> str:
-    """Require a pinned Vertex model version string; reject aliases.
+    """Require a stable GA Vertex model identifier; reject aliases and pre-GA builds.
 
     ``source`` names where the string came from (file key or env var) so the
     error points ops at the right knob.
     """
-    if value.endswith("-latest"):
+    if value != value.strip() or not value:
+        raise ModelConfigError(f"{source}: {value!r} is not a model identifier")
+    if value.endswith(_ALIAS_SUFFIX):
         raise ModelConfigError(
-            f"{source}: {value!r} is a '-latest' alias; pin a model version"
+            f"{source}: {value!r} is a '{_ALIAS_SUFFIX}' alias;"
+            " use the stable model identifier"
         )
-    if not _PINNED_SUFFIX.search(value):
+    marker = next((m for m in _PRE_GA_MARKERS if m in value), None)
+    if marker is not None:
         raise ModelConfigError(
-            f"{source}: {value!r} is not a pinned model version string"
-            " (expected a numeric suffix such as '-002')"
+            f"{source}: {value!r} is a pre-GA '{marker.lstrip('-')}' build;"
+            " use the stable model identifier"
         )
     return value
 

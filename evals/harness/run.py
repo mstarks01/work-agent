@@ -41,6 +41,8 @@ from evals.harness.scorer import (
     unlisted_for_promotion,
 )
 from evals.harness.structural import report_issues
+from stride_service.model_tiers import load_model_tiers
+from stride_service.pipeline import DEFAULT_MODEL_TIERS_PATH
 
 EVALS_ROOT = Path(__file__).resolve().parents[1]
 DEFAULT_CORPUS_DIR = EVALS_ROOT / "corpus"
@@ -91,15 +93,32 @@ async def _run_mode(
 
 
 def _score_reports(
-    cases: Sequence[GoldenCase], reports: dict[str, Any]
+    cases: Sequence[GoldenCase], reports: dict[str, Any], judge: VertexJudge
 ) -> list[CaseScore]:
-    config = load_judge_config()
-    judge = VertexJudge(config)
     return [
         score_case(case, reports[case.id].threats, judge)
         for case in cases
         if case.id in reports
     ]
+
+
+def _models_record(judge: VertexJudge | None) -> dict[str, Any]:
+    """What this run asked Vertex for, and what Vertex says it served.
+
+    Ticket 026: the tier strings are stable GA identifiers, not immutable
+    builds, so the artifact records both halves. A metric that moved between
+    two runs with different ``judge_served`` values is a model change, not a
+    regression, and nothing else in the artifact would show that.
+    """
+    tiers = load_model_tiers(DEFAULT_MODEL_TIERS_PATH)
+    judge_config = load_judge_config()
+    return {
+        "tiers_config_version": tiers.version,
+        "tiers": dict(tiers.tiers),
+        "judge_config_version": judge_config.version,
+        "judge": judge_config.model,
+        "judge_served": list(judge.served_model_versions) if judge else [],
+    }
 
 
 def _print_scores(scores: Sequence[CaseScore]) -> None:
@@ -126,13 +145,16 @@ def command_run(args: argparse.Namespace) -> int:
     payloads, failures, reports = asyncio.run(_run_mode(cases, args.mode))
 
     scores: list[CaseScore] = []
+    judge: VertexJudge | None = None
     if reports and not args.no_scoring:
-        scores = _score_reports(cases, reports)
+        judge = VertexJudge(load_judge_config())
+        scores = _score_reports(cases, reports, judge)
         _print_scores(scores)
 
     artifact = {
         "mode": args.mode,
         "cases": [case.id for case in cases],
+        "models": _models_record(judge),
         "gating": "tier-1-structural-only",
         "structural_failures": failures,
         "mode_output": payloads,
@@ -151,7 +173,8 @@ def command_run(args: argparse.Namespace) -> int:
 
 def command_calibrate(args: argparse.Namespace) -> int:
     """The >= 90% judge-human bar; failing it blocks a judge change."""
-    result = measure_agreement(VertexJudge(load_judge_config()), load_pairs())
+    judge = VertexJudge(load_judge_config())
+    result = measure_agreement(judge, load_pairs())
     print(
         f"judge-human agreement {result.agreement:.1%} over {result.total} pairs"
         f" (bar {AGREEMENT_BAR:.0%})"
@@ -161,9 +184,8 @@ def command_calibrate(args: argparse.Namespace) -> int:
         f" false non-matches {len(result.false_non_matches)}"
     )
     if args.out:
-        Path(args.out).write_text(
-            json.dumps(result.to_json(), indent=2) + "\n", "utf-8"
-        )
+        payload = {**result.to_json(), "models": _models_record(judge)}
+        Path(args.out).write_text(json.dumps(payload, indent=2) + "\n", "utf-8")
     if result.meets_bar:
         return 0
     print(

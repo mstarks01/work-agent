@@ -248,8 +248,8 @@ def test_a_critic_that_invents_a_threat_fails_the_job_loudly():
 
 def test_the_default_pipeline_binds_the_pinned_models_from_config():
     pipeline = build_default_pipeline(env={})
-    assert pipeline.node_models[graph.EXTRACT_NODE] == "gemini-2.5-flash-002"
-    assert pipeline.node_models[graph.CRITIC_NODE] == "gemini-2.5-pro-002"
+    assert pipeline.node_models[graph.EXTRACT_NODE] == "gemini-2.5-flash"
+    assert pipeline.node_models[graph.CRITIC_NODE] == "gemini-2.5-pro"
     assert set(pipeline.node_models) == set(graph.TIER_NODE_BY_GRAPH_NODE)
 
 

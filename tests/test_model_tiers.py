@@ -17,8 +17,8 @@ from stride_service.model_tiers import (
 
 REPO_CONFIG = Path(__file__).parents[1] / "config" / "model_tiers.toml"
 
-FLASH = "gemini-2.5-flash-002"
-PRO = "gemini-2.5-pro-002"
+FLASH = "gemini-2.5-flash"
+PRO = "gemini-2.5-pro"
 
 
 def config_toml(flash=FLASH, pro=PRO, nodes=None, version=1):
@@ -93,9 +93,9 @@ class TestEnvOverrides:
         with pytest.raises(ModelConfigError, match="STRIDE_MODEL_FLASH"):
             load_model_tiers(config_path(config_toml()), env=env)
 
-    def test_env_unpinned_rejected(self, config_path):
-        env = {env_var_for("pro"): "gemini-2.5-pro"}
-        with pytest.raises(ModelConfigError, match="not a pinned"):
+    def test_env_preview_build_rejected(self, config_path):
+        env = {env_var_for("pro"): "gemini-2.5-pro-preview-06-05"}
+        with pytest.raises(ModelConfigError, match="pre-GA"):
             load_model_tiers(config_path(config_toml()), env=env)
 
     def test_env_set_but_empty_rejected(self, config_path):
@@ -109,16 +109,27 @@ class TestEnvOverrides:
 
 
 class TestPinValidation:
+    # Ticket 026: "pinned" is the stable GA identifier, not version digits.
+    # Gemini 2.5+ ships no numbered stable builds, so the old rule rejected
+    # every string that actually resolves and accepted none that do.
     @pytest.mark.parametrize(
         "value",
-        ["gemini-2.5-pro-latest", "gemini-2.5-pro", "gemini-flash-preview-05"],
+        [
+            "gemini-2.5-pro-latest",
+            "gemini-2.5-pro-preview-06-05",
+            "gemini-2.0-flash-exp",
+            " gemini-2.5-pro",
+            "",
+        ],
     )
-    def test_aliases_and_unpinned_rejected(self, value):
+    def test_aliases_and_pre_ga_builds_rejected(self, value):
         with pytest.raises(ModelConfigError):
             validate_model_string(value, source="tiers.pro")
 
-    @pytest.mark.parametrize("value", ["gemini-2.5-pro-002", "gemini-3.0-flash-1001"])
-    def test_pinned_accepted(self, value):
+    @pytest.mark.parametrize(
+        "value", ["gemini-2.5-pro", "gemini-2.5-flash", "gemini-1.5-pro-002"]
+    )
+    def test_stable_identifiers_accepted(self, value):
         assert validate_model_string(value, source="tiers.pro") == value
 
     def test_alias_in_file_rejected(self, config_path):

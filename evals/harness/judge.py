@@ -221,6 +221,20 @@ class VertexJudge:
         self._claim_prompt = self._prompts.load(CLAIM_PROMPT_NAME)
         self._adjudication_prompt = self._prompts.load(ADJUDICATION_PROMPT_NAME)
         self._client = client or self._default_client()
+        self._served_versions: set[str] = set()
+
+    @property
+    def served_model_versions(self) -> tuple[str, ...]:
+        """The model versions Vertex reported actually serving these calls.
+
+        The configured string is only a request (ticket 026): for generations
+        that ship no numbered builds, the stable identifier resolves to
+        whichever build is current, so reproducibility rests on recording what
+        answered rather than on the string alone. More than one entry in a
+        single run means the build moved mid-run — which is exactly the fact a
+        phantom regression would otherwise be blamed on the prompt.
+        """
+        return tuple(sorted(self._served_versions))
 
     @staticmethod
     def _default_client() -> object:
@@ -263,6 +277,9 @@ class VertexJudge:
                 response_schema=schema,
             ),
         )
+        served = getattr(response, "model_version", None)
+        if served:
+            self._served_versions.add(served)
         try:
             return schema.model_validate_json(response.text or "")
         except ValidationError as exc:

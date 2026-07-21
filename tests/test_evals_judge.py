@@ -28,6 +28,7 @@ from evals.harness.judge import (
     load_judge_config,
 )
 from stride_service.markdown_loader import MarkdownLoader
+from stride_service.model_tiers import validate_model_string
 from tests.factories import valid_model
 
 EVALS_ROOT = Path(__file__).resolve().parents[1] / "evals"
@@ -44,14 +45,17 @@ PAIR = ClaimPair(
 class FakeClient:
     """Records the request and replays a canned response."""
 
-    def __init__(self, text: str) -> None:
+    def __init__(self, text: str, model_version: str | None = None) -> None:
         self.models = self
         self.text = text
+        self.model_version = model_version
         self.calls: list[dict] = []
 
     def generate_content(self, *, model, contents, config):
         self.calls.append({"model": model, "contents": contents, "config": config})
-        return type("Response", (), {"text": self.text})()
+        return type(
+            "Response", (), {"text": self.text, "model_version": self.model_version}
+        )()
 
 
 def judge(text: str) -> VertexJudge:
@@ -67,9 +71,9 @@ def test_shipped_judge_config_is_pinned_and_versioned():
 
     assert config.version >= 1
     assert config.temperature == 0.0
-    # Ticket 007's pinned-suffix rule, reused: an alias is not reproducible,
-    # and a judge that moves silently re-scores history.
-    assert config.model.endswith("-002")
+    # Ticket 026's restated rule, shared with the tiers: the stable GA
+    # identifier, never an auto-updating alias or a pre-GA build.
+    validate_model_string(config.model, source="judge.model")
 
 
 def test_alias_judge_model_is_refused(tmp_path):
@@ -83,7 +87,7 @@ def test_alias_judge_model_is_refused(tmp_path):
 def test_unknown_key_in_judge_config_fails_closed(tmp_path):
     path = tmp_path / "judge.toml"
     path.write_text(
-        'version = 1\nmodel = "gemini-2.5-pro-002"\ntemperature = 0.0\ntier = "pro"\n'
+        'version = 1\nmodel = "gemini-2.5-pro"\ntemperature = 0.0\ntier = "pro"\n'
     )
 
     with pytest.raises(JudgeConfigError):
@@ -172,3 +176,22 @@ def test_request_pins_model_temperature_and_schema():
     # (OWASP LLM01).
     assert PAIR.reference_claim in json.loads(call["contents"]).values()
     assert PAIR.reference_claim not in call["config"].system_instruction
+
+
+def test_the_served_model_version_is_recorded():
+    """Ticket 026: the configured string is a request, not an immutable build.
+
+    Gemini 2.5+ stable identifiers resolve to whichever build is current, so
+    what actually answered is the only thing that makes a run's numbers
+    comparable to the next run's.
+    """
+    served = "gemini-2.5-pro-2026-05-01"
+    client = FakeClient(json.dumps({"match": True, "rationale": "same"}), served)
+    judge = VertexJudge(
+        load_judge_config(), client=client, prompts=MarkdownLoader(JUDGE_PROMPTS)
+    )
+
+    assert judge.served_model_versions == ()
+    judge.equivalent(PAIR)
+
+    assert judge.served_model_versions == (served,)

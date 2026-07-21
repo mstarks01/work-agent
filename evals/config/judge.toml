@@ -21,7 +21,13 @@
 # a scoring run is reproducible while order stays uncorrelated with which side
 # of a pair is the reference.
 
-version = 1
-model = "gemini-2.5-pro-002"
+# Version 2 (ticket 026) corrected the model string only: "gemini-2.5-pro-002"
+# was a Gemini 1.5-era naming convention that does not resolve on Vertex, so
+# this judge had never been able to run. Nothing is re-baselined by the change
+# because no baseline exists — the >= 90% agreement check has still never
+# executed.
+
+version = 2
+model = "gemini-2.5-pro"
 temperature = 0.0
 order_seed = 20260721

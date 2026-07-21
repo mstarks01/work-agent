@@ -120,12 +120,31 @@ run that stays inside the corpus's 8–20 element sizing, but it is an estimate,
 not a quote. **What binds is quota and nondeterminism, not dollars**, which is
 why the workflow serializes cases and allows one live run at a time.
 
-## Known gap
+## First-run checklist: the model strings
 
-The pinned model strings in `config/model_tiers.toml` — `gemini-2.5-pro-002`
-and `gemini-2.5-flash-002` — could not be corroborated against Vertex
-documentation; Gemini 2.5's published GA identifiers carry no `-002` suffix
-(that numbering belongs to the retired 1.5 generation). The first live run is
-therefore also the first test of those strings, and a `404 Publisher Model not
-found` there is a config bug, not a CI bug. Tracked as
-[Verify the pinned Vertex model strings resolve](../.wayfinder/tickets/026-verify-pinned-model-strings.md).
+[Verify the pinned Vertex model strings resolve](../.wayfinder/tickets/026-verify-pinned-model-strings.md)
+corrected the pins from `gemini-2.5-{pro,flash}-002` — a Gemini 1.5-era naming
+convention that does not resolve — to the stable GA identifiers
+`gemini-2.5-pro` and `gemini-2.5-flash`, and restated the rule that guards them
+(the most specific *stable* identifier; no `-latest`, no `-preview`/`-exp`).
+That correction was made on documentary evidence: **no run in this repo has
+ever spoken to Vertex**, because no credentials exist here.
+
+So the first live run is still the first test of these strings. On the first
+run after step 0 of the setup above:
+
+1. `gh workflow run "Evals (live Vertex)" -f mode=extraction` — exercises the
+   `flash` tier through the `extract` node.
+2. `gh workflow run "Evals (live Vertex)" -f calibrate=true` — exercises the
+   `pro` tier through the judge, and is the first execution of the ≥90%
+   judge–human agreement bar ([Eval phase 2](../.wayfinder/tickets/025-eval-phase-2.md)).
+3. Read `models.judge_served` in the run artifact. It is Vertex's own report of
+   which build answered; an empty list means the SDK stopped returning
+   `model_version` and the reproducibility record is silently gone.
+
+A `404 Publisher Model not found` in step 1 or 2 is a config bug, not a CI bug.
+
+**Deadline:** Gemini 2.5 retires on Vertex **2026-10-16**. The 3.x models were
+still preview-stage as of 2026-07-21 and so fail the pin rule; the generation
+move is a re-baselining sweep owned by
+[Eval phase 2](../.wayfinder/tickets/025-eval-phase-2.md).

@@ -49,6 +49,14 @@ configuration you do not ship is how a suite goes green while production
 drifts. The judge's own model and temperature are pinned separately in
 `evals/config/judge.toml`, since a judge upgrade re-scores history.
 
+Every artifact carries a `models` block: the tier and judge strings the run
+asked for, their config versions, and `judge_served` — the model versions
+Vertex reported actually serving the judge calls. Ticket 026: Gemini 2.5+
+stable identifiers name the current build rather than a frozen one, so *what
+answered* is what makes two runs comparable. Two different `judge_served`
+values across runs mean the build moved; that is a model change, not a
+regression, and nothing else in the artifact would show it.
+
 ## Running
 
 ```sh

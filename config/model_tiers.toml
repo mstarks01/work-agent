@@ -1,21 +1,28 @@
 # Model-tier configuration (wayfinder ticket 007) — source of truth for
 # tier -> pinned Vertex model string and LLM node -> tier.
 #
-# Tier strings must be pinned version strings (no -latest aliases): regional
-# Vertex endpoints may reject aliases, and evals are only reproducible against
-# a pinned model. Upgrades change a pinned string only after the golden-case
+# Tier strings must be the *stable GA* identifier of a Vertex model — no
+# -latest aliases, no -preview/-exp builds (ticket 026, restating ticket 007).
+# Gemini 2.5 and later ship no numbered stable builds, so "gemini-2.5-pro" is
+# the most specific stable string that exists; the eval harness records the
+# served model version per run so a moved build shows up as evidence rather
+# than being assumed away. Upgrades change a string only after the golden-case
 # eval suite passes on the candidate.
+#
+# DEADLINE: Gemini 2.5 retires on Vertex 2026-10-16. The move to a 3.x
+# generation is a re-baselining sweep, owned by wayfinder ticket 025 — as of
+# 2026-07-21 the 3.x models are preview-stage and so fail the rule above.
 #
 # STRIDE_MODEL_FLASH / STRIDE_MODEL_PRO env vars override the tier strings at
 # deploy time (ops retune on Cloud Run without an image rebuild). The
 # node -> tier mapping below is file-only and must cover exactly the LLM nodes
 # of the graph; deterministic FunctionNodes carry no model.
 
-version = 1
+version = 2
 
 [tiers]
-flash = "gemini-2.5-flash-002"
-pro = "gemini-2.5-pro-002"
+flash = "gemini-2.5-flash"
+pro = "gemini-2.5-pro"
 
 [nodes]
 extract = "flash"

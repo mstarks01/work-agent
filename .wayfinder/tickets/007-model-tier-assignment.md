@@ -21,3 +21,5 @@ Resolved 2026-07-18 via grilling, grounded in tickets 001 (quality patterns: rec
 4. **Fallback/upgrade** — never auto-degrade across tiers. Retries stay on the pinned model; a run that can't reach its tier fails the job cleanly with a clear error (retry mechanics belong to the future graph-error-handling ticket). Outage response is an ops action: flip the env var to another same-tier version. Upgrades change the pinned string only after the golden-case eval suite passes on the candidate model.
 
 Graduated: [Implement model-tier config in stride_service](017-implement-model-config.md).
+
+**Decision 2 amended** by [Verify the pinned Vertex model strings resolve](026-verify-pinned-model-strings.md) (2026-07-21): "pinned Vertex model version string" assumed numbered stable builds, which Gemini 2.5 and later do not ship — the lint it produced rejected every string that resolves. "Pinned" now means the most specific *stable GA* identifier (no `-latest`, no `-preview`/`-exp`), and eval reproducibility is carried by recording the served model version per run rather than by the string alone. Decisions 1, 3 and 4 stand.
