@@ -4,7 +4,7 @@ title: "Eval phase 2: baselines, ratchets, critic yield, corpus expansion"
 label: wayfinder:task
 status: open
 assignee:
-blocked-by: [023, 024]
+blocked-by: [023, 024, 026]
 ---
 
 ## Question

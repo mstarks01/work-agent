@@ -1,0 +1,138 @@
+# Live golden-case evals against real Vertex — wayfinder ticket 024,
+# implementing ticket 009 decision 17.
+#
+# `pull_request_target` is PROHIBITED in this repository and this file is where
+# the prohibition bites: combined with a PR-head checkout it would run
+# untrusted code while holding the Vertex identity, which is a
+# credential-exfiltration primitive rather than a CI convenience. This repo
+# takes no fork contributions, so plain `pull_request` with `id-token: write`
+# is sufficient. Do not "fix" a skipped fork run by reaching for it.
+#
+# Auth is GitHub OIDC -> Workload Identity Federation -> short-lived
+# credentials. There are no long-lived secrets: the provider path and the
+# service-account address are repository *variables*, because neither is a
+# secret and pretending otherwise hides them from review. Vertex is
+# IAM-authenticated -- API keys are the AI Studio surface and cannot serve
+# ticket 007's pinned regional model strings -- so there is no key-based
+# fallback that keeps Vertex. See .github/WORKLOAD_IDENTITY.md for the
+# one-time setup this workflow assumes.
+name: Evals (live Vertex)
+
+on:
+  pull_request:
+    # Path-filtered to the agentic surface. report.py and system_model.py
+    # count as agentic: they define the schemas bound as node output schemas,
+    # so a change there changes what the models are asked to emit. A path
+    # filter can always be fooled, which is what the scheduled sweep is for.
+    paths:
+      - "prompts/**"
+      - "skills/**"
+      - "config/**"
+      - "src/stride_service/graph.py"
+      - "src/stride_service/prompts.py"
+      - "src/stride_service/skills.py"
+      - "src/stride_service/critic.py"
+      - "src/stride_service/pipeline.py"
+      - "src/stride_service/report.py"
+      - "src/stride_service/system_model.py"
+      - ".github/workflows/evals-live.yml"
+  schedule:
+    # Weekly backstop sweep — Mondays 06:00 UTC.
+    - cron: "0 6 * * 1"
+  workflow_dispatch:
+    inputs:
+      mode:
+        description: "Eval mode"
+        type: choice
+        options: [end-to-end, analysis, extraction]
+        default: end-to-end
+      calibrate:
+        description: "Also run the judge-vs-human agreement check"
+        type: boolean
+        default: false
+
+permissions: {}
+
+# Quota is shared across the whole repository, so the guard that matters is
+# one live run at a time -- not a per-case cap. cancel-in-progress is false
+# deliberately: cancelling mid-run spends the money and keeps none of the
+# result.
+concurrency:
+  group: evals-live
+  cancel-in-progress: false
+
+jobs:
+  live:
+    name: Golden-case evals
+    runs-on: ubuntu-latest
+    timeout-minutes: 90
+    # Skip fork PRs rather than authenticating them. With no fork
+    # contributions this should never fire; if it does, it is a signal to
+    # look, not to loosen.
+    if: github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name == github.repository
+    permissions:
+      contents: read
+      id-token: write # the OIDC token exchanged for short-lived Vertex credentials
+
+    steps:
+      - name: Check out
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - name: Set up uv and Python
+        uses: astral-sh/setup-uv@11f9893b081a58869d3b5fccaea48c9e9e46f990 # v8.3.2
+        with:
+          python-version: "3.12"
+          enable-cache: true
+
+      - name: Install dependencies
+        run: uv sync --locked
+
+      # Writes an external-account credentials file and points ADC at it.
+      # Nothing in src/ reads GOOGLE_* or constructs a client -- ADK picks up
+      # ADC implicitly -- so authenticating needs no service-code change.
+      - name: Authenticate to Google Cloud
+        uses: google-github-actions/auth@7c6bc770dae815cd3e89ee6cdf493a5fab2cc093 # v3
+        with:
+          workload_identity_provider: ${{ vars.GCP_WORKLOAD_IDENTITY_PROVIDER }}
+          service_account: ${{ vars.GCP_EVAL_SERVICE_ACCOUNT }}
+
+      # Cases run serially inside the CLI, which is the bounded concurrency
+      # ticket 024 asks for; it also keeps the near/far exemplar delta in one
+      # artifact, which a per-case matrix would split apart.
+      #
+      # Exit status is Tier 1 structural only (ticket 009 decisions 16/19):
+      # must-find recall and every Tier 3 metric are computed, written to the
+      # artifact, and deliberately do not block. A gate that fires before
+      # anyone knows the normal range trains people to bypass it.
+      - name: Run golden-case evals
+        env:
+          GOOGLE_CLOUD_PROJECT: ${{ vars.GCP_PROJECT_ID }}
+          GOOGLE_CLOUD_LOCATION: ${{ vars.GCP_LOCATION }}
+          GOOGLE_GENAI_USE_VERTEXAI: "true"
+          EVAL_MODE: ${{ inputs.mode || 'end-to-end' }}
+        run: uv run python -m evals.harness.run run --mode "$EVAL_MODE" --out eval-artifact.json
+
+      # Judge model and sampling are pinned in evals/config/judge.toml with no
+      # override, so this measures the judge the scores were produced by. It
+      # is not on the PR path-filtered trigger: it costs judge calls and its
+      # failure blocks a *judge* change, not a prompt change.
+      - name: Judge-vs-human agreement
+        if: github.event_name == 'schedule' || inputs.calibrate
+        env:
+          GOOGLE_CLOUD_PROJECT: ${{ vars.GCP_PROJECT_ID }}
+          GOOGLE_CLOUD_LOCATION: ${{ vars.GCP_LOCATION }}
+          GOOGLE_GENAI_USE_VERTEXAI: "true"
+        run: uv run python -m evals.harness.run calibrate --out judge-agreement.json
+
+      - name: Upload run artifact
+        if: always()
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: eval-run-${{ github.run_id }}
+          path: |
+            eval-artifact.json
+            judge-agreement.json
+          if-no-files-found: warn
+          retention-days: 30

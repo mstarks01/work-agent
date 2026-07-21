@@ -1,0 +1,55 @@
+# Offline CI — wayfinder ticket 024.
+#
+# Everything here is credential-free by construction: the pytest suite, the
+# corpus lints, the prompt/skill lints, and the eval scorer replayed over
+# ticket 022's recorded judge labels. No job in this file may ever be granted
+# `id-token: write` — the offline/live split is the security boundary that
+# keeps untrusted-PR-shaped work away from the Vertex identity, not a speed
+# optimization. Live evals live in evals-live.yml.
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+
+# Least privilege by default; each job re-grants only what it needs.
+permissions: {}
+
+concurrency:
+  group: ci-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
+jobs:
+  offline:
+    name: Offline suite (no credentials)
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    permissions:
+      contents: read
+
+    steps:
+      # Third-party actions are pinned by commit SHA, not tag: a tag is
+      # mutable and a moved tag runs attacker code with this job's token.
+      - name: Check out
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - name: Set up uv and Python
+        uses: astral-sh/setup-uv@11f9893b081a58869d3b5fccaea48c9e9e46f990 # v8.3.2
+        with:
+          python-version: "3.12"
+          enable-cache: true
+
+      # --locked fails rather than resolving: CI must install the reviewed
+      # uv.lock, not whatever the index offers today.
+      - name: Install dependencies
+        run: uv sync --locked
+
+      - name: Corpus lints
+        run: uv run python evals/verify_corpus.py
+
+      - name: Test suite
+        run: uv run pytest -q
