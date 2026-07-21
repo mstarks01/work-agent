@@ -123,3 +123,55 @@ rather than network-based trust, neither of which any current case has), cases
 09 and 10 (two OWASP cookbook conversions, entries to be picked and reviewed at
 blessing), and the promotion pass, which stays deferred until run artifacts
 exist.
+
+### 2026-07-21 — cases 07 and 08 blessed
+
+Both internal-systems cases are authored, blessed and merged:
+`evals/corpus/07-cicd-store-deploy` and `evals/corpus/08-sso-identity-broker`.
+`verify_corpus.py` is green at 10 cases, the offline suite is 418 passed / 1
+skipped, and 64 more hand-labelled pairs landed (240 total, 142 match / 98
+no-match), each case's set weighted toward hard negatives.
+
+The pair is not two systems so much as two attacks on the same instrument.
+**07** is the only case where authority flows *upward through a build* — a
+developer's input becomes the artifact running in 1,200 stores — and where both
+direction traps are pull-shaped, so every flow runs against the intuition that
+data flow and initiation agree. **08** is the case where **the boundary
+crossings under-describe the risk**: its two highest-severity references cross
+nothing at all, so an analyst that follows only the crossings scores well
+everywhere else in the corpus and badly here. That is a deliberate counterweight
+to the fact that crossings are the highest-signal STRIDE input the design leans
+on — until now nothing in the corpus could tell a model that leans on them *too*
+hard from one that reads the system.
+
+Three findings from the bootstraps, which are signal about `prompts/extract.md`
+and not about the pinned Flash node (same credential constraint; re-bootstrap is
+[ticket 030](030-rebootstrap-corpus.md)):
+
+- **The stranded qualifier appeared in a new and worse form, then failed to
+  appear at all.** In 07 a *stated absence* — "the runner does not verify
+  signatures" — reached `description` and `data_description` but left
+  `authentication` at `unknown`, which does not lose the fact so much as
+  **downgrade the verdict**, grounded to needs-info, invisibly. In 08 the
+  equivalent qualifier landed in the attribute intact. The difference worth
+  testing is that 08's qualifier sits in the same sentence as the behaviour it
+  qualifies.
+- **Asset tags come from what an element is called, not from what the source
+  says is in it** — both cases, four instances, in both directions: flows
+  carrying the system's crown jewels tagged empty, a flow the source calls the
+  *public* half tagged `secrets`, a directory tagged `credentials` because
+  directories usually hold them.
+- **08's candidate is the corpus's first that the validator rejects** (two
+  `id-mismatch` errors), and it came back at 23 elements, outside the band. The
+  over-production was one reflex from three angles: a response modelled as its
+  own flow, a generalized class modelled beside its one named instance, and an
+  out-of-scope actor invented to hang an assumption on. Neither defect is a
+  recall failure, and both have mechanical fixes worth weighing against prompt
+  changes — deriving the ID in code from the emitted name being the obvious one.
+
+`tests/test_evals_reference.py::test_loads_every_shipped_case` went 8 → 10 and
+will need updating again as 09 and 10 land.
+
+**Remaining after this session:** cases 09 and 10 (the two OWASP cookbook
+conversions — entries still to be picked, and to be reviewed with the case at
+blessing), and the promotion pass, still deferred until run artifacts exist.
