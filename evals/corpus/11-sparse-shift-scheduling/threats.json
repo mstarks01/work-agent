@@ -1,0 +1,221 @@
+[
+  {
+    "category": "spoofing",
+    "affected_element_ids": [
+      "flow:colleague-to-scheduling-web-app:view-shifts",
+      "entity:colleague"
+    ],
+    "claim": "An attacker signs in to the scheduling web app as a colleague and reads that colleague's shifts and details, because how colleagues are authenticated is unverified.",
+    "tier": "must-find",
+    "severity": {
+      "likelihood": "medium",
+      "impact": "medium"
+    },
+    "notes": "The source explicitly says nobody has documented how colleagues sign in. needs-info is the right verdict here; silence is not."
+  },
+  {
+    "category": "spoofing",
+    "affected_element_ids": [
+      "flow:store-manager-to-scheduling-web-app:build-rota",
+      "entity:store-manager"
+    ],
+    "claim": "An attacker signs in as a store manager and builds that store's rota, because how managers are authenticated is unverified.",
+    "tier": "must-find",
+    "severity": {
+      "likelihood": "medium",
+      "impact": "high"
+    },
+    "notes": "Same unknown as the colleague lane but a materially higher impact, which is why the two are kept as separate references rather than one."
+  },
+  {
+    "category": "spoofing",
+    "affected_element_ids": [
+      "flow:payroll-system-to-file-share:collect-payroll-export",
+      "store:file-share"
+    ],
+    "claim": "An attacker presents itself to the file share as the payroll system and collects the weekly payroll export, since how the share identifies a collector is unverified.",
+    "tier": "must-find",
+    "severity": {
+      "likelihood": "medium",
+      "impact": "high"
+    },
+    "notes": "This is the boundary crossing the source draws most clearly and says least about. The payroll team environment is a zone we are told nothing else about."
+  },
+  {
+    "category": "spoofing",
+    "affected_element_ids": [
+      "flow:scheduling-web-app-to-scheduling-service:rota-requests"
+    ],
+    "claim": "An attacker on the internal network calls the scheduling service while claiming to be the web app, because how the two identify each other is unverified.",
+    "tier": "expected",
+    "severity": {
+      "likelihood": "medium",
+      "impact": "high"
+    },
+    "notes": "Stated as undocumented in the closing paragraph, which is the sentence most likely to be dropped in extraction."
+  },
+  {
+    "category": "tampering",
+    "affected_element_ids": [
+      "store:file-share",
+      "flow:payroll-system-to-file-share:collect-payroll-export"
+    ],
+    "claim": "An attacker alters the payroll export while it sits on the file share, so the payroll system collects hours nobody worked.",
+    "tier": "must-find",
+    "severity": {
+      "likelihood": "medium",
+      "impact": "high"
+    },
+    "notes": "The export rests unattended between two independent trust zones, and nothing states any integrity control over it. This is the case's strongest finding."
+  },
+  {
+    "category": "tampering",
+    "affected_element_ids": [
+      "store:rota-database",
+      "flow:scheduling-service-to-rota-database:read-write-rotas"
+    ],
+    "claim": "An attacker who reaches the rota database changes rota entries directly, bypassing whatever the scheduling service enforces.",
+    "tier": "expected",
+    "severity": {
+      "likelihood": "low",
+      "impact": "high"
+    },
+    "notes": "Reaching the store and modifying it is a distinct claim from reading it; the pair is deliberately split across lanes."
+  },
+  {
+    "category": "tampering",
+    "affected_element_ids": [
+      "flow:store-manager-to-scheduling-web-app:build-rota"
+    ],
+    "claim": "An attacker positioned between a manager's device and the web app modifies rota changes in flight, because whether the traffic is encrypted is unverified.",
+    "tier": "expected",
+    "severity": {
+      "likelihood": "low",
+      "impact": "medium"
+    },
+    "notes": "Encryption in transit is stated as undocumented, not as absent; an analyst asserting there is no TLS here is ungrounded."
+  },
+  {
+    "category": "repudiation",
+    "affected_element_ids": [
+      "process:scheduling-service",
+      "flow:store-manager-to-scheduling-web-app:build-rota"
+    ],
+    "claim": "A store manager denies having made a rota change that disadvantaged a colleague, and nothing in the model records who changed what.",
+    "tier": "must-find",
+    "severity": {
+      "likelihood": "medium",
+      "impact": "medium"
+    },
+    "notes": "No log or audit store appears anywhere in the source. Absence of a logging element is a legitimate repudiation finding; absence of a stated control is not."
+  },
+  {
+    "category": "repudiation",
+    "affected_element_ids": [
+      "flow:payroll-system-to-file-share:collect-payroll-export",
+      "store:file-share"
+    ],
+    "claim": "Nobody can establish who collected a given payroll export from the file share, because no record of collections exists in the model.",
+    "tier": "expected",
+    "severity": {
+      "likelihood": "medium",
+      "impact": "medium"
+    },
+    "notes": "Pairs with the spoofing claim on the same flow: one is getting in as payroll, this one is that nothing afterwards distinguishes them."
+  },
+  {
+    "category": "information-disclosure",
+    "affected_element_ids": [
+      "store:rota-database"
+    ],
+    "claim": "An attacker reads colleague names, contact details and availability from the rota database, because whether it is encrypted at rest is unverified.",
+    "tier": "must-find",
+    "severity": {
+      "likelihood": "medium",
+      "impact": "high"
+    },
+    "notes": "The source states what the data is but never classifies it. The pii tag comes from the content, and data_classification stays unknown; a case that conflates the two is exactly what this case is here to catch."
+  },
+  {
+    "category": "information-disclosure",
+    "affected_element_ids": [
+      "store:file-share",
+      "flow:scheduling-service-to-file-share:write-payroll-export"
+    ],
+    "claim": "An attacker with access to the file share reads a whole store's payroll export in one file.",
+    "tier": "must-find",
+    "severity": {
+      "likelihood": "medium",
+      "impact": "high"
+    },
+    "notes": "Aggregation is the point: the export concentrates in one artifact what the database holds per colleague."
+  },
+  {
+    "category": "information-disclosure",
+    "affected_element_ids": [
+      "flow:colleague-to-scheduling-web-app:view-shifts"
+    ],
+    "claim": "An attacker on the network path between a colleague's phone and the web app reads that colleague's shifts and details in transit.",
+    "tier": "expected",
+    "severity": {
+      "likelihood": "low",
+      "impact": "medium"
+    },
+    "notes": "The one flow that leaves the internal network on the colleague side, with encryption explicitly undocumented."
+  },
+  {
+    "category": "denial-of-service",
+    "affected_element_ids": [
+      "process:scheduling-web-app"
+    ],
+    "claim": "An attacker floods the scheduling web app so managers cannot build rotas and colleagues cannot see their shifts.",
+    "tier": "expected",
+    "severity": {
+      "likelihood": "medium",
+      "impact": "medium"
+    },
+    "notes": "The web app is the one process the model infers to be reachable from outside, and that inference is recorded as an assumption rather than asserted."
+  },
+  {
+    "category": "denial-of-service",
+    "affected_element_ids": [
+      "store:file-share",
+      "process:scheduling-service"
+    ],
+    "claim": "An attacker prevents the weekly export from reaching the file share, so a pay run happens with no hours for a store.",
+    "tier": "must-find",
+    "severity": {
+      "likelihood": "low",
+      "impact": "high"
+    },
+    "notes": "A weekly batch with a deadline behind it fails differently from a request path: the damage is a missed pay run, not slow pages."
+  },
+  {
+    "category": "elevation-of-privilege",
+    "affected_element_ids": [
+      "process:scheduling-web-app",
+      "flow:colleague-to-scheduling-web-app:view-shifts"
+    ],
+    "claim": "A colleague uses the shared app to build or change a rota as though they were a store manager, because the separation between the two roles is unverified.",
+    "tier": "must-find",
+    "severity": {
+      "likelihood": "medium",
+      "impact": "high"
+    },
+    "notes": "Both roles are stated to use the same app, and no authorization rule between them is stated anywhere. This is the finding that follows from the shared-app fact rather than from any missing control."
+  },
+  {
+    "category": "elevation-of-privilege",
+    "affected_element_ids": [
+      "process:scheduling-service",
+      "flow:scheduling-web-app-to-scheduling-service:rota-requests"
+    ],
+    "claim": "An attacker on the internal network calls the scheduling service directly and performs rota writes the web app would not have allowed.",
+    "tier": "expected",
+    "severity": {
+      "likelihood": "low",
+      "impact": "high"
+    },
+    "notes": "The service is where writes actually happen, which the source says outright; whether it re-checks anything the app checked is undocumented."
+  }
+]

@@ -1,0 +1,209 @@
+[
+  {
+    "category": "spoofing",
+    "affected_element_ids": [
+      "flow:supplier-to-supplier-portal:upload-documents",
+      "entity:supplier"
+    ],
+    "claim": "An attacker who obtains a supplier's vendor-issued password signs in as that supplier and uploads paperwork in their name.",
+    "tier": "must-find",
+    "severity": {
+      "likelihood": "medium",
+      "impact": "medium"
+    },
+    "notes": "Sign-in is the one control the source actually states, so this claim rests on a stated fact rather than on an unknown. Whether a second factor exists is never stated, and asserting its absence would be ungrounded."
+  },
+  {
+    "category": "spoofing",
+    "affected_element_ids": [
+      "flow:category-manager-to-supplier-portal:review-documents",
+      "entity:category-manager"
+    ],
+    "claim": "An attacker signs in to the portal as a category manager and approves supplier paperwork, because how category managers are authenticated is unverified.",
+    "tier": "must-find",
+    "severity": {
+      "likelihood": "medium",
+      "impact": "high"
+    },
+    "notes": "The datasheet's fully authenticated and audited covers this flow rhetorically and states nothing about it. An analyst that treats the manager path as authenticated because the vendor says so has swallowed the claim."
+  },
+  {
+    "category": "spoofing",
+    "affected_element_ids": [
+      "flow:portal-vendor-to-landing-bucket:push-nightly-extract",
+      "store:landing-bucket"
+    ],
+    "claim": "An attacker writes a file into the landing bucket while posing as the vendor's nightly push, since how the bucket identifies the writer is unverified.",
+    "tier": "must-find",
+    "severity": {
+      "likelihood": "medium",
+      "impact": "high"
+    },
+    "notes": "The one flow crossing from the vendor platform into our cloud account, and the source states no authentication on it at all."
+  },
+  {
+    "category": "tampering",
+    "affected_element_ids": [
+      "store:landing-bucket",
+      "flow:supplier-master-service-to-landing-bucket:load-extract"
+    ],
+    "claim": "An attacker modifies the extract file in the landing bucket before the supplier master service loads it, and the altered supplier records reach the database.",
+    "tier": "must-find",
+    "severity": {
+      "likelihood": "medium",
+      "impact": "high"
+    },
+    "notes": "The runbook states the file is picked up as-is, which is a stated absence of validation rather than an inferred one — the strongest grounded finding in the case."
+  },
+  {
+    "category": "tampering",
+    "affected_element_ids": [
+      "flow:portal-vendor-to-landing-bucket:push-nightly-extract"
+    ],
+    "claim": "An attacker on the path of the nightly push alters the extract in transit, because the source contradicts itself over whether that transfer is encrypted.",
+    "tier": "must-find",
+    "severity": {
+      "likelihood": "medium",
+      "impact": "high"
+    },
+    "notes": "This is the case's central reference. The correct handling of we were told it is encrypted end to end against the runbook's plain CSV is needs-info on an unresolved conflict; both a confident encrypted and a confident unencrypted are wrong, and the latter is worse."
+  },
+  {
+    "category": "tampering",
+    "affected_element_ids": [
+      "store:document-store",
+      "flow:supplier-portal-to-document-store:store-documents"
+    ],
+    "claim": "An attacker with access inside the vendor platform alters a stored compliance document so a supplier appears certified when they are not.",
+    "tier": "expected",
+    "severity": {
+      "likelihood": "low",
+      "impact": "high"
+    },
+    "notes": "We run no part of the vendor platform, so every control inside it is unverifiable by us rather than absent. Secure by design is not a control."
+  },
+  {
+    "category": "repudiation",
+    "affected_element_ids": [
+      "flow:category-manager-to-supplier-portal:review-documents",
+      "process:supplier-portal"
+    ],
+    "claim": "A category manager denies having approved a supplier's paperwork, and the model holds no audit record we control or can produce.",
+    "tier": "must-find",
+    "severity": {
+      "likelihood": "medium",
+      "impact": "medium"
+    },
+    "notes": "The datasheet says audited and the model has no audit store, because a marketing adjective is not an element. An analyst that cites an audit log here is citing something that does not exist in the model."
+  },
+  {
+    "category": "repudiation",
+    "affected_element_ids": [
+      "entity:portal-vendor",
+      "flow:portal-vendor-to-landing-bucket:push-nightly-extract"
+    ],
+    "claim": "The vendor disputes what a given nightly extract contained when it left their platform, and nothing on our side records what arrived.",
+    "tier": "expected",
+    "severity": {
+      "likelihood": "low",
+      "impact": "medium"
+    },
+    "notes": "A dispute across an organizational boundary is the repudiation shape that matters here, and it is the boundary we have least visibility across."
+  },
+  {
+    "category": "information-disclosure",
+    "affected_element_ids": [
+      "store:landing-bucket"
+    ],
+    "claim": "An attacker with access to the landing bucket reads the whole supplier extract, because whether the bucket is encrypted at rest is unverified.",
+    "tier": "must-find",
+    "severity": {
+      "likelihood": "medium",
+      "impact": "high"
+    },
+    "notes": "Enterprise-grade encryption throughout is a claim about the vendor's platform; the bucket is in our cloud account and the source says nothing about it either way."
+  },
+  {
+    "category": "information-disclosure",
+    "affected_element_ids": [
+      "store:document-store",
+      "entity:portal-vendor"
+    ],
+    "claim": "An attacker inside the vendor platform reads supplier staff contact details out of the stored compliance documents.",
+    "tier": "expected",
+    "severity": {
+      "likelihood": "low",
+      "impact": "high"
+    },
+    "notes": "The documents are stated to hold contact details for supplier staff, which is what drives the pii tag; fully compliant states nothing about who inside the vendor can read them."
+  },
+  {
+    "category": "information-disclosure",
+    "affected_element_ids": [
+      "flow:supplier-to-supplier-portal:upload-documents"
+    ],
+    "claim": "An attacker on the network path between a supplier and the portal reads uploaded paperwork in transit, because whether that traffic is encrypted is unverified.",
+    "tier": "expected",
+    "severity": {
+      "likelihood": "low",
+      "impact": "medium"
+    },
+    "notes": "The upload flow crosses from the public internet into the vendor platform and the datasheet's encryption claim never becomes a stated property of it."
+  },
+  {
+    "category": "denial-of-service",
+    "affected_element_ids": [
+      "entity:portal-vendor",
+      "process:supplier-portal"
+    ],
+    "claim": "The vendor platform becomes unavailable and suppliers cannot file compliance paperwork while it is down.",
+    "tier": "expected",
+    "severity": {
+      "likelihood": "medium",
+      "impact": "medium"
+    },
+    "notes": "Availability of a system we do not run is a real exposure and not a control gap; it belongs in the report even though there is nothing on our side to fix."
+  },
+  {
+    "category": "denial-of-service",
+    "affected_element_ids": [
+      "store:landing-bucket",
+      "process:supplier-master-service"
+    ],
+    "claim": "An attacker stops the nightly extract from being loaded and the supplier database silently keeps serving stale supplier records.",
+    "tier": "must-find",
+    "severity": {
+      "likelihood": "low",
+      "impact": "high"
+    },
+    "notes": "The failure here is staleness rather than an outage: nothing in the source detects a missing nightly file."
+  },
+  {
+    "category": "elevation-of-privilege",
+    "affected_element_ids": [
+      "flow:supplier-to-supplier-portal:upload-documents",
+      "process:supplier-portal"
+    ],
+    "claim": "A signed-in supplier reaches another supplier's compliance documents through the portal, because no separation between supplier tenants is stated.",
+    "tier": "must-find",
+    "severity": {
+      "likelihood": "medium",
+      "impact": "high"
+    },
+    "notes": "Many suppliers share one vendor-hosted product and the source states nothing about isolation between them. Fully compliant is the phrase most likely to be mistaken for an answer to this."
+  },
+  {
+    "category": "elevation-of-privilege",
+    "affected_element_ids": [
+      "flow:supplier-master-service-to-landing-bucket:load-extract",
+      "process:supplier-master-service"
+    ],
+    "claim": "An attacker uses the contents of the extract file to make the supplier master service act beyond what a data load should do, since the file is consumed as-is.",
+    "tier": "expected",
+    "severity": {
+      "likelihood": "low",
+      "impact": "high"
+    },
+    "notes": "Picked up as-is is stated, so treating attacker-influenced file content as trusted input is grounded rather than speculative."
+  }
+]

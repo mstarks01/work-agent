@@ -1030,5 +1030,381 @@
     "candidate_claim": "An attacker corrupts the player database so matchmaking returns wrong results.",
     "label": "no-match",
     "note": "Integrity action, not the resource exhaustion the reference claims."
+  },
+  {
+    "case": "11-sparse-shift-scheduling",
+    "category": "spoofing",
+    "reference_claim": "An attacker signs in to the scheduling web app as a colleague and reads that colleague's shifts and details, because how colleagues are authenticated is unverified.",
+    "candidate_claim": "An attacker who obtains a colleague's login views that colleague's shifts and personal details in the app.",
+    "label": "match",
+    "note": "Same action, same target; the reference states the unknown that makes it possible and the candidate states the outcome."
+  },
+  {
+    "case": "11-sparse-shift-scheduling",
+    "category": "spoofing",
+    "reference_claim": "An attacker signs in to the scheduling web app as a colleague and reads that colleague's shifts and details, because how colleagues are authenticated is unverified.",
+    "candidate_claim": "An attacker signs in as a colleague and changes their own availability to get better shifts.",
+    "label": "no-match",
+    "note": "Hard negative: same element, same lane, and the initial action is the same, but the claim is a write where the reference's is a read."
+  },
+  {
+    "case": "11-sparse-shift-scheduling",
+    "category": "spoofing",
+    "reference_claim": "An attacker signs in as a store manager and builds that store's rota, because how managers are authenticated is unverified.",
+    "candidate_claim": "An attacker authenticates to the app as a store manager and publishes a rota for that manager's store.",
+    "label": "match",
+    "note": "Same action, same target."
+  },
+  {
+    "case": "11-sparse-shift-scheduling",
+    "category": "spoofing",
+    "reference_claim": "An attacker signs in as a store manager and builds that store's rota, because how managers are authenticated is unverified.",
+    "candidate_claim": "An attacker signs in to the app as a colleague and reads their shifts.",
+    "label": "no-match",
+    "note": "Hard negative: the same lane and the same app, but the reference is specifically the manager identity, and the colleague claim is its own entry."
+  },
+  {
+    "case": "11-sparse-shift-scheduling",
+    "category": "spoofing",
+    "reference_claim": "An attacker presents itself to the file share as the payroll system and collects the weekly payroll export, since how the share identifies a collector is unverified.",
+    "candidate_claim": "An attacker pulls the weekly payroll export off the file share by presenting itself as the payroll system.",
+    "label": "match",
+    "note": "Same action, same flow."
+  },
+  {
+    "case": "11-sparse-shift-scheduling",
+    "category": "spoofing",
+    "reference_claim": "An attacker presents itself to the file share as the payroll system and collects the weekly payroll export, since how the share identifies a collector is unverified.",
+    "candidate_claim": "An attacker reads the payroll export from the file share because it is stored unencrypted.",
+    "label": "no-match",
+    "note": "Asserts a fact the model does not support \u2014 encryption at rest is unknown, not absent \u2014 so this is ungrounded rather than a match."
+  },
+  {
+    "case": "11-sparse-shift-scheduling",
+    "category": "spoofing",
+    "reference_claim": "An attacker on the internal network calls the scheduling service while claiming to be the web app, because how the two identify each other is unverified.",
+    "candidate_claim": "A workload on the internal network issues rota writes to the scheduling service while claiming to be the web app.",
+    "label": "match",
+    "note": "Same action against the same flow; the candidate cites the service where the reference cites the flow, which is element agreement, not a claim difference."
+  },
+  {
+    "case": "11-sparse-shift-scheduling",
+    "category": "tampering",
+    "reference_claim": "An attacker alters the payroll export while it sits on the file share, so the payroll system collects hours nobody worked.",
+    "candidate_claim": "An attacker edits the payroll export on the share before payroll collects it, so colleagues are paid for hours they did not work.",
+    "label": "match",
+    "note": "Same action, same target, same consequence."
+  },
+  {
+    "case": "11-sparse-shift-scheduling",
+    "category": "tampering",
+    "reference_claim": "An attacker alters the payroll export while it sits on the file share, so the payroll system collects hours nobody worked.",
+    "candidate_claim": "An attacker deletes the payroll export from the share so it is never collected.",
+    "label": "no-match",
+    "note": "Hard negative: same element and lane, but destruction is a distinct action from alteration, and the corpus files the missing export under denial of service."
+  },
+  {
+    "case": "11-sparse-shift-scheduling",
+    "category": "tampering",
+    "reference_claim": "An attacker who reaches the rota database changes rota entries directly, bypassing whatever the scheduling service enforces.",
+    "candidate_claim": "An attacker with database access rewrites rota rows without going through the scheduling service.",
+    "label": "match",
+    "note": "Same action, same target."
+  },
+  {
+    "case": "11-sparse-shift-scheduling",
+    "category": "tampering",
+    "reference_claim": "An attacker positioned between a manager's device and the web app modifies rota changes in flight, because whether the traffic is encrypted is unverified.",
+    "candidate_claim": "An attacker intercepts a manager's rota change on its way to the web app and alters it.",
+    "label": "match",
+    "note": "Same action, same flow."
+  },
+  {
+    "case": "11-sparse-shift-scheduling",
+    "category": "tampering",
+    "reference_claim": "An attacker positioned between a manager's device and the web app modifies rota changes in flight, because whether the traffic is encrypted is unverified.",
+    "candidate_claim": "An attacker intercepts a manager's session and reads the rota in transit.",
+    "label": "no-match",
+    "note": "Hard negative on the same flow: reading and modifying are two claims, and the corpus carries the read separately."
+  },
+  {
+    "case": "11-sparse-shift-scheduling",
+    "category": "repudiation",
+    "reference_claim": "A store manager denies having made a rota change that disadvantaged a colleague, and nothing in the model records who changed what.",
+    "candidate_claim": "A manager who cut a colleague's hours denies having done it, and nothing records who made the change.",
+    "label": "match",
+    "note": "Paraphrase with the same mechanism."
+  },
+  {
+    "case": "11-sparse-shift-scheduling",
+    "category": "repudiation",
+    "reference_claim": "A store manager denies having made a rota change that disadvantaged a colleague, and nothing in the model records who changed what.",
+    "candidate_claim": "An attacker deletes the audit records of a rota change to hide it.",
+    "label": "no-match",
+    "note": "Ungrounded: the model has no audit store to delete from, which is the reference's own point."
+  },
+  {
+    "case": "11-sparse-shift-scheduling",
+    "category": "repudiation",
+    "reference_claim": "Nobody can establish who collected a given payroll export from the file share, because no record of collections exists in the model.",
+    "candidate_claim": "There is no record establishing which party fetched a particular payroll export.",
+    "label": "match",
+    "note": "Same claim stated as the condition rather than the dispute."
+  },
+  {
+    "case": "11-sparse-shift-scheduling",
+    "category": "information-disclosure",
+    "reference_claim": "An attacker reads colleague names, contact details and availability from the rota database, because whether it is encrypted at rest is unverified.",
+    "candidate_claim": "An attacker who reaches the rota database reads colleague contact details out of it.",
+    "label": "match",
+    "note": "Same read action against the same target."
+  },
+  {
+    "case": "11-sparse-shift-scheduling",
+    "category": "information-disclosure",
+    "reference_claim": "An attacker reads colleague names, contact details and availability from the rota database, because whether it is encrypted at rest is unverified.",
+    "candidate_claim": "An attacker reads colleague contact details from the rota database, which is classified confidential and unencrypted.",
+    "label": "no-match",
+    "note": "Ungrounded on two counts: data classification is unknown and encryption at rest is unknown, so both asserted facts are invented."
+  },
+  {
+    "case": "11-sparse-shift-scheduling",
+    "category": "information-disclosure",
+    "reference_claim": "An attacker with access to the file share reads a whole store's payroll export in one file.",
+    "candidate_claim": "An attacker who can list the file share opens the payroll export and reads a whole store's data at once.",
+    "label": "match",
+    "note": "Same action, same target."
+  },
+  {
+    "case": "11-sparse-shift-scheduling",
+    "category": "denial-of-service",
+    "reference_claim": "An attacker floods the scheduling web app so managers cannot build rotas and colleagues cannot see their shifts.",
+    "candidate_claim": "An attacker sends enough traffic at the scheduling web app that managers cannot build rotas.",
+    "label": "match",
+    "note": "Same action, same target."
+  },
+  {
+    "case": "11-sparse-shift-scheduling",
+    "category": "denial-of-service",
+    "reference_claim": "An attacker prevents the weekly export from reaching the file share, so a pay run happens with no hours for a store.",
+    "candidate_claim": "An attacker stops the weekly export reaching the share, so a store's colleagues are not paid.",
+    "label": "match",
+    "note": "Same action, same consequence."
+  },
+  {
+    "case": "11-sparse-shift-scheduling",
+    "category": "elevation-of-privilege",
+    "reference_claim": "A colleague uses the shared app to build or change a rota as though they were a store manager, because the separation between the two roles is unverified.",
+    "candidate_claim": "A colleague uses the app to edit the rota as though they held a manager's role.",
+    "label": "match",
+    "note": "Same escalation, same mechanism."
+  },
+  {
+    "case": "11-sparse-shift-scheduling",
+    "category": "elevation-of-privilege",
+    "reference_claim": "A colleague uses the shared app to build or change a rota as though they were a store manager, because the separation between the two roles is unverified.",
+    "candidate_claim": "A colleague exploits a flaw in the app's role checks to become an administrator.",
+    "label": "no-match",
+    "note": "Hard negative: the model states no role-check implementation and no administrator role, so the claim asserts machinery that does not exist."
+  },
+  {
+    "case": "11-sparse-shift-scheduling",
+    "category": "elevation-of-privilege",
+    "reference_claim": "An attacker on the internal network calls the scheduling service directly and performs rota writes the web app would not have allowed.",
+    "candidate_claim": "An attacker inside the internal network writes rotas by calling the scheduling service without going through the app.",
+    "label": "match",
+    "note": "Same escalation, same route."
+  },
+  {
+    "case": "12-overclaiming-supplier-portal",
+    "category": "spoofing",
+    "reference_claim": "An attacker who obtains a supplier's vendor-issued password signs in as that supplier and uploads paperwork in their name.",
+    "candidate_claim": "An attacker who has a supplier's portal password logs in as that supplier and files paperwork on their behalf.",
+    "label": "match",
+    "note": "Same action, same target; sign-in is the one control the source states, and both phrasings rest on it."
+  },
+  {
+    "case": "12-overclaiming-supplier-portal",
+    "category": "spoofing",
+    "reference_claim": "An attacker who obtains a supplier's vendor-issued password signs in as that supplier and uploads paperwork in their name.",
+    "candidate_claim": "An attacker signs in as a supplier because the portal enforces no multi-factor authentication.",
+    "label": "no-match",
+    "note": "Ungrounded: the source states a username and password and never states that nothing else is required, so the asserted absence is invented."
+  },
+  {
+    "case": "12-overclaiming-supplier-portal",
+    "category": "spoofing",
+    "reference_claim": "An attacker signs in to the portal as a category manager and approves supplier paperwork, because how category managers are authenticated is unverified.",
+    "candidate_claim": "An attacker gets into the portal as a category manager and approves a supplier's compliance paperwork.",
+    "label": "match",
+    "note": "Same action, same target."
+  },
+  {
+    "case": "12-overclaiming-supplier-portal",
+    "category": "spoofing",
+    "reference_claim": "An attacker signs in to the portal as a category manager and approves supplier paperwork, because how category managers are authenticated is unverified.",
+    "candidate_claim": "An attacker signs in as a category manager, which the platform prevents because all access is fully authenticated.",
+    "label": "no-match",
+    "note": "Treats the vendor's datasheet phrasing as a control in the model; the authentication attribute on that flow is unknown."
+  },
+  {
+    "case": "12-overclaiming-supplier-portal",
+    "category": "spoofing",
+    "reference_claim": "An attacker writes a file into the landing bucket while posing as the vendor's nightly push, since how the bucket identifies the writer is unverified.",
+    "candidate_claim": "An attacker drops a file into the landing bucket that our side takes for the vendor's nightly push.",
+    "label": "match",
+    "note": "Same action, same target."
+  },
+  {
+    "case": "12-overclaiming-supplier-portal",
+    "category": "spoofing",
+    "reference_claim": "An attacker writes a file into the landing bucket while posing as the vendor's nightly push, since how the bucket identifies the writer is unverified.",
+    "candidate_claim": "An attacker reads the nightly extract out of the landing bucket.",
+    "label": "no-match",
+    "note": "Hard negative: same element, same file, but reading is the information-disclosure entry and writing is this one."
+  },
+  {
+    "case": "12-overclaiming-supplier-portal",
+    "category": "tampering",
+    "reference_claim": "An attacker modifies the extract file in the landing bucket before the supplier master service loads it, and the altered supplier records reach the database.",
+    "candidate_claim": "An attacker alters the CSV sitting in the landing bucket and the supplier master service loads the altered records without checking them.",
+    "label": "match",
+    "note": "Same action, same target; picked up as-is is stated in the source and both phrasings rely on it."
+  },
+  {
+    "case": "12-overclaiming-supplier-portal",
+    "category": "tampering",
+    "reference_claim": "An attacker modifies the extract file in the landing bucket before the supplier master service loads it, and the altered supplier records reach the database.",
+    "candidate_claim": "An attacker alters the extract while the vendor is transferring it.",
+    "label": "no-match",
+    "note": "Hard negative: tampering at rest in the bucket and tampering in transit are two entries in this case, deliberately kept apart."
+  },
+  {
+    "case": "12-overclaiming-supplier-portal",
+    "category": "tampering",
+    "reference_claim": "An attacker on the path of the nightly push alters the extract in transit, because the source contradicts itself over whether that transfer is encrypted.",
+    "candidate_claim": "An attacker on the path of the nightly transfer modifies the extract, since the source both claims end-to-end encryption and describes a plain CSV.",
+    "label": "match",
+    "note": "Same action, same flow, and the candidate names the same unresolved conflict."
+  },
+  {
+    "case": "12-overclaiming-supplier-portal",
+    "category": "tampering",
+    "reference_claim": "An attacker on the path of the nightly push alters the extract in transit, because the source contradicts itself over whether that transfer is encrypted.",
+    "candidate_claim": "An attacker on the path of the nightly transfer modifies the extract, which is sent unencrypted.",
+    "label": "no-match",
+    "note": "Ungrounded: encryption in transit is unknown because the source contradicts itself, and resolving the contradiction into a stated absence is the error this case exists to catch."
+  },
+  {
+    "case": "12-overclaiming-supplier-portal",
+    "category": "tampering",
+    "reference_claim": "An attacker with access inside the vendor platform alters a stored compliance document so a supplier appears certified when they are not.",
+    "candidate_claim": "Someone with access inside the vendor platform edits a stored audit certificate so a supplier looks compliant.",
+    "label": "match",
+    "note": "Same action, same target."
+  },
+  {
+    "case": "12-overclaiming-supplier-portal",
+    "category": "tampering",
+    "reference_claim": "An attacker with access inside the vendor platform alters a stored compliance document so a supplier appears certified when they are not.",
+    "candidate_claim": "An attacker alters a compliance document in the vendor's platform, which stores documents without encryption.",
+    "label": "no-match",
+    "note": "Ungrounded: encryption at rest on the document store is unknown, and enterprise-grade encryption throughout is a marketing claim rather than a stated property either way."
+  },
+  {
+    "case": "12-overclaiming-supplier-portal",
+    "category": "repudiation",
+    "reference_claim": "A category manager denies having approved a supplier's paperwork, and the model holds no audit record we control or can produce.",
+    "candidate_claim": "A category manager disputes an approval recorded against their name and we hold no audit trail of our own.",
+    "label": "match",
+    "note": "Paraphrase with the same mechanism."
+  },
+  {
+    "case": "12-overclaiming-supplier-portal",
+    "category": "repudiation",
+    "reference_claim": "A category manager denies having approved a supplier's paperwork, and the model holds no audit record we control or can produce.",
+    "candidate_claim": "A category manager disputes an approval, and the platform's audit log shows the wrong actor.",
+    "label": "no-match",
+    "note": "Ungrounded: there is no audit log element in the model, which is precisely the reference's claim."
+  },
+  {
+    "case": "12-overclaiming-supplier-portal",
+    "category": "repudiation",
+    "reference_claim": "The vendor disputes what a given nightly extract contained when it left their platform, and nothing on our side records what arrived.",
+    "candidate_claim": "The vendor and our team disagree over what a nightly extract contained, and nothing on our side recorded what arrived.",
+    "label": "match",
+    "note": "Same claim, same boundary."
+  },
+  {
+    "case": "12-overclaiming-supplier-portal",
+    "category": "information-disclosure",
+    "reference_claim": "An attacker with access to the landing bucket reads the whole supplier extract, because whether the bucket is encrypted at rest is unverified.",
+    "candidate_claim": "An attacker with access to our cloud account reads the supplier extract out of the landing bucket.",
+    "label": "match",
+    "note": "Same read action, same target."
+  },
+  {
+    "case": "12-overclaiming-supplier-portal",
+    "category": "information-disclosure",
+    "reference_claim": "An attacker inside the vendor platform reads supplier staff contact details out of the stored compliance documents.",
+    "candidate_claim": "An attacker inside the vendor's platform reads supplier staff contact details from the stored documents.",
+    "label": "match",
+    "note": "Same action, same target."
+  },
+  {
+    "case": "12-overclaiming-supplier-portal",
+    "category": "information-disclosure",
+    "reference_claim": "An attacker on the network path between a supplier and the portal reads uploaded paperwork in transit, because whether that traffic is encrypted is unverified.",
+    "candidate_claim": "An attacker between a supplier and the portal captures the paperwork as it is uploaded.",
+    "label": "match",
+    "note": "Same action, same flow."
+  },
+  {
+    "case": "12-overclaiming-supplier-portal",
+    "category": "denial-of-service",
+    "reference_claim": "The vendor platform becomes unavailable and suppliers cannot file compliance paperwork while it is down.",
+    "candidate_claim": "Suppliers cannot file paperwork while the vendor's platform is down.",
+    "label": "match",
+    "note": "Same claim; availability of a system we do not run is still an exposure worth reporting."
+  },
+  {
+    "case": "12-overclaiming-supplier-portal",
+    "category": "denial-of-service",
+    "reference_claim": "An attacker stops the nightly extract from being loaded and the supplier database silently keeps serving stale supplier records.",
+    "candidate_claim": "The nightly load stops happening and the supplier database keeps serving records that are no longer current.",
+    "label": "match",
+    "note": "Same action, same silent-staleness consequence."
+  },
+  {
+    "case": "12-overclaiming-supplier-portal",
+    "category": "denial-of-service",
+    "reference_claim": "An attacker stops the nightly extract from being loaded and the supplier database silently keeps serving stale supplier records.",
+    "candidate_claim": "An attacker floods the supplier master service so it cannot process the extract.",
+    "label": "no-match",
+    "note": "Hard negative: same element and lane, but flooding a process is a different action from the missing nightly load the reference claims."
+  },
+  {
+    "case": "12-overclaiming-supplier-portal",
+    "category": "elevation-of-privilege",
+    "reference_claim": "A signed-in supplier reaches another supplier's compliance documents through the portal, because no separation between supplier tenants is stated.",
+    "candidate_claim": "A supplier signed in to the portal reaches compliance documents belonging to a different supplier.",
+    "label": "match",
+    "note": "Same escalation, same target."
+  },
+  {
+    "case": "12-overclaiming-supplier-portal",
+    "category": "elevation-of-privilege",
+    "reference_claim": "A signed-in supplier reaches another supplier's compliance documents through the portal, because no separation between supplier tenants is stated.",
+    "candidate_claim": "A supplier escalates to a category manager role in the portal.",
+    "label": "no-match",
+    "note": "Hard negative: cross-tenant access and vertical role escalation are different claims, and only the former is in the corpus."
+  },
+  {
+    "case": "12-overclaiming-supplier-portal",
+    "category": "elevation-of-privilege",
+    "reference_claim": "An attacker uses the contents of the extract file to make the supplier master service act beyond what a data load should do, since the file is consumed as-is.",
+    "candidate_claim": "An attacker who influences the extract's contents gets the supplier master service to act on it beyond a plain data load.",
+    "label": "match",
+    "note": "Same escalation, same mechanism."
   }
 ]

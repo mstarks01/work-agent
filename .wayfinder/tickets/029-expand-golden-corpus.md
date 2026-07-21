@@ -3,7 +3,7 @@ id: 029
 title: "Expand the golden corpus to 12 and run the promotion pass"
 label: wayfinder:task
 status: open
-assignee:
+assignee: github@michaelstarks.com
 blocked-by: []
 ---
 
@@ -49,3 +49,77 @@ ticket is worked before any live run, do the six new cases now and leave the
 promotion pass for the next blessing round.
 
 `verify_corpus.py` must stay green throughout.
+
+## Progress
+
+### 2026-07-21 — the validity-gate case is dropped, and what replaced it
+
+The second adversarial case as specified above — one that should **fail the
+validity gate** and exercise `repair` → `reject` — **cannot be built, and should
+not be**. Confirmed with the user on 2026-07-21 and replaced rather than
+deferred.
+
+Three reasons, in increasing order of how much they matter:
+
+1. **The corpus schema cannot express it.** Every case must carry a `model.json`
+   that *passes* `parse_and_validate` and a `threats.json` with a reference in
+   all six lanes (`evals/verify_corpus.py`). A rejected job produces no threats,
+   so there is nothing to score against, and `CASE_FIELDS` is closed — there is
+   no expected-outcome field to branch on.
+2. **`repair` → `reject` is not reachable from source text.** The validity gate
+   checks well-formedness — unique typed IDs, referential integrity, zone
+   membership, legal enums. Those are properties of *what the extractor emits*,
+   never of what the user wrote. No prose obliges a correct extractor to emit a
+   dangling reference, so a well-behaved `extract` would make the case "fail",
+   which scores the tool down for working. Input containing no system at all
+   does not help either: that yields an empty-but-well-formed model, which the
+   gate passes.
+3. **It is already covered, offline, for free.** `tests/test_pipeline.py:201`
+   feeds the graph a model with a dangling `destination` twice and asserts
+   `PipelineRejected` carrying the issues, `prepare` never reached, no analyst
+   run; routing is pinned at `tests/test_graph.py:127`, issue parking at `:228`,
+   and surfacing through the job and API layers at `tests/test_jobs.py:176` and
+   `tests/test_api.py:172`. Scripted stand-ins, no credentials, no SME time.
+
+**Replaced by an over-claiming source** — `12-overclaiming-supplier-portal`.
+Where the sparse case grades silence, this one grades noise dressed as fact: a
+vendor-hosted SaaS described almost entirely in security marketing language
+(secure by design, enterprise-grade encryption throughout, fully authenticated
+and audited, fully compliant), none of which may set an attribute, plus a
+straight self-contradiction — the nightly extract is claimed encrypted end to
+end where the runbook says it arrives as a plain CSV — which must resolve to
+`unknown` rather than to either side. One genuine control is stated among the
+noise so the case cannot be passed by discarding everything, and one genuine
+absence is stated so grounded findings remain available.
+
+This keeps decision 6's composition at 12 cases with 2 adversarial, and it
+grades the failure mode `BLESSING.md` step 3 names as "the most common and most
+damaging error" together with its inverse, invented absence.
+
+### 2026-07-21 — cases 11 and 12 blessed
+
+Both adversarial cases are authored, blessed and merged:
+`evals/corpus/11-sparse-shift-scheduling` and
+`evals/corpus/12-overclaiming-supplier-portal`. `verify_corpus.py` is green at 8
+cases, the offline suite is 416 passed / 1 skipped, and 47 hand-labelled
+judge-calibration pairs were added for the two cases (176 total, 106 match / 70
+no-match), weighted toward hard negatives and ungrounded candidates as step 5
+requires.
+
+The two are a deliberate pair pulling on opposite sides of one mechanism: on a
+sparse input the candidate invents values to fill gaps, and on an assurance-dense
+one it adopts values the text supplies but never establishes. Both produce a
+confident non-`unknown` attribute the source does not support, so both are graded
+by the same `unknown`/assumption distinction.
+
+`tests/test_evals_reference.py::test_loads_every_shipped_case` carried the corpus
+size as a literal and was updated 6 → 8; it will need updating again as the
+remaining cases land.
+
+**Remaining on this ticket:** cases 07 and 08 (internal systems — the user chose
+a **CI/CD build-and-deploy pipeline** and an **SSO / identity broker**, for a
+large retail estate; trust flowing upward through a build, and claims-based
+rather than network-based trust, neither of which any current case has), cases
+09 and 10 (two OWASP cookbook conversions, entries to be picked and reviewed at
+blessing), and the promotion pass, which stays deferred until run artifacts
+exist.
