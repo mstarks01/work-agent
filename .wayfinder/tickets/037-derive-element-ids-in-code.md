@@ -2,8 +2,8 @@
 id: 037
 title: "Derive element IDs in code instead of asking the model for two agreeing fields"
 label: wayfinder:task
-status: open
-assignee:
+status: resolved
+assignee: github@michaelstarks.com
 blocked-by: []
 ---
 
@@ -63,3 +63,90 @@ of that line an ID slug sits on is not in doubt.
 Resolved when the decision is made and, if it is to derive, the change is shipped
 with the offline suite green and `prompts/extract.md` reconciled to whatever the
 model is still asked for.
+
+## Resolution
+
+**Derive.** Names are authoritative, IDs follow, and the model is no longer
+asked to keep two fields in agreement. Shipped as
+`stride_service.system_model.normalize_element_ids` — a pure function returning
+a normalized copy — plus `derive_element_id`, which is now the single
+definition of the invariant that `validation.validate` compares against
+(`_expected_id` deleted). Suite 436 green (was 420), `verify_corpus.py` clean at
+12 cases, 0 problems.
+
+The four questions, settled:
+
+**1. IDs stay stable, and the model loses only the abbreviation.** The value is
+unchanged for every element whose ID already matched — `normalize_element_ids`
+is the identity on a valid model, asserted as a test. What the model gives up
+is the shorter-than-its-name slug all 21 errors were reaching for, and the
+answer to wanting one is a shorter `name`, which is what the blessing pass
+reached for too: it fixed all 21 by editing `name`, never the ID. Worth naming
+the alternative that was rejected — **dropping the `id == f(name)` rule
+entirely** and requiring only a unique typed slug would also have erased the 21
+errors, and it is the wrong direction: it hands the model *more* freedom over a
+mechanical field, and it un-guards ID legibility, which is what makes a threat
+citing `process:auth-service` traceable at all. Deriving and de-constraining
+both remove the error; only one of them removes the judgement.
+
+**2. Derivation is a whole-model rewrite, not a field-drop.** This is the part
+that would have broken had it shipped naively: flow `source`/`destination`,
+`trust_zone`, and `assumptions[].element_id` all cite IDs, so overwriting IDs
+alone converts 21 `id-mismatch` errors into a comparable pile of
+`invalid-reference` ones — the same job failing at a different rule. The pass
+therefore records old→new for every element it rewrites and repoints every
+reference through it, in an order the dependency dictates: non-flow elements
+first, then zones and endpoints, then flow IDs (built from the endpoints' *new*
+IDs), then assumptions (which may cite a flow). A self-consistent model stays
+self-consistent; a dangling reference is left exactly as emitted, for the gate
+to report.
+
+**3. The schema does not change — only the pipeline.** `_Element.id` stays
+required, so the corpus, the reports, and every reference threat are untouched.
+Normalization is opt-in via `parse_and_validate(..., normalize_ids=True)`, and
+the choice of who passes it is the load-bearing half of this decision:
+
+- `validate_extraction` (both validate nodes, so `repair`'s output is
+  normalized too) — **on**.
+- `run_extraction` in the eval harness — **on**, because `score_extraction`
+  compares blessed and candidate element IDs by set membership, and blessed IDs
+  are already derived. An abbreviated candidate slug scored as one missing
+  element *and* one extra, on a reading of the source that was correct.
+- `verify_corpus.py` and `reference.py` — **off**, and deliberately. In a
+  hand-authored `model.json` two disagreeing fields are an authoring error a
+  human should be shown, not a slug to canonicalize silently.
+
+That split is also the answer to the "reports and denies, never silently
+auto-repairs" rule: this is derivation, not repair. It reads no source text and
+decides nothing the gate did not already know — the ID was always a pure
+function of the name. Repair is for facts; this is for representation.
+
+**4. `repair` keeps its job, and gets it back.** `invalid-reference`,
+`duplicate-id`, `no-trust-zones`, `illegal-asset-tag` and `schema` are all
+still reachable; what changes is that the one repair pass the design allows is
+no longer spent on a defect with no bearing on extraction quality. The
+`id-mismatch` code is **kept and now unreachable from `extract`** — it still
+fires for models that arrive hand-authored, which is exactly the corpus path
+above, and `validation.py`'s docstring records that reachability split so the
+code is not later read as dead.
+
+One consequence worth watching rather than fixing: **normalization can create a
+`duplicate-id` that the emitted model did not have**, when two elements share a
+name and were told apart only by hand-shortened IDs. That is a real defect
+surfacing, not one introduced — two elements with one name is the class/instance
+duplication cases 08 and 09 already record — and it now arrives as the gate
+error it always was, with `repair` and the source text available to resolve it.
+Tested.
+
+`prompts/extract.md` reconciled at step 3: the model is still asked for IDs
+(references need them and the schema requires them), but told they are
+recomputed from the names it gives, that abbreviating one is pointless because
+references follow automatically, and that two elements sharing a name share an
+ID. No other prompt changed — `repair` never sees the issue code.
+
+**Not verified against the real Flash node**, same constraint as 022/023/026/028:
+the 21 errors came from agent stand-ins, so what is proven here is that the
+failure shape cannot reach the gate, not that the pinned model produces it at
+the same rate. [Re-bootstrap the phase-1 corpus](030-rebootstrap-corpus.md) is
+where that number comes from — and it should now find `id-mismatch` at zero by
+construction, which makes the rest of its taxonomy easier to read.

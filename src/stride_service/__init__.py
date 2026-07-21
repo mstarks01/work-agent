@@ -87,8 +87,10 @@ from stride_service.system_model import (
     SystemModel,
     TrustBoundary,
     ZonedElement,
+    derive_element_id,
     make_element_id,
     make_flow_id,
+    normalize_element_ids,
     normalize_name,
 )
 from stride_service.validation import (
@@ -173,8 +175,10 @@ __all__ = [
     "execute_job",
     "extract_section",
     "load_model_tiers",
+    "derive_element_id",
     "make_element_id",
     "make_flow_id",
+    "normalize_element_ids",
     "normalize_name",
     "parse_and_validate",
     "split_sections",

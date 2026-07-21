@@ -8,6 +8,11 @@ elements. Ticket 010 added the admission cap on model size
 (:data:`MAX_ELEMENTS`), enforced here because this is the one gate every
 extraction passes through before any analyst spend.
 
+Ticket 037 moved ID derivation into code: callers passing ``normalize_ids``
+to :func:`parse_and_validate` get their IDs canonicalized before the gate
+runs, so ``id-mismatch`` is unreachable from the extraction pipeline. The rule
+stays enforced here for models that arrive hand-authored.
+
 Errors are structured (:class:`ValidationIssue`) so the repair pass can feed
 them back to the extraction agent verbatim. Analysts only ever see models for
 which :func:`validate` returns an empty list. On any failure the gate reports
@@ -24,10 +29,9 @@ from pydantic import BaseModel, ConfigDict, ValidationError
 
 from stride_service.system_model import (
     CORE_ASSET_TAGS,
-    DataFlow,
     SystemModel,
-    make_element_id,
-    make_flow_id,
+    derive_element_id,
+    normalize_element_ids,
 )
 
 IssueCode = Literal[
@@ -69,12 +73,6 @@ class ValidationIssue(BaseModel):
 def allowed_asset_tags(extra_asset_tags: Collection[str] = ()) -> frozenset[str]:
     """The controlled asset vocabulary: core tags plus config extensions."""
     return CORE_ASSET_TAGS | frozenset(extra_asset_tags)
-
-
-def _expected_id(element) -> str:
-    if isinstance(element, DataFlow):
-        return make_flow_id(element.source, element.destination, element.name)
-    return make_element_id(element.id_prefix, element.name)
 
 
 def validate(
@@ -123,7 +121,7 @@ def validate(
 
     for element in elements:
         try:
-            expected = _expected_id(element)
+            expected = derive_element_id(element)
         except ValueError:
             expected = None
         if expected is not None and element.id != expected:
@@ -204,6 +202,7 @@ def parse_and_validate(
     data: object,
     extra_asset_tags: Collection[str] = (),
     max_elements: int = MAX_ELEMENTS,
+    normalize_ids: bool = False,
 ) -> tuple[SystemModel | None, list[ValidationIssue]]:
     """Parse raw extraction output and run the validity gate.
 
@@ -211,6 +210,14 @@ def parse_and_validate(
     ``issues`` is empty; a model returned alongside issues exists solely so
     the repair pass has both the artifact and the errors. Schema-level
     failures return ``(None, issues)`` — fail closed, never a partial model.
+
+    ``normalize_ids`` runs :func:`~stride_service.system_model.normalize_element_ids`
+    over the parsed model first, making ``id-mismatch`` unreachable and
+    returning the normalized model for the caller to carry forward. It is
+    **off by default and on only where a model arrives from a model**: hand-
+    authored artifacts — the golden corpus above all — want a mismatch
+    reported, because there the two disagreeing fields are an authoring error
+    a human should see rather than a slug to canonicalize.
     """
     try:
         model = SystemModel.model_validate(data)
@@ -224,4 +231,6 @@ def parse_and_validate(
             for error in exc.errors()
         ]
         return None, issues
+    if normalize_ids:
+        model = normalize_element_ids(model)
     return model, validate(model, extra_asset_tags, max_elements)

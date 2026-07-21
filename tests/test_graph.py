@@ -218,6 +218,34 @@ def test_validate_routes_invalid_and_feeds_the_repair_prompt():
     assert graph.STATE_VALID_MODEL not in ctx.state
 
 
+def test_validate_derives_ids_rather_than_spending_the_repair_pass():
+    """Ticket 037: an abbreviated ID is not a reason to route to ``repair``."""
+    abbreviated = valid_model().model_dump(mode="json")
+    abbreviated["processes"][0]["name"] = "Web App Frontend Service"
+    ctx = FakeContext()
+    event = graph.validate_extraction(abbreviated, ctx)
+
+    assert event.actions.route == graph.ROUTE_VALID
+    published = ctx.state[graph.STATE_VALID_MODEL]
+    assert published["processes"][0]["id"] == "process:web-app-frontend-service"
+    assert published["data_flows"][0]["destination"] == (
+        "process:web-app-frontend-service"
+    )
+
+
+def test_validate_parks_the_normalized_model_the_issues_cite():
+    """Repair reads {previous_model}; it must contain the IDs it is sent."""
+    broken = valid_model().model_dump(mode="json")
+    broken["processes"][0]["name"] = "Web App Frontend Service"
+    broken["data_flows"][0]["source"] = "entity:does-not-exist"
+    ctx = FakeContext()
+    event = graph.validate_extraction(broken, ctx)
+
+    assert event.actions.route == graph.ROUTE_INVALID
+    assert "process:web-app-frontend-service" in ctx.state[graph.STATE_PREVIOUS_MODEL]
+    assert "id-mismatch" not in ctx.state[graph.STATE_VALIDATION_ISSUES]
+
+
 def test_validate_routes_invalid_on_unparseable_output():
     ctx = FakeContext()
     event = graph.validate_extraction({"processes": "not a list"}, ctx)

@@ -195,7 +195,11 @@ async def run_extraction(case: GoldenCase, pipeline: Pipeline) -> ExtractionResu
     )
     if STATE_EXTRACTED_MODEL not in state:
         raise EvalRunError(f"{case.id}: extract produced no model")
-    model, issues = parse_and_validate(state[STATE_EXTRACTED_MODEL])
+    # normalize_ids mirrors the ``validate`` node (ticket 037): blessed models
+    # already carry derived IDs, so scoring a candidate's raw IDs by set
+    # membership would count an abbreviated slug as one missing element and one
+    # extra, on a reading of the source that was correct.
+    model, issues = parse_and_validate(state[STATE_EXTRACTED_MODEL], normalize_ids=True)
     return ExtractionResult(case_id=case.id, extracted=model, issues=tuple(issues))
 
 

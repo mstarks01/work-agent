@@ -242,14 +242,22 @@ def render(value: Any) -> str:
 def validate_extraction(extracted_model: dict, ctx) -> Event:
     """Run the mechanical validity gate and route on the result.
 
+    Element IDs are derived here rather than demanded of the model (ticket
+    037), so ``repair``'s one pass is never spent reconciling an ID with its
+    own name.
+
     On failure, parks the rejected model and the issues where the repair
     prompt's ``{previous_model}`` and ``{validation_issues}`` placeholders
-    read them. Both validate nodes run this same function — what differs is
-    where their ``invalid`` edge points.
+    read them. What is parked is the *normalized* model whenever there is one,
+    because that is the artifact the issues were computed against — handing
+    repair the pre-normalization IDs would cite elements it cannot find.
+    Both validate nodes run this same function — what differs is where their
+    ``invalid`` edge points.
     """
-    model, issues = parse_and_validate(extracted_model)
+    model, issues = parse_and_validate(extracted_model, normalize_ids=True)
     if issues or model is None:
-        ctx.state[STATE_PREVIOUS_MODEL] = render(extracted_model)
+        parked = extracted_model if model is None else model.model_dump(mode="json")
+        ctx.state[STATE_PREVIOUS_MODEL] = render(parked)
         ctx.state[STATE_VALIDATION_ISSUES] = render(
             [issue.model_dump(mode="json") for issue in issues]
         )

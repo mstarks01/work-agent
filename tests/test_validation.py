@@ -161,3 +161,27 @@ class TestElementCap:
     def test_parse_and_validate_threads_the_cap(self):
         _, issues = parse_and_validate(self.sized(8).model_dump(), max_elements=5)
         assert codes(issues) == ["too-many-elements"]
+
+
+class TestNormalizeIds:
+    """Ticket 037: the pipeline derives IDs; hand-authored models do not."""
+
+    def abbreviated(self):
+        model = valid_model()
+        model.processes[0].name = "Web App Frontend Service"
+        return model.model_dump()
+
+    def test_off_by_default_so_authored_models_still_report_mismatch(self):
+        model, issues = parse_and_validate(self.abbreviated())
+        assert "id-mismatch" in codes(issues)
+        assert model.processes[0].id == "process:web-app"
+
+    def test_on_request_the_model_is_normalized_and_passes(self):
+        model, issues = parse_and_validate(self.abbreviated(), normalize_ids=True)
+        assert issues == []
+        assert model.processes[0].id == "process:web-app-frontend-service"
+
+    def test_schema_failures_still_fail_closed(self):
+        model, issues = parse_and_validate({"not_a_field": True}, normalize_ids=True)
+        assert model is None
+        assert codes(issues) == ["schema"]

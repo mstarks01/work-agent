@@ -132,6 +132,18 @@ class TrustBoundary(_Element):
 
 Element = Union[ExternalEntity, Process, DataStore, DataFlow, TrustBoundary]
 
+
+def derive_element_id(element: Element) -> str:
+    """The deterministic ID an element's type, name, and endpoints imply.
+
+    The single definition of the ID invariant: the validity gate compares an
+    emitted ID against this, and :func:`normalize_element_ids` overwrites with
+    it. Raises ValueError when a name normalizes to an empty slug.
+    """
+    if isinstance(element, DataFlow):
+        return make_flow_id(element.source, element.destination, element.name)
+    return make_element_id(element.id_prefix, element.name)
+
 # Elements that belong to a trust zone (everything except flows and boundaries).
 ZonedElement = Union[ExternalEntity, Process, DataStore]
 
@@ -212,6 +224,71 @@ class SystemModel(BaseModel):
                     )
                 )
         return crossings
+
+
+def _rewrite_id(element: Element, rewrites: dict[str, str]) -> None:
+    """Overwrite one element's ID with its derived form, recording the change.
+
+    A name that normalizes to an empty slug has no derived form; the emitted ID
+    is left alone so the validity gate reports it rather than this pass
+    guessing at it.
+    """
+    try:
+        derived = derive_element_id(element)
+    except ValueError:
+        return
+    if derived != element.id:
+        rewrites[element.id] = derived
+        element.id = derived
+
+
+def normalize_element_ids(model: SystemModel) -> SystemModel:
+    """Return a copy whose IDs are derived from names, references rewritten.
+
+    An element ID is a pure function of type and name, so a model that emits
+    both is being asked to keep two fields in agreement by hand — a mechanical
+    constraint that belongs in code (wayfinder ticket 037). This is derivation,
+    not repair: it decides nothing the emitting model knew and the gate does
+    not know, and it reads no source text.
+
+    Names are authoritative and IDs follow. An emitted ID is therefore only a
+    *link*: every reference to it — ``trust_zone``, flow endpoints, and
+    ``assumptions[].element_id`` — is rewritten to the derived ID, so a
+    self-consistent model stays self-consistent. Dangling references are left
+    untouched for the gate to report.
+
+    Normalization can make two elements collide on one derived ID. That is a
+    real defect surfacing, not one introduced: two elements sharing a name are
+    the class/instance duplication the gate's ``duplicate-id`` rule exists to
+    catch.
+    """
+    normalized = model.model_copy(deep=True)
+    zoned = (
+        *normalized.external_entities,
+        *normalized.processes,
+        *normalized.data_stores,
+    )
+    rewrites: dict[str, str] = {}
+
+    for element in (*zoned, *normalized.trust_boundaries):
+        _rewrite_id(element, rewrites)
+
+    for element in zoned:
+        element.trust_zone = rewrites.get(element.trust_zone, element.trust_zone)
+
+    # Flows last: a flow's derived ID is built from its endpoints' IDs, so the
+    # endpoints have to carry their derived values before it is computed.
+    for flow in normalized.data_flows:
+        flow.source = rewrites.get(flow.source, flow.source)
+        flow.destination = rewrites.get(flow.destination, flow.destination)
+        _rewrite_id(flow, rewrites)
+
+    for assumption in normalized.assumptions:
+        assumption.element_id = rewrites.get(
+            assumption.element_id, assumption.element_id
+        )
+
+    return normalized
 
 
 def is_slug(value: str) -> bool:
