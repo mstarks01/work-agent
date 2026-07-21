@@ -80,3 +80,13 @@ DIGEST_TOKEN_BUDGET = 2000
 def test_boundary_digest_assembles_within_budget():
     digest = category_boundary_digest(loader)
     assert estimate_tokens(digest) <= DIGEST_TOKEN_BUDGET
+
+
+# Ticket 010 retired the mechanically-pre-filtered element view: every analyst
+# receives the whole System Model, and ``## Applicability`` scopes only where a
+# threat may be *filed*. A skill that claims its input was filtered is telling
+# the model something false about what it is looking at.
+@pytest.mark.parametrize("category", STRIDE_CATEGORIES)
+def test_applicability_does_not_claim_a_filtered_element_view(category):
+    applicability = split_sections(loader.load(f"stride/{category}"))["Applicability"]
+    assert "pre-filter" not in applicability.lower()

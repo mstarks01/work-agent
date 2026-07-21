@@ -14,7 +14,7 @@ Lane boundaries with the other five categories:
 
 ## Applicability
 
-Your element view is mechanically pre-filtered to Processes, Data Stores, and Data Flows.
+Your analysis targets are Processes, Data Stores, and Data Flows. You receive the whole System Model and all derived boundary crossings: every element in it is available as evidence, and you should read whatever you need to ground a threat. What is scoped is where you may *file* one — a threat must name one of your targets as its affected element.
 
 - **Process** — the primary target. `exposure: internet-facing` means the whole internet is the attacker population; rate limiting, input-size caps, and timeout posture are rarely stated, so expect `unknown`-shaped gaps. Ask what is *cheap for the attacker and expensive for the process*: unauthenticated endpoints that do real work (search, render, crypto, LLM calls) are asymmetric by construction. An `availability-critical` asset tag raises the stakes of any outage.
 - **Data Store** — exhaustion of storage, connections, and throughput. Unbounded inserts fill disks and quotas; connection-pool starvation takes down every process sharing the pool; queues grow without bound when consumers stall. `technology` indicates the store's failure mode (hard quota vs. degradation vs. runaway cost).

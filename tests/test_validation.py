@@ -1,6 +1,11 @@
 """Tests for the mechanical validity gate."""
 
-from stride_service.validation import allowed_asset_tags, parse_and_validate, validate
+from stride_service.validation import (
+    MAX_ELEMENTS,
+    allowed_asset_tags,
+    parse_and_validate,
+    validate,
+)
 from tests.factories import valid_model
 
 
@@ -109,3 +114,50 @@ class TestParseFailures:
         model, issues = parse_and_validate(data)
         assert model is not None
         assert "no-trust-zones" in codes(issues)
+
+
+class TestElementCap:
+    """The ticket-010 admission cap: model size is bounded before analyst spend."""
+
+    def sized(self, total):
+        """A valid model padded with cloned processes to exactly ``total`` elements."""
+        model = valid_model()
+        template = model.processes[0]
+        padding = total - len(model.elements())
+        model.processes += [
+            template.model_copy(
+                update={"id": f"process:worker-{index}", "name": f"Worker {index}"}
+            )
+            for index in range(padding)
+        ]
+        assert len(model.elements()) == total
+        return model
+
+    def test_model_at_the_limit_is_accepted(self):
+        model = valid_model()
+        assert validate(model, max_elements=len(model.elements())) == []
+
+    def test_model_over_the_limit_is_reported(self):
+        model = self.sized(8)
+        issues = validate(model, max_elements=5)
+        assert codes(issues) == ["too-many-elements"]
+
+    def test_cap_message_names_both_numbers(self):
+        issues = validate(self.sized(8), max_elements=5)
+        assert "5-element limit" in issues[0].message
+        assert "8 elements" in issues[0].message
+
+    def test_cap_reports_alone_and_suppresses_other_issues(self):
+        model = self.sized(8)
+        model.trust_boundaries = []
+        issues = validate(model, max_elements=5)
+        assert codes(issues) == ["too-many-elements"]
+
+    def test_default_cap_is_the_configured_limit(self):
+        assert validate(self.sized(MAX_ELEMENTS), max_elements=MAX_ELEMENTS) == []
+        over = validate(self.sized(MAX_ELEMENTS + 1))
+        assert codes(over) == ["too-many-elements"]
+
+    def test_parse_and_validate_threads_the_cap(self):
+        _, issues = parse_and_validate(self.sized(8).model_dump(), max_elements=5)
+        assert codes(issues) == ["too-many-elements"]

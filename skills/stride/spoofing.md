@@ -14,7 +14,7 @@ Lane boundaries with the other five categories:
 
 ## Applicability
 
-Your element view is mechanically pre-filtered to External Entities and Processes. Data Flows are not analysis targets here, but their attributes (`authentication`, `protocol`, `encryption_in_transit`) are your primary evidence about the endpoints they touch — always read the flows attached to each element you analyze.
+Your analysis targets are External Entities and Processes. You receive the whole System Model and all derived boundary crossings: every element in it is available as evidence, and you should read whatever you need to ground a threat. What is scoped is where you may *file* one — a threat must name one of your targets as its affected element. Data Flows are not analysis targets here, but their attributes (`authentication`, `protocol`, `encryption_in_transit`) are your primary evidence about the endpoints they touch — always read the flows attached to each element you analyze.
 
 - **External Entity, `kind: human`** — ask how the system verifies this person. Examine every flow the entity initiates: what does `authentication` say, and does the mechanism resist phishing, credential stuffing, and session theft? An entity carrying the `credentials` asset tag is itself a spoofing target.
 - **External Entity, `kind: external-system`** — machine identity. Look for static API keys, shared secrets, unsigned callbacks/webhooks, and absence of mutual authentication on flows in either direction. Also consider the reverse: can an attacker impersonate *your* system to this external party?

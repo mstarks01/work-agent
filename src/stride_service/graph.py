@@ -134,6 +134,16 @@ evidence, not a redesign."""
 # The six keys the prompt files template against carry *rendered* text, since
 # ADK substitutes ``str(value)`` into an instruction. The structured values
 # the FunctionNodes pass between themselves live under their own keys.
+#
+# Two key families, and the invariant that keeps them honest (ticket 010):
+# *structured* keys are the code's view (Pydantic round-trips), *rendered*
+# keys are the model's view (:func:`render` output). Both copies of an
+# artifact are kept on purpose — reading back exactly the bytes a model saw is
+# what makes a failed job debuggable — so the rule that stops them drifting
+# is: **a rendered key is written once by the FunctionNode that derives it,
+# and never read by Python.** No node mutates an artifact after rendering it.
+# A future node that re-renders or edits one of these in place breaks the
+# report's traceability without failing any test.
 
 STATE_INPUT_TEXT = "input_text"
 STATE_SYSTEM_MODEL = "system_model"

@@ -13,7 +13,7 @@ Lane boundaries with the other five categories:
 
 ## Applicability
 
-Your element view is mechanically pre-filtered to Processes.
+Your analysis targets are Processes. You receive the whole System Model and all derived boundary crossings: every element in it is available as evidence, and you should read whatever you need to ground a threat. What is scoped is where you may *file* one — a threat must name one of your targets as its affected element.
 
 - **Process as authorization enforcement point** — for each process, ask *what decisions it makes about who may do what*, and how those decisions fail. Missing object-level ownership checks (acting on IDs supplied by the caller, OWASP A01), role checks performed client-side or per-endpoint gaps, and admin functionality distinguished only by an unlinked URL are the canonical breaks. `exposure: internet-facing` puts the enforcement surface in front of everyone.
 - **Process as privilege holder** — what identity and standing authority does the process itself carry? Its `trust_zone` and outbound flows define what compromising it yields: a process with flows into higher-trust zones or to stores tagged `credentials`/`secrets` is a privilege-escalation ladder. `technology` signals execution risk (interpreters, plugin systems, container runtimes) and known local-escalation surfaces.

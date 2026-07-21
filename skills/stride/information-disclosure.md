@@ -14,7 +14,7 @@ Lane boundaries with the other five categories:
 
 ## Applicability
 
-Your element view is mechanically pre-filtered to Processes, Data Stores, and Data Flows.
+Your analysis targets are Processes, Data Stores, and Data Flows. You receive the whole System Model and all derived boundary crossings: every element in it is available as evidence, and you should read whatever you need to ground a threat. What is scoped is where you may *file* one — a threat must name one of your targets as its affected element.
 
 - **Data Flow** — eavesdropping and interception. Read `encryption_in_transit`, `protocol`, and `data_description`: what travels, and who can see the path? Boundary-crossing flows traverse zones with different observer populations — weight them. Watch for sensitive content in transport metadata: URLs, query strings, and headers are logged by intermediaries even under TLS.
 - **Data Store** — exposure at rest and through the read path. `data_classification`, asset tags (`pii`, `credentials`, `secrets`, `financial`, `health`), and `encryption_at_rest` set the stakes; inbound-read flows and their `authentication` define who can query. Include the store's shadow copies — backups, snapshots, replicas — which inherit the data but rarely the access controls.

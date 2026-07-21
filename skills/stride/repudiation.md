@@ -14,7 +14,7 @@ Lane boundaries with the other five categories:
 
 ## Applicability
 
-Your element view is mechanically pre-filtered to External Entities, Processes, and Data Stores.
+Your analysis targets are External Entities, Processes, and Data Stores. You receive the whole System Model and all derived boundary crossings: every element in it is available as evidence, and you should read whatever you need to ground a threat. What is scoped is where you may *file* one — a threat must name one of your targets as its affected element.
 
 - **External Entity** — for each entity, ask: if this actor disputed an action tomorrow, what evidence exists? `kind: human` raises fraud and dispute scenarios (denied transactions, denied approvals); `kind: external-system` raises partner-integration disputes (denied API calls, denied deliveries). The `authentication` on the entity's flows determines whether log entries can bind actions to the actor at all — shared or absent credentials make every record deniable.
 - **Process** — does the process record its security-relevant actions (authentication events, authorization denials, writes to sensitive stores, administrative changes), with actor, timestamp, and outcome? A process performing high-value operations (flows touching `financial`, `credentials`, `health` assets) with no logging store among its outbound flows is the classic gap. Processes that act on behalf of callers must propagate the *original* actor identity, or downstream records attribute everything to the service account.

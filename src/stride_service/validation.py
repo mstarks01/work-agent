@@ -4,7 +4,9 @@ Implements the well-formedness rules from wayfinder ticket 003: unique typed
 IDs deterministic from type+name, referential integrity of flow endpoints and
 ``trust_zone``, at least one trust zone, legal enum values (including the
 config-extendable asset-tag vocabulary), and assumptions referencing real
-elements.
+elements. Ticket 010 added the admission cap on model size
+(:data:`MAX_ELEMENTS`), enforced here because this is the one gate every
+extraction passes through before any analyst spend.
 
 Errors are structured (:class:`ValidationIssue`) so the repair pass can feed
 them back to the extraction agent verbatim. Analysts only ever see models for
@@ -35,7 +37,22 @@ IssueCode = Literal[
     "invalid-reference",
     "no-trust-zones",
     "illegal-asset-tag",
+    "too-many-elements",
 ]
+
+# Admission cap on model size (ticket 010). Deliberately loose: it is a
+# blast-radius guard, not a quality threshold. Every artifact downstream
+# scales with element count — six analysts each read the whole model, and the
+# critic reads every draft they produce in one pass — so an unbounded model
+# means unbounded spend and a critic dedupeing hundreds of drafts with no
+# error anywhere. Rejecting here costs one ``len()`` and happens before any
+# analyst call. Element count rather than a token estimate because it is the
+# number a user can act on: "split the system" is advice they can follow.
+#
+# Where quality actually decays with model size is unmeasured — the golden
+# corpus is 8-20 elements by design (ticket 009) — so this number is a guard
+# awaiting evidence, not a calibrated limit.
+MAX_ELEMENTS = 150
 
 
 class ValidationIssue(BaseModel):
@@ -61,11 +78,28 @@ def _expected_id(element) -> str:
 
 
 def validate(
-    model: SystemModel, extra_asset_tags: Collection[str] = ()
+    model: SystemModel,
+    extra_asset_tags: Collection[str] = (),
+    max_elements: int = MAX_ELEMENTS,
 ) -> list[ValidationIssue]:
-    """Run every gate rule; an empty result means the model is analyst-ready."""
-    issues: list[ValidationIssue] = []
+    """Run every gate rule; an empty result means the model is analyst-ready.
+
+    The size cap is checked first and returns alone: a model too large to
+    analyze cannot be made acceptable by fixing its IDs, and reporting the
+    other few hundred issues alongside it would bury the one that matters.
+    """
     elements = model.elements()
+    if len(elements) > max_elements:
+        return [
+            ValidationIssue(
+                code="too-many-elements",
+                message=f"the model has {len(elements)} elements, over the"
+                f" {max_elements}-element limit; split the system into"
+                " smaller models and submit them separately",
+            )
+        ]
+
+    issues: list[ValidationIssue] = []
     legal_tags = allowed_asset_tags(extra_asset_tags)
 
     id_counts = Counter(element.id for element in elements)
@@ -167,7 +201,9 @@ def validate(
 
 
 def parse_and_validate(
-    data: object, extra_asset_tags: Collection[str] = ()
+    data: object,
+    extra_asset_tags: Collection[str] = (),
+    max_elements: int = MAX_ELEMENTS,
 ) -> tuple[SystemModel | None, list[ValidationIssue]]:
     """Parse raw extraction output and run the validity gate.
 
@@ -188,4 +224,4 @@ def parse_and_validate(
             for error in exc.errors()
         ]
         return None, issues
-    return model, validate(model, extra_asset_tags)
+    return model, validate(model, extra_asset_tags, max_elements)
