@@ -52,6 +52,55 @@ async def analyze(
 - `on_node` — optional async callback invoked with each node name as it
   completes, for progress or tracing.
 
+## Writing the description
+
+The `description` is free-form — prose, bullets, a table, or a rough dump all
+work, and it will be incomplete. The first pipeline stage transcribes it into a
+canonical system model; the quality of the report tracks how much of the
+following the text actually states.
+
+Include, as far as you know them:
+
+- **Components** — the actors/external entities, the running processes, and the
+  data stores.
+- **Data flows** — who calls whom, in which direction (a webhook or callback the
+  other side initiates is its own flow).
+- **Trust zones** — network segments, auth boundaries, privilege levels. If the
+  text implies none, the whole system is treated as one zone.
+- **Security-relevant attributes** — for each component and flow:
+  `authentication`, `encryption_in_transit`, `encryption_at_rest`, `exposure`
+  (is it internet-facing?), and `data_classification`.
+- **Sensitive assets** in play — credentials, PII, financial, health, secrets,
+  business-critical or availability-critical data.
+
+Two behaviours worth knowing:
+
+- **Anything you do not state becomes `unknown`.** The extractor transcribes; it
+  does not invent facts. An `unknown` control is treated as unverified and tends
+  to surface as a `needs-info` [threat](Report-Schema.md) rather than a confirmed
+  one. Stating "the API requires OAuth" and omitting it produce materially
+  different reports — so state the controls you have.
+- **Keep the described system under 150 elements** (`MAX_ELEMENTS`; see
+  [Configuration](Configuration.md)). A larger system comes back as a
+  `too-many-elements` rejection — split it and submit the parts separately.
+  Analysis quality is best in the 8–20 element range.
+
+A short but well-formed description:
+
+```text
+Customers use a React web app over HTTPS to place orders. The web app calls an
+internal Orders API (OAuth2 bearer tokens) inside our VPC, which reads and
+writes an encrypted Postgres database holding customer PII and payment details.
+A nightly job in the same VPC exports order summaries to an S3 bucket. Admins
+reach the Orders API from a separate management network.
+```
+
+That names the actors, the flows, two trust zones (public edge, VPC; plus the
+management network), the transport and auth on the exposed path, and the
+sensitive data — enough for a grounded model. What it leaves unsaid (is the S3
+bucket encrypted? is the admin path authenticated?) becomes `unknown`, which is
+exactly the signal the analysts act on.
+
 ## The three outcomes
 
 `analyze` returns a `PipelineOutcome`, which is the job lifecycle's
