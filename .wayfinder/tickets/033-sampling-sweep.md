@@ -2,7 +2,7 @@
 id: 033
 title: "Answer the sampling question with the instrument"
 label: wayfinder:task
-status: open
+status: closed
 assignee:
 blocked-by: [032]
 ---
@@ -41,3 +41,14 @@ ticket's call to make once the three arms above have numbers.
 
 Whatever wins, the outcome is a versioned bump to `config/sampling.toml` with the
 run artifacts behind it.
+
+## Closed — out of scope (2026-07-23)
+
+Not resolved on the route — **closed out of scope**. This ticket needs a live
+Vertex call (sweeps, calibration runs, or re-bootstrapping against the real
+model) to produce its numbers. The user ruled GCP/Vertex provisioning and all
+live eval measurement out of scope — the app assumes a correctly configured
+environment — which closed [Provision Vertex access](027-provision-live-infrastructure.md)
+and, with it, the only path to those numbers here. The offline machinery ships;
+the numbers, the >=90% judge bar, and the Tier-2/3 gate promotions are a future
+eval effort, not a ticket in this map. See the map's Out of scope section.

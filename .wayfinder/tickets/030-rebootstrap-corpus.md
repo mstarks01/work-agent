@@ -2,7 +2,7 @@
 id: 030
 title: "Re-bootstrap the phase-1 corpus against the real extract node"
 label: wayfinder:task
-status: open
+status: closed
 assignee:
 blocked-by: [027]
 ---
@@ -37,3 +37,14 @@ Two things to watch:
 - If this runs after [Expand the golden corpus to 12](029-expand-golden-corpus.md),
   bootstrap the new cases the same way so the whole corpus carries one
   provenance, rather than two generations of it.
+
+## Closed — out of scope (2026-07-23)
+
+Not resolved on the route — **closed out of scope**. This ticket needs a live
+Vertex call (sweeps, calibration runs, or re-bootstrapping against the real
+model) to produce its numbers. The user ruled GCP/Vertex provisioning and all
+live eval measurement out of scope — the app assumes a correctly configured
+environment — which closed [Provision Vertex access](027-provision-live-infrastructure.md)
+and, with it, the only path to those numbers here. The offline machinery ships;
+the numbers, the >=90% judge bar, and the Tier-2/3 gate promotions are a future
+eval effort, not a ticket in this map. See the map's Out of scope section.

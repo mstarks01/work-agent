@@ -2,8 +2,8 @@
 id: 027
 title: "Provision Vertex access and run the first-run checklist"
 label: wayfinder:task
-status: open
-assignee:
+status: closed
+assignee: github@michaelstarks.com
 blocked-by: [035]
 ---
 
@@ -52,3 +52,16 @@ The checklist is already written and must be followed rather than reinvented:
 Resolved when a live Vertex call succeeds from both CI and this box, and the
 answer records project id, region, service-account email, and the served model
 version each pinned string resolved to.
+
+## Closed — out of scope (2026-07-23)
+
+Not resolved on the route — **closed out of scope**. The user's call:
+GCP/Vertex/IAM provisioning is out of scope, and the app assumes a correctly
+configured environment. Standing up the project, Workload Identity Federation,
+service account, and bindings is therefore an ops concern for this effort, not a
+ticket in this map. `.github/WORKLOAD_IDENTITY.md` (the runbook) and
+`evals-live.yml` (the OIDC→WIF workflow) stay in the tree unchanged as the
+handoff for whoever provisions the environment. Closing this removed the only
+path to a live Vertex call here, so the measurement chain it blocked
+(030/031/032/033/036) was closed out of scope with it; 034 was reframed as a
+credential-free config migration. See the map's Out of scope section.

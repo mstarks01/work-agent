@@ -2,7 +2,7 @@
 id: 032
 title: "Establish baselines and promote the gates"
 label: wayfinder:task
-status: open
+status: closed
 assignee:
 blocked-by: [027, 028, 029, 031]
 ---
@@ -61,3 +61,14 @@ Watch cost and quota rather than dollars: output on the eight-way `pro` fan-out
 is the whole bill (Pro $10/1M out, confirmed July 2026), and `concurrency:
 evals-live` allows one live run at a time — five sweeps over twelve cases is a
 serialized wait, not an expense worth optimizing.
+
+## Closed — out of scope (2026-07-23)
+
+Not resolved on the route — **closed out of scope**. This ticket needs a live
+Vertex call (sweeps, calibration runs, or re-bootstrapping against the real
+model) to produce its numbers. The user ruled GCP/Vertex provisioning and all
+live eval measurement out of scope — the app assumes a correctly configured
+environment — which closed [Provision Vertex access](027-provision-live-infrastructure.md)
+and, with it, the only path to those numbers here. The offline machinery ships;
+the numbers, the >=90% judge bar, and the Tier-2/3 gate promotions are a future
+eval effort, not a ticket in this map. See the map's Out of scope section.
