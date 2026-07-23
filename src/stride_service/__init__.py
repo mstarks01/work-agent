@@ -13,6 +13,12 @@ from stride_service.auth import (
     PingJwtVerifier,
     TokenVerifier,
 )
+from stride_service.engine import (
+    DEFAULT_CALLER,
+    MAX_SYSTEM_NAME_CHARS,
+    EngineInputError,
+    StrideEngine,
+)
 from stride_service.jobs import (
     GENERIC_FAILURE_MESSAGE,
     TERMINAL_STATUSES,
@@ -104,11 +110,13 @@ __all__ = [
     "ANALYST_NODES",
     "CATEGORY_SKILL_TOKEN_CAP",
     "CORE_ASSET_TAGS",
+    "DEFAULT_CALLER",
     "DEFAULT_DISCLAIMER",
     "DOMAIN_PACK_TOKEN_CAP",
     "GENERIC_FAILURE_MESSAGE",
     "LLM_NODES",
     "MAX_DESCRIPTION_BYTES",
+    "MAX_SYSTEM_NAME_CHARS",
     "TERMINAL_STATUSES",
     "SCHEMA_VERSION",
     "SEVERITY_MATRIX",
@@ -124,6 +132,7 @@ __all__ = [
     "DataFlow",
     "DataStore",
     "Element",
+    "EngineInputError",
     "ExternalEntity",
     "InMemoryJobStore",
     "InputRef",
@@ -151,6 +160,7 @@ __all__ = [
     "SkillLoader",
     "SkillNotFoundError",
     "StrideCategory",
+    "StrideEngine",
     "StrideReport",
     "StubPipelineRunner",
     "Summary",

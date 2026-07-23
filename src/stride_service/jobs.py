@@ -58,6 +58,11 @@ _LEGAL_TRANSITIONS: dict[JobStatus, frozenset[JobStatus]] = {
 # Stored on a failed job in place of any internal detail.
 GENERIC_FAILURE_MESSAGE = "internal error while running the analysis pipeline"
 
+# Authoritative cap on a submitted description, in UTF-8 bytes (ticket 008).
+# Enforced at every entry point — the HTTP layer and the in-process engine —
+# so untrusted input is bounded before it reaches a model (OWASP LLM10).
+MAX_DESCRIPTION_BYTES = 100 * 1024
+
 
 class InvalidTransitionError(ValueError):
     """A job was asked to move along an edge the lifecycle does not have."""

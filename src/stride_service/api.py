@@ -40,6 +40,7 @@ from stride_service.auth import (
     TokenVerifier,
 )
 from stride_service.jobs import (
+    MAX_DESCRIPTION_BYTES,
     TERMINAL_STATUSES,
     InMemoryJobStore,
     JobRecord,
@@ -53,10 +54,9 @@ from stride_service.validation import ValidationIssue
 
 logger = logging.getLogger(__name__)
 
-# Authoritative input cap from ticket 008: the submitted description, in UTF-8
-# bytes. The raw-body limit adds slack for JSON framing and escaping so the
-# middleware can reject oversized payloads before parsing them.
-MAX_DESCRIPTION_BYTES = 100 * 1024
+# MAX_DESCRIPTION_BYTES (the ticket-008 input cap) lives in jobs.py, shared with
+# the in-process engine. The raw-body limit adds slack for JSON framing and
+# escaping so the middleware can reject oversized payloads before parsing them.
 MAX_REQUEST_BODY_BYTES = 120 * 1024
 
 _SSE_POLL_SECONDS = 0.2
