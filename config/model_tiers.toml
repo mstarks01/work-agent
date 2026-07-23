@@ -9,9 +9,12 @@
 # than being assumed away. Upgrades change a string only after the golden-case
 # eval suite passes on the candidate.
 #
-# DEADLINE: Gemini 2.5 retires on Vertex 2026-10-16. The move to a 3.x
-# generation is a re-baselining sweep, owned by wayfinder ticket 025 — as of
-# 2026-07-21 the 3.x models are preview-stage and so fail the rule above.
+# SCOPE (user decision 2026-07-23): design for Gemini 2.x only. Migrating to a
+# 3.x generation is out of scope (wayfinder ticket 034, closed), so these stay
+# on 2.5. Gemini 2.5 retires on Vertex 2026-10-16; keeping the pinned strings
+# current past that is an ops/env concern under the "assumes a correctly
+# configured environment" posture, handled via the STRIDE_MODEL_* overrides
+# below, not by editing this file.
 #
 # STRIDE_MODEL_FLASH / STRIDE_MODEL_PRO env vars override the tier strings at
 # deploy time (ops retune on Cloud Run without an image rebuild). The
