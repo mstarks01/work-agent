@@ -3,6 +3,8 @@
 Label: `wayfinder:map`
 Tickets live in `.wayfinder/tickets/` as child issues. A ticket is claimed by setting its `assignee:` frontmatter; open+unassigned+unblocked = frontier.
 
+**Status: design effort complete (2026-07-23).** All 39 tickets are closed/resolved — the frontier is empty. Every in-scope design and build decision has been made and shipped (offline suite 460 green). Live-Vertex measurement and any move off Gemini 2.x are out of scope. Remaining deployment threads (image/release/Ping middleware, job-store backend, session backend, observability) are left as **Not yet specified** fog that follows org patterns and hands off — deliberately not charted into tickets. Reopening any of the above is a fresh effort, not a resumption of this map.
+
 ## Destination
 
 A production-quality STRIDE threat-modeling service in this repo: Python, Google ADK graph-based multi-agent workflow, self-owned container on Cloud Run behind Ping-authenticated endpoints. Front-end submits semi-structured text one-shot, receives a job handle, polls/streams until a structured JSON report (per-element threats + severity + mitigations, traceable to input elements) is ready. Shipping includes a golden-case eval suite in CI.
