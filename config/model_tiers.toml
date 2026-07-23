@@ -34,3 +34,7 @@ repair = "flash"
 "analyst/denial-of-service" = "pro"
 "analyst/elevation-of-privilege" = "pro"
 critic = "pro"
+# The bounded critic re-ask (ticket 038): same judgement as the critic, so
+# always the same tier — a separate line here only so it is pinned, never so
+# it can drift onto a cheaper model than the pass it corrects.
+recritic = "pro"

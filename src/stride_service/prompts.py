@@ -25,9 +25,10 @@ from stride_service.report import StrideCategory
 # lints enforce these exact strings.
 PROMPT_SECTION_HEADINGS: tuple[str, ...] = ("Role", "Input", "Procedure", "Output")
 
-# The four prompt bodies, by node kind.
+# The prompt bodies, by node kind.
 ANALYST_PROMPT_NAME = "analyst"
 CRITIC_PROMPT_NAME = "critic"
+RECRITIC_PROMPT_NAME = "recritic"
 EXTRACT_PROMPT_NAME = "extract"
 REPAIR_PROMPT_NAME = "repair"
 PROMPT_BODY_NAMES: tuple[str, ...] = (
@@ -35,6 +36,7 @@ PROMPT_BODY_NAMES: tuple[str, ...] = (
     REPAIR_PROMPT_NAME,
     ANALYST_PROMPT_NAME,
     CRITIC_PROMPT_NAME,
+    RECRITIC_PROMPT_NAME,
 )
 
 EXEMPLARS_PREFIX = "exemplars/"
@@ -43,6 +45,7 @@ EXEMPLARS_PREFIX = "exemplars/"
 ANALYST_PROMPT_TOKEN_CAP = 2000
 EXEMPLAR_TOKEN_CAP = 1500
 CRITIC_PROMPT_TOKEN_CAP = 1500
+RECRITIC_PROMPT_TOKEN_CAP = 1000
 EXTRACT_PROMPT_TOKEN_CAP = 1500
 REPAIR_PROMPT_TOKEN_CAP = 800
 
@@ -70,6 +73,16 @@ def compose_critic_prompt(loader: MarkdownLoader) -> str:
     in :mod:`stride_service.critic`.
     """
     return loader.load(CRITIC_PROMPT_NAME).strip() + "\n"
+
+
+def compose_recritic_prompt(loader: MarkdownLoader) -> str:
+    """The critic re-ask prompt: a bounded reconciliation of the critic's output.
+
+    No exemplars, like the critic — it re-rules the drafts it was given
+    against the mechanical problems in its previous output, and the checks it
+    must satisfy run in :mod:`stride_service.critic`.
+    """
+    return loader.load(RECRITIC_PROMPT_NAME).strip() + "\n"
 
 
 def compose_extract_prompt(loader: MarkdownLoader) -> str:

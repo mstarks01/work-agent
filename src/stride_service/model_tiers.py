@@ -31,11 +31,14 @@ TIER_NAMES: tuple[TierName, ...] = ("flash", "pro")
 
 # The LLM nodes of the decided topology (ticket 004). Deterministic
 # FunctionNodes (validate, prepare, join, router, assemble) carry no model
-# and never appear in the config.
+# and never appear in the config. ``recritic`` is the bounded critic re-ask
+# (ticket 038 decision 3): a distinct LLM node so it is pinned and offline-
+# scriptable in its own right, and it runs the same judgement as the critic,
+# so it lives on the same tier.
 ANALYST_NODES: tuple[str, ...] = tuple(
     f"analyst/{category}" for category in STRIDE_CATEGORIES
 )
-LLM_NODES: tuple[str, ...] = ("extract", "repair", *ANALYST_NODES, "critic")
+LLM_NODES: tuple[str, ...] = ("extract", "repair", *ANALYST_NODES, "critic", "recritic")
 
 # What "pinned" means on Vertex, restated by ticket 026 after ticket 007's
 # original rule turned out to describe a naming convention Google retired.

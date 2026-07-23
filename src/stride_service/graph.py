@@ -11,9 +11,15 @@ implementation tickets shipped::
                                                       |                  v
                                                       +-valid-> prepare  critic
                                                                           |
-                                            assemble <--accept-- router <-+
+                          assemble <--accept-- router <------------------+
+                             ^  ^                 |
+                             |  |          revise v
+                             |  +--accept-- rereview <- recritic
+                             |                 |
+                             |          revise v
+                             +---(none)  critic_failed (raises)
 
-Three nodes carry names ticket 004's sketch does not spell out, and each is
+Six nodes carry names ticket 004's sketch does not spell out, and each is
 structural rather than a new decision:
 
 * ``revalidate`` is the second run of the *same* validate function after the
@@ -25,6 +31,19 @@ structural rather than a new decision:
   the validator's issues in state for the runner to return as a rejection.
 * ``merge`` runs :func:`stride_service.critic.join_drafts` behind ADK's
   ``JoinNode``, which is a pure barrier with no user code of its own.
+* ``router`` and ``rereview`` are the critic's ``validate``/``revalidate``
+  (ticket 038 decision 3): one ``route_review`` function run twice, moving the
+  mechanical check *out* of ``assemble`` so a malformed critic output can be
+  re-asked before assembly. Clean output accepts to ``assemble``; a malformed
+  one revises — to ``recritic`` the first time, to ``critic_failed`` the
+  second.
+* ``recritic`` is the one bounded critic re-ask, the ``repair`` of the review
+  half. A structural pass, not a counted one — the graph cannot loop back for
+  a third.
+* ``critic_failed`` is where a still-malformed re-ask lands: it *raises*
+  rather than parking issues, because a critic that will not return its own
+  drafts whole is our defect (a ``failed`` job), not the input's (a
+  ``rejected`` one, which carries ``ValidationIssue``s).
 
 Every LLM node binds its model through the caller's ``resolve_model`` (the
 canonical names in :data:`stride_service.model_tiers.LLM_NODES`), its skills
@@ -58,15 +77,18 @@ from google.adk.agents import LlmAgent
 from google.adk.events.event import Event
 from google.adk.models.base_llm import BaseLlm
 from google.adk.workflow import START, FunctionNode, JoinNode, Workflow
+from google.genai import types
 
-from stride_service.critic import assemble_threats, join_drafts
+from stride_service.critic import assemble_threats, join_drafts, review_issues
 from stride_service.markdown_loader import MarkdownLoader
 from stride_service.prompts import (
     compose_analyst_prompt,
     compose_critic_prompt,
     compose_extract_prompt,
+    compose_recritic_prompt,
     compose_repair_prompt,
 )
+from stride_service.resilience import ResilienceConfig
 from stride_service.report import (
     STRIDE_CATEGORIES,
     DraftThreat,
@@ -97,6 +119,9 @@ JOIN_NODE = "join"
 MERGE_NODE = "merge"
 CRITIC_NODE = "critic"
 ROUTER_NODE = "router"
+RECRITIC_NODE = "recritic"
+REREVIEW_NODE = "rereview"
+CRITIC_FAILED_NODE = "critic_failed"
 ASSEMBLE_NODE = "assemble"
 
 
@@ -114,6 +139,7 @@ TIER_NODE_BY_GRAPH_NODE: dict[str, str] = {
     EXTRACT_NODE: "extract",
     REPAIR_NODE: "repair",
     CRITIC_NODE: "critic",
+    RECRITIC_NODE: "recritic",
     **{
         analyst_node_name(category): f"analyst/{category}"
         for category in STRIDE_CATEGORIES
@@ -141,9 +167,12 @@ ROUTE_VALID = "valid"
 ROUTE_INVALID = "invalid"
 ROUTE_ACCEPT = "accept"
 ROUTE_REVISE = "revise"
-"""Reserved by ticket 004 and deliberately unwired: no node consumes it, so
-adding the critic->analyst revise loop is an edge change gated on eval
-evidence, not a redesign."""
+"""Reserved by ticket 004, now the critic re-ask route (ticket 038 decision
+3). ``route_review`` takes it when the critic's output fails the mechanical
+check: from ``router`` it reaches the bounded ``recritic`` re-ask, and from
+``rereview`` — the second look after that re-ask — it reaches
+``critic_failed``, since a repeated failure is ours to own, not the input's to
+be rejected for."""
 
 # --- State keys -------------------------------------------------------------
 #
@@ -167,6 +196,8 @@ STATE_BOUNDARY_CROSSINGS = "boundary_crossings"
 STATE_DRAFT_THREATS = "draft_threats"
 STATE_PREVIOUS_MODEL = "previous_model"
 STATE_VALIDATION_ISSUES = "validation_issues"
+STATE_PREVIOUS_REVIEW = "previous_review"
+STATE_CRITIC_ISSUES = "critic_issues"
 
 STATE_EXTRACTED_MODEL = "extracted_model"
 STATE_VALID_MODEL = "valid_model"
@@ -315,14 +346,50 @@ def merge_drafts(valid_model: dict, ctx) -> dict[str, Any]:
     return {"draft_count": len(merged)}
 
 
-def route_review(reviewed_threats: list) -> Event:
-    """The critic's output goes to assembly; the revise route stays reserved.
+def route_review(
+    valid_model: dict, merged_drafts: list, reviewed_threats: list, ctx
+) -> Event:
+    """Run the mechanical check on the critic's output and route on the result.
 
-    v1 runs exactly one critic pass (ticket 004), so this router has one live
-    destination. It exists as a node because a revise loop must be an edge
-    change rather than a rewrite when evals justify one.
+    The check that used to live in :func:`assemble_report` moved here (ticket
+    038 decision 3): to re-ask the critic when its output is malformed, the
+    graph has to decide *before* assembly whether it is malformed. Clean
+    output routes to ``accept``; a critic that dropped, invented, duplicated
+    or mis-referenced a threat routes to ``revise``, with the failing ruling
+    and the problem list parked where the re-ask prompt reads them.
+
+    Both review nodes run this same function — what differs is where their
+    ``revise`` edge points (``recritic`` for the first look, ``critic_failed``
+    for the second), exactly as the two validate nodes share one function.
     """
-    return Event(route=ROUTE_ACCEPT, output={"reviewed_count": len(reviewed_threats)})
+    model = SystemModel.model_validate(valid_model)
+    drafts = [DraftThreat.model_validate(draft) for draft in merged_drafts]
+    reviewed = [Threat.model_validate(threat) for threat in reviewed_threats]
+    issues = review_issues(drafts, reviewed, model)
+    if issues:
+        ctx.state[STATE_PREVIOUS_REVIEW] = render(reviewed_threats)
+        ctx.state[STATE_CRITIC_ISSUES] = render(issues)
+        return Event(route=ROUTE_REVISE, output={"issue_count": len(issues)})
+    return Event(route=ROUTE_ACCEPT, output={"reviewed_count": len(reviewed)})
+
+
+def fail_review(valid_model: dict, merged_drafts: list, reviewed_threats: list) -> dict:
+    """Terminal node: the critic re-ask still did not reconcile, so the job fails.
+
+    Reached only on the ``revise`` edge out of ``rereview``, which means the
+    check found problems on the second look. Raising propagates out of the
+    runner as a failed job — not a *rejected* one: rejection means the input
+    failed the validity gate and carries ``ValidationIssue``s, whereas a
+    critic that will not return its own drafts whole is our defect and has
+    none (ticket 038 decision 3, holding the ticket-008 contract).
+    """
+    model = SystemModel.model_validate(valid_model)
+    drafts = [DraftThreat.model_validate(draft) for draft in merged_drafts]
+    reviewed = [Threat.model_validate(threat) for threat in reviewed_threats]
+    # review_issues is non-empty here by construction; assemble_threats raises
+    # the CriticOutputError naming exactly what still does not reconcile.
+    assemble_threats(drafts, reviewed, model)
+    raise AssertionError("fail_review reached on reconciled critic output")
 
 
 def assemble_report(
@@ -330,10 +397,11 @@ def assemble_report(
 ) -> dict[str, Any]:
     """Build the report body deterministically from the critic's rulings.
 
-    :func:`assemble_threats` is the gate: the critic must return exactly the
-    drafts it was given, every reference must still resolve, and the split
-    into actionable and rejected arrays follows the verdicts rather than any
-    model's say-so.
+    Reached only on the ``accept`` edge, so the mechanical check has already
+    passed in :func:`route_review`. :func:`assemble_threats` re-runs it and
+    fails closed regardless — nothing reaches the report on output that did
+    not survive the gate — then splits the ruled threats into the actionable
+    and rejected arrays by verdict rather than any model's say-so.
     """
     model = SystemModel.model_validate(valid_model)
     drafts = [DraftThreat.model_validate(draft) for draft in merged_drafts]
@@ -366,6 +434,22 @@ class Pipeline:
     node_models: dict[str, str]
 
 
+def _generate_content_config(
+    sampling: SamplingConfig, resilience: ResilienceConfig | None
+) -> types.GenerateContentConfig:
+    """Sampling and the per-request timeout, composed into one node config.
+
+    The timeout rides on ``http_options`` (ticket 038 decision 4); sampling
+    stays exactly as ticket 023 pinned it, so ``config/sampling.toml`` is
+    untouched. ``resilience`` is optional only so the offline stand-ins, whose
+    fakes never read a deadline, can build the graph without a config.
+    """
+    config = sampling.to_generate_content_config()
+    if resilience is not None:
+        config.http_options = resilience.to_http_options()
+    return config
+
+
 def _llm_node(
     *,
     name: str,
@@ -374,6 +458,7 @@ def _llm_node(
     output_key: str,
     resolve_model: ModelResolver,
     sampling: SamplingConfig,
+    resilience: ResilienceConfig | None,
 ) -> LlmAgent:
     """One LLM node: its model, its full instruction, its emitted schema.
 
@@ -381,7 +466,8 @@ def _llm_node(
     its instruction and the state templated into it, never the transcript of
     the nodes before it. Sampling comes from the config shared with the eval
     suite (ticket 009 decision 15), so no node runs on library defaults the
-    eval numbers were not taken against.
+    eval numbers were not taken against; the request deadline comes from the
+    resilience config (ticket 038).
     """
     return LlmAgent(
         name=name,
@@ -390,7 +476,7 @@ def _llm_node(
         output_schema=output_schema,
         output_key=output_key,
         include_contents="none",
-        generate_content_config=sampling.to_generate_content_config(),
+        generate_content_config=_generate_content_config(sampling, resilience),
     )
 
 
@@ -398,6 +484,7 @@ def _extract_node(
     prompt_loader: MarkdownLoader,
     resolve_model: ModelResolver,
     sampling: SamplingConfig,
+    resilience: ResilienceConfig | None,
 ) -> LlmAgent:
     """The extraction node, shared by the production graph and eval mode 1."""
     return _llm_node(
@@ -407,6 +494,7 @@ def _extract_node(
         output_key=STATE_EXTRACTED_MODEL,
         resolve_model=resolve_model,
         sampling=sampling,
+        resilience=resilience,
     )
 
 
@@ -437,12 +525,28 @@ def analyst_instruction(
     return _instruction(skills, prompt.replace("{category}", category))
 
 
+def recritic_instruction(
+    skill_loader: MarkdownLoader, prompt_loader: MarkdownLoader
+) -> str:
+    """The critic re-ask instruction: the critic's own skills, the re-ask prompt.
+
+    Reuses :func:`compose_critic_skills` byte-for-byte, so the re-ask reads
+    the same severity rubric and lane definitions the critic did — it may have
+    to re-rule a draft it dropped — and shares that cacheable prefix with the
+    critic across jobs.
+    """
+    return _instruction(
+        compose_critic_skills(skill_loader), compose_recritic_prompt(prompt_loader)
+    )
+
+
 def build_pipeline(
     *,
     skill_loader: MarkdownLoader,
     prompt_loader: MarkdownLoader,
     resolve_model: ModelResolver,
     sampling: SamplingConfig,
+    resilience: ResilienceConfig | None = None,
     domain_packs: Sequence[str] = (),
     entry: Entry = ENTRY_EXTRACT,
     name: str = "stride_pipeline",
@@ -452,6 +556,11 @@ def build_pipeline(
     ``resolve_model`` takes a canonical LLM node name and returns the model
     to bind — :meth:`ModelTierConfig.resolve_model` in production, so a node
     silently running on the wrong tier stays impossible.
+
+    ``resilience`` binds the per-request timeout onto every LLM node (ticket
+    038). It is optional so the offline stand-ins can build the graph without
+    a config; production always passes one, and the client-level retry is
+    bound separately by the caller's ``resolve_model``.
 
     ``entry`` selects where the graph starts. ``"extract"`` is production and
     the end-to-end eval mode. ``"prepare"`` is the **analysis** eval mode of
@@ -466,7 +575,7 @@ def build_pipeline(
         raise ValueError(f"unknown graph entry point: {entry!r}")
 
     if entry == ENTRY_EXTRACT_ONLY:
-        extract = _extract_node(prompt_loader, resolve_model, sampling)
+        extract = _extract_node(prompt_loader, resolve_model, sampling, resilience)
         return Pipeline(
             workflow=Workflow(name=name, edges=[(START, extract)]),
             node_models={extract.name: _model_name(extract.model)},
@@ -481,6 +590,16 @@ def build_pipeline(
         output_key=STATE_REVIEWED_THREATS,
         resolve_model=resolve_model,
         sampling=sampling,
+        resilience=resilience,
+    )
+    recritic = _llm_node(
+        name=RECRITIC_NODE,
+        instruction=recritic_instruction(skill_loader, prompt_loader),
+        output_schema=list[Threat],
+        output_key=STATE_REVIEWED_THREATS,
+        resolve_model=resolve_model,
+        sampling=sampling,
+        resilience=resilience,
     )
     analysts = [
         _llm_node(
@@ -492,6 +611,7 @@ def build_pipeline(
             output_key=analyst_state_key(category),
             resolve_model=resolve_model,
             sampling=sampling,
+            resilience=resilience,
         )
         for category in STRIDE_CATEGORIES
     ]
@@ -500,11 +620,13 @@ def build_pipeline(
     join = JoinNode(name=JOIN_NODE)
     merge = FunctionNode(func=merge_drafts, name=MERGE_NODE)
     router = FunctionNode(func=route_review, name=ROUTER_NODE)
+    rereview = FunctionNode(func=route_review, name=REREVIEW_NODE)
+    critic_failed = FunctionNode(func=fail_review, name=CRITIC_FAILED_NODE)
     assemble = FunctionNode(func=assemble_report, name=ASSEMBLE_NODE)
 
     extraction_nodes: list[LlmAgent] = []
     if entry == ENTRY_EXTRACT:
-        extract = _extract_node(prompt_loader, resolve_model, sampling)
+        extract = _extract_node(prompt_loader, resolve_model, sampling, resilience)
         repair = _llm_node(
             name=REPAIR_NODE,
             instruction=compose_repair_prompt(prompt_loader),
@@ -512,6 +634,7 @@ def build_pipeline(
             output_key=STATE_EXTRACTED_MODEL,
             resolve_model=resolve_model,
             sampling=sampling,
+            resilience=resilience,
         )
         validate = FunctionNode(func=validate_extraction, name=VALIDATE_NODE)
         revalidate = FunctionNode(func=validate_extraction, name=REVALIDATE_NODE)
@@ -533,10 +656,12 @@ def build_pipeline(
             (prepare, tuple(analysts)),
             *((analyst, join) for analyst in analysts),
             (join, merge, critic, router),
-            (router, {ROUTE_ACCEPT: assemble}),
+            (router, {ROUTE_ACCEPT: assemble, ROUTE_REVISE: recritic}),
+            (recritic, rereview),
+            (rereview, {ROUTE_ACCEPT: assemble, ROUTE_REVISE: critic_failed}),
         ],
     )
-    llm_nodes = [*extraction_nodes, *analysts, critic]
+    llm_nodes = [*extraction_nodes, *analysts, critic, recritic]
     return Pipeline(
         workflow=workflow,
         node_models={node.name: _model_name(node.model) for node in llm_nodes},

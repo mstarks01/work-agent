@@ -118,19 +118,20 @@ def join_drafts(
     return merged
 
 
-def assemble_threats(
+def review_issues(
     drafts: Sequence[DraftThreat],
     reviewed: Sequence[Threat],
     system_model: SystemModel,
-) -> AssembledThreats:
-    """Split the critic's ruled threats into the report's two arrays.
+) -> list[str]:
+    """Every way the critic's output fails to account for the drafts it saw.
 
-    The critic returns every draft it was given, each with a ``verdict`` and
-    a ``confidence`` (verdict shape and the category letter are enforced by
-    the models). Checked here: the reviewed set is exactly the drafted set —
-    no threat invented, none dropped — and references still resolve after any
-    edit the critic made. Rejected threats ride in their own audit array;
-    the rest are sorted most-severe-first, as the report expects.
+    The mechanical check, returned as a list rather than raised, so the graph
+    can *route* on it (ticket 038 decision 3): an empty list means the critic
+    output is assemblable, a non-empty one is what the bounded re-ask is asked
+    to fix. The critic must return exactly the drafted set — no threat
+    invented, none dropped — with unique IDs and references that still resolve
+    after any edit it made. Verdict shape and the category letter are enforced
+    by the models and never re-checked here.
     """
     drafted_ids = {draft.id for draft in drafts}
     reviewed_ids = {threat.id for threat in reviewed}
@@ -145,6 +146,24 @@ def assemble_threats(
     issues += _duplicate_id_issues(reviewed)
     issues += _unresolved_reference_issues(reviewed, system_model)
     issues += _unresolved_unknown_ref_issues(reviewed, system_model)
+    return issues
+
+
+def assemble_threats(
+    drafts: Sequence[DraftThreat],
+    reviewed: Sequence[Threat],
+    system_model: SystemModel,
+) -> AssembledThreats:
+    """Split the critic's ruled threats into the report's two arrays.
+
+    :func:`review_issues` is the gate — one definition of what "well-formed
+    critic output" means, shared with the router that decides whether to
+    re-ask. Assembly runs only after that gate has passed, but re-checks here
+    and fails closed regardless: nothing reaches the report on output that did
+    not survive the check. Rejected threats ride in their own audit array; the
+    rest are sorted most-severe-first, as the report expects.
+    """
+    issues = review_issues(drafts, reviewed, system_model)
     if issues:
         raise CriticOutputError("; ".join(issues))
 

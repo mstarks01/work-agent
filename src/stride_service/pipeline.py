@@ -31,6 +31,8 @@ from pathlib import Path
 
 from google.adk import Runner
 from google.adk.apps import App
+from google.adk.models.base_llm import BaseLlm
+from google.adk.models.google_llm import Gemini
 from google.adk.sessions import BaseSessionService, InMemorySessionService
 from google.genai import types
 
@@ -39,6 +41,7 @@ from stride_service.graph import (
     STATE_INPUT_TEXT,
     STATE_REJECTION,
     Analysis,
+    ModelResolver,
     Pipeline,
     build_pipeline,
     rejection_issues,
@@ -51,8 +54,9 @@ from stride_service.jobs import (
     PipelineRejected,
 )
 from stride_service.markdown_loader import MarkdownLoader
-from stride_service.model_tiers import load_model_tiers
+from stride_service.model_tiers import ModelTierConfig, load_model_tiers
 from stride_service.report import InputRef, Job, NodeRun, StrideReport
+from stride_service.resilience import ResilienceConfig, load_resilience
 from stride_service.sampling import load_sampling
 
 logger = logging.getLogger(__name__)
@@ -70,11 +74,13 @@ DEFAULT_SKILLS_DIR = _REPO_ROOT / "skills"
 DEFAULT_PROMPTS_DIR = _REPO_ROOT / "prompts"
 DEFAULT_MODEL_TIERS_PATH = _REPO_ROOT / "config" / "model_tiers.toml"
 DEFAULT_SAMPLING_PATH = _REPO_ROOT / "config" / "sampling.toml"
+DEFAULT_RESILIENCE_PATH = _REPO_ROOT / "config" / "resilience.toml"
 
 SKILLS_DIR_VAR = "STRIDE_SKILLS_DIR"
 PROMPTS_DIR_VAR = "STRIDE_PROMPTS_DIR"
 MODEL_TIERS_VAR = "STRIDE_MODEL_TIERS"
 SAMPLING_VAR = "STRIDE_SAMPLING"
+RESILIENCE_VAR = "STRIDE_RESILIENCE"
 
 
 class PipelineError(RuntimeError):
@@ -118,8 +124,23 @@ class AdkPipelineRunner:
         """Drive the graph to a terminal state, reporting each node as it lands.
 
         A node that raises propagates: the job fails loudly rather than
-        completing with a report built on a check that did not run.
+        completing with a report built on a check that did not run. On that
+        path the input's digest is logged (ticket 038 decision 5) so a poison
+        input that repeatedly wedges jobs is identifiable across runs without
+        the service ever storing the untrusted text.
         """
+        source_sha256 = hashlib.sha256(job.description.encode("utf-8")).hexdigest()
+        try:
+            return await self._drive(job, on_node, source_sha256)
+        except Exception:
+            logger.warning(
+                "job %s failed in the graph; source_sha256=%s", job.id, source_sha256
+            )
+            raise
+
+    async def _drive(
+        self, job: JobRecord, on_node: NodeCallback, source_sha256: str
+    ) -> PipelineOutcome:
         session = await self._session_service.create_session(
             app_name=self._app_name,
             user_id=job.owner_subject,
@@ -153,7 +174,7 @@ class AdkPipelineRunner:
         analysis = Analysis.from_state(state[STATE_ANALYSIS])
         return PipelineCompleted(
             report=self._build_report(
-                job, analysis, self._node_runs(finishes, started_at)
+                job, analysis, self._node_runs(finishes, started_at), source_sha256
             )
         )
 
@@ -182,7 +203,11 @@ class AdkPipelineRunner:
         return runs
 
     def _build_report(
-        self, job: JobRecord, analysis: Analysis, nodes: list[NodeRun]
+        self,
+        job: JobRecord,
+        analysis: Analysis,
+        nodes: list[NodeRun],
+        source_sha256: str,
     ) -> StrideReport:
         return StrideReport(
             job=Job(
@@ -192,9 +217,7 @@ class AdkPipelineRunner:
             ),
             input=InputRef(
                 system_name=job.system_name or DEFAULT_SYSTEM_NAME,
-                source_sha256=hashlib.sha256(
-                    job.description.encode("utf-8")
-                ).hexdigest(),
+                source_sha256=source_sha256,
             ),
             nodes=nodes,
             system_model=analysis.system_model,
@@ -205,23 +228,46 @@ class AdkPipelineRunner:
         )
 
 
+def resilient_resolver(
+    tiers: ModelTierConfig, resilience: ResilienceConfig
+) -> ModelResolver:
+    """A resolver that binds each node's pinned model with its retry policy.
+
+    ``ModelTierConfig.resolve_model`` returns the pinned *string*; production
+    wraps it in a :class:`Gemini` carrying the client-level retry (ticket 038
+    decision 2) so a single 429 no longer kills a paid-for job. ``build_pipeline``
+    accepts a ``BaseLlm`` here, and ``_model_name`` unwraps it back to the
+    pinned string, so the report's ``nodes`` array is unchanged.
+    """
+    retry_options = resilience.to_retry_options()
+
+    def resolve(node: str) -> BaseLlm:
+        return Gemini(model=tiers.resolve_model(node), retry_options=retry_options)
+
+    return resolve
+
+
 def build_default_pipeline(env: Mapping[str, str] | None = None) -> Pipeline:
     """The production graph: repo Markdown, repo config, pinned models.
 
-    Fails closed on a missing or invalid tier or sampling config rather than
-    starting a service whose nodes would run on whatever model or decoding
-    parameters happened to be default.
+    Fails closed on a missing or invalid tier, sampling, or resilience config
+    rather than starting a service whose nodes would run on whatever model,
+    decoding parameters, or retry/timeout behaviour happened to be default.
     """
     if env is None:
         env = os.environ
     tiers = load_model_tiers(
         env.get(MODEL_TIERS_VAR, DEFAULT_MODEL_TIERS_PATH), env=env
     )
+    resilience = load_resilience(
+        env.get(RESILIENCE_VAR, DEFAULT_RESILIENCE_PATH), env=env
+    )
     return build_pipeline(
         skill_loader=MarkdownLoader(env.get(SKILLS_DIR_VAR, DEFAULT_SKILLS_DIR)),
         prompt_loader=MarkdownLoader(env.get(PROMPTS_DIR_VAR, DEFAULT_PROMPTS_DIR)),
-        resolve_model=tiers.resolve_model,
+        resolve_model=resilient_resolver(tiers, resilience),
         sampling=load_sampling(env.get(SAMPLING_VAR, DEFAULT_SAMPLING_PATH)),
+        resilience=resilience,
     )
 
 

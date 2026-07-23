@@ -232,18 +232,81 @@ def test_a_hallucinated_element_reference_fails_the_job_loudly():
         run(pipeline, job())
 
 
-def test_a_critic_that_invents_a_threat_fails_the_job_loudly():
+def test_a_malformed_critic_output_is_re_asked_once_and_then_assembled():
+    """The critic drops a draft; the bounded re-ask returns the full set."""
     replies = happy_replies()
-    replies["critic"] = json.dumps(
+    replies[graph.analyst_node_name("tampering")] = draft_json("T-01", "tampering")
+    both = json.dumps(
+        [
+            sample_threat("S-01").model_dump(mode="json"),
+            sample_threat("T-01", category="tampering").model_dump(mode="json"),
+        ]
+    )
+    # The critic drops T-01; the re-ask returns both drafts, reconciled.
+    replies["critic"] = json.dumps([sample_threat("S-01").model_dump(mode="json")])
+    replies["recritic"] = both
+
+    pipeline, models = build(replies)
+    outcome, visited = run(pipeline, job())
+
+    assert isinstance(outcome, PipelineCompleted)
+    assert {threat.id for threat in outcome.report.threats} == {"S-01", "T-01"}
+    assert visited[-4:] == [
+        graph.ROUTER_NODE,
+        graph.RECRITIC_NODE,
+        graph.REREVIEW_NODE,
+        graph.ASSEMBLE_NODE,
+    ]
+    assert graph.CRITIC_FAILED_NODE not in visited
+    # The re-ask saw the failing ruling and the problem it must fix.
+    re_ask_instruction = models["recritic"].seen[0]
+    assert "T-01" in re_ask_instruction  # named in {critic_issues}
+
+
+def test_a_critic_that_will_not_reconcile_after_the_re_ask_fails_the_job_loudly():
+    replies = happy_replies()
+    invented = json.dumps(
         [
             sample_threat("S-01").model_dump(mode="json"),
             sample_threat("T-02", category="tampering").model_dump(mode="json"),
         ]
     )
+    # Both the critic and its re-ask return a threat no analyst drafted.
+    replies["critic"] = invented
+    replies["recritic"] = invented
     pipeline, _ = build(replies)
 
     with pytest.raises(Exception, match="T-02"):
         run(pipeline, job())
+
+
+def test_a_failed_job_logs_the_input_digest(caplog):
+    """Ticket 038 decision 5: a poison input is identifiable across jobs.
+
+    The digest is logged on failure without the service ever storing the text.
+    """
+    import hashlib
+    import logging
+
+    replies = happy_replies()
+    invented = json.dumps(
+        [
+            sample_threat("S-01").model_dump(mode="json"),
+            sample_threat("T-02", category="tampering").model_dump(mode="json"),
+        ]
+    )
+    replies["critic"] = invented
+    replies["recritic"] = invented
+    pipeline, _ = build(replies)
+    record = job("A poison description.")
+    digest = hashlib.sha256(record.description.encode("utf-8")).hexdigest()
+
+    with caplog.at_level(logging.WARNING, logger="stride_service.pipeline"):
+        with pytest.raises(Exception, match="T-02"):
+            run(pipeline, record)
+
+    assert any(digest in message for message in caplog.messages)
+    assert record.description not in caplog.text  # the text itself is never logged
 
 
 def test_the_default_pipeline_binds_the_pinned_models_from_config():
@@ -251,6 +314,36 @@ def test_the_default_pipeline_binds_the_pinned_models_from_config():
     assert pipeline.node_models[graph.EXTRACT_NODE] == "gemini-2.5-flash"
     assert pipeline.node_models[graph.CRITIC_NODE] == "gemini-2.5-pro"
     assert set(pipeline.node_models) == set(graph.TIER_NODE_BY_GRAPH_NODE)
+
+
+def test_the_default_pipeline_binds_retry_and_timeout(monkeypatch):
+    """Ticket 038: every LLM node carries the retry policy and the deadline."""
+    from google.adk.models.google_llm import Gemini
+
+    pipeline = build_default_pipeline(env={})
+    nodes = {node.name: node for node in pipeline.workflow.graph.nodes}
+
+    critic = nodes[graph.CRITIC_NODE]
+    # The model is a Gemini wrapping the pinned string with a retry policy,
+    # and _model_name still records the bare string in the report.
+    assert isinstance(critic.model, Gemini)
+    assert critic.model.retry_options.attempts == 3
+    assert pipeline.node_models[graph.CRITIC_NODE] == "gemini-2.5-pro"
+    # The per-request timeout rides on http_options, sampling untouched.
+    timeout = critic.generate_content_config.http_options.timeout
+    assert timeout == 300000
+
+
+def test_env_overrides_the_retry_attempts_without_touching_the_model():
+    pipeline = build_default_pipeline(env={"STRIDE_RETRY_ATTEMPTS": "5"})
+    nodes = {node.name: node for node in pipeline.workflow.graph.nodes}
+    assert nodes[graph.CRITIC_NODE].model.retry_options.attempts == 5
+    assert pipeline.node_models[graph.CRITIC_NODE] == "gemini-2.5-pro"
+
+
+def test_the_default_pipeline_fails_closed_on_a_missing_resilience_config(tmp_path):
+    with pytest.raises(Exception, match="cannot be read"):
+        build_default_pipeline(env={"STRIDE_RESILIENCE": str(tmp_path / "gone.toml")})
 
 
 def test_the_default_pipeline_fails_closed_on_a_missing_tier_config(tmp_path):

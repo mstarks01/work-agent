@@ -46,10 +46,23 @@ from evals.harness.scorer import (
 )
 from evals.harness.structural import report_issues
 from stride_service.model_tiers import load_model_tiers
-from stride_service.pipeline import DEFAULT_MODEL_TIERS_PATH
+from stride_service.pipeline import DEFAULT_MODEL_TIERS_PATH, DEFAULT_RESILIENCE_PATH
+from stride_service.resilience import load_resilience
 
 EVALS_ROOT = Path(__file__).resolve().parents[1]
 DEFAULT_CORPUS_DIR = EVALS_ROOT / "corpus"
+
+
+def _live_judge() -> VertexJudge:
+    """The pinned judge, retry-and-timeout-hardened like the graph (ticket 038).
+
+    A calibration or scoring sweep is hours of paid work; without the same
+    resilience config the graph carries, one 429 to the judge throws all of it
+    away.
+    """
+    return VertexJudge(
+        load_judge_config(), resilience=load_resilience(DEFAULT_RESILIENCE_PATH)
+    )
 
 
 def _select(cases: Sequence[GoldenCase], wanted: Sequence[str]) -> list[GoldenCase]:
@@ -193,7 +206,7 @@ def command_run(args: argparse.Namespace) -> int:
     yields: list[CriticYield] = []
     judge: VertexJudge | None = None
     if runs and not args.no_scoring:
-        judge = VertexJudge(load_judge_config())
+        judge = _live_judge()
         scores, yields = _score_runs(cases, runs, judge)
         _print_scores(scores)
         _print_yields(yields)
@@ -222,7 +235,7 @@ def command_run(args: argparse.Namespace) -> int:
 
 def command_calibrate(args: argparse.Namespace) -> int:
     """The >= 90% judge-human bar; failing it blocks a judge change."""
-    judge = VertexJudge(load_judge_config())
+    judge = _live_judge()
     result = measure_agreement(judge, load_pairs())
     print(
         f"judge-human agreement {result.agreement:.1%} over {result.total} pairs"

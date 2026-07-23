@@ -29,6 +29,7 @@ from evals.harness.judge import (
 )
 from stride_service.markdown_loader import MarkdownLoader
 from stride_service.model_tiers import validate_model_string
+from stride_service.resilience import load_resilience
 from tests.factories import valid_model
 
 EVALS_ROOT = Path(__file__).resolve().parents[1] / "evals"
@@ -195,3 +196,33 @@ def test_the_served_model_version_is_recorded():
     judge.equivalent(PAIR)
 
     assert judge.served_model_versions == (served,)
+
+
+def test_default_client_carries_the_resilience_config(monkeypatch):
+    """Ticket 038: the live judge retries and times out like the graph.
+
+    Without an injected client, the judge builds its own — and a sweep that
+    inherits the SDK's never-retry, no-timeout defaults dies on one 429 after
+    hours of work.
+    """
+    from google import genai
+
+    captured: dict[str, object] = {}
+
+    def fake_client(*, http_options=None):
+        captured["http_options"] = http_options
+        return FakeClient("{}")
+
+    monkeypatch.setattr(genai, "Client", fake_client)
+    resilience = load_resilience(
+        Path(__file__).resolve().parents[1] / "config" / "resilience.toml", env={}
+    )
+    VertexJudge(
+        load_judge_config(),
+        prompts=MarkdownLoader(JUDGE_PROMPTS),
+        resilience=resilience,
+    )
+
+    http_options = captured["http_options"]
+    assert http_options.timeout == resilience.timeout_ms
+    assert http_options.retry_options.attempts == resilience.attempts

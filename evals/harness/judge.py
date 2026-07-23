@@ -42,6 +42,7 @@ from pydantic import BaseModel, ConfigDict, Field, ValidationError
 from stride_service.markdown_loader import MarkdownLoader
 from stride_service.model_tiers import validate_model_string
 from stride_service.report import StrideCategory
+from stride_service.resilience import ResilienceConfig
 from stride_service.system_model import SystemModel
 
 EVALS_ROOT = Path(__file__).resolve().parents[1]
@@ -264,8 +265,10 @@ class VertexJudge:
         *,
         client: object | None = None,
         prompts: MarkdownLoader | None = None,
+        resilience: ResilienceConfig | None = None,
     ) -> None:
         self._config = config
+        self._resilience = resilience
         self._rng = random.Random(config.order_seed)
         self._prompts = prompts or MarkdownLoader(DEFAULT_JUDGE_PROMPTS_DIR)
         self._claim_prompt = self._prompts.load(CLAIM_PROMPT_NAME)
@@ -286,11 +289,24 @@ class VertexJudge:
         """
         return tuple(sorted(self._served_versions))
 
-    @staticmethod
-    def _default_client() -> object:
-        from google import genai
+    def _default_client(self) -> object:
+        """A GenAI client carrying the same retry and timeout as the graph.
 
-        return genai.Client()
+        Without this the calibration sweep and the scheduled live eval inherit
+        the SDK's never-retry, no-timeout defaults and die on one 429 after
+        hours of work (ticket 038 decision 5). Retry and timeout ride on the
+        client's ``http_options`` so every judge call gets them.
+        """
+        from google import genai
+        from google.genai import types
+
+        if self._resilience is None:
+            return genai.Client()
+        http_options = types.HttpOptions(
+            timeout=self._resilience.timeout_ms,
+            retry_options=self._resilience.to_retry_options(),
+        )
+        return genai.Client(http_options=http_options)
 
     def equivalent(self, pair: ClaimPair) -> ClaimRuling:
         return self._ask(

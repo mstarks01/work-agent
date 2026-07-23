@@ -46,7 +46,8 @@ def config_path(tmp_path):
 class TestNodeInventory:
     def test_llm_nodes_are_bookends_plus_analysts_plus_critic(self):
         assert LLM_NODES[:2] == ("extract", "repair")
-        assert LLM_NODES[-1] == "critic"
+        # The critic and its bounded re-ask close the list (ticket 038).
+        assert LLM_NODES[-2:] == ("critic", "recritic")
         assert len(ANALYST_NODES) == 6
         assert all(node.startswith("analyst/") for node in ANALYST_NODES)
 

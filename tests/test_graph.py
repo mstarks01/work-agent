@@ -35,6 +35,8 @@ RUNTIME_PLACEHOLDERS = frozenset(
         graph.STATE_INPUT_TEXT,
         graph.STATE_PREVIOUS_MODEL,
         graph.STATE_VALIDATION_ISSUES,
+        graph.STATE_PREVIOUS_REVIEW,
+        graph.STATE_CRITIC_ISSUES,
     }
 )
 
@@ -137,11 +139,28 @@ def test_one_repair_pass_then_rejection(pipeline):
     assert not routed_targets(pipeline, graph.REJECT_NODE)
 
 
-def test_revise_route_is_reserved_but_unwired(pipeline):
+def test_critic_re_ask_mirrors_the_one_repair_pass(pipeline):
+    """router/recritic/rereview is the critic's validate/repair/revalidate."""
     assert routed_targets(pipeline, graph.ROUTER_NODE) == {
-        graph.ROUTE_ACCEPT: graph.ASSEMBLE_NODE
+        graph.ROUTE_ACCEPT: graph.ASSEMBLE_NODE,
+        graph.ROUTE_REVISE: graph.RECRITIC_NODE,
     }
-    assert graph.ROUTE_REVISE not in routed_targets(pipeline, graph.ROUTER_NODE)
+    assert routed_targets(pipeline, graph.RECRITIC_NODE) == {None: graph.REREVIEW_NODE}
+    assert routed_targets(pipeline, graph.REREVIEW_NODE) == {
+        graph.ROUTE_ACCEPT: graph.ASSEMBLE_NODE,
+        graph.ROUTE_REVISE: graph.CRITIC_FAILED_NODE,
+    }
+    # critic_failed is terminal: it raises rather than routing anywhere.
+    assert not routed_targets(pipeline, graph.CRITIC_FAILED_NODE)
+
+
+def test_recritic_runs_on_the_critic_tier_and_emits_the_review_schema(pipeline):
+    by_name = nodes_by_name(pipeline)
+    recritic = by_name[graph.RECRITIC_NODE]
+    assert isinstance(recritic, LlmAgent)
+    assert recritic.output_schema == list[Threat]
+    assert recritic.output_key == graph.STATE_REVIEWED_THREATS
+    assert recritic.model == by_name[graph.CRITIC_NODE].model
 
 
 def test_llm_nodes_see_no_history(pipeline):
@@ -298,9 +317,46 @@ def test_merge_fails_closed_on_a_hallucinated_element():
         graph.merge_drafts(valid_model().model_dump(mode="json"), ctx)
 
 
-def test_router_accepts():
-    event = graph.route_review([])
+def test_router_accepts_well_formed_critic_output():
+    drafts = [sample_draft("S-01")]
+    reviewed = [sample_threat("S-01")]
+    ctx = FakeContext()
+    event = graph.route_review(
+        valid_model().model_dump(mode="json"),
+        [draft.model_dump(mode="json") for draft in drafts],
+        [threat.model_dump(mode="json") for threat in reviewed],
+        ctx,
+    )
     assert event.actions.route == graph.ROUTE_ACCEPT
+    assert graph.STATE_CRITIC_ISSUES not in ctx.state
+
+
+def test_router_revises_and_feeds_the_re_ask_prompt():
+    """A dropped draft routes to the re-ask, parking the ruling and the issues."""
+    drafts = [sample_draft("S-01"), sample_draft("T-01", category="tampering")]
+    reviewed = [sample_threat("S-01")]  # T-01 dropped
+    ctx = FakeContext()
+    event = graph.route_review(
+        valid_model().model_dump(mode="json"),
+        [draft.model_dump(mode="json") for draft in drafts],
+        [threat.model_dump(mode="json") for threat in reviewed],
+        ctx,
+    )
+    assert event.actions.route == graph.ROUTE_REVISE
+    assert "T-01" in ctx.state[graph.STATE_CRITIC_ISSUES]
+    assert "S-01" in ctx.state[graph.STATE_PREVIOUS_REVIEW]
+
+
+def test_fail_review_raises_the_still_unreconciled_issues():
+    """The second look reached the terminal: the job fails, naming what is wrong."""
+    drafts = [sample_draft("S-01"), sample_draft("T-01", category="tampering")]
+    reviewed = [sample_threat("S-01")]  # T-01 still dropped after the re-ask
+    with pytest.raises(CriticOutputError, match="dropped draft 'T-01'"):
+        graph.fail_review(
+            valid_model().model_dump(mode="json"),
+            [draft.model_dump(mode="json") for draft in drafts],
+            [threat.model_dump(mode="json") for threat in reviewed],
+        )
 
 
 def test_assemble_splits_rulings_and_builds_the_summary():

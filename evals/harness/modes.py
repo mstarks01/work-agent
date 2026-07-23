@@ -58,6 +58,7 @@ from stride_service.graph import (
 )
 from stride_service.markdown_loader import MarkdownLoader
 from stride_service.model_tiers import load_model_tiers
+from stride_service.pipeline import resilient_resolver
 from stride_service.report import (
     DraftThreat,
     InputRef,
@@ -65,6 +66,7 @@ from stride_service.report import (
     NodeRun,
     StrideReport,
 )
+from stride_service.resilience import load_resilience
 from stride_service.sampling import SamplingConfig, load_sampling
 from stride_service.system_model import SystemModel
 from stride_service.validation import ValidationIssue, parse_and_validate
@@ -150,16 +152,20 @@ def build_eval_pipeline(
 ) -> Pipeline:
     """The shipped graph, entered where the mode needs it.
 
-    Repo prompts, repo skills, repo tier config, repo sampling config: the
-    defaults are production's, and the overrides exist for offline tests that
+    Repo prompts, repo skills, repo tier config, repo sampling config, repo
+    resilience config: the defaults are production's — including the retry and
+    per-request timeout (ticket 038), so a scheduled sweep does not die on one
+    429 after hours of work — and the overrides exist for offline tests that
     bind scripted models.
     """
     tiers = load_model_tiers(REPO_ROOT / "config" / "model_tiers.toml")
+    resilience = load_resilience(REPO_ROOT / "config" / "resilience.toml")
     return build_pipeline(
         skill_loader=MarkdownLoader(REPO_ROOT / "skills"),
         prompt_loader=MarkdownLoader(REPO_ROOT / "prompts"),
-        resolve_model=resolve_model or tiers.resolve_model,
+        resolve_model=resolve_model or resilient_resolver(tiers, resilience),
         sampling=sampling or load_sampling(REPO_ROOT / "config" / "sampling.toml"),
+        resilience=resilience,
         entry=entry,
     )
 
