@@ -4,8 +4,8 @@ The service reads its behaviour from versioned files in `config/` and from a set
 of environment variables. Loaders **fail closed**: a missing or invalid file
 stops startup rather than silently falling back to a default model or sampling.
 
-Both [[Integration-Guide|`StrideEngine.from_config(env=...)`]] and the
-[[HTTP-API|HTTP app]] take the same environment; the tables below apply to both.
+Both [`StrideEngine.from_config(env=...)`](Integration-Guide.md) and the
+[HTTP app](HTTP-API.md) take the same environment; the tables below apply to both.
 
 ## Config files
 
@@ -72,7 +72,7 @@ rejected.
 
 ### Ping auth (HTTP surface only)
 
-Required by the [[HTTP-API|`/v1` API]]; the in-process engine does not use them.
+Required by the [`/v1` API](HTTP-API.md); the in-process engine does not use them.
 
 | Variable | Purpose |
 | --- | --- |
@@ -87,7 +87,7 @@ Default Credentials plus the project and location the `google-adk` client reads
 (typically `GOOGLE_CLOUD_PROJECT`, `GOOGLE_CLOUD_LOCATION`, and
 `GOOGLE_GENAI_USE_VERTEXAI=1`). Provisioning that environment is deliberately out
 of scope here; the code assumes it is correctly configured. Offline tests and
-the in-memory [[Integration-Guide|stub runner]] need none of it.
+the in-memory [stub runner](Integration-Guide.md) need none of it.
 
 ## Input limits
 
@@ -97,4 +97,4 @@ Bounds enforced before or during analysis:
 | --- | --- | --- |
 | `MAX_DESCRIPTION_BYTES` | 100 KiB (UTF-8) | Rejected at both entry points. |
 | `MAX_SYSTEM_NAME_CHARS` | 200 | Rejected by the engine / API. |
-| `MAX_ELEMENTS` | 150 | A larger model is a `too-many-elements` [[Report-Schema|rejection]]. |
+| `MAX_ELEMENTS` | 150 | A larger model is a `too-many-elements` [rejection](Report-Schema.md). |

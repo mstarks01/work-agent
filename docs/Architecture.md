@@ -1,8 +1,8 @@
 # Architecture
 
-Both entry points — the in-process [[Integration-Guide|engine]] and the
-[[HTTP-API|`/v1` API]] — drive one Google ADK Workflow graph and shape its
-outcome into a [[Report-Schema|`StrideReport`]]. This page is the map of what
+Both entry points — the in-process [engine](Integration-Guide.md) and the
+[`/v1` API](HTTP-API.md) — drive one Google ADK Workflow graph and shape its
+outcome into a [`StrideReport`](Report-Schema.md). This page is the map of what
 runs between text in and report out.
 
 ## The pipeline
@@ -26,7 +26,7 @@ extract -> validate -> prepare -> [6 analysts] -> merge -> critic -> route_revie
   boundary).
 - **validate** is a mechanical gate. Failures route to **repair** (one bounded
   pass over the original text) and revalidate; a model that still fails, or is
-  over the [[Configuration|150-element cap]], ends as a **rejection**.
+  over the [150-element cap](Configuration.md), ends as a **rejection**.
 - **prepare** derives the per-analysis context.
 - **six analysts** run in parallel, one per STRIDE category, each drafting
   threats in its lane.
@@ -43,7 +43,7 @@ the models are asked only for judgement.
 
 ## Models
 
-Per-node model selection through [[Configuration|`config/model_tiers.toml`]]:
+Per-node model selection through [`config/model_tiers.toml`](Configuration.md):
 `flash` for `extract`/`repair`, `pro` for the six analysts, the `critic`, and
 the `recritic`. Deterministic `FunctionNode`s carry no model. Each `pro` call on
 the eight-way fan-out plus critic is where the token budget goes.
@@ -62,7 +62,7 @@ points:
 
 ## Resilience
 
-Retry and timeout are configured in [[Configuration|`config/resilience.toml`]]
+Retry and timeout are configured in [`config/resilience.toml`](Configuration.md)
 and bound onto each model at the SDK level, so the report's `nodes` array is
 unchanged by a retry. A per-request timeout turns a hang into a retryable error.
 Three attempts by default.

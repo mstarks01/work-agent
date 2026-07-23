@@ -1,8 +1,8 @@
 # Integration Guide
 
 `StrideEngine` is the in-process entry point: hand it the text describing a
-system and it returns a [[Report-Schema|`StrideReport`]]. It owns none of the
-[[HTTP-API|HTTP contract's]] ceremony — no auth token, no job store, no polling
+system and it returns a [`StrideReport`](Report-Schema.md). It owns none of the
+[HTTP contract's](HTTP-API.md) ceremony — no auth token, no job store, no polling
 — so it is the right surface for swapping this pipeline in behind an
 application's own analysis interface.
 
@@ -17,7 +17,7 @@ from stride_service import StrideEngine
 engine = StrideEngine.from_config()   # repo prompts, repo config, pinned models
 ```
 
-`from_config()` fails closed on missing or invalid [[Configuration|config]]
+`from_config()` fails closed on missing or invalid [config](Configuration.md)
 rather than running nodes on a default model or sampling. It reads paths and
 overrides from the environment; pass `env=` to override (mainly for tests):
 
@@ -55,7 +55,7 @@ async def analyze(
 ## The three outcomes
 
 `analyze` returns a `PipelineOutcome`, which is the job lifecycle's
-`completed | rejected` split (see [[Report-Schema]] for the full result shape);
+`completed | rejected` split (see [Report-Schema](Report-Schema.md) for the full result shape);
 an internal failure raises instead. The engine never returns a partial report.
 
 ```python
@@ -83,7 +83,7 @@ else:
 | exception raised | Something failed internally | nothing — fail closed |
 
 A rejection is about the *input* (for example a system too large to analyse —
-see the `too-many-elements` code in [[Configuration]]) and is actionable by the
+see the `too-many-elements` code in [Configuration](Configuration.md)) and is actionable by the
 caller. An exception is the service's fault and carries no issues.
 
 `EngineInputError` (a `ValueError`) is raised *before* any model runs, for a
@@ -113,4 +113,4 @@ from stride_service import StrideEngine, StubPipelineRunner
 engine = StrideEngine(StubPipelineRunner())   # no models; returns an empty report
 ```
 
-See [[Architecture]] for the runner and store seams.
+See [Architecture](Architecture.md) for the runner and store seams.

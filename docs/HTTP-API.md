@@ -2,7 +2,7 @@
 
 The `/v1` job API is the decoupled surface for a front end. It is async:
 submit text, get a job handle, poll or stream until the report is ready. For an
-in-process integration prefer [[Integration-Guide|`StrideEngine`]] — it drives
+in-process integration prefer [`StrideEngine`](Integration-Guide.md) — it drives
 the same pipeline without the job/auth/polling machinery.
 
 Build the app with `create_app()`; every seam is injectable, defaulting to
@@ -14,7 +14,7 @@ from stride_service import create_app
 app = create_app()   # in-memory store, real pipeline, Ping JWT verifier
 ```
 
-See [[Configuration]] for the required `STRIDE_PING_*` and Vertex environment.
+See [Configuration](Configuration.md) for the required `STRIDE_PING_*` and Vertex environment.
 
 ## Auth
 
@@ -30,7 +30,7 @@ detail is generic on purpose; the reason is logged, never returned.
 | `POST` | `/v1/jobs` | Submit a description; returns a job handle. |
 | `GET` | `/v1/jobs/{id}` | Poll: status, per-node progress, timestamps. Never the report. |
 | `GET` | `/v1/jobs/{id}/events` | The same progression as Server-Sent Events; resumable via `Last-Event-ID`. |
-| `GET` | `/v1/jobs/{id}/report` | The full [[Report-Schema|report]] once completed; `409` before. |
+| `GET` | `/v1/jobs/{id}/report` | The full [report](Report-Schema.md) once completed; `409` before. |
 | `GET` | `/healthz` | Unauthenticated liveness probe. |
 
 Errors are RFC 9457 `application/problem+json`.
@@ -43,7 +43,7 @@ queued -> running -> completed | failed | rejected
 
 - `completed` — the report is available at `/v1/jobs/{id}/report`.
 - `rejected` — the input failed the validity gate; the poll response carries the
-  `validation_issues` (see [[Report-Schema]]).
+  `validation_issues` (see [Report-Schema](Report-Schema.md)).
 - `failed` — an internal error; only a generic message is exposed.
 
 This mirrors the engine's three outcomes; the HTTP layer adds the queue,
@@ -67,4 +67,4 @@ Location: /v1/jobs/job-ab12...
 
 Then `GET /v1/jobs/job-ab12...` until `status` is terminal, or subscribe to
 `GET /v1/jobs/job-ab12.../events`. The description is capped at 100 KiB (see
-[[Configuration]]); an oversized body is rejected before parsing.
+[Configuration](Configuration.md)); an oversized body is rejected before parsing.

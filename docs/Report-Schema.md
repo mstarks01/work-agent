@@ -6,8 +6,8 @@ embedded system model, so a consumer needs nothing but the one payload. The
 model validators enforce that on construction — a report that does not hold
 together cannot be built.
 
-Get one from either [[Integration-Guide|the engine]] (`outcome.report`) or the
-[[HTTP-API|`/v1/jobs/{id}/report`]] endpoint.
+Get one from either [the engine](Integration-Guide.md) (`outcome.report`) or the
+[`/v1/jobs/{id}/report`](HTTP-API.md) endpoint.
 
 ## Top-level shape
 
@@ -109,5 +109,5 @@ report.model_dump(mode="json")    # dict
 
 An input that cannot be modelled yields no report — the engine returns a
 `PipelineRejected` carrying `list[ValidationIssue]` instead (see
-[[Integration-Guide]]). Each issue has a `code`, a human `message`, and
+[Integration-Guide](Integration-Guide.md)). Each issue has a `code`, a human `message`, and
 optionally the `element_id` / `field` it concerns.
