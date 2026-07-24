@@ -1,0 +1,342 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>STRIDE Report — Orders Service</title>
+<style>
+  /* Palette roles (dataviz reference instance). Status hues are fixed, never themed. */
+  .viz-root {
+    color-scheme: light;
+    --plane:        #f9f9f7;
+    --surface:      #fcfcfb;
+    --surface-2:    #f2f2ee;
+    --ink:          #0b0b0b;
+    --ink-2:        #52514e;
+    --muted:        #898781;
+    --border:       rgba(11,11,11,0.10);
+    --hairline:     #e1e0d9;
+    /* severity = status palette: critical / high(serious) / medium(warning) / low(good) */
+    --sev-critical: #d03b3b;
+    --sev-high:     #ec835a;
+    --sev-medium:   #fab219;
+    --sev-low:      #0ca30c;
+    --tint:         color-mix(in srgb, var(--surface) 88%, transparent);
+  }
+  @media (prefers-color-scheme: dark) {
+    :root:where(:not([data-theme="light"])) .viz-root {
+      color-scheme: dark;
+      --plane:    #0d0d0d;
+      --surface:  #1a1a19;
+      --surface-2:#242422;
+      --ink:      #ffffff;
+      --ink-2:    #c3c2b7;
+      --muted:    #898781;
+      --border:   rgba(255,255,255,0.10);
+      --hairline: #2c2c2a;
+    }
+  }
+  :root[data-theme="dark"] .viz-root {
+    color-scheme: dark;
+    --plane:#0d0d0d; --surface:#1a1a19; --surface-2:#242422;
+    --ink:#ffffff; --ink-2:#c3c2b7; --muted:#898781; --border:rgba(255,255,255,0.10); --hairline:#2c2c2a;
+  }
+
+  * { box-sizing: border-box; }
+  body { margin: 0; }
+  .viz-root {
+    font-family: system-ui, -apple-system, "Segoe UI", sans-serif;
+    background: var(--plane); color: var(--ink);
+    line-height: 1.5; padding: 32px 20px 64px;
+  }
+  .wrap { max-width: 940px; margin: 0 auto; }
+
+  .topbar { display: flex; justify-content: space-between; align-items: flex-start; gap: 16px; }
+  h1 { font-size: 1.5rem; margin: 0 0 4px; letter-spacing: -0.01em; }
+  h2 { font-size: 0.8rem; text-transform: uppercase; letter-spacing: 0.08em;
+       color: var(--muted); margin: 40px 0 14px; font-weight: 600; }
+  .meta { color: var(--ink-2); font-size: 0.85rem; }
+  .meta code { font-family: ui-monospace, SFMono-Regular, Menlo, monospace; }
+
+  .toggle { border: 1px solid var(--border); background: var(--surface); color: var(--ink-2);
+    border-radius: 8px; padding: 6px 12px; font: inherit; font-size: 0.8rem; cursor: pointer; }
+  .toggle:hover { color: var(--ink); }
+
+  .disclaimer { margin-top: 16px; padding: 10px 14px; border-radius: 10px;
+    background: var(--tint); border: 1px solid var(--border); color: var(--ink-2); font-size: 0.85rem;
+    display: flex; gap: 8px; align-items: center; }
+  .disclaimer .dot { width: 8px; height: 8px; border-radius: 50%; background: var(--sev-medium); flex: none; }
+
+  /* stat tiles */
+  .tiles { display: grid; grid-template-columns: repeat(4, 1fr); gap: 12px; }
+  .tile { background: var(--surface); border: 1px solid var(--border); border-radius: 12px; padding: 16px; }
+  .tile .n { font-size: 1.9rem; font-weight: 650; letter-spacing: -0.02em; }
+  .tile .k { color: var(--muted); font-size: 0.78rem; text-transform: uppercase; letter-spacing: 0.06em; margin-top: 2px; }
+  @media (max-width: 620px) { .tiles { grid-template-columns: repeat(2, 1fr); } }
+
+  /* severity mix bar */
+  .mix { display: flex; height: 14px; border-radius: 7px; overflow: hidden; background: var(--surface-2); gap: 2px; }
+  .mix span { display: block; }
+  .mixlegend { display: flex; flex-wrap: wrap; gap: 14px; margin-top: 10px; font-size: 0.82rem; color: var(--ink-2); }
+  .mixlegend .swatch { width: 10px; height: 10px; border-radius: 3px; display: inline-block; margin-right: 6px; vertical-align: middle; }
+
+  /* threat cards */
+  .card { background: var(--surface); border: 1px solid var(--border); border-left: 4px solid var(--muted);
+    border-radius: 12px; padding: 16px 18px; margin-bottom: 14px; }
+  .card.rejected { opacity: 0.9; border-left-color: var(--muted); background: var(--surface-2); }
+  .card-head { display: flex; align-items: baseline; gap: 10px; flex-wrap: wrap; }
+  .card h3 { font-size: 1.02rem; margin: 0; flex: 1 1 260px; }
+  .tid { font-family: ui-monospace, SFMono-Regular, Menlo, monospace; color: var(--muted); font-size: 0.82rem; }
+  .cat { font-size: 0.72rem; text-transform: uppercase; letter-spacing: 0.06em; color: var(--ink-2); }
+  .desc { margin: 10px 0 12px; color: var(--ink-2); font-size: 0.92rem; }
+
+  .badges { display: flex; gap: 8px; flex-wrap: wrap; align-items: center; }
+  .chip { display: inline-flex; align-items: center; gap: 6px; font-size: 0.75rem; font-weight: 600;
+    padding: 3px 9px; border-radius: 999px; border: 1px solid var(--border); white-space: nowrap; }
+  .chip .swatch { width: 9px; height: 9px; border-radius: 50%; flex: none; }
+  .chip.verdict { color: var(--ink-2); background: var(--surface); }
+  .chip.confidence { color: var(--muted); background: transparent; border-color: var(--hairline); }
+
+  .field { font-size: 0.85rem; margin-top: 8px; }
+  .field .lbl { color: var(--muted); text-transform: uppercase; letter-spacing: 0.05em; font-size: 0.68rem; }
+  .refs code { font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: 0.8rem;
+    background: var(--surface-2); border: 1px solid var(--border); border-radius: 6px; padding: 1px 6px; margin-right: 6px; }
+  ul.mits { margin: 6px 0 0; padding-left: 18px; font-size: 0.88rem; color: var(--ink-2); }
+
+  .unknown { margin-top: 10px; padding: 9px 12px; border-radius: 9px; font-size: 0.85rem;
+    background: color-mix(in srgb, var(--sev-medium) 12%, var(--surface));
+    border: 1px solid color-mix(in srgb, var(--sev-medium) 40%, var(--border)); color: var(--ink-2); }
+  .unknown code { font-family: ui-monospace, SFMono-Regular, Menlo, monospace; }
+
+  /* tables */
+  table { width: 100%; border-collapse: collapse; font-size: 0.84rem; }
+  th, td { text-align: left; padding: 8px 10px; border-bottom: 1px solid var(--hairline); vertical-align: top; }
+  th { color: var(--muted); text-transform: uppercase; letter-spacing: 0.05em; font-size: 0.68rem; font-weight: 600; }
+  td code, .crossing code { font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: 0.8rem; }
+  td .unk { color: var(--sev-high); font-weight: 600; }
+  .crossing { font-size: 0.85rem; color: var(--ink-2); padding: 6px 0; }
+  .assume { font-size: 0.85rem; color: var(--ink-2); }
+
+  .nodes { display: flex; flex-wrap: wrap; gap: 8px; }
+  .node { font-size: 0.76rem; color: var(--ink-2); background: var(--surface); border: 1px solid var(--border);
+    border-radius: 8px; padding: 4px 10px; }
+  .node b { font-weight: 600; color: var(--ink); }
+  .node .m { color: var(--muted); font-family: ui-monospace, SFMono-Regular, Menlo, monospace; }
+</style>
+</head>
+<body>
+<div class="viz-root">
+  <div class="wrap">
+    <div class="topbar">
+      <div>
+        <h1 id="sysname"></h1>
+        <div class="meta" id="jobmeta"></div>
+      </div>
+      <button class="toggle" id="themebtn" type="button">Toggle theme</button>
+    </div>
+    <div class="disclaimer"><span class="dot"></span><span id="disclaimer"></span></div>
+
+    <h2>Summary</h2>
+    <div class="tiles" id="tiles"></div>
+    <div style="margin-top:18px">
+      <div class="mix" id="mix"></div>
+      <div class="mixlegend" id="mixlegend"></div>
+    </div>
+
+    <h2>Threats</h2>
+    <div id="threats"></div>
+
+    <h2>Rejected — considered and dismissed</h2>
+    <div id="rejected"></div>
+
+    <h2>System model (extracted DFD)</h2>
+    <table id="elements"><thead><tr>
+      <th>Type</th><th>ID</th><th>Name</th><th>Trust zone</th><th>Key attributes</th>
+    </tr></thead><tbody></tbody></table>
+    <div id="crossings" style="margin-top:12px"></div>
+    <div id="assumptions" style="margin-top:12px"></div>
+
+    <h2>Pipeline</h2>
+    <div class="nodes" id="nodes"></div>
+  </div>
+</div>
+
+<script type="application/json" id="report">
+{
+  "schema_version": "1.0",
+  "disclaimer": "AI-generated threat model. Not reviewed by a human security analyst.",
+  "job": { "id": "job-8f3a2c91", "status": "completed", "created_at": "2026-07-24T14:03:21Z", "completed_at": "2026-07-24T14:04:09Z", "revise_rounds": 0 },
+  "input": { "system_name": "Orders Service", "source_sha256": "0000000000000000000000000000000000000000000000000000000000000000" },
+  "nodes": [
+    { "node": "extract", "model": "gemini-2.5-flash", "duration_ms": 3180 },
+    { "node": "analyst/spoofing", "model": "gemini-2.5-pro", "duration_ms": 9900 },
+    { "node": "analyst/denial-of-service", "model": "gemini-2.5-pro", "duration_ms": 8700 },
+    { "node": "analyst/information-disclosure", "model": "gemini-2.5-pro", "duration_ms": 10200 },
+    { "node": "critic", "model": "gemini-2.5-pro", "duration_ms": 14500 },
+    { "node": "assemble", "model": null, "duration_ms": 18 }
+  ],
+  "system_model": {
+    "external_entities": [ { "id": "entity:customer", "name": "Customer", "assets": ["pii"], "kind": "human", "trust_zone": "boundary:internet" } ],
+    "processes": [ { "id": "process:web-app", "name": "Web App", "assets": [], "technology": "Python/FastAPI on Cloud Run", "trust_zone": "boundary:internal-network", "exposure": "internet-facing" } ],
+    "data_stores": [ { "id": "store:orders-db", "name": "Orders DB", "assets": ["business-critical-data","pii"], "technology": "Cloud SQL Postgres", "trust_zone": "boundary:internal-network", "data_classification": "confidential", "encryption_at_rest": "unknown" } ],
+    "data_flows": [
+      { "id": "flow:customer-to-web-app:login", "name": "Login", "source": "entity:customer", "destination": "process:web-app", "protocol": "HTTPS", "authentication": "session cookie", "encryption_in_transit": "TLS 1.3" },
+      { "id": "flow:web-app-to-orders-db:store-order", "name": "Store Order", "source": "process:web-app", "destination": "store:orders-db", "protocol": "Postgres wire protocol", "authentication": "IAM database auth", "encryption_in_transit": "unknown" }
+    ],
+    "trust_boundaries": [
+      { "id": "boundary:internet", "name": "Internet", "kind": "network" },
+      { "id": "boundary:internal-network", "name": "Internal Network", "kind": "network" }
+    ],
+    "assumptions": [ { "assumption": "web app is internet-facing", "element_id": "process:web-app", "basis": "customers reach it directly from the browser" } ]
+  },
+  "boundary_crossings": [ { "flow_id": "flow:customer-to-web-app:login", "source_zone": "boundary:internet", "destination_zone": "boundary:internal-network" } ],
+  "threats": [
+    { "id": "S-01", "category": "spoofing", "title": "Session cookie theft enables account takeover",
+      "description": "Session cookies are the only asserted authenticator on the login flow. If one is stolen (XSS, network capture on a downgraded connection), an attacker impersonates the customer to the web app.",
+      "affected_element_ids": ["flow:customer-to-web-app:login"],
+      "severity": { "likelihood": "medium", "impact": "high", "level": "high", "justification": "Commodity attack against exposed sessions holding PII." },
+      "mitigations": [ { "summary": "Set HttpOnly, Secure and SameSite on session cookies" }, { "summary": "Bind sessions to a second factor for sensitive actions" } ],
+      "confidence": "high", "verdict": { "status": "confirmed", "reason": "", "related_unknowns": [] } },
+    { "id": "D-01", "category": "denial-of-service", "title": "Internet-facing web app exposed to volumetric abuse",
+      "description": "The web app is internet-facing with no stated rate limiting or upstream protection, so unauthenticated request floods can exhaust its Cloud Run capacity and deny service to customers.",
+      "affected_element_ids": ["process:web-app"],
+      "severity": { "likelihood": "medium", "impact": "medium", "level": "medium", "justification": "Exposed endpoint; impact bounded to availability." },
+      "mitigations": [ { "summary": "Front the app with a WAF/CDN and per-IP rate limits" } ],
+      "confidence": "high", "verdict": { "status": "confirmed", "reason": "", "related_unknowns": [] } },
+    { "id": "I-01", "category": "information-disclosure", "title": "Orders database may lack encryption at rest",
+      "description": "The orders database holds customer PII and business-critical data, but whether it is encrypted at rest is not stated. If it is not, disk or backup compromise discloses the full order history.",
+      "affected_element_ids": ["store:orders-db"],
+      "severity": { "likelihood": "low", "impact": "high", "level": "medium", "justification": "High-value data; likelihood hinges on an unverified control." },
+      "mitigations": [ { "summary": "Confirm and enforce CMEK encryption at rest on the database" } ],
+      "confidence": "medium", "verdict": { "status": "needs-info", "reason": "Encryption at rest for the orders database is unknown.", "related_unknowns": [ { "element_id": "store:orders-db", "attribute": "encryption_at_rest" } ] } }
+  ],
+  "rejected_threats": [
+    { "id": "R-01", "category": "repudiation", "title": "Customers could deny having placed an order",
+      "description": "Considered whether a customer can repudiate an order.",
+      "affected_element_ids": ["flow:web-app-to-orders-db:store-order"],
+      "severity": { "likelihood": "low", "impact": "low", "level": "low", "justification": "Low-value dispute risk on an internal, authenticated flow." },
+      "mitigations": [], "confidence": "low",
+      "verdict": { "status": "rejected", "reason": "The store-order flow uses IAM database auth, giving attributable writes; no evidence of a missing audit trail in the description.", "related_unknowns": [] } }
+  ],
+  "summary": { "threat_count": 3, "by_category": { "spoofing": 1, "denial-of-service": 1, "information-disclosure": 1 }, "by_severity": { "high": 1, "medium": 2 }, "needs_info_count": 1, "rejected_count": 1, "elements_analyzed": 7 }
+}
+</script>
+
+<script>
+  const R = JSON.parse(document.getElementById("report").textContent);
+  const $ = (id) => document.getElementById(id);
+  const el = (t, cls, html) => { const n = document.createElement(t); if (cls) n.className = cls; if (html != null) n.innerHTML = html; return n; };
+  const esc = (s) => String(s).replace(/[&<>]/g, c => ({ "&":"&amp;", "<":"&lt;", ">":"&gt;" }[c]));
+
+  const SEV = { critical: ["Critical","--sev-critical"], high: ["High","--sev-high"], medium: ["Medium","--sev-medium"], low: ["Low","--sev-low"] };
+  const SEV_ORDER = ["critical","high","medium","low"];
+  const VERDICT = { confirmed: ["Confirmed","✓"], "needs-info": ["Needs info","?"], rejected: ["Rejected","✕"] };
+  const svar = (lvl) => `var(${SEV[lvl][1]})`;
+
+  // header
+  $("sysname").textContent = R.input.system_name;
+  const fmt = (t) => new Date(t).toISOString().replace("T"," ").replace(".000Z"," UTC");
+  $("jobmeta").innerHTML = `Job <code>${esc(R.job.id)}</code> · ${esc(R.job.status)} · ${fmt(R.job.completed_at)} · schema ${esc(R.schema_version)}`;
+  $("disclaimer").textContent = R.disclaimer;
+
+  // stat tiles
+  const tiles = [
+    [R.summary.threat_count, "Actionable threats"],
+    [R.summary.needs_info_count, "Needs info"],
+    [R.summary.rejected_count, "Rejected"],
+    [R.summary.elements_analyzed, "Elements analysed"],
+  ];
+  tiles.forEach(([n, k]) => { const t = el("div","tile"); t.append(el("div","n",String(n)), el("div","k",esc(k))); $("tiles").append(t); });
+
+  // severity mix bar (only levels present, in severity order) with direct-labelled legend
+  const present = SEV_ORDER.filter(l => R.summary.by_severity[l]);
+  const total = present.reduce((a,l) => a + R.summary.by_severity[l], 0) || 1;
+  present.forEach(l => { const s = el("span"); s.style.flex = R.summary.by_severity[l]; s.style.background = svar(l); $("mix").append(s); });
+  present.forEach(l => {
+    const item = el("div"); item.innerHTML = `<span class="swatch" style="background:${svar(l)}"></span>${SEV[l][0]} · ${R.summary.by_severity[l]}`;
+    $("mixlegend").append(item);
+  });
+
+  function threatCard(t, rejected) {
+    const card = el("div", "card" + (rejected ? " rejected" : ""));
+    card.style.borderLeftColor = svar(t.severity.level);
+    const head = el("div","card-head");
+    head.append(el("h3", null, esc(t.title)), el("span","tid", esc(t.id)));
+    card.append(head);
+    card.append(el("div","cat", esc(t.category)));
+
+    const badges = el("div","badges"); badges.style.marginTop = "10px";
+    const sev = el("span","chip"); sev.innerHTML = `<span class="swatch" style="background:${svar(t.severity.level)}"></span>${SEV[t.severity.level][0]}`;
+    sev.title = `likelihood ${t.severity.likelihood} × impact ${t.severity.impact} → ${t.severity.level}`;
+    const [vlabel, vglyph] = VERDICT[t.verdict.status];
+    const vd = el("span","chip verdict", `${vglyph} ${vlabel}`);
+    const conf = el("span","chip confidence", `confidence: ${esc(t.confidence)}`);
+    badges.append(sev, vd, conf);
+    card.append(badges);
+
+    card.append(el("div","desc", esc(t.description)));
+    card.append(el("div","field", `<span class="lbl">Severity rationale</span><br>${esc(t.severity.justification)}`));
+
+    const refs = el("div","field refs"); refs.innerHTML = `<span class="lbl">Affected elements</span><br>` + t.affected_element_ids.map(r => `<code>${esc(r)}</code>`).join("");
+    card.append(refs);
+
+    if (t.verdict.status === "needs-info" && t.verdict.related_unknowns.length) {
+      const u = t.verdict.related_unknowns.map(r => `<code>${esc(r.element_id)}</code> → <code>${esc(r.attribute)}</code>`).join(", ");
+      card.append(el("div","unknown", `<b>Needs info.</b> ${esc(t.verdict.reason)} Unknown: ${u}`));
+    }
+    if (t.verdict.status === "rejected") {
+      card.append(el("div","field", `<span class="lbl">Reason dismissed</span><br>${esc(t.verdict.reason)}`));
+    }
+    if (t.mitigations && t.mitigations.length) {
+      const list = el("ul","mits"); t.mitigations.forEach(m => list.append(el("li", null, esc(m.summary))));
+      const wrap = el("div","field"); wrap.append(el("div","lbl","Mitigations"), list); card.append(wrap);
+    }
+    return card;
+  }
+
+  const ordered = [...R.threats].sort((a,b) => SEV_ORDER.indexOf(a.severity.level) - SEV_ORDER.indexOf(b.severity.level));
+  ordered.forEach(t => $("threats").append(threatCard(t, false)));
+  R.rejected_threats.forEach(t => $("rejected").append(threatCard(t, true)));
+
+  // system model table
+  const attrs = {
+    "external-entity": e => `kind: ${e.kind}` + (e.assets.length ? ` · assets: ${e.assets.join(", ")}` : ""),
+    "process": e => `${e.technology} · exposure: ${e.exposure}`,
+    "data-store": e => `${e.technology} · ${e.data_classification} · at rest: ${mark(e.encryption_at_rest)}`,
+    "data-flow": e => `${e.protocol} · auth: ${e.authentication} · in transit: ${mark(e.encryption_in_transit)}`,
+  };
+  function mark(v){ return v === "unknown" ? `<span class="unk">unknown</span>` : esc(v); }
+  const rows = [
+    ...R.system_model.external_entities.map(e => ["external-entity", e]),
+    ...R.system_model.processes.map(e => ["process", e]),
+    ...R.system_model.data_stores.map(e => ["data-store", e]),
+    ...R.system_model.data_flows.map(e => ["data-flow", e]),
+  ];
+  const tb = $("elements").querySelector("tbody");
+  rows.forEach(([type, e]) => {
+    const zone = e.trust_zone || (e.source + " → " + e.destination);
+    const tr = el("tr");
+    tr.innerHTML = `<td>${type}</td><td><code>${esc(e.id)}</code></td><td>${esc(e.name)}</td><td><code>${esc(zone)}</code></td><td>${attrs[type](e)}</td>`;
+    tb.append(tr);
+  });
+  R.boundary_crossings.forEach(c => {
+    $("crossings").append(el("div","crossing", `Boundary crossing: <code>${esc(c.flow_id)}</code> — <code>${esc(c.source_zone)}</code> → <code>${esc(c.destination_zone)}</code>`));
+  });
+  R.system_model.assumptions.forEach(a => {
+    $("assumptions").append(el("div","assume", `Assumption: ${esc(a.assumption)} (<code>${esc(a.element_id)}</code>) — ${esc(a.basis)}`));
+  });
+
+  // pipeline
+  R.nodes.forEach(n => {
+    $("nodes").append(el("div","node", `<b>${esc(n.node)}</b> <span class="m">${n.model ? esc(n.model) : "code"}</span> · ${n.duration_ms} ms`));
+  });
+
+  // theme toggle
+  $("themebtn").addEventListener("click", () => {
+    const cur = document.documentElement.getAttribute("data-theme");
+    const dark = cur ? cur === "dark" : matchMedia("(prefers-color-scheme: dark)").matches;
+    document.documentElement.setAttribute("data-theme", dark ? "light" : "dark");
+  });
+</script>
+</body>
+</html>
