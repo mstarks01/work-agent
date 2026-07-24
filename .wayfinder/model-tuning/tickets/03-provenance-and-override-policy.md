@@ -2,8 +2,8 @@
 id: 03
 title: "Decide provenance stamping and the env-override / eval-gate policy"
 label: wayfinder:grilling
-status: open
-assignee: ""
+status: resolved
+assignee: "github@michaelstarks.com"
 blocked-by: [01, 02]
 ---
 
@@ -34,3 +34,93 @@ The high-level policy is settled (grilled 2026-07-24, on the map): pinned file c
 - **`candidate_count` is exactly Self-MoA** (Vertex 1–8); reserved, not offered.
   If ever exposed it must route through ticket 009's union/dedupe path, never
   the plain tuning knob.
+
+## Answer (grilled 2026-07-24)
+
+The three sub-questions are settled. The mechanics below are unambiguous enough
+to build against once ticket 04's default numbers land.
+
+### 1. Provenance recording — clear values **and** a derived fingerprint
+
+- Every run records **both** the resolved per-tier sampling values *in the
+  clear* **and** a fingerprint **derived from those recorded values** (so it is
+  recomputable from the artifact, not hashed independently upstream). This
+  mirrors the existing precedent — served `model` is already recorded in the
+  clear per node (`report.py` `NodeRun`, ticket 026).
+- The fingerprint is **generation identity**: `sha256(served model, resolved
+  tier sampling)`, computed **per node** and stamped on `NodeRun` beside the
+  served `model`. Model + sampling are bound into one hash because the thing the
+  eval gate certifies is a tier's *generation behaviour*, which is model and
+  sampling jointly — splitting them lets a mismatched pair pass two green
+  half-checks. It keys on the **served** model (per node, per ticket 026, not
+  the requested string), so a pro node served a new build gets a different hash
+  than its siblings and that drift is *visible* — which is the point.
+- The clear per-tier sampling values live **once** in a **top-level per-tier
+  block** on the report (no duplication across same-tier nodes); only the small
+  per-node hash repeats on each `NodeRun`.
+- *Mechanical:* sha256 (matches `InputRef.source_sha256`); canonical
+  serialization = sorted keys over the *resolved* values.
+
+### 2. The `http_options` / resilience gap — fenced out
+
+- The fingerprint stays **model + sampling**. The override surface **forbids
+  `http_options`** (already on ticket 01's forbid list), so this effort
+  introduces **no** new un-fingerprinted path — the ticket's "a timeout override
+  cannot slip in un-fingerprinted" worry is closed at the surface, not by
+  folding resilience into the hash.
+- The pre-existing `RunConfig.http_options → config/resilience.toml` path
+  (ticket 01 research, `basic.py:82-83`) is **out of scope**: it belongs to the
+  resilience config's own future provenance, and `resilience.toml` is a separate
+  pinned config the map deliberately keeps apart. Recorded in the map's
+  Out-of-scope section.
+
+### 3. Env override — v1 ships the eval-gated escape hatch
+
+- v1 **does** ship an env override, reintroducing what decision 15 forbade —
+  *because* the thing that made it unsafe (invisible eval-only drift) is now
+  fixed by the fingerprint + gate. Decision 15 is not violated; it is superseded
+  on its own terms. This generalizes the `STRIDE_MODEL_*` precedent to sampling.
+- Naming: **`STRIDE_SAMPLING_{TIER}_{PARAM}`** (e.g.
+  `STRIDE_SAMPLING_PRO_TEMPERATURE`, `STRIDE_SAMPLING_FLASH_TOP_P`) — per-tier,
+  per-param, category-namespaced to parallel `STRIDE_MODEL_` and leave room for
+  future `STRIDE_RESILIENCE_*`.
+- Scope = **offered params only** (`temperature`, `top_p`, `seed`, per-tier
+  class-guarded `thinking`), each validated **identically to the file value**
+  (fail-closed, same ranges, class-legal `thinking`). An env var naming a
+  **reserved** param (incl. `candidate_count`) or a **forbidden** one **raises**
+  ("not overridable") — the live-knob surface equals the offered surface, no
+  wider. `candidate_count` stays file-pinned at 1 and cannot be pushed off 1 by
+  env at all.
+- Overrides flow into the *resolved* sampling, so they are **captured by the
+  per-node fingerprint automatically** — an override is defensible precisely
+  because it is fingerprinted and gateable.
+
+### 4. Eval-gate mechanism — manifest + offline `certify`
+
+- The blessed baseline is a **checked-in manifest** (mechanical:
+  `evals/blessed-fingerprints.toml`) holding the per-node fingerprints a
+  sanctioned baseline sweep recorded. Sweep **promotion writes both**
+  `sampling.toml` *and* the manifest — this is the "sweep promotes a winner"
+  loop the destination describes. A manifest (not derive-from-file) is required
+  because the served-model half of the fingerprint cannot be recomputed from the
+  pinned file. It catches override-drift and served-build drift uniformly (both
+  yield fingerprints absent from the set). Mechanical: manifest keys node → set
+  of blessed fingerprints (a node may have several blessed served-builds).
+- The gate is a **pure, offline-testable function**
+  `certify(report_fingerprints, manifest) → {certified, uncertified_nodes}`,
+  exercised by the offline suite with scripted fingerprints + a stub manifest
+  (the live gate *run* stays out of scope — no Vertex).
+- The **report carries raw fingerprints only**; certification is computed in the
+  **eval/CI layer**, never stamped on the product report (a production report
+  should not need the eval manifest to describe itself). "Never silently trust"
+  = the eval path **always** runs `certify` and surfaces the verdict, refusing
+  to fold an uncertified run into trusted aggregates. Hard-fail-vs-warn is a CI
+  policy knob; the mechanism guarantees the verdict is computed and surfaced.
+
+**Reconcile with decision 15:** provenance is exactly what lets an override
+coexist with honest evals — the fingerprint + manifest gate convert "green
+suite, drifting prod" from an invisible risk into a visible, gateable fact.
+
+On close, this ticket plus [the schema ticket](02-config-schema-migration.md)
+graduate the implementation build-out from the fog; the sole remaining blocker
+is [ticket 04's](04-per-class-decoding-defaults.md) default numbers.
