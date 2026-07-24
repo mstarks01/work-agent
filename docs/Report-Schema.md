@@ -9,6 +9,13 @@ together cannot be built.
 Get one from either [the engine](Integration-Guide.md) (`outcome.report`) or the
 [`/v1/jobs/{id}/report`](HTTP-API.md) endpoint.
 
+## A rendered example
+
+[`example-report.html`](example-report.html) is a self-contained viewer holding a
+sample report — open it in a browser to see the payload below rendered as threat
+cards, a severity summary, and the extracted DFD. It is a single file with the
+report JSON embedded, so it also serves as a reference for laying one out.
+
 ## Top-level shape
 
 ```python
