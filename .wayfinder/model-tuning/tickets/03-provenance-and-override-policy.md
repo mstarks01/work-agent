@@ -16,3 +16,21 @@ The high-level policy is settled (grilled 2026-07-24, on the map): pinned file c
 3. **Eval-gate treatment of an unblessed config.** How the harness/CI treats a run whose fingerprint no baseline sweep covered — flag / mark uncertified, never silently trust. This decides the *mechanism* the gate enforces; the actual gate **run** is out of scope (live Vertex), so it must be offline-testable (e.g. a fingerprint-mismatch check the offline suite exercises).
 
 **Reconcile with decision 15** (eval and prod read one file): provenance is precisely what lets an override coexist with honest evals — it converts "green suite, drifting prod" from an invisible risk into a visible, gateable fact. On close, this ticket plus [the schema ticket](02-config-schema-migration.md) graduate the implementation build-out from the fog.
+
+## Research input (from ticket 01, 2026-07-24)
+
+- **`response_schema` override is a hard crash, not a silent override** — ADK
+  *raises* (`llm_agent.py:1078-1087`) if it appears on the config, so the
+  override layer must **forbid** it outright, not merely deprioritize.
+  `response_mime_type` overrides are silently discarded — also forbid.
+- **`RunConfig.http_options` wins over the node's `http_options`**
+  (`basic.py:82-83`) — a latent path to silently override
+  `config/resilience.toml`. The override/provenance design must account for it
+  so a timeout override cannot slip in un-fingerprinted.
+- **`seed` is best-effort**, and `gemini-2.5-pro` is reported non-deterministic
+  even with fixed seed + `temperature = 0`. Provenance framing: `seed` reduces
+  variance, it does not certify reproducibility — the **fingerprint**, not the
+  seed, is what makes a result defensible.
+- **`candidate_count` is exactly Self-MoA** (Vertex 1–8); reserved, not offered.
+  If ever exposed it must route through ticket 009's union/dedupe path, never
+  the plain tuning knob.

@@ -3,7 +3,7 @@
 Label: `wayfinder:map`
 Effort dir: `.wayfinder/model-tuning/`. Tickets live in `.wayfinder/model-tuning/tickets/` as child issues, numbered from `01`. A ticket is claimed by setting its `assignee:` frontmatter; open + unassigned + unblocked = frontier. Blocking is the `blocked-by:` list; a ticket is unblocked when every id it lists is `resolved`/`closed`.
 
-**Status: charting (2026-07-24).** Fresh effort, separate from the completed [design map](../map.md). Destination named through grilling; three decision tickets created, one on the frontier.
+**Status: charting (2026-07-24).** Fresh effort, separate from the completed [design map](../map.md). Destination named through grilling; three decision tickets created. Ticket 01 (research) resolved — the frontier is now [the config-schema ticket](tickets/02-config-schema-migration.md).
 
 ## Destination
 
@@ -22,6 +22,8 @@ Both model classes the workflow uses (`flash`, `pro`) carry their own ADK/GenAI 
 ## Decisions so far
 
 <!-- charting resolves nothing; populated as tickets close -->
+
+- [Research: ADK 2.5 tuning params — the GenerateContentConfig surface, per-class applicability, and which ADK owns](tickets/01-research-adk-tuning-params.md) — v1 set: **offer** `temperature`/`top_p`/`seed` (seed best-effort, not a reproducibility guarantee) plus per-tier class-guarded `thinking_budget` (flash 0–24,576 with 0=off, pro 128–32,768 with 0 a 400); **reserve** `candidate_count` (= the deferred Self-MoA lever)/`top_k`/`max_output_tokens`/penalties; **forbid** `response_schema` (ADK *raises*)/`response_mime_type`/`stop_sequences`/`http_options`. ADK forwards the config verbatim to Vertex; `top_k` is a float. Findings on `research/model-tuning-params` (`c92c29b`).
 
 ## Not yet specified
 

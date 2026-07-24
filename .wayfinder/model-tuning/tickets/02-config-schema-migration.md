@@ -18,3 +18,17 @@ Given the safe-to-tune param set from [the research ticket](01-research-adk-tuni
 5. **Judge scope.** Whether the eval judge (`evals/config/judge.toml`, its own model + sampling) adopts the same per-class shape now or stays a separate pinned config. Default lean: out of this effort unless research shows the judge shares the tension.
 
 **Constraint carried in:** the file stays the canonical source of truth eval and production both read (decision 15). This ticket decides the *layout*; the loader/graph wiring graduates as implementation on close.
+
+## Research input (from ticket 01, 2026-07-24)
+
+- **The v1 param set is decided upstream.** Schema needs to carry the *offer*
+  set — `temperature`, `top_p`, `seed`, and per-tier `thinking_budget` — and
+  leave room for the *reserved* ones without shipping them; the *forbidden*
+  params never appear in the file at all.
+- **`thinking_budget` cannot be one shared number.** Flash accepts 0–24,576
+  (0 = disabled), pro accepts 128–32,768 (0 is a **400**). The per-tier block
+  must express intent (off / auto / N) and the loader must resolve to a
+  class-legal value — the single strongest reason to key by **tier** and the
+  hard reason the flat v1 shape cannot stretch.
+- **`top_k` is typed `float`** on the installed `GenerateContentConfig` — set
+  the validator type accordingly if `top_k` is ever admitted.

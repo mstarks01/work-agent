@@ -2,7 +2,7 @@
 id: 01
 title: "Research: ADK 2.5 tuning params — the GenerateContentConfig surface, per-class applicability, and which ADK owns"
 label: wayfinder:research
-status: claimed
+status: resolved
 assignee: "claude (research subagent)"
 blocked-by: []
 ---
@@ -24,3 +24,43 @@ For each param, answer:
 ## Context pointer
 
 Findings land on branch `research/model-tuning-params`.
+
+## Resolution
+
+Resolved 2026-07-24 by research subagent. Full findings:
+`docs/research/model-tuning-params.md` on branch `research/model-tuning-params`
+(commit `c92c29b`).
+
+**Recommended v1 tunable set:**
+
+- **Offer** (decoding knobs, all classes): `temperature` (already shipped),
+  `top_p` (already on `SamplingConfig`, unset), `seed` — documented
+  **best-effort, not a reproducibility guarantee** (`gemini-2.5-pro` reported
+  non-deterministic even with fixed seed + `temperature = 0`).
+- **Offer per tier, class-guarded:** `thinking_config.thinking_budget` — legal
+  ranges differ by class, so never one shared value.
+- **Reserve:** `candidate_count` (Vertex 1–8; *is* the deferred Self-MoA
+  mechanism — extra candidates are silently dropped without ticket 009's
+  union/dedupe), plus `top_k` / `max_output_tokens` / `presence_penalty` /
+  `frequency_penalty` (unmeasured, each fights structured-JSON extraction).
+- **Forbid** (owned elsewhere / contract-breaking): `response_schema` (ADK
+  **raises** if set — `llm_agent.py:1078-1087`), `response_mime_type` (forced to
+  `application/json`, override silently discarded), `stop_sequences` (truncates
+  schema JSON), `http_options` / timeout (owned by `config/resilience.toml`),
+  `tools` / `system_instruction` (ADK rejects).
+
+**Installed-source facts:** all candidate fields exist on
+`GenerateContentConfig` (`types.py:6018-6242`); `top_k` is typed **float**; ADK
+forwards the whole config verbatim to Vertex `generate_content`
+(`google_llm.py:282-285`), stripping no decoding param; `set_output_schema`
+sets `response_schema` + `response_mime_type` from each node's `output_schema`
+(`basic.py:92-94`).
+
+**Per-class landmine:** `thinking_budget` — flash **0–24,576** (0 = off legal);
+pro **128–32,768** (**0 is a 400**, cannot be disabled). Ticket 02's schema must
+model off/auto/N intent and resolve to a class-legal value.
+
+**Two doc gaps** (flagged in the file, not guessed): exact Vertex 2.5
+`presence_penalty` / `frequency_penalty` ranges (client-rendered doc tables did
+not yield values); per-class thinking numbers and seed semantics are cited to
+official Google (Firebase AI Logic + Vertex GenerationConfig REST reference).
