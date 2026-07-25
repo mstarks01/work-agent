@@ -67,6 +67,34 @@ and bound onto each model at the SDK level, so the report's `nodes` array is
 unchanged by a retry. A per-request timeout turns a hang into a retryable error.
 Three attempts by default.
 
+## Concurrency and isolation
+
+Concurrent analyses are independent. Each `analyze()` call runs one job in its
+own ADK session, created fresh with a unique session id and seeded with only that
+job's own input text; the graph's per-run data lives entirely in that session's
+state, read back by the same session id. The engine, runner, and compiled
+pipeline hold no per-run state — they carry only read-only configuration (the
+node→model map, the loaded prompts and skills), so one engine is safe to share
+across every call.
+
+- **Isolation is per session, not per caller.** Two analyses submitted at the
+  same time by the same caller still get separate sessions, so they can never
+  read or overwrite each other's state.
+- **Within a single analysis**, the six analysts run in parallel but each writes
+  to its own category-keyed slot in the session, so the parallel branches don't
+  clobber one another before the merge.
+- **Untrusted input stays contained.** Because a job's text lives only in its own
+  session (as fenced data — see [The pipeline](#the-pipeline)), a prompt-injection
+  attempt in one submission cannot reach another running analysis.
+
+This guarantee assumes the intended concurrency model: `async` calls on a single
+event loop. The default `InMemorySessionService` is an in-process store — safe
+for cooperative async concurrency with distinct session ids, but not a
+thread-safe store to share across OS threads. Scaling across processes keeps
+analyses isolated (nothing is shared), but then each worker has its own in-memory
+job and session state, so a job must be routed to the worker that holds it —
+which is what the persistent backends below are for.
+
 ## Seams
 
 The pipeline is reached through interfaces, so backends are swappable and the
