@@ -37,10 +37,9 @@ official Google documentation (cite each as a URL, no guessing — leave a value
    `thinking = "auto"` comment is accurate.
 
 **Deliverable:** a table `param → { flash default, pro default, source URL }`
-plus any value that could not be verified, flagged `UNVERIFIED`. Capture
-findings on branch `research/model-tuning-defaults` with a context pointer
-here. On close, the implementation build-out can author `sampling.toml` with
-cited numbers.
+plus any value that could not be verified, flagged `UNVERIFIED`. Capture the
+findings with a context pointer here. On close, the implementation build-out can
+author `sampling.toml` with cited numbers.
 
 **Scope guard:** these are the *neutral model defaults*, not tuned values. The
 tuned per-tier values and any live sweep remain out of scope (live Vertex);
@@ -49,13 +48,12 @@ honestly.
 
 ## Context pointer
 
-Findings land on branch `research/model-tuning-defaults`, file
-`docs/research/model-tuning-defaults.md` (research commit `90615ef`).
+Findings captured during research; the full write-up is summarized in the Answer
+below.
 
 ## Answer
 
-Full findings + citations: `docs/research/model-tuning-defaults.md` (branch
-`research/model-tuning-defaults`, commit `90615ef`). Summary:
+Full findings and citations were captured during research. Summary:
 
 | param | flash default | pro default | source |
 |---|---|---|---|

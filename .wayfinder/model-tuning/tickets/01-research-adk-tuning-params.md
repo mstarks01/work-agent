@@ -19,17 +19,16 @@ For each param, answer:
 4. **`candidate_count` vs Self-MoA.** Does exposing `candidate_count` collide with the deferred Self-MoA recall lever (ticket 009 / `config/sampling.toml` comments)? Recommend whether it should be reserved rather than offered as a plain tuning knob.
 5. **`seed` for reproducibility.** Confirm whether `seed` is honored on Vertex Gemini 2.5 and what guarantee it gives — this is the user's "repeatable, defensible results" lever beyond `temperature = 0`.
 
-**Deliverable:** a table `param → { exposed?, per-class?, safe-to-tune?, notes }` plus a short recommended v1 tunable set. Most of (1) is answerable by reading the installed package; (2)/(5) need Vertex Gemini 2.5 docs. Capture findings on branch `research/model-tuning-params` with a context pointer here.
+**Deliverable:** a table `param → { exposed?, per-class?, safe-to-tune?, notes }` plus a short recommended v1 tunable set. Most of (1) is answerable by reading the installed package; (2)/(5) need Vertex Gemini 2.5 docs. Capture the findings with a context pointer here.
 
 ## Context pointer
 
-Findings land on branch `research/model-tuning-params`.
+Findings captured during research; the full write-up is summarized below.
 
 ## Resolution
 
-Resolved 2026-07-24 by research subagent. Full findings:
-`docs/research/model-tuning-params.md` on branch `research/model-tuning-params`
-(commit `c92c29b`).
+Resolved 2026-07-24 by research subagent. Full findings captured during research;
+summary follows.
 
 **Recommended v1 tunable set:**
 
