@@ -24,7 +24,8 @@ class StrideReport:
     disclaimer: str              # AI-generated, not human-reviewed
     job: Job                     # id, status="completed", timestamps, revise_rounds
     input: InputRef              # system_name + source_sha256 of the exact text
-    nodes: list[NodeRun]         # per-node model + duration_ms
+    nodes: list[NodeRun]         # per-node model, sampling fingerprint, duration_ms
+    sampling: dict[str, dict]    # per-tier resolved decoding params (provenance)
     system_model: SystemModel    # the canonical model the analysis ran on
     boundary_crossings: list[BoundaryCrossing]
     threats: list[Threat]        # confirmed + needs-info, severity-ordered
@@ -101,6 +102,39 @@ class Summary:
 
 `summary` is computed from the report's own contents and must match them, so it
 is safe to trust without recounting.
+
+## Provenance
+
+The report records the exact generation identity it ran on, so a result defends
+itself without trusting any external record.
+
+```python
+class NodeRun:
+    node: str                        # graph node name, e.g. "extract", "critic"
+    model: str | None                # served model; None for deterministic FunctionNodes
+    sampling_fingerprint: str | None # 64-hex sha256(served model, resolved tier sampling)
+    duration_ms: int
+```
+
+- `sampling` is the per-tier **clear block**: tier name → the resolved decoding
+  params that tier's nodes used (`{"flash": {"temperature": 0.0, ...}, "pro":
+  {...}}`), recorded once per tier as plain scalars. An unset param is `null` —
+  the model applied its own default.
+- Each LLM node's `sampling_fingerprint` is
+  `sha256(served model, resolved tier sampling)`, binding model and sampling into
+  **one** hash keyed on the *served* model, and is **recomputable** from that
+  node's `model` plus its tier's entry in `sampling`. A deterministic
+  `FunctionNode` (e.g. `assemble`) carries neither a model nor a fingerprint.
+
+What makes a result defensible is the fingerprint, not the `seed` — `seed` is
+best-effort and guarantees nothing. The report carries **raw** fingerprints
+only; whether a run is *certified* (its fingerprints match a blessed baseline) is
+computed in the eval/CI layer against `evals/blessed-fingerprints.toml`, never
+asserted on the report itself. See
+[Configuration → The eval gate](Configuration.md#the-eval-gate-and-provenance).
+
+Both `sampling` and `sampling_fingerprint` are empty/absent on a report with no
+LLM provenance — a stub-runner or eval-synthetic report.
 
 ## Serialising
 

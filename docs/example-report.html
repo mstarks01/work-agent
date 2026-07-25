@@ -168,13 +168,17 @@
   "job": { "id": "job-8f3a2c91", "status": "completed", "created_at": "2026-07-24T14:03:21Z", "completed_at": "2026-07-24T14:04:09Z", "revise_rounds": 0 },
   "input": { "system_name": "Orders Service", "source_sha256": "0000000000000000000000000000000000000000000000000000000000000000" },
   "nodes": [
-    { "node": "extract", "model": "gemini-2.5-flash", "duration_ms": 3180 },
-    { "node": "analyst/spoofing", "model": "gemini-2.5-pro", "duration_ms": 9900 },
-    { "node": "analyst/denial-of-service", "model": "gemini-2.5-pro", "duration_ms": 8700 },
-    { "node": "analyst/information-disclosure", "model": "gemini-2.5-pro", "duration_ms": 10200 },
-    { "node": "critic", "model": "gemini-2.5-pro", "duration_ms": 14500 },
+    { "node": "extract", "model": "gemini-2.5-flash", "sampling_fingerprint": "407d58f1302de32688d0b08e8965c3b705a3036ea06b217e4fd04ee19d543699", "duration_ms": 3180 },
+    { "node": "analyst/spoofing", "model": "gemini-2.5-pro", "sampling_fingerprint": "85b42a6567b6b33f1fae62e42c011e12494250e6bb5795de9a49f65c436adbad", "duration_ms": 9900 },
+    { "node": "analyst/denial-of-service", "model": "gemini-2.5-pro", "sampling_fingerprint": "85b42a6567b6b33f1fae62e42c011e12494250e6bb5795de9a49f65c436adbad", "duration_ms": 8700 },
+    { "node": "analyst/information-disclosure", "model": "gemini-2.5-pro", "sampling_fingerprint": "85b42a6567b6b33f1fae62e42c011e12494250e6bb5795de9a49f65c436adbad", "duration_ms": 10200 },
+    { "node": "critic", "model": "gemini-2.5-pro", "sampling_fingerprint": "85b42a6567b6b33f1fae62e42c011e12494250e6bb5795de9a49f65c436adbad", "duration_ms": 14500 },
     { "node": "assemble", "model": null, "duration_ms": 18 }
   ],
+  "sampling": {
+    "flash": { "temperature": 0.0, "top_p": null, "top_k": null, "seed": null, "max_output_tokens": null, "candidate_count": 1, "presence_penalty": null, "frequency_penalty": null, "thinking_budget": null },
+    "pro": { "temperature": 0.0, "top_p": null, "top_k": null, "seed": null, "max_output_tokens": null, "candidate_count": 1, "presence_penalty": null, "frequency_penalty": null, "thinking_budget": null }
+  },
   "system_model": {
     "external_entities": [ { "id": "entity:customer", "name": "Customer", "assets": ["pii"], "kind": "human", "trust_zone": "boundary:internet" } ],
     "processes": [ { "id": "process:web-app", "name": "Web App", "assets": [], "technology": "Python/FastAPI on Cloud Run", "trust_zone": "boundary:internal-network", "exposure": "internet-facing" } ],
@@ -328,7 +332,16 @@
 
   // pipeline
   R.nodes.forEach(n => {
-    $("nodes").append(el("div","node", `<b>${esc(n.node)}</b> <span class="m">${n.model ? esc(n.model) : "code"}</span> · ${n.duration_ms} ms`));
+    const fp = n.sampling_fingerprint
+      ? ` · <code class="m" title="generation-identity fingerprint: sha256(served model, resolved tier sampling)\n${esc(n.sampling_fingerprint)}">fp ${esc(n.sampling_fingerprint.slice(0, 12))}…</code>`
+      : "";
+    $("nodes").append(el("div","node", `<b>${esc(n.node)}</b> <span class="m">${n.model ? esc(n.model) : "code"}</span> · ${n.duration_ms} ms${fp}`));
+  });
+  // per-tier resolved sampling (provenance clear block)
+  Object.entries(R.sampling || {}).forEach(([tier, params]) => {
+    const set = Object.entries(params).filter(([, v]) => v !== null)
+      .map(([k, v]) => `${esc(k)} = ${esc(String(v))}`).join(", ");
+    $("nodes").append(el("div","node m", `<b>tier ${esc(tier)}</b> sampling · ${set} <span class="m">(others: model default)</span>`));
   });
 
   // theme toggle

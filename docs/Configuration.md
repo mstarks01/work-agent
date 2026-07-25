@@ -27,9 +27,51 @@ project targets Gemini 2.x only.
 
 ### Sampling
 
-`temperature = 0.0`, deliberately **not** environment-overridable — grading a
-configuration you do not ship is how a suite goes green while production drifts.
-Change sampling with a reviewed edit to the file.
+`config/sampling.toml` (`version = 2`) pins the decoding parameters **per model
+class**, in `[tiers.flash]` and `[tiers.pro]` tables that reuse the node→tier map
+from `model_tiers.toml`. Eval and production read this same file — grading a
+configuration you do not ship is how a suite goes green while production drifts,
+so there is no eval-only copy.
+
+The file lists **every** decoding parameter the surface admits, each either
+pinned to a value or left as a *commented* line with a reason — an omitted key is
+a rejected typo, never a silent "model default". What ships is
+behaviour-unchanged from before the effort: `temperature = 0.0` (greedy), every
+other param the model's own default.
+
+| Param | Shipped state | Why |
+| --- | --- | --- |
+| `temperature` | pinned `0.0` | Greedy decoding; the model's own default is `1.0`. |
+| `candidate_count` | pinned `1` | Reserved Self-MoA lever; the loader **rejects any value ≠ 1**. |
+| `top_p`, `top_k`, `presence_penalty`, `frequency_penalty` | **unset** | Model-dependent with no published per-class constant — pinning a guess would claim a decision nobody made. |
+| `seed` | **unset** | No numeric default; best-effort, **not** a reproducibility guarantee. |
+| `max_output_tokens` | **unset** | Uncapped up to the model ceiling of `65,536`. |
+| `thinking` | **unset** | Leaves the model's preset per-class budget. |
+
+The unset states are sourced from research
+([ticket 04](../.wayfinder/model-tuning/tickets/04-per-class-decoding-defaults.md)):
+where Google documents a value as model-dependent with no rendered per-class
+number, the file leaves it unset rather than inventing one.
+
+`thinking` is a per-tier mixed scalar resolved to a class-legal budget:
+
+- **unset** → the model's preset per-class budget (today's default — **not**
+  dynamic allocation).
+- `"auto"` → dynamic allocation (an explicit `thinking_budget = -1`).
+- `"off"` → disabled. `flash` only (range `0–24,576`); `pro`'s floor is `128`
+  and `0` is a 400, so `"off"` on `pro` is rejected.
+- an **int** → a fixed budget, checked against the class range (`flash`
+  `0–24,576`, `pro` `128–32,768`).
+
+Parameters that break the structured-output contract are **never** in the file
+and never overridable: `response_schema` (ADK *raises*), `response_mime_type`
+(silently discarded), `stop_sequences` (would truncate mid-token), and
+`http_options` (owned by `resilience.toml`).
+
+Tuning is a reviewed edit to the file, promoted by an eval sweep (see
+[The eval gate](#the-eval-gate-and-provenance) below) — not an ad-hoc production
+change. The `STRIDE_SAMPLING_*` env vars exist only as a recorded, eval-gated
+escape hatch, documented [below](#sampling-overrides-deploy-time-recorded).
 
 ### Resilience
 
@@ -61,6 +103,52 @@ down mid-incident without an image rebuild.
 These override the tier strings only; the node-to-tier mapping stays in the
 file. The same pinned-string rule applies — an alias or preview build is
 rejected.
+
+### Sampling overrides (deploy-time, recorded)
+
+`STRIDE_SAMPLING_{TIER}_{PARAM}` retunes one tier's decoding at deploy time
+without an image rebuild, validated **identically** to a file value (an
+out-of-range override fails closed exactly like one in the file). `{TIER}` is
+`FLASH` or `PRO`; `{PARAM}` is one of the **offered** params below.
+
+| Variable | Effect |
+| --- | --- |
+| `STRIDE_SAMPLING_{TIER}_TEMPERATURE` | Overrides the tier's `temperature`. |
+| `STRIDE_SAMPLING_{TIER}_TOP_P` | Overrides the tier's `top_p`. |
+| `STRIDE_SAMPLING_{TIER}_SEED` | Overrides the tier's `seed`. |
+| `STRIDE_SAMPLING_{TIER}_THINKING` | Overrides the tier's `thinking` (`off`/`auto`/int). |
+
+Only these four params are overridable. A var naming a **reserved**
+(`candidate_count`) or **forbidden** param raises `not overridable`; an unknown
+tier or a set-but-empty value also raises. This is deliberately a **recorded,
+eval-gated escape hatch**, not the tuning path: overrides flow into the resolved
+values, so the run's provenance fingerprint captures them, and a run on
+un-blessed sampling reads as uncertified (see below). Retune for real with a
+reviewed file diff plus a sweep, not a standing override.
+
+### The eval gate and provenance
+
+Every run is **self-describing**. The report carries, in the clear, the resolved
+per-tier params it ran on (`StrideReport.sampling`) and a per-node
+generation-identity fingerprint (`NodeRun.sampling_fingerprint`) —
+`sha256(served model, resolved tier sampling)`, binding model and sampling into
+one hash keyed on the *served* model. What makes a result defensible is that
+fingerprint, recomputable from the recorded clear block; the `seed` is
+best-effort and guarantees nothing. See [Report Schema](Report-Schema.md#provenance).
+
+`evals/blessed-fingerprints.toml` records, per node, the fingerprints a
+sanctioned baseline sweep blessed. The eval path **always** certifies a run's
+fingerprints against it: a fingerprint absent from its node's set is
+*uncertified*, and an uncertified run is never silently folded into a trusted
+aggregate. Override-drift and served-build-drift are caught identically — both
+just produce a fingerprint that is not in the set. The sets ship **empty** (no
+live sweep has run — out of scope, no Vertex here), so every real run reads as
+uncertified until a baseline sweep promotes one; hard-fail is an off-by-default
+CI knob (`--require-certified`). A sweep's `promote` step is the single write
+path: one winning config both re-pins `sampling.toml` in place and derives the
+blessed fingerprints, so the two cannot drift. The live sweep and the tuned
+numbers themselves are out of scope — `temperature = 0` remains the shipped
+default.
 
 ### Resilience overrides
 
