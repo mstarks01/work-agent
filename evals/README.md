@@ -72,6 +72,10 @@ python -m evals.harness.run run --mode extraction --case 01-payments-checkout
 python -m evals.harness.run calibrate --out agreement.json
 ```
 
+The loop these commands drive — establishing a baseline band, changing one
+lever, comparing against the band, and promoting a winner — is
+[`TUNING.md`](TUNING.md).
+
 `run` exits non-zero only on **Tier 1 structural** failures. Must-find recall,
 lane and element accuracy, the ungrounded rate, the severity confusion and the
 near/far exemplar delta and critic yield are all computed, printed and written
