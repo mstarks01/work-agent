@@ -40,9 +40,9 @@ if isinstance(outcome, PipelineCompleted):
     print(report.summary.threat_count)
 ```
 
-Reaching the models needs a configured Vertex environment (ADC + project/location);
-provisioning that is deliberately **out of scope for this repo**. Offline tests
-and the in-memory stub runner need none of it.
+Reaching the models needs a configured Vertex environment (ADC + project/location),
+which the repo assumes is already set up. Offline tests and the in-memory stub
+runner need none of it.
 
 ## Repository layout
 
@@ -82,13 +82,12 @@ python evals/verify_corpus.py # mechanical checks over the golden corpus
 ```
 
 Everything under `tests/` and `evals/verify_corpus.py` is credential-free and
-deterministic. The live eval commands (`python -m evals.harness.run ...`) need
-Vertex access and are out of scope here — see [evals/TUNING.md](evals/TUNING.md).
+deterministic. The live eval commands (`python -m evals.harness.run ...`) need a
+configured Vertex environment — see [evals/TUNING.md](evals/TUNING.md).
 
 ## Status
 
-The analysis code is complete and offline-tested; it has not yet been run
-against live Vertex. The shipped decoding default is `temperature = 0`; tuning
-the per-tier sampling values is a future eval sweep (see
-[evals/TUNING.md](evals/TUNING.md)). Persistent job/session backends are left as
-seams — the in-memory defaults are enough to get a report in process.
+The analysis code is complete and offline-tested. The shipped decoding default is
+`temperature = 0`; improving the per-tier sampling values is a measured tuning
+loop (see [evals/TUNING.md](evals/TUNING.md)). Persistent job/session backends
+are left as seams — the in-memory defaults are enough to get a report in process.

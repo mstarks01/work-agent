@@ -105,36 +105,35 @@ is safe to trust without recounting.
 
 ## Provenance
 
-The report records the exact generation identity it ran on, so a result defends
-itself without trusting any external record.
+The report records exactly which models and decoding parameters produced it, so
+a result stands on its own without trusting any outside record.
 
 ```python
 class NodeRun:
     node: str                        # graph node name, e.g. "extract", "critic"
-    model: str | None                # served model; None for deterministic FunctionNodes
-    sampling_fingerprint: str | None # 64-hex sha256(served model, resolved tier sampling)
+    model: str | None                # the model this node ran on; None for code-only nodes
+    sampling_fingerprint: str | None # 64-hex identity hash of (model, decoding params)
     duration_ms: int
 ```
 
-- `sampling` is the per-tier **clear block**: tier name → the resolved decoding
-  params that tier's nodes used (`{"flash": {"temperature": 0.0, ...}, "pro":
-  {...}}`), recorded once per tier as plain scalars. An unset param is `null` —
-  the model applied its own default.
-- Each LLM node's `sampling_fingerprint` is
-  `sha256(served model, resolved tier sampling)`, binding model and sampling into
-  **one** hash keyed on the *served* model, and is **recomputable** from that
-  node's `model` plus its tier's entry in `sampling`. A deterministic
-  `FunctionNode` (e.g. `assemble`) carries neither a model nor a fingerprint.
+- **`sampling`** lists the decoding parameters each tier actually used, once per
+  tier: `{"flash": {"temperature": 0.0, ...}, "pro": {...}}`. A parameter left to
+  the model's default shows as `null`.
+- **`sampling_fingerprint`** is a hash of the model plus those parameters — one
+  value that identifies exactly how a node generated its output. It can be
+  recomputed from the node's `model` and its tier's entry in `sampling`, so
+  anyone can verify it. Code-only nodes (like `assemble`) have no model and no
+  fingerprint.
 
-What makes a result defensible is the fingerprint, not the `seed` — `seed` is
-best-effort and guarantees nothing. The report carries **raw** fingerprints
-only; whether a run is *certified* (its fingerprints match a blessed baseline) is
-computed in the eval/CI layer against `evals/blessed-fingerprints.toml`, never
-asserted on the report itself. See
+The fingerprint — not `seed` — is what makes a result reproducible to reason
+about; `seed` is best-effort only. The report carries the fingerprints as-is; the
+separate question of whether a run matches an approved baseline is answered by
+the eval tooling (against `evals/blessed-fingerprints.toml`), not asserted on the
+report itself. See
 [Configuration → The eval gate](Configuration.md#the-eval-gate-and-provenance).
 
-Both `sampling` and `sampling_fingerprint` are empty/absent on a report with no
-LLM provenance — a stub-runner or eval-synthetic report.
+A report produced without live models (the in-memory stub runner, or eval
+fixtures) simply has an empty `sampling` and no fingerprints.
 
 ## Serialising
 

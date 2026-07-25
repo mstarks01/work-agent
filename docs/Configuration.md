@@ -33,27 +33,26 @@ from `model_tiers.toml`. Eval and production read this same file — grading a
 configuration you do not ship is how a suite goes green while production drifts,
 so there is no eval-only copy.
 
-The file lists **every** decoding parameter the surface admits, each either
-pinned to a value or left as a *commented* line with a reason — an omitted key is
-a rejected typo, never a silent "model default". What ships is
-behaviour-unchanged from before the effort: `temperature = 0.0` (greedy), every
-other param the model's own default.
+The file lists **every** decoding parameter the models accept, each either pinned
+to a value or left as a *commented* line explaining why. An omitted key is a
+typo the loader rejects, never a silent fallback to a model default. The shipped
+values keep the models greedy and deterministic: `temperature = 0.0`, everything
+else left to the model's own default.
 
-| Param | Shipped state | Why |
+| Param | Shipped state | Notes |
 | --- | --- | --- |
 | `temperature` | pinned `0.0` | Greedy decoding; the model's own default is `1.0`. |
-| `candidate_count` | pinned `1` | Reserved Self-MoA lever; the loader **rejects any value ≠ 1**. |
-| `top_p`, `top_k`, `presence_penalty`, `frequency_penalty` | **unset** | Model-dependent with no published per-class constant — pinning a guess would claim a decision nobody made. |
+| `candidate_count` | pinned `1` | Reserved for future multi-candidate sampling; the loader **rejects any value ≠ 1**. |
+| `top_p`, `top_k`, `presence_penalty`, `frequency_penalty` | **unset** | No documented per-class default to pin; left to the model. |
 | `seed` | **unset** | No numeric default; best-effort, **not** a reproducibility guarantee. |
 | `max_output_tokens` | **unset** | Uncapped up to the model ceiling of `65,536`. |
 | `thinking` | **unset** | Leaves the model's preset per-class budget. |
 
-The unset states are sourced from research
-([ticket 04](../.wayfinder/model-tuning/tickets/04-per-class-decoding-defaults.md)):
-where Google documents a value as model-dependent with no rendered per-class
-number, the file leaves it unset rather than inventing one.
+A parameter is left unset wherever the model gives no published per-class value
+to pin — inventing one would bake in a number nobody measured. To find a better
+value, measure it: see [Tuning the models](../evals/TUNING.md).
 
-`thinking` is a per-tier mixed scalar resolved to a class-legal budget:
+`thinking` is a per-tier scalar resolved to a class-legal budget:
 
 - **unset** → the model's preset per-class budget (today's default — **not**
   dynamic allocation).
@@ -68,10 +67,10 @@ and never overridable: `response_schema` (ADK *raises*), `response_mime_type`
 (silently discarded), `stop_sequences` (would truncate mid-token), and
 `http_options` (owned by `resilience.toml`).
 
-Tuning is a reviewed edit to the file, promoted by an eval sweep (see
-[The eval gate](#the-eval-gate-and-provenance) below) — not an ad-hoc production
-change. The `STRIDE_SAMPLING_*` env vars exist only as a recorded, eval-gated
-escape hatch, documented [below](#sampling-overrides-deploy-time-recorded).
+Tuning is a reviewed edit to this file, backed by an eval measurement (see
+[The eval gate and provenance](#the-eval-gate-and-provenance) below) — not an
+ad-hoc production change. The `STRIDE_SAMPLING_*` environment variables exist
+only as a recorded escape hatch, documented [below](#sampling-overrides).
 
 ### Resilience
 
@@ -104,12 +103,12 @@ These override the tier strings only; the node-to-tier mapping stays in the
 file. The same pinned-string rule applies — an alias or preview build is
 rejected.
 
-### Sampling overrides (deploy-time, recorded)
+### Sampling overrides
 
 `STRIDE_SAMPLING_{TIER}_{PARAM}` retunes one tier's decoding at deploy time
 without an image rebuild, validated **identically** to a file value (an
 out-of-range override fails closed exactly like one in the file). `{TIER}` is
-`FLASH` or `PRO`; `{PARAM}` is one of the **offered** params below.
+`FLASH` or `PRO`; `{PARAM}` is one of the four **offered** params below.
 
 | Variable | Effect |
 | --- | --- |
@@ -118,13 +117,13 @@ out-of-range override fails closed exactly like one in the file). `{TIER}` is
 | `STRIDE_SAMPLING_{TIER}_SEED` | Overrides the tier's `seed`. |
 | `STRIDE_SAMPLING_{TIER}_THINKING` | Overrides the tier's `thinking` (`off`/`auto`/int). |
 
-Only these four params are overridable. A var naming a **reserved**
-(`candidate_count`) or **forbidden** param raises `not overridable`; an unknown
-tier or a set-but-empty value also raises. This is deliberately a **recorded,
-eval-gated escape hatch**, not the tuning path: overrides flow into the resolved
-values, so the run's provenance fingerprint captures them, and a run on
-un-blessed sampling reads as uncertified (see below). Retune for real with a
-reviewed file diff plus a sweep, not a standing override.
+Only these four params are overridable. A variable naming a reserved
+(`candidate_count`) or forbidden param raises `not overridable`; an unknown tier
+or an empty value also raises. Treat this as a temporary escape hatch, not the
+way you tune: an override is recorded in the run's provenance fingerprint, so a
+run using one reads as **uncertified** (see below). To change sampling for real,
+edit the file and back it with a measurement — see
+[Tuning the models](../evals/TUNING.md).
 
 ### The eval gate and provenance
 
@@ -136,19 +135,19 @@ one hash keyed on the *served* model. What makes a result defensible is that
 fingerprint, recomputable from the recorded clear block; the `seed` is
 best-effort and guarantees nothing. See [Report Schema](Report-Schema.md#provenance).
 
-`evals/blessed-fingerprints.toml` records, per node, the fingerprints a
-sanctioned baseline sweep blessed. The eval path **always** certifies a run's
-fingerprints against it: a fingerprint absent from its node's set is
-*uncertified*, and an uncertified run is never silently folded into a trusted
-aggregate. Override-drift and served-build-drift are caught identically — both
-just produce a fingerprint that is not in the set. The sets ship **empty** (no
-live sweep has run — out of scope, no Vertex here), so every real run reads as
-uncertified until a baseline sweep promotes one; hard-fail is an off-by-default
-CI knob (`--require-certified`). A sweep's `promote` step is the single write
-path: one winning config both re-pins `sampling.toml` in place and derives the
-blessed fingerprints, so the two cannot drift. The live sweep and the tuned
-numbers themselves are out of scope — `temperature = 0` remains the shipped
-default.
+`evals/blessed-fingerprints.toml` records, per node, the fingerprints of
+configurations a measured run has blessed. The eval harness certifies every run
+against it: a fingerprint that isn't in a node's blessed set marks the run
+**uncertified**, and an uncertified run's scores are never treated as a trusted
+baseline. This catches both an unexpected sampling override and an unannounced
+model-build change — either one produces a fingerprint that isn't on the list.
+
+The blessed sets start **empty**, so until you promote a measured baseline every
+run reads as uncertified; that's surfaced, not fatal, unless you pass
+`--require-certified`. Promoting a winner updates the config and the blessed
+list together (one step, so they can't disagree) — see
+[Tuning the models](../evals/TUNING.md#step-5--promote-the-winner). The shipped
+default is `temperature = 0` until a measurement replaces it.
 
 ### Resilience overrides
 
@@ -168,14 +167,14 @@ Required by the [`/v1` API](HTTP-API.md); the in-process engine does not use the
 | `STRIDE_PING_AUDIENCE` | Expected audience. |
 | `STRIDE_PING_JWKS_URL` | JWKS endpoint for signature verification. |
 
-### Vertex environment (out of scope for this repo)
+### Vertex environment
 
 Reaching the models needs a configured Google Vertex environment — Application
 Default Credentials plus the project and location the `google-adk` client reads
 (typically `GOOGLE_CLOUD_PROJECT`, `GOOGLE_CLOUD_LOCATION`, and
-`GOOGLE_GENAI_USE_VERTEXAI=1`). Provisioning that environment is deliberately out
-of scope here; the code assumes it is correctly configured. Offline tests and
-the in-memory [stub runner](Integration-Guide.md) need none of it.
+`GOOGLE_GENAI_USE_VERTEXAI=1`). The code assumes this is correctly configured.
+Offline tests and the in-memory [stub runner](Integration-Guide.md) need none of
+it.
 
 ## Input limits
 
