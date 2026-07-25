@@ -1,187 +1,173 @@
 # Blessing a golden case
 
-The one-time, offline workflow that turns a system description into a golden
-case. Nothing here runs at analysis time and nothing here is interactive —
-per-analysis human review is out of scope for this effort. Authored with the
-phase-1 corpus (wayfinder ticket 022); the phase-2 expansion follows the same
-steps.
-
-The whole point of this document is **step 3**. Everything else is bookkeeping.
+How to turn a system description into a golden case the evals can score against.
+This is a one-time, offline authoring task — nothing here runs during a live
+analysis. The whole point of the document is **step 3**; everything else is
+bookkeeping around it.
 
 ## What a case is
 
-Two artifacts plus their input, per wayfinder ticket 009 decision 1:
+Two artifacts plus the input they're built from:
 
 ```
 evals/corpus/<NN>-<slug>/
-  source.md       the submitted text — the exact input the service would receive
-  model.json      the blessed SystemModel; must pass the shipped validator
+  source.md       the submitted text — exactly what the service would receive
+  model.json      the blessed System Model; must pass the shipped validator
   threats.json    the reference threat set, written against model.json's IDs
-  corrections.md  the bootstrap → blessed diff, and what it says about `extract`
+  corrections.md  how the model was corrected against the source, and what that says
   case.json       metadata: domain, exemplar proximity, provenance, source_sha256
 ```
 
-`evals/judge_calibration/` holds the hand-labelled judge fixtures:
-`build_pairs.py` carries the labels, `pairs.json` is generated from it.
+The judge fixtures live alongside, in `evals/judge_calibration/`:
+`build_pairs.py` holds the hand labels, and `pairs.json` is generated from it.
 
-`python evals/verify_corpus.py` checks everything mechanical about the above and
-must be green before a case merges. `--write-sha` stamps `source_sha256`.
+Run `python evals/verify_corpus.py` to check everything mechanical about the
+above; it must be green before a case merges. `--write-sha` stamps
+`source_sha256`.
 
 ## The workflow
 
 ### 1. Write the source text
 
-The input is what a front-end user would actually submit: prose, bullets, a
-rough dump. **Semi-structured and incomplete on purpose.** A description with no
-gaps in it tests nothing — the service's controlling behaviour is that
-unstated facts become `unknown`, and a case with no unknowns cannot exercise it.
+The input is what a real user would submit: prose, bullets, a rough dump —
+**semi-structured and incomplete on purpose**. A description with no gaps tests
+nothing, because the behaviour that matters most is how the service handles what
+the text *doesn't* say (unstated facts become `unknown`). A case with no unknowns
+can't exercise that.
 
-Size the system so the finished model lands at **8–20 elements**. That band is
-not a style preference: reference threat sets must be *exhaustively* enumerable
-by a human, because every real threat the SME failed to write down scores as a
-false positive against the tool (ticket 009 decision 5).
+Size the system so the finished model lands at **8–20 elements**. That's not a
+style preference: the reference threat set has to be exhaustively enumerable by a
+human, because any real threat the author forgets to write down will score
+against the tool as a false positive.
 
-**Sanitization is mandatory and non-negotiable for internal cases.** No real
-hostnames, IPs, bucket names, account identifiers, credentials, customer data,
-or employee names. The phase-1 internal cases (01–04) are synthetic systems
-written for this corpus rather than sanitized copies of real ones, which is the
-safer default: there is nothing to leak by omission. If a future case is derived
-from a real system, sanitize before the text is written down, not afterwards.
+**Sanitization is mandatory for anything based on a real system.** No real
+hostnames, IPs, bucket names, account IDs, credentials, customer data, or
+employee names. The safest default — and what the synthetic cases do — is to
+invent a plausible system rather than sanitize a real one: there's nothing to
+leak by omission. If a case *is* derived from a real system, sanitize before you
+write the text down, not after.
 
-For cookbook conversions, record the source entry and its licence in
-`case.json`'s `provenance`. The OWASP Threat Model Cookbook is CC-BY 4.0 for
-textual and graphical representations, so attribution is required. If the source
-diagram is larger than the 8–20 band, convert a **scoped subset** whose removal
-does not change any remaining element's attributes, and say what you dropped.
+For a case converted from the OWASP Threat Model Cookbook (CC-BY 4.0), record the
+source entry and its licence in `case.json`. If the source diagram is larger than
+the 8–20 band, convert a **scoped subset** whose removal doesn't change any
+remaining element's attributes, and note what you dropped.
 
-### 2. Bootstrap the model
+### 2. Draft the model
 
-Run the extraction node over `source.md` and keep its output as the candidate
-model. Hand-authoring a DFD per case is the expensive path for no gain the
-correction pass does not also give (ticket 009 decision 2).
+Run the extraction step over `source.md` and keep its output as the starting
+draft of the model:
 
-#### Bootstrapping without credentials
+```sh
+python -m evals.harness.run run --mode extraction --case <NN>-<slug>
+```
 
-Phase 1 was authored in an environment with no Vertex access, so the bootstrap
-was produced by an **agent stand-in** running the shipped `prompts/extract.md`
-rather than by the pinned `extract` node. Every phase-1 case records
-`"bootstrap": "agent-stand-in"` in `case.json` to mark this.
-
-The consequence is specific and worth stating plainly: the bootstrap→blessed
-diffs in `corrections.md` are signal about **the prompt**, not about the pinned
-Flash model's own blind spots. They are still the right shape of evidence — and
-the corpus is already usable — but the moment credentials exist, re-running
-`extract` over each `source.md` and re-recording the diff is cheap and turns
-that signal into the thing decision 2 actually asked for. Nothing else in the
-case changes: the blessed model is blessed against the *source text*, not
-against whatever produced the candidate.
+Hand-authoring a diagram from scratch is the expensive path and buys nothing the
+correction pass in step 3 doesn't already give.
 
 ### 3. Correct the model against the source text
 
-**Work the checklist against `source.md`. Do not read the candidate model
-looking for things that seem wrong.** This is the entire mitigation for the
-anchoring risk decision 2 accepted: correcting a plausible artifact is
-measurably less thorough than authoring from a blank page, so the reviewer's
-attention has to be driven by the input, not by the candidate.
+This is the real work. **Read the source text and check the model against it —
+do not read the draft model looking for things that seem wrong.** Correcting a
+plausible-looking artifact is measurably less thorough than checking it against
+the source, so let the *input* drive your attention, not the draft.
 
-In practice: take the source text a sentence at a time and ask, of each
-sentence, what the model must say — then go and check that it says it.
+In practice: take the source one sentence at a time and ask what the model must
+say about that sentence — then go confirm it says it. Run this checklist on each
+pass:
 
-Checklist, per pass over the source text:
-
-1. **Every noun that is a thing.** Does an element exist for it, of the right
-   type? Watch for things mentioned outside the main narrative path — an actor
-   introduced in a closing paragraph is the most commonly dropped element.
-2. **Every verb that is an interaction.** Does a flow exist for it? Is its
+1. **Every noun that's a thing** — is there an element for it, of the right type?
+   Watch for things mentioned in passing; an actor introduced in a closing
+   sentence is the most commonly dropped element.
+2. **Every verb that's an interaction** — is there a flow for it? Is its
    direction *who initiates*, not which way the data travels? Pull, poll, and
    consume interactions are routinely reversed.
-3. **Every security-relevant attribute.** For `authentication`,
-   `encryption_in_transit`, `encryption_at_rest`, `exposure`,
-   `data_classification`: does the text state it? If not, is it `unknown`?
-   A plausible value the text never gave is the most common and most damaging
-   error, and an *invented absence* ("no encryption") is worse than an invented
-   control, because analysts file confident findings on it.
-4. **Every stated qualifier.** "Shared", "never rotated", "full read/write",
-   "does not check" — is it in the attribute an analyst reads, or did it only
-   survive in `source_excerpt`? A qualifier stranded in an excerpt is invisible
-   downstream. This is the corpus's most repeated extraction failure.
-5. **Every inference.** Does each non-`unknown` value the text did not state
-   appear in `assumptions` with a basis? An inference in an attribute but not in
-   `assumptions` is a bug.
-6. **Zones and asset tags.** Does every entity, process and store sit in a
-   boundary the text implies? Are asset tags driven by what the data *is*, not
+3. **Every security-relevant attribute** — for authentication, encryption in
+   transit, encryption at rest, exposure, and data classification: does the text
+   state it? If not, is it `unknown`? A plausible value the text never gave is
+   the most common and most damaging error — and inventing an *absence* ("no
+   encryption") is worse than inventing a control, because analysts file
+   confident findings on it.
+4. **Every stated qualifier** — "shared", "never rotated", "full read/write",
+   "does not check": is it in an attribute an analyst will read, or did it only
+   survive as a quoted excerpt? A qualifier stranded in a quote is invisible
+   downstream. This is the single most repeated extraction failure.
+5. **Every inference** — does each non-`unknown` value the text *didn't* state
+   appear in the model's `assumptions` list, with a basis? An inferred value with
+   no matching assumption is a bug.
+6. **Zones and asset tags** — does every entity, process, and store sit in a
+   trust zone the text implies? Are asset tags driven by what the data *is*, not
    by what the element is *called*?
 
-Record every correction in `corrections.md`: path, bootstrap value, blessed
-value, and the source-text reason. Close with a short **Signal** section naming
-the pattern — that accumulating record is what the extraction eval's error
-weighting will eventually be derived from.
+Record every correction in `corrections.md`: the path, the draft value, the
+corrected value, and the reason from the source text. Close with a short summary
+of the pattern you saw — that record is what later informs how extraction errors
+are weighted.
 
 ### 4. Write the reference threat set
 
-Against the blessed model's element IDs, one entry per threat:
+Write one entry per threat, against the corrected model's element IDs:
 `category`, `affected_element_ids`, `claim`, `tier`, `severity`, `notes`.
 
-- **`claim` is the matching target.** One sentence, attacker-action phrasing:
-  *who does what to what*. Not a control recommendation, not a description of a
-  weakness — the judge rules on whether two claims describe the same attacker
-  action against the same target, and a claim phrased as a missing control gives
-  it nothing to compare.
-- **Enumerate exhaustively**, lane by lane. Every case carries at least one
-  reference in all six lanes; `verify_corpus.py` enforces it.
-- **Tier honestly.** `must-find` means *missing this means the tool does not
-  work*. If everything is must-find the gate is unreachable; if nothing is, it
-  is vacuous.
-- **Severity is `likelihood` and `impact` only.** The band derives from the
-  shipped matrix — never write one.
+- **`claim` is what the judge matches on.** One sentence, phrased as an attacker
+  action — *who does what to what*. Not a control recommendation, not a
+  description of a weakness. A claim written as a missing control gives the judge
+  nothing to compare.
+- **Enumerate exhaustively, lane by lane.** Every case must carry at least one
+  reference threat in each of the six STRIDE categories; `verify_corpus.py`
+  enforces it.
+- **Tier honestly.** `must-find` means *if the tool misses this, it doesn't
+  work*. If everything is must-find the bar is unreachable; if nothing is, it's
+  meaningless.
+- **Severity is `likelihood` and `impact` only** — the band is derived from the
+  shipped matrix, so never write one.
 - **Keep same-element threats in different lanes distinct.** Reading a flow and
-  modifying it are two claims, and the pair teaches the judge the distinction it
-  most often gets wrong.
-- `notes` is SME rationale. Never scored, always worth writing: it is what makes
-  a later reviewer able to disagree with you specifically.
+  modifying it are two different claims; the pair teaches the judge the
+  distinction it most often gets wrong.
+- **`notes` is your rationale.** Never scored, always worth writing — it's what
+  lets a later reviewer disagree with you specifically.
 
 ### 5. Label the judge-calibration pairs
 
-In the same session, hand-label candidate pairs match/no-match in
-`build_pairs.py` (ticket 009 decision 13). These are the ground truth for the
-**≥90% judge–human agreement bar**, and they are what lets the scorer be
-unit-tested with zero Vertex calls.
+In the same sitting, hand-label candidate threat pairs as match / no-match in
+`build_pairs.py`. These are the ground truth for the **≥90% judge–human agreement
+bar**, and they're what lets the scorer be tested with no live calls at all.
 
-- Label **within lane only** — the mechanical prefilter means cross-lane pairs
+- **Label within a category only** — the prefilter means cross-category pairs
   never reach the judge.
-- Weight toward **hard negatives**: same element, same lane, *different attacker
-  action*. Easy negatives measure nothing. A judge that says "match" too readily
-  inflates recall silently, which is the expensive direction of error.
-- Include pairs that differ only in **which element they cite**. Those are
-  matches: matching is decided on the claim, and element agreement is scored as
-  its own dimension (decision 8).
-- Include candidates that assert facts the model does not support. Those are
-  no-match — and downstream they are `ungrounded`, the one gating bucket.
-- Keep the set from going lopsided; `verify_corpus.py` fails below 30% of either
-  label.
+- **Weight toward hard negatives:** same element, same category, *different
+  attacker action*. Easy negatives measure nothing, and a judge that says "match"
+  too readily inflates recall silently — the expensive direction to be wrong.
+- **Include pairs that differ only in which element they cite.** Those are
+  matches: matching is decided on the claim, and element agreement is scored
+  separately.
+- **Include candidates that assert facts the model doesn't support.** Those are
+  no-match — and downstream they're the "ungrounded" bucket that counts against
+  the tool.
+- **Keep the set balanced;** `verify_corpus.py` fails if either label drops below
+  30%.
 
 ### 6. Bless and merge
 
-One reading session, one PR, one approval. The reviewer signs off on `source.md`,
-`model.json`, `threats.json` and the labelled pairs **together** — they are one
-artifact, and reviewing them separately loses the property that the threat set
-is exhaustive *against that model*.
+One reading session, one pull request, one approval. The reviewer signs off on
+`source.md`, `model.json`, `threats.json`, and the labelled pairs **together** —
+they're one artifact, and reviewing them separately loses the property that the
+threat set is exhaustive *against that model*.
 
 Merge checklist:
 
 - [ ] `python evals/verify_corpus.py` is green
 - [ ] the model was corrected against the source text, per step 3
-- [ ] `corrections.md` records every correction and its signal
+- [ ] `corrections.md` records every correction and the pattern behind it
 - [ ] sanitization confirmed; provenance and licence recorded in `case.json`
 - [ ] `source_sha256` stamped (`--write-sha`)
 - [ ] tier assignment reviewed: some must-find, not all
 
-## Feeding the corpus from real runs
+## Growing a case from real runs
 
-References are non-exhaustive by construction and converge from real output, not
-from anyone trying to be exhaustive up front (ticket 009 decision 11). Each
-scoring run surfaces `valid-unlisted` threats — grounded, plausible, simply not
-in the reference set. Recurring ones are reviewed and promoted into the
-reference set at the next blessing pass, which is a repeat of steps 4–6 for the
-affected case only. Promoting a threat is a reviewable diff with a human
-explaining why; it is never automatic.
+Reference sets aren't meant to be exhaustive up front — they converge from real
+output. Each scoring run surfaces grounded, plausible threats the tool produced
+that simply aren't in the reference set (`unlisted_for_promotion` in the
+artifact). Review the recurring ones and promote them into the reference set at
+the next blessing pass — which is just steps 4–6 again, for that one case.
+Promoting a threat is always a reviewed change with a human explaining why; it's
+never automatic.

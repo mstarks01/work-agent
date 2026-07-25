@@ -1,152 +1,161 @@
 # Evals
 
-The golden-case corpus and its fixtures, designed in wayfinder ticket 009 and
-authored in ticket 022. The harness that consumes them is ticket 023.
+How we measure the analysis quality: a corpus of hand-blessed "golden" cases, a
+scorer that compares the service's output against them, and an LLM judge that
+decides when two threats describe the same thing.
 
-Nothing in this tree ships in the production image: the corpus, the judge prompt
-and the scorer are eval-side by design (ticket 009 decision 14), and the package
-build only takes `src/stride_service`.
+Nothing in this directory ships in the production image — the corpus, the judge,
+and the scorer are test-side only, and the package build takes just
+`src/stride_service`. Two companion guides:
+
+- **[BLESSING.md](BLESSING.md)** — how to author a new golden case.
+- **[TUNING.md](TUNING.md)** — how to use these evals to improve the models.
 
 ## Layout
 
 ```
 evals/
   README.md                     this file
-  BLESSING.md                   the SME workflow that produces a case
+  BLESSING.md                   how to author a golden case
+  TUNING.md                     how to tune the models against the corpus
   verify_corpus.py              mechanical checks over everything below
+  blessed-fingerprints.toml     the sampling configs approved by a measured run
   corpus/<NN>-<slug>/
     source.md                   the submitted text
-    model.json                  blessed SystemModel (passes the shipped validator)
-    threats.json                reference threat set, against model.json's IDs
-    corrections.md              bootstrap → blessed diff and its signal
+    model.json                  the blessed System Model (passes the shipped validator)
+    threats.json                the reference threat set, keyed to model.json's IDs
+    corrections.md              notes on how the model was corrected, and why
     case.json                   metadata, provenance, source_sha256
   judge_calibration/
-    build_pairs.py              the hand labels (edit this)
-    pairs.json                  generated fixtures (never hand-edit)
-  config/judge.toml             the separately-pinned judge (ticket 009 dec. 12)
-  prompts/                      the judge's prompts — NOT the shipped prompts/
-  harness/                      the scorer and the eval modes (ticket 023)
+    build_pairs.py              the hand-labelled judge fixtures (edit this)
+    pairs.json                  generated from build_pairs.py (never hand-edit)
+  config/judge.toml             the judge's own pinned model and settings
+  prompts/                      the judge's prompts (NOT the shipped prompts/)
+  harness/                      the scorer and the eval runner
 ```
-
-The harness was fitted to this layout, not the reverse — content before code,
-the same order tickets 019/020 used.
 
 ## The harness
 
 | Module | What it owns |
 |---|---|
-| `harness/reference.py` | `ReferenceThreat` and the fail-closed corpus loader |
-| `harness/structural.py` | Tier 1 gates — the only ones that block in phase 1 |
-| `harness/judge.py` | the pinned judge, its two calls, and the `Judge` seam |
-| `harness/scorer.py` | lane prefilter → judge → assignment → buckets → severity |
-| `harness/calibration.py` | judge-vs-human agreement over `judge_calibration/` |
-| `harness/modes.py` | the three eval modes over the shipped graph |
-| `harness/run.py` | the CLI |
+| `harness/reference.py` | The `ReferenceThreat` type and the fail-closed corpus loader. |
+| `harness/structural.py` | The structural gates — the only checks that fail a run. |
+| `harness/judge.py` | The pinned judge, its two calls, and the `Judge` seam for testing. |
+| `harness/scorer.py` | The scoring pipeline: prefilter → judge → match → bucket → severity. |
+| `harness/critic_yield.py` | What the critic added and removed, scored on both sides. |
+| `harness/calibration.py` | Judge-vs-human agreement over the labelled fixtures. |
+| `harness/certify.py` | The eval gate: certify a run's config, and promote a winner. |
+| `harness/modes.py` | The three run modes over the shipped graph. |
+| `harness/run.py` | The command-line entry point. |
 
-Sampling is **not** here: `config/sampling.toml` at the repo root is read by
-production and the eval suite alike (ticket 009 decision 15), because grading a
-configuration you do not ship is how a suite goes green while production
-drifts. The judge's own model and temperature are pinned separately in
-`evals/config/judge.toml`, since a judge upgrade re-scores history.
+Sampling parameters are **not** here: the harness reads `config/sampling.toml`
+at the repo root, the exact same file production reads. Grading a configuration
+you don't ship is how a test suite goes green while production quietly drifts.
+The judge's own model is pinned separately in `evals/config/judge.toml`, because
+changing the judge re-scores every past result.
 
-Every artifact carries a `models` block: the tier and judge strings the run
-asked for, their config versions, and `judge_served` — the model versions
-Vertex reported actually serving the judge calls. Ticket 026: Gemini 2.5+
-stable identifiers name the current build rather than a frozen one, so *what
-answered* is what makes two runs comparable. Two different `judge_served`
-values across runs mean the build moved; that is a model change, not a
-regression, and nothing else in the artifact would show it.
+Every run also records which model versions Vertex actually served, not just
+which ones it asked for. Stable model identifiers name the current build rather
+than a frozen one, so two runs that report different served versions have run on
+different models — that's a model change, not a regression, and nothing else in
+the output would reveal it.
 
 ## Running
 
+Offline — no credentials, safe on every change:
+
 ```sh
-python evals/verify_corpus.py                 # check every case and the fixtures
-python evals/verify_corpus.py --write-sha     # restamp source_sha256
-python evals/judge_calibration/build_pairs.py # regenerate pairs.json
+python evals/verify_corpus.py                 # check every case and the judge fixtures
+python evals/verify_corpus.py --write-sha     # restamp source_sha256 after editing a source
+python evals/judge_calibration/build_pairs.py # regenerate pairs.json from the labels
+pytest tests/test_evals_*.py tests/test_corpus_lints.py
+```
 
-pytest tests/test_evals_*.py tests/test_corpus_lints.py   # offline, no credentials
+Live — needs a configured Vertex environment (see
+[Configuration](../docs/Configuration.md#vertex-environment)):
 
-# live: needs ADC for Vertex (IAM, never API keys)
+```sh
 python -m evals.harness.run run --mode analysis --out artifact.json
 python -m evals.harness.run run --mode extraction --case 01-payments-checkout
 python -m evals.harness.run calibrate --out agreement.json
 ```
 
-The loop these commands drive — establishing a baseline band, changing one
-lever, comparing against the band, and promoting a winner — is
-[`TUNING.md`](TUNING.md).
+A `run` fails (exits non-zero) **only** on a structural problem — a report that
+doesn't parse, references that don't resolve, a severity that contradicts the
+matrix, or a summary that disagrees with its own contents. Every quality metric
+below is computed, printed, and written to the artifact, but does **not** fail
+the run: a gate that fires before anyone knows the normal range just trains
+people to bypass it. `calibrate` is the exception — it fails below the 90%
+judge–human agreement bar, because a judge that disagrees with humans makes
+every other number meaningless.
 
-`run` exits non-zero only on **Tier 1 structural** failures. Must-find recall,
-lane and element accuracy, the ungrounded rate, the severity confusion and the
-near/far exemplar delta and critic yield are all computed, printed and written
-to the artifact — and none of them block, until ticket 032 has the ~5 baseline
-sweeps that say what normal looks like. `calibrate` exits non-zero below the 90% agreement bar;
-failing it means the judge prompt needs work, not a lowered bar.
+## What the metrics mean
 
-## Metrics, and what they are not
+Every number here is measured **by the judge** — use them to compare
+configurations and track movement, never as absolute scores or against another
+tool's published figures.
 
-- **must-find recall** — per case, not aggregate: an aggregate hides one case
-  failing completely, which is the failure that matters.
-- **lane accuracy** — observable only because unmatched threats get a
-  cross-lane pass. A misfiled threat is recorded as a lane error and the
-  reference stays a miss; ticket 013 rejects misfiled threats rather than
-  recategorizing them.
-- **element accuracy** — scored, never a prefilter. A threat that cites the
-  process where the SME cited the flow at its endpoint still matches.
-- **ungrounded rate** — the only gating bucket among unmatched threats.
-  `valid-unlisted` is explicitly *not* a failure, and recurring entries are
-  surfaced in the artifact for promotion into the reference set.
-- **`needs-info`** — never a false positive. Its own bucket, never adjudicated.
-- **critic yield** — always read as a *pair*. `killed-ungrounded` is the critic
-  earning the most expensive node in the graph; `killed-real` is the same critic
-  destroying findings that matched a reference, and it is the number that can
-  veto ticket 004's generator-critic pattern outright. A kill count on its own
-  says neither. Both come from scoring the pre-critic draft union and the
-  report through the *same* scorer on the same claim string (the title), so the
-  two sides are comparable by construction; the second pass replays memoized
-  judge rulings and costs almost nothing. Comparators: Semgrep's assistant
-  kills ~20% at 92–96% agreement with human triage, unfiltered LLM enumeration
-  runs ~86% raw false positives.
+- **must-find recall** — did the tool find the threats a case marks as
+  essential? Reported **per case**, never averaged: an average hides one case
+  failing completely, which is the failure that matters most.
+- **lane accuracy** — was each threat filed under the right STRIDE category? A
+  misfiled threat counts as a category error, not a near-miss.
+- **element accuracy** — did the threat cite the right element? Scored, but never
+  used to reject a match — citing the process where the reference cited the flow
+  at its endpoint still counts as the same threat.
+- **ungrounded rate** — of the threats the tool produced that aren't in the
+  reference set, how many assert facts the model doesn't support? This is the one
+  "extra threat" bucket that counts against the tool; a plausible, grounded extra
+  does not.
+- **critic yield** — always read as a **pair**: how many junk threats the critic
+  removed (good) *against* how many real threats it removed (bad). A kill count
+  on its own tells you nothing about which of those two is happening.
+- **near/far exemplar delta** — see below.
 
-## Phase-1 corpus
+## The corpus
 
-Six cases (ticket 009 decision 19), each 8–20 elements so its reference set is
-exhaustively enumerable by a human.
+Twelve cases, each sized so a human can enumerate its threats exhaustively
+(roughly 8–20 elements). Case `01` is the **control** and is not optional: every
+worked example in the shipped prompts is drawn from one payments system, and
+that can bias the tool toward payments-shaped threats. You can't see that bias as
+an absolute score — only as the **gap** between recall on the near-domain case
+(`01`) and the far-domain cases (everything else). Without `01` there's nothing
+to compare against. That gap is tracked and watched, but never fails a build.
 
-| Case | Domain | Exemplar proximity | Provenance |
+| Case | Domain | Proximity | Source |
 |---|---|---|---|
-| `01-payments-checkout` | payments | **near** | internal (synthetic) |
-| `02-iot-fleet-telemetry` | IoT fleet | far | internal (synthetic) |
-| `03-batch-data-pipeline` | batch data | far | internal (synthetic) |
-| `04-ml-inference-service` | ML serving | far | internal (synthetic) |
-| `05-cookbook-queue-webapp` | web app + queue | far | OWASP Threat Model Cookbook (CC-BY 4.0) |
-| `06-cookbook-online-game` | online game | far | OWASP Threat Model Cookbook (CC-BY 4.0) |
+| `01-payments-checkout` | payments | **near** | synthetic |
+| `02-iot-fleet-telemetry` | IoT fleet | far | synthetic |
+| `03-batch-data-pipeline` | batch data | far | synthetic |
+| `04-ml-inference-service` | ML serving | far | synthetic |
+| `05-cookbook-queue-webapp` | web app + queue | far | OWASP Threat Model Cookbook |
+| `06-cookbook-online-game` | online game | far | OWASP Threat Model Cookbook |
+| `07-cicd-store-deploy` | CI/CD release | far | synthetic |
+| `08-sso-identity-broker` | identity & access | far | synthetic |
+| `09-cookbook-sokify-retail` | online retail | far | OWASP Threat Model Cookbook |
+| `10-cookbook-generic-cms` | content management | far | OWASP Threat Model Cookbook |
+| `11-sparse-shift-scheduling` | workforce scheduling | far | synthetic (sparse input) |
+| `12-overclaiming-supplier-portal` | supplier management | far | synthetic (over-claiming input) |
 
-Case 01 is the **control** and is not optional. All 18 analyst exemplars in
-`prompts/` are anchored on one fictional payment service, and few-shot anchoring
-on a single domain can bias recall toward its threat shapes. That bias is not
-measurable as an absolute score — only as the **delta** between near- and
-far-exemplar recall. Without case 01 there is nothing to subtract from.
+The Cookbook cases come from the [OWASP Threat Model
+Cookbook](https://github.com/OWASP/threat-model-cookbook) (CC-BY 4.0), converted
+to the kind of prose a user would submit; each case records its exact source and
+licence in `case.json`. Cases `11` and `12` are deliberately adversarial — one
+with input too sparse to model confidently (which should yield `needs-info`
+threats, not invented ones), one that over-claims security controls the text
+doesn't justify.
 
-The delta is a tracked, deliberately **non-gating** number: a large delta is a
-finding to act on, not a build to break.
+The corpus checks in `verify_corpus.py` are deterministic and need no
+credentials, so they run on every PR (via `tests/test_corpus_lints.py`) and stay
+runnable by hand.
 
-The corpus checks are credential-free and deterministic, so they run on every
-PR (ticket 009 decision 17); `tests/test_corpus_lints.py` runs
-`verify_corpus.py`'s checks in the test job, and the script stays runnable by
-hand for corpus authors.
+## Things to keep in mind
 
-## Caveats to carry forward
-
-- **Bootstrap provenance.** Phase-1 candidate models were produced by an agent
-  stand-in running `prompts/extract.md`, not by the pinned `extract` node, so
-  the `corrections.md` diffs are signal about the prompt rather than about that
-  model's blind spots. See BLESSING.md, "Bootstrapping without credentials".
-- **Judge-relative metrics.** Once scoring exists, recall and precision numbers
-  are relative to the judge and its prompt. Valid for tracking movement and
-  comparing configurations; not absolutes, and not comparable to published
-  figures from other tools.
-- **Deferred to phase 2** (ticket 025): the two adversarial cases (sparse input
-  yielding `needs-info`, and a validity-gate failure exercising `repair` →
-  `reject`) and the remaining six cases. The binding cost is serialized SME
-  time, not code.
+- **The metrics are judge-relative.** Recall and precision numbers move *with*
+  the judge and its prompt. They're valid for tracking change and comparing
+  configurations, not as absolutes and not comparable to other tools' figures.
+- **Reference sets grow from real output.** They aren't meant to be exhaustive up
+  front. Each run surfaces grounded, plausible threats it produced that aren't in
+  the reference set; recurring ones get promoted into the reference set on the
+  next blessing pass (see [BLESSING.md](BLESSING.md)). Promotion is always a
+  reviewed change with a human explaining why.
