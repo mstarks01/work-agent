@@ -186,13 +186,31 @@ class Threat(DraftThreat):
 
 
 class NodeRun(BaseModel):
-    """Per-node execution metadata: which model ran, and for how long."""
+    """Per-node execution metadata: which model ran, its sampling identity, timing.
+
+    ``sampling_fingerprint`` is the generation-identity hash (ticket 07 /
+    ticket 03 §1): ``sha256(served model, resolved tier sampling)``, recomputable
+    from this node's served ``model`` and the report's top-level per-tier
+    ``sampling`` clear block. A deterministic FunctionNode carries neither a
+    model nor a fingerprint.
+    """
 
     model_config = ConfigDict(extra="forbid")
 
     node: str = Field(min_length=1, max_length=100)
     model: str | None = None  # None for deterministic FunctionNodes
+    sampling_fingerprint: str | None = Field(default=None, pattern=r"^[0-9a-f]{64}$")
     duration_ms: int = Field(ge=0)
+
+    @model_validator(mode="after")
+    def _fingerprint_needs_model(self) -> Self:
+        # A fingerprint keyed on the served model is incoherent without one; a
+        # deterministic node has neither.
+        if self.sampling_fingerprint is not None and self.model is None:
+            raise ValueError(
+                "sampling_fingerprint requires a served model on the same node"
+            )
+        return self
 
 
 class Job(BaseModel):
@@ -275,6 +293,15 @@ class StrideReport(BaseModel):
     job: Job
     input: InputRef
     nodes: list[NodeRun]
+    # The resolved per-tier decoding params this run used, in the clear, once
+    # per tier (ticket 07 / ticket 03 §1): tier name -> the tier's resolved
+    # sampling values (the serialized ``TierSampling``). Recorded as plain
+    # scalars, not the ``TierSampling`` model, so this low-level schema module
+    # stays free of the sampling/model_tiers import (which cycles back through
+    # skills). Each node's sampling_fingerprint is recomputable from its served
+    # model and its tier's entry here. Empty on reports with no LLM provenance
+    # (a stub-runner or eval-synthetic report).
+    sampling: dict[str, dict[str, float | int | None]] = Field(default_factory=dict)
     system_model: SystemModel
     boundary_crossings: list[BoundaryCrossing]
     threats: list[Threat]  # confirmed + needs-info, severity-ordered

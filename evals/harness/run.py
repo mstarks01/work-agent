@@ -32,6 +32,7 @@ from typing import Any
 
 from evals.harness import modes
 from evals.harness.calibration import AGREEMENT_BAR, load_pairs, measure_agreement
+from evals.harness.certify import CertifyResult, certify, load_manifest
 from evals.harness.critic_yield import (
     CriticYield,
     aggregate_yield,
@@ -77,8 +78,15 @@ def _select(cases: Sequence[GoldenCase], wanted: Sequence[str]) -> list[GoldenCa
 
 async def _run_mode(
     cases: Sequence[GoldenCase], mode: str
-) -> tuple[list[dict[str, Any]], list[str], dict[str, modes.AnalysisRun]]:
-    """Run one mode over the selected cases, collecting Tier 1 failures."""
+) -> tuple[list[dict[str, Any]], list[str], dict[str, modes.AnalysisRun], dict[str, str]]:
+    """Run one mode over the selected cases, collecting Tier 1 failures.
+
+    The pipeline's per-node fingerprints (ticket 07) come back too: they are a
+    property of the run's *configuration*, identical across cases, and are what
+    the eval gate certifies (ticket 08). A sweep varies the per-tier params (via
+    ``sampling.toml`` or a ``STRIDE_SAMPLING_*`` override) and each variant's run
+    carries its own fingerprints here.
+    """
     pipeline = modes.build_eval_pipeline(modes.MODE_ENTRIES[mode])
     failures: list[str] = []
     payloads: list[dict[str, Any]] = []
@@ -106,7 +114,7 @@ async def _run_mode(
         failures += [f"{case.id}: {issue}" for issue in issues]
         payloads.append({"case": case.id, "structural_issues": issues})
 
-    return payloads, failures, runs
+    return payloads, failures, runs, pipeline.node_fingerprints
 
 
 def _score_runs(
@@ -200,7 +208,13 @@ def _print_yields(yields: Sequence[CriticYield]) -> None:
 
 def command_run(args: argparse.Namespace) -> int:
     cases = _select(load_corpus(args.corpus), args.case)
-    payloads, failures, runs = asyncio.run(_run_mode(cases, args.mode))
+    payloads, failures, runs, node_fingerprints = asyncio.run(_run_mode(cases, args.mode))
+
+    # Never silently trust (ticket 08 / 03 §4): the verdict is always computed
+    # and surfaced, so an aggregate can never be read without knowing whether the
+    # generation identity behind it is a blessed baseline.
+    certification = certify(node_fingerprints, load_manifest())
+    _print_certification(certification)
 
     scores: list[CaseScore] = []
     yields: list[CriticYield] = []
@@ -216,9 +230,14 @@ def command_run(args: argparse.Namespace) -> int:
         "cases": [case.id for case in cases],
         "models": _models_record(judge),
         "gating": "tier-1-structural-only",
+        "certification": certification.to_json(),
+        "node_fingerprints": node_fingerprints,
         "structural_failures": failures,
         "mode_output": payloads,
+        # Aggregates carry the verdict so nothing downstream folds an
+        # uncertified run into a trusted number unaware.
         "scores": [score.to_json() for score in scores],
+        "trusted": certification.certified,
         "exemplar_delta": exemplar_delta(scores) if scores else None,
         "critic_yield": [entry.to_json() for entry in yields],
         "critic_yield_aggregate": aggregate_yield(yields) if yields else None,
@@ -230,7 +249,27 @@ def command_run(args: argparse.Namespace) -> int:
 
     for failure in failures:
         print(f"TIER 1 FAILURE: {failure}", file=sys.stderr)
-    return 1 if failures else 0
+    uncertified_blocks = args.require_certified and not certification.certified
+    if uncertified_blocks:
+        print(
+            "UNCERTIFIED: --require-certified is set and the run's fingerprints"
+            " are not blessed",
+            file=sys.stderr,
+        )
+    return 1 if failures or uncertified_blocks else 0
+
+
+def _print_certification(result: CertifyResult) -> None:
+    """Surface the gate verdict, always — certified or not."""
+    if result.certified:
+        print("certification: all node fingerprints blessed")
+        return
+    print(
+        f"certification: UNCERTIFIED — {len(result.uncertified)} node(s) not"
+        " blessed (aggregates are untrusted; --require-certified to hard-fail)"
+    )
+    for node in result.uncertified:
+        print(f"  {node.node}: {node.fingerprint}")
 
 
 def command_calibrate(args: argparse.Namespace) -> int:
@@ -271,6 +310,11 @@ def main(argv: Sequence[str] | None = None) -> int:
         "--no-scoring",
         action="store_true",
         help="run the graph and apply Tier 1 gates without spending judge calls",
+    )
+    run_parser.add_argument(
+        "--require-certified",
+        action="store_true",
+        help="fail the run when its fingerprints are not in the blessed manifest",
     )
     run_parser.set_defaults(func=command_run)
 

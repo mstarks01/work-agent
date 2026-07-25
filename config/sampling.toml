@@ -1,19 +1,62 @@
-# Sampling configuration (wayfinder ticket 009, decision 15) — read by both
-# the production graph and the eval suite, from this one file. Grading a
+# Sampling configuration (wayfinder model-tuning, tickets 02 / 04 / 05) — the
+# one file eval and production both read (ticket 009 decision 15). Grading a
 # configuration you do not ship is how a suite goes green while production
-# drifts, so there is no eval-only override and no env-var override: changing
-# sampling is a reviewable diff here.
+# drifts, so there is no eval-only copy: per-tier tuning is a reviewable diff
+# here, promoted by an eval sweep (ticket 08).
 #
-# temperature = 0 is a starting point, not a settled answer. Greedy decoding
-# reproduces the anchored exemplar pattern most closely (plausibly amplifying
-# the exemplar-domain bias the corpus measures as a near/far delta) and rules
-# out the Self-MoA recall lever (k = 2-3 at temperature > 0, union-merged and
-# critic-deduped). Ticket 025 measures 0 vs. the model default vs. k = 3 and
-# moves this number on evidence.
+# Keyed by model class (tier), reusing model_tiers.toml's node -> tier map:
+# `flash` runs extraction/normalization, `pro` the six STRIDE analysts and the
+# critic. Every decoding param the surface admits (ticket 01) is listed per
+# tier — pinned to a value, or left unset with a reason — so the file is the
+# full record of what each class runs on. An omitted key is no longer "model
+# default by accident": the loader rejects an unknown key, and a param that is
+# deliberately unset is a *commented* line, not a silent absence.
 #
-# Anything not listed is left to the model's own default deliberately: this
-# project has measured neither top_p nor thinking budget, and pinning an
-# unmeasured value would look like a decision that was never made.
+# Values Google documents as model-dependent with no published per-class
+# constant (top_p / top_k / penalties — ticket 04) are left unset rather than
+# invented: pinning a guessed number would claim a decision nobody made. The
+# shipped defaults are behaviour-unchanged from today — temperature = 0, every
+# other param the model's own default — because this effort ships the
+# *mechanism*; the tuned numbers are a later eval sweep (out of scope, no live
+# Vertex).
+#
+# Env overrides STRIDE_SAMPLING_{TIER}_{PARAM} retune the OFFERED params
+# (temperature, top_p, seed, thinking) at deploy time without an image rebuild,
+# validated exactly like the file value and captured by the run's provenance
+# fingerprint (tickets 03 / 07). Reserved params (candidate_count) and the
+# deliberately-absent set below cannot be set by env at all.
+#
+# Deliberately absent — the contract-breaking params, never in this file and
+# never overridable (ticket 01):
+#   response_schema     ADK *raises* if it appears on the generate config
+#   response_mime_type  silently discarded by ADK
+#   stop_sequences      would truncate structured output mid-token
+#   http_options        owned by resilience.toml, not sampling
 
-version = 1
-temperature = 0.0
+version = 2
+
+[tiers.flash]
+temperature = 0.0       # pinned greedy decoding; the model's own default is 1.0
+candidate_count = 1     # reserved Self-MoA lever (ticket 009); loader rejects != 1
+# top_p             unset -> model default; no published per-class constant (ticket 04)
+# top_k             unset -> model default; no published per-class constant (ticket 04)
+# seed              unset -> no numeric default; best-effort, not reproducibility (ticket 04)
+# max_output_tokens unset -> uncapped to the model ceiling of 65,536 (ticket 04)
+# presence_penalty  unset -> effective default 0.0; valid range unverified (ticket 04)
+# frequency_penalty unset -> effective default 0.0; valid range unverified (ticket 04)
+# thinking          unset -> the model's preset per-class budget (ticket 04); NOT dynamic.
+#                   Set "off" to disable (flash 0-24,576, 0 allowed), "auto" for
+#                   dynamic (thinking_budget = -1), or an int budget in range.
+
+[tiers.pro]
+temperature = 0.0       # pinned greedy decoding; the model's own default is 1.0
+candidate_count = 1     # reserved Self-MoA lever (ticket 009); loader rejects != 1
+# top_p             unset -> model default; no published per-class constant (ticket 04)
+# top_k             unset -> model default; no published per-class constant (ticket 04)
+# seed              unset -> no numeric default; best-effort, not reproducibility (ticket 04)
+# max_output_tokens unset -> uncapped to the model ceiling of 65,536 (ticket 04)
+# presence_penalty  unset -> effective default 0.0; valid range unverified (ticket 04)
+# frequency_penalty unset -> effective default 0.0; valid range unverified (ticket 04)
+# thinking          unset -> the model's preset per-class budget (ticket 04); NOT dynamic.
+#                   pro cannot disable thinking (floor 128, 0 is a 400): "off" is
+#                   rejected. Set "auto" for dynamic (-1) or an int in 128-32,768.

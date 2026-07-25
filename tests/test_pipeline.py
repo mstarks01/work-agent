@@ -28,8 +28,14 @@ from stride_service.pipeline import (
     PipelineError,
     build_default_pipeline,
 )
+from stride_service.model_tiers import load_model_tiers
 from stride_service.report import STRIDE_CATEGORIES
-from stride_service.sampling import load_sampling
+from stride_service.sampling import (
+    TierSampling,
+    load_sampling,
+    make_resolve_sampling,
+    sampling_fingerprint,
+)
 from tests.factories import sample_draft, sample_threat, valid_model
 
 PROJECT_ROOT = Path(__file__).resolve().parents[1]
@@ -76,11 +82,14 @@ def build(replies: dict[str, str]) -> tuple[graph.Pipeline, dict[str, ScriptedLl
         )
         return models[node]
 
+    tiers = load_model_tiers(PROJECT_ROOT / "config" / "model_tiers.toml", env={})
+    sampling = load_sampling(PROJECT_ROOT / "config" / "sampling.toml", env={})
     pipeline = graph.build_pipeline(
         skill_loader=MarkdownLoader(PROJECT_ROOT / "skills"),
         prompt_loader=MarkdownLoader(PROJECT_ROOT / "prompts"),
         resolve_model=resolve,
-        sampling=load_sampling(PROJECT_ROOT / "config" / "sampling.toml"),
+        resolve_sampling=make_resolve_sampling(sampling, tiers.resolve_tier),
+        tier_sampling=sampling.tiers,
     )
     return pipeline, models
 
@@ -146,6 +155,52 @@ def test_report_nodes_record_the_model_each_node_ran_on():
     assert by_node[graph.CRITIC_NODE].model == PRO
     assert by_node[graph.ASSEMBLE_NODE].model is None
     assert all(run_.duration_ms >= 0 for run_ in outcome.report.nodes)
+
+
+def test_report_stamps_the_per_tier_sampling_clear_block():
+    """Ticket 07: the resolved sampling is recorded in the clear, once per tier."""
+    pipeline, _ = build(happy_replies())
+    outcome, _ = run(pipeline, job())
+
+    sampling = load_sampling(PROJECT_ROOT / "config" / "sampling.toml", env={})
+    assert outcome.report.sampling == {
+        tier: params.model_dump() for tier, params in sampling.tiers.items()
+    }
+
+
+def test_each_llm_node_fingerprint_recomputes_from_the_artifact():
+    """The per-node hash is derivable from the clear block + served model alone."""
+    pipeline, _ = build(happy_replies())
+    outcome, _ = run(pipeline, job())
+    tiers = load_model_tiers(PROJECT_ROOT / "config" / "model_tiers.toml", env={})
+    clear = outcome.report.sampling
+
+    for node_run in outcome.report.nodes:
+        canonical = graph.TIER_NODE_BY_GRAPH_NODE.get(node_run.node)
+        if canonical is None:  # deterministic FunctionNode
+            assert node_run.model is None
+            assert node_run.sampling_fingerprint is None
+            continue
+        tier = tiers.resolve_tier(canonical)
+        expected = sampling_fingerprint(node_run.model, TierSampling(**clear[tier]))
+        assert node_run.sampling_fingerprint == expected
+
+
+def test_flash_and_pro_nodes_get_different_fingerprints():
+    """Different served model *and* (potentially) sampling → distinct identities."""
+    pipeline, _ = build(happy_replies())
+    outcome, _ = run(pipeline, job())
+    by_node = {run_.node: run_ for run_ in outcome.report.nodes}
+
+    extract_fp = by_node[graph.EXTRACT_NODE].sampling_fingerprint
+    critic_fp = by_node[graph.CRITIC_NODE].sampling_fingerprint
+    assert extract_fp and critic_fp and extract_fp != critic_fp
+    # recritic shares the critic's tier and model, so it shares the identity.
+    assert by_node[graph.CRITIC_NODE].sampling_fingerprint == sampling_fingerprint(
+        PRO, load_sampling(PROJECT_ROOT / "config" / "sampling.toml", env={}).for_tier(
+            "pro"
+        )
+    )
 
 
 def test_each_analyst_gets_its_own_category_and_the_shared_model():

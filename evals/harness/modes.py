@@ -67,7 +67,11 @@ from stride_service.report import (
     StrideReport,
 )
 from stride_service.resilience import load_resilience
-from stride_service.sampling import SamplingConfig, load_sampling
+from stride_service.sampling import (
+    SamplingConfig,
+    load_sampling,
+    make_resolve_sampling,
+)
 from stride_service.system_model import SystemModel
 from stride_service.validation import ValidationIssue, parse_and_validate
 
@@ -160,11 +164,13 @@ def build_eval_pipeline(
     """
     tiers = load_model_tiers(REPO_ROOT / "config" / "model_tiers.toml")
     resilience = load_resilience(REPO_ROOT / "config" / "resilience.toml")
+    sampling = sampling or load_sampling(REPO_ROOT / "config" / "sampling.toml")
     return build_pipeline(
         skill_loader=MarkdownLoader(REPO_ROOT / "skills"),
         prompt_loader=MarkdownLoader(REPO_ROOT / "prompts"),
         resolve_model=resolve_model or resilient_resolver(tiers, resilience),
-        sampling=sampling or load_sampling(REPO_ROOT / "config" / "sampling.toml"),
+        resolve_sampling=make_resolve_sampling(sampling, tiers.resolve_tier),
+        tier_sampling=sampling.tiers,
         resilience=resilience,
         entry=entry,
     )

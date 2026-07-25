@@ -28,3 +28,10 @@ Update `docs/Configuration.md` to cover:
 
 Keep it consistent with the existing `STRIDE_MODEL_*` documentation it
 parallels.
+
+**Also (surfaced resolving [ticket 07](07-provenance-stamping.md)):** the report
+schema gained `StrideReport.sampling` (per-tier clear block) and
+`NodeRun.sampling_fingerprint`. Update **`docs/Report-Schema.md`** and the
+**`docs/example-report.html`** sample so the documented report shape matches
+what ships — the provenance is only self-defending if the schema doc describes
+it.

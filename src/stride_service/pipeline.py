@@ -57,7 +57,7 @@ from stride_service.markdown_loader import MarkdownLoader
 from stride_service.model_tiers import ModelTierConfig, load_model_tiers
 from stride_service.report import InputRef, Job, NodeRun, StrideReport
 from stride_service.resilience import ResilienceConfig, load_resilience
-from stride_service.sampling import load_sampling
+from stride_service.sampling import load_sampling, make_resolve_sampling
 
 logger = logging.getLogger(__name__)
 
@@ -197,6 +197,9 @@ class AdkPipelineRunner:
                 NodeRun(
                     node=finish.node,
                     model=self._pipeline.node_models.get(finish.node),
+                    sampling_fingerprint=self._pipeline.node_fingerprints.get(
+                        finish.node
+                    ),
                     duration_ms=max(round((finish.at - ready_at) * 1000), 0),
                 )
             )
@@ -220,6 +223,10 @@ class AdkPipelineRunner:
                 source_sha256=source_sha256,
             ),
             nodes=nodes,
+            sampling={
+                tier: params.model_dump()
+                for tier, params in self._pipeline.tier_sampling.items()
+            },
             system_model=analysis.system_model,
             boundary_crossings=analysis.boundary_crossings,
             threats=analysis.threats,
@@ -262,11 +269,13 @@ def build_default_pipeline(env: Mapping[str, str] | None = None) -> Pipeline:
     resilience = load_resilience(
         env.get(RESILIENCE_VAR, DEFAULT_RESILIENCE_PATH), env=env
     )
+    sampling = load_sampling(env.get(SAMPLING_VAR, DEFAULT_SAMPLING_PATH), env=env)
     return build_pipeline(
         skill_loader=MarkdownLoader(env.get(SKILLS_DIR_VAR, DEFAULT_SKILLS_DIR)),
         prompt_loader=MarkdownLoader(env.get(PROMPTS_DIR_VAR, DEFAULT_PROMPTS_DIR)),
         resolve_model=resilient_resolver(tiers, resilience),
-        sampling=load_sampling(env.get(SAMPLING_VAR, DEFAULT_SAMPLING_PATH)),
+        resolve_sampling=make_resolve_sampling(sampling, tiers.resolve_tier),
+        tier_sampling=sampling.tiers,
         resilience=resilience,
     )
 

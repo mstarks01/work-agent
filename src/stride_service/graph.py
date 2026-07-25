@@ -69,7 +69,7 @@ the critic seams here.
 from __future__ import annotations
 
 import json
-from collections.abc import Callable, Sequence
+from collections.abc import Callable, Mapping, Sequence
 from dataclasses import dataclass
 from typing import Any, Literal
 
@@ -97,7 +97,11 @@ from stride_service.report import (
     Threat,
     build_summary,
 )
-from stride_service.sampling import SamplingConfig
+from stride_service.sampling import (
+    SamplingResolver,
+    TierSampling,
+    sampling_fingerprint,
+)
 from stride_service.skills import compose_analyst_skills, compose_critic_skills
 from stride_service.system_model import BoundaryCrossing, SystemModel
 from stride_service.validation import ValidationIssue, parse_and_validate
@@ -423,26 +427,35 @@ def assemble_report(
 
 @dataclass(frozen=True)
 class Pipeline:
-    """The built graph plus the model each LLM node was bound to.
+    """The built graph plus the static provenance every run stamps.
 
     ``node_models`` is what the report's ``nodes`` array records: a run has to
-    be able to say which model produced it, and deterministic nodes carry
-    none.
+    be able to say which model produced it, and deterministic nodes carry none.
+    ``tier_sampling`` and ``node_fingerprints`` are the sampling provenance
+    (ticket 07): the resolved per-tier clear block the report records once per
+    tier, and each LLM node's ``sha256(served model, tier sampling)``
+    generation-identity hash. All three are config-derived and fixed for the
+    life of the pipeline, computed once here and copied into each report.
     """
 
     workflow: Workflow
     node_models: dict[str, str]
+    tier_sampling: dict[str, TierSampling]
+    node_fingerprints: dict[str, str]
 
 
 def _generate_content_config(
-    sampling: SamplingConfig, resilience: ResilienceConfig | None
+    sampling: TierSampling, resilience: ResilienceConfig | None
 ) -> types.GenerateContentConfig:
-    """Sampling and the per-request timeout, composed into one node config.
+    """One node's tier sampling and the per-request timeout, composed together.
 
-    The timeout rides on ``http_options`` (ticket 038 decision 4); sampling
-    stays exactly as ticket 023 pinned it, so ``config/sampling.toml`` is
-    untouched. ``resilience`` is optional only so the offline stand-ins, whose
-    fakes never read a deadline, can build the graph without a config.
+    ``sampling`` is the node's *own* tier's decoding params (ticket 06):
+    ``resolve_sampling`` hands each node its :class:`TierSampling`, so flash and
+    pro nodes no longer share a graph-wide constant. The timeout rides on
+    ``http_options`` (ticket 038 decision 4), which stays owned by
+    ``config/resilience.toml`` — never sourced from sampling (ticket 03).
+    ``resilience`` is optional only so the offline stand-ins, whose fakes never
+    read a deadline, can build the graph without a config.
     """
     config = sampling.to_generate_content_config()
     if resilience is not None:
@@ -457,33 +470,38 @@ def _llm_node(
     output_schema: Any,
     output_key: str,
     resolve_model: ModelResolver,
-    sampling: SamplingConfig,
+    resolve_sampling: SamplingResolver,
     resilience: ResilienceConfig | None,
 ) -> LlmAgent:
     """One LLM node: its model, its full instruction, its emitted schema.
 
     ``include_contents='none'`` is set explicitly (ticket 002): a node sees
     its instruction and the state templated into it, never the transcript of
-    the nodes before it. Sampling comes from the config shared with the eval
-    suite (ticket 009 decision 15), so no node runs on library defaults the
-    eval numbers were not taken against; the request deadline comes from the
-    resilience config (ticket 038).
+    the nodes before it. Model *and* sampling are resolved off the one
+    canonical node name (:data:`TIER_NODE_BY_GRAPH_NODE`), so each node runs on
+    its own tier's decoding params from the config shared with the eval suite
+    (ticket 009 decision 15) — no node on library defaults, none on another
+    tier's sampling. The request deadline comes from the resilience config
+    (ticket 038).
     """
+    tier_node = TIER_NODE_BY_GRAPH_NODE[name]
     return LlmAgent(
         name=name,
-        model=resolve_model(TIER_NODE_BY_GRAPH_NODE[name]),
+        model=resolve_model(tier_node),
         instruction=instruction,
         output_schema=output_schema,
         output_key=output_key,
         include_contents="none",
-        generate_content_config=_generate_content_config(sampling, resilience),
+        generate_content_config=_generate_content_config(
+            resolve_sampling(tier_node), resilience
+        ),
     )
 
 
 def _extract_node(
     prompt_loader: MarkdownLoader,
     resolve_model: ModelResolver,
-    sampling: SamplingConfig,
+    resolve_sampling: SamplingResolver,
     resilience: ResilienceConfig | None,
 ) -> LlmAgent:
     """The extraction node, shared by the production graph and eval mode 1."""
@@ -493,7 +511,7 @@ def _extract_node(
         output_schema=SystemModel,
         output_key=STATE_EXTRACTED_MODEL,
         resolve_model=resolve_model,
-        sampling=sampling,
+        resolve_sampling=resolve_sampling,
         resilience=resilience,
     )
 
@@ -545,7 +563,8 @@ def build_pipeline(
     skill_loader: MarkdownLoader,
     prompt_loader: MarkdownLoader,
     resolve_model: ModelResolver,
-    sampling: SamplingConfig,
+    resolve_sampling: SamplingResolver,
+    tier_sampling: Mapping[str, TierSampling],
     resilience: ResilienceConfig | None = None,
     domain_packs: Sequence[str] = (),
     entry: Entry = ENTRY_EXTRACT,
@@ -555,7 +574,14 @@ def build_pipeline(
 
     ``resolve_model`` takes a canonical LLM node name and returns the model
     to bind — :meth:`ModelTierConfig.resolve_model` in production, so a node
-    silently running on the wrong tier stays impossible.
+    silently running on the wrong tier stays impossible. ``resolve_sampling``
+    is its sibling (ticket 06): the same canonical name in, the node's tier
+    decoding params out — :func:`~stride_service.sampling.make_resolve_sampling`
+    in production, so each node gets its own tier's ``GenerateContentConfig``.
+    ``tier_sampling`` is the resolved per-tier clear block (``SamplingConfig``'s
+    ``tiers``) the report stamps once per tier for provenance (ticket 07); each
+    LLM node's fingerprint is derived here from its served model and its tier's
+    resolved sampling.
 
     ``resilience`` binds the per-request timeout onto every LLM node (ticket
     038). It is optional so the offline stand-ins can build the graph without
@@ -575,10 +601,14 @@ def build_pipeline(
         raise ValueError(f"unknown graph entry point: {entry!r}")
 
     if entry == ENTRY_EXTRACT_ONLY:
-        extract = _extract_node(prompt_loader, resolve_model, sampling, resilience)
+        extract = _extract_node(
+            prompt_loader, resolve_model, resolve_sampling, resilience
+        )
         return Pipeline(
             workflow=Workflow(name=name, edges=[(START, extract)]),
             node_models={extract.name: _model_name(extract.model)},
+            tier_sampling=dict(tier_sampling),
+            node_fingerprints=_node_fingerprints([extract], resolve_sampling),
         )
 
     critic = _llm_node(
@@ -589,7 +619,7 @@ def build_pipeline(
         output_schema=list[Threat],
         output_key=STATE_REVIEWED_THREATS,
         resolve_model=resolve_model,
-        sampling=sampling,
+        resolve_sampling=resolve_sampling,
         resilience=resilience,
     )
     recritic = _llm_node(
@@ -598,7 +628,7 @@ def build_pipeline(
         output_schema=list[Threat],
         output_key=STATE_REVIEWED_THREATS,
         resolve_model=resolve_model,
-        sampling=sampling,
+        resolve_sampling=resolve_sampling,
         resilience=resilience,
     )
     analysts = [
@@ -610,7 +640,7 @@ def build_pipeline(
             output_schema=list[DraftThreat],
             output_key=analyst_state_key(category),
             resolve_model=resolve_model,
-            sampling=sampling,
+            resolve_sampling=resolve_sampling,
             resilience=resilience,
         )
         for category in STRIDE_CATEGORIES
@@ -626,14 +656,16 @@ def build_pipeline(
 
     extraction_nodes: list[LlmAgent] = []
     if entry == ENTRY_EXTRACT:
-        extract = _extract_node(prompt_loader, resolve_model, sampling, resilience)
+        extract = _extract_node(
+            prompt_loader, resolve_model, resolve_sampling, resilience
+        )
         repair = _llm_node(
             name=REPAIR_NODE,
             instruction=compose_repair_prompt(prompt_loader),
             output_schema=SystemModel,
             output_key=STATE_EXTRACTED_MODEL,
             resolve_model=resolve_model,
-            sampling=sampling,
+            resolve_sampling=resolve_sampling,
             resilience=resilience,
         )
         validate = FunctionNode(func=validate_extraction, name=VALIDATE_NODE)
@@ -665,12 +697,32 @@ def build_pipeline(
     return Pipeline(
         workflow=workflow,
         node_models={node.name: _model_name(node.model) for node in llm_nodes},
+        tier_sampling=dict(tier_sampling),
+        node_fingerprints=_node_fingerprints(llm_nodes, resolve_sampling),
     )
 
 
 def _model_name(model: str | BaseLlm) -> str:
     """The model string to record, however the node was bound to it."""
     return model if isinstance(model, str) else model.model
+
+
+def _node_fingerprints(
+    llm_nodes: Sequence[LlmAgent], resolve_sampling: SamplingResolver
+) -> dict[str, str]:
+    """Each LLM node's ``sha256(served model, tier sampling)`` (ticket 07).
+
+    Computed from the very ``node_models`` source and ``resolve_sampling`` the
+    graph binds, so a node's recorded served model and its fingerprint can never
+    describe different generations.
+    """
+    return {
+        node.name: sampling_fingerprint(
+            _model_name(node.model),
+            resolve_sampling(TIER_NODE_BY_GRAPH_NODE[node.name]),
+        )
+        for node in llm_nodes
+    }
 
 
 def rejection_issues(rendered: str) -> list[ValidationIssue]:

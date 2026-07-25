@@ -19,7 +19,8 @@ from stride_service.critic import CriticOutputError, DraftJoinError
 from stride_service.markdown_loader import MarkdownLoader
 from stride_service.model_tiers import LLM_NODES, load_model_tiers
 from stride_service.report import STRIDE_CATEGORIES, DraftThreat, Threat
-from stride_service.sampling import load_sampling
+from stride_service.resilience import load_resilience
+from stride_service.sampling import load_sampling, make_resolve_sampling
 from stride_service.system_model import SystemModel
 from tests.factories import sample_draft, sample_threat, valid_model
 
@@ -61,11 +62,13 @@ def prompt_loader() -> MarkdownLoader:
 @pytest.fixture
 def pipeline(skill_loader: MarkdownLoader, prompt_loader: MarkdownLoader):
     tiers = load_model_tiers(PROJECT_ROOT / "config" / "model_tiers.toml", env={})
+    sampling = load_sampling(PROJECT_ROOT / "config" / "sampling.toml", env={})
     return graph.build_pipeline(
         skill_loader=skill_loader,
         prompt_loader=prompt_loader,
         resolve_model=tiers.resolve_model,
-        sampling=load_sampling(PROJECT_ROOT / "config" / "sampling.toml"),
+        resolve_sampling=make_resolve_sampling(sampling, tiers.resolve_tier),
+        tier_sampling=sampling.tiers,
     )
 
 
@@ -97,6 +100,101 @@ def test_llm_nodes_bind_their_resolved_model(pipeline):
             continue
         assert node.model == tiers.resolve_model(graph.TIER_NODE_BY_GRAPH_NODE[name])
         assert pipeline.node_models[name] == node.model
+
+
+# Flash and pro differ on every offered param, so a node bound to the wrong
+# tier's sampling would read wrong here. ``thinking = "off"`` on flash resolves
+# to budget 0; ``"auto"`` on pro resolves to -1 (dynamic).
+_DIVERGENT_SAMPLING = """\
+version = 2
+[tiers.flash]
+temperature = 0.0
+seed = 11
+thinking = "off"
+[tiers.pro]
+temperature = 1.0
+seed = 22
+thinking = "auto"
+"""
+
+
+def _pipeline_with_sampling(skill_loader, prompt_loader, sampling_path, resilience):
+    tiers = load_model_tiers(PROJECT_ROOT / "config" / "model_tiers.toml", env={})
+    sampling = load_sampling(sampling_path, env={})
+    return graph.build_pipeline(
+        skill_loader=skill_loader,
+        prompt_loader=prompt_loader,
+        resolve_model=tiers.resolve_model,
+        resolve_sampling=make_resolve_sampling(sampling, tiers.resolve_tier),
+        tier_sampling=sampling.tiers,
+        resilience=resilience,
+    )
+
+
+def test_each_llm_node_binds_its_own_tier_sampling(
+    skill_loader, prompt_loader, tmp_path
+):
+    """Ticket 06: sampling is resolved per node, not shared graph-wide.
+
+    ``extract``/``repair`` run on flash, the analysts and critic/recritic on
+    pro; with the two tiers pinned to different decoding params, each node must
+    carry *its* tier's ``GenerateContentConfig``.
+    """
+    sampling_path = tmp_path / "sampling.toml"
+    sampling_path.write_text(_DIVERGENT_SAMPLING, encoding="utf-8")
+    resilience = load_resilience(PROJECT_ROOT / "config" / "resilience.toml", env={})
+    nodes = nodes_by_name(
+        _pipeline_with_sampling(skill_loader, prompt_loader, sampling_path, resilience)
+    )
+
+    flash_nodes = (graph.EXTRACT_NODE, graph.REPAIR_NODE)
+    pro_nodes = (
+        graph.CRITIC_NODE,
+        graph.RECRITIC_NODE,
+        *graph.ANALYST_GRAPH_NODES,
+    )
+    for name in flash_nodes:
+        config = nodes[name].generate_content_config
+        assert config.temperature == 0.0
+        assert config.seed == 11
+        assert config.thinking_config.thinking_budget == 0
+    for name in pro_nodes:
+        config = nodes[name].generate_content_config
+        assert config.temperature == 1.0
+        assert config.seed == 22
+        assert config.thinking_config.thinking_budget == -1
+
+
+def test_per_node_sampling_composes_with_the_resilience_timeout(
+    skill_loader, prompt_loader, tmp_path
+):
+    """The node's tier sampling and the resilience timeout ride the one config.
+
+    ``http_options`` stays owned by ``resilience.toml`` (ticket 03) — folding
+    per-node sampling in must not drop it, nor sampling source it.
+    """
+    sampling_path = tmp_path / "sampling.toml"
+    sampling_path.write_text(_DIVERGENT_SAMPLING, encoding="utf-8")
+    resilience = load_resilience(PROJECT_ROOT / "config" / "resilience.toml", env={})
+    nodes = nodes_by_name(
+        _pipeline_with_sampling(skill_loader, prompt_loader, sampling_path, resilience)
+    )
+
+    extract = nodes[graph.EXTRACT_NODE].generate_content_config
+    assert extract.http_options.timeout == resilience.timeout_ms
+    assert extract.temperature == 0.0  # sampling survives the http_options fold-in
+
+
+def test_llm_nodes_carry_no_http_options_without_resilience(
+    skill_loader, prompt_loader, tmp_path
+):
+    """Resilience is optional (offline stand-ins); its absence leaves no timeout."""
+    sampling_path = tmp_path / "sampling.toml"
+    sampling_path.write_text(_DIVERGENT_SAMPLING, encoding="utf-8")
+    nodes = nodes_by_name(
+        _pipeline_with_sampling(skill_loader, prompt_loader, sampling_path, None)
+    )
+    assert nodes[graph.CRITIC_NODE].generate_content_config.http_options is None
 
 
 def test_deterministic_bookends_carry_no_model(pipeline):

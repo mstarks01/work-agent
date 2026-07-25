@@ -113,11 +113,19 @@ class ModelTierConfig(BaseModel):
             raise ValueError(f"nodes missing entries for: {missing}")
         return self
 
-    def resolve_model(self, node: str) -> str:
-        """The pinned model string the named LLM node runs on."""
+    def resolve_tier(self, node: str) -> TierName:
+        """The tier the named LLM node runs on.
+
+        The node -> tier map lives here once; ``resolve_sampling`` reuses it
+        (via this method) so sampling never re-derives or duplicates it.
+        """
         if node not in self.nodes:
             raise ModelConfigError(f"unknown LLM node: {node!r}")
-        return self.tiers[self.nodes[node]]
+        return self.nodes[node]
+
+    def resolve_model(self, node: str) -> str:
+        """The pinned model string the named LLM node runs on."""
+        return self.tiers[self.resolve_tier(node)]
 
 
 def load_model_tiers(
