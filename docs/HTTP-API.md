@@ -11,15 +11,18 @@ production wiring.
 ```python
 from stride_service import create_app
 
-app = create_app()   # in-memory store, real pipeline, Ping JWT verifier
+app = create_app()   # in-memory store, real pipeline, configured JWT verifier
 ```
 
-See [Configuration](Configuration.md) for the required `STRIDE_PING_*` and Vertex environment.
+See [Configuration](Configuration.md#bearer-auth-http-surface-only) for the
+required `STRIDE_AUTH_PROVIDER` / `STRIDE_OIDC_*` and Vertex environment.
 
 ## Auth
 
-Every `/v1` route requires a Ping-issued bearer JWT (RS256, verified against the
-configured issuer, audience, and JWKS). Job reads are **owner-only** and return
+Every `/v1` route requires a bearer JWT (RS256, verified against the configured
+issuer, audience, and JWKS) from the selected auth provider — see
+[Configuration](Configuration.md#bearer-auth-http-surface-only) for supported
+identity providers and setup. Job reads are **owner-only** and return
 `404` — not `403` — for a non-owner, so job IDs cannot be enumerated. Rejection
 detail is generic on purpose; the reason is logged, never returned.
 

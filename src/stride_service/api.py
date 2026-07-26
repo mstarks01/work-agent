@@ -35,9 +35,8 @@ from starlette.exceptions import HTTPException as StarletteHTTPException
 
 from stride_service.auth import (
     AuthenticationError,
-    PingAuthSettings,
-    PingJwtVerifier,
     TokenVerifier,
+    build_verifier,
 )
 from stride_service.jobs import (
     MAX_DESCRIPTION_BYTES,
@@ -182,11 +181,7 @@ def create_app(
     app.state.runner = (
         runner if runner is not None else default_pipeline_runner()
     )
-    app.state.verifier = (
-        verifier
-        if verifier is not None
-        else PingJwtVerifier(PingAuthSettings.from_env())
-    )
+    app.state.verifier = verifier if verifier is not None else build_verifier()
 
     @app.exception_handler(StarletteHTTPException)
     async def _http_exception(request: Request, exc: StarletteHTTPException):
