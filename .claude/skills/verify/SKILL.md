@@ -6,14 +6,16 @@ description: Launch and drive the stride_service /v1 job API locally to verify c
 # Verifying stride_service
 
 The runtime surface is the FastAPI app from `stride_service.api.create_app()`.
-Production auth needs `STRIDE_PING_ISSUER`, `STRIDE_PING_AUDIENCE`, and
-`STRIDE_PING_JWKS_URL`; `create_app()` fails closed without them.
+Production auth needs `STRIDE_AUTH_PROVIDER=oidc` plus `STRIDE_OIDC_ISSUER`,
+`STRIDE_OIDC_AUDIENCE`, and `STRIDE_OIDC_JWKS_URL`; `create_app()` fails closed
+without them.
 
-## Launch with real auth (no Ping needed)
+## Launch with real auth (no IdP needed)
 
 Run a throwaway JWKS: generate an RSA key, serve
 `{"keys": [jwt.algorithms.RSAAlgorithm.to_jwk(pub)]}` (add `kid`/`alg`) from a
-stdlib `HTTPServer` thread, point `STRIDE_PING_JWKS_URL` at it, mint RS256
+stdlib `HTTPServer` thread, set `STRIDE_AUTH_PROVIDER=oidc`, point
+`STRIDE_OIDC_JWKS_URL` at it, mint RS256
 tokens with matching `kid`, `iss`, `aud`, `exp`, `sub`. Then:
 
 ```bash
