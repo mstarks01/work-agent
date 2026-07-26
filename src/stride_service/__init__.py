@@ -9,9 +9,10 @@ from stride_service.api import (
 from stride_service.auth import (
     AuthConfigError,
     AuthenticationError,
-    PingAuthSettings,
-    PingJwtVerifier,
+    OidcJwtVerifier,
+    OidcSettings,
     TokenVerifier,
+    build_verifier,
 )
 from stride_service.engine import (
     DEFAULT_CALLER,
@@ -148,8 +149,8 @@ __all__ = [
     "ModelConfigError",
     "ModelTierConfig",
     "NodeRun",
-    "PingAuthSettings",
-    "PingJwtVerifier",
+    "OidcJwtVerifier",
+    "OidcSettings",
     "PipelineCompleted",
     "PipelineOutcome",
     "PipelineRejected",
@@ -175,6 +176,7 @@ __all__ = [
     "ZonedElement",
     "allowed_asset_tags",
     "build_summary",
+    "build_verifier",
     "category_boundary_digest",
     "compose_analyst_skills",
     "compose_critic_skills",

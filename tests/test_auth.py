@@ -1,4 +1,4 @@
-"""Ping JWT verifier: signature, issuer, audience, expiry, and config."""
+"""OIDC JWT verifier and provider registry: verification, config, selection."""
 
 from datetime import UTC, datetime, timedelta
 from types import SimpleNamespace
@@ -11,8 +11,9 @@ from cryptography.hazmat.primitives.asymmetric import rsa
 from stride_service.auth import (
     AuthConfigError,
     AuthenticationError,
-    PingAuthSettings,
-    PingJwtVerifier,
+    OidcJwtVerifier,
+    OidcSettings,
+    build_verifier,
 )
 
 ISSUER = "https://ping.example.com"
@@ -34,14 +35,14 @@ class StaticJwksClient:
         return SimpleNamespace(key=_PUBLIC_KEY)
 
 
-def settings() -> PingAuthSettings:
-    return PingAuthSettings(
+def settings() -> OidcSettings:
+    return OidcSettings(
         issuer=ISSUER, audience=AUDIENCE, jwks_url="https://ping.example.com/jwks"
     )
 
 
-def verifier() -> PingJwtVerifier:
-    return PingJwtVerifier(settings(), jwks_client=StaticJwksClient())
+def verifier() -> OidcJwtVerifier:
+    return OidcJwtVerifier(settings(), jwks_client=StaticJwksClient())
 
 
 def make_token(**overrides) -> str:
@@ -56,7 +57,7 @@ def make_token(**overrides) -> str:
     return jwt.encode(claims, _PRIVATE_PEM, algorithm="RS256")
 
 
-class TestPingJwtVerifier:
+class TestOidcJwtVerifier:
     def test_valid_token_yields_subject(self):
         assert verifier().verify(make_token()) == "alice"
 
@@ -101,18 +102,57 @@ class TestPingJwtVerifier:
             pytest.fail("expected AuthenticationError")
 
 
-class TestPingAuthSettings:
+class TestOidcSettings:
     def test_from_env_reads_all_three_vars(self):
         env = {
-            "STRIDE_PING_ISSUER": ISSUER,
-            "STRIDE_PING_AUDIENCE": AUDIENCE,
-            "STRIDE_PING_JWKS_URL": "https://ping.example.com/jwks",
+            "STRIDE_OIDC_ISSUER": ISSUER,
+            "STRIDE_OIDC_AUDIENCE": AUDIENCE,
+            "STRIDE_OIDC_JWKS_URL": "https://ping.example.com/jwks",
         }
-        loaded = PingAuthSettings.from_env(env)
+        loaded = OidcSettings.from_env(env, prefix="STRIDE_OIDC")
         assert loaded.issuer == ISSUER
         assert loaded.audience == AUDIENCE
         assert loaded.algorithms == ("RS256",)
 
     def test_from_env_fails_closed_when_missing(self):
-        with pytest.raises(AuthConfigError, match="STRIDE_PING_AUDIENCE"):
-            PingAuthSettings.from_env({"STRIDE_PING_ISSUER": ISSUER})
+        with pytest.raises(AuthConfigError, match="STRIDE_OIDC_AUDIENCE"):
+            OidcSettings.from_env({"STRIDE_OIDC_ISSUER": ISSUER}, prefix="STRIDE_OIDC")
+
+    def test_from_env_honours_prefix(self):
+        env = {
+            "STRIDE_ALT_ISSUER": ISSUER,
+            "STRIDE_ALT_AUDIENCE": AUDIENCE,
+            "STRIDE_ALT_JWKS_URL": "https://alt.example.com/jwks",
+        }
+        loaded = OidcSettings.from_env(env, prefix="STRIDE_ALT")
+        assert loaded.jwks_url == "https://alt.example.com/jwks"
+
+
+class TestBuildVerifier:
+    def _oidc_env(self) -> dict[str, str]:
+        return {
+            "STRIDE_AUTH_PROVIDER": "oidc",
+            "STRIDE_OIDC_ISSUER": ISSUER,
+            "STRIDE_OIDC_AUDIENCE": AUDIENCE,
+            "STRIDE_OIDC_JWKS_URL": "https://ping.example.com/jwks",
+        }
+
+    def test_builds_configured_provider(self):
+        assert isinstance(build_verifier(self._oidc_env()), OidcJwtVerifier)
+
+    def test_provider_selection_is_case_insensitive(self):
+        env = self._oidc_env() | {"STRIDE_AUTH_PROVIDER": "  Oidc  "}
+        assert isinstance(build_verifier(env), OidcJwtVerifier)
+
+    def test_unset_provider_fails_closed(self):
+        with pytest.raises(AuthConfigError, match="STRIDE_AUTH_PROVIDER"):
+            build_verifier({})
+
+    def test_unknown_provider_fails_closed(self):
+        env = self._oidc_env() | {"STRIDE_AUTH_PROVIDER": "nope"}
+        with pytest.raises(AuthConfigError, match="unknown auth provider 'nope'"):
+            build_verifier(env)
+
+    def test_selected_provider_still_needs_its_config(self):
+        with pytest.raises(AuthConfigError, match="STRIDE_OIDC_ISSUER"):
+            build_verifier({"STRIDE_AUTH_PROVIDER": "oidc"})

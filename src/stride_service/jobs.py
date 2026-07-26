@@ -95,7 +95,7 @@ class JobEvent(BaseModel):
 class JobRecord(BaseModel):
     """Everything the service knows about one job.
 
-    ``owner_subject`` is the Ping token subject captured at submission; every
+    ``owner_subject`` is the auth token subject captured at submission; every
     read is checked against it. The record never leaves the service — API
     responses are separate views that expose only what each route contracts.
     """
