@@ -11,11 +11,13 @@ production wiring.
 ```python
 from stride_service import create_app
 
-app = create_app()   # in-memory store, real pipeline, configured JWT verifier
+app = create_app()   # configured store, real pipeline, configured JWT verifier
 ```
 
 See [Configuration](Configuration.md#bearer-auth-http-surface-only) for the
-required `STRIDE_AUTH_PROVIDER` / `STRIDE_OIDC_*` and Vertex environment.
+required `STRIDE_AUTH_PROVIDER` / `STRIDE_OIDC_*`, the
+[`STRIDE_JOB_STORE`](Configuration.md#job-storage-http-surface-only) backend
+selection, and the Vertex environment.
 
 ## Auth
 

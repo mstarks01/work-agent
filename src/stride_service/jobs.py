@@ -7,7 +7,10 @@ the poll response and the SSE stream, and the two seams this ticket
 deliberately leaves open:
 
 * :class:`JobStore` — persistence is a deferred storage decision; the API only
-  ever talks to this interface. :class:`InMemoryJobStore` is the v1 backend.
+  ever talks to this interface. Backends are selected at deploy time by
+  ``STRIDE_JOB_STORE`` and constructed through :func:`build_store`, so a durable
+  or shared backend is one registry entry. :class:`InMemoryJobStore` is the
+  ``memory`` backend — the v1 default, non-durable and per-instance.
 * :class:`PipelineRunner` — the API runs jobs through this interface, never
   against a graph directly. :class:`stride_service.pipeline.AdkPipelineRunner`
   is the implementation (ticket 021); :class:`StubPipelineRunner` stays as the
@@ -21,7 +24,8 @@ from __future__ import annotations
 
 import hashlib
 import logging
-from collections.abc import Awaitable, Callable
+import os
+from collections.abc import Awaitable, Callable, Mapping
 from dataclasses import dataclass
 from datetime import UTC, datetime
 from typing import Literal, Protocol, Self
@@ -185,6 +189,39 @@ class InMemoryJobStore:
         if record.id not in self._records:
             raise ValueError(f"job {record.id!r} does not exist")
         self._records[record.id] = record.model_copy(deep=True)
+
+
+class JobStoreConfigError(ValueError):
+    """The job-store configuration is missing or unusable."""
+
+
+JobStoreFactory = Callable[[Mapping[str, str]], JobStore]
+
+_FACTORIES: dict[str, JobStoreFactory] = {
+    "memory": lambda env: InMemoryJobStore(),
+}
+
+
+def build_store(env: Mapping[str, str] = os.environ) -> JobStore:
+    """Select and construct the configured job store; fail closed.
+
+    The backend is chosen by ``STRIDE_JOB_STORE`` at deploy time — never by the
+    request — so an empty or unknown value raises rather than silently falling
+    back to non-durable, per-instance ``memory`` storage that loses every job on
+    restart and isolates jobs behind a load balancer. Durable or shared storage
+    is a new registry entry implementing the :class:`JobStore` protocol.
+    """
+    name = env.get("STRIDE_JOB_STORE", "").strip().lower()
+    if not name:
+        raise JobStoreConfigError("set STRIDE_JOB_STORE")
+    try:
+        factory = _FACTORIES[name]
+    except KeyError:
+        known = ", ".join(sorted(_FACTORIES))
+        raise JobStoreConfigError(
+            f"unknown job store {name!r}; known stores: {known}"
+        ) from None
+    return factory(env)
 
 
 @dataclass(frozen=True)

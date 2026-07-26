@@ -9,10 +9,12 @@ from stride_service.jobs import (
     InMemoryJobStore,
     InvalidTransitionError,
     JobRecord,
+    JobStoreConfigError,
     NodeCallback,
     PipelineOutcome,
     PipelineRejected,
     StubPipelineRunner,
+    build_store,
     execute_job,
 )
 from stride_service.validation import ValidationIssue
@@ -143,6 +145,24 @@ class TestInMemoryJobStore:
             return before_save.status, after_save.status
 
         assert asyncio.run(scenario()) == ("queued", "running")
+
+
+class TestBuildStore:
+    def test_builds_configured_backend(self):
+        store = build_store({"STRIDE_JOB_STORE": "memory"})
+        assert isinstance(store, InMemoryJobStore)
+
+    def test_backend_selection_is_case_insensitive(self):
+        store = build_store({"STRIDE_JOB_STORE": "  Memory  "})
+        assert isinstance(store, InMemoryJobStore)
+
+    def test_unset_backend_fails_closed(self):
+        with pytest.raises(JobStoreConfigError, match="STRIDE_JOB_STORE"):
+            build_store({})
+
+    def test_unknown_backend_fails_closed(self):
+        with pytest.raises(JobStoreConfigError, match="unknown job store 'redis'"):
+            build_store({"STRIDE_JOB_STORE": "redis"})
 
 
 class TestExecuteJob:
