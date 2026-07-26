@@ -157,15 +157,83 @@ default is `temperature = 0` until a measurement replaces it.
 | `STRIDE_TIMEOUT_MS` | Per-request timeout, milliseconds. |
 | `STRIDE_RETRY_INITIAL_DELAY` / `_MAX_DELAY` / `_EXP_BASE` / `_JITTER` | Optional backoff-curve knobs; unset means the SDK default. |
 
-### Ping auth (HTTP surface only)
+### Bearer auth (HTTP surface only)
 
 Required by the [`/v1` API](HTTP-API.md); the in-process engine does not use them.
+Every `/v1` route requires a valid bearer token; the verifier returns the
+token's `sub`, and job ownership binds to that subject.
+
+#### How the provider is chosen
+
+`STRIDE_AUTH_PROVIDER` selects the backend at deploy time and **fails closed** —
+an unset or unknown value stops startup rather than weakening or skipping the
+check. The value is never read from the request, so a token can't pick its own
+verifier.
 
 | Variable | Purpose |
 | --- | --- |
-| `STRIDE_PING_ISSUER` | Expected token issuer. |
-| `STRIDE_PING_AUDIENCE` | Expected audience. |
-| `STRIDE_PING_JWKS_URL` | JWKS endpoint for signature verification. |
+| `STRIDE_AUTH_PROVIDER` | Auth backend to use. Today: `oidc`. |
+
+Each backend reads its own prefixed settings. The `oidc` backend is a standard
+**OIDC JWT verifier**, configured through `STRIDE_OIDC_*`:
+
+| Variable | Purpose |
+| --- | --- |
+| `STRIDE_OIDC_ISSUER` | Expected `iss` claim — your IdP's issuer URL. |
+| `STRIDE_OIDC_AUDIENCE` | Expected `aud` claim — the API's identifier at the IdP. |
+| `STRIDE_OIDC_JWKS_URL` | JWKS endpoint the IdP publishes its signing keys at. |
+
+Tokens must be RS256-signed and carry `exp`, `iss`, `aud`, and `sub`; anything
+else is rejected with a single generic error (the real reason is logged, never
+returned).
+
+#### Supported identity providers
+
+The `oidc` backend speaks plain OIDC, so it works with **any OIDC-compliant
+identity provider**. For each, the three settings come from the IdP's OIDC
+discovery document (`<issuer>/.well-known/openid-configuration` → `issuer` and
+`jwks_uri`); the audience is the API/resource identifier you register for this
+service. Switching providers is a values change only — the variable names stay
+`STRIDE_OIDC_*`.
+
+| Provider | Typical issuer (`STRIDE_OIDC_ISSUER`) |
+| --- | --- |
+| Ping (PingOne / PingFederate) | `https://auth.pingone.com/<env-id>/as` |
+| Okta | `https://<org>.okta.com/oauth2/<auth-server-id>` |
+| Auth0 | `https://<tenant>.auth0.com/` |
+| Microsoft Entra ID (Azure AD) | `https://login.microsoftonline.com/<tenant-id>/v2.0` |
+| AWS Cognito | `https://cognito-idp.<region>.amazonaws.com/<pool-id>` |
+| Keycloak | `https://<host>/realms/<realm>` |
+
+#### Example: Okta
+
+1. In the IdP, register this service as an API/resource and note the **audience**
+   (resource identifier) clients will request tokens for — e.g. `stride-service`.
+2. Fetch the discovery document to read the issuer and JWKS URL:
+   ```bash
+   curl -s https://<org>.okta.com/oauth2/<auth-server-id>/.well-known/openid-configuration \
+     | jq '{issuer, jwks_uri}'
+   ```
+3. Set the environment:
+   ```bash
+   export STRIDE_AUTH_PROVIDER=oidc
+   export STRIDE_OIDC_ISSUER="https://<org>.okta.com/oauth2/<auth-server-id>"
+   export STRIDE_OIDC_AUDIENCE="stride-service"
+   export STRIDE_OIDC_JWKS_URL="https://<org>.okta.com/oauth2/<auth-server-id>/v1/keys"
+   ```
+4. Start the app. Callers pass `Authorization: Bearer <token>` on every `/v1`
+   request; see the [HTTP API](HTTP-API.md) for the routes.
+
+Pointing at a different OIDC IdP (Ping, Auth0, Entra, …) is the same three
+settings from that IdP's discovery document — no code change.
+
+#### Adding a new backend
+
+A backend with a distinct name (or a non-OIDC mechanism — opaque-token
+introspection, mTLS, an API key) is a new entry in the `_FACTORIES` registry in
+[`src/stride_service/auth.py`](../src/stride_service/auth.py). Reuse
+`OidcJwtVerifier` for another OIDC issuer, or implement the `TokenVerifier`
+protocol (`verify(token) -> str`) for anything else; the API layer is unchanged.
 
 ### Vertex environment
 
