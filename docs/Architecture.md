@@ -103,13 +103,14 @@ whole graph runs offline against scripted models:
 | Seam | Interface | Default | Status |
 | --- | --- | --- | --- |
 | Pipeline execution | `PipelineRunner` | `AdkPipelineRunner` (real graph) / `StubPipelineRunner` (tests) | Complete |
-| Job persistence | `JobStore` | `InMemoryJobStore` | In-memory only; persistent backend is a deferred choice |
+| Job persistence | `JobStore` | `InMemoryJobStore` (`memory`) | Backend selected by `STRIDE_JOB_STORE` via a fail-closed registry; only the non-durable `memory` backend ships — a durable one is a new registry entry |
 | ADK sessions | `BaseSessionService` | `InMemorySessionService` | In-memory only; a `session_service_uri` backend is unwired |
 
-The in-memory defaults are enough to get a report in process. A persistent
-`JobStore` and session backend, deployment (container, Cloud Run, Ping
-middleware), and observability are out of scope for the current work — the
-interfaces are in place for them.
+The in-memory defaults are enough to get a report in process. Backend
+*selection* is now wired for the `JobStore` (`STRIDE_JOB_STORE`, fail-closed);
+a durable `JobStore` implementation and session backend, deployment (container,
+Cloud Run, Ping middleware), and observability are out of scope for the current
+work — the interfaces and selection seam are in place for them.
 
 ## Where the code lives
 

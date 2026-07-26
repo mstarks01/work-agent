@@ -21,7 +21,12 @@ from google.genai import types
 
 from stride_service import graph
 from stride_service.api import create_app
-from stride_service.jobs import JobRecord, PipelineCompleted, PipelineRejected
+from stride_service.jobs import (
+    InMemoryJobStore,
+    JobRecord,
+    PipelineCompleted,
+    PipelineRejected,
+)
 from stride_service.markdown_loader import MarkdownLoader
 from stride_service.pipeline import (
     AdkPipelineRunner,
@@ -413,7 +418,7 @@ def test_the_api_runs_jobs_through_the_real_graph_by_default():
         def verify(self, token: str) -> str:
             raise AssertionError("not reached")
 
-    app = create_app(verifier=NoVerifier())
+    app = create_app(store=InMemoryJobStore(), verifier=NoVerifier())
     assert isinstance(app.state.runner, AdkPipelineRunner)
 
 
