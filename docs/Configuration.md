@@ -235,6 +235,32 @@ introspection, mTLS, an API key) is a new entry in the `_FACTORIES` registry in
 `OidcJwtVerifier` for another OIDC issuer, or implement the `TokenVerifier`
 protocol (`verify(token) -> str`) for anything else; the API layer is unchanged.
 
+### Job storage (HTTP surface only)
+
+Required by the [`/v1` API](HTTP-API.md); the in-process engine keeps no jobs.
+The API only ever talks to the `JobStore` interface, so the backend is a
+deploy-time choice.
+
+`STRIDE_JOB_STORE` selects the backend at startup and **fails closed** — an
+unset or unknown value stops startup rather than silently falling back to
+non-durable storage. The value is never read from the request.
+
+| Variable | Purpose |
+| --- | --- |
+| `STRIDE_JOB_STORE` | Job-store backend to use. Today: `memory`. |
+
+The `memory` backend is a per-instance, in-process dict: fast and dependency-free,
+but jobs are lost on restart and are not shared across instances, so it suits
+single-instance or development deployments only. Durable, multi-instance
+deployments need a shared backend (see below).
+
+#### Adding a new backend
+
+A durable or shared backend (Redis, Postgres, …) is a new entry in the
+`_FACTORIES` registry in [`src/stride_service/jobs.py`](../src/stride_service/jobs.py).
+Implement the `JobStore` protocol (`create`, `get`, `save`) and read any
+connection settings from its own prefixed env vars; the API layer is unchanged.
+
 ### Vertex environment
 
 Reaching the models needs a configured Google Vertex environment — Application
