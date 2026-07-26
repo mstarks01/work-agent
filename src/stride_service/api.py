@@ -41,11 +41,11 @@ from stride_service.auth import (
 from stride_service.jobs import (
     MAX_DESCRIPTION_BYTES,
     TERMINAL_STATUSES,
-    InMemoryJobStore,
     JobRecord,
     JobStatus,
     JobStore,
     PipelineRunner,
+    build_store,
     execute_job,
 )
 from stride_service.pipeline import default_pipeline_runner
@@ -177,7 +177,7 @@ def create_app(
 ) -> FastAPI:
     """Build the service app; production defaults, injectable seams for tests."""
     app = FastAPI(title="STRIDE Threat-Modeling Service")
-    app.state.store = store if store is not None else InMemoryJobStore()
+    app.state.store = store if store is not None else build_store()
     app.state.runner = (
         runner if runner is not None else default_pipeline_runner()
     )
