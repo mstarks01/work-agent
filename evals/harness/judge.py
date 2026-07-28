@@ -31,16 +31,22 @@ re-validated here before any of it reaches a metric (LLM05).
 from __future__ import annotations
 
 import json
+import os
 import random
 import tomllib
+from collections.abc import Callable, Mapping
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Literal, Protocol, TypeVar
+from typing import Any, Literal, Protocol, TypeVar
 
 from pydantic import BaseModel, ConfigDict, Field, ValidationError
 
 from stride_service.markdown_loader import MarkdownLoader
-from stride_service.model_gate import check_supported
+from stride_service.model_gate import (
+    check_supported,
+    completion,
+    supports_structured_output,
+)
 from stride_service.model_tiers import validate_model_string
 from stride_service.report import StrideCategory
 from stride_service.resilience import ResilienceConfig
@@ -107,13 +113,19 @@ class JudgeConfig(BaseModel):
     order_seed: int = 0
 
     def model_post_init(self, _context: object) -> None:
+        vendor = vendor_for(self.vendor)
         validate_model_string(self.model, self.vendor, source="judge.model")
         check_supported(
-            vendor_for(self.vendor),
-            self.model,
-            {"temperature": self.temperature},
-            source="judge",
+            vendor, self.model, {"temperature": self.temperature}, source="judge"
         )
+        # Every ruling is parsed back into a pydantic model, so a judge whose
+        # model treats a response schema as a hint would fail per-call, deep
+        # inside a sweep. Checking it here makes that a load-time error.
+        if not supports_structured_output(vendor, self.model):
+            raise ValueError(
+                f"judge.model: {self.vendor}/{self.model} does not support a"
+                " response schema; the judge's rulings cannot be constrained"
+            )
 
 
 def load_judge_config(path: Path | str = DEFAULT_JUDGE_CONFIG_PATH) -> JudgeConfig:
@@ -282,22 +294,32 @@ def adjudication_payload(
     }
 
 
-class VertexJudge:
-    """The pinned judge, over Vertex through the GenAI SDK.
+class PinnedJudge:
+    """The pinned judge, over whichever vendor ``judge.toml`` names.
 
-    Authentication is ADC (decision 17: IAM, never API keys), so nothing here
-    reads a credential — the CI job's Workload Identity Federation short-lived
-    credentials are picked up implicitly, and the harness needs no code change
-    to authenticate.
+    Reaches its provider through the **same adapter the graph uses** — one
+    library, one credential model, one build-time gate (#10 decision 3). It was
+    previously hardwired to Vertex through the GenAI SDK, which contradicted the
+    decision that freed the judge from Google: config could name Anthropic or
+    OpenAI, and the call would still have gone to Vertex.
+
+    Auth is derived from the vendor like everywhere else, so the ADC path Vertex
+    needs is unchanged (the CI job's Workload Identity credentials are still
+    picked up), while an API-key vendor reads its own vendor-scoped variable.
+
+    ``request`` exists so tests can drive every code path — payload shaping,
+    order randomization, schema re-validation, served-build recording — with no
+    provider call at all.
     """
 
     def __init__(
         self,
         config: JudgeConfig,
         *,
-        client: object | None = None,
+        request: Callable[..., Any] | None = None,
         prompts: MarkdownLoader | None = None,
         resilience: ResilienceConfig | None = None,
+        env: Mapping[str, str] | None = None,
     ) -> None:
         self._config = config
         self._resilience = resilience
@@ -305,44 +327,44 @@ class VertexJudge:
         self._prompts = prompts or MarkdownLoader(DEFAULT_JUDGE_PROMPTS_DIR)
         self._claim_prompt = self._prompts.load(CLAIM_PROMPT_NAME)
         self._adjudication_prompt = self._prompts.load(ADJUDICATION_PROMPT_NAME)
-        self._client = client or self._default_client()
+        self._request = request or completion
+        self._vendor = vendor_for(config.vendor)
+        self._env = os.environ if env is None else env
         self._served_versions: set[str] = set()
 
     @property
     def served_model_versions(self) -> tuple[str, ...]:
-        """The model versions Vertex reported actually serving these calls.
+        """The model builds the provider reported actually serving these calls.
 
-        The configured string is only a request (ticket 026): for generations
-        that ship no numbered builds, the stable identifier resolves to
-        whichever build is current, so reproducibility rests on recording what
-        answered rather than on the string alone. More than one entry in a
-        single run means the build moved mid-run — which is exactly the fact a
-        phantom regression would otherwise be blamed on the prompt.
+        The configured string is only a request: for generations that ship no
+        numbered builds, the stable identifier resolves to whichever build is
+        current, so reproducibility rests on recording what answered rather than
+        on the string alone. More than one entry in a single run means the build
+        moved mid-run — exactly the fact a phantom regression would otherwise be
+        blamed on the prompt.
         """
         return tuple(sorted(self._served_versions))
 
-    def _default_client(self) -> object:
-        """A GenAI client carrying the same retry and timeout as the graph.
+    def _call_kwargs(self) -> dict[str, Any]:
+        """The provider parameters every judge call carries.
 
-        Without this the calibration sweep and the scheduled live eval inherit
-        the SDK's never-retry, no-timeout defaults and die on one 429 after
-        hours of work (ticket 038 decision 5). Retry and timeout ride on the
-        client's ``http_options`` so every judge call gets them.
+        Credentials come from the vendor registry rather than ambient pickup,
+        and retry rides ``num_retries`` — the same arithmetic the graph uses,
+        since ``attempts`` is a total and the provider counts retries after the
+        first try. Without it the calibration sweep and the scheduled live eval
+        inherit never-retry, no-timeout defaults and die on one 429 after hours
+        of work.
         """
-        from google import genai
-        from google.genai import types
-
-        if self._resilience is None:
-            return genai.Client()
-        # Only ``attempts`` survives: resilience version 2 dropped the backoff
-        # knobs as inert under LiteLLM, which picks its curve internally. This
-        # client is still GenAI's, so it still takes a retry object — building
-        # one from attempts alone leaves the SDK's own jittered defaults.
-        http_options = types.HttpOptions(
-            timeout=self._resilience.timeout_ms,
-            retry_options=types.HttpRetryOptions(attempts=self._resilience.attempts),
-        )
-        return genai.Client(http_options=http_options)
+        kwargs: dict[str, Any] = {
+            "model": self._vendor.route(self._config.model),
+            "temperature": self._config.temperature,
+            **self._vendor.credential_kwargs(self._env),
+        }
+        if self._resilience is not None:
+            kwargs["num_retries"] = self._resilience.to_num_retries()
+            # litellm takes seconds; resilience.toml is milliseconds.
+            kwargs["timeout"] = self._resilience.timeout_ms / 1000
+        return kwargs
 
     def equivalent(self, pair: ClaimPair) -> ClaimRuling:
         return self._ask(
@@ -366,25 +388,41 @@ class VertexJudge:
     def _ask(
         self, instruction: str, payload: dict[str, object], schema: type[RulingT]
     ) -> RulingT:
-        """One judge call, constrained to ``schema`` and re-validated here."""
-        from google.genai import types
+        """One judge call, constrained to ``schema`` and re-validated here.
 
-        response = self._client.models.generate_content(
-            model=self._config.model,
-            contents=json.dumps(payload, ensure_ascii=False),
-            config=types.GenerateContentConfig(
-                system_instruction=instruction,
-                temperature=self._config.temperature,
-                response_mime_type="application/json",
-                response_schema=schema,
-            ),
+        The instruction is a system message and the payload a user message, so
+        model-produced claims reach the judge as **data** and never as
+        instructions (OWASP LLM01). The schema constrains the output, and it is
+        re-validated here before any of it reaches a metric (LLM05) — a provider
+        that honours the schema loosely still cannot smuggle a shape through.
+        """
+        response = self._request(
+            messages=[
+                {"role": "system", "content": instruction},
+                {"role": "user", "content": json.dumps(payload, ensure_ascii=False)},
+            ],
+            response_format=schema,
+            **self._call_kwargs(),
         )
-        served = getattr(response, "model_version", None)
+        served = getattr(response, "model", None)
         if served:
-            self._served_versions.add(served)
+            self._served_versions.add(self._vendor.route(served))
         try:
-            return schema.model_validate_json(response.text or "")
+            return schema.model_validate_json(_content_of(response) or "")
         except ValidationError as exc:
             raise JudgeError(
                 f"judge returned output that is not a valid {schema.__name__}"
             ) from exc
+
+
+def _content_of(response: Any) -> str | None:
+    """The text of a completion's first choice, or ``None`` if it has none.
+
+    Tolerant of a response carrying no choices — a refusal or a filtered
+    completion — so that surfaces as a schema-validation failure naming the
+    judge, not an IndexError from inside the harness.
+    """
+    choices = getattr(response, "choices", None) or []
+    if not choices:
+        return None
+    return getattr(getattr(choices[0], "message", None), "content", None)

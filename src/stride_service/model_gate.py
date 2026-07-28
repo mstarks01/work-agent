@@ -78,6 +78,37 @@ def _import_litellm_hermetically() -> Any:
 _litellm = _import_litellm_hermetically()
 
 
+def supports_structured_output(vendor: Vendor, model: str) -> bool:
+    """Whether this ``(vendor, model)`` can be constrained to a response schema.
+
+    Separate from :func:`check_supported` because it is not a raise/no-raise
+    question: ``response_format`` is an accepted *parameter* on every provider,
+    but only some models honour it as a schema rather than as a hint. A caller
+    that depends on parsing structured output needs the stronger fact.
+    """
+    return bool(
+        _litellm.utils.supports_response_schema(
+            model=model, custom_llm_provider=vendor.litellm_provider
+        )
+    )
+
+
+def completion(**kwargs: Any) -> Any:
+    """Issue one request through the same pinned ``litellm`` the gate checks.
+
+    A thin passthrough, and the point is the *sameness*: a gate that validates
+    against one copy of the library while the request goes out through another
+    proves nothing. Everything that issues a request goes through here, so the
+    hermetic model-cost map and the exact version pin cover the call as well as
+    the check.
+
+    Deliberately not wrapped in retry or error translation — callers own their
+    own failure semantics, and ``num_retries`` rides the kwargs like any other
+    provider parameter.
+    """
+    return _litellm.completion(**kwargs)
+
+
 def assert_kwarg_supported(name: str) -> None:
     """Fail closed if LiteLLM does not recognise a constructor kwarg by that name.
 
