@@ -11,10 +11,14 @@ sentence with the commands filled in.
 
 ## Before you start
 
-- **Configured provider credentials.** The scoring runs call the live models, so
-  you need Application Default Credentials plus the project/location the client
-  reads. See [Configuration](../docs/Configuration.md#vertex-environment). The
-  offline steps (`verify_corpus.py`, `pytest`) need none of this.
+- **Credentials for your configured vendors.** The scoring runs call live
+  models, so you need whatever the tiers in `config/model_tiers.toml` select —
+  Google Cloud application default credentials plus a project and location for
+  Vertex, or an API key for Anthropic or OpenAI. The judge in
+  `evals/config/judge.toml` has its own `(vendor, model)` pair and may need a
+  different one. See
+  [Configuration](../docs/Configuration.md#provider-environment). The offline
+  steps (`verify_corpus.py`, `pytest`) need none of this.
 - **Dependencies installed:** `uv sync`.
 - **A clean corpus:** `python evals/verify_corpus.py` should be green.
 
@@ -25,7 +29,7 @@ sentence with the commands filled in.
 2. Establish a baseline    run ×5     ──▶ the metric averages AND their spread
 3. Change one lever        edit/env   ──▶ sampling, a prompt, or the corpus
 4. Re-run and compare      run ×5     ──▶ beat the baseline spread, per case
-5. Promote the winner      commit     ──▶ (sampling also updates the eval gate)
+5. Promote the winner      commit     ──▶ (sampling also updates the blessed list)
 ```
 
 Do them in order. Steps 1–2 are setup you do once per tuning session; 3–5 are the
@@ -155,11 +159,14 @@ justify in the pull request.
 **Prompt or corpus changes** ship like any code change: commit the edited files
 with the run artifacts (or a summary) in the PR so a reviewer can see the gain.
 
-**Sampling changes** need one extra step, because the exact configuration a run
-used is recorded on every report as a fingerprint, and the eval gate checks
-production against a list of blessed fingerprints. Promoting a sampling winner
-must update *both* the config and that blessed list, or they'd disagree. The
-`promote` helper does both from one configuration so they can't:
+**Sampling changes** need one extra step. Every report records the exact
+configuration each node ran on as a **fingerprint** — a hash of the served model
+build plus that tier's decoding parameters — and both the service and the eval
+harness check those fingerprints against the ones this deployment has
+**blessed**, in `config/blessed-fingerprints.toml`. Promoting a sampling winner
+has to update *both* the config file and that blessed list, or the two disagree
+and every run reads as uncertified. The `promote` helper writes both from one configuration so
+they can't drift apart:
 
 ```python
 from evals.harness.certify import promote
@@ -175,7 +182,8 @@ promote(winner, served_models, tiers.resolve_tier)
 ```
 
 This rewrites `config/sampling.toml` in place (keeping its comments) and records
-the winning fingerprints in `config/blessed-fingerprints.toml`. Commit both.
+the winning fingerprints in `config/blessed-fingerprints.toml`, keyed by tier.
+Commit both.
 
 > Note: `promote` refuses to pin a parameter the file deliberately leaves unset
 > (like `top_p`). Those are unset because there's no measured value to
@@ -184,18 +192,26 @@ the winning fingerprints in `config/blessed-fingerprints.toml`. Commit both.
 
 ### Certification
 
-Once promoted, a production run's fingerprints match the blessed list and the run
-reports **certified**. Until then — and for any run driven by a temporary
-`STRIDE_SAMPLING_*` override — the run is **uncertified**, and its scores are
-never quietly treated as trustworthy baselines. To make an uncertified run fail
-outright (e.g. in CI):
+Once promoted, a production run's fingerprints match the blessed list and the
+run reports **certified**. Until then — and for any run driven by a temporary
+`STRIDE_SAMPLING_*` override, since an override changes the fingerprint — the
+run is **uncertified**, and its scores are surfaced as untrusted rather than
+folded quietly into a baseline. To make an uncertified run fail outright (in CI,
+say):
 
 ```sh
 python -m evals.harness.run run --mode analysis --require-certified
 ```
 
-This is off by default, because a gate that fires before anyone has established a
-baseline just teaches people to skip it.
+It is off by default: the blessed list ships empty, so on by default it would
+fail every run before anyone had a baseline to compare against, and people would
+just switch it off.
+
+The service applies the same check to jobs it completes, using the same
+`config/blessed-fingerprints.toml` — there, the equivalent switch is
+`STRIDE_REQUIRE_CERTIFIED` and it withholds the report rather than failing the
+job. See
+[Configuration](../docs/Configuration.md#provenance-and-certification).
 
 ## What blocks a run, and what only informs it
 
@@ -204,7 +220,7 @@ Not every metric stops the world. The gating is deliberately staged:
 | Signal | Blocks a run? | Why |
 | --- | --- | --- |
 | **Structural validity** (report parses, references resolve, severity matches the matrix, summary matches contents) | **Yes, always** | A malformed report is never a valid result. |
-| **Certification** (fingerprints blessed) | Only under `--require-certified` | Surfaced on every run so a drifting configuration is never trusted silently. |
+| **Certification** (every fingerprint blessed) | Only under `--require-certified` | Surfaced on every run, so a configuration that has drifted is never trusted silently. |
 | **must-find recall, near/far delta, critic yield** | No — printed and recorded | These are findings to act on, not build breakers, until enough baselines exist to know what "normal" is. |
 
 The shipped default remains `temperature = 0`. Tuning the per-tier values to

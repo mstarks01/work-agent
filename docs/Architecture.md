@@ -43,16 +43,43 @@ the models are asked only for judgement.
 
 ## Models
 
-Per-node model selection through [`config/model_tiers.toml`](Configuration.md):
-the `base` tier for `extract`/`repair`, `strong` for the six analysts, the
-`critic`, and the `recritic`. Deterministic `FunctionNode`s carry no model. Each
-`strong` call on the eight-way fan-out plus critic is where the token budget
-goes.
+Every LLM node runs on one of two **model tiers** — named for the job they do,
+not for any vendor's product line:
 
-Each tier selects its own `(vendor, model)` pair independently, so the two tiers
-may run different vendors at once. Every vendor is reached through one adapter,
-and the ten LLM nodes share **two** adapter instances — one per tier — so the
-build-time credential and parameter checks fire twice rather than ten times.
+- **`base`** — the workhorse: `extract` and `repair`.
+- **`strong`** — judgement: the six analysts, the `critic`, and the `recritic`.
+
+[`config/model_tiers.toml`](Configuration.md) maps nodes to tiers and each tier
+to a `(vendor, model)` pair. Deterministic `FunctionNode`s carry no model. The
+`strong` tier is where the token budget goes — the eight-way fan-out plus the
+critic.
+
+The two tiers choose their vendor **independently**, so `base` and `strong` can
+run different vendors at the same time. Every vendor is reached through one
+adapter (LiteLLM), and the ten LLM nodes share **two** adapter instances — one
+per tier — so the startup checks on credentials and decoding parameters run
+twice rather than ten times.
+
+## Provenance and certification
+
+Each node records what actually answered it: the **served** model build (the
+build string the provider reported, prefixed with its vendor), the **requested**
+route, and a **fingerprint** — a hash of the served route plus the tier's
+decoding parameters. These land in the report's `nodes` array, so a report
+explains its own origin without trusting an outside record.
+
+**Certification** compares those fingerprints against the ones this deployment
+has **blessed** — approved by a sanctioned measured run and recorded in
+`config/blessed-fingerprints.toml`. It has three results: `certified` (every
+fingerprint observed is blessed), `uncertified` (at least one is not), and
+`unexercised` (a tier the graph declares produced no fingerprint at all).
+
+The service certifies every job it completes — this is not the eval harness's
+job alone. The result lands on the job record, never on the report: the report
+is portable evidence that travels with the analysis, while a match against a
+blessed list is one deployment's claim about it. See
+[Configuration](Configuration.md#provenance-and-certification) for the full
+rules and the environment variables that control them.
 
 ## Outcomes
 
@@ -69,9 +96,9 @@ points:
 ## Resilience
 
 Retry and timeout are configured in [`config/resilience.toml`](Configuration.md)
-and bound onto each model at the SDK level, so the report's `nodes` array is
-unchanged by a retry. A per-request timeout turns a hang into a retryable error.
-Three attempts by default.
+and attached to the adapter itself, so a retry is invisible to the graph and the
+report's `nodes` array is unchanged by one. A per-request timeout turns a hang
+into an error the retry can act on. Three attempts by default.
 
 ## Concurrency and isolation
 
@@ -112,11 +139,12 @@ whole graph runs offline against scripted models:
 | Job persistence | `JobStore` | `InMemoryJobStore` (`memory`) | Backend selected by `STRIDE_JOB_STORE` via a fail-closed registry; only the non-durable `memory` backend ships — a durable one is a new registry entry |
 | ADK sessions | `BaseSessionService` | `InMemorySessionService` | In-memory only; a `session_service_uri` backend is unwired |
 
-The in-memory defaults are enough to get a report in process. Backend
-*selection* is now wired for the `JobStore` (`STRIDE_JOB_STORE`, fail-closed);
-a durable `JobStore` implementation and session backend, deployment (container,
-Cloud Run, Ping middleware), and observability are out of scope for the current
-work — the interfaces and selection seam are in place for them.
+The in-memory defaults are enough to get a report in process. Choosing a backend
+is already wired for the `JobStore` (`STRIDE_JOB_STORE`, which stops startup on
+an unset or unknown value rather than quietly falling back). Still out of scope
+for the current work: a durable `JobStore` implementation, a session backend,
+deployment packaging (container, Cloud Run), and observability. The interfaces
+and the selection seam are in place for all of them.
 
 ## Where the code lives
 
@@ -130,6 +158,11 @@ work — the interfaces and selection seam are in place for them.
 | `stride_service.system_model` | Canonical model + validity helpers. |
 | `stride_service.report` | `StrideReport` and the severity model. |
 | `stride_service.validation` | The mechanical validity gate. |
+| `stride_service.critic` | The mechanical checks around the critic step — the ones no model should be asked to perform. |
 | `stride_service.skills` / `.prompts` / `.markdown_loader` | Skill/prompt loading and composition. |
 | `stride_service.model_tiers` / `.sampling` / `.resilience` | Config loaders. |
-| `stride_service.auth` | Ping JWT verification. |
+| `stride_service.vendors` | The vendor registry: each vendor's router prefix, credential mode, and model-name rules. |
+| `stride_service.binding` | Builds one adapter per tier from `(vendor, model, sampling, resilience)`. |
+| `stride_service.model_gate` | The startup check that asks the provider library whether a tier's parameters are actually supported. |
+| `stride_service.certification` | Compares a run's fingerprints against the deployment's blessed manifest. |
+| `stride_service.auth` | Bearer-token (OIDC JWT) verification. |

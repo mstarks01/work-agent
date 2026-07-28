@@ -17,9 +17,10 @@ from stride_service import StrideEngine
 engine = StrideEngine.from_config()   # repo prompts, repo config, pinned models
 ```
 
-`from_config()` fails closed on missing or invalid [config](Configuration.md)
-rather than running nodes on a default model or sampling. It reads paths and
-overrides from the environment; pass `env=` to override (mainly for tests):
+If [config](Configuration.md) is missing or invalid, `from_config()` raises
+rather than running nodes on some default model or sampling nobody chose. It
+reads paths and overrides from the environment; pass `env=` to override that
+(mainly for tests):
 
 ```python
 engine = StrideEngine.from_config(env={"STRIDE_MODEL_STRONG_MODEL": "gemini-2.5-pro"})

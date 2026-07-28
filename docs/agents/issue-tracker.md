@@ -65,8 +65,11 @@ Completed on GitHub Issues (canonical):
   — 12 tickets, complete 2026-07-28. A **planning** map: it settled the decisions
   (sole `LiteLlm` adapter, `base`/`strong` tiers, vendor-derived auth, served-build
   fingerprints, the certification bar, the four-file config cutover) and stopped
-  short of implementing them. Most of that implementation is still outstanding, and
-  the decisions live in the tickets' resolution comments, not in code.
+  short of implementing them. The implementation has since landed in PRs
+  [#20](https://github.com/mstarks01/work-agent/pull/20) and
+  [#21](https://github.com/mstarks01/work-agent/pull/21), so the decisions now
+  live in code as well as in the tickets' resolution comments — read the code
+  first and the comments for the reasoning behind it.
 
 Archived under `.wayfinder/`, from before this repo moved to GitHub issues:
 
@@ -82,3 +85,7 @@ dependency operations above; don't take them as a model for how to chart a new o
 Reopening any of the three would be a **fresh map, not a resumption** — including
 #3, whose closed tickets are the *record* of decisions taken, not a backlog. Work
 that merely implements #3's decisions needs no map at all.
+
+Ordinary follow-up work — fixing drifted docs, implementing a settled decision,
+repairing a bug — is not a wayfinding effort. Chart a map only when the route to
+the destination is genuinely unclear and the effort is too big for one session.
