@@ -20,12 +20,12 @@ from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "src"))
 
-from stride_service.report import (  # noqa: E402
+from stride_service.report import (
     STRIDE_CATEGORIES,
     Rating,
     derive_severity_level,
 )
-from stride_service.validation import parse_and_validate  # noqa: E402
+from stride_service.validation import parse_and_validate
 
 CORPUS_DIR = Path(__file__).resolve().parent / "corpus"
 CALIBRATION_PATH = Path(__file__).resolve().parent / "judge_calibration" / "pairs.json"

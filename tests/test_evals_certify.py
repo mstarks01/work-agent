@@ -167,7 +167,7 @@ def _build_fingerprints(sampling, served="fake-model-001"):
 def test_a_pro_override_reprints_only_pro_nodes():
     default = load_sampling(SAMPLING_PATH)
     overridden = load_sampling(
-        SAMPLING_PATH, env={"STRIDE_SAMPLING_PRO_TEMPERATURE": "0.9"}
+        SAMPLING_PATH, env={"STRIDE_SAMPLING_STRONG_TEMPERATURE": "0.9"}
     )
 
     base = _build_fingerprints(default)
@@ -182,7 +182,7 @@ def test_a_pro_override_reprints_only_pro_nodes():
 def test_certify_flags_an_override_drifted_run():
     default = load_sampling(SAMPLING_PATH)
     overridden = load_sampling(
-        SAMPLING_PATH, env={"STRIDE_SAMPLING_PRO_TEMPERATURE": "0.9"}
+        SAMPLING_PATH, env={"STRIDE_SAMPLING_STRONG_TEMPERATURE": "0.9"}
     )
     manifest = _manifest(
         {node: {fp} for node, fp in _build_fingerprints(default).items()}
@@ -229,8 +229,8 @@ def _promote_setup(tmp_path):
 def test_promote_reprints_values_in_place_and_writes_the_manifest(tmp_path):
     sampling_copy, manifest_copy, resolve_tier = _promote_setup(tmp_path)
     winner = load_sampling(SAMPLING_PATH)
-    hot_flash = winner.for_tier("flash").model_copy(update={"temperature": 0.2})
-    winner = winner.model_copy(update={"tiers": {**winner.tiers, "flash": hot_flash}})
+    hot_base = winner.for_tier("base").model_copy(update={"temperature": 0.2})
+    winner = winner.model_copy(update={"tiers": {**winner.tiers, "base": hot_base}})
 
     manifest = promote(
         winner,
@@ -249,7 +249,7 @@ def test_promote_reprints_values_in_place_and_writes_the_manifest(tmp_path):
     reloaded = load_manifest(manifest_copy)
     assert reloaded.blessed_for("extract") == manifest.blessed_for("extract")
     assert certify(_build_fingerprints(winner, "build-001"), reloaded).certified is False
-    # extract (flash) is blessed; only the two named nodes were promoted.
+    # extract (base) is blessed; only the two named nodes were promoted.
     assert reloaded.blessed_for("extract")
     assert reloaded.blessed_for("critic")
     assert reloaded.blessed_for("recritic") == frozenset()
@@ -275,10 +275,10 @@ def test_promote_accumulates_blessed_builds(tmp_path):
 def test_promote_refuses_to_pin_a_previously_unset_param(tmp_path):
     sampling_copy, manifest_copy, resolve_tier = _promote_setup(tmp_path)
     winner = load_sampling(SAMPLING_PATH)
-    tuned = winner.for_tier("pro").model_copy(update={"top_p": 0.9})
-    winner = winner.model_copy(update={"tiers": {**winner.tiers, "pro": tuned}})
+    tuned = winner.for_tier("strong").model_copy(update={"top_p": 0.9})
+    winner = winner.model_copy(update={"tiers": {**winner.tiers, "strong": tuned}})
 
-    with pytest.raises(CertificationError, match="tiers.pro.top_p"):
+    with pytest.raises(CertificationError, match="tiers.strong.top_p"):
         promote(
             winner, {"critic": "build-001"}, resolve_tier,
             sampling_path=sampling_copy, manifest_path=manifest_copy,

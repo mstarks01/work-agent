@@ -59,6 +59,16 @@ def prompt_loader() -> MarkdownLoader:
     return MarkdownLoader(PROJECT_ROOT / "prompts")
 
 
+def _route_resolver(tiers):
+    """Bind nodes to their tier's route string, standing in for the adapter.
+
+    Production binds one ``LiteLlm`` per tier; these tests only need a stable
+    per-tier identity on the node, and building real adapters would run the
+    credential check against credentials an offline test does not have.
+    """
+    return lambda node: tiers.resolve_model(node).route
+
+
 @pytest.fixture
 def pipeline(skill_loader: MarkdownLoader, prompt_loader: MarkdownLoader):
     tiers = load_model_tiers(PROJECT_ROOT / "config" / "model_tiers.toml", env={})
@@ -66,7 +76,7 @@ def pipeline(skill_loader: MarkdownLoader, prompt_loader: MarkdownLoader):
     return graph.build_pipeline(
         skill_loader=skill_loader,
         prompt_loader=prompt_loader,
-        resolve_model=tiers.resolve_model,
+        resolve_model=_route_resolver(tiers),
         resolve_sampling=make_resolve_sampling(sampling, tiers.resolve_tier),
         tier_sampling=sampling.tiers,
     )
@@ -98,23 +108,33 @@ def test_llm_nodes_bind_their_resolved_model(pipeline):
     for name, node in nodes_by_name(pipeline).items():
         if not isinstance(node, LlmAgent):
             continue
-        assert node.model == tiers.resolve_model(graph.TIER_NODE_BY_GRAPH_NODE[name])
+        selection = tiers.resolve_model(graph.TIER_NODE_BY_GRAPH_NODE[name])
+        assert node.model == selection.route
         assert pipeline.node_models[name] == node.model
 
 
-# Flash and pro differ on every offered param, so a node bound to the wrong
-# tier's sampling would read wrong here. ``thinking = "off"`` on flash resolves
-# to budget 0; ``"auto"`` on pro resolves to -1 (dynamic).
+def test_the_recorded_model_carries_its_vendor(pipeline):
+    # A bare served identifier carries no vendor, and two vendors can serve the
+    # same build — so the prefix is part of the identity, not decoration.
+    assert pipeline.node_models[graph.EXTRACT_NODE].startswith("vertex_ai/")
+
+
+# The two tiers differ on every param the node config carries, so a node bound
+# to the wrong tier's sampling would read wrong here.
 _DIVERGENT_SAMPLING = """\
-version = 2
-[tiers.flash]
+version = 3
+[tiers.base]
 temperature = 0.0
+top_p = 0.5
+max_output_tokens = 1024
 seed = 11
-thinking = "off"
-[tiers.pro]
+thinking = "low"
+[tiers.strong]
 temperature = 1.0
+top_p = 0.9
+max_output_tokens = 4096
 seed = 22
-thinking = "auto"
+thinking = "high"
 """
 
 
@@ -124,7 +144,7 @@ def _pipeline_with_sampling(skill_loader, prompt_loader, sampling_path, resilien
     return graph.build_pipeline(
         skill_loader=skill_loader,
         prompt_loader=prompt_loader,
-        resolve_model=tiers.resolve_model,
+        resolve_model=_route_resolver(tiers),
         resolve_sampling=make_resolve_sampling(sampling, tiers.resolve_tier),
         tier_sampling=sampling.tiers,
         resilience=resilience,
@@ -136,9 +156,9 @@ def test_each_llm_node_binds_its_own_tier_sampling(
 ):
     """Ticket 06: sampling is resolved per node, not shared graph-wide.
 
-    ``extract``/``repair`` run on flash, the analysts and critic/recritic on
-    pro; with the two tiers pinned to different decoding params, each node must
-    carry *its* tier's ``GenerateContentConfig``.
+    ``extract``/``repair`` run on base, the analysts and critic/recritic on
+    strong; with the two tiers pinned to different decoding params, each node
+    must carry *its* tier's ``GenerateContentConfig``.
     """
     sampling_path = tmp_path / "sampling.toml"
     sampling_path.write_text(_DIVERGENT_SAMPLING, encoding="utf-8")
@@ -147,22 +167,41 @@ def test_each_llm_node_binds_its_own_tier_sampling(
         _pipeline_with_sampling(skill_loader, prompt_loader, sampling_path, resilience)
     )
 
-    flash_nodes = (graph.EXTRACT_NODE, graph.REPAIR_NODE)
-    pro_nodes = (
+    base_nodes = (graph.EXTRACT_NODE, graph.REPAIR_NODE)
+    strong_nodes = (
         graph.CRITIC_NODE,
         graph.RECRITIC_NODE,
         *graph.ANALYST_GRAPH_NODES,
     )
-    for name in flash_nodes:
+    for name in base_nodes:
         config = nodes[name].generate_content_config
         assert config.temperature == 0.0
-        assert config.seed == 11
-        assert config.thinking_config.thinking_budget == 0
-    for name in pro_nodes:
+        assert config.top_p == 0.5
+        assert config.max_output_tokens == 1024
+    for name in strong_nodes:
         config = nodes[name].generate_content_config
         assert config.temperature == 1.0
-        assert config.seed == 22
-        assert config.thinking_config.thinking_budget == -1
+        assert config.top_p == 0.9
+        assert config.max_output_tokens == 4096
+
+
+def test_seed_and_reasoning_stay_off_the_node_config(
+    skill_loader, prompt_loader, tmp_path
+):
+    """They ride the tier's adapter constructor instead (#6 decision 1).
+
+    ADK's request map forwards neither, so putting them here would let them
+    vanish silently while the fingerprint went on attesting to a seed the
+    request never carried.
+    """
+    sampling_path = tmp_path / "sampling.toml"
+    sampling_path.write_text(_DIVERGENT_SAMPLING, encoding="utf-8")
+    nodes = nodes_by_name(
+        _pipeline_with_sampling(skill_loader, prompt_loader, sampling_path, None)
+    )
+    config = nodes[graph.EXTRACT_NODE].generate_content_config
+    assert config.seed is None
+    assert config.thinking_config is None
 
 
 def test_per_node_sampling_composes_with_the_resilience_timeout(
