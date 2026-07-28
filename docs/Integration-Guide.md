@@ -22,7 +22,7 @@ rather than running nodes on a default model or sampling. It reads paths and
 overrides from the environment; pass `env=` to override (mainly for tests):
 
 ```python
-engine = StrideEngine.from_config(env={"STRIDE_MODEL_PRO": "gemini-2.5-pro"})
+engine = StrideEngine.from_config(env={"STRIDE_MODEL_STRONG_MODEL": "gemini-2.5-pro"})
 ```
 
 One engine holds no cross-call state, so it is safe to share across concurrent

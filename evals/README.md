@@ -19,7 +19,6 @@ evals/
   BLESSING.md                   how to author a golden case
   TUNING.md                     how to tune the models against the corpus
   verify_corpus.py              mechanical checks over everything below
-  blessed-fingerprints.toml     the sampling configs approved by a measured run
   corpus/<NN>-<slug>/
     source.md                   the submitted text
     model.json                  the blessed System Model (passes the shipped validator)
@@ -54,7 +53,7 @@ you don't ship is how a test suite goes green while production quietly drifts.
 The judge's own model is pinned separately in `evals/config/judge.toml`, because
 changing the judge re-scores every past result.
 
-Every run also records which model versions Vertex actually served, not just
+Every run also records which model builds the provider actually served, not just
 which ones it asked for. Stable model identifiers name the current build rather
 than a frozen one, so two runs that report different served versions have run on
 different models — that's a model change, not a regression, and nothing else in
@@ -71,7 +70,7 @@ python evals/judge_calibration/build_pairs.py # regenerate pairs.json from the l
 pytest tests/test_evals_*.py tests/test_corpus_lints.py
 ```
 
-Live — needs a configured Vertex environment (see
+Live — needs configured provider credentials (see
 [Configuration](../docs/Configuration.md#vertex-environment)):
 
 ```sh

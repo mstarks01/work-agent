@@ -36,6 +36,7 @@ from tests.test_pipeline import (
     STRONG_MODEL,
     ScriptedLlm,
     draft_json,
+    served_build,
 )
 
 MARKER = re.compile(r"MARK-[0-9a-f]{4}")
@@ -66,7 +67,8 @@ class MarkerExtractLlm(BaseLlm):
         yield LlmResponse(
             content=types.Content(
                 role="model", parts=[types.Part(text=model.model_dump_json())]
-            )
+            ),
+            model_version=served_build(self.model),
         )
 
 
