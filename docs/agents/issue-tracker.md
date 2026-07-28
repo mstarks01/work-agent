@@ -53,18 +53,32 @@ gh api --method POST repos/mstarks01/work-agent/issues/<map>/sub_issues -F sub_i
 gh api --method POST repos/mstarks01/work-agent/issues/<child>/dependencies/blocked_by -F issue_id=$BLOCKER_ID
 ```
 
-### Archived local-markdown maps — not live
+### Completed efforts — no live map right now
 
-`.wayfinder/` holds **two completed efforts** from before this repo moved to GitHub
-issues, kept as a record:
+**There is currently no open map.** All three efforts charted so far are complete,
+so `/wayfinder` invoked with a loose idea should **chart a new map**, not look for
+one to resume.
+
+Completed on GitHub Issues (canonical):
+
+- [#3 — Map: make the model provider pluggable (multi-vendor)](https://github.com/mstarks01/work-agent/issues/3)
+  — 12 tickets, complete 2026-07-28. A **planning** map: it settled the decisions
+  (sole `LiteLlm` adapter, `base`/`strong` tiers, vendor-derived auth, served-build
+  fingerprints, the certification bar, the four-file config cutover) and stopped
+  short of implementing them. Most of that implementation is still outstanding, and
+  the decisions live in the tickets' resolution comments, not in code.
+
+Archived under `.wayfinder/`, from before this repo moved to GitHub issues:
 
 - `.wayfinder/map.md` + `.wayfinder/tickets/` — the original service design map, 39
   tickets, complete 2026-07-23.
 - `.wayfinder/model-tuning/` — per-tier ADK model tuning, 9 tickets, complete
   2026-07-25.
 
-Both have empty frontiers and are **closed history**. They use the local-markdown
-convention (`assignee:` frontmatter as the claim, a `blocked-by:` list for
-dependencies) and must not be confused for the live map. **GitHub Issues is
-canonical**; any new effort is charted there. Reopening either archived effort
-would be a fresh map, not a resumption.
+The two archived efforts use the local-markdown convention (`assignee:` frontmatter
+as the claim, a `blocked-by:` list for dependencies) rather than the sub-issue and
+dependency operations above; don't take them as a model for how to chart a new one.
+
+Reopening any of the three would be a **fresh map, not a resumption** — including
+#3, whose closed tickets are the *record* of decisions taken, not a backlog. Work
+that merely implements #3's decisions needs no map at all.
