@@ -57,19 +57,28 @@ credential this deployment did not declare cannot authenticate a run. Keys are
 never logged, never in the report, and never in a fingerprint; errors name the
 variable, never its value.
 
-**Pinning** is per-vendor and deliberately weak — a denylist of floating forms
-(`-latest`, `-preview`, `-exp`) plus a per-family pinned shape where the vendor
-publishes one (`claude-...@YYYYMMDD` on Vertex, `claude-...-YYYYMMDD` direct;
-Gemini 2.5+ ships no numbered builds, so the bare name is the most specific
-identifier there is). It is a proxy, not the guarantee: the real guarantee is the
-**served build read back from every response** and recorded per node execution.
+**Pinning** means naming a model specifically enough that it won't quietly
+change under you. The check is per-vendor and deliberately loose: it rejects
+names that openly float (`-latest`, `-preview`, `-exp`) and, where a vendor
+publishes a dated form, requires it (`claude-...@YYYYMMDD` on Vertex,
+`claude-...-YYYYMMDD` when called directly). Gemini 2.5 and later ship no
+numbered builds, so there the bare name is the most specific identifier
+available.
+
+A loose rule is the right one here because it runs against three vendors'
+catalogs at once, and its predecessor — an allowlist of numbered Gemini builds —
+broke outright when Google retired them. The name check is only a proxy. The
+real guarantee is the **served build read back from every response** and
+recorded for each node execution, described under
+[Provenance and certification](#provenance-and-certification).
 
 ### Sampling
 
-`config/sampling.toml` (`version = 3`) pins decoding **per tier**, in
-`[tiers.base]` and `[tiers.strong]` tables reusing the node→tier map from
-`model_tiers.toml`. Eval and production read this same file — grading a
-configuration you do not ship is how a suite goes green while production drifts.
+`config/sampling.toml` (`version = 3`) pins decoding parameters **per tier**, in
+`[tiers.base]` and `[tiers.strong]` tables that reuse the node→tier map from
+`model_tiers.toml`. The eval harness and production read this same file, on
+purpose: grading a configuration you don't actually ship is how a test suite
+stays green while production quietly drifts.
 
 The file lists **every** decoding parameter the surface admits, each either
 pinned or left as a *commented* line explaining why. An omitted key is a typo the
@@ -101,19 +110,23 @@ and never overridable: `response_schema` (the SDK *raises*), `response_mime_type
 (silently discarded), `stop_sequences` (would truncate mid-token), and
 `http_options` (owned by `resilience.toml`).
 
-### The build-time gate
+### The startup parameter check
 
-At startup, every tier's `(vendor, model, sampling)` combination is run through
-the provider library's own parameter check. **An unsupported parameter fails the
-build, not the first request** — otherwise it would raise mid-job, after earlier
-nodes had already been paid for. Concretely: `seed` on Anthropic (or on
-Vertex-hosted Claude) is a startup error, while the same `seed` on Vertex-hosted
-Gemini is fine; `temperature = 0.0` on an OpenAI o-series model is a startup
-error, because o-series constrains it to exactly `1`.
+Vendors do not accept the same decoding parameters. At startup, every tier's
+`(vendor, model, sampling)` combination is run through the provider library's
+own check, so **an unsupported parameter stops startup rather than failing the
+first request** — otherwise it would raise partway through a job, after earlier
+nodes had already been paid for. For example:
 
-The check asks the library rather than mirroring a table, so it cannot drift
-against the gate that actually fires. The library's model-cost map is pinned to
-the installed copy, so the verdict never depends on a network fetch at startup.
+- `seed` on Anthropic, or on Vertex-hosted Claude, is a startup error — but the
+  same `seed` on Vertex-hosted Gemini is fine.
+- `temperature = 0.0` on an OpenAI o-series model is a startup error, because
+  o-series models constrain temperature to exactly `1`.
+
+The check asks the library itself rather than consulting a table this repo
+maintains, so it cannot drift away from the behaviour that actually fires at
+request time. The library's model data is read from the installed copy, so the
+answer never depends on a network fetch during startup.
 
 ### Resilience
 
@@ -179,53 +192,71 @@ it with a measurement — see [Tuning the models](../evals/TUNING.md).
 
 ### Provenance and certification
 
-Every run is **self-describing**. Each node records:
+Three terms, defined once and used throughout:
 
-- `NodeRun.model` — the **served** build, vendor-prefixed
-  (`vertex_ai/gemini-2.5-pro-002`): what actually answered.
-- `NodeRun.requested_model` — the **configured** route
-  (`vertex_ai/gemini-2.5-pro`): what was asked for.
-- `NodeRun.sampling_fingerprint` — `sha256(served route, resolved tier sampling)`.
+- **Served build** — the model identifier the provider says actually answered a
+  request, prefixed with its vendor (`vertex_ai/gemini-2.5-pro-002`). Not
+  necessarily the one you asked for.
+- **Fingerprint** (also *generation identity*) — `sha256` of the served route
+  plus that tier's resolved decoding parameters. One value that identifies
+  exactly how a node produced its output.
+- **Blessed** — a fingerprint recorded in `config/blessed-fingerprints.toml`
+  because a measured, sanctioned run produced it. The list is this deployment's
+  own; nothing about it ships from this repo.
 
-The report records both model fields and compares neither. Their disagreement is
-the drift signal, and it needs no comparison logic: a moved build produces a
-fingerprint no manifest blessed, so drift falls out of certification for free.
+Every run is **self-describing**: each node records what it asked for, what
+answered, and the fingerprint of the two together.
 
-The fingerprint is computed **per node execution**, not once at startup — so a
-build that moves mid-run yields two identities for one node, which is the signal
-rather than a defect. The vendor prefix is part of the hash because a served
-identifier carries no vendor, and Vertex-hosted Claude and Anthropic-direct
-return identical build strings.
+| Field | What it holds |
+| --- | --- |
+| `NodeRun.requested_model` | The configured route — what was asked for (`vertex_ai/gemini-2.5-pro`). |
+| `NodeRun.model` | The served build — what actually answered (`vertex_ai/gemini-2.5-pro-002`). |
+| `NodeRun.sampling_fingerprint` | The fingerprint of the served route and the tier's decoding params. |
 
-`config/blessed-fingerprints.toml` records, **per tier**, the identities a
-measured run has blessed. It is keyed by tier rather than by node because a
-fingerprint carries no node name: `critic` and `recritic` share a tier and
-present a byte-identical hash, so node keying would report the first production
-revise path uncertified on a technicality.
+The report records both model fields and **compares neither**. It doesn't need
+to: if the build moves, the fingerprint changes too, and no blessed list
+contains it — so the run reads as uncertified and the drift surfaces there
+instead.
 
-The manifest is **deployment-local**: the project can never ship a certified
-pair, because a repo-level blessing plus a local one could only resolve as a
-silent override or a silent veto. `STRIDE_BLESSED_FINGERPRINTS` picks *which*
-single file is read; it is not an overlay.
+The fingerprint is computed **per node execution**, not once at startup. A build
+that moves partway through a run therefore gives one node two different
+identities, which is the signal you want rather than a defect. The vendor prefix
+is part of the hash because a served identifier alone carries no vendor —
+Vertex-hosted Claude and Anthropic-direct Claude return identical build strings.
+
+`config/blessed-fingerprints.toml` records blessed fingerprints **per tier**,
+not per node. A fingerprint contains no node name, and `critic` and `recritic`
+run on the same tier, so they present a byte-identical hash; keying by node
+would call that one hash blessed under `critic` and unblessed under `recritic`,
+marking the first revise path in production uncertified on a technicality.
+
+The list is **deployment-local**. This project can never ship a run that already
+counts as certified, because a repo-level blessing plus a local one could only
+resolve as one silently overriding the other.
+`STRIDE_BLESSED_FINGERPRINTS` chooses *which* single file is read — it does not
+layer a second one on top.
 
 **The service certifies every job it completes**, not just the eval harness. The
-verdict has three states and lives on the job record, never on the report — the
-report is portable evidence, the manifest is one deployment's claim:
+result has three states and lives on the job record, never on the report: the
+report is portable evidence that travels with the analysis, while a blessed list
+is one deployment's claim about it.
 
 | State | Meaning | Effect on `GET /v1/jobs/{id}/report` |
 | --- | --- | --- |
 | certified | Every observed fingerprint is blessed | Served |
 | uncertified | At least one is not | Served **unless** `STRIDE_REQUIRE_CERTIFIED` |
-| unexercised | A tier the graph declares presented no identity at all | **Always** withheld |
+| unexercised | A tier the graph declares presented no fingerprint at all | **Always** withheld |
 
-The sets ship **empty**, so until you promote a measured baseline every run reads
-as uncertified. That is annotated, not fatal: a gate that fires before the normal
-range is known just trains people to bypass it. `unexercised` is different — it
-is unreachable on any run that produces a report, so withholding costs nothing.
+The lists ship **empty**, so until you promote a measured baseline every run
+reads as uncertified. That is recorded, not fatal — a gate that fires before
+anyone knows the normal range just trains people to switch it off.
+`unexercised` is different: every tier has a node that always runs, so it cannot
+happen on a run that produced a report at all. It is an internal assertion, and
+enforcing it costs nothing.
 
 Withholding refuses the *report*; it never fails the job. A failed job carries no
-report at all, and the fingerprints that prove the drift live in it. Nothing
-about certification reaches the job status view — it is operator-only.
+report at all, and the fingerprints that show what drifted live inside it.
+Nothing about certification appears in the job status view — it is operator-only.
 
 | Variable | Effect |
 | --- | --- |
@@ -344,11 +375,11 @@ connection settings from its own prefixed env vars; the API layer is unchanged.
 
 ### Provider environment
 
-Each tier's vendor implies what it needs; see
-[Models and vendors](#models-and-vendors) for the table. Startup fails closed if
-a selected vendor's credentials are absent, so a misconfigured deployment never
-reaches the first request. Offline tests and the in-memory
-[stub runner](Integration-Guide.md) need none of it.
+Each tier's vendor determines what credentials it needs; see
+[Models and vendors](#models-and-vendors) for the table. If a selected vendor's
+credentials are missing, startup stops with an error, so a misconfigured
+deployment never reaches its first request. Offline tests and the in-memory
+[stub runner](Integration-Guide.md) need none of this.
 
 ## Input limits
 
