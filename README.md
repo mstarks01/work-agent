@@ -21,8 +21,8 @@ rejecting the ungrounded. See [`CONTEXT.md`](CONTEXT.md) for the domain glossary
 - **In process** — embed `StrideEngine` and get a report back from a function
   call. The path for swapping the engine in behind an existing analysis
   interface.
-- **Over HTTP** — the async, Ping-authenticated [`/v1` job API](docs/HTTP-API.md)
-  for a decoupled front end.
+- **Over HTTP** — the async [`/v1` job API](docs/HTTP-API.md), authenticated with
+  a bearer token from any OIDC identity provider, for a decoupled front end.
 
 Both surfaces drive the same pipeline and return the same
 [`StrideReport`](docs/Report-Schema.md).
@@ -42,16 +42,18 @@ if isinstance(outcome, PipelineCompleted):
 ```
 
 Reaching the models needs credentials for whichever vendor each tier selects —
-ADC plus project/location for Vertex, an API key for Anthropic or OpenAI. Startup
-fails closed if they are missing; see [docs/Configuration.md](docs/Configuration.md).
-Offline tests and the in-memory stub runner need none of it.
+Google Cloud application default credentials plus a project and location for
+Vertex, or an API key for Anthropic or OpenAI. If they are missing, startup
+stops with an error rather than running on some fallback nobody chose; see
+[docs/Configuration.md](docs/Configuration.md). Offline tests and the in-memory
+stub runner need none of it.
 
 ## Repository layout
 
 | Path | What lives here |
 |---|---|
 | `src/stride_service/` | The shipped engine — the only thing in the wheel. Graph, agents, config loaders, report schema, HTTP API. |
-| `config/` | Versioned, fail-closed config: `model_tiers.toml`, `sampling.toml`, `resilience.toml`. |
+| `config/` | Versioned config that stops startup rather than falling back: `model_tiers.toml`, `sampling.toml`, `resilience.toml`, `blessed-fingerprints.toml`. |
 | `prompts/` | Agent prompts and per-category exemplars. |
 | `skills/` | The per-category STRIDE skill Markdown baked into the image. |
 | `docs/` | User-facing documentation (see below). |
@@ -63,7 +65,7 @@ Offline tests and the in-memory stub runner need none of it.
 - **[docs/Home.md](docs/Home.md)** — start here; the docs index and overview.
 - [Integration-Guide](docs/Integration-Guide.md) — embed the engine in process.
 - [Report-Schema](docs/Report-Schema.md) — the result shape, provenance, and the three outcomes.
-- [Configuration](docs/Configuration.md) — config files, environment variables, per-tier sampling, and the eval gate.
+- [Configuration](docs/Configuration.md) — config files, environment variables, per-tier decoding, and how a run is certified.
 - [HTTP-API](docs/HTTP-API.md) — the `/v1` async job contract.
 - [Architecture](docs/Architecture.md) — how the graph, models, and seams fit together.
 
@@ -89,7 +91,10 @@ configured provider credentials — see [evals/TUNING.md](evals/TUNING.md).
 
 ## Status
 
-The analysis code is complete and offline-tested. The shipped decoding default is
+The analysis code is complete and covered by an offline test suite. It has not
+yet been run against a live model, so no run has produced a certified baseline
+and the blessed-fingerprint list ships empty. The shipped decoding default is
 `temperature = 0`; improving the per-tier sampling values is a measured tuning
-loop (see [evals/TUNING.md](evals/TUNING.md)). Persistent job/session backends
-are left as seams — the in-memory defaults are enough to get a report in process.
+loop (see [evals/TUNING.md](evals/TUNING.md)). Persistent job and session
+backends are left as seams — the in-memory defaults are enough to get a report
+in process.

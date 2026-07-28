@@ -134,20 +134,22 @@ class NodeRun:
 > served build rather than the configured string. A consumer keying on `model`
 > now reads what answered.
 
-The report records both model fields and **compares neither**. Their disagreement
-is the drift signal, and it needs no comparison logic: a moved build produces a
-fingerprint no approved baseline blessed, so drift falls out of certification.
+The report records both model fields and **compares neither**. It doesn't need
+to: if the build moves, the fingerprint moves with it, and the run stops
+matching any list of blessed fingerprints — so the drift surfaces there rather
+than through comparison logic here.
 
-The fingerprint is computed **per node execution**, so a node that ran more than
-once — the critic on a revise path — appears once per execution, and a build that
-moved mid-run gives one node two identities. That is the signal, not a defect.
+The fingerprint is computed **per node execution**. A node that ran more than
+once — the critic on a revise path — appears once per execution, and a build
+that moved partway through a run gives one node two different fingerprints.
+That is the signal, not a defect.
 
-The fingerprint — not `seed` — is what makes a result reproducible to reason
-about; `seed` is best-effort, and some vendors do not accept it at all. The
-report carries the fingerprints as-is. Whether a run matches a baseline this
-*deployment* approved is a separate question, answered against
-`config/blessed-fingerprints.toml` and recorded on the job, never on the report:
-the report is portable evidence, a manifest is one deployment's claim. See
+The fingerprint, not `seed`, is what makes a result reproducible to reason
+about: `seed` is best-effort, and some vendors don't accept it at all. The
+report carries fingerprints as-is. Whether they match a baseline that a
+*particular deployment* has blessed is a separate question, answered against
+that deployment's `config/blessed-fingerprints.toml` and recorded on the job —
+never on the report, which travels as portable evidence. See
 [Configuration → Provenance and certification](Configuration.md#provenance-and-certification).
 
 A report produced without live models (the in-memory stub runner, or eval

@@ -43,15 +43,17 @@ evals/
 | `harness/scorer.py` | The scoring pipeline: prefilter → judge → match → bucket → severity. |
 | `harness/critic_yield.py` | What the critic added and removed, scored on both sides. |
 | `harness/calibration.py` | Judge-vs-human agreement over the labelled fixtures. |
-| `harness/certify.py` | The eval gate: certify a run's config, and promote a winner. |
+| `harness/certify.py` | Promoting a winning configuration: rewrites `config/sampling.toml` and records its fingerprints as blessed. The certification check itself lives in the service (`stride_service.certification`), which this imports. |
 | `harness/modes.py` | The three run modes over the shipped graph. |
 | `harness/run.py` | The command-line entry point. |
 
 Sampling parameters are **not** here: the harness reads `config/sampling.toml`
 at the repo root, the exact same file production reads. Grading a configuration
 you don't ship is how a test suite goes green while production quietly drifts.
-The judge's own model is pinned separately in `evals/config/judge.toml`, because
-changing the judge re-scores every past result.
+The judge's own model is pinned separately in `evals/config/judge.toml` — it
+names a `(vendor, model)` pair like any tier does, and has no environment
+override. Changing anything in that file re-scores every past result, so treat
+it as a re-baselining event rather than a dependency bump.
 
 Every run also records which model builds the provider actually served, not just
 which ones it asked for. Stable model identifiers name the current build rather
@@ -70,8 +72,8 @@ python evals/judge_calibration/build_pairs.py # regenerate pairs.json from the l
 pytest tests/test_evals_*.py tests/test_corpus_lints.py
 ```
 
-Live — needs configured provider credentials (see
-[Configuration](../docs/Configuration.md#vertex-environment)):
+Live — needs credentials for whichever vendor the tiers are configured to use
+(see [Configuration](../docs/Configuration.md#provider-environment)):
 
 ```sh
 python -m evals.harness.run run --mode analysis --out artifact.json
