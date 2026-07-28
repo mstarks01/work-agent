@@ -1,8 +1,8 @@
-"""The offline eval gate (ticket 08): certify(), the manifest, and promotion.
+"""Sweep promotion: the write half of certification (the pure check moved).
 
-Zero Vertex calls — the whole point of ticket 03 §4 is a gate the credential-
-free suite exercises. Fingerprints are scripted or built from the shipped graph
-without running it; the live gate *run* stays out of scope.
+Zero provider calls. ``promote`` re-pins ``sampling.toml`` in place and records
+the fingerprints that pinning implies; the check those fingerprints are later
+tested against now lives in ``tests/test_certification.py``.
 """
 
 from __future__ import annotations
@@ -12,168 +12,76 @@ from pathlib import Path
 import pytest
 
 from evals.harness import modes
-from evals.harness.certify import (
-    DEFAULT_MANIFEST_PATH,
+from evals.harness.certify import DEFAULT_MANIFEST_PATH, promote
+from stride_service.certification import (
+    MANIFEST_VERSION,
     BlessedManifest,
     CertificationError,
     certify,
     load_manifest,
-    promote,
-    report_fingerprints,
 )
-from stride_service.graph import ENTRY_EXTRACT
+from stride_service.graph import ENTRY_EXTRACT, TIER_NODE_BY_GRAPH_NODE
 from stride_service.model_tiers import load_model_tiers
-from stride_service.report import NodeRun, StrideReport
-from stride_service.sampling import load_sampling
-from tests.factories import sample_report
+from stride_service.sampling import load_sampling, sampling_fingerprint
 
 REPO_ROOT = Path(__file__).resolve().parents[1]
 SAMPLING_PATH = REPO_ROOT / "config" / "sampling.toml"
 TIERS_PATH = REPO_ROOT / "config" / "model_tiers.toml"
 
-FP_A = "a" * 64
-FP_B = "b" * 64
-FP_C = "c" * 64
+_TIER_OF = load_model_tiers(TIERS_PATH, env={}).resolve_tier
 
 
-def _manifest(nodes: dict[str, set[str]]) -> BlessedManifest:
-    return BlessedManifest(version=1, nodes=nodes)
+def tier_of(graph_node: str) -> str:
+    return _TIER_OF(TIER_NODE_BY_GRAPH_NODE[graph_node])
 
 
-# --- certify() ------------------------------------------------------------
+def _manifest(tiers: dict[str, set[str]]) -> BlessedManifest:
+    return BlessedManifest(version=MANIFEST_VERSION, tiers=tiers)
 
 
-def test_exact_match_is_certified():
-    manifest = _manifest({"extract": {FP_A}, "critic": {FP_B}})
-
-    result = certify({"extract": FP_A, "critic": FP_B}, manifest)
-
-    assert result.certified
-    assert result.uncertified == ()
-
-
-def test_a_mismatched_node_is_uncertified_and_listed():
-    manifest = _manifest({"extract": {FP_A}, "critic": {FP_B}})
-
-    result = certify({"extract": FP_A, "critic": FP_C}, manifest)
-
-    assert not result.certified
-    assert [n.node for n in result.uncertified] == ["critic"]
-    assert result.uncertified[0].fingerprint == FP_C
+def _blessed_from(observations: dict[str, frozenset[str]]) -> BlessedManifest:
+    """Bless every fingerprint a variant produced, collapsed onto its tier."""
+    tiers: dict[str, set[str]] = {}
+    for node, prints in observations.items():
+        tiers.setdefault(tier_of(node), set()).update(prints)
+    return _manifest(tiers)
 
 
-def test_a_node_absent_from_the_manifest_fails_closed():
-    # An empty / missing blessed set certifies nothing — the honest pre-baseline
-    # state the shipped manifest ships in.
-    result = certify({"extract": FP_A}, _manifest({}))
-
-    assert not result.certified
-    assert result.uncertified[0].node == "extract"
-
-
-def test_multiple_blessed_builds_per_node_all_certify():
-    manifest = _manifest({"extract": {FP_A, FP_B}})
-
-    assert certify({"extract": FP_A}, manifest).certified
-    assert certify({"extract": FP_B}, manifest).certified
-    assert not certify({"extract": FP_C}, manifest).certified
-
-
-# --- manifest loading fails closed ---------------------------------------
-
-
-def test_shipped_manifest_loads_and_ships_empty():
-    manifest = load_manifest()
-
-    assert manifest.version == 1
-    # Every blessed set is empty until a live sweep promotes one.
-    assert all(not prints for prints in manifest.nodes.values())
-    assert manifest.blessed_for("extract") == frozenset()
-
-
-def test_load_rejects_a_bad_version(tmp_path):
-    bad = tmp_path / "m.toml"
-    bad.write_text("version = 2\n[nodes]\n", encoding="utf-8")
-
-    with pytest.raises(CertificationError, match="unsupported version 2"):
-        load_manifest(bad)
-
-
-def test_load_rejects_a_non_hex_fingerprint(tmp_path):
-    bad = tmp_path / "m.toml"
-    bad.write_text('version = 1\n[nodes]\nextract = ["nope"]\n', encoding="utf-8")
-
-    with pytest.raises(CertificationError):
-        load_manifest(bad)
-
-
-def test_load_rejects_a_stray_top_level_key(tmp_path):
-    bad = tmp_path / "m.toml"
-    bad.write_text("version = 1\nbogus = 1\n[nodes]\n", encoding="utf-8")
-
-    with pytest.raises(CertificationError):
-        load_manifest(bad)
-
-
-def test_load_rejects_invalid_toml(tmp_path):
-    bad = tmp_path / "m.toml"
-    bad.write_text("version = = 1\n", encoding="utf-8")
-
-    with pytest.raises(CertificationError, match="invalid TOML"):
-        load_manifest(bad)
-
-
-def test_load_rejects_a_missing_file(tmp_path):
-    with pytest.raises(CertificationError, match="cannot be read"):
-        load_manifest(tmp_path / "does-not-exist.toml")
-
-
-# --- report_fingerprints skips deterministic nodes ------------------------
-
-
-def _report_with_nodes(nodes: list[NodeRun]) -> StrideReport:
-    return sample_report().model_copy(update={"nodes": nodes})
-
-
-def test_report_fingerprints_covers_llm_nodes_only():
-    report = _report_with_nodes(
-        [
-            NodeRun(node="extract", model="gemini", sampling_fingerprint=FP_A, duration_ms=1),
-            NodeRun(node="validate", model=None, duration_ms=0),
-        ]
-    )
-
-    assert report_fingerprints(report) == {"extract": FP_A}
+ALL_NODES = tuple(TIER_NODE_BY_GRAPH_NODE)
 
 
 # --- sweep parametrization: each variant is fingerprinted, drift flagged ---
 
 
 def _build_fingerprints(sampling, served="fake-model-001"):
-    """The shipped graph's per-node fingerprints for one sampling variant.
+    """The per-node fingerprints one sampling variant would produce.
 
-    Building — not running — the pipeline is enough: a node's fingerprint is a
-    property of its served model and resolved tier sampling, both fixed at build
-    (ticket 07). A string model keeps it credential-free.
+    The served build is now supplied rather than read off the built graph: a
+    fingerprint's model half is what *answered*, which a build cannot know
+    (#7 decision 2). Building the pipeline is still what resolves each node's
+    tier sampling, and a string model keeps it credential-free.
     """
     pipeline = modes.build_eval_pipeline(
         ENTRY_EXTRACT,
         resolve_model=lambda _tier_node: served,
         sampling=sampling,
     )
-    return pipeline.node_fingerprints
+    return {
+        node: frozenset({sampling_fingerprint(served, node_sampling)})
+        for node, node_sampling in pipeline.node_sampling.items()
+    }
 
 
 def test_a_pro_override_reprints_only_pro_nodes():
     default = load_sampling(SAMPLING_PATH)
     overridden = load_sampling(
-        SAMPLING_PATH, env={"STRIDE_SAMPLING_PRO_TEMPERATURE": "0.9"}
+        SAMPLING_PATH, env={"STRIDE_SAMPLING_STRONG_TEMPERATURE": "0.9"}
     )
 
     base = _build_fingerprints(default)
     swept = _build_fingerprints(overridden)
 
-    # Flash nodes are untouched; every pro node's generation identity moved.
+    # Base nodes are untouched; every strong node's generation identity moved.
     assert base["extract"] == swept["extract"]
     assert base["critic"] != swept["critic"]
     assert base["analyst_spoofing"] != swept["analyst_spoofing"]
@@ -182,14 +90,14 @@ def test_a_pro_override_reprints_only_pro_nodes():
 def test_certify_flags_an_override_drifted_run():
     default = load_sampling(SAMPLING_PATH)
     overridden = load_sampling(
-        SAMPLING_PATH, env={"STRIDE_SAMPLING_PRO_TEMPERATURE": "0.9"}
+        SAMPLING_PATH, env={"STRIDE_SAMPLING_STRONG_TEMPERATURE": "0.9"}
     )
-    manifest = _manifest(
-        {node: {fp} for node, fp in _build_fingerprints(default).items()}
-    )
+    manifest = _blessed_from(_build_fingerprints(default))
 
-    assert certify(_build_fingerprints(default), manifest).certified
-    drifted = certify(_build_fingerprints(overridden), manifest)
+    assert certify(
+        _build_fingerprints(default), manifest, tier_of, ALL_NODES
+    ).certified
+    drifted = certify(_build_fingerprints(overridden), manifest, tier_of, ALL_NODES)
     assert not drifted.certified
     assert {n.node for n in drifted.uncertified} == {
         "critic",
@@ -205,12 +113,12 @@ def test_certify_flags_an_override_drifted_run():
 
 def test_certify_flags_a_served_build_drifted_run():
     default = load_sampling(SAMPLING_PATH)
-    manifest = _manifest(
-        {node: {fp} for node, fp in _build_fingerprints(default, "build-001").items()}
-    )
+    manifest = _blessed_from(_build_fingerprints(default, "build-001"))
 
-    # Same sampling, a different served build — every node's hash moves.
-    drifted = certify(_build_fingerprints(default, "build-002"), manifest)
+    # Same sampling, a different served build — every tier's hash moves.
+    drifted = certify(
+        _build_fingerprints(default, "build-002"), manifest, tier_of, ALL_NODES
+    )
     assert not drifted.certified
     assert len(drifted.uncertified) == len(_build_fingerprints(default))
 
@@ -222,20 +130,18 @@ def _promote_setup(tmp_path):
     sampling_copy = tmp_path / "sampling.toml"
     sampling_copy.write_text(SAMPLING_PATH.read_text(encoding="utf-8"), encoding="utf-8")
     manifest_copy = tmp_path / "blessed.toml"
-    resolve_tier = load_model_tiers(TIERS_PATH).resolve_tier
-    return sampling_copy, manifest_copy, resolve_tier
+    return sampling_copy, manifest_copy
 
 
 def test_promote_reprints_values_in_place_and_writes_the_manifest(tmp_path):
-    sampling_copy, manifest_copy, resolve_tier = _promote_setup(tmp_path)
+    sampling_copy, manifest_copy = _promote_setup(tmp_path)
     winner = load_sampling(SAMPLING_PATH)
-    hot_flash = winner.for_tier("flash").model_copy(update={"temperature": 0.2})
-    winner = winner.model_copy(update={"tiers": {**winner.tiers, "flash": hot_flash}})
+    hot_base = winner.for_tier("base").model_copy(update={"temperature": 0.2})
+    winner = winner.model_copy(update={"tiers": {**winner.tiers, "base": hot_base}})
 
     manifest = promote(
         winner,
-        {"extract": "build-001", "critic": "build-001"},
-        resolve_tier,
+        {"base": "build-001", "strong": "build-001"},
         sampling_path=sampling_copy,
         manifest_path=manifest_copy,
     )
@@ -247,40 +153,63 @@ def test_promote_reprints_values_in_place_and_writes_the_manifest(tmp_path):
     assert "# top_p" in rewritten  # unset lines untouched
     # The manifest reloads and its fingerprints are single-sourced from `winner`.
     reloaded = load_manifest(manifest_copy)
-    assert reloaded.blessed_for("extract") == manifest.blessed_for("extract")
-    assert certify(_build_fingerprints(winner, "build-001"), reloaded).certified is False
-    # extract (flash) is blessed; only the two named nodes were promoted.
-    assert reloaded.blessed_for("extract")
-    assert reloaded.blessed_for("critic")
-    assert reloaded.blessed_for("recritic") == frozenset()
+    assert reloaded.blessed_for("base") == manifest.blessed_for("base")
+    assert reloaded.blessed_for("base")
+    assert reloaded.blessed_for("strong")
+
+
+def test_promoting_one_tier_leaves_the_other_unblessed(tmp_path):
+    sampling_copy, manifest_copy = _promote_setup(tmp_path)
+    winner = load_sampling(SAMPLING_PATH)
+
+    manifest = promote(
+        winner,
+        {"base": "build-001"},
+        sampling_path=sampling_copy,
+        manifest_path=manifest_copy,
+    )
+
+    assert manifest.blessed_for("base")
+    assert manifest.blessed_for("strong") == frozenset()
+
+
+def test_promote_rejects_an_unknown_tier(tmp_path):
+    sampling_copy, manifest_copy = _promote_setup(tmp_path)
+    with pytest.raises(CertificationError, match="unknown tier"):
+        promote(
+            load_sampling(SAMPLING_PATH),
+            {"extract": "build-001"},  # a node name, not a tier
+            sampling_path=sampling_copy,
+            manifest_path=manifest_copy,
+        )
 
 
 def test_promote_accumulates_blessed_builds(tmp_path):
-    sampling_copy, manifest_copy, resolve_tier = _promote_setup(tmp_path)
+    sampling_copy, manifest_copy = _promote_setup(tmp_path)
     winner = load_sampling(SAMPLING_PATH)
 
     promote(
-        winner, {"extract": "build-001"}, resolve_tier,
+        winner, {"base": "build-001"},
         sampling_path=sampling_copy, manifest_path=manifest_copy,
     )
     manifest = promote(
-        winner, {"extract": "build-002"}, resolve_tier,
+        winner, {"base": "build-002"},
         sampling_path=sampling_copy, manifest_path=manifest_copy,
     )
 
-    # A node accumulates several blessed served-builds (ticket 03 §4).
-    assert len(manifest.blessed_for("extract")) == 2
+    # A tier accumulates several blessed served-builds (ticket 03 §4).
+    assert len(manifest.blessed_for("base")) == 2
 
 
 def test_promote_refuses_to_pin_a_previously_unset_param(tmp_path):
-    sampling_copy, manifest_copy, resolve_tier = _promote_setup(tmp_path)
+    sampling_copy, manifest_copy = _promote_setup(tmp_path)
     winner = load_sampling(SAMPLING_PATH)
-    tuned = winner.for_tier("pro").model_copy(update={"top_p": 0.9})
-    winner = winner.model_copy(update={"tiers": {**winner.tiers, "pro": tuned}})
+    tuned = winner.for_tier("strong").model_copy(update={"top_p": 0.9})
+    winner = winner.model_copy(update={"tiers": {**winner.tiers, "strong": tuned}})
 
-    with pytest.raises(CertificationError, match="tiers.pro.top_p"):
+    with pytest.raises(CertificationError, match="tiers.strong.top_p"):
         promote(
-            winner, {"critic": "build-001"}, resolve_tier,
+            winner, {"strong": "build-001"},
             sampling_path=sampling_copy, manifest_path=manifest_copy,
         )
     # A rejected promotion leaves neither file touched.
@@ -288,5 +217,7 @@ def test_promote_refuses_to_pin_a_previously_unset_param(tmp_path):
     assert sampling_copy.read_text() == SAMPLING_PATH.read_text()
 
 
-def test_default_manifest_path_points_at_the_shipped_file():
-    assert DEFAULT_MANIFEST_PATH == REPO_ROOT / "evals" / "blessed-fingerprints.toml"
+def test_the_manifest_lives_with_the_service_config_not_under_evals():
+    # It moved to config/ when the service became what certifies: evals/ does
+    # not ship, so a manifest under it was unreachable from the production image.
+    assert DEFAULT_MANIFEST_PATH == REPO_ROOT / "config" / "blessed-fingerprints.toml"

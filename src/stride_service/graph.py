@@ -88,7 +88,6 @@ from stride_service.prompts import (
     compose_recritic_prompt,
     compose_repair_prompt,
 )
-from stride_service.resilience import ResilienceConfig
 from stride_service.report import (
     STRIDE_CATEGORIES,
     DraftThreat,
@@ -97,10 +96,10 @@ from stride_service.report import (
     Threat,
     build_summary,
 )
+from stride_service.resilience import ResilienceConfig
 from stride_service.sampling import (
     SamplingResolver,
     TierSampling,
-    sampling_fingerprint,
 )
 from stride_service.skills import compose_analyst_skills, compose_critic_skills
 from stride_service.system_model import BoundaryCrossing, SystemModel
@@ -429,19 +428,27 @@ def assemble_report(
 class Pipeline:
     """The built graph plus the static provenance every run stamps.
 
-    ``node_models`` is what the report's ``nodes`` array records: a run has to
-    be able to say which model produced it, and deterministic nodes carry none.
-    ``tier_sampling`` and ``node_fingerprints`` are the sampling provenance
-    (ticket 07): the resolved per-tier clear block the report records once per
-    tier, and each LLM node's ``sha256(served model, tier sampling)``
-    generation-identity hash. All three are config-derived and fixed for the
-    life of the pipeline, computed once here and copied into each report.
+    ``node_models`` is the *configured* route each LLM node was bound to
+    (``vertex_ai/gemini-2.5-pro``) — what the run asked for, which the report
+    records as ``requested_model``. Deterministic nodes carry none.
+
+    ``tier_sampling`` is the resolved per-tier clear block the report records
+    once per tier; ``node_sampling`` is the same values keyed by graph node, so
+    a fingerprint can be computed for a node without re-walking the tier map.
+
+    There is deliberately **no** ``node_fingerprints`` here. A fingerprint's
+    model half is the *served* build (#7 decision 2), which is only known once
+    a node has actually run and answered — so it is computed per node
+    *execution* in :mod:`stride_service.pipeline`, not once at build time. A
+    build-time fingerprint would attest to the configured string while
+    ``sampling.py``, ``report.py`` and ``promote()`` all already asserted it
+    described what was served.
     """
 
     workflow: Workflow
     node_models: dict[str, str]
     tier_sampling: dict[str, TierSampling]
-    node_fingerprints: dict[str, str]
+    node_sampling: dict[str, TierSampling]
 
 
 def _generate_content_config(
@@ -608,7 +615,7 @@ def build_pipeline(
             workflow=Workflow(name=name, edges=[(START, extract)]),
             node_models={extract.name: _model_name(extract.model)},
             tier_sampling=dict(tier_sampling),
-            node_fingerprints=_node_fingerprints([extract], resolve_sampling),
+            node_sampling=_node_sampling([extract], resolve_sampling),
         )
 
     critic = _llm_node(
@@ -698,7 +705,7 @@ def build_pipeline(
         workflow=workflow,
         node_models={node.name: _model_name(node.model) for node in llm_nodes},
         tier_sampling=dict(tier_sampling),
-        node_fingerprints=_node_fingerprints(llm_nodes, resolve_sampling),
+        node_sampling=_node_sampling(llm_nodes, resolve_sampling),
     )
 
 
@@ -707,20 +714,19 @@ def _model_name(model: str | BaseLlm) -> str:
     return model if isinstance(model, str) else model.model
 
 
-def _node_fingerprints(
+def _node_sampling(
     llm_nodes: Sequence[LlmAgent], resolve_sampling: SamplingResolver
-) -> dict[str, str]:
-    """Each LLM node's ``sha256(served model, tier sampling)`` (ticket 07).
+) -> dict[str, TierSampling]:
+    """Each LLM node's resolved tier sampling, keyed by graph node name.
 
-    Computed from the very ``node_models`` source and ``resolve_sampling`` the
-    graph binds, so a node's recorded served model and its fingerprint can never
-    describe different generations.
+    The same ``resolve_sampling`` the graph binds onto the nodes themselves, so
+    the params a node runs on and the params its fingerprint attests to can
+    never describe different generations. The served model — the fingerprint's
+    other half — is not known until the node answers, so the hash itself is
+    computed per execution rather than here.
     """
     return {
-        node.name: sampling_fingerprint(
-            _model_name(node.model),
-            resolve_sampling(TIER_NODE_BY_GRAPH_NODE[node.name]),
-        )
+        node.name: resolve_sampling(TIER_NODE_BY_GRAPH_NODE[node.name])
         for node in llm_nodes
     }
 

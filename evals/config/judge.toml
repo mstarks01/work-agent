@@ -27,7 +27,25 @@
 # because no baseline exists — the >= 90% agreement check has still never
 # executed.
 
-version = 2
+# Version 3 (wayfinder #10 / #15) joins the multi-vendor cutover. The judge now
+# names a (vendor, model) pair like any tier, because it is no longer Google-
+# only: its legitimacy rests on measured agreement against the hand labels in
+# evals/judge_calibration/pairs.json (>= 90%), which is vendor-independent
+# ground truth, plus a greedy-decoding requirement so a re-run cannot flip a
+# verdict. This REOPENS the self-preference rationale below, which assumed
+# judge and subject always shared a vendor — that assumption is gone, and the
+# agreement check is what replaces it.
+#
+# The loader runs the build-time sampling gate over (vendor, model,
+# temperature), which is how "o-series cannot judge" fails closed: greedy
+# decoding is required here, and o-series constrains temperature to exactly 1,
+# so an o-series judge is a load-time error rather than a surprise mid-sweep.
+#
+# The pair below is unchanged in behaviour from version 2 — the same Gemini
+# model, now named with the vendor that was previously implicit.
+
+version = 3
+vendor = "vertex"
 model = "gemini-2.5-pro"
 temperature = 0.0
 order_seed = 20260721

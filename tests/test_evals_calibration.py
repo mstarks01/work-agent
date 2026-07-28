@@ -99,8 +99,9 @@ def test_result_serializes_every_disagreement(pairs, labels):
 def test_reference_claims_stay_attached_to_the_corpus(pairs):
     # build_pairs.py pulls reference claims from threats.json by index, so a
     # reworded reference cannot silently detach a fixture from what it labels.
-    from evals.harness.reference import load_corpus
     from pathlib import Path
+
+    from evals.harness.reference import load_corpus
 
     corpus_dir = Path(__file__).resolve().parents[1] / "evals" / "corpus"
     claims_by_case = {

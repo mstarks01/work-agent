@@ -1,0 +1,42 @@
+# Blessed generation-identity fingerprints — the certification baseline.
+#
+# Each TIER maps to the set of fingerprints a sanctioned baseline sweep
+# recorded for it. A run whose observed fingerprint (sha256 of the
+# vendor-prefixed served build plus the resolved tier sampling) is absent from
+# its tier's set is *uncertified*.
+#
+# KEYED BY TIER, NOT BY NODE (version 2, wayfinder #14). A fingerprint's payload
+# contains no node name — it is (served build, tier sampling) — and the tier map
+# puts critic and recritic both on `strong`, extract and repair both on `base`.
+# So recritic presents a BYTE-IDENTICAL hash to critic, and per-node keying
+# would call that same hash blessed under one key and unblessed under the other,
+# reporting the first production revise path uncertified on a technicality.
+# Node keying was a leftover from build-time fingerprints; the binding is per
+# tier and so is the hash. The re-key was free: the sets ship empty, so nothing
+# stored could be invalidated.
+#
+# DEPLOYMENT-LOCAL (wayfinder #10). This file is read by the deployment that
+# runs the service, located by STRIDE_BLESSED_FINGERPRINTS and defaulting to
+# this path. The project can therefore never ship a certified pair: a repo-level
+# blessing plus a local one would have to resolve either as a silent override or
+# a silent veto, and both are worse than requiring each deployment to bless what
+# it runs. The env var only picks WHICH file is read — exactly one is, which is
+# what keeps this from being the two-layer overlay that was rejected.
+#
+# A MACHINE RECORD, not a hand-edited one: written by
+# evals.harness.certify.promote, single-sourced with config/sampling.toml so the
+# two cannot drift. Hand-editing is a review smell.
+#
+# The sets ship EMPTY: no sanctioned sweep has run, so no build is blessed and
+# every real run reads as uncertified. That is the honest pre-baseline state.
+# The service annotates the job record with it either way; withholding the
+# report on an uncertified run is opt-in (STRIDE_REQUIRE_CERTIFIED), because a
+# gate that fires before the normal range is known just trains people to bypass
+# it. An *unexercised* tier withholds unconditionally — that one is a
+# cannot-happen assertion, not a measurement.
+
+version = 2
+
+[tiers]
+base = []
+strong = []

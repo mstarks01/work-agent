@@ -39,6 +39,7 @@ from google.adk.sessions import InMemorySessionService
 from google.genai import types
 
 from evals.harness.reference import GoldenCase
+from stride_service.binding import build_tier_adapters, make_resolve_model
 from stride_service.graph import (
     ENTRY_EXTRACT,
     ENTRY_EXTRACT_ONLY,
@@ -58,7 +59,6 @@ from stride_service.graph import (
 )
 from stride_service.markdown_loader import MarkdownLoader
 from stride_service.model_tiers import load_model_tiers
-from stride_service.pipeline import resilient_resolver
 from stride_service.report import (
     DraftThreat,
     InputRef,
@@ -161,6 +161,10 @@ def build_eval_pipeline(
     per-request timeout (ticket 038), so a scheduled sweep does not die on one
     429 after hours of work — and the overrides exist for offline tests that
     bind scripted models.
+
+    ``resolve_model`` short-circuits the tier adapters deliberately: building
+    them runs the credential check, which an offline test binding scripted
+    models has no credentials to pass and no provider to call.
     """
     tiers = load_model_tiers(REPO_ROOT / "config" / "model_tiers.toml")
     resilience = load_resilience(REPO_ROOT / "config" / "resilience.toml")
@@ -168,7 +172,10 @@ def build_eval_pipeline(
     return build_pipeline(
         skill_loader=MarkdownLoader(REPO_ROOT / "skills"),
         prompt_loader=MarkdownLoader(REPO_ROOT / "prompts"),
-        resolve_model=resolve_model or resilient_resolver(tiers, resilience),
+        resolve_model=resolve_model
+        or make_resolve_model(
+            build_tier_adapters(tiers, sampling, resilience), tiers
+        ),
         resolve_sampling=make_resolve_sampling(sampling, tiers.resolve_tier),
         tier_sampling=sampling.tiers,
         resilience=resilience,

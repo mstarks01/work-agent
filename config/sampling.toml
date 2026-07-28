@@ -1,62 +1,85 @@
-# Sampling configuration (wayfinder model-tuning, tickets 02 / 04 / 05) — the
-# one file eval and production both read (ticket 009 decision 15). Grading a
-# configuration you do not ship is how a suite goes green while production
-# drifts, so there is no eval-only copy: per-tier tuning is a reviewable diff
-# here, promoted by an eval sweep (ticket 08).
+# Sampling configuration — the one file eval and production both read (ticket
+# 009 decision 15). Grading a configuration you do not ship is how a suite goes
+# green while production drifts, so there is no eval-only copy: per-tier tuning
+# is a reviewable diff here, promoted by an eval sweep.
 #
-# Keyed by model class (tier), reusing model_tiers.toml's node -> tier map:
-# `flash` runs extraction/normalization, `pro` the six STRIDE analysts and the
-# critic. Every decoding param the surface admits (ticket 01) is listed per
-# tier — pinned to a value, or left unset with a reason — so the file is the
-# full record of what each class runs on. An omitted key is no longer "model
-# default by accident": the loader rejects an unknown key, and a param that is
-# deliberately unset is a *commented* line, not a silent absence.
+# Keyed by tier, reusing model_tiers.toml's node -> tier map: `base` runs
+# extraction and repair, `strong` the six STRIDE analysts, the critic and the
+# re-ask. Every decoding param the surface admits is listed per tier — pinned to
+# a value, or left unset with a reason — so the file is the full record of what
+# each tier runs on. An omitted key is not "model default by accident": the
+# loader rejects an unknown key, and a deliberately-unset param is a *commented*
+# line, not a silent absence.
 #
-# Values Google documents as model-dependent with no published per-class
-# constant (top_p / top_k / penalties — ticket 04) are left unset rather than
-# invented: pinning a guessed number would claim a decision nobody made. The
-# shipped defaults are behaviour-unchanged from today — temperature = 0, every
-# other param the model's own default — because this effort ships the
-# *mechanism*; the tuned numbers are a later eval sweep (out of scope, no live
-# Vertex).
+# Version 3 (wayfinder #13 / #15) is a hard cutover from version 2, forced by
+# going multi-vendor. Three changes, each because a version-2 construct turned
+# out to be either unportable or silently wrong:
+#
+#   top_k is GONE from the surface. It is absent from the signature of
+#   litellm's get_optional_params, so it is the one param the build-time gate
+#   provably cannot cover — LiteLLM re-injects it raw into the request body
+#   after the check runs. A wrong top_k would be silent while the fingerprint
+#   attested to it. It was unset on both tiers, so nothing could depend on it.
+#
+#   thinking is now a uniform low/medium/high enum, not an integer budget with
+#   per-tier legal ranges. `reasoning_effort` reaches all three vendors, so the
+#   per-class ranges version 2 mirrored dissolve rather than needing to be
+#   mirrored three times over. `auto` and `off` are both dropped: `auto` raises
+#   on two vendors, and `off` is worse than unportable — gemini-2.5-pro + none
+#   PASSES the build-time gate as thinkingBudget: 0 and then 400s at request
+#   time, and there is no per-(vendor, model) data left to catch it.
+#
+#   max_output_tokens is now PINNED. Anthropic derives a 5,120-8,192 cap only
+#   when the caller is silent — which is exactly what version 2's file did on
+#   both tiers, while its comment claimed "uncapped to 65,536". Pinning it makes
+#   the request say what the file says.
+#
+# THE VALUE CHECK ON `thinking` IS OURS. reasoning_effort = "banana" passes the
+# provider gate on o3, so a pydantic Literal catches it here — the same class of
+# silent wrong as top_k, caught in the one place that can catch it.
+#
+# WHAT THE GATE DOES CHECK: every param below is run through litellm's
+# get_optional_params at build time against each tier's actual (vendor, model).
+# An unsupported param fails the build rather than raising mid-job after earlier
+# nodes have been paid for. That check is also why `seed` can be pinned safely
+# at all — it is a declared litellm param, so it is fail-closed, not silently
+# dropped.
 #
 # Env overrides STRIDE_SAMPLING_{TIER}_{PARAM} retune the OFFERED params
-# (temperature, top_p, seed, thinking) at deploy time without an image rebuild,
-# validated exactly like the file value and captured by the run's provenance
-# fingerprint (tickets 03 / 07). Reserved params (candidate_count) and the
-# deliberately-absent set below cannot be set by env at all.
+# (temperature, top_p, seed, thinking, max_output_tokens) at deploy time,
+# validated exactly like the file value and captured by the run's fingerprint.
+# Reserved params (candidate_count) and the deliberately-absent set below cannot
+# be set by env at all.
 #
 # Deliberately absent — the contract-breaking params, never in this file and
-# never overridable (ticket 01):
+# never overridable:
 #   response_schema     ADK *raises* if it appears on the generate config
 #   response_mime_type  silently discarded by ADK
 #   stop_sequences      would truncate structured output mid-token
 #   http_options        owned by resilience.toml, not sampling
 
-version = 2
+version = 3
 
-[tiers.flash]
-temperature = 0.0       # pinned greedy decoding; the model's own default is 1.0
-candidate_count = 1     # reserved Self-MoA lever (ticket 009); loader rejects != 1
-# top_p             unset -> model default; no published per-class constant (ticket 04)
-# top_k             unset -> model default; no published per-class constant (ticket 04)
-# seed              unset -> no numeric default; best-effort, not reproducibility (ticket 04)
-# max_output_tokens unset -> uncapped to the model ceiling of 65,536 (ticket 04)
-# presence_penalty  unset -> effective default 0.0; valid range unverified (ticket 04)
-# frequency_penalty unset -> effective default 0.0; valid range unverified (ticket 04)
-# thinking          unset -> the model's preset per-class budget (ticket 04); NOT dynamic.
-#                   Set "off" to disable (flash 0-24,576, 0 allowed), "auto" for
-#                   dynamic (thinking_budget = -1), or an int budget in range.
+[tiers.base]
+temperature = 0.0        # pinned greedy decoding; the model's own default is 1.0
+max_output_tokens = 8192 # pinned: silence means a vendor-derived cap (see above)
+candidate_count = 1      # reserved Self-MoA lever; loader rejects != 1
+# top_p             unset -> model default; no published per-tier constant
+# seed              unset -> no numeric default; buys consistency, not
+#                   reproducibility, and is unavailable on Anthropic at all
+# presence_penalty  unset -> effective default 0.0; valid range unverified
+# frequency_penalty unset -> effective default 0.0; valid range unverified
+# thinking          unset -> the model's own preset. Set "low", "medium" or
+#                   "high"; the wire value each becomes is the vendor's business
 
-[tiers.pro]
-temperature = 0.0       # pinned greedy decoding; the model's own default is 1.0
-candidate_count = 1     # reserved Self-MoA lever (ticket 009); loader rejects != 1
-# top_p             unset -> model default; no published per-class constant (ticket 04)
-# top_k             unset -> model default; no published per-class constant (ticket 04)
-# seed              unset -> no numeric default; best-effort, not reproducibility (ticket 04)
-# max_output_tokens unset -> uncapped to the model ceiling of 65,536 (ticket 04)
-# presence_penalty  unset -> effective default 0.0; valid range unverified (ticket 04)
-# frequency_penalty unset -> effective default 0.0; valid range unverified (ticket 04)
-# thinking          unset -> the model's preset per-class budget (ticket 04); NOT dynamic.
-#                   pro cannot disable thinking (floor 128, 0 is a 400): "off" is
-#                   rejected. Set "auto" for dynamic (-1) or an int in 128-32,768.
+[tiers.strong]
+temperature = 0.0        # pinned greedy decoding; the model's own default is 1.0
+max_output_tokens = 8192 # pinned: silence means a vendor-derived cap (see above)
+candidate_count = 1      # reserved Self-MoA lever; loader rejects != 1
+# top_p             unset -> model default; no published per-tier constant
+# seed              unset -> no numeric default; buys consistency, not
+#                   reproducibility, and is unavailable on Anthropic at all
+# presence_penalty  unset -> effective default 0.0; valid range unverified
+# frequency_penalty unset -> effective default 0.0; valid range unverified
+# thinking          unset -> the model's own preset. Set "low", "medium" or
+#                   "high"; the wire value each becomes is the vendor's business
