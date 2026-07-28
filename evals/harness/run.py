@@ -38,7 +38,7 @@ from evals.harness.critic_yield import (
     aggregate_yield,
     score_case_with_yield,
 )
-from evals.harness.judge import Judge, VertexJudge, load_judge_config
+from evals.harness.judge import Judge, PinnedJudge, load_judge_config
 from evals.harness.reference import GoldenCase, load_corpus
 from evals.harness.scorer import (
     CaseScore,
@@ -61,14 +61,14 @@ EVALS_ROOT = Path(__file__).resolve().parents[1]
 DEFAULT_CORPUS_DIR = EVALS_ROOT / "corpus"
 
 
-def _live_judge() -> VertexJudge:
+def _live_judge() -> PinnedJudge:
     """The pinned judge, retry-and-timeout-hardened like the graph (ticket 038).
 
     A calibration or scoring sweep is hours of paid work; without the same
     resilience config the graph carries, one 429 to the judge throws all of it
     away.
     """
-    return VertexJudge(
+    return PinnedJudge(
         load_judge_config(), resilience=load_resilience(DEFAULT_RESILIENCE_PATH)
     )
 
@@ -160,8 +160,8 @@ def _score_runs(
     )
 
 
-def _models_record(judge: VertexJudge | None) -> dict[str, Any]:
-    """What this run asked Vertex for, and what Vertex says it served.
+def _models_record(judge: PinnedJudge | None) -> dict[str, Any]:
+    """What this run asked its providers for, and what they say they served.
 
     Ticket 026: the tier strings are stable GA identifiers, not immutable
     builds, so the artifact records both halves. A metric that moved between
@@ -244,7 +244,7 @@ def command_run(args: argparse.Namespace) -> int:
 
     scores: list[CaseScore] = []
     yields: list[CriticYield] = []
-    judge: VertexJudge | None = None
+    judge: PinnedJudge | None = None
     if runs and not args.no_scoring:
         judge = _live_judge()
         scores, yields = _score_runs(cases, runs, judge)
