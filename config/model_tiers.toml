@@ -1,43 +1,67 @@
-# Model-tier configuration (wayfinder ticket 007) — source of truth for
-# tier -> pinned Vertex model string and LLM node -> tier.
+# Model-tier configuration — source of truth for tier -> (vendor, model) and
+# LLM node -> tier.
 #
-# Tier strings must be the *stable GA* identifier of a Vertex model — no
-# -latest aliases, no -preview/-exp builds (ticket 026, restating ticket 007).
-# Gemini 2.5 and later ship no numbered stable builds, so "gemini-2.5-pro" is
-# the most specific stable string that exists; the eval harness records the
-# served model version per run so a moved build shows up as evidence rather
-# than being assumed away. Upgrades change a string only after the golden-case
-# eval suite passes on the candidate.
+# Version 3 (wayfinder #5 / #9 / #15) is a hard cutover from version 2, not a
+# migration: the `flash`/`pro` tier keys became the vendor-neutral `base` and
+# `strong`, and each tier's bare model string became a (vendor, model) pair.
+# There is no v2 shim — a version-2 file fails the loader's version check.
 #
-# SCOPE (user decision 2026-07-23): design for Gemini 2.x only. Migrating to a
-# 3.x generation is out of scope (wayfinder ticket 034, closed), so these stay
-# on 2.5. Gemini 2.5 retires on Vertex 2026-10-16; keeping the pinned strings
-# current past that is an ops/env concern under the "assumes a correctly
-# configured environment" posture, handled via the STRIDE_MODEL_* overrides
-# below, not by editing this file.
+# WHY A PAIR, NOT A ROUTER STRING: `vertex_ai/gemini-2.5-pro` would have to be
+# parsed back apart by all three consumers that need the vendor as a key — the
+# credential mode it implies, the family-branching pinned-form rule, and the
+# build-time sampling gate — and `vertex_ai/` is not one provider (LiteLLM
+# dispatches `vertex_ai/claude-*` and `vertex_ai/gemini-*` to different config
+# classes). The prefix lives in exactly one place: the vendor registry.
 #
-# STRIDE_MODEL_FLASH / STRIDE_MODEL_PRO env vars override the tier strings at
-# deploy time (ops retune on Cloud Run without an image rebuild). The
-# node -> tier mapping below is file-only and must cover exactly the LLM nodes
-# of the graph; deterministic FunctionNodes carry no model.
+# TIER NAMES are a capability axis, not a vendor's product line: `base` is the
+# workhorse (extraction, repair), `strong` is judgement (the six analysts, the
+# critic, the re-ask). The old `flash`/`pro` were Gemini product names and would
+# be an active lie under a Claude or GPT model string. The two tiers select
+# independently, so mixed-vendor pairs are ordinary, not a special case.
+#
+# PINNING is per-vendor and deliberately weak — an open-world denylist of
+# floating forms (`-latest`, `-preview`, `-exp`, plus a per-family pinned shape
+# where the vendor publishes one). It is a proxy, not the guarantee: the
+# reproducibility guarantee is the *served* build read back from every response
+# and recorded per node execution. The predecessor to this rule was an allowlist
+# of numbered Gemini builds, and it broke outright when Google retired them;
+# that risk now runs against three catalogs, so the rule stays loose and the
+# readback carries the weight.
+#
+# ENV OVERRIDES are two vars per tier: STRIDE_MODEL_{BASE,STRONG}_VENDOR and
+# _MODEL. `_MODEL` alone is the ops case (retune on a deployed revision without
+# an image rebuild). `_VENDOR` alone is a build-time error — a cross-vendor pair
+# like anthropic + gemini-2.5-pro passes every downstream check and would die on
+# node one of a paid-for job. Any unrecognised STRIDE_MODEL_* var also raises,
+# so a deployment still carrying v2's STRIDE_MODEL_FLASH fails loudly instead of
+# being silently ignored.
+#
+# The shipped selection is unchanged in behaviour from version 2 — the same two
+# Gemini models on Vertex. This file is where "no privileged default" is a
+# property of the *mechanism*, not of the values: nothing here is reachable only
+# because it is Google's.
 
-version = 2
+version = 3
 
-[tiers]
-flash = "gemini-2.5-flash"
-pro = "gemini-2.5-pro"
+[tiers.base]
+vendor = "vertex"
+model = "gemini-2.5-flash"
+
+[tiers.strong]
+vendor = "vertex"
+model = "gemini-2.5-pro"
 
 [nodes]
-extract = "flash"
-repair = "flash"
-"analyst/spoofing" = "pro"
-"analyst/tampering" = "pro"
-"analyst/repudiation" = "pro"
-"analyst/information-disclosure" = "pro"
-"analyst/denial-of-service" = "pro"
-"analyst/elevation-of-privilege" = "pro"
-critic = "pro"
+extract = "base"
+repair = "base"
+"analyst/spoofing" = "strong"
+"analyst/tampering" = "strong"
+"analyst/repudiation" = "strong"
+"analyst/information-disclosure" = "strong"
+"analyst/denial-of-service" = "strong"
+"analyst/elevation-of-privilege" = "strong"
+critic = "strong"
 # The bounded critic re-ask (ticket 038): same judgement as the critic, so
-# always the same tier — a separate line here only so it is pinned, never so
-# it can drift onto a cheaper model than the pass it corrects.
-recritic = "pro"
+# always the same tier — a separate line here only so it is pinned, never so it
+# can drift onto a cheaper model than the pass it corrects.
+recritic = "strong"

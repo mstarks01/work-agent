@@ -11,74 +11,122 @@ Both [`StrideEngine.from_config(env=...)`](Integration-Guide.md) and the
 
 | File | Purpose |
 | --- | --- |
-| `config/model_tiers.toml` | Maps each LLM node to a tier, and each tier to a pinned Vertex model string. |
+| `config/model_tiers.toml` | Maps each LLM node to a tier, and each tier to a `(vendor, model)` pair. |
 | `config/sampling.toml` | Decoding parameters, shared by production and evals. |
 | `config/resilience.toml` | Retry attempts and per-request timeout for LLM calls. |
+| `config/blessed-fingerprints.toml` | The generation identities this deployment has blessed. |
 | `skills/` | The per-category STRIDE skill Markdown baked into the image. |
 | `prompts/` | The agent prompt and exemplar Markdown. |
 
-### Models
+### Models and vendors
 
-Two tiers, pinned to stable-GA identifiers (no `-latest`, `-preview`, `-exp`):
-`flash` for extraction/repair, `pro` for the six analysts, the critic, and the
-critic re-ask. Upgrade a string only after the eval suite passes on the
-candidate. The pinned defaults are `gemini-2.5-flash` and `gemini-2.5-pro`; the
-project targets Gemini 2.x only.
+The service runs on **any supported vendor, with no privileged default**. Two
+tiers named on a capability axis — `base` (extraction, repair) and `strong` (the
+six analysts, the critic, the re-ask) — each select a `(vendor, model)` pair
+**independently**, so the two tiers may run different vendors at once.
+
+```toml
+version = 3
+
+[tiers.base]
+vendor = "vertex"
+model = "gemini-2.5-flash"
+
+[tiers.strong]
+vendor = "anthropic"
+model = "claude-sonnet-4-5-20250929"
+```
+
+Supported vendors are `vertex`, `anthropic` and `openai`. Every one is reached
+through a single adapter (LiteLLM); there is no per-vendor code path, and Gemini
+reaches Vertex the same way everything else does.
+
+**Auth is derived from the vendor, never configured alongside it.** Each vendor
+owns its credential mode, so an unrepresentable pairing like `vertex` + an API
+key cannot be written down at all:
+
+| Vendor | Credential mode | Required environment |
+| --- | --- | --- |
+| `vertex` | ADC | `STRIDE_VERTEX_PROJECT`, `STRIDE_VERTEX_LOCATION`, `GOOGLE_APPLICATION_CREDENTIALS` |
+| `anthropic` | API key | `STRIDE_ANTHROPIC_API_KEY` |
+| `openai` | API key | `STRIDE_OPENAI_API_KEY` |
+
+Keys are read **only** from these vendor-scoped variables. LiteLLM's ambient
+`ANTHROPIC_API_KEY` / `OPENAI_API_KEY` pickup is deliberately unused, so a
+credential this deployment did not declare cannot authenticate a run. Keys are
+never logged, never in the report, and never in a fingerprint; errors name the
+variable, never its value.
+
+**Pinning** is per-vendor and deliberately weak — a denylist of floating forms
+(`-latest`, `-preview`, `-exp`) plus a per-family pinned shape where the vendor
+publishes one (`claude-...@YYYYMMDD` on Vertex, `claude-...-YYYYMMDD` direct;
+Gemini 2.5+ ships no numbered builds, so the bare name is the most specific
+identifier there is). It is a proxy, not the guarantee: the real guarantee is the
+**served build read back from every response** and recorded per node execution.
 
 ### Sampling
 
-`config/sampling.toml` (`version = 2`) pins the decoding parameters **per model
-class**, in `[tiers.flash]` and `[tiers.pro]` tables that reuse the node→tier map
-from `model_tiers.toml`. Eval and production read this same file — grading a
-configuration you do not ship is how a suite goes green while production drifts,
-so there is no eval-only copy.
+`config/sampling.toml` (`version = 3`) pins decoding **per tier**, in
+`[tiers.base]` and `[tiers.strong]` tables reusing the node→tier map from
+`model_tiers.toml`. Eval and production read this same file — grading a
+configuration you do not ship is how a suite goes green while production drifts.
 
-The file lists **every** decoding parameter the models accept, each either pinned
-to a value or left as a *commented* line explaining why. An omitted key is a
-typo the loader rejects, never a silent fallback to a model default. The shipped
-values keep the models greedy and deterministic: `temperature = 0.0`, everything
-else left to the model's own default.
+The file lists **every** decoding parameter the surface admits, each either
+pinned or left as a *commented* line explaining why. An omitted key is a typo the
+loader rejects, never a silent fallback.
 
 | Param | Shipped state | Notes |
 | --- | --- | --- |
 | `temperature` | pinned `0.0` | Greedy decoding; the model's own default is `1.0`. |
-| `candidate_count` | pinned `1` | Reserved for future multi-candidate sampling; the loader **rejects any value ≠ 1**. |
-| `top_p`, `top_k`, `presence_penalty`, `frequency_penalty` | **unset** | No documented per-class default to pin; left to the model. |
-| `seed` | **unset** | No numeric default; best-effort, **not** a reproducibility guarantee. |
-| `max_output_tokens` | **unset** | Uncapped up to the model ceiling of `65,536`. |
-| `thinking` | **unset** | Leaves the model's preset per-class budget. |
+| `max_output_tokens` | pinned `8192` | Must be pinned: silence means a *vendor-derived* cap. |
+| `candidate_count` | pinned `1` | Reserved; the loader **rejects any value ≠ 1**. |
+| `top_p`, `presence_penalty`, `frequency_penalty` | **unset** | No verified per-tier constant to pin. |
+| `seed` | **unset** | Buys consistency, not reproducibility — and Anthropic does not accept it at all. |
+| `thinking` | **unset** | Leaves the model's own preset. |
 
-A parameter is left unset wherever the model gives no published per-class value
-to pin — inventing one would bake in a number nobody measured. To find a better
-value, measure it: see [Tuning the models](../evals/TUNING.md).
+`thinking` is a uniform `"low"` / `"medium"` / `"high"` enum. It reaches all
+three vendors, which is why there are no longer per-tier legal ranges: LiteLLM
+maps it to `budget_tokens` on Anthropic, `thinkingConfig` on Gemini, and passes
+it through on OpenAI o-series. `"auto"` and `"off"` are **not** accepted —
+`"auto"` raises on two vendors, and `"off"` is worse than unportable, since
+Gemini accepts it at build time and then fails the request.
 
-`thinking` is a per-tier scalar resolved to a class-legal budget:
-
-- **unset** → the model's preset per-class budget (today's default — **not**
-  dynamic allocation).
-- `"auto"` → dynamic allocation (an explicit `thinking_budget = -1`).
-- `"off"` → disabled. `flash` only (range `0–24,576`); `pro`'s floor is `128`
-  and `0` is a 400, so `"off"` on `pro` is rejected.
-- an **int** → a fixed budget, checked against the class range (`flash`
-  `0–24,576`, `pro` `128–32,768`).
+> **`top_k` is gone from the surface** (it was removed in version 3). It is the
+> one parameter the build-time check provably cannot cover — LiteLLM re-injects
+> it into the request *after* validation — so a wrong value would be silent while
+> the fingerprint attested to it.
 
 Parameters that break the structured-output contract are **never** in the file
-and never overridable: `response_schema` (ADK *raises*), `response_mime_type`
+and never overridable: `response_schema` (the SDK *raises*), `response_mime_type`
 (silently discarded), `stop_sequences` (would truncate mid-token), and
 `http_options` (owned by `resilience.toml`).
 
-Tuning is a reviewed edit to this file, backed by an eval measurement (see
-[The eval gate and provenance](#the-eval-gate-and-provenance) below) — not an
-ad-hoc production change. The `STRIDE_SAMPLING_*` environment variables exist
-only as a recorded escape hatch, documented [below](#sampling-overrides).
+### The build-time gate
+
+At startup, every tier's `(vendor, model, sampling)` combination is run through
+the provider library's own parameter check. **An unsupported parameter fails the
+build, not the first request** — otherwise it would raise mid-job, after earlier
+nodes had already been paid for. Concretely: `seed` on Anthropic (or on
+Vertex-hosted Claude) is a startup error, while the same `seed` on Vertex-hosted
+Gemini is fine; `temperature = 0.0` on an OpenAI o-series model is a startup
+error, because o-series constrains it to exactly `1`.
+
+The check asks the library rather than mirroring a table, so it cannot drift
+against the gate that actually fires. The library's model-cost map is pinned to
+the installed copy, so the verdict never depends on a network fetch at startup.
 
 ### Resilience
 
-`attempts = 3`, `timeout_ms = 300000`. On SDK defaults the LLM nodes never retry
-and never time out, so a single 429 kills a paid-for job; these two numbers fix
-both. Unlike sampling, these **are** environment-overridable — they change how
-hard the service tries, never which answer it gets, so they are safe to turn
-down mid-incident without an image rebuild.
+`attempts = 3`, `timeout_ms = 300000` (`version = 2`). On library defaults the
+LLM nodes never retry and never time out, so a single 429 kills a paid-for job.
+Unlike sampling, these **are** environment-overridable — they change how hard the
+service tries, never which answer it gets.
+
+`attempts` is a **total** count and is converted for the provider, which counts
+retries *after* the first try. Version 2 **removed** the four backoff knobs
+(`initial_delay`, `max_delay`, `exp_base`, `jitter`): the adapter picks its
+backoff curve internally from the exception type, so as configuration they read
+as a knob and connected to nothing.
 
 ## Environment variables
 
@@ -91,63 +139,97 @@ down mid-incident without an image rebuild.
 | `STRIDE_MODEL_TIERS` | `config/model_tiers.toml` |
 | `STRIDE_SAMPLING` | `config/sampling.toml` |
 | `STRIDE_RESILIENCE` | `config/resilience.toml` |
+| `STRIDE_BLESSED_FINGERPRINTS` | `config/blessed-fingerprints.toml` |
 
 ### Model overrides (deploy-time, no image rebuild)
 
 | Variable | Effect |
 | --- | --- |
-| `STRIDE_MODEL_FLASH` | Overrides the `flash` tier string. |
-| `STRIDE_MODEL_PRO` | Overrides the `pro` tier string. |
+| `STRIDE_MODEL_BASE_VENDOR` / `STRIDE_MODEL_BASE_MODEL` | Overrides the `base` tier's pair. |
+| `STRIDE_MODEL_STRONG_VENDOR` / `STRIDE_MODEL_STRONG_MODEL` | Overrides the `strong` tier's pair. |
 
-These override the tier strings only; the node-to-tier mapping stays in the
-file. The same pinned-string rule applies — an alias or preview build is
-rejected.
+`_MODEL` **alone** is the ordinary case — retune a tier's model on a deployed
+revision. `_VENDOR` alone is a **startup error**: a mismatched pair such as
+`anthropic` + `gemini-2.5-pro` passes every downstream check and would only die
+on the first node of a paid-for job.
+
+Any unrecognised `STRIDE_MODEL_*` variable also raises. That is deliberate: a
+deployment still carrying version 2's `STRIDE_MODEL_FLASH` must fail loudly
+rather than have it silently ignored while the tier quietly runs the file's
+model.
 
 ### Sampling overrides
 
-`STRIDE_SAMPLING_{TIER}_{PARAM}` retunes one tier's decoding at deploy time
-without an image rebuild, validated **identically** to a file value (an
-out-of-range override fails closed exactly like one in the file). `{TIER}` is
-`FLASH` or `PRO`; `{PARAM}` is one of the four **offered** params below.
+`STRIDE_SAMPLING_{TIER}_{PARAM}` retunes one tier's decoding at deploy time,
+validated **identically** to a file value. `{TIER}` is `BASE` or `STRONG`.
 
 | Variable | Effect |
 | --- | --- |
 | `STRIDE_SAMPLING_{TIER}_TEMPERATURE` | Overrides the tier's `temperature`. |
 | `STRIDE_SAMPLING_{TIER}_TOP_P` | Overrides the tier's `top_p`. |
 | `STRIDE_SAMPLING_{TIER}_SEED` | Overrides the tier's `seed`. |
-| `STRIDE_SAMPLING_{TIER}_THINKING` | Overrides the tier's `thinking` (`off`/`auto`/int). |
+| `STRIDE_SAMPLING_{TIER}_THINKING` | Overrides the tier's `thinking` (`low`/`medium`/`high`). |
+| `STRIDE_SAMPLING_{TIER}_MAX_OUTPUT_TOKENS` | Overrides the tier's `max_output_tokens`. |
 
-Only these four params are overridable. A variable naming a reserved
-(`candidate_count`) or forbidden param raises `not overridable`; an unknown tier
-or an empty value also raises. Treat this as a temporary escape hatch, not the
-way you tune: an override is recorded in the run's provenance fingerprint, so a
-run using one reads as **uncertified** (see below). To change sampling for real,
-edit the file and back it with a measurement — see
-[Tuning the models](../evals/TUNING.md).
+Only these are overridable. A variable naming a reserved (`candidate_count`),
+removed (`top_k`) or forbidden param raises `not overridable`. Treat this as a
+temporary escape hatch: an override changes the run's fingerprint, so a run using
+one reads as **uncertified**. To change sampling for real, edit the file and back
+it with a measurement — see [Tuning the models](../evals/TUNING.md).
 
-### The eval gate and provenance
+### Provenance and certification
 
-Every run is **self-describing**. The report carries, in the clear, the resolved
-per-tier params it ran on (`StrideReport.sampling`) and a per-node
-generation-identity fingerprint (`NodeRun.sampling_fingerprint`) —
-`sha256(served model, resolved tier sampling)`, binding model and sampling into
-one hash keyed on the *served* model. What makes a result defensible is that
-fingerprint, recomputable from the recorded clear block; the `seed` is
-best-effort and guarantees nothing. See [Report Schema](Report-Schema.md#provenance).
+Every run is **self-describing**. Each node records:
 
-`evals/blessed-fingerprints.toml` records, per node, the fingerprints of
-configurations a measured run has blessed. The eval harness certifies every run
-against it: a fingerprint that isn't in a node's blessed set marks the run
-**uncertified**, and an uncertified run's scores are never treated as a trusted
-baseline. This catches both an unexpected sampling override and an unannounced
-model-build change — either one produces a fingerprint that isn't on the list.
+- `NodeRun.model` — the **served** build, vendor-prefixed
+  (`vertex_ai/gemini-2.5-pro-002`): what actually answered.
+- `NodeRun.requested_model` — the **configured** route
+  (`vertex_ai/gemini-2.5-pro`): what was asked for.
+- `NodeRun.sampling_fingerprint` — `sha256(served route, resolved tier sampling)`.
 
-The blessed sets start **empty**, so until you promote a measured baseline every
-run reads as uncertified; that's surfaced, not fatal, unless you pass
-`--require-certified`. Promoting a winner updates the config and the blessed
-list together (one step, so they can't disagree) — see
-[Tuning the models](../evals/TUNING.md#step-5--promote-the-winner). The shipped
-default is `temperature = 0` until a measurement replaces it.
+The report records both model fields and compares neither. Their disagreement is
+the drift signal, and it needs no comparison logic: a moved build produces a
+fingerprint no manifest blessed, so drift falls out of certification for free.
+
+The fingerprint is computed **per node execution**, not once at startup — so a
+build that moves mid-run yields two identities for one node, which is the signal
+rather than a defect. The vendor prefix is part of the hash because a served
+identifier carries no vendor, and Vertex-hosted Claude and Anthropic-direct
+return identical build strings.
+
+`config/blessed-fingerprints.toml` records, **per tier**, the identities a
+measured run has blessed. It is keyed by tier rather than by node because a
+fingerprint carries no node name: `critic` and `recritic` share a tier and
+present a byte-identical hash, so node keying would report the first production
+revise path uncertified on a technicality.
+
+The manifest is **deployment-local**: the project can never ship a certified
+pair, because a repo-level blessing plus a local one could only resolve as a
+silent override or a silent veto. `STRIDE_BLESSED_FINGERPRINTS` picks *which*
+single file is read; it is not an overlay.
+
+**The service certifies every job it completes**, not just the eval harness. The
+verdict has three states and lives on the job record, never on the report — the
+report is portable evidence, the manifest is one deployment's claim:
+
+| State | Meaning | Effect on `GET /v1/jobs/{id}/report` |
+| --- | --- | --- |
+| certified | Every observed fingerprint is blessed | Served |
+| uncertified | At least one is not | Served **unless** `STRIDE_REQUIRE_CERTIFIED` |
+| unexercised | A tier the graph declares presented no identity at all | **Always** withheld |
+
+The sets ship **empty**, so until you promote a measured baseline every run reads
+as uncertified. That is annotated, not fatal: a gate that fires before the normal
+range is known just trains people to bypass it. `unexercised` is different — it
+is unreachable on any run that produces a report, so withholding costs nothing.
+
+Withholding refuses the *report*; it never fails the job. A failed job carries no
+report at all, and the fingerprints that prove the drift live in it. Nothing
+about certification reaches the job status view — it is operator-only.
+
+| Variable | Effect |
+| --- | --- |
+| `STRIDE_REQUIRE_CERTIFIED` | Withhold the report when the run is uncertified. Off by default. |
 
 ### Resilience overrides
 
@@ -155,7 +237,6 @@ default is `temperature = 0` until a measurement replaces it.
 | --- | --- |
 | `STRIDE_RETRY_ATTEMPTS` | Total attempts per LLM call. |
 | `STRIDE_TIMEOUT_MS` | Per-request timeout, milliseconds. |
-| `STRIDE_RETRY_INITIAL_DELAY` / `_MAX_DELAY` / `_EXP_BASE` / `_JITTER` | Optional backoff-curve knobs; unset means the SDK default. |
 
 ### Bearer auth (HTTP surface only)
 
@@ -261,14 +342,13 @@ A durable or shared backend (Redis, Postgres, …) is a new entry in the
 Implement the `JobStore` protocol (`create`, `get`, `save`) and read any
 connection settings from its own prefixed env vars; the API layer is unchanged.
 
-### Vertex environment
+### Provider environment
 
-Reaching the models needs a configured Google Vertex environment — Application
-Default Credentials plus the project and location the `google-adk` client reads
-(typically `GOOGLE_CLOUD_PROJECT`, `GOOGLE_CLOUD_LOCATION`, and
-`GOOGLE_GENAI_USE_VERTEXAI=1`). The code assumes this is correctly configured.
-Offline tests and the in-memory [stub runner](Integration-Guide.md) need none of
-it.
+Each tier's vendor implies what it needs; see
+[Models and vendors](#models-and-vendors) for the table. Startup fails closed if
+a selected vendor's credentials are absent, so a misconfigured deployment never
+reaches the first request. Offline tests and the in-memory
+[stub runner](Integration-Guide.md) need none of it.
 
 ## Input limits
 

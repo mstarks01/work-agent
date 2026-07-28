@@ -28,12 +28,12 @@ from stride_service.jobs import (
     PipelineRejected,
 )
 from stride_service.markdown_loader import MarkdownLoader
+from stride_service.model_tiers import ModelConfigError, load_model_tiers
 from stride_service.pipeline import (
     AdkPipelineRunner,
     PipelineError,
     build_default_pipeline,
 )
-from stride_service.model_tiers import load_model_tiers
 from stride_service.report import STRIDE_CATEGORIES
 from stride_service.sampling import (
     TierSampling,
@@ -41,16 +41,32 @@ from stride_service.sampling import (
     make_resolve_sampling,
     sampling_fingerprint,
 )
+from stride_service.vendors import ProviderAuthError
 from tests.factories import sample_draft, sample_threat, valid_model
 
 PROJECT_ROOT = Path(__file__).resolve().parents[1]
 
-FLASH = "fake-flash-001"
-PRO = "fake-pro-001"
+BASE_MODEL = "fake-base-001"
+STRONG_MODEL = "fake-strong-001"
+
+# The shipped config selects Vertex on both tiers, and Vertex's credential mode
+# is ADC — so building the real pipeline needs these three present. They are
+# names of variables, never credentials: nothing here is a secret.
+VERTEX_ENV = {
+    "STRIDE_VERTEX_PROJECT": "test-project",
+    "STRIDE_VERTEX_LOCATION": "us-central1",
+    "GOOGLE_APPLICATION_CREDENTIALS": "/nonexistent/adc.json",
+}
 
 
 class ScriptedLlm(BaseLlm):
-    """One node's model: replays a fixed emission and records the request."""
+    """One node's model: replays a fixed emission and records the request.
+
+    It reports a ``model_version`` distinct from the configured ``model``, the
+    way a real provider does — the pinned string names a family, the served
+    build names what answered. Keeping them different here is what lets the
+    tests tell "recorded what was asked for" apart from "recorded what ran".
+    """
 
     reply: str
     seen: list[str] = []
@@ -60,15 +76,23 @@ class ScriptedLlm(BaseLlm):
     ) -> AsyncGenerator[LlmResponse, None]:
         self.seen.append(llm_request.config.system_instruction or "")
         yield LlmResponse(
-            content=types.Content(role="model", parts=[types.Part(text=self.reply)])
+            content=types.Content(role="model", parts=[types.Part(text=self.reply)]),
+            model_version=served_build(self.model),
         )
+
+
+def served_build(requested: str) -> str:
+    """The build a scripted model claims answered: the request plus a suffix."""
+    return f"{requested}-served"
 
 
 def draft_json(threat_id: str, category: str) -> str:
     return json.dumps([sample_draft(threat_id, category).model_dump(mode="json")])
 
 
-def build(replies: dict[str, str]) -> tuple[graph.Pipeline, dict[str, ScriptedLlm]]:
+def build(
+    replies: dict[str, str], llm_class: type[ScriptedLlm] = ScriptedLlm
+) -> tuple[graph.Pipeline, dict[str, ScriptedLlm]]:
     """The real graph, with every LLM node bound to its scripted stand-in."""
     models: dict[str, ScriptedLlm] = {}
 
@@ -81,8 +105,8 @@ def build(replies: dict[str, str]) -> tuple[graph.Pipeline, dict[str, ScriptedLl
         # ``build_pipeline`` resolves by canonical tier name; the scripts here
         # are keyed by graph node name, which is what the tests talk about.
         node = graph_node_of[tier_node]
-        model_name = FLASH if node in (graph.EXTRACT_NODE, graph.REPAIR_NODE) else PRO
-        models[node] = ScriptedLlm(
+        model_name = BASE_MODEL if node in (graph.EXTRACT_NODE, graph.REPAIR_NODE) else STRONG_MODEL
+        models[node] = llm_class(
             model=model_name, reply=replies.get(node, "[]"), seen=[]
         )
         return models[node]
@@ -156,10 +180,37 @@ def test_report_nodes_record_the_model_each_node_ran_on():
     outcome, _ = run(pipeline, job())
 
     by_node = {run_.node: run_ for run_ in outcome.report.nodes}
-    assert by_node[graph.EXTRACT_NODE].model == FLASH
-    assert by_node[graph.CRITIC_NODE].model == PRO
+    # `model` is what answered; `requested_model` is what was asked for. The
+    # report records both and compares neither — drift falls out of
+    # certification, not out of a comparison here.
+    assert by_node[graph.EXTRACT_NODE].model == served_build(BASE_MODEL)
+    assert by_node[graph.EXTRACT_NODE].requested_model == BASE_MODEL
+    assert by_node[graph.CRITIC_NODE].model == served_build(STRONG_MODEL)
+    assert by_node[graph.CRITIC_NODE].requested_model == STRONG_MODEL
     assert by_node[graph.ASSEMBLE_NODE].model is None
+    assert by_node[graph.ASSEMBLE_NODE].requested_model is None
     assert all(run_.duration_ms >= 0 for run_ in outcome.report.nodes)
+
+
+def test_a_node_with_no_served_build_carries_no_fingerprint():
+    """Nothing honest to hash: better no identity than one keyed on a guess."""
+
+    class SilentLlm(ScriptedLlm):
+        async def generate_content_async(self, llm_request, stream: bool = False):
+            yield LlmResponse(
+                content=types.Content(
+                    role="model", parts=[types.Part(text=self.reply)]
+                )
+            )
+
+    pipeline, _ = build(happy_replies(), llm_class=SilentLlm)
+    outcome, _ = run(pipeline, job())
+    by_node = {run_.node: run_ for run_ in outcome.report.nodes}
+    extract = by_node[graph.EXTRACT_NODE]
+    assert extract.model is None
+    assert extract.sampling_fingerprint is None
+    # What was asked for is still known, and still recorded.
+    assert extract.requested_model == BASE_MODEL
 
 
 def test_report_stamps_the_per_tier_sampling_clear_block():
@@ -191,7 +242,7 @@ def test_each_llm_node_fingerprint_recomputes_from_the_artifact():
         assert node_run.sampling_fingerprint == expected
 
 
-def test_flash_and_pro_nodes_get_different_fingerprints():
+def test_base_and_strong_nodes_get_different_fingerprints():
     """Different served model *and* (potentially) sampling → distinct identities."""
     pipeline, _ = build(happy_replies())
     outcome, _ = run(pipeline, job())
@@ -201,10 +252,9 @@ def test_flash_and_pro_nodes_get_different_fingerprints():
     critic_fp = by_node[graph.CRITIC_NODE].sampling_fingerprint
     assert extract_fp and critic_fp and extract_fp != critic_fp
     # recritic shares the critic's tier and model, so it shares the identity.
+    sampling = load_sampling(PROJECT_ROOT / "config" / "sampling.toml", env={})
     assert by_node[graph.CRITIC_NODE].sampling_fingerprint == sampling_fingerprint(
-        PRO, load_sampling(PROJECT_ROOT / "config" / "sampling.toml", env={}).for_tier(
-            "pro"
-        )
+        served_build(STRONG_MODEL), sampling.for_tier("strong")
     )
 
 
@@ -370,35 +420,66 @@ def test_a_failed_job_logs_the_input_digest(caplog):
 
 
 def test_the_default_pipeline_binds_the_pinned_models_from_config():
-    pipeline = build_default_pipeline(env={})
-    assert pipeline.node_models[graph.EXTRACT_NODE] == "gemini-2.5-flash"
-    assert pipeline.node_models[graph.CRITIC_NODE] == "gemini-2.5-pro"
+    pipeline = build_default_pipeline(env=VERTEX_ENV)
+    assert pipeline.node_models[graph.EXTRACT_NODE] == "vertex_ai/gemini-2.5-flash"
+    assert pipeline.node_models[graph.CRITIC_NODE] == "vertex_ai/gemini-2.5-pro"
     assert set(pipeline.node_models) == set(graph.TIER_NODE_BY_GRAPH_NODE)
 
 
-def test_the_default_pipeline_binds_retry_and_timeout(monkeypatch):
-    """Ticket 038: every LLM node carries the retry policy and the deadline."""
-    from google.adk.models.google_llm import Gemini
+def test_the_ten_llm_nodes_share_two_adapters_one_per_tier():
+    """#6: the binding is per tier, so the build-time checks fire twice, not ten times."""
+    pipeline = build_default_pipeline(env=VERTEX_ENV)
+    nodes = {node.name: node for node in pipeline.workflow.graph.nodes}
+    adapters = {
+        id(nodes[name].model) for name in graph.TIER_NODE_BY_GRAPH_NODE
+    }
+    assert len(graph.TIER_NODE_BY_GRAPH_NODE) == 10
+    assert len(adapters) == 2
 
-    pipeline = build_default_pipeline(env={})
+
+def test_the_default_pipeline_binds_retry_and_timeout():
+    """Ticket 038: every LLM node carries the retry policy and the deadline."""
+    from google.adk.models.lite_llm import LiteLlm
+
+    pipeline = build_default_pipeline(env=VERTEX_ENV)
     nodes = {node.name: node for node in pipeline.workflow.graph.nodes}
 
     critic = nodes[graph.CRITIC_NODE]
-    # The model is a Gemini wrapping the pinned string with a retry policy,
-    # and _model_name still records the bare string in the report.
-    assert isinstance(critic.model, Gemini)
-    assert critic.model.retry_options.attempts == 3
-    assert pipeline.node_models[graph.CRITIC_NODE] == "gemini-2.5-pro"
+    assert isinstance(critic.model, LiteLlm)
+    # attempts=3 is a total; LiteLLM counts retries after the first try.
+    assert critic.model._additional_args["num_retries"] == 2
+    assert pipeline.node_models[graph.CRITIC_NODE] == "vertex_ai/gemini-2.5-pro"
     # The per-request timeout rides on http_options, sampling untouched.
-    timeout = critic.generate_content_config.http_options.timeout
-    assert timeout == 300000
+    assert critic.generate_content_config.http_options.timeout == 300000
+
+
+def test_drop_params_is_never_set_so_litellm_stays_fail_closed():
+    """The sampling fingerprint's honesty depends on it (map Notes, #8)."""
+    pipeline = build_default_pipeline(env=VERTEX_ENV)
+    nodes = {node.name: node for node in pipeline.workflow.graph.nodes}
+    assert "drop_params" not in nodes[graph.CRITIC_NODE].model._additional_args
 
 
 def test_env_overrides_the_retry_attempts_without_touching_the_model():
-    pipeline = build_default_pipeline(env={"STRIDE_RETRY_ATTEMPTS": "5"})
+    pipeline = build_default_pipeline(env=VERTEX_ENV | {"STRIDE_RETRY_ATTEMPTS": "5"})
     nodes = {node.name: node for node in pipeline.workflow.graph.nodes}
-    assert nodes[graph.CRITIC_NODE].model.retry_options.attempts == 5
-    assert pipeline.node_models[graph.CRITIC_NODE] == "gemini-2.5-pro"
+    assert nodes[graph.CRITIC_NODE].model._additional_args["num_retries"] == 4
+    assert pipeline.node_models[graph.CRITIC_NODE] == "vertex_ai/gemini-2.5-pro"
+
+
+def test_the_default_pipeline_fails_closed_without_provider_credentials():
+    """The credential check is a build-time gate, not a first-request surprise."""
+    with pytest.raises(ProviderAuthError, match="STRIDE_VERTEX_PROJECT"):
+        build_default_pipeline(env={})
+
+
+def test_a_credential_error_never_echoes_the_secret(monkeypatch):
+    # OWASP A09: a key echoed into a log or an error has leaked.
+    env = VERTEX_ENV | {"STRIDE_MODEL_BASE_VENDOR": "anthropic",
+                        "STRIDE_MODEL_BASE_MODEL": "claude-sonnet-4-5-20250929"}
+    with pytest.raises(ProviderAuthError) as excinfo:
+        build_default_pipeline(env=env)
+    assert "STRIDE_ANTHROPIC_API_KEY" in str(excinfo.value)
 
 
 def test_the_default_pipeline_fails_closed_on_a_missing_resilience_config(tmp_path):
@@ -407,12 +488,16 @@ def test_the_default_pipeline_fails_closed_on_a_missing_resilience_config(tmp_pa
 
 
 def test_the_default_pipeline_fails_closed_on_a_missing_tier_config(tmp_path):
-    with pytest.raises(OSError):
-        build_default_pipeline(env={"STRIDE_MODEL_TIERS": str(tmp_path / "gone.toml")})
+    with pytest.raises(ModelConfigError, match="cannot be read"):
+        build_default_pipeline(
+            env=VERTEX_ENV | {"STRIDE_MODEL_TIERS": str(tmp_path / "gone.toml")}
+        )
 
 
-def test_the_api_runs_jobs_through_the_real_graph_by_default():
+def test_the_api_runs_jobs_through_the_real_graph_by_default(monkeypatch):
     """The seam ticket 018 left for the graph now defaults to the graph."""
+    for var, value in VERTEX_ENV.items():
+        monkeypatch.setenv(var, value)
 
     class NoVerifier:
         def verify(self, token: str) -> str:

@@ -44,9 +44,15 @@ the models are asked only for judgement.
 ## Models
 
 Per-node model selection through [`config/model_tiers.toml`](Configuration.md):
-`flash` for `extract`/`repair`, `pro` for the six analysts, the `critic`, and
-the `recritic`. Deterministic `FunctionNode`s carry no model. Each `pro` call on
-the eight-way fan-out plus critic is where the token budget goes.
+the `base` tier for `extract`/`repair`, `strong` for the six analysts, the
+`critic`, and the `recritic`. Deterministic `FunctionNode`s carry no model. Each
+`strong` call on the eight-way fan-out plus critic is where the token budget
+goes.
+
+Each tier selects its own `(vendor, model)` pair independently, so the two tiers
+may run different vendors at once. Every vendor is reached through one adapter,
+and the ten LLM nodes share **two** adapter instances — one per tier — so the
+build-time credential and parameter checks fire twice rather than ten times.
 
 ## Outcomes
 

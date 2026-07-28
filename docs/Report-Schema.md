@@ -20,7 +20,7 @@ report JSON embedded, so it also serves as a reference for laying one out.
 
 ```python
 class StrideReport:
-    schema_version: str          # "1.0"
+    schema_version: str          # "1.1"
     disclaimer: str              # AI-generated, not human-reviewed
     job: Job                     # id, status="completed", timestamps, revise_rounds
     input: InputRef              # system_name + source_sha256 of the exact text
@@ -111,26 +111,44 @@ a result stands on its own without trusting any outside record.
 ```python
 class NodeRun:
     node: str                        # graph node name, e.g. "extract", "critic"
-    model: str | None                # the model this node ran on; None for code-only nodes
-    sampling_fingerprint: str | None # 64-hex identity hash of (model, decoding params)
+    model: str | None                # the SERVED build, vendor-prefixed; None for code-only nodes
+    requested_model: str | None      # the CONFIGURED route this node asked for
+    sampling_fingerprint: str | None # 64-hex identity hash of (served route, decoding params)
     duration_ms: int
 ```
 
 - **`sampling`** lists the decoding parameters each tier actually used, once per
-  tier: `{"flash": {"temperature": 0.0, ...}, "pro": {...}}`. A parameter left to
-  the model's default shows as `null`.
-- **`sampling_fingerprint`** is a hash of the model plus those parameters — one
-  value that identifies exactly how a node generated its output. It can be
+  tier: `{"base": {"temperature": 0.0, ...}, "strong": {...}}`. A parameter left
+  to the model's default shows as `null`.
+- **`model`** is what *answered* — the build the provider reported, joined to its
+  vendor prefix, e.g. `vertex_ai/gemini-2.5-pro-002`.
+- **`requested_model`** is what was *asked for* — the configured route, e.g.
+  `vertex_ai/gemini-2.5-pro`.
+- **`sampling_fingerprint`** is a hash of the served route plus those parameters
+  — one value identifying exactly how a node generated its output. It can be
   recomputed from the node's `model` and its tier's entry in `sampling`, so
-  anyone can verify it. Code-only nodes (like `assemble`) have no model and no
-  fingerprint.
+  anyone can verify it. Code-only nodes (like `assemble`) have all three as
+  `null`.
+
+> **`schema_version` 1.1** added `requested_model` and redefined `model` as the
+> served build rather than the configured string. A consumer keying on `model`
+> now reads what answered.
+
+The report records both model fields and **compares neither**. Their disagreement
+is the drift signal, and it needs no comparison logic: a moved build produces a
+fingerprint no approved baseline blessed, so drift falls out of certification.
+
+The fingerprint is computed **per node execution**, so a node that ran more than
+once — the critic on a revise path — appears once per execution, and a build that
+moved mid-run gives one node two identities. That is the signal, not a defect.
 
 The fingerprint — not `seed` — is what makes a result reproducible to reason
-about; `seed` is best-effort only. The report carries the fingerprints as-is; the
-separate question of whether a run matches an approved baseline is answered by
-the eval tooling (against `evals/blessed-fingerprints.toml`), not asserted on the
-report itself. See
-[Configuration → The eval gate](Configuration.md#the-eval-gate-and-provenance).
+about; `seed` is best-effort, and some vendors do not accept it at all. The
+report carries the fingerprints as-is. Whether a run matches a baseline this
+*deployment* approved is a separate question, answered against
+`config/blessed-fingerprints.toml` and recorded on the job, never on the report:
+the report is portable evidence, a manifest is one deployment's claim. See
+[Configuration → Provenance and certification](Configuration.md#provenance-and-certification).
 
 A report produced without live models (the in-memory stub runner, or eval
 fixtures) simply has an empty `sampling` and no fingerprints.

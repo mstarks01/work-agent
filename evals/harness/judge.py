@@ -40,10 +40,12 @@ from typing import Literal, Protocol, TypeVar
 from pydantic import BaseModel, ConfigDict, Field, ValidationError
 
 from stride_service.markdown_loader import MarkdownLoader
+from stride_service.model_gate import check_supported
 from stride_service.model_tiers import validate_model_string
 from stride_service.report import StrideCategory
 from stride_service.resilience import ResilienceConfig
 from stride_service.system_model import SystemModel
+from stride_service.vendors import VendorName, vendor_for
 
 EVALS_ROOT = Path(__file__).resolve().parents[1]
 DEFAULT_JUDGE_CONFIG_PATH = EVALS_ROOT / "config" / "judge.toml"
@@ -69,18 +71,35 @@ class JudgeError(RuntimeError):
     """The judge did not return a usable ruling."""
 
 
+# Hard cutover, alongside the other three config files (#15 decision 5).
+# ``judge.toml`` is absorbed into the cutover because the coupling is *code*:
+# ``validate_model_string`` gained a vendor argument, so leaving this file out
+# would mean either a dead-but-called Gemini-shaped validator or a repo that
+# does not import.
+SUPPORTED_VERSION = 3
+
+
 class JudgeConfig(BaseModel):
-    """The pinned judge: model string and its own sampling.
+    """The pinned judge: its ``(vendor, model)`` pair and its own sampling.
 
     Sampling is pinned *with the judge* rather than read from
     ``config/sampling.toml``: the shared file is the configuration under test,
     and a judge whose decoding moved with it would re-score history every time
     the suite measured a new production temperature.
+
+    The judge selects a vendor like any tier does (#10 decision 3): it is no
+    longer Google-only, and its legitimacy rests on measured agreement against
+    hand labels rather than on sharing a vendor with the system under test.
+    Running the build-time gate over ``(vendor, model, temperature)`` here is
+    what makes "o-series cannot judge" fail closed rather than surprise a sweep:
+    greedy decoding is required, and o-series constrains ``temperature`` to
+    exactly 1.
     """
 
     model_config = ConfigDict(extra="forbid", frozen=True)
 
     version: int = Field(ge=1)
+    vendor: VendorName
     model: str = Field(min_length=1)
     temperature: float = Field(ge=0.0, le=2.0)
     # Seeds the presentation-order shuffle, so a run is reproducible while
@@ -88,7 +107,13 @@ class JudgeConfig(BaseModel):
     order_seed: int = 0
 
     def model_post_init(self, _context: object) -> None:
-        validate_model_string(self.model, source="judge.model")
+        validate_model_string(self.model, self.vendor, source="judge.model")
+        check_supported(
+            vendor_for(self.vendor),
+            self.model,
+            {"temperature": self.temperature},
+            source="judge",
+        )
 
 
 def load_judge_config(path: Path | str = DEFAULT_JUDGE_CONFIG_PATH) -> JudgeConfig:
@@ -99,6 +124,13 @@ def load_judge_config(path: Path | str = DEFAULT_JUDGE_CONFIG_PATH) -> JudgeConf
         raise JudgeConfigError(f"{path}: invalid TOML: {exc}") from exc
     except OSError as exc:
         raise JudgeConfigError(f"{path}: cannot be read: {exc}") from exc
+
+    version = raw.get("version")
+    if version != SUPPORTED_VERSION:
+        raise JudgeConfigError(
+            f"{path}: unsupported version {version!r};"
+            f" expected {SUPPORTED_VERSION} (hard cutover, no shim)"
+        )
     try:
         return JudgeConfig(**raw)
     except ValidationError as exc:
@@ -302,9 +334,13 @@ class VertexJudge:
 
         if self._resilience is None:
             return genai.Client()
+        # Only ``attempts`` survives: resilience version 2 dropped the backoff
+        # knobs as inert under LiteLLM, which picks its curve internally. This
+        # client is still GenAI's, so it still takes a retry object — building
+        # one from attempts alone leaves the SDK's own jittered defaults.
         http_options = types.HttpOptions(
             timeout=self._resilience.timeout_ms,
-            retry_options=self._resilience.to_retry_options(),
+            retry_options=types.HttpRetryOptions(attempts=self._resilience.attempts),
         )
         return genai.Client(http_options=http_options)
 

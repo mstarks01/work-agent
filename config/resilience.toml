@@ -2,26 +2,30 @@
 # graph's LLM calls, read by the production graph, the eval harness, and the
 # eval judge alike.
 #
-# On their SDK defaults the nine LLM nodes never retry and never time out: a
-# single 429 on any node kills a paid-for job on first contact, and a stalled
-# call parks a job in `running` forever. These two numbers fix both.
+# On their SDK defaults the LLM nodes never retry and never time out: a single
+# 429 on any node kills a paid-for job on first contact, and a stalled call
+# parks a job in `running` forever. These two numbers fix both.
 #
 # Unlike config/sampling.toml, these values ARE env-overridable
-# (STRIDE_RETRY_ATTEMPTS, STRIDE_TIMEOUT_MS, and the optional backoff knobs
-# STRIDE_RETRY_INITIAL_DELAY / _MAX_DELAY / _EXP_BASE / _JITTER). Sampling is
-# pinned because temperature changes WHAT the model produces; attempts and
-# timeout change only HOW HARD we try, never which answer we get, so they
-# cannot move an eval score and are exactly the knobs to turn down mid-incident
-# without an image rebuild.
+# (STRIDE_RETRY_ATTEMPTS, STRIDE_TIMEOUT_MS). Sampling is pinned because
+# temperature changes WHAT the model produces; attempts and timeout change only
+# HOW HARD we try, never which answer we get, so they cannot move an eval score
+# and are exactly the knobs to turn down mid-incident without an image rebuild.
 #
-# attempts and timeout_ms are one mechanism (decisions 2 and 4): the timeout
-# turns a hang into an httpx.TimeoutException, which is already in the SDK's
-# retry predicate, so the client-level retry then re-issues the call. The
-# retryable status set and the backoff curve are left to the SDK's own
-# jittered defaults — anything not listed here is deliberately unset rather
-# than pinned to a number this project has never measured (ticket 038: the
-# numbers are unverified against live Vertex until baselines run).
+# Version 2 (wayfinder #15) drops version 1's four backoff knobs —
+# initial_delay, max_delay, exp_base, jitter. They appear NOWHERE in litellm,
+# which picks its backoff curve internally from the exception type, so under the
+# LiteLlm adapter they were config that read as a knob and connected to nothing.
+# Their env vars (STRIDE_RETRY_INITIAL_DELAY / _MAX_DELAY / _EXP_BASE / _JITTER)
+# are gone with them. This is a hard cutover: a version-1 file fails the check.
+#
+# `attempts` is a TOTAL count and is deliberately not passed through verbatim.
+# LiteLLM's num_retries counts retries AFTER the first try, so the binding sends
+# attempts - 1; passing 3 straight through would give four tries, and the old
+# timeout-only path silently gave one. The retryable status set and the backoff
+# curve remain the library's own — anything not listed here is deliberately
+# unset rather than pinned to a number this project has never measured.
 
-version = 1
+version = 2
 attempts = 3
 timeout_ms = 300000

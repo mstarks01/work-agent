@@ -7,7 +7,6 @@ from pydantic import ValidationError
 from stride_service.report import (
     Severity,
     StrideReport,
-    Threat,
     UnknownRef,
     Verdict,
     build_summary,

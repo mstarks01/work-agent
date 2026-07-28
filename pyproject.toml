@@ -10,6 +10,12 @@ requires-python = ">=3.11"
 dependencies = [
     "fastapi>=0.115",
     "google-adk==2.5.0",
+    # Exact pin, on the google-adk precedent. litellm is not just the adapter:
+    # `litellm.utils.get_optional_params` IS the build-time supported-param
+    # gate, and it is not a documented public API, so a version bump must
+    # re-run the probe in tests/test_model_gate.py rather than be taken as a
+    # routine dependency update.
+    "litellm==1.93.0",
     "pydantic>=2.7",
     "pyjwt[crypto]>=2.9",
 ]

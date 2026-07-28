@@ -32,7 +32,7 @@ from typing import Any
 
 from evals.harness import modes
 from evals.harness.calibration import AGREEMENT_BAR, load_pairs, measure_agreement
-from evals.harness.certify import CertifyResult, certify, load_manifest
+from evals.harness.certify import DEFAULT_MANIFEST_PATH
 from evals.harness.critic_yield import (
     CriticYield,
     aggregate_yield,
@@ -46,6 +46,13 @@ from evals.harness.scorer import (
     unlisted_for_promotion,
 )
 from evals.harness.structural import report_issues
+from stride_service.certification import (
+    CertifyResult,
+    certify,
+    load_manifest,
+    report_fingerprints,
+)
+from stride_service.graph import TIER_NODE_BY_GRAPH_NODE
 from stride_service.model_tiers import load_model_tiers
 from stride_service.pipeline import DEFAULT_MODEL_TIERS_PATH, DEFAULT_RESILIENCE_PATH
 from stride_service.resilience import load_resilience
@@ -114,7 +121,17 @@ async def _run_mode(
         failures += [f"{case.id}: {issue}" for issue in issues]
         payloads.append({"case": case.id, "structural_issues": issues})
 
-    return payloads, failures, runs, pipeline.node_fingerprints
+    observations: dict[str, set[str]] = {}
+    for run in runs.values():
+        for node, prints in report_fingerprints(run.report).items():
+            observations.setdefault(node, set()).update(prints)
+    return (
+        payloads,
+        failures,
+        runs,
+        {node: frozenset(prints) for node, prints in observations.items()},
+        list(pipeline.node_sampling),
+    )
 
 
 def _score_runs(
@@ -208,12 +225,21 @@ def _print_yields(yields: Sequence[CriticYield]) -> None:
 
 def command_run(args: argparse.Namespace) -> int:
     cases = _select(load_corpus(args.corpus), args.case)
-    payloads, failures, runs, node_fingerprints = asyncio.run(_run_mode(cases, args.mode))
+    payloads, failures, runs, observations, expected = asyncio.run(
+        _run_mode(cases, args.mode)
+    )
 
     # Never silently trust (ticket 08 / 03 §4): the verdict is always computed
     # and surfaced, so an aggregate can never be read without knowing whether the
     # generation identity behind it is a blessed baseline.
-    certification = certify(node_fingerprints, load_manifest())
+    tiers = load_model_tiers(DEFAULT_MODEL_TIERS_PATH)
+
+    def tier_of(graph_node: str) -> str:
+        return tiers.resolve_tier(TIER_NODE_BY_GRAPH_NODE[graph_node])
+
+    certification = certify(
+        observations, load_manifest(DEFAULT_MANIFEST_PATH), tier_of, expected
+    )
     _print_certification(certification)
 
     scores: list[CaseScore] = []
@@ -231,7 +257,7 @@ def command_run(args: argparse.Namespace) -> int:
         "models": _models_record(judge),
         "gating": "tier-1-structural-only",
         "certification": certification.to_json(),
-        "node_fingerprints": node_fingerprints,
+        "node_fingerprints": {n: sorted(p) for n, p in observations.items()},
         "structural_failures": failures,
         "mode_output": payloads,
         # Aggregates carry the verdict so nothing downstream folds an
@@ -249,7 +275,11 @@ def command_run(args: argparse.Namespace) -> int:
 
     for failure in failures:
         print(f"TIER 1 FAILURE: {failure}", file=sys.stderr)
-    uncertified_blocks = args.require_certified and not certification.certified
+    # Blocks on uncertified *or* unexercised: a tier that never ran means the
+    # sweep did not exercise what it claims to have measured.
+    uncertified_blocks = args.require_certified and (
+        not certification.certified or not certification.complete
+    )
     if uncertified_blocks:
         print(
             "UNCERTIFIED: --require-certified is set and the run's fingerprints"
