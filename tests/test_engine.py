@@ -169,7 +169,14 @@ def test_analyze_sync_refuses_a_running_loop():
 
 
 def test_from_config_builds_an_adk_runner():
-    engine = StrideEngine.from_config(env={})
+    # Vertex's credential mode is ADC, and the check is a build-time gate.
+    engine = StrideEngine.from_config(
+        env={
+            "STRIDE_VERTEX_PROJECT": "test-project",
+            "STRIDE_VERTEX_LOCATION": "us-central1",
+            "GOOGLE_APPLICATION_CREDENTIALS": "/nonexistent/adc.json",
+        }
+    )
 
     assert isinstance(engine._runner, AdkPipelineRunner)
 

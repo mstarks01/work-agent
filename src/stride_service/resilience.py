@@ -1,29 +1,34 @@
 """Resilience configuration for the graph's LLM calls.
 
-Implements wayfinder ticket 038: on their own defaults the nine LLM nodes
-never retry and never time out. ``Gemini.retry_options`` defaults to ``None``,
-which genai turns into "attempt once", so a single 429 on any node kills a
-paid-for job on first contact; ``http_options.timeout`` defaults to ``None``,
-which reaches httpx as no deadline, so a stalled call parks a job in
-``running`` forever. This module is the two knobs that fix both.
+Implements wayfinder ticket 038: on their own defaults the LLM nodes never retry
+and never time out. A single 429 on any node kills a paid-for job on first
+contact, and a stalled call parks a job in ``running`` forever. This module is
+the two knobs that fix both.
 
-Unlike :mod:`stride_service.sampling`, these values **are** env-overridable.
-The split that settles it: sampling is pinned because temperature changes
-*what* the model produces, so an eval-only value is how a suite goes green
-while production drifts; attempts and timeout change only *how hard we try*,
-never which answer we get, so they cannot move a score and are exactly the
-knobs to turn down mid-incident without a redeploy.
+Unlike :mod:`stride_service.sampling`, these values **are** env-overridable. The
+split that settles it: sampling is pinned because temperature changes *what* the
+model produces, so an eval-only value is how a suite goes green while production
+drifts; attempts and timeout change only *how hard we try*, never which answer
+we get, so they cannot move a score and are exactly the knobs to turn down
+mid-incident without a redeploy.
 
-``attempts`` and ``timeout_ms`` compose two SDK mechanisms into one
-resilience story (ticket 038 decisions 2 and 4): the timeout rides on the
-per-request ``GenerateContentConfig.http_options`` and turns a hang into an
-``httpx.TimeoutException``, which is already in the SDK's retry predicate, so
-the client-level retry then re-issues it. The backoff knobs are optional —
-left unset, the SDK's own jittered defaults and retryable status set apply.
+Version 2 is a hard cutover (#15 decision 4) and **drops the four backoff
+knobs**. ``initial_delay`` / ``max_delay`` / ``exp_base`` / ``jitter`` appear
+nowhere in ``litellm``, which picks its backoff curve internally from the
+exception type, so under the ``LiteLlm`` adapter they are ``top_k`` again: unset
+in the shipped file and provably inert. Keeping them would mean a config surface
+that reads as a knob and connects to nothing.
 
-Loading fails closed: a malformed file, an out-of-range value or an unknown
-key raises :class:`ResilienceConfigError` rather than silently reverting a
-node to never-retry, no-timeout behaviour.
+Retry now rides the adapter's constructor rather than a GenAI retry object, and
+the arithmetic is explicit (#6 decision 2). ``attempts`` is a *total* count;
+LiteLLM's ``num_retries`` counts retries *after* the first try. Passing
+``attempts`` straight through would over-shoot to four tries where three are
+configured, and the previous ``to_http_options()``-only path silently under-shot
+to one. Only ``attempts - 1`` reproduces the configured number.
+
+Loading fails closed: a malformed file, an out-of-range value, an unknown key or
+a stale version raises :class:`ResilienceConfigError` rather than silently
+reverting a node to never-retry, no-timeout behaviour.
 """
 
 from __future__ import annotations
@@ -37,16 +42,15 @@ from typing import TypeVar
 from google.genai import types
 from pydantic import BaseModel, ConfigDict, Field, ValidationError
 
+# Hard cutover: version 1 carried the four backoff knobs this schema drops, and
+# ``extra="forbid"`` would reject them with a confusing per-key error. The
+# version check fires first and says why.
+SUPPORTED_VERSION = 2
+
 _ENV_PREFIX = "STRIDE_"
 
-# The env vars that retune resilience at deploy time or mid-incident. Named
-# alongside STRIDE_MODEL_FLASH / STRIDE_MODEL_PRO (ticket 007).
 ATTEMPTS_VAR = f"{_ENV_PREFIX}RETRY_ATTEMPTS"
 TIMEOUT_MS_VAR = f"{_ENV_PREFIX}TIMEOUT_MS"
-INITIAL_DELAY_VAR = f"{_ENV_PREFIX}RETRY_INITIAL_DELAY"
-MAX_DELAY_VAR = f"{_ENV_PREFIX}RETRY_MAX_DELAY"
-EXP_BASE_VAR = f"{_ENV_PREFIX}RETRY_EXP_BASE"
-JITTER_VAR = f"{_ENV_PREFIX}RETRY_JITTER"
 
 _T = TypeVar("_T", int, float)
 
@@ -56,42 +60,24 @@ class ResilienceConfigError(ValueError):
 
 
 class ResilienceConfig(BaseModel):
-    """Validated retry and timeout parameters applied to every LLM call.
-
-    Only the parameters the design has an opinion about are required.
-    ``attempts`` and ``timeout_ms`` are the two decided in ticket 038; the
-    backoff knobs are optional and default to the SDK's own jittered values
-    when left unset, so pinning a number this project has never measured is
-    never forced.
-    """
+    """Validated retry and timeout parameters applied to every LLM call."""
 
     model_config = ConfigDict(extra="forbid", frozen=True)
 
     version: int = Field(ge=1)
     attempts: int = Field(ge=1)
     timeout_ms: int = Field(gt=0)
-    initial_delay: float | None = Field(default=None, gt=0.0)
-    max_delay: float | None = Field(default=None, gt=0.0)
-    exp_base: float | None = Field(default=None, gt=0.0)
-    jitter: float | None = Field(default=None, ge=0.0)
 
-    def to_retry_options(self) -> types.HttpRetryOptions:
-        """The client-level retry policy the GenAI SDK applies (decision 2).
+    def to_num_retries(self) -> int:
+        """LiteLLM's ``num_retries``: retries *after* the first try.
 
-        ``http_status_codes`` is left unset on purpose — reusing the SDK's own
-        retryable set rather than second-guessing which 5xx/429 codes deserve
-        a retry.
+        See the module docstring — this arithmetic is the whole reason the value
+        is not passed through verbatim.
         """
-        return types.HttpRetryOptions(
-            attempts=self.attempts,
-            initial_delay=self.initial_delay,
-            max_delay=self.max_delay,
-            exp_base=self.exp_base,
-            jitter=self.jitter,
-        )
+        return self.attempts - 1
 
     def to_http_options(self) -> types.HttpOptions:
-        """Per-request HTTP options carrying the deadline (decision 4).
+        """Per-request HTTP options carrying the deadline (ticket 038 decision 4).
 
         ADK merges its tracking headers and api version into a caller-supplied
         ``http_options``, so setting the timeout here leaves those untouched.
@@ -121,8 +107,8 @@ def load_resilience(
     """Load and validate the resilience config, applying env-var overrides.
 
     Overrides replace the corresponding file value before validation, so a
-    negative ``attempts`` arriving via the environment is rejected exactly
-    like one in the file.
+    negative ``attempts`` arriving via the environment is rejected exactly like
+    one in the file.
     """
     if env is None:
         env = os.environ
@@ -133,13 +119,18 @@ def load_resilience(
     except OSError as exc:
         raise ResilienceConfigError(f"{path}: cannot be read: {exc}") from exc
 
+    version = raw.get("version")
+    if version != SUPPORTED_VERSION:
+        raise ResilienceConfigError(
+            f"{path}: unsupported version {version!r};"
+            f" expected {SUPPORTED_VERSION} (hard cutover, no shim)."
+            " Version 1's backoff knobs are inert under the LiteLlm adapter"
+            " and have been removed"
+        )
+
     overrides = {
         "attempts": _override(env, ATTEMPTS_VAR, int),
         "timeout_ms": _override(env, TIMEOUT_MS_VAR, int),
-        "initial_delay": _override(env, INITIAL_DELAY_VAR, float),
-        "max_delay": _override(env, MAX_DELAY_VAR, float),
-        "exp_base": _override(env, EXP_BASE_VAR, float),
-        "jitter": _override(env, JITTER_VAR, float),
     }
     raw.update({key: value for key, value in overrides.items() if value is not None})
 

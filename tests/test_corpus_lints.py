@@ -17,7 +17,7 @@ import pytest
 EVALS_ROOT = Path(__file__).resolve().parents[1] / "evals"
 sys.path.insert(0, str(EVALS_ROOT))
 
-import verify_corpus  # noqa: E402
+import verify_corpus
 
 
 @pytest.mark.parametrize(
