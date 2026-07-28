@@ -1,8 +1,8 @@
-# Offline CI — wayfinder ticket 024.
+# Offline CI.
 #
 # Everything here is credential-free by construction: the pytest suite, the
-# corpus lints, the prompt/skill lints, and the eval scorer replayed over
-# ticket 022's recorded judge labels. No job in this file may ever be granted
+# corpus lints, the prompt/skill lints, and the eval scorer replayed over the
+# recorded judge labels in evals/judge_calibration/. No job here may ever be granted
 # `id-token: write` — the offline/live split is the security boundary that
 # keeps untrusted-PR-shaped work away from the Vertex identity, not a speed
 # optimization. Live evals live in evals-live.yml.
