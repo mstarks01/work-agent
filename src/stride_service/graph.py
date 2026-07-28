@@ -88,7 +88,6 @@ from stride_service.prompts import (
     compose_recritic_prompt,
     compose_repair_prompt,
 )
-from stride_service.resilience import ResilienceConfig
 from stride_service.report import (
     STRIDE_CATEGORIES,
     DraftThreat,
@@ -97,6 +96,7 @@ from stride_service.report import (
     Threat,
     build_summary,
 )
+from stride_service.resilience import ResilienceConfig
 from stride_service.sampling import (
     SamplingResolver,
     TierSampling,

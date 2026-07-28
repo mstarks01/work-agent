@@ -1,29 +1,45 @@
 """Per-tier sampling configuration for the graph's LLM nodes.
 
-Implements the model-tuning effort (wayfinder tickets 02 / 04 / 05): decoding
-parameters are pinned per model class (tier) in a versioned TOML file that
-**eval and production read from the same place** (ticket 009 decision 15).
-``flash`` and ``pro`` carry their own params; the node -> tier map lives once
-in ``model_tiers.toml`` and is reused via :meth:`ModelTierConfig.resolve_tier`,
+Decoding parameters are pinned per tier in a versioned TOML file that **eval and
+production read from the same place** (ticket 009 decision 15). ``base`` and
+``strong`` carry their own params; the node -> tier map lives once in
+``model_tiers.toml`` and is reused via :meth:`ModelTierConfig.resolve_tier`,
 never duplicated here.
 
+Version 3 is a hard cutover (#15 decision 4) driven by going multi-vendor:
+
+* **``top_k`` is gone from the surface entirely** (#15 decision 3). It is absent
+  from ``litellm.utils.get_optional_params``'s signature, so it is the one param
+  the build-time gate provably cannot cover — LiteLLM re-injects it raw into the
+  request body after the check — and its wrongness is *silent* while the
+  fingerprint attests to it. It was unset on both tiers, so nothing could depend
+  on it.
+* **``thinking`` is a uniform ``low``/``medium``/``high`` enum**, not a
+  per-tier integer budget. ``reasoning_effort`` reaches all three vendors
+  (Anthropic → ``budget_tokens``, identically via Vertex; Gemini →
+  ``thinkingConfig``; OpenAI → passthrough), so the per-class budget ranges that
+  version 2 mirrored dissolve rather than needing per-vendor mirroring.
+  ``auto`` and ``off`` are both dropped: ``auto`` raises on two vendors, and
+  ``off`` is worse than unportable — ``gemini-2.5-pro`` + ``none`` *passes* the
+  gate as ``thinkingBudget: 0`` and then 400s at request time.
+* **``max_output_tokens`` is pinned**, because the reason it needs pinning is
+  vendor-dependent: Anthropic derives a 5,120–8,192 cap only when the caller is
+  silent, which is what version 2's file did on both tiers.
+
 Loading fails closed (OWASP A02/A10): an unsupported version, an unknown key or
-tier, an out-of-range value, a ``candidate_count`` other than 1, or a
-per-class-illegal thinking budget raises :class:`SamplingConfigError` instead
-of falling back to a library default — a node quietly running on different
-sampling than the config records invalidates every eval result taken against
-it.
+tier, an out-of-range value, or a ``candidate_count`` other than 1 raises
+:class:`SamplingConfigError` rather than falling back to a library default — a
+node quietly running on different sampling than the config records invalidates
+every eval result taken against it.
 
-``STRIDE_SAMPLING_{TIER}_{PARAM}`` env overrides retune the *offered* params
-(``temperature``, ``top_p``, ``seed``, ``thinking``) at deploy time, validated
-identically to the file value; an env var naming a reserved or forbidden param
-raises ("not overridable"), so the live-knob surface is exactly the offered
-surface — no wider (ticket 03 §3). Overrides flow into the resolved values, so
-the run's provenance fingerprint (tickets 03 / 07) captures them.
+The **value** check on ``thinking`` is ours, not the gate's: ``reasoning_effort =
+"banana"`` passes ``get_optional_params`` on ``o3``, which would be a second
+``top_k``-class silent wrong. A pydantic ``Literal`` catches it here.
 
-This module is the config layer only; :mod:`stride_service.graph` wires
-``resolve_sampling`` onto each node so every node runs its own tier's decoding
-params (ticket 06).
+``STRIDE_SAMPLING_{TIER}_{PARAM}`` env overrides retune the *offered* params at
+deploy time, validated identically to the file value; an env var naming a
+reserved or forbidden param raises, so the live-knob surface is exactly the
+offered surface — no wider (ticket 03 §3).
 """
 
 from __future__ import annotations
@@ -34,7 +50,7 @@ import os
 import tomllib
 from collections.abc import Callable, Mapping
 from pathlib import Path
-from typing import Literal, Self
+from typing import Any, Literal, Self
 
 from google.genai import types
 from pydantic import (
@@ -48,30 +64,28 @@ from pydantic import (
 
 from stride_service.model_tiers import TIER_NAMES, TierName
 
-# Hard cutover (ticket 02 decision 6): the loader accepts only version 2 and
-# fail-closes on anything else. There is no v1 shim.
-SUPPORTED_VERSION = 2
+# Hard cutover (#15 decision 4): the loader accepts only version 3. Versions
+# land independent and exact-match across the four config files — a shared
+# number would buy nothing once each file pins its own, since a stale file fails
+# its own check.
+SUPPORTED_VERSION = 3
 
-# Both classes cap output at this ceiling (ticket 04); unset leaves the request
-# uncapped up to it.
-MODEL_OUTPUT_CEILING = 65_536
-
-# Per-class thinking-budget legality (tickets 01 / 04). ``flash`` may disable
-# thinking (0); ``pro``'s floor is 128 and 0 is a 400. Dynamic allocation (-1)
-# is requested via "auto", never as a raw in-range integer.
-THINKING_RANGE: dict[TierName, tuple[int, int]] = {
-    "flash": (0, 24_576),
-    "pro": (128, 32_768),
-}
-_THINKING_DYNAMIC = -1
-
-# The mixed scalar a tier's ``thinking`` field accepts in the file / overrides.
-ThinkingScalar = Literal["off", "auto"] | int
+# The uniform reasoning surface (#15 decision 3). Deliberately not per-vendor
+# data: the enum is what every vendor accepts, and the wire value it becomes
+# (Gemini derives a budget from it, so "low" is 1024 tokens rather than the
+# config's own word) is LiteLLM's business, not this file's.
+ReasoningEffort = Literal["low", "medium", "high"]
 
 # Env override surface (ticket 03 §3): only these params are overridable. A var
 # naming any other param — reserved (``candidate_count``) or forbidden — raises.
 _ENV_PREFIX = "STRIDE_SAMPLING_"
-OFFERED_PARAMS: tuple[str, ...] = ("temperature", "top_p", "seed", "thinking")
+OFFERED_PARAMS: tuple[str, ...] = (
+    "temperature",
+    "top_p",
+    "seed",
+    "thinking",
+    "max_output_tokens",
+)
 
 
 class SamplingConfigError(ValueError):
@@ -82,22 +96,25 @@ class _RawTier(BaseModel):
     """One tier's decoding params exactly as written in the file / overrides.
 
     ``extra="forbid"`` rejects an unknown or misspelled key rather than silently
-    ignoring it. Every param is optional: an omitted key means "unset — leave
-    the model's own default", which is how the shipped file expresses the params
-    ticket 04 found have no publishable per-class constant.
+    ignoring it — which is also how a version-2 file's ``top_k`` line is caught
+    rather than quietly dropped.
+
+    No upper bound is placed on ``max_output_tokens``: the ceiling is a
+    per-``(vendor, model)`` fact, and mirroring one here is the same mistake
+    ``Vendor.supported`` was — a table that drifts against the provider actually
+    serving the request.
     """
 
     model_config = ConfigDict(extra="forbid", frozen=True)
 
     temperature: float | None = Field(default=None, ge=0.0, le=2.0)
     top_p: float | None = Field(default=None, gt=0.0, le=1.0)
-    top_k: float | None = Field(default=None, gt=0.0)  # typed float in genai
     seed: int | None = None
-    max_output_tokens: int | None = Field(default=None, ge=1, le=MODEL_OUTPUT_CEILING)
+    max_output_tokens: int | None = Field(default=None, ge=1)
     candidate_count: int = 1
     presence_penalty: float | None = None
     frequency_penalty: float | None = None
-    thinking: ThinkingScalar | None = None
+    thinking: ReasoningEffort | None = None
 
     @field_validator("candidate_count")
     @classmethod
@@ -113,13 +130,7 @@ class _RawTier(BaseModel):
 
 
 class _RawSampling(BaseModel):
-    """The whole file's shape before per-tier thinking is resolved.
-
-    ``extra="forbid"`` rejects a stray top-level key; ``dict[TierName, ...]``
-    rejects an unknown tier name. Both tiers being *present* is enforced on the
-    resolved :class:`SamplingConfig`, after overrides have had their chance to
-    add one.
-    """
+    """The whole file's shape before per-tier resolution."""
 
     model_config = ConfigDict(extra="forbid", frozen=True)
 
@@ -128,57 +139,83 @@ class _RawSampling(BaseModel):
 
 
 class TierSampling(BaseModel):
-    """One tier's resolved decoding params, ready to bind onto a node.
+    """One tier's resolved decoding params, ready to bind onto a tier's adapter.
 
-    Produced by the loader from a validated :class:`_RawTier` once the tier is
-    known: the mixed ``thinking`` scalar is resolved to a class-legal
-    ``thinking_budget`` (or ``None`` = the model's preset). Frozen; every field
-    maps straight onto :class:`~google.genai.types.GenerateContentConfig`.
+    Split three ways at the point of use, because ADK carries only some of it:
+
+    * :meth:`constructor_kwargs` — ``seed`` and ``reasoning_effort``, which ADK's
+      request map forwards *neither* of (#6 decision 1). Passing them on the
+      generate-content config would mean the fingerprint attests to a seed the
+      request never carried.
+    * :meth:`to_generate_content_config` — the params ADK does forward.
+    * :meth:`gate_params` — everything, for the build-time supported-param check.
     """
 
     model_config = ConfigDict(extra="forbid", frozen=True)
 
     temperature: float | None = None
     top_p: float | None = None
-    top_k: float | None = None
     seed: int | None = None
     max_output_tokens: int | None = None
     candidate_count: int = 1
     presence_penalty: float | None = None
     frequency_penalty: float | None = None
-    thinking_budget: int | None = None
+    thinking: ReasoningEffort | None = None
+
+    def constructor_kwargs(self) -> dict[str, Any]:
+        """The params that must ride the ``LiteLlm`` constructor, not the config.
+
+        ADK 2.5.0's request map (``lite_llm.py:2404-2419``) forwards neither
+        ``seed`` nor any reasoning parameter, and fail-closed ``drop_params``
+        cannot fail closed on what LiteLLM is never told. Constructor kwargs
+        reach ``acompletion`` via ``_additional_args`` *before* ``generation_params``,
+        so the value survives and the fingerprint stays honest.
+        """
+        kwargs: dict[str, Any] = {}
+        if self.seed is not None:
+            kwargs["seed"] = self.seed
+        if self.thinking is not None:
+            kwargs["reasoning_effort"] = self.thinking
+        return kwargs
 
     def to_generate_content_config(self) -> types.GenerateContentConfig:
         """The ADK/GenAI object a node on this tier is configured with.
 
-        An unset param is sent as ``None`` (the model applies its own default);
-        an unset ``thinking_budget`` means no ``thinking_config`` at all, which
-        leaves the model's preset per-class budget (ticket 04).
+        An unset param is sent as ``None``, leaving the model's own default.
+        ``seed`` and ``thinking`` are deliberately absent — see
+        :meth:`constructor_kwargs`.
         """
-        thinking_config = (
-            types.ThinkingConfig(thinking_budget=self.thinking_budget)
-            if self.thinking_budget is not None
-            else None
-        )
         return types.GenerateContentConfig(
             temperature=self.temperature,
             top_p=self.top_p,
-            top_k=self.top_k,
-            seed=self.seed,
             max_output_tokens=self.max_output_tokens,
             candidate_count=self.candidate_count,
             presence_penalty=self.presence_penalty,
             frequency_penalty=self.frequency_penalty,
-            thinking_config=thinking_config,
         )
+
+    def gate_params(self) -> dict[str, Any]:
+        """Every set param, named as LiteLLM names it, for the build-time gate.
+
+        ``candidate_count`` is LiteLLM's ``n``. Unset params are omitted rather
+        than sent as ``None``: the gate asks "would this provider accept this
+        request", and a param the request will not carry is not part of it.
+        """
+        params: dict[str, Any] = {
+            "temperature": self.temperature,
+            "top_p": self.top_p,
+            "seed": self.seed,
+            "max_tokens": self.max_output_tokens,
+            "n": self.candidate_count,
+            "presence_penalty": self.presence_penalty,
+            "frequency_penalty": self.frequency_penalty,
+            "reasoning_effort": self.thinking,
+        }
+        return {name: value for name, value in params.items() if value is not None}
 
 
 class SamplingConfig(BaseModel):
-    """Validated per-tier sampling, keyed by model class.
-
-    Mirrors :class:`~stride_service.model_tiers.ModelTierConfig`: both tiers are
-    required, ``extra="forbid"`` and ``frozen`` throughout.
-    """
+    """Validated per-tier sampling, keyed by tier."""
 
     model_config = ConfigDict(extra="forbid", frozen=True)
 
@@ -193,29 +230,35 @@ class SamplingConfig(BaseModel):
         return self
 
     def for_tier(self, tier: TierName) -> TierSampling:
-        """The resolved sampling params for one model class."""
+        """The resolved sampling params for one tier."""
         return self.tiers[tier]
 
 
 SamplingResolver = Callable[[str], TierSampling]
 
 
-def sampling_fingerprint(served_model: str, sampling: TierSampling) -> str:
-    """One node's generation-identity hash: ``sha256(served model, sampling)``.
+def sampling_fingerprint(served_route: str, sampling: TierSampling) -> str:
+    """One node execution's generation-identity hash: ``sha256(served route, sampling)``.
 
     Model and the resolved tier sampling are bound into **one** hash (ticket 03
-    §1): the eval gate certifies a tier's *generation behaviour*, which is model
+    §1): certification is about a tier's *generation behaviour*, which is model
     and sampling jointly — splitting them lets a mismatched pair pass two green
-    half-checks. Keyed on the **served** model (per node, ticket 026) so a node
-    served a different build gets a different fingerprint and that drift is
-    visible.
+    half-checks.
+
+    ``served_route`` is the vendor prefix joined to the **served** build, e.g.
+    ``vertex_ai/gemini-2.5-pro-002`` (#7 decisions 2 and 3). The served half
+    comes from ``LlmResponse.model_version``, per node *execution* rather than
+    from the configured string at build time, which is what every docstring
+    around it already asserted. The vendor half is not decoration: a served
+    identifier carries no vendor, and Vertex-hosted Claude and Anthropic-direct
+    return through an identical transformation, so a served-only hash would let
+    a manifest blessed on one silently certify the other.
 
     Canonical serialization — sorted keys over the resolved values plus the
-    served model — so the hash is recomputable from the recorded clear block and
-    served ``model`` alone, never from some upstream state. sha256 matches
-    :attr:`~stride_service.report.InputRef.source_sha256`.
+    served route — so the hash is recomputable from the recorded clear block
+    alone, never from some upstream state.
     """
-    payload = {"model": served_model, **sampling.model_dump()}
+    payload = {"model": served_route, **sampling.model_dump()}
     canonical = json.dumps(payload, sort_keys=True, separators=(",", ":"))
     return hashlib.sha256(canonical.encode("utf-8")).hexdigest()
 
@@ -225,43 +268,13 @@ def env_var_for(tier: TierName, param: str) -> str:
     return f"{_ENV_PREFIX}{tier.upper()}_{param.upper()}"
 
 
-def resolve_thinking(value: ThinkingScalar | None, tier: TierName) -> int | None:
-    """Resolve the mixed ``thinking`` scalar to a class-legal budget (ticket 04).
-
-    Unset (``None``) leaves the model's preset per-class budget — today's
-    default, which is *not* dynamic allocation. ``"auto"`` requests dynamic
-    (``-1``); ``"off"`` disables (``flash`` only — ``pro``'s floor is 128, so it
-    raises); an int is checked against the class range.
-    """
-    if value is None:
-        return None
-    if value == "auto":
-        return _THINKING_DYNAMIC
-    low, high = THINKING_RANGE[tier]
-    if value == "off":
-        if low > 0:
-            raise SamplingConfigError(
-                f"tiers.{tier}: thinking cannot be 'off'"
-                f" (floor is {low}; 0 is a 400)"
-            )
-        return 0
-    if not low <= value <= high:
-        raise SamplingConfigError(
-            f"tiers.{tier}: thinking budget {value} out of range [{low}, {high}]"
-            " (use 'auto' for dynamic allocation)"
-        )
-    return value
-
-
 def make_resolve_sampling(
     config: SamplingConfig, resolve_tier: Callable[[str], TierName]
 ) -> SamplingResolver:
     """The injected sibling of ``resolve_model``: node -> its tier's sampling.
 
     ``resolve_tier`` is :meth:`ModelTierConfig.resolve_tier`, so the node -> tier
-    walk lives once in the tier config and the graph stays purely node-centric
-    (ticket 02 decision 7). :func:`stride_service.graph.build_pipeline` wires the
-    returned resolver onto each node (ticket 06).
+    walk lives once in the tier config and the graph stays purely node-centric.
     """
 
     def resolve_sampling(node: str) -> TierSampling:
@@ -273,40 +286,31 @@ def make_resolve_sampling(
 def _parse_env_value(var: str, param: str, value: str) -> float | int | str:
     """Parse an override string to its param's type; raise on a bad literal.
 
-    Range and per-class legality stay in :class:`_RawTier` and
-    :func:`resolve_thinking`, so an override is validated identically to a file
-    value — this only converts the string to the type the file would hold.
+    Range and enum legality stay in :class:`_RawTier`, so an override is
+    validated identically to a file value — this only converts the string to the
+    type the file would hold.
     """
     if param in ("temperature", "top_p"):
         try:
             return float(value)
         except ValueError:
             raise SamplingConfigError(f"{var}: {value!r} is not a number") from None
-    if param == "seed":
+    if param in ("seed", "max_output_tokens"):
         try:
             return int(value)
         except ValueError:
             raise SamplingConfigError(f"{var}: {value!r} is not an integer") from None
-    # thinking: the mixed scalar.
-    if value in ("off", "auto"):
-        return value
-    try:
-        return int(value)
-    except ValueError:
-        raise SamplingConfigError(
-            f"{var}: {value!r} is not 'off', 'auto', or an integer budget"
-        ) from None
+    # thinking: left as the raw string for _RawTier's Literal to accept or reject.
+    return value
 
 
 def _apply_env_overrides(tiers_raw: object, env: Mapping[str, str]) -> None:
     """Fold ``STRIDE_SAMPLING_{TIER}_{PARAM}`` overrides into the raw tables.
 
     Only the offered params are overridable; a var naming a reserved or
-    forbidden param raises ("not overridable") — the live-knob surface equals
-    the offered surface, no wider (ticket 03 §3). A set-but-empty override is a
-    deploy mistake and raises rather than being silently ignored. Values land in
-    the raw tier table and are then validated by :class:`_RawTier` exactly like
-    a file value.
+    forbidden param raises — the live-knob surface equals the offered surface,
+    no wider. A set-but-empty override is a deploy mistake and raises rather
+    than being silently ignored.
     """
     if not isinstance(tiers_raw, dict):
         # A malformed / missing ``tiers`` shape: leave it for _RawSampling to
@@ -339,9 +343,9 @@ def load_sampling(
 ) -> SamplingConfig:
     """Load and validate the per-tier sampling config, applying env overrides.
 
-    ``STRIDE_SAMPLING_{TIER}_{PARAM}`` overrides are folded in before validation,
-    so an out-of-range value arriving via the environment fails closed exactly
-    like one in the file. Every failure path raises :class:`SamplingConfigError`.
+    Overrides are folded in before validation, so an out-of-range value arriving
+    via the environment fails closed exactly like one in the file. Every failure
+    path raises :class:`SamplingConfigError`.
     """
     if env is None:
         env = os.environ
@@ -362,21 +366,11 @@ def load_sampling(
     if parsed.version != SUPPORTED_VERSION:
         raise SamplingConfigError(
             f"{path}: unsupported version {parsed.version};"
-            f" expected {SUPPORTED_VERSION} (hard cutover, no v1 shim)"
+            f" expected {SUPPORTED_VERSION} (hard cutover, no shim)"
         )
 
     resolved = {
-        tier: TierSampling(
-            temperature=raw_tier.temperature,
-            top_p=raw_tier.top_p,
-            top_k=raw_tier.top_k,
-            seed=raw_tier.seed,
-            max_output_tokens=raw_tier.max_output_tokens,
-            candidate_count=raw_tier.candidate_count,
-            presence_penalty=raw_tier.presence_penalty,
-            frequency_penalty=raw_tier.frequency_penalty,
-            thinking_budget=resolve_thinking(raw_tier.thinking, tier),
-        )
+        tier: TierSampling(**raw_tier.model_dump())
         for tier, raw_tier in parsed.tiers.items()
     }
     try:
