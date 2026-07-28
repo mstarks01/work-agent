@@ -1,8 +1,8 @@
 """The judge seam: its pinned config, its prompts, and its output handling.
 
-No Vertex call happens here — :class:`VertexJudge` takes its client by
-injection, so the request it builds and the way it treats the response are both
-testable offline.
+No provider call happens here — :class:`PinnedJudge` takes its request function
+by injection, so the request it builds and the way it treats the response are
+both testable offline.
 """
 
 from __future__ import annotations
@@ -21,8 +21,8 @@ from evals.harness.judge import (
     ClaimRuling,
     JudgeConfigError,
     JudgeError,
+    PinnedJudge,
     UnmatchedThreat,
-    VertexJudge,
     adjudication_payload,
     claim_payload,
     load_judge_config,
@@ -30,6 +30,7 @@ from evals.harness.judge import (
 from stride_service.markdown_loader import MarkdownLoader
 from stride_service.model_tiers import validate_model_string
 from stride_service.resilience import load_resilience
+from stride_service.vendors import vendor_for
 from tests.factories import valid_model
 
 EVALS_ROOT = Path(__file__).resolve().parents[1] / "evals"
@@ -43,27 +44,38 @@ PAIR = ClaimPair(
 )
 
 
-class FakeClient:
-    """Records the request and replays a canned response."""
+class FakeCompletion:
+    """Records the request and replays a canned completion response.
 
-    def __init__(self, text: str, model_version: str | None = None) -> None:
-        self.models = self
+    Shaped like litellm's ``ModelResponse``: a ``model`` naming the served build
+    and a ``choices[0].message.content`` carrying the text.
+    """
+
+    def __init__(self, text: str, served: str | None = None) -> None:
         self.text = text
-        self.model_version = model_version
+        self.served = served
         self.calls: list[dict] = []
 
-    def generate_content(self, *, model, contents, config):
-        self.calls.append({"model": model, "contents": contents, "config": config})
-        return type(
-            "Response", (), {"text": self.text, "model_version": self.model_version}
-        )()
+    def __call__(self, **kwargs):
+        self.calls.append(kwargs)
+        message = type("Message", (), {"content": self.text})()
+        choice = type("Choice", (), {"message": message})()
+        return type("Response", (), {"model": self.served, "choices": [choice]})()
 
 
-def judge(text: str) -> VertexJudge:
-    return VertexJudge(
+ENV = {
+    "STRIDE_VERTEX_PROJECT": "p",
+    "STRIDE_VERTEX_LOCATION": "us-central1",
+    "GOOGLE_APPLICATION_CREDENTIALS": "/adc.json",
+}
+
+
+def judge(text: str, served: str | None = None) -> PinnedJudge:
+    return PinnedJudge(
         load_judge_config(),
-        client=FakeClient(text),
+        request=FakeCompletion(text, served),
         prompts=MarkdownLoader(JUDGE_PROMPTS),
+        env=ENV,
     )
 
 
@@ -169,64 +181,85 @@ def test_unusable_judge_output_raises_rather_than_scoring():
         judge('{"match": "yes"}').equivalent(PAIR)
 
 
-def test_request_pins_model_temperature_and_schema():
-    vertex = judge(json.dumps({"match": False, "rationale": "different action"}))
-    vertex.equivalent(PAIR)
-    call = vertex._client.calls[0]
+def test_request_pins_the_route_temperature_and_schema():
+    pinned = judge(json.dumps({"match": False, "rationale": "different action"}))
+    pinned.equivalent(PAIR)
+    call = pinned._request.calls[0]
 
-    assert call["model"] == load_judge_config().model
-    assert call["config"].temperature == 0.0
-    assert issubclass(call["config"].response_schema, BaseModel)
-    # Claims ride as JSON data, never concatenated into the instruction
-    # (OWASP LLM01).
-    assert PAIR.reference_claim in json.loads(call["contents"]).values()
-    assert PAIR.reference_claim not in call["config"].system_instruction
+    config = load_judge_config()
+    # The route carries the vendor prefix, like every other call in the repo.
+    assert call["model"] == vendor_for(config.vendor).route(config.model)
+    assert call["temperature"] == 0.0
+    assert issubclass(call["response_format"], BaseModel)
+
+    # Claims ride as a user message, never concatenated into the system
+    # instruction (OWASP LLM01).
+    system, user = call["messages"]
+    assert system["role"] == "system"
+    assert user["role"] == "user"
+    assert PAIR.reference_claim in json.loads(user["content"]).values()
+    assert PAIR.reference_claim not in system["content"]
 
 
-def test_the_served_model_version_is_recorded():
-    """Ticket 026: the configured string is a request, not an immutable build.
+def test_credentials_come_from_the_vendor_registry_not_ambient_pickup():
+    pinned = judge(json.dumps({"match": True, "rationale": "same"}))
+    pinned.equivalent(PAIR)
+    call = pinned._request.calls[0]
 
-    Gemini 2.5+ stable identifiers resolve to whichever build is current, so
-    what actually answered is the only thing that makes a run's numbers
-    comparable to the next run's.
+    # Vertex implies ADC; an API-key vendor would read its own scoped var.
+    assert call["vertex_project"] == "p"
+    assert "api_key" not in call
+
+
+def test_a_response_with_no_choices_fails_as_an_unusable_ruling():
+    # A refusal or filtered completion must name the judge, not surface as an
+    # IndexError from inside the harness.
+    empty = PinnedJudge(
+        load_judge_config(),
+        request=lambda **_: type("R", (), {"model": None, "choices": []})(),
+        prompts=MarkdownLoader(JUDGE_PROMPTS),
+        env=ENV,
+    )
+    with pytest.raises(JudgeError):
+        empty.equivalent(PAIR)
+
+
+def test_the_served_model_version_is_recorded_vendor_prefixed():
+    """The configured string is a request, not an immutable build.
+
+    Stable identifiers resolve to whichever build is current, so what actually
+    answered is the only thing making one run's numbers comparable to the next.
+    The prefix rides along for the same reason it does on a fingerprint: a bare
+    served id does not say which vendor produced it.
     """
     served = "gemini-2.5-pro-2026-05-01"
-    client = FakeClient(json.dumps({"match": True, "rationale": "same"}), served)
-    judge = VertexJudge(
-        load_judge_config(), client=client, prompts=MarkdownLoader(JUDGE_PROMPTS)
-    )
+    pinned = judge(json.dumps({"match": True, "rationale": "same"}), served)
 
-    assert judge.served_model_versions == ()
-    judge.equivalent(PAIR)
+    assert pinned.served_model_versions == ()
+    pinned.equivalent(PAIR)
 
-    assert judge.served_model_versions == (served,)
+    assert pinned.served_model_versions == (f"vertex_ai/{served}",)
 
 
-def test_default_client_carries_the_resilience_config(monkeypatch):
+def test_the_call_carries_the_resilience_config():
     """Ticket 038: the live judge retries and times out like the graph.
 
-    Without an injected client, the judge builds its own — and a sweep that
-    inherits the SDK's never-retry, no-timeout defaults dies on one 429 after
-    hours of work.
+    A sweep that inherits never-retry, no-timeout defaults dies on one 429 after
+    hours of work. ``attempts`` is a total, so the provider's retry count is one
+    less — the same arithmetic the graph's binding uses.
     """
-    from google import genai
-
-    captured: dict[str, object] = {}
-
-    def fake_client(*, http_options=None):
-        captured["http_options"] = http_options
-        return FakeClient("{}")
-
-    monkeypatch.setattr(genai, "Client", fake_client)
     resilience = load_resilience(
         Path(__file__).resolve().parents[1] / "config" / "resilience.toml", env={}
     )
-    VertexJudge(
+    pinned = PinnedJudge(
         load_judge_config(),
+        request=FakeCompletion(json.dumps({"match": True, "rationale": "same"})),
         prompts=MarkdownLoader(JUDGE_PROMPTS),
         resilience=resilience,
+        env=ENV,
     )
+    pinned.equivalent(PAIR)
+    call = pinned._request.calls[0]
 
-    http_options = captured["http_options"]
-    assert http_options.timeout == resilience.timeout_ms
-    assert http_options.retry_options.attempts == resilience.attempts
+    assert call["num_retries"] == resilience.attempts - 1
+    assert call["timeout"] == resilience.timeout_ms / 1000
