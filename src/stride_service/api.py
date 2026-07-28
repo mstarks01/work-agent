@@ -95,6 +95,32 @@ class JobStatusView(BaseModel):
     error: str | None = None
 
 
+def _withheld_report(request: Request, record: JobRecord) -> JSONResponse | None:
+    """The problem response for a report this deployment must not serve, if any.
+
+    Withholding the report — rather than failing the job — is deliberate (#17
+    decision 3). A ``failed`` job carries no report at all, and the fingerprints
+    that *prove* the drift live in the report, so failing would destroy the very
+    evidence an operator needs. The job stays ``completed`` and the envelope
+    refuses.
+
+    The body names the unblessed nodes and their hashes, never the report's
+    contents: enough for the operator who turned the knob on to act, and nothing
+    that leaks the analysis past a gate that just decided not to serve it.
+    """
+    gate = getattr(request.app.state, "certification", None)
+    result = record.certification
+    if gate is None or result is None or not gate.withholds(result):
+        return None
+    return _problem_response(
+        409,
+        "the report is withheld: its generation identity is not blessed by this"
+        " deployment's manifest",
+        uncertified_nodes=[node.to_json() for node in result.uncertified],
+        unexercised_tiers=list(result.unexercised),
+    )
+
+
 def _problem_response(
     status_code: int,
     detail: str,
@@ -181,6 +207,10 @@ def create_app(
     app.state.runner = (
         runner if runner is not None else default_pipeline_runner()
     )
+    # The gate the report route consults. Read off the runner that owns it, so
+    # the manifest a job was certified against and the one the route enforces
+    # are the same object by construction — never two loads that could disagree.
+    app.state.certification = getattr(app.state.runner, "_certification", None)
     app.state.verifier = verifier if verifier is not None else build_verifier()
 
     @app.exception_handler(StarletteHTTPException)
@@ -271,6 +301,9 @@ def create_app(
         if record.report is None:
             logger.error("completed job %s has no report attached", record.id)
             raise HTTPException(status_code=500, detail="an internal error occurred")
+        withheld = _withheld_report(request, record)
+        if withheld is not None:
+            return withheld
         return JSONResponse(record.report.model_dump(mode="json"))
 
     @app.get("/v1/jobs/{job_id}/events")

@@ -11,7 +11,7 @@ sentence with the commands filled in.
 
 ## Before you start
 
-- **A configured Vertex environment.** The scoring runs call the live models, so
+- **Configured provider credentials.** The scoring runs call the live models, so
   you need Application Default Credentials plus the project/location the client
   reads. See [Configuration](../docs/Configuration.md#vertex-environment). The
   offline steps (`verify_corpus.py`, `pytest`) need none of this.
@@ -96,9 +96,9 @@ without editing the file, use an environment override (see
 what a sweep does:
 
 ```sh
-# Try a warmer temperature on the pro-tier analysts for one run:
-STRIDE_SAMPLING_PRO_TEMPERATURE=0.4 \
-  python -m evals.harness.run run --mode analysis --out warm-pro.json
+# Try a warmer temperature on the strong-tier analysts for one run:
+STRIDE_SAMPLING_STRONG_TEMPERATURE=0.4 \
+  python -m evals.harness.run run --mode analysis --out warm-strong.json
 ```
 
 The canonical sampling experiment is three arms on the same corpus, **judged by
@@ -175,10 +175,10 @@ promote(winner, served_models, tiers.resolve_tier)
 ```
 
 This rewrites `config/sampling.toml` in place (keeping its comments) and records
-the winning fingerprints in `evals/blessed-fingerprints.toml`. Commit both.
+the winning fingerprints in `config/blessed-fingerprints.toml`. Commit both.
 
 > Note: `promote` refuses to pin a parameter the file deliberately leaves unset
-> (like `top_p` or `top_k`). Those are unset because there's no measured value to
+> (like `top_p`). Those are unset because there's no measured value to
 > pin — turning one on is a real decision that belongs in a reviewed edit with a
 > reason, not a silent sweep write.
 

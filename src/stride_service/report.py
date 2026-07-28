@@ -22,7 +22,11 @@ from pydantic import BaseModel, ConfigDict, Field, model_validator
 
 from stride_service.system_model import BoundaryCrossing, SystemModel
 
-SCHEMA_VERSION = "1.0"
+# 1.1 adds NodeRun.requested_model, and redefines NodeRun.model as the *served*
+# build rather than the configured string. Additive for readers that ignore
+# unknown fields; consumers keying on `model` now read what answered rather than
+# what was asked for, which is what every docstring around it already claimed.
+SCHEMA_VERSION = "1.1"
 
 DEFAULT_DISCLAIMER = (
     "AI-generated threat model. Not reviewed by a human security analyst."
@@ -188,17 +192,33 @@ class Threat(DraftThreat):
 class NodeRun(BaseModel):
     """Per-node execution metadata: which model ran, its sampling identity, timing.
 
-    ``sampling_fingerprint`` is the generation-identity hash (ticket 07 /
-    ticket 03 §1): ``sha256(served model, resolved tier sampling)``, recomputable
-    from this node's served ``model`` and the report's top-level per-tier
-    ``sampling`` clear block. A deterministic FunctionNode carries neither a
-    model nor a fingerprint.
+    Two model fields, because they answer different questions and the report
+    **records both rather than computing either** (#7 decision 5):
+
+    * ``model`` is the **served** build, vendor-prefixed —
+      ``vertex_ai/gemini-2.5-pro-002``. What actually answered, read back from
+      the response.
+    * ``requested_model`` is the **configured** route —
+      ``vertex_ai/gemini-2.5-pro``. What the run asked for.
+
+    Their disagreement *is* the drift signal, and it needs no comparison logic
+    here: drift falls out of certification for free, because a moved build
+    yields a fingerprint no manifest blessed. A served-vs-configured comparison
+    would instead need a per-vendor served-id normalization table — a fourth
+    mirrored vendor fact, and one that fails silently.
+
+    ``sampling_fingerprint`` is the generation-identity hash: ``sha256(served
+    route, resolved tier sampling)``, recomputable from this node's ``model``
+    and the report's top-level per-tier ``sampling`` clear block. It is computed
+    per node *execution*, so a build that moves mid-run gives one node two
+    hashes. A deterministic FunctionNode carries none of the three.
     """
 
     model_config = ConfigDict(extra="forbid")
 
     node: str = Field(min_length=1, max_length=100)
-    model: str | None = None  # None for deterministic FunctionNodes
+    model: str | None = None  # served; None for deterministic FunctionNodes
+    requested_model: str | None = None  # configured
     sampling_fingerprint: str | None = Field(default=None, pattern=r"^[0-9a-f]{64}$")
     duration_ms: int = Field(ge=0)
 

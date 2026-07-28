@@ -35,10 +35,16 @@ from google.adk.sessions import BaseSessionService, InMemorySessionService
 from google.genai import types
 
 from stride_service.binding import build_tier_adapters, make_resolve_model
+from stride_service.certification import (
+    CertificationGate,
+    CertifyResult,
+    load_manifest,
+)
 from stride_service.graph import (
     STATE_ANALYSIS,
     STATE_INPUT_TEXT,
     STATE_REJECTION,
+    TIER_NODE_BY_GRAPH_NODE,
     Analysis,
     Pipeline,
     build_pipeline,
@@ -52,10 +58,15 @@ from stride_service.jobs import (
     PipelineRejected,
 )
 from stride_service.markdown_loader import MarkdownLoader
-from stride_service.model_tiers import load_model_tiers
+from stride_service.model_tiers import ModelTierConfig, load_model_tiers
 from stride_service.report import InputRef, Job, NodeRun, StrideReport
 from stride_service.resilience import load_resilience
-from stride_service.sampling import load_sampling, make_resolve_sampling
+from stride_service.sampling import (
+    load_sampling,
+    make_resolve_sampling,
+    sampling_fingerprint,
+)
+from stride_service.vendors import join_served
 
 logger = logging.getLogger(__name__)
 
@@ -73,12 +84,17 @@ DEFAULT_PROMPTS_DIR = _REPO_ROOT / "prompts"
 DEFAULT_MODEL_TIERS_PATH = _REPO_ROOT / "config" / "model_tiers.toml"
 DEFAULT_SAMPLING_PATH = _REPO_ROOT / "config" / "sampling.toml"
 DEFAULT_RESILIENCE_PATH = _REPO_ROOT / "config" / "resilience.toml"
+DEFAULT_BLESSED_FINGERPRINTS_PATH = (
+    _REPO_ROOT / "config" / "blessed-fingerprints.toml"
+)
 
 SKILLS_DIR_VAR = "STRIDE_SKILLS_DIR"
 PROMPTS_DIR_VAR = "STRIDE_PROMPTS_DIR"
 MODEL_TIERS_VAR = "STRIDE_MODEL_TIERS"
 SAMPLING_VAR = "STRIDE_SAMPLING"
 RESILIENCE_VAR = "STRIDE_RESILIENCE"
+BLESSED_FINGERPRINTS_VAR = "STRIDE_BLESSED_FINGERPRINTS"
+REQUIRE_CERTIFIED_VAR = "STRIDE_REQUIRE_CERTIFIED"
 
 
 class PipelineError(RuntimeError):
@@ -87,10 +103,18 @@ class PipelineError(RuntimeError):
 
 @dataclass(frozen=True)
 class _NodeFinish:
-    """When one graph node produced its output."""
+    """When one graph node produced its output, and what build answered it.
+
+    ``served_model`` is the build the provider says actually ran, read off the
+    event rather than assumed from the configured string (#7 decision 2). It is
+    ``None`` when the event carries none — an offline stand-in, or a provider
+    that did not report one — and a node with no served build gets no
+    fingerprint rather than one attesting to a model nobody confirmed.
+    """
 
     node: str
     at: float
+    served_model: str | None
 
 
 class AdkPipelineRunner:
@@ -107,8 +131,10 @@ class AdkPipelineRunner:
         *,
         session_service: BaseSessionService | None = None,
         app_name: str = DEFAULT_APP_NAME,
+        certification: CertificationGate | None = None,
     ) -> None:
         self._pipeline = pipeline
+        self._certification = certification
         self._app_name = app_name
         self._session_service = session_service or InMemorySessionService()
         self._runner = Runner(
@@ -155,7 +181,13 @@ class AdkPipelineRunner:
             ),
         ):
             for node in _finished_nodes(event, self._node_names):
-                finishes.append(_NodeFinish(node=node, at=event.timestamp))
+                finishes.append(
+                    _NodeFinish(
+                        node=node,
+                        at=event.timestamp,
+                        served_model=getattr(event, "model_version", None),
+                    )
+                )
                 await on_node(node)
 
         final = await self._session_service.get_session(
@@ -170,11 +202,38 @@ class AdkPipelineRunner:
             )
 
         analysis = Analysis.from_state(state[STATE_ANALYSIS])
-        return PipelineCompleted(
-            report=self._build_report(
-                job, analysis, self._node_runs(finishes, started_at), source_sha256
-            )
+        report = self._build_report(
+            job, analysis, self._node_runs(finishes, started_at), source_sha256
         )
+        return PipelineCompleted(
+            report=report, certification=self._certify(job, report)
+        )
+
+    def _certify(self, job: JobRecord, report: StrideReport) -> CertifyResult | None:
+        """Certify the finished report against this deployment's manifest.
+
+        Runs **once, after the report is built**: a fingerprint exists only per
+        node execution, and the expectation of what should have run is only
+        complete once every node has, so certifying earlier would certify a
+        partial run.
+
+        Logged for the operator, never surfaced to the client (#17 decision 6,
+        OWASP A09): hashes and node names, never the report's contents. A client
+        learns about certification exactly when its deployment opted into
+        caring.
+        """
+        if self._certification is None:
+            return None
+        result = self._certification.check(report, self._pipeline.node_sampling)
+        if not result.certified or not result.complete:
+            logger.warning(
+                "job %s certification: certified=%s uncertified=%s unexercised=%s",
+                job.id,
+                result.certified,
+                [node.to_json() for node in result.uncertified],
+                list(result.unexercised),
+            )
+        return result
 
     def _node_runs(
         self, finishes: list[_NodeFinish], started_at: float
@@ -191,17 +250,32 @@ class AdkPipelineRunner:
                 ),
                 default=started_at,
             )
+            requested = self._pipeline.node_models.get(finish.node)
+            served = _served_route(requested, finish.served_model)
             runs.append(
                 NodeRun(
                     node=finish.node,
-                    model=self._pipeline.node_models.get(finish.node),
-                    sampling_fingerprint=self._pipeline.node_fingerprints.get(
-                        finish.node
-                    ),
+                    model=served,
+                    requested_model=requested,
+                    sampling_fingerprint=self._fingerprint(finish.node, served),
                     duration_ms=max(round((finish.at - ready_at) * 1000), 0),
                 )
             )
         return runs
+
+    def _fingerprint(self, node: str, served_route: str | None) -> str | None:
+        """This node execution's generation identity, or ``None`` if unknowable.
+
+        Computed per *execution* (#7 decision 2), so 12 cases give one node 12
+        hashes and a build that moves mid-run gives it two — which is the drift
+        signal, not a defect. Without a served build there is nothing honest to
+        hash, so the node carries no fingerprint at all rather than one keyed on
+        what was merely requested.
+        """
+        sampling = self._pipeline.node_sampling.get(node)
+        if served_route is None or sampling is None:
+            return None
+        return sampling_fingerprint(served_route, sampling)
 
     def _build_report(
         self,
@@ -231,6 +305,18 @@ class AdkPipelineRunner:
             rejected_threats=analysis.rejected_threats,
             summary=analysis.summary,
         )
+
+
+def _served_route(requested_route: str | None, served_model: str | None) -> str | None:
+    """The vendor-prefixed build that answered, or ``None`` if either half is missing.
+
+    A deterministic FunctionNode has no requested route; a node whose event
+    carried no ``model_version`` has no served build. Either way there is no
+    served identity to record.
+    """
+    if requested_route is None or served_model is None:
+        return None
+    return join_served(requested_route, served_model)
 
 
 def build_default_pipeline(env: Mapping[str, str] | None = None) -> Pipeline:
@@ -263,9 +349,56 @@ def build_default_pipeline(env: Mapping[str, str] | None = None) -> Pipeline:
     )
 
 
+def build_certification_gate(
+    tiers: ModelTierConfig, env: Mapping[str, str]
+) -> CertificationGate:
+    """Load this deployment's blessed manifest and its gating policy.
+
+    Located by ``STRIDE_BLESSED_FINGERPRINTS``, defaulting to the repo path —
+    the fourth config of the tiers/sampling/resilience kind. A repo default plus
+    an env override is **not** the two-layer overlay #10 rejected: exactly one
+    file is read, and the variable only picks which.
+
+    Unset-means-disabled was rejected outright — an absent environment variable
+    silently switching off a provenance check is precisely the failure mode this
+    exists to prevent — so a missing or malformed manifest raises here, at
+    startup, rather than at the first completed job.
+    """
+    manifest = load_manifest(
+        env.get(BLESSED_FINGERPRINTS_VAR, DEFAULT_BLESSED_FINGERPRINTS_PATH)
+    )
+
+    def tier_of(graph_node: str) -> str:
+        return tiers.resolve_tier(TIER_NODE_BY_GRAPH_NODE[graph_node])
+
+    return CertificationGate(
+        manifest=manifest,
+        tier_of=tier_of,
+        require_certified=_flag(env, REQUIRE_CERTIFIED_VAR),
+    )
+
+
+def _flag(env: Mapping[str, str], var: str) -> bool:
+    """A boolean env flag, on only for an explicit affirmative."""
+    return env.get(var, "").strip().lower() in ("1", "true", "yes", "on")
+
+
 def default_pipeline_runner(env: Mapping[str, str] | None = None) -> AdkPipelineRunner:
-    """The runner the API uses when no other is injected."""
-    return AdkPipelineRunner(build_default_pipeline(env))
+    """The runner the API uses when no other is injected.
+
+    Certification is assembled here rather than in ``build_pipeline``: which
+    manifest a deployment blesses against is a runner concern, and the graph
+    does not certify.
+    """
+    if env is None:
+        env = os.environ
+    tiers = load_model_tiers(
+        env.get(MODEL_TIERS_VAR, DEFAULT_MODEL_TIERS_PATH), env=env
+    )
+    return AdkPipelineRunner(
+        build_default_pipeline(env),
+        certification=build_certification_gate(tiers, env),
+    )
 
 
 def _predecessors_of(pipeline: Pipeline) -> dict[str, set[str]]:
