@@ -1,5 +1,8 @@
-# Live golden-case evals against real Vertex — wayfinder ticket 024,
-# implementing ticket 009 decision 17.
+# Live golden-case evals against real Vertex.
+#
+# Vertex only, because that is what the shipped config/model_tiers.toml selects.
+# A tier pointed at Anthropic or OpenAI would need an API key in a repository
+# secret instead, and none of the federation below would apply to it.
 #
 # `pull_request_target` is PROHIBITED in this repository and this file is where
 # the prohibition bites: combined with a PR-head checkout it would run
@@ -12,10 +15,10 @@
 # credentials. There are no long-lived secrets: the provider path and the
 # service-account address are repository *variables*, because neither is a
 # secret and pretending otherwise hides them from review. Vertex is
-# IAM-authenticated -- API keys are the AI Studio surface and cannot serve
-# ticket 007's pinned regional model strings -- so there is no key-based
-# fallback that keeps Vertex. See .github/WORKLOAD_IDENTITY.md for the
-# one-time setup this workflow assumes.
+# IAM-authenticated -- API keys are the AI Studio surface and cannot serve the
+# pinned regional model strings -- so there is no key-based fallback that keeps
+# Vertex. See .github/WORKLOAD_IDENTITY.md for the one-time setup this workflow
+# assumes.
 name: Evals (live Vertex)
 
 on:
@@ -98,14 +101,14 @@ jobs:
           workload_identity_provider: ${{ vars.GCP_WORKLOAD_IDENTITY_PROVIDER }}
           service_account: ${{ vars.GCP_EVAL_SERVICE_ACCOUNT }}
 
-      # Cases run serially inside the CLI, which is the bounded concurrency
-      # ticket 024 asks for; it also keeps the near/far exemplar delta in one
+      # Cases run one at a time inside the CLI. That is the bounded concurrency
+      # this job needs, and it keeps the near/far exemplar delta in a single
       # artifact, which a per-case matrix would split apart.
       #
-      # Exit status is Tier 1 structural only (ticket 009 decisions 16/19):
-      # must-find recall and every Tier 3 metric are computed, written to the
-      # artifact, and deliberately do not block. A gate that fires before
-      # anyone knows the normal range trains people to bypass it.
+      # Only structural failures set a non-zero exit status: must-find recall
+      # and the other quality metrics are computed and written to the artifact,
+      # but do not block. A gate that fires before anyone knows the normal
+      # range trains people to bypass it.
       - name: Run golden-case evals
         env:
           GOOGLE_CLOUD_PROJECT: ${{ vars.GCP_PROJECT_ID }}
