@@ -8,10 +8,7 @@ payloads as raw JSON where the model would refuse to construct them.
 
 from __future__ import annotations
 
-import pytest
-
 from evals.harness.structural import report_issues, structural_issues
-from stride_service.report import StrideReport
 from tests.factories import sample_report, sample_threat
 
 

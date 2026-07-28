@@ -72,14 +72,17 @@ def test_shipped_judge_config_is_pinned_and_versioned():
 
     assert config.version >= 1
     assert config.temperature == 0.0
-    # Ticket 026's restated rule, shared with the tiers: the stable GA
-    # identifier, never an auto-updating alias or a pre-GA build.
-    validate_model_string(config.model, source="judge.model")
+    # The judge names a (vendor, model) pair like any tier does — it is no
+    # longer Google-only, and the pinned-form rule is the vendor's.
+    validate_model_string(config.model, config.vendor, source="judge.model")
 
 
 def test_alias_judge_model_is_refused(tmp_path):
     path = tmp_path / "judge.toml"
-    path.write_text('version = 1\nmodel = "gemini-2.5-pro-latest"\ntemperature = 0.0\n')
+    path.write_text(
+        'version = 3\nvendor = "vertex"\n'
+        'model = "gemini-2.5-pro-latest"\ntemperature = 0.0\n'
+    )
 
     with pytest.raises(ValueError, match="latest"):
         load_judge_config(path)
@@ -88,7 +91,8 @@ def test_alias_judge_model_is_refused(tmp_path):
 def test_unknown_key_in_judge_config_fails_closed(tmp_path):
     path = tmp_path / "judge.toml"
     path.write_text(
-        'version = 1\nmodel = "gemini-2.5-pro"\ntemperature = 0.0\ntier = "pro"\n'
+        'version = 3\nvendor = "vertex"\nmodel = "gemini-2.5-pro"\n'
+        'temperature = 0.0\ntier = "strong"\n'
     )
 
     with pytest.raises(JudgeConfigError):

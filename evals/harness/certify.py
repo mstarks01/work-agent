@@ -22,14 +22,15 @@ Vertex); everything here is exercised offline against scripted fingerprints.
 
 from __future__ import annotations
 
+import json
 import re
 import tomllib
 from collections.abc import Callable, Mapping
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Annotated, Self
+from typing import Annotated
 
-from pydantic import BaseModel, ConfigDict, Field, ValidationError, model_validator
+from pydantic import BaseModel, ConfigDict, Field, ValidationError
 
 from stride_service.model_tiers import TierName
 from stride_service.report import StrideReport
@@ -41,12 +42,17 @@ DEFAULT_MANIFEST_PATH = EVALS_ROOT / "blessed-fingerprints.toml"
 DEFAULT_SAMPLING_PATH = REPO_ROOT / "config" / "sampling.toml"
 
 # The file keys a sweep may re-pin in place, and how each serializes back to
-# TOML. ``thinking`` is handled apart: it is a mixed scalar in the file, not a
-# raw budget.
+# TOML. ``top_k`` is absent from every set: sampling version 3 removed it from
+# the config surface entirely, because the build-time gate provably cannot cover
+# it, so there is no longer a line for a promotion to re-pin.
 _FLOAT_PARAMS = frozenset(
-    {"temperature", "top_p", "top_k", "presence_penalty", "frequency_penalty"}
+    {"temperature", "top_p", "presence_penalty", "frequency_penalty"}
 )
 _INT_PARAMS = frozenset({"seed", "max_output_tokens", "candidate_count"})
+# ``thinking`` is a low/medium/high enum in version 3, not a resolved integer
+# budget, so it serializes as a quoted string like any other TOML literal —
+# the mixed-scalar reversal the previous schema needed is gone with it.
+_STR_PARAMS = frozenset({"thinking"})
 
 # Hard cutover, like the sampling loader (ticket 02): only this manifest version
 # is accepted, everything else fails closed.
@@ -225,32 +231,21 @@ def _wanted_values(sampling: SamplingConfig) -> dict[tuple[str, str], str]:
     """The ``(tier, file key) -> serialized value`` a promotion means to write."""
     wanted: dict[tuple[str, str], str] = {}
     for tier_name, tier in sampling.tiers.items():
-        params = tier.model_dump()
-        budget = params.pop("thinking_budget")
-        for param, value in params.items():
+        for param, value in tier.model_dump().items():
             if value is not None:
                 wanted[(tier_name, param)] = _file_value(param, value)
-        if budget is not None:
-            wanted[(tier_name, "thinking")] = _thinking_scalar(budget)
     return wanted
 
 
-def _file_value(param: str, value: float | int) -> str:
+def _file_value(param: str, value: float | str) -> str:
     """Serialize one param's value as the TOML literal the file would hold."""
     if param in _FLOAT_PARAMS:
         return repr(float(value))
     if param in _INT_PARAMS:
         return str(int(value))
+    if param in _STR_PARAMS:
+        return json.dumps(str(value))
     raise CertificationError(f"{param} is not a promotable sampling param")
-
-
-def _thinking_scalar(budget: int) -> str:
-    """Reverse a resolved ``thinking_budget`` to the file's mixed scalar."""
-    if budget == -1:
-        return '"auto"'
-    if budget == 0:
-        return '"off"'
-    return str(budget)
 
 
 def _rewrite_sampling_values(text: str, sampling: SamplingConfig) -> str:

@@ -30,11 +30,10 @@ from stride_service.graph import (
     analyst_node_name,
 )
 from stride_service.report import (
-    STRIDE_CATEGORIES,
     CATEGORY_LETTERS,
+    STRIDE_CATEGORIES,
     Mitigation,
     Severity,
-    Threat,
     Verdict,
 )
 from stride_service.sampling import load_sampling
@@ -142,8 +141,8 @@ def test_analysis_mode_output_passes_the_tier_1_gates(case):
 
 
 def test_analysis_mode_scores_against_the_reference_set(case):
-    from tests.eval_factories import ScriptedJudge
     from evals.harness.scorer import score_case
+    from tests.eval_factories import ScriptedJudge
 
     pipeline = build(case, ENTRY_PREPARE, {})
     report = asyncio.run(modes.run_analysis(case, pipeline)).report
