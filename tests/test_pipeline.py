@@ -60,7 +60,13 @@ VERTEX_ENV = {
 
 
 class ScriptedLlm(BaseLlm):
-    """One node's model: replays a fixed emission and records the request."""
+    """One node's model: replays a fixed emission and records the request.
+
+    It reports a ``model_version`` distinct from the configured ``model``, the
+    way a real provider does — the pinned string names a family, the served
+    build names what answered. Keeping them different here is what lets the
+    tests tell "recorded what was asked for" apart from "recorded what ran".
+    """
 
     reply: str
     seen: list[str] = []
@@ -70,15 +76,23 @@ class ScriptedLlm(BaseLlm):
     ) -> AsyncGenerator[LlmResponse, None]:
         self.seen.append(llm_request.config.system_instruction or "")
         yield LlmResponse(
-            content=types.Content(role="model", parts=[types.Part(text=self.reply)])
+            content=types.Content(role="model", parts=[types.Part(text=self.reply)]),
+            model_version=served_build(self.model),
         )
+
+
+def served_build(requested: str) -> str:
+    """The build a scripted model claims answered: the request plus a suffix."""
+    return f"{requested}-served"
 
 
 def draft_json(threat_id: str, category: str) -> str:
     return json.dumps([sample_draft(threat_id, category).model_dump(mode="json")])
 
 
-def build(replies: dict[str, str]) -> tuple[graph.Pipeline, dict[str, ScriptedLlm]]:
+def build(
+    replies: dict[str, str], llm_class: type[ScriptedLlm] = ScriptedLlm
+) -> tuple[graph.Pipeline, dict[str, ScriptedLlm]]:
     """The real graph, with every LLM node bound to its scripted stand-in."""
     models: dict[str, ScriptedLlm] = {}
 
@@ -92,7 +106,7 @@ def build(replies: dict[str, str]) -> tuple[graph.Pipeline, dict[str, ScriptedLl
         # are keyed by graph node name, which is what the tests talk about.
         node = graph_node_of[tier_node]
         model_name = BASE_MODEL if node in (graph.EXTRACT_NODE, graph.REPAIR_NODE) else STRONG_MODEL
-        models[node] = ScriptedLlm(
+        models[node] = llm_class(
             model=model_name, reply=replies.get(node, "[]"), seen=[]
         )
         return models[node]
@@ -166,10 +180,37 @@ def test_report_nodes_record_the_model_each_node_ran_on():
     outcome, _ = run(pipeline, job())
 
     by_node = {run_.node: run_ for run_ in outcome.report.nodes}
-    assert by_node[graph.EXTRACT_NODE].model == BASE_MODEL
-    assert by_node[graph.CRITIC_NODE].model == STRONG_MODEL
+    # `model` is what answered; `requested_model` is what was asked for. The
+    # report records both and compares neither — drift falls out of
+    # certification, not out of a comparison here.
+    assert by_node[graph.EXTRACT_NODE].model == served_build(BASE_MODEL)
+    assert by_node[graph.EXTRACT_NODE].requested_model == BASE_MODEL
+    assert by_node[graph.CRITIC_NODE].model == served_build(STRONG_MODEL)
+    assert by_node[graph.CRITIC_NODE].requested_model == STRONG_MODEL
     assert by_node[graph.ASSEMBLE_NODE].model is None
+    assert by_node[graph.ASSEMBLE_NODE].requested_model is None
     assert all(run_.duration_ms >= 0 for run_ in outcome.report.nodes)
+
+
+def test_a_node_with_no_served_build_carries_no_fingerprint():
+    """Nothing honest to hash: better no identity than one keyed on a guess."""
+
+    class SilentLlm(ScriptedLlm):
+        async def generate_content_async(self, llm_request, stream: bool = False):
+            yield LlmResponse(
+                content=types.Content(
+                    role="model", parts=[types.Part(text=self.reply)]
+                )
+            )
+
+    pipeline, _ = build(happy_replies(), llm_class=SilentLlm)
+    outcome, _ = run(pipeline, job())
+    by_node = {run_.node: run_ for run_ in outcome.report.nodes}
+    extract = by_node[graph.EXTRACT_NODE]
+    assert extract.model is None
+    assert extract.sampling_fingerprint is None
+    # What was asked for is still known, and still recorded.
+    assert extract.requested_model == BASE_MODEL
 
 
 def test_report_stamps_the_per_tier_sampling_clear_block():
@@ -213,7 +254,7 @@ def test_base_and_strong_nodes_get_different_fingerprints():
     # recritic shares the critic's tier and model, so it shares the identity.
     sampling = load_sampling(PROJECT_ROOT / "config" / "sampling.toml", env={})
     assert by_node[graph.CRITIC_NODE].sampling_fingerprint == sampling_fingerprint(
-        STRONG_MODEL, sampling.for_tier("strong")
+        served_build(STRONG_MODEL), sampling.for_tier("strong")
     )
 
 

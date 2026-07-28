@@ -33,6 +33,7 @@ from uuid import uuid4
 
 from pydantic import BaseModel, ConfigDict, Field, model_validator
 
+from stride_service.certification import CertifyResult
 from stride_service.report import (
     InputRef,
     Job,
@@ -117,6 +118,12 @@ class JobRecord(BaseModel):
     validation_issues: list[ValidationIssue] = Field(default_factory=list)
     error: str | None = None
     report: StrideReport | None = None
+    # The certification verdict for this run, or None if the job produced no
+    # report. It lives on the record rather than on the report (#17 decision 2):
+    # every derived report field recomputes *from the report*, and this one
+    # cannot — it depends on a mutable, deployment-local manifest. The report is
+    # portable; the manifest is not. Operator-only: no route exposes it.
+    certification: CertifyResult | None = None
 
     @classmethod
     def create(
@@ -226,9 +233,14 @@ def build_store(env: Mapping[str, str] = os.environ) -> JobStore:
 
 @dataclass(frozen=True)
 class PipelineCompleted:
-    """The pipeline produced a report."""
+    """The pipeline produced a report, and the runner certified it.
+
+    ``certification`` is ``None`` only where no gate was configured — the
+    offline stand-ins, which have no manifest to certify against.
+    """
 
     report: StrideReport
+    certification: CertifyResult | None = None
 
 
 @dataclass(frozen=True)
@@ -325,6 +337,7 @@ async def execute_job(store: JobStore, runner: PipelineRunner, job_id: str) -> N
     if isinstance(outcome, PipelineCompleted):
         record.transition("completed")
         record.report = outcome.report
+        record.certification = outcome.certification
     else:
         record.transition("rejected")
         record.validation_issues = outcome.issues

@@ -244,6 +244,25 @@ VENDORS: dict[VendorName, Vendor] = {
 }
 
 
+def join_served(requested_route: str, served_model: str) -> str:
+    """Re-attach a requested route's vendor prefix to the build that answered.
+
+    Providers return a bare build identifier — ``gemini-2.5-pro-002``, not
+    ``vertex_ai/gemini-2.5-pro-002`` — so the vendor has to come from what was
+    asked for. That join is what keeps a fingerprint honest (#7 decision 3):
+    Vertex-hosted Claude and Anthropic-direct return through an identical
+    transformation, so a served-only hash would let a manifest blessed on one
+    silently certify the other.
+
+    The prefix is the segment before the first ``/``, which is the shape every
+    registry entry's :attr:`Vendor.prefix` takes. A requested route carrying no
+    prefix — an offline stand-in bound to a bare name — yields the served build
+    unchanged rather than inventing a vendor for it.
+    """
+    prefix, separator, _ = requested_route.partition("/")
+    return f"{prefix}{separator}{served_model}" if separator else served_model
+
+
 def vendor_for(name: str) -> Vendor:
     """The registry entry for a vendor name, or raise."""
     if name not in VENDORS:

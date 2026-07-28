@@ -3,11 +3,12 @@
 An agentic **STRIDE threat-modeling engine**: semi-structured text describing a
 system goes in, a structured JSON threat report comes out. The analysis runs as
 a [Google ADK](https://google.github.io/adk-docs/) multi-agent graph over
-per-tier Vertex Gemini models.
+per-tier models from any supported vendor — Vertex, Anthropic or OpenAI, with no
+privileged default.
 
 ```
 description text ──▶ extract ──▶ [ 6 STRIDE analysts in parallel ] ──▶ critic ──▶ StrideReport
-                     (flash)              (pro)                        (pro)        (JSON)
+                     (base)              (strong)                     (strong)      (JSON)
 ```
 
 An extraction pass builds the canonical **System Model** (a DFD); six per-category
@@ -40,9 +41,10 @@ if isinstance(outcome, PipelineCompleted):
     print(report.summary.threat_count)
 ```
 
-Reaching the models needs a configured Vertex environment (ADC + project/location),
-which the repo assumes is already set up. Offline tests and the in-memory stub
-runner need none of it.
+Reaching the models needs credentials for whichever vendor each tier selects —
+ADC plus project/location for Vertex, an API key for Anthropic or OpenAI. Startup
+fails closed if they are missing; see [docs/Configuration.md](docs/Configuration.md).
+Offline tests and the in-memory stub runner need none of it.
 
 ## Repository layout
 
@@ -82,8 +84,8 @@ python evals/verify_corpus.py # mechanical checks over the golden corpus
 ```
 
 Everything under `tests/` and `evals/verify_corpus.py` is credential-free and
-deterministic. The live eval commands (`python -m evals.harness.run ...`) need a
-configured Vertex environment — see [evals/TUNING.md](evals/TUNING.md).
+deterministic. The live eval commands (`python -m evals.harness.run ...`) need
+configured provider credentials — see [evals/TUNING.md](evals/TUNING.md).
 
 ## Status
 
