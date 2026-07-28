@@ -136,11 +136,11 @@ run after step 0 of the setup above:
 1. `gh workflow run "Evals (live Vertex)" -f mode=extraction` — exercises the
    `flash` tier through the `extract` node.
 2. `gh workflow run "Evals (live Vertex)" -f calibrate=true` — exercises the
-   `pro` tier through the judge, and is the first execution of the ≥90%
+   `strong` tier through the judge, and is the first execution of the ≥90%
    judge–human agreement bar ([Eval phase 2](../.wayfinder/tickets/025-eval-phase-2.md)).
-3. Read `models.judge_served` in the run artifact. It is Vertex's own report of
-   which build answered; an empty list means the SDK stopped returning
-   `model_version` and the reproducibility record is silently gone.
+3. Read `models.judge_served` in the run artifact. It is the provider's own
+   report of which build answered; an empty list means it stopped returning a
+   served build and the reproducibility record is silently gone.
 
 A `404 Publisher Model not found` in step 1 or 2 is a config bug, not a CI bug.
 
