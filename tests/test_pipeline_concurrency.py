@@ -30,7 +30,13 @@ from stride_service.model_tiers import load_model_tiers
 from stride_service.pipeline import AdkPipelineRunner
 from stride_service.sampling import load_sampling, make_resolve_sampling
 from tests.factories import sample_threat, valid_model
-from tests.test_pipeline import FLASH, PRO, PROJECT_ROOT, ScriptedLlm, draft_json
+from tests.test_pipeline import (
+    BASE_MODEL,
+    PROJECT_ROOT,
+    STRONG_MODEL,
+    ScriptedLlm,
+    draft_json,
+)
 
 MARKER = re.compile(r"MARK-[0-9a-f]{4}")
 
@@ -78,8 +84,8 @@ def _build_shared_pipeline() -> graph.Pipeline:
     def resolve(tier_node: str) -> BaseLlm:
         node = graph_node_of[tier_node]
         if node == graph.EXTRACT_NODE:
-            return MarkerExtractLlm(model=FLASH)
-        model_name = FLASH if node == graph.REPAIR_NODE else PRO
+            return MarkerExtractLlm(model=BASE_MODEL)
+        model_name = BASE_MODEL if node == graph.REPAIR_NODE else STRONG_MODEL
         return ScriptedLlm(model=model_name, reply=replies.get(node, "[]"), seen=[])
 
     tiers = load_model_tiers(PROJECT_ROOT / "config" / "model_tiers.toml", env={})

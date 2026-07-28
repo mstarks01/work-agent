@@ -1,10 +1,10 @@
 """Per-tier sampling config: the knob eval and production share (decision 15).
 
-These are unit tests of the config layer (ticket 05): loading, per-class
-thinking resolution, the ``STRIDE_SAMPLING_*`` override surface, and the
-``resolve_sampling`` sibling of ``resolve_model``. All fail-closed, mirroring
-``test_model_tiers``. Binding the resolver onto each graph node is ticket 06,
-and its per-node assertions live with that ticket, not here.
+These are unit tests of the config layer: loading, the ``STRIDE_SAMPLING_*``
+override surface, the three-way split of a resolved tier's params at the point
+of use, and the ``resolve_sampling`` sibling of ``resolve_model``. All
+fail-closed, mirroring ``test_model_tiers``. Binding the resolver onto each
+graph node is ticket 06, and its per-node assertions live with that ticket.
 """
 
 from __future__ import annotations
@@ -14,17 +14,16 @@ from pathlib import Path
 
 import pytest
 
-from stride_service.model_tiers import ModelTierConfig
+from stride_service.model_tiers import ModelTierConfig, TierSelection
 from stride_service.sampling import (
-    MODEL_OUTPUT_CEILING,
     OFFERED_PARAMS,
+    SUPPORTED_VERSION,
     SamplingConfig,
     SamplingConfigError,
     TierSampling,
     env_var_for,
     load_sampling,
     make_resolve_sampling,
-    resolve_thinking,
     sampling_fingerprint,
 )
 
@@ -36,11 +35,11 @@ def tier_block(tier, body=""):
     return f"[tiers.{tier}]\ntemperature = 0.0\ncandidate_count = 1\n{body}"
 
 
-def config_toml(version=2, flash_body="", pro_body="", extra=""):
+def config_toml(version=SUPPORTED_VERSION, base_body="", strong_body="", extra=""):
     return (
         f"version = {version}\n\n"
-        f"{tier_block('flash', flash_body)}\n"
-        f"{tier_block('pro', pro_body)}\n"
+        f"{tier_block('base', base_body)}\n"
+        f"{tier_block('strong', strong_body)}\n"
         f"{extra}"
     )
 
@@ -58,24 +57,28 @@ def config_path(tmp_path):
 class TestShippedConfig:
     def test_loads_and_covers_both_tiers(self):
         config = load_sampling(SAMPLING_PATH, env={})
-        assert config.version == 2
-        assert set(config.tiers) == {"flash", "pro"}
+        assert config.version == SUPPORTED_VERSION
+        assert set(config.tiers) == {"base", "strong"}
 
-    def test_defaults_to_greedy_decoding_behaviour_unchanged(self):
+    def test_defaults_to_greedy_decoding(self):
         config = load_sampling(SAMPLING_PATH, env={})
-        for tier in ("flash", "pro"):
+        for tier in ("base", "strong"):
             sampling = config.for_tier(tier)
             assert sampling.temperature == 0.0
             assert sampling.candidate_count == 1
-            # Everything ticket 04 could not verify stays unset, not invented.
+            # Everything with no verified per-tier constant stays unset.
             assert sampling.top_p is None
-            assert sampling.top_k is None
             assert sampling.seed is None
-            assert sampling.max_output_tokens is None
             assert sampling.presence_penalty is None
             assert sampling.frequency_penalty is None
-            # Unset thinking leaves the model's preset budget, not dynamic.
-            assert sampling.thinking_budget is None
+            assert sampling.thinking is None
+
+    def test_max_output_tokens_is_pinned_not_silent(self):
+        # Silence is not neutral: Anthropic derives a 5,120-8,192 cap only when
+        # the caller says nothing, so an unset value means the vendor decides.
+        config = load_sampling(SAMPLING_PATH, env={})
+        for tier in ("base", "strong"):
+            assert config.for_tier(tier).max_output_tokens is not None
 
 
 class TestVersionCutover:
@@ -84,20 +87,27 @@ class TestVersionCutover:
         with pytest.raises(SamplingConfigError):
             load_sampling(path, env={})
 
-    def test_wrong_version_number_rejected(self, config_path):
-        path = config_path(config_toml(version=3))
-        with pytest.raises(SamplingConfigError, match="unsupported version 3"):
+    def test_version_2_file_fails_closed_with_no_shim(self, config_path):
+        path = config_path(config_toml(version=2))
+        with pytest.raises(SamplingConfigError, match="unsupported version 2"):
+            load_sampling(path, env={})
+
+    def test_a_version_2_top_k_line_is_rejected_not_ignored(self, config_path):
+        # top_k left the surface because the build-time gate provably cannot
+        # cover it; a leftover line must fail loudly rather than be dropped.
+        path = config_path(config_toml(base_body="top_k = 40\n"))
+        with pytest.raises(SamplingConfigError):
             load_sampling(path, env={})
 
     def test_missing_version_rejected(self, config_path):
-        text = config_toml().replace("version = 2\n", "")
+        text = config_toml().replace(f"version = {SUPPORTED_VERSION}\n", "")
         with pytest.raises(SamplingConfigError):
             load_sampling(config_path(text), env={})
 
 
 class TestFileValidation:
     def test_unknown_key_in_tier_rejected(self, config_path):
-        path = config_path(config_toml(flash_body="thinking_budget = 1024\n"))
+        path = config_path(config_toml(base_body="thinking_budget = 1024\n"))
         with pytest.raises(SamplingConfigError):
             load_sampling(path, env={})
 
@@ -107,7 +117,7 @@ class TestFileValidation:
             load_sampling(path, env={})
 
     def test_missing_tier_rejected(self, config_path):
-        text = "version = 2\n\n" + tier_block("flash")
+        text = f"version = {SUPPORTED_VERSION}\n\n" + tier_block("base")
         with pytest.raises(SamplingConfigError, match="missing entries"):
             load_sampling(config_path(text), env={})
 
@@ -117,20 +127,26 @@ class TestFileValidation:
             load_sampling(path, env={})
 
     def test_out_of_range_temperature_rejected(self, config_path):
-        path = config_path(config_toml(flash_body="temperature = 7\n"))
+        path = config_path(config_toml(base_body="temperature = 7\n"))
         with pytest.raises(SamplingConfigError):
             load_sampling(path, env={})
 
     def test_out_of_range_top_p_rejected(self, config_path):
-        path = config_path(config_toml(pro_body="top_p = 1.5\n"))
+        path = config_path(config_toml(strong_body="top_p = 1.5\n"))
         with pytest.raises(SamplingConfigError):
             load_sampling(path, env={})
 
-    def test_max_output_tokens_over_ceiling_rejected(self, config_path):
-        over = MODEL_OUTPUT_CEILING + 1
-        path = config_path(config_toml(flash_body=f"max_output_tokens = {over}\n"))
+    def test_zero_max_output_tokens_rejected(self, config_path):
+        path = config_path(config_toml(base_body="max_output_tokens = 0\n"))
         with pytest.raises(SamplingConfigError):
             load_sampling(path, env={})
+
+    def test_no_ceiling_is_mirrored_for_max_output_tokens(self, config_path):
+        # The ceiling is a per-(vendor, model) fact; mirroring one here is the
+        # mistake Vendor.supported was. A large value loads; the provider is
+        # what rejects it.
+        path = config_path(config_toml(base_body="max_output_tokens = 200000\n"))
+        assert load_sampling(path, env={}).for_tier("base").max_output_tokens == 200000
 
     def test_missing_file_rejected(self, tmp_path):
         with pytest.raises(SamplingConfigError, match="cannot be read"):
@@ -143,7 +159,7 @@ class TestFileValidation:
     def test_config_is_frozen(self, config_path):
         config = load_sampling(config_path(config_toml()), env={})
         with pytest.raises(Exception):
-            config.version = 3
+            config.version = 99
 
 
 class TestCandidateCountReserved:
@@ -153,116 +169,123 @@ class TestCandidateCountReserved:
             load_sampling(config_path(text), env={})
 
     def test_candidate_count_not_overridable_by_env(self, config_path):
-        env = {"STRIDE_SAMPLING_FLASH_CANDIDATE_COUNT": "3"}
+        env = {"STRIDE_SAMPLING_BASE_CANDIDATE_COUNT": "3"}
         with pytest.raises(SamplingConfigError, match="not overridable"):
             load_sampling(config_path(config_toml()), env=env)
 
 
-class TestThinkingResolution:
-    def test_unset_is_model_preset(self):
-        assert resolve_thinking(None, "flash") is None
-        assert resolve_thinking(None, "pro") is None
+class TestThinkingEnum:
+    """The uniform reasoning surface, and why its value check lives here."""
 
-    def test_auto_is_dynamic(self):
-        assert resolve_thinking("auto", "flash") == -1
-        assert resolve_thinking("auto", "pro") == -1
+    @pytest.mark.parametrize("effort", ["low", "medium", "high"])
+    def test_the_three_efforts_load(self, config_path, effort):
+        path = config_path(config_toml(base_body=f'thinking = "{effort}"\n'))
+        assert load_sampling(path, env={}).for_tier("base").thinking == effort
 
-    def test_flash_off_disables(self):
-        assert resolve_thinking("off", "flash") == 0
-
-    def test_pro_off_rejected(self):
-        with pytest.raises(SamplingConfigError, match="cannot be 'off'"):
-            resolve_thinking("off", "pro")
-
-    def test_in_range_int_kept(self):
-        assert resolve_thinking(1024, "flash") == 1024
-        assert resolve_thinking(1024, "pro") == 1024
-
-    @pytest.mark.parametrize("tier,budget", [("flash", 24_577), ("pro", 127)])
-    def test_out_of_class_range_rejected(self, tier, budget):
-        with pytest.raises(SamplingConfigError, match="out of range"):
-            resolve_thinking(budget, tier)
-
-    def test_file_thinking_resolves_to_budget(self, config_path):
-        path = config_path(config_toml(flash_body='thinking = "off"\n'))
-        config = load_sampling(path, env={})
-        assert config.for_tier("flash").thinking_budget == 0
-
-    def test_pro_off_in_file_fails_closed(self, config_path):
-        path = config_path(config_toml(pro_body='thinking = "off"\n'))
-        with pytest.raises(SamplingConfigError, match="cannot be 'off'"):
+    @pytest.mark.parametrize("value", ["off", "auto", "none", "banana", "1024"])
+    def test_everything_else_is_rejected_here(self, config_path, value):
+        # The provider gate cannot catch these: reasoning_effort="banana"
+        # PASSES get_optional_params on o3, and gemini + "none" passes as
+        # thinkingBudget: 0 and then 400s at request time. So a pydantic
+        # Literal is the only thing standing between the config and a silent
+        # wrong the fingerprint would attest to.
+        path = config_path(config_toml(base_body=f'thinking = "{value}"\n'))
+        with pytest.raises(SamplingConfigError):
             load_sampling(path, env={})
 
+    def test_there_are_no_per_tier_legal_ranges_left(self, config_path):
+        # Version 2 rejected "off" on pro and allowed it on flash. The enum is
+        # uniform, so both tiers accept exactly the same three values.
+        text = config_toml(base_body='thinking = "high"\n', strong_body='thinking = "high"\n')
+        config = load_sampling(config_path(text), env={})
+        assert config.for_tier("base").thinking == "high"
+        assert config.for_tier("strong").thinking == "high"
 
-class TestGenerateContentConfig:
-    def test_unset_thinking_sends_no_thinking_config(self):
-        config = TierSampling(temperature=0.0)
-        gcc = config.to_generate_content_config()
-        assert gcc.temperature == 0.0
-        assert gcc.candidate_count == 1
-        assert gcc.thinking_config is None
 
-    def test_set_budget_sends_thinking_config(self):
-        gcc = TierSampling(thinking_budget=1024).to_generate_content_config()
-        assert gcc.thinking_config is not None
-        assert gcc.thinking_config.thinking_budget == 1024
+class TestParamSplit:
+    """A resolved tier is split three ways, because ADK carries only some of it."""
 
-    def test_all_offered_params_map_through(self):
+    def test_seed_and_reasoning_ride_the_constructor(self):
+        sampling = TierSampling(temperature=0.0, seed=7, thinking="low")
+        assert sampling.constructor_kwargs() == {"seed": 7, "reasoning_effort": "low"}
+
+    def test_unset_constructor_params_are_omitted_entirely(self):
+        assert TierSampling(temperature=0.0).constructor_kwargs() == {}
+
+    def test_the_generate_content_config_carries_neither(self):
+        # Put on the config instead, they would vanish silently while the
+        # fingerprint went on attesting to a seed the request never carried.
         gcc = TierSampling(
-            temperature=0.3, top_p=0.9, seed=7, thinking_budget=-1
+            temperature=0.3, top_p=0.9, seed=7, thinking="high"
         ).to_generate_content_config()
         assert gcc.temperature == 0.3
         assert gcc.top_p == 0.9
-        assert gcc.seed == 7
-        assert gcc.thinking_config.thinking_budget == -1
+        assert gcc.seed is None
+        assert gcc.thinking_config is None
+
+    def test_gate_params_name_things_as_litellm_names_them(self):
+        params = TierSampling(
+            temperature=0.0, max_output_tokens=8192, thinking="low"
+        ).gate_params()
+        assert params == {
+            "temperature": 0.0,
+            "max_tokens": 8192,
+            "n": 1,
+            "reasoning_effort": "low",
+        }
+
+    def test_gate_params_omit_unset_rather_than_sending_none(self):
+        # The gate asks whether a request would be accepted; a param the
+        # request will not carry is not part of it.
+        assert "seed" not in TierSampling(temperature=0.0).gate_params()
 
 
 class TestEnvOverrides:
     def test_offered_params_apply_per_tier(self, config_path):
         env = {
-            env_var_for("pro", "temperature"): "0.7",
-            env_var_for("flash", "top_p"): "0.8",
-            env_var_for("pro", "seed"): "42",
-            env_var_for("flash", "thinking"): "off",
+            env_var_for("strong", "temperature"): "0.7",
+            env_var_for("base", "top_p"): "0.8",
+            env_var_for("strong", "seed"): "42",
+            env_var_for("base", "thinking"): "medium",
+            env_var_for("strong", "max_output_tokens"): "4096",
         }
         config = load_sampling(config_path(config_toml()), env=env)
-        assert config.for_tier("pro").temperature == 0.7
-        assert config.for_tier("flash").top_p == 0.8
-        assert config.for_tier("pro").seed == 42
-        assert config.for_tier("flash").thinking_budget == 0
+        assert config.for_tier("strong").temperature == 0.7
+        assert config.for_tier("base").top_p == 0.8
+        assert config.for_tier("strong").seed == 42
+        assert config.for_tier("base").thinking == "medium"
+        assert config.for_tier("strong").max_output_tokens == 4096
         # An untouched tier keeps its file value.
-        assert config.for_tier("flash").temperature == 0.0
+        assert config.for_tier("base").temperature == 0.0
 
     def test_override_validated_like_file_value(self, config_path):
-        env = {env_var_for("flash", "temperature"): "7"}
+        env = {env_var_for("base", "temperature"): "7"}
         with pytest.raises(SamplingConfigError):
             load_sampling(config_path(config_toml()), env=env)
 
-    def test_override_thinking_class_checked(self, config_path):
-        env = {env_var_for("pro", "thinking"): "off"}
-        with pytest.raises(SamplingConfigError, match="cannot be 'off'"):
+    def test_override_thinking_enum_checked(self, config_path):
+        env = {env_var_for("strong", "thinking"): "off"}
+        with pytest.raises(SamplingConfigError):
             load_sampling(config_path(config_toml()), env=env)
 
     def test_non_numeric_override_rejected(self, config_path):
-        env = {env_var_for("flash", "temperature"): "hot"}
+        env = {env_var_for("base", "temperature"): "hot"}
         with pytest.raises(SamplingConfigError, match="not a number"):
             load_sampling(config_path(config_toml()), env=env)
 
     def test_set_but_empty_rejected(self, config_path):
-        env = {env_var_for("flash", "temperature"): "  "}
+        env = {env_var_for("base", "temperature"): "  "}
         with pytest.raises(SamplingConfigError, match="set but empty"):
             load_sampling(config_path(config_toml()), env=env)
 
-    @pytest.mark.parametrize(
-        "param", ["top_k", "max_output_tokens", "presence_penalty"]
-    )
-    def test_reserved_param_not_overridable(self, config_path, param):
-        env = {env_var_for("flash", param): "1"}
+    @pytest.mark.parametrize("param", ["top_k", "presence_penalty", "candidate_count"])
+    def test_reserved_and_removed_params_not_overridable(self, config_path, param):
+        env = {env_var_for("base", param): "1"}
         with pytest.raises(SamplingConfigError, match="not overridable"):
             load_sampling(config_path(config_toml()), env=env)
 
     def test_forbidden_param_not_overridable(self, config_path):
-        env = {"STRIDE_SAMPLING_PRO_RESPONSE_SCHEMA": "{}"}
+        env = {"STRIDE_SAMPLING_STRONG_RESPONSE_SCHEMA": "{}"}
         with pytest.raises(SamplingConfigError, match="not overridable"):
             load_sampling(config_path(config_toml()), env=env)
 
@@ -272,35 +295,48 @@ class TestEnvOverrides:
             load_sampling(config_path(config_toml()), env=env)
 
     def test_unrelated_env_vars_ignored(self, config_path):
-        env = {"PATH": "/usr/bin", "STRIDE_MODEL_PRO": "gemini-2.5-pro"}
+        env = {"PATH": "/usr/bin", "STRIDE_MODEL_STRONG_MODEL": "gemini-2.5-pro"}
         config = load_sampling(config_path(config_toml()), env=env)
-        assert config.for_tier("pro").temperature == 0.0
+        assert config.for_tier("strong").temperature == 0.0
 
     def test_env_var_naming(self):
-        assert env_var_for("flash", "top_p") == "STRIDE_SAMPLING_FLASH_TOP_P"
-        assert env_var_for("pro", "temperature") == "STRIDE_SAMPLING_PRO_TEMPERATURE"
+        assert env_var_for("base", "top_p") == "STRIDE_SAMPLING_BASE_TOP_P"
+        assert (
+            env_var_for("strong", "temperature") == "STRIDE_SAMPLING_STRONG_TEMPERATURE"
+        )
 
     def test_os_environ_is_default_env(self, config_path, monkeypatch):
-        monkeypatch.setenv(env_var_for("pro", "temperature"), "0.9")
+        monkeypatch.setenv(env_var_for("strong", "temperature"), "0.9")
         config = load_sampling(config_path(config_toml()))
-        assert config.for_tier("pro").temperature == 0.9
+        assert config.for_tier("strong").temperature == 0.9
 
     def test_offered_surface_is_exactly_the_offered_params(self):
-        assert OFFERED_PARAMS == ("temperature", "top_p", "seed", "thinking")
+        assert OFFERED_PARAMS == (
+            "temperature",
+            "top_p",
+            "seed",
+            "thinking",
+            "max_output_tokens",
+        )
 
 
 class TestResolveSampling:
     def test_resolves_via_tier_map(self):
         config = load_sampling(SAMPLING_PATH, env={})
         tiers = ModelTierConfig(
-            version=2,
-            tiers={"flash": "gemini-2.5-flash", "pro": "gemini-2.5-pro"},
-            nodes={node: "flash" if node in ("extract", "repair") else "pro"
-                   for node in _all_llm_nodes()},
+            version=3,
+            tiers={
+                "base": TierSelection(vendor="vertex", model="gemini-2.5-flash"),
+                "strong": TierSelection(vendor="vertex", model="gemini-2.5-pro"),
+            },
+            nodes={
+                node: "base" if node in ("extract", "repair") else "strong"
+                for node in _all_llm_nodes()
+            },
         )
         resolve = make_resolve_sampling(config, tiers.resolve_tier)
-        assert resolve("extract") is config.for_tier("flash")
-        assert resolve("critic") is config.for_tier("pro")
+        assert resolve("extract") is config.for_tier("base")
+        assert resolve("critic") is config.for_tier("strong")
 
     def test_unknown_node_propagates(self):
         config = load_sampling(SAMPLING_PATH, env={})
@@ -321,14 +357,16 @@ def _all_llm_nodes():
 
 def test_direct_construction_requires_both_tiers():
     with pytest.raises(ValueError, match="missing entries"):
-        SamplingConfig(version=2, tiers={"flash": TierSampling()})
+        SamplingConfig(version=SUPPORTED_VERSION, tiers={"base": TierSampling()})
 
 
 class TestSamplingFingerprint:
     """The generation-identity hash (ticket 07 / ticket 03 §1)."""
 
     def test_is_a_sha256_hex_digest(self):
-        fp = sampling_fingerprint("gemini-2.5-pro", TierSampling(temperature=0.0))
+        fp = sampling_fingerprint(
+            "vertex_ai/gemini-2.5-pro", TierSampling(temperature=0.0)
+        )
         assert re.fullmatch(r"[0-9a-f]{64}", fp)
 
     def test_is_deterministic(self):
@@ -336,13 +374,22 @@ class TestSamplingFingerprint:
         first = sampling_fingerprint("m", sampling)
         assert first == sampling_fingerprint("m", sampling)
 
-    def test_same_sampling_different_served_model_diverges(self):
+    def test_same_sampling_different_served_build_diverges(self):
         # Two nodes on one tier served different builds must differ — the drift
-        # the gate exists to catch (ticket 026 keys on the served model).
+        # the gate exists to catch.
         sampling = TierSampling(temperature=0.0)
-        assert sampling_fingerprint("gemini-2.5-pro", sampling) != sampling_fingerprint(
-            "gemini-2.5-pro-002", sampling
-        )
+        assert sampling_fingerprint(
+            "vertex_ai/gemini-2.5-pro", sampling
+        ) != sampling_fingerprint("vertex_ai/gemini-2.5-pro-002", sampling)
+
+    def test_the_same_served_build_under_two_vendors_diverges(self):
+        # The served identifier carries no vendor, and Vertex-hosted Claude and
+        # Anthropic-direct return through an identical transformation — so
+        # without the prefix a manifest blessed on one would certify the other.
+        sampling = TierSampling(temperature=0.0)
+        assert sampling_fingerprint(
+            "vertex_ai/claude-sonnet-4-5", sampling
+        ) != sampling_fingerprint("anthropic/claude-sonnet-4-5", sampling)
 
     def test_same_model_different_sampling_diverges(self):
         assert sampling_fingerprint(
@@ -352,6 +399,6 @@ class TestSamplingFingerprint:
     def test_recomputable_from_the_recorded_clear_values(self):
         # The report stores TierSampling.model_dump(); reconstructing from that
         # dict must reproduce the very hash stamped on the NodeRun.
-        sampling = TierSampling(temperature=0.0, seed=3, thinking_budget=-1)
+        sampling = TierSampling(temperature=0.0, seed=3, thinking="low")
         recomputed = sampling_fingerprint("m", TierSampling(**sampling.model_dump()))
         assert recomputed == sampling_fingerprint("m", sampling)
