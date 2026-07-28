@@ -31,17 +31,15 @@ from pathlib import Path
 
 from google.adk import Runner
 from google.adk.apps import App
-from google.adk.models.base_llm import BaseLlm
-from google.adk.models.google_llm import Gemini
 from google.adk.sessions import BaseSessionService, InMemorySessionService
 from google.genai import types
 
+from stride_service.binding import build_tier_adapters, make_resolve_model
 from stride_service.graph import (
     STATE_ANALYSIS,
     STATE_INPUT_TEXT,
     STATE_REJECTION,
     Analysis,
-    ModelResolver,
     Pipeline,
     build_pipeline,
     rejection_issues,
@@ -54,9 +52,9 @@ from stride_service.jobs import (
     PipelineRejected,
 )
 from stride_service.markdown_loader import MarkdownLoader
-from stride_service.model_tiers import ModelTierConfig, load_model_tiers
+from stride_service.model_tiers import load_model_tiers
 from stride_service.report import InputRef, Job, NodeRun, StrideReport
-from stride_service.resilience import ResilienceConfig, load_resilience
+from stride_service.resilience import load_resilience
 from stride_service.sampling import load_sampling, make_resolve_sampling
 
 logger = logging.getLogger(__name__)
@@ -235,31 +233,15 @@ class AdkPipelineRunner:
         )
 
 
-def resilient_resolver(
-    tiers: ModelTierConfig, resilience: ResilienceConfig
-) -> ModelResolver:
-    """A resolver that binds each node's pinned model with its retry policy.
-
-    ``ModelTierConfig.resolve_model`` returns the pinned *string*; production
-    wraps it in a :class:`Gemini` carrying the client-level retry (ticket 038
-    decision 2) so a single 429 no longer kills a paid-for job. ``build_pipeline``
-    accepts a ``BaseLlm`` here, and ``_model_name`` unwraps it back to the
-    pinned string, so the report's ``nodes`` array is unchanged.
-    """
-    retry_options = resilience.to_retry_options()
-
-    def resolve(node: str) -> BaseLlm:
-        return Gemini(model=tiers.resolve_model(node), retry_options=retry_options)
-
-    return resolve
-
-
 def build_default_pipeline(env: Mapping[str, str] | None = None) -> Pipeline:
     """The production graph: repo Markdown, repo config, pinned models.
 
     Fails closed on a missing or invalid tier, sampling, or resilience config
     rather than starting a service whose nodes would run on whatever model,
     decoding parameters, or retry/timeout behaviour happened to be default.
+    Building the tier adapters adds two more build-time gates — the supported-
+    param check and the credential check — so an unusable provider selection is
+    caught here rather than on node one of a paid-for job.
     """
     if env is None:
         env = os.environ
@@ -270,10 +252,11 @@ def build_default_pipeline(env: Mapping[str, str] | None = None) -> Pipeline:
         env.get(RESILIENCE_VAR, DEFAULT_RESILIENCE_PATH), env=env
     )
     sampling = load_sampling(env.get(SAMPLING_VAR, DEFAULT_SAMPLING_PATH), env=env)
+    adapters = build_tier_adapters(tiers, sampling, resilience, env=env)
     return build_pipeline(
         skill_loader=MarkdownLoader(env.get(SKILLS_DIR_VAR, DEFAULT_SKILLS_DIR)),
         prompt_loader=MarkdownLoader(env.get(PROMPTS_DIR_VAR, DEFAULT_PROMPTS_DIR)),
-        resolve_model=resilient_resolver(tiers, resilience),
+        resolve_model=make_resolve_model(adapters, tiers),
         resolve_sampling=make_resolve_sampling(sampling, tiers.resolve_tier),
         tier_sampling=sampling.tiers,
         resilience=resilience,
