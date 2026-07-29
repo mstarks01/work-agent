@@ -56,14 +56,16 @@ gh api --method POST repos/mstarks01/work-agent/issues/<child>/dependencies/bloc
 ### The live map
 
 - [#24 — Map: answer "how do I use this?" — a first-run path for the integrator](https://github.com/mstarks01/work-agent/issues/24)
-  — charted 2026-07-29, 8 tickets (3 resolved, 2 out of scope). A **planning** map: it
+  — charted 2026-07-29, 8 tickets (4 resolved, 2 out of scope). A **planning** map: it
   decides the first-run path for an integrator embedding `StrideEngine` (docs plus two
   utilities — an unbloated in-process web app and a runnable `examples/`) and stops at the
   spec. The route is settled: `uv sync` → model auth → lite web app → **Load example** →
   Analyze → embed in process, starting from a new `docs/First-Run.md`. `examples/` is
-  settled too, and is now the single source of truth for every code block in the prose. A
-  credential-free fixture runner and a stdin→stdout CLI were both charted in and later
-  ruled out of scope.
+  settled too, and is now the single source of truth for every code block in the prose. The
+  web app is settled as two pages — a form page streaming `on_node` progress, then
+  `docs/example-report.html` unedited with the report JSON injected. A credential-free
+  fixture runner and a stdin→stdout CLI were both charted in and later ruled out of scope.
+  Only the docs information architecture and packaging remain open.
   `/wayfinder` invoked with a map should resume this one.
 
 ### Completed efforts
