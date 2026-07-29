@@ -35,74 +35,84 @@ prohibited here (see the header of `evals-live.yml` for why).
 
 ## 1. Substitutions
 
-| Placeholder | Meaning |
-|---|---|
-| `<PROJECT_ID>` | the GCP project billing the evals |
-| `<PROJECT_NUMBER>` | numeric id of that project |
-| `<OWNER>/<REPO>` | the GitHub repository full name, e.g. `mstarks01/work-agent` |
-| `<LOCATION>` | Vertex region, e.g. `us-central1` |
+| Placeholder | Meaning | Supplied as |
+|---|---|---|
+| `<PROJECT_ID>` | the GCP project billing the evals | `--project-id` |
+| `<LOCATION>` | Vertex region, e.g. `us-central1` | `--location` |
+| `<OWNER>/<REPO>` | the GitHub repository full name, e.g. `mstarks01/work-agent` | `--repo`, else `origin` |
+| `<PROJECT_NUMBER>` | numeric id of that project | derived from `<PROJECT_ID>` |
 
-## 2. Pool and provider, pinned to this repository
-
-```sh
-gcloud iam workload-identity-pools create github \
-  --project=<PROJECT_ID> --location=global \
-  --display-name="GitHub Actions"
-
-gcloud iam workload-identity-pools providers create-oidc github-actions \
-  --project=<PROJECT_ID> --location=global --workload-identity-pool=github \
-  --display-name="GitHub Actions OIDC" \
-  --issuer-uri="https://token.actions.githubusercontent.com" \
-  --attribute-mapping="google.subject=assertion.sub,attribute.repository=assertion.repository,attribute.repository_owner=assertion.repository_owner" \
-  --attribute-condition="assertion.repository == '<OWNER>/<REPO>'"
-```
-
-The `--attribute-condition` is **load-bearing and not optional**. Without it the
-provider trusts every OIDC token GitHub issues to anyone — any repository on
-github.com could then exchange its token for these credentials. The condition
-must name the repository, not just the owner: `repository_owner` alone still
-admits every repo under the account, including one an attacker gets a workflow
-merged into.
-
-## 3. A separate eval service account
+## 2. Run the setup
 
 ```sh
-gcloud iam service-accounts create stride-evals \
-  --project=<PROJECT_ID> --display-name="STRIDE golden-case evals"
-
-# The only role it gets. Not editor, not owner, not the deploy identity.
-gcloud projects add-iam-policy-binding <PROJECT_ID> \
-  --member="serviceAccount:stride-evals@<PROJECT_ID>.iam.gserviceaccount.com" \
-  --role="roles/aiplatform.user"
-
-# Let only this repository's federated principals impersonate it.
-gcloud iam service-accounts add-iam-policy-binding \
-  stride-evals@<PROJECT_ID>.iam.gserviceaccount.com \
-  --project=<PROJECT_ID> \
-  --role="roles/iam.workloadIdentityUser" \
-  --member="principalSet://iam.googleapis.com/projects/<PROJECT_NUMBER>/locations/global/workloadIdentityPools/github/attribute.repository/<OWNER>/<REPO>"
+.github/scripts/setup-workload-identity.sh \
+  --project-id <PROJECT_ID> --location <LOCATION>
 ```
 
-Separate from whatever identity deploys to Cloud Run, and holding
-`roles/aiplatform.user` and nothing else. CI runs model inference; it has no
-business deploying, reading buckets, or minting tokens. If a future job needs
-another permission, add another service account rather than widening this one.
+`--repo` defaults to whatever `origin` resolves to, and `<PROJECT_NUMBER>` is
+read from the project rather than typed — it is the field most often
+transcribed wrong, and getting it wrong yields a provider that authenticates
+nothing with no obvious cause. Pass `--dry-run` to print the exact commands
+without executing them.
 
-## 4. Repository variables
+The script is idempotent: it describes each resource before creating it, so
+re-running converges rather than erroring. Sections 3–5 below explain what it
+does and why; the commands themselves live only in the script, so that what is
+documented and what is run cannot drift apart.
+
+## 3. What it creates: pool and provider, pinned to this repository
+
+A workload identity pool `github` and an OIDC provider `github-actions`,
+issuer `https://token.actions.githubusercontent.com`, carrying this attribute
+condition:
+
+```
+assertion.repository == '<OWNER>/<REPO>'
+```
+
+That condition is **load-bearing and not optional**. Without it the provider
+trusts every OIDC token GitHub issues to anyone — any repository on github.com
+could then exchange its token for these credentials. The condition must name
+the repository, not just the owner: `repository_owner` alone still admits every
+repo under the account, including one an attacker gets a workflow merged into.
+
+Re-running with a different `--repo` updates the condition rather than leaving
+the old repository trusted.
+
+## 4. What it creates: a separate eval service account
+
+`stride-evals@<PROJECT_ID>.iam.gserviceaccount.com`, holding
+`roles/aiplatform.user` and nothing else, impersonable only by this
+repository's federated principals via `roles/iam.workloadIdentityUser`.
+
+Separate from whatever identity deploys to Cloud Run. CI runs model inference;
+it has no business deploying, reading buckets, or minting tokens. If a future
+job needs another permission, add another service account rather than widening
+this one.
+
+It also enables `iamcredentials`, `sts`, and `aiplatform` on the project.
+
+## 5. What it sets: repository variables
 
 Set as **variables**, not secrets — none of these is confidential, and storing
 a non-secret as a secret only removes it from log output where it would have
 been useful.
 
-```sh
-gh variable set GCP_WORKLOAD_IDENTITY_PROVIDER \
-  --body "projects/<PROJECT_NUMBER>/locations/global/workloadIdentityPools/github/providers/github-actions"
-gh variable set GCP_EVAL_SERVICE_ACCOUNT --body "stride-evals@<PROJECT_ID>.iam.gserviceaccount.com"
-gh variable set GCP_PROJECT_ID --body "<PROJECT_ID>"
-gh variable set GCP_LOCATION --body "<LOCATION>"
-```
+| Variable | Value |
+|---|---|
+| `GCP_WORKLOAD_IDENTITY_PROVIDER` | `projects/<PROJECT_NUMBER>/locations/global/workloadIdentityPools/github/providers/github-actions` |
+| `GCP_EVAL_SERVICE_ACCOUNT` | `stride-evals@<PROJECT_ID>.iam.gserviceaccount.com` |
+| `GCP_PROJECT_ID` | `<PROJECT_ID>` |
+| `GCP_LOCATION` | `<LOCATION>` |
 
-## 5. Verify
+Until all four are set, `evals-live.yml` does not attempt to authenticate. Its
+preflight step skips the job on `pull_request` with a warning naming the unset
+variables, and fails it on `schedule` and `workflow_dispatch` — those asked for
+a live run, and a sweep that silently runs nothing is worse than one that
+stops. A skipped PR run is therefore the expected state before this setup, not
+a symptom of it going wrong.
+
+## 6. Verify
 
 ```sh
 gh workflow run "Evals (live Vertex)" -f mode=extraction
