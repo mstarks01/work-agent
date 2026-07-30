@@ -24,11 +24,12 @@ from google.adk.models.llm_response import LlmResponse
 from google.genai import types
 
 from stride_service import graph
+from stride_service.binding import NodeBinding
 from stride_service.jobs import JobRecord, PipelineCompleted
 from stride_service.markdown_loader import MarkdownLoader
 from stride_service.model_tiers import load_model_tiers
 from stride_service.pipeline import AdkPipelineRunner
-from stride_service.sampling import load_sampling, make_resolve_sampling
+from stride_service.sampling import load_sampling
 from tests.factories import (
     BASE_MODEL,
     PROJECT_ROOT,
@@ -96,9 +97,7 @@ def _build_shared_pipeline() -> graph.Pipeline:
     return graph.build_pipeline(
         skill_loader=MarkdownLoader(PROJECT_ROOT / "skills"),
         prompt_loader=MarkdownLoader(PROJECT_ROOT / "prompts"),
-        resolve_model=resolve,
-        resolve_sampling=make_resolve_sampling(sampling, tiers.resolve_tier),
-        tier_sampling=sampling.tiers,
+        binding=NodeBinding.from_configs(tiers, sampling, resolve),
     )
 
 
