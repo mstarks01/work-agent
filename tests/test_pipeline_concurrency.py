@@ -29,15 +29,16 @@ from stride_service.markdown_loader import MarkdownLoader
 from stride_service.model_tiers import load_model_tiers
 from stride_service.pipeline import AdkPipelineRunner
 from stride_service.sampling import load_sampling, make_resolve_sampling
-from tests.factories import sample_threat, valid_model
-from tests.test_pipeline import (
+from tests.factories import (
     BASE_MODEL,
     PROJECT_ROOT,
     STRONG_MODEL,
     ScriptedLlm,
-    draft_json,
+    sample_threat,
     served_build,
+    valid_model,
 )
+from tests.test_pipeline import draft_json
 
 MARKER = re.compile(r"MARK-[0-9a-f]{4}")
 

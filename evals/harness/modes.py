@@ -33,13 +33,9 @@ from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any
 
-from google.adk import Runner
-from google.adk.apps import App
-from google.adk.sessions import InMemorySessionService
-from google.genai import types
-
 from evals.harness.reference import GoldenCase
 from stride_service.binding import build_tier_adapters, make_resolve_model
+from stride_service.execution import GraphExecutor, GraphRun
 from stride_service.graph import (
     ENTRY_EXTRACT,
     ENTRY_EXTRACT_ONLY,
@@ -86,11 +82,18 @@ class EvalRunError(RuntimeError):
 
 @dataclass(frozen=True)
 class ExtractionResult:
-    """One extraction run: what came out, and whether it was even valid."""
+    """One extraction run: what came out, whether it was valid, and what ran.
+
+    ``node_runs`` is carried even though this mode produces no report: the
+    ``extract`` execution presented a generation identity like any other, and
+    sourcing observations from the report would make exactly the tier this mode
+    exercises the one tier it could never certify.
+    """
 
     case_id: str
     extracted: SystemModel | None
     issues: tuple[ValidationIssue, ...]
+    node_runs: tuple[NodeRun, ...] = ()
 
 
 @dataclass(frozen=True)
@@ -183,35 +186,26 @@ def build_eval_pipeline(
     )
 
 
-async def run_graph(
-    pipeline: Pipeline, state: Mapping[str, Any], message: str
-) -> dict[str, Any]:
-    """Drive one graph to completion and hand back its final session state."""
-    session_service = InMemorySessionService()
-    runner = Runner(
-        app=App(name=EVAL_APP_NAME, root_agent=pipeline.workflow),
-        session_service=session_service,
-    )
-    session = await session_service.create_session(
-        app_name=EVAL_APP_NAME, user_id=EVAL_USER, state=dict(state)
-    )
-    async for _event in runner.run_async(
-        user_id=EVAL_USER,
-        session_id=session.id,
-        new_message=types.Content(role="user", parts=[types.Part(text=message)]),
-    ):
-        pass
-    final = await session_service.get_session(
-        app_name=EVAL_APP_NAME, user_id=EVAL_USER, session_id=session.id
-    )
-    return dict(final.state) if final else {}
+async def run_graph(pipeline: Pipeline, state: Mapping[str, Any], message: str) -> GraphRun:
+    """Drive one graph to completion and hand back the Graph Run.
+
+    The shipped :class:`~stride_service.execution.GraphExecutor` drives it, so
+    a sweep stamps each node execution exactly as the service does — the served
+    build it presented and the generation-identity fingerprint that implies.
+    Stamping this here rather than in the harness is what makes the eval CLI a
+    real second caller of :func:`~stride_service.certification.certify` rather
+    than one certifying an empty observation set.
+    """
+    executor = GraphExecutor(pipeline, app_name=EVAL_APP_NAME)
+    return await executor.run(state, message, user_id=EVAL_USER)
 
 
 async def run_extraction(case: GoldenCase, pipeline: Pipeline) -> ExtractionResult:
     """Mode 1: the source text through ``extract``, and nothing else."""
-    state = await run_graph(
+    graph_run = await run_graph(
         pipeline, {STATE_INPUT_TEXT: case.source_text}, case.source_text
     )
+    state = graph_run.final_state
     if STATE_EXTRACTED_MODEL not in state:
         raise EvalRunError(f"{case.id}: extract produced no model")
     # normalize_ids mirrors the ``validate`` node (ticket 037): blessed models
@@ -219,7 +213,12 @@ async def run_extraction(case: GoldenCase, pipeline: Pipeline) -> ExtractionResu
     # membership would count an abbreviated slug as one missing element and one
     # extra, on a reading of the source that was correct.
     model, issues = parse_and_validate(state[STATE_EXTRACTED_MODEL], normalize_ids=True)
-    return ExtractionResult(case_id=case.id, extracted=model, issues=tuple(issues))
+    return ExtractionResult(
+        case_id=case.id,
+        extracted=model,
+        issues=tuple(issues),
+        node_runs=tuple(graph_run.node_runs),
+    )
 
 
 def score_extraction(case: GoldenCase, result: ExtractionResult) -> ExtractionScore:
@@ -262,23 +261,25 @@ async def run_analysis(case: GoldenCase, pipeline: Pipeline) -> AnalysisRun:
     The seeded ``valid_model`` is the blessed one, so the analysts see exactly
     what the SME blessed and nothing depends on that run's extraction.
     """
-    state = await run_graph(
+    graph_run = await run_graph(
         pipeline,
         {STATE_VALID_MODEL: case.model.model_dump(mode="json")},
         case.source_text,
     )
-    return _run_from_state(case, state)
+    return _run_from_graph(case, graph_run, pipeline)
 
 
 async def run_end_to_end(case: GoldenCase, pipeline: Pipeline) -> AnalysisRun:
     """Mode 3: text in, report out — the integration smoke test."""
-    state = await run_graph(
+    graph_run = await run_graph(
         pipeline, {STATE_INPUT_TEXT: case.source_text}, case.source_text
     )
-    return _run_from_state(case, state)
+    return _run_from_graph(case, graph_run, pipeline)
 
 
-def _run_from_state(case: GoldenCase, state: Mapping[str, Any]) -> AnalysisRun:
+def _run_from_graph(
+    case: GoldenCase, graph_run: GraphRun, pipeline: Pipeline
+) -> AnalysisRun:
     """Complete the graph's :class:`Analysis` into a report, as production does.
 
     The eval stamps the same job/input/node metadata
@@ -286,7 +287,12 @@ def _run_from_state(case: GoldenCase, state: Mapping[str, Any]) -> AnalysisRun:
     Tier 1 gates check a whole ``StrideReport`` — including the
     self-containment invariants — and a stripped-down payload would test a
     shape production never emits.
+
+    That now includes the node runs and the per-tier sampling clear block. They
+    were previously stubbed, which meant a sweep's reports carried no
+    fingerprints and its certification verdict was computed over nothing.
     """
+    state = graph_run.final_state
     if STATE_REJECTION in state:
         issues = rejection_issues(state[STATE_REJECTION])
         detail = "; ".join(f"{issue.code}: {issue.message}" for issue in issues)
@@ -306,7 +312,11 @@ def _run_from_state(case: GoldenCase, state: Mapping[str, Any]) -> AnalysisRun:
                 case.source_text.encode("utf-8")
             ).hexdigest(),
         ),
-        nodes=[NodeRun(node="eval", model=None, duration_ms=0)],
+        nodes=graph_run.node_runs,
+        sampling={
+            tier: params.model_dump()
+            for tier, params in pipeline.tier_sampling.items()
+        },
         system_model=analysis.system_model,
         boundary_crossings=analysis.boundary_crossings,
         threats=analysis.threats,
