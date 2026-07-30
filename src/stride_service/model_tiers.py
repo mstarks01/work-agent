@@ -56,6 +56,18 @@ _ENV_PREFIX = "STRIDE_MODEL_"
 _VENDOR_FIELD = "VENDOR"
 _MODEL_FIELD = "MODEL"
 
+# Old name -> new name, for variables that had to move *out* of this loader's
+# namespace. ``STRIDE_MODEL_TIERS`` located this file; it also matched
+# ``_ENV_PREFIX``, so the unknown-override check below rejected it and the
+# documented path override could never be set. Renaming was the fix rather than
+# exempting the name, which would have left this loader knowing about a variable
+# that belongs to whatever locates its config.
+#
+# A hard cutover, and the loud failure is free: the old name is still inside the
+# policed namespace, so it cannot be silently ignored. The check below only
+# replaces a confusing error with an accurate one.
+RENAMED_VARS: dict[str, str] = {"STRIDE_MODEL_TIERS": "STRIDE_TIERS_FILE"}
+
 
 class ModelConfigError(ConfigError):
     """The model-tier configuration is invalid or unusable."""
@@ -161,6 +173,15 @@ def _apply_env_overrides(tiers_raw: object, env: Mapping[str, str]) -> None:
         # A malformed or missing ``tiers`` shape: leave it for ModelTierConfig
         # to reject rather than applying an override against nothing.
         return
+
+    renamed = sorted(var for var in env if var in RENAMED_VARS)
+    if renamed:
+        detail = "; ".join(f"{var} is now {RENAMED_VARS[var]}" for var in renamed)
+        raise ModelConfigError(
+            f"{detail}. It names this file's *path*, not a tier override, and"
+            f" its old name sat inside the {_ENV_PREFIX!r} namespace this loader"
+            " polices — so setting it could only ever fail"
+        )
 
     known = {var for tier in TIER_NAMES for var in env_vars_for(tier)}
     unknown = sorted(
