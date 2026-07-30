@@ -62,6 +62,7 @@ from pydantic import (
     model_validator,
 )
 
+from stride_service.errors import ConfigError
 from stride_service.model_tiers import TIER_NAMES, TierName
 
 # Hard cutover (#15 decision 4): the loader accepts only version 3. Versions
@@ -88,7 +89,7 @@ OFFERED_PARAMS: tuple[str, ...] = (
 )
 
 
-class SamplingConfigError(ValueError):
+class SamplingConfigError(ConfigError):
     """The sampling configuration is invalid or unusable."""
 
 

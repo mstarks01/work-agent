@@ -150,7 +150,7 @@ report carries fingerprints as-is. Whether they match a baseline that a
 *particular deployment* has blessed is a separate question, answered against
 that deployment's `config/blessed-fingerprints.toml` and recorded on the job —
 never on the report, which travels as portable evidence. See
-[Configuration → Provenance and certification](Configuration.md#provenance-and-certification).
+[Architecture → Provenance and certification](Architecture.md#provenance-and-certification).
 
 A report produced without live models (the in-memory stub runner, or eval
 fixtures) simply has an empty `sampling` and no fingerprints.
