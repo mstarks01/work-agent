@@ -7,7 +7,7 @@ point — is decidable without a model, so it is exercised on every pull request
 rather than only when someone has Vertex configured.
 
 The escape test is the load-bearing one. #29 made the injection point the entire
-trust boundary: the viewer renders the submitter's own prose, so anything that
+trust boundary: the template renders the submitter's own prose, so anything that
 can close the ``<script>`` block turns the route's payoff page into stored XSS.
 """
 
@@ -168,7 +168,7 @@ def test_the_report_page_is_the_viewer_with_this_run_injected(client):
     page = client.get(f"/report/{run_id}").text
     viewer = VIEWER.read_text(encoding="utf-8")
 
-    # The viewer file itself is never edited (#29) — only its payload differs.
+    # Only the payload block differs; the template's chrome is served as-is.
     assert page.count("<script") == viewer.count("<script")
     assert "Stub System" in page
 

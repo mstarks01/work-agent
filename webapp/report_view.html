@@ -161,24 +161,9 @@
   </div>
 </div>
 
-<script type="application/json" id="report">
-<!--
-  Substitution anchor, not a sample. The web app (webapp/main.py) reads this
-  file at request time and replaces the contents of this block with the JSON of
-  the run you just performed; it needs the block to EXIST, and never reads what
-  is in it.
-
-  This deliberately holds no report. A checked-in sample would have to be a real
-  analysis to be honest about provenance, which means regenerating it against
-  live models every time the schema moves -- an upkeep cost for a file nobody is
-  meant to open on its own. Open the app instead: docs/Web-App.md.
-
-  Consequence: this page renders empty when opened directly from disk. That is
-  intended. The viewer's JS indexes R.summary and iterates R.threats, so it
-  throws on this empty object rather than drawing a misleading blank report.
--->
-{}
-</script>
+<!-- webapp/main.py replaces the contents of the block below with the run's
+     report JSON, every `<` escaped, before serving this page. -->
+<script type="application/json" id="report">{}</script>
 
 <script>
   const R = JSON.parse(document.getElementById("report").textContent);

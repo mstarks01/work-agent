@@ -5,10 +5,9 @@ This wraps ``examples/sync_docs.py`` the way ``tests/test_corpus_lints.py`` wrap
 ``evals/verify_corpus.py``: hand-runnable for authors, unbypassable in CI.
 
 Note what this is *not*. It is a ``--write``/``--check`` pair over one-way
-includes, so it covers only prose blocks generated from a source region.
-``docs/example-report.html`` is out of its scope entirely: that file carries no
-checked-in report, only the substitution anchor the web app injects into at
-request time, so there is nothing in it to keep in sync.
+includes, so it covers only prose blocks generated from a named source region.
+It says nothing about ``webapp/report_view.html``, which is a template rather
+than prose and carries no checked-in report to keep in sync.
 """
 
 from __future__ import annotations
