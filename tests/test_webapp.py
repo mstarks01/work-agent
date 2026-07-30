@@ -20,8 +20,7 @@ import pytest
 from fastapi.testclient import TestClient
 
 from stride_service import StrideEngine, StubPipelineRunner
-from stride_service.model_tiers import load_model_tiers
-from stride_service.pipeline import DEFAULT_MODEL_TIERS_PATH
+from stride_service.deployment import Deployment
 from stride_service.vendors import ProviderAuthError
 from webapp.main import Analyses, Startup, create_app, render_report
 
@@ -34,8 +33,8 @@ BREAKOUT = '</script><img src=x onerror=alert(1)>'
 
 @pytest.fixture
 def tiers():
-    """The real shipped tier config. Loading it needs no credentials."""
-    return load_model_tiers(DEFAULT_MODEL_TIERS_PATH, env={})
+    """The real shipped tier config. Resolving it needs no credentials."""
+    return Deployment.from_env(env={}).tiers
 
 
 @pytest.fixture

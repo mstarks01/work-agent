@@ -154,6 +154,16 @@ as a knob and connected to nothing.
 | `STRIDE_RESILIENCE` | `config/resilience.toml` |
 | `STRIDE_BLESSED_FINGERPRINTS` | `config/blessed-fingerprints.toml` |
 
+A variable **picks which file is read**; it never layers a second file over the
+first. A set-but-empty value is a deploy mistake and raises rather than falling
+back to the repo copy.
+
+These apply to the **whole deployment**, not only the service: an eval sweep
+reads the same files, and promoting a sweep winner re-pins the same
+`sampling.toml` and blesses into the same manifest. Redirect a path and
+everything follows it — which is what makes grading a configuration you do not
+run impossible rather than merely discouraged.
+
 ### Model overrides (deploy-time, no image rebuild)
 
 | Variable | Effect |

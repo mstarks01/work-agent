@@ -16,34 +16,28 @@ event carrying its own output.
 The submitted description is untrusted text (OWASP LLM01): it enters session
 state as data for the extraction prompt's fenced ``{input_text}`` block and
 is never concatenated into an instruction here.
+
+Which config this runner is built from is not this module's business: see
+:class:`stride_service.deployment.Deployment`, which locates and loads it once
+per process and hands back a configured runner.
 """
 
 from __future__ import annotations
 
 import hashlib
 import logging
-import os
-from collections.abc import Mapping
 from datetime import UTC, datetime
-from pathlib import Path
 
 from google.adk.sessions import BaseSessionService
 
-from stride_service.binding import build_tier_adapters, make_resolve_model
-from stride_service.certification import (
-    CertificationGate,
-    CertifyResult,
-    load_manifest,
-)
+from stride_service.certification import CertificationGate, CertifyResult
 from stride_service.execution import GraphExecutor, GraphRun
 from stride_service.graph import (
     STATE_ANALYSIS,
     STATE_INPUT_TEXT,
     STATE_REJECTION,
-    TIER_NODE_BY_GRAPH_NODE,
     Analysis,
     Pipeline,
-    build_pipeline,
     rejection_issues,
 )
 from stride_service.jobs import (
@@ -53,11 +47,7 @@ from stride_service.jobs import (
     PipelineOutcome,
     PipelineRejected,
 )
-from stride_service.markdown_loader import MarkdownLoader
-from stride_service.model_tiers import ModelTierConfig, load_model_tiers
 from stride_service.report import InputRef, Job, StrideReport
-from stride_service.resilience import load_resilience
-from stride_service.sampling import load_sampling, make_resolve_sampling
 
 logger = logging.getLogger(__name__)
 
@@ -65,27 +55,6 @@ DEFAULT_APP_NAME = "stride-service"
 
 # Reports need a system name; the front end may not have sent one.
 DEFAULT_SYSTEM_NAME = "Unnamed system"
-
-# The repo layout baked into the image (ticket 006): Markdown next to the
-# package, not fetched at run time. Overridable for a different image layout,
-# never for content the image does not carry.
-_REPO_ROOT = Path(__file__).resolve().parents[2]
-DEFAULT_SKILLS_DIR = _REPO_ROOT / "skills"
-DEFAULT_PROMPTS_DIR = _REPO_ROOT / "prompts"
-DEFAULT_MODEL_TIERS_PATH = _REPO_ROOT / "config" / "model_tiers.toml"
-DEFAULT_SAMPLING_PATH = _REPO_ROOT / "config" / "sampling.toml"
-DEFAULT_RESILIENCE_PATH = _REPO_ROOT / "config" / "resilience.toml"
-DEFAULT_BLESSED_FINGERPRINTS_PATH = (
-    _REPO_ROOT / "config" / "blessed-fingerprints.toml"
-)
-
-SKILLS_DIR_VAR = "STRIDE_SKILLS_DIR"
-PROMPTS_DIR_VAR = "STRIDE_PROMPTS_DIR"
-MODEL_TIERS_VAR = "STRIDE_MODEL_TIERS"
-SAMPLING_VAR = "STRIDE_SAMPLING"
-RESILIENCE_VAR = "STRIDE_RESILIENCE"
-BLESSED_FINGERPRINTS_VAR = "STRIDE_BLESSED_FINGERPRINTS"
-REQUIRE_CERTIFIED_VAR = "STRIDE_REQUIRE_CERTIFIED"
 
 
 class PipelineError(RuntimeError):
@@ -213,85 +182,3 @@ class AdkPipelineRunner:
             rejected_threats=analysis.rejected_threats,
             summary=analysis.summary,
         )
-
-
-def build_default_pipeline(env: Mapping[str, str] | None = None) -> Pipeline:
-    """The production graph: repo Markdown, repo config, pinned models.
-
-    Fails closed on a missing or invalid tier, sampling, or resilience config
-    rather than starting a service whose nodes would run on whatever model,
-    decoding parameters, or retry/timeout behaviour happened to be default.
-    Building the tier adapters adds two more build-time gates — the supported-
-    param check and the credential check — so an unusable provider selection is
-    caught here rather than on node one of a paid-for job.
-    """
-    if env is None:
-        env = os.environ
-    tiers = load_model_tiers(
-        env.get(MODEL_TIERS_VAR, DEFAULT_MODEL_TIERS_PATH), env=env
-    )
-    resilience = load_resilience(
-        env.get(RESILIENCE_VAR, DEFAULT_RESILIENCE_PATH), env=env
-    )
-    sampling = load_sampling(env.get(SAMPLING_VAR, DEFAULT_SAMPLING_PATH), env=env)
-    adapters = build_tier_adapters(tiers, sampling, resilience, env=env)
-    return build_pipeline(
-        skill_loader=MarkdownLoader(env.get(SKILLS_DIR_VAR, DEFAULT_SKILLS_DIR)),
-        prompt_loader=MarkdownLoader(env.get(PROMPTS_DIR_VAR, DEFAULT_PROMPTS_DIR)),
-        resolve_model=make_resolve_model(adapters, tiers),
-        resolve_sampling=make_resolve_sampling(sampling, tiers.resolve_tier),
-        tier_sampling=sampling.tiers,
-        resilience=resilience,
-    )
-
-
-def build_certification_gate(
-    tiers: ModelTierConfig, env: Mapping[str, str]
-) -> CertificationGate:
-    """Load this deployment's blessed manifest and its gating policy.
-
-    Located by ``STRIDE_BLESSED_FINGERPRINTS``, defaulting to the repo path —
-    the fourth config of the tiers/sampling/resilience kind. A repo default plus
-    an env override is **not** the two-layer overlay #10 rejected: exactly one
-    file is read, and the variable only picks which.
-
-    Unset-means-disabled was rejected outright — an absent environment variable
-    silently switching off a provenance check is precisely the failure mode this
-    exists to prevent — so a missing or malformed manifest raises here, at
-    startup, rather than at the first completed job.
-    """
-    manifest = load_manifest(
-        env.get(BLESSED_FINGERPRINTS_VAR, DEFAULT_BLESSED_FINGERPRINTS_PATH)
-    )
-
-    def tier_of(graph_node: str) -> str:
-        return tiers.resolve_tier(TIER_NODE_BY_GRAPH_NODE[graph_node])
-
-    return CertificationGate(
-        manifest=manifest,
-        tier_of=tier_of,
-        require_certified=_flag(env, REQUIRE_CERTIFIED_VAR),
-    )
-
-
-def _flag(env: Mapping[str, str], var: str) -> bool:
-    """A boolean env flag, on only for an explicit affirmative."""
-    return env.get(var, "").strip().lower() in ("1", "true", "yes", "on")
-
-
-def default_pipeline_runner(env: Mapping[str, str] | None = None) -> AdkPipelineRunner:
-    """The runner the API uses when no other is injected.
-
-    Certification is assembled here rather than in ``build_pipeline``: which
-    manifest a deployment blesses against is a runner concern, and the graph
-    does not certify.
-    """
-    if env is None:
-        env = os.environ
-    tiers = load_model_tiers(
-        env.get(MODEL_TIERS_VAR, DEFAULT_MODEL_TIERS_PATH), env=env
-    )
-    return AdkPipelineRunner(
-        build_default_pipeline(env),
-        certification=build_certification_gate(tiers, env),
-    )
