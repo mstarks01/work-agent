@@ -43,7 +43,11 @@ from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any, Self
 
-from stride_service.binding import build_tier_adapters, make_resolve_model
+from stride_service.binding import (
+    NodeBinding,
+    build_tier_adapters,
+    make_resolve_model,
+)
 from stride_service.certification import (
     BlessedManifest,
     CertificationGate,
@@ -62,7 +66,7 @@ from stride_service.markdown_loader import MarkdownLoader
 from stride_service.model_tiers import ModelTierConfig, TierName, load_model_tiers
 from stride_service.pipeline import AdkPipelineRunner
 from stride_service.resilience import ResilienceConfig, load_resilience
-from stride_service.sampling import SamplingConfig, load_sampling, make_resolve_sampling
+from stride_service.sampling import SamplingConfig, load_sampling
 
 # The repo layout baked into the image (ticket 006): Markdown and config next to
 # the package, not fetched at run time. A variable picks a different file; it
@@ -206,12 +210,9 @@ class Deployment:
         return build_pipeline(
             skill_loader=MarkdownLoader(self.paths.skills),
             prompt_loader=MarkdownLoader(self.paths.prompts),
-            resolve_model=resolve_model,
-            resolve_sampling=make_resolve_sampling(
-                self.sampling, self.tiers.resolve_tier
+            binding=NodeBinding.from_configs(
+                self.tiers, self.sampling, resolve_model, self.resilience
             ),
-            tier_sampling=self.sampling.tiers,
-            resilience=self.resilience,
             entry=entry,
         )
 

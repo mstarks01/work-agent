@@ -21,6 +21,7 @@ from google.adk.models.base_llm import BaseLlm
 from google.adk.models.llm_response import LlmResponse
 from google.genai import types
 
+from stride_service.binding import NodeBinding
 from stride_service.graph import (
     ENTRY_EXTRACT,
     EXTRACT_NODE,
@@ -43,7 +44,7 @@ from stride_service.report import (
     Verdict,
     build_summary,
 )
-from stride_service.sampling import load_sampling, make_resolve_sampling
+from stride_service.sampling import load_sampling
 from stride_service.system_model import (
     Assumption,
     DataFlow,
@@ -293,9 +294,7 @@ def scripted_pipeline(
     pipeline = build_pipeline(
         skill_loader=MarkdownLoader(PROJECT_ROOT / "skills"),
         prompt_loader=MarkdownLoader(PROJECT_ROOT / "prompts"),
-        resolve_model=resolve,
-        resolve_sampling=make_resolve_sampling(sampling, tiers.resolve_tier),
-        tier_sampling=sampling.tiers,
+        binding=NodeBinding.from_configs(tiers, sampling, resolve),
         entry=entry,
     )
     return pipeline, models

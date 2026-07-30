@@ -215,7 +215,7 @@ and the selection seam are in place for all of them.
 | `stride_service.skills` / `.prompts` / `.markdown_loader` | Skill/prompt loading and composition. |
 | `stride_service.model_tiers` / `.sampling` / `.resilience` | Config loaders. |
 | `stride_service.vendors` | The vendor registry: each vendor's router prefix, credential mode, and model-name rules. |
-| `stride_service.binding` | Builds one adapter per tier from `(vendor, model, sampling, resilience)`. |
+| `stride_service.binding` | Builds one adapter per tier from `(vendor, model, sampling, resilience)`, and the `NodeBinding` the graph binds onto its LLM nodes. |
 | `stride_service.model_gate` | The startup check that asks the provider library whether a tier's parameters are actually supported. |
 | `stride_service.certification` | Compares a run's fingerprints against the deployment's blessed manifest. |
 | `stride_service.auth` | Bearer-token (OIDC JWT) verification. |

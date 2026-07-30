@@ -15,12 +15,13 @@ from google.adk.agents import LlmAgent
 from google.adk.workflow import FunctionNode, JoinNode
 
 from stride_service import graph
+from stride_service.binding import NodeBinding
 from stride_service.critic import CriticOutputError, DraftJoinError
 from stride_service.markdown_loader import MarkdownLoader
 from stride_service.model_tiers import LLM_NODES, load_model_tiers
 from stride_service.report import STRIDE_CATEGORIES, DraftThreat, Threat
 from stride_service.resilience import load_resilience
-from stride_service.sampling import load_sampling, make_resolve_sampling
+from stride_service.sampling import load_sampling
 from stride_service.system_model import SystemModel
 from tests.factories import sample_draft, sample_threat, valid_model
 
@@ -76,9 +77,7 @@ def pipeline(skill_loader: MarkdownLoader, prompt_loader: MarkdownLoader):
     return graph.build_pipeline(
         skill_loader=skill_loader,
         prompt_loader=prompt_loader,
-        resolve_model=_route_resolver(tiers),
-        resolve_sampling=make_resolve_sampling(sampling, tiers.resolve_tier),
-        tier_sampling=sampling.tiers,
+        binding=NodeBinding.from_configs(tiers, sampling, _route_resolver(tiers)),
     )
 
 
@@ -144,10 +143,9 @@ def _pipeline_with_sampling(skill_loader, prompt_loader, sampling_path, resilien
     return graph.build_pipeline(
         skill_loader=skill_loader,
         prompt_loader=prompt_loader,
-        resolve_model=_route_resolver(tiers),
-        resolve_sampling=make_resolve_sampling(sampling, tiers.resolve_tier),
-        tier_sampling=sampling.tiers,
-        resilience=resilience,
+        binding=NodeBinding.from_configs(
+            tiers, sampling, _route_resolver(tiers), resilience
+        ),
     )
 
 
