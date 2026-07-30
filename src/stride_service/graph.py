@@ -69,9 +69,9 @@ the critic seams here.
 from __future__ import annotations
 
 import json
-from collections.abc import Callable, Mapping, Sequence
+from collections.abc import Callable, Sequence
 from dataclasses import dataclass
-from typing import Any, Literal
+from typing import TYPE_CHECKING, Any, Literal
 
 from google.adk.agents import LlmAgent
 from google.adk.events.event import Event
@@ -104,6 +104,11 @@ from stride_service.sampling import (
 from stride_service.skills import compose_analyst_skills, compose_critic_skills
 from stride_service.system_model import BoundaryCrossing, SystemModel
 from stride_service.validation import ValidationIssue, parse_and_validate
+
+if TYPE_CHECKING:
+    # Type-only, so composing a graph costs no provider-library import and the
+    # binding <-> graph reference stays one-directional at run time.
+    from stride_service.binding import NodeBinding
 
 # Resolves one canonical LLM node name (as in ``LLM_NODES``) to the model it
 # runs on. A ``BaseLlm`` instance is accepted so tests can drive the whole
@@ -569,31 +574,19 @@ def build_pipeline(
     *,
     skill_loader: MarkdownLoader,
     prompt_loader: MarkdownLoader,
-    resolve_model: ModelResolver,
-    resolve_sampling: SamplingResolver,
-    tier_sampling: Mapping[str, TierSampling],
-    resilience: ResilienceConfig | None = None,
+    binding: NodeBinding,
     domain_packs: Sequence[str] = (),
     entry: Entry = ENTRY_EXTRACT,
     name: str = "stride_pipeline",
 ) -> Pipeline:
     """Wire the whole graph: prompts, skills, and models onto the topology.
 
-    ``resolve_model`` takes a canonical LLM node name and returns the model
-    to bind — :meth:`ModelTierConfig.resolve_model` in production, so a node
-    silently running on the wrong tier stays impossible. ``resolve_sampling``
-    is its sibling (ticket 06): the same canonical name in, the node's tier
-    decoding params out — :func:`~stride_service.sampling.make_resolve_sampling`
-    in production, so each node gets its own tier's ``GenerateContentConfig``.
-    ``tier_sampling`` is the resolved per-tier clear block (``SamplingConfig``'s
-    ``tiers``) the report stamps once per tier for provenance (ticket 07); each
-    LLM node's fingerprint is derived here from its served model and its tier's
-    resolved sampling.
-
-    ``resilience`` binds the per-request timeout onto every LLM node (ticket
-    038). It is optional so the offline stand-ins can build the graph without
-    a config; production always passes one, and the client-level retry is
-    bound separately by the caller's ``resolve_model``.
+    ``binding`` is everything an LLM node runs on — which model, which tier's
+    decoding params, and the per-request deadline. It arrives as one value
+    rather than as four parameters because two of them are views of the same
+    :class:`~stride_service.sampling.SamplingConfig`, and sourcing them from
+    different ones would leave every node running on params the report does not
+    attest to. See :class:`~stride_service.binding.NodeBinding`.
 
     ``entry`` selects where the graph starts. ``"extract"`` is production and
     the end-to-end eval mode. ``"prepare"`` is the **analysis** eval mode of
@@ -607,6 +600,10 @@ def build_pipeline(
     if entry not in (ENTRY_EXTRACT, ENTRY_PREPARE, ENTRY_EXTRACT_ONLY):
         raise ValueError(f"unknown graph entry point: {entry!r}")
 
+    resolve_model = binding.resolve_model
+    resolve_sampling = binding.resolve_sampling
+    resilience = binding.resilience
+
     if entry == ENTRY_EXTRACT_ONLY:
         extract = _extract_node(
             prompt_loader, resolve_model, resolve_sampling, resilience
@@ -614,7 +611,7 @@ def build_pipeline(
         return Pipeline(
             workflow=Workflow(name=name, edges=[(START, extract)]),
             node_models={extract.name: _model_name(extract.model)},
-            tier_sampling=dict(tier_sampling),
+            tier_sampling=dict(binding.tier_sampling),
             node_sampling=_node_sampling([extract], resolve_sampling),
         )
 
@@ -704,7 +701,7 @@ def build_pipeline(
     return Pipeline(
         workflow=workflow,
         node_models={node.name: _model_name(node.model) for node in llm_nodes},
-        tier_sampling=dict(tier_sampling),
+        tier_sampling=dict(binding.tier_sampling),
         node_sampling=_node_sampling(llm_nodes, resolve_sampling),
     )
 
