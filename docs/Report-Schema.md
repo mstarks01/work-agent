@@ -11,17 +11,13 @@ Get one from either [the engine](Integration-Guide.md) (`outcome.report`) or the
 
 ## Seeing one rendered
 
-[`example-report.html`](example-report.html) is a self-contained renderer for
-this schema — threat cards, a severity summary, the extracted DFD, and the
-per-node provenance panel, in one file with no dependencies. It is what the
-[web app](Web-App.md) serves you after a run, reading it at request time and
-injecting that run's JSON.
+Run the [web app](Web-App.md) — [First-Run](First-Run.md) step 3. It renders a
+real report of your own: threat cards, a severity summary, the extracted DFD,
+and the per-node provenance panel.
 
-**Opening it directly from disk shows nothing.** It carries no checked-in sample
-report, deliberately: a stored one would have to be regenerated against live
-models every time the schema moved, to stay honest about the provenance it
-displays. Run the app ([First-Run](First-Run.md) step 3) to see a real one, or
-read the file if you want a worked reference for laying a report out yourself.
+There is no checked-in sample report in this repository. One would be a second
+description of this schema, drifting from the schema itself every time it moved,
+and the fields below are the authoritative account.
 
 ## Top-level shape
 

@@ -14,8 +14,7 @@ Two pages, three data endpoints (#29):
 
 ======================  ========================================================
 ``GET  /``              form page: the resolved tiers, a textarea, Analyze
-``GET  /report/{run}``  ``docs/example-report.html``, unedited, with this run's
-                        JSON injected
+``GET  /report/{run}``  ``report_view.html`` with this run's JSON injected
 ``GET  /example``       ``examples/orders.md``, for **Load example**
 ``POST /analyze``       start a run, return its id
 ``GET  /events/{run}``  server-sent per-node progress
@@ -86,7 +85,7 @@ from stride_service.vendors import vendor_for
 logger = logging.getLogger("webapp")
 
 REPO_ROOT = Path(__file__).resolve().parents[1]
-VIEWER = REPO_ROOT / "docs" / "example-report.html"
+VIEWER = Path(__file__).resolve().parent / "report_view.html"
 SAMPLE = REPO_ROOT / "examples" / "orders.md"
 
 HOST = "127.0.0.1"
@@ -97,8 +96,8 @@ PORT = 8000
 # oldest-first evicted. A restart loses history, which is correct here.
 MAX_RUNS = 20
 
-# The viewer parses this same block at docs/example-report.html:229. Matched by
-# id rather than position so the chrome can move without breaking injection.
+# The template's own script parses this same block. Matched by id rather than
+# by position, so the chrome can move without breaking injection.
 _PAYLOAD_BLOCK = re.compile(
     r'(<script type="application/json" id="report">)(.*?)(</script>)',
     re.DOTALL,
@@ -188,11 +187,11 @@ def build_startup(env: Mapping[str, str] | None = None) -> Startup:
 
 
 def render_report(report: StrideReport) -> str:
-    """``docs/example-report.html``, unedited, carrying this run's report.
+    """``report_view.html``, carrying this run's report.
 
-    The viewer file is never edited and never imported — it stays a
-    documentation artifact that happens to be a complete renderer (#29), and
-    this substitutes only the contents of its JSON block.
+    The template is a self-contained renderer for the report schema — no build
+    step, no framework, its own inline CSS and JS. This substitutes only the
+    contents of its JSON block and serves the result.
 
     **The escape is the contract.** The report carries the submitter's own prose,
     so a description containing ``</script>`` would close the block and
