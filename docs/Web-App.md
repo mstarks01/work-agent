@@ -65,7 +65,8 @@ unsupported sampling parameter — the app still starts, but serves a **diagnost
 page instead of the form**. There is no textarea and no Analyze button, so no
 analysis can run on a model nobody chose.
 
-The page names the vendor your config selects and lists **every** environment
+Where the config itself read cleanly — the credential and sampling cases — the
+page names the vendor your config selects and lists **every** environment
 variable that vendor needs, marking the ones that are unset. It reports presence
 only and never prints a value. For Vertex that is:
 
@@ -78,6 +79,9 @@ GOOGLE_APPLICATION_CREDENTIALS  NOT SET
 All of them at once, rather than one per restart — the underlying check raises on
 the first variable it finds missing, which would otherwise mean three restarts to
 discover three variables.
+
+If the tier config is what failed, there is no selected vendor to report and the
+page says so instead: fix the file named in the error first.
 
 **Recovery is always: fix it, then restart.** There is no retry button. A process
 cannot pick up an environment variable that changed after it started, so a retry
