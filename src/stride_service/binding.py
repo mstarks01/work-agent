@@ -38,7 +38,8 @@ from __future__ import annotations
 
 import os
 from collections.abc import Mapping
-from typing import TYPE_CHECKING
+from dataclasses import dataclass
+from typing import TYPE_CHECKING, Self
 
 # Imported before anything that could pull in ``litellm``: this module's import
 # is what pins the model-cost map to the installed copy. See
@@ -46,10 +47,20 @@ from typing import TYPE_CHECKING
 from stride_service.model_gate import assert_kwarg_supported, check_supported
 from stride_service.model_tiers import TIER_NAMES, ModelTierConfig, TierName
 from stride_service.resilience import ResilienceConfig
-from stride_service.sampling import SamplingConfig
+from stride_service.sampling import (
+    SamplingConfig,
+    SamplingResolver,
+    TierSampling,
+    make_resolve_sampling,
+)
 
 if TYPE_CHECKING:
+    # Both deliberately type-only. A runtime ``from stride_service.graph import``
+    # here would sort *above* the ``model_gate`` import and break the ordering
+    # the comment above depends on.
     from google.adk.models.lite_llm import LiteLlm
+
+    from stride_service.graph import ModelResolver
 
 # LiteLLM counts retries after the first try; ``ResilienceConfig`` counts total
 # attempts. The name is asserted against LiteLLM's own parameter list at build
@@ -114,3 +125,51 @@ def make_resolve_model(
         return adapters[tiers.resolve_tier(node)]
 
     return resolve_model
+
+
+@dataclass(frozen=True)
+class NodeBinding:
+    """Everything the graph binds onto an LLM node, as one value.
+
+    These four travelled as four parameters, and two of them are *views of the
+    same object*: ``resolve_sampling`` hands each node its tier's decoding
+    params, and ``tier_sampling`` is the clear block the report records for
+    those same tiers. Nothing stopped a caller sourcing them from different
+    :class:`~stride_service.sampling.SamplingConfig` objects, and the failure is
+    silent — every node would run on one config while the report attested to
+    another, so each ``sampling_fingerprint`` would be unverifiable against the
+    block shipped beside it. That is precisely what the fingerprint exists to
+    make impossible.
+
+    :meth:`from_configs` derives both from one config, so the disagreement is
+    not a bug to catch but a state that cannot be written down.
+
+    ``resolve_model`` stays a caller-supplied callable rather than being derived
+    here: an offline test binds scripted models through it, and taking that away
+    would mean the graph could only be built by something holding credentials.
+    """
+
+    resolve_model: ModelResolver
+    resolve_sampling: SamplingResolver
+    tier_sampling: dict[TierName, TierSampling]
+    resilience: ResilienceConfig | None = None
+
+    @classmethod
+    def from_configs(
+        cls,
+        tiers: ModelTierConfig,
+        sampling: SamplingConfig,
+        resolve_model: ModelResolver,
+        resilience: ResilienceConfig | None = None,
+    ) -> Self:
+        """Bind one tier config and one sampling config onto the graph's nodes.
+
+        The node -> tier walk comes from ``tiers`` and is not re-derived; both
+        sampling views come from ``sampling`` and cannot disagree.
+        """
+        return cls(
+            resolve_model=resolve_model,
+            resolve_sampling=make_resolve_sampling(sampling, tiers.resolve_tier),
+            tier_sampling=dict(sampling.tiers),
+            resilience=resilience,
+        )
