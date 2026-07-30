@@ -48,7 +48,7 @@ from typing import Annotated
 from pydantic import BaseModel, ConfigDict, Field, ValidationError
 
 from stride_service.model_tiers import TIER_NAMES, TierName
-from stride_service.report import StrideReport
+from stride_service.report import NodeRun, StrideReport
 
 # Version 2 re-keys the manifest from nodes to tiers (#14 decision 4). A hard
 # cutover with no shim, and a free one: the file ships with empty sets, so
@@ -179,20 +179,31 @@ def certify(
     )
 
 
-def report_fingerprints(report: StrideReport) -> dict[str, frozenset[str]]:
-    """The node -> fingerprint sets a report presents, ready to certify.
+def fingerprints_of(nodes: Iterable[NodeRun]) -> dict[str, frozenset[str]]:
+    """The node -> fingerprint sets a run of node executions presents.
 
     Only LLM nodes carry a fingerprint: a deterministic FunctionNode has none
     and is skipped rather than certified against an empty set. A node appearing
     more than once — the critic on a revise path — contributes every hash it
     presented, which is what makes a mid-run build move visible.
+
+    Takes the node runs rather than a report because the two callers hold
+    different things: the service certifies a finished report, while a sweep
+    certifies runs that may produce no report at all — the extraction mode
+    scores an emission, not a :class:`StrideReport`, and its ``extract``
+    execution is no less an observed generation identity for that.
     """
     observations: dict[str, set[str]] = {}
-    for node in report.nodes:
+    for node in nodes:
         if node.sampling_fingerprint is None:
             continue
         observations.setdefault(node.node, set()).add(node.sampling_fingerprint)
     return {node: frozenset(prints) for node, prints in observations.items()}
+
+
+def report_fingerprints(report: StrideReport) -> dict[str, frozenset[str]]:
+    """The node -> fingerprint sets a finished report presents, ready to certify."""
+    return fingerprints_of(report.nodes)
 
 
 def load_manifest(path: Path | str) -> BlessedManifest:
