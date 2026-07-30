@@ -14,6 +14,7 @@ from stride_service.auth import (
     TokenVerifier,
     build_verifier,
 )
+from stride_service.deployment import ConfigPaths, Deployment
 from stride_service.engine import (
     DEFAULT_CALLER,
     MAX_SYSTEM_NAME_CHARS,
@@ -135,8 +136,10 @@ __all__ = [
     "AuthenticationError",
     "BoundaryCrossing",
     "ConfigError",
+    "ConfigPaths",
     "DataFlow",
     "DataStore",
+    "Deployment",
     "Element",
     "EngineInputError",
     "ExternalEntity",

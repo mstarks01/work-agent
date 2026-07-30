@@ -29,6 +29,31 @@ engine = StrideEngine.from_config(env={"STRIDE_MODEL_STRONG_MODEL": "gemini-2.5-
 One engine holds no cross-call state, so it is safe to share across concurrent
 tasks.
 
+### When you need the configuration too
+
+`from_config()` resolves a `Deployment` — this installation's config files,
+located by the `STRIDE_*` variables in [Configuration](Configuration.md) and read
+once — and builds the engine from it. Resolve it yourself when you need both:
+
+```python
+from stride_service import Deployment, StrideEngine
+
+deployment = Deployment.from_env()          # reads config; no credentials touched
+engine = StrideEngine.from_deployment(deployment)   # resolves credentials, builds the graph
+
+deployment.tiers.tiers["strong"].model       # what the strong tier selected
+```
+
+The two stages fail differently on purpose. `from_env()` raises for a missing or
+invalid config file. `from_deployment()` raises for a credential or provider
+problem — by which point you still have the `Deployment`, so you can report
+*which* vendor the config selected. That is exactly what the first-run app's
+diagnostic page does.
+
+Reuse one `Deployment` rather than resolving a second: it builds its runner and
+its certification gate once, so everything sharing it is provably on the same
+configuration.
+
 ## Running an analysis
 
 `analyze` is async and drives one submission to a terminal state:

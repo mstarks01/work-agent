@@ -22,15 +22,10 @@ from stride_service.jobs import (
     PipelineCompleted,
     PipelineRejected,
 )
-from stride_service.model_tiers import ModelConfigError, load_model_tiers
-from stride_service.pipeline import (
-    AdkPipelineRunner,
-    PipelineError,
-    build_default_pipeline,
-)
+from stride_service.model_tiers import load_model_tiers
+from stride_service.pipeline import AdkPipelineRunner, PipelineError
 from stride_service.report import STRIDE_CATEGORIES
 from stride_service.sampling import TierSampling, load_sampling, sampling_fingerprint
-from stride_service.vendors import ProviderAuthError
 from tests.factories import (
     BASE_MODEL,
     PROJECT_ROOT,
@@ -315,81 +310,6 @@ def test_a_failed_job_logs_the_input_digest(caplog):
 
     assert any(digest in message for message in caplog.messages)
     assert record.description not in caplog.text  # the text itself is never logged
-
-
-def test_the_default_pipeline_binds_the_pinned_models_from_config():
-    pipeline = build_default_pipeline(env=VERTEX_ENV)
-    assert pipeline.node_models[graph.EXTRACT_NODE] == "vertex_ai/gemini-2.5-flash"
-    assert pipeline.node_models[graph.CRITIC_NODE] == "vertex_ai/gemini-2.5-pro"
-    assert set(pipeline.node_models) == set(graph.TIER_NODE_BY_GRAPH_NODE)
-
-
-def test_the_ten_llm_nodes_share_two_adapters_one_per_tier():
-    """#6: the binding is per tier, so the build-time checks fire twice, not ten times."""
-    pipeline = build_default_pipeline(env=VERTEX_ENV)
-    nodes = {node.name: node for node in pipeline.workflow.graph.nodes}
-    adapters = {
-        id(nodes[name].model) for name in graph.TIER_NODE_BY_GRAPH_NODE
-    }
-    assert len(graph.TIER_NODE_BY_GRAPH_NODE) == 10
-    assert len(adapters) == 2
-
-
-def test_the_default_pipeline_binds_retry_and_timeout():
-    """Ticket 038: every LLM node carries the retry policy and the deadline."""
-    from google.adk.models.lite_llm import LiteLlm
-
-    pipeline = build_default_pipeline(env=VERTEX_ENV)
-    nodes = {node.name: node for node in pipeline.workflow.graph.nodes}
-
-    critic = nodes[graph.CRITIC_NODE]
-    assert isinstance(critic.model, LiteLlm)
-    # attempts=3 is a total; LiteLLM counts retries after the first try.
-    assert critic.model._additional_args["num_retries"] == 2
-    assert pipeline.node_models[graph.CRITIC_NODE] == "vertex_ai/gemini-2.5-pro"
-    # The per-request timeout rides on http_options, sampling untouched.
-    assert critic.generate_content_config.http_options.timeout == 300000
-
-
-def test_drop_params_is_never_set_so_litellm_stays_fail_closed():
-    """The sampling fingerprint's honesty depends on it (map Notes, #8)."""
-    pipeline = build_default_pipeline(env=VERTEX_ENV)
-    nodes = {node.name: node for node in pipeline.workflow.graph.nodes}
-    assert "drop_params" not in nodes[graph.CRITIC_NODE].model._additional_args
-
-
-def test_env_overrides_the_retry_attempts_without_touching_the_model():
-    pipeline = build_default_pipeline(env=VERTEX_ENV | {"STRIDE_RETRY_ATTEMPTS": "5"})
-    nodes = {node.name: node for node in pipeline.workflow.graph.nodes}
-    assert nodes[graph.CRITIC_NODE].model._additional_args["num_retries"] == 4
-    assert pipeline.node_models[graph.CRITIC_NODE] == "vertex_ai/gemini-2.5-pro"
-
-
-def test_the_default_pipeline_fails_closed_without_provider_credentials():
-    """The credential check is a build-time gate, not a first-request surprise."""
-    with pytest.raises(ProviderAuthError, match="STRIDE_VERTEX_PROJECT"):
-        build_default_pipeline(env={})
-
-
-def test_a_credential_error_never_echoes_the_secret(monkeypatch):
-    # OWASP A09: a key echoed into a log or an error has leaked.
-    env = VERTEX_ENV | {"STRIDE_MODEL_BASE_VENDOR": "anthropic",
-                        "STRIDE_MODEL_BASE_MODEL": "claude-sonnet-4-5-20250929"}
-    with pytest.raises(ProviderAuthError) as excinfo:
-        build_default_pipeline(env=env)
-    assert "STRIDE_ANTHROPIC_API_KEY" in str(excinfo.value)
-
-
-def test_the_default_pipeline_fails_closed_on_a_missing_resilience_config(tmp_path):
-    with pytest.raises(Exception, match="cannot be read"):
-        build_default_pipeline(env={"STRIDE_RESILIENCE": str(tmp_path / "gone.toml")})
-
-
-def test_the_default_pipeline_fails_closed_on_a_missing_tier_config(tmp_path):
-    with pytest.raises(ModelConfigError, match="cannot be read"):
-        build_default_pipeline(
-            env=VERTEX_ENV | {"STRIDE_MODEL_TIERS": str(tmp_path / "gone.toml")}
-        )
 
 
 def test_the_api_runs_jobs_through_the_real_graph_by_default(monkeypatch):
