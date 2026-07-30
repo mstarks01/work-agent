@@ -11,13 +11,8 @@ from __future__ import annotations
 
 import asyncio
 import json
-from collections.abc import AsyncGenerator
-from pathlib import Path
 
 import pytest
-from google.adk.models.base_llm import BaseLlm
-from google.adk.models.llm_response import LlmResponse
-from google.genai import types
 
 from stride_service import graph
 from stride_service.api import create_app
@@ -27,7 +22,6 @@ from stride_service.jobs import (
     PipelineCompleted,
     PipelineRejected,
 )
-from stride_service.markdown_loader import MarkdownLoader
 from stride_service.model_tiers import ModelConfigError, load_model_tiers
 from stride_service.pipeline import (
     AdkPipelineRunner,
@@ -35,19 +29,17 @@ from stride_service.pipeline import (
     build_default_pipeline,
 )
 from stride_service.report import STRIDE_CATEGORIES
-from stride_service.sampling import (
-    TierSampling,
-    load_sampling,
-    make_resolve_sampling,
-    sampling_fingerprint,
-)
+from stride_service.sampling import TierSampling, load_sampling, sampling_fingerprint
 from stride_service.vendors import ProviderAuthError
-from tests.factories import sample_draft, sample_threat, valid_model
-
-PROJECT_ROOT = Path(__file__).resolve().parents[1]
-
-BASE_MODEL = "fake-base-001"
-STRONG_MODEL = "fake-strong-001"
+from tests.factories import (
+    BASE_MODEL,
+    PROJECT_ROOT,
+    sample_draft,
+    sample_threat,
+    served_build,
+    valid_model,
+)
+from tests.factories import scripted_pipeline as build
 
 # The shipped config selects Vertex on both tiers, and Vertex's credential mode
 # is ADC — so building the real pipeline needs these three present. They are
@@ -59,68 +51,8 @@ VERTEX_ENV = {
 }
 
 
-class ScriptedLlm(BaseLlm):
-    """One node's model: replays a fixed emission and records the request.
-
-    It reports a ``model_version`` distinct from the configured ``model``, the
-    way a real provider does — the pinned string names a family, the served
-    build names what answered. Keeping them different here is what lets the
-    tests tell "recorded what was asked for" apart from "recorded what ran".
-    """
-
-    reply: str
-    seen: list[str] = []
-
-    async def generate_content_async(
-        self, llm_request, stream: bool = False
-    ) -> AsyncGenerator[LlmResponse, None]:
-        self.seen.append(llm_request.config.system_instruction or "")
-        yield LlmResponse(
-            content=types.Content(role="model", parts=[types.Part(text=self.reply)]),
-            model_version=served_build(self.model),
-        )
-
-
-def served_build(requested: str) -> str:
-    """The build a scripted model claims answered: the request plus a suffix."""
-    return f"{requested}-served"
-
-
 def draft_json(threat_id: str, category: str) -> str:
     return json.dumps([sample_draft(threat_id, category).model_dump(mode="json")])
-
-
-def build(
-    replies: dict[str, str], llm_class: type[ScriptedLlm] = ScriptedLlm
-) -> tuple[graph.Pipeline, dict[str, ScriptedLlm]]:
-    """The real graph, with every LLM node bound to its scripted stand-in."""
-    models: dict[str, ScriptedLlm] = {}
-
-    graph_node_of = {
-        tier_node: graph_node
-        for graph_node, tier_node in graph.TIER_NODE_BY_GRAPH_NODE.items()
-    }
-
-    def resolve(tier_node: str) -> BaseLlm:
-        # ``build_pipeline`` resolves by canonical tier name; the scripts here
-        # are keyed by graph node name, which is what the tests talk about.
-        node = graph_node_of[tier_node]
-        model_name = BASE_MODEL if node in (graph.EXTRACT_NODE, graph.REPAIR_NODE) else STRONG_MODEL
-        models[node] = llm_class(
-            model=model_name, reply=replies.get(node, "[]"), seen=[]
-        )
-        return models[node]
-
-    tiers = load_model_tiers(PROJECT_ROOT / "config" / "model_tiers.toml", env={})
-    sampling = load_sampling(PROJECT_ROOT / "config" / "sampling.toml", env={})
-    pipeline = graph.build_pipeline(
-        skill_loader=MarkdownLoader(PROJECT_ROOT / "skills"),
-        prompt_loader=MarkdownLoader(PROJECT_ROOT / "prompts"),
-        resolve_model=resolve,
-        resolve_sampling=make_resolve_sampling(sampling, tiers.resolve_tier),
-        tier_sampling=sampling.tiers,
-    )
-    return pipeline, models
 
 
 def job(description: str = "Customers log in to the web app.") -> JobRecord:
@@ -175,42 +107,20 @@ def test_a_clean_run_produces_a_report():
     assert graph.REJECT_NODE not in visited
 
 
-def test_report_nodes_record_the_model_each_node_ran_on():
+def test_the_report_carries_the_graph_runs_node_stamps():
+    """Assembly's job: what the executor stamped reaches the report unaltered.
+
+    The stamping itself — served-build join, fingerprints, durations — is
+    :mod:`stride_service.execution`'s and is tested at that interface.
+    """
     pipeline, _ = build(happy_replies())
-    outcome, _ = run(pipeline, job())
+    outcome, visited = run(pipeline, job())
 
+    assert [node_run.node for node_run in outcome.report.nodes] == visited
     by_node = {run_.node: run_ for run_ in outcome.report.nodes}
-    # `model` is what answered; `requested_model` is what was asked for. The
-    # report records both and compares neither — drift falls out of
-    # certification, not out of a comparison here.
     assert by_node[graph.EXTRACT_NODE].model == served_build(BASE_MODEL)
-    assert by_node[graph.EXTRACT_NODE].requested_model == BASE_MODEL
-    assert by_node[graph.CRITIC_NODE].model == served_build(STRONG_MODEL)
-    assert by_node[graph.CRITIC_NODE].requested_model == STRONG_MODEL
-    assert by_node[graph.ASSEMBLE_NODE].model is None
-    assert by_node[graph.ASSEMBLE_NODE].requested_model is None
-    assert all(run_.duration_ms >= 0 for run_ in outcome.report.nodes)
-
-
-def test_a_node_with_no_served_build_carries_no_fingerprint():
-    """Nothing honest to hash: better no identity than one keyed on a guess."""
-
-    class SilentLlm(ScriptedLlm):
-        async def generate_content_async(self, llm_request, stream: bool = False):
-            yield LlmResponse(
-                content=types.Content(
-                    role="model", parts=[types.Part(text=self.reply)]
-                )
-            )
-
-    pipeline, _ = build(happy_replies(), llm_class=SilentLlm)
-    outcome, _ = run(pipeline, job())
-    by_node = {run_.node: run_ for run_ in outcome.report.nodes}
-    extract = by_node[graph.EXTRACT_NODE]
-    assert extract.model is None
-    assert extract.sampling_fingerprint is None
-    # What was asked for is still known, and still recorded.
-    assert extract.requested_model == BASE_MODEL
+    assert by_node[graph.CRITIC_NODE].sampling_fingerprint is not None
+    assert by_node[graph.ASSEMBLE_NODE].sampling_fingerprint is None
 
 
 def test_report_stamps_the_per_tier_sampling_clear_block():
@@ -225,7 +135,11 @@ def test_report_stamps_the_per_tier_sampling_clear_block():
 
 
 def test_each_llm_node_fingerprint_recomputes_from_the_artifact():
-    """The per-node hash is derivable from the clear block + served model alone."""
+    """The per-node hash is derivable from the clear block + served model alone.
+
+    The report is the portable evidence, so this is asserted over the assembled
+    artifact rather than over the executor's output.
+    """
     pipeline, _ = build(happy_replies())
     outcome, _ = run(pipeline, job())
     tiers = load_model_tiers(PROJECT_ROOT / "config" / "model_tiers.toml", env={})
@@ -240,22 +154,6 @@ def test_each_llm_node_fingerprint_recomputes_from_the_artifact():
         tier = tiers.resolve_tier(canonical)
         expected = sampling_fingerprint(node_run.model, TierSampling(**clear[tier]))
         assert node_run.sampling_fingerprint == expected
-
-
-def test_base_and_strong_nodes_get_different_fingerprints():
-    """Different served model *and* (potentially) sampling → distinct identities."""
-    pipeline, _ = build(happy_replies())
-    outcome, _ = run(pipeline, job())
-    by_node = {run_.node: run_ for run_ in outcome.report.nodes}
-
-    extract_fp = by_node[graph.EXTRACT_NODE].sampling_fingerprint
-    critic_fp = by_node[graph.CRITIC_NODE].sampling_fingerprint
-    assert extract_fp and critic_fp and extract_fp != critic_fp
-    # recritic shares the critic's tier and model, so it shares the identity.
-    sampling = load_sampling(PROJECT_ROOT / "config" / "sampling.toml", env={})
-    assert by_node[graph.CRITIC_NODE].sampling_fingerprint == sampling_fingerprint(
-        served_build(STRONG_MODEL), sampling.for_tier("strong")
-    )
 
 
 def test_each_analyst_gets_its_own_category_and_the_shared_model():
