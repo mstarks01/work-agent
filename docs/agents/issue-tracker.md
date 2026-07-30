@@ -56,7 +56,7 @@ gh api --method POST repos/mstarks01/work-agent/issues/<child>/dependencies/bloc
 ### The live map
 
 - [#24 — Map: answer "how do I use this?" — a first-run path for the integrator](https://github.com/mstarks01/work-agent/issues/24)
-  — charted 2026-07-29, 9 tickets (5 resolved, 2 out of scope). A **planning** map: it
+  — charted 2026-07-29, 9 tickets (6 resolved, 2 out of scope). A **planning** map: it
   decides the first-run path for an integrator embedding `StrideEngine` (docs plus two
   utilities — an unbloated in-process web app and a runnable `examples/`) and stops at the
   spec. The route is settled: `uv sync` → model auth → lite web app → **Load example** →
@@ -69,8 +69,11 @@ gh api --method POST repos/mstarks01/work-agent/issues/<child>/dependencies/bloc
   `README.md` is the sole index carrying no Python, the web app gains `docs/Web-App.md`, and
   `docs/Configuration.md` sheds 176 lines to HTTP-API.md and Architecture.md. That decision
   found `docs/example-report.html`'s embedded sample payload to be pre-cutover (schema `1.0`,
-  `flash`/`pro` tier keys), so regenerating it is now its own ticket. Packaging and that
-  regeneration remain open. `/wayfinder` invoked with a map should resume this one.
+  `flash`/`pro` tier keys), so regenerating it is now its own ticket. Packaging is settled as
+  well: the web app is clone-only in a top-level `webapp/`, never in the wheel, with uvicorn in
+  a defaulted-on `web` dependency-group — no `[project.scripts]`, no `[web]` extra, and nothing
+  new inherited by an integrator embedding the engine. Only that regeneration remains open.
+  `/wayfinder` invoked with a map should resume this one.
 
 ### Completed efforts
 
