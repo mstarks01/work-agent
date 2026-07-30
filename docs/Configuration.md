@@ -149,7 +149,7 @@ as a knob and connected to nothing.
 | --- | --- |
 | `STRIDE_SKILLS_DIR` | `skills/` |
 | `STRIDE_PROMPTS_DIR` | `prompts/` |
-| `STRIDE_MODEL_TIERS` | `config/model_tiers.toml` |
+| `STRIDE_TIERS_FILE` | `config/model_tiers.toml` |
 | `STRIDE_SAMPLING` | `config/sampling.toml` |
 | `STRIDE_RESILIENCE` | `config/resilience.toml` |
 | `STRIDE_BLESSED_FINGERPRINTS` | `config/blessed-fingerprints.toml` |
@@ -163,6 +163,13 @@ reads the same files, and promoting a sweep winner re-pins the same
 `sampling.toml` and blesses into the same manifest. Redirect a path and
 everything follows it — which is what makes grading a configuration you do not
 run impossible rather than merely discouraged.
+
+> **Renamed:** this variable was `STRIDE_MODEL_TIERS`. That name sat inside the
+> `STRIDE_MODEL_` namespace the tier loader polices (see
+> [below](#how-strictly-each-override-family-is-checked)), so setting it was
+> rejected as an unrecognised *model override* and the documented path override
+> could never actually be used. The old name still stops startup, now with an
+> error that names the new one.
 
 ### Model overrides (deploy-time, no image rebuild)
 
