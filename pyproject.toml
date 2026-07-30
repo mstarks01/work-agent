@@ -26,6 +26,20 @@ dev = [
     "pytest>=8",
     "ruff>=0.16.0",
 ]
+# The lite first-run web app's server (#32). A dependency-group, not an extra
+# and not a wheel dependency: `webapp/` is deliberately outside the wheel, so
+# `stride-service[web]` would advertise a `pip install` path that cannot work —
+# pipeline.py resolves skills/, prompts/ and config/*.toml from the repo root,
+# which from site-packages is empty. Groups never enter the built distribution,
+# so the integrator at route step 5 inherits none of this.
+web = [
+    "uvicorn>=0.30",
+]
+
+[tool.uv]
+# Both groups on by default, so `uv sync` (route step 1) leaves route step 3 a
+# bare `uv run python webapp/main.py` with no install incantation in between.
+default-groups = ["dev", "web"]
 
 [tool.hatch.build.targets.wheel]
 packages = ["src/stride_service"]

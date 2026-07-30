@@ -44,10 +44,11 @@ import os
 import sys
 from typing import Any
 
+from stride_service.errors import ConfigError
 from stride_service.vendors import Vendor
 
 
-class ModelGateError(ValueError):
+class ModelGateError(ConfigError):
     """A tier's ``(vendor, model, sampling)`` combination cannot be requested."""
 
 

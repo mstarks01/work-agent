@@ -9,12 +9,15 @@ together cannot be built.
 Get one from either [the engine](Integration-Guide.md) (`outcome.report`) or the
 [`/v1/jobs/{id}/report`](HTTP-API.md) endpoint.
 
-## A rendered example
+## Seeing one rendered
 
-[`example-report.html`](example-report.html) is a self-contained viewer holding a
-sample report — open it in a browser to see the payload below rendered as threat
-cards, a severity summary, and the extracted DFD. It is a single file with the
-report JSON embedded, so it also serves as a reference for laying one out.
+Run the [web app](Web-App.md) — [First-Run](First-Run.md) step 3. It renders a
+real report of your own: threat cards, a severity summary, the extracted DFD,
+and the per-node provenance panel.
+
+There is no checked-in sample report in this repository. One would be a second
+description of this schema, drifting from the schema itself every time it moved,
+and the fields below are the authoritative account.
 
 ## Top-level shape
 
@@ -150,7 +153,7 @@ report carries fingerprints as-is. Whether they match a baseline that a
 *particular deployment* has blessed is a separate question, answered against
 that deployment's `config/blessed-fingerprints.toml` and recorded on the job —
 never on the report, which travels as portable evidence. See
-[Configuration → Provenance and certification](Configuration.md#provenance-and-certification).
+[Architecture → Provenance and certification](Architecture.md#provenance-and-certification).
 
 A report produced without live models (the in-memory stub runner, or eval
 fixtures) simply has an empty `sampling` and no fingerprints.

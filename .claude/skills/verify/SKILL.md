@@ -19,10 +19,12 @@ stdlib `HTTPServer` thread, set `STRIDE_AUTH_PROVIDER=oidc`, point
 tokens with matching `kid`, `iss`, `aud`, `exp`, `sub`. Then:
 
 ```bash
-uv run --with uvicorn python <script that sets env, then uvicorn.run(create_app(), port=8470)>
+uv run python <script that sets env, then uvicorn.run(create_app(), port=8470)>
 ```
 
-uvicorn is not a project dependency — always `--with uvicorn`.
+uvicorn is a `web` dependency-group member, not a wheel dependency. The group is
+in `[tool.uv] default-groups`, so `uv sync` installs it and no `--with uvicorn`
+is needed; passing it anyway is harmless.
 Set the env vars **before** importing `stride_service.api`.
 
 `create_app()` now defaults to the real ADK graph
