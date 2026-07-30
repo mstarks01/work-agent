@@ -28,13 +28,12 @@ from __future__ import annotations
 
 import hashlib
 from collections.abc import Mapping
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
 from datetime import UTC, datetime
-from pathlib import Path
 from typing import Any
 
 from evals.harness.reference import GoldenCase
-from stride_service.binding import build_tier_adapters, make_resolve_model
+from stride_service.deployment import Deployment
 from stride_service.execution import GraphExecutor, GraphRun
 from stride_service.graph import (
     ENTRY_EXTRACT,
@@ -50,11 +49,8 @@ from stride_service.graph import (
     Entry,
     ModelResolver,
     Pipeline,
-    build_pipeline,
     rejection_issues,
 )
-from stride_service.markdown_loader import MarkdownLoader
-from stride_service.model_tiers import load_model_tiers
 from stride_service.report import (
     DraftThreat,
     InputRef,
@@ -62,16 +58,12 @@ from stride_service.report import (
     NodeRun,
     StrideReport,
 )
-from stride_service.resilience import load_resilience
 from stride_service.sampling import (
     SamplingConfig,
-    load_sampling,
-    make_resolve_sampling,
 )
 from stride_service.system_model import SystemModel
 from stride_service.validation import ValidationIssue, parse_and_validate
 
-REPO_ROOT = Path(__file__).resolve().parents[2]
 EVAL_APP_NAME = "stride-evals"
 EVAL_USER = "eval-harness"
 
@@ -154,36 +146,29 @@ class ExtractionScore:
 def build_eval_pipeline(
     entry: Entry,
     *,
+    deployment: Deployment | None = None,
     resolve_model: ModelResolver | None = None,
     sampling: SamplingConfig | None = None,
 ) -> Pipeline:
     """The shipped graph, entered where the mode needs it.
 
-    Repo prompts, repo skills, repo tier config, repo sampling config, repo
-    resilience config: the defaults are production's — including the retry and
-    per-request timeout (ticket 038), so a scheduled sweep does not die on one
-    429 after hours of work — and the overrides exist for offline tests that
-    bind scripted models.
+    Built from a :class:`~stride_service.deployment.Deployment`, which is the
+    same thing the service is built from — including the retry and per-request
+    timeout (ticket 038), so a scheduled sweep does not die on one 429 after
+    hours of work. That is what makes "eval and production read from the same
+    place" true rather than aspirational: this used to hard-code
+    ``REPO_ROOT / "config"``, so a deployment that redirected a path had its
+    sweeps grading a configuration it does not run.
 
     ``resolve_model`` short-circuits the tier adapters deliberately: building
     them runs the credential check, which an offline test binding scripted
-    models has no credentials to pass and no provider to call.
+    models has no credentials to pass and no provider to call. ``sampling``
+    overrides the deployment's for a sweep varying the per-tier params.
     """
-    tiers = load_model_tiers(REPO_ROOT / "config" / "model_tiers.toml")
-    resilience = load_resilience(REPO_ROOT / "config" / "resilience.toml")
-    sampling = sampling or load_sampling(REPO_ROOT / "config" / "sampling.toml")
-    return build_pipeline(
-        skill_loader=MarkdownLoader(REPO_ROOT / "skills"),
-        prompt_loader=MarkdownLoader(REPO_ROOT / "prompts"),
-        resolve_model=resolve_model
-        or make_resolve_model(
-            build_tier_adapters(tiers, sampling, resilience), tiers
-        ),
-        resolve_sampling=make_resolve_sampling(sampling, tiers.resolve_tier),
-        tier_sampling=sampling.tiers,
-        resilience=resilience,
-        entry=entry,
-    )
+    deployment = deployment or Deployment.from_env()
+    if sampling is not None:
+        deployment = replace(deployment, sampling=sampling, _built={})
+    return deployment.pipeline(entry=entry, resolve_model=resolve_model)
 
 
 async def run_graph(pipeline: Pipeline, state: Mapping[str, Any], message: str) -> GraphRun:

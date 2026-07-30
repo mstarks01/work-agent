@@ -12,7 +12,7 @@ from pathlib import Path
 import pytest
 
 from evals.harness import modes
-from evals.harness.certify import DEFAULT_MANIFEST_PATH, promote
+from evals.harness.certify import promote, promotion_paths
 from stride_service.certification import (
     MANIFEST_VERSION,
     BlessedManifest,
@@ -20,6 +20,7 @@ from stride_service.certification import (
     certify,
     load_manifest,
 )
+from stride_service.deployment import SAMPLING_VAR, Deployment
 from stride_service.graph import ENTRY_EXTRACT, TIER_NODE_BY_GRAPH_NODE
 from stride_service.model_tiers import load_model_tiers
 from stride_service.sampling import load_sampling, sampling_fingerprint
@@ -220,4 +221,17 @@ def test_promote_refuses_to_pin_a_previously_unset_param(tmp_path):
 def test_the_manifest_lives_with_the_service_config_not_under_evals():
     # It moved to config/ when the service became what certifies: evals/ does
     # not ship, so a manifest under it was unreachable from the production image.
-    assert DEFAULT_MANIFEST_PATH == REPO_ROOT / "config" / "blessed-fingerprints.toml"
+    paths = promotion_paths()
+    assert paths.blessed_fingerprints == REPO_ROOT / "config" / "blessed-fingerprints.toml"
+
+
+def test_a_promotion_re_pins_the_file_the_sweep_actually_measured(tmp_path):
+    """A redirected deployment promotes into its own config, not the repo's."""
+    redirected = tmp_path / "sampling.toml"
+    redirected.write_text(SAMPLING_PATH.read_text(), encoding="utf-8")
+
+    paths = promotion_paths(
+        Deployment.from_env(env={SAMPLING_VAR: str(redirected)})
+    )
+
+    assert paths.sampling == redirected

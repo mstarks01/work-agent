@@ -38,6 +38,7 @@ from stride_service.auth import (
     TokenVerifier,
     build_verifier,
 )
+from stride_service.deployment import Deployment
 from stride_service.jobs import (
     MAX_DESCRIPTION_BYTES,
     TERMINAL_STATUSES,
@@ -48,7 +49,6 @@ from stride_service.jobs import (
     build_store,
     execute_job,
 )
-from stride_service.pipeline import default_pipeline_runner
 from stride_service.validation import ValidationIssue
 
 logger = logging.getLogger(__name__)
@@ -197,20 +197,29 @@ def _sse_frame(event) -> str:
 
 def create_app(
     *,
+    deployment: Deployment | None = None,
     store: JobStore | None = None,
     runner: PipelineRunner | None = None,
     verifier: TokenVerifier | None = None,
 ) -> FastAPI:
-    """Build the service app; production defaults, injectable seams for tests."""
+    """Build the service app; production defaults, injectable seams for tests.
+
+    The runner and the gate the report route consults both come from one
+    :class:`~stride_service.deployment.Deployment`, so the manifest a job was
+    certified against and the one the route enforces are the same object by
+    construction. An injected ``runner`` is a test stand-in and carries no
+    gate — a report it produced was never certified, so there is nothing for
+    the route to withhold on.
+    """
     app = FastAPI(title="STRIDE Threat-Modeling Service")
     app.state.store = store if store is not None else build_store()
-    app.state.runner = (
-        runner if runner is not None else default_pipeline_runner()
-    )
-    # The gate the report route consults. Read off the runner that owns it, so
-    # the manifest a job was certified against and the one the route enforces
-    # are the same object by construction — never two loads that could disagree.
-    app.state.certification = getattr(app.state.runner, "_certification", None)
+    if runner is not None:
+        app.state.runner = runner
+        app.state.certification = None
+    else:
+        deployment = deployment if deployment is not None else Deployment.from_env()
+        app.state.runner = deployment.runner()
+        app.state.certification = deployment.gate()
     app.state.verifier = verifier if verifier is not None else build_verifier()
 
     @app.exception_handler(StarletteHTTPException)
