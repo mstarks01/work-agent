@@ -9,6 +9,11 @@ The method is one sentence: **change one thing, measure it against the run-to-ru
 noise, and keep only what clearly beats the noise.** Everything below is that
 sentence with the commands filled in.
 
+> For **contributors changing the shipped model config** in `config/`. It scores
+> the engine against this repo's fixed golden corpus — not against your own
+> system's text — and every scoring run calls live models. Embedding the engine
+> instead? You want [docs/First-Run.md](../docs/First-Run.md).
+
 ## Before you start
 
 - **Credentials for your configured vendors.** The scoring runs call live
@@ -211,7 +216,7 @@ The service applies the same check to jobs it completes, using the same
 `config/blessed-fingerprints.toml` — there, the equivalent switch is
 `STRIDE_REQUIRE_CERTIFIED` and it withholds the report rather than failing the
 job. See
-[Configuration](../docs/Configuration.md#provenance-and-certification).
+[Architecture](../docs/Architecture.md#provenance-and-certification).
 
 ## What blocks a run, and what only informs it
 
