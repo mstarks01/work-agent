@@ -23,16 +23,11 @@ from __future__ import annotations
 import hashlib
 import logging
 import os
-from collections import defaultdict
 from collections.abc import Mapping
-from dataclasses import dataclass
 from datetime import UTC, datetime
 from pathlib import Path
 
-from google.adk import Runner
-from google.adk.apps import App
-from google.adk.sessions import BaseSessionService, InMemorySessionService
-from google.genai import types
+from google.adk.sessions import BaseSessionService
 
 from stride_service.binding import build_tier_adapters, make_resolve_model
 from stride_service.certification import (
@@ -40,6 +35,7 @@ from stride_service.certification import (
     CertifyResult,
     load_manifest,
 )
+from stride_service.execution import GraphExecutor, GraphRun
 from stride_service.graph import (
     STATE_ANALYSIS,
     STATE_INPUT_TEXT,
@@ -59,14 +55,9 @@ from stride_service.jobs import (
 )
 from stride_service.markdown_loader import MarkdownLoader
 from stride_service.model_tiers import ModelTierConfig, load_model_tiers
-from stride_service.report import InputRef, Job, NodeRun, StrideReport
+from stride_service.report import InputRef, Job, StrideReport
 from stride_service.resilience import load_resilience
-from stride_service.sampling import (
-    load_sampling,
-    make_resolve_sampling,
-    sampling_fingerprint,
-)
-from stride_service.vendors import join_served
+from stride_service.sampling import load_sampling, make_resolve_sampling
 
 logger = logging.getLogger(__name__)
 
@@ -101,28 +92,16 @@ class PipelineError(RuntimeError):
     """The graph finished without producing an analysis or a rejection."""
 
 
-@dataclass(frozen=True)
-class _NodeFinish:
-    """When one graph node produced its output, and what build answered it.
-
-    ``served_model`` is the build the provider says actually ran, read off the
-    event rather than assumed from the configured string (#7 decision 2). It is
-    ``None`` when the event carries none — an offline stand-in, or a provider
-    that did not report one — and a node with no served build gets no
-    fingerprint rather than one attesting to a model nobody confirmed.
-    """
-
-    node: str
-    at: float
-    served_model: str | None
-
-
 class AdkPipelineRunner:
     """Runs one job through the ADK Workflow and shapes the outcome.
 
     One :class:`~stride_service.graph.Pipeline` is built at startup and
     reused: instructions are composed once, so the cacheable prefix every
-    node shares is byte-identical across jobs.
+    node shares is byte-identical across jobs. Driving that graph and stamping
+    each node execution is :class:`~stride_service.execution.GraphExecutor`'s,
+    shared with the eval harness so both stamp identically; what stays here is
+    what only a *job* has — its identity, its input digest, and the
+    certification its deployment applies.
     """
 
     def __init__(
@@ -135,14 +114,9 @@ class AdkPipelineRunner:
     ) -> None:
         self._pipeline = pipeline
         self._certification = certification
-        self._app_name = app_name
-        self._session_service = session_service or InMemorySessionService()
-        self._runner = Runner(
-            app=App(name=app_name, root_agent=pipeline.workflow),
-            session_service=self._session_service,
+        self._executor = GraphExecutor(
+            pipeline, app_name=app_name, session_service=session_service
         )
-        self._predecessors = _predecessors_of(pipeline)
-        self._node_names = _node_names_of(pipeline)
 
     async def run(self, job: JobRecord, on_node: NodeCallback) -> PipelineOutcome:
         """Drive the graph to a terminal state, reporting each node as it lands.
@@ -165,35 +139,13 @@ class AdkPipelineRunner:
     async def _drive(
         self, job: JobRecord, on_node: NodeCallback, source_sha256: str
     ) -> PipelineOutcome:
-        session = await self._session_service.create_session(
-            app_name=self._app_name,
+        graph_run = await self._executor.run(
+            {STATE_INPUT_TEXT: job.description},
+            job.description,
             user_id=job.owner_subject,
-            state={STATE_INPUT_TEXT: job.description},
+            on_node=on_node,
         )
-        started_at = datetime.now(UTC).timestamp()
-        finishes: list[_NodeFinish] = []
-
-        async for event in self._runner.run_async(
-            user_id=job.owner_subject,
-            session_id=session.id,
-            new_message=types.Content(
-                role="user", parts=[types.Part(text=job.description)]
-            ),
-        ):
-            for node in _finished_nodes(event, self._node_names):
-                finishes.append(
-                    _NodeFinish(
-                        node=node,
-                        at=event.timestamp,
-                        served_model=getattr(event, "model_version", None),
-                    )
-                )
-                await on_node(node)
-
-        final = await self._session_service.get_session(
-            app_name=self._app_name, user_id=job.owner_subject, session_id=session.id
-        )
-        state = dict(final.state) if final else {}
+        state = graph_run.final_state
         if STATE_REJECTION in state:
             return PipelineRejected(issues=rejection_issues(state[STATE_REJECTION]))
         if STATE_ANALYSIS not in state:
@@ -202,9 +154,7 @@ class AdkPipelineRunner:
             )
 
         analysis = Analysis.from_state(state[STATE_ANALYSIS])
-        report = self._build_report(
-            job, analysis, self._node_runs(finishes, started_at), source_sha256
-        )
+        report = self._build_report(job, analysis, graph_run, source_sha256)
         return PipelineCompleted(
             report=report, certification=self._certify(job, report)
         )
@@ -235,53 +185,11 @@ class AdkPipelineRunner:
             )
         return result
 
-    def _node_runs(
-        self, finishes: list[_NodeFinish], started_at: float
-    ) -> list[NodeRun]:
-        """Per-node metadata in the order the nodes finished."""
-        finished_at = {finish.node: finish.at for finish in finishes}
-        runs = []
-        for finish in finishes:
-            ready_at = max(
-                (
-                    finished_at[predecessor]
-                    for predecessor in self._predecessors[finish.node]
-                    if predecessor in finished_at
-                ),
-                default=started_at,
-            )
-            requested = self._pipeline.node_models.get(finish.node)
-            served = _served_route(requested, finish.served_model)
-            runs.append(
-                NodeRun(
-                    node=finish.node,
-                    model=served,
-                    requested_model=requested,
-                    sampling_fingerprint=self._fingerprint(finish.node, served),
-                    duration_ms=max(round((finish.at - ready_at) * 1000), 0),
-                )
-            )
-        return runs
-
-    def _fingerprint(self, node: str, served_route: str | None) -> str | None:
-        """This node execution's generation identity, or ``None`` if unknowable.
-
-        Computed per *execution* (#7 decision 2), so 12 cases give one node 12
-        hashes and a build that moves mid-run gives it two — which is the drift
-        signal, not a defect. Without a served build there is nothing honest to
-        hash, so the node carries no fingerprint at all rather than one keyed on
-        what was merely requested.
-        """
-        sampling = self._pipeline.node_sampling.get(node)
-        if served_route is None or sampling is None:
-            return None
-        return sampling_fingerprint(served_route, sampling)
-
     def _build_report(
         self,
         job: JobRecord,
         analysis: Analysis,
-        nodes: list[NodeRun],
+        graph_run: GraphRun,
         source_sha256: str,
     ) -> StrideReport:
         return StrideReport(
@@ -294,7 +202,7 @@ class AdkPipelineRunner:
                 system_name=job.system_name or DEFAULT_SYSTEM_NAME,
                 source_sha256=source_sha256,
             ),
-            nodes=nodes,
+            nodes=graph_run.node_runs,
             sampling={
                 tier: params.model_dump()
                 for tier, params in self._pipeline.tier_sampling.items()
@@ -305,18 +213,6 @@ class AdkPipelineRunner:
             rejected_threats=analysis.rejected_threats,
             summary=analysis.summary,
         )
-
-
-def _served_route(requested_route: str | None, served_model: str | None) -> str | None:
-    """The vendor-prefixed build that answered, or ``None`` if either half is missing.
-
-    A deterministic FunctionNode has no requested route; a node whose event
-    carried no ``model_version`` has no served build. Either way there is no
-    served identity to record.
-    """
-    if requested_route is None or served_model is None:
-        return None
-    return join_served(requested_route, served_model)
 
 
 def build_default_pipeline(env: Mapping[str, str] | None = None) -> Pipeline:
@@ -399,33 +295,3 @@ def default_pipeline_runner(env: Mapping[str, str] | None = None) -> AdkPipeline
         build_default_pipeline(env),
         certification=build_certification_gate(tiers, env),
     )
-
-
-def _predecessors_of(pipeline: Pipeline) -> dict[str, set[str]]:
-    """Who must finish before each node can start, read off the built graph."""
-    predecessors: dict[str, set[str]] = defaultdict(set)
-    graph = pipeline.workflow.graph
-    for edge in graph.edges if graph else []:
-        predecessors[edge.to_node.name].add(edge.from_node.name)
-    return predecessors
-
-
-def _node_names_of(pipeline: Pipeline) -> set[str]:
-    """Every node in the built graph, by name."""
-    graph = pipeline.workflow.graph
-    return {node.name for node in graph.nodes} if graph else set()
-
-
-def _finished_nodes(event, known: set[str]) -> list[str]:
-    """The graph nodes whose output this event carries, if any.
-
-    ADK tags an event with the node paths it is the output for; the last
-    segment of a path (``stride_pipeline@1/extract@1``) is the node name.
-    The terminal node's event also carries the workflow's own path, which is
-    not a node the job should hear about — matching against the graph's node
-    names drops it.
-    """
-    node_info = getattr(event, "node_info", None)
-    paths = getattr(node_info, "output_for", None) or []
-    names = (path.rsplit("/", 1)[-1].split("@", 1)[0] for path in paths)
-    return [name for name in names if name in known]

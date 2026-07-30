@@ -319,8 +319,10 @@ class StrideReport(BaseModel):
     # scalars, not the ``TierSampling`` model, so this low-level schema module
     # stays free of the sampling/model_tiers import (which cycles back through
     # skills). Each node's sampling_fingerprint is recomputable from its served
-    # model and its tier's entry here. Empty on reports with no LLM provenance
-    # (a stub-runner or eval-synthetic report).
+    # model and its tier's entry here. Empty only on reports with no LLM
+    # provenance at all — the stub runner's. An eval report carries this block
+    # like any other: a sweep's fingerprints are evidence, and evidence nobody
+    # can recompute from the artifact is an assertion.
     sampling: dict[str, dict[str, float | int | None]] = Field(default_factory=dict)
     system_model: SystemModel
     boundary_crossings: list[BoundaryCrossing]
