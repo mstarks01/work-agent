@@ -17,8 +17,12 @@
 # secret and pretending otherwise hides them from review. Vertex is
 # IAM-authenticated -- API keys are the AI Studio surface and cannot serve the
 # pinned regional model strings -- so there is no key-based fallback that keeps
-# Vertex. See .github/WORKLOAD_IDENTITY.md for the one-time setup this workflow
-# assumes.
+# Vertex. That setup is one-time and lives outside this repository:
+# .github/WORKLOAD_IDENTITY.md explains it and
+# .github/scripts/setup-workload-identity.sh performs it. Until it is done the
+# preflight step below skips this job on pull_request rather than failing it --
+# provisioning was ruled an ops concern, so an unprovisioned repository is a
+# supported state, not a broken one.
 name: Evals (live Vertex)
 
 on:
@@ -77,6 +81,27 @@ jobs:
       contents: read
       id-token: write # the OIDC token exchanged for short-lived Vertex credentials
 
+    # The vendor registry reads its own STRIDE_-prefixed variables and nothing
+    # else (#9): an ambient credential this deployment did not declare must not
+    # be able to authenticate a run, which is the ASI03 inherited-credential
+    # path. So the project and location have to be handed over explicitly --
+    # ADC alone is not enough, because `vertex_project` and `vertex_location`
+    # are ordinary config that LiteLlm needs alongside the credentials.
+    #
+    # These replace GOOGLE_CLOUD_PROJECT / GOOGLE_CLOUD_LOCATION /
+    # GOOGLE_GENAI_USE_VERTEXAI, which this workflow set from 2026-07-21 until
+    # this commit. Those configured ADK's *native* Gemini client; the
+    # multi-vendor cutover (#8, #9, 2026-07-28) replaced it with the sole
+    # LiteLlm adapter reading the registry, so nothing has read them since.
+    # Setting three variables no code reads while omitting the two it requires
+    # is why the sweep has never completed a run.
+    #
+    # The third required variable, GOOGLE_APPLICATION_CREDENTIALS, is exported
+    # by the auth action below rather than set here.
+    env:
+      STRIDE_VERTEX_PROJECT: ${{ vars.GCP_PROJECT_ID }}
+      STRIDE_VERTEX_LOCATION: ${{ vars.GCP_LOCATION }}
+
     steps:
       - name: Check out
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
@@ -92,10 +117,88 @@ jobs:
       - name: Install dependencies
         run: uv sync --locked
 
-      # Writes an external-account credentials file and points ADC at it.
-      # Nothing in src/ reads GOOGLE_* or constructs a client -- ADK picks up
-      # ADC implicitly -- so authenticating needs no service-code change.
+      # The federation this job authenticates through is one-time GCP setup
+      # (.github/WORKLOAD_IDENTITY.md) that lives outside the repository, so a
+      # green checkout says nothing about whether it exists. Unconfigured, the
+      # auth action reports only "must specify exactly one of
+      # workload_identity_provider or credentials_json" -- true, but it names
+      # the action's input rather than the repository variable that feeds it,
+      # and says nothing about the setup document.
+      #
+      # Skipping is allowed on `pull_request` alone. A PR that touches a path
+      # filter has not asked for a live run, and a red check for absent
+      # infrastructure teaches people to ignore this workflow. `schedule` and
+      # `workflow_dispatch` did ask, so for them missing credentials fail the
+      # job: a sweep that silently runs nothing is worse than one that stops.
+      #
+      # Only variable *names* are reported. None of the four is secret, but a
+      # preflight step is not the place that decision gets re-litigated.
+      - name: Check federation is configured
+        id: preflight
+        shell: bash
+        env:
+          GCP_WORKLOAD_IDENTITY_PROVIDER: ${{ vars.GCP_WORKLOAD_IDENTITY_PROVIDER }}
+          GCP_EVAL_SERVICE_ACCOUNT: ${{ vars.GCP_EVAL_SERVICE_ACCOUNT }}
+          GCP_PROJECT_ID: ${{ vars.GCP_PROJECT_ID }}
+          GCP_LOCATION: ${{ vars.GCP_LOCATION }}
+        run: |
+          set -euo pipefail
+
+          missing=()
+          for name in GCP_WORKLOAD_IDENTITY_PROVIDER GCP_EVAL_SERVICE_ACCOUNT \
+                      GCP_PROJECT_ID GCP_LOCATION; do
+            # :- because set -u treats indirect expansion of an unset name as
+            # fatal. The env: block above always defines all four, so in CI
+            # they are set-but-empty rather than unset -- but a guard that
+            # depends on that distinction is not a guard.
+            [[ -n "${!name:-}" ]] || missing+=("$name")
+          done
+
+          if [[ ${#missing[@]} -eq 0 ]]; then
+            echo "configured=true" >>"$GITHUB_OUTPUT"
+            exit 0
+          fi
+
+          echo "configured=false" >>"$GITHUB_OUTPUT"
+          {
+            echo "## Live evals did not run"
+            echo
+            echo "Workload Identity Federation is not configured for this repository."
+            echo
+            echo "Unset repository variables:"
+            printf -- '- `%s`\n' "${missing[@]}"
+            echo
+            echo "See [.github/WORKLOAD_IDENTITY.md](.github/WORKLOAD_IDENTITY.md)"
+            echo "for the one-time setup, then re-run with:"
+            echo
+            echo '```sh'
+            echo 'gh workflow run "Evals (live Vertex)" -f mode=extraction'
+            echo '```'
+          } >>"$GITHUB_STEP_SUMMARY"
+
+          if [[ "$GITHUB_EVENT_NAME" != "pull_request" ]]; then
+            echo "::error::A ${GITHUB_EVENT_NAME} event asked for a live run, but" \
+                 "Workload Identity Federation is not configured. Unset:" \
+                 "${missing[*]}. See .github/WORKLOAD_IDENTITY.md."
+            exit 1
+          fi
+
+          echo "::warning::Skipping live evals -- Workload Identity Federation is" \
+               "not configured. Unset: ${missing[*]}." \
+               "See .github/WORKLOAD_IDENTITY.md."
+
+      # Writes an external-account credentials file and exports
+      # GOOGLE_APPLICATION_CREDENTIALS pointing at it.
+      #
+      # That variable is read *explicitly* by the vendor registry
+      # (`vendors.ADC_VAR`), not picked up implicitly: the check is for
+      # credential material this deployment declared, and probing gcloud's
+      # well-known path would make the build depend on laptop state (A02). It
+      # is the one GOOGLE_-prefixed variable the service reads, and the auth
+      # action is what sets it -- which is why it is absent from the job `env`
+      # above while its two companions are listed there.
       - name: Authenticate to Google Cloud
+        if: steps.preflight.outputs.configured == 'true'
         uses: google-github-actions/auth@7c6bc770dae815cd3e89ee6cdf493a5fab2cc093 # v3
         with:
           workload_identity_provider: ${{ vars.GCP_WORKLOAD_IDENTITY_PROVIDER }}
@@ -110,10 +213,8 @@ jobs:
       # but do not block. A gate that fires before anyone knows the normal
       # range trains people to bypass it.
       - name: Run golden-case evals
+        if: steps.preflight.outputs.configured == 'true'
         env:
-          GOOGLE_CLOUD_PROJECT: ${{ vars.GCP_PROJECT_ID }}
-          GOOGLE_CLOUD_LOCATION: ${{ vars.GCP_LOCATION }}
-          GOOGLE_GENAI_USE_VERTEXAI: "true"
           EVAL_MODE: ${{ inputs.mode || 'end-to-end' }}
         run: uv run python -m evals.harness.run run --mode "$EVAL_MODE" --out eval-artifact.json
 
@@ -122,15 +223,14 @@ jobs:
       # is not on the PR path-filtered trigger: it costs judge calls and its
       # failure blocks a *judge* change, not a prompt change.
       - name: Judge-vs-human agreement
-        if: github.event_name == 'schedule' || inputs.calibrate
-        env:
-          GOOGLE_CLOUD_PROJECT: ${{ vars.GCP_PROJECT_ID }}
-          GOOGLE_CLOUD_LOCATION: ${{ vars.GCP_LOCATION }}
-          GOOGLE_GENAI_USE_VERTEXAI: "true"
+        if: steps.preflight.outputs.configured == 'true' && (github.event_name == 'schedule' || inputs.calibrate)
         run: uv run python -m evals.harness.run calibrate --out judge-agreement.json
 
+      # always(), so a failed sweep still surfaces whatever it did produce --
+      # but not when preflight skipped, which would upload an empty artifact
+      # and make "the evals ran" indistinguishable from "the evals could not".
       - name: Upload run artifact
-        if: always()
+        if: always() && steps.preflight.outputs.configured == 'true'
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         with:
           name: eval-run-${{ github.run_id }}
