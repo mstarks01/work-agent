@@ -1988,6 +1988,9 @@ dev = [
     { name = "pytest" },
     { name = "ruff" },
 ]
+web = [
+    { name = "uvicorn" },
+]
 
 [package.metadata]
 requires-dist = [
@@ -2004,6 +2007,7 @@ dev = [
     { name = "pytest", specifier = ">=8" },
     { name = "ruff", specifier = ">=0.16.0" },
 ]
+web = [{ name = "uvicorn", specifier = ">=0.30" }]
 
 [[package]]
 name = "tenacity"

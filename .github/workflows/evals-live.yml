@@ -129,6 +129,45 @@ jobs:
           GOOGLE_GENAI_USE_VERTEXAI: "true"
         run: uv run python -m evals.harness.run calibrate --out judge-agreement.json
 
+      # Layer 3 of the examples' honesty mechanism (#30). The offline lane
+      # proves the docs show these files and that their branching runs against
+      # a stub; only a live run can show that examples/orders.md still extracts
+      # into a usable model and that the analysts still return threats for it.
+      #
+      # This is the sole check on the sample's extraction quality, which was
+      # accepted as an unverified risk when the sample was purpose-built rather
+      # than promoted out of the golden corpus.
+      #
+      # Note: `examples/**` is deliberately NOT on this workflow's PR path
+      # filter, so an examples-only pull request does not fire this and the
+      # Monday sweep is the real guarantee. examples/README.md says so in those
+      # words -- keep the two in step if the filter ever changes.
+      #
+      # The vendor registry reads its own STRIDE_-prefixed variables rather
+      # than the ambient GOOGLE_CLOUD_* ones, by design (#9): an undeclared
+      # credential in the environment must not be able to authenticate a run.
+      - name: Sample description still extracts (examples/embed.py)
+        env:
+          STRIDE_VERTEX_PROJECT: ${{ vars.GCP_PROJECT_ID }}
+          STRIDE_VERTEX_LOCATION: ${{ vars.GCP_LOCATION }}
+        run: |
+          uv run python examples/embed.py | tee embed-run.txt
+          uv run python - <<'PY'
+          import re, sys
+          report = open("embed-run.txt").read()
+          def number(label):
+              match = re.search(rf"^{label}:\s+(\d+)", report, re.M)
+              assert match, f"embed.py printed no {label!r} line:\n{report}"
+              return int(match.group(1))
+
+          elements, threats = number("elements"), number("threats")
+          # The band docs/Integration-Guide.md promises analysis quality in, and
+          # the band examples/orders.md was written to sit inside.
+          assert 8 <= elements <= 20, f"sample extracted {elements} elements, outside 8-20"
+          assert threats > 0, "sample produced no threats at all"
+          print(f"ok: {elements} elements, {threats} threats")
+          PY
+
       - name: Upload run artifact
         if: always()
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1

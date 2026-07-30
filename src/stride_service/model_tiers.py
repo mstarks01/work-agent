@@ -29,6 +29,7 @@ from typing import Literal, Self
 
 from pydantic import BaseModel, ConfigDict, Field, ValidationError, model_validator
 
+from stride_service.errors import ConfigError
 from stride_service.skills import STRIDE_CATEGORIES
 from stride_service.vendors import Vendor, VendorName, vendor_for
 
@@ -56,7 +57,7 @@ _VENDOR_FIELD = "VENDOR"
 _MODEL_FIELD = "MODEL"
 
 
-class ModelConfigError(ValueError):
+class ModelConfigError(ConfigError):
     """The model-tier configuration is invalid or unusable."""
 
 
