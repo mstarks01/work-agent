@@ -100,24 +100,21 @@ credential case, which is the common one at this point.
   engine directly; [`examples/embed.py`](../examples/embed.py) is four lines from
   `report.model_dump_json()`.
 
-## Regenerating the sample report
+## How the report page is rendered
 
-[`docs/example-report.html`](example-report.html) carries a checked-in sample
-payload so it renders standalone. That payload is a real analysis, and it is
-refreshed by dogfooding this route rather than by hand:
+[`docs/example-report.html`](example-report.html) is a complete, dependency-free
+renderer for the [report schema](Report-Schema.md). The app reads it at request
+time, replaces the contents of its `<script type="application/json" id="report">`
+block with your run's JSON, and serves the result. **The file itself is never
+edited and never imported** — it stays a documentation artifact that happens to
+be a working viewer, and `Report-Schema.md` keeps linking it as one.
 
-1. Start the app: `uv run python webapp/main.py`.
-2. Click **Load example** — it loads `examples/orders.md`.
-3. Analyze, and wait for the run to finish.
-4. Save the run's report JSON into the `<script type="application/json"
-   id="report">` block in `docs/example-report.html`, replacing it wholesale.
-   Nothing else in the file changes.
+That block holds no checked-in report; it exists only as the substitution
+anchor. So opening the file straight from disk renders nothing, which is why
+neither this page nor [First-Run](First-Run.md) points you at it as something to
+look at on its own — run the app instead.
 
-`tests/test_docs_example_report.py` guards it: the payload must validate as a
-`StrideReport`, match the current schema version, be keyed by the configured tier
-names, and carry full provenance on every LLM node. That last check is why the
-payload is never hand-authored — inventing fingerprints and served-model strings
-would fabricate provenance in a file the docs present as a real analysis.
-
-Timings, job id, and fingerprints differ on every regeneration. That is expected;
-nothing pins them.
+A stored sample was considered and dropped. To be honest about the provenance
+panel it renders, it would have to be a real analysis, regenerated against live
+models every time the schema or the tier names moved. That is recurring upkeep,
+requiring credentials, for a file whose only reader is this app.

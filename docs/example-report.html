@@ -162,68 +162,22 @@
 </div>
 
 <script type="application/json" id="report">
-{
-  "schema_version": "1.0",
-  "disclaimer": "AI-generated threat model. Not reviewed by a human security analyst.",
-  "job": { "id": "job-8f3a2c91", "status": "completed", "created_at": "2026-07-24T14:03:21Z", "completed_at": "2026-07-24T14:04:09Z", "revise_rounds": 0 },
-  "input": { "system_name": "Orders Service", "source_sha256": "0000000000000000000000000000000000000000000000000000000000000000" },
-  "nodes": [
-    { "node": "extract", "model": "gemini-2.5-flash", "sampling_fingerprint": "407d58f1302de32688d0b08e8965c3b705a3036ea06b217e4fd04ee19d543699", "duration_ms": 3180 },
-    { "node": "analyst/spoofing", "model": "gemini-2.5-pro", "sampling_fingerprint": "85b42a6567b6b33f1fae62e42c011e12494250e6bb5795de9a49f65c436adbad", "duration_ms": 9900 },
-    { "node": "analyst/denial-of-service", "model": "gemini-2.5-pro", "sampling_fingerprint": "85b42a6567b6b33f1fae62e42c011e12494250e6bb5795de9a49f65c436adbad", "duration_ms": 8700 },
-    { "node": "analyst/information-disclosure", "model": "gemini-2.5-pro", "sampling_fingerprint": "85b42a6567b6b33f1fae62e42c011e12494250e6bb5795de9a49f65c436adbad", "duration_ms": 10200 },
-    { "node": "critic", "model": "gemini-2.5-pro", "sampling_fingerprint": "85b42a6567b6b33f1fae62e42c011e12494250e6bb5795de9a49f65c436adbad", "duration_ms": 14500 },
-    { "node": "assemble", "model": null, "duration_ms": 18 }
-  ],
-  "sampling": {
-    "flash": { "temperature": 0.0, "top_p": null, "top_k": null, "seed": null, "max_output_tokens": null, "candidate_count": 1, "presence_penalty": null, "frequency_penalty": null, "thinking_budget": null },
-    "pro": { "temperature": 0.0, "top_p": null, "top_k": null, "seed": null, "max_output_tokens": null, "candidate_count": 1, "presence_penalty": null, "frequency_penalty": null, "thinking_budget": null }
-  },
-  "system_model": {
-    "external_entities": [ { "id": "entity:customer", "name": "Customer", "assets": ["pii"], "kind": "human", "trust_zone": "boundary:internet" } ],
-    "processes": [ { "id": "process:web-app", "name": "Web App", "assets": [], "technology": "Python/FastAPI on Cloud Run", "trust_zone": "boundary:internal-network", "exposure": "internet-facing" } ],
-    "data_stores": [ { "id": "store:orders-db", "name": "Orders DB", "assets": ["business-critical-data","pii"], "technology": "Cloud SQL Postgres", "trust_zone": "boundary:internal-network", "data_classification": "confidential", "encryption_at_rest": "unknown" } ],
-    "data_flows": [
-      { "id": "flow:customer-to-web-app:login", "name": "Login", "source": "entity:customer", "destination": "process:web-app", "protocol": "HTTPS", "authentication": "session cookie", "encryption_in_transit": "TLS 1.3" },
-      { "id": "flow:web-app-to-orders-db:store-order", "name": "Store Order", "source": "process:web-app", "destination": "store:orders-db", "protocol": "Postgres wire protocol", "authentication": "IAM database auth", "encryption_in_transit": "unknown" }
-    ],
-    "trust_boundaries": [
-      { "id": "boundary:internet", "name": "Internet", "kind": "network" },
-      { "id": "boundary:internal-network", "name": "Internal Network", "kind": "network" }
-    ],
-    "assumptions": [ { "assumption": "web app is internet-facing", "element_id": "process:web-app", "basis": "customers reach it directly from the browser" } ]
-  },
-  "boundary_crossings": [ { "flow_id": "flow:customer-to-web-app:login", "source_zone": "boundary:internet", "destination_zone": "boundary:internal-network" } ],
-  "threats": [
-    { "id": "S-01", "category": "spoofing", "title": "Session cookie theft enables account takeover",
-      "description": "Session cookies are the only asserted authenticator on the login flow. If one is stolen (XSS, network capture on a downgraded connection), an attacker impersonates the customer to the web app.",
-      "affected_element_ids": ["flow:customer-to-web-app:login"],
-      "severity": { "likelihood": "medium", "impact": "high", "level": "high", "justification": "Commodity attack against exposed sessions holding PII." },
-      "mitigations": [ { "summary": "Set HttpOnly, Secure and SameSite on session cookies" }, { "summary": "Bind sessions to a second factor for sensitive actions" } ],
-      "confidence": "high", "verdict": { "status": "confirmed", "reason": "", "related_unknowns": [] } },
-    { "id": "D-01", "category": "denial-of-service", "title": "Internet-facing web app exposed to volumetric abuse",
-      "description": "The web app is internet-facing with no stated rate limiting or upstream protection, so unauthenticated request floods can exhaust its Cloud Run capacity and deny service to customers.",
-      "affected_element_ids": ["process:web-app"],
-      "severity": { "likelihood": "medium", "impact": "medium", "level": "medium", "justification": "Exposed endpoint; impact bounded to availability." },
-      "mitigations": [ { "summary": "Front the app with a WAF/CDN and per-IP rate limits" } ],
-      "confidence": "high", "verdict": { "status": "confirmed", "reason": "", "related_unknowns": [] } },
-    { "id": "I-01", "category": "information-disclosure", "title": "Orders database may lack encryption at rest",
-      "description": "The orders database holds customer PII and business-critical data, but whether it is encrypted at rest is not stated. If it is not, disk or backup compromise discloses the full order history.",
-      "affected_element_ids": ["store:orders-db"],
-      "severity": { "likelihood": "low", "impact": "high", "level": "medium", "justification": "High-value data; likelihood hinges on an unverified control." },
-      "mitigations": [ { "summary": "Confirm and enforce CMEK encryption at rest on the database" } ],
-      "confidence": "medium", "verdict": { "status": "needs-info", "reason": "Encryption at rest for the orders database is unknown.", "related_unknowns": [ { "element_id": "store:orders-db", "attribute": "encryption_at_rest" } ] } }
-  ],
-  "rejected_threats": [
-    { "id": "R-01", "category": "repudiation", "title": "Customers could deny having placed an order",
-      "description": "Considered whether a customer can repudiate an order.",
-      "affected_element_ids": ["flow:web-app-to-orders-db:store-order"],
-      "severity": { "likelihood": "low", "impact": "low", "level": "low", "justification": "Low-value dispute risk on an internal, authenticated flow." },
-      "mitigations": [], "confidence": "low",
-      "verdict": { "status": "rejected", "reason": "The store-order flow uses IAM database auth, giving attributable writes; no evidence of a missing audit trail in the description.", "related_unknowns": [] } }
-  ],
-  "summary": { "threat_count": 3, "by_category": { "spoofing": 1, "denial-of-service": 1, "information-disclosure": 1 }, "by_severity": { "high": 1, "medium": 2 }, "needs_info_count": 1, "rejected_count": 1, "elements_analyzed": 7 }
-}
+<!--
+  Substitution anchor, not a sample. The web app (webapp/main.py) reads this
+  file at request time and replaces the contents of this block with the JSON of
+  the run you just performed; it needs the block to EXIST, and never reads what
+  is in it.
+
+  This deliberately holds no report. A checked-in sample would have to be a real
+  analysis to be honest about provenance, which means regenerating it against
+  live models every time the schema moves -- an upkeep cost for a file nobody is
+  meant to open on its own. Open the app instead: docs/Web-App.md.
+
+  Consequence: this page renders empty when opened directly from disk. That is
+  intended. The viewer's JS indexes R.summary and iterates R.threats, so it
+  throws on this empty object rather than drawing a misleading blank report.
+-->
+{}
 </script>
 
 <script>
