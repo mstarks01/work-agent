@@ -81,6 +81,27 @@ jobs:
       contents: read
       id-token: write # the OIDC token exchanged for short-lived Vertex credentials
 
+    # The vendor registry reads its own STRIDE_-prefixed variables and nothing
+    # else (#9): an ambient credential this deployment did not declare must not
+    # be able to authenticate a run, which is the ASI03 inherited-credential
+    # path. So the project and location have to be handed over explicitly --
+    # ADC alone is not enough, because `vertex_project` and `vertex_location`
+    # are ordinary config that LiteLlm needs alongside the credentials.
+    #
+    # These replace GOOGLE_CLOUD_PROJECT / GOOGLE_CLOUD_LOCATION /
+    # GOOGLE_GENAI_USE_VERTEXAI, which this workflow set from 2026-07-21 until
+    # this commit. Those configured ADK's *native* Gemini client; the
+    # multi-vendor cutover (#8, #9, 2026-07-28) replaced it with the sole
+    # LiteLlm adapter reading the registry, so nothing has read them since.
+    # Setting three variables no code reads while omitting the two it requires
+    # is why the sweep has never completed a run.
+    #
+    # The third required variable, GOOGLE_APPLICATION_CREDENTIALS, is exported
+    # by the auth action below rather than set here.
+    env:
+      STRIDE_VERTEX_PROJECT: ${{ vars.GCP_PROJECT_ID }}
+      STRIDE_VERTEX_LOCATION: ${{ vars.GCP_LOCATION }}
+
     steps:
       - name: Check out
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
@@ -166,9 +187,16 @@ jobs:
                "not configured. Unset: ${missing[*]}." \
                "See .github/WORKLOAD_IDENTITY.md."
 
-      # Writes an external-account credentials file and points ADC at it.
-      # Nothing in src/ reads GOOGLE_* or constructs a client -- ADK picks up
-      # ADC implicitly -- so authenticating needs no service-code change.
+      # Writes an external-account credentials file and exports
+      # GOOGLE_APPLICATION_CREDENTIALS pointing at it.
+      #
+      # That variable is read *explicitly* by the vendor registry
+      # (`vendors.ADC_VAR`), not picked up implicitly: the check is for
+      # credential material this deployment declared, and probing gcloud's
+      # well-known path would make the build depend on laptop state (A02). It
+      # is the one GOOGLE_-prefixed variable the service reads, and the auth
+      # action is what sets it -- which is why it is absent from the job `env`
+      # above while its two companions are listed there.
       - name: Authenticate to Google Cloud
         if: steps.preflight.outputs.configured == 'true'
         uses: google-github-actions/auth@7c6bc770dae815cd3e89ee6cdf493a5fab2cc093 # v3
@@ -187,9 +215,6 @@ jobs:
       - name: Run golden-case evals
         if: steps.preflight.outputs.configured == 'true'
         env:
-          GOOGLE_CLOUD_PROJECT: ${{ vars.GCP_PROJECT_ID }}
-          GOOGLE_CLOUD_LOCATION: ${{ vars.GCP_LOCATION }}
-          GOOGLE_GENAI_USE_VERTEXAI: "true"
           EVAL_MODE: ${{ inputs.mode || 'end-to-end' }}
         run: uv run python -m evals.harness.run run --mode "$EVAL_MODE" --out eval-artifact.json
 
@@ -199,10 +224,6 @@ jobs:
       # failure blocks a *judge* change, not a prompt change.
       - name: Judge-vs-human agreement
         if: steps.preflight.outputs.configured == 'true' && (github.event_name == 'schedule' || inputs.calibrate)
-        env:
-          GOOGLE_CLOUD_PROJECT: ${{ vars.GCP_PROJECT_ID }}
-          GOOGLE_CLOUD_LOCATION: ${{ vars.GCP_LOCATION }}
-          GOOGLE_GENAI_USE_VERTEXAI: "true"
         run: uv run python -m evals.harness.run calibrate --out judge-agreement.json
 
       # always(), so a failed sweep still surfaces whatever it did produce --
