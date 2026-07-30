@@ -66,8 +66,11 @@ Completed on GitHub Issues (canonical):
   — 10 tickets (8 resolved, 2 out of scope), charted 2026-07-29, complete 2026-07-30. A
   **planning** map: it decided the first-run path for an integrator embedding `StrideEngine`
   (docs plus two utilities — an unbloated in-process web app and a runnable `examples/`) and
-  stopped at the spec. **Nothing here is built yet** — the whole map is a decision record, and
-  implementing it is ordinary follow-up work that needs no map. The route: `uv sync` → model auth
+  stopped at the spec. The map itself is a decision record; **the spec was implemented
+  afterwards** as ordinary follow-up work needing no map, on `build/first-run-path`. Read the
+  code first and the tickets' resolution comments for the reasoning behind it. One piece is
+  deliberately outstanding — `docs/example-report.html`'s payload, which needs live models
+  (issue #36). The route: `uv sync` → model auth
   → lite web app → **Load example** → Analyze → embed in process, from a new `docs/First-Run.md`.
   The web app is two pages (a form page streaming `on_node` over SSE, then
   `docs/example-report.html` unedited with the run's JSON injected), clone-only in a top-level
