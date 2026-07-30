@@ -62,24 +62,75 @@ twice rather than ten times.
 
 ## Provenance and certification
 
-Each node records what actually answered it: the **served** model build (the
-build string the provider reported, prefixed with its vendor), the **requested**
-route, and a **fingerprint** — a hash of the served route plus the tier's
-decoding parameters. These land in the report's `nodes` array, so a report
-explains its own origin without trusting an outside record.
+Three terms, defined once and used throughout:
 
-**Certification** compares those fingerprints against the ones this deployment
-has **blessed** — approved by a sanctioned measured run and recorded in
-`config/blessed-fingerprints.toml`. It has three results: `certified` (every
-fingerprint observed is blessed), `uncertified` (at least one is not), and
-`unexercised` (a tier the graph declares produced no fingerprint at all).
+- **Served build** — the model identifier the provider says actually answered a
+  request, prefixed with its vendor (`vertex_ai/gemini-2.5-pro-002`). Not
+  necessarily the one you asked for.
+- **Fingerprint** (also *generation identity*) — `sha256` of the served route
+  plus that tier's resolved decoding parameters. One value that identifies
+  exactly how a node produced its output.
+- **Blessed** — a fingerprint recorded in `config/blessed-fingerprints.toml`
+  because a measured, sanctioned run produced it. The list is this deployment's
+  own; nothing about it ships from this repo.
 
-The service certifies every job it completes — this is not the eval harness's
-job alone. The result lands on the job record, never on the report: the report
-is portable evidence that travels with the analysis, while a match against a
-blessed list is one deployment's claim about it. See
-[Configuration](Configuration.md#provenance-and-certification) for the full
-rules and the environment variables that control them.
+Every run is **self-describing**: each node records what it asked for, what
+answered, and the fingerprint of the two together.
+
+| Field | What it holds |
+| --- | --- |
+| `NodeRun.requested_model` | The configured route — what was asked for (`vertex_ai/gemini-2.5-pro`). |
+| `NodeRun.model` | The served build — what actually answered (`vertex_ai/gemini-2.5-pro-002`). |
+| `NodeRun.sampling_fingerprint` | The fingerprint of the served route and the tier's decoding params. |
+
+The report records both model fields and **compares neither**. It doesn't need
+to: if the build moves, the fingerprint changes too, and no blessed list
+contains it — so the run reads as uncertified and the drift surfaces there
+instead.
+
+The fingerprint is computed **per node execution**, not once at startup. A build
+that moves partway through a run therefore gives one node two different
+identities, which is the signal you want rather than a defect. The vendor prefix
+is part of the hash because a served identifier alone carries no vendor —
+Vertex-hosted Claude and Anthropic-direct Claude return identical build strings.
+
+`config/blessed-fingerprints.toml` records blessed fingerprints **per tier**,
+not per node. A fingerprint contains no node name, and `critic` and `recritic`
+run on the same tier, so they present a byte-identical hash; keying by node
+would call that one hash blessed under `critic` and unblessed under `recritic`,
+marking the first revise path in production uncertified on a technicality.
+
+The list is **deployment-local**. This project can never ship a run that already
+counts as certified, because a repo-level blessing plus a local one could only
+resolve as one silently overriding the other.
+`STRIDE_BLESSED_FINGERPRINTS` chooses *which* single file is read — it does not
+layer a second one on top.
+
+**The service certifies every job it completes**, not just the eval harness. The
+result has three states and lives on the job record, never on the report: the
+report is portable evidence that travels with the analysis, while a blessed list
+is one deployment's claim about it.
+
+| State | Meaning | Effect on `GET /v1/jobs/{id}/report` |
+| --- | --- | --- |
+| certified | Every observed fingerprint is blessed | Served |
+| uncertified | At least one is not | Served **unless** `STRIDE_REQUIRE_CERTIFIED` |
+| unexercised | A tier the graph declares presented no fingerprint at all | **Always** withheld |
+
+The lists ship **empty**, so until you promote a measured baseline every run
+reads as uncertified. That is recorded, not fatal — a gate that fires before
+anyone knows the normal range just trains people to switch it off.
+`unexercised` is different: every tier has a node that always runs, so it cannot
+happen on a run that produced a report at all. It is an internal assertion, and
+enforcing it costs nothing.
+
+Withholding refuses the *report*; it never fails the job. A failed job carries no
+report at all, and the fingerprints that show what drifted live inside it.
+Nothing about certification appears in the job status view — it is operator-only.
+
+| Variable | Effect |
+| --- | --- |
+| `STRIDE_REQUIRE_CERTIFIED` | Withhold the report when the run is uncertified. Off by default. |
 
 ## Outcomes
 

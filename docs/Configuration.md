@@ -70,7 +70,7 @@ catalogs at once, and its predecessor — an allowlist of numbered Gemini builds
 broke outright when Google retired them. The name check is only a proxy. The
 real guarantee is the **served build read back from every response** and
 recorded for each node execution, described under
-[Provenance and certification](#provenance-and-certification).
+[Architecture → Provenance and certification](Architecture.md#provenance-and-certification).
 
 ### Sampling
 
@@ -190,188 +190,12 @@ temporary escape hatch: an override changes the run's fingerprint, so a run usin
 one reads as **uncertified**. To change sampling for real, edit the file and back
 it with a measurement — see [Tuning the models](../evals/TUNING.md).
 
-### Provenance and certification
-
-Three terms, defined once and used throughout:
-
-- **Served build** — the model identifier the provider says actually answered a
-  request, prefixed with its vendor (`vertex_ai/gemini-2.5-pro-002`). Not
-  necessarily the one you asked for.
-- **Fingerprint** (also *generation identity*) — `sha256` of the served route
-  plus that tier's resolved decoding parameters. One value that identifies
-  exactly how a node produced its output.
-- **Blessed** — a fingerprint recorded in `config/blessed-fingerprints.toml`
-  because a measured, sanctioned run produced it. The list is this deployment's
-  own; nothing about it ships from this repo.
-
-Every run is **self-describing**: each node records what it asked for, what
-answered, and the fingerprint of the two together.
-
-| Field | What it holds |
-| --- | --- |
-| `NodeRun.requested_model` | The configured route — what was asked for (`vertex_ai/gemini-2.5-pro`). |
-| `NodeRun.model` | The served build — what actually answered (`vertex_ai/gemini-2.5-pro-002`). |
-| `NodeRun.sampling_fingerprint` | The fingerprint of the served route and the tier's decoding params. |
-
-The report records both model fields and **compares neither**. It doesn't need
-to: if the build moves, the fingerprint changes too, and no blessed list
-contains it — so the run reads as uncertified and the drift surfaces there
-instead.
-
-The fingerprint is computed **per node execution**, not once at startup. A build
-that moves partway through a run therefore gives one node two different
-identities, which is the signal you want rather than a defect. The vendor prefix
-is part of the hash because a served identifier alone carries no vendor —
-Vertex-hosted Claude and Anthropic-direct Claude return identical build strings.
-
-`config/blessed-fingerprints.toml` records blessed fingerprints **per tier**,
-not per node. A fingerprint contains no node name, and `critic` and `recritic`
-run on the same tier, so they present a byte-identical hash; keying by node
-would call that one hash blessed under `critic` and unblessed under `recritic`,
-marking the first revise path in production uncertified on a technicality.
-
-The list is **deployment-local**. This project can never ship a run that already
-counts as certified, because a repo-level blessing plus a local one could only
-resolve as one silently overriding the other.
-`STRIDE_BLESSED_FINGERPRINTS` chooses *which* single file is read — it does not
-layer a second one on top.
-
-**The service certifies every job it completes**, not just the eval harness. The
-result has three states and lives on the job record, never on the report: the
-report is portable evidence that travels with the analysis, while a blessed list
-is one deployment's claim about it.
-
-| State | Meaning | Effect on `GET /v1/jobs/{id}/report` |
-| --- | --- | --- |
-| certified | Every observed fingerprint is blessed | Served |
-| uncertified | At least one is not | Served **unless** `STRIDE_REQUIRE_CERTIFIED` |
-| unexercised | A tier the graph declares presented no fingerprint at all | **Always** withheld |
-
-The lists ship **empty**, so until you promote a measured baseline every run
-reads as uncertified. That is recorded, not fatal — a gate that fires before
-anyone knows the normal range just trains people to switch it off.
-`unexercised` is different: every tier has a node that always runs, so it cannot
-happen on a run that produced a report at all. It is an internal assertion, and
-enforcing it costs nothing.
-
-Withholding refuses the *report*; it never fails the job. A failed job carries no
-report at all, and the fingerprints that show what drifted live inside it.
-Nothing about certification appears in the job status view — it is operator-only.
-
-| Variable | Effect |
-| --- | --- |
-| `STRIDE_REQUIRE_CERTIFIED` | Withhold the report when the run is uncertified. Off by default. |
-
 ### Resilience overrides
 
 | Variable | Effect |
 | --- | --- |
 | `STRIDE_RETRY_ATTEMPTS` | Total attempts per LLM call. |
 | `STRIDE_TIMEOUT_MS` | Per-request timeout, milliseconds. |
-
-### Bearer auth (HTTP surface only)
-
-Required by the [`/v1` API](HTTP-API.md); the in-process engine does not use them.
-Every `/v1` route requires a valid bearer token; the verifier returns the
-token's `sub`, and job ownership binds to that subject.
-
-#### How the provider is chosen
-
-`STRIDE_AUTH_PROVIDER` selects the backend at deploy time and **fails closed** —
-an unset or unknown value stops startup rather than weakening or skipping the
-check. The value is never read from the request, so a token can't pick its own
-verifier.
-
-| Variable | Purpose |
-| --- | --- |
-| `STRIDE_AUTH_PROVIDER` | Auth backend to use. Today: `oidc`. |
-
-Each backend reads its own prefixed settings. The `oidc` backend is a standard
-**OIDC JWT verifier**, configured through `STRIDE_OIDC_*`:
-
-| Variable | Purpose |
-| --- | --- |
-| `STRIDE_OIDC_ISSUER` | Expected `iss` claim — your IdP's issuer URL. |
-| `STRIDE_OIDC_AUDIENCE` | Expected `aud` claim — the API's identifier at the IdP. |
-| `STRIDE_OIDC_JWKS_URL` | JWKS endpoint the IdP publishes its signing keys at. |
-
-Tokens must be RS256-signed and carry `exp`, `iss`, `aud`, and `sub`; anything
-else is rejected with a single generic error (the real reason is logged, never
-returned).
-
-#### Supported identity providers
-
-The `oidc` backend speaks plain OIDC, so it works with **any OIDC-compliant
-identity provider**. For each, the three settings come from the IdP's OIDC
-discovery document (`<issuer>/.well-known/openid-configuration` → `issuer` and
-`jwks_uri`); the audience is the API/resource identifier you register for this
-service. Switching providers is a values change only — the variable names stay
-`STRIDE_OIDC_*`.
-
-| Provider | Typical issuer (`STRIDE_OIDC_ISSUER`) |
-| --- | --- |
-| Ping (PingOne / PingFederate) | `https://auth.pingone.com/<env-id>/as` |
-| Okta | `https://<org>.okta.com/oauth2/<auth-server-id>` |
-| Auth0 | `https://<tenant>.auth0.com/` |
-| Microsoft Entra ID (Azure AD) | `https://login.microsoftonline.com/<tenant-id>/v2.0` |
-| AWS Cognito | `https://cognito-idp.<region>.amazonaws.com/<pool-id>` |
-| Keycloak | `https://<host>/realms/<realm>` |
-
-#### Example: Okta
-
-1. In the IdP, register this service as an API/resource and note the **audience**
-   (resource identifier) clients will request tokens for — e.g. `stride-service`.
-2. Fetch the discovery document to read the issuer and JWKS URL:
-   ```bash
-   curl -s https://<org>.okta.com/oauth2/<auth-server-id>/.well-known/openid-configuration \
-     | jq '{issuer, jwks_uri}'
-   ```
-3. Set the environment:
-   ```bash
-   export STRIDE_AUTH_PROVIDER=oidc
-   export STRIDE_OIDC_ISSUER="https://<org>.okta.com/oauth2/<auth-server-id>"
-   export STRIDE_OIDC_AUDIENCE="stride-service"
-   export STRIDE_OIDC_JWKS_URL="https://<org>.okta.com/oauth2/<auth-server-id>/v1/keys"
-   ```
-4. Start the app. Callers pass `Authorization: Bearer <token>` on every `/v1`
-   request; see the [HTTP API](HTTP-API.md) for the routes.
-
-Pointing at a different OIDC IdP (Ping, Auth0, Entra, …) is the same three
-settings from that IdP's discovery document — no code change.
-
-#### Adding a new backend
-
-A backend with a distinct name (or a non-OIDC mechanism — opaque-token
-introspection, mTLS, an API key) is a new entry in the `_FACTORIES` registry in
-[`src/stride_service/auth.py`](../src/stride_service/auth.py). Reuse
-`OidcJwtVerifier` for another OIDC issuer, or implement the `TokenVerifier`
-protocol (`verify(token) -> str`) for anything else; the API layer is unchanged.
-
-### Job storage (HTTP surface only)
-
-Required by the [`/v1` API](HTTP-API.md); the in-process engine keeps no jobs.
-The API only ever talks to the `JobStore` interface, so the backend is a
-deploy-time choice.
-
-`STRIDE_JOB_STORE` selects the backend at startup and **fails closed** — an
-unset or unknown value stops startup rather than silently falling back to
-non-durable storage. The value is never read from the request.
-
-| Variable | Purpose |
-| --- | --- |
-| `STRIDE_JOB_STORE` | Job-store backend to use. Today: `memory`. |
-
-The `memory` backend is a per-instance, in-process dict: fast and dependency-free,
-but jobs are lost on restart and are not shared across instances, so it suits
-single-instance or development deployments only. Durable, multi-instance
-deployments need a shared backend (see below).
-
-#### Adding a new backend
-
-A durable or shared backend (Redis, Postgres, …) is a new entry in the
-`_FACTORIES` registry in [`src/stride_service/jobs.py`](../src/stride_service/jobs.py).
-Implement the `JobStore` protocol (`create`, `get`, `save`) and read any
-connection settings from its own prefixed env vars; the API layer is unchanged.
 
 ### Provider environment
 
