@@ -149,7 +149,7 @@ as a knob and connected to nothing.
 | --- | --- |
 | `STRIDE_SKILLS_DIR` | `skills/` |
 | `STRIDE_PROMPTS_DIR` | `prompts/` |
-| `STRIDE_MODEL_TIERS` | `config/model_tiers.toml` |
+| `STRIDE_TIERS_FILE` | `config/model_tiers.toml` |
 | `STRIDE_SAMPLING` | `config/sampling.toml` |
 | `STRIDE_RESILIENCE` | `config/resilience.toml` |
 | `STRIDE_BLESSED_FINGERPRINTS` | `config/blessed-fingerprints.toml` |
@@ -163,6 +163,13 @@ reads the same files, and promoting a sweep winner re-pins the same
 `sampling.toml` and blesses into the same manifest. Redirect a path and
 everything follows it — which is what makes grading a configuration you do not
 run impossible rather than merely discouraged.
+
+> **Renamed:** this variable was `STRIDE_MODEL_TIERS`. That name sat inside the
+> `STRIDE_MODEL_` namespace the tier loader polices (see
+> [below](#how-strictly-each-override-family-is-checked)), so setting it was
+> rejected as an unrecognised *model override* and the documented path override
+> could never actually be used. The old name still stops startup, now with an
+> error that names the new one.
 
 ### Model overrides (deploy-time, no image rebuild)
 
@@ -206,6 +213,45 @@ it with a measurement — see [Tuning the models](../evals/TUNING.md).
 | --- | --- |
 | `STRIDE_RETRY_ATTEMPTS` | Total attempts per LLM call. |
 | `STRIDE_TIMEOUT_MS` | Per-request timeout, milliseconds. |
+
+### How strictly each override family is checked
+
+The three families do **not** treat an unrecognised variable the same way, and
+the difference is worth knowing before you debug a setting that appears to have
+no effect.
+
+| You set | Result |
+| --- | --- |
+| `STRIDE_MODEL_BASE_MODLE` (typo) | **Startup fails**: `unrecognised model override(s)` |
+| `STRIDE_MODEL_FLASH` (stale v2 name) | **Startup fails**: same check |
+| `STRIDE_SAMPLING_BSAE_SEED` (typo'd tier) | **Startup fails**: `unknown tier 'BSAE'` |
+| `STRIDE_SAMPLING_BASE_TOP_K` (removed param) | **Startup fails**: `TOP_K is not overridable` |
+| `STRIDE_RETRY_ATEMPTS` (typo) | **Silently ignored** — the file's value stands |
+| `STRIDE_TIMEOUT_MSEC` (typo) | **Silently ignored** — the file's value stands |
+
+The reason is naming, not intent. `STRIDE_MODEL_*` and `STRIDE_SAMPLING_*` are
+namespaces those two loaders own, so each can enumerate every variable it
+accepts and reject anything else in its namespace. The resilience knobs are bare
+`STRIDE_`-prefixed names, and `STRIDE_` belongs to the whole application — it
+also holds the config paths, the provider credentials and the job-store
+selector. No single loader can claim it, so the resilience loader reads the two
+names it knows and cannot see that you meant a third.
+
+What makes the weaker guarantee tolerable is the **consequence**, which is also
+why the two families differ in the first place:
+
+- Model and sampling change *what* the model produces. A silently missed
+  override there means a run recorded as using one configuration actually used
+  another, which invalidates every measurement taken against it — so those
+  fail closed, hard.
+- Retry and timeout change only *how hard we try*, never which answer comes
+  back. A silently missed override costs you resilience, never correctness, and
+  cannot move an eval score.
+
+So: **when a retry or timeout change appears to do nothing, suspect the variable
+name first.** Nothing echoes these values back, and a set-but-empty value *is*
+caught (`STRIDE_RETRY_ATTEMPTS=` raises `is set but empty`) — it is only a
+misspelled *name* that passes unnoticed.
 
 ### Provider environment
 
