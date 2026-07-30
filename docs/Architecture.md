@@ -204,7 +204,9 @@ and the selection seam are in place for all of them.
 | `stride_service.engine` | In-process `StrideEngine` facade. |
 | `stride_service.api` | The `/v1` FastAPI app. |
 | `stride_service.jobs` | Job lifecycle, `JobStore`, `PipelineRunner` seams. |
-| `stride_service.pipeline` | `AdkPipelineRunner`, production graph wiring. |
+| `stride_service.deployment` | One installation's config, resolved once: the files, the graph they configure, its runner and its certification gate. |
+| `stride_service.pipeline` | `AdkPipelineRunner`: one job's identity, input digest and certification around a Graph Run. |
+| `stride_service.execution` | Drives a built graph and stamps each node execution. Shared by the service and the eval harness. |
 | `stride_service.graph` | Topology and node functions. |
 | `stride_service.system_model` | Canonical model + validity helpers. |
 | `stride_service.report` | `StrideReport` and the severity model. |
