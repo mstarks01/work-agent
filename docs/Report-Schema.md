@@ -9,12 +9,19 @@ together cannot be built.
 Get one from either [the engine](Integration-Guide.md) (`outcome.report`) or the
 [`/v1/jobs/{id}/report`](HTTP-API.md) endpoint.
 
-## A rendered example
+## Seeing one rendered
 
-[`example-report.html`](example-report.html) is a self-contained viewer holding a
-sample report — open it in a browser to see the payload below rendered as threat
-cards, a severity summary, and the extracted DFD. It is a single file with the
-report JSON embedded, so it also serves as a reference for laying one out.
+[`example-report.html`](example-report.html) is a self-contained renderer for
+this schema — threat cards, a severity summary, the extracted DFD, and the
+per-node provenance panel, in one file with no dependencies. It is what the
+[web app](Web-App.md) serves you after a run, reading it at request time and
+injecting that run's JSON.
+
+**Opening it directly from disk shows nothing.** It carries no checked-in sample
+report, deliberately: a stored one would have to be regenerated against live
+models every time the schema moved, to stay honest about the provenance it
+displays. Run the app ([First-Run](First-Run.md) step 3) to see a real one, or
+read the file if you want a worked reference for laying a report out yourself.
 
 ## Top-level shape
 

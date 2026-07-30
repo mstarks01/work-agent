@@ -64,13 +64,6 @@ The wheel carries the engine, but a *run* also needs `config/`, `prompts/` and
 - [HTTP-API](docs/HTTP-API.md) — the `/v1` async job contract, and its bearer auth.
 - [Architecture](docs/Architecture.md) — the graph, the seams, and how a run is certified.
 
-<!-- Add "- [example-report.html](docs/example-report.html) — a rendered sample
-     report." here, and the matching link in docs/First-Run.md step 4, once the
-     file's embedded payload is regenerated (issue #36). Until then
-     tests/test_docs_example_report.py is red by design and the sample shows a
-     report shape the engine cannot emit — not something to hand a first-time
-     reader as the route's payoff. -->
-
 
 ## Development
 
