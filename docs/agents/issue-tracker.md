@@ -99,6 +99,15 @@ Completed on GitHub Issues (canonical):
   live in code as well as in the tickets' resolution comments — read the code
   first and the comments for the reasoning behind it.
 
+**Research and prototype branches are archived as tags, not branches.** Both maps' tickets
+cite `research/*` findings files (`docs/research/*.md`, never merged to `main`) and
+`prototype/*` code by branch name and commit SHA. Those nine branches were deleted on
+2026-07-30; every tip is preserved as an annotated `archive/<branch>` tag, so the SHA
+citations still resolve. Read one without touching the worktree:
+`git show archive/research/litellm-sole-adapter:docs/research/litellm-sole-adapter.md`.
+A future map's research subagents should expect the same treatment: the branch is throwaway,
+the tag is the record.
+
 Archived under `.wayfinder/`, from before this repo moved to GitHub issues:
 
 - `.wayfinder/map.md` + `.wayfinder/tickets/` — the original service design map, 39
