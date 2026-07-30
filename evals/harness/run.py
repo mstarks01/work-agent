@@ -33,7 +33,6 @@ from typing import Any
 
 from evals.harness import modes
 from evals.harness.calibration import AGREEMENT_BAR, load_pairs, measure_agreement
-from evals.harness.certify import DEFAULT_MANIFEST_PATH
 from evals.harness.critic_yield import (
     CriticYield,
     aggregate_yield,
@@ -47,32 +46,23 @@ from evals.harness.scorer import (
     unlisted_for_promotion,
 )
 from evals.harness.structural import report_issues
-from stride_service.certification import (
-    CertifyResult,
-    certify,
-    fingerprints_of,
-    load_manifest,
-)
-from stride_service.graph import TIER_NODE_BY_GRAPH_NODE
-from stride_service.model_tiers import load_model_tiers
-from stride_service.pipeline import DEFAULT_MODEL_TIERS_PATH, DEFAULT_RESILIENCE_PATH
+from stride_service.certification import CertifyResult, certify, fingerprints_of
+from stride_service.deployment import Deployment
 from stride_service.report import NodeRun
-from stride_service.resilience import load_resilience
 
 EVALS_ROOT = Path(__file__).resolve().parents[1]
 DEFAULT_CORPUS_DIR = EVALS_ROOT / "corpus"
 
 
-def _live_judge() -> PinnedJudge:
+def _live_judge(deployment: Deployment) -> PinnedJudge:
     """The pinned judge, retry-and-timeout-hardened like the graph (ticket 038).
 
     A calibration or scoring sweep is hours of paid work; without the same
     resilience config the graph carries, one 429 to the judge throws all of it
-    away.
+    away. It is the deployment's config, not a second read of the file, so the
+    judge cannot end up hardened differently from the graph it is scoring.
     """
-    return PinnedJudge(
-        load_judge_config(), resilience=load_resilience(DEFAULT_RESILIENCE_PATH)
-    )
+    return PinnedJudge(load_judge_config(), resilience=deployment.resilience)
 
 
 def _select(cases: Sequence[GoldenCase], wanted: Sequence[str]) -> list[GoldenCase]:
@@ -109,7 +99,9 @@ def _observe(observed: dict[str, set[str]], nodes: Iterable[NodeRun]) -> None:
         observed.setdefault(node, set()).update(prints)
 
 
-async def _run_mode(cases: Sequence[GoldenCase], mode: str) -> ModeRun:
+async def _run_mode(
+    cases: Sequence[GoldenCase], mode: str, deployment: Deployment
+) -> ModeRun:
     """Run one mode over the selected cases, collecting Tier 1 failures.
 
     The per-node fingerprints (ticket 07) come back too, taken from the node
@@ -117,7 +109,9 @@ async def _run_mode(cases: Sequence[GoldenCase], mode: str) -> ModeRun:
     and sourcing observations from one would leave the single tier that mode
     exercises the only tier it could never certify.
     """
-    pipeline = modes.build_eval_pipeline(modes.MODE_ENTRIES[mode])
+    pipeline = modes.build_eval_pipeline(
+        modes.MODE_ENTRIES[mode], deployment=deployment
+    )
     failures: list[str] = []
     payloads: list[dict[str, Any]] = []
     runs: dict[str, modes.AnalysisRun] = {}
@@ -182,7 +176,9 @@ def _score_runs(
     )
 
 
-def _models_record(judge: PinnedJudge | None) -> dict[str, Any]:
+def _models_record(
+    deployment: Deployment, judge: PinnedJudge | None
+) -> dict[str, Any]:
     """What this run asked its providers for, and what they say they served.
 
     Ticket 026: the tier strings are stable GA identifiers, not immutable
@@ -190,7 +186,7 @@ def _models_record(judge: PinnedJudge | None) -> dict[str, Any]:
     two runs with different ``judge_served`` values is a model change, not a
     regression, and nothing else in the artifact would show that.
     """
-    tiers = load_model_tiers(DEFAULT_MODEL_TIERS_PATH)
+    tiers = deployment.tiers
     judge_config = load_judge_config()
     return {
         "tiers_config_version": tiers.version,
@@ -247,21 +243,20 @@ def _print_yields(yields: Sequence[CriticYield]) -> None:
 
 def command_run(args: argparse.Namespace) -> int:
     cases = _select(load_corpus(args.corpus), args.case)
-    mode_run = asyncio.run(_run_mode(cases, args.mode))
+    # One deployment for the whole sweep: the graph it runs, the manifest it is
+    # certified against and the resilience the judge inherits are then one
+    # configuration rather than four reads that could disagree.
+    deployment = Deployment.from_env()
+    mode_run = asyncio.run(_run_mode(cases, args.mode, deployment))
     failures = mode_run.failures
 
     # Never silently trust (ticket 08 / 03 §4): the verdict is always computed
     # and surfaced, so an aggregate can never be read without knowing whether the
     # generation identity behind it is a blessed baseline.
-    tiers = load_model_tiers(DEFAULT_MODEL_TIERS_PATH)
-
-    def tier_of(graph_node: str) -> str:
-        return tiers.resolve_tier(TIER_NODE_BY_GRAPH_NODE[graph_node])
-
     certification = certify(
         mode_run.observations,
-        load_manifest(DEFAULT_MANIFEST_PATH),
-        tier_of,
+        deployment.manifest,
+        deployment.tier_of,
         mode_run.expected_nodes,
     )
     _print_certification(certification)
@@ -273,7 +268,7 @@ def command_run(args: argparse.Namespace) -> int:
     yields: list[CriticYield] = []
     judge: PinnedJudge | None = None
     if mode_run.runs and not args.no_scoring:
-        judge = _live_judge()
+        judge = _live_judge(deployment)
         scores, yields = _score_runs(cases, mode_run.runs, judge)
         _print_scores(scores)
         _print_yields(yields)
@@ -281,7 +276,7 @@ def command_run(args: argparse.Namespace) -> int:
     artifact = {
         "mode": args.mode,
         "cases": [case.id for case in cases],
-        "models": _models_record(judge),
+        "models": _models_record(deployment, judge),
         "gating": "tier-1-structural-only",
         "certification": certification.to_json(),
         "node_fingerprints": {
@@ -348,7 +343,8 @@ def _print_certification(result: CertifyResult) -> None:
 
 def command_calibrate(args: argparse.Namespace) -> int:
     """The >= 90% judge-human bar; failing it blocks a judge change."""
-    judge = _live_judge()
+    deployment = Deployment.from_env()
+    judge = _live_judge(deployment)
     result = measure_agreement(judge, load_pairs())
     print(
         f"judge-human agreement {result.agreement:.1%} over {result.total} pairs"
@@ -359,7 +355,7 @@ def command_calibrate(args: argparse.Namespace) -> int:
         f" false non-matches {len(result.false_non_matches)}"
     )
     if args.out:
-        payload = {**result.to_json(), "models": _models_record(judge)}
+        payload = {**result.to_json(), "models": _models_record(deployment, judge)}
         Path(args.out).write_text(json.dumps(payload, indent=2) + "\n", "utf-8")
     if result.meets_bar:
         return 0

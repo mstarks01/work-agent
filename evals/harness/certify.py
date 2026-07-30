@@ -3,9 +3,13 @@
 The **write** half of certification. The pure check moved into the service
 (:mod:`stride_service.certification`) once #17 decision 1 established that the
 service is what certifies each job it completes; this module keeps what only a
-sanctioned sweep does — re-pinning ``config/sampling.toml`` in place and
+sanctioned sweep does — re-pinning this deployment's sampling file in place and
 recording the fingerprints that pinning implies. The dependency now runs
 evals -> service, which is the direction it already ran.
+
+*This deployment's*, not the repo's: both files are located through
+:class:`~stride_service.deployment.Deployment`, so a sweep run against a
+redirected ``STRIDE_SAMPLING`` promotes into the file it actually measured.
 
 The single-sourced write path (ticket 03 §4): one ``SamplingConfig`` both
 re-pins the file's values *and* derives the fingerprints recorded in the
@@ -29,17 +33,25 @@ from stride_service.certification import (
     CertificationError,
     load_manifest,
 )
+from stride_service.deployment import ConfigPaths, Deployment
 from stride_service.model_tiers import TIER_NAMES
 from stride_service.sampling import SamplingConfig, sampling_fingerprint
 
-EVALS_ROOT = Path(__file__).resolve().parents[1]
-REPO_ROOT = EVALS_ROOT.parent
-DEFAULT_SAMPLING_PATH = REPO_ROOT / "config" / "sampling.toml"
 
-# The manifest is deployment-local (#10 decision 4) and lives with the other
-# service configs, not under evals/ — which is also what let the service load it
-# at all, since evals/ does not ship.
-DEFAULT_MANIFEST_PATH = REPO_ROOT / "config" / "blessed-fingerprints.toml"
+def promotion_paths(deployment: Deployment | None = None) -> ConfigPaths:
+    """Which ``sampling.toml`` and manifest a promotion re-pins.
+
+    The deployment's, not the repo's. A sweep measures whatever
+    ``STRIDE_SAMPLING`` names, so promoting its winner has to re-pin that same
+    file — re-pinning the checked-in copy instead would bless a fingerprint
+    describing params the measured configuration never held. The manifest is
+    deployment-local by design (#10 decision 4) and follows for the same reason.
+
+    Resolved through the deployment rather than from ``REPO_ROOT`` here, which
+    is what made this module a third opinion on where config lives.
+    """
+    return (deployment or Deployment.from_env()).paths
+
 
 # The file keys a sweep may re-pin in place, and how each serializes back to
 # TOML. ``top_k`` is absent from every set: sampling version 3 removed it from
@@ -58,8 +70,8 @@ def promote(
     sampling: SamplingConfig,
     served_builds: Mapping[str, str],
     *,
-    sampling_path: Path | str = DEFAULT_SAMPLING_PATH,
-    manifest_path: Path | str = DEFAULT_MANIFEST_PATH,
+    sampling_path: Path | str | None = None,
+    manifest_path: Path | str | None = None,
 ) -> BlessedManifest:
     """Promote a sweep winner: re-pin ``sampling.toml`` and bless its fingerprints.
 
@@ -72,10 +84,19 @@ def promote(
     (the "why-absent" record is the point of the file). Promoting a param the
     file leaves *unset* raises: turning an unverified param into a pinned one is
     a human decision that owes a rationale, not a silent sweep write.
+
+    Both paths default to this deployment's — see :func:`promotion_paths` — and
+    stay explicit parameters so a caller holding a deployment, or a test, can
+    name them directly.
     """
     unknown = sorted(set(served_builds) - set(TIER_NAMES))
     if unknown:
         raise CertificationError(f"unknown tier(s) in served builds: {unknown}")
+
+    if sampling_path is None or manifest_path is None:
+        paths = promotion_paths()
+        sampling_path = sampling_path or paths.sampling
+        manifest_path = manifest_path or paths.blessed_fingerprints
 
     sampling_path = Path(sampling_path)
     rewritten = _rewrite_sampling_values(
