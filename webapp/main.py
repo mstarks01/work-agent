@@ -78,8 +78,8 @@ from stride_service import (
     StrideEngine,
     StrideReport,
 )
-from stride_service.model_tiers import ModelTierConfig, load_model_tiers
-from stride_service.pipeline import DEFAULT_MODEL_TIERS_PATH, MODEL_TIERS_VAR
+from stride_service.deployment import Deployment
+from stride_service.model_tiers import ModelTierConfig
 from stride_service.vendors import vendor_for
 
 logger = logging.getLogger("webapp")
@@ -167,23 +167,25 @@ class Startup:
 def build_startup(env: Mapping[str, str] | None = None) -> Startup:
     """Build the engine once, converting a config failure into a page.
 
-    Building *is* the preflight: it loads the tiers, resolves the vendor's
-    credentials, and runs every tier's ``(vendor, model, sampling)`` through
-    LiteLLM's own check. The tiers are loaded first and separately so that a
-    credential failure can still name the vendor the config selected — that is
-    the whole content of the diagnostic.
+    Two stages, and the split is the whole content of the diagnostic. Resolving
+    the :class:`~stride_service.deployment.Deployment` reads the config files;
+    building the engine off it resolves the vendor's credentials and runs every
+    tier's ``(vendor, model, sampling)`` through LiteLLM's own check. So a
+    *config* failure leaves no tiers to report, while a *credential* failure
+    can still name the vendor the config selected — which is the case a first
+    run overwhelmingly hits. One read either way: the tiers the page prints are
+    the tiers the engine was built from, not a second load of the same file.
     """
     env = os.environ if env is None else env
-    tiers = None
+    deployment = None
     try:
-        tiers = load_model_tiers(
-            env.get(MODEL_TIERS_VAR, DEFAULT_MODEL_TIERS_PATH), env=env
-        )
-        engine = StrideEngine.from_config(env)
+        deployment = Deployment.from_env(env)
+        engine = StrideEngine.from_deployment(deployment)
     except ConfigError as exc:
         logger.error("config error at startup: %s", exc)
+        tiers = deployment.tiers if deployment is not None else None
         return Startup(engine=None, tiers=tiers, error=exc)
-    return Startup(engine=engine, tiers=tiers, error=None)
+    return Startup(engine=engine, tiers=deployment.tiers, error=None)
 
 
 def render_report(report: StrideReport) -> str:

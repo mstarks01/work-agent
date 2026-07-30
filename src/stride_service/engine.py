@@ -30,6 +30,7 @@ import logging
 from collections.abc import Mapping
 from typing import Self
 
+from stride_service.deployment import Deployment
 from stride_service.jobs import (
     MAX_DESCRIPTION_BYTES,
     JobRecord,
@@ -37,7 +38,6 @@ from stride_service.jobs import (
     PipelineOutcome,
     PipelineRunner,
 )
-from stride_service.pipeline import default_pipeline_runner
 
 logger = logging.getLogger(__name__)
 
@@ -80,13 +80,24 @@ class StrideEngine:
 
     @classmethod
     def from_config(cls, env: Mapping[str, str] | None = None) -> Self:
-        """The production engine: repo Markdown, repo config, pinned models.
+        """The production engine: this deployment's Markdown, config and models.
 
         Fails closed on missing or invalid config, exactly as the HTTP app
         does, rather than running nodes on whatever model or sampling happened
         to be default.
         """
-        return cls(default_pipeline_runner(env))
+        return cls.from_deployment(Deployment.from_env(env))
+
+    @classmethod
+    def from_deployment(cls, deployment: Deployment) -> Self:
+        """An engine on an already-resolved deployment.
+
+        For callers that need the configuration *and* the engine — the
+        first-run app reports which vendor a tier selected when the credential
+        check fails, and re-reading the config to find that out is how the two
+        could disagree.
+        """
+        return cls(deployment.runner())
 
     async def analyze(
         self,
