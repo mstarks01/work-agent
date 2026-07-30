@@ -20,6 +20,7 @@ from stride_service.engine import (
     EngineInputError,
     StrideEngine,
 )
+from stride_service.errors import ConfigError
 from stride_service.jobs import (
     GENERIC_FAILURE_MESSAGE,
     TERMINAL_STATUSES,
@@ -133,6 +134,7 @@ __all__ = [
     "AuthConfigError",
     "AuthenticationError",
     "BoundaryCrossing",
+    "ConfigError",
     "DataFlow",
     "DataStore",
     "Element",

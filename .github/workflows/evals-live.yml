@@ -226,6 +226,42 @@ jobs:
         if: steps.preflight.outputs.configured == 'true' && (github.event_name == 'schedule' || inputs.calibrate)
         run: uv run python -m evals.harness.run calibrate --out judge-agreement.json
 
+      # Layer 3 of the examples' honesty mechanism (#30). The offline lane
+      # proves the docs show these files and that their branching runs against
+      # a stub; only a live run can show that examples/orders.md still extracts
+      # into a usable model and that the analysts still return threats for it.
+      #
+      # This is the sole check on the sample's extraction quality, which was
+      # accepted as an unverified risk when the sample was purpose-built rather
+      # than promoted out of the golden corpus.
+      #
+      # Note: `examples/**` is deliberately NOT on this workflow's PR path
+      # filter, so an examples-only pull request does not fire this and the
+      # Monday sweep is the real guarantee. examples/README.md says so in those
+      # words -- keep the two in step if the filter ever changes.
+      #
+      # Credentials come from the job-level STRIDE_VERTEX_* block, like every
+      # other live step here.
+      - name: Sample description still extracts (examples/embed.py)
+        if: steps.preflight.outputs.configured == 'true'
+        run: |
+          uv run python examples/embed.py | tee embed-run.txt
+          uv run python - <<'PY'
+          import re
+          report = open("embed-run.txt").read()
+          def number(label):
+              match = re.search(rf"^{label}:\s+(\d+)", report, re.M)
+              assert match, f"embed.py printed no {label!r} line:\n{report}"
+              return int(match.group(1))
+
+          elements, threats = number("elements"), number("threats")
+          # The band docs/Integration-Guide.md promises analysis quality in, and
+          # the band examples/orders.md was written to sit inside.
+          assert 8 <= elements <= 20, f"sample extracted {elements} elements, outside 8-20"
+          assert threats > 0, "sample produced no threats at all"
+          print(f"ok: {elements} elements, {threats} threats")
+          PY
+
       # always(), so a failed sweep still surfaces whatever it did produce --
       # but not when preflight skipped, which would upload an empty artifact
       # and make "the evals ran" indistinguishable from "the evals could not".

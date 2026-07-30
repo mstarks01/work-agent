@@ -35,6 +35,8 @@ from dataclasses import dataclass
 from enum import StrEnum
 from typing import Literal
 
+from stride_service.errors import ConfigError
+
 VendorName = Literal["vertex", "anthropic", "openai"]
 VENDOR_NAMES: tuple[VendorName, ...] = ("vertex", "anthropic", "openai")
 
@@ -57,7 +59,7 @@ VERTEX_LOCATION_VAR = "STRIDE_VERTEX_LOCATION"
 ADC_VAR = "GOOGLE_APPLICATION_CREDENTIALS"
 
 
-class ProviderAuthError(ValueError):
+class ProviderAuthError(ConfigError):
     """Outbound provider credentials are missing or unusable.
 
     Distinct from :class:`stride_service.auth.AuthConfigError`, which is about
@@ -207,13 +209,38 @@ class Vendor:
         and is mitigated by keeping keys env-only, out of logs, out of the
         report, and out of the fingerprint, plus rotation.
         """
-        if self.credential is CredentialMode.API_KEY:
-            return {"api_key": self._require(env, self.api_key_var)}
         return {
-            "vertex_project": self._require(env, VERTEX_PROJECT_VAR),
-            "vertex_location": self._require(env, VERTEX_LOCATION_VAR),
-            "vertex_credentials": self._require(env, ADC_VAR),
+            kwarg: self._require(env, var) for kwarg, var in self._credential_vars()
         }
+
+    def _credential_vars(self) -> tuple[tuple[str, str], ...]:
+        """The ``(LiteLlm kwarg, env var)`` pairs this vendor authenticates with.
+
+        One table, two readers: :meth:`credential_kwargs` builds the adapter's
+        auth from it and :attr:`required_env_vars` reports it. Deriving both
+        from the same place is the point — a vendor -> env-var table copied
+        into a caller drifts from the check that actually runs, and the caller
+        that needs it is a *diagnostic* page whose whole value is being right
+        about which variables are missing (#28 decision 6).
+        """
+        if self.credential is CredentialMode.API_KEY:
+            return (("api_key", self.api_key_var),)
+        return (
+            ("vertex_project", VERTEX_PROJECT_VAR),
+            ("vertex_location", VERTEX_LOCATION_VAR),
+            ("vertex_credentials", ADC_VAR),
+        )
+
+    @property
+    def required_env_vars(self) -> tuple[str, ...]:
+        """Every environment variable this vendor needs, in check order.
+
+        :meth:`_require` raises on the *first* missing variable, so a Vertex
+        user with none of the three set would otherwise discover them one per
+        restart. Callers reporting a credential failure list this whole set and
+        mark the unset ones — presence only, never values (OWASP A09).
+        """
+        return tuple(var for _, var in self._credential_vars())
 
     def _require(self, env: Mapping[str, str], var: str) -> str:
         value = env.get(var, "")
