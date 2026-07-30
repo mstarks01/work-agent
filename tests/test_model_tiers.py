@@ -128,6 +128,31 @@ class TestEnvOverrides:
             "anthropic/claude-sonnet-4-5-20250929"
         )
 
+    def test_the_path_variable_can_actually_be_set(self, config_path):
+        """The gap that hid the bug: nothing ever set it to a *valid* file.
+
+        The only test that named it pointed at a nonexistent path, and the read
+        fails before the override check — so it passed for the wrong reason
+        while the documented override was unusable.
+        """
+        path = config_path(config_toml())
+        config = load_model_tiers(path, env={"STRIDE_TIERS_FILE": str(path)})
+
+        assert config.resolve_model("extract").model == BASE
+
+    def test_the_old_path_variable_name_stops_startup(self, config_path):
+        """A hard cutover, and the error names its replacement.
+
+        ``STRIDE_MODEL_TIERS`` matched this loader's own override prefix, so it
+        was rejected as an unrecognised model override — a true error with a
+        misleading message, for a variable the docs told people to set.
+        """
+        with pytest.raises(ModelConfigError, match="STRIDE_TIERS_FILE"):
+            load_model_tiers(
+                config_path(config_toml()),
+                env={"STRIDE_MODEL_TIERS": "/some/model_tiers.toml"},
+            )
+
     def test_vendor_without_model_is_a_build_time_error(self, config_path):
         # The one half-set case nothing downstream catches: anthropic +
         # gemini-2.5-pro passes the denylist and passes the sampling gate, so it
