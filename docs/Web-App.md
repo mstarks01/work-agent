@@ -55,9 +55,8 @@ graph node as it finishes (`extract`, the six `analyst/*` nodes, `critic`,
 `assemble`) rather than showing you a blank tab. Node names appear exactly as the
 graph emits them.
 
-**The report**, rendered by [`example-report.html`](example-report.html) — the
-same self-contained viewer the docs link as a sample, served unedited with your
-run's JSON injected into it.
+**The report** — threat cards, a severity summary, the extracted DFD, and the
+served-build provenance for every LLM node.
 
 ## When the configuration is wrong
 
@@ -102,19 +101,10 @@ credential case, which is the common one at this point.
 
 ## How the report page is rendered
 
-[`docs/example-report.html`](example-report.html) is a complete, dependency-free
-renderer for the [report schema](Report-Schema.md). The app reads it at request
-time, replaces the contents of its `<script type="application/json" id="report">`
-block with your run's JSON, and serves the result. **The file itself is never
-edited and never imported** — it stays a documentation artifact that happens to
-be a working viewer, and `Report-Schema.md` keeps linking it as one.
+`webapp/report_view.html` is a self-contained renderer for the
+[report schema](Report-Schema.md) — inline CSS and JS, no build step, no
+dependencies. The app reads it, substitutes your run's JSON into its
+`<script type="application/json" id="report">` block, and serves the result.
 
-That block holds no checked-in report; it exists only as the substitution
-anchor. So opening the file straight from disk renders nothing, which is why
-neither this page nor [First-Run](First-Run.md) points you at it as something to
-look at on its own — run the app instead.
-
-A stored sample was considered and dropped. To be honest about the provenance
-panel it renders, it would have to be a real analysis, regenerated against live
-models every time the schema or the tier names moved. That is recurring upkeep,
-requiring credentials, for a file whose only reader is this app.
+It holds no report of its own, so opening it from disk shows nothing. It is a
+template belonging to this app, not a sample to look at.
