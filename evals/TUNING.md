@@ -212,6 +212,12 @@ It is off by default: the blessed list ships empty, so on by default it would
 fail every run before anyone had a baseline to compare against, and people would
 just switch it off.
 
+A run reports **incomplete** if a tier its graph declares presented no
+fingerprint at all. That is an assertion rather than a measurement — every tier
+has a node that always runs — so it should never be seen; if it is, the sweep
+did not exercise what it claims to have measured, and its scores are recorded
+as untrusted whether or not `--require-certified` is set.
+
 The service applies the same check to jobs it completes, using the same
 `config/blessed-fingerprints.toml` — there, the equivalent switch is
 `STRIDE_REQUIRE_CERTIFIED` and it withholds the report rather than failing the

@@ -11,21 +11,20 @@ from __future__ import annotations
 
 import asyncio
 import json
-from collections.abc import AsyncGenerator
 from pathlib import Path
 
 import pytest
 from google.adk.models.base_llm import BaseLlm
-from google.adk.models.llm_response import LlmResponse
-from google.genai import types
 
 from evals.harness import modes
 from evals.harness.reference import load_case
 from evals.harness.structural import report_issues
+from stride_service.certification import fingerprints_of
 from stride_service.graph import (
     ENTRY_EXTRACT,
     ENTRY_EXTRACT_ONLY,
     ENTRY_PREPARE,
+    EXTRACT_NODE,
     TIER_NODE_BY_GRAPH_NODE,
     analyst_node_name,
 )
@@ -37,6 +36,7 @@ from stride_service.report import (
     Verdict,
 )
 from stride_service.sampling import load_sampling
+from tests.factories import ScriptedLlm
 
 REPO_ROOT = Path(__file__).resolve().parents[1]
 CASE_DIR = REPO_ROOT / "evals" / "corpus" / "01-payments-checkout"
@@ -45,21 +45,6 @@ CASE_DIR = REPO_ROOT / "evals" / "corpus" / "01-payments-checkout"
 @pytest.fixture(scope="module")
 def case():
     return load_case(CASE_DIR)
-
-
-class ScriptedLlm(BaseLlm):
-    """One node's model: replays a fixed emission and records the request."""
-
-    reply: str
-    seen: list[str] = []
-
-    async def generate_content_async(
-        self, llm_request, stream: bool = False
-    ) -> AsyncGenerator[LlmResponse, None]:
-        self.seen.append(llm_request.config.system_instruction or "")
-        yield LlmResponse(
-            content=types.Content(role="model", parts=[types.Part(text=self.reply)])
-        )
 
 
 def scripted_threat(case, category, *, promoted: bool) -> dict:
@@ -229,6 +214,59 @@ def test_end_to_end_mode_runs_the_production_entry(case):
 
     assert "extract" in models
     assert report_issues(report) == []
+
+
+# --- Provenance -------------------------------------------------------------
+#
+# A sweep is one of certification's two callers. These are the regression: the
+# harness used to stamp a single placeholder NodeRun, so every eval report
+# carried no fingerprint, ``fingerprints_of`` returned an empty mapping, and
+# ``certify`` announced that every fingerprint was blessed having seen none.
+
+
+def test_an_eval_report_stamps_the_nodes_that_actually_ran(case):
+    pipeline = build(case, ENTRY_EXTRACT, {})
+
+    report = asyncio.run(modes.run_end_to_end(case, pipeline)).report
+
+    stamped = {node_run.node for node_run in report.nodes}
+    assert EXTRACT_NODE in stamped
+    assert "critic" in stamped
+    assert stamped <= {node.name for node in pipeline.workflow.graph.nodes}
+    # The placeholder this replaced.
+    assert "eval" not in stamped
+
+
+def test_an_eval_report_presents_fingerprints_to_certify(case):
+    pipeline = build(case, ENTRY_EXTRACT, {})
+
+    report = asyncio.run(modes.run_end_to_end(case, pipeline)).report
+    observations = fingerprints_of(report.nodes)
+
+    assert observations, "a sweep with no observations certifies nothing"
+    assert all(prints for prints in observations.values())
+    assert observations.keys() <= set(TIER_NODE_BY_GRAPH_NODE)
+
+
+def test_an_eval_reports_fingerprints_recompute_from_its_own_clear_block(case):
+    """Evidence, not assertion: the artifact carries what verifies it."""
+    pipeline = build(case, ENTRY_EXTRACT, {})
+
+    report = asyncio.run(modes.run_end_to_end(case, pipeline)).report
+
+    assert report.sampling == {
+        tier: params.model_dump() for tier, params in pipeline.tier_sampling.items()
+    }
+
+
+def test_extraction_mode_observes_its_one_node(case):
+    """The mode produces no report, and its ``extract`` identity counts anyway."""
+    pipeline = build(case, ENTRY_EXTRACT_ONLY, {})
+
+    result = asyncio.run(modes.run_extraction(case, pipeline))
+    observations = fingerprints_of(result.node_runs)
+
+    assert set(observations) == {EXTRACT_NODE}
 
 
 def test_every_mode_maps_to_a_graph_entry():
