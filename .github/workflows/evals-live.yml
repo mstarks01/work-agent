@@ -29,8 +29,14 @@ on:
   pull_request:
     # Path-filtered to the agentic surface. report.py and system_model.py
     # count as agentic: they define the schemas bound as node output schemas,
-    # so a change there changes what the models are asked to emit. A path
-    # filter can always be fooled, which is what the scheduled sweep is for.
+    # so a change there changes what the models are asked to emit.
+    # deployment.py counts for a different reason -- it does not touch a prompt
+    # or a schema, but it decides which config the graph is built from, so a
+    # change there can change which model runs and on what sampling. It was
+    # missed when graph assembly moved out of pipeline.py, which is on this
+    # list; the gap is the ordinary cost of a filter naming files rather than
+    # behaviour. A path filter can always be fooled, which is what the
+    # scheduled sweep is for.
     paths:
       - "prompts/**"
       - "skills/**"
@@ -39,6 +45,7 @@ on:
       - "src/stride_service/prompts.py"
       - "src/stride_service/skills.py"
       - "src/stride_service/critic.py"
+      - "src/stride_service/deployment.py"
       - "src/stride_service/pipeline.py"
       - "src/stride_service/report.py"
       - "src/stride_service/system_model.py"
