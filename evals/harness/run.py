@@ -26,7 +26,8 @@ import argparse
 import asyncio
 import json
 import sys
-from collections.abc import Sequence
+from collections.abc import Iterable, Sequence
+from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
 
@@ -49,12 +50,13 @@ from evals.harness.structural import report_issues
 from stride_service.certification import (
     CertifyResult,
     certify,
+    fingerprints_of,
     load_manifest,
-    report_fingerprints,
 )
 from stride_service.graph import TIER_NODE_BY_GRAPH_NODE
 from stride_service.model_tiers import load_model_tiers
 from stride_service.pipeline import DEFAULT_MODEL_TIERS_PATH, DEFAULT_RESILIENCE_PATH
+from stride_service.report import NodeRun
 from stride_service.resilience import load_resilience
 
 EVALS_ROOT = Path(__file__).resolve().parents[1]
@@ -83,25 +85,48 @@ def _select(cases: Sequence[GoldenCase], wanted: Sequence[str]) -> list[GoldenCa
     return [by_id[case_id] for case_id in wanted]
 
 
-async def _run_mode(
-    cases: Sequence[GoldenCase], mode: str
-) -> tuple[list[dict[str, Any]], list[str], dict[str, modes.AnalysisRun], dict[str, str]]:
+@dataclass(frozen=True)
+class ModeRun:
+    """Everything one sweep of one mode produced.
+
+    ``observations`` maps a node to every fingerprint it presented across the
+    whole sweep — twelve cases give one node twelve — and is what
+    :func:`~stride_service.certification.certify` rules on. ``expected_nodes``
+    is the *built* graph's LLM nodes, so a mode that enters at ``extract`` and
+    stops is not held to the tiers it never routes through.
+    """
+
+    payloads: list[dict[str, Any]]
+    failures: list[str]
+    runs: dict[str, modes.AnalysisRun]
+    observations: dict[str, frozenset[str]]
+    expected_nodes: list[str]
+
+
+def _observe(observed: dict[str, set[str]], nodes: Iterable[NodeRun]) -> None:
+    """Fold one case's node executions into the sweep's observation set."""
+    for node, prints in fingerprints_of(nodes).items():
+        observed.setdefault(node, set()).update(prints)
+
+
+async def _run_mode(cases: Sequence[GoldenCase], mode: str) -> ModeRun:
     """Run one mode over the selected cases, collecting Tier 1 failures.
 
-    The pipeline's per-node fingerprints (ticket 07) come back too: they are a
-    property of the run's *configuration*, identical across cases, and are what
-    the eval gate certifies (ticket 08). A sweep varies the per-tier params (via
-    ``sampling.toml`` or a ``STRIDE_SAMPLING_*`` override) and each variant's run
-    carries its own fingerprints here.
+    The per-node fingerprints (ticket 07) come back too, taken from the node
+    runs rather than from the report: the extraction mode produces no report,
+    and sourcing observations from one would leave the single tier that mode
+    exercises the only tier it could never certify.
     """
     pipeline = modes.build_eval_pipeline(modes.MODE_ENTRIES[mode])
     failures: list[str] = []
     payloads: list[dict[str, Any]] = []
     runs: dict[str, modes.AnalysisRun] = {}
+    observed: dict[str, set[str]] = {}
 
     for case in cases:
         if mode == "extraction":
             result = await modes.run_extraction(case, pipeline)
+            _observe(observed, result.node_runs)
             score = modes.score_extraction(case, result)
             payloads.append(score.to_json())
             failures += [
@@ -117,20 +142,17 @@ async def _run_mode(
             else await modes.run_end_to_end(case, pipeline)
         )
         runs[case.id] = run
+        _observe(observed, run.report.nodes)
         issues = report_issues(run.report)
         failures += [f"{case.id}: {issue}" for issue in issues]
         payloads.append({"case": case.id, "structural_issues": issues})
 
-    observations: dict[str, set[str]] = {}
-    for run in runs.values():
-        for node, prints in report_fingerprints(run.report).items():
-            observations.setdefault(node, set()).update(prints)
-    return (
-        payloads,
-        failures,
-        runs,
-        {node: frozenset(prints) for node, prints in observations.items()},
-        list(pipeline.node_sampling),
+    return ModeRun(
+        payloads=payloads,
+        failures=failures,
+        runs=runs,
+        observations={node: frozenset(prints) for node, prints in observed.items()},
+        expected_nodes=list(pipeline.node_sampling),
     )
 
 
@@ -225,9 +247,8 @@ def _print_yields(yields: Sequence[CriticYield]) -> None:
 
 def command_run(args: argparse.Namespace) -> int:
     cases = _select(load_corpus(args.corpus), args.case)
-    payloads, failures, runs, observations, expected = asyncio.run(
-        _run_mode(cases, args.mode)
-    )
+    mode_run = asyncio.run(_run_mode(cases, args.mode))
+    failures = mode_run.failures
 
     # Never silently trust (ticket 08 / 03 §4): the verdict is always computed
     # and surfaced, so an aggregate can never be read without knowing whether the
@@ -238,16 +259,22 @@ def command_run(args: argparse.Namespace) -> int:
         return tiers.resolve_tier(TIER_NODE_BY_GRAPH_NODE[graph_node])
 
     certification = certify(
-        observations, load_manifest(DEFAULT_MANIFEST_PATH), tier_of, expected
+        mode_run.observations,
+        load_manifest(DEFAULT_MANIFEST_PATH),
+        tier_of,
+        mode_run.expected_nodes,
     )
     _print_certification(certification)
+    # Both halves, never ``certified`` alone: it is narrow by design and is
+    # vacuously true of a sweep that observed no fingerprint at all.
+    trusted = certification.certified and certification.complete
 
     scores: list[CaseScore] = []
     yields: list[CriticYield] = []
     judge: PinnedJudge | None = None
-    if runs and not args.no_scoring:
+    if mode_run.runs and not args.no_scoring:
         judge = _live_judge()
-        scores, yields = _score_runs(cases, runs, judge)
+        scores, yields = _score_runs(cases, mode_run.runs, judge)
         _print_scores(scores)
         _print_yields(yields)
 
@@ -257,13 +284,15 @@ def command_run(args: argparse.Namespace) -> int:
         "models": _models_record(judge),
         "gating": "tier-1-structural-only",
         "certification": certification.to_json(),
-        "node_fingerprints": {n: sorted(p) for n, p in observations.items()},
+        "node_fingerprints": {
+            node: sorted(prints) for node, prints in mode_run.observations.items()
+        },
         "structural_failures": failures,
-        "mode_output": payloads,
+        "mode_output": mode_run.payloads,
         # Aggregates carry the verdict so nothing downstream folds an
         # uncertified run into a trusted number unaware.
         "scores": [score.to_json() for score in scores],
-        "trusted": certification.certified,
+        "trusted": trusted,
         "exemplar_delta": exemplar_delta(scores) if scores else None,
         "critic_yield": [entry.to_json() for entry in yields],
         "critic_yield_aggregate": aggregate_yield(yields) if yields else None,
@@ -290,16 +319,31 @@ def command_run(args: argparse.Namespace) -> int:
 
 
 def _print_certification(result: CertifyResult) -> None:
-    """Surface the gate verdict, always — certified or not."""
-    if result.certified:
+    """Surface the gate verdict, always — and never claim more than it checked.
+
+    ``certified`` is narrow by design (see
+    :mod:`stride_service.certification`): it means no *observed* fingerprint
+    went unblessed, which is vacuously true of a sweep that observed none.
+    Printing it alone is how a run that certified nothing came to announce that
+    every fingerprint was blessed, so completeness is reported first and the
+    green line requires both halves.
+    """
+    if not result.complete:
+        tiers = ", ".join(result.unexercised)
+        print(
+            f"certification: INCOMPLETE — tier(s) {tiers} presented no"
+            " fingerprint, so nothing was certified and the aggregates below"
+            " are untrusted (--require-certified to hard-fail)"
+        )
+    if not result.certified:
+        print(
+            f"certification: UNCERTIFIED — {len(result.uncertified)} node(s) not"
+            " blessed (aggregates are untrusted; --require-certified to hard-fail)"
+        )
+        for node in result.uncertified:
+            print(f"  {node.node}: {node.fingerprint}")
+    if result.certified and result.complete:
         print("certification: all node fingerprints blessed")
-        return
-    print(
-        f"certification: UNCERTIFIED — {len(result.uncertified)} node(s) not"
-        " blessed (aggregates are untrusted; --require-certified to hard-fail)"
-    )
-    for node in result.uncertified:
-        print(f"  {node.node}: {node.fingerprint}")
 
 
 def command_calibrate(args: argparse.Namespace) -> int:
