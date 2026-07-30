@@ -5,10 +5,10 @@ This wraps ``examples/sync_docs.py`` the way ``tests/test_corpus_lints.py`` wrap
 ``evals/verify_corpus.py``: hand-runnable for authors, unbypassable in CI.
 
 Note what this is *not*. It is a ``--write``/``--check`` pair over one-way
-includes, so it covers only blocks a writer can regenerate offline. The sample
-payload inside ``docs/example-report.html`` has no offline writer — regenerating
-it needs live models — so it is guarded by
-``tests/test_docs_example_report.py`` instead.
+includes, so it covers only prose blocks generated from a source region.
+``docs/example-report.html`` is out of its scope entirely: that file carries no
+checked-in report, only the substitution anchor the web app injects into at
+request time, so there is nothing in it to keep in sync.
 """
 
 from __future__ import annotations
