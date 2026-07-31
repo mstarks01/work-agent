@@ -104,8 +104,24 @@ gh api --method POST repos/mstarks01/work-agent/issues/<child>/dependencies/bloc
   Measurement corrected a premise in #53: extract's construction-time prefix is **178 tokens**,
   under every vendor's caching minimum, so there is no cache at that node to protect and `## Input`
   stays before `## Procedure`, keeping the trusted instruction last. `extract.md` lands 1650/2000.
-  Prototype on `prototype/multi-source-render` @ `e4a17a6`, to be archived as a tag. Closing #54
-  leaves the frontier at #55 and #56, with #57 now waiting only on #56.
+  Prototype on `prototype/multi-source-render` @ `e4a17a6`, to be archived as a tag. #55 settles
+  the conflict rule #50 and #53 both deferred: **sources carry equal weight**, so a disagreement is
+  recorded rather than adjudicated — no precedence from order (#50 fixed it as presentation-only),
+  from `kind` (nothing carries a date, so it cannot proxy recency), or from the caller. Detection is
+  stated rather than left to judgement, because the failure mode has no floor: **silence is not a
+  claim** and a more specific claim **refines** a compatible one, without which "no precedence"
+  reads as "anything not confirmed by all sources is disputed" and flattens every multi-source
+  model to `unknown`. Where the field takes `unknown` a conflict goes there with both claims
+  verbatim in `notes`; where it **cannot** (`trust_zone`, `ExternalEntity.kind`, flow endpoints)
+  extraction picks a value — preferring the reading that yields a boundary crossing — plus an
+  `assumptions` entry, which is not #53's laundering because the schema, not the speaker, forces
+  the inference. A disputed *element* is emitted, not dropped, on the asymmetry that a modelled
+  phantom is visible while an omitted real component is not. Never grounds for rejection, and by
+  construction a conflict cannot trip the validity gate. `notes` becomes a **two-producer field**,
+  which is #59's problem to solve. **#53 is amended**: supersession narrows from "within one source"
+  to one speaker correcting themselves. Lands as `extract.md` Procedure rule 6 at 220 tokens —
+  **1870/2000, no cap move** — plus `CONTEXT.md`; no wire-contract change. Closing #55 releases
+  #59, leaving the frontier at #56 and #59.
 
 ### Completed efforts
 
