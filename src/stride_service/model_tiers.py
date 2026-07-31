@@ -1,22 +1,22 @@
 """Model-tier configuration for the graph's LLM nodes.
 
-Exactly two vendor-neutral tiers (#5): ``base`` runs extraction and repair,
+Exactly two vendor-neutral tiers: ``base`` runs extraction and repair,
 ``strong`` the six STRIDE analysts, the critic and the critic re-ask. Each tier
 independently selects a ``(vendor, model)`` **pair**, so the two tiers may run
 different vendors at once, and no vendor is privileged.
 
-Vendor and model are two keys, never one router string (#15 decision 1). Three
-consumers need the vendor as a *key* — the credential mode it implies (#9), the
-family-branching floating-form rule (#7 decision 1), and the two-argument
-build-time sampling gate (#13) — and #12 proved ``vertex_ai/`` is not one
-provider, so a joined string would have to be parsed back apart by all three.
-The prefix exists in exactly one place, :attr:`Vendor.prefix`.
+Vendor and model are two keys, never one router string. Three consumers need
+the vendor as a *key* — the credential mode it implies, the family-branching
+floating-form rule, and the two-argument build-time sampling gate — and
+``vertex_ai/`` is not one provider, so a joined string would have to be parsed
+back apart by all three. The prefix exists in exactly one place,
+:attr:`Vendor.prefix`.
 
 Loading fails closed: an unknown tier, vendor or node name, a floating model
 identifier (from the file *or* an env var), a node missing from the mapping, or
 a config version other than :data:`SUPPORTED_VERSION` raises
-:class:`ModelConfigError` rather than degrading. There is no cross-tier fallback
-and no compatibility shim for the version-2 schema.
+:class:`ModelConfigError` rather than degrading. There is no cross-tier
+fallback and no compatibility shim for other schema versions.
 """
 
 from __future__ import annotations
@@ -33,20 +33,18 @@ from stride_service.errors import ConfigError
 from stride_service.skills import STRIDE_CATEGORIES
 from stride_service.vendors import Vendor, VendorName, vendor_for
 
-# Hard cutover (#15 decision 4): version 2 named Gemini-only tier strings under
-# ``flash``/``pro`` keys and cannot be read as a ``(vendor, model)`` pair. The
-# loader accepts only version 3; a version-2 file fails its own check rather
-# than being migrated in place.
+# The only schema version this loader accepts. A file on any other version
+# fails its own check rather than being migrated in place.
 SUPPORTED_VERSION = 3
 
 TierName = Literal["base", "strong"]
 TIER_NAMES: tuple[TierName, ...] = ("base", "strong")
 
-# The LLM nodes of the decided topology (ticket 004). Deterministic
-# FunctionNodes (validate, prepare, join, router, assemble) carry no model and
-# never appear in the config. ``recritic`` is the bounded critic re-ask (ticket
-# 038 decision 3): a distinct LLM node so it is pinned in its own right, running
-# the same judgement as the critic and so always on the same tier.
+# The graph's LLM nodes. Deterministic FunctionNodes (validate, prepare, join,
+# router, assemble) carry no model and never appear in the config. ``recritic``
+# is the bounded critic re-ask: a distinct LLM node so it is pinned in its own
+# right, running the same judgement as the critic and so always on the same
+# tier.
 ANALYST_NODES: tuple[str, ...] = tuple(
     f"analyst/{category}" for category in STRIDE_CATEGORIES
 )
@@ -56,25 +54,13 @@ _ENV_PREFIX = "STRIDE_MODEL_"
 _VENDOR_FIELD = "VENDOR"
 _MODEL_FIELD = "MODEL"
 
-# Old name -> new name, for variables that had to move *out* of this loader's
-# namespace. ``STRIDE_MODEL_TIERS`` located this file; it also matched
-# ``_ENV_PREFIX``, so the unknown-override check below rejected it and the
-# documented path override could never be set. Renaming was the fix rather than
-# exempting the name, which would have left this loader knowing about a variable
-# that belongs to whatever locates its config.
-#
-# A hard cutover, and the loud failure is free: the old name is still inside the
-# policed namespace, so it cannot be silently ignored. The check below only
-# replaces a confusing error with an accurate one.
-RENAMED_VARS: dict[str, str] = {"STRIDE_MODEL_TIERS": "STRIDE_TIERS_FILE"}
-
 
 class ModelConfigError(ConfigError):
     """The model-tier configuration is invalid or unusable."""
 
 
 def env_vars_for(tier: TierName) -> tuple[str, str]:
-    """The ``(vendor, model)`` override vars for one tier (#15 decision 2)."""
+    """The ``(vendor, model)`` override vars for one tier."""
     stem = f"{_ENV_PREFIX}{tier.upper()}"
     return f"{stem}_{_VENDOR_FIELD}", f"{stem}_{_MODEL_FIELD}"
 
@@ -157,31 +143,20 @@ def _apply_env_overrides(tiers_raw: object, env: Mapping[str, str]) -> None:
 
     ``_MODEL`` alone is the ops case the file header exists for — retuning a
     tier's model on a deployed revision without an image rebuild. ``_VENDOR``
-    alone is a **build-time error** (#15 decision 2): it is the one half-set case
-    nothing downstream catches, because a cross-vendor pair like
-    ``anthropic`` + ``gemini-2.5-pro`` passes the floating-form denylist, passes
-    the sampling gate (an unknown model falls back to the provider's base
-    config), and #7 decision 6 declined a build-time existence check — so it
-    would die on node one of a paid-for job instead.
+    alone is a **build-time error**: it is the one half-set case nothing
+    downstream catches, because a cross-vendor pair like ``anthropic`` +
+    ``gemini-2.5-pro`` passes the floating-form denylist and passes the
+    sampling gate (an unknown model falls back to the provider's base config),
+    and there is no build-time existence check — so it would die on node one of
+    a paid-for job instead.
 
-    An unrecognised ``STRIDE_MODEL_*`` variable also raises, which is what makes
-    the cutover safe: a deployment still carrying version 2's
-    ``STRIDE_MODEL_FLASH`` must fail loudly, not have it silently ignored while
-    the tier quietly runs the file's model.
+    An unrecognised ``STRIDE_MODEL_*`` variable also raises rather than being
+    silently ignored while the tier quietly runs the file's model.
     """
     if not isinstance(tiers_raw, dict):
         # A malformed or missing ``tiers`` shape: leave it for ModelTierConfig
         # to reject rather than applying an override against nothing.
         return
-
-    renamed = sorted(var for var in env if var in RENAMED_VARS)
-    if renamed:
-        detail = "; ".join(f"{var} is now {RENAMED_VARS[var]}" for var in renamed)
-        raise ModelConfigError(
-            f"{detail}. It names this file's *path*, not a tier override, and"
-            f" its old name sat inside the {_ENV_PREFIX!r} namespace this loader"
-            " polices — so setting it could only ever fail"
-        )
 
     known = {var for tier in TIER_NAMES for var in env_vars_for(tier)}
     unknown = sorted(
@@ -238,7 +213,7 @@ def load_model_tiers(
     if version != SUPPORTED_VERSION:
         raise ModelConfigError(
             f"{path}: unsupported version {version!r};"
-            f" expected {SUPPORTED_VERSION} (hard cutover, no shim)"
+            f" expected {SUPPORTED_VERSION}"
         )
 
     try:

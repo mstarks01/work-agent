@@ -44,7 +44,7 @@ class TestRouting:
 
 
 class TestCredentialMode:
-    """The vendor implies the mode; config never picks it (#9)."""
+    """The vendor implies the mode; config never picks it."""
 
     def test_vertex_is_adc_because_it_admits_no_api_key_path(self):
         assert vendor_for("vertex").credential is CredentialMode.ADC
@@ -164,8 +164,8 @@ class TestWhatTheRegistryDeliberatelyOmits:
         assert not hasattr(vendor_for("vertex"), "supported")
 
     def test_the_reasoning_kwarg_is_a_constant_not_a_field(self):
-        # #15 decision 3 made the surface uniform, so a per-vendor field would
-        # mirror the same value three times.
+        # The reasoning surface is uniform, so a per-vendor field would mirror
+        # the same value three times.
         assert REASONING_KWARG == "reasoning_effort"
         assert not hasattr(vendor_for("vertex"), "reasoning_kwarg")
 

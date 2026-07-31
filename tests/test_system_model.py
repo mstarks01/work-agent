@@ -103,7 +103,7 @@ class TestBoundaryCrossings:
 
 
 class TestNormalizeElementIds:
-    """Ticket 037: IDs are derived in code, and references follow."""
+    """IDs are derived in code, and references follow."""
 
     def abbreviated(self) -> SystemModel:
         """The shape all 21 corpus mismatches took: a short ID, a longer name.

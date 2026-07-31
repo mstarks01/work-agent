@@ -159,8 +159,8 @@ def test_no_non_markdown_files_under_prompts():
     assert not stray
 
 
-# Worst-case analyst instruction is skill text (~2.2K) plus this; ticket 006's
-# envelope is 6-8K, so the composed prompt has ~4K of room.
+# Worst-case analyst instruction is skill text (~2.2K) plus this; the envelope
+# is 6-8K, so the composed prompt has ~4K of room.
 COMPOSED_ANALYST_TOKEN_BUDGET = 3500
 
 
