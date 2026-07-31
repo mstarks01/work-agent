@@ -7,9 +7,8 @@ one cross-boundary flow and one intra-zone flow, one recorded assumption.
 Also home to :class:`ScriptedLlm`, the offline stand-in every graph-driving
 test binds its nodes to. It lives here rather than in one test module because
 the service tests and the eval tests must drive the graph through the *same*
-stand-in: the eval harness previously used a copy that reported no
-``model_version``, which is what let a whole class of provenance defect stay
-invisible to the eval lane.
+stand-in. A copy that reported no ``model_version`` would let a whole class of
+provenance defect stay invisible to the eval lane.
 """
 
 from collections.abc import AsyncGenerator

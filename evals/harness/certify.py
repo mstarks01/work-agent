@@ -1,24 +1,22 @@
 """Promoting a sweep winner: re-pin the sampling file and bless its fingerprints.
 
-The **write** half of certification. The pure check moved into the service
-(:mod:`stride_service.certification`) once #17 decision 1 established that the
-service is what certifies each job it completes; this module keeps what only a
-sanctioned sweep does — re-pinning this deployment's sampling file in place and
-recording the fingerprints that pinning implies. The dependency now runs
-evals -> service, which is the direction it already ran.
+The **write** half of certification. The pure check lives in the service
+(:mod:`stride_service.certification`), which certifies each job it completes;
+this module is what only a sanctioned sweep does — re-pinning this deployment's
+sampling file in place and recording the fingerprints that pinning implies.
 
 *This deployment's*, not the repo's: both files are located through
 :class:`~stride_service.deployment.Deployment`, so a sweep run against a
 redirected ``STRIDE_SAMPLING`` promotes into the file it actually measured.
 
-The single-sourced write path (ticket 03 §4): one ``SamplingConfig`` both
-re-pins the file's values *and* derives the fingerprints recorded in the
-manifest, so the two cannot drift — a blessed fingerprint always describes the
-params the file actually holds.
+The write path is single-sourced: one ``SamplingConfig`` both re-pins the
+file's values *and* derives the fingerprints recorded in the manifest, so the
+two cannot drift — a blessed fingerprint always describes the params the file
+actually holds.
 
-Promotion is keyed by **tier**, following the manifest (#14 decisions 4 and 7).
-``promote`` still recomputes the fingerprints from the config rather than
-accepting them from the caller; that redundancy *is* the no-drift invariant.
+Promotion is keyed by **tier**, following the manifest. ``promote`` recomputes
+the fingerprints from the config rather than accepting them from the caller;
+that redundancy *is* the no-drift invariant.
 """
 
 from __future__ import annotations
@@ -45,24 +43,23 @@ def promotion_paths(deployment: Deployment | None = None) -> ConfigPaths:
     ``STRIDE_SAMPLING`` names, so promoting its winner has to re-pin that same
     file — re-pinning the checked-in copy instead would bless a fingerprint
     describing params the measured configuration never held. The manifest is
-    deployment-local by design (#10 decision 4) and follows for the same reason.
+    deployment-local by design and follows for the same reason.
 
-    Resolved through the deployment rather than from ``REPO_ROOT`` here, which
-    is what made this module a third opinion on where config lives.
+    Both are resolved through the deployment rather than from ``REPO_ROOT``, so
+    this module is not a second opinion on where config lives.
     """
     return (deployment or Deployment.from_env()).paths
 
 
 # The file keys a sweep may re-pin in place, and how each serializes back to
-# TOML. ``top_k`` is absent from every set: sampling version 3 removed it from
-# the config surface entirely, because the build-time gate provably cannot cover
-# it, so there is no longer a line for a promotion to re-pin.
+# TOML. ``top_k`` is absent from every set: it is not part of the sampling
+# config surface, because the build-time gate provably cannot cover it.
 _FLOAT_PARAMS = frozenset(
     {"temperature", "top_p", "presence_penalty", "frequency_penalty"}
 )
 _INT_PARAMS = frozenset({"seed", "max_output_tokens", "candidate_count"})
-# ``thinking`` is a low/medium/high enum in version 3, not a resolved integer
-# budget, so it serializes as a quoted string like any other TOML literal.
+# ``thinking`` is a low/medium/high enum, not a resolved integer budget, so it
+# serializes as a quoted string like any other TOML literal.
 _STR_PARAMS = frozenset({"thinking"})
 
 
@@ -75,10 +72,10 @@ def promote(
 ) -> BlessedManifest:
     """Promote a sweep winner: re-pin ``sampling.toml`` and bless its fingerprints.
 
-    ``served_builds`` maps each **tier** to the vendor-prefixed served build that
-    answered for it. The node -> tier walk drops out entirely (#14 decision 7):
-    a fingerprint's payload carries no node name, so blessing was never per-node
-    in substance, only in storage.
+    ``served_builds`` maps each **tier** to the vendor-prefixed served build
+    that answered for it. There is no node -> tier walk: a fingerprint's
+    payload carries no node name, so blessing is per tier in substance as well
+    as in storage.
 
     Re-pinning is a value update **in place**, preserving the file's comments
     (the "why-absent" record is the point of the file). Promoting a param the
@@ -170,7 +167,7 @@ def _rewrite_sampling_values(text: str, sampling: SamplingConfig) -> str:
         detail = ", ".join(f"tiers.{t}.{p}" for t, p in unwritten)
         raise CertificationError(
             f"cannot promote unset param(s) {detail}: the file leaves them"
-            " unset with a rationale; pinning one is a human decision (ticket 04)"
+            " unset with a rationale; pinning one is a human decision"
         )
     return "".join(lines)
 

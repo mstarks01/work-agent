@@ -59,7 +59,7 @@ def config_path(tmp_path):
 class TestNodeInventory:
     def test_llm_nodes_are_bookends_plus_analysts_plus_critic(self):
         assert LLM_NODES[:2] == ("extract", "repair")
-        # The critic and its bounded re-ask close the list (ticket 038).
+        # The critic and its bounded re-ask close the list.
         assert LLM_NODES[-2:] == ("critic", "recritic")
         assert len(ANALYST_NODES) == 6
         assert all(node.startswith("analyst/") for node in ANALYST_NODES)
@@ -129,29 +129,15 @@ class TestEnvOverrides:
         )
 
     def test_the_path_variable_can_actually_be_set(self, config_path):
-        """The gap that hid the bug: nothing ever set it to a *valid* file.
+        """``STRIDE_TIERS_FILE`` points the loader at a valid file and is read.
 
-        The only test that named it pointed at a nonexistent path, and the read
-        fails before the override check — so it passed for the wrong reason
-        while the documented override was unusable.
+        Named against a *valid* file on purpose: a nonexistent path fails the
+        read before the override check, so it would pass for the wrong reason.
         """
         path = config_path(config_toml())
         config = load_model_tiers(path, env={"STRIDE_TIERS_FILE": str(path)})
 
         assert config.resolve_model("extract").model == BASE
-
-    def test_the_old_path_variable_name_stops_startup(self, config_path):
-        """A hard cutover, and the error names its replacement.
-
-        ``STRIDE_MODEL_TIERS`` matched this loader's own override prefix, so it
-        was rejected as an unrecognised model override — a true error with a
-        misleading message, for a variable the docs told people to set.
-        """
-        with pytest.raises(ModelConfigError, match="STRIDE_TIERS_FILE"):
-            load_model_tiers(
-                config_path(config_toml()),
-                env={"STRIDE_MODEL_TIERS": "/some/model_tiers.toml"},
-            )
 
     def test_vendor_without_model_is_a_build_time_error(self, config_path):
         # The one half-set case nothing downstream catches: anthropic +
@@ -161,9 +147,9 @@ class TestEnvOverrides:
         with pytest.raises(ModelConfigError, match="is set without"):
             load_model_tiers(config_path(config_toml()), env={vendor_var: "anthropic"})
 
-    def test_a_stale_version_2_override_is_rejected_not_ignored(self, config_path):
-        # What makes the cutover safe: silently ignoring STRIDE_MODEL_FLASH
-        # would leave the tier quietly running the file's model.
+    def test_an_unrecognised_override_is_rejected_not_ignored(self, config_path):
+        # Any STRIDE_MODEL_* name outside the four the loader knows: silently
+        # ignoring one would leave the tier quietly running the file's model.
         with pytest.raises(ModelConfigError, match="unrecognised model override"):
             load_model_tiers(
                 config_path(config_toml()), env={"STRIDE_MODEL_FLASH": BASE}
@@ -267,7 +253,7 @@ class TestPinValidation:
 
 
 class TestFileValidation:
-    def test_version_2_file_fails_closed_with_no_shim(self, config_path):
+    def test_a_file_on_another_version_fails_closed(self, config_path):
         with pytest.raises(ModelConfigError, match="unsupported version"):
             load_model_tiers(config_path(config_toml(version=2)), env={})
 

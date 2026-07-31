@@ -1,7 +1,6 @@
 """The ADK Workflow graph: nodes wired to prompts, skills, and models.
 
-Assembles the topology decided in ticket 004 out of the pieces the earlier
-implementation tickets shipped::
+The topology::
 
     START -> extract -> validate -+-valid--> prepare -> 6 analysts -> join
                                   |             ^                       |
@@ -19,31 +18,29 @@ implementation tickets shipped::
                              |          revise v
                              +---(none)  critic_failed (raises)
 
-Six nodes carry names ticket 004's sketch does not spell out, and each is
-structural rather than a new decision:
+Six of those nodes are structural rather than analytical:
 
 * ``revalidate`` is the second run of the *same* validate function after the
-  one repair pass. Two nodes instead of a back-edge because the repair
-  budget is exactly one: the graph cannot loop, so it cannot spend a second
-  pass, and "one repair then reject" is visible in the topology rather than
-  enforced by a counter.
-* ``reject`` is where the second failure lands — a terminal node that parks
-  the validator's issues in state for the runner to return as a rejection.
+  one repair pass. Two nodes instead of a back-edge because the repair budget
+  is exactly one: the graph cannot loop, so it cannot spend a second pass, and
+  "one repair then reject" is visible in the topology rather than enforced by a
+  counter.
+* ``reject`` is where the second failure lands — a terminal node that parks the
+  validator's issues in state for the runner to return as a rejection.
 * ``merge`` runs :func:`stride_service.critic.join_drafts` behind ADK's
   ``JoinNode``, which is a pure barrier with no user code of its own.
-* ``router`` and ``rereview`` are the critic's ``validate``/``revalidate``
-  (ticket 038 decision 3): one ``route_review`` function run twice, moving the
-  mechanical check *out* of ``assemble`` so a malformed critic output can be
-  re-asked before assembly. Clean output accepts to ``assemble``; a malformed
-  one revises — to ``recritic`` the first time, to ``critic_failed`` the
-  second.
+* ``router`` and ``rereview`` are the critic's ``validate``/``revalidate``: one
+  ``route_review`` function run twice, keeping the mechanical check outside
+  ``assemble`` so a malformed critic output can be re-asked before assembly.
+  Clean output accepts to ``assemble``; a malformed one revises — to
+  ``recritic`` the first time, to ``critic_failed`` the second.
 * ``recritic`` is the one bounded critic re-ask, the ``repair`` of the review
-  half. A structural pass, not a counted one — the graph cannot loop back for
-  a third.
-* ``critic_failed`` is where a still-malformed re-ask lands: it *raises*
-  rather than parking issues, because a critic that will not return its own
-  drafts whole is our defect (a ``failed`` job), not the input's (a
-  ``rejected`` one, which carries ``ValidationIssue``s).
+  half. A structural pass, not a counted one — the graph cannot loop back for a
+  third.
+* ``critic_failed`` is where a still-malformed re-ask lands: it *raises* rather
+  than parking issues, because a critic that will not return its own drafts
+  whole is our defect (a ``failed`` job), not the input's (a ``rejected`` one,
+  which carries ``ValidationIssue``s).
 
 Every LLM node binds its model through the caller's ``resolve_model`` (the
 canonical names in :data:`stride_service.model_tiers.LLM_NODES`), its skills
@@ -53,11 +50,11 @@ so ``analyst/information-disclosure`` in the tier config is
 ``analyst_information_disclosure`` here; :data:`TIER_NODE_BY_GRAPH_NODE` is
 the only place that correspondence lives.
 
-The bookends are deliberately deterministic (ticket 004, and the standing
-principle that mechanical work belongs in code): analysts cannot receive a
-malformed view, and the report cannot cite an element the model does not
-contain. Every check in this module fails closed — a raising FunctionNode
-aborts the workflow, which the runner turns into a failed job.
+The bookends are deliberately deterministic, because mechanical work belongs in
+code: analysts cannot receive a malformed view, and the report cannot cite an
+element the model does not contain. Every check in this module fails closed — a
+raising FunctionNode aborts the workflow, which the runner turns into a failed
+job.
 
 Security: the submitted text is untrusted and reaches the extraction prompt
 inside a fenced block that names it as data (OWASP LLM01); everything a
@@ -160,9 +157,9 @@ Entry = Literal["extract", "prepare", "extract-only"]
 
 ENTRY_EXTRACT: Entry = "extract"
 ENTRY_PREPARE: Entry = "prepare"
-"""The analysis eval mode's entry (ticket 009 decision 1): start at
-``prepare`` over a blessed model seeded in state, so a recall miss cannot be
-blamed on an element ``extract`` never produced."""
+"""The analysis eval mode's entry: start at ``prepare`` over a blessed model
+seeded in state, so a recall miss cannot be blamed on an element ``extract``
+never produced."""
 
 ENTRY_EXTRACT_ONLY: Entry = "extract-only"
 """The extraction eval mode: run ``extract`` and stop, leaving its emission at
@@ -175,10 +172,9 @@ ROUTE_VALID = "valid"
 ROUTE_INVALID = "invalid"
 ROUTE_ACCEPT = "accept"
 ROUTE_REVISE = "revise"
-"""Reserved by ticket 004, now the critic re-ask route (ticket 038 decision
-3). ``route_review`` takes it when the critic's output fails the mechanical
-check: from ``router`` it reaches the bounded ``recritic`` re-ask, and from
-``rereview`` — the second look after that re-ask — it reaches
+"""The critic re-ask route. ``route_review`` takes it when the critic's output
+fails the mechanical check: from ``router`` it reaches the bounded ``recritic``
+re-ask, and from ``rereview`` — the second look after that re-ask — it reaches
 ``critic_failed``, since a repeated failure is ours to own, not the input's to
 be rejected for."""
 
@@ -188,7 +184,7 @@ be rejected for."""
 # ADK substitutes ``str(value)`` into an instruction. The structured values
 # the FunctionNodes pass between themselves live under their own keys.
 #
-# Two key families, and the invariant that keeps them honest (ticket 010):
+# Two key families, and the invariant that keeps them honest:
 # *structured* keys are the code's view (Pydantic round-trips), *rendered*
 # keys are the model's view (:func:`render` output). Both copies of an
 # artifact are kept on purpose — reading back exactly the bytes a model saw is
@@ -359,12 +355,12 @@ def route_review(
 ) -> Event:
     """Run the mechanical check on the critic's output and route on the result.
 
-    The check that used to live in :func:`assemble_report` moved here (ticket
-    038 decision 3): to re-ask the critic when its output is malformed, the
-    graph has to decide *before* assembly whether it is malformed. Clean
-    output routes to ``accept``; a critic that dropped, invented, duplicated
-    or mis-referenced a threat routes to ``revise``, with the failing ruling
-    and the problem list parked where the re-ask prompt reads them.
+    The check runs here rather than in :func:`assemble_report` because
+    re-asking a malformed critic means deciding *before* assembly whether it is
+    malformed. Clean output routes to ``accept``; a critic that dropped,
+    invented, duplicated or mis-referenced a threat routes to ``revise``, with
+    the failing ruling and the problem list parked where the re-ask prompt
+    reads them.
 
     Both review nodes run this same function — what differs is where their
     ``revise`` edge points (``recritic`` for the first look, ``critic_failed``
@@ -387,9 +383,8 @@ def fail_review(valid_model: dict, merged_drafts: list, reviewed_threats: list) 
     Reached only on the ``revise`` edge out of ``rereview``, which means the
     check found problems on the second look. Raising propagates out of the
     runner as a failed job — not a *rejected* one: rejection means the input
-    failed the validity gate and carries ``ValidationIssue``s, whereas a
-    critic that will not return its own drafts whole is our defect and has
-    none (ticket 038 decision 3, holding the ticket-008 contract).
+    failed the validity gate and carries ``ValidationIssue``s, whereas a critic
+    that will not return its own drafts whole is our defect and has none.
     """
     model = SystemModel.model_validate(valid_model)
     drafts = [DraftThreat.model_validate(draft) for draft in merged_drafts]
@@ -442,12 +437,9 @@ class Pipeline:
     a fingerprint can be computed for a node without re-walking the tier map.
 
     There is deliberately **no** ``node_fingerprints`` here. A fingerprint's
-    model half is the *served* build (#7 decision 2), which is only known once
-    a node has actually run and answered — so it is computed per node
-    *execution* in :mod:`stride_service.pipeline`, not once at build time. A
-    build-time fingerprint would attest to the configured string while
-    ``sampling.py``, ``report.py`` and ``promote()`` all already asserted it
-    described what was served.
+    model half is the *served* build, which is only known once a node has
+    actually run and answered, so it is computed per node *execution* in
+    :mod:`stride_service.pipeline` rather than once at build time.
     """
 
     workflow: Workflow
@@ -461,13 +453,12 @@ def _generate_content_config(
 ) -> types.GenerateContentConfig:
     """One node's tier sampling and the per-request timeout, composed together.
 
-    ``sampling`` is the node's *own* tier's decoding params (ticket 06):
-    ``resolve_sampling`` hands each node its :class:`TierSampling`, so flash and
-    pro nodes no longer share a graph-wide constant. The timeout rides on
-    ``http_options`` (ticket 038 decision 4), which stays owned by
-    ``config/resilience.toml`` — never sourced from sampling (ticket 03).
-    ``resilience`` is optional only so the offline stand-ins, whose fakes never
-    read a deadline, can build the graph without a config.
+    ``sampling`` is the node's *own* tier's decoding params:
+    ``resolve_sampling`` hands each node its :class:`TierSampling`, so nodes on
+    different tiers never share one graph-wide constant. The timeout rides on
+    ``http_options``, owned by ``config/resilience.toml`` and never sourced
+    from sampling. ``resilience`` is optional only so the offline stand-ins,
+    whose fakes never read a deadline, can build the graph without a config.
     """
     config = sampling.to_generate_content_config()
     if resilience is not None:
@@ -487,14 +478,13 @@ def _llm_node(
 ) -> LlmAgent:
     """One LLM node: its model, its full instruction, its emitted schema.
 
-    ``include_contents='none'`` is set explicitly (ticket 002): a node sees
-    its instruction and the state templated into it, never the transcript of
-    the nodes before it. Model *and* sampling are resolved off the one
-    canonical node name (:data:`TIER_NODE_BY_GRAPH_NODE`), so each node runs on
-    its own tier's decoding params from the config shared with the eval suite
-    (ticket 009 decision 15) — no node on library defaults, none on another
-    tier's sampling. The request deadline comes from the resilience config
-    (ticket 038).
+    ``include_contents='none'`` is set explicitly: a node sees its instruction
+    and the state templated into it, never the transcript of the nodes before
+    it. Model *and* sampling are resolved off the one canonical node name
+    (:data:`TIER_NODE_BY_GRAPH_NODE`), so each node runs on its own tier's
+    decoding params from the config shared with the eval suite — no node on
+    library defaults, none on another tier's sampling. The request deadline
+    comes from the resilience config.
     """
     tier_node = TIER_NODE_BY_GRAPH_NODE[name]
     return LlmAgent(
@@ -582,20 +572,19 @@ def build_pipeline(
     """Wire the whole graph: prompts, skills, and models onto the topology.
 
     ``binding`` is everything an LLM node runs on — which model, which tier's
-    decoding params, and the per-request deadline. It arrives as one value
-    rather than as four parameters because two of them are views of the same
-    :class:`~stride_service.sampling.SamplingConfig`, and sourcing them from
+    decoding params, and the per-request deadline — as one value, because two
+    of its fields are views of the same
+    :class:`~stride_service.sampling.SamplingConfig` and sourcing them from
     different ones would leave every node running on params the report does not
     attest to. See :class:`~stride_service.binding.NodeBinding`.
 
     ``entry`` selects where the graph starts. ``"extract"`` is production and
-    the end-to-end eval mode. ``"prepare"`` is the **analysis** eval mode of
-    ticket 009 decision 1: a blessed System Model is seeded at
-    :data:`STATE_VALID_MODEL` and the extraction half is left out entirely,
-    so threat numbers are attributable to the analysts and critic rather than
-    to an element ``extract`` never produced. It is a parameter here, not a
-    second topology in the eval tree, because two definitions of the same
-    graph drift.
+    the end-to-end eval mode. ``"prepare"`` is the **analysis** eval mode: a
+    blessed System Model is seeded at :data:`STATE_VALID_MODEL` and the
+    extraction half is left out entirely, so threat numbers are attributable to
+    the analysts and critic rather than to an element ``extract`` never
+    produced. It is a parameter here, not a second topology in the eval tree,
+    because two definitions of the same graph drift.
     """
     if entry not in (ENTRY_EXTRACT, ENTRY_PREPARE, ENTRY_EXTRACT_ONLY):
         raise ValueError(f"unknown graph entry point: {entry!r}")

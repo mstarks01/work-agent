@@ -44,7 +44,7 @@ def observed(**nodes: set[str]) -> dict[str, frozenset[str]]:
 
 
 class TestTierKeying:
-    """#14 decision 4: blessing is per tier, because the hash is."""
+    """Blessing is per tier, because the hash is."""
 
     def test_two_nodes_on_one_tier_certify_off_one_blessed_set(self):
         # critic and recritic present a byte-identical hash by construction.
@@ -75,7 +75,7 @@ class TestTierKeying:
 
 
 class TestPerExecutionSets:
-    """#14 decision 1: a node maps to every hash it presented, not one."""
+    """A node maps to every hash it presented, not one."""
 
     def test_a_node_that_ran_twice_certifies_only_if_both_are_blessed(self):
         # A build that moved mid-run gives one node two hashes; that is the
@@ -96,7 +96,7 @@ class TestPerExecutionSets:
 
 
 class TestTheThirdState:
-    """#14 decisions 3 and 5: unexercised is a separate field, naming tiers."""
+    """Unexercised is a separate field, naming tiers."""
 
     def test_an_unexercised_tier_is_named_without_touching_certified(self):
         # Folding it into the boolean would mark an ordinary run untrusted,
@@ -205,7 +205,7 @@ class TestManifestLoading:
 
 
 class TestGatePolicy:
-    """#17 decisions 3 and 4: the two withholding rules deliberately differ."""
+    """The two withholding rules deliberately differ."""
 
     def gate(self, require_certified: bool) -> CertificationGate:
         return CertificationGate(

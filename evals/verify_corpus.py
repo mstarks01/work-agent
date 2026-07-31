@@ -1,9 +1,7 @@
 """Mechanical checks over the golden corpus and the judge-calibration fixtures.
 
-Authored with the corpus (wayfinder ticket 022) so the content is verifiable
-before any harness exists; ticket 023 ports these checks into the offline test
-job, the same way ticket 019's script became ticket 020's lints. Everything
-here is deterministic and credential-free by construction.
+Everything here is deterministic and credential-free by construction;
+``tests/test_corpus_lints.py`` runs the same checks in CI.
 
 Run ``python evals/verify_corpus.py`` to check, ``--write-sha`` to stamp each
 case's ``source_sha256`` from its ``source.md``.
@@ -30,13 +28,13 @@ from stride_service.validation import parse_and_validate
 CORPUS_DIR = Path(__file__).resolve().parent / "corpus"
 CALIBRATION_PATH = Path(__file__).resolve().parent / "judge_calibration" / "pairs.json"
 
-# Ticket 009 decision 5: ground truth must be exhaustively enumerable by a
-# human, which is only true of small systems.
+# Ground truth must be exhaustively enumerable by a human, which is only true
+# of small systems.
 MIN_ELEMENTS = 8
 MAX_ELEMENTS = 20
 
-# Ticket 009 decision 13: ~100 hand-labelled pairs, and a fixture set that is
-# all matches or all non-matches cannot measure agreement.
+# ~100 hand-labelled pairs, and a fixture set that is all matches or all
+# non-matches cannot measure agreement.
 MIN_CALIBRATION_PAIRS = 100
 MIN_LABEL_SHARE = 0.3
 
@@ -119,8 +117,8 @@ def _check_threats(threats: object, element_ids: set[str]) -> Iterator[str]:
         if threat["tier"] not in TIERS:
             yield f"{where} tier {threat['tier']!r} is not must-find/expected"
 
-        # Mirrors ticket 020's exemplar guard: a reference threat that cites an
-        # element the blessed model does not have is unscoreable.
+        # Mirrors the exemplar lint: a reference threat that cites an element
+        # the blessed model does not have is unscoreable.
         for element_id in threat["affected_element_ids"]:
             if element_id not in element_ids:
                 yield f"{where} cites {element_id!r}, absent from model.json"

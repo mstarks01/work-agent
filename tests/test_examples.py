@@ -1,10 +1,10 @@
-"""Layer 2 of the examples' honesty mechanism (#30): their logic actually runs.
+"""Layer 2 of the examples' honesty mechanism: their logic actually runs.
 
-The docs lint next door proves the prose shows *these* files. It cannot prove the
-files are correct — a snippet that imports cleanly and mishandles a rejection
-passes byte-equality perfectly happily, and that is precisely the bug that
-motivated this work: ``README.md`` used to carry a quick start that tested
-``isinstance(outcome, PipelineCompleted)`` and silently did nothing otherwise.
+The docs lint next door proves the prose shows *these* files. It cannot prove
+the files are correct — a snippet that imports cleanly and mishandles a
+rejection passes byte-equality perfectly happily — a quick start that tests
+``isinstance(outcome, PipelineCompleted)`` and silently does nothing otherwise
+is exactly the shape this catches.
 
 So each example exposes ``async def main(engine)`` rather than building its own
 engine, and this drives that seam with stub runners across all three outcomes.
@@ -101,7 +101,7 @@ def test_the_example_lets_an_internal_failure_propagate(example):
 
 
 def test_the_sample_description_is_in_the_band_the_docs_promise():
-    """``examples/orders.md`` is sized for the 8-20 element range (#30).
+    """``examples/orders.md`` is sized for the 8-20 element range.
 
     Element count needs a model, so it cannot be asserted here — the weekly live
     lane does that. What is decidable offline is the word budget the sample was

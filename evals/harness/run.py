@@ -1,13 +1,11 @@
 """The eval CLI: run a mode over the corpus, or calibrate the judge.
 
-Gating is phase 1's (ticket 009 decisions 16 and 19): **Tier 1 structural
-only**. A report that does not parse, whose references dangle, whose severity
-bands contradict the matrix or whose summary disagrees with its own contents
-fails the run. Must-find recall is computed, printed and written to the
-artifact, and deliberately **does not block** — it becomes a hard per-case gate
-in ticket 025, after ~5 baseline sweeps have established the normal range. A
-gate that fires before anyone knows the normal range trains people to bypass
-it.
+Gating is **Tier 1 structural only**. A report that does not parse, whose
+references dangle, whose severity bands contradict the matrix or whose summary
+disagrees with its own contents fails the run. Must-find recall is computed,
+printed and written to the artifact, and deliberately **does not block** until
+baseline sweeps have established its normal range: a gate that fires before
+anyone knows that range trains people to bypass it.
 
 Everything the run learned lands in one JSON artifact: every judge ruling with
 its rationale, every bucket decision, the severity confusion, the near/far
@@ -15,9 +13,9 @@ exemplar delta, and the ``valid-unlisted`` threats queued for the SME's next
 blessing pass. The metrics are judge-relative — track movement with them, never
 quote them as absolutes.
 
-``run`` needs live Vertex credentials (ADC, per decision 17 — never API keys).
-``score`` is credential-free and replays a recorded artifact's produced threats
-through the scorer, which is what the PR job exercises.
+``run`` needs live provider credentials. ``score`` is credential-free and
+replays a recorded artifact's produced threats through the scorer, which is
+what the PR job exercises.
 """
 
 from __future__ import annotations
@@ -55,7 +53,7 @@ DEFAULT_CORPUS_DIR = EVALS_ROOT / "corpus"
 
 
 def _live_judge(deployment: Deployment) -> PinnedJudge:
-    """The pinned judge, retry-and-timeout-hardened like the graph (ticket 038).
+    """The pinned judge, retry-and-timeout-hardened like the graph.
 
     A calibration or scoring sweep is hours of paid work; without the same
     resilience config the graph carries, one 429 to the judge throws all of it
@@ -104,10 +102,10 @@ async def _run_mode(
 ) -> ModeRun:
     """Run one mode over the selected cases, collecting Tier 1 failures.
 
-    The per-node fingerprints (ticket 07) come back too, taken from the node
-    runs rather than from the report: the extraction mode produces no report,
-    and sourcing observations from one would leave the single tier that mode
-    exercises the only tier it could never certify.
+    The per-node fingerprints come back too, taken from the node runs rather
+    than from the report: the extraction mode produces no report, and sourcing
+    observations from one would leave the single tier that mode exercises the
+    only tier it could never certify.
     """
     pipeline = modes.build_eval_pipeline(
         modes.MODE_ENTRIES[mode], deployment=deployment
@@ -155,7 +153,7 @@ def _score_runs(
     runs: dict[str, modes.AnalysisRun],
     judge: Judge,
 ) -> tuple[list[CaseScore], list[CriticYield]]:
-    """Score every case on both sides of the critic (ticket 028).
+    """Score every case on both sides of the critic.
 
     Yield comes out of the same pass rather than a second sweep: the pre-critic
     drafts are a superset of the report's threats, so scoring them first leaves
@@ -181,10 +179,10 @@ def _models_record(
 ) -> dict[str, Any]:
     """What this run asked its providers for, and what they say they served.
 
-    Ticket 026: the tier strings are stable GA identifiers, not immutable
-    builds, so the artifact records both halves. A metric that moved between
-    two runs with different ``judge_served`` values is a model change, not a
-    regression, and nothing else in the artifact would show that.
+    The tier strings are stable GA identifiers, not immutable builds, so the
+    artifact records both halves. A metric that moved between two runs with
+    different ``judge_served`` values is a model change, not a regression, and
+    nothing else in the artifact would show that.
     """
     tiers = deployment.tiers
     judge_config = load_judge_config()
@@ -250,9 +248,9 @@ def command_run(args: argparse.Namespace) -> int:
     mode_run = asyncio.run(_run_mode(cases, args.mode, deployment))
     failures = mode_run.failures
 
-    # Never silently trust (ticket 08 / 03 §4): the verdict is always computed
-    # and surfaced, so an aggregate can never be read without knowing whether the
-    # generation identity behind it is a blessed baseline.
+    # Never silently trust: the verdict is always computed and surfaced, so an
+    # aggregate can never be read without knowing whether the generation
+    # identity behind it is a blessed baseline.
     certification = certify(
         mode_run.observations,
         deployment.manifest,
