@@ -77,8 +77,8 @@ def test_the_form_page_shows_the_resolved_tiers_read_only(client, tiers):
     page = client.get("/").text
     for tier, selection in tiers.tiers.items():
         assert f"<b>{tier}</b> → {selection.vendor} / {selection.model}" in page
-    # Selection is config-only (#28): the page reflects it, and offers no input
-    # that could influence it. The only form control is the description.
+    # Selection is config-only: the page reflects it, and offers no input that
+    # could influence it. The only form control is the description.
     assert "<select" not in page
     assert page.count("<input") == 0
     assert page.count("<textarea") == 1
@@ -93,7 +93,7 @@ def test_load_example_serves_the_same_file_the_examples_run(client):
 
 
 def test_analyze_refuses_a_request_that_is_not_same_origin(client):
-    """CSRF (#29): any page you visit could otherwise spend your vendor budget."""
+    """CSRF: any page you visit could otherwise spend your vendor budget."""
     for headers in ({}, {"Sec-Fetch-Site": "cross-site"}, {"Sec-Fetch-Site": "none"}):
         response = client.post("/analyze", json={"description": "x"}, headers=headers)
         assert response.status_code == 403, headers
@@ -111,7 +111,7 @@ def test_a_run_streams_one_tick_per_node_then_redirects(client):
         for line in events.splitlines()
         if line.startswith("data: ") and '"node"' in line
     ]
-    # Verbatim as the graph emits them — no display-name mapping (#29).
+    # Verbatim as the graph emits them — no display-name mapping.
     assert ticked == list(StubPipelineRunner.nodes)
     assert f'"url": "/report/{run_id}"' in events
 
@@ -179,7 +179,7 @@ def test_an_unknown_run_has_no_report(client):
 
 
 def test_the_injection_point_escapes_every_angle_bracket():
-    """The whole trust boundary, tested directly (#29).
+    """The whole trust boundary, tested directly.
 
     A description containing ``</script>`` must not be able to close the JSON
     block. With the escape the payload lands inert, and the page still holds

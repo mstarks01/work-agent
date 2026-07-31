@@ -1,21 +1,12 @@
 """One installation's configuration, resolved once and shared by everything.
 
 A **Deployment** is the four config files plus the skills and prompts, located
-by ``STRIDE_*`` variables that pick *which* file is read. It exists because five
-places were each assembling that themselves — the HTTP service, the in-process
-engine, the first-run web app, the eval harness's pipeline builder, and the eval
-CLI — and they had drifted three ways:
-
-* ``model_tiers.toml`` was read five times per process, twice inside one call
-  chain (``default_pipeline_runner`` loaded it, then ``build_default_pipeline``
-  loaded it again);
-* only the service knew the path variables at all. The eval harness hard-coded
-  ``REPO_ROOT / "config"``, so a deployment that redirected ``STRIDE_SAMPLING``
-  had its sweeps grading a configuration it does not run — against a docstring
-  in :mod:`stride_service.sampling` promising eval and production read from the
-  same place;
-* the node -> tier walk (``resolve_tier(TIER_NODE_BY_GRAPH_NODE[node])``) was
-  written out twice, once in the service and once in the eval CLI.
+by ``STRIDE_*`` variables that pick *which* file is read. Every consumer — the
+HTTP service, the in-process engine, the first-run web app, the eval harness's
+pipeline builder and the eval CLI — assembles its configuration through this
+one object, so each file is read once per process, a deployment that redirects
+``STRIDE_SAMPLING`` has its sweeps grading the configuration it actually runs,
+and the node -> tier walk is written in a single place.
 
 **Configs load eagerly, adapters and the graph do not.** Reading four TOML files
 is cheap, needs no credentials, and is where fail-closed belongs: a deployment
@@ -27,8 +18,7 @@ holds a valid Deployment whose ``runner()`` raised.
 
 **One manifest, one gate.** :meth:`gate` is memoized and :meth:`runner` consumes
 it, so the manifest a job is certified against and the one the report route
-enforces are the same object rather than two loads that happen to agree. The
-route used to reach through the runner's private attribute to get it.
+enforces are the same object rather than two loads that happen to agree.
 
 The environment is held for one purpose — deriving each vendor's credentials at
 adapter-build time — and is kept out of ``repr`` and equality so a deployment
@@ -68,9 +58,9 @@ from stride_service.pipeline import AdkPipelineRunner
 from stride_service.resilience import ResilienceConfig, load_resilience
 from stride_service.sampling import SamplingConfig, load_sampling
 
-# The repo layout baked into the image (ticket 006): Markdown and config next to
-# the package, not fetched at run time. A variable picks a different file; it
-# never layers a second one over the first (#10).
+# The repo layout baked into the image: Markdown and config next to the
+# package, not fetched at run time. A variable picks a different file; it never
+# layers a second one over the first.
 _REPO_ROOT = Path(__file__).resolve().parents[2]
 DEFAULT_SKILLS_DIR = _REPO_ROOT / "skills"
 DEFAULT_PROMPTS_DIR = _REPO_ROOT / "prompts"
@@ -134,7 +124,7 @@ class Deployment:
     """One installation's resolved configuration, and what it can build.
 
     Construct with :meth:`from_env` and pass it around; constructing a second
-    one re-reads every file, which is exactly the duplication this replaces.
+    one re-reads every file.
     """
 
     tiers: ModelTierConfig
@@ -178,9 +168,9 @@ class Deployment:
     def tier_of(self, graph_node: str) -> TierName:
         """The tier a *graph* node runs on, via its canonical tier-node name.
 
-        The one place this walk is written. It is two mappings deep — graph
-        node to canonical node, canonical node to tier — and having it twice is
-        how two callers came to disagree about what a node's tier was.
+        The one place this walk is written: it is two mappings deep — graph
+        node to canonical node, canonical node to tier — and callers that
+        re-derive it are how two of them come to disagree about a node's tier.
         """
         return self.tiers.resolve_tier(TIER_NODE_BY_GRAPH_NODE[graph_node])
 
@@ -220,8 +210,7 @@ class Deployment:
         """This deployment's certification gate, built once.
 
         Memoized so two jobs in one process can never be certified against
-        different manifests — which would be #10's silent override displaced
-        from space into time — and so the gate the report route enforces is the
+        different manifests, and so the gate the report route enforces is the
         same object the runner certified with.
         """
         return self._memo("gate", self._build_gate)
@@ -231,7 +220,7 @@ class Deployment:
 
         Memoized because the graph is expensive to compose — instructions are
         built once so the cacheable prefix every node shares is byte-identical
-        across jobs (ticket 021).
+        across jobs.
         """
         return self._memo("runner", self._build_runner)
 

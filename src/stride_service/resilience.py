@@ -1,9 +1,9 @@
 """Resilience configuration for the graph's LLM calls.
 
-Implements wayfinder ticket 038: on their own defaults the LLM nodes never retry
-and never time out. A single 429 on any node kills a paid-for job on first
-contact, and a stalled call parks a job in ``running`` forever. This module is
-the two knobs that fix both.
+Two knobs — attempts and timeout — applied to every LLM call. On library
+defaults the nodes never retry and never time out: a single 429 on any node
+would kill a paid-for job on first contact, and a stalled call would park a job
+in ``running`` forever.
 
 Unlike :mod:`stride_service.sampling`, these values **are** env-overridable. The
 split that settles it: sampling is pinned because temperature changes *what* the
@@ -12,19 +12,15 @@ drifts; attempts and timeout change only *how hard we try*, never which answer
 we get, so they cannot move a score and are exactly the knobs to turn down
 mid-incident without a redeploy.
 
-Version 2 is a hard cutover (#15 decision 4) and **drops the four backoff
-knobs**. ``initial_delay`` / ``max_delay`` / ``exp_base`` / ``jitter`` appear
-nowhere in ``litellm``, which picks its backoff curve internally from the
-exception type, so under the ``LiteLlm`` adapter they are ``top_k`` again: unset
-in the shipped file and provably inert. Keeping them would mean a config surface
-that reads as a knob and connects to nothing.
+There are no backoff knobs. ``litellm`` picks its backoff curve internally from
+the exception type, so an ``initial_delay`` / ``max_delay`` / ``exp_base`` /
+``jitter`` surface would read as a knob and connect to nothing.
 
-Retry now rides the adapter's constructor rather than a GenAI retry object, and
-the arithmetic is explicit (#6 decision 2). ``attempts`` is a *total* count;
-LiteLLM's ``num_retries`` counts retries *after* the first try. Passing
-``attempts`` straight through would over-shoot to four tries where three are
-configured, and the previous ``to_http_options()``-only path silently under-shot
-to one. Only ``attempts - 1`` reproduces the configured number.
+Retry rides the adapter's constructor, and the arithmetic is explicit.
+``attempts`` is a *total* count while LiteLLM's ``num_retries`` counts retries
+*after* the first try, so passing ``attempts`` through verbatim would over-shoot
+to four tries where three are configured. Only ``attempts - 1`` reproduces the
+configured number.
 
 Loading fails closed: a malformed file, an out-of-range value, an unknown key or
 a stale version raises :class:`ResilienceConfigError` rather than silently
@@ -42,9 +38,9 @@ from typing import TypeVar
 from google.genai import types
 from pydantic import BaseModel, ConfigDict, Field, ValidationError
 
-# Hard cutover: version 1 carried the four backoff knobs this schema drops, and
-# ``extra="forbid"`` would reject them with a confusing per-key error. The
-# version check fires first and says why.
+# The only schema version this loader accepts. The version check fires before
+# shape validation, so a file on another schema is named as such rather than
+# reported as a set of stray keys under ``extra="forbid"``.
 SUPPORTED_VERSION = 2
 
 _ENV_PREFIX = "STRIDE_"
@@ -77,7 +73,7 @@ class ResilienceConfig(BaseModel):
         return self.attempts - 1
 
     def to_http_options(self) -> types.HttpOptions:
-        """Per-request HTTP options carrying the deadline (ticket 038 decision 4).
+        """Per-request HTTP options carrying the deadline.
 
         ADK merges its tracking headers and api version into a caller-supplied
         ``http_options``, so setting the timeout here leaves those untouched.
@@ -123,9 +119,8 @@ def load_resilience(
     if version != SUPPORTED_VERSION:
         raise ResilienceConfigError(
             f"{path}: unsupported version {version!r};"
-            f" expected {SUPPORTED_VERSION} (hard cutover, no shim)."
-            " Version 1's backoff knobs are inert under the LiteLlm adapter"
-            " and have been removed"
+            f" expected {SUPPORTED_VERSION}, which carries only 'attempts' and"
+            " 'timeout_ms'"
         )
 
     overrides = {

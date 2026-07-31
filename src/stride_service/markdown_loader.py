@@ -1,10 +1,7 @@
 """Loading Markdown content — skills and prompts — from a directory of files.
 
-One implementation serves both content roots (wayfinder tickets 011, 013):
-the loader takes a directory in and hands named Markdown text out, with no
-templating and no caching. :mod:`stride_service.skills` aliases these names
-as ``SkillLoader``/``SkillNotFoundError``/``SkillFormatError``, which is what
-the skills tree and its lints were written against.
+One implementation serves both content roots: the loader takes a directory in
+and hands named Markdown text out, with no templating and no caching.
 
 Loading fails closed. Repo Markdown is trusted content baked into the image,
 but a missing file, a heading that deviates from the fixed set, or a name
@@ -76,8 +73,8 @@ class MarkdownLoader:
     Names are root-relative POSIX paths without the ``.md`` suffix, e.g.
     ``"stride/spoofing"``, ``"shared/severity_rubric"``, ``"analyst"`` or
     ``"exemplars/tampering"``. This is the canonical directory-in,
-    named-items-out interface for the service (ticket 011: no external
-    PromptLoader was available to mirror), used for both skills and prompts.
+    named-items-out interface for the service, used for both skills and
+    prompts.
     """
 
     def __init__(self, root: Path | str) -> None:

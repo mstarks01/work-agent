@@ -1,4 +1,4 @@
-"""The three eval modes over one corpus (ticket 009 decision 1).
+"""The three eval modes over one corpus.
 
 Two artifacts per case buy three modes, and the point of the split is
 **attribution**: an end-to-end-only fixture cannot say whether a recall miss
@@ -18,8 +18,8 @@ and the state seeded into the session. Nothing about the topology, the prompts,
 the skills, the tier config or the sampling config is eval-specific — grading a
 configuration you do not ship is the failure mode this whole design rejects.
 
-Every function here needs live Vertex credentials, and nothing here runs in the
-credential-free PR job (decision 17): that job scores recorded output through
+Every function here needs live provider credentials, and nothing here runs in
+the credential-free PR job: that job scores recorded output through
 :mod:`evals.harness.scorer` and :mod:`evals.harness.structural`, both of which
 take plain data.
 """
@@ -94,8 +94,8 @@ class AnalysisRun:
 
     The drafts are read straight off ``merged_drafts`` in the final session
     state, which is where :func:`~stride_service.graph.merge_drafts` parks them
-    on the way into the critic — so critic yield (ticket 028) costs one extra
-    state key here and no change to the production seam. Reading them back as
+    on the way into the critic — so critic yield costs one extra state key here
+    and no change to the production seam. Reading them back as
     :class:`DraftThreat` rather than passing the raw dicts on keeps the scorer
     typed against the shipped model, and revalidates on the way out of state
     exactly as :func:`~stride_service.graph.assemble_report` does.
@@ -154,11 +154,11 @@ def build_eval_pipeline(
 
     Built from a :class:`~stride_service.deployment.Deployment`, which is the
     same thing the service is built from — including the retry and per-request
-    timeout (ticket 038), so a scheduled sweep does not die on one 429 after
-    hours of work. That is what makes "eval and production read from the same
-    place" true rather than aspirational: this used to hard-code
-    ``REPO_ROOT / "config"``, so a deployment that redirected a path had its
-    sweeps grading a configuration it does not run.
+    timeout, so a scheduled sweep does not die on one 429 after hours of work.
+    Locating config through the deployment rather than the repo root is what
+    makes "eval and production read from the same place" true rather than
+    aspirational: a deployment that redirects a path has its sweeps grading the
+    configuration it actually runs.
 
     ``resolve_model`` short-circuits the tier adapters deliberately: building
     them runs the credential check, which an offline test binding scripted
@@ -193,10 +193,10 @@ async def run_extraction(case: GoldenCase, pipeline: Pipeline) -> ExtractionResu
     state = graph_run.final_state
     if STATE_EXTRACTED_MODEL not in state:
         raise EvalRunError(f"{case.id}: extract produced no model")
-    # normalize_ids mirrors the ``validate`` node (ticket 037): blessed models
-    # already carry derived IDs, so scoring a candidate's raw IDs by set
-    # membership would count an abbreviated slug as one missing element and one
-    # extra, on a reading of the source that was correct.
+    # normalize_ids mirrors the ``validate`` node: blessed models already carry
+    # derived IDs, so scoring a candidate's raw IDs by set membership would
+    # count an abbreviated slug as one missing element and one extra, on a
+    # reading of the source that was correct.
     model, issues = parse_and_validate(state[STATE_EXTRACTED_MODEL], normalize_ids=True)
     return ExtractionResult(
         case_id=case.id,
@@ -273,9 +273,9 @@ def _run_from_graph(
     self-containment invariants — and a stripped-down payload would test a
     shape production never emits.
 
-    That now includes the node runs and the per-tier sampling clear block. They
-    were previously stubbed, which meant a sweep's reports carried no
-    fingerprints and its certification verdict was computed over nothing.
+    That includes the node runs and the per-tier sampling clear block, without
+    which a sweep's reports would carry no fingerprints and its certification
+    verdict would be computed over nothing.
     """
     state = graph_run.final_state
     if STATE_REJECTION in state:

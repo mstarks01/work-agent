@@ -1,9 +1,9 @@
 """Judge-vs-human agreement over the hand-labelled fixtures.
 
-Ticket 009 decision 13: the SME hand-labelled ~100 candidate pairs match /
-no-match in the same session that blessed the corpus, and judge-human agreement
-must be **>= 90%** (comparator: Semgrep's 92-96% on an analogous triage task).
-Failing the bar means the judge prompt needs work, not ship-anyway.
+The SME hand-labelled ~100 candidate pairs match / no-match in the same session
+that blessed the corpus, and judge-human agreement must be **>= 90%**
+(comparator: Semgrep's 92-96% on an analogous triage task). Failing the bar
+means the judge prompt needs work, not ship-anyway.
 
 This is what makes a judge change a real gate rather than a dependency bump:
 re-run it on any change to ``evals/config/judge.toml``, because a new judge
@@ -15,8 +15,8 @@ tracking movement and comparing configurations, and they are not absolutes
 comparable to published figures from other tools.
 
 The same fixtures do double duty as the offline unit-test corpus for
-:mod:`evals.harness.scorer` (decision 17), where a scripted judge replays the
-recorded labels and no Vertex call happens at all.
+:mod:`evals.harness.scorer`, where a scripted judge replays the recorded labels
+and no provider call happens at all.
 """
 
 from __future__ import annotations
@@ -33,7 +33,6 @@ from stride_service.report import STRIDE_CATEGORIES, StrideCategory
 EVALS_ROOT = Path(__file__).resolve().parents[1]
 DEFAULT_PAIRS_PATH = EVALS_ROOT / "judge_calibration" / "pairs.json"
 
-# Ticket 009 decision 13.
 AGREEMENT_BAR = 0.90
 
 Label = Literal["match", "no-match"]

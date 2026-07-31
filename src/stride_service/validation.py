@@ -1,17 +1,16 @@
 """Mechanical validity gate for the System Model.
 
-Implements the well-formedness rules from wayfinder ticket 003: unique typed
-IDs deterministic from type+name, referential integrity of flow endpoints and
-``trust_zone``, at least one trust zone, legal enum values (including the
-config-extendable asset-tag vocabulary), and assumptions referencing real
-elements. Ticket 010 added the admission cap on model size
-(:data:`MAX_ELEMENTS`), enforced here because this is the one gate every
+The well-formedness rules: unique typed IDs deterministic from type+name,
+referential integrity of flow endpoints and ``trust_zone``, at least one trust
+zone, legal enum values (including the config-extendable asset-tag vocabulary),
+and assumptions referencing real elements. The admission cap on model size
+(:data:`MAX_ELEMENTS`) is enforced here because this is the one gate every
 extraction passes through before any analyst spend.
 
-Ticket 037 moved ID derivation into code: callers passing ``normalize_ids``
-to :func:`parse_and_validate` get their IDs canonicalized before the gate
-runs, so ``id-mismatch`` is unreachable from the extraction pipeline. The rule
-stays enforced here for models that arrive hand-authored.
+ID derivation lives in code: callers passing ``normalize_ids`` to
+:func:`parse_and_validate` get their IDs canonicalized before the gate runs, so
+``id-mismatch`` is unreachable from the extraction pipeline. The rule stays
+enforced here for models that arrive hand-authored.
 
 Errors are structured (:class:`ValidationIssue`) so the repair pass can feed
 them back to the extraction agent verbatim. Analysts only ever see models for
@@ -44,7 +43,7 @@ IssueCode = Literal[
     "too-many-elements",
 ]
 
-# Admission cap on model size (ticket 010). Deliberately loose: it is a
+# Admission cap on model size. Deliberately loose: it is a
 # blast-radius guard, not a quality threshold. Every artifact downstream
 # scales with element count — six analysts each read the whole model, and the
 # critic reads every draft they produce in one pass — so an unbounded model
@@ -54,8 +53,8 @@ IssueCode = Literal[
 # number a user can act on: "split the system" is advice they can follow.
 #
 # Where quality actually decays with model size is unmeasured — the golden
-# corpus is 8-20 elements by design (ticket 009) — so this number is a guard
-# awaiting evidence, not a calibrated limit.
+# corpus is 8-20 elements by design — so this number is a guard awaiting
+# evidence, not a calibrated limit.
 MAX_ELEMENTS = 150
 
 

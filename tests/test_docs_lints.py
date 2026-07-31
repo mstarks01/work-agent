@@ -1,4 +1,4 @@
-"""Layer 1 of the examples' honesty mechanism (#30): the docs show the real code.
+"""Layer 1 of the examples' honesty mechanism: the docs show the real code.
 
 ``examples/`` is the single source of truth for every code block in the prose.
 This wraps ``examples/sync_docs.py`` the way ``tests/test_corpus_lints.py`` wraps
