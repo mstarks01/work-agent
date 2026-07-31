@@ -77,8 +77,22 @@ gh api --method POST repos/mstarks01/work-agent/issues/<child>/dependencies/bloc
   sum's fault and the error carries a per-source breakdown rather than naming a culprit. Both
   numbers move to `config/resilience.toml` **v3**, a hard cutover, on that file's own test that a
   knob which cannot change an answer may be env-overridable; `label` gains a 200-char bound,
-  amending #50. Frontier now: how extraction reads a conversation (#53) and `source_excerpt`
-  with N sources (#56).
+  amending #50. #53 gives extraction five rules for reading a conversation, placed **once and
+  always-on** in `extract.md` rather than per-kind or per-source, which would vary the prompt
+  prefix by job shape: spoken uncertainty (hedge or admitted gap) is `unknown` plus the words in
+  `notes` and never an **Assumption**; facts come from assertions rather than questions, every
+  speaker read alike because #51 proved no export carries a role — taking roles from `label` was
+  refused as a second contract on free-form caller text; a later statement supersedes an earlier
+  one *within* one source only; plans and hypotheticals are excluded outright; excerpts stay
+  verbatim but may span turns keeping speaker labels. It also raises
+  `EXTRACT_PROMPT_TOKEN_CAP` 1500 → **2000** — archived ticket 006 sized 1500 against the
+  *analyst's* 6–8K envelope while settling that extract loads no skills, so `extract.md` is that
+  node's whole instruction at ~5% of a full-budget call. `CONTEXT.md`'s **Unknown** and
+  **Assumption** are sharpened accordingly. Closing #53 released both its dependents, so the
+  frontier is now three wide: rendering N sources into the prompt (#54), the cross-source
+  conflict rule (#55), and `source_excerpt` with N sources (#56). #53 also surfaced #59 —
+  nothing downstream is told to read `notes`, which #53 made load-bearing — blocked by #55 in
+  case it adds another producer.
 
 ### Completed efforts
 
