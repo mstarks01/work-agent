@@ -55,12 +55,67 @@ gh api --method POST repos/mstarks01/work-agent/issues/<child>/dependencies/bloc
 
 ### The live map
 
-_(none — no wayfinding effort is currently in flight. `/wayfinder` invoked with a loose idea
-should chart a new map; there is nothing to resume.)_
+None. [#49](https://github.com/mstarks01/work-agent/issues/49) completed 2026-07-31 and has
+moved to Completed efforts below; its spec is awaiting implementation on `build/sources-cutover`.
+Chart a new one only under the bar at the end of this file.
 
 ### Completed efforts
 
 Completed on GitHub Issues (canonical):
+
+- [#49 — Map: accept call transcripts as job input](https://github.com/mstarks01/work-agent/issues/49)
+  — 10 tickets, charted and completed 2026-07-31. A **planning** map: it settles the spec for
+  accepting analyst↔developer interview transcripts as job input and stops there. **The spec is
+  not yet implemented** — it ships as one branch, `build/sources-cutover`, whose plan is
+  [#57, the cutover inventory](https://github.com/mstarks01/work-agent/issues/57): seven commits,
+  no green intermediate (the no-shim rule makes the contract atomic), config ahead of the contract,
+  and one narrow ADR at `docs/adr/0001-sources-replace-description.md` creating the directory.
+  Read #57 first, then the other nine resolution comments for the reasoning.
+
+  The route in one pass: `description` is replaced by a uniform `sources` list of
+  `{kind, label, text}` — `kind` a closed enum, `label` a required, unique, 200-char, model-visible
+  citation key, order presentation-only ([#50](https://github.com/mstarks01/work-agent/issues/50)).
+  Budget is **bytes, not tokens** (tokens would make the public contract deployment-dependent):
+  100 KiB total and 10 sources, no per-source cap, on `config/resilience.toml` **v3**
+  ([#52](https://github.com/mstarks01/work-agent/issues/52)). Extraction gains six conversational
+  rules placed **once and always-on** in `extract.md`
+  ([#53](https://github.com/mstarks01/work-agent/issues/53),
+  [#55](https://github.com/mstarks01/work-agent/issues/55)): a hedge or admitted gap is `unknown`
+  plus the speaker's words in `notes` and never an Assumption; facts come from assertions not
+  questions, every speaker read alike; sources carry **equal weight**, so a disagreement is
+  recorded rather than adjudicated, flattening to `unknown` where the field allows and to a
+  schema-forced value plus an `assumptions` entry where it does not. Rendering is **one fenced
+  block per source with no caller-controlled byte outside a fence**, the fence sized to its content
+  ([#54](https://github.com/mstarks01/work-agent/issues/54)); `GraphExecutor.run` takes
+  `Sequence[Source]` and renders internally, which is the seam the whole cutover turns on.
+  Traceability gains `source_label` (gate-enforced against the job's labels — the first gate rule
+  taking data from outside the model) and an ungated, redactable `source_speaker`, with
+  `source_excerpt` held at 1000 chars
+  ([#56](https://github.com/mstarks01/work-agent/issues/56)). Downstream, `notes` gets a
+  **bounding** rule — context for the needs-info question, never evidence, never weight on a rating
+  — in the shared severity rubric plus one sentence each on `analyst.md` and `critic.md`
+  ([#59](https://github.com/mstarks01/work-agent/issues/59)). The eval corpus gains **one
+  two-source transcript case** and every `case.json` gains a `sources` array
+  ([#58](https://github.com/mstarks01/work-agent/issues/58)).
+
+  Two findings outlived their tickets. **Measurement beat survey**
+  ([#51](https://github.com/mstarks01/work-agent/issues/51)): four real Teams `.vtt` exports are
+  34.8% spoken words and 65% machinery, a raw 60-minute export blows the cap while the same call
+  cleaned does not, and attribution names the *participant* but never the **role** — which is why
+  extraction reads every speaker alike and why `source_timestamp` was rejected (cleaning strips cue
+  timings, so the field would be empty exactly on compliant input). And **the tree beat the
+  charted list**: #57's verification found the ticket's own inventory wrong in five places and
+  missed four modules, `execution.py` and `__init__.py` among them. Findings live on
+  `archive/research/transcript-exports` @ `935fc57` and `archive/prototype/multi-source-render`
+  @ `e4a17a6`.
+
+  Two questions were left in fog deliberately, both needing real extractions rather than argument:
+  what the validity gate should do with a **rambling call** that never settles into a system, and
+  **PII residue** — participant names ride into `source_excerpt` by #53's rule and quoted claims
+  into `notes` by #55's, and only `source_speaker` was made strippable. Five areas are **out of
+  scope** and do not graduate: file-format parsing in the service, front-end acquisition UX,
+  integrator-facing transcript-prep guidance, any rationale/claim carrier in the System Model, and
+  a condensation pre-pass.
 
 - [#24 — Map: answer "how do I use this?" — a first-run path for the integrator](https://github.com/mstarks01/work-agent/issues/24)
   — 10 tickets (8 resolved, 2 out of scope), charted 2026-07-29, complete 2026-07-30. A
