@@ -63,7 +63,10 @@ gh api --method POST repos/mstarks01/work-agent/issues/<child>/dependencies/bloc
   only, never files; caps only, so an over-long transcript is rejected rather than condensed;
   and extraction stays the sole reader of raw text. Frontier at charting: the `sources`
   contract (#50) and the transcript-export research (#51), the latter worked **inline** rather
-  than by subagent.
+  than by subagent. #50 is resolved: a source is `{kind, label, text}` with `kind` a closed
+  load-bearing enum and `label` a required, unique, model-visible citation key; order carries
+  no precedence, so the conflict rule (#55) is still owed. `CONTEXT.md` carries the **Source**
+  term ahead of any implementation. Frontier now: #51 and `source_excerpt` with N sources (#56).
 
 ### Completed efforts
 
