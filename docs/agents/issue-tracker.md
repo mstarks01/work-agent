@@ -92,7 +92,20 @@ gh api --method POST repos/mstarks01/work-agent/issues/<child>/dependencies/bloc
   frontier is now three wide: rendering N sources into the prompt (#54), the cross-source
   conflict rule (#55), and `source_excerpt` with N sources (#56). #53 also surfaced #59 —
   nothing downstream is told to read `notes`, which #53 made load-bearing — blocked by #55 in
-  case it adds another producer.
+  case it adds another producer. #54 renders **one fenced block per source with no
+  caller-controlled byte outside a fence**: the fence is sized to the content (`longest backtick
+  run + 1`) so a block cannot be closed from within, the `label` rides inside it on a positional
+  `label:`/`----` header, and the marker line outside carries only index, count and the
+  one-phrase register that is all `kind` still selects after #53. A `<source-NONCE label="...">`
+  envelope was killed by #50's own contract — `"` and `>` are legal label bytes. `GraphExecutor.run`
+  takes `Sequence[Source]` and renders internally, so the two drivers' four call sites collapse to
+  one and seeding a raw string stops being expressible; `render_sources` and `Source` land in a new
+  `sources.py`. `{input_text}` keeps its name, so `repair.md` inherits the render byte-identically.
+  Measurement corrected a premise in #53: extract's construction-time prefix is **178 tokens**,
+  under every vendor's caching minimum, so there is no cache at that node to protect and `## Input`
+  stays before `## Procedure`, keeping the trusted instruction last. `extract.md` lands 1650/2000.
+  Prototype on `prototype/multi-source-render` @ `e4a17a6`, to be archived as a tag. Closing #54
+  leaves the frontier at #55 and #56, with #57 now waiting only on #56.
 
 ### Completed efforts
 
