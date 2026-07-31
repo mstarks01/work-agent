@@ -158,7 +158,27 @@ gh api --method POST repos/mstarks01/work-agent/issues/<child>/dependencies/bloc
   `docs/adr/0001-sources-replace-description.md`, creating the directory `docs/agents/domain.md`
   has always pointed at, carrying only what a glossary structurally cannot — bytes-not-tokens,
   equal weight, fence-per-source. **#58 does not gate the branch.** Closing #57 released #58,
-  leaving the frontier at #58 and #59. Closing #56 releases **#57**, leaving the frontier at #57 and #59.
+  leaving the frontier at #58 and #59. #58 says **yes to a transcript case** — but not on the
+  ticket's own grounds, which case 11 refutes by already grading silence → `unknown` on prose.
+  The reframing finding: **`score_extraction` is attribute-blind** (element IDs and boundary
+  crossings only) and `verify_corpus.py` checks no attributes, so the only route from an
+  extraction rule to a number is the **reference threat set in end-to-end mode** — needs-info
+  must-find threats that a wrongly-confident attribute suppresses. **One case, two sources**
+  (a written note plus a transcript contradicting it), asserting four things that move a number:
+  a hedge must not become a value, a fact inside a question is not a fact, a hypothetical
+  produces no element, and the disagreement flattens on **`exposure`** (flattenable per #55's
+  own audit). The self-correction is element-level, since attribute-level is invisible to
+  `ExtractionScore`. Real-vs-synthetic is a **false fork** — content written to order as all
+  12 cases are, but **form** measured from #51, and **cleaned not raw** because #52's caps force
+  cleaning. **Every case's `case.json` gains a `sources` array**, the 12 existing ones as
+  one-element arrays, with per-source shas plus an aggregate over the refs; a new lint ties #56's
+  hard-coded `"System description"` to the gate rule #56 wrote and nothing checked. **Amends #57**:
+  that schema migration joins commit 6 (now "206 values + 12 arrays + loader + lint") because the
+  harness must take `Sequence[Source]` there regardless — but #57's call **stands**, and
+  `13-retail-loyalty-interview` is contributor-side follow-up that does not gate the ship. The
+  judge needs nothing and `judge.toml` must stay untouched. #55's unflattenable path stays
+  ungraded: an assumption produces no threat, so nothing mechanical can see it. Closing #58
+  leaves the frontier at **#59** alone — the last open ticket on this map.
 
 ### Completed efforts
 
