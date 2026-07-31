@@ -55,7 +55,7 @@ class TestVertexIsNotOneProvider:
 
 
 class TestValueConstraintsAreCaught:
-    """#13 decision 2: why the gate is ``get_optional_params``, not the name list.
+    """Why the gate is ``get_optional_params``, not the name list.
 
     ``get_supported_openai_params`` is merely this call's *input*. Only the full
     call runs ``_map_openai_params`` as well as ``_check_valid_arg``, which is
@@ -91,13 +91,13 @@ class TestWhatTheGateCannotDo:
         ]
 
     def test_an_unknown_model_is_not_an_existence_check(self):
-        # Falls back to the provider's base config rather than raising,
-        # consistent with #7 decision 6 declining a build-time existence check.
+        # Falls back to the provider's base config rather than raising: the
+        # gate is not a build-time existence check.
         gate("vertex", "gemini-9.9-imaginary", temperature=0.0)
 
 
 class TestReasoningReachesEveryVendor:
-    """#15 decision 3: what let THINKING_RANGE die for a uniform enum."""
+    """The reasoning enum is uniform, so no per-vendor budget range is needed."""
 
     @pytest.mark.parametrize("effort", ["low", "medium", "high"])
     def test_gemini_accepts_the_effort_enum(self, effort):
@@ -118,7 +118,7 @@ class TestReasoningReachesEveryVendor:
 
 
 class TestKwargAssertion:
-    """#15 decision 4's open obligation: num_retries is ``**kwargs``-only."""
+    """``num_retries`` is ``**kwargs``-only, so a misspelling is silent."""
 
     def test_a_real_litellm_param_passes(self):
         assert_kwarg_supported("num_retries")
@@ -131,7 +131,7 @@ class TestKwargAssertion:
 
 
 class TestHermeticImport:
-    """#13 decision 4: the pin alone pins nothing without the local cost map."""
+    """The version pin alone pins nothing without the local cost map."""
 
     def test_the_local_cost_map_is_pinned(self):
         # litellm fetches its model-cost map from GitHub at import, and that map

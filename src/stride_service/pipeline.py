@@ -1,9 +1,8 @@
 """Driving the ADK graph for one job: the real :class:`PipelineRunner`.
 
-This is what sits behind the seam ticket 018 left for it. The job API knows
-nothing new: it still hands a :class:`~stride_service.jobs.JobRecord` and a
-node callback to something with a ``run`` method, and gets back either a
-report or a structured rejection.
+The implementation behind :class:`~stride_service.jobs.PipelineRunner`: the job
+API hands it a :class:`~stride_service.jobs.JobRecord` and a node callback, and
+gets back either a report or a structured rejection.
 
 Everything the graph cannot know is stamped here. Job identity, the input
 digest, and per-node timings belong to the run rather than to the analysis,
@@ -92,9 +91,9 @@ class AdkPipelineRunner:
 
         A node that raises propagates: the job fails loudly rather than
         completing with a report built on a check that did not run. On that
-        path the input's digest is logged (ticket 038 decision 5) so a poison
-        input that repeatedly wedges jobs is identifiable across runs without
-        the service ever storing the untrusted text.
+        path the input's digest is logged, so a poison input that repeatedly
+        wedges jobs is identifiable across runs without the service ever
+        storing the untrusted text.
         """
         source_sha256 = hashlib.sha256(job.description.encode("utf-8")).hexdigest()
         try:
@@ -136,10 +135,9 @@ class AdkPipelineRunner:
         complete once every node has, so certifying earlier would certify a
         partial run.
 
-        Logged for the operator, never surfaced to the client (#17 decision 6,
-        OWASP A09): hashes and node names, never the report's contents. A client
-        learns about certification exactly when its deployment opted into
-        caring.
+        Logged for the operator, never surfaced to the client (OWASP A09):
+        hashes and node names, never the report's contents. A client learns
+        about certification exactly when its deployment opted into caring.
         """
         if self._certification is None:
             return None

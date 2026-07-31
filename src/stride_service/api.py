@@ -1,9 +1,5 @@
 """The `/v1` job API: the only production surface the front-end calls.
 
-Implements the REST contract from wayfinder ticket 008 — a custom job-oriented
-API wrapping the (stubbed) pipeline runner; ADK's stock routes are never
-mounted here:
-
 * ``POST /v1/jobs`` — submit, 100 KB description cap, returns a job handle.
 * ``GET /v1/jobs/{id}`` — canonical poll: status, per-node progress,
   timestamps, error info; never the report.
@@ -13,8 +9,8 @@ mounted here:
 * ``GET /healthz`` — unauthenticated, for Cloud Run probes.
 
 Every error body is RFC 9457 ``application/problem+json``. Every `/v1` route
-requires a Ping JWT; job reads are owner-only and return 404 — not 403 — for
-non-owners, so job IDs cannot be enumerated.
+requires a verified bearer token; job reads are owner-only and return 404 — not
+403 — for non-owners, so job IDs cannot be enumerated.
 """
 
 from __future__ import annotations
@@ -53,8 +49,8 @@ from stride_service.validation import ValidationIssue
 
 logger = logging.getLogger(__name__)
 
-# MAX_DESCRIPTION_BYTES (the ticket-008 input cap) lives in jobs.py, shared with
-# the in-process engine. The raw-body limit adds slack for JSON framing and
+# MAX_DESCRIPTION_BYTES, the input cap, lives in jobs.py, shared with the
+# in-process engine. The raw-body limit adds slack for JSON framing and
 # escaping so the middleware can reject oversized payloads before parsing them.
 MAX_REQUEST_BODY_BYTES = 120 * 1024
 
@@ -98,15 +94,14 @@ class JobStatusView(BaseModel):
 def _withheld_report(request: Request, record: JobRecord) -> JSONResponse | None:
     """The problem response for a report this deployment must not serve, if any.
 
-    Withholding the report — rather than failing the job — is deliberate (#17
-    decision 3). A ``failed`` job carries no report at all, and the fingerprints
-    that *prove* the drift live in the report, so failing would destroy the very
-    evidence an operator needs. The job stays ``completed`` and the envelope
-    refuses.
+    Withholding the report rather than failing the job is deliberate: a
+    ``failed`` job carries no report at all, and the fingerprints that *prove*
+    the drift live in the report, so failing would destroy the evidence an
+    operator needs. The job stays ``completed`` and the envelope refuses.
 
     The body names the unblessed nodes and their hashes, never the report's
-    contents: enough for the operator who turned the knob on to act, and nothing
-    that leaks the analysis past a gate that just decided not to serve it.
+    contents — enough to act on, nothing that leaks the analysis past a gate
+    that just decided not to serve it.
     """
     gate = getattr(request.app.state, "certification", None)
     result = record.certification

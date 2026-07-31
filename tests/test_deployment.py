@@ -1,11 +1,9 @@
 """Resolving one installation's configuration, once.
 
-The five call sites that used to assemble this themselves are now one module,
-so these are the tests that used to live against ``build_default_pipeline``
-plus the ones that only make sense now there is a single resolved object: that
-each file is read once, that the gate the report route enforces is the gate the
-runner certified with, and that a redirected path is honoured everywhere rather
-than only on the service side.
+One module resolves the configuration every caller shares, so these assert what
+that single resolved object guarantees: that each file is read once, that the
+gate the report route enforces is the gate the runner certified with, and that
+a redirected path is honoured everywhere rather than only on the service side.
 """
 
 from __future__ import annotations
@@ -145,7 +143,7 @@ def test_the_ten_llm_nodes_share_two_adapters_one_per_tier():
 
 
 def test_the_pipeline_binds_retry_and_timeout():
-    """Ticket 038: every LLM node carries the retry policy and the deadline."""
+    """Every LLM node carries the retry policy and the deadline."""
     from google.adk.models.lite_llm import LiteLlm
 
     pipeline = Deployment.from_env(env=VERTEX_ENV).pipeline()

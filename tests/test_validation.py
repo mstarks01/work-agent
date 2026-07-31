@@ -164,7 +164,7 @@ class TestElementCap:
 
 
 class TestNormalizeIds:
-    """Ticket 037: the pipeline derives IDs; hand-authored models do not."""
+    """The pipeline derives IDs; hand-authored models do not."""
 
     def abbreviated(self):
         model = valid_model()

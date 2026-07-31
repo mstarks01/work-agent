@@ -1,10 +1,8 @@
-"""Ticket 022's corpus checks, ported into the offline test job.
+"""The corpus checks, run as part of the offline test job.
 
-The same move ticket 019's verification script made into ticket 020's lints:
-the script stays runnable by hand for corpus authors, and CI runs it here so a
-corpus edit cannot land without it. Everything is deterministic and
-credential-free, which is what lets it run on every PR (ticket 009 decision
-17).
+``evals/verify_corpus.py`` stays runnable by hand for corpus authors, and CI
+runs it here so a corpus edit cannot land without it. Everything is
+deterministic and credential-free, which is what lets it run on every PR.
 """
 
 from __future__ import annotations

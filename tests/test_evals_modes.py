@@ -1,10 +1,10 @@
 """The three eval modes, driven offline against scripted models.
 
 No Vertex endpoint is involved: ``build_pipeline`` takes the model resolver, so
-each LLM node is bound to a fake replaying a canned emission — the same
-technique ticket 021's tests use. What is under test is that the *shipped*
-graph runs from each mode's entry point and yields the artifact that mode
-scores, including the analysis mode's blessed-model injection at ``prepare``.
+each LLM node is bound to a fake replaying a canned emission. What is under
+test is that the *shipped* graph runs from each mode's entry point and yields
+the artifact that mode scores, including the analysis mode's blessed-model
+injection at ``prepare``.
 """
 
 from __future__ import annotations
@@ -109,7 +109,7 @@ def test_analysis_mode_injects_the_blessed_model_at_prepare(case):
     report = asyncio.run(modes.run_analysis(case, pipeline)).report
 
     # No extraction ran, and the analysts saw exactly the blessed model — the
-    # whole point of the mode (ticket 009 decision 1).
+    # whole point of the mode.
     assert "extract" not in models
     assert report.system_model == case.model
     spoofing = models[analyst_node_name("spoofing")].seen[0]
@@ -145,8 +145,8 @@ def test_analysis_mode_scores_against_the_reference_set(case):
 
 
 def test_analysis_mode_surfaces_the_pre_critic_drafts(case):
-    # Ticket 028: the union the critic was handed, read off the state key
-    # ``merge_drafts`` already writes — no production seam moves for it.
+    # The union the critic was handed, read off the state key ``merge_drafts``
+    # already writes — no production seam moves for it.
     pipeline = build(case, ENTRY_PREPARE, {})
 
     run = asyncio.run(modes.run_analysis(case, pipeline))
@@ -218,10 +218,10 @@ def test_end_to_end_mode_runs_the_production_entry(case):
 
 # --- Provenance -------------------------------------------------------------
 #
-# A sweep is one of certification's two callers. These are the regression: the
-# harness used to stamp a single placeholder NodeRun, so every eval report
-# carried no fingerprint, ``fingerprints_of`` returned an empty mapping, and
-# ``certify`` announced that every fingerprint was blessed having seen none.
+# A sweep is one of certification's two callers. Without a stamped NodeRun per
+# execution an eval report carries no fingerprint, ``fingerprints_of`` returns an
+# empty mapping, and ``certify`` announces every fingerprint blessed having seen
+# none.
 
 
 def test_an_eval_report_stamps_the_nodes_that_actually_ran(case):

@@ -1,10 +1,10 @@
-"""Per-tier sampling config: the knob eval and production share (decision 15).
+"""Per-tier sampling config: the knob eval and production share.
 
 These are unit tests of the config layer: loading, the ``STRIDE_SAMPLING_*``
 override surface, the three-way split of a resolved tier's params at the point
 of use, and the ``resolve_sampling`` sibling of ``resolve_model``. All
 fail-closed, mirroring ``test_model_tiers``. Binding the resolver onto each
-graph node is ticket 06, and its per-node assertions live with that ticket.
+graph node is asserted in ``test_graph``.
 """
 
 from __future__ import annotations
@@ -361,7 +361,7 @@ def test_direct_construction_requires_both_tiers():
 
 
 class TestSamplingFingerprint:
-    """The generation-identity hash (ticket 07 / ticket 03 §1)."""
+    """The generation-identity hash."""
 
     def test_is_a_sha256_hex_digest(self):
         fp = sampling_fingerprint(

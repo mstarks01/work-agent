@@ -1,4 +1,4 @@
-"""Tier 1 structural gates — the only ones that block in phase 1.
+"""Tier 1 structural gates — the only ones that block.
 
 Each check is exercised against a report deliberately broken in one way. The
 gates are re-asserted in :mod:`evals.harness.structural` rather than delegated

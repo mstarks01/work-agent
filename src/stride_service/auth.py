@@ -1,15 +1,14 @@
 """Bearer-token verification for the `/v1` API.
 
-Implements the auth rule from wayfinder ticket 008: every `/v1` route requires
-a valid bearer token, and verification returns only the token subject — that
-subject is what job ownership binds to.
+Every `/v1` route requires a valid bearer token, and verification returns only
+the token subject — that subject is what job ownership binds to.
 
 The default ``oidc`` backend verifies OIDC JWTs (signature via JWKS, issuer,
-audience, expiry), which covers any standard OIDC identity provider — Okta,
-Ping, Auth0, Entra ID, Cognito, and the like. Backends are selected at deploy
-time by ``STRIDE_AUTH_PROVIDER`` and constructed through :func:`build_verifier`,
-so a new backend is one registry entry — another OIDC instance, or a new
-:class:`TokenVerifier` implementation for a different mechanism entirely.
+audience, expiry), which covers any standard OIDC identity provider. Backends
+are selected at deploy time by ``STRIDE_AUTH_PROVIDER`` and constructed through
+:func:`build_verifier`, so a new backend is one registry entry — another OIDC
+instance, or a new :class:`TokenVerifier` implementation for a different
+mechanism entirely.
 
 Failure detail is asymmetric on purpose: the *reason* a token was rejected is
 logged, while callers see one generic :class:`AuthenticationError` — token

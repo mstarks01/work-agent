@@ -1,16 +1,15 @@
-"""Both sides of the critic, scored from one run (ticket 009 decision 10).
+"""Both sides of the critic, scored from one run.
 
 The critic is the most expensive node in the graph — one strong-tier pass over
-every analyst's output — and ticket 004 bet the whole quality pattern on it
-without evidence. This module is that evidence, and it is deliberately
-two-sided: a critic that kills ungrounded threats is earning its cost, and the
-*same* critic killing threats that matched a reference is destroying real
-findings. Only the pair means anything. A kill count alone can be read as
-either.
+every analyst's output — and this module is the evidence that it earns that
+cost. It is deliberately two-sided: a critic that kills ungrounded threats is
+earning its cost, and the *same* critic killing threats that matched a
+reference is destroying real findings. Only the pair means anything. A kill
+count alone can be read as either.
 
-The comparators ticket 004 cited, for reading the numbers against something:
-Semgrep's assistant kills ~20% of findings at 92-96% agreement with human
-triage, and unfiltered LLM threat enumeration runs ~86% raw false positives.
+Comparators, for reading the numbers against something: Semgrep's assistant
+kills ~20% of findings at 92-96% agreement with human triage, and unfiltered
+LLM threat enumeration runs ~86% raw false positives.
 
 **How it works.** The critic returns exactly the drafts it was given
 (:func:`~stride_service.critic.assemble_threats` enforces it), so a killed
@@ -35,10 +34,10 @@ Two properties hold this together:
 Credential-free, like the rest of the scorer: it takes plain data and a
 :class:`~evals.harness.judge.Judge`.
 
-**Non-gating on arrival.** This is an instrument. Whether any of these numbers
-becomes a threshold is decided in ticket 032 from observed spread across the
-baseline sweeps, not guessed at here — and the number that could *veto* the
-generator-critic pattern outright is ``matched_killed``.
+**Non-gating.** This is an instrument. Any threshold over these numbers comes
+from observed spread across the baseline sweeps, not from a guess here — and
+the number that could *veto* the generator-critic pattern outright is
+``matched_killed``.
 """
 
 from __future__ import annotations
