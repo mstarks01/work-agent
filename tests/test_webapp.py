@@ -22,6 +22,7 @@ from fastapi.testclient import TestClient
 from stride_service import StrideEngine, StubPipelineRunner
 from stride_service.deployment import Deployment
 from stride_service.vendors import ProviderAuthError
+from tests.factories import TEST_TIER_ENV
 from webapp.main import Analyses, Startup, create_app, render_report
 
 SAME_ORIGIN = {"Sec-Fetch-Site": "same-origin"}
@@ -33,8 +34,8 @@ BREAKOUT = '</script><img src=x onerror=alert(1)>'
 
 @pytest.fixture
 def tiers():
-    """The real shipped tier config. Resolving it needs no credentials."""
-    return Deployment.from_env(env={}).tiers
+    """The shipped tier config under the test selection; needs no credentials."""
+    return Deployment.from_env(env=TEST_TIER_ENV).tiers
 
 
 @pytest.fixture

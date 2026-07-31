@@ -20,9 +20,14 @@ Both [`StrideEngine.from_config(env=...)`](Integration-Guide.md) and the
 
 ### Models and vendors
 
-The service runs on **any supported vendor, with no privileged default**. Two
-tiers named on a capability axis — `base` (extraction, repair) and `strong` (the
-six analysts, the critic, the re-ask) — each select a `(vendor, model)` pair
+The service runs on **any supported vendor, with no privileged default** — and
+that holds for the shipped file, not only for the mechanism. `model_tiers.toml`
+selects **nothing**: both tier tables are absent, and a run that has not chosen
+stops at startup with an error naming the vendors and the two places a selection
+can be made. There is no vendor you reach by doing nothing.
+
+Two tiers named on a capability axis — `base` (extraction, repair) and `strong`
+(the six analysts, the critic, the re-ask) — each select a `(vendor, model)` pair
 **independently**, so the two tiers may run different vendors at once.
 
 ```toml

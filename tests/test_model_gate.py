@@ -86,9 +86,12 @@ class TestWhatTheGateCannotDo:
         # which is why top_k left the config surface in sampling version 3.
         from litellm.utils import get_optional_params
 
-        assert "top_k" not in get_optional_params.__code__.co_varnames[
-            : get_optional_params.__code__.co_argcount
-        ]
+        assert (
+            "top_k"
+            not in get_optional_params.__code__.co_varnames[
+                : get_optional_params.__code__.co_argcount
+            ]
+        )
 
     def test_an_unknown_model_is_not_an_existence_check(self):
         # Falls back to the provider's base config rather than raising,
@@ -158,15 +161,40 @@ class TestErrorsPointAtTheKnob:
             )
 
 
-def test_the_shipped_config_passes_its_own_gate():
-    """The end-to-end assertion: what ships is what the gate accepts."""
+@pytest.mark.parametrize(
+    ("vendor", "base_model", "strong_model"),
+    [
+        ("vertex", "gemini-2.5-flash", "gemini-2.5-pro"),
+        ("anthropic", "claude-haiku-4-5-20251001", "claude-sonnet-4-5-20250929"),
+        ("openai", "gpt-4.1-mini", "gpt-4.1"),
+    ],
+)
+def test_every_documented_vendor_passes_the_gate_on_shipped_sampling(
+    vendor, base_model, strong_model
+):
+    """What the docs offer is what the gate accepts — for all three, not one.
+
+    The predecessor asserted this of the *shipped selection*, which worked only
+    while a selection shipped. Now that none does, the equivalent guarantee has
+    to be made of every pair `docs/First-Run.md` step 2 tells a reader to write
+    down: shipped sampling has to survive whichever of them they pick, and a
+    param one vendor rejects must not reach a reader as a working example.
+    """
     from pathlib import Path
 
     from stride_service.model_tiers import load_model_tiers
     from stride_service.sampling import load_sampling
 
     root = Path(__file__).resolve().parents[1]
-    tiers = load_model_tiers(root / "config" / "model_tiers.toml", env={})
+    tiers = load_model_tiers(
+        root / "config" / "model_tiers.toml",
+        env={
+            "STRIDE_MODEL_BASE_VENDOR": vendor,
+            "STRIDE_MODEL_BASE_MODEL": base_model,
+            "STRIDE_MODEL_STRONG_VENDOR": vendor,
+            "STRIDE_MODEL_STRONG_MODEL": strong_model,
+        },
+    )
     sampling = load_sampling(root / "config" / "sampling.toml", env={})
     for tier in ("base", "strong"):
         selection = tiers.tiers[tier]
