@@ -1,7 +1,6 @@
 """Canonical System Model: the extraction agent's output, every downstream agent's input.
 
-Terminology and the decisions behind this schema live in CONTEXT.md and
-wayfinder ticket 003 (domain model: canonical system representation).
+Terminology for this schema lives in CONTEXT.md.
 
 The five element types are the classic DFD-based STRIDE-per-element taxonomy.
 Free-form security-relevant attributes accept the sentinel value ``"unknown"``,
@@ -38,7 +37,6 @@ CORE_ASSET_TAGS = frozenset(
     }
 )
 
-_SLUG_RE = re.compile(r"[a-z0-9]+(?:-[a-z0-9]+)*")
 _NON_SLUG_CHARS_RE = re.compile(r"[^a-z0-9]+")
 
 
@@ -247,9 +245,9 @@ def normalize_element_ids(model: SystemModel) -> SystemModel:
 
     An element ID is a pure function of type and name, so a model that emits
     both is being asked to keep two fields in agreement by hand — a mechanical
-    constraint that belongs in code (wayfinder ticket 037). This is derivation,
-    not repair: it decides nothing the emitting model knew and the gate does
-    not know, and it reads no source text.
+    constraint that belongs in code. This is derivation, not repair: it decides
+    nothing the emitting model knew and the gate does not know, and it reads no
+    source text.
 
     Names are authoritative and IDs follow. An emitted ID is therefore only a
     *link*: every reference to it — ``trust_zone``, flow endpoints, and
@@ -289,8 +287,3 @@ def normalize_element_ids(model: SystemModel) -> SystemModel:
         )
 
     return normalized
-
-
-def is_slug(value: str) -> bool:
-    """True if value is a legal normalized slug."""
-    return _SLUG_RE.fullmatch(value) is not None

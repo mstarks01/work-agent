@@ -1,4 +1,4 @@
-"""Critic yield, offline, with zero Vertex calls (ticket 028).
+"""Critic yield, offline, with zero provider calls.
 
 The instrument has one job: say what the critic killed *and* what killing it
 cost. These tests hold the two halves apart — a critic that kills an ungrounded
@@ -72,7 +72,7 @@ def test_scorer_takes_drafts_without_promoting_them(case):
 
 
 def test_needs_info_bypass_still_applies_to_ruled_threats(case):
-    # And the post-critic side keeps decision 9: a needs-info threat is never
+    # And the post-critic side keeps the rule: a needs-info threat is never
     # adjudicated as a false positive.
     draft = draft_threat(1, "spoofing", "An attacker forges a webhook.")
     ruled = promote(
@@ -258,7 +258,7 @@ def test_aggregate_pools_counts_rather_than_averaging_rates(case):
 
 def test_the_cli_reports_both_sides_per_case_and_pooled(case, capsys):
     # The wiring: one pass over the corpus produces the yield alongside the
-    # scores, so ticket 032's sweeps measure it rather than needing a re-run.
+    # scores, so a sweep measures it rather than needing a re-run.
     from evals.harness import modes, run
 
     reference = _must_find(case)

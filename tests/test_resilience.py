@@ -1,4 +1,4 @@
-"""The resilience config: the retry and timeout knobs of ticket 038.
+"""The resilience config: the retry and timeout knobs.
 
 Mirrors ``test_sampling.py`` and ``test_model_tiers.py``: a versioned TOML file
 loaded fail-closed, with the one difference that *these* values are

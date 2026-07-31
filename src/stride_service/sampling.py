@@ -1,30 +1,26 @@
 """Per-tier sampling configuration for the graph's LLM nodes.
 
-Decoding parameters are pinned per tier in a versioned TOML file that **eval and
-production read from the same place** (ticket 009 decision 15). ``base`` and
-``strong`` carry their own params; the node -> tier map lives once in
-``model_tiers.toml`` and is reused via :meth:`ModelTierConfig.resolve_tier`,
-never duplicated here.
+Decoding parameters are pinned per tier in a versioned TOML file that **eval
+and production read from the same place**. ``base`` and ``strong`` carry their
+own params; the node -> tier map lives once in ``model_tiers.toml`` and is
+reused via :meth:`ModelTierConfig.resolve_tier`, never duplicated here.
 
-Version 3 is a hard cutover (#15 decision 4) driven by going multi-vendor:
+Three things about the surface:
 
-* **``top_k`` is gone from the surface entirely** (#15 decision 3). It is absent
-  from ``litellm.utils.get_optional_params``'s signature, so it is the one param
-  the build-time gate provably cannot cover — LiteLLM re-injects it raw into the
-  request body after the check — and its wrongness is *silent* while the
-  fingerprint attests to it. It was unset on both tiers, so nothing could depend
-  on it.
+* **``top_k`` is not on it.** It is absent from
+  ``litellm.utils.get_optional_params``'s signature, so it is the one param the
+  build-time gate provably cannot cover — LiteLLM re-injects it raw into the
+  request body after the check — and its wrongness would be *silent* while the
+  fingerprint attests to it.
 * **``thinking`` is a uniform ``low``/``medium``/``high`` enum**, not a
-  per-tier integer budget. ``reasoning_effort`` reaches all three vendors
-  (Anthropic → ``budget_tokens``, identically via Vertex; Gemini →
-  ``thinkingConfig``; OpenAI → passthrough), so the per-class budget ranges that
-  version 2 mirrored dissolve rather than needing per-vendor mirroring.
-  ``auto`` and ``off`` are both dropped: ``auto`` raises on two vendors, and
+  per-tier integer budget. ``reasoning_effort`` reaches every vendor (Anthropic
+  → ``budget_tokens``, identically via Vertex; Gemini → ``thinkingConfig``;
+  OpenAI → passthrough), so no per-vendor budget range is mirrored here.
+  ``auto`` and ``off`` are excluded: ``auto`` raises on two vendors, and
   ``off`` is worse than unportable — ``gemini-2.5-pro`` + ``none`` *passes* the
   gate as ``thinkingBudget: 0`` and then 400s at request time.
-* **``max_output_tokens`` is pinned**, because the reason it needs pinning is
-  vendor-dependent: Anthropic derives a 5,120–8,192 cap only when the caller is
-  silent, which is what version 2's file did on both tiers.
+* **``max_output_tokens`` is pinned**, because the default is vendor-dependent:
+  Anthropic derives a 5,120–8,192 cap only when the caller is silent.
 
 Loading fails closed (OWASP A02/A10): an unsupported version, an unknown key or
 tier, an out-of-range value, or a ``candidate_count`` other than 1 raises
@@ -32,14 +28,14 @@ tier, an out-of-range value, or a ``candidate_count`` other than 1 raises
 node quietly running on different sampling than the config records invalidates
 every eval result taken against it.
 
-The **value** check on ``thinking`` is ours, not the gate's: ``reasoning_effort =
-"banana"`` passes ``get_optional_params`` on ``o3``, which would be a second
-``top_k``-class silent wrong. A pydantic ``Literal`` catches it here.
+The **value** check on ``thinking`` is ours, not the gate's: ``reasoning_effort
+= "banana"`` passes ``get_optional_params`` on ``o3``, which would be another
+silently-wrong param. A pydantic ``Literal`` catches it here.
 
 ``STRIDE_SAMPLING_{TIER}_{PARAM}`` env overrides retune the *offered* params at
 deploy time, validated identically to the file value; an env var naming a
 reserved or forbidden param raises, so the live-knob surface is exactly the
-offered surface — no wider (ticket 03 §3).
+offered surface — no wider.
 """
 
 from __future__ import annotations
@@ -65,20 +61,19 @@ from pydantic import (
 from stride_service.errors import ConfigError
 from stride_service.model_tiers import TIER_NAMES, TierName
 
-# Hard cutover (#15 decision 4): the loader accepts only version 3. Versions
-# land independent and exact-match across the four config files — a shared
-# number would buy nothing once each file pins its own, since a stale file fails
-# its own check.
+# The only schema version this loader accepts. Versions are independent and
+# exact-match across the four config files — a shared number would buy nothing
+# once each file pins its own, since a stale file fails its own check.
 SUPPORTED_VERSION = 3
 
-# The uniform reasoning surface (#15 decision 3). Deliberately not per-vendor
-# data: the enum is what every vendor accepts, and the wire value it becomes
-# (Gemini derives a budget from it, so "low" is 1024 tokens rather than the
-# config's own word) is LiteLLM's business, not this file's.
+# The uniform reasoning surface. Deliberately not per-vendor data: the enum is
+# what every vendor accepts, and the wire value it becomes (Gemini derives a
+# budget from it, so "low" is 1024 tokens rather than the config's own word) is
+# LiteLLM's business, not this file's.
 ReasoningEffort = Literal["low", "medium", "high"]
 
-# Env override surface (ticket 03 §3): only these params are overridable. A var
-# naming any other param — reserved (``candidate_count``) or forbidden — raises.
+# Env override surface: only these params are overridable. A var naming any
+# other param — reserved (``candidate_count``) or forbidden — raises.
 _ENV_PREFIX = "STRIDE_SAMPLING_"
 OFFERED_PARAMS: tuple[str, ...] = (
     "temperature",
@@ -96,14 +91,13 @@ class SamplingConfigError(ConfigError):
 class _RawTier(BaseModel):
     """One tier's decoding params exactly as written in the file / overrides.
 
-    ``extra="forbid"`` rejects an unknown or misspelled key rather than silently
-    ignoring it — which is also how a version-2 file's ``top_k`` line is caught
+    ``extra="forbid"`` rejects an unknown or misspelled key rather than
+    silently ignoring it — which is also how a stray ``top_k`` line is caught
     rather than quietly dropped.
 
     No upper bound is placed on ``max_output_tokens``: the ceiling is a
-    per-``(vendor, model)`` fact, and mirroring one here is the same mistake
-    ``Vendor.supported`` was — a table that drifts against the provider actually
-    serving the request.
+    per-``(vendor, model)`` fact, and mirroring one here would be a table that
+    drifts against the provider actually serving the request.
     """
 
     model_config = ConfigDict(extra="forbid", frozen=True)
@@ -120,9 +114,9 @@ class _RawTier(BaseModel):
     @field_validator("candidate_count")
     @classmethod
     def _reserved_candidate_count(cls, value: int) -> int:
-        # The Self-MoA lever (ticket 009): >1 silently drops candidates, so it
-        # is reserved, not offered, and pinned at 1 until routed through the
-        # union/dedupe path.
+        # The Self-MoA lever: >1 silently drops candidates, so it is reserved,
+        # not offered, and pinned at 1 until routed through the union/dedupe
+        # path.
         if value != 1:
             raise ValueError(
                 f"candidate_count must be 1 (reserved Self-MoA lever); got {value}"
@@ -144,12 +138,13 @@ class TierSampling(BaseModel):
 
     Split three ways at the point of use, because ADK carries only some of it:
 
-    * :meth:`constructor_kwargs` — ``seed`` and ``reasoning_effort``, which ADK's
-      request map forwards *neither* of (#6 decision 1). Passing them on the
+    * :meth:`constructor_kwargs` — ``seed`` and ``reasoning_effort``, which
+      ADK's request map forwards *neither* of. Passing them on the
       generate-content config would mean the fingerprint attests to a seed the
       request never carried.
     * :meth:`to_generate_content_config` — the params ADK does forward.
-    * :meth:`gate_params` — everything, for the build-time supported-param check.
+    * :meth:`gate_params` — everything, for the build-time supported-param
+      check.
     """
 
     model_config = ConfigDict(extra="forbid", frozen=True)
@@ -241,19 +236,19 @@ SamplingResolver = Callable[[str], TierSampling]
 def sampling_fingerprint(served_route: str, sampling: TierSampling) -> str:
     """One node execution's generation-identity hash: ``sha256(served route, sampling)``.
 
-    Model and the resolved tier sampling are bound into **one** hash (ticket 03
-    §1): certification is about a tier's *generation behaviour*, which is model
-    and sampling jointly — splitting them lets a mismatched pair pass two green
+    Model and the resolved tier sampling are bound into **one** hash:
+    certification is about a tier's *generation behaviour*, which is model and
+    sampling jointly — splitting them lets a mismatched pair pass two green
     half-checks.
 
     ``served_route`` is the vendor prefix joined to the **served** build, e.g.
-    ``vertex_ai/gemini-2.5-pro-002`` (#7 decisions 2 and 3). The served half
-    comes from ``LlmResponse.model_version``, per node *execution* rather than
-    from the configured string at build time, which is what every docstring
-    around it already asserted. The vendor half is not decoration: a served
-    identifier carries no vendor, and Vertex-hosted Claude and Anthropic-direct
-    return through an identical transformation, so a served-only hash would let
-    a manifest blessed on one silently certify the other.
+    ``vertex_ai/gemini-2.5-pro-002``. The served half comes from
+    ``LlmResponse.model_version``, per node *execution* rather than from the
+    configured string at build time. The vendor half is not decoration: a
+    served identifier carries no vendor, and Vertex-hosted Claude and
+    Anthropic-direct return through an identical transformation, so a
+    served-only hash would let a manifest blessed on one silently certify the
+    other.
 
     Canonical serialization — sorted keys over the resolved values plus the
     served route — so the hash is recomputable from the recorded clear block
@@ -367,7 +362,7 @@ def load_sampling(
     if parsed.version != SUPPORTED_VERSION:
         raise SamplingConfigError(
             f"{path}: unsupported version {parsed.version};"
-            f" expected {SUPPORTED_VERSION} (hard cutover, no shim)"
+            f" expected {SUPPORTED_VERSION}"
         )
 
     resolved = {

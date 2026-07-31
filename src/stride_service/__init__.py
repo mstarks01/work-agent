@@ -40,6 +40,11 @@ from stride_service.jobs import (
     build_store,
     execute_job,
 )
+from stride_service.markdown_loader import (
+    MarkdownFormatError,
+    MarkdownLoader,
+    MarkdownNotFoundError,
+)
 from stride_service.model_tiers import (
     ANALYST_NODES,
     LLM_NODES,
@@ -76,9 +81,6 @@ from stride_service.skills import (
     SEVERITY_RUBRIC_TOKEN_CAP,
     SKILL_SECTION_HEADINGS,
     STRIDE_CATEGORIES,
-    SkillFormatError,
-    SkillLoader,
-    SkillNotFoundError,
     category_boundary_digest,
     compose_analyst_skills,
     compose_critic_skills,
@@ -154,6 +156,9 @@ __all__ = [
     "JobStore",
     "JobStoreConfigError",
     "JobSubmission",
+    "MarkdownFormatError",
+    "MarkdownLoader",
+    "MarkdownNotFoundError",
     "Mitigation",
     "ModelConfigError",
     "ModelTierConfig",
@@ -166,9 +171,6 @@ __all__ = [
     "PipelineRunner",
     "Process",
     "Severity",
-    "SkillFormatError",
-    "SkillLoader",
-    "SkillNotFoundError",
     "StrideCategory",
     "StrideEngine",
     "StrideReport",
