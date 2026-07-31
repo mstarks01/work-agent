@@ -31,10 +31,12 @@ the engine you inherit none of this — your dependency surface stays `fastapi`,
 
 ## What it shows you
 
-**The models it is about to use**, one line per tier:
+**The models it is about to use**, one line per tier — whichever pair you
+selected in step 2 of [First-Run](First-Run.md), since nothing is selected by
+default:
 
 ```
-base   → vertex / gemini-2.5-flash
+base   → openai / gpt-4.1-mini
 strong → vertex / gemini-2.5-pro
 ```
 

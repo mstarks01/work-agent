@@ -22,13 +22,13 @@ from stride_service.jobs import (
     PipelineCompleted,
     PipelineRejected,
 )
-from stride_service.model_tiers import load_model_tiers
 from stride_service.pipeline import AdkPipelineRunner, PipelineError
 from stride_service.report import STRIDE_CATEGORIES
 from stride_service.sampling import TierSampling, load_sampling, sampling_fingerprint
 from tests.factories import (
     BASE_MODEL,
     PROJECT_ROOT,
+    repo_tiers,
     sample_draft,
     sample_threat,
     served_build,
@@ -137,7 +137,7 @@ def test_each_llm_node_fingerprint_recomputes_from_the_artifact():
     """
     pipeline, _ = build(happy_replies())
     outcome, _ = run(pipeline, job())
-    tiers = load_model_tiers(PROJECT_ROOT / "config" / "model_tiers.toml", env={})
+    tiers = repo_tiers()
     clear = outcome.report.sampling
 
     for node_run in outcome.report.nodes:

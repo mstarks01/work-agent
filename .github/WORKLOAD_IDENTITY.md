@@ -4,11 +4,13 @@ One-time setup that `.github/workflows/evals-live.yml` assumes: how a CI run
 gets short-lived Google Cloud credentials without any secret being stored in
 this repository.
 
-This covers **Vertex only**, because that is what the shipped configuration
-runs. The service itself reaches three vendors (see
-[Configuration](../docs/Configuration.md#models-and-vendors)); if a tier is ever
-pointed at Anthropic or OpenAI, its CI credential is an API key in a repository
-secret and none of the federation setup below applies to it.
+This covers **Vertex only**, because that is what `evals-live.yml` selects in
+its `STRIDE_MODEL_*` block. The shipped configuration selects no vendor at all
+— see [Configuration](../docs/Configuration.md#models-and-vendors) — so the
+workflow names one, and this setup follows that choice rather than the other way
+round. Point those variables at Anthropic or OpenAI and the CI credential
+becomes an API key in a repository secret, with none of the federation setup
+below applying to it.
 
 **Zero long-lived secrets.** No service-account JSON key is created, downloaded,
 or stored in this repository at any point. A key is a permanent credential
@@ -124,7 +126,7 @@ gh workflow run "Evals (live Vertex)" -f mode=extraction
 ## Cost
 
 Confirmed against Vertex list pricing (standard tier, July 2026) for the models
-the shipped configuration selects — `gemini-2.5-flash` on the `base` tier and
+`evals-live.yml` selects — `gemini-2.5-flash` on the `base` tier and
 `gemini-2.5-pro` on the `strong` tier:
 
 | Model | Input ≤200K | Output ≤200K |
@@ -143,7 +145,7 @@ at once.
 
 ## First-run checklist: the model strings
 
-The model strings in `config/model_tiers.toml` have never been exercised.
+The model strings in `evals-live.yml` have never been exercised.
 An earlier pass corrected them from `gemini-2.5-{pro,flash}-002` — a Gemini
 1.5-era naming convention that does not resolve — to the stable identifiers
 `gemini-2.5-pro` and `gemini-2.5-flash`, and restated the rule that guards them:

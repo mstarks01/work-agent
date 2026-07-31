@@ -23,12 +23,38 @@ also needs `config/`, `prompts/` and `skills/` alongside it, so working from a
 checkout is the supported path — see [Configuration](Configuration.md) for the
 `STRIDE_*_DIR` overrides if you need to relocate them later.
 
-## 2. Set model auth for one vendor
+## 2. Choose a vendor and set its auth
 
-Each tier picks a vendor in [`config/model_tiers.toml`](../config/model_tiers.toml),
-and each vendor implies its own credential mode — the two are never configured
-separately. The shipped config selects **Vertex** for both tiers, so that is the
-path that runs with no edit; Anthropic and OpenAI each need a small change first.
+**Nothing is selected by default.** [`config/model_tiers.toml`](../config/model_tiers.toml)
+ships with both tiers empty, so this step is required rather than a default you
+might override: a run that has not chosen stops at startup with an error naming
+the three vendors and the two places a selection can be made.
+
+That is deliberate. All three vendors are reached through one adapter and none
+is privileged, so shipping one of them selected would make that claim true of
+the mechanism while the values quietly said otherwise.
+
+Pick a vendor, write the pair into the file, then set that vendor's
+credentials — each vendor implies its own credential mode, so the two are never
+configured separately.
+
+```toml
+# config/model_tiers.toml
+[tiers.base]
+vendor = "vertex"
+model = "gemini-2.5-flash"
+
+[tiers.strong]
+vendor = "vertex"
+model = "gemini-2.5-pro"
+```
+
+The two tiers select independently: `base` is the workhorse (extraction,
+repair), `strong` is judgement (the six analysts, the critic, the re-ask). A
+mixed pair — a cheap model from one vendor, judgement from another — is
+ordinary rather than a special case.
+
+Then the credentials for whichever vendor you named.
 
 ### Vertex
 
@@ -61,26 +87,20 @@ setup described in [WORKLOAD_IDENTITY](../.github/WORKLOAD_IDENTITY.md).
 
 ### Anthropic or OpenAI
 
-Point the tiers at the vendor, then set that vendor's key — only the one, since a
-key the config does not select is never read. For Anthropic, in
-`config/model_tiers.toml`:
+Both authenticate with an API key, and only the vendor your tiers actually name
+is read — a key for a vendor the config does not select never authenticates
+anything.
 
-```toml
-[tiers.base]
-vendor = "anthropic"
-model = "claude-haiku-4-5-20251001"
-
-[tiers.strong]
-vendor = "anthropic"
-model = "claude-sonnet-4-5-20250929"
-```
+For Anthropic, `vendor = "anthropic"` in both tier tables with models such as
+`claude-haiku-4-5-20251001` on `base` and `claude-sonnet-4-5-20250929` on
+`strong`:
 
 ```sh
 export STRIDE_ANTHROPIC_API_KEY=sk-ant-...   # the full key, not a prefix
 ```
 
-For OpenAI, the same two tables with `vendor = "openai"` and models such as
-`gpt-4.1-mini` on `base` and `gpt-4.1` on `strong`:
+For OpenAI, `vendor = "openai"` with models such as `gpt-4.1-mini` on `base` and
+`gpt-4.1` on `strong`:
 
 ```sh
 export STRIDE_OPENAI_API_KEY=sk-...          # the full key, not a prefix
@@ -90,12 +110,13 @@ Model names must be pinned — no `-latest`, `-preview` or `-exp`, and Anthropic
 requires the dated suffix shown above.
 [Configuration](Configuration.md#models-and-vendors) gives the rule per vendor.
 
-The two tiers select independently, so a mixed pair — `vertex` on `base`,
-`anthropic` on `strong` — is ordinary rather than a special case. To move a tier
-without editing the file, `STRIDE_MODEL_{BASE,STRONG}_VENDOR` and `_MODEL` do it
-at startup, but they must move **together**: setting `_VENDOR` alone is a startup
-error, since a mismatched pair passes every other check and would die on the
-first node of a paid-for job.
+### Selecting without editing the file
+
+`STRIDE_MODEL_{BASE,STRONG}_VENDOR` and the matching `_MODEL` make the same
+selection from the environment, which is how a deployed revision retunes without
+an image rebuild and how CI states its own choice. They must move **together**:
+setting `_VENDOR` alone is a startup error, since a mismatched pair passes every
+other check and would die on the first node of a paid-for job.
 
 Nothing falls back. A missing variable stops startup with an error naming the
 variable rather than quietly running on some default model — and the web app in

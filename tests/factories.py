@@ -31,7 +31,7 @@ from stride_service.graph import (
     build_pipeline,
 )
 from stride_service.markdown_loader import MarkdownLoader
-from stride_service.model_tiers import load_model_tiers
+from stride_service.model_tiers import ModelTierConfig, load_model_tiers
 from stride_service.report import (
     DraftThreat,
     InputRef,
@@ -59,6 +59,43 @@ PROJECT_ROOT = Path(__file__).resolve().parents[1]
 
 BASE_MODEL = "fake-base-001"
 STRONG_MODEL = "fake-strong-001"
+
+# The shipped config selects no vendor, so a test that needs a resolvable tier
+# config has to choose one. Deliberately **mixed**: the two tiers select
+# independently, and a same-vendor pair on both sides would leave that path
+# untested everywhere but here — which is exactly what the old Vertex-on-both
+# default did. Nothing downstream of this reaches a network; the vendors are
+# named so the binding and the gate see a realistic pair, not so a model runs.
+TEST_TIER_ENV: dict[str, str] = {
+    "STRIDE_MODEL_BASE_VENDOR": "openai",
+    "STRIDE_MODEL_BASE_MODEL": "gpt-4.1-mini",
+    "STRIDE_MODEL_STRONG_VENDOR": "vertex",
+    "STRIDE_MODEL_STRONG_MODEL": "gemini-2.5-pro",
+}
+
+# What the selection above implies: one API key and one ADC triple, because the
+# two tiers sit on vendors with different credential modes. Placeholders — the
+# loader checks that a variable is *declared*, never that it authenticates, and
+# no test here reaches a provider. Kept beside the selection so the two cannot
+# drift; a tier moved to a third vendor needs its variables added here too.
+TEST_CREDENTIAL_ENV: dict[str, str] = {
+    "STRIDE_OPENAI_API_KEY": "sk-not-a-real-key",
+    "STRIDE_VERTEX_PROJECT": "test-project",
+    "STRIDE_VERTEX_LOCATION": "us-central1",
+    "GOOGLE_APPLICATION_CREDENTIALS": "/nonexistent/adc.json",
+}
+
+
+def repo_tiers() -> ModelTierConfig:
+    """The shipped tier config, resolved under the canonical test selection.
+
+    One place, so the selection cannot drift between the nine modules that need
+    it. Tests assert about topology, binding and provenance rather than about
+    which vendor answered, so *which* pair this is remains a fixture detail.
+    """
+    return load_model_tiers(
+        PROJECT_ROOT / "config" / "model_tiers.toml", env=TEST_TIER_ENV
+    )
 
 
 def valid_model() -> SystemModel:
@@ -289,7 +326,7 @@ def scripted_pipeline(
         )
         return models[node]
 
-    tiers = load_model_tiers(PROJECT_ROOT / "config" / "model_tiers.toml", env={})
+    tiers = repo_tiers()
     sampling = load_sampling(PROJECT_ROOT / "config" / "sampling.toml", env={})
     pipeline = build_pipeline(
         skill_loader=MarkdownLoader(PROJECT_ROOT / "skills"),

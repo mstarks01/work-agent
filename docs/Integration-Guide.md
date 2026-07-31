@@ -23,8 +23,17 @@ reads paths and overrides from the environment; pass `env=` to override that
 (mainly for tests):
 
 ```python
-engine = StrideEngine.from_config(env={"STRIDE_MODEL_STRONG_MODEL": "gemini-2.5-pro"})
+engine = StrideEngine.from_config(
+    env={
+        "STRIDE_MODEL_STRONG_VENDOR": "vertex",
+        "STRIDE_MODEL_STRONG_MODEL": "gemini-2.5-pro",
+    }
+)
 ```
+
+`_MODEL` on its own retunes a tier whose vendor the file already names. Nothing
+is selected by default, so where the file names none — as it ships — both halves
+have to be passed, for both tiers.
 
 One engine holds no cross-call state, so it is safe to share across concurrent
 tasks.
