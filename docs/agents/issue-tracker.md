@@ -70,9 +70,15 @@ gh api --method POST repos/mstarks01/work-agent/issues/<child>/dependencies/bloc
   four real Teams `.vtt` exports are 34.8% spoken words and 65% machinery, a raw 60-minute VTT
   (~133 KB) blows the 100 KiB cap while the same call cleaned (~46 KB) does not, and speaker
   attribution names the *participant* but never the **role**. Findings on
-  `research/transcript-exports` @ `935fc57`, to be archived as a tag. Frontier now: the size
-  budget (#52), how extraction reads a conversation (#53), and `source_excerpt` with N
-  sources (#56).
+  `research/transcript-exports` @ `935fc57`, to be archived as a tag. #52 sets the budget in
+  **bytes** — tokens are disqualified because tiers pick vendors independently, which would make
+  the public contract deployment-dependent — at **100 KiB total** (unchanged; ~2.2 h of cleaned
+  conversation) and **10 sources**, with no per-source cap, so an over-budget submission is the
+  sum's fault and the error carries a per-source breakdown rather than naming a culprit. Both
+  numbers move to `config/resilience.toml` **v3**, a hard cutover, on that file's own test that a
+  knob which cannot change an answer may be env-overridable; `label` gains a 200-char bound,
+  amending #50. Frontier now: how extraction reads a conversation (#53) and `source_excerpt`
+  with N sources (#56).
 
 ### Completed efforts
 
