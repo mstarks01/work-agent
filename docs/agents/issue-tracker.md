@@ -66,7 +66,13 @@ gh api --method POST repos/mstarks01/work-agent/issues/<child>/dependencies/bloc
   than by subagent. #50 is resolved: a source is `{kind, label, text}` with `kind` a closed
   load-bearing enum and `label` a required, unique, model-visible citation key; order carries
   no precedence, so the conflict rule (#55) is still owed. `CONTEXT.md` carries the **Source**
-  term ahead of any implementation. Frontier now: #51 and `source_excerpt` with N sources (#56).
+  term ahead of any implementation. #51 is resolved by **measurement** rather than survey —
+  four real Teams `.vtt` exports are 34.8% spoken words and 65% machinery, a raw 60-minute VTT
+  (~133 KB) blows the 100 KiB cap while the same call cleaned (~46 KB) does not, and speaker
+  attribution names the *participant* but never the **role**. Findings on
+  `research/transcript-exports` @ `935fc57`, to be archived as a tag. Frontier now: the size
+  budget (#52), how extraction reads a conversation (#53), and `source_excerpt` with N
+  sources (#56).
 
 ### Completed efforts
 
