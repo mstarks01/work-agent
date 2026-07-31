@@ -1,6 +1,7 @@
 """Tests for model-tier config loading, env overrides, and pin validation."""
 
 from pathlib import Path
+from typing import ClassVar
 
 import pytest
 
@@ -16,6 +17,7 @@ from stride_service.model_tiers import (
     load_model_tiers,
     validate_model_string,
 )
+from stride_service.vendors import VENDOR_NAMES
 
 REPO_CONFIG = Path(__file__).parents[1] / "config" / "model_tiers.toml"
 
@@ -71,12 +73,48 @@ class TestNodeInventory:
 
 
 class TestRepoConfig:
-    def test_shipped_config_loads_and_covers_all_llm_nodes(self):
-        config = load_model_tiers(REPO_CONFIG, env={})
+    """What ships, and what it deliberately does not ship.
+
+    The selection is empty on purpose: "no privileged default" is meant to be
+    true of the shipped values, not only of the mechanism. These are the tests
+    that would fail if a vendor crept back into the file.
+    """
+
+    SELECTED: ClassVar[dict[str, str]] = {
+        "STRIDE_MODEL_BASE_VENDOR": "openai",
+        "STRIDE_MODEL_BASE_MODEL": "gpt-4.1-mini",
+        "STRIDE_MODEL_STRONG_VENDOR": "anthropic",
+        "STRIDE_MODEL_STRONG_MODEL": "claude-sonnet-4-5-20250929",
+    }
+
+    def test_shipped_config_selects_no_vendor(self):
+        with pytest.raises(ModelConfigError, match="no vendor selected") as excinfo:
+            load_model_tiers(REPO_CONFIG, env={})
+
+        message = str(excinfo.value)
+        assert "base" in message and "strong" in message
+        # The error is the onboarding instruction, so it has to name every
+        # vendor available and both places a selection can be made.
+        for vendor in VENDOR_NAMES:
+            assert vendor in message
+        assert "STRIDE_MODEL_BASE_VENDOR" in message
+        assert "docs/First-Run.md" in message
+
+    def test_shipped_config_names_no_vendor_anywhere_uncommented(self):
+        """A commented example is guidance; an uncommented one is a default."""
+        live = [
+            line
+            for line in REPO_CONFIG.read_text(encoding="utf-8").splitlines()
+            if line.strip() and not line.lstrip().startswith("#")
+        ]
+        assert not [line for line in live if "vendor" in line or "model =" in line]
+
+    def test_shipped_config_covers_all_llm_nodes(self):
+        config = load_model_tiers(REPO_CONFIG, env=self.SELECTED)
         assert set(config.nodes) == set(LLM_NODES)
 
     def test_shipped_config_tier_assignment(self):
-        config = load_model_tiers(REPO_CONFIG, env={})
+        config = load_model_tiers(REPO_CONFIG, env=self.SELECTED)
         assert config.nodes["extract"] == "base"
         assert config.nodes["repair"] == "base"
         assert config.nodes["critic"] == "strong"
@@ -187,7 +225,7 @@ class TestEnvOverrides:
 
 
 class TestPinValidation:
-    """"Pinned" is per-vendor and deliberately weak — an open-world denylist.
+    """ "Pinned" is per-vendor and deliberately weak — an open-world denylist.
 
     The guarantee lives on the served-build readback, not here: an allowlist of
     numbered builds is what broke when Google retired them, and that risk now
@@ -224,9 +262,7 @@ class TestPinValidation:
 
     def test_anthropic_direct_must_carry_its_dated_snapshot(self):
         assert (
-            validate_model_string(
-                "claude-sonnet-4-5-20250929", "anthropic", source="t"
-            )
+            validate_model_string("claude-sonnet-4-5-20250929", "anthropic", source="t")
             == "claude-sonnet-4-5-20250929"
         )
         with pytest.raises(ModelConfigError, match="not pinned"):

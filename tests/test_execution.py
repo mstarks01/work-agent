@@ -17,7 +17,6 @@ import pytest
 
 from stride_service import graph
 from stride_service.execution import GraphExecutor
-from stride_service.model_tiers import load_model_tiers
 from stride_service.sampling import (
     TierSampling,
     load_sampling,
@@ -28,6 +27,7 @@ from tests.factories import (
     PROJECT_ROOT,
     STRONG_MODEL,
     SilentLlm,
+    repo_tiers,
     sample_draft,
     sample_threat,
     scripted_pipeline,
@@ -124,7 +124,7 @@ def test_a_node_with_no_served_build_carries_no_fingerprint():
 def test_every_llm_node_fingerprint_recomputes_from_its_tier_sampling(graph_run):
     """The hash is derivable from the served build and the tier's clear values."""
     pipeline, _ = scripted_pipeline(happy_replies())
-    tiers = load_model_tiers(PROJECT_ROOT / "config" / "model_tiers.toml", env={})
+    tiers = repo_tiers()
 
     for node_run in graph_run.node_runs:
         canonical = graph.TIER_NODE_BY_GRAPH_NODE.get(node_run.node)

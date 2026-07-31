@@ -26,10 +26,20 @@ from stride_service.model_tiers import ModelConfigError
 from stride_service.vendors import ProviderAuthError
 from tests.factories import PROJECT_ROOT
 
-# The shipped config selects Vertex on both tiers, and Vertex's credential mode
-# is ADC — so building adapters needs these three present. They are names of
-# variables, never credentials: nothing here is a secret.
-VERTEX_ENV = {
+# The shipped config selects nothing, so every resolution here has to choose a
+# vendor first. Vertex on both tiers, because this module's subject is
+# credential resolution and Vertex's ADC mode is the three-variable case — the
+# one where getting the set wrong is worth catching.
+VERTEX_TIERS = {
+    "STRIDE_MODEL_BASE_VENDOR": "vertex",
+    "STRIDE_MODEL_BASE_MODEL": "gemini-2.5-flash",
+    "STRIDE_MODEL_STRONG_VENDOR": "vertex",
+    "STRIDE_MODEL_STRONG_MODEL": "gemini-2.5-pro",
+}
+
+# Building adapters for that selection needs these three present. They are names
+# of variables, never credentials: nothing here is a secret.
+VERTEX_ENV = VERTEX_TIERS | {
     "STRIDE_VERTEX_PROJECT": "test-project",
     "STRIDE_VERTEX_LOCATION": "us-central1",
     "GOOGLE_APPLICATION_CREDENTIALS": "/nonexistent/adc.json",
@@ -41,7 +51,7 @@ VERTEX_ENV = {
 
 def test_from_env_resolves_the_repo_configs_without_credentials():
     """Reading config is cheap and credential-free; that is why it is eager."""
-    deployment = Deployment.from_env(env={})
+    deployment = Deployment.from_env(env=VERTEX_TIERS)
 
     assert deployment.tiers.version == 3
     assert set(deployment.sampling.tiers) == {"base", "strong"}
@@ -64,7 +74,7 @@ def test_each_config_file_is_read_exactly_once(monkeypatch):
 
         monkeypatch.setattr(module, name, counted)
 
-    Deployment.from_env(env={})
+    Deployment.from_env(env=VERTEX_TIERS)
 
     assert sorted(reads) == ["load_model_tiers", "load_resilience", "load_sampling"]
 
@@ -77,7 +87,7 @@ def test_a_path_variable_picks_the_file_and_never_layers_a_second(tmp_path):
         encoding="utf-8",
     )
 
-    deployment = Deployment.from_env(env={SAMPLING_VAR: str(custom)})
+    deployment = Deployment.from_env(env=VERTEX_TIERS | {SAMPLING_VAR: str(custom)})
 
     assert deployment.sampling.for_tier("base").temperature == 0.25
     # Not merged with the repo file: the strong tier is what the chosen file says.
@@ -101,20 +111,24 @@ def test_from_env_fails_closed_on_a_missing_tier_config(tmp_path):
 
 def test_from_env_fails_closed_on_a_missing_resilience_config(tmp_path):
     with pytest.raises(Exception, match="cannot be read"):
-        Deployment.from_env(env={RESILIENCE_VAR: str(tmp_path / "gone.toml")})
+        Deployment.from_env(
+            env=VERTEX_TIERS | {RESILIENCE_VAR: str(tmp_path / "gone.toml")}
+        )
 
 
 def test_the_environment_stays_out_of_repr_and_equality():
     """OWASP A09: a deployment in a log or a traceback must not carry a key."""
-    deployment = Deployment.from_env(env=VERTEX_ENV | {"STRIDE_ANTHROPIC_API_KEY": "sk-secret"})
+    deployment = Deployment.from_env(
+        env=VERTEX_ENV | {"STRIDE_ANTHROPIC_API_KEY": "sk-secret"}
+    )
 
     assert "sk-secret" not in repr(deployment)
-    assert deployment == Deployment.from_env(env={})
+    assert deployment == Deployment.from_env(env=VERTEX_TIERS)
 
 
 def test_tier_of_walks_graph_node_to_tier():
     """The one place this two-step walk is written."""
-    deployment = Deployment.from_env(env={})
+    deployment = Deployment.from_env(env=VERTEX_TIERS)
 
     assert deployment.tier_of(graph.EXTRACT_NODE) == "base"
     assert deployment.tier_of(graph.CRITIC_NODE) == "strong"
@@ -183,7 +197,7 @@ def test_building_the_pipeline_fails_closed_without_provider_credentials():
     what lets the first-run app report this failure while still naming the
     vendor the config selected.
     """
-    deployment = Deployment.from_env(env={})
+    deployment = Deployment.from_env(env=VERTEX_TIERS)
 
     with pytest.raises(ProviderAuthError, match="STRIDE_VERTEX_PROJECT"):
         deployment.pipeline()
@@ -203,7 +217,7 @@ def test_a_credential_error_never_echoes_the_secret():
 
 def test_an_offline_resolver_short_circuits_the_credential_check():
     """What the eval harness and every offline test rely on."""
-    pipeline = Deployment.from_env(env={}).pipeline(
+    pipeline = Deployment.from_env(env=VERTEX_TIERS).pipeline(
         resolve_model=lambda tier_node: "scripted"
     )
 
@@ -215,7 +229,7 @@ def test_an_offline_resolver_short_circuits_the_credential_check():
 
 def test_the_gate_is_built_once():
     """Two jobs in one process can never be certified against two manifests."""
-    deployment = Deployment.from_env(env={})
+    deployment = Deployment.from_env(env=VERTEX_TIERS)
 
     assert deployment.gate() is deployment.gate()
 
@@ -239,11 +253,19 @@ def test_the_route_enforces_the_gate_the_runner_certified_with():
 
 
 def test_require_certified_is_off_unless_explicitly_affirmative():
-    assert Deployment.from_env(env={}).gate().require_certified is False
-    assert Deployment.from_env(env={"STRIDE_REQUIRE_CERTIFIED": "no"}).gate(
-    ).require_certified is False
-    assert Deployment.from_env(env={"STRIDE_REQUIRE_CERTIFIED": "true"}).gate(
-    ).require_certified is True
+    assert Deployment.from_env(env=VERTEX_TIERS).gate().require_certified is False
+    assert (
+        Deployment.from_env(env=VERTEX_TIERS | {"STRIDE_REQUIRE_CERTIFIED": "no"})
+        .gate()
+        .require_certified
+        is False
+    )
+    assert (
+        Deployment.from_env(env=VERTEX_TIERS | {"STRIDE_REQUIRE_CERTIFIED": "true"})
+        .gate()
+        .require_certified
+        is True
+    )
 
 
 def test_config_paths_are_repo_relative_by_default():

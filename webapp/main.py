@@ -407,9 +407,14 @@ def _vendor_sections(
     """
     env = os.environ if env is None else env
     if tiers is None:
+        # Covers both "the file is broken" and the ordinary first-run case where
+        # it is fine but selects nothing. Which variables to set is a question
+        # only a chosen vendor can answer, and guessing one here would reinstate
+        # the privileged default the config deliberately does not ship.
         return (
-            "<p>The model configuration could not be read, so there is no vendor "
-            "to report required variables for. Fix the error above first.</p>"
+            "<p>No vendor is selected yet, so there is nothing to report "
+            "required variables for — which ones you need depends on which "
+            "vendor you pick. Resolve the error above first.</p>"
         )
     sections = []
     for vendor in dict.fromkeys(sel.vendor for sel in tiers.tiers.values()):
