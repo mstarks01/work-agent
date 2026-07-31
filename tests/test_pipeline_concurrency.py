@@ -27,7 +27,6 @@ from stride_service import graph
 from stride_service.binding import NodeBinding
 from stride_service.jobs import JobRecord, PipelineCompleted
 from stride_service.markdown_loader import MarkdownLoader
-from stride_service.model_tiers import load_model_tiers
 from stride_service.pipeline import AdkPipelineRunner
 from stride_service.sampling import load_sampling
 from tests.factories import (
@@ -35,6 +34,7 @@ from tests.factories import (
     PROJECT_ROOT,
     STRONG_MODEL,
     ScriptedLlm,
+    repo_tiers,
     sample_threat,
     served_build,
     valid_model,
@@ -92,7 +92,7 @@ def _build_shared_pipeline() -> graph.Pipeline:
         model_name = BASE_MODEL if node == graph.REPAIR_NODE else STRONG_MODEL
         return ScriptedLlm(model=model_name, reply=replies.get(node, "[]"), seen=[])
 
-    tiers = load_model_tiers(PROJECT_ROOT / "config" / "model_tiers.toml", env={})
+    tiers = repo_tiers()
     sampling = load_sampling(PROJECT_ROOT / "config" / "sampling.toml", env={})
     return graph.build_pipeline(
         skill_loader=MarkdownLoader(PROJECT_ROOT / "skills"),

@@ -36,20 +36,33 @@
 # so a deployment still carrying v2's STRIDE_MODEL_FLASH fails loudly instead of
 # being silently ignored.
 #
-# The shipped selection is unchanged in behaviour from version 2 — the same two
-# Gemini models on Vertex. This file is where "no privileged default" is a
-# property of the *mechanism*, not of the values: nothing here is reachable only
-# because it is Google's.
+# NOTHING IS SELECTED BY DEFAULT, and that is the point. Earlier versions of
+# this file shipped two Gemini models on Vertex, which made "no privileged
+# default" true of the *mechanism* while the values said otherwise — the vendor
+# you got by doing nothing was Google's. Both tier tables are now absent, so a
+# run that has not chosen stops and says so rather than reaching a vendor nobody
+# picked. The three vendors are reached through one adapter and differ only in
+# the credential mode each implies; none is cheaper to select than the others.
 
 version = 3
 
-[tiers.base]
-vendor = "vertex"
-model = "gemini-2.5-flash"
-
-[tiers.strong]
-vendor = "vertex"
-model = "gemini-2.5-pro"
+# CHOOSE A VENDOR AND MODEL FOR EACH TIER. Uncomment one pair per tier below, or
+# set STRIDE_MODEL_{BASE,STRONG}_VENDOR together with the matching _MODEL — the
+# two halves must move together, since a vendor without its model is not a
+# usable selection. Model identifiers must be pinned: no `-latest`, `-preview`
+# or `-exp`, and Anthropic requires its dated suffix. docs/First-Run.md step 2
+# walks through each vendor's credentials; docs/Configuration.md has the rules.
+#
+# [tiers.base]
+# vendor = "vertex"     # or "anthropic" or "openai"
+# model = "gemini-2.5-flash"
+#
+# [tiers.strong]
+# vendor = "vertex"
+# model = "gemini-2.5-pro"
+#
+# The two tiers select independently, so a mixed pair — a cheap workhorse from
+# one vendor, judgement from another — is ordinary rather than a special case.
 
 [nodes]
 extract = "base"

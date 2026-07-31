@@ -18,12 +18,12 @@ from stride_service import graph
 from stride_service.binding import NodeBinding
 from stride_service.critic import CriticOutputError, DraftJoinError
 from stride_service.markdown_loader import MarkdownLoader
-from stride_service.model_tiers import LLM_NODES, load_model_tiers
+from stride_service.model_tiers import LLM_NODES
 from stride_service.report import STRIDE_CATEGORIES, DraftThreat, Threat
 from stride_service.resilience import load_resilience
 from stride_service.sampling import load_sampling
 from stride_service.system_model import SystemModel
-from tests.factories import sample_draft, sample_threat, valid_model
+from tests.factories import repo_tiers, sample_draft, sample_threat, valid_model
 
 PROJECT_ROOT = __import__("pathlib").Path(__file__).resolve().parents[1]
 
@@ -72,7 +72,7 @@ def _route_resolver(tiers):
 
 @pytest.fixture
 def pipeline(skill_loader: MarkdownLoader, prompt_loader: MarkdownLoader):
-    tiers = load_model_tiers(PROJECT_ROOT / "config" / "model_tiers.toml", env={})
+    tiers = repo_tiers()
     sampling = load_sampling(PROJECT_ROOT / "config" / "sampling.toml", env={})
     return graph.build_pipeline(
         skill_loader=skill_loader,
@@ -103,7 +103,7 @@ def test_every_canonical_llm_node_is_a_graph_node(pipeline):
 
 
 def test_llm_nodes_bind_their_resolved_model(pipeline):
-    tiers = load_model_tiers(PROJECT_ROOT / "config" / "model_tiers.toml", env={})
+    tiers = repo_tiers()
     for name, node in nodes_by_name(pipeline).items():
         if not isinstance(node, LlmAgent):
             continue
@@ -114,8 +114,20 @@ def test_llm_nodes_bind_their_resolved_model(pipeline):
 
 def test_the_recorded_model_carries_its_vendor(pipeline):
     # A bare served identifier carries no vendor, and two vendors can serve the
-    # same build — so the prefix is part of the identity, not decoration.
-    assert pipeline.node_models[graph.EXTRACT_NODE].startswith("vertex_ai/")
+    # same build — so the prefix is part of the identity, not decoration. The
+    # test selection runs a different vendor per tier, which is what lets this
+    # also pin that each node records *its own* tier's vendor: against the old
+    # Vertex-on-both default, one global prefix would have passed identically.
+    tiers = repo_tiers()
+    for node in (graph.EXTRACT_NODE, graph.CRITIC_NODE):
+        selection = tiers.resolve_model(graph.TIER_NODE_BY_GRAPH_NODE[node])
+        assert pipeline.node_models[node].startswith(selection.vendor_entry.prefix)
+
+    base, strong = (
+        pipeline.node_models[node].partition("/")[0]
+        for node in (graph.EXTRACT_NODE, graph.CRITIC_NODE)
+    )
+    assert base != strong
 
 
 # The two tiers differ on every param the node config carries, so a node bound
@@ -138,7 +150,7 @@ thinking = "high"
 
 
 def _pipeline_with_sampling(skill_loader, prompt_loader, sampling_path, resilience):
-    tiers = load_model_tiers(PROJECT_ROOT / "config" / "model_tiers.toml", env={})
+    tiers = repo_tiers()
     sampling = load_sampling(sampling_path, env={})
     return graph.build_pipeline(
         skill_loader=skill_loader,

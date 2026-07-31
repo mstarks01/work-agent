@@ -169,9 +169,14 @@ def test_analyze_sync_refuses_a_running_loop():
 
 
 def test_from_config_builds_an_adk_runner():
-    # Vertex's credential mode is ADC, and the check is a build-time gate.
+    # Nothing is selected by default, so the vendor is named here too. Vertex's
+    # credential mode is ADC, and the check is a build-time gate.
     engine = StrideEngine.from_config(
         env={
+            "STRIDE_MODEL_BASE_VENDOR": "vertex",
+            "STRIDE_MODEL_BASE_MODEL": "gemini-2.5-flash",
+            "STRIDE_MODEL_STRONG_VENDOR": "vertex",
+            "STRIDE_MODEL_STRONG_MODEL": "gemini-2.5-pro",
             "STRIDE_VERTEX_PROJECT": "test-project",
             "STRIDE_VERTEX_LOCATION": "us-central1",
             "GOOGLE_APPLICATION_CREDENTIALS": "/nonexistent/adc.json",

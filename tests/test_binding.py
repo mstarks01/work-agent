@@ -15,10 +15,10 @@ import pytest
 
 from stride_service.binding import NodeBinding
 from stride_service.graph import TIER_NODE_BY_GRAPH_NODE
-from stride_service.model_tiers import ModelConfigError, load_model_tiers
+from stride_service.model_tiers import ModelConfigError
 from stride_service.resilience import load_resilience
 from stride_service.sampling import load_sampling
-from tests.factories import PROJECT_ROOT
+from tests.factories import PROJECT_ROOT, repo_tiers
 
 DIVERGENT = """\
 version = 3
@@ -33,7 +33,7 @@ seed = 22
 
 @pytest.fixture
 def tiers():
-    return load_model_tiers(PROJECT_ROOT / "config" / "model_tiers.toml", env={})
+    return repo_tiers()
 
 
 @pytest.fixture
