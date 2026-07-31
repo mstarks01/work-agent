@@ -1,9 +1,9 @@
 """Wiring checks on the assembled graph, and the deterministic node functions.
 
 The FunctionNode bodies are plain functions, so they are tested directly
-against a fake context; the graph itself is checked for the shape ticket 004
-decided — the routes that exist, the fan-out width, and every LLM node bound
-to the model its canonical name resolves to.
+against a fake context; the graph itself is checked for its shape — the routes
+that exist, the fan-out width, and every LLM node bound to the model its
+canonical name resolves to.
 """
 
 from __future__ import annotations
@@ -152,7 +152,7 @@ def _pipeline_with_sampling(skill_loader, prompt_loader, sampling_path, resilien
 def test_each_llm_node_binds_its_own_tier_sampling(
     skill_loader, prompt_loader, tmp_path
 ):
-    """Ticket 06: sampling is resolved per node, not shared graph-wide.
+    """Sampling is resolved per node, not shared graph-wide.
 
     ``extract``/``repair`` run on base, the analysts and critic/recritic on
     strong; with the two tiers pinned to different decoding params, each node
@@ -186,7 +186,7 @@ def test_each_llm_node_binds_its_own_tier_sampling(
 def test_seed_and_reasoning_stay_off_the_node_config(
     skill_loader, prompt_loader, tmp_path
 ):
-    """They ride the tier's adapter constructor instead (#6 decision 1).
+    """They ride the tier's adapter constructor instead.
 
     ADK's request map forwards neither, so putting them here would let them
     vanish silently while the fingerprint went on attesting to a seed the
@@ -207,7 +207,7 @@ def test_per_node_sampling_composes_with_the_resilience_timeout(
 ):
     """The node's tier sampling and the resilience timeout ride the one config.
 
-    ``http_options`` stays owned by ``resilience.toml`` (ticket 03) — folding
+    ``http_options`` stays owned by ``resilience.toml`` — folding
     per-node sampling in must not drop it, nor sampling source it.
     """
     sampling_path = tmp_path / "sampling.toml"
@@ -373,7 +373,7 @@ def test_validate_routes_invalid_and_feeds_the_repair_prompt():
 
 
 def test_validate_derives_ids_rather_than_spending_the_repair_pass():
-    """Ticket 037: an abbreviated ID is not a reason to route to ``repair``."""
+    """An abbreviated ID is not a reason to route to ``repair``."""
     abbreviated = valid_model().model_dump(mode="json")
     abbreviated["processes"][0]["name"] = "Web App Frontend Service"
     ctx = FakeContext()

@@ -5,16 +5,9 @@ completion: the final session state, plus one :class:`~stride_service.report.Nod
 per node execution. It is deliberately *not* a report — job identity, the input
 digest and certification belong to whoever asked for the run, not to the graph.
 
-The graph has exactly two drivers, and this module exists because they were
-stamping differently. :class:`~stride_service.pipeline.AdkPipelineRunner` owned
-the served-route join, the per-execution fingerprint and the predecessor-relative
-duration as private methods, so the eval harness — driving the same graph over a
-corpus — could not reach them and stamped a single placeholder ``NodeRun``
-instead. Every eval report therefore carried no fingerprints at all, which made
-``report_fingerprints`` return an empty mapping, which made
-:func:`~stride_service.certification.certify` report ``certified=True`` over
-nothing. A sweep printed "all node fingerprints blessed" having blessed nothing.
-Stamping lives here so that cannot recur: one implementation, both drivers.
+The graph has two drivers — :class:`~stride_service.pipeline.AdkPipelineRunner`
+and the eval harness — and both stamp their node runs here. One implementation,
+so a sweep cannot certify against fingerprints it never recorded.
 
 What the graph cannot know stays with the caller. What only the driver can
 observe — which node an ADK event is the output for, what build answered it,
@@ -50,10 +43,10 @@ class _NodeFinish:
     """When one graph node produced its output, and what build answered it.
 
     ``served_model`` is the build the provider says actually ran, read off the
-    event rather than assumed from the configured string (#7 decision 2). It is
-    ``None`` when the event carries none — an offline stand-in, or a provider
-    that did not report one — and a node with no served build gets no
-    fingerprint rather than one attesting to a model nobody confirmed.
+    event rather than assumed from the configured string. It is ``None`` when
+    the event carries none — an offline stand-in, or a provider that did not
+    report one — and a node with no served build gets no fingerprint rather
+    than one attesting to a model nobody confirmed.
     """
 
     node: str
@@ -183,11 +176,11 @@ class GraphExecutor:
     def _fingerprint(self, node: str, served_route: str | None) -> str | None:
         """This node execution's generation identity, or ``None`` if unknowable.
 
-        Computed per *execution* (#7 decision 2), so 12 cases give one node 12
-        hashes and a build that moves mid-run gives it two — which is the drift
-        signal, not a defect. Without a served build there is nothing honest to
-        hash, so the node carries no fingerprint at all rather than one keyed on
-        what was merely requested.
+        Computed per *execution*, so 12 cases give one node 12 hashes and a
+        build that moves mid-run gives it two — which is the drift signal, not
+        a defect. Without a served build there is nothing honest to hash, so
+        the node carries no fingerprint at all rather than one keyed on what
+        was merely requested.
         """
         sampling = self._pipeline.node_sampling.get(node)
         if served_route is None or sampling is None:

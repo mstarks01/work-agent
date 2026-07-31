@@ -1,23 +1,22 @@
 """Job lifecycle, persistence interface, and pipeline-runner interface.
 
-Implements the job side of the front-end API contract (wayfinder ticket 008):
-the ``queued -> running -> completed | failed | rejected`` state machine with
-illegal transitions refused, an append-only per-job event log that backs both
-the poll response and the SSE stream, and the two seams this ticket
-deliberately leaves open:
+The job side of the front-end API contract: the ``queued -> running ->
+completed | failed | rejected`` state machine with illegal transitions refused,
+an append-only per-job event log that backs both the poll response and the SSE
+stream, and two open seams:
 
-* :class:`JobStore` — persistence is a deferred storage decision; the API only
-  ever talks to this interface. Backends are selected at deploy time by
-  ``STRIDE_JOB_STORE`` and constructed through :func:`build_store`, so a durable
-  or shared backend is one registry entry. :class:`InMemoryJobStore` is the
-  ``memory`` backend — the v1 default, non-durable and per-instance.
+* :class:`JobStore` — the API only ever talks to this interface. Backends are
+  selected at deploy time by ``STRIDE_JOB_STORE`` and constructed through
+  :func:`build_store`, so a durable or shared backend is one registry entry.
+  :class:`InMemoryJobStore` is the ``memory`` backend — the default,
+  non-durable and per-instance.
 * :class:`PipelineRunner` — the API runs jobs through this interface, never
   against a graph directly. :class:`stride_service.pipeline.AdkPipelineRunner`
-  is the implementation (ticket 021); :class:`StubPipelineRunner` stays as the
-  no-model stand-in that exercises the contract end to end.
+  is the implementation; :class:`StubPipelineRunner` is the no-model stand-in
+  that exercises the contract end to end.
 
 A ``failed`` job stores only a generic error message — internal detail is
-logged, never surfaced (ticket 008 rule 5).
+logged, never surfaced.
 """
 
 from __future__ import annotations
@@ -63,9 +62,9 @@ _LEGAL_TRANSITIONS: dict[JobStatus, frozenset[JobStatus]] = {
 # Stored on a failed job in place of any internal detail.
 GENERIC_FAILURE_MESSAGE = "internal error while running the analysis pipeline"
 
-# Authoritative cap on a submitted description, in UTF-8 bytes (ticket 008).
-# Enforced at every entry point — the HTTP layer and the in-process engine —
-# so untrusted input is bounded before it reaches a model (OWASP LLM10).
+# Authoritative cap on a submitted description, in UTF-8 bytes. Enforced at
+# every entry point — the HTTP layer and the in-process engine — so untrusted
+# input is bounded before it reaches a model (OWASP LLM10).
 MAX_DESCRIPTION_BYTES = 100 * 1024
 
 
@@ -119,9 +118,9 @@ class JobRecord(BaseModel):
     error: str | None = None
     report: StrideReport | None = None
     # The certification verdict for this run, or None if the job produced no
-    # report. It lives on the record rather than on the report (#17 decision 2):
-    # every derived report field recomputes *from the report*, and this one
-    # cannot — it depends on a mutable, deployment-local manifest. The report is
+    # report. It lives on the record rather than on the report because every
+    # derived report field recomputes *from the report* and this one cannot —
+    # it depends on a mutable, deployment-local manifest. The report is
     # portable; the manifest is not. Operator-only: no route exposes it.
     certification: CertifyResult | None = None
 

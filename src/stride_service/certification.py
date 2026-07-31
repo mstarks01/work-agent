@@ -1,26 +1,19 @@
 """Certifying a run's generation identities against a deployment's manifest.
 
-This lives in the **service**, not the eval harness (#17 decision 1). The
-decisive fact was packaging rather than philosophy: ``evals/`` does not ship —
-``pyproject.toml`` builds only ``src/stride_service`` — so the production image
-could not import the eval gate even if it wanted to, and nothing in production
-certified anything. That left #7 decision 4 unredeemed: it declined a
-served-vs-configured comparison because drift "falls out of certification for
-free", which is true only where something certifies.
+The pure check lives in the **service**, not the eval harness, because
+``evals/`` does not ship — ``pyproject.toml`` builds only
+``src/stride_service`` — so the production image could not import an eval-side
+gate. The **write** path stays in evals: ``promote()`` and the
+certification-bar verification import
+*this* module.
 
-So the pure check moved here and the **write** path stayed in evals:
-``promote()`` and the certification-bar verification import *this* module. The
-dependency inverts in the direction it already ran.
-
-**The manifest keys by tier, not by node** (#14 decision 4). A fingerprint's
-payload contains no node name — it is ``(vendor-prefixed served build, tier
-sampling)`` — and the tier map puts ``critic`` and ``recritic`` both on
-``strong``, ``extract`` and ``repair`` both on ``base``. So ``recritic``
-presents a *byte-identical* hash to ``critic``, and per-node keying would call
-that same hash blessed under one key and unblessed under the other, reporting
-the first production revise path uncertified on a technicality. Node keying was
-a leftover from build-time fingerprints; the binding is per tier and so is the
-hash.
+**The manifest keys by tier, not by node.** A fingerprint's payload contains no
+node name — it is ``(vendor-prefixed served build, tier sampling)`` — and the
+tier map puts ``critic`` and ``recritic`` both on ``strong``, ``extract`` and
+``repair`` both on ``base``. So ``recritic`` presents a *byte-identical* hash
+to ``critic``, and per-node keying would call that same hash blessed under one
+key and unblessed under the other, reporting the production revise path
+uncertified on a technicality.
 
 **Three states, and the third is a separate field.** ``certified`` keeps its
 narrow meaning — every observed fingerprint is blessed — because callers consume
@@ -50,9 +43,8 @@ from pydantic import BaseModel, ConfigDict, Field, ValidationError
 from stride_service.model_tiers import TIER_NAMES, TierName
 from stride_service.report import NodeRun, StrideReport
 
-# Version 2 re-keys the manifest from nodes to tiers (#14 decision 4). A hard
-# cutover with no shim, and a free one: the file ships with empty sets, so
-# nothing stored can be invalidated by the change.
+# The manifest schema version. Keyed by tier, with no compatibility shim for
+# older files.
 MANIFEST_VERSION = 2
 
 # A fingerprint is a lowercase sha256 hex digest. Validating the shape on write
@@ -146,10 +138,10 @@ def certify(
     ran is simply absent.
 
     ``expected_nodes`` is the built graph's LLM nodes, which is where the
-    expectation of what *should* have run comes from (#14 decision 2). It is
-    deliberately **not** the manifest: the manifest is deployment-local and
-    ships empty, so a manifest-derived expectation would be empty exactly on day
-    one, and would conflate a *stale* manifest with an *unexercised* one.
+    expectation of what *should* have run comes from. It is deliberately
+    **not** the manifest: the manifest is deployment-local and ships empty, so
+    a manifest-derived expectation would be empty exactly on day one, and would
+    conflate a *stale* manifest with an *unexercised* one.
 
     Pure and order-independent: results are sorted so the verdict does not
     depend on mapping iteration order.
@@ -220,15 +212,14 @@ def load_manifest(path: Path | str) -> BlessedManifest:
     except OSError as exc:
         raise CertificationError(f"{path}: cannot be read: {exc}") from exc
 
-    # The version check fires before shape validation: a version-1 file's
-    # ``[nodes]`` table would otherwise be rejected as a stray key, which is
-    # true but says nothing about why.
+    # The version check fires before shape validation, so a file on another
+    # schema is named as such rather than reported as a set of stray keys.
     version = raw.get("version")
     if version != MANIFEST_VERSION:
         raise CertificationError(
             f"{path}: unsupported version {version!r};"
-            f" expected {MANIFEST_VERSION} (hard cutover: version 1 keyed by"
-            " node, this keys by tier)"
+            f" expected {MANIFEST_VERSION}, which keys blessed fingerprints"
+            " by tier"
         )
 
     try:
@@ -242,19 +233,19 @@ class CertificationGate:
     """One deployment's manifest plus the policy for acting on its verdict.
 
     Assembled once at startup and reused, so two jobs in one process can never
-    be certified against different manifests — which would be #10's silent
-    override displaced from space into time.
+    be certified against different manifests.
 
-    The two withholding rules deliberately differ (#17 decisions 3 and 4):
+    The two withholding rules deliberately differ:
 
     * **uncertified** withholds only under ``require_certified``. It is a
       *measurement* gate, and the manifest ships empty, so on by default it
       would fail every run on day one and train people to switch it off.
-    * **unexercised** withholds **unconditionally**. It is an *assertion*, not a
-      measurement: it is unreachable on any run that produces a report, because
-      every tier has a node that always runs and a rejected model returns no
-      report at all. Its cost is therefore zero, and putting it behind the same
-      knob would make the free half inert for every default deployment.
+    * **unexercised** withholds **unconditionally**. It is an *assertion*, not
+      a measurement: it is unreachable on any run that produces a report,
+      because every tier has a node that always runs and a rejected model
+      returns no report at all. Its cost is therefore zero, and putting it
+      behind the same knob would make the free half inert for every default
+      deployment.
 
     Withholding means refusing the *report*, never failing the job: a failed job
     has no report at all, and the fingerprints that prove the drift live in it.

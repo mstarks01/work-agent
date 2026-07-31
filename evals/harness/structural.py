@@ -1,14 +1,13 @@
-"""Tier 1: the structural gates, and the only ones that block in phase 1.
+"""Tier 1: the structural gates, and the only ones that block.
 
-Ticket 009 decision 16 splits thresholds by nature. These are the absolute,
-per-case, zero-tolerance ones — a report parses as a
+Thresholds are split by nature; these are the absolute, per-case,
+zero-tolerance ones — a report parses as a
 :class:`~stride_service.report.StrideReport`, its references resolve, its
 threat IDs are unique and carry the right category letters, its severity bands
 match :func:`~stride_service.report.derive_severity_level`, and its summary
 counts match its own contents. They gate from day one because they are
 deterministic, free, and already enforced by shipped validators; must-find
-recall computes and reports but does not block until baselines exist
-(decision 19).
+recall computes and reports but does not block until baselines exist.
 
 The checks are re-asserted here rather than delegated wholesale to the
 model validator, for two reasons: a raw payload has to be gradeable before it

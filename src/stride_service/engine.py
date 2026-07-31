@@ -7,14 +7,14 @@ interface — reaches for :class:`StrideEngine` instead of fabricating a
 :class:`~stride_service.jobs.JobRecord`, an auth subject, and a node callback by
 hand.
 
-The engine carries none of the HTTP contract's ceremony: no Ping token, no job
-store, no polling. It builds the pipeline once (the expensive shared-prefix
-composition ticket 021 amortises across jobs) and runs each submission to a
-terminal state. Success returns a :class:`~stride_service.report.StrideReport`,
-an input the validity gate rejects returns its
-:class:`~stride_service.validation.ValidationIssue`s, and an internal failure
-raises. That trichotomy is the job lifecycle's ``completed | rejected | failed``
-(ticket 008) with the transport removed.
+The engine carries none of the HTTP contract's ceremony: no bearer token, no
+job store, no polling. It builds the pipeline once — the expensive
+shared-prefix composition is amortised across jobs — and runs each submission
+to a terminal state. Success returns a
+:class:`~stride_service.report.StrideReport`, an input the validity gate
+rejects returns its :class:`~stride_service.validation.ValidationIssue`s, and
+an internal failure raises. That trichotomy is the job lifecycle's ``completed
+| rejected | failed`` with the transport removed.
 
 The submitted description is untrusted text (OWASP LLM01): the engine caps its
 size and hands it to the pipeline, which places it in session state as fenced
@@ -42,12 +42,12 @@ from stride_service.jobs import (
 logger = logging.getLogger(__name__)
 
 # owner_subject on an in-process job is only the ADK session's user_id: it
-# isolates session state and carries none of the Ping-token meaning it has on
-# the HTTP path. Callers embedding the engine per tenant may pass their own.
+# isolates session state and carries none of the token-subject meaning it has
+# on the HTTP path. Callers embedding the engine per tenant may pass their own.
 DEFAULT_CALLER = "in-process"
 
-# Mirrors the HTTP contract's system_name bound (ticket 008). Optional metadata,
-# so an over-long name is a caller error rather than a model-judged rejection.
+# Mirrors the HTTP contract's system_name bound. Optional metadata, so an
+# over-long name is a caller error rather than a model-judged rejection.
 MAX_SYSTEM_NAME_CHARS = 200
 
 
@@ -113,9 +113,9 @@ class StrideEngine:
         :class:`~stride_service.report.StrideReport` when analysis succeeds, or
         a :class:`~stride_service.jobs.PipelineRejected` carrying the validity
         gate's issues when the input cannot be modelled. An internal failure
-        raises — the engine never returns a partial or best-effort report
-        (ticket 038 decision 1). ``on_node``, if given, is awaited with each
-        node name as it completes, for progress or tracing.
+        raises — the engine never returns a partial or best-effort report.
+        ``on_node``, if given, is awaited with each node name as it completes,
+        for progress or tracing.
 
         Usage::
 

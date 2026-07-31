@@ -1,12 +1,12 @@
 """``ReferenceThreat`` and the loader for the golden corpus.
 
 ``ReferenceThreat`` is an eval-side model, deliberately **not**
-:class:`~stride_service.report.DraftThreat` (ticket 009 decision 3). A draft
-carries fields that must not be graded — ``mitigations``, and a 4000-character
-``description`` nobody asked the model to reproduce verbatim — and lacks
-``tier``, the field that makes a recall threshold mean anything. Its ``id``
-would be actively misleading: a reference ``S-01`` and a produced ``S-01`` are
-the same string for no reason at all.
+:class:`~stride_service.report.DraftThreat`. A draft carries fields that must
+not be graded — ``mitigations``, and a 4000-character ``description`` nobody
+asked the model to reproduce verbatim — and lacks ``tier``, the field that
+makes a recall threshold mean anything. Its ``id`` would be actively
+misleading: a reference ``S-01`` and a produced ``S-01`` are the same string
+for no reason at all.
 
 What *is* shared is imported rather than restated: ``StrideCategory``,
 ``Rating`` and the severity matrix come from
@@ -14,13 +14,12 @@ What *is* shared is imported rather than restated: ``StrideCategory``,
 vocabulary.
 
 Loading fails closed in the shape
-:class:`~stride_service.markdown_loader.MarkdownLoader` established — a
-missing file, a malformed case, a model that fails the shipped
-validity gate, or a reference citing an element the blessed model does not
-contain raises :class:`CorpusError`. The last of those mirrors ticket 020's
-exemplar guard: a reference threat pointing at a nonexistent element is
-unscoreable, and silently dropping it would quietly lower the recall
-denominator.
+:class:`~stride_service.markdown_loader.MarkdownLoader` established — a missing
+file, a malformed case, a model that fails the shipped validity gate, or a
+reference citing an element the blessed model does not contain raises
+:class:`CorpusError`. The last of those mirrors the exemplar lint: a reference
+threat pointing at a nonexistent element is unscoreable, and silently dropping
+it would quietly lower the recall denominator.
 """
 
 from __future__ import annotations
@@ -41,7 +40,7 @@ from stride_service.report import (
 from stride_service.system_model import SystemModel
 from stride_service.validation import parse_and_validate
 
-# Ticket 009 decision 4: one weight makes every threshold wrong. ``must-find``
+# Two tiers, because one weight makes every threshold wrong. ``must-find``
 # drives the hard recall gate, ``expected`` a tracked, softer number.
 Tier = Literal["must-find", "expected"]
 
@@ -95,7 +94,7 @@ class CaseMetadata(BaseModel):
     title: str = Field(min_length=1)
     domain: str = Field(min_length=1)
     # The near/far split is the whole instrument for the exemplar-domain-bias
-    # delta (ticket 009 decision 6), so it is typed, not a free string.
+    # delta, so it is typed, not a free string.
     exemplar_proximity: Literal["near", "far"]
     provenance: str = Field(min_length=1)
     bootstrap: str = Field(min_length=1)
@@ -108,7 +107,7 @@ class GoldenCase:
     """One case: the submitted text, the blessed model, the reference set.
 
     Two artifacts rather than an input/output pair, which is what buys the
-    three eval modes and per-node attribution of a regression (decision 1).
+    three eval modes and per-node attribution of a regression.
     """
 
     meta: CaseMetadata
