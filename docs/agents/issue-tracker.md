@@ -121,7 +121,26 @@ gh api --method POST repos/mstarks01/work-agent/issues/<child>/dependencies/bloc
   which is #59's problem to solve. **#53 is amended**: supersession narrows from "within one source"
   to one speaker correcting themselves. Lands as `extract.md` Procedure rule 6 at 220 tokens —
   **1870/2000, no cap move** — plus `CONTEXT.md`; no wire-contract change. Closing #55 releases
-  #59, leaving the frontier at #56 and #59.
+  #59, leaving the frontier at #56 and #59. #56 gives an Element **`source_label`** plus a
+  best-effort **`source_speaker`**, leaving `source_excerpt` at 1000 chars. The label names the
+  **excerpt, not the element** — a quote has one origin by construction, so the field cannot be
+  half-true, while the `list[str]` that #55's two-source elements invite cannot say which label the
+  quote belongs to; multi-source provenance stays in `notes` where #55 put it. It is
+  **gate-enforced** (non-empty excerpt ⇒ non-empty label from the job's labels) as a fifth
+  `invalid-reference` rule, and is the **first gate rule taking data from outside the model** —
+  `validate()` gains `source_labels`, cheap only because #54 already made `GraphExecutor.run` take
+  `Sequence[Source]`. `source_speaker` is ungated and earns its place by **redactability**: #53 put
+  participant names into excerpt bytes by rule, and a name in its own field is strippable where one
+  inside a quote is not. **`source_timestamp` was rejected on measurement** — #52's caps force
+  cleaning, cleaning strips cue timings, so it would be empty exactly on compliant input. The 1000
+  cap holds on evidence (corpus max **229**; #51's mean merged turn ~220 chars) and because excerpts
+  are already **14.1% of `model.json`**, which is dumped whole into every analyst prompt. The
+  ticket's stated blast radius was **wrong both ways**: `webapp/report_view.html` and
+  `docs/Report-Schema.md` name the field nowhere and are untouched, while `evals/verify_corpus.py`
+  and `evals/harness/reference.py` do change; all **206 corpus values** take a hard-coded
+  `"System description"`, a `case.json`-declared `sources` array being refused as pre-empting #58.
+  `EXTRACT_PROMPT_TOKEN_CAP` **2000 → 2200** — rule 7 costs +107 measured, landing ~1985/2000, and
+  15 tokens is not headroom. Closing #56 releases **#57**, leaving the frontier at #57 and #59.
 
 ### Completed efforts
 
