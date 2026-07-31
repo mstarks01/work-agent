@@ -57,10 +57,10 @@ ALL_NODES = tuple(TIER_NODE_BY_GRAPH_NODE)
 def _build_fingerprints(sampling, served="fake-model-001"):
     """The per-node fingerprints one sampling variant would produce.
 
-    The served build is now supplied rather than read off the built graph: a
-    fingerprint's model half is what *answered*, which a build cannot know
-    (#7 decision 2). Building the pipeline is still what resolves each node's
-    tier sampling, and a string model keeps it credential-free.
+    The served build is supplied rather than read off the built graph: a
+    fingerprint's model half is what *answered*, which a build cannot know.
+    Building the pipeline is what resolves each node's tier sampling, and a
+    string model keeps it credential-free.
     """
     pipeline = modes.build_eval_pipeline(
         ENTRY_EXTRACT,
@@ -198,7 +198,7 @@ def test_promote_accumulates_blessed_builds(tmp_path):
         sampling_path=sampling_copy, manifest_path=manifest_copy,
     )
 
-    # A tier accumulates several blessed served-builds (ticket 03 §4).
+    # A tier accumulates several blessed served-builds.
     assert len(manifest.blessed_for("base")) == 2
 
 

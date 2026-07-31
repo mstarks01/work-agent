@@ -1,9 +1,5 @@
 """STRIDE report: the structured JSON payload the front-end retrieves for a job.
 
-Shape and the decisions behind it live in wayfinder ticket 005 (STRIDE report
-schema and severity model); the prototype it graduates from is on branch
-``prototype/report-schema``.
-
 Severity is qualitative likelihood x impact with the band **derived by a fixed
 matrix, never asserted** by a model — the critic calibrates two narrow
 judgments and evals check the arithmetic. Rejected threats ride in their own
@@ -22,10 +18,9 @@ from pydantic import BaseModel, ConfigDict, Field, model_validator
 
 from stride_service.system_model import BoundaryCrossing, SystemModel
 
-# 1.1 adds NodeRun.requested_model, and redefines NodeRun.model as the *served*
-# build rather than the configured string. Additive for readers that ignore
-# unknown fields; consumers keying on `model` now read what answered rather than
-# what was asked for, which is what every docstring around it already claimed.
+# The payload schema readers key on. Consumers that ignore unknown fields
+# tolerate a minor bump; a major bump is a breaking change to a field's
+# meaning.
 SCHEMA_VERSION = "1.1"
 
 DEFAULT_DISCLAIMER = (
@@ -154,7 +149,7 @@ class DraftThreat(BaseModel):
     Everything a category analyst produces and nothing it may rule on —
     ``verdict`` and ``confidence`` are the critic's, and appear only once a
     draft is promoted to a :class:`Threat`. This is the shape the prompt
-    exemplars are lint-parsed against (ticket 013).
+    exemplars are lint-parsed against.
     """
 
     model_config = ConfigDict(extra="forbid")
@@ -193,7 +188,7 @@ class NodeRun(BaseModel):
     """Per-node execution metadata: which model ran, its sampling identity, timing.
 
     Two model fields, because they answer different questions and the report
-    **records both rather than computing either** (#7 decision 5):
+    **records both rather than computing either**:
 
     * ``model`` is the **served** build, vendor-prefixed —
       ``vertex_ai/gemini-2.5-pro-002``. What actually answered, read back from
@@ -236,8 +231,8 @@ class NodeRun(BaseModel):
 class Job(BaseModel):
     """Identity and timing of the run that produced this report.
 
-    A report only exists for a completed job, so ``status`` admits exactly
-    the ``completed`` state from the job-lifecycle contract (ticket 008).
+    A report only exists for a completed job, so ``status`` admits exactly the
+    ``completed`` state from the job-lifecycle contract.
     """
 
     model_config = ConfigDict(extra="forbid")
@@ -314,15 +309,15 @@ class StrideReport(BaseModel):
     input: InputRef
     nodes: list[NodeRun]
     # The resolved per-tier decoding params this run used, in the clear, once
-    # per tier (ticket 07 / ticket 03 §1): tier name -> the tier's resolved
-    # sampling values (the serialized ``TierSampling``). Recorded as plain
-    # scalars, not the ``TierSampling`` model, so this low-level schema module
-    # stays free of the sampling/model_tiers import (which cycles back through
-    # skills). Each node's sampling_fingerprint is recomputable from its served
-    # model and its tier's entry here. Empty only on reports with no LLM
-    # provenance at all — the stub runner's. An eval report carries this block
-    # like any other: a sweep's fingerprints are evidence, and evidence nobody
-    # can recompute from the artifact is an assertion.
+    # per tier: tier name -> the tier's resolved sampling values (the
+    # serialized ``TierSampling``). Recorded as plain scalars, not the
+    # ``TierSampling`` model, so this low-level schema module stays free of the
+    # sampling/model_tiers import (which cycles back through skills). Each
+    # node's sampling_fingerprint is recomputable from its served model and its
+    # tier's entry here. Empty only on reports with no LLM provenance at all —
+    # the stub runner's. An eval report carries this block like any other: a
+    # sweep's fingerprints are evidence, and evidence nobody can recompute from
+    # the artifact is an assertion.
     sampling: dict[str, dict[str, float | int | None]] = Field(default_factory=dict)
     system_model: SystemModel
     boundary_crossings: list[BoundaryCrossing]

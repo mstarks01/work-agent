@@ -1,7 +1,7 @@
 """The service certifies each job it completes, and the envelope acts on it.
 
-Covers the runtime half of certification (#17): the runner attaches a verdict to
-the job record, and ``GET /v1/jobs/{id}/report`` withholds a report whose
+Covers the runtime half of certification: the runner attaches a verdict to the
+job record, and ``GET /v1/jobs/{id}/report`` withholds a report whose
 generation identity this deployment has not blessed. Nothing here reaches a
 provider — the runner is a stand-in and the manifests are built in memory.
 """
@@ -148,8 +148,8 @@ class TestUnexercisedWithholdsUnconditionally:
 
 class TestNothingReachesTheClientView:
     def test_the_status_view_never_mentions_certification(self):
-        # Operator-only (#17 decision 6): a client learns about certification
-        # exactly when its deployment opted into caring.
+        # Operator-only: a client learns about certification exactly when its
+        # deployment opted into caring.
         client = make_client(CertifyResult(certified=False), gate())
         job_id = submit(client)
         body = client.get(f"/v1/jobs/{job_id}", headers=auth()).json()

@@ -3,8 +3,8 @@
 The adapter half of this module is exercised through
 ``tests/test_deployment.py``, which builds real ``LiteLlm`` adapters and asserts
 the per-tier sharing and the build-time gates. What is here is the binding
-*value* — the four things that used to travel as four parameters, two of which
-are views of one ``SamplingConfig``.
+*value* — the four things an LLM node runs on, two of which are views of one
+``SamplingConfig``.
 """
 
 from __future__ import annotations

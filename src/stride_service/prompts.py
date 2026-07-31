@@ -1,13 +1,12 @@
 """Prompt composition for the four LLM node kinds.
 
-Prompt content lives in ``prompts/`` as Markdown (ticket 019) and loads
-through the same :class:`~stride_service.markdown_loader.MarkdownLoader` the
-skills use — a skill is *what to know*, a prompt is *what to do with this
-job's input* (ticket 013). Composition here is concatenation only: the
-``{category}``, ``{system_model}``, ``{boundary_crossings}``,
-``{draft_threats}``, ``{input_text}``, ``{previous_model}`` and
-``{validation_issues}`` placeholders stay untouched for ADK state templating
-to fill at run time.
+Prompt content lives in ``prompts/`` as Markdown and loads through the same
+:class:`~stride_service.markdown_loader.MarkdownLoader` the skills use — a
+skill is *what to know*, a prompt is *what to do with this job's input*.
+Composition here is concatenation only: the ``{category}``, ``{system_model}``,
+``{boundary_crossings}``, ``{draft_threats}``, ``{input_text}``,
+``{previous_model}`` and ``{validation_issues}`` placeholders stay untouched
+for ADK state templating to fill at run time.
 
 Order is stable-first, mirroring
 :func:`~stride_service.skills.compose_analyst_skills`: the one shared
@@ -21,8 +20,8 @@ from __future__ import annotations
 from stride_service.markdown_loader import MarkdownLoader
 from stride_service.report import StrideCategory
 
-# The four fixed H2 sections of an agent prompt, in order (ticket 013). The
-# lints enforce these exact strings.
+# The four fixed H2 sections of an agent prompt, in order. The lints enforce
+# these exact strings.
 PROMPT_SECTION_HEADINGS: tuple[str, ...] = ("Role", "Input", "Procedure", "Output")
 
 # The prompt bodies, by node kind.
@@ -41,7 +40,7 @@ PROMPT_BODY_NAMES: tuple[str, ...] = (
 
 EXEMPLARS_PREFIX = "exemplars/"
 
-# Token caps per prompt file (ticket 019), checked in CI by the lint tests.
+# Token caps per prompt file, checked in CI by the lint tests.
 ANALYST_PROMPT_TOKEN_CAP = 2000
 EXEMPLAR_TOKEN_CAP = 1500
 CRITIC_PROMPT_TOKEN_CAP = 1500

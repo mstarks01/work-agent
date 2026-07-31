@@ -1,11 +1,10 @@
 """Judge-vs-human agreement: the machinery, and the fixtures behind it.
 
-The bar itself (>= 90%, ticket 009 decision 13) can only be measured against
-the real judge, which needs Vertex credentials and therefore belongs to the
-live CI job. What is testable offline is everything around it: that the
-fixtures are loadable and balanced, that agreement is computed the way the
-decision states, and that a judge below the bar fails rather than passes with a
-note.
+The bar itself (>= 90%) can only be measured against the real judge, which
+needs provider credentials and therefore belongs to the live CI job. What is
+testable offline is everything around it: that the fixtures are loadable and
+balanced, that agreement is computed the way the decision states, and that a
+judge below the bar fails rather than passes with a note.
 """
 
 from __future__ import annotations

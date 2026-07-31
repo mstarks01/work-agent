@@ -1,17 +1,15 @@
 """Scoring produced threats against a golden case's reference set.
 
-The order is the one the standing principle demands — mechanical first,
-judgement only where nothing else will do (ticket 009 decisions 7-9):
+Mechanical first, judgement only where nothing else will do:
 
 1. **Lane prefilter** (mechanical). A produced threat is only ever a candidate
-   for same-category references. Not a shortcut: ticket 013 already ruled that
-   misfiled threats are rejected, never recategorized. Cuts pair count ~6x for
-   free.
+   for same-category references. Not a shortcut: misfiled threats are rejected,
+   never recategorized. Cuts pair count ~6x for free.
 2. **Per-pair claim equivalence** (judged). Binary, within lane, one line of
    rationale each, individually auditable in the run artifact.
 3. **One-to-one assignment** (mechanical). Deterministic maximum bipartite
-   matching, so each produced threat consumes at most one reference; without
-   it recall is inflatable and stops meaning anything.
+   matching, so each produced threat consumes at most one reference; without it
+   recall is inflatable and stops meaning anything.
 4. **Adjudication of the unmatched** (judged, three buckets). Unmatched is
    *not* treated as a false positive: references are non-exhaustive by
    construction, so that rule would punish finding real threats and push every
@@ -20,11 +18,11 @@ judgement only where nothing else will do (ticket 009 decisions 7-9):
    arithmetic; comparing bands needs no judge.
 
 Two things this module deliberately does *not* do. Element agreement is
-**scored, never used as a prefilter** (decision 8): a correct threat may cite
-the data flow where the SME cited the process at its endpoint, and filtering on
-it would score a hit as a miss. And ``needs-info`` threats are never false
-positives (decision 9) — they are the designed behaviour the third exemplar per
-category teaches, and get their own bucket.
+**scored, never used as a prefilter**: a correct threat may cite the data flow
+where the SME cited the process at its endpoint, and filtering on it would
+score a hit as a miss. And ``needs-info`` threats are never false positives —
+they are the designed behaviour the third exemplar per category teaches, and
+get their own bucket.
 
 Every number here is **judge-relative**. Valid for tracking movement and
 comparing configurations; not an absolute, and not comparable to published
@@ -32,12 +30,12 @@ figures from other tools.
 
 The scorer takes :class:`~stride_service.report.DraftThreat`, not
 :class:`~stride_service.report.Threat`, so the *same* function scores the
-pre-critic union and the post-critic report (ticket 028). Nothing is promoted
-to make that work: ``verdict`` and ``confidence`` are the critic's outputs, and
-synthesizing them to measure the critic would decide the answer by fiat. The
-one field a draft cannot supply — the ``needs-info`` adjudication bypass — is
-therefore simply inactive before the critic has ruled, which is the honest
-reading of a set nobody has ruled on yet.
+pre-critic union and the post-critic report. Nothing is promoted to make that
+work: ``verdict`` and ``confidence`` are the critic's outputs, and synthesizing
+them to measure the critic would decide the answer by fiat. The one field a
+draft cannot supply — the ``needs-info`` adjudication bypass — is therefore
+simply inactive before the critic has ruled, which is the honest reading of a
+set nobody has ruled on yet.
 """
 
 from __future__ import annotations
@@ -60,15 +58,15 @@ from stride_service.report import DraftThreat, SeverityLevel, StrideCategory, Th
 def candidate_claim(threat: DraftThreat) -> str:
     """The produced threat's claim, as the judge sees it.
 
-    The ``title``: ticket 019 defines it as one scannable line naming the
-    attacker action and its target, which is exactly the register a
-    ``ReferenceThreat.claim`` is written in. Grading the 4000-character
-    ``description`` instead would grade prose no one asked the model to
-    reproduce, and it is what the hand-labelled calibration fixtures were
-    written against — so the judged task offline and the judged task in a live
-    run are the same task. It is defined on the *draft* base class for the same
-    reason: a draft and the threat it becomes are judged on the same string, or
-    critic yield compares two numbers that were never comparable.
+    The ``title``: one scannable line naming the attacker action and its
+    target, which is exactly the register a ``ReferenceThreat.claim`` is
+    written in. Grading the 4000-character ``description`` instead would grade
+    prose no one asked the model to reproduce, and it is what the hand-labelled
+    calibration fixtures were written against — so the judged task offline and
+    the judged task in a live run are the same task. It is defined on the
+    *draft* base class for the same reason: a draft and the threat it becomes
+    are judged on the same string, or critic yield compares two numbers that
+    were never comparable.
     """
     return threat.title
 
@@ -158,8 +156,8 @@ class LaneError:
 
     The only way lane accuracy is observable at all: in-lane matching cannot
     see a misfiled threat by construction. Recorded here, and deliberately
-    **not** counted as a recall hit — ticket 013 rejects misfiled threats
-    rather than recategorizing them, so the reference stays a miss.
+    **not** counted as a recall hit — misfiled threats are rejected rather than
+    recategorized, so the reference stays a miss.
     """
 
     threat_id: str
@@ -305,13 +303,12 @@ def score_case(
     """Score one case's produced threats against its reference set.
 
     ``produced`` is a bare threat list rather than a report, and typed at the
-    draft base class, so this one function scores both sides of the critic
-    (ticket 028): the merged drafts going in, and the report's threats coming
-    out.
+    draft base class, so this one function scores both sides of the critic: the
+    merged drafts going in, and the report's threats coming out.
     """
     rulings: list[PairRuling] = []
     in_lane = _judge_in_lane(case, produced, judge, rulings)
-    assignment = _assign(in_lane, case.references, produced)
+    assignment = _assign(in_lane, case.references)
 
     matched = tuple(
         _matched_pair(reference_index, case.references[reference_index], produced[pos])
@@ -399,7 +396,6 @@ def _judge_in_lane(
 def _assign(
     candidates: dict[int, list[int]],
     references: Sequence[ReferenceThreat],
-    produced: Sequence[DraftThreat],
 ) -> dict[int, int]:
     """Step 3: maximum one-to-one assignment, deterministically.
 
@@ -601,7 +597,7 @@ def exemplar_delta(scores: Sequence[CaseScore]) -> dict[str, float]:
 
 
 def unlisted_for_promotion(scores: Sequence[CaseScore]) -> list[dict[str, Any]]:
-    """The corpus feedback loop (decision 11).
+    """The corpus feedback loop.
 
     Grounded threats the reference set does not carry, surfaced for SME review
     and promotion at the next blessing pass. Non-exhaustive ground truth

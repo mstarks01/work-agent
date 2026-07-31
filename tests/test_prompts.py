@@ -1,9 +1,8 @@
-"""Tests for prompt composition and the skill/markdown loader aliases."""
+"""Tests for prompt composition and the shared Markdown loader."""
 
 import pytest
 
 from stride_service.markdown_loader import (
-    MarkdownFormatError,
     MarkdownLoader,
     MarkdownNotFoundError,
 )
@@ -17,7 +16,6 @@ from stride_service.prompts import (
     exemplar_name,
 )
 from stride_service.report import STRIDE_CATEGORIES
-from stride_service.skills import SkillFormatError, SkillLoader, SkillNotFoundError
 
 
 def prompt_text(title, body="Body."):
@@ -44,12 +42,7 @@ def loader(prompts_root):
     return MarkdownLoader(prompts_root)
 
 
-class TestLoaderAliases:
-    def test_skill_names_alias_the_one_implementation(self):
-        assert SkillLoader is MarkdownLoader
-        assert SkillNotFoundError is MarkdownNotFoundError
-        assert SkillFormatError is MarkdownFormatError
-
+class TestSharedLoader:
     def test_prompts_load_through_the_same_loader(self, loader):
         assert "exemplars/spoofing" in loader.names()
 
