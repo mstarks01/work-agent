@@ -12,9 +12,16 @@ floating-form rule, and the two-argument build-time sampling gate — and
 back apart by all three. The prefix exists in exactly one place,
 :attr:`Vendor.prefix`.
 
-Loading fails closed: an unknown tier, vendor or node name, a floating model
-identifier (from the file *or* an env var), a node missing from the mapping, or
-a config version other than :data:`SUPPORTED_VERSION` raises
+**No vendor is selected by default.** The shipped config names no ``(vendor,
+model)`` pair for either tier, so a first run stops with
+:func:`_require_selected_tiers`' message rather than reaching a vendor nobody
+chose. "No privileged default" is therefore a property of the shipped values,
+not only of the mechanism: every vendor is reached the same way, and none of
+them is what you get by doing nothing.
+
+Loading fails closed: an unselected tier, an unknown tier, vendor or node name,
+a floating model identifier (from the file *or* an env var), a node missing from
+the mapping, or a config version other than :data:`SUPPORTED_VERSION` raises
 :class:`ModelConfigError` rather than degrading. There is no cross-tier
 fallback and no compatibility shim for other schema versions.
 """
@@ -31,7 +38,7 @@ from pydantic import BaseModel, ConfigDict, Field, ValidationError, model_valida
 
 from stride_service.errors import ConfigError
 from stride_service.skills import STRIDE_CATEGORIES
-from stride_service.vendors import Vendor, VendorName, vendor_for
+from stride_service.vendors import VENDOR_NAMES, Vendor, VendorName, vendor_for
 
 # The only schema version this loader accepts. A file on any other version
 # fails its own check rather than being migrated in place.
@@ -138,7 +145,7 @@ class ModelTierConfig(BaseModel):
         return self.tiers[self.resolve_tier(node)]
 
 
-def _apply_env_overrides(tiers_raw: object, env: Mapping[str, str]) -> None:
+def _apply_env_overrides(raw: dict[str, object], env: Mapping[str, str]) -> None:
     """Fold ``STRIDE_MODEL_{TIER}_{VENDOR,MODEL}`` overrides into the raw tables.
 
     ``_MODEL`` alone is the ops case the file header exists for — retuning a
@@ -152,12 +159,15 @@ def _apply_env_overrides(tiers_raw: object, env: Mapping[str, str]) -> None:
 
     An unrecognised ``STRIDE_MODEL_*`` variable also raises rather than being
     silently ignored while the tier quietly runs the file's model.
-    """
-    if not isinstance(tiers_raw, dict):
-        # A malformed or missing ``tiers`` shape: leave it for ModelTierConfig
-        # to reject rather than applying an override against nothing.
-        return
 
+    That namespace check runs before the table is touched, so a typo'd override
+    is reported even when the file selects nothing — which, since nothing is
+    selected by default, is the state a deployment configured purely by
+    environment starts from. A ``tiers`` table absent from the file is created
+    empty here for the same reason: ``_VENDOR`` + ``_MODEL`` together are a
+    complete selection, and requiring a file edit to make them land would mean
+    no deployment could configure itself from the environment alone.
+    """
     known = {var for tier in TIER_NAMES for var in env_vars_for(tier)}
     unknown = sorted(
         var for var in env if var.startswith(_ENV_PREFIX) and var not in known
@@ -168,6 +178,12 @@ def _apply_env_overrides(tiers_raw: object, env: Mapping[str, str]) -> None:
             f" expected {sorted(known)} (schema version {SUPPORTED_VERSION})"
         )
 
+    tiers_raw = raw.setdefault("tiers", {})
+    if not isinstance(tiers_raw, dict):
+        # A malformed ``tiers`` shape: leave it for ModelTierConfig to reject
+        # rather than applying an override against nothing.
+        return
+
     for tier in TIER_NAMES:
         vendor_var, model_var = env_vars_for(tier)
         vendor = env.get(vendor_var)
@@ -177,6 +193,12 @@ def _apply_env_overrides(tiers_raw: object, env: Mapping[str, str]) -> None:
                 f"{vendor_var} is set without {model_var};"
                 " a vendor without its model is not a usable selection"
             )
+        if vendor is None and model is None:
+            # Touching nothing is what lets an unselected tier stay unselected:
+            # an empty table conjured here would read as a selection to
+            # ``_require_selected_tiers`` and swap its message for a pydantic
+            # dump about two missing fields.
+            continue
         table = tiers_raw.setdefault(tier, {})
         if not isinstance(table, dict):
             raise ModelConfigError(f"tiers.{tier}: not a table")
@@ -186,6 +208,45 @@ def _apply_env_overrides(tiers_raw: object, env: Mapping[str, str]) -> None:
             if not value.strip():
                 raise ModelConfigError(f"{var} is set but empty")
             table[var.rsplit("_", 1)[-1].lower()] = value.strip()
+
+
+def _require_selected_tiers(path: Path | str, tiers_raw: object) -> None:
+    """Stop with an actionable message when a tier names no vendor.
+
+    Separate from :meth:`ModelTierConfig._check_complete`, which catches the
+    same gap for a config built in code and reports it as a pydantic validation
+    error. This one exists for the case that is now the *shipped* state — a
+    first run against a config that selects nothing — where the error is the
+    entire onboarding instruction, so it names the vendors that are available
+    and both places a selection can be made. A pydantic error dump at that
+    moment would be accurate and useless.
+
+    Vendor **names** only. The message is reached before any credential is
+    read, and naming a variable's value here is how a key ends up in a log
+    (OWASP A09).
+    """
+    selected = tiers_raw if isinstance(tiers_raw, dict) else {}
+    # A *complete* pair, not merely a present table: `_MODEL` alone against an
+    # unselected file leaves a tier holding a model and no vendor, which is the
+    # same unmade choice and deserves the same instruction.
+    missing = [
+        tier
+        for tier in TIER_NAMES
+        if not (
+            isinstance(selected.get(tier), dict)
+            and {"vendor", "model"} <= set(selected[tier])
+        )
+    ]
+    if not missing:
+        return
+    overrides = " and ".join(" + ".join(env_vars_for(tier)) for tier in missing)
+    raise ModelConfigError(
+        f"{path}: no vendor selected for tier(s) {missing}."
+        " This service ships no default vendor, so each tier must name one"
+        f" before it can run. Supported vendors: {', '.join(VENDOR_NAMES)}."
+        f" Set a (vendor, model) pair per tier in the file, or set {overrides}."
+        " See docs/First-Run.md step 2."
+    )
 
 
 def load_model_tiers(
@@ -207,7 +268,7 @@ def load_model_tiers(
     except OSError as exc:
         raise ModelConfigError(f"{path}: cannot be read: {exc}") from exc
 
-    _apply_env_overrides(raw.get("tiers"), env)
+    _apply_env_overrides(raw, env)
 
     version = raw.get("version")
     if version != SUPPORTED_VERSION:
@@ -215,6 +276,10 @@ def load_model_tiers(
             f"{path}: unsupported version {version!r};"
             f" expected {SUPPORTED_VERSION}"
         )
+
+    # After the version check, so a version-2 file reports the schema it is
+    # rather than the selection it is missing.
+    _require_selected_tiers(path, raw.get("tiers"))
 
     try:
         return ModelTierConfig(**raw)
