@@ -56,7 +56,7 @@ gh api --method POST repos/mstarks01/work-agent/issues/<child>/dependencies/bloc
 ### The live map
 
 - [#49 — Map: accept call transcripts as job input](https://github.com/mstarks01/work-agent/issues/49)
-  — 9 tickets, charted 2026-07-31, in flight. A **planning** map: it settles the spec for
+  — 10 tickets, charted 2026-07-31, in flight. A **planning** map: it settles the spec for
   accepting analyst↔developer interview transcripts as job input and stops there. Four
   premises were fixed while charting and are *not* open questions — the input becomes a
   uniform `sources` list with `description` removed in a hard cutover; the service takes text
@@ -140,7 +140,25 @@ gh api --method POST repos/mstarks01/work-agent/issues/<child>/dependencies/bloc
   and `evals/harness/reference.py` do change; all **206 corpus values** take a hard-coded
   `"System description"`, a `case.json`-declared `sources` array being refused as pre-empting #58.
   `EXTRACT_PROMPT_TOKEN_CAP` **2000 → 2200** — rule 7 costs +107 measured, landing ~1985/2000, and
-  15 tokens is not headroom. Closing #56 releases **#57**, leaving the frontier at #57 and #59.
+  15 tokens is not headroom. #57 is the **hand-off document**, verified against the tree rather
+  than against its own charted list — which was **wrong in five places**: `docs/adr/` does not
+  exist (it is created by the cutover), the corpus has **12** cases rather than the five #58
+  assumes, `case.json` carries no input text at all (it is `source.md` plus a digest, which is
+  why #56 could refuse a declared `sources` array without blocking anything), `Architecture.md`
+  and `Web-App.md` are clean, and `Report-Schema.md` *is* in the blast radius via #50's `InputRef`
+  rather than #56's excerpt. Four modules the list missed — **`execution.py`** (the seam #54
+  actually moved), **`__init__.py`** (the public `__all__`, which is what makes this breaking for
+  an embedder), `validation.py`, `resilience.py` — plus **two** digest sites, `pipeline.py:98` and
+  `StubPipelineRunner` at `jobs.py:297`, which must move together. **`CONTEXT.md` needs nothing**:
+  #50/#53/#55/#56 wrote it to its target state ahead of implementation, so treating it as
+  work-to-do would produce a second, drifting copy. **One branch**, `build/sources-cutover`, seven
+  commits — the no-shim rule makes the contract atomic, so no green intermediate exists to ship;
+  config lands **ahead** of the contract (it holds the caps the contract enforces) and the 206
+  mechanical corpus values get their own commit. **One narrow ADR**,
+  `docs/adr/0001-sources-replace-description.md`, creating the directory `docs/agents/domain.md`
+  has always pointed at, carrying only what a glossary structurally cannot — bytes-not-tokens,
+  equal weight, fence-per-source. **#58 does not gate the branch.** Closing #57 released #58,
+  leaving the frontier at #58 and #59. Closing #56 releases **#57**, leaving the frontier at #57 and #59.
 
 ### Completed efforts
 
