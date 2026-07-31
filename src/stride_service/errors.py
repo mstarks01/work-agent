@@ -8,11 +8,11 @@ sampling (:class:`~stride_service.sampling.SamplingConfigError`). Each names a
 different knob, and code that *handles* the four uniformly should not have to
 enumerate them.
 
-That caller is the first-run web app (#28 decision 6), which turns any of the
-four into a diagnostic page instead of a traceback. Enumerating them in a
-four-tuple ``except`` would make it depend on this package's internal error
-taxonomy, and the day a fifth config loader lands the page silently regresses
-to the traceback it exists to replace.
+That caller is the first-run web app, which turns any of the four into a
+diagnostic page instead of a traceback. Enumerating them in a four-tuple
+``except`` would make it depend on this package's internal error taxonomy, and
+the day a fifth config loader lands the page silently regresses to the
+traceback it exists to replace.
 
 Catching bare :class:`ValueError` is wrong outright:
 :class:`~stride_service.engine.EngineInputError` is also a ``ValueError``, and

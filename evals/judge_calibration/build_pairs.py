@@ -1,11 +1,11 @@
 """Assemble the judge-calibration fixtures from hand-labelled tuples.
 
-``LABELS`` is the hand-labelling itself (wayfinder ticket 022, ticket 009
-decision 13): one tuple per candidate pair, each label decided by a human
-reading the pair, each carrying the rationale that decided it. Reference claims
-are pulled verbatim from each case's ``threats.json`` by index, so a reworded
-reference cannot silently detach a fixture from the claim it was labelled
-against — ``verify_corpus.py`` fails when it does.
+``LABELS`` is the hand-labelling itself: one tuple per candidate pair, each
+label decided by a human reading the pair, each carrying the rationale that
+decided it. Reference claims are pulled verbatim from each case's
+``threats.json`` by index, so a reworded reference cannot silently detach a
+fixture from the claim it was labelled against — ``verify_corpus.py`` fails
+when it does.
 
 Editing fixtures means editing ``LABELS`` and re-running this; ``pairs.json`` is
 generated and should never be hand-edited.

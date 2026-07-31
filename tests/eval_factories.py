@@ -1,8 +1,8 @@
 """Scripted judges and threat builders for the offline eval tests.
 
-The whole scorer is exercised with **zero Vertex calls** (ticket 009 decision
-17): the judge is a seam, so a stand-in replaying the SME's recorded labels
-plays its part exactly. That is what the credential-free PR job runs.
+The whole scorer is exercised with **zero provider calls**: the judge is a
+seam, so a stand-in replaying the SME's recorded labels plays its part exactly.
+That is what the credential-free PR job runs.
 """
 
 from __future__ import annotations

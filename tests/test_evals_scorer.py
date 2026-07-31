@@ -1,4 +1,4 @@
-"""The scorer, offline, with zero Vertex calls (ticket 009 decision 17).
+"""The scorer, offline, with zero provider calls.
 
 Every judgement call goes through a stand-in replaying the SME's recorded
 labels, so what is under test here is the mechanical half — the lane prefilter,
@@ -85,8 +85,8 @@ def _is_cross_lane(pair, case) -> bool:
 
 def test_assignment_is_one_to_one(case):
     # Two produced threats the judge calls equivalent to the *same* reference
-    # must consume one reference between them; without this recall inflates
-    # and stops meaning anything (decision 7c).
+    # must consume one reference between them; without this recall inflates and
+    # stops meaning anything.
     reference = case.references[0]
     produced = [
         threat_for(reference, 1, "Claim one."),
@@ -169,7 +169,7 @@ def test_needs_info_threats_bypass_adjudication(case):
 def test_element_disagreement_is_scored_not_filtered(case):
     # A correct threat may cite the process where the SME cited the flow at its
     # endpoint. That must still match, and show up as an element-accuracy miss
-    # rather than a recall miss (decision 8).
+    # rather than a recall miss.
     reference = case.references[0]
     produced = [
         produced_threat(
@@ -190,8 +190,8 @@ def test_element_disagreement_is_scored_not_filtered(case):
 
 
 def test_misfiled_threat_is_a_lane_error_and_not_a_recall_hit(case):
-    # Ticket 013 rejects misfiled threats rather than recategorizing them, so
-    # the reference stays missed while lane accuracy records the mistake.
+    # Misfiled threats are rejected rather than recategorized, so the reference
+    # stays missed while lane accuracy records the mistake.
     reference = next(ref for ref in case.references if ref.category == "tampering")
     produced = [produced_threat(1, "spoofing", "Filed in the wrong lane.")]
     judge = ScriptedJudge([(reference.claim, "Filed in the wrong lane.")])

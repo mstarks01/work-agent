@@ -1,19 +1,17 @@
 """Binding a tier's ``(vendor, model, sampling, resilience)`` to one adapter.
 
-This is the seam that replaced ``resilient_resolver`` (#6). The old resolver
-built one ``Gemini`` per node from a bare model string; this builds **one
-``LiteLlm`` per tier**, shared by that tier's nodes — ten LLM nodes, two
-adapters — and owns every parameter ADK will not carry for us.
+**One ``LiteLlm`` per tier**, shared by that tier's nodes — ten LLM nodes, two
+adapters — owning every parameter ADK will not carry for us.
 
 Three things ride the constructor rather than the generate-content config,
 each for the same underlying reason — ADK's request map forwards them nowhere,
 and a param LiteLLM is never told cannot be caught by its fail-closed
 ``drop_params``:
 
-* **``seed``** and **``reasoning_effort``** (#6 decision 1). Put on the config
-  instead, they would vanish silently while ``sampling_fingerprint`` went on
-  attesting to a seed the request never carried.
-* **``num_retries``** (#6 decision 2), at ``attempts - 1``. See
+* **``seed``** and **``reasoning_effort``**. Put on the config instead, they
+  would vanish silently while ``sampling_fingerprint`` went on attesting to a
+  seed the request never carried.
+* **``num_retries``**, at ``attempts - 1``. See
   :meth:`ResilienceConfig.to_num_retries` for why the arithmetic is explicit.
 
 Constructor kwargs reach ``acompletion`` via ``_additional_args`` *before*
@@ -25,13 +23,12 @@ Two build-time gates fire per tier, so a misconfiguration costs nothing rather
 than dying on node one of a paid-for job:
 
 * the **supported-param check** (:mod:`stride_service.model_gate`);
-* the **credential check** (:meth:`Vendor.credential_kwargs`), which fires twice
-  — once per tier — and fails closed under :class:`ProviderAuthError`.
+* the **credential check** (:meth:`Vendor.credential_kwargs`), which fires once
+  per tier and fails closed under :class:`ProviderAuthError`.
 
-There is no privileged default and no successor to ``resilient_resolver``:
-Gemini reaches Vertex through ``LiteLlm`` exactly like every other vendor. ADK
-emits a warning when a Gemini model is used through LiteLLM; that warning is the
-visible cost of "no privileged default", not a misconfiguration.
+No vendor is privileged: every model reaches its provider through ``LiteLlm``.
+ADK emits a warning when a Gemini model is used through LiteLLM; that warning
+is the visible cost of no privileged default, not a misconfiguration.
 """
 
 from __future__ import annotations
@@ -131,18 +128,16 @@ def make_resolve_model(
 class NodeBinding:
     """Everything the graph binds onto an LLM node, as one value.
 
-    These four travelled as four parameters, and two of them are *views of the
-    same object*: ``resolve_sampling`` hands each node its tier's decoding
-    params, and ``tier_sampling`` is the clear block the report records for
-    those same tiers. Nothing stopped a caller sourcing them from different
-    :class:`~stride_service.sampling.SamplingConfig` objects, and the failure is
-    silent — every node would run on one config while the report attested to
-    another, so each ``sampling_fingerprint`` would be unverifiable against the
-    block shipped beside it. That is precisely what the fingerprint exists to
-    make impossible.
-
-    :meth:`from_configs` derives both from one config, so the disagreement is
-    not a bug to catch but a state that cannot be written down.
+    ``resolve_sampling`` and ``tier_sampling`` are *views of the same object*:
+    the first hands each node its tier's decoding params, the second is the
+    clear block the report records for those same tiers. Sourced from different
+    :class:`~stride_service.sampling.SamplingConfig` objects they would
+    disagree silently — every node running on one config while the report
+    attested to another, leaving each ``sampling_fingerprint`` unverifiable
+    against the block shipped beside it, which is precisely what the
+    fingerprint exists to make impossible. :meth:`from_configs` derives both
+    from one config, so that disagreement is not a bug to catch but a state
+    that cannot be written down.
 
     ``resolve_model`` stays a caller-supplied callable rather than being derived
     here: an offline test binds scripted models through it, and taking that away

@@ -10,13 +10,13 @@ from pathlib import Path
 
 import pytest
 
+from stride_service.markdown_loader import MarkdownLoader
 from stride_service.skills import (
     CATEGORY_SKILL_TOKEN_CAP,
     DOMAIN_PACK_TOKEN_CAP,
     SEVERITY_RUBRIC_TOKEN_CAP,
     SKILL_SECTION_HEADINGS,
     STRIDE_CATEGORIES,
-    SkillLoader,
     category_boundary_digest,
     estimate_tokens,
     split_sections,
@@ -24,7 +24,7 @@ from stride_service.skills import (
 
 SKILLS_DIR = Path(__file__).resolve().parents[1] / "skills"
 
-loader = SkillLoader(SKILLS_DIR)
+loader = MarkdownLoader(SKILLS_DIR)
 domain_packs = sorted(
     name for name in loader.names() if name.startswith("domains/")
 )
@@ -72,8 +72,8 @@ def test_no_stray_skill_files():
     assert not stray
 
 
-# Ticket 006 estimated the critic's digest at ~1-1.5K tokens; the shipped
-# skills come in just under 1.6K. Guard against runaway Scope growth at 2K.
+# The critic's digest runs ~1-1.5K tokens and the shipped skills come in just
+# under 1.6K. Guard against runaway Scope growth at 2K.
 DIGEST_TOKEN_BUDGET = 2000
 
 
@@ -82,10 +82,10 @@ def test_boundary_digest_assembles_within_budget():
     assert estimate_tokens(digest) <= DIGEST_TOKEN_BUDGET
 
 
-# Ticket 010 retired the mechanically-pre-filtered element view: every analyst
-# receives the whole System Model, and ``## Applicability`` scopes only where a
-# threat may be *filed*. A skill that claims its input was filtered is telling
-# the model something false about what it is looking at.
+# There is no mechanically-pre-filtered element view: every analyst receives the
+# whole System Model, and ``## Applicability`` scopes only where a threat may be
+# *filed*. A skill that claims its input was filtered is telling the model
+# something false about what it is looking at.
 @pytest.mark.parametrize("category", STRIDE_CATEGORIES)
 def test_applicability_does_not_claim_a_filtered_element_view(category):
     applicability = split_sections(loader.load(f"stride/{category}"))["Applicability"]

@@ -124,8 +124,8 @@ def test_both_judge_prompts_load():
 
 
 def test_judge_prompts_stay_out_of_the_shipped_prompt_tree():
-    # Ticket 009 decision 14: the judge prompt satisfies none of ticket 020's
-    # lints and has no business in the production image.
+    # The judge prompt satisfies none of the shipped prompt lints and has no
+    # business in the production image.
     shipped = MarkdownLoader(Path(__file__).resolve().parents[1] / "prompts").names()
 
     assert not any(name.startswith("judge") for name in shipped)
@@ -242,7 +242,7 @@ def test_the_served_model_version_is_recorded_vendor_prefixed():
 
 
 def test_the_call_carries_the_resilience_config():
-    """Ticket 038: the live judge retries and times out like the graph.
+    """The live judge retries and times out like the graph.
 
     A sweep that inherits never-retry, no-timeout defaults dies on one 429 after
     hours of work. ``attempts`` is a total, so the provider's retry count is one

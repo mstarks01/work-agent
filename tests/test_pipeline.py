@@ -119,7 +119,7 @@ def test_the_report_carries_the_graph_runs_node_stamps():
 
 
 def test_report_stamps_the_per_tier_sampling_clear_block():
-    """Ticket 07: the resolved sampling is recorded in the clear, once per tier."""
+    """The resolved sampling is recorded in the clear, once per tier."""
     pipeline, _ = build(happy_replies())
     outcome, _ = run(pipeline, job())
 
@@ -284,7 +284,7 @@ def test_a_critic_that_will_not_reconcile_after_the_re_ask_fails_the_job_loudly(
 
 
 def test_a_failed_job_logs_the_input_digest(caplog):
-    """Ticket 038 decision 5: a poison input is identifiable across jobs.
+    """A poison input is identifiable across jobs.
 
     The digest is logged on failure without the service ever storing the text.
     """
@@ -313,7 +313,7 @@ def test_a_failed_job_logs_the_input_digest(caplog):
 
 
 def test_the_api_runs_jobs_through_the_real_graph_by_default(monkeypatch):
-    """The seam ticket 018 left for the graph now defaults to the graph."""
+    """The runner seam defaults to the real graph."""
     for var, value in VERTEX_ENV.items():
         monkeypatch.setenv(var, value)
 

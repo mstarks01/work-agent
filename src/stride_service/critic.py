@@ -1,13 +1,12 @@
 """Mechanical checks at the join and assemble seams around the critic.
 
-The deterministic half of the critic step (ticket 020, and the standing
-principle that mechanical checks belong in code and prompts only carry
-judgement). Everything here is a check no model should be asked to perform:
-that the six analysts' drafts cite elements the System Model actually
-contains, that threat IDs are unique, and that the critic returned exactly
-the drafts it was given, each carrying a well-formed verdict. The critic
-prompt names these as already done so its judgement is spent on evidence,
-lanes, duplicates, severity and confidence instead.
+The deterministic half of the critic step: mechanical checks belong in code,
+prompts carry only judgement. Everything here is a check no model should be
+asked to perform — that the six analysts' drafts cite elements the System Model
+actually contains, that threat IDs are unique, and that the critic returned
+exactly the drafts it was given, each carrying a well-formed verdict. The
+critic prompt names these as already done so its judgement is spent on
+evidence, lanes, duplicates, severity and confidence instead.
 
 Model output is untrusted input (OWASP LLM05): it is validated here, before
 anything reaches the report. Both seams fail closed with every issue listed
@@ -126,12 +125,12 @@ def review_issues(
     """Every way the critic's output fails to account for the drafts it saw.
 
     The mechanical check, returned as a list rather than raised, so the graph
-    can *route* on it (ticket 038 decision 3): an empty list means the critic
-    output is assemblable, a non-empty one is what the bounded re-ask is asked
-    to fix. The critic must return exactly the drafted set — no threat
-    invented, none dropped — with unique IDs and references that still resolve
-    after any edit it made. Verdict shape and the category letter are enforced
-    by the models and never re-checked here.
+    can *route* on it: an empty list means the critic output is assemblable, a
+    non-empty one is what the bounded re-ask is asked to fix. The critic must
+    return exactly the drafted set — no threat invented, none dropped — with
+    unique IDs and references that still resolve after any edit it made.
+    Verdict shape and the category letter are enforced by the models and never
+    re-checked here.
     """
     drafted_ids = {draft.id for draft in drafts}
     reviewed_ids = {threat.id for threat in reviewed}

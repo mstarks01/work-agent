@@ -1,7 +1,7 @@
-"""``ReferenceThreat`` and the corpus loader (ticket 023).
+"""``ReferenceThreat`` and the corpus loader.
 
 The loader is checked against the shipped corpus, not a synthetic fixture:
-"fits the ticket-022 layout" is the requirement, and only the real files test
+fitting the real corpus layout is the requirement, and only the real files test
 it. Fail-closed behaviour gets its own tempdir cases.
 """
 
@@ -35,7 +35,7 @@ def test_loads_every_shipped_case(corpus):
 
 def test_exactly_one_near_exemplar_control(corpus):
     # Without the payments control there is nothing to subtract from, and the
-    # exemplar-domain-bias delta is unmeasurable (ticket 009 decision 6).
+    # exemplar-domain-bias delta is unmeasurable.
     near = [case.id for case in corpus if case.meta.exemplar_proximity == "near"]
     assert near == ["01-payments-checkout"]
 
@@ -61,8 +61,8 @@ def test_reference_severity_band_uses_shipped_arithmetic(corpus):
 
 
 def test_blessed_models_are_small_enough_to_enumerate(corpus):
-    # Ground truth is only exhaustively enumerable by a human on small systems
-    # (decision 5); non-exhaustive references silently corrupt precision.
+    # Ground truth is only exhaustively enumerable by a human on small systems;
+    # non-exhaustive references silently corrupt precision.
     for case in corpus:
         assert 8 <= len(case.model.elements()) <= 20
 
@@ -103,9 +103,9 @@ def _copy_case(source: Path, destination: Path) -> Path:
 
 
 def test_dangling_element_reference_fails_closed(tmp_path):
-    # Mirrors ticket 020's exemplar guard: a reference citing an element the
-    # blessed model lacks is unscoreable, and dropping it silently would lower
-    # the recall denominator without anyone noticing.
+    # Mirrors the exemplar lint: a reference citing an element the blessed
+    # model lacks is unscoreable, and dropping it silently would lower the
+    # recall denominator without anyone noticing.
     case_dir = _copy_case(CORPUS_DIR / "01-payments-checkout", tmp_path)
     threats = json.loads((case_dir / "threats.json").read_text())
     threats[0]["affected_element_ids"] = ["process:does-not-exist"]
