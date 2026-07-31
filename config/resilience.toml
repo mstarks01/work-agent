@@ -1,23 +1,29 @@
-# Resilience configuration (wayfinder ticket 038) — retry and timeout for the
-# graph's LLM calls, read by the production graph, the eval harness, and the
-# eval judge alike.
+# Resilience configuration (wayfinder ticket 038) — operational bounds for the
+# service, read by the production graph, the eval harness, and the eval judge
+# alike. Two knobs bound each LLM call; two bound a job's input.
 #
 # On their SDK defaults the LLM nodes never retry and never time out: a single
 # 429 on any node kills a paid-for job on first contact, and a stalled call
-# parks a job in `running` forever. These two numbers fix both.
+# parks a job in `running` forever. `attempts` and `timeout_ms` fix both.
 #
-# Unlike config/sampling.toml, these values ARE env-overridable
-# (STRIDE_RETRY_ATTEMPTS, STRIDE_TIMEOUT_MS). Sampling is pinned because
-# temperature changes WHAT the model produces; attempts and timeout change only
-# HOW HARD we try, never which answer we get, so they cannot move an eval score
-# and are exactly the knobs to turn down mid-incident without an image rebuild.
+# Unlike config/sampling.toml, every value here IS env-overridable
+# (STRIDE_RETRY_ATTEMPTS, STRIDE_TIMEOUT_MS, STRIDE_MAX_SOURCE_BYTES,
+# STRIDE_MAX_SOURCES). Sampling is pinned because temperature changes WHAT the
+# model produces; nothing in this file can. Attempts and timeout change only HOW
+# HARD we try; the input bounds decide only whether a submission is accepted at
+# all, never which answer it gets. So none of these can move an eval score, and
+# all of them are knobs to turn down mid-incident without an image rebuild.
 #
-# Version 2 (wayfinder #15) drops version 1's four backoff knobs —
+# Version 3 (wayfinder #52) adds the two input bounds. This is a hard cutover:
+# a version-2 file fails the check, so every deployment edits its file rather
+# than inheriting a default for a contract its callers can see.
+#
+# Version 2 (wayfinder #15) dropped version 1's four backoff knobs —
 # initial_delay, max_delay, exp_base, jitter. They appear NOWHERE in litellm,
 # which picks its backoff curve internally from the exception type, so under the
 # LiteLlm adapter they were config that read as a knob and connected to nothing.
 # Their env vars (STRIDE_RETRY_INITIAL_DELAY / _MAX_DELAY / _EXP_BASE / _JITTER)
-# are gone with them. This is a hard cutover: a version-1 file fails the check.
+# are gone with them.
 #
 # `attempts` is a TOTAL count and is deliberately not passed through verbatim.
 # LiteLLM's num_retries counts retries AFTER the first try, so the binding sends
@@ -26,6 +32,22 @@
 # curve remain the library's own — anything not listed here is deliberately
 # unset rather than pinned to a number this project has never measured.
 
-version = 2
+version = 3
 attempts = 3
 timeout_ms = 300000
+
+# The input bounds, in UTF-8 BYTES rather than tokens. A token budget would make
+# the public contract depend on which vendor the tiers select, so what a caller
+# may submit would change under them without the contract changing; bytes are
+# something the caller can measure themselves.
+#
+# `max_source_bytes` is the TOTAL across all of a job's sources. There is
+# deliberately no per-source cap — it would forbid only shapes this total
+# already permits, and it would let the service blame one source for a budget
+# the whole submission overspent.
+#
+# 100 KiB holds roughly 2.2 hours of cleaned conversation at the 769 bytes/min
+# measured over real meeting exports (wayfinder #51). Nothing mechanical binds
+# at either number: they move on evidence, not on taste.
+max_source_bytes = 102400
+max_sources = 10
