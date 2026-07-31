@@ -1,30 +1,26 @@
 """The vendor registry: the per-provider facts nothing else will carry.
 
-Implements the multi-vendor map's provider seam (wayfinder #6 / #9 / #7). Every
-model reaches the graph through ADK's ``LiteLlm`` (#8: no vendor forces a
-bespoke adapter), so what varies per provider is not *how* to call it but three
-facts the adapter cannot supply:
+Every model reaches the graph through ADK's ``LiteLlm``, so what varies per
+provider is not *how* to call it but three facts the adapter cannot supply:
 
 * the **router prefix** LiteLLM dispatches on (``vertex_ai/``, ``anthropic/``,
   ``openai/``), which is also the vendor half of a generation-identity
-  fingerprint (#7 decision 3);
+  fingerprint;
 * the **credential mode**, which the vendor *implies* rather than the config
-  choosing (#9): Vertex admits no raw-API-key path under any adapter
+  choosing: Vertex admits no raw-API-key path under any adapter
   (``BerriAI/litellm#21036``), so ``vertex + api_key`` must be unrepresentable
   rather than validated against;
-* the **floating-form rule** for model identifiers, which differs by vendor and,
-  on Vertex, by model *family* (#7 decision 1).
+* the **floating-form rule** for model identifiers, which differs by vendor
+  and, on Vertex, by model *family*.
 
-Deliberately **not** here: the per-``(vendor, model)`` sampling support set. #12
-falsified it as registry data — ``vertex_ai/`` is not one provider, and the real
-answer lives in LiteLLM's own config classes — so #13 replaced it with a call to
-``litellm`` at build time. See :mod:`stride_service.model_gate`.
+Deliberately **not** here: the per-``(vendor, model)`` sampling support set.
+``vertex_ai/`` is not one provider and the real answer lives in LiteLLM's own
+config classes, so the check is a call to ``litellm`` at build time — see
+:mod:`stride_service.model_gate`.
 
-Reasoning effort is likewise *not* per-vendor data. #6 provisioned a
-``reasoning_kwarg`` per entry, but #15 decision 3 then settled a uniform
-``reasoning_effort`` surface reaching all three vendors, so the kwarg is a
-module constant: a registry field whose value is the same everywhere is a fact
-mirrored for no reader.
+Reasoning effort is likewise *not* per-vendor data: one uniform
+``reasoning_effort`` surface reaches every vendor, so the kwarg is a module
+constant rather than a registry field whose value is the same everywhere.
 """
 
 from __future__ import annotations
@@ -40,8 +36,8 @@ from stride_service.errors import ConfigError
 VendorName = Literal["vertex", "anthropic", "openai"]
 VENDOR_NAMES: tuple[VendorName, ...] = ("vertex", "anthropic", "openai")
 
-# The one reasoning knob, uniform across vendors (#15 decision 3): LiteLLM maps
-# it to ``budget_tokens`` on Anthropic (identically via Vertex), to
+# The one reasoning knob, uniform across vendors: LiteLLM maps it to
+# ``budget_tokens`` on Anthropic (identically via Vertex), to
 # ``thinkingConfig`` on Gemini, and passes it through on OpenAI o-series.
 REASONING_KWARG = "reasoning_effort"
 
@@ -96,13 +92,11 @@ class _FormRule:
     hint: str
 
 
-# What "pinned" means, per vendor and — on Vertex — per model family (#7
-# decision 1). This stays an **open-world denylist** by decision, and is
-# explicitly weak: ``model_tiers.py``'s predecessor pinned an allowlist of
-# numbered Gemini builds and broke outright when Google retired them, and that
-# risk now runs against three catalogs. The reproducibility guarantee does not
-# rest here — it rests on the *served* build read back from every response (#7
-# decision 2), which is where every docstring already claimed it was.
+# What "pinned" means, per vendor and — on Vertex — per model family. This is an
+# **open-world denylist** by decision, and is explicitly weak: an allowlist of
+# known builds breaks outright the moment a vendor retires one, and that risk
+# runs against three catalogs. The reproducibility guarantee does not rest here
+# — it rests on the *served* build read back from every response.
 _ALIAS_SUFFIX = "-latest"
 _PRE_GA_MARKERS = ("-preview", "-exp")
 
@@ -158,8 +152,8 @@ class Vendor:
     def route(self, model: str) -> str:
         """The router string LiteLLM dispatches on, e.g. ``vertex_ai/gemini-2.5-pro``.
 
-        The same join is the vendor half of a fingerprint (#7 decision 3): the
-        served identifier carries no vendor, and Vertex-hosted Claude and
+        The same join is the vendor half of a fingerprint: the served
+        identifier carries no vendor, and Vertex-hosted Claude and
         Anthropic-direct return through an identical transformation, so a
         served-only hash would let a manifest blessed on one silently certify
         the other.
@@ -199,9 +193,9 @@ class Vendor:
         """The auth kwargs for this vendor's ``LiteLlm``, or fail closed.
 
         Read **explicitly** from vendor-scoped variables rather than relying on
-        LiteLLM's ambient ``ANTHROPIC_API_KEY`` / ``OPENAI_API_KEY`` pickup (#9),
-        so no credential this deployment did not declare can authenticate a run
-        — an undeclared key in the process environment is exactly the ASI03
+        LiteLLM's ambient ``ANTHROPIC_API_KEY`` / ``OPENAI_API_KEY`` pickup, so
+        no credential this deployment did not declare can authenticate a run —
+        an undeclared key in the process environment is exactly the ASI03
         inherited-credential path.
 
         Long-lived API keys are accepted with controls, not avoided: none of
@@ -221,7 +215,7 @@ class Vendor:
         from the same place is the point — a vendor -> env-var table copied
         into a caller drifts from the check that actually runs, and the caller
         that needs it is a *diagnostic* page whose whole value is being right
-        about which variables are missing (#28 decision 6).
+        about which variables are missing.
         """
         if self.credential is CredentialMode.API_KEY:
             return (("api_key", self.api_key_var),)
@@ -276,10 +270,10 @@ def join_served(requested_route: str, served_model: str) -> str:
 
     Providers return a bare build identifier — ``gemini-2.5-pro-002``, not
     ``vertex_ai/gemini-2.5-pro-002`` — so the vendor has to come from what was
-    asked for. That join is what keeps a fingerprint honest (#7 decision 3):
-    Vertex-hosted Claude and Anthropic-direct return through an identical
-    transformation, so a served-only hash would let a manifest blessed on one
-    silently certify the other.
+    asked for. That join is what keeps a fingerprint honest: Vertex-hosted
+    Claude and Anthropic-direct return through an identical transformation, so
+    a served-only hash would let a manifest blessed on one silently certify the
+    other.
 
     The prefix is the segment before the first ``/``, which is the shape every
     registry entry's :attr:`Vendor.prefix` takes. A requested route carrying no

@@ -6,11 +6,11 @@ Start it from a clone, with model auth already configured::
 
 It embeds :class:`~stride_service.StrideEngine` **in process**. It does not go
 through the ``/v1`` HTTP surface, so it needs no bearer token and no CORS — and
-it runs real models against real prose, because there is no credential-free path
-on this route (#25). Its whole job is to show a first-time integrator that the
-engine works, then get out of the way; the library is what they actually embed.
+it runs real models against real prose, because there is no credential-free
+path here. Its whole job is to show a first-time integrator that the engine
+works, then get out of the way; the library is what they actually embed.
 
-Two pages, three data endpoints (#29):
+Two pages, three data endpoints:
 
 ======================  ========================================================
 ``GET  /``              form page: the resolved tiers, a textarea, Analyze
@@ -21,32 +21,31 @@ Two pages, three data endpoints (#29):
 ======================  ========================================================
 
 **Deliberately unbloated.** One module, no template engine, no JS framework, no
-build step, no CSS framework, no bundler. HTML comes from f-strings and the only
-client-side JavaScript is the SSE listener, the Load-example fill, and the
-redirect. Anything more is a reason to re-open #29 rather than to add a
-dependency.
+build step, no CSS framework, no bundler. HTML comes from f-strings and the
+only client-side JavaScript is the SSE listener, the Load-example fill, and the
+redirect.
 
 Security posture, all of it deliberate:
 
-* **Loopback only** (#28). ``127.0.0.1`` is hard-bound with no flag and no
-  override. The no-auth/no-CORS posture is only safe there: anything reachable
-  is an unauthenticated proxy to someone else's vendor bill. Remote,
-  authenticated access is exactly what ``/v1`` already exists for.
-* **No HTTP input touches model identity** (#28). Tier, vendor, model and
-  sampling come from ``config/`` alone. A form field selecting a model would be
+* **Loopback only.** ``127.0.0.1`` is hard-bound with no flag and no override.
+  The no-auth/no-CORS posture is only safe there: anything reachable is an
+  unauthenticated proxy to someone else's vendor bill. Remote, authenticated
+  access is exactly what ``/v1`` already exists for.
+* **No HTTP input touches model identity.** Tier, vendor, model and sampling
+  come from ``config/`` alone. A form field selecting a model would be
   unauthenticated control over what runs and what it costs (A01, LLM10).
-* **The injection point is the whole trust boundary** (#29). A report carries
-  the submitter's own prose, so every ``<`` is escaped to ``\\u003c`` before the
+* **The injection point is the whole trust boundary.** A report carries the
+  submitter's own prose, so every ``<`` is escaped to ``\\u003c`` before the
   JSON enters the viewer's ``<script>`` block — otherwise a description
   containing ``</script>`` closes it and the rest parses as HTML (A05 / LLM05).
   See :func:`render_report`.
-* **CSRF** (#29). ``POST /analyze`` requires ``Sec-Fetch-Site: same-origin``.
-  The header is browser-set and unspoofable from script, and it is checked
-  before anything else so a cross-origin caller cannot even start a run.
+* **CSRF.** ``POST /analyze`` requires ``Sec-Fetch-Site: same-origin``. The
+  header is browser-set and unspoofable from script, and it is checked before
+  anything else so a cross-origin caller cannot even start a run.
 * **One run at a time** (LLM10). A second submission is refused with a message,
   not queued and held open.
-* **No CSP on the report page**, accepted rather than papered over: the viewer's
-  scripts are inline, and adding a nonce would mean editing a file #29 requires
+* **No CSP on the report page**, accepted rather than papered over: the
+  viewer's scripts are inline, and a nonce would mean editing a file that must
   be served unedited. Loopback, single user, no session to steal.
 """
 
@@ -150,9 +149,9 @@ class Analyses:
 class Startup:
     """What building the engine produced: a working pair, or the failure.
 
-    The app serves either way (#28). If construction raised, every route that
-    would run a model is replaced by the diagnostic page, so no analysis can run
-    on a model nobody chose — fail-closed, but explained.
+    The app serves either way. If construction raised, every route that would
+    run a model is replaced by the diagnostic page, so no analysis can run on a
+    model nobody chose — fail-closed, but explained.
     """
 
     engine: StrideEngine | None
@@ -295,9 +294,9 @@ async def _drive(
 ) -> None:
     """Run one analysis to a terminal state, narrating it onto the run's queue.
 
-    Only a completed run reaches the viewer, because the viewer renders reports
-    (#29). A rejection, a bad submission and an internal failure all land back
-    on the form page, where the description is still in the textarea.
+    Only a completed run reaches the viewer, because the viewer renders
+    reports. A rejection, a bad submission and an internal failure all land
+    back on the form page, where the description is still in the textarea.
     """
     try:
         outcome = await engine.analyze(
@@ -579,6 +578,6 @@ if __name__ == "__main__":
 
     logging.basicConfig(level=logging.INFO, format="%(levelname)s %(message)s")
     print(f"STRIDE first-run app on http://{HOST}:{PORT}")
-    # Loopback is hard-bound (#28): no flag, no env override. The no-auth
-    # posture is only safe here.
+    # Loopback is hard-bound: no flag, no env override. The no-auth posture is
+    # only safe here.
     uvicorn.run(create_app(), host=HOST, port=PORT, log_level="warning")

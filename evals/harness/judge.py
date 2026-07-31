@@ -1,26 +1,24 @@
 """The eval judge: claim equivalence, and adjudication of unmatched threats.
 
-Two narrow judgement calls, and nothing else (ticket 009 decisions 7 and 9).
-Everything mechanically decidable — the lane prefilter, one-to-one assignment,
-severity arithmetic, reference resolution — happens in
-:mod:`evals.harness.scorer` without a model, per the standing principle that
+Two narrow judgement calls, and nothing else. Everything mechanically decidable
+— the lane prefilter, one-to-one assignment, severity arithmetic, reference
+resolution — happens in :mod:`evals.harness.scorer` without a model, because
 deterministic decisions belong in code.
 
 Three properties this module exists to hold:
 
-* **The judge is pinned separately from the tiers** (decision 12). A judge
-  upgrade silently re-scores history and turns a comparison into a phantom
-  regression, so ``evals/config/judge.toml`` is versioned on its own and there
-  is deliberately no env-var override: changing the judge is a reviewable diff
-  and an explicit re-baselining event, gated by
-  :mod:`evals.harness.calibration`.
-* **Position bias is killed by randomizing pair order** (decision 12). Which
-  claim is presented first is drawn from a seeded RNG, so the ordering is
-  reproducible across runs but uncorrelated with which side is the reference.
-* **The judge prompt does not live in ``prompts/``** (decision 14). That tree
-  is the shipped service's, governed by ticket 020's lints and baked into the
-  production container; a judge prompt satisfies none of those rules and has
-  no business in the deployed image.
+* **The judge is pinned separately from the tiers.** A judge upgrade silently
+  re-scores history and turns a comparison into a phantom regression, so
+  ``evals/config/judge.toml`` is versioned on its own and there is deliberately
+  no env-var override: changing the judge is a reviewable diff and an explicit
+  re-baselining event, gated by :mod:`evals.harness.calibration`.
+* **Position bias is killed by randomizing pair order.** Which claim is
+  presented first is drawn from a seeded RNG, so the ordering is reproducible
+  across runs but uncorrelated with which side is the reference.
+* **The judge prompt does not live in ``prompts/``.** That tree is the shipped
+  service's, governed by the prompt lints and baked into the production
+  container; a judge prompt satisfies none of those rules and has no business
+  in the deployed image.
 
 Security: claims are model-produced text and reach the judge as data, never as
 instructions (OWASP LLM01). They ride in a JSON payload the prompt names as
@@ -60,10 +58,10 @@ DEFAULT_JUDGE_PROMPTS_DIR = EVALS_ROOT / "prompts"
 CLAIM_PROMPT_NAME = "judge_claim_equivalence"
 ADJUDICATION_PROMPT_NAME = "judge_adjudication"
 
-# Ticket 009 decision 9. ``ungrounded`` is the only gating bucket: a threat
-# asserting a fact the blessed model does not support is the failure that
-# destroys trust in a security report. ``valid-unlisted`` is explicitly *not*
-# a failure — references are non-exhaustive by construction.
+# ``ungrounded`` is the only gating bucket: a threat asserting a fact the
+# blessed model does not support is the failure that destroys trust in a
+# security report. ``valid-unlisted`` is explicitly *not* a failure —
+# references are non-exhaustive by construction.
 Bucket = Literal["ungrounded", "valid-unlisted", "noise"]
 
 RulingT = TypeVar("RulingT", bound=BaseModel)
@@ -77,11 +75,8 @@ class JudgeError(RuntimeError):
     """The judge did not return a usable ruling."""
 
 
-# Hard cutover, alongside the other three config files (#15 decision 5).
-# ``judge.toml`` is absorbed into the cutover because the coupling is *code*:
-# ``validate_model_string`` gained a vendor argument, so leaving this file out
-# would mean either a dead-but-called Gemini-shaped validator or a repo that
-# does not import.
+# The only schema version this loader accepts; a file on any other version
+# fails its own check rather than being migrated in place.
 SUPPORTED_VERSION = 3
 
 
@@ -93,13 +88,12 @@ class JudgeConfig(BaseModel):
     and a judge whose decoding moved with it would re-score history every time
     the suite measured a new production temperature.
 
-    The judge selects a vendor like any tier does (#10 decision 3): it is no
-    longer Google-only, and its legitimacy rests on measured agreement against
-    hand labels rather than on sharing a vendor with the system under test.
-    Running the build-time gate over ``(vendor, model, temperature)`` here is
-    what makes "o-series cannot judge" fail closed rather than surprise a sweep:
-    greedy decoding is required, and o-series constrains ``temperature`` to
-    exactly 1.
+    The judge selects a vendor like any tier does; its legitimacy rests on
+    measured agreement against hand labels rather than on sharing a vendor with
+    the system under test. Running the build-time gate over ``(vendor, model,
+    temperature)`` here is what makes "o-series cannot judge" fail closed
+    rather than surprise a sweep: greedy decoding is required, and o-series
+    constrains ``temperature`` to exactly 1.
     """
 
     model_config = ConfigDict(extra="forbid", frozen=True)
@@ -141,7 +135,7 @@ def load_judge_config(path: Path | str = DEFAULT_JUDGE_CONFIG_PATH) -> JudgeConf
     if version != SUPPORTED_VERSION:
         raise JudgeConfigError(
             f"{path}: unsupported version {version!r};"
-            f" expected {SUPPORTED_VERSION} (hard cutover, no shim)"
+            f" expected {SUPPORTED_VERSION}"
         )
     try:
         return JudgeConfig(**raw)
@@ -169,7 +163,7 @@ class ClaimRuling(BaseModel):
 
 
 class BucketRuling(BaseModel):
-    """Where an unmatched produced threat lands (decision 9)."""
+    """Where an unmatched produced threat lands."""
 
     model_config = ConfigDict(extra="forbid", frozen=True)
 
@@ -192,8 +186,8 @@ class Judge(Protocol):
     """The two judgement calls the scorer is allowed to make.
 
     A protocol so the scorer is unit-testable offline against a scripted
-    stand-in with zero Vertex calls, which is exactly what the credential-free
-    PR job runs (decision 17).
+    stand-in with zero provider calls, which is exactly what the
+    credential-free PR job runs.
     """
 
     def equivalent(self, pair: ClaimPair) -> ClaimRuling: ...
@@ -209,11 +203,11 @@ class Judge(Protocol):
 class MemoJudge:
     """A judge that answers a repeated question with its first answer.
 
-    Exists for critic yield (ticket 028), which scores the pre-critic drafts
-    and the post-critic threats against the *same* references. The post-critic
-    set is a subset of the pre-critic one, so without memoization the second
-    pass re-asks — and re-pays for — a question already answered, and a judge
-    at non-zero temperature could answer it differently the second time. That
+    Exists for critic yield, which scores the pre-critic drafts and the
+    post-critic threats against the *same* references. The post-critic set is a
+    subset of the pre-critic one, so without memoization the second pass
+    re-asks — and re-pays for — a question already answered, and a judge at
+    non-zero temperature could answer it differently the second time. That
     would show up as critic yield rather than as judge variance, which is the
     one thing this instrument must not manufacture.
 
@@ -298,14 +292,12 @@ class PinnedJudge:
     """The pinned judge, over whichever vendor ``judge.toml`` names.
 
     Reaches its provider through the **same adapter the graph uses** — one
-    library, one credential model, one build-time gate (#10 decision 3). It was
-    previously hardwired to Vertex through the GenAI SDK, which contradicted the
-    decision that freed the judge from Google: config could name Anthropic or
-    OpenAI, and the call would still have gone to Vertex.
+    library, one credential model, one build-time gate — so the vendor
+    ``judge.toml`` names is the vendor the call goes to.
 
-    Auth is derived from the vendor like everywhere else, so the ADC path Vertex
-    needs is unchanged (the CI job's Workload Identity credentials are still
-    picked up), while an API-key vendor reads its own vendor-scoped variable.
+    Auth is derived from the vendor like everywhere else: Vertex takes the ADC
+    path (the CI job's Workload Identity credentials are picked up), while an
+    API-key vendor reads its own vendor-scoped variable.
 
     ``request`` exists so tests can drive every code path — payload shaping,
     order randomization, schema re-validation, served-build recording — with no

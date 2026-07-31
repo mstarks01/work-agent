@@ -1,37 +1,31 @@
 """The build-time supported-param gate: ask LiteLLM, don't mirror it.
 
-#6 decision 3 established that an unsupported sampling param must fail the
-*build*, not the first request: LiteLLM's ``drop_params`` default is fail-closed,
-so an unsupported param otherwise raises mid-job after earlier nodes have
-already been paid for. #12 then falsified the mechanism that decision assumed —
-a ``frozenset`` of supported names per vendor — on two counts:
+An unsupported sampling param must fail the *build*, not the first request:
+LiteLLM's ``drop_params`` default is fail-closed, so an unsupported param
+otherwise raises mid-job after earlier nodes have already been paid for.
 
-* supportedness is a function of ``(vendor, model)``, not vendor. ``vertex_ai/``
-  is not one provider: LiteLLM dispatches on the model-string prefix to four
-  config classes, so ``vertex_ai/claude-*`` (no ``seed``, it subclasses
-  ``AnthropicConfig``) and ``vertex_ai/gemini-*`` (``seed`` fine) disagree under
-  a single ``vertex`` entry;
-* set membership cannot express a *value* constraint, and o-series
-  ``temperature`` is constrained to exactly ``1``.
-
-So the check survives and its implementation does not (#13). The gate is a
-**call**, not a table: ``litellm.utils.get_optional_params`` run for raise /
-no-raise with its output discarded. That entry point — rather than
-``get_supported_openai_params``, which is merely the gate's input — runs both
-``_check_valid_arg`` *and* ``_map_openai_params``, so the o-series value
-constraint is caught by the same call.
+The gate is a **call**, not a table: ``litellm.utils.get_optional_params`` run
+for raise / no-raise with its output discarded. A table cannot express what the
+answer depends on. Supportedness is a function of ``(vendor, model)`` rather
+than vendor — ``vertex_ai/`` is not one provider, since LiteLLM dispatches on
+the model-string prefix to four config classes, so ``vertex_ai/claude-*`` (no
+``seed``, it subclasses ``AnthropicConfig``) and ``vertex_ai/gemini-*``
+(``seed`` fine) disagree — and some constraints are on a *value*, such as
+o-series ``temperature`` being exactly ``1``. That entry point, rather than
+``get_supported_openai_params`` which is merely the gate's input, runs both
+``_check_valid_arg`` *and* ``_map_openai_params``, so the value constraints are
+caught by the same call.
 
 Two things the gate provably cannot do, both handled elsewhere:
 
-* ``top_k`` is absent from its signature entirely, so #15 decision 3 removed
-  ``top_k`` from the config surface rather than leaving it silently unchecked;
-* ``reasoning_effort="banana"`` *passes* on ``o3``, so the enum's value check is
-  a pydantic ``Literal`` in :mod:`stride_service.sampling`.
+* ``top_k`` is absent from its signature entirely, which is why ``top_k`` is
+  not part of the sampling config surface at all;
+* ``reasoning_effort="banana"`` *passes* on ``o3``, so the enum's value check
+  is a pydantic ``Literal`` in :mod:`stride_service.sampling`.
 
 It is also **not** a de-facto existence check: an unrecognised model falls back
-to the provider's base config rather than raising, which is consistent with #7
-decision 6 declining a build-time existence check. The narrow residual is that a
-future o-series under an unrecognised naming pattern would pass the build.
+to the provider's base config rather than raising. The narrow residual is that
+a future o-series under an unrecognised naming pattern would pass the build.
 
 ``get_optional_params`` is not a documented public API. It is exercised
 directly by this module's tests, which is what makes a ``litellm`` version bump
@@ -115,9 +109,8 @@ def assert_kwarg_supported(name: str) -> None:
 
     ADK's ``LiteLlm`` takes ``**kwargs`` and forwards them verbatim, so a
     misspelled parameter is not an error anywhere — it is simply carried along
-    and ignored. For ``num_retries`` that would silently revert retry to a single
-    try, which is precisely the failure this project added retry to prevent, and
-    nothing downstream would show it.
+    and ignored. For ``num_retries`` that would silently revert retry to a
+    single try, and nothing downstream would show it.
     """
     if name not in _litellm.utils.all_litellm_params:
         raise ModelGateError(
