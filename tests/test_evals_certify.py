@@ -22,14 +22,12 @@ from stride_service.certification import (
 )
 from stride_service.deployment import SAMPLING_VAR, Deployment
 from stride_service.graph import ENTRY_EXTRACT, TIER_NODE_BY_GRAPH_NODE
-from stride_service.model_tiers import load_model_tiers
 from stride_service.sampling import load_sampling, sampling_fingerprint
+from tests.factories import TEST_TIER_ENV, repo_tiers
 
 REPO_ROOT = Path(__file__).resolve().parents[1]
 SAMPLING_PATH = REPO_ROOT / "config" / "sampling.toml"
-TIERS_PATH = REPO_ROOT / "config" / "model_tiers.toml"
-
-_TIER_OF = load_model_tiers(TIERS_PATH, env={}).resolve_tier
+_TIER_OF = repo_tiers().resolve_tier
 
 
 def tier_of(graph_node: str) -> str:
@@ -231,7 +229,7 @@ def test_a_promotion_re_pins_the_file_the_sweep_actually_measured(tmp_path):
     redirected.write_text(SAMPLING_PATH.read_text(), encoding="utf-8")
 
     paths = promotion_paths(
-        Deployment.from_env(env={SAMPLING_VAR: str(redirected)})
+        Deployment.from_env(env=TEST_TIER_ENV | {SAMPLING_VAR: str(redirected)})
     )
 
     assert paths.sampling == redirected

@@ -30,10 +30,14 @@ Both surfaces drive the same pipeline and return the same
 **New here? [docs/First-Run.md](docs/First-Run.md)** takes you from a clone to a
 real report to the engine embedded in your own code, in five steps.
 
-Reaching the models needs credentials for whichever vendor each tier selects —
-Google Cloud application default credentials plus a project and location for
-Vertex, or an API key for Anthropic or OpenAI. If they are missing, startup
-stops with an error rather than running on some fallback nobody chose; see
+**No vendor is selected out of the box.** `config/model_tiers.toml` ships with
+both tiers empty, so choosing one is a required first step rather than an
+override — "no privileged default" is a property of what ships, not just of the
+mechanism. Reaching the models then needs credentials for whichever vendor each
+tier names: Google Cloud application default credentials plus a project and
+location for Vertex, or an API key for Anthropic or OpenAI. If either the
+selection or its credentials are missing, startup stops with an error naming
+what to set rather than running on some fallback nobody chose; see
 [docs/Configuration.md](docs/Configuration.md). Offline tests and the in-memory
 stub runner need none of it.
 

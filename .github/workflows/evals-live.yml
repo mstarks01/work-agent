@@ -1,8 +1,16 @@
 # Live golden-case evals against real Vertex.
 #
-# Vertex only, because that is what the shipped config/model_tiers.toml selects.
+# Vertex because this workflow *chooses* Vertex, in the STRIDE_MODEL_* block
+# below. The shipped config/model_tiers.toml selects no vendor at all, so a live
+# sweep has to name one; this is the only place that choice is written down, and
+# changing the four variables there is what moves the sweep to another vendor.
 # A tier pointed at Anthropic or OpenAI would need an API key in a repository
 # secret instead, and none of the federation below would apply to it.
+#
+# The selection is pinned here rather than left to the file so that a sweep's
+# results always name the models they were measured on: an eval baseline is only
+# meaningful against a known pair, and reading it from a file that may be edited
+# between runs is how a re-baseline goes unnoticed.
 #
 # `pull_request_target` is PROHIBITED in this repository and this file is where
 # the prohibition bites: combined with a PR-head checkout it would run
@@ -105,7 +113,16 @@ jobs:
     #
     # The third required variable, GOOGLE_APPLICATION_CREDENTIALS, is exported
     # by the auth action below rather than set here.
+    #
+    # The STRIDE_MODEL_* four are the sweep's vendor choice. Nothing is selected
+    # by default, so without them the run stops at config load with the
+    # onboarding error rather than reaching a model. _VENDOR and _MODEL move
+    # together per tier: a vendor without its model is rejected at startup.
     env:
+      STRIDE_MODEL_BASE_VENDOR: vertex
+      STRIDE_MODEL_BASE_MODEL: gemini-2.5-flash
+      STRIDE_MODEL_STRONG_VENDOR: vertex
+      STRIDE_MODEL_STRONG_MODEL: gemini-2.5-pro
       STRIDE_VERTEX_PROJECT: ${{ vars.GCP_PROJECT_ID }}
       STRIDE_VERTEX_LOCATION: ${{ vars.GCP_LOCATION }}
 
