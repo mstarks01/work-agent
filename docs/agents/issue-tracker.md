@@ -55,134 +55,67 @@ gh api --method POST repos/mstarks01/work-agent/issues/<child>/dependencies/bloc
 
 ### The live map
 
-- [#49 — Map: accept call transcripts as job input](https://github.com/mstarks01/work-agent/issues/49)
-  — 10 tickets, charted 2026-07-31, in flight. A **planning** map: it settles the spec for
-  accepting analyst↔developer interview transcripts as job input and stops there. Four
-  premises were fixed while charting and are *not* open questions — the input becomes a
-  uniform `sources` list with `description` removed in a hard cutover; the service takes text
-  only, never files; caps only, so an over-long transcript is rejected rather than condensed;
-  and extraction stays the sole reader of raw text. Frontier at charting: the `sources`
-  contract (#50) and the transcript-export research (#51), the latter worked **inline** rather
-  than by subagent. #50 is resolved: a source is `{kind, label, text}` with `kind` a closed
-  load-bearing enum and `label` a required, unique, model-visible citation key; order carries
-  no precedence, so the conflict rule (#55) is still owed. `CONTEXT.md` carries the **Source**
-  term ahead of any implementation. #51 is resolved by **measurement** rather than survey —
-  four real Teams `.vtt` exports are 34.8% spoken words and 65% machinery, a raw 60-minute VTT
-  (~133 KB) blows the 100 KiB cap while the same call cleaned (~46 KB) does not, and speaker
-  attribution names the *participant* but never the **role**. Findings on
-  `research/transcript-exports` @ `935fc57`, to be archived as a tag. #52 sets the budget in
-  **bytes** — tokens are disqualified because tiers pick vendors independently, which would make
-  the public contract deployment-dependent — at **100 KiB total** (unchanged; ~2.2 h of cleaned
-  conversation) and **10 sources**, with no per-source cap, so an over-budget submission is the
-  sum's fault and the error carries a per-source breakdown rather than naming a culprit. Both
-  numbers move to `config/resilience.toml` **v3**, a hard cutover, on that file's own test that a
-  knob which cannot change an answer may be env-overridable; `label` gains a 200-char bound,
-  amending #50. #53 gives extraction five rules for reading a conversation, placed **once and
-  always-on** in `extract.md` rather than per-kind or per-source, which would vary the prompt
-  prefix by job shape: spoken uncertainty (hedge or admitted gap) is `unknown` plus the words in
-  `notes` and never an **Assumption**; facts come from assertions rather than questions, every
-  speaker read alike because #51 proved no export carries a role — taking roles from `label` was
-  refused as a second contract on free-form caller text; a later statement supersedes an earlier
-  one *within* one source only; plans and hypotheticals are excluded outright; excerpts stay
-  verbatim but may span turns keeping speaker labels. It also raises
-  `EXTRACT_PROMPT_TOKEN_CAP` 1500 → **2000** — archived ticket 006 sized 1500 against the
-  *analyst's* 6–8K envelope while settling that extract loads no skills, so `extract.md` is that
-  node's whole instruction at ~5% of a full-budget call. `CONTEXT.md`'s **Unknown** and
-  **Assumption** are sharpened accordingly. Closing #53 released both its dependents, so the
-  frontier is now three wide: rendering N sources into the prompt (#54), the cross-source
-  conflict rule (#55), and `source_excerpt` with N sources (#56). #53 also surfaced #59 —
-  nothing downstream is told to read `notes`, which #53 made load-bearing — blocked by #55 in
-  case it adds another producer. #54 renders **one fenced block per source with no
-  caller-controlled byte outside a fence**: the fence is sized to the content (`longest backtick
-  run + 1`) so a block cannot be closed from within, the `label` rides inside it on a positional
-  `label:`/`----` header, and the marker line outside carries only index, count and the
-  one-phrase register that is all `kind` still selects after #53. A `<source-NONCE label="...">`
-  envelope was killed by #50's own contract — `"` and `>` are legal label bytes. `GraphExecutor.run`
-  takes `Sequence[Source]` and renders internally, so the two drivers' four call sites collapse to
-  one and seeding a raw string stops being expressible; `render_sources` and `Source` land in a new
-  `sources.py`. `{input_text}` keeps its name, so `repair.md` inherits the render byte-identically.
-  Measurement corrected a premise in #53: extract's construction-time prefix is **178 tokens**,
-  under every vendor's caching minimum, so there is no cache at that node to protect and `## Input`
-  stays before `## Procedure`, keeping the trusted instruction last. `extract.md` lands 1650/2000.
-  Prototype on `prototype/multi-source-render` @ `e4a17a6`, to be archived as a tag. #55 settles
-  the conflict rule #50 and #53 both deferred: **sources carry equal weight**, so a disagreement is
-  recorded rather than adjudicated — no precedence from order (#50 fixed it as presentation-only),
-  from `kind` (nothing carries a date, so it cannot proxy recency), or from the caller. Detection is
-  stated rather than left to judgement, because the failure mode has no floor: **silence is not a
-  claim** and a more specific claim **refines** a compatible one, without which "no precedence"
-  reads as "anything not confirmed by all sources is disputed" and flattens every multi-source
-  model to `unknown`. Where the field takes `unknown` a conflict goes there with both claims
-  verbatim in `notes`; where it **cannot** (`trust_zone`, `ExternalEntity.kind`, flow endpoints)
-  extraction picks a value — preferring the reading that yields a boundary crossing — plus an
-  `assumptions` entry, which is not #53's laundering because the schema, not the speaker, forces
-  the inference. A disputed *element* is emitted, not dropped, on the asymmetry that a modelled
-  phantom is visible while an omitted real component is not. Never grounds for rejection, and by
-  construction a conflict cannot trip the validity gate. `notes` becomes a **two-producer field**,
-  which is #59's problem to solve. **#53 is amended**: supersession narrows from "within one source"
-  to one speaker correcting themselves. Lands as `extract.md` Procedure rule 6 at 220 tokens —
-  **1870/2000, no cap move** — plus `CONTEXT.md`; no wire-contract change. Closing #55 releases
-  #59, leaving the frontier at #56 and #59. #56 gives an Element **`source_label`** plus a
-  best-effort **`source_speaker`**, leaving `source_excerpt` at 1000 chars. The label names the
-  **excerpt, not the element** — a quote has one origin by construction, so the field cannot be
-  half-true, while the `list[str]` that #55's two-source elements invite cannot say which label the
-  quote belongs to; multi-source provenance stays in `notes` where #55 put it. It is
-  **gate-enforced** (non-empty excerpt ⇒ non-empty label from the job's labels) as a fifth
-  `invalid-reference` rule, and is the **first gate rule taking data from outside the model** —
-  `validate()` gains `source_labels`, cheap only because #54 already made `GraphExecutor.run` take
-  `Sequence[Source]`. `source_speaker` is ungated and earns its place by **redactability**: #53 put
-  participant names into excerpt bytes by rule, and a name in its own field is strippable where one
-  inside a quote is not. **`source_timestamp` was rejected on measurement** — #52's caps force
-  cleaning, cleaning strips cue timings, so it would be empty exactly on compliant input. The 1000
-  cap holds on evidence (corpus max **229**; #51's mean merged turn ~220 chars) and because excerpts
-  are already **14.1% of `model.json`**, which is dumped whole into every analyst prompt. The
-  ticket's stated blast radius was **wrong both ways**: `webapp/report_view.html` and
-  `docs/Report-Schema.md` name the field nowhere and are untouched, while `evals/verify_corpus.py`
-  and `evals/harness/reference.py` do change; all **206 corpus values** take a hard-coded
-  `"System description"`, a `case.json`-declared `sources` array being refused as pre-empting #58.
-  `EXTRACT_PROMPT_TOKEN_CAP` **2000 → 2200** — rule 7 costs +107 measured, landing ~1985/2000, and
-  15 tokens is not headroom. #57 is the **hand-off document**, verified against the tree rather
-  than against its own charted list — which was **wrong in five places**: `docs/adr/` does not
-  exist (it is created by the cutover), the corpus has **12** cases rather than the five #58
-  assumes, `case.json` carries no input text at all (it is `source.md` plus a digest, which is
-  why #56 could refuse a declared `sources` array without blocking anything), `Architecture.md`
-  and `Web-App.md` are clean, and `Report-Schema.md` *is* in the blast radius via #50's `InputRef`
-  rather than #56's excerpt. Four modules the list missed — **`execution.py`** (the seam #54
-  actually moved), **`__init__.py`** (the public `__all__`, which is what makes this breaking for
-  an embedder), `validation.py`, `resilience.py` — plus **two** digest sites, `pipeline.py:98` and
-  `StubPipelineRunner` at `jobs.py:297`, which must move together. **`CONTEXT.md` needs nothing**:
-  #50/#53/#55/#56 wrote it to its target state ahead of implementation, so treating it as
-  work-to-do would produce a second, drifting copy. **One branch**, `build/sources-cutover`, seven
-  commits — the no-shim rule makes the contract atomic, so no green intermediate exists to ship;
-  config lands **ahead** of the contract (it holds the caps the contract enforces) and the 206
-  mechanical corpus values get their own commit. **One narrow ADR**,
-  `docs/adr/0001-sources-replace-description.md`, creating the directory `docs/agents/domain.md`
-  has always pointed at, carrying only what a glossary structurally cannot — bytes-not-tokens,
-  equal weight, fence-per-source. **#58 does not gate the branch.** Closing #57 released #58,
-  leaving the frontier at #58 and #59. #58 says **yes to a transcript case** — but not on the
-  ticket's own grounds, which case 11 refutes by already grading silence → `unknown` on prose.
-  The reframing finding: **`score_extraction` is attribute-blind** (element IDs and boundary
-  crossings only) and `verify_corpus.py` checks no attributes, so the only route from an
-  extraction rule to a number is the **reference threat set in end-to-end mode** — needs-info
-  must-find threats that a wrongly-confident attribute suppresses. **One case, two sources**
-  (a written note plus a transcript contradicting it), asserting four things that move a number:
-  a hedge must not become a value, a fact inside a question is not a fact, a hypothetical
-  produces no element, and the disagreement flattens on **`exposure`** (flattenable per #55's
-  own audit). The self-correction is element-level, since attribute-level is invisible to
-  `ExtractionScore`. Real-vs-synthetic is a **false fork** — content written to order as all
-  12 cases are, but **form** measured from #51, and **cleaned not raw** because #52's caps force
-  cleaning. **Every case's `case.json` gains a `sources` array**, the 12 existing ones as
-  one-element arrays, with per-source shas plus an aggregate over the refs; a new lint ties #56's
-  hard-coded `"System description"` to the gate rule #56 wrote and nothing checked. **Amends #57**:
-  that schema migration joins commit 6 (now "206 values + 12 arrays + loader + lint") because the
-  harness must take `Sequence[Source]` there regardless — but #57's call **stands**, and
-  `13-retail-loyalty-interview` is contributor-side follow-up that does not gate the ship. The
-  judge needs nothing and `judge.toml` must stay untouched. #55's unflattenable path stays
-  ungraded: an assumption produces no threat, so nothing mechanical can see it. Closing #58
-  leaves the frontier at **#59** alone — the last open ticket on this map.
+None. [#49](https://github.com/mstarks01/work-agent/issues/49) completed 2026-07-31 and has
+moved to Completed efforts below; its spec is awaiting implementation on `build/sources-cutover`.
+Chart a new one only under the bar at the end of this file.
 
 ### Completed efforts
 
 Completed on GitHub Issues (canonical):
+
+- [#49 — Map: accept call transcripts as job input](https://github.com/mstarks01/work-agent/issues/49)
+  — 10 tickets, charted and completed 2026-07-31. A **planning** map: it settles the spec for
+  accepting analyst↔developer interview transcripts as job input and stops there. **The spec is
+  not yet implemented** — it ships as one branch, `build/sources-cutover`, whose plan is
+  [#57, the cutover inventory](https://github.com/mstarks01/work-agent/issues/57): seven commits,
+  no green intermediate (the no-shim rule makes the contract atomic), config ahead of the contract,
+  and one narrow ADR at `docs/adr/0001-sources-replace-description.md` creating the directory.
+  Read #57 first, then the other nine resolution comments for the reasoning.
+
+  The route in one pass: `description` is replaced by a uniform `sources` list of
+  `{kind, label, text}` — `kind` a closed enum, `label` a required, unique, 200-char, model-visible
+  citation key, order presentation-only ([#50](https://github.com/mstarks01/work-agent/issues/50)).
+  Budget is **bytes, not tokens** (tokens would make the public contract deployment-dependent):
+  100 KiB total and 10 sources, no per-source cap, on `config/resilience.toml` **v3**
+  ([#52](https://github.com/mstarks01/work-agent/issues/52)). Extraction gains six conversational
+  rules placed **once and always-on** in `extract.md`
+  ([#53](https://github.com/mstarks01/work-agent/issues/53),
+  [#55](https://github.com/mstarks01/work-agent/issues/55)): a hedge or admitted gap is `unknown`
+  plus the speaker's words in `notes` and never an Assumption; facts come from assertions not
+  questions, every speaker read alike; sources carry **equal weight**, so a disagreement is
+  recorded rather than adjudicated, flattening to `unknown` where the field allows and to a
+  schema-forced value plus an `assumptions` entry where it does not. Rendering is **one fenced
+  block per source with no caller-controlled byte outside a fence**, the fence sized to its content
+  ([#54](https://github.com/mstarks01/work-agent/issues/54)); `GraphExecutor.run` takes
+  `Sequence[Source]` and renders internally, which is the seam the whole cutover turns on.
+  Traceability gains `source_label` (gate-enforced against the job's labels — the first gate rule
+  taking data from outside the model) and an ungated, redactable `source_speaker`, with
+  `source_excerpt` held at 1000 chars
+  ([#56](https://github.com/mstarks01/work-agent/issues/56)). Downstream, `notes` gets a
+  **bounding** rule — context for the needs-info question, never evidence, never weight on a rating
+  — in the shared severity rubric plus one sentence each on `analyst.md` and `critic.md`
+  ([#59](https://github.com/mstarks01/work-agent/issues/59)). The eval corpus gains **one
+  two-source transcript case** and every `case.json` gains a `sources` array
+  ([#58](https://github.com/mstarks01/work-agent/issues/58)).
+
+  Two findings outlived their tickets. **Measurement beat survey**
+  ([#51](https://github.com/mstarks01/work-agent/issues/51)): four real Teams `.vtt` exports are
+  34.8% spoken words and 65% machinery, a raw 60-minute export blows the cap while the same call
+  cleaned does not, and attribution names the *participant* but never the **role** — which is why
+  extraction reads every speaker alike and why `source_timestamp` was rejected (cleaning strips cue
+  timings, so the field would be empty exactly on compliant input). And **the tree beat the
+  charted list**: #57's verification found the ticket's own inventory wrong in five places and
+  missed four modules, `execution.py` and `__init__.py` among them. Findings live on
+  `archive/research/transcript-exports` @ `935fc57` and `archive/prototype/multi-source-render`
+  @ `e4a17a6`.
+
+  Two questions were left in fog deliberately, both needing real extractions rather than argument:
+  what the validity gate should do with a **rambling call** that never settles into a system, and
+  **PII residue** — participant names ride into `source_excerpt` by #53's rule and quoted claims
+  into `notes` by #55's, and only `source_speaker` was made strippable. Five areas are **out of
+  scope** and do not graduate: file-format parsing in the service, front-end acquisition UX,
+  integrator-facing transcript-prep guidance, any rationale/claim carrier in the System Model, and
+  a condensation pre-pass.
 
 - [#24 — Map: answer "how do I use this?" — a first-run path for the integrator](https://github.com/mstarks01/work-agent/issues/24)
   — 10 tickets (8 resolved, 2 out of scope), charted 2026-07-29, complete 2026-07-30. A
