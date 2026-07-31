@@ -55,8 +55,15 @@ gh api --method POST repos/mstarks01/work-agent/issues/<child>/dependencies/bloc
 
 ### The live map
 
-_(none — no wayfinding effort is currently in flight. `/wayfinder` invoked with a loose idea
-should chart a new map; there is nothing to resume.)_
+- [#49 — Map: accept call transcripts as job input](https://github.com/mstarks01/work-agent/issues/49)
+  — 9 tickets, charted 2026-07-31, in flight. A **planning** map: it settles the spec for
+  accepting analyst↔developer interview transcripts as job input and stops there. Four
+  premises were fixed while charting and are *not* open questions — the input becomes a
+  uniform `sources` list with `description` removed in a hard cutover; the service takes text
+  only, never files; caps only, so an over-long transcript is rejected rather than condensed;
+  and extraction stays the sole reader of raw text. Frontier at charting: the `sources`
+  contract (#50) and the transcript-export research (#51), the latter worked **inline** rather
+  than by subagent.
 
 ### Completed efforts
 
