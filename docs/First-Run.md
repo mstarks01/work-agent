@@ -25,22 +25,77 @@ checkout is the supported path — see [Configuration](Configuration.md) for the
 
 ## 2. Set model auth for one vendor
 
-Each tier picks a vendor in [`config/model_tiers.toml`](../config/model_tiers.toml).
-The shipped config selects **Vertex** for both tiers, so configure Vertex unless
-you change it:
+Each tier picks a vendor in [`config/model_tiers.toml`](../config/model_tiers.toml),
+and each vendor implies its own credential mode — the two are never configured
+separately. The shipped config selects **Vertex** for both tiers, so that is the
+path that runs with no edit; Anthropic and OpenAI each need a small change first.
+
+### Vertex
+
+Vertex authenticates with Application Default Credentials, never an API key. For
+a local first run, mint them against your own account:
+
+```sh
+gcloud auth application-default login
+gcloud services enable aiplatform.googleapis.com --project your-gcp-project
+```
+
+Your account needs `roles/aiplatform.user` on that project. Then:
 
 ```sh
 export STRIDE_VERTEX_PROJECT=your-gcp-project
 export STRIDE_VERTEX_LOCATION=us-central1
-export GOOGLE_APPLICATION_CREDENTIALS=/path/to/service-account.json
+export GOOGLE_APPLICATION_CREDENTIALS="$HOME/.config/gcloud/application_default_credentials.json"
 ```
 
-For Anthropic or OpenAI instead, point the tiers at that vendor and set its key:
+That third export is required even though `gcloud` just wrote the file to its
+own well-known path, and it is the step that surprises people: most Google
+libraries discover ADC there by themselves, and this service deliberately does
+not. It reads only *declared* credential material, because probing the
+filesystem would make a build's outcome depend on the state of whichever laptop
+it ran on. If `gcloud` printed a different path, export that one.
+
+Do not create a service-account key for this. CI does not use one either — it
+federates short-lived credentials from GitHub's OIDC token, a separate one-time
+setup described in [WORKLOAD_IDENTITY](../.github/WORKLOAD_IDENTITY.md).
+
+### Anthropic or OpenAI
+
+Point the tiers at the vendor, then set that vendor's key — only the one, since a
+key the config does not select is never read. For Anthropic, in
+`config/model_tiers.toml`:
+
+```toml
+[tiers.base]
+vendor = "anthropic"
+model = "claude-haiku-4-5-20251001"
+
+[tiers.strong]
+vendor = "anthropic"
+model = "claude-sonnet-4-5-20250929"
+```
 
 ```sh
-export STRIDE_ANTHROPIC_API_KEY=sk-ant-...
-export STRIDE_OPENAI_API_KEY=sk-...
+export STRIDE_ANTHROPIC_API_KEY=sk-ant-...   # the full key, not a prefix
 ```
+
+For OpenAI, the same two tables with `vendor = "openai"` and models such as
+`gpt-4.1-mini` on `base` and `gpt-4.1` on `strong`:
+
+```sh
+export STRIDE_OPENAI_API_KEY=sk-...          # the full key, not a prefix
+```
+
+Model names must be pinned — no `-latest`, `-preview` or `-exp`, and Anthropic
+requires the dated suffix shown above.
+[Configuration](Configuration.md#models-and-vendors) gives the rule per vendor.
+
+The two tiers select independently, so a mixed pair — `vertex` on `base`,
+`anthropic` on `strong` — is ordinary rather than a special case. To move a tier
+without editing the file, `STRIDE_MODEL_{BASE,STRONG}_VENDOR` and `_MODEL` do it
+at startup, but they must move **together**: setting `_VENDOR` alone is a startup
+error, since a mismatched pair passes every other check and would die on the
+first node of a paid-for job.
 
 Nothing falls back. A missing variable stops startup with an error naming the
 variable rather than quietly running on some default model — and the web app in
