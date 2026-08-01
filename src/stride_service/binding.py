@@ -78,6 +78,18 @@ if TYPE_CHECKING:
 # swallowed and silently revert retry to a single try.
 _NUM_RETRIES_KWARG = "num_retries"
 
+# ``constrain_output = false`` suppresses the schema by passing ``response_format``
+# as an explicit ``None`` constructor kwarg, which ADK applies over the one it
+# derived from the node's output_schema.
+#
+# Deliberately **not** run through ``assert_kwarg_supported``: that asks
+# LiteLLM's ``all_litellm_params``, which is its own extra-kwarg registry —
+# ``num_retries`` is in it, ``response_format`` is not, because the latter is an
+# OpenAI-spec parameter on the completion signature rather than a LiteLLM
+# addition. Asserting it there fails on a correct name, which is worse than not
+# asserting: the misspelling risk is covered instead by the test that reads the
+# suppressed value back off the built adapter.
+
 # Anthropic removed ``temperature`` from Claude 4.7 onward: only the model's own
 # default is accepted and a request carrying the param is rejected. LiteLLM
 # knows this, and ``check_supported`` does catch it — but only for models
@@ -122,21 +134,28 @@ def _check_temperature_unset(
 
 
 def _check_native_structured_output(
-    vendor: Vendor, model: str, source: str
+    vendor: Vendor, model: str, sampling: TierSampling, source: str
 ) -> None:
     """Fail closed when a tier's model would get *emulated* schema constraint.
 
-    Every LLM node in the graph binds an ``output_schema``, so a tier whose
-    model falls to LiteLLM's synthesised-tool path is not merely taking a
-    different route to the same place — it sends a ``$defs``-bearing schema the
-    provider will not resolve, and the node fails on the response it validates
-    rather than on the request it made. That is the most expensive shape a
-    failure can take here: it survives the build, survives the request, and
-    dies at output validation on node one.
+    A tier whose model falls to LiteLLM's synthesised-tool path is not merely
+    taking a different route to the same place — it sends a ``$defs``-bearing
+    schema the provider will not resolve, and the node fails on the response it
+    validates rather than on the request it made. That is the most expensive
+    shape a failure can take here: it survives the build, survives the request,
+    and dies at output validation on node one.
+
+    Scoped to tiers that actually send a schema. A tier running
+    ``constrain_output = false`` sends none, so how the provider *would* have
+    constrained one is not a fact about anything that happens — checking it
+    there would reject a configuration on the strength of a request it never
+    makes.
 
     Checked per tier at build time for the same reason as everything else in
     this module — a misconfiguration should cost nothing.
     """
+    if not sampling.constrain_output:
+        return
     if emulates_structured_output(vendor, model):
         raise ModelGateError(
             f"{source}: {vendor.name} cannot constrain {model!r} to a schema"
@@ -183,7 +202,7 @@ def build_tier_adapters(
             vendor, selection.model, tier_sampling.gate_params(), source=source
         )
         _check_temperature_unset(selection.model, tier_sampling, source)
-        _check_native_structured_output(vendor, selection.model, source)
+        _check_native_structured_output(vendor, selection.model, tier_sampling, source)
         adapters[tier] = LiteLlm(
             model=selection.route,
             **{_NUM_RETRIES_KWARG: resilience.to_num_retries()},

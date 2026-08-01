@@ -45,6 +45,13 @@
 # at all — it is a declared litellm param, so it is fail-closed, not silently
 # dropped.
 #
+# WHAT NO GATE CAN CHECK: whether the provider's own schema compiler will
+# accept the graph's node schemas. Anthropic rejects SystemModel's with "the
+# compiled grammar is too large" -- a limit on the schema, not on structured
+# output as such, and unpublished, so nothing computes it offline. That is what
+# `constrain_output = false` is for, per tier. It is not derived from the vendor
+# because it is not a fact about the vendor.
+#
 # WHAT THE GATE CANNOT CHECK, AND THE ONE RULE THAT COVERS IT: litellm answers
 # from the model data in the installed copy, so a model released after that copy
 # is unknown to it and falls back to the provider's base config, where anything
@@ -70,13 +77,19 @@
 #   stop_sequences      would truncate structured output mid-token
 #   http_options        owned by resilience.toml, not sampling
 
-version = 3
+version = 4
 
 [tiers.base]
 temperature = 0.0        # pinned greedy decoding; the model's own default is 1.0.
                          # Unset this line if this tier runs Claude >= 4.7.
 max_output_tokens = 8192 # pinned: silence means a vendor-derived cap (see above)
 candidate_count = 1      # reserved Self-MoA lever; loader rejects != 1
+constrain_output = true  # send this tier's node schema to the provider. Set
+                         # false where the provider will not take it -- see the
+                         # note above -- which gives up constrained generation
+                         # only: the node keeps its output_schema, the response
+                         # is still validated, and a bad extraction still
+                         # reaches the repair node.
 # top_p             unset -> model default; no published per-tier constant
 # seed              unset -> no numeric default; buys consistency, not
 #                   reproducibility, and is unavailable on Anthropic at all
@@ -90,6 +103,12 @@ temperature = 0.0        # pinned greedy decoding; the model's own default is 1.
                          # Unset this line if this tier runs Claude >= 4.7.
 max_output_tokens = 8192 # pinned: silence means a vendor-derived cap (see above)
 candidate_count = 1      # reserved Self-MoA lever; loader rejects != 1
+constrain_output = true  # send this tier's node schema to the provider. Set
+                         # false where the provider will not take it -- see the
+                         # note above -- which gives up constrained generation
+                         # only: the node keeps its output_schema, the response
+                         # is still validated, and a bad extraction still
+                         # reaches the repair node.
 # top_p             unset -> model default; no published per-tier constant
 # seed              unset -> no numeric default; buys consistency, not
 #                   reproducibility, and is unavailable on Anthropic at all

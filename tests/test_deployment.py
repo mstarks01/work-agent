@@ -84,7 +84,7 @@ def test_a_path_variable_picks_the_file_and_never_layers_a_second(tmp_path):
     """#10: exactly one file is read; the variable only chooses which."""
     custom = tmp_path / "sampling.toml"
     custom.write_text(
-        "version = 3\n[tiers.base]\ntemperature = 0.25\n[tiers.strong]\n",
+        "version = 4\n[tiers.base]\ntemperature = 0.25\n[tiers.strong]\n",
         encoding="utf-8",
     )
 
@@ -252,7 +252,7 @@ ANTHROPIC_ENV = {
 }
 
 NO_TEMPERATURE = """\
-version = 3
+version = 4
 [tiers.base]
 max_output_tokens = 8192
 [tiers.strong]
@@ -340,6 +340,75 @@ def test_gemini_and_openai_are_untouched_by_the_schema_gate():
     pipeline = Deployment.from_env(env=VERTEX_ENV).pipeline()
 
     assert pipeline.node_models[graph.CRITIC_NODE] == "vertex_ai/gemini-2.5-pro"
+
+
+UNCONSTRAINED_BASE = """\
+version = 4
+[tiers.base]
+max_output_tokens = 8192
+constrain_output = false
+[tiers.strong]
+max_output_tokens = 8192
+constrain_output = false
+"""
+
+
+def test_an_unconstrained_tier_suppresses_the_schema_on_the_adapter(tmp_path):
+    """The seam: an explicit None over the one ADK derived from output_schema.
+
+    Read off the built adapter rather than asserted about the config, because
+    the value only does anything if it survives into ``_additional_args``.
+    """
+    path = tmp_path / "sampling.toml"
+    path.write_text(UNCONSTRAINED_BASE, encoding="utf-8")
+    env = ANTHROPIC_ENV | {
+        "STRIDE_SAMPLING": str(path),
+        "STRIDE_MODEL_BASE_MODEL": CLAUDE_NATIVE,
+        "STRIDE_MODEL_STRONG_MODEL": CLAUDE_NATIVE,
+    }
+
+    pipeline = Deployment.from_env(env=env).pipeline()
+    nodes = {node.name: node for node in pipeline.workflow.graph.nodes}
+    extract = nodes[graph.EXTRACT_NODE]
+
+    assert "response_format" in extract.model._additional_args
+    assert extract.model._additional_args["response_format"] is None
+    # The node keeps its schema, so the response is still validated on arrival.
+    assert extract.output_schema is not None
+
+
+def test_a_constrained_tier_leaves_the_derived_schema_alone():
+    """The default must not carry the key at all — None would suppress it."""
+    pipeline = Deployment.from_env(env=VERTEX_ENV).pipeline()
+    nodes = {node.name: node for node in pipeline.workflow.graph.nodes}
+
+    assert "response_format" not in nodes[graph.EXTRACT_NODE].model._additional_args
+
+
+def test_the_schema_gate_is_scoped_to_tiers_that_send_a_schema(tmp_path):
+    """The narrowing: a model rejected while constrained is fine unconstrained.
+
+    `claude-opus-5` takes the emulated path, so the gate stops it — but only
+    because a schema would be sent. Turn that off and there is no emulated
+    request to object to, so the same selection must build.
+    """
+    # Both legs run without temperature so the 4.7 floor cannot fire first and
+    # mask which gate is under test; the only difference is constrain_output.
+    constrained = tmp_path / "constrained.toml"
+    constrained.write_text(NO_TEMPERATURE, encoding="utf-8")
+    path = tmp_path / "sampling.toml"
+    path.write_text(UNCONSTRAINED_BASE, encoding="utf-8")
+
+    with pytest.raises(ModelGateError, match=r"\$defs"):
+        Deployment.from_env(
+            env=ANTHROPIC_ENV | {"STRIDE_SAMPLING": str(constrained)}
+        ).pipeline()
+
+    pipeline = Deployment.from_env(
+        env=ANTHROPIC_ENV | {"STRIDE_SAMPLING": str(path)}
+    ).pipeline()
+
+    assert pipeline.node_models[graph.EXTRACT_NODE] == f"anthropic/{CLAUDE_5}"
 
 
 def test_claude_4_6_keeps_the_pinned_temperature():
