@@ -91,15 +91,19 @@ def _reply_for(case, graph_node: str) -> str:
         return json.dumps(case.model.model_dump(mode="json"))
     if graph_node == "critic":
         return json.dumps(
-            [
-                scripted_threat(case, category, promoted=True)
-                for category in STRIDE_CATEGORIES
-            ]
+            {
+                "threats": [
+                    scripted_threat(case, category, promoted=True)
+                    for category in STRIDE_CATEGORIES
+                ]
+            }
         )
     for category in STRIDE_CATEGORIES:
         if graph_node == analyst_node_name(category):
-            return json.dumps([scripted_threat(case, category, promoted=False)])
-    return "[]"
+            return json.dumps(
+                {"threats": [scripted_threat(case, category, promoted=False)]}
+            )
+    return '{"threats": []}'
 
 
 def test_analysis_mode_injects_the_blessed_model_at_prepare(case):

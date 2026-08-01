@@ -19,7 +19,11 @@ from stride_service.binding import NodeBinding
 from stride_service.critic import CriticOutputError, DraftJoinError
 from stride_service.markdown_loader import MarkdownLoader
 from stride_service.model_tiers import LLM_NODES
-from stride_service.report import STRIDE_CATEGORIES, DraftThreat, Threat
+from stride_service.report import (
+    STRIDE_CATEGORIES,
+    DraftThreats,
+    ReviewedThreats,
+)
 from stride_service.resilience import load_resilience
 from stride_service.sampling import load_sampling
 from stride_service.system_model import SystemModel
@@ -305,7 +309,7 @@ def test_recritic_runs_on_the_critic_tier_and_emits_the_review_schema(pipeline):
     by_name = nodes_by_name(pipeline)
     recritic = by_name[graph.RECRITIC_NODE]
     assert isinstance(recritic, LlmAgent)
-    assert recritic.output_schema == list[Threat]
+    assert recritic.output_schema is ReviewedThreats
     assert recritic.output_key == graph.STATE_REVIEWED_THREATS
     assert recritic.model == by_name[graph.CRITIC_NODE].model
 
@@ -320,9 +324,35 @@ def test_llm_nodes_emit_their_schema(pipeline):
     by_name = nodes_by_name(pipeline)
     assert by_name[graph.EXTRACT_NODE].output_schema is SystemModel
     assert by_name[graph.REPAIR_NODE].output_schema is SystemModel
-    assert by_name[graph.CRITIC_NODE].output_schema == list[Threat]
+    assert by_name[graph.CRITIC_NODE].output_schema is ReviewedThreats
     for name in graph.ANALYST_GRAPH_NODES:
-        assert by_name[name].output_schema == list[DraftThreat]
+        assert by_name[name].output_schema is DraftThreats
+
+
+def test_every_node_schema_survives_the_trip_to_a_response_format(pipeline):
+    """The regression this wrapper exists for.
+
+    A node's ``output_schema`` is only worth anything on the wire if the
+    adapter can turn it into a response format. A bare ``list[...]`` cannot be
+    turned into one: ADK logs a warning, returns ``None``, and the node
+    generates unconstrained — with nothing in the request, the response or the
+    report to show for it. That is why the analysts and both review passes
+    carry wrapper models rather than lists.
+
+    Asserted against ADK's own converter rather than a shape of our choosing,
+    because it is that function's answer that decides whether a schema is sent.
+    """
+    from google.adk.models.lite_llm import _to_litellm_response_format
+
+    for name, node in nodes_by_name(pipeline).items():
+        if not isinstance(node, LlmAgent):
+            continue
+        response_format = _to_litellm_response_format(
+            node.output_schema, "claude-sonnet-4-6"
+        )
+        assert response_format is not None, f"{name} would send no schema"
+        # An object root, not an array: OpenAI's structured outputs require one.
+        assert response_format["json_schema"]["schema"]["type"] == "object"
 
 
 def test_extract_and_repair_share_one_output_key(pipeline):
@@ -442,9 +472,11 @@ def test_merge_joins_drafts_in_canonical_order():
     }
     ctx = FakeContext(
         **{
-            graph.analyst_state_key(category): [
-                draft.model_dump(mode="json") for draft in category_drafts
-            ]
+            graph.analyst_state_key(category): {
+                "threats": [
+                    draft.model_dump(mode="json") for draft in category_drafts
+                ]
+            }
             for category, category_drafts in drafts.items()
         }
     )
@@ -458,7 +490,7 @@ def test_merge_joins_drafts_in_canonical_order():
 def test_merge_fails_closed_on_a_hallucinated_element():
     draft = sample_draft("S-01", affected_element_ids=["process:invented"])
     ctx = FakeContext(
-        **{graph.analyst_state_key("spoofing"): [draft.model_dump(mode="json")]}
+        **{graph.analyst_state_key("spoofing"): {"threats": [draft.model_dump(mode="json")]}}
     )
     with pytest.raises(DraftJoinError, match="process:invented"):
         graph.merge_drafts(valid_model().model_dump(mode="json"), ctx)
@@ -471,7 +503,7 @@ def test_router_accepts_well_formed_critic_output():
     event = graph.route_review(
         valid_model().model_dump(mode="json"),
         [draft.model_dump(mode="json") for draft in drafts],
-        [threat.model_dump(mode="json") for threat in reviewed],
+        {"threats": [threat.model_dump(mode="json") for threat in reviewed]},
         ctx,
     )
     assert event.actions.route == graph.ROUTE_ACCEPT
@@ -486,7 +518,7 @@ def test_router_revises_and_feeds_the_re_ask_prompt():
     event = graph.route_review(
         valid_model().model_dump(mode="json"),
         [draft.model_dump(mode="json") for draft in drafts],
-        [threat.model_dump(mode="json") for threat in reviewed],
+        {"threats": [threat.model_dump(mode="json") for threat in reviewed]},
         ctx,
     )
     assert event.actions.route == graph.ROUTE_REVISE
@@ -502,7 +534,7 @@ def test_fail_review_raises_the_still_unreconciled_issues():
         graph.fail_review(
             valid_model().model_dump(mode="json"),
             [draft.model_dump(mode="json") for draft in drafts],
-            [threat.model_dump(mode="json") for threat in reviewed],
+            {"threats": [threat.model_dump(mode="json") for threat in reviewed]},
         )
 
 
@@ -521,7 +553,7 @@ def test_assemble_splits_rulings_and_builds_the_summary():
     output = graph.assemble_report(
         valid_model().model_dump(mode="json"),
         [draft.model_dump(mode="json") for draft in drafts],
-        [t.model_dump(mode="json") for t in (confirmed, rejected)],
+        {"threats": [t.model_dump(mode="json") for t in (confirmed, rejected)]},
         ctx,
     )
 
@@ -540,6 +572,6 @@ def test_assemble_fails_closed_when_the_critic_drops_a_draft():
         graph.assemble_report(
             valid_model().model_dump(mode="json"),
             [draft.model_dump(mode="json") for draft in drafts],
-            [sample_threat("S-01").model_dump(mode="json")],
+            {"threats": [sample_threat("S-01").model_dump(mode="json")]},
             ctx,
         )

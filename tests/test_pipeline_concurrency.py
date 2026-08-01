@@ -16,7 +16,6 @@ No Vertex endpoint is involved: every LLM node is a scripted stand-in.
 from __future__ import annotations
 
 import asyncio
-import json
 import re
 
 from google.adk.models.base_llm import BaseLlm
@@ -32,12 +31,14 @@ from stride_service.sampling import load_sampling
 from stride_service.sources import Source
 from tests.factories import (
     BASE_MODEL,
+    EMPTY_THREATS,
     PROJECT_ROOT,
     STRONG_MODEL,
     ScriptedLlm,
     repo_tiers,
     sample_threat,
     served_build,
+    threats_json,
     valid_model,
 )
 from tests.test_pipeline import draft_json
@@ -83,7 +84,7 @@ def _build_shared_pipeline() -> graph.Pipeline:
     }
     replies = {
         graph.analyst_node_name("spoofing"): draft_json("S-01", "spoofing"),
-        graph.CRITIC_NODE: json.dumps([sample_threat("S-01").model_dump(mode="json")]),
+        graph.CRITIC_NODE: threats_json(sample_threat("S-01")),
     }
 
     def resolve(tier_node: str) -> BaseLlm:
@@ -91,7 +92,7 @@ def _build_shared_pipeline() -> graph.Pipeline:
         if node == graph.EXTRACT_NODE:
             return MarkerExtractLlm(model=BASE_MODEL)
         model_name = BASE_MODEL if node == graph.REPAIR_NODE else STRONG_MODEL
-        return ScriptedLlm(model=model_name, reply=replies.get(node, "[]"), seen=[])
+        return ScriptedLlm(model=model_name, reply=replies.get(node, EMPTY_THREATS), seen=[])
 
     tiers = repo_tiers()
     sampling = load_sampling(PROJECT_ROOT / "config" / "sampling.toml", env={})

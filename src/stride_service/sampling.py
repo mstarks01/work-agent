@@ -30,8 +30,9 @@ Three things about the surface:
   So it is a per-tier choice a deployment makes, not one derived from the
   vendor. Turning it off gives up constrained *generation* only: the node keeps
   its ``output_schema``, the response is validated on arrival, and a failed
-  extraction still reaches the repair node. Eight of the graph's ten LLM nodes
-  already run this way, because ADK cannot convert their ``list[...]`` schemas.
+  extraction still reaches the repair node. Every LLM node carries a schema the
+  adapter can convert, so this is the only thing that decides whether one is
+  sent.
 
 Loading fails closed (OWASP A02/A10): an unsupported version, an unknown key or
 tier, an out-of-range value, or a ``candidate_count`` other than 1 raises
