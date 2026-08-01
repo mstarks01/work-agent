@@ -37,6 +37,7 @@ from stride_service.report import (
     StrideCategory,
     derive_severity_level,
 )
+from stride_service.sources import Source
 from stride_service.system_model import SystemModel
 from stride_service.validation import parse_and_validate
 
@@ -118,6 +119,11 @@ class GoldenCase:
     @property
     def id(self) -> str:
         return self.meta.id
+
+    @property
+    def sources(self) -> tuple[Source, ...]:
+        """The case's input, in the shape every driver of the graph takes."""
+        return (Source.description(self.source_text),)
 
     @property
     def must_find(self) -> tuple[ReferenceThreat, ...]:

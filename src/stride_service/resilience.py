@@ -48,6 +48,8 @@ from typing import TypeVar
 from google.genai import types
 from pydantic import BaseModel, ConfigDict, Field, ValidationError
 
+from stride_service.sources import SourceLimits
+
 # The only schema version this loader accepts. The version check fires before
 # shape validation, so a file on another schema is named as such rather than
 # reported as a set of stray keys under ``extra="forbid"``.
@@ -90,6 +92,12 @@ class ResilienceConfig(BaseModel):
         is not passed through verbatim.
         """
         return self.attempts - 1
+
+    def source_limits(self) -> SourceLimits:
+        """The input bounds, as the value every entry point checks against."""
+        return SourceLimits(
+            max_total_bytes=self.max_source_bytes, max_sources=self.max_sources
+        )
 
     def to_http_options(self) -> types.HttpOptions:
         """Per-request HTTP options carrying the deadline.

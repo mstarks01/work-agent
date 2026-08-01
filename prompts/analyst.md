@@ -12,9 +12,7 @@ You draft threats. You do **not** rule on them: verdicts and confidence are the 
 
 The System Model for this job, already validated, and its mechanically derived boundary crossings:
 
-```
 {system_model}
-```
 
 ```
 {boundary_crossings}

@@ -21,10 +21,12 @@ from stride_service.jobs import (
     JobRecord,
     PipelineCompleted,
     PipelineRejected,
+    StubPipelineRunner,
 )
 from stride_service.pipeline import AdkPipelineRunner, PipelineError
-from stride_service.report import STRIDE_CATEGORIES
+from stride_service.report import STRIDE_CATEGORIES, InputRef
 from stride_service.sampling import TierSampling, load_sampling, sampling_fingerprint
+from stride_service.sources import Source
 from tests.factories import (
     BASE_MODEL,
     PROJECT_ROOT,
@@ -50,10 +52,10 @@ def draft_json(threat_id: str, category: str) -> str:
     return json.dumps([sample_draft(threat_id, category).model_dump(mode="json")])
 
 
-def job(description: str = "Customers log in to the web app.") -> JobRecord:
+def job(text: str = "Customers log in to the web app.") -> JobRecord:
     record = JobRecord.create(
         owner_subject="ping|user-1",
-        description=description,
+        sources=[Source.description(text)],
         system_name="Order Service",
     )
     record.transition("running")
@@ -283,12 +285,34 @@ def test_a_critic_that_will_not_reconcile_after_the_re_ask_fails_the_job_loudly(
         run(pipeline, job())
 
 
+def test_the_stub_and_the_real_runner_compute_one_input_ref():
+    """Two digest sites, one arithmetic.
+
+    ``StubPipelineRunner`` builds an ``InputRef`` independently of the real
+    runner. If the two ever computed it differently, every fixture and every
+    offline test would assert against a reference production never emits.
+    """
+    record = job("Customers log in to the web app.")
+    pipeline, _ = build(happy_replies())
+
+    outcome, _ = run(pipeline, record)
+    stub_report = asyncio.run(
+        StubPipelineRunner().run(job("Customers log in to the web app."), _ignore)
+    )
+
+    assert isinstance(outcome, PipelineCompleted)
+    assert outcome.report.input.model_dump() == stub_report.report.input.model_dump()
+
+
+async def _ignore(node: str) -> None:
+    """Node callback for a run whose progress nothing is watching."""
+
+
 def test_a_failed_job_logs_the_input_digest(caplog):
     """A poison input is identifiable across jobs.
 
     The digest is logged on failure without the service ever storing the text.
     """
-    import hashlib
     import logging
 
     replies = happy_replies()
@@ -302,14 +326,17 @@ def test_a_failed_job_logs_the_input_digest(caplog):
     replies["recritic"] = invented
     pipeline, _ = build(replies)
     record = job("A poison description.")
-    digest = hashlib.sha256(record.description.encode("utf-8")).hexdigest()
+    digest = InputRef.of(
+        system_name=record.system_name, sources=record.sources
+    ).source_sha256
 
     with caplog.at_level(logging.WARNING, logger="stride_service.pipeline"):
         with pytest.raises(Exception, match="T-02"):
             run(pipeline, record)
 
     assert any(digest in message for message in caplog.messages)
-    assert record.description not in caplog.text  # the text itself is never logged
+    # the text itself is never logged
+    assert record.sources[0].text not in caplog.text
 
 
 def test_the_api_runs_jobs_through_the_real_graph_by_default(monkeypatch):

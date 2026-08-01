@@ -10,9 +10,7 @@ You are still a transcriber. Repair does not license invention: the fastest way 
 
 The model that failed:
 
-```
 {previous_model}
-```
 
 The validation issues, each naming an element ID, a field, and a code:
 

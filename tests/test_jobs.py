@@ -17,12 +17,15 @@ from stride_service.jobs import (
     build_store,
     execute_job,
 )
+from stride_service.report import InputRef
+from stride_service.sources import Source
 from stride_service.validation import ValidationIssue
 
 
 def make_record() -> JobRecord:
     return JobRecord.create(
-        owner_subject="alice", description="a web app storing orders"
+        owner_subject="alice",
+        sources=[Source.description("a web app storing orders")],
     )
 
 
@@ -186,12 +189,19 @@ class TestExecuteJob:
         assert node_events == list(StubPipelineRunner.nodes)
         assert record.events[-1].status == "completed"
 
-    def test_stub_report_hashes_the_submitted_description(self):
-        record = self.run_with(StubPipelineRunner())
+    def test_stub_report_references_every_source_it_was_given(self):
         import hashlib
 
-        expected = hashlib.sha256(record.description.encode()).hexdigest()
-        assert record.report.input.source_sha256 == expected
+        record = self.run_with(StubPipelineRunner())
+        ref = record.report.input
+
+        assert [r.label for r in ref.sources] == [s.label for s in record.sources]
+        assert ref.sources[0].sha256 == hashlib.sha256(
+            record.sources[0].text.encode("utf-8")
+        ).hexdigest()
+        # Recomputable from the report alone: the aggregate is taken over the
+        # refs, which the report carries.
+        assert ref.source_sha256 == InputRef.aggregate_digest(ref.sources)
 
     def test_rejection_embeds_validation_issues(self):
         record = self.run_with(RejectingRunner())

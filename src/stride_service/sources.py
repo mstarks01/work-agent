@@ -30,6 +30,7 @@ from __future__ import annotations
 
 import re
 from collections.abc import Sequence
+from dataclasses import dataclass
 from typing import Literal, Self
 
 from pydantic import BaseModel, ConfigDict, Field, field_validator
@@ -127,13 +128,81 @@ def total_bytes(sources: Sequence[Source]) -> int:
     return sum(source.size_bytes() for source in sources)
 
 
-def _fence_for(body: str) -> str:
+@dataclass(frozen=True)
+class LimitBreach:
+    """Why a submission was refused before any model ran.
+
+    ``rung`` is what the breach *is*, so each surface can map it to its own
+    vocabulary — an HTTP status, an engine exception — without re-deriving the
+    reason. ``message`` is caller-facing and names no internal detail.
+    """
+
+    rung: Literal["empty", "count", "total"]
+    message: str
+
+
+@dataclass(frozen=True)
+class SourceLimits:
+    """One deployment's bounds on what a single job may carry.
+
+    Held as a value rather than read from config at each check, so the HTTP
+    route, the in-process engine and any future entry point enforce the same
+    numbers — the ones their deployment resolved once at startup.
+    """
+
+    max_total_bytes: int
+    max_sources: int
+
+    def breach(self, sources: Sequence[Source]) -> LimitBreach | None:
+        """The first bound ``sources`` breaks, or ``None`` if it fits.
+
+        Ordered shape before size: an empty list is not a small job, it is a
+        job with no input, and saying so is more use than quoting a byte count
+        of zero against a cap.
+        """
+        if not sources:
+            return LimitBreach("empty", "a job carries at least one source")
+        if len(sources) > self.max_sources:
+            return LimitBreach(
+                "count",
+                f"{len(sources)} sources submitted, over the "
+                f"{self.max_sources} source limit",
+            )
+        total = total_bytes(sources)
+        if total > self.max_total_bytes:
+            return LimitBreach(
+                "total",
+                f"sources total {total} bytes, over the "
+                f"{self.max_total_bytes} byte limit; "
+                f"per source: {self._breakdown(sources)}",
+            )
+        return None
+
+    @staticmethod
+    def _breakdown(sources: Sequence[Source]) -> str:
+        """Each source's size, keyed by label.
+
+        The error names **no culprit**: there is no per-source cap, so nothing
+        here is individually too big and the overspend belongs to the sum. What
+        the caller needs is the arithmetic, so they can decide what to cut.
+        """
+        return ", ".join(
+            f"{source.label!r} {source.size_bytes()} bytes" for source in sources
+        )
+
+
+def fence_for(body: str) -> str:
     """The shortest fence ``body`` cannot close.
 
     CommonMark's own rule: a fenced block ends at a line of backticks at least
     as long as the one that opened it, so one backtick longer than the longest
     run anywhere in the body is enough — and is what makes a hostile transcript
     carrying its own fence stay inside the block.
+
+    Shared with the seam that renders the System Model into an analyst prompt:
+    ``json.dumps`` escapes quotes and newlines but **not** backticks, so a
+    ``notes`` or ``source_excerpt`` value that carries a fence would otherwise
+    close a static one node downstream of here.
     """
     longest = max((len(run.group()) for run in _BACKTICK_RUN.finditer(body)), default=0)
     return "`" * max(3, longest + 1)
@@ -158,7 +227,7 @@ def render_sources(sources: Sequence[Source]) -> str:
     blocks = []
     for index, source in enumerate(sources, start=1):
         body = f"label: {source.label}\n{_HEADER_RULE}\n{source.text}"
-        fence = _fence_for(body)
+        fence = fence_for(body)
         blocks.append(
             f"### Source {index} of {total} — {_REGISTERS[source.kind]}\n\n"
             f"{fence}\n{body}\n{fence}"
