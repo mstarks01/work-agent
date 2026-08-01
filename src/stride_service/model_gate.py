@@ -88,6 +88,73 @@ def supports_structured_output(vendor: Vendor, model: str) -> bool:
     )
 
 
+# A minimal schema-constrained request, used only to ask LiteLLM *which way* it
+# would satisfy the constraint. The schema's shape is deliberately irrelevant:
+# the branch is keyed on the model, not on what is being asked for, so a
+# two-field object answers the same question the graph's real schemas would and
+# keeps this module from importing them.
+_SCHEMA_PROBE: dict[str, Any] = {
+    "type": "json_schema",
+    "json_schema": {
+        "name": "probe",
+        "strict": True,
+        "schema": {
+            "type": "object",
+            "properties": {"ok": {"type": "boolean"}},
+            "required": ["ok"],
+            "additionalProperties": False,
+        },
+    },
+}
+
+
+def emulates_structured_output(vendor: Vendor, model: str) -> bool:
+    """Whether schema constraint reaches this model *emulated*, not natively.
+
+    Some providers constrain output to a schema directly; where a model is not
+    known to support that, LiteLLM falls back to synthesising a single tool
+    whose input schema is the response schema and forcing a call to it. The two
+    are not equivalent, and the difference is silent at build time: the native
+    path resolves ``$ref``/``$defs`` before sending (Anthropic does not resolve
+    external references), while the emulated path forwards the schema as-is. A
+    ``$defs``-bearing schema — which every Pydantic model with a nested type
+    produces — therefore reaches the model unusable, and what comes back fails
+    the node's own output validation rather than the request.
+
+    Asked as a **call**, like :func:`check_supported`, and detected by its
+    signature rather than by mirroring which models are on which path: the
+    presence of LiteLLM's own internal response-format tool in the mapped
+    params. A table of supported models here would be the thing this module
+    exists not to be, and would drift the moment a model is added upstream.
+
+    Deliberately **not** the same question as :func:`supports_structured_output`.
+    That one asks whether a schema is honoured at all, and answers ``True`` for
+    models on both paths — it cannot see this difference.
+    """
+    params = _litellm.utils.get_optional_params(
+        model=model,
+        custom_llm_provider=vendor.litellm_provider,
+        response_format=_SCHEMA_PROBE,
+    )
+    tools = params.get("tools") or []
+    return any(_tool_name(tool) == _litellm.constants.RESPONSE_FORMAT_TOOL_NAME
+               for tool in tools)
+
+
+def _tool_name(tool: Any) -> str | None:
+    """A tool's name under either wire shape LiteLLM emits.
+
+    Anthropic-shaped tools carry ``name`` at the top level; OpenAI-shaped ones
+    nest it under ``function``. Reading both keeps the check provider-neutral.
+    """
+    if not isinstance(tool, dict):
+        return None
+    nested = tool.get("function")
+    if isinstance(nested, dict) and "name" in nested:
+        return nested["name"]
+    return tool.get("name")
+
+
 def completion(**kwargs: Any) -> Any:
     """Issue one request through the same pinned ``litellm`` the gate checks.
 
