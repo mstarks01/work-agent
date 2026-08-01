@@ -22,6 +22,16 @@ Three things about the surface:
   gate as ``thinkingBudget: 0`` and then 400s at request time.
 * **``max_output_tokens`` is pinned**, because the default is vendor-dependent:
   Anthropic derives a 5,120–8,192 cap only when the caller is silent.
+* **``constrain_output`` decides whether the node's schema is sent at all.**
+  Constrained generation is the default and the better answer where a provider
+  will take it, but "will take it" is a property of the schema *and* the
+  provider's own limits — a grammar compiler can reject a schema it is
+  perfectly willing to honour in principle — and nothing computes that offline.
+  So it is a per-tier choice a deployment makes, not one derived from the
+  vendor. Turning it off gives up constrained *generation* only: the node keeps
+  its ``output_schema``, the response is validated on arrival, and a failed
+  extraction still reaches the repair node. Eight of the graph's ten LLM nodes
+  already run this way, because ADK cannot convert their ``list[...]`` schemas.
 
 Loading fails closed (OWASP A02/A10): an unsupported version, an unknown key or
 tier, an out-of-range value, or a ``candidate_count`` other than 1 raises
@@ -65,7 +75,13 @@ from stride_service.model_tiers import TIER_NAMES, TierName
 # The only schema version this loader accepts. Versions are independent and
 # exact-match across the four config files — a shared number would buy nothing
 # once each file pins its own, since a stale file fails its own check.
-SUPPORTED_VERSION = 3
+#
+# Version 4 adds ``constrain_output``. It carries a default, so a version-3 file
+# would have loaded unchanged — the bump is deliberate anyway, because the field
+# enters the sampling fingerprint and therefore re-baselines every blessed
+# number. A silent default would have moved that line under deployments that
+# never read this file.
+SUPPORTED_VERSION = 4
 
 # The uniform reasoning surface. Deliberately not per-vendor data: the enum is
 # what every vendor accepts, and the wire value it becomes (Gemini derives a
@@ -82,7 +98,13 @@ OFFERED_PARAMS: tuple[str, ...] = (
     "seed",
     "thinking",
     "max_output_tokens",
+    "constrain_output",
 )
+
+# The only two strings ``constrain_output`` accepts from the environment.
+# Python's own truthiness would read "false" as True, which is the classic way
+# a deployment ends up running the opposite of what its config says.
+_BOOL_LITERALS = {"true": True, "false": False}
 
 
 class SamplingConfigError(ConfigError):
@@ -111,6 +133,7 @@ class _RawTier(BaseModel):
     presence_penalty: float | None = None
     frequency_penalty: float | None = None
     thinking: ReasoningEffort | None = None
+    constrain_output: bool = True
 
     @field_validator("candidate_count")
     @classmethod
@@ -158,6 +181,7 @@ class TierSampling(BaseModel):
     presence_penalty: float | None = None
     frequency_penalty: float | None = None
     thinking: ReasoningEffort | None = None
+    constrain_output: bool = True
 
     def constructor_kwargs(self) -> dict[str, Any]:
         """The params that must ride the ``LiteLlm`` constructor, not the config.
@@ -167,12 +191,22 @@ class TierSampling(BaseModel):
         cannot fail closed on what LiteLLM is never told. Constructor kwargs
         reach ``acompletion`` via ``_additional_args`` *before* ``generation_params``,
         so the value survives and the fingerprint stays honest.
+
+        ``constrain_output = false`` rides the same seam for the opposite
+        reason. ADK derives ``response_format`` from the node's
+        ``output_schema`` and then applies ``_additional_args`` *over* it
+        (``lite_llm.py:2744-2750``), so an explicit ``None`` here is what
+        suppresses the schema on the wire. The node keeps its
+        ``output_schema``, so the response is still validated on arrival —
+        what is given up is constrained *generation*, not the check.
         """
         kwargs: dict[str, Any] = {}
         if self.seed is not None:
             kwargs["seed"] = self.seed
         if self.thinking is not None:
             kwargs["reasoning_effort"] = self.thinking
+        if not self.constrain_output:
+            kwargs["response_format"] = None
         return kwargs
 
     def to_generate_content_config(self) -> types.GenerateContentConfig:
@@ -280,7 +314,7 @@ def make_resolve_sampling(
     return resolve_sampling
 
 
-def _parse_env_value(var: str, param: str, value: str) -> float | int | str:
+def _parse_env_value(var: str, param: str, value: str) -> float | int | bool | str:
     """Parse an override string to its param's type; raise on a bad literal.
 
     Range and enum legality stay in :class:`_RawTier`, so an override is
@@ -297,6 +331,12 @@ def _parse_env_value(var: str, param: str, value: str) -> float | int | str:
             return int(value)
         except ValueError:
             raise SamplingConfigError(f"{var}: {value!r} is not an integer") from None
+    if param == "constrain_output":
+        parsed = _BOOL_LITERALS.get(value.lower())
+        if parsed is None:
+            expected = ", ".join(sorted(_BOOL_LITERALS))
+            raise SamplingConfigError(f"{var}: {value!r} is not one of {expected}")
+        return parsed
     # thinking: left as the raw string for _RawTier's Literal to accept or reject.
     return value
 
