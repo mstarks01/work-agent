@@ -5,6 +5,14 @@
   "exemplar_proximity": "near",
   "provenance": "internal-system (synthetic, sanitized)",
   "bootstrap": "agent-stand-in",
-  "source_sha256": "00335740adbf8247bb22bdaeedb9e574f75fb6a6615c772edc13a72fff07be08",
-  "notes": "The control case for the exemplar-domain-bias delta (ticket 009 decision 6). Deliberately near-identical in shape to analyst.md's shared exemplar system: three network zones, an internet-facing API in a DMZ, a core worker, a PII/financial datastore with unverified at-rest protection, an append-only-ish archive, and an unauthenticated third-party payment callback. It is not a copy \u2014 names, technologies and flow labels differ \u2014 but nothing structural is far from the exemplar, which is the point: far-domain recall is only meaningful as a delta against this."
+  "sources": [
+    {
+      "kind": "description",
+      "label": "System description",
+      "file": "source.md",
+      "sha256": "00335740adbf8247bb22bdaeedb9e574f75fb6a6615c772edc13a72fff07be08"
+    }
+  ],
+  "source_sha256": "f90b4a8504474d0285ef1f001ad98fa1e2e5e7cdfc44d795996c9e7235a74883",
+  "notes": "The control case for the exemplar-domain-bias delta (ticket 009 decision 6). Deliberately near-identical in shape to analyst.md's shared exemplar system: three network zones, an internet-facing API in a DMZ, a core worker, a PII/financial datastore with unverified at-rest protection, an append-only-ish archive, and an unauthenticated third-party payment callback. It is not a copy — names, technologies and flow labels differ — but nothing structural is far from the exemplar, which is the point: far-domain recall is only meaningful as a delta against this."
 }

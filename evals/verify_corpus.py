@@ -15,15 +15,21 @@ import json
 import sys
 from collections.abc import Iterator
 from pathlib import Path
+from typing import get_args
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "src"))
 
 from stride_service.report import (
     STRIDE_CATEGORIES,
+    InputRef,
     Rating,
+    SourceRef,
     derive_severity_level,
 )
+from stride_service.sources import SourceKind
 from stride_service.validation import parse_and_validate
+
+SOURCE_KINDS = frozenset(get_args(SourceKind))
 
 CORPUS_DIR = Path(__file__).resolve().parent / "corpus"
 CALIBRATION_PATH = Path(__file__).resolve().parent / "judge_calibration" / "pairs.json"
@@ -49,6 +55,7 @@ CASE_FIELDS = frozenset(
         "exemplar_proximity",
         "provenance",
         "bootstrap",
+        "sources",
         "source_sha256",
         "notes",
     )
@@ -71,9 +78,111 @@ def _load_json(path: Path) -> object:
         return json.load(handle)
 
 
+SOURCE_FIELDS = frozenset(("kind", "label", "file", "sha256"))
+
+
 def source_sha256(source_path: Path) -> str:
-    """The digest recorded in ``case.json``, over the exact submitted bytes."""
+    """One source's digest, over the exact submitted bytes."""
     return hashlib.sha256(source_path.read_bytes()).hexdigest()
+
+
+def declared_labels(meta: dict) -> set[str]:
+    """The labels this case's sources declare, for the citation lint."""
+    sources = meta.get("sources")
+    if not isinstance(sources, list):
+        return set()
+    return {
+        source.get("label")
+        for source in sources
+        if isinstance(source, dict) and isinstance(source.get("label"), str)
+    }
+
+
+def _check_sources(case_dir: Path, meta: dict) -> Iterator[str]:
+    """Each declared source exists, digests as claimed, and is named once."""
+    sources = meta.get("sources")
+    if not isinstance(sources, list) or not sources:
+        yield "case.json sources must be a non-empty list"
+        return
+
+    refs = []
+    seen_labels = set()
+    for index, source in enumerate(sources):
+        where = f"sources[{index}]"
+        if not isinstance(source, dict):
+            yield f"{where} is not an object"
+            continue
+        missing = SOURCE_FIELDS - source.keys()
+        unexpected = source.keys() - SOURCE_FIELDS
+        if missing or unexpected:
+            yield (
+                f"{where} fields wrong: missing {sorted(missing)},"
+                f" extra {sorted(unexpected)}"
+            )
+            continue
+        if source["kind"] not in SOURCE_KINDS:
+            yield (
+                f"{where} kind {source['kind']!r} is not one of"
+                f" {sorted(SOURCE_KINDS)}"
+            )
+        if source["label"] in seen_labels:
+            yield f"{where} label {source['label']!r} is used twice in one case"
+        seen_labels.add(source["label"])
+
+        path = case_dir / source["file"]
+        if not path.is_file():
+            yield f"{where} names {source['file']!r}, which does not exist"
+            continue
+        expected = source_sha256(path)
+        if source["sha256"] != expected:
+            yield (
+                f"{where} sha256 does not match {source['file']}"
+                f" (expected {expected})"
+            )
+            continue
+        refs.append(
+            SourceRef(kind=source["kind"], label=source["label"], sha256=expected)
+        )
+
+    if len(refs) == len(sources):
+        expected_aggregate = InputRef.aggregate_digest(refs)
+        if meta.get("source_sha256") != expected_aggregate:
+            yield (
+                "source_sha256 is not the aggregate over the declared sources"
+                f" (expected {expected_aggregate})"
+            )
+
+
+def _check_citations(model: object, labels: set[str]) -> Iterator[str]:
+    """Every ``source_label`` in the model names a source the case declares.
+
+    This is what ties the corpus to the gate rule it exists to exercise: the
+    service rejects a model citing a label its job never carried, so a corpus
+    whose labels drifted from its own case.json would be grading a shape the
+    service would refuse.
+    """
+    if not isinstance(model, dict):
+        return
+    for elements in model.values():
+        if not isinstance(elements, list):
+            continue
+        for element in elements:
+            if not isinstance(element, dict):
+                continue
+            excerpt = element.get("source_excerpt")
+            label = element.get("source_label")
+            if not excerpt:
+                continue
+            if not label:
+                yield (
+                    f"model.json: {element.get('id')} has a source_excerpt with"
+                    " no source_label"
+                )
+            elif label not in labels:
+                yield (
+                    f"model.json: {element.get('id')} cites source_label"
+                    f" {label!r}, which this case does not declare"
+                )
 
 
 def _check_case_metadata(case_dir: Path, meta: dict) -> Iterator[str]:
@@ -87,9 +196,7 @@ def _check_case_metadata(case_dir: Path, meta: dict) -> Iterator[str]:
         yield f"case.json id {meta.get('id')!r} does not match directory name"
     if meta.get("exemplar_proximity") not in EXEMPLAR_PROXIMITY:
         yield f"exemplar_proximity {meta.get('exemplar_proximity')!r} is not near/far"
-    expected_sha = source_sha256(case_dir / "source.md")
-    if meta.get("source_sha256") != expected_sha:
-        yield f"source_sha256 does not match source.md (expected {expected_sha})"
+    yield from _check_sources(case_dir, meta)
 
 
 def _check_threats(threats: object, element_ids: set[str]) -> Iterator[str]:
@@ -155,9 +262,13 @@ def check_case(case_dir: Path) -> list[str]:
     if problems:
         return problems
 
-    problems.extend(_check_case_metadata(case_dir, _load_json(case_dir / "case.json")))
+    meta = _load_json(case_dir / "case.json")
+    problems.extend(_check_case_metadata(case_dir, meta))
 
-    model, issues = parse_and_validate(_load_json(case_dir / "model.json"))
+    raw_model = _load_json(case_dir / "model.json")
+    problems.extend(_check_citations(raw_model, declared_labels(meta)))
+
+    model, issues = parse_and_validate(raw_model)
     problems.extend(f"model.json: {issue.code}: {issue.message}" for issue in issues)
     if model is None:
         return problems
@@ -231,12 +342,24 @@ def _severity_bands() -> Iterator[str]:
 
 
 def write_shas() -> None:
-    """Stamp each case's ``source_sha256`` from its current ``source.md``."""
+    """Restamp every declared source's digest, and the aggregate over them."""
     for case_dir in case_dirs():
         meta_path = case_dir / "case.json"
         meta = _load_json(meta_path)
-        meta["source_sha256"] = source_sha256(case_dir / "source.md")
-        meta_path.write_text(json.dumps(meta, indent=2) + "\n", encoding="utf-8")
+        refs = []
+        for source in meta.get("sources", []):
+            source["sha256"] = source_sha256(case_dir / source["file"])
+            refs.append(
+                SourceRef(
+                    kind=source["kind"],
+                    label=source["label"],
+                    sha256=source["sha256"],
+                )
+            )
+        meta["source_sha256"] = InputRef.aggregate_digest(refs)
+        meta_path.write_text(
+            json.dumps(meta, indent=2, ensure_ascii=False) + "\n", encoding="utf-8"
+        )
 
 
 def main() -> int:

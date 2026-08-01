@@ -5,6 +5,14 @@
   "exemplar_proximity": "far",
   "provenance": "Synthetic system authored for this corpus (wayfinder ticket 029). Not derived from, or sanitized from, any real system: there is nothing to leak by omission.",
   "bootstrap": "agent-stand-in",
-  "source_sha256": "2507fd3081003c1c94427ef81dcea36f6ca92f5358c965789b49ec4af89b6a60",
+  "sources": [
+    {
+      "kind": "description",
+      "label": "System description",
+      "file": "source.md",
+      "sha256": "2507fd3081003c1c94427ef81dcea36f6ca92f5358c965789b49ec4af89b6a60"
+    }
+  ],
+  "source_sha256": "88a78f79efdde888363d10b780cb17c5d204a7ad4a7f52713dab6f1e448fcdbc",
   "notes": "Adversarial case 1 of 2 (ticket 009 decision 6). The structure is fully stated and the security posture is almost entirely absent, so nearly every attribute an analyst reads is unknown and the correct behaviour is needs-info rather than either confidence or silence. It is the case that grades the unknown/assumption distinction ticket 003 built: the source states what the rota database holds without ever classifying it, so pii comes from the content while data_classification stays unknown, and it places the web app nowhere, so its zone is an assumption on the record rather than a silent pick. Far from the payments exemplar in shape as well as attribute density: the trust hand-off is a weekly file left at rest for another team's system to fetch, so the collector initiates, there is no synchronous caller identity anywhere in it, and the availability failure is a missed pay run rather than a slow page."
 }
