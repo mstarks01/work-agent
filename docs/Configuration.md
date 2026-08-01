@@ -233,10 +233,14 @@ happily, and the same schema goes to another provider fine.
 
 What you give up is constrained *generation*, not the check. The node keeps its
 `output_schema`, the response is validated on arrival, and a failed extraction
-still reaches the repair node. **Eight of the graph's ten LLM nodes already run
-this way** — the six analysts and both critic passes bind `list[...]` schemas
-that ADK cannot convert, so no schema is sent for them either. Turning it off on
-`base` makes all ten uniform rather than introducing a new mode.
+still reaches the repair node.
+
+Every LLM node carries a schema the adapter can convert, so this setting is the
+only thing deciding whether one is sent. (That was not always true: the six
+analysts and both critic passes once bound bare `list[...]` schemas, which ADK
+cannot convert — it sent none and they generated unconstrained, silently. They
+now carry wrapper models, and a test asserts every node's schema survives the
+conversion.)
 
 It enters the sampling fingerprint, so a sweep measured with constrained output
 does not certify a run made without it. It is deliberately **not** promotable: a
