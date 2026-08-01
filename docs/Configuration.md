@@ -135,16 +135,29 @@ answer never depends on a network fetch during startup.
 
 ### Resilience
 
-`attempts = 3`, `timeout_ms = 300000` (`version = 2`). On library defaults the
-LLM nodes never retry and never time out, so a single 429 kills a paid-for job.
-Unlike sampling, these **are** environment-overridable — they change how hard the
-service tries, never which answer it gets.
+`attempts = 3`, `timeout_ms = 300000`, `max_source_bytes = 102400`,
+`max_sources = 10` (`version = 3`). On library defaults the LLM nodes never
+retry and never time out, so a single 429 kills a paid-for job; the other two
+bound what one job may carry. Unlike sampling, all four **are**
+environment-overridable — none of them can move an eval score, because retry
+and timeout change how hard the service tries and the input bounds decide only
+whether a submission is accepted at all.
 
 `attempts` is a **total** count and is converted for the provider, which counts
-retries *after* the first try. Version 2 **removed** the four backoff knobs
-(`initial_delay`, `max_delay`, `exp_base`, `jitter`): the adapter picks its
-backoff curve internally from the exception type, so as configuration they read
-as a knob and connected to nothing.
+retries *after* the first try.
+
+`max_source_bytes` is the **total across all of a job's sources**, not a bound
+on any one of them: there is deliberately no per-source cap, since it would
+forbid only shapes the total already permits. Both bounds are in UTF-8 bytes
+rather than tokens, so the public contract does not change when a deployment
+changes vendor.
+
+Version 3 **added** the two input bounds. Version 2 **removed** version 1's four
+backoff knobs (`initial_delay`, `max_delay`, `exp_base`, `jitter`): the adapter
+picks its backoff curve internally from the exception type, so as configuration
+they read as a knob and connected to nothing. Both are hard cutovers — a file on
+an older version fails to load, so every deployment edits its file rather than
+inheriting a default for a contract its callers can see.
 
 ## Environment variables
 
@@ -265,6 +278,8 @@ Bounds enforced before or during analysis:
 
 | Limit | Value | Where |
 | --- | --- | --- |
-| `MAX_DESCRIPTION_BYTES` | 100 KiB (UTF-8) | Rejected at both entry points. |
+| `max_source_bytes` | 100 KiB (UTF-8), total across all sources | Rejected at both entry points; deployment config. |
+| `max_sources` | 10 | Rejected at both entry points; deployment config. |
+| Source `label` | 200 characters, single-line, unique per job | Rejected as a malformed source. |
 | `MAX_SYSTEM_NAME_CHARS` | 200 | Rejected by the engine / API. |
 | `MAX_ELEMENTS` | 150 | A larger model is a `too-many-elements` [rejection](Report-Schema.md). |

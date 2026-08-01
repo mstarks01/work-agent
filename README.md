@@ -7,7 +7,7 @@ per-tier models from any supported vendor — Vertex, Anthropic or OpenAI, with 
 privileged default.
 
 ```
-description text ──▶ extract ──▶ [ 6 STRIDE analysts in parallel ] ──▶ critic ──▶ StrideReport
+sources (text) ──▶ extract ──▶ [ 6 STRIDE analysts in parallel ] ──▶ critic ──▶ StrideReport
                      (base)              (strong)                     (strong)      (JSON)
 ```
 
@@ -50,7 +50,7 @@ stub runner need none of it.
 | `prompts/` | Agent prompts and per-category exemplars. |
 | `skills/` | The per-category STRIDE skill Markdown baked into the image. |
 | `docs/` | User-facing documentation (see below). |
-| `examples/` | Runnable embedding examples and the shared sample description. The source of truth for every code block in the docs. |
+| `examples/` | Runnable embedding examples and the shared sample source. The source of truth for every code block in the docs. |
 | `webapp/` | The lite first-run web app. **Never ships** in the wheel; run from a clone. |
 | `evals/` | Golden-case corpus, scorer, and the [eval harness](evals/README.md). **Never ships** in the image. |
 | `tests/` | Offline test suite (no credentials required). |

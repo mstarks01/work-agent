@@ -69,7 +69,7 @@ configuration.
 
 ```python
 async def analyze(
-    description: str,
+    sources: Sequence[Source],
     *,
     system_name: str | None = None,
     caller: str = "in-process",
@@ -77,9 +77,20 @@ async def analyze(
 ) -> PipelineOutcome
 ```
 
-- `description` — the untrusted system description. Bounded to 100 KiB of UTF-8
-  (`MAX_DESCRIPTION_BYTES`); it enters the pipeline as data, never as an
-  instruction.
+- `sources` — an ordered, non-empty sequence of untrusted `Source` values, each
+  `{kind, label, text}`. Build them with `Source.description(text)` or
+  `Source.transcript(text)`, both of which default the label, or name one
+  yourself with `label=`. Bounded by this deployment's config — 100 KiB total
+  across all sources and 10 sources as shipped — and counted in UTF-8 bytes
+  rather than tokens. Every source enters the pipeline as data inside its own
+  fenced block, never as an instruction.
+
+  Order is presentation only: **sources carry equal weight**, so listing a
+  document before a transcript does not make it authoritative. Where two
+  sources disagree, extraction records the disagreement rather than choosing —
+  the attribute lands as `unknown` with both claims quoted in the element's
+  `notes`, or, where the schema cannot hold `unknown`, as a value plus an entry
+  in the model's `assumptions`.
 - `system_name` — optional label echoed into the report. Blank falls through to
   a default; over 200 characters (`MAX_SYSTEM_NAME_CHARS`) is a caller error.
 - `caller` — isolates the underlying session; it is not an authorization
@@ -87,12 +98,16 @@ async def analyze(
 - `on_node` — optional async callback invoked with each node name as it
   completes, for progress or tracing.
 
-## Writing the description
+## Writing the sources
 
-The `description` is free-form — prose, bullets, a table, or a rough dump all
-work, and it will be incomplete. The first pipeline stage transcribes it into a
-canonical system model; the quality of the report tracks how much of the
-following the text actually states.
+A source is free-form — prose, bullets, a table, a rough dump or a transcribed
+call all work, and it will be incomplete. The first pipeline stage transcribes
+it into a canonical system model; the quality of the report tracks how much of
+the following the text actually states.
+
+The service takes **text only**: decode a `.vtt`, `.docx` or meeting-tool export
+before submitting. Give each source a `label` you will recognise, because it is
+what every quote in the report cites.
 
 Include, as far as you know them:
 
@@ -164,15 +179,20 @@ here rather than retyped, so the shape below is provably the shape that works:
 <!-- docs-include: examples/embed.py#embed -->
 ```python
 async def main(engine: StrideEngine) -> None:
-    """Analyze one system description, handling every outcome it can have."""
-    description = SAMPLE.read_text(encoding="utf-8")
+    """Analyze one system, handling every outcome the run can have."""
+    # A job takes an ordered list of sources. One written description is the
+    # simplest case; add Source.transcript(...) for a recorded call, and give
+    # each a label you will recognise when you read it back in the report.
+    sources = [
+        Source.description(SAMPLE.read_text(encoding="utf-8"), label="Orders note"),
+    ]
 
     try:
-        outcome = await engine.analyze(description, system_name="Orders")
+        outcome = await engine.analyze(sources, system_name="Orders")
     except EngineInputError as exc:
-        # Raised before any model runs: empty description, oversized
-        # description, over-long system_name. Your caller's mistake, not the
-        # service's — surface it as a validation error.
+        # Raised before any model runs: no sources, too many, more bytes than
+        # the deployment allows, or an over-long system_name. Your caller's
+        # mistake, not the service's — surface it as a validation error.
         print(f"invalid submission: {exc}", file=sys.stderr)
         raise
     except Exception:
@@ -183,8 +203,8 @@ async def main(engine: StrideEngine) -> None:
         raise
 
     if isinstance(outcome, PipelineRejected):
-        # The description could not be turned into a valid system model. This
-        # is actionable by whoever wrote it: each issue names what to fix.
+        # The sources could not be turned into a valid system model. This is
+        # actionable by whoever wrote them: each issue names what to fix.
         for issue in outcome.issues:
             print(f"rejected [{issue.code}] {issue.message}", file=sys.stderr)
         return
@@ -205,9 +225,15 @@ see the `too-many-elements` code in [Configuration](Configuration.md)) and is ac
 caller. An exception is the service's fault and carries no issues.
 
 `EngineInputError` (a `ValueError`) is raised *before* any model runs, for a
-submission that breaks the input contract — empty description, oversized
-description, over-long `system_name`. Treat it as a caller/validation error, not
-a pipeline failure.
+submission that breaks the input contract — no sources, more sources than the
+deployment allows, more bytes than it allows, or an over-long `system_name`.
+Treat it as a caller/validation error, not a pipeline failure. A malformed
+*individual* source raises earlier still, as a `ValidationError` when you
+construct the `Source`.
+
+There is no per-source byte cap, only a total, so the over-budget message names
+no single culprit — it carries a per-label breakdown so you can decide what to
+trim.
 
 ## Synchronous callers
 
@@ -221,10 +247,12 @@ From [`examples/embed_sync.py`](../examples/embed_sync.py):
 ```python
 def analyze_orders(engine: StrideEngine) -> None:
     """The synchronous call, with the same three outcomes as the async one."""
-    description = SAMPLE.read_text(encoding="utf-8")
+    sources = [
+        Source.description(SAMPLE.read_text(encoding="utf-8"), label="Orders note"),
+    ]
 
     try:
-        outcome = engine.analyze_sync(description, system_name="Orders")
+        outcome = engine.analyze_sync(sources, system_name="Orders")
     except RuntimeError as exc:
         # analyze_sync was called from inside a running event loop. Await
         # engine.analyze(...) there instead — see examples/embed.py.
