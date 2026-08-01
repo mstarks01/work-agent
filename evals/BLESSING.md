@@ -1,6 +1,7 @@
 # Blessing a golden case
 
-How to turn a system description into a golden case the evals can score against.
+How to turn one or more submitted sources into a golden case the evals can
+score against.
 This is a one-time, offline authoring task — nothing here runs during a live
 analysis. The whole point of the document is **step 3**; everything else is
 bookkeeping around it.
@@ -15,25 +16,63 @@ evals/corpus/<NN>-<slug>/
   model.json      the blessed System Model; must pass the shipped validator
   threats.json    the reference threat set, written against model.json's IDs
   corrections.md  how the model was corrected against the source, and what that says
-  case.json       metadata: domain, exemplar proximity, provenance, source_sha256
+  case.json       metadata, plus the sources array declaring the case's input
 ```
+
+A case may declare **more than one source**, because a job may submit more than
+one. `case.json` names them the way a caller does:
+
+```json
+"sources": [
+  {"kind": "description", "label": "System description",
+   "file": "source.md", "sha256": "<digest of that file>"},
+  {"kind": "transcript", "label": "Kickoff call",
+   "file": "call.md", "sha256": "<digest of that file>"}
+]
+```
+
+Each entry's `file` is relative to the case directory, so a second source is a
+second file beside `source.md` — name it for what it is. `label` must be unique
+within the case, and it is the label every `source_label` in `model.json` has to
+cite: the service rejects a model citing a label its job never carried, so a
+corpus that broke that rule would grade a shape production refuses.
+`source_sha256` at the top level is the **aggregate over those refs**, computed
+exactly as a report's `InputRef` computes it — not a digest of the text.
 
 The judge fixtures live alongside, in `evals/judge_calibration/`:
 `build_pairs.py` holds the hand labels, and `pairs.json` is generated from it.
 
 Run `python evals/verify_corpus.py` to check everything mechanical about the
-above; it must be green before a case merges. `--write-sha` stamps
-`source_sha256`.
+above; it must be green before a case merges. It checks that every declared file
+exists and digests as claimed, that labels are unique, and that every
+`source_label` in `model.json` names a source the case declares. `--write-sha`
+restamps each source's digest and the aggregate over them.
 
 ## The workflow
 
 ### 1. Write the source text
 
-The input is what a real user would submit: prose, bullets, a rough dump —
-**semi-structured and incomplete on purpose**. A description with no gaps tests
-nothing, because the behaviour that matters most is how the service handles what
-the text *doesn't* say (unstated facts become `unknown`). A case with no unknowns
-can't exercise that.
+The input is what a real user would submit: prose, bullets, a rough dump, or a
+transcribed call — **semi-structured and incomplete on purpose**. A source with
+no gaps tests nothing, because the behaviour that matters most is how the
+service handles what the text *doesn't* say (unstated facts become `unknown`).
+A case with no unknowns can't exercise that.
+
+**Writing a transcript source.** Match the form real exports have, which was
+measured rather than guessed ([#51](https://github.com/mstarks01/work-agent/issues/51)):
+attribution names the *participant* and never their role, there are **no**
+uncertainty markers like `[inaudible]` (the real failure mode is fluent
+fabrication, not visible garbling), and merged turns run around 220 characters.
+Write it **cleaned, not raw** — the byte budget forces cleaning, and cue timings
+are stripped by it.
+
+**Grading a conversational rule needs care.** `score_extraction` is
+attribute-blind — it sees element IDs and boundary crossings — so "a hedge
+became `unknown`" is invisible to it. The only path from an extraction rule to a
+number is the reference threat set in end-to-end mode: a needs-info must-find
+threat that a wrongly-confident attribute would suppress, dropping recall. Write
+each assertion so it fires through that or through `ExtractionScore` directly,
+or it will not be measured at all.
 
 Size the system so the finished model lands at **8–20 elements**. That's not a
 style preference: the reference threat set has to be exhaustively enumerable by a
@@ -159,7 +198,9 @@ Merge checklist:
 - [ ] the model was corrected against the source text, per step 3
 - [ ] `corrections.md` records every correction and the pattern behind it
 - [ ] sanitization confirmed; provenance and licence recorded in `case.json`
-- [ ] `source_sha256` stamped (`--write-sha`)
+- [ ] `sources` declared in `case.json`, one entry per input file
+- [ ] every `source_label` in `model.json` names one of those labels
+- [ ] digests and the aggregate stamped (`--write-sha`)
 - [ ] tier assignment reviewed: some must-find, not all
 
 ## Growing a case from real runs

@@ -24,7 +24,7 @@ evals/
     model.json                  the blessed System Model (passes the shipped validator)
     threats.json                the reference threat set, keyed to model.json's IDs
     corrections.md              notes on how the model was corrected, and why
-    case.json                   metadata, provenance, source_sha256
+    case.json                   metadata, provenance, and the declared sources
   judge_calibration/
     build_pairs.py              the hand-labelled judge fixtures (edit this)
     pairs.json                  generated from build_pairs.py (never hand-edit)
@@ -67,7 +67,7 @@ Offline — no credentials, safe on every change:
 
 ```sh
 python evals/verify_corpus.py                 # check every case and the judge fixtures
-python evals/verify_corpus.py --write-sha     # restamp source_sha256 after editing a source
+python evals/verify_corpus.py --write-sha     # restamp source digests after editing a source
 python evals/judge_calibration/build_pairs.py # regenerate pairs.json from the labels
 pytest tests/test_evals_*.py tests/test_corpus_lints.py
 ```
