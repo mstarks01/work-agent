@@ -19,12 +19,17 @@ Constructor kwargs reach ``acompletion`` via ``_additional_args`` *before*
 neither here nor via ``LITELLM_DROP_PARAMS`` — because LiteLLM's default is
 fail-closed and the sampling fingerprint's honesty depends on it.
 
-Three build-time gates fire per tier, so a misconfiguration costs nothing rather
+Four build-time gates fire per tier, so a misconfiguration costs nothing rather
 than dying on node one of a paid-for job:
 
 * the **supported-param check** (:mod:`stride_service.model_gate`);
 * the **removed-``temperature`` check** below, which covers that check's one
   documented blind spot on Claude;
+* the **native-structured-output check** below. Every LLM node binds an
+  ``output_schema``, and a model the provider library cannot constrain natively
+  gets that constraint *emulated* — which sends an unresolved schema and fails
+  at output validation mid-job, the one failure shape the other gates cannot
+  see because both the request and the response are well-formed;
 * the **credential check** (:meth:`Vendor.credential_kwargs`), which fires once
   per tier and fails closed under :class:`ProviderAuthError`.
 
@@ -47,6 +52,7 @@ from stride_service.model_gate import (
     ModelGateError,
     assert_kwarg_supported,
     check_supported,
+    emulates_structured_output,
 )
 from stride_service.model_tiers import TIER_NAMES, ModelTierConfig, TierName
 from stride_service.resilience import ResilienceConfig
@@ -56,7 +62,7 @@ from stride_service.sampling import (
     TierSampling,
     make_resolve_sampling,
 )
-from stride_service.vendors import claude_generation
+from stride_service.vendors import Vendor, claude_generation
 
 if TYPE_CHECKING:
     # Both deliberately type-only. A runtime ``from stride_service.graph import``
@@ -115,6 +121,33 @@ def _check_temperature_unset(
         )
 
 
+def _check_native_structured_output(
+    vendor: Vendor, model: str, source: str
+) -> None:
+    """Fail closed when a tier's model would get *emulated* schema constraint.
+
+    Every LLM node in the graph binds an ``output_schema``, so a tier whose
+    model falls to LiteLLM's synthesised-tool path is not merely taking a
+    different route to the same place — it sends a ``$defs``-bearing schema the
+    provider will not resolve, and the node fails on the response it validates
+    rather than on the request it made. That is the most expensive shape a
+    failure can take here: it survives the build, survives the request, and
+    dies at output validation on node one.
+
+    Checked per tier at build time for the same reason as everything else in
+    this module — a misconfiguration should cost nothing.
+    """
+    if emulates_structured_output(vendor, model):
+        raise ModelGateError(
+            f"{source}: {vendor.name} cannot constrain {model!r} to a schema"
+            " natively, so the provider library would emulate it with a"
+            " synthesised tool and send the graph's schema with its $defs"
+            " unresolved. Every LLM node binds an output schema, so this fails"
+            " at output validation mid-job rather than here. Choose a model"
+            " whose provider supports schema-constrained output directly."
+        )
+
+
 def build_tier_adapters(
     tiers: ModelTierConfig,
     sampling: SamplingConfig,
@@ -150,6 +183,7 @@ def build_tier_adapters(
             vendor, selection.model, tier_sampling.gate_params(), source=source
         )
         _check_temperature_unset(selection.model, tier_sampling, source)
+        _check_native_structured_output(vendor, selection.model, source)
         adapters[tier] = LiteLlm(
             model=selection.route,
             **{_NUM_RETRIES_KWARG: resilience.to_num_retries()},
