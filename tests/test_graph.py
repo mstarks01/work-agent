@@ -503,8 +503,10 @@ def test_router_accepts_well_formed_critic_output():
     event = graph.route_review(
         valid_model().model_dump(mode="json"),
         [draft.model_dump(mode="json") for draft in drafts],
-        {"threats": [threat.model_dump(mode="json") for threat in reviewed]},
         ctx,
+        reviewed_threats={
+            "threats": [threat.model_dump(mode="json") for threat in reviewed]
+        },
     )
     assert event.actions.route == graph.ROUTE_ACCEPT
     assert graph.STATE_CRITIC_ISSUES not in ctx.state
@@ -518,12 +520,53 @@ def test_router_revises_and_feeds_the_re_ask_prompt():
     event = graph.route_review(
         valid_model().model_dump(mode="json"),
         [draft.model_dump(mode="json") for draft in drafts],
-        {"threats": [threat.model_dump(mode="json") for threat in reviewed]},
         ctx,
+        reviewed_threats={
+            "threats": [threat.model_dump(mode="json") for threat in reviewed]
+        },
     )
     assert event.actions.route == graph.ROUTE_REVISE
     assert "T-01" in ctx.state[graph.STATE_CRITIC_ISSUES]
     assert "S-01" in ctx.state[graph.STATE_PREVIOUS_REVIEW]
+
+
+def test_a_critic_that_emitted_nothing_routes_to_the_re_ask():
+    """The shape a truncated completion takes: no output key written at all.
+
+    An LLM node that emits no text — a completion cut off at
+    ``max_output_tokens``, reasoning tokens included — leaves ``output_key``
+    unwritten rather than empty, so the router binds nothing for it. That is the
+    critic dropping every draft, and it belongs on the ``revise`` edge the graph
+    already has, not on an ADK parameter-binding error naming ``router``.
+    """
+    drafts = [sample_draft("S-01"), sample_draft("T-01", category="tampering")]
+    ctx = FakeContext()
+
+    event = graph.route_review(
+        valid_model().model_dump(mode="json"),
+        [draft.model_dump(mode="json") for draft in drafts],
+        ctx,
+    )
+
+    assert event.actions.route == graph.ROUTE_REVISE
+    assert "S-01" in ctx.state[graph.STATE_CRITIC_ISSUES]
+    assert "T-01" in ctx.state[graph.STATE_CRITIC_ISSUES]
+
+
+def test_a_silent_re_ask_fails_naming_the_drafts_it_never_ruled():
+    """The second silence is terminal, and says what did not reconcile.
+
+    ``critic_failed`` is what a silent critic reaches after its one re-ask, so
+    it has to survive the same absent key — this is the node whose whole job is
+    reporting why the run died.
+    """
+    drafts = [sample_draft("S-01")]
+
+    with pytest.raises(CriticOutputError, match="dropped draft 'S-01'"):
+        graph.fail_review(
+            valid_model().model_dump(mode="json"),
+            [draft.model_dump(mode="json") for draft in drafts],
+        )
 
 
 def test_fail_review_raises_the_still_unreconciled_issues():
@@ -534,7 +577,9 @@ def test_fail_review_raises_the_still_unreconciled_issues():
         graph.fail_review(
             valid_model().model_dump(mode="json"),
             [draft.model_dump(mode="json") for draft in drafts],
-            {"threats": [threat.model_dump(mode="json") for threat in reviewed]},
+            reviewed_threats={
+                "threats": [threat.model_dump(mode="json") for threat in reviewed]
+            },
         )
 
 
@@ -553,8 +598,10 @@ def test_assemble_splits_rulings_and_builds_the_summary():
     output = graph.assemble_report(
         valid_model().model_dump(mode="json"),
         [draft.model_dump(mode="json") for draft in drafts],
-        {"threats": [t.model_dump(mode="json") for t in (confirmed, rejected)]},
         ctx,
+        reviewed_threats={
+            "threats": [t.model_dump(mode="json") for t in (confirmed, rejected)]
+        },
     )
 
     assert output == {"threat_count": 1, "rejected_count": 1}
@@ -572,6 +619,8 @@ def test_assemble_fails_closed_when_the_critic_drops_a_draft():
         graph.assemble_report(
             valid_model().model_dump(mode="json"),
             [draft.model_dump(mode="json") for draft in drafts],
-            {"threats": [sample_threat("S-01").model_dump(mode="json")]},
             ctx,
+            reviewed_threats={
+                "threats": [sample_threat("S-01").model_dump(mode="json")]
+            },
         )
