@@ -184,7 +184,10 @@ class TestSourceRendering:
             Source.description("a web app storing orders", label="Doc"),
             Source.transcript("Ana: it writes to Postgres.", label="Kickoff call"),
         ]
-        pipeline, models = scripted_pipeline(happy_replies())
+        # The scripted model must cite a label this job carries, or the gate
+        # rejects it before the run reaches an analysis.
+        replies = happy_replies() | {"extract": valid_model("Doc").model_dump_json()}
+        pipeline, models = scripted_pipeline(replies)
 
         drive(pipeline, sources=sources)
 
