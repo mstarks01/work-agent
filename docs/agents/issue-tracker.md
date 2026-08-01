@@ -56,7 +56,7 @@ gh api --method POST repos/mstarks01/work-agent/issues/<child>/dependencies/bloc
 ### The live map
 
 None. [#49](https://github.com/mstarks01/work-agent/issues/49) completed 2026-07-31 and has
-moved to Completed efforts below; its spec is awaiting implementation on `build/sources-cutover`.
+moved to Completed efforts below; its spec was implemented and merged 2026-08-01.
 Chart a new one only under the bar at the end of this file.
 
 ### Completed efforts
@@ -64,13 +64,22 @@ Chart a new one only under the bar at the end of this file.
 Completed on GitHub Issues (canonical):
 
 - [#49 — Map: accept call transcripts as job input](https://github.com/mstarks01/work-agent/issues/49)
-  — 10 tickets, charted and completed 2026-07-31. A **planning** map: it settles the spec for
-  accepting analyst↔developer interview transcripts as job input and stops there. **The spec is
-  not yet implemented** — it ships as one branch, `build/sources-cutover`, whose plan is
-  [#57, the cutover inventory](https://github.com/mstarks01/work-agent/issues/57): seven commits,
-  no green intermediate (the no-shim rule makes the contract atomic), config ahead of the contract,
-  and one narrow ADR at `docs/adr/0001-sources-replace-description.md` creating the directory.
-  Read #57 first, then the other nine resolution comments for the reasoning.
+  — 10 tickets, charted and completed 2026-07-31. A **planning** map: it settled the spec for
+  accepting analyst↔developer interview transcripts as job input and stopped there. **The spec has
+  since been implemented** — written up as [#61](https://github.com/mstarks01/work-agent/issues/61)
+  and merged 2026-08-01 in [#63](https://github.com/mstarks01/work-agent/pull/63), seven commits on
+  `build/sources-cutover` following
+  [#57, the cutover inventory](https://github.com/mstarks01/work-agent/issues/57): no green
+  intermediate (the no-shim rule makes the contract atomic), config ahead of the contract, and one
+  narrow ADR at `docs/adr/0001-sources-replace-description.md` creating the directory. **Read the
+  code first**, then #57, then the other nine resolution comments for the reasoning behind it.
+
+  Two things did not land with it. The **corpus regression run**
+  ([#59](https://github.com/mstarks01/work-agent/issues/59)'s exit criterion) needs live provider
+  credentials and has not been run against merged `main`; the `severity_rubric.md` edit reaches
+  every analyst on every job, and 20 elements across 5 of the 12 cases carry `notes`. And the
+  thirteenth corpus case is [#64](https://github.com/mstarks01/work-agent/issues/64), open and
+  contributor-side — only its schema migration is in.
 
   The route in one pass: `description` is replaced by a uniform `sources` list of
   `{kind, label, text}` — `kind` a closed enum, `label` a required, unique, 200-char, model-visible
