@@ -84,7 +84,7 @@ class TestRepoConfig:
         "STRIDE_MODEL_BASE_VENDOR": "openai",
         "STRIDE_MODEL_BASE_MODEL": "gpt-4.1-mini",
         "STRIDE_MODEL_STRONG_VENDOR": "anthropic",
-        "STRIDE_MODEL_STRONG_MODEL": "claude-sonnet-4-5-20250929",
+        "STRIDE_MODEL_STRONG_MODEL": "claude-opus-5",
     }
 
     def test_shipped_config_selects_no_vendor(self):
@@ -136,7 +136,7 @@ class TestResolution:
 
     def test_the_two_tiers_may_run_different_vendors_at_once(self, config_path):
         text = config_toml(
-            strong_vendor="anthropic", strong="claude-sonnet-4-5-20250929"
+            strong_vendor="anthropic", strong="claude-opus-5"
         )
         config = load_model_tiers(config_path(text), env={})
         assert config.resolve_model("extract").vendor == "vertex"
@@ -160,10 +160,10 @@ class TestEnvOverrides:
 
     def test_vendor_and_model_together_switch_vendor(self, config_path):
         vendor_var, model_var = env_vars_for("base")
-        env = {vendor_var: "anthropic", model_var: "claude-sonnet-4-5-20250929"}
+        env = {vendor_var: "anthropic", model_var: "claude-opus-5"}
         config = load_model_tiers(config_path(config_toml()), env=env)
         assert config.resolve_model("extract").route == (
-            "anthropic/claude-sonnet-4-5-20250929"
+            "anthropic/claude-opus-5"
         )
 
     def test_the_path_variable_can_actually_be_set(self, config_path):
@@ -225,11 +225,13 @@ class TestEnvOverrides:
 
 
 class TestPinValidation:
-    """ "Pinned" is per-vendor and deliberately weak — an open-world denylist.
+    """ "Pinned" is per-family: a denylist, plus a shape where one is published.
 
-    The guarantee lives on the served-build readback, not here: an allowlist of
-    numbered builds is what broke when Google retired them, and that risk now
-    runs against three catalogs.
+    The denylist half stays deliberately weak, and the guarantee lives on the
+    served-build readback rather than here: an allowlist of numbered builds is
+    what broke when Google retired them, and that risk runs against three
+    catalogs. Claude's half is a *shape*, not a list of builds, so a model
+    released tomorrow already satisfies it.
     """
 
     @pytest.mark.parametrize(
@@ -252,21 +254,25 @@ class TestPinValidation:
         # most specific identifier that exists.
         assert validate_model_string(value, "vertex", source="t") == value
 
-    def test_vertex_claude_must_carry_its_dated_build(self):
+    @pytest.mark.parametrize("vendor", ["anthropic", "vertex"])
+    def test_the_dateless_claude_id_is_the_pinned_form(self, vendor):
+        # Both vendors that serve Claude spell 4.6-and-later identically, and
+        # the dateless ID is the snapshot rather than a pointer at one.
         assert (
-            validate_model_string("claude-sonnet-4-5@20250929", "vertex", source="t")
-            == "claude-sonnet-4-5@20250929"
+            validate_model_string("claude-opus-5", vendor, source="t")
+            == "claude-opus-5"
         )
-        with pytest.raises(ModelConfigError, match="not pinned"):
-            validate_model_string("claude-sonnet-4-5", "vertex", source="t")
 
-    def test_anthropic_direct_must_carry_its_dated_snapshot(self):
-        assert (
-            validate_model_string("claude-sonnet-4-5-20250929", "anthropic", source="t")
-            == "claude-sonnet-4-5-20250929"
-        )
-        with pytest.raises(ModelConfigError, match="not pinned"):
-            validate_model_string("claude-sonnet-4-5", "anthropic", source="t")
+    @pytest.mark.parametrize("vendor", ["anthropic", "vertex"])
+    def test_the_pre_generation_dated_forms_are_rejected(self, vendor):
+        for value in ("claude-sonnet-4-5-20250929", "claude-sonnet-4-5@20250929"):
+            with pytest.raises(ModelConfigError, match="not pinned"):
+                validate_model_string(value, vendor, source="t")
+
+    def test_a_claude_below_the_floor_is_rejected_as_a_generation(self):
+        # Well-formed, just too old: the message names the generation it read.
+        with pytest.raises(ModelConfigError, match="supports 4.6 and later"):
+            validate_model_string("claude-haiku-4-5", "anthropic", source="t")
 
     def test_the_vertex_rule_branches_on_model_family(self):
         # One vendor entry, two families: vertex_ai/ is not one provider.
@@ -274,7 +280,7 @@ class TestPinValidation:
         with pytest.raises(ModelConfigError):
             validate_model_string("claude-sonnet-4-5", "vertex", source="t")
 
-    def test_openai_has_no_dated_form_to_require(self):
+    def test_openai_has_no_canonical_form_to_require(self):
         # The o-series ships none at all, so only the shared denylist applies.
         assert validate_model_string("o3", "openai", source="t") == "o3"
 

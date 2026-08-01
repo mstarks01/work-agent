@@ -19,14 +19,20 @@
 # be an active lie under a Claude or GPT model string. The two tiers select
 # independently, so mixed-vendor pairs are ordinary, not a special case.
 #
-# PINNING is per-vendor and deliberately weak — an open-world denylist of
-# floating forms (`-latest`, `-preview`, `-exp`, plus a per-family pinned shape
-# where the vendor publishes one). It is a proxy, not the guarantee: the
-# reproducibility guarantee is the *served* build read back from every response
-# and recorded per node execution. The predecessor to this rule was an allowlist
-# of numbered Gemini builds, and it broke outright when Google retired them;
-# that risk now runs against three catalogs, so the rule stays loose and the
-# readback carries the weight.
+# PINNING is per model family and deliberately weak — an open-world denylist of
+# floating forms (`-latest`, `-preview`, `-exp`), plus a canonical shape where
+# the vendor publishes one. Claude is the family that does: from generation 4.6
+# on, the identifier is dateless and carries the whole version
+# (`claude-opus-5`, `claude-sonnet-4-6`), it is a pinned snapshot rather than an
+# alias, and Vertex spells it the same way. This service runs Claude 4.6 and
+# later only; the pre-4.6 dated forms are rejected outright rather than
+# supported alongside.
+#
+# Pinning is a proxy, not the guarantee: the reproducibility guarantee is the
+# *served* build read back from every response and recorded per node execution.
+# The predecessor to this rule was an allowlist of numbered Gemini builds, and
+# it broke outright when Google retired them; matching a shape rather than
+# enumerating builds is what keeps the Claude half from repeating that.
 #
 # ENV OVERRIDES are two vars per tier: STRIDE_MODEL_{BASE,STRONG}_VENDOR and
 # _MODEL. `_MODEL` alone is the ops case (retune on a deployed revision without
@@ -50,7 +56,7 @@ version = 3
 # set STRIDE_MODEL_{BASE,STRONG}_VENDOR together with the matching _MODEL — the
 # two halves must move together, since a vendor without its model is not a
 # usable selection. Model identifiers must be pinned: no `-latest`, `-preview`
-# or `-exp`, and Anthropic requires its dated suffix. docs/First-Run.md step 2
+# or `-exp`, and Claude takes its dateless 4.6+ ID. docs/First-Run.md step 2
 # walks through each vendor's credentials; docs/Configuration.md has the rules.
 #
 # [tiers.base]

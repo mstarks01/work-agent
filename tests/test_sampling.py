@@ -388,8 +388,8 @@ class TestSamplingFingerprint:
         # without the prefix a manifest blessed on one would certify the other.
         sampling = TierSampling(temperature=0.0)
         assert sampling_fingerprint(
-            "vertex_ai/claude-sonnet-4-5", sampling
-        ) != sampling_fingerprint("anthropic/claude-sonnet-4-5", sampling)
+            "vertex_ai/claude-opus-5", sampling
+        ) != sampling_fingerprint("anthropic/claude-opus-5", sampling)
 
     def test_same_model_different_sampling_diverges(self):
         assert sampling_fingerprint(
