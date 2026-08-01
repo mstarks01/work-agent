@@ -6,6 +6,7 @@
       "description": "The end user's browser, outside the application's network.",
       "assets": [],
       "source_excerpt": "A user's browser talks to the web application over HTTP/S across the public internet.",
+      "source_label": "System description",
       "kind": "external-system",
       "trust_zone": "boundary:public-internet"
     }
@@ -17,6 +18,7 @@
       "description": "Serves the browser and enqueues work rather than performing it inline.",
       "assets": ["reputation"],
       "source_excerpt": "the web application runs in our web tier",
+      "source_label": "System description",
       "technology": "unknown",
       "trust_zone": "boundary:web-tier",
       "exposure": "internet-facing"
@@ -27,6 +29,7 @@
       "description": "Consumes queued jobs and performs the work against the database.",
       "assets": ["business-critical-data"],
       "source_excerpt": "a background worker process picks them up and does the work",
+      "source_label": "System description",
       "technology": "unknown",
       "trust_zone": "boundary:backend-tier",
       "exposure": "internal"
@@ -39,6 +42,7 @@
       "description": "Carries jobs from the web application to the worker.",
       "assets": ["business-critical-data"],
       "source_excerpt": "It puts jobs onto a message queue, and a background worker process picks them up",
+      "source_label": "System description",
       "technology": "unknown",
       "trust_zone": "boundary:backend-tier",
       "data_classification": "unknown",
@@ -50,6 +54,7 @@
       "description": "Application records and the application's log records.",
       "assets": ["business-critical-data"],
       "source_excerpt": "The background worker reads and writes the database. The database is also where we keep the application's log records.",
+      "source_label": "System description",
       "technology": "unknown",
       "trust_zone": "boundary:backend-tier",
       "data_classification": "unknown",
@@ -61,6 +66,7 @@
       "description": "Configuration for the web application, holding its message-queue credentials.",
       "assets": ["credentials", "secrets"],
       "source_excerpt": "Both of those config stores hold the credentials the process needs — the web application's queue credentials",
+      "source_label": "System description",
       "technology": "unknown",
       "trust_zone": "boundary:web-tier",
       "data_classification": "unknown",
@@ -72,6 +78,7 @@
       "description": "Configuration for the background worker, holding its database credentials.",
       "assets": ["credentials", "secrets"],
       "source_excerpt": "and the worker's database credentials",
+      "source_label": "System description",
       "technology": "unknown",
       "trust_zone": "boundary:backend-tier",
       "data_classification": "unknown",
@@ -85,6 +92,7 @@
       "description": "User's browser makes requests to the application; responses ride the same interaction.",
       "assets": [],
       "source_excerpt": "A user's browser talks to the web application over HTTP/S across the public internet.",
+      "source_label": "System description",
       "source": "entity:browser",
       "destination": "process:web-application",
       "protocol": "HTTP/S",
@@ -98,6 +106,7 @@
       "description": "Application places a job on the queue.",
       "assets": ["business-critical-data"],
       "source_excerpt": "It puts jobs onto a message queue",
+      "source_label": "System description",
       "source": "process:web-application",
       "destination": "store:message-queue",
       "protocol": "unknown",
@@ -111,6 +120,7 @@
       "description": "Worker takes jobs off the queue.",
       "assets": ["business-critical-data"],
       "source_excerpt": "a background worker process picks them up and does the work",
+      "source_label": "System description",
       "source": "process:background-worker",
       "destination": "store:message-queue",
       "protocol": "unknown",
@@ -124,6 +134,7 @@
       "description": "Worker reads and writes application records and log records.",
       "assets": ["business-critical-data"],
       "source_excerpt": "The background worker reads and writes the database.",
+      "source_label": "System description",
       "source": "process:background-worker",
       "destination": "store:database",
       "protocol": "unknown",
@@ -137,6 +148,7 @@
       "description": "Application reads its settings, including queue credentials.",
       "assets": ["credentials"],
       "source_excerpt": "the web application has a web application config",
+      "source_label": "System description",
       "source": "process:web-application",
       "destination": "store:web-application-config",
       "protocol": "unknown",
@@ -150,6 +162,7 @@
       "description": "Worker reads its settings, including database credentials.",
       "assets": ["credentials"],
       "source_excerpt": "and the worker has a worker config",
+      "source_label": "System description",
       "source": "process:background-worker",
       "destination": "store:worker-config",
       "protocol": "unknown",
@@ -164,6 +177,7 @@
       "name": "public internet",
       "description": "Outside the application's network, where the browser sits.",
       "source_excerpt": "The browser sits outside our network",
+      "source_label": "System description",
       "kind": "network"
     },
     {
@@ -171,6 +185,7 @@
       "name": "web tier",
       "description": "Internet-facing tier holding the web application and its config.",
       "source_excerpt": "the web application runs in our web tier",
+      "source_label": "System description",
       "kind": "network"
     },
     {
@@ -178,6 +193,7 @@
       "name": "backend tier",
       "description": "Tier behind the web tier holding the queue, the worker, its config and the database.",
       "source_excerpt": "The queue, the worker and the database are all in the backend tier, behind the web tier.",
+      "source_label": "System description",
       "kind": "network"
     }
   ],

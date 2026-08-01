@@ -3,8 +3,16 @@
   "title": "Content site with a CDN-served asset path and direct admin database access",
   "domain": "content-management",
   "exemplar_proximity": "far",
-  "provenance": "OWASP Threat Model Cookbook, \"Generic CMS example\" (Flow Diagram/generic-cms/generic-cms.py, pytm), https://github.com/OWASP/threat-model-cookbook \u2014 textual and graphical representations CC-BY 4.0. Converted to submitted-text form for this corpus.",
+  "provenance": "OWASP Threat Model Cookbook, \"Generic CMS example\" (Flow Diagram/generic-cms/generic-cms.py, pytm), https://github.com/OWASP/threat-model-cookbook — textual and graphical representations CC-BY 4.0. Converted to submitted-text form for this corpus.",
   "bootstrap": "agent-stand-in",
-  "source_sha256": "11d2a58f0e1d5773054f0a72d222b3cc96f889cdd0206dd3656495a3d5fe8313",
-  "notes": "Cookbook conversion 4 of 4, and the only one converted whole \u2014 the source diagram lands inside the 8-20 band with no scoping. Two things earn its place. First, mixed transport: the page arrives over HTTPS and the executable furniture over HTTP, so the corpus can tell an analyst that reads per-flow encryption from one that reads a system-level 'it uses HTTPS'. Second, a path that bypasses the application entirely \u2014 the admin maintains the database directly rather than through the CMS, which is where the repudiation lane comes from and which no other case carries. It also carries the corpus's only stated absence phrased as an adjective on the thing it qualifies ('an unsecured MySQL connection'), which is the observation cases 07 and 08 left open and which corrections.md reworks."
+  "sources": [
+    {
+      "kind": "description",
+      "label": "System description",
+      "file": "source.md",
+      "sha256": "11d2a58f0e1d5773054f0a72d222b3cc96f889cdd0206dd3656495a3d5fe8313"
+    }
+  ],
+  "source_sha256": "ebad6dfc9e9594bbe3aed68cffbddce0236ec91e2a02fd196810da4681cff060",
+  "notes": "Cookbook conversion 4 of 4, and the only one converted whole — the source diagram lands inside the 8-20 band with no scoping. Two things earn its place. First, mixed transport: the page arrives over HTTPS and the executable furniture over HTTP, so the corpus can tell an analyst that reads per-flow encryption from one that reads a system-level 'it uses HTTPS'. Second, a path that bypasses the application entirely — the admin maintains the database directly rather than through the CMS, which is where the repudiation lane comes from and which no other case carries. It also carries the corpus's only stated absence phrased as an adjective on the thing it qualifies ('an unsecured MySQL connection'), which is the observation cases 07 and 08 left open and which corrections.md reworks."
 }

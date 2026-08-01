@@ -37,7 +37,7 @@ from stride_service.report import (
     StrideCategory,
     derive_severity_level,
 )
-from stride_service.sources import Source
+from stride_service.sources import MAX_LABEL_CHARS, Source, SourceKind
 from stride_service.system_model import SystemModel
 from stride_service.validation import parse_and_validate
 
@@ -86,6 +86,23 @@ class ReferenceThreat(BaseModel):
         return self.tier == "must-find"
 
 
+class CaseSource(BaseModel):
+    """One declared input file, and what it is.
+
+    The corpus declares its sources the way a job submits them, so the harness
+    reads the label from here rather than hard-coding one at each seed site —
+    which is also what ties a case's ``source_label`` values to something a
+    lint can check.
+    """
+
+    model_config = ConfigDict(extra="forbid", frozen=True)
+
+    kind: SourceKind
+    label: str = Field(min_length=1, max_length=MAX_LABEL_CHARS)
+    file: str = Field(min_length=1)
+    sha256: str = Field(pattern=r"^[0-9a-f]{64}$")
+
+
 class CaseMetadata(BaseModel):
     """``case.json``: what the case is and where it came from."""
 
@@ -99,6 +116,8 @@ class CaseMetadata(BaseModel):
     exemplar_proximity: Literal["near", "far"]
     provenance: str = Field(min_length=1)
     bootstrap: str = Field(min_length=1)
+    sources: list[CaseSource] = Field(min_length=1)
+    # The aggregate, taken over the refs exactly as a report's InputRef is.
     source_sha256: str = Field(pattern=r"^[0-9a-f]{64}$")
     notes: str = ""
 
@@ -112,7 +131,7 @@ class GoldenCase:
     """
 
     meta: CaseMetadata
-    source_text: str
+    sources: tuple[Source, ...]
     model: SystemModel
     references: tuple[ReferenceThreat, ...]
 
@@ -121,9 +140,9 @@ class GoldenCase:
         return self.meta.id
 
     @property
-    def sources(self) -> tuple[Source, ...]:
-        """The case's input, in the shape every driver of the graph takes."""
-        return (Source.description(self.source_text),)
+    def source_text(self) -> str:
+        """Every source's text, for the scorers that read the input as prose."""
+        return "\n\n".join(source.text for source in self.sources)
 
     @property
     def must_find(self) -> tuple[ReferenceThreat, ...]:
@@ -200,10 +219,35 @@ def load_case(case_dir: Path | str) -> GoldenCase:
     model = _load_model(case_dir)
     return GoldenCase(
         meta=meta,
-        source_text=(case_dir / "source.md").read_text(encoding="utf-8"),
+        sources=_load_sources(case_dir, meta),
         model=model,
         references=_load_references(case_dir, model),
     )
+
+
+def _load_sources(case_dir: Path, meta: CaseMetadata) -> tuple[Source, ...]:
+    """The case's declared sources, in declared order.
+
+    A declared file that is missing is a corpus error rather than an empty
+    source: a case that silently analyses less text than it claims would score
+    against a reference set written for the whole of it.
+    """
+    sources = []
+    for declared in meta.sources:
+        path = case_dir / declared.file
+        if not path.is_file():
+            raise CorpusError(
+                f"{case_dir.name}: case.json declares {declared.file!r}, which"
+                " does not exist"
+            )
+        sources.append(
+            Source(
+                kind=declared.kind,
+                label=declared.label,
+                text=path.read_text(encoding="utf-8"),
+            )
+        )
+    return tuple(sources)
 
 
 def load_corpus(corpus_dir: Path | str) -> tuple[GoldenCase, ...]:
