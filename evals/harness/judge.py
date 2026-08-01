@@ -43,6 +43,7 @@ from stride_service.markdown_loader import MarkdownLoader
 from stride_service.model_gate import (
     check_supported,
     completion,
+    emulates_structured_output,
     supports_structured_output,
 )
 from stride_service.model_tiers import validate_model_string
@@ -119,6 +120,18 @@ class JudgeConfig(BaseModel):
             raise ValueError(
                 f"judge.model: {self.vendor}/{self.model} does not support a"
                 " response schema; the judge's rulings cannot be constrained"
+            )
+        # The weaker sibling of the check above, and not implied by it: a model
+        # can honour a schema while the library still has to *emulate* the
+        # constraint with a synthesised tool, forwarding the schema's $defs
+        # unresolved. The ruling then comes back shaped wrong rather than
+        # unconstrained — same "fails per-call, deep inside a sweep" cost, so
+        # it is caught in the same place. See binding.py for the graph's copy.
+        if emulates_structured_output(vendor, self.model):
+            raise ValueError(
+                f"judge.model: {self.vendor}/{self.model} cannot be constrained"
+                " to a schema natively; the constraint would be emulated and"
+                " the judge's rulings would come back unusably shaped"
             )
 
 
