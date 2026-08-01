@@ -317,6 +317,7 @@ class TestEnvOverrides:
             "seed",
             "thinking",
             "max_output_tokens",
+            "constrain_output",
         )
 
 
@@ -402,3 +403,68 @@ class TestSamplingFingerprint:
         sampling = TierSampling(temperature=0.0, seed=3, thinking="low")
         recomputed = sampling_fingerprint("m", TierSampling(**sampling.model_dump()))
         assert recomputed == sampling_fingerprint("m", sampling)
+
+
+class TestConstrainOutput:
+    """Whether a tier's node schema is sent to the provider at all.
+
+    Not a decoding value: it records whether the provider serving this tier will
+    accept the graph's schema, which nothing can compute offline — a grammar
+    compiler can reject a schema the provider is perfectly willing to honour in
+    principle. So it is a per-tier choice a deployment makes.
+    """
+
+    def test_constraining_is_the_default(self, config_path):
+        config = load_sampling(config_path(config_toml()), env={})
+        assert config.for_tier("base").constrain_output is True
+
+    def test_the_shipped_file_constrains_both_tiers(self):
+        config = load_sampling(PROJECT_ROOT / "config" / "sampling.toml", env={})
+        assert all(t.constrain_output for t in config.tiers.values())
+
+    def test_off_suppresses_the_schema_via_a_constructor_kwarg(self, config_path):
+        # ADK derives response_format from the node's output_schema and then
+        # applies _additional_args over it, so an explicit None is what
+        # suppresses it. Constrained tiers must not carry the key at all.
+        text = config_toml(base_body="constrain_output = false\n")
+        config = load_sampling(config_path(text), env={})
+        assert config.for_tier("base").constructor_kwargs()["response_format"] is None
+        assert "response_format" not in config.for_tier("strong").constructor_kwargs()
+
+    def test_it_is_not_a_provider_param(self, config_path):
+        # The gate asks whether a provider accepts the *request*; this decides
+        # what the request contains, so sending it to the gate is meaningless.
+        text = config_toml(base_body="constrain_output = false\n")
+        config = load_sampling(config_path(text), env={})
+        assert "constrain_output" not in config.for_tier("base").gate_params()
+
+    def test_it_enters_the_fingerprint(self, config_path):
+        # Constrained and unconstrained generation are different generation
+        # behaviour, so a sweep measured one way must not certify the other.
+        constrained = load_sampling(config_path(config_toml()), env={})
+        loose = load_sampling(
+            config_path(config_toml(base_body="constrain_output = false\n")), env={}
+        )
+        assert sampling_fingerprint(
+            "anthropic/claude-opus-4-6", constrained.for_tier("base")
+        ) != sampling_fingerprint(
+            "anthropic/claude-opus-4-6", loose.for_tier("base")
+        )
+
+    @pytest.mark.parametrize(
+        ("value", "expected"), [("false", False), ("FALSE", False), ("true", True)]
+    )
+    def test_the_env_override_takes_only_explicit_literals(
+        self, config_path, value, expected
+    ):
+        env = {env_var_for("base", "constrain_output"): value}
+        config = load_sampling(config_path(config_toml()), env=env)
+        assert config.for_tier("base").constrain_output is expected
+
+    @pytest.mark.parametrize("value", ["0", "no", "off", "yes"])
+    def test_a_truthy_looking_string_is_not_accepted(self, config_path, value):
+        # Python would read every one of these as True, which is how a
+        # deployment ends up running the opposite of what it configured.
+        env = {env_var_for("base", "constrain_output"): value}
+        with pytest.raises(SamplingConfigError, match="is not one of"):
+            load_sampling(config_path(config_toml()), env=env)

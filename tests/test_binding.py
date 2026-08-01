@@ -21,7 +21,7 @@ from stride_service.sampling import load_sampling
 from tests.factories import PROJECT_ROOT, repo_tiers
 
 DIVERGENT = """\
-version = 3
+version = 4
 [tiers.base]
 temperature = 0.0
 seed = 11
