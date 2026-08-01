@@ -1,6 +1,6 @@
 """Call the engine from synchronous code — ``analyze_sync``.
 
-Run it against the sample description::
+Run it against the sample source::
 
     uv run python examples/embed_sync.py
 
@@ -27,6 +27,7 @@ from stride_service import (
     EngineInputError,
     PipelineCompleted,
     PipelineRejected,
+    Source,
     StrideEngine,
 )
 
@@ -36,10 +37,12 @@ SAMPLE = Path(__file__).resolve().parent / "orders.md"
 # docs-region: embed_sync
 def analyze_orders(engine: StrideEngine) -> None:
     """The synchronous call, with the same three outcomes as the async one."""
-    description = SAMPLE.read_text(encoding="utf-8")
+    sources = [
+        Source.description(SAMPLE.read_text(encoding="utf-8"), label="Orders note"),
+    ]
 
     try:
-        outcome = engine.analyze_sync(description, system_name="Orders")
+        outcome = engine.analyze_sync(sources, system_name="Orders")
     except RuntimeError as exc:
         # analyze_sync was called from inside a running event loop. Await
         # engine.analyze(...) there instead — see examples/embed.py.
