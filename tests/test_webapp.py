@@ -19,7 +19,7 @@ import re
 import pytest
 from fastapi.testclient import TestClient
 
-from stride_service import StrideEngine, StubPipelineRunner
+from stride_service import Source, SourceLimits, StrideEngine, StubPipelineRunner
 from stride_service.deployment import Deployment
 from stride_service.vendors import ProviderAuthError
 from tests.factories import TEST_TIER_ENV
@@ -42,7 +42,9 @@ def tiers():
 def client(tiers):
     """The app wired to a stub runner — no models, no credentials, no cost."""
     startup = Startup(
-        engine=StrideEngine(StubPipelineRunner()), tiers=tiers, error=None
+        engine=StrideEngine(StubPipelineRunner(), limits=WEBAPP_LIMITS),
+        tiers=tiers,
+        error=None,
     )
     return TestClient(create_app(startup))
 
@@ -60,10 +62,26 @@ def broken_client(tiers):
     return TestClient(create_app(startup))
 
 
-def run_to_completion(client, description: str = "A web app talks to a database.") -> str:
+# The demo app has one textarea, so it posts one description-kind source. Its
+# label is the app's, not the user's: the form asks for text, not a citation key.
+WEBAPP_LIMITS = SourceLimits(max_total_bytes=100 * 1024, max_sources=10)
+
+
+def posted(text: str) -> dict:
+    """The body the app's own page sends."""
+    return {
+        "sources": [
+            {"kind": "description", "label": "Pasted description", "text": text}
+        ]
+    }
+
+
+def run_to_completion(
+    client, text: str = "A web app talks to a database."
+) -> str:
     """Submit, drain the event stream, and return the finished run's id."""
     started = client.post(
-        "/analyze", json={"description": description}, headers=SAME_ORIGIN
+        "/analyze", json=posted(text), headers=SAME_ORIGIN
     )
     assert started.status_code == 200, started.text
     run_id = started.json()["run"]
@@ -95,13 +113,13 @@ def test_load_example_serves_the_same_file_the_examples_run(client):
 def test_analyze_refuses_a_request_that_is_not_same_origin(client):
     """CSRF: any page you visit could otherwise spend your vendor budget."""
     for headers in ({}, {"Sec-Fetch-Site": "cross-site"}, {"Sec-Fetch-Site": "none"}):
-        response = client.post("/analyze", json={"description": "x"}, headers=headers)
+        response = client.post("/analyze", json=posted("x"), headers=headers)
         assert response.status_code == 403, headers
 
 
 def test_a_run_streams_one_tick_per_node_then_redirects(client):
     started = client.post(
-        "/analyze", json={"description": "A web app."}, headers=SAME_ORIGIN
+        "/analyze", json=posted("A web app."), headers=SAME_ORIGIN
     )
     run_id = started.json()["run"]
     events = client.get(f"/events/{run_id}").text
@@ -145,19 +163,21 @@ def test_a_second_submission_is_refused_while_one_is_running(tiers):
     """LLM10, at the HTTP surface: refused with a message, not held open."""
     analyses = Analyses()
     startup = Startup(
-        engine=StrideEngine(StubPipelineRunner()), tiers=tiers, error=None
+        engine=StrideEngine(StubPipelineRunner(), limits=WEBAPP_LIMITS),
+        tiers=tiers,
+        error=None,
     )
     client = TestClient(create_app(startup, analyses))
 
     analyses.claim()  # stand in for a run already in flight
-    response = client.post("/analyze", json={"description": "B"}, headers=SAME_ORIGIN)
+    response = client.post("/analyze", json=posted("B"), headers=SAME_ORIGIN)
     assert response.status_code == 409
     assert "already running" in response.json()["message"]
 
 
 def test_the_gate_reopens_once_a_run_finishes(client):
     run_to_completion(client)
-    again = client.post("/analyze", json={"description": "B"}, headers=SAME_ORIGIN)
+    again = client.post("/analyze", json=posted("B"), headers=SAME_ORIGIN)
     assert again.status_code == 200
 
 
@@ -181,7 +201,7 @@ def test_an_unknown_run_has_no_report(client):
 def test_the_injection_point_escapes_every_angle_bracket():
     """The whole trust boundary, tested directly.
 
-    A description containing ``</script>`` must not be able to close the JSON
+    A submitted system name containing ``</script>`` must not close the JSON
     block. With the escape the payload lands inert, and the page still holds
     exactly the script tags the viewer shipped with.
     """
@@ -189,8 +209,10 @@ def test_the_injection_point_escapes_every_angle_bracket():
 
     from webapp.main import VIEWER
 
-    engine = StrideEngine(StubPipelineRunner())
-    outcome = asyncio.run(engine.analyze("A web app.", system_name=BREAKOUT))
+    engine = StrideEngine(StubPipelineRunner(), limits=WEBAPP_LIMITS)
+    outcome = asyncio.run(
+        engine.analyze([Source.description("A web app.")], system_name=BREAKOUT)
+    )
     page = render_report(outcome.report)
 
     payload = re.search(
@@ -234,6 +256,6 @@ def test_the_diagnostic_never_prints_a_credential_value(broken_client, monkeypat
 
 def test_analyze_is_closed_while_the_config_is_broken(broken_client):
     response = broken_client.post(
-        "/analyze", json={"description": "x"}, headers=SAME_ORIGIN
+        "/analyze", json=posted("x"), headers=SAME_ORIGIN
     )
     assert response.status_code == 503

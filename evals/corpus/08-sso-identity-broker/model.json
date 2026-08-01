@@ -6,6 +6,7 @@
       "description": "A member of staff who signs in through the broker from wherever they are, including their own device at home, and then uses the applications the token admits them to.",
       "assets": ["credentials", "pii"],
       "source_excerpt": "Colleagues sign in to it from wherever they are, including their own devices at home.",
+      "source_label": "System description",
       "kind": "human",
       "trust_zone": "boundary:outside-corporate-network"
     },
@@ -15,6 +16,7 @@
       "description": "The franchise stores' own identity provider. It vouches for franchise colleagues and the broker takes that as a sign-in; nothing is written down about which colleagues it may vouch for.",
       "assets": ["credentials"],
       "source_excerpt": "their own identity provider vouches for them and the broker takes that as a sign-in. We have not written down which colleagues that provider is allowed to vouch for.",
+      "source_label": "System description",
       "notes": "Franchise colleagues themselves are not modelled: they have no account here, and how they reach their own provider is outside the system this model describes and unstated in the source.",
       "kind": "external-system",
       "trust_zone": "boundary:franchise-partner"
@@ -25,6 +27,7 @@
       "description": "The system of record for group membership. The broker pulls changes from it once a night, and that is also how leavers stop being colleagues.",
       "assets": ["pii"],
       "source_excerpt": "Group membership is not maintained there by hand — it comes from the HR system overnight.",
+      "source_label": "System description",
       "kind": "external-system",
       "trust_zone": "boundary:outside-corporate-network"
     }
@@ -36,6 +39,7 @@
       "description": "Signs colleagues in, issues twelve-hour tokens carrying staff id and group list, signs every application's tokens with one key, publishes the public half, pulls group changes from HR nightly and writes sign-ins to an audit log.",
       "assets": ["credentials", "secrets", "availability-critical"],
       "source_excerpt": "Everything colleagues use signs them in through one identity broker. The broker runs on the corporate network.",
+      "source_label": "System description",
       "technology": "unknown",
       "trust_zone": "boundary:corporate-network",
       "exposure": "internet-facing"
@@ -46,6 +50,7 @@
       "description": "Lets the holder of a token carrying the store-manager group change prices and void transactions, without checking which store the colleague belongs to.",
       "assets": ["financial", "business-critical-data"],
       "source_excerpt": "If the token has the store-manager group in it, the console lets the holder change prices and void transactions. The console does not check which store the colleague belongs to, so a store-manager token works against every store.",
+      "source_label": "System description",
       "notes": "The source describes a class of applications that all take the token and decide from the groups in it, and names this one. It is modelled as the relying application: a second, nameless one would duplicate every flow the console already carries and add no stated fact.",
       "technology": "unknown",
       "trust_zone": "boundary:corporate-network",
@@ -59,6 +64,7 @@
       "description": "The broker's own directory of colleagues and the groups they are in, populated overnight from the HR system.",
       "assets": ["pii"],
       "source_excerpt": "The broker keeps the colleagues and the groups they are in its own directory.",
+      "source_label": "System description",
       "technology": "unknown",
       "trust_zone": "boundary:corporate-network",
       "data_classification": "unknown",
@@ -70,6 +76,7 @@
       "description": "Holds the signing key. The same key signs the tokens for every application.",
       "assets": ["secrets"],
       "source_excerpt": "The broker signs tokens with a signing key it keeps in a key store. The same key signs the tokens for every application.",
+      "source_label": "System description",
       "technology": "unknown",
       "trust_zone": "boundary:corporate-network",
       "data_classification": "unknown",
@@ -81,6 +88,7 @@
       "description": "Where the broker writes sign-ins. What it records, and whether it covers the franchise route, is not written down.",
       "assets": ["business-critical-data"],
       "source_excerpt": "The broker writes sign-ins to an audit log. Nobody has written down what that log records, whether it covers the franchise route",
+      "source_label": "System description",
       "technology": "unknown",
       "trust_zone": "boundary:corporate-network",
       "data_classification": "unknown",
@@ -94,6 +102,7 @@
       "description": "A colleague signs in to the broker from wherever they are; the token comes back on the same interaction.",
       "assets": ["credentials"],
       "source_excerpt": "Colleagues sign in to it from wherever they are, including their own devices at home.",
+      "source_label": "System description",
       "source": "entity:colleague",
       "destination": "process:identity-broker",
       "protocol": "unknown",
@@ -107,6 +116,7 @@
       "description": "The franchise provider asserts a franchise colleague's identity and the broker takes that as a sign-in.",
       "assets": ["credentials"],
       "source_excerpt": "their own identity provider vouches for them and the broker takes that as a sign-in. We have not written down which colleagues that provider is allowed to vouch for.",
+      "source_label": "System description",
       "source": "entity:franchise-identity-provider",
       "destination": "process:identity-broker",
       "protocol": "unknown",
@@ -120,6 +130,7 @@
       "description": "The token holder changes prices and voids transactions in the console.",
       "assets": ["financial", "business-critical-data"],
       "source_excerpt": "If the token has the store-manager group in it, the console lets the holder change prices and void transactions.",
+      "source_label": "System description",
       "source": "entity:colleague",
       "destination": "process:store-admin-console",
       "protocol": "unknown",
@@ -133,6 +144,7 @@
       "description": "The application fetches the public half of the signing key from the broker to check token signatures.",
       "assets": [],
       "source_excerpt": "Applications fetch the public half from the broker to check the signature.",
+      "source_label": "System description",
       "source": "process:store-admin-console",
       "destination": "process:identity-broker",
       "protocol": "unknown",
@@ -146,6 +158,7 @@
       "description": "The broker pulls group membership changes, leavers included, once a night.",
       "assets": ["pii"],
       "source_excerpt": "The broker pulls the changes once a night, and that is also how leavers stop being colleagues.",
+      "source_label": "System description",
       "source": "process:identity-broker",
       "destination": "entity:hr-system",
       "protocol": "unknown",
@@ -159,6 +172,7 @@
       "description": "The broker reads colleagues and groups at sign-in and writes what the nightly pull brings back.",
       "assets": ["pii"],
       "source_excerpt": "The broker keeps the colleagues and the groups they are in its own directory.",
+      "source_label": "System description",
       "source": "process:identity-broker",
       "destination": "store:directory",
       "protocol": "unknown",
@@ -172,6 +186,7 @@
       "description": "The broker reads the one signing key it signs every application's tokens with.",
       "assets": ["secrets"],
       "source_excerpt": "The broker signs tokens with a signing key it keeps in a key store.",
+      "source_label": "System description",
       "source": "process:identity-broker",
       "destination": "store:key-store",
       "protocol": "unknown",
@@ -185,6 +200,7 @@
       "description": "The broker writes sign-ins to the log; what it writes is not stated.",
       "assets": ["business-critical-data"],
       "source_excerpt": "The broker writes sign-ins to an audit log.",
+      "source_label": "System description",
       "source": "process:identity-broker",
       "destination": "store:audit-log",
       "protocol": "unknown",
@@ -199,6 +215,7 @@
       "name": "corporate network",
       "description": "Where the broker, the store admin console, the directory, the key store and the audit log sit.",
       "source_excerpt": "The broker runs on the corporate network.",
+      "source_label": "System description",
       "kind": "network"
     },
     {
@@ -206,6 +223,7 @@
       "name": "outside corporate network",
       "description": "Wherever colleagues sign in from, their own devices at home included; the HR system is placed here for want of any stated location.",
       "source_excerpt": "Colleagues sign in to it from wherever they are, including their own devices at home.",
+      "source_label": "System description",
       "kind": "network"
     },
     {
@@ -213,6 +231,7 @@
       "name": "franchise partner",
       "description": "The franchise stores and the identity provider they run; a separate party rather than a network location.",
       "source_excerpt": "We also let the franchise stores in. Franchise colleagues do not have staff accounts with us; their own identity provider vouches for them",
+      "source_label": "System description",
       "kind": "other"
     }
   ],

@@ -6,6 +6,7 @@
       "description": "Another product team's backend consuming inference; two of them run in a different cloud.",
       "assets": [],
       "source_excerpt": "Other teams' backends call our inference gateway",
+      "source_label": "System description",
       "kind": "external-system",
       "trust_zone": "boundary:public-internet"
     },
@@ -15,6 +16,7 @@
       "description": "Engineer who publishes new model artifacts to the registry.",
       "assets": [],
       "source_excerpt": "ML engineers publish new model artifacts to the registry bucket.",
+      "source_label": "System description",
       "kind": "human",
       "trust_zone": "boundary:model-network"
     }
@@ -26,6 +28,7 @@
       "description": "Internet-exposed FastAPI service on GKE; authenticates callers by API key, forwards requests, and logs every request and response.",
       "assets": ["reputation", "availability-critical"],
       "source_excerpt": "our inference gateway, a FastAPI service on GKE that we expose on the internet",
+      "source_label": "System description",
       "technology": "FastAPI on GKE",
       "trust_zone": "boundary:serving-edge",
       "exposure": "internet-facing"
@@ -36,6 +39,7 @@
       "description": "GPU-backed server that loads model artifacts at startup, reads customer features, and runs inference.",
       "assets": ["business-critical-data", "availability-critical"],
       "source_excerpt": "the model server, which runs the actual model on GPU nodes in our model network",
+      "source_label": "System description",
       "technology": "GPU inference server",
       "trust_zone": "boundary:model-network",
       "exposure": "internal"
@@ -48,6 +52,7 @@
       "description": "Bucket holding model artifacts, loaded unverified at model server startup and written by engineers.",
       "assets": ["business-critical-data"],
       "source_excerpt": "I don't believe anything verifies the artifact hasn't been swapped — we just trust the bucket.",
+      "source_label": "System description",
       "technology": "object storage bucket",
       "trust_zone": "boundary:model-network",
       "data_classification": "internal",
@@ -59,6 +64,7 @@
       "description": "Redis holding per-customer features: account age and spend bands. No password configured.",
       "assets": ["pii", "financial"],
       "source_excerpt": "Redis has no password on it; it is only reachable inside the model network.",
+      "source_label": "System description",
       "technology": "Redis",
       "trust_zone": "boundary:model-network",
       "data_classification": "confidential",
@@ -70,6 +76,7 @@
       "description": "BigQuery table of every request and response, including raw prompts typed by end users.",
       "assets": ["pii"],
       "source_excerpt": "That means raw prompts, which sometimes carry whatever the calling team's users typed.",
+      "source_label": "System description",
       "technology": "BigQuery",
       "trust_zone": "boundary:serving-edge",
       "data_classification": "confidential",
@@ -83,6 +90,7 @@
       "description": "A product backend submits an inference request over the internet.",
       "assets": ["pii"],
       "source_excerpt": "Callers pass an API key in a header. Keys are issued per calling team and we have never expired one.",
+      "source_label": "System description",
       "source": "entity:calling-service",
       "destination": "process:inference-gateway",
       "protocol": "HTTPS",
@@ -96,6 +104,7 @@
       "description": "Gateway forwards the request into the model network.",
       "assets": ["pii"],
       "source_excerpt": "There is no auth between the gateway and the model server; the model network is meant to be reachable only from the gateway.",
+      "source_label": "System description",
       "source": "process:inference-gateway",
       "destination": "process:model-server",
       "protocol": "unknown",
@@ -109,6 +118,7 @@
       "description": "Model server pulls its model artifact at startup and loads it without verifying integrity.",
       "assets": ["business-critical-data"],
       "source_excerpt": "The model server loads model artifacts from a model registry bucket at startup. It uses its own service account for that.",
+      "source_label": "System description",
       "source": "process:model-server",
       "destination": "store:model-registry",
       "protocol": "object storage API",
@@ -122,6 +132,7 @@
       "description": "Model server reads per-customer features for a request.",
       "assets": ["pii", "financial"],
       "source_excerpt": "which the model server reads from a Redis feature store on the same network. Redis has no password on it",
+      "source_label": "System description",
       "source": "process:model-server",
       "destination": "store:feature-store",
       "protocol": "Redis protocol",
@@ -135,6 +146,7 @@
       "description": "Gateway records the full request and response for debugging.",
       "assets": ["pii"],
       "source_excerpt": "The gateway writes every request and response into an inference log in BigQuery, for debugging.",
+      "source_label": "System description",
       "source": "process:inference-gateway",
       "destination": "store:inference-log",
       "protocol": "BigQuery API",
@@ -148,6 +160,7 @@
       "description": "Engineer pushes a new model artifact into the registry.",
       "assets": ["business-critical-data"],
       "source_excerpt": "I'm not sure what governs who can push — I think it is a shared group account.",
+      "source_label": "System description",
       "source": "entity:ml-engineer",
       "destination": "store:model-registry",
       "protocol": "object storage API",
@@ -162,6 +175,7 @@
       "name": "public internet",
       "description": "Where calling services sit, including two in a different cloud.",
       "source_excerpt": "we expose on the internet because two of the calling services are in a different cloud",
+      "source_label": "System description",
       "kind": "network"
     },
     {
@@ -169,6 +183,7 @@
       "name": "serving edge",
       "description": "Internet-exposed serving tier holding the gateway and its request log.",
       "source_excerpt": "our inference gateway, a FastAPI service on GKE that we expose on the internet",
+      "source_label": "System description",
       "kind": "network"
     },
     {
@@ -176,6 +191,7 @@
       "name": "model network",
       "description": "Internal GPU network holding the model server, its registry and the feature store.",
       "source_excerpt": "the model network is meant to be reachable only from the gateway",
+      "source_label": "System description",
       "kind": "network"
     }
   ],

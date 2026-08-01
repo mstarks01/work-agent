@@ -22,6 +22,7 @@ from stride_service.sampling import (
     load_sampling,
     sampling_fingerprint,
 )
+from stride_service.sources import Source, render_sources
 from tests.factories import (
     BASE_MODEL,
     PROJECT_ROOT,
@@ -50,7 +51,7 @@ def happy_replies() -> dict[str, str]:
     }
 
 
-def drive(pipeline, *, visited: list[str] | None = None):
+def drive(pipeline, *, visited: list[str] | None = None, sources=None):
     """One Graph Run over the scripted pipeline."""
 
     async def on_node(node: str) -> None:
@@ -60,8 +61,7 @@ def drive(pipeline, *, visited: list[str] | None = None):
     async def scenario():
         executor = GraphExecutor(pipeline, app_name="stride-test")
         return await executor.run(
-            {graph.STATE_INPUT_TEXT: DESCRIPTION},
-            DESCRIPTION,
+            sources if sources is not None else [Source.description(DESCRIPTION)],
             user_id="test-user",
             on_node=on_node,
         )
@@ -169,3 +169,59 @@ def test_extract_only_entry_stamps_just_the_one_node():
 
     assert [node_run.node for node_run in run.node_runs] == [graph.EXTRACT_NODE]
     assert run.node_runs[0].sampling_fingerprint is not None
+
+
+class TestSourceRendering:
+    """The executor is where a job becomes prompt bytes (#54).
+
+    The render rule itself is tested in ``test_sources`` against the pure
+    function. What can only be seen here is the wiring: that the executor calls
+    it, and that no caller can hand the graph text of their own instead.
+    """
+
+    def test_what_extraction_sees_is_the_rendered_sources(self):
+        sources = [
+            Source.description("a web app storing orders", label="Doc"),
+            Source.transcript("Ana: it writes to Postgres.", label="Kickoff call"),
+        ]
+        # The scripted model must cite a label this job carries, or the gate
+        # rejects it before the run reaches an analysis.
+        replies = happy_replies() | {"extract": valid_model("Doc").model_dump_json()}
+        pipeline, models = scripted_pipeline(replies)
+
+        drive(pipeline, sources=sources)
+
+        assert render_sources(sources) in models[graph.EXTRACT_NODE].seen[0]
+
+    def test_seeding_the_input_text_directly_is_refused(self):
+        # Seeding raw text is what would let the service and the eval harness
+        # show one job to a model differently, so it is inexpressible.
+        pipeline, _ = scripted_pipeline(happy_replies())
+        executor = GraphExecutor(pipeline, app_name="stride-test")
+
+        async def scenario():
+            return await executor.run(
+                [Source.description("text")],
+                user_id="test-user",
+                extra_state={graph.STATE_INPUT_TEXT: "text of my own"},
+            )
+
+        with pytest.raises(ValueError, match=graph.STATE_INPUT_TEXT):
+            asyncio.run(scenario())
+
+    def test_other_state_still_seeds(self):
+        # Mode 2 injects an already-blessed model at a later entry point.
+        pipeline, _ = scripted_pipeline(happy_replies())
+        executor = GraphExecutor(pipeline, app_name="stride-test")
+
+        async def scenario():
+            return await executor.run(
+                [Source.description("text")],
+                user_id="test-user",
+                extra_state={graph.STATE_VALID_MODEL: valid_model().model_dump(
+                    mode="json"
+                )},
+            )
+
+        run = asyncio.run(scenario())
+        assert graph.STATE_VALID_MODEL in run.final_state

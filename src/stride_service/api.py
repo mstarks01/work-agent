@@ -1,6 +1,7 @@
 """The `/v1` job API: the only production surface the front-end calls.
 
-* ``POST /v1/jobs`` — submit, 100 KB description cap, returns a job handle.
+* ``POST /v1/jobs`` — submit an ordered list of sources, bounded in UTF-8 bytes
+  and in count by this deployment's config; returns a job handle.
 * ``GET /v1/jobs/{id}`` — canonical poll: status, per-node progress,
   timestamps, error info; never the report.
 * ``GET /v1/jobs/{id}/events`` — the same progression as SSE, resumable via
@@ -35,8 +36,8 @@ from stride_service.auth import (
     build_verifier,
 )
 from stride_service.deployment import Deployment
+from stride_service.errors import ConfigError
 from stride_service.jobs import (
-    MAX_DESCRIPTION_BYTES,
     TERMINAL_STATUSES,
     JobRecord,
     JobStatus,
@@ -45,26 +46,41 @@ from stride_service.jobs import (
     build_store,
     execute_job,
 )
+from stride_service.sources import Source, SourceLimits
 from stride_service.validation import ValidationIssue
 
 logger = logging.getLogger(__name__)
 
-# MAX_DESCRIPTION_BYTES, the input cap, lives in jobs.py, shared with the
-# in-process engine. The raw-body limit adds slack for JSON framing and
-# escaping so the middleware can reject oversized payloads before parsing them.
-MAX_REQUEST_BODY_BYTES = 120 * 1024
+# The raw-body guard is **derived** from the deployment's byte budget rather
+# than configured beside it: it exists only to refuse an absurd payload before
+# the JSON is parsed, and doubling the budget leaves ample room for framing and
+# escaping. It is not the contract — the budget is (OWASP LLM10).
+_BODY_SLACK = 2
 
 _SSE_POLL_SECONDS = 0.2
+
+# The size rungs of the input ladder, mapped to what HTTP calls them. An empty
+# list is a malformed request rather than an oversized one: a job with no input
+# is the wrong *shape*, and 413 would quote a byte count against a cap nobody
+# came near. Per-source well-formedness never reaches here — a bad source fails
+# body validation, which FastAPI answers with 422.
+_STATUS_BY_RUNG = {"empty": 400, "count": 413, "total": 413}
 
 _bearer_scheme = HTTPBearer(auto_error=False)
 
 
 class JobSubmission(BaseModel):
-    """Body of ``POST /v1/jobs``; no client-controlled knobs in v1."""
+    """Body of ``POST /v1/jobs``; no client-controlled knobs in v1.
+
+    ``sources`` is typed but not bounded here. Pydantic answers the first rung
+    of the ladder — is each source well-formed? — and the route answers the
+    rest, because the count and byte budgets are this deployment's config
+    rather than a property of the schema.
+    """
 
     model_config = ConfigDict(extra="forbid")
 
-    description: str = Field(min_length=1)
+    sources: list[Source]
     system_name: str | None = Field(default=None, min_length=1, max_length=200)
 
 
@@ -196,6 +212,7 @@ def create_app(
     store: JobStore | None = None,
     runner: PipelineRunner | None = None,
     verifier: TokenVerifier | None = None,
+    limits: SourceLimits | None = None,
 ) -> FastAPI:
     """Build the service app; production defaults, injectable seams for tests.
 
@@ -205,6 +222,11 @@ def create_app(
     construction. An injected ``runner`` is a test stand-in and carries no
     gate — a report it produced was never certified, so there is nothing for
     the route to withhold on.
+
+    ``limits`` bounds what one job may carry. It comes from the deployment
+    wherever there is one; a caller who injects a runner instead must state it,
+    because reading a second configuration behind their back is how an app
+    comes to enforce bounds its deployment never chose.
     """
     app = FastAPI(title="STRIDE Threat-Modeling Service")
     app.state.store = store if store is not None else build_store()
@@ -215,6 +237,15 @@ def create_app(
         deployment = deployment if deployment is not None else Deployment.from_env()
         app.state.runner = deployment.runner()
         app.state.certification = deployment.gate()
+    if limits is None:
+        if deployment is None:
+            raise ConfigError(
+                "create_app needs limits= when it is given a runner instead of "
+                "a deployment"
+            )
+        limits = deployment.resilience.source_limits()
+    app.state.limits = limits
+    max_body_bytes = limits.max_total_bytes * _BODY_SLACK
     app.state.verifier = verifier if verifier is not None else build_verifier()
 
     @app.exception_handler(StarletteHTTPException)
@@ -242,10 +273,10 @@ def create_app(
     async def _limit_submission_body(request: Request, call_next):
         if request.method == "POST" and request.url.path == "/v1/jobs":
             content_length = request.headers.get("content-length", "")
-            if content_length.isdigit() and int(content_length) > MAX_REQUEST_BODY_BYTES:
+            if content_length.isdigit() and int(content_length) > max_body_bytes:
                 return _problem_response(
                     413,
-                    f"request body exceeds the {MAX_REQUEST_BODY_BYTES} byte limit",
+                    f"request body exceeds the {max_body_bytes} byte limit",
                 )
         return await call_next(request)
 
@@ -260,14 +291,14 @@ def create_app(
         background_tasks: BackgroundTasks,
         subject: str = Depends(require_subject),
     ) -> JSONResponse:
-        if len(submission.description.encode("utf-8")) > MAX_DESCRIPTION_BYTES:
+        breach = request.app.state.limits.breach(submission.sources)
+        if breach is not None:
             raise HTTPException(
-                status_code=413,
-                detail=f"description exceeds the {MAX_DESCRIPTION_BYTES} byte limit",
+                status_code=_STATUS_BY_RUNG[breach.rung], detail=breach.message
             )
         record = JobRecord.create(
             owner_subject=subject,
-            description=submission.description,
+            sources=submission.sources,
             system_name=submission.system_name,
         )
         await request.app.state.store.create(record)

@@ -6,6 +6,7 @@
       "description": "A person playing the game on their own machine.",
       "assets": ["pii"],
       "source_excerpt": "Players run our game client on their own machines. We do not control those machines.",
+      "source_label": "System description",
       "kind": "human",
       "trust_zone": "boundary:player-local-machine"
     },
@@ -15,6 +16,7 @@
       "description": "Staff member who reviews and acts on player accounts.",
       "assets": [],
       "source_excerpt": "our customer support staff work from the corporate network and use a moderation website",
+      "source_label": "System description",
       "kind": "human",
       "trust_zone": "boundary:corp-network"
     }
@@ -26,6 +28,7 @@
       "description": "The game client, running on hardware the operator does not control.",
       "assets": [],
       "source_excerpt": "Players run our game client on their own machines. We do not control those machines.",
+      "source_label": "System description",
       "technology": "unknown",
       "trust_zone": "boundary:player-local-machine",
       "exposure": "unknown"
@@ -36,6 +39,7 @@
       "description": "Matchmaking service that clients connect to and that hands matches to the game servers.",
       "assets": ["availability-critical"],
       "source_excerpt": "It talks to the lobby on TCP 1234 for matchmaking",
+      "source_label": "System description",
       "technology": "unknown",
       "trust_zone": "boundary:prod-network",
       "exposure": "internet-facing"
@@ -46,6 +50,7 @@
       "description": "Match servers that clients connect to directly and that record match outcomes.",
       "assets": ["availability-critical", "business-critical-data"],
       "source_excerpt": "once a match starts it talks directly to the game servers on TCP 1235",
+      "source_label": "System description",
       "technology": "unknown",
       "trust_zone": "boundary:prod-network",
       "exposure": "internet-facing"
@@ -56,6 +61,7 @@
       "description": "Internal tool used by customer support to view and act on player accounts.",
       "assets": ["pii"],
       "source_excerpt": "use a moderation website to look at and act on player accounts",
+      "source_label": "System description",
       "technology": "unknown",
       "trust_zone": "boundary:prod-network",
       "exposure": "unknown"
@@ -68,6 +74,7 @@
       "description": "Player accounts, written by the game servers and the moderation website and read by the lobby.",
       "assets": ["pii", "business-critical-data"],
       "source_excerpt": "The lobby reads the player database to set up a match",
+      "source_label": "System description",
       "technology": "unknown",
       "trust_zone": "boundary:prod-network",
       "data_classification": "unknown",
@@ -79,6 +86,7 @@
       "description": "Match statistics written during and after a match.",
       "assets": ["business-critical-data"],
       "source_excerpt": "The game servers read and write the stats database during and after a match",
+      "source_label": "System description",
       "technology": "unknown",
       "trust_zone": "boundary:prod-network",
       "data_classification": "unknown",
@@ -92,6 +100,7 @@
       "description": "Player launches the client and plays through it.",
       "assets": [],
       "source_excerpt": "The player launches the client and plays through it.",
+      "source_label": "System description",
       "source": "entity:player",
       "destination": "process:game-client",
       "protocol": "local",
@@ -105,6 +114,7 @@
       "description": "Client connects out to the lobby to be placed in a match.",
       "assets": [],
       "source_excerpt": "It talks to the lobby on TCP 1234 for matchmaking",
+      "source_label": "System description",
       "source": "process:game-client",
       "destination": "process:lobby",
       "protocol": "TCP 1234",
@@ -118,6 +128,7 @@
       "description": "Client connects directly to the match server for the duration of a match.",
       "assets": [],
       "source_excerpt": "once a match starts it talks directly to the game servers on TCP 1235",
+      "source_label": "System description",
       "source": "process:game-client",
       "destination": "process:game-servers",
       "protocol": "TCP 1235",
@@ -131,6 +142,7 @@
       "description": "Lobby hands a formed match to a game server.",
       "assets": [],
       "source_excerpt": "hands the match over to the game servers",
+      "source_label": "System description",
       "source": "process:lobby",
       "destination": "process:game-servers",
       "protocol": "unknown",
@@ -144,6 +156,7 @@
       "description": "Lobby reads player records to form a match.",
       "assets": ["pii"],
       "source_excerpt": "The lobby reads the player database to set up a match",
+      "source_label": "System description",
       "source": "process:lobby",
       "destination": "store:player-database",
       "protocol": "unknown",
@@ -157,6 +170,7 @@
       "description": "Game servers record match statistics.",
       "assets": ["business-critical-data"],
       "source_excerpt": "The game servers read and write the stats database during and after a match",
+      "source_label": "System description",
       "source": "process:game-servers",
       "destination": "store:stats-database",
       "protocol": "unknown",
@@ -170,6 +184,7 @@
       "description": "Game servers write match outcomes back onto player records.",
       "assets": ["pii", "business-critical-data"],
       "source_excerpt": "they also write back to the player database",
+      "source_label": "System description",
       "source": "process:game-servers",
       "destination": "store:player-database",
       "protocol": "unknown",
@@ -183,6 +198,7 @@
       "description": "Support staff review and act on player accounts.",
       "assets": ["pii"],
       "source_excerpt": "customer support staff work from the corporate network and use a moderation website",
+      "source_label": "System description",
       "source": "entity:customer-support",
       "destination": "process:moderation-website",
       "protocol": "unknown",
@@ -196,6 +212,7 @@
       "description": "Moderation website reads and writes player records directly.",
       "assets": ["pii"],
       "source_excerpt": "That website reads and writes the player database directly.",
+      "source_label": "System description",
       "source": "process:moderation-website",
       "destination": "store:player-database",
       "protocol": "unknown",
@@ -210,6 +227,7 @@
       "name": "player local machine",
       "description": "Hardware owned by the player; outside the operator's control.",
       "source_excerpt": "Players run our game client on their own machines. We do not control those machines.",
+      "source_label": "System description",
       "kind": "other"
     },
     {
@@ -217,6 +235,7 @@
       "name": "corp network",
       "description": "Corporate network where customer support staff work.",
       "source_excerpt": "our customer support staff work from the corporate network",
+      "source_label": "System description",
       "kind": "network"
     },
     {
@@ -224,6 +243,7 @@
       "name": "prod network",
       "description": "Production network holding the lobby, the game servers, the moderation website and both databases.",
       "source_excerpt": "The client connects out to two things in our production network.",
+      "source_label": "System description",
       "kind": "network"
     }
   ],

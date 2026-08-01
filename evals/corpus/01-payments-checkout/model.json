@@ -6,6 +6,7 @@
       "description": "A customer who browses the storefront and places orders.",
       "assets": ["pii"],
       "source_excerpt": "Shoppers browse the storefront and place orders through the storefront API",
+      "source_label": "System description",
       "kind": "human",
       "trust_zone": "boundary:public-internet"
     },
@@ -15,6 +16,7 @@
       "description": "Third-party payment processor that settles payments and calls back on settlement.",
       "assets": ["financial"],
       "source_excerpt": "Our card processor is a third party.",
+      "source_label": "System description",
       "kind": "external-system",
       "trust_zone": "boundary:public-internet"
     }
@@ -26,6 +28,7 @@
       "description": "Node service on Cloud Run; the only internet-exposed component. Terminates shopper sessions and receives the processor's settlement webhook.",
       "assets": ["reputation"],
       "source_excerpt": "the storefront API, a Node service running on Cloud Run. It is the only thing we expose to the internet.",
+      "source_label": "System description",
       "technology": "Node on Cloud Run",
       "trust_zone": "boundary:storefront-dmz",
       "exposure": "internet-facing"
@@ -36,6 +39,7 @@
       "description": "Python worker that captures orders, persists them, and writes receipts.",
       "assets": ["financial", "availability-critical"],
       "source_excerpt": "The order service is a Python worker in our core network; it is not exposed outside.",
+      "source_label": "System description",
       "technology": "Python worker",
       "trust_zone": "boundary:core-services",
       "exposure": "internal"
@@ -48,6 +52,7 @@
       "description": "PostgreSQL database holding orders, shopper addresses and card last-four.",
       "assets": ["pii", "financial"],
       "source_excerpt": "Orders, shopper addresses and card-last-four live in a PostgreSQL database (orders-db)",
+      "source_label": "System description",
       "technology": "PostgreSQL",
       "trust_zone": "boundary:core-services",
       "data_classification": "confidential",
@@ -59,6 +64,7 @@
       "description": "Cloud Storage bucket holding one receipt per completed order.",
       "assets": ["business-critical-data"],
       "source_excerpt": "a receipt written to a Cloud Storage bucket we call the receipt archive",
+      "source_label": "System description",
       "technology": "Cloud Storage bucket",
       "trust_zone": "boundary:core-services",
       "data_classification": "internal",
@@ -72,6 +78,7 @@
       "description": "Shopper submits an order over an authenticated session.",
       "assets": ["pii", "financial"],
       "source_excerpt": "Shoppers sign in with email and password and get a session cookie; we have not rolled out MFA for shopper accounts yet.",
+      "source_label": "System description",
       "source": "entity:shopper",
       "destination": "process:storefront-api",
       "protocol": "HTTPS",
@@ -85,6 +92,7 @@
       "description": "Processor POSTs a settlement callback marking an order paid.",
       "assets": ["financial"],
       "source_excerpt": "they POST a webhook back to the storefront API to tell us the order is paid. I would have to check how that callback is authenticated.",
+      "source_label": "System description",
       "source": "entity:card-processor",
       "destination": "process:storefront-api",
       "protocol": "HTTPS POST",
@@ -98,6 +106,7 @@
       "description": "Storefront API forwards a submitted order into the core zone for capture.",
       "assets": ["pii", "financial"],
       "source_excerpt": "There is no auth on that gRPC call — the order service accepts anything that can reach it",
+      "source_label": "System description",
       "source": "process:storefront-api",
       "destination": "process:order-service",
       "protocol": "gRPC",
@@ -111,6 +120,7 @@
       "description": "Order service reads and writes order rows.",
       "assets": ["pii", "financial"],
       "source_excerpt": "a single application account that has full read/write. The password comes from an environment variable on the worker.",
+      "source_label": "System description",
       "source": "process:order-service",
       "destination": "store:orders-db",
       "protocol": "PostgreSQL wire protocol",
@@ -124,6 +134,7 @@
       "description": "Order service writes one receipt object per completed order.",
       "assets": ["business-critical-data"],
       "source_excerpt": "That is on TLS with the order service's own service account",
+      "source_label": "System description",
       "source": "process:order-service",
       "destination": "store:receipt-archive",
       "protocol": "HTTPS",
@@ -138,6 +149,7 @@
       "name": "public internet",
       "description": "Everything outside the storefront's control: shoppers and the card processor.",
       "source_excerpt": "It is the only thing we expose to the internet.",
+      "source_label": "System description",
       "kind": "network"
     },
     {
@@ -145,6 +157,7 @@
       "name": "storefront dmz",
       "description": "The internet-exposed tier holding the storefront API.",
       "source_excerpt": "the storefront API, a Node service running on Cloud Run. It is the only thing we expose to the internet.",
+      "source_label": "System description",
       "kind": "network"
     },
     {
@@ -152,6 +165,7 @@
       "name": "core services",
       "description": "Internal network holding the order service and its data.",
       "source_excerpt": "The order service is a Python worker in our core network; it is not exposed outside.",
+      "source_label": "System description",
       "kind": "network"
     }
   ],

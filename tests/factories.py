@@ -44,6 +44,7 @@ from stride_service.report import (
     build_summary,
 )
 from stride_service.sampling import load_sampling
+from stride_service.sources import DEFAULT_DESCRIPTION_LABEL, Source
 from stride_service.system_model import (
     Assumption,
     DataFlow,
@@ -97,7 +98,13 @@ def repo_tiers() -> ModelTierConfig:
     )
 
 
-def valid_model() -> SystemModel:
+def valid_model(source_label: str = DEFAULT_DESCRIPTION_LABEL) -> SystemModel:
+    """The shared gate-passing model.
+
+    ``source_label`` is a parameter because the citation rule checks it against
+    the *job's* labels: a model whose excerpts cite a source the job did not
+    carry is invalid, so a test submitting its own labels must say so here too.
+    """
     return SystemModel(
         external_entities=[
             ExternalEntity(
@@ -106,6 +113,7 @@ def valid_model() -> SystemModel:
                 kind="human",
                 trust_zone="boundary:internet",
                 source_excerpt="customers log in from the browser",
+                source_label=source_label,
                 assets=["pii"],
             )
         ],
@@ -117,6 +125,7 @@ def valid_model() -> SystemModel:
                 trust_zone="boundary:internal-network",
                 exposure="internet-facing",
                 source_excerpt="the web app runs on Cloud Run",
+                source_label=source_label,
             )
         ],
         data_stores=[
@@ -128,6 +137,7 @@ def valid_model() -> SystemModel:
                 data_classification="confidential",
                 encryption_at_rest="unknown",
                 source_excerpt="orders are stored in Postgres",
+                source_label=source_label,
                 assets=["business-critical-data", "pii"],
             )
         ],
@@ -142,6 +152,7 @@ def valid_model() -> SystemModel:
                 data_description="credentials in, session out",
                 encryption_in_transit="TLS 1.3",
                 source_excerpt="customers log in from the browser",
+                source_label=source_label,
             ),
             DataFlow(
                 id="flow:web-app-to-orders-db:store-order",
@@ -153,6 +164,7 @@ def valid_model() -> SystemModel:
                 data_description="order rows",
                 encryption_in_transit="unknown",
                 source_excerpt="orders are stored in Postgres",
+                source_label=source_label,
             ),
         ],
         trust_boundaries=[
@@ -161,12 +173,14 @@ def valid_model() -> SystemModel:
                 name="Internet",
                 kind="network",
                 source_excerpt="customers log in from the browser",
+                source_label=source_label,
             ),
             TrustBoundary(
                 id="boundary:internal-network",
                 name="Internal Network",
                 kind="network",
                 source_excerpt="the web app runs on Cloud Run",
+                source_label=source_label,
             ),
         ],
         assumptions=[
@@ -234,7 +248,10 @@ def sample_report(
             created_at=created,
             completed_at=datetime(2026, 7, 18, 14, 4, 9, tzinfo=UTC),
         ),
-        input=InputRef(system_name="Order Service", source_sha256="0" * 64),
+        input=InputRef.of(
+            system_name="Order Service",
+            sources=[Source.description("Customers log in to the web app.")],
+        ),
         nodes=[
             NodeRun(node="extract", model="gemini-2.5-flash", duration_ms=3200),
             NodeRun(node="critic", model="gemini-2.5-pro", duration_ms=14500),

@@ -69,11 +69,13 @@ from fastapi.responses import (
     Response,
     StreamingResponse,
 )
+from pydantic import ValidationError
 
 from stride_service import (
     ConfigError,
     EngineInputError,
     PipelineCompleted,
+    Source,
     StrideEngine,
     StrideReport,
 )
@@ -251,10 +253,10 @@ def create_app(
 
         try:
             body = await request.json()
-            description = str(body["description"])
-        except (ValueError, KeyError, TypeError):
+            sources = [Source.model_validate(source) for source in body["sources"]]
+        except (ValidationError, ValueError, KeyError, TypeError):
             return JSONResponse(
-                {"message": "Expected a JSON body with a 'description'."},
+                {"message": "Expected a JSON body with a 'sources' list."},
                 status_code=400,
             )
 
@@ -265,7 +267,9 @@ def create_app(
                 status_code=409,
             )
         # Held on the run so the task is not garbage-collected mid-flight.
-        run.task = asyncio.create_task(_drive(state.engine, analyses, run, description))
+        run.task = asyncio.create_task(
+            _drive(state.engine, analyses, run, sources)
+        )
         return JSONResponse({"run": run.id})
 
     @app.get("/events/{run_id}")
@@ -290,21 +294,22 @@ def create_app(
 
 
 async def _drive(
-    engine: StrideEngine, analyses: Analyses, run: Run, description: str
+    engine: StrideEngine, analyses: Analyses, run: Run, sources: list[Source]
 ) -> None:
     """Run one analysis to a terminal state, narrating it onto the run's queue.
 
     Only a completed run reaches the viewer, because the viewer renders
     reports. A rejection, a bad submission and an internal failure all land
-    back on the form page, where the description is still in the textarea.
+    back on the form page, where the submitted text is still in the textarea.
     """
     try:
         outcome = await engine.analyze(
-            description, system_name="Your system", on_node=_ticker(run)
+            sources, system_name="Your system", on_node=_ticker(run)
         )
     except EngineInputError as exc:
-        # Raised before any model ran — empty or oversized description. The
-        # message is about the caller's input and is safe to show.
+        # Raised before any model ran — no sources, too many, or more bytes
+        # than this deployment allows. The message is about the caller's input
+        # and is safe to show.
         await _emit(run, "failed", {"message": str(exc)})
     except Exception:
         # The traceback goes to the server log and never to the browser (A10).
@@ -520,7 +525,11 @@ _FORM_PAGE = (
     const started = await fetch("/analyze", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ description: box.value }),
+      body: JSON.stringify({
+        sources: [
+          { kind: "description", label: "Pasted description", text: box.value },
+        ],
+      }),
     });
     if (!started.ok) {
       fail(escape((await started.json()).message));

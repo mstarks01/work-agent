@@ -6,6 +6,7 @@
       "description": "Writes changes and pushes branches to the self-hosted git server; can also log in to the build runner and trigger an unreviewed rebuild of main by hand.",
       "assets": [],
       "source_excerpt": "Developers push their branches to our self-hosted git server, which sits on the corporate network.",
+      "source_label": "System description",
       "kind": "human",
       "trust_zone": "boundary:corporate-network"
     },
@@ -15,6 +16,7 @@
       "description": "Public dependency source on the internet that the build runner resolves the lockfile against.",
       "assets": [],
       "source_excerpt": "Dependency resolution reaches out to the public package registry on the internet",
+      "source_label": "System description",
       "kind": "external-system",
       "trust_zone": "boundary:internet"
     }
@@ -26,6 +28,7 @@
       "description": "Picks up a merge to main, fetches the source, resolves the dependency lockfile and produces a container image tagged with the commit sha. Holds the shared build token used to call the deploy controller.",
       "assets": ["credentials", "business-critical-data"],
       "source_excerpt": "The build runner picks the merge up, fetches the source, resolves the dependency lockfile and produces a container image.",
+      "source_label": "System description",
       "technology": "unknown",
       "trust_zone": "boundary:build-environment",
       "exposure": "internal"
@@ -36,6 +39,7 @@
       "description": "Holds one record — which image sha the estate should be on. Set by the build runner, polled by every store server.",
       "assets": ["business-critical-data"],
       "source_excerpt": "The deploy controller runs on the corporate network and holds one record: which image sha the estate should be on.",
+      "source_label": "System description",
       "technology": "unknown",
       "trust_zone": "boundary:corporate-network",
       "exposure": "internal"
@@ -46,6 +50,7 @@
       "description": "The back-office server in each of about 1,200 stores, running the till software as a container. Polls the deploy controller once a minute and pulls and restarts on a new release.",
       "assets": ["business-critical-data", "availability-critical"],
       "source_excerpt": "Each store has a small server in the back office running the till software as a container.",
+      "source_label": "System description",
       "notes": "One element stands for the whole fleet of ~1,200 identical servers; the source describes them collectively and states no per-store difference.",
       "technology": "container runtime running the till software",
       "trust_zone": "boundary:store-estate",
@@ -59,6 +64,7 @@
       "description": "Self-hosted git server holding developer branches and main; a merge to main is what starts a build.",
       "assets": ["business-critical-data"],
       "source_excerpt": "Developers push their branches to our self-hosted git server, which sits on the corporate network.",
+      "source_label": "System description",
       "notes": "The source treats the git server both as somewhere source rests and as something developers push to; modelled as a Data Store, which is where the source code actually lives.",
       "technology": "self-hosted git server",
       "trust_zone": "boundary:corporate-network",
@@ -71,6 +77,7 @@
       "description": "Holds the container images, tagged with the commit sha. Sits in the build environment and is reachable from the store estate over the WAN.",
       "assets": ["business-critical-data"],
       "source_excerpt": "It pushes the finished image to our image registry, which is also in the build environment.",
+      "source_label": "System description",
       "technology": "container image registry",
       "trust_zone": "boundary:build-environment",
       "data_classification": "unknown",
@@ -84,6 +91,7 @@
       "description": "Developers push their branches to the git server; a merge to main is what starts a build.",
       "assets": ["business-critical-data"],
       "source_excerpt": "Developers push their branches to our self-hosted git server, which sits on the corporate network.",
+      "source_label": "System description",
       "source": "entity:developer",
       "destination": "store:git-server",
       "protocol": "unknown",
@@ -97,6 +105,7 @@
       "description": "Any developer can log in to the build runner and kick off a rebuild of main by hand.",
       "assets": [],
       "source_excerpt": "And any developer can log in to the build runner and kick off a rebuild of main by hand; that path does not require a merge and is not reviewed.",
+      "source_label": "System description",
       "source": "entity:developer",
       "destination": "process:build-runner",
       "protocol": "unknown",
@@ -110,6 +119,7 @@
       "description": "The runner picks the merge up and fetches the source it is going to build.",
       "assets": ["business-critical-data"],
       "source_excerpt": "The build runner picks the merge up, fetches the source, resolves the dependency lockfile and produces a container image.",
+      "source_label": "System description",
       "source": "process:build-runner",
       "destination": "store:git-server",
       "protocol": "unknown",
@@ -123,6 +133,7 @@
       "description": "The runner resolves the lockfile against the public package registry and takes what it downloads as given.",
       "assets": [],
       "source_excerpt": "Dependency resolution reaches out to the public package registry on the internet, and the lockfile is taken as given — the runner does not verify signatures on what it downloads.",
+      "source_label": "System description",
       "source": "process:build-runner",
       "destination": "entity:public-package-registry",
       "protocol": "unknown",
@@ -136,6 +147,7 @@
       "description": "The runner pushes the finished image, tagged with the commit sha, to the registry.",
       "assets": ["business-critical-data"],
       "source_excerpt": "It pushes the finished image to our image registry, which is also in the build environment.",
+      "source_label": "System description",
       "source": "process:build-runner",
       "destination": "store:image-registry",
       "protocol": "unknown",
@@ -149,6 +161,7 @@
       "description": "The runner calls the controller and asks it to make the image it just pushed the current release.",
       "assets": ["credentials", "business-critical-data"],
       "source_excerpt": "The token the runner uses to call the controller is a shared build token that is the same for every pipeline and has not been rotated since the pipeline was set up.",
+      "source_label": "System description",
       "source": "process:build-runner",
       "destination": "process:deploy-controller",
       "protocol": "unknown",
@@ -162,6 +175,7 @@
       "description": "Every store server asks the controller once a minute what the current release is; the store initiates, nothing is pushed to it.",
       "assets": [],
       "source_excerpt": "The store servers do not get pushed to. Every store server asks the deploy controller once a minute what the current release is",
+      "source_label": "System description",
       "source": "process:store-server",
       "destination": "process:deploy-controller",
       "protocol": "unknown",
@@ -175,6 +189,7 @@
       "description": "On a changed release the store server pulls that image from the registry over the WAN and restarts the container.",
       "assets": ["business-critical-data"],
       "source_excerpt": "if it differs from what it is running it pulls that image from the registry and restarts the container. The registry allows the pull; nobody has written down what a store server presents to it",
+      "source_label": "System description",
       "source": "process:store-server",
       "destination": "store:image-registry",
       "protocol": "unknown",
@@ -189,6 +204,7 @@
       "name": "corporate network",
       "description": "Holds the git server and the deploy controller, and is where developers sit.",
       "source_excerpt": "our self-hosted git server, which sits on the corporate network",
+      "source_label": "System description",
       "kind": "network"
     },
     {
@@ -196,6 +212,7 @@
       "name": "build environment",
       "description": "The runner's own environment, stated to be separate from the corporate network; the image registry is in it too.",
       "source_excerpt": "The runner lives in its own build environment, separate from the corporate network.",
+      "source_label": "System description",
       "kind": "network"
     },
     {
@@ -203,6 +220,7 @@
       "name": "store estate",
       "description": "About 1,200 back-office store servers, reaching the corporate network and the registry over the retail WAN.",
       "source_excerpt": "Traffic between the stores and the corporate network goes over the retail WAN.",
+      "source_label": "System description",
       "kind": "network"
     },
     {
@@ -210,6 +228,7 @@
       "name": "internet",
       "description": "Where the public package registry sits.",
       "source_excerpt": "Dependency resolution reaches out to the public package registry on the internet",
+      "source_label": "System description",
       "kind": "network"
     }
   ],

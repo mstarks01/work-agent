@@ -1,16 +1,26 @@
-"""Resilience configuration for the graph's LLM calls.
+"""Operational bounds that cannot change an answer.
 
-Two knobs — attempts and timeout — applied to every LLM call. On library
-defaults the nodes never retry and never time out: a single 429 on any node
-would kill a paid-for job on first contact, and a stalled call would park a job
-in ``running`` forever.
+Four knobs. Two — attempts and timeout — are applied to every LLM call: on
+library defaults the nodes never retry and never time out, so a single 429 on
+any node would kill a paid-for job on first contact, and a stalled call would
+park a job in ``running`` forever. Two more bound the job's *input*: how many
+sources one job may carry, and how many UTF-8 bytes they may total.
 
-Unlike :mod:`stride_service.sampling`, these values **are** env-overridable. The
-split that settles it: sampling is pinned because temperature changes *what* the
-model produces, so an eval-only value is how a suite goes green while production
-drifts; attempts and timeout change only *how hard we try*, never which answer
-we get, so they cannot move a score and are exactly the knobs to turn down
-mid-incident without a redeploy.
+The input bounds are in **bytes, not tokens**. A token budget would make the
+public contract depend on which vendor a deployment's tiers happen to select,
+so what a caller may submit would change under them without the contract
+changing. Bytes are something the caller can measure themselves. There is
+deliberately no *per-source* cap: it would forbid only shapes the total already
+permits, and it would let the service blame one source for a budget the whole
+submission overspent.
+
+Unlike :mod:`stride_service.sampling`, every value here **is** env-overridable.
+The split that settles it: sampling is pinned because temperature changes *what*
+the model produces, so an eval-only value is how a suite goes green while
+production drifts. Nothing in this file can move an eval score — attempts and
+timeout change only *how hard we try*, and the input bounds decide only whether
+a submission is accepted at all, never which answer it gets — so these are
+exactly the knobs to turn down mid-incident without a redeploy.
 
 There are no backoff knobs. ``litellm`` picks its backoff curve internally from
 the exception type, so an ``initial_delay`` / ``max_delay`` / ``exp_base`` /
@@ -38,15 +48,19 @@ from typing import TypeVar
 from google.genai import types
 from pydantic import BaseModel, ConfigDict, Field, ValidationError
 
+from stride_service.sources import SourceLimits
+
 # The only schema version this loader accepts. The version check fires before
 # shape validation, so a file on another schema is named as such rather than
 # reported as a set of stray keys under ``extra="forbid"``.
-SUPPORTED_VERSION = 2
+SUPPORTED_VERSION = 3
 
 _ENV_PREFIX = "STRIDE_"
 
 ATTEMPTS_VAR = f"{_ENV_PREFIX}RETRY_ATTEMPTS"
 TIMEOUT_MS_VAR = f"{_ENV_PREFIX}TIMEOUT_MS"
+MAX_SOURCE_BYTES_VAR = f"{_ENV_PREFIX}MAX_SOURCE_BYTES"
+MAX_SOURCES_VAR = f"{_ENV_PREFIX}MAX_SOURCES"
 
 _T = TypeVar("_T", int, float)
 
@@ -56,13 +70,20 @@ class ResilienceConfigError(ValueError):
 
 
 class ResilienceConfig(BaseModel):
-    """Validated retry and timeout parameters applied to every LLM call."""
+    """Validated retry, timeout and input bounds for one deployment.
+
+    ``max_source_bytes`` is the total across *all* of a job's sources, not a
+    bound on any one of them — an over-budget submission overspent as a whole,
+    and no single source is at fault.
+    """
 
     model_config = ConfigDict(extra="forbid", frozen=True)
 
     version: int = Field(ge=1)
     attempts: int = Field(ge=1)
     timeout_ms: int = Field(gt=0)
+    max_source_bytes: int = Field(gt=0)
+    max_sources: int = Field(ge=1)
 
     def to_num_retries(self) -> int:
         """LiteLLM's ``num_retries``: retries *after* the first try.
@@ -71,6 +92,12 @@ class ResilienceConfig(BaseModel):
         is not passed through verbatim.
         """
         return self.attempts - 1
+
+    def source_limits(self) -> SourceLimits:
+        """The input bounds, as the value every entry point checks against."""
+        return SourceLimits(
+            max_total_bytes=self.max_source_bytes, max_sources=self.max_sources
+        )
 
     def to_http_options(self) -> types.HttpOptions:
         """Per-request HTTP options carrying the deadline.
@@ -119,13 +146,15 @@ def load_resilience(
     if version != SUPPORTED_VERSION:
         raise ResilienceConfigError(
             f"{path}: unsupported version {version!r};"
-            f" expected {SUPPORTED_VERSION}, which carries only 'attempts' and"
-            " 'timeout_ms'"
+            f" expected {SUPPORTED_VERSION}, which carries 'attempts',"
+            " 'timeout_ms', 'max_source_bytes' and 'max_sources'"
         )
 
     overrides = {
         "attempts": _override(env, ATTEMPTS_VAR, int),
         "timeout_ms": _override(env, TIMEOUT_MS_VAR, int),
+        "max_source_bytes": _override(env, MAX_SOURCE_BYTES_VAR, int),
+        "max_sources": _override(env, MAX_SOURCES_VAR, int),
     }
     raw.update({key: value for key, value in overrides.items() if value is not None})
 

@@ -6,6 +6,7 @@
       "description": "A store colleague who looks at the shifts they have been given.",
       "assets": ["pii"],
       "source_excerpt": "Colleagues use the same app to look at the shifts they have been given. Colleagues reach the app from their own phones.",
+      "source_label": "System description",
       "kind": "human",
       "trust_zone": "boundary:public-internet"
     },
@@ -15,6 +16,7 @@
       "description": "Builds the weekly rota for a store.",
       "assets": [],
       "source_excerpt": "Store managers use a scheduling web app to build the weekly rota for their store.",
+      "source_label": "System description",
       "kind": "human",
       "trust_zone": "boundary:public-internet"
     },
@@ -24,6 +26,7 @@
       "description": "System run by another team that collects the weekly payroll export.",
       "assets": [],
       "source_excerpt": "The payroll system, which is run by another team, collects the export from the file share.",
+      "source_label": "System description",
       "kind": "external-system",
       "trust_zone": "boundary:payroll-team-environment"
     }
@@ -35,6 +38,7 @@
       "description": "The app both managers and colleagues use; holds no rota data of its own.",
       "assets": ["pii"],
       "source_excerpt": "Store managers use a scheduling web app to build the weekly rota for their store.",
+      "source_label": "System description",
       "technology": "unknown",
       "trust_zone": "boundary:internal-network",
       "exposure": "internet-facing"
@@ -45,6 +49,7 @@
       "description": "Reads and writes the rotas and produces the weekly payroll export.",
       "assets": ["pii", "business-critical-data"],
       "source_excerpt": "The scheduling service is what actually reads and writes the rotas",
+      "source_label": "System description",
       "technology": "unknown",
       "trust_zone": "boundary:internal-network",
       "exposure": "internal"
@@ -57,6 +62,7 @@
       "description": "Holds the rotas, and colleague names, contact details and stated availability.",
       "assets": ["pii", "business-critical-data"],
       "source_excerpt": "Colleague names, contact details and stated availability are held in that database.",
+      "source_label": "System description",
       "technology": "unknown",
       "trust_zone": "boundary:internal-network",
       "data_classification": "unknown",
@@ -68,6 +74,7 @@
       "description": "Where the weekly payroll export is written and left for the payroll system to collect.",
       "assets": ["pii"],
       "source_excerpt": "Once a week the scheduling service writes a payroll export onto a file share.",
+      "source_label": "System description",
       "technology": "unknown",
       "trust_zone": "boundary:internal-network",
       "data_classification": "unknown",
@@ -81,6 +88,7 @@
       "description": "Colleague opens the app to see their own shifts; the response rides the same interaction.",
       "assets": ["pii"],
       "source_excerpt": "Colleagues use the same app to look at the shifts they have been given.",
+      "source_label": "System description",
       "source": "entity:colleague",
       "destination": "process:scheduling-web-app",
       "protocol": "unknown",
@@ -94,6 +102,7 @@
       "description": "Manager builds and changes the weekly rota for their store.",
       "assets": ["pii", "business-critical-data"],
       "source_excerpt": "Store managers use a scheduling web app to build the weekly rota for their store.",
+      "source_label": "System description",
       "source": "entity:store-manager",
       "destination": "process:scheduling-web-app",
       "protocol": "unknown",
@@ -107,6 +116,7 @@
       "description": "The app asks the service for rota reads and writes.",
       "assets": ["pii", "business-critical-data"],
       "source_excerpt": "The web app talks to a scheduling service.",
+      "source_label": "System description",
       "source": "process:scheduling-web-app",
       "destination": "process:scheduling-service",
       "protocol": "unknown",
@@ -120,6 +130,7 @@
       "description": "The service reads and writes rotas and colleague details.",
       "assets": ["pii", "business-critical-data"],
       "source_excerpt": "The scheduling service is what actually reads and writes the rotas, which live in a rota database.",
+      "source_label": "System description",
       "source": "process:scheduling-service",
       "destination": "store:rota-database",
       "protocol": "unknown",
@@ -133,6 +144,7 @@
       "description": "The service writes the weekly payroll export to the share.",
       "assets": ["pii"],
       "source_excerpt": "Once a week the scheduling service writes a payroll export onto a file share.",
+      "source_label": "System description",
       "source": "process:scheduling-service",
       "destination": "store:file-share",
       "protocol": "unknown",
@@ -146,6 +158,7 @@
       "description": "The payroll system initiates the collection of the export from the share.",
       "assets": ["pii"],
       "source_excerpt": "The payroll system, which is run by another team, collects the export from the file share.",
+      "source_label": "System description",
       "source": "entity:payroll-system",
       "destination": "store:file-share",
       "protocol": "unknown",
@@ -160,6 +173,7 @@
       "name": "public internet",
       "description": "Where colleagues and managers sit; colleagues reach the app from their own phones.",
       "source_excerpt": "Colleagues reach the app from their own phones.",
+      "source_label": "System description",
       "kind": "network"
     },
     {
@@ -167,6 +181,7 @@
       "name": "internal network",
       "description": "Holds the scheduling service, the rota database and the file share, and the web app that fronts them.",
       "source_excerpt": "The scheduling service, the rota database and the file share are on the internal network.",
+      "source_label": "System description",
       "kind": "network"
     },
     {
@@ -174,6 +189,7 @@
       "name": "payroll team environment",
       "description": "Run by another team; the source says nothing else about it.",
       "source_excerpt": "The payroll system, which is run by another team",
+      "source_label": "System description",
       "kind": "other"
     }
   ],
