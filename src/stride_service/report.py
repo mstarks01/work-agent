@@ -187,6 +187,40 @@ class Threat(DraftThreat):
     verdict: Verdict
 
 
+class DraftThreats(BaseModel):
+    """What an analyst node emits: an object wrapping its list of drafts.
+
+    The wrapper exists for the *schema*, not for the domain. A node's
+    ``output_schema`` is what the graph asks the provider to constrain
+    generation to, and a bare ``list[DraftThreat]`` cannot be asked for: ADK
+    cannot convert a generic alias into a response format, so it sends none and
+    the node generates unconstrained — silently, with only a log line. Wrapping
+    the list in a model gives the conversion something it can carry, and an
+    object root at that, which is what OpenAI's structured outputs require and
+    a bare array would not satisfy.
+
+    Nothing downstream sees it: the graph unwraps at the node boundary, so the
+    domain keeps working in lists.
+    """
+
+    model_config = ConfigDict(extra="forbid")
+
+    threats: list[DraftThreat]
+
+
+class ReviewedThreats(BaseModel):
+    """What the critic and its re-ask emit: the same wrapper over ruled threats.
+
+    Separate from :class:`DraftThreats` because the element type differs — a
+    reviewed threat carries the critic's ``verdict`` and ``confidence``. See
+    that class for why the wrapper exists at all.
+    """
+
+    model_config = ConfigDict(extra="forbid")
+
+    threats: list[Threat]
+
+
 class NodeRun(BaseModel):
     """Per-node execution metadata: which model ran, its sampling identity, timing.
 

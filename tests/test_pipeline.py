@@ -34,6 +34,7 @@ from tests.factories import (
     sample_draft,
     sample_threat,
     served_build,
+    threats_json,
     valid_model,
 )
 from tests.factories import scripted_pipeline as build
@@ -49,7 +50,7 @@ VERTEX_ENV = {
 
 
 def draft_json(threat_id: str, category: str) -> str:
-    return json.dumps([sample_draft(threat_id, category).model_dump(mode="json")])
+    return threats_json(sample_draft(threat_id, category))
 
 
 def job(text: str = "Customers log in to the web app.") -> JobRecord:
@@ -80,7 +81,7 @@ def happy_replies() -> dict[str, str]:
     return {
         "extract": valid_model().model_dump_json(),
         graph.analyst_node_name("spoofing"): draft_json("S-01", "spoofing"),
-        "critic": json.dumps([sample_threat("S-01").model_dump(mode="json")]),
+        "critic": threats_json(sample_threat("S-01")),
     }
 
 
@@ -167,11 +168,8 @@ def test_each_analyst_gets_its_own_category_and_the_shared_model():
 def test_the_critic_sees_every_analysts_drafts_once():
     replies = happy_replies()
     replies[graph.analyst_node_name("tampering")] = draft_json("T-01", "tampering")
-    replies["critic"] = json.dumps(
-        [
-            sample_threat("S-01").model_dump(mode="json"),
-            sample_threat("T-01", category="tampering").model_dump(mode="json"),
-        ]
+    replies["critic"] = threats_json(
+        sample_threat("S-01"), sample_threat("T-01", category="tampering")
     )
     pipeline, models = build(replies)
     outcome, _ = run(pipeline, job())
@@ -224,12 +222,8 @@ def test_a_model_that_fails_twice_is_rejected_with_its_issues():
 def test_a_hallucinated_element_reference_fails_the_job_loudly():
     """The merge seam refuses drafts the System Model cannot account for."""
     replies = happy_replies()
-    replies[graph.analyst_node_name("spoofing")] = json.dumps(
-        [
-            sample_draft("S-01", affected_element_ids=["process:invented"]).model_dump(
-                mode="json"
-            )
-        ]
+    replies[graph.analyst_node_name("spoofing")] = threats_json(
+        sample_draft("S-01", affected_element_ids=["process:invented"])
     )
     pipeline, _ = build(replies)
 
@@ -241,14 +235,11 @@ def test_a_malformed_critic_output_is_re_asked_once_and_then_assembled():
     """The critic drops a draft; the bounded re-ask returns the full set."""
     replies = happy_replies()
     replies[graph.analyst_node_name("tampering")] = draft_json("T-01", "tampering")
-    both = json.dumps(
-        [
-            sample_threat("S-01").model_dump(mode="json"),
-            sample_threat("T-01", category="tampering").model_dump(mode="json"),
-        ]
+    both = threats_json(
+        sample_threat("S-01"), sample_threat("T-01", category="tampering")
     )
     # The critic drops T-01; the re-ask returns both drafts, reconciled.
-    replies["critic"] = json.dumps([sample_threat("S-01").model_dump(mode="json")])
+    replies["critic"] = threats_json(sample_threat("S-01"))
     replies["recritic"] = both
 
     pipeline, models = build(replies)
@@ -270,11 +261,8 @@ def test_a_malformed_critic_output_is_re_asked_once_and_then_assembled():
 
 def test_a_critic_that_will_not_reconcile_after_the_re_ask_fails_the_job_loudly():
     replies = happy_replies()
-    invented = json.dumps(
-        [
-            sample_threat("S-01").model_dump(mode="json"),
-            sample_threat("T-02", category="tampering").model_dump(mode="json"),
-        ]
+    invented = threats_json(
+        sample_threat("S-01"), sample_threat("T-02", category="tampering")
     )
     # Both the critic and its re-ask return a threat no analyst drafted.
     replies["critic"] = invented
@@ -316,11 +304,8 @@ def test_a_failed_job_logs_the_input_digest(caplog):
     import logging
 
     replies = happy_replies()
-    invented = json.dumps(
-        [
-            sample_threat("S-01").model_dump(mode="json"),
-            sample_threat("T-02", category="tampering").model_dump(mode="json"),
-        ]
+    invented = threats_json(
+        sample_threat("S-01"), sample_threat("T-02", category="tampering")
     )
     replies["critic"] = invented
     replies["recritic"] = invented
