@@ -10,8 +10,9 @@ provider is not *how* to call it but three facts the adapter cannot supply:
   choosing: Vertex admits no raw-API-key path under any adapter
   (``BerriAI/litellm#21036``), so ``vertex + api_key`` must be unrepresentable
   rather than validated against;
-* the **floating-form rule** for model identifiers, which differs by vendor
-  and, on Vertex, by model *family*.
+* the **floating-form rule** for model identifiers, which differs by model
+  *family* rather than by vendor — Claude carries a canonical identifier of its
+  own shape, and both vendors that serve it spell that shape the same way.
 
 Deliberately **not** here: the per-``(vendor, model)`` sampling support set.
 ``vertex_ai/`` is not one provider and the real answer lives in LiteLLM's own
@@ -36,9 +37,11 @@ from stride_service.errors import ConfigError
 VendorName = Literal["vertex", "anthropic", "openai"]
 VENDOR_NAMES: tuple[VendorName, ...] = ("vertex", "anthropic", "openai")
 
-# The one reasoning knob, uniform across vendors: LiteLLM maps it to
-# ``budget_tokens`` on Anthropic (identically via Vertex), to
-# ``thinkingConfig`` on Gemini, and passes it through on OpenAI o-series.
+# The one reasoning knob, uniform across vendors: LiteLLM maps it to adaptive
+# ``thinking`` plus ``output_config.effort`` on Anthropic (identically via
+# Vertex), to ``thinkingConfig`` on Gemini, and passes it through on OpenAI
+# o-series. Anthropic's half was ``budget_tokens`` before Claude 4.6, which is
+# the generation this service now floors at — see :data:`MINIMUM_CLAUDE_GENERATION`.
 REASONING_KWARG = "reasoning_effort"
 
 _API_KEY_TEMPLATE = "STRIDE_{vendor}_API_KEY"
@@ -80,51 +83,98 @@ class _FormRule:
     """One model family's pinned-form rule.
 
     ``family`` is the model-name prefix this rule covers; the empty string is the
-    vendor's catch-all. ``pinned`` is the shape a *pinned* build takes where the
-    vendor publishes one — Vertex Claude's ``@YYYYMMDD``, Anthropic's dated
-    snapshot suffix. Where a vendor's most specific stable identifier is the bare
-    name (Gemini 2.5 and later ship no numbered builds), ``pinned`` is ``None``
-    and only the denylist applies.
+    vendor's catch-all. ``pinned`` is the canonical identifier's shape where the
+    vendor documents one — Claude's dateless ``claude-{name}-{major}[-{minor}]``.
+    Where a family's most specific stable identifier is the bare name (Gemini 2.5
+    and later ship no numbered builds), ``pinned`` is ``None`` and only the
+    denylist applies. ``minimum_generation`` is the oldest ``(major, minor)`` this
+    service will run; it is meaningful only for the Claude rule, whose pattern is
+    the one that carries the version.
     """
 
     family: str
     pinned: re.Pattern[str] | None
     hint: str
+    minimum_generation: tuple[int, int] | None = None
 
 
-# What "pinned" means, per vendor and — on Vertex — per model family. This is an
-# **open-world denylist** by decision, and is explicitly weak: an allowlist of
-# known builds breaks outright the moment a vendor retires one, and that risk
-# runs against three catalogs. The reproducibility guarantee does not rest here
-# — it rests on the *served* build read back from every response.
+# Floating forms, rejected for every vendor and family. This half stays an
+# **open-world denylist** by decision: for families whose vendor publishes no
+# canonical form there is nothing to match against, and an allowlist of known
+# builds breaks outright the moment a vendor retires one — that risk runs
+# against three catalogs. The reproducibility guarantee does not rest here; it
+# rests on the *served* build read back from every response.
 _ALIAS_SUFFIX = "-latest"
 _PRE_GA_MARKERS = ("-preview", "-exp")
 
-_VERTEX_DATED = re.compile(r"@\d{8}$")
-_ANTHROPIC_DATED = re.compile(r"-\d{8}$")
+# Claude is the family that *does* publish a canonical form, so it gets a closed
+# shape rather than a denylist. From the 4.6 generation on, the identifier is
+# dateless and carries the whole version — and it is a pinned snapshot, not an
+# alias: Anthropic ships a new ID rather than moving weights under an existing
+# one, and Google Cloud spells it identically. Before 4.6 the pinned build
+# carried a date (``-YYYYMMDD`` direct, ``@YYYYMMDD`` on Vertex) and the bare
+# name *was* a floating alias, which is why one pattern cannot serve both.
+#
+# Matching a shape rather than enumerating builds is what keeps this from
+# repeating the retired-allowlist failure: a Claude model released tomorrow
+# already satisfies it.
+_CLAUDE_ID = re.compile(r"claude-[a-z]+-(?P<major>\d+)(?:-(?P<minor>\d+))?")
+
+# The oldest Claude generation this service runs. 4.6 is a deliberate floor and
+# also the exact point where the identifier became self-describing, so the
+# pattern that pins is the same one that reads the generation. Everything below
+# it is rejected as a generation rather than as a typo.
+MINIMUM_CLAUDE_GENERATION = (4, 6)
+
+_CLAUDE_RULE = _FormRule(
+    family="claude-",
+    pinned=_CLAUDE_ID,
+    hint=(
+        "a Claude model ID is 'claude-<name>-<major>[-<minor>]',"
+        " e.g. 'claude-opus-5' or 'claude-sonnet-4-6'"
+    ),
+    minimum_generation=MINIMUM_CLAUDE_GENERATION,
+)
+
+# Gemini on Vertex, and every OpenAI model: no canonical form to require, so
+# only the shared denylist applies. OpenAI's o-series ships no dated form at
+# all, and the dated gpt-* snapshots are optional rather than canonical.
+_CATCH_ALL = _FormRule(family="", pinned=None, hint="")
 
 _FORM_RULES: dict[VendorName, tuple[_FormRule, ...]] = {
-    "vertex": (
-        _FormRule(
-            family="claude-",
-            pinned=_VERTEX_DATED,
-            hint="a Vertex Claude build is pinned as 'claude-...@YYYYMMDD'",
-        ),
-        _FormRule(family="", pinned=None, hint=""),
-    ),
-    "anthropic": (
-        _FormRule(
-            family="claude-",
-            pinned=_ANTHROPIC_DATED,
-            hint="an Anthropic build is pinned as 'claude-...-YYYYMMDD'",
-        ),
-        _FormRule(family="", pinned=None, hint=""),
-    ),
-    # OpenAI's o-series ships no dated form at all, and the dated gpt-* snapshots
-    # are optional rather than canonical, so there is nothing to require here
-    # beyond the shared denylist.
-    "openai": (_FormRule(family="", pinned=None, hint=""),),
+    "vertex": (_CLAUDE_RULE, _CATCH_ALL),
+    "anthropic": (_CLAUDE_RULE, _CATCH_ALL),
+    "openai": (_CATCH_ALL,),
 }
+
+
+def claude_generation(model: str) -> tuple[int, int] | None:
+    """The ``(major, minor)`` a Claude identifier names, or ``None`` if it isn't one.
+
+    A major-version release omits the minor segment (``claude-opus-5``), so an
+    absent group reads as ``.0`` rather than as a parse failure.
+
+    Public because two callers need it, and neither can key on the *vendor*:
+    this module's own floor check, and the build-time sampling rule in
+    :mod:`stride_service.binding`, which has to know which Claude generation it
+    is binding whether that Claude arrives direct or via Vertex.
+    """
+    match = _CLAUDE_ID.fullmatch(model)
+    if match is None:
+        return None
+    return int(match["major"]), int(match["minor"] or 0)
+
+
+def _check_generation(model: str, minimum: tuple[int, int], source: str) -> None:
+    """Reject an identifier older than the minimum supported generation."""
+    generation = claude_generation(model)
+    if generation is not None and generation < minimum:
+        found = ".".join(str(part) for part in generation)
+        wanted = ".".join(str(part) for part in minimum)
+        raise ValueError(
+            f"{source}: {model!r} is generation {found};"
+            f" this service supports {wanted} and later"
+        )
 
 
 @dataclass(frozen=True)
@@ -161,7 +211,7 @@ class Vendor:
         return f"{self.prefix}{model}"
 
     def validate_model(self, model: str, source: str) -> str:
-        """Reject a floating model identifier; return the pinned one unchanged.
+        """Reject a floating or unsupported identifier; return the pinned one.
 
         ``source`` names where the string came from (a config key or an env var)
         so the error points ops at the knob to turn.
@@ -180,8 +230,11 @@ class Vendor:
                 " use the pinned model identifier"
             )
         rule = self._rule_for(model)
-        if rule.pinned is not None and not rule.pinned.search(model):
-            raise ValueError(f"{source}: {model!r} is not pinned — {rule.hint}")
+        if rule.pinned is not None:
+            if rule.pinned.fullmatch(model) is None:
+                raise ValueError(f"{source}: {model!r} is not pinned — {rule.hint}")
+            if rule.minimum_generation is not None:
+                _check_generation(model, rule.minimum_generation, source)
         return model
 
     def _rule_for(self, model: str) -> _FormRule:

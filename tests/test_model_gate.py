@@ -25,8 +25,8 @@ from stride_service.model_gate import (
 from stride_service.vendors import vendor_for
 
 GEMINI = "gemini-2.5-pro"
-VERTEX_CLAUDE = "claude-sonnet-4-5@20250929"
-ANTHROPIC_CLAUDE = "claude-sonnet-4-5-20250929"
+VERTEX_CLAUDE = "claude-sonnet-4-6"
+ANTHROPIC_CLAUDE = "claude-sonnet-4-6"
 
 
 def gate(vendor: str, model: str, **params) -> None:
@@ -165,7 +165,7 @@ class TestErrorsPointAtTheKnob:
     ("vendor", "base_model", "strong_model"),
     [
         ("vertex", "gemini-2.5-flash", "gemini-2.5-pro"),
-        ("anthropic", "claude-haiku-4-5-20251001", "claude-sonnet-4-5-20250929"),
+        ("anthropic", "claude-sonnet-4-6", "claude-opus-5"),
         ("openai", "gpt-4.1-mini", "gpt-4.1"),
     ],
 )
