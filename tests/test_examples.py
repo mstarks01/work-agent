@@ -22,6 +22,7 @@ import pytest
 
 from stride_service import (
     PipelineRejected,
+    SourceLimits,
     StrideEngine,
     StubPipelineRunner,
 )
@@ -74,15 +75,19 @@ def test_every_example_exposes_the_injected_engine_contract(example):
     assert asyncio.iscoroutinefunction(example.main)
 
 
+# The shipped bounds; the examples are about the call shape, not the caps.
+EXAMPLE_LIMITS = SourceLimits(max_total_bytes=100 * 1024, max_sources=10)
+
+
 def test_the_example_reports_a_completed_run(example, capsys):
-    engine = StrideEngine(StubPipelineRunner())
+    engine = StrideEngine(StubPipelineRunner(), limits=EXAMPLE_LIMITS)
     asyncio.run(example.main(engine))
     assert capsys.readouterr().out, "a completed run must print something"
 
 
 def test_the_example_handles_a_rejection_without_raising(example, capsys):
     """The bug this whole mechanism exists to catch: silence on rejection."""
-    engine = StrideEngine(RejectingRunner())
+    engine = StrideEngine(RejectingRunner(), limits=EXAMPLE_LIMITS)
     asyncio.run(example.main(engine))
 
     captured = capsys.readouterr()
@@ -95,7 +100,7 @@ def test_the_example_handles_a_rejection_without_raising(example, capsys):
 
 def test_the_example_lets_an_internal_failure_propagate(example):
     """Fail closed: nothing partial is invented on the way out."""
-    engine = StrideEngine(ExplodingRunner())
+    engine = StrideEngine(ExplodingRunner(), limits=EXAMPLE_LIMITS)
     with pytest.raises(RuntimeError):
         asyncio.run(example.main(engine))
 

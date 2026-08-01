@@ -153,12 +153,12 @@ What to look at first:
 - **Confirmed vs needs-info threats.** The sample deliberately leaves a few facts
   unstated (is the S3 bucket encrypted? is the admin console authenticated?), and
   those come back as `needs-info` rather than as invented findings. That contrast
-  is the behaviour to understand before you write your own description.
+  is the behaviour to understand before you write your own sources.
 - **Provenance** — the served model build and sampling fingerprint for every LLM
   node, which is what makes a report reproducible.
 
 Then replace the sample with your own system and analyze again.
-[Integration-Guide](Integration-Guide.md) explains what makes a description
+[Integration-Guide](Integration-Guide.md) explains what makes a source
 extract well; the short version is that anything you do not state becomes
 `unknown`, so state the controls you actually have.
 
@@ -169,15 +169,20 @@ The web app was the demonstration. This is the thing you ship:
 <!-- docs-include: examples/embed.py#embed -->
 ```python
 async def main(engine: StrideEngine) -> None:
-    """Analyze one system description, handling every outcome it can have."""
-    description = SAMPLE.read_text(encoding="utf-8")
+    """Analyze one system, handling every outcome the run can have."""
+    # A job takes an ordered list of sources. One written description is the
+    # simplest case; add Source.transcript(...) for a recorded call, and give
+    # each a label you will recognise when you read it back in the report.
+    sources = [
+        Source.description(SAMPLE.read_text(encoding="utf-8"), label="Orders note"),
+    ]
 
     try:
-        outcome = await engine.analyze(description, system_name="Orders")
+        outcome = await engine.analyze(sources, system_name="Orders")
     except EngineInputError as exc:
-        # Raised before any model runs: empty description, oversized
-        # description, over-long system_name. Your caller's mistake, not the
-        # service's — surface it as a validation error.
+        # Raised before any model runs: no sources, too many, more bytes than
+        # the deployment allows, or an over-long system_name. Your caller's
+        # mistake, not the service's — surface it as a validation error.
         print(f"invalid submission: {exc}", file=sys.stderr)
         raise
     except Exception:
@@ -188,8 +193,8 @@ async def main(engine: StrideEngine) -> None:
         raise
 
     if isinstance(outcome, PipelineRejected):
-        # The description could not be turned into a valid system model. This
-        # is actionable by whoever wrote it: each issue names what to fix.
+        # The sources could not be turned into a valid system model. This is
+        # actionable by whoever wrote them: each issue names what to fix.
         for issue in outcome.issues:
             print(f"rejected [{issue.code}] {issue.message}", file=sys.stderr)
         return

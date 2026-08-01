@@ -26,7 +26,7 @@ class StrideReport:
     schema_version: str          # "1.1"
     disclaimer: str              # AI-generated, not human-reviewed
     job: Job                     # id, status="completed", timestamps, revise_rounds
-    input: InputRef              # system_name + source_sha256 of the exact text
+    input: InputRef              # system_name + one ref per submitted source
     nodes: list[NodeRun]         # per-node model, sampling fingerprint, duration_ms
     sampling: dict[str, dict]    # per-tier resolved decoding params (provenance)
     system_model: SystemModel    # the canonical model the analysis ran on
@@ -41,6 +41,32 @@ of drafts the critic ruled out. Both are the same `Threat` type — placement is
 decided by the verdict.
 
 ## A threat
+
+`InputRef` ties the report to what was submitted without carrying the text:
+
+```python
+class SourceRef:
+    kind: str                    # description | transcript
+    label: str                   # the citation key an element's source_label names
+    sha256: str                  # digest of that one source's text
+
+class InputRef:
+    system_name: str
+    sources: list[SourceRef]     # one per submitted source, in submitted order
+    source_sha256: str           # aggregate, taken over the refs above
+```
+
+The aggregate is computed **over the refs**, not over the concatenated text, so
+it stays recomputable from the report alone — the refs are in the report, the
+text never is.
+
+Every element in `system_model` carries `source_excerpt` (a verbatim quote),
+`source_label` (which source the *quote* came from — it always names one of the
+refs above), and an optional `source_speaker` (who said it, where the text
+attributes it). `source_speaker` is a separate field precisely so a name can be
+stripped; a name inside a verbatim excerpt cannot be. An element's `notes` may
+also quote submitted words — a speaker's hedge, or two sources disagreeing —
+so both fields ship raw caller text in the report JSON.
 
 ```python
 class Threat:
