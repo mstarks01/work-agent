@@ -21,7 +21,15 @@ Three things about the surface:
   ``off`` is worse than unportable — ``gemini-2.5-pro`` + ``none`` *passes* the
   gate as ``thinkingBudget: 0`` and then 400s at request time.
 * **``max_output_tokens`` is pinned**, because the default is vendor-dependent:
-  Anthropic derives a 5,120–8,192 cap only when the caller is silent.
+  Anthropic derives a 5,120–8,192 cap only when the caller is silent. It is
+  pinned per tier at a value sized against *measured* output — the tiers emit
+  different things, and the critic, which re-emits every draft it was given,
+  needs several times what one extraction does. Undersizing it does not
+  truncate visibly: the completion returns no text, the node writes no output
+  key, and the next FunctionNode fails to bind. ``binding.py`` checks each
+  tier's value against its model's published ceiling, which
+  :func:`~stride_service.model_gate.check_supported` cannot — every provider
+  accepts the param, and only the serving model objects to the value.
 * **``constrain_output`` decides whether the node's schema is sent at all.**
   Constrained generation is the default and the better answer where a provider
   will take it, but "will take it" is a property of the schema *and* the
@@ -128,7 +136,10 @@ class _RawTier(BaseModel):
 
     No upper bound is placed on ``max_output_tokens``: the ceiling is a
     per-``(vendor, model)`` fact, and mirroring one here would be a table that
-    drifts against the provider actually serving the request.
+    drifts against the provider actually serving the request. It is enforced
+    where the pair is known — :func:`stride_service.binding._check_output_ceiling`
+    asks the model map at build time — so "unbounded here" means unbounded by
+    the *loader*, not unchecked.
     """
 
     model_config = ConfigDict(extra="forbid", frozen=True)
