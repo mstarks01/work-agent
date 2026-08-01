@@ -31,7 +31,11 @@ from google.adk.apps import App
 from google.adk.sessions import BaseSessionService, InMemorySessionService
 from google.genai import types
 
-from stride_service.graph import STATE_INPUT_TEXT, Pipeline
+from stride_service.graph import (
+    STATE_INPUT_TEXT,
+    STATE_SOURCE_LABELS,
+    Pipeline,
+)
 from stride_service.report import NodeRun
 from stride_service.sampling import sampling_fingerprint
 from stride_service.sources import Source, render_sources
@@ -133,6 +137,10 @@ class GraphExecutor:
                 "not seeded by the caller"
             )
         seed[STATE_INPUT_TEXT] = rendered
+        # The gate checks each citation against this set. It travels beside the
+        # rendered text because both are facts about the job rather than about
+        # the model, and both are the executor's to write.
+        seed[STATE_SOURCE_LABELS] = [source.label for source in sources]
 
         session = await self._session_service.create_session(
             app_name=self._app_name, user_id=user_id, state=seed
