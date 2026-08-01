@@ -12,6 +12,7 @@ by which decision would be falsified if the assertion failed.
 
 from __future__ import annotations
 
+import contextlib
 import os
 import sys
 
@@ -131,6 +132,72 @@ class TestKwargAssertion:
         # revert retry to a single try — the failure retry exists to prevent.
         with pytest.raises(ModelGateError, match="not a litellm parameter"):
             assert_kwarg_supported("num_retrys")
+
+
+class TestRetryLayering:
+    """What one ``attempt`` actually costs in HTTP requests.
+
+    ``config/resilience.toml`` bounds LiteLLM's retry layer, and LiteLLM builds
+    the provider SDK's client with a retry layer of its own set *from* that
+    bound. The product is what a per-minute request quota sees, so it is a fact
+    about the installed library and belongs in a probe: a version bump that
+    changes the coupling — in either direction — has to show up here rather than
+    as a rate-limited job.
+
+    Probed on the OpenAI path because that is where LiteLLM plumbs
+    ``max_retries`` through at all; no request is made, since the client is
+    intercepted as it is built.
+    """
+
+    @staticmethod
+    def _client_retries(monkeypatch, **kwargs) -> list[int]:
+        """The SDK ``max_retries`` of each client one acompletion would build."""
+        import asyncio
+
+        from litellm.llms.openai.openai import OpenAIChatCompletion
+
+        from stride_service.model_gate import _litellm
+
+        built: list[int] = []
+
+        def intercept(self, **client_kwargs):
+            built.append(client_kwargs.get("max_retries"))
+            raise RuntimeError("intercepted before any request")
+
+        monkeypatch.setattr(OpenAIChatCompletion, "_get_openai_client", intercept)
+
+        async def attempt() -> None:
+            with contextlib.suppress(Exception):
+                await _litellm.acompletion(
+                    model="openai/gpt-4o",
+                    messages=[{"role": "user", "content": "probe"}],
+                    api_key="not-a-real-key",
+                    **kwargs,
+                )
+
+        asyncio.run(attempt())
+        return built
+
+    def test_the_first_attempt_carries_the_sdks_own_retries(self, monkeypatch):
+        # num_retries=2 is the shipped attempts=3. LiteLLM makes three attempts,
+        # and hands the first one an SDK client that will itself retry twice.
+        built = self._client_retries(monkeypatch, num_retries=2)
+
+        assert built == [2, 0, 0]
+        assert sum(1 + retries for retries in built) == 5  # 2 * attempts - 1
+
+    def test_max_retries_cannot_close_it_from_the_adapter(self, monkeypatch):
+        # The reason resilience.py documents this rather than pinning it in
+        # binding.py: num_retries overwrites an explicit max_retries on its way
+        # to the client, so the kwarg would be a knob connected to nothing.
+        built = self._client_retries(monkeypatch, num_retries=2, max_retries=0)
+
+        assert built[0] == 2
+
+    def test_a_single_attempt_costs_a_single_request(self, monkeypatch):
+        # attempts=1 is the mid-incident floor, and it is a real floor: with
+        # nothing to retry at either layer it is one request per node.
+        assert self._client_retries(monkeypatch, num_retries=0) == [0]
 
 
 class TestHermeticImport:

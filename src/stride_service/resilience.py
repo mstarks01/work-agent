@@ -32,6 +32,23 @@ Retry rides the adapter's constructor, and the arithmetic is explicit.
 to four tries where three are configured. Only ``attempts - 1`` reproduces the
 configured number.
 
+That bounds LiteLLM's *own* retry layer. There is a second one beneath it that
+this file cannot reach: on the OpenAI/Azure path LiteLLM builds its provider
+client with the SDK's ``max_retries`` set **from** ``num_retries``, so the first
+attempt carries up to ``attempts - 1`` SDK-level retries of its own, while the
+attempts LiteLLM itself makes are pinned to zero. The worst case per node is
+therefore ``2 * attempts - 1`` HTTP requests — five at the shipped three, and up
+to thirty in the seconds the six analysts fan out. Against a per-minute request
+quota that burst is the thing that turns one 429 into a run that spends its
+budget on retried 429s (OWASP LLM10), so ``attempts`` is the knob to turn *down*
+mid-incident rather than up.
+
+Passing ``max_retries`` on the adapter does not close it — ``num_retries``
+overwrites the value on its way to the client — which is why this is written
+down and probed in ``tests/test_model_gate.py`` rather than pinned in
+:mod:`stride_service.binding`. A knob that connects to nothing is the surface
+version 2 removed the backoff params for.
+
 Loading fails closed: a malformed file, an out-of-range value, an unknown key or
 a stale version raises :class:`ResilienceConfigError` rather than silently
 reverting a node to never-retry, no-timeout behaviour.
