@@ -28,6 +28,7 @@ from pydantic import BaseModel, ConfigDict, ValidationError
 
 from stride_service.system_model import (
     CORE_ASSET_TAGS,
+    Element,
     SystemModel,
     derive_element_id,
     normalize_element_ids,
@@ -78,6 +79,7 @@ def validate(
     model: SystemModel,
     extra_asset_tags: Collection[str] = (),
     max_elements: int = MAX_ELEMENTS,
+    source_labels: Collection[str] = (),
 ) -> list[ValidationIssue]:
     """Run every gate rule; an empty result means the model is analyst-ready.
 
@@ -194,6 +196,54 @@ def validate(
                 )
             )
 
+    issues.extend(_citation_issues(elements, source_labels))
+    return issues
+
+
+def _citation_issues(
+    elements: Collection[Element], source_labels: Collection[str]
+) -> list[ValidationIssue]:
+    """The traceability chain resolves, or the model does not pass.
+
+    Excerpt and label are **coupled**: a quote with no label cites nothing, and
+    a label naming a source the job never carried asserts a chain that is not
+    there — which is worse than no citation at all, because a reader who
+    follows it finds a source that does not exist. Set membership is
+    mechanical, so it belongs here rather than in a prompt.
+
+    This is the one gate rule taking data from outside the model. Where no
+    labels are supplied the rule does not run: a hand-authored model checked
+    without a job has no set to check against, and inventing one would fail
+    every such model on a citation that is not wrong.
+    """
+    if not source_labels:
+        return []
+
+    legal = frozenset(source_labels)
+    issues: list[ValidationIssue] = []
+    for element in elements:
+        if not element.source_excerpt:
+            continue
+        if not element.source_label:
+            issues.append(
+                ValidationIssue(
+                    code="invalid-reference",
+                    message="source_excerpt is present with no source_label naming"
+                    " the source it was quoted from",
+                    element_id=element.id,
+                    field="source_label",
+                )
+            )
+        elif element.source_label not in legal:
+            issues.append(
+                ValidationIssue(
+                    code="invalid-reference",
+                    message=f"source_label {element.source_label!r} does not name one"
+                    f" of this job's sources {sorted(legal)}",
+                    element_id=element.id,
+                    field="source_label",
+                )
+            )
     return issues
 
 
@@ -202,6 +252,7 @@ def parse_and_validate(
     extra_asset_tags: Collection[str] = (),
     max_elements: int = MAX_ELEMENTS,
     normalize_ids: bool = False,
+    source_labels: Collection[str] = (),
 ) -> tuple[SystemModel | None, list[ValidationIssue]]:
     """Parse raw extraction output and run the validity gate.
 
@@ -232,4 +283,4 @@ def parse_and_validate(
         return None, issues
     if normalize_ids:
         model = normalize_element_ids(model)
-    return model, validate(model, extra_asset_tags, max_elements)
+    return model, validate(model, extra_asset_tags, max_elements, source_labels)

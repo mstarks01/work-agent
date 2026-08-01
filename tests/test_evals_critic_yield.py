@@ -284,7 +284,6 @@ def test_the_cli_reports_both_sides_per_case_and_pooled(case, capsys):
 
 def _report_with(case, threats):
     """A minimal report carrying the given threats, as the modes build one."""
-    import hashlib
     from datetime import UTC, datetime
 
     from stride_service.report import (
@@ -298,12 +297,7 @@ def _report_with(case, threats):
     now = datetime.now(UTC)
     return StrideReport(
         job=Job(id=f"eval-{case.id}", created_at=now, completed_at=now),
-        input=InputRef(
-            system_name=case.meta.title,
-            source_sha256=hashlib.sha256(
-                case.source_text.encode("utf-8")
-            ).hexdigest(),
-        ),
+        input=InputRef.of(system_name=case.meta.title, sources=case.sources),
         nodes=[NodeRun(node="eval", model=None, duration_ms=0)],
         system_model=case.model,
         boundary_crossings=case.model.boundary_crossings(),

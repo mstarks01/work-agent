@@ -99,6 +99,7 @@ from stride_service.sampling import (
     TierSampling,
 )
 from stride_service.skills import compose_analyst_skills, compose_critic_skills
+from stride_service.sources import fence_for
 from stride_service.system_model import BoundaryCrossing, SystemModel
 from stride_service.validation import ValidationIssue, parse_and_validate
 
@@ -195,6 +196,10 @@ be rejected for."""
 # report's traceability without failing any test.
 
 STATE_INPUT_TEXT = "input_text"
+# The job's source labels, for the one gate rule that takes data from outside
+# the model: a source_excerpt's citation has to name a source the job actually
+# carried. Written by the executor beside the rendered input, never by a node.
+STATE_SOURCE_LABELS = "source_labels"
 STATE_SYSTEM_MODEL = "system_model"
 STATE_BOUNDARY_CROSSINGS = "boundary_crossings"
 STATE_DRAFT_THREATS = "draft_threats"
@@ -267,6 +272,24 @@ def render(value: Any) -> str:
     return json.dumps(value, indent=2, ensure_ascii=False, sort_keys=False)
 
 
+def render_fenced(value: Any) -> str:
+    """A rendered value plus a fence it cannot close.
+
+    ``render`` is ``json.dumps``, which escapes quotes, backslashes and
+    newlines but **not** backticks. A System Model carries caller words by rule
+    — ``source_excerpt`` verbatim, and ``notes`` quoting what a speaker said —
+    so a value holding a fence would close a static one in the prompt and land
+    the bytes after it in instruction position. That is the hole
+    :func:`~stride_service.sources.render_sources` closes one node upstream,
+    with the same technique and the same sizing rule: sized once over the whole
+    rendered document, because this seam renders one JSON blob rather than N
+    caller-controlled blocks.
+    """
+    body = render(value)
+    fence = fence_for(body)
+    return f"{fence}\n{body}\n{fence}"
+
+
 # --- Deterministic node functions -------------------------------------------
 #
 # Plain functions, wrapped in FunctionNodes below. Parameters bind by name
@@ -274,7 +297,9 @@ def render(value: Any) -> str:
 # become the session's state delta.
 
 
-def validate_extraction(extracted_model: dict, ctx) -> Event:
+def validate_extraction(
+    extracted_model: dict, ctx, source_labels: list[str] | None = None
+) -> Event:
     """Run the mechanical validity gate and route on the result.
 
     Element IDs are derived here rather than demanded of the model (ticket
@@ -289,10 +314,14 @@ def validate_extraction(extracted_model: dict, ctx) -> Event:
     Both validate nodes run this same function — what differs is where their
     ``invalid`` edge points.
     """
-    model, issues = parse_and_validate(extracted_model, normalize_ids=True)
+    model, issues = parse_and_validate(
+        extracted_model, normalize_ids=True, source_labels=source_labels or ()
+    )
     if issues or model is None:
         parked = extracted_model if model is None else model.model_dump(mode="json")
-        ctx.state[STATE_PREVIOUS_MODEL] = render(parked)
+        # Fenced for the same reason as the analysts' copy: this is the model
+        # built from caller words, handed straight back to a model.
+        ctx.state[STATE_PREVIOUS_MODEL] = render_fenced(parked)
         ctx.state[STATE_VALIDATION_ISSUES] = render(
             [issue.model_dump(mode="json") for issue in issues]
         )
@@ -320,7 +349,7 @@ def prepare_analysis(valid_model: dict, ctx) -> dict[str, Any]:
     """
     model = SystemModel.model_validate(valid_model)
     crossings = model.boundary_crossings()
-    ctx.state[STATE_SYSTEM_MODEL] = render(valid_model)
+    ctx.state[STATE_SYSTEM_MODEL] = render_fenced(valid_model)
     ctx.state[STATE_BOUNDARY_CROSSINGS] = render(
         [crossing.model_dump(mode="json") for crossing in crossings]
     )

@@ -12,12 +12,16 @@ so a sweep cannot certify against fingerprints it never recorded.
 What the graph cannot know stays with the caller. What only the driver can
 observe — which node an ADK event is the output for, what build answered it,
 when its last predecessor finished — is here.
+
+Rendering the job's sources is here for the same reason: both drivers cross
+this seam, so a render that happened one level up would be two renders that
+have to agree.
 """
 
 from __future__ import annotations
 
 from collections import defaultdict
-from collections.abc import Awaitable, Callable, Mapping
+from collections.abc import Awaitable, Callable, Mapping, Sequence
 from dataclasses import dataclass
 from datetime import UTC, datetime
 from typing import Any
@@ -27,9 +31,14 @@ from google.adk.apps import App
 from google.adk.sessions import BaseSessionService, InMemorySessionService
 from google.genai import types
 
-from stride_service.graph import Pipeline
+from stride_service.graph import (
+    STATE_INPUT_TEXT,
+    STATE_SOURCE_LABELS,
+    Pipeline,
+)
 from stride_service.report import NodeRun
 from stride_service.sampling import sampling_fingerprint
+from stride_service.sources import Source, render_sources
 from stride_service.vendors import join_served
 
 # Awaited with each node name as it lands. Structurally the same callable as
@@ -95,23 +104,46 @@ class GraphExecutor:
 
     async def run(
         self,
-        state: Mapping[str, Any],
-        message: str,
+        sources: Sequence[Source],
         *,
         user_id: str,
+        extra_state: Mapping[str, Any] | None = None,
         on_node: OnNode | None = None,
     ) -> GraphRun:
         """Drive the graph to completion, reporting each node as it lands.
 
-        ``state`` seeds the session; ``message`` is the user turn the graph
-        starts from. Both carry untrusted submitted text (OWASP LLM01) — they
-        enter session state as data for a prompt's fenced block and are never
-        concatenated into an instruction here. A node that raises propagates:
-        the caller decides what a partial run means, and nothing here converts
-        a failure into a run that merely looks short.
+        The job's sources are rendered **here**, once, and the result seeds both
+        the session state and the user turn the graph starts from. Taking the
+        sources rather than a rendered string is what makes it impossible for
+        the service and the eval harness to show one job to a model differently:
+        there is no way to express seeding raw text.
+
+        Everything the render produces is untrusted submitted text (OWASP
+        LLM01). It enters as data inside per-source fences and is never
+        concatenated into an instruction here.
+
+        ``extra_state`` seeds keys the graph needs that are not the input — an
+        eval mode injecting an already-blessed model at a later entry point. It
+        may not carry the input text: that key is this method's to write.
+
+        A node that raises propagates: the caller decides what a partial run
+        means, and nothing here converts a failure into a run that looks short.
         """
+        rendered = render_sources(sources)
+        seed: dict[str, Any] = dict(extra_state or {})
+        if STATE_INPUT_TEXT in seed:
+            raise ValueError(
+                f"{STATE_INPUT_TEXT} is rendered from the job's sources, "
+                "not seeded by the caller"
+            )
+        seed[STATE_INPUT_TEXT] = rendered
+        # The gate checks each citation against this set. It travels beside the
+        # rendered text because both are facts about the job rather than about
+        # the model, and both are the executor's to write.
+        seed[STATE_SOURCE_LABELS] = [source.label for source in sources]
+
         session = await self._session_service.create_session(
-            app_name=self._app_name, user_id=user_id, state=dict(state)
+            app_name=self._app_name, user_id=user_id, state=seed
         )
         started_at = datetime.now(UTC).timestamp()
         finishes: list[_NodeFinish] = []
@@ -119,7 +151,7 @@ class GraphExecutor:
         async for event in self._runner.run_async(
             user_id=user_id,
             session_id=session.id,
-            new_message=types.Content(role="user", parts=[types.Part(text=message)]),
+            new_message=types.Content(role="user", parts=[types.Part(text=rendered)]),
         ):
             for node in _finished_nodes(event, self._node_names):
                 finishes.append(

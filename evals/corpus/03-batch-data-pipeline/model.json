@@ -6,6 +6,7 @@
       "description": "One of three partner organisations pushing a daily claims extract.",
       "assets": ["pii", "health"],
       "source_excerpt": "Three insurance partners drop a daily extract for us.",
+      "source_label": "System description",
       "kind": "external-system",
       "trust_zone": "boundary:partner-network"
     },
@@ -15,6 +16,7 @@
       "description": "Internal analyst querying the warehouse directly.",
       "assets": [],
       "source_excerpt": "Analysts query the warehouse directly.",
+      "source_label": "System description",
       "kind": "human",
       "trust_zone": "boundary:warehouse-network"
     }
@@ -26,6 +28,7 @@
       "description": "Airflow scheduler that lists the landing bucket nightly and triggers a transform per file. Does not verify which partner a file came from.",
       "assets": ["business-critical-data"],
       "source_excerpt": "An Airflow scheduler running in the landing network wakes up at 02:00, lists the bucket, and reads whatever is there.",
+      "source_label": "System description",
       "technology": "Airflow",
       "trust_zone": "boundary:landing-network",
       "exposure": "internal"
@@ -36,6 +39,7 @@
       "description": "Spark job that normalizes claim records and loads them into the warehouse. Validates schema only.",
       "assets": ["pii", "health"],
       "source_excerpt": "the scheduler triggers a Spark transform job in the warehouse network",
+      "source_label": "System description",
       "technology": "Spark",
       "trust_zone": "boundary:warehouse-network",
       "exposure": "internal"
@@ -48,6 +52,7 @@
       "description": "Object store receiving partner extracts, one folder per partner.",
       "assets": ["pii", "health"],
       "source_excerpt": "They push files into a landing bucket over SFTP.",
+      "source_label": "System description",
       "technology": "object storage with an SFTP front end",
       "trust_zone": "boundary:landing-network",
       "data_classification": "confidential",
@@ -59,6 +64,7 @@
       "description": "Airflow's own database, holding connection strings and the partner SFTP keys.",
       "assets": ["credentials", "secrets"],
       "source_excerpt": "Airflow keeps its connection strings and the partner keys in its own metadata database.",
+      "source_label": "System description",
       "technology": "PostgreSQL",
       "trust_zone": "boundary:landing-network",
       "data_classification": "confidential",
@@ -70,6 +76,7 @@
       "description": "BigQuery dataset of normalized claim records, including member names and dates of birth.",
       "assets": ["pii", "health", "business-critical-data"],
       "source_excerpt": "The transform normalizes the records and loads them into BigQuery.",
+      "source_label": "System description",
       "technology": "BigQuery",
       "trust_zone": "boundary:warehouse-network",
       "data_classification": "confidential",
@@ -83,6 +90,7 @@
       "description": "Partner uploads its daily claims extract into its folder.",
       "assets": ["pii", "health"],
       "source_excerpt": "Each partner has a static key we issued when they onboarded; the keys have not changed since.",
+      "source_label": "System description",
       "source": "entity:insurance-partner",
       "destination": "store:landing-bucket",
       "protocol": "SFTP",
@@ -96,6 +104,7 @@
       "description": "Scheduler lists the bucket nightly and reads every file present, without checking which partner deposited it.",
       "assets": ["pii", "health"],
       "source_excerpt": "It does not check that a file came from the partner whose folder it landed in.",
+      "source_label": "System description",
       "source": "process:ingest-scheduler",
       "destination": "store:landing-bucket",
       "protocol": "object storage API",
@@ -109,6 +118,7 @@
       "description": "Scheduler reads its connection strings and the partner keys.",
       "assets": ["credentials", "secrets"],
       "source_excerpt": "Airflow keeps its connection strings and the partner keys in its own metadata database.",
+      "source_label": "System description",
       "source": "process:ingest-scheduler",
       "destination": "store:airflow-metadata-db",
       "protocol": "PostgreSQL wire protocol",
@@ -122,6 +132,7 @@
       "description": "Scheduler starts one transform run per landed file.",
       "assets": [],
       "source_excerpt": "For each file the scheduler triggers a Spark transform job in the warehouse network.",
+      "source_label": "System description",
       "source": "process:ingest-scheduler",
       "destination": "process:transform-job",
       "protocol": "unknown",
@@ -135,6 +146,7 @@
       "description": "Transform writes normalized claim rows into the warehouse.",
       "assets": ["pii", "health"],
       "source_excerpt": "Nothing validates the row contents beyond the schema.",
+      "source_label": "System description",
       "source": "process:transform-job",
       "destination": "store:claims-warehouse",
       "protocol": "BigQuery API",
@@ -148,6 +160,7 @@
       "description": "Analyst queries the warehouse under a dataset-wide grant.",
       "assets": ["pii", "health"],
       "source_excerpt": "they authenticate with SSO, but the grant is dataset-wide — we have not split member-identifying columns out",
+      "source_label": "System description",
       "source": "entity:data-analyst",
       "destination": "store:claims-warehouse",
       "protocol": "BigQuery API",
@@ -162,6 +175,7 @@
       "name": "partner network",
       "description": "The three partner organisations, outside this system's control.",
       "source_excerpt": "Three insurance partners drop a daily extract for us.",
+      "source_label": "System description",
       "kind": "network"
     },
     {
@@ -169,6 +183,7 @@
       "name": "landing network",
       "description": "Ingest tier holding the landing bucket, the scheduler and its metadata database.",
       "source_excerpt": "An Airflow scheduler running in the landing network",
+      "source_label": "System description",
       "kind": "network"
     },
     {
@@ -176,6 +191,7 @@
       "name": "warehouse network",
       "description": "Analytics tier holding the transform job, the warehouse and its analysts.",
       "source_excerpt": "the scheduler triggers a Spark transform job in the warehouse network",
+      "source_label": "System description",
       "kind": "network"
     }
   ],

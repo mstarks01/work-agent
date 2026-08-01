@@ -29,6 +29,7 @@ from stride_service.jobs import JobRecord, PipelineCompleted
 from stride_service.markdown_loader import MarkdownLoader
 from stride_service.pipeline import AdkPipelineRunner
 from stride_service.sampling import load_sampling
+from stride_service.sources import Source
 from tests.factories import (
     BASE_MODEL,
     PROJECT_ROOT,
@@ -110,7 +111,11 @@ def _marker_job(index: int) -> tuple[str, JobRecord]:
     marker = f"MARK-{index:04x}"
     record = JobRecord.create(
         owner_subject="ping|shared-caller",
-        description=f"Customers log in to the web app. Job token {marker}.",
+        sources=[
+            Source.description(
+                f"Customers log in to the web app. Job token {marker}."
+            )
+        ],
         system_name=f"System-{index:04x}",
     )
     record.transition("running")

@@ -18,7 +18,7 @@ This repo is **single-context**: one `CONTEXT.md` at the root, one `docs/adr/`.
 ```
 /
 ├── CONTEXT.md          ← the glossary; exists and is maintained
-├── docs/adr/           ← not created yet; /domain-modeling adds it lazily
+├── docs/adr/           ← decisions with in-repo consequences the glossary cannot carry
 └── src/stride_service/
 ```
 

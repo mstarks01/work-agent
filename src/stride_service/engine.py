@@ -16,28 +16,29 @@ rejects returns its :class:`~stride_service.validation.ValidationIssue`s, and
 an internal failure raises. That trichotomy is the job lifecycle's ``completed
 | rejected | failed`` with the transport removed.
 
-The submitted description is untrusted text (OWASP LLM01): the engine caps its
-size and hands it to the pipeline, which places it in session state as fenced
-data for the extraction prompt and never concatenates it into an instruction.
+The submitted sources are untrusted text (OWASP LLM01): the engine bounds them
+and hands them to the pipeline, which places them in session state as fenced
+data for the extraction prompt and never concatenates them into an instruction.
 The engine adds no new trust surface — it only re-asserts, for the in-process
-path, the input bounds the HTTP layer already enforces.
+path, the input bounds the HTTP layer already enforces, from the same
+deployment config and in the same order.
 """
 
 from __future__ import annotations
 
 import asyncio
 import logging
-from collections.abc import Mapping
+from collections.abc import Mapping, Sequence
 from typing import Self
 
 from stride_service.deployment import Deployment
 from stride_service.jobs import (
-    MAX_DESCRIPTION_BYTES,
     JobRecord,
     NodeCallback,
     PipelineOutcome,
     PipelineRunner,
 )
+from stride_service.sources import Source, SourceLimits
 
 logger = logging.getLogger(__name__)
 
@@ -69,14 +70,9 @@ class StrideEngine:
     concurrent tasks.
     """
 
-    def __init__(
-        self,
-        runner: PipelineRunner,
-        *,
-        max_description_bytes: int = MAX_DESCRIPTION_BYTES,
-    ) -> None:
+    def __init__(self, runner: PipelineRunner, *, limits: SourceLimits) -> None:
         self._runner = runner
-        self._max_description_bytes = max_description_bytes
+        self._limits = limits
 
     @classmethod
     def from_config(cls, env: Mapping[str, str] | None = None) -> Self:
@@ -97,17 +93,24 @@ class StrideEngine:
         check fails, and re-reading the config to find that out is how the two
         could disagree.
         """
-        return cls(deployment.runner())
+        return cls(
+            deployment.runner(), limits=deployment.resilience.source_limits()
+        )
 
     async def analyze(
         self,
-        description: str,
+        sources: Sequence[Source],
         *,
         system_name: str | None = None,
         caller: str = DEFAULT_CALLER,
         on_node: NodeCallback | None = None,
     ) -> PipelineOutcome:
         """Drive one submission to a terminal state.
+
+        ``sources`` is an ordered, non-empty sequence of
+        :class:`~stride_service.sources.Source`. Order is presentation only:
+        nothing here or downstream reads an earlier source as outranking a
+        later one.
 
         Returns a :class:`~stride_service.jobs.PipelineCompleted` carrying the
         :class:`~stride_service.report.StrideReport` when analysis succeeds, or
@@ -119,18 +122,20 @@ class StrideEngine:
 
         Usage::
 
-            outcome = await engine.analyze(text, system_name="Checkout")
+            outcome = await engine.analyze(
+                [Source.description(text)], system_name="Checkout"
+            )
             if isinstance(outcome, PipelineCompleted):
                 report = outcome.report
             else:
                 issues = outcome.issues
         """
-        job = self._build_job(description, system_name=system_name, caller=caller)
+        job = self._build_job(sources, system_name=system_name, caller=caller)
         return await self._runner.run(job, on_node or _ignore_node)
 
     def analyze_sync(
         self,
-        description: str,
+        sources: Sequence[Source],
         *,
         system_name: str | None = None,
         caller: str = DEFAULT_CALLER,
@@ -146,23 +151,34 @@ class StrideEngine:
                 "await analyze() instead"
             )
         return asyncio.run(
-            self.analyze(description, system_name=system_name, caller=caller)
+            self.analyze(sources, system_name=system_name, caller=caller)
         )
 
     def _build_job(
-        self, description: str, *, system_name: str | None, caller: str
+        self, sources: Sequence[Source], *, system_name: str | None, caller: str
     ) -> JobRecord:
-        if not description or not description.strip():
-            raise EngineInputError("description must be non-empty")
-        size = len(description.encode("utf-8"))
-        if size > self._max_description_bytes:
+        """Shape a submission into a job, or refuse it before any model runs.
+
+        Per-source well-formedness is already enforced: constructing a
+        :class:`~stride_service.sources.Source` is what validates a kind, a
+        label and non-empty text, so by the time one arrives here the only
+        questions left are about the list as a whole.
+        """
+        if isinstance(sources, str | bytes):
+            # A string satisfies Sequence, so the removed contract's
+            # ``analyze(text)`` would otherwise iterate characters and report
+            # a nonsense source count. This is the call an integrator port
+            # makes first, so it says what to write instead.
             raise EngineInputError(
-                f"description is {size} bytes, over the "
-                f"{self._max_description_bytes} byte cap"
+                "analyze takes a sequence of Source, not a string; "
+                "pass [Source.description(text)] or [Source.transcript(text)]"
             )
+        breach = self._limits.breach(sources)
+        if breach is not None:
+            raise EngineInputError(breach.message)
         return JobRecord.create(
             owner_subject=caller,
-            description=description,
+            sources=sources,
             system_name=_clean_system_name(system_name),
         )
 

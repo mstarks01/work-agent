@@ -1,7 +1,6 @@
 """Agentic STRIDE threat-modeling service."""
 
 from stride_service.api import (
-    MAX_DESCRIPTION_BYTES,
     JobStatusView,
     JobSubmission,
     create_app,
@@ -66,6 +65,7 @@ from stride_service.report import (
     Mitigation,
     NodeRun,
     Severity,
+    SourceRef,
     StrideCategory,
     StrideReport,
     Summary,
@@ -87,6 +87,13 @@ from stride_service.skills import (
     estimate_tokens,
     extract_section,
     split_sections,
+)
+from stride_service.sources import (
+    MAX_LABEL_CHARS,
+    Source,
+    SourceKind,
+    SourceLimits,
+    render_sources,
 )
 from stride_service.system_model import (
     CORE_ASSET_TAGS,
@@ -123,7 +130,7 @@ __all__ = [
     "DOMAIN_PACK_TOKEN_CAP",
     "GENERIC_FAILURE_MESSAGE",
     "LLM_NODES",
-    "MAX_DESCRIPTION_BYTES",
+    "MAX_LABEL_CHARS",
     "MAX_SYSTEM_NAME_CHARS",
     "SCHEMA_VERSION",
     "SEVERITY_MATRIX",
@@ -171,6 +178,10 @@ __all__ = [
     "PipelineRunner",
     "Process",
     "Severity",
+    "Source",
+    "SourceKind",
+    "SourceLimits",
+    "SourceRef",
     "StrideCategory",
     "StrideEngine",
     "StrideReport",
@@ -206,6 +217,7 @@ __all__ = [
     "normalize_element_ids",
     "normalize_name",
     "parse_and_validate",
+    "render_sources",
     "split_sections",
     "validate",
     "validate_model_string",

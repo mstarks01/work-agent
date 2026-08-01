@@ -6,6 +6,7 @@
       "description": "A supplier who uploads their own compliance paperwork.",
       "assets": ["pii"],
       "source_excerpt": "Suppliers upload their compliance paperwork through a portal",
+      "source_label": "System description",
       "kind": "human",
       "trust_zone": "boundary:public-internet"
     },
@@ -15,6 +16,7 @@
       "description": "Reviews uploaded paperwork and approves or rejects it.",
       "assets": [],
       "source_excerpt": "Our category managers, who work from the corporate network, review what has been uploaded and approve or reject it.",
+      "source_label": "System description",
       "kind": "human",
       "trust_zone": "boundary:corporate-network"
     },
@@ -24,6 +26,7 @@
       "description": "Hosts the portal and pushes the nightly extract; we run no part of it.",
       "assets": [],
       "source_excerpt": "The vendor hosts it and we do not run any part of it.",
+      "source_label": "System description",
       "kind": "external-system",
       "trust_zone": "boundary:vendor-platform"
     }
@@ -35,6 +38,7 @@
       "description": "Vendor-hosted SaaS product suppliers upload to and category managers review in.",
       "assets": ["pii"],
       "source_excerpt": "The portal is a SaaS product.",
+      "source_label": "System description",
       "technology": "unknown",
       "notes": "The datasheet's phrases — secure by design, enterprise-grade encryption throughout, fully authenticated and audited, fully compliant — name no technology and state no verifiable control, so none of them set an attribute here.",
       "trust_zone": "boundary:vendor-platform",
@@ -46,6 +50,7 @@
       "description": "Loads the nightly extract from the landing bucket and writes supplier records.",
       "assets": ["business-critical-data"],
       "source_excerpt": "Our supplier master service loads that file and writes the records into the supplier database.",
+      "source_label": "System description",
       "technology": "unknown",
       "trust_zone": "boundary:cloud-account",
       "exposure": "internal"
@@ -58,6 +63,7 @@
       "description": "Where the uploaded compliance documents rest, inside the vendor's platform.",
       "assets": ["pii", "business-critical-data"],
       "source_excerpt": "The documents themselves stay in the vendor's platform.",
+      "source_label": "System description",
       "technology": "unknown",
       "notes": "Enterprise-grade encryption throughout is a vendor marketing claim about the platform, not a stated property of this store, so encryption_at_rest is unknown rather than encrypted.",
       "trust_zone": "boundary:vendor-platform",
@@ -70,6 +76,7 @@
       "description": "Bucket in our cloud account the vendor pushes the nightly extract into.",
       "assets": ["pii", "business-critical-data"],
       "source_excerpt": "Every night the vendor pushes a supplier data extract to a landing bucket in our cloud account.",
+      "source_label": "System description",
       "technology": "unknown",
       "trust_zone": "boundary:cloud-account",
       "data_classification": "unknown",
@@ -81,6 +88,7 @@
       "description": "Holds the supplier records loaded from the nightly extract.",
       "assets": ["pii", "business-critical-data"],
       "source_excerpt": "writes the records into the supplier database",
+      "source_label": "System description",
       "technology": "unknown",
       "trust_zone": "boundary:cloud-account",
       "data_classification": "unknown",
@@ -94,6 +102,7 @@
       "description": "Supplier uploads compliance paperwork to the portal.",
       "assets": ["pii", "business-critical-data"],
       "source_excerpt": "Suppliers upload their compliance paperwork through a portal",
+      "source_label": "System description",
       "source": "entity:supplier",
       "destination": "process:supplier-portal",
       "protocol": "unknown",
@@ -107,6 +116,7 @@
       "description": "Category manager reviews uploaded paperwork and records an approval or rejection.",
       "assets": ["pii", "business-critical-data"],
       "source_excerpt": "review what has been uploaded and approve or reject it",
+      "source_label": "System description",
       "source": "entity:category-manager",
       "destination": "process:supplier-portal",
       "protocol": "unknown",
@@ -121,6 +131,7 @@
       "description": "The portal puts uploaded documents into the vendor platform's store.",
       "assets": ["pii", "business-critical-data"],
       "source_excerpt": "The documents themselves stay in the vendor's platform.",
+      "source_label": "System description",
       "source": "process:supplier-portal",
       "destination": "store:document-store",
       "protocol": "unknown",
@@ -134,6 +145,7 @@
       "description": "The vendor initiates a nightly push of the supplier data extract into our bucket.",
       "assets": ["pii", "business-critical-data"],
       "source_excerpt": "Every night the vendor pushes a supplier data extract to a landing bucket in our cloud account.",
+      "source_label": "System description",
       "source": "entity:portal-vendor",
       "destination": "store:landing-bucket",
       "protocol": "unknown",
@@ -148,6 +160,7 @@
       "description": "The supplier master service picks the extract file up from the bucket as-is.",
       "assets": ["pii", "business-critical-data"],
       "source_excerpt": "the file arrives as a plain CSV and is picked up as-is",
+      "source_label": "System description",
       "source": "process:supplier-master-service",
       "destination": "store:landing-bucket",
       "protocol": "unknown",
@@ -161,6 +174,7 @@
       "description": "The service writes the loaded records into the supplier database.",
       "assets": ["pii", "business-critical-data"],
       "source_excerpt": "writes the records into the supplier database",
+      "source_label": "System description",
       "source": "process:supplier-master-service",
       "destination": "store:supplier-database",
       "protocol": "unknown",
@@ -175,6 +189,7 @@
       "name": "public internet",
       "description": "Where suppliers sit when they upload their paperwork.",
       "source_excerpt": "Suppliers upload their compliance paperwork through a portal",
+      "source_label": "System description",
       "kind": "network"
     },
     {
@@ -182,6 +197,7 @@
       "name": "corporate network",
       "description": "Where category managers work.",
       "source_excerpt": "Our category managers, who work from the corporate network",
+      "source_label": "System description",
       "kind": "network"
     },
     {
@@ -189,6 +205,7 @@
       "name": "vendor platform",
       "description": "The vendor's hosting, holding the portal and the documents; we run no part of it and can verify nothing inside it.",
       "source_excerpt": "The vendor hosts it and we do not run any part of it.",
+      "source_label": "System description",
       "kind": "other"
     },
     {
@@ -196,6 +213,7 @@
       "name": "cloud account",
       "description": "Our own cloud account, holding the landing bucket, the supplier master service and the supplier database.",
       "source_excerpt": "The bucket, the service and the database are all in our cloud account.",
+      "source_label": "System description",
       "kind": "network"
     }
   ],
