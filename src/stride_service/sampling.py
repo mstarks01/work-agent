@@ -28,11 +28,18 @@ Three things about the surface:
   provider's own limits — a grammar compiler can reject a schema it is
   perfectly willing to honour in principle — and nothing computes that offline.
   So it is a per-tier choice a deployment makes, not one derived from the
-  vendor. Turning it off gives up constrained *generation* only: the node keeps
-  its ``output_schema``, the response is validated on arrival, and a failed
-  extraction still reaches the repair node. Every LLM node carries a schema the
-  adapter can convert, so this is the only thing that decides whether one is
-  sent.
+  vendor. Every LLM node carries a schema the adapter can convert, so this is
+  the only thing that decides whether one is sent.
+
+  **Turning it off is not currently a working configuration**, and the earlier
+  claim here that it gives up constrained *generation* only was wrong. Measured
+  against Claude Sonnet 4.6 with the extraction schema suppressed, the model
+  fenced its JSON in a ```` ```json ```` block — which ADK hands to validation
+  unstripped, so it fails before anything reads it — and omitted required
+  fields (every ``trust_boundaries[*].kind``). The repair node sits on the same
+  tier and is equally unconstrained, so the repair loop does not rescue it. The
+  field is kept because the *mechanism* is right, but a tier that turns it off
+  needs the graph to tolerate a fenced response first.
 
 Loading fails closed (OWASP A02/A10): an unsupported version, an unknown key or
 tier, an out-of-range value, or a ``candidate_count`` other than 1 raises

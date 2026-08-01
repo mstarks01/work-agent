@@ -231,9 +231,20 @@ the schema stops going on the wire. It is **per tier, not per vendor**, because
 it is not a fact about the vendor: the same provider takes a smaller schema
 happily, and the same schema goes to another provider fine.
 
-What you give up is constrained *generation*, not the check. The node keeps its
-`output_schema`, the response is validated on arrival, and a failed extraction
-still reaches the repair node.
+**Setting it `false` is not currently a working configuration.** An earlier
+version of this page said it gives up constrained *generation* only, leaving
+validation and the repair loop to cover the difference. Measured live against
+`claude-sonnet-4-6` with the extraction schema suppressed, that is not what
+happens: the model fences its JSON in a ```` ```json ```` block, which ADK hands
+to validation unstripped so it fails before anything reads the content, and it
+omits required fields (every `trust_boundaries[*].kind`). `repair` sits on the
+same tier and is equally unconstrained, so the repair loop fails the same way
+and the job dies.
+
+The field is kept because the *mechanism* is right — the schema genuinely stops
+going on the wire — but a tier that turns it off needs the graph to tolerate a
+fenced response first. Where a provider will not compile a schema, the working
+answer today is to make the schema smaller, not to stop sending it.
 
 Every LLM node carries a schema the adapter can convert, so this setting is the
 only thing deciding whether one is sent. (That was not always true: the six

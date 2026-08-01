@@ -71,6 +71,13 @@
 # be set by env at all.
 #
 # Deliberately absent — the contract-breaking params, never in this file and
+# `constrain_output = false` IS NOT A WORKING ANSWER to a schema the provider
+# will not compile, despite reading like one. Measured live against Claude
+# Sonnet 4.6: with the extraction schema suppressed the model fences its JSON,
+# which ADK hands to validation unstripped, and omits required fields. Repair
+# sits on the same tier, equally unconstrained, and fails the same way. See
+# sampling.py.
+#
 # never overridable:
 #   response_schema     ADK *raises* if it appears on the generate config
 #   response_mime_type  silently discarded by ADK
@@ -84,12 +91,9 @@ temperature = 0.0        # pinned greedy decoding; the model's own default is 1.
                          # Unset this line if this tier runs Claude >= 4.7.
 max_output_tokens = 8192 # pinned: silence means a vendor-derived cap (see above)
 candidate_count = 1      # reserved Self-MoA lever; loader rejects != 1
-constrain_output = true  # send this tier's node schema to the provider. Set
-                         # false where the provider will not take it -- see the
-                         # note above -- which gives up constrained generation
-                         # only: the node keeps its output_schema, the response
-                         # is still validated, and a bad extraction still
-                         # reaches the repair node.
+constrain_output = true  # send this tier's node schema to the provider.
+                         # Leave it true: setting it false is not currently a
+                         # working configuration -- see the note above.
 # top_p             unset -> model default; no published per-tier constant
 # seed              unset -> no numeric default; buys consistency, not
 #                   reproducibility, and is unavailable on Anthropic at all
@@ -103,12 +107,9 @@ temperature = 0.0        # pinned greedy decoding; the model's own default is 1.
                          # Unset this line if this tier runs Claude >= 4.7.
 max_output_tokens = 8192 # pinned: silence means a vendor-derived cap (see above)
 candidate_count = 1      # reserved Self-MoA lever; loader rejects != 1
-constrain_output = true  # send this tier's node schema to the provider. Set
-                         # false where the provider will not take it -- see the
-                         # note above -- which gives up constrained generation
-                         # only: the node keeps its output_schema, the response
-                         # is still validated, and a bad extraction still
-                         # reaches the repair node.
+constrain_output = true  # send this tier's node schema to the provider.
+                         # Leave it true: setting it false is not currently a
+                         # working configuration -- see the note above.
 # top_p             unset -> model default; no published per-tier constant
 # seed              unset -> no numeric default; buys consistency, not
 #                   reproducibility, and is unavailable on Anthropic at all
