@@ -235,6 +235,12 @@ def test_an_offline_resolver_short_circuits_the_credential_check():
 # is deliberately not the model under test.
 CLAUDE_5 = "claude-opus-5"
 
+# A Claude that clears *every* gate: generation >= 4.7 so the temperature floor
+# still applies to it, and on the pinned litellm's native structured-output
+# path so the schema check passes. The two rules need different models to be
+# demonstrated independently.
+CLAUDE_NATIVE = "claude-opus-4-7"
+
 ANTHROPIC_ENV = {
     "STRIDE_MODEL_BASE_VENDOR": "anthropic",
     "STRIDE_MODEL_BASE_MODEL": CLAUDE_5,
@@ -285,12 +291,55 @@ def test_unsetting_temperature_lets_the_same_selection_build(tmp_path):
     """The fix the error message names, end to end."""
     path = tmp_path / "sampling.toml"
     path.write_text(NO_TEMPERATURE, encoding="utf-8")
+    env = ANTHROPIC_ENV | {
+        "STRIDE_SAMPLING": str(path),
+        "STRIDE_MODEL_BASE_MODEL": CLAUDE_NATIVE,
+        "STRIDE_MODEL_STRONG_MODEL": CLAUDE_NATIVE,
+    }
 
-    pipeline = Deployment.from_env(
-        env=ANTHROPIC_ENV | {"STRIDE_SAMPLING": str(path)}
-    ).pipeline()
+    pipeline = Deployment.from_env(env=env).pipeline()
 
-    assert pipeline.node_models[graph.CRITIC_NODE] == f"anthropic/{CLAUDE_5}"
+    assert pipeline.node_models[graph.CRITIC_NODE] == f"anthropic/{CLAUDE_NATIVE}"
+
+
+def test_a_model_without_native_schema_support_fails_the_build(tmp_path):
+    """The expensive failure shape: well-formed request, well-formed response.
+
+    Where a provider cannot constrain output to a schema directly, the library
+    emulates it with a synthesised tool and forwards the schema's `$defs`
+    unresolved. Nothing rejects the request, so without this gate the job dies
+    at output validation on node one. Temperature is unset here so the floor
+    does not fire first and mask which check is under test.
+    """
+    path = tmp_path / "sampling.toml"
+    path.write_text(NO_TEMPERATURE, encoding="utf-8")
+
+    with pytest.raises(ModelGateError) as excinfo:
+        Deployment.from_env(env=ANTHROPIC_ENV | {"STRIDE_SAMPLING": str(path)}).pipeline()
+
+    message = str(excinfo.value)
+    assert "tiers.base" in message
+    assert "$defs" in message and "schema" in message
+
+
+def test_the_schema_gate_catches_vertex_hosted_claude_too():
+    """Not an Anthropic-only problem, and the reason it is asked as a call.
+
+    Under the pinned library, Vertex-hosted Claude takes the emulated path for
+    *every* generation — including ones the direct vendor serves natively. A
+    rule keyed on the model would have called this configuration fine.
+    """
+    env = VERTEX_ENV | {"STRIDE_MODEL_BASE_MODEL": "claude-sonnet-4-6"}
+
+    with pytest.raises(ModelGateError, match=r"\$defs"):
+        Deployment.from_env(env=env).pipeline()
+
+
+def test_gemini_and_openai_are_untouched_by_the_schema_gate():
+    """No false positives: both constrain schemas natively and must still build."""
+    pipeline = Deployment.from_env(env=VERTEX_ENV).pipeline()
+
+    assert pipeline.node_models[graph.CRITIC_NODE] == "vertex_ai/gemini-2.5-pro"
 
 
 def test_claude_4_6_keeps_the_pinned_temperature():

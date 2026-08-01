@@ -181,6 +181,37 @@ support table: when the pinned library's model data catches up, the first check
 starts catching the same case and this one becomes redundant rather than
 contradictory.
 
+### The startup schema check
+
+Every LLM node in the graph binds an output schema, so a third check runs per
+tier: **can this `(vendor, model)` be constrained to a schema *natively*?**
+
+Where a provider cannot, the library does not fail — it *emulates* the
+constraint by synthesising a single tool whose input schema is the response
+schema and forcing a call to it. The two paths are not equivalent. The native
+path resolves `$ref`/`$defs` before sending, because providers do not resolve
+external schema references; the emulated path forwards the schema as-is. A
+schema with nested types — which every Pydantic model here produces — therefore
+arrives unusable, and the model answers in a shape of its own invention.
+
+That failure is the most expensive one available: the request is well-formed,
+the response is well-formed, and the job dies at the node's own output
+validation partway through. Neither of the other two checks can see it. So a
+tier whose model would take the emulated path is a startup error naming the
+tier.
+
+Like the supported-param check, this is asked as a **call**, not a table — the
+check inspects whether the library had to synthesise its internal
+response-format tool for this pair. That matters more than it sounds: under the
+pinned library, the same Claude generation can be native on one vendor and
+emulated on another, so a rule keyed on the model alone would pass a
+configuration that does not work.
+
+`supports_structured_output` is a **different and weaker question** — whether a
+schema is honoured at all — and answers yes for models on both paths. It cannot
+substitute for this check. The eval judge runs both at config-load time for the
+same reason (`evals/harness/judge.py`).
+
 ### Resilience
 
 `attempts = 3`, `timeout_ms = 300000`, `max_source_bytes = 102400`,
