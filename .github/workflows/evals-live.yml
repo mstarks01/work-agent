@@ -38,12 +38,19 @@ on:
     # Path-filtered to the agentic surface. report.py and system_model.py
     # count as agentic: they define the schemas bound as node output schemas,
     # so a change there changes what the models are asked to emit.
-    # deployment.py counts for a different reason -- it does not touch a prompt
-    # or a schema, but it decides which config the graph is built from, so a
-    # change there can change which model runs and on what sampling. It was
-    # missed when graph assembly moved out of pipeline.py, which is on this
-    # list; the gap is the ordinary cost of a filter naming files rather than
-    # behaviour. A path filter can always be fooled, which is what the
+    # deployment.py, binding.py and model_gate.py count for a different reason
+    # -- none of them touches a prompt or a schema, but between them they decide
+    # which config the graph is built from, which (vendor, model) each tier
+    # binds, and which pairs are allowed to bind at all. A change to any of the
+    # three can change which model runs and on what sampling.
+    #
+    # The list has now been short twice, both times the same way: it named the
+    # files that existed when a responsibility was written down, and stayed
+    # still when that responsibility moved. deployment.py was missed when graph
+    # assembly moved out of pipeline.py; binding.py and model_gate.py were
+    # missed when tier binding and the build-time gates moved out of
+    # deployment.py. That is the ordinary cost of a filter naming files rather
+    # than behaviour -- a path filter can always be fooled, which is what the
     # scheduled sweep is for.
     paths:
       - "prompts/**"
@@ -54,6 +61,8 @@ on:
       - "src/stride_service/skills.py"
       - "src/stride_service/critic.py"
       - "src/stride_service/deployment.py"
+      - "src/stride_service/binding.py"
+      - "src/stride_service/model_gate.py"
       - "src/stride_service/pipeline.py"
       - "src/stride_service/report.py"
       - "src/stride_service/system_model.py"
