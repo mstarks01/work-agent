@@ -44,6 +44,7 @@ from stride_service.report import (
     build_summary,
 )
 from stride_service.sampling import load_sampling
+from stride_service.sources import Source
 from stride_service.system_model import (
     Assumption,
     DataFlow,
@@ -234,7 +235,10 @@ def sample_report(
             created_at=created,
             completed_at=datetime(2026, 7, 18, 14, 4, 9, tzinfo=UTC),
         ),
-        input=InputRef(system_name="Order Service", source_sha256="0" * 64),
+        input=InputRef.of(
+            system_name="Order Service",
+            sources=[Source.description("Customers log in to the web app.")],
+        ),
         nodes=[
             NodeRun(node="extract", model="gemini-2.5-flash", duration_ms=3200),
             NodeRun(node="critic", model="gemini-2.5-pro", duration_ms=14500),

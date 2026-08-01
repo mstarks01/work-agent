@@ -6,7 +6,7 @@ import json
 import pytest
 from fastapi.testclient import TestClient
 
-from stride_service.api import MAX_DESCRIPTION_BYTES, create_app
+from stride_service.api import create_app
 from stride_service.auth import AuthenticationError
 from stride_service.jobs import (
     InMemoryJobStore,
@@ -17,6 +17,7 @@ from stride_service.jobs import (
     StubPipelineRunner,
 )
 from stride_service.report import StrideReport
+from stride_service.sources import Source, SourceLimits
 from stride_service.validation import ValidationIssue
 
 TOKENS = {"alice-token": "alice", "bob-token": "bob"}
@@ -51,20 +52,32 @@ def auth(token: str = "alice-token") -> dict[str, str]:
     return {"Authorization": f"Bearer {token}"}
 
 
-def make_client(runner=None, store=None) -> tuple[TestClient, InMemoryJobStore]:
+# Small enough that an over-budget body is a few hundred bytes rather than a
+# hundred kilobytes, so the size tests stay readable.
+TEST_LIMITS = SourceLimits(max_total_bytes=512, max_sources=3)
+
+
+def make_client(
+    runner=None, store=None, limits: SourceLimits = TEST_LIMITS
+) -> tuple[TestClient, InMemoryJobStore]:
     store = store if store is not None else InMemoryJobStore()
     app = create_app(
         store=store,
         runner=runner if runner is not None else StubPipelineRunner(),
         verifier=FakeVerifier(),
+        limits=limits,
     )
     return TestClient(app), store
+
+
+def one_source(text: str = "a web app storing orders", **kwargs) -> list[dict]:
+    return [{"kind": "description", "label": "Doc", "text": text} | kwargs]
 
 
 def submit(client: TestClient, token: str = "alice-token") -> str:
     response = client.post(
         "/v1/jobs",
-        json={"description": "a web app storing orders"},
+        json={"sources": one_source()},
         headers=auth(token),
     )
     assert response.status_code == 201
@@ -117,7 +130,7 @@ class TestSubmit:
         client, _ = make_client()
         response = client.post(
             "/v1/jobs",
-            json={"description": "a web app", "system_name": "Orders"},
+            json={"sources": one_source(), "system_name": "Orders"},
             headers=auth(),
         )
         assert response.status_code == 201
@@ -125,33 +138,142 @@ class TestSubmit:
         assert body["status"] == "queued"
         assert response.headers["location"] == f"/v1/jobs/{body['job_id']}"
 
-    def test_oversized_description_is_413_problem(self):
+    def test_a_transcript_and_a_document_submit_together(self):
         client, _ = make_client()
         response = client.post(
             "/v1/jobs",
-            json={"description": "x" * (MAX_DESCRIPTION_BYTES + 1)},
+            json={
+                "sources": [
+                    {"kind": "description", "label": "Doc", "text": "a web app"},
+                    {
+                        "kind": "transcript",
+                        "label": "Kickoff call",
+                        "text": "Ana: it writes to Postgres.",
+                    },
+                ]
+            },
             headers=auth(),
         )
-        assert response.status_code == 413
-        assert response.headers["content-type"] == "application/problem+json"
+        assert response.status_code == 201
 
-    def test_missing_description_is_422_problem(self):
+    def test_the_old_description_shape_is_refused(self):
+        # Hard cutover: an integrator finds out at the boundary, not by having
+        # their prose silently ignored.
+        client, _ = make_client()
+        response = client.post(
+            "/v1/jobs", json={"description": "a web app"}, headers=auth()
+        )
+        assert response.status_code == 422
+
+    def test_missing_sources_is_422_problem(self):
         client, _ = make_client()
         response = client.post("/v1/jobs", json={}, headers=auth())
         assert response.status_code == 422
         body = response.json()
         assert response.headers["content-type"] == "application/problem+json"
         assert body["status"] == 422
-        assert any("description" in error["loc"] for error in body["errors"])
+        assert any("sources" in error["loc"] for error in body["errors"])
 
     def test_unknown_field_rejected(self):
         client, _ = make_client()
         response = client.post(
             "/v1/jobs",
-            json={"description": "app", "model_tier": "pro"},
+            json={"sources": one_source(), "model_tier": "pro"},
             headers=auth(),
         )
         assert response.status_code == 422
+
+
+class TestInputLadder:
+    """Four rungs, shape before size (#52)."""
+
+    @pytest.mark.parametrize(
+        "bad_source",
+        [
+            {"kind": "voicemail", "label": "Call", "text": "hi"},
+            {"kind": "description", "label": "", "text": "hi"},
+            {"kind": "description", "label": "Doc", "text": ""},
+            {"kind": "description", "label": "two\nlines", "text": "hi"},
+            {"kind": "description", "label": "Doc"},
+            {"kind": "description", "label": "Doc", "text": "hi", "authority": "x"},
+        ],
+    )
+    def test_rung_one_a_malformed_source_is_422(self, bad_source):
+        client, _ = make_client()
+        response = client.post(
+            "/v1/jobs", json={"sources": [bad_source]}, headers=auth()
+        )
+        assert response.status_code == 422
+
+    def test_rung_two_an_empty_list_is_400(self):
+        # Not 413: a job with no input is the wrong shape, and quoting a byte
+        # count of zero against a cap would explain nothing.
+        client, _ = make_client()
+        response = client.post("/v1/jobs", json={"sources": []}, headers=auth())
+        assert response.status_code == 400
+        assert response.headers["content-type"] == "application/problem+json"
+        assert "at least one source" in response.json()["detail"]
+
+    def test_rung_three_too_many_sources_is_413_naming_the_count(self):
+        client, _ = make_client()
+        sources = [
+            {"kind": "description", "label": f"Doc {n}", "text": "x"}
+            for n in range(TEST_LIMITS.max_sources + 1)
+        ]
+        response = client.post("/v1/jobs", json={"sources": sources}, headers=auth())
+        assert response.status_code == 413
+        detail = response.json()["detail"]
+        assert str(TEST_LIMITS.max_sources) in detail
+        assert str(len(sources)) in detail
+
+    def test_rung_four_over_budget_names_no_culprit_but_breaks_it_down(self):
+        # There is no per-source cap, so nothing here is individually too big:
+        # the overspend belongs to the sum, and the caller gets the arithmetic
+        # to decide what to cut.
+        client, _ = make_client()
+        half = TEST_LIMITS.max_total_bytes // 2
+        response = client.post(
+            "/v1/jobs",
+            json={
+                "sources": [
+                    {"kind": "description", "label": "Doc", "text": "a" * half},
+                    {"kind": "transcript", "label": "Call", "text": "b" * half},
+                    {"kind": "transcript", "label": "Standup", "text": "c" * half},
+                ]
+            },
+            headers=auth(),
+        )
+        assert response.status_code == 413
+        detail = response.json()["detail"]
+        assert str(TEST_LIMITS.max_total_bytes) in detail
+        for label in ("Doc", "Call", "Standup"):
+            assert label in detail
+
+    def test_shape_is_checked_before_size(self):
+        # A submission that is both malformed and over-count hears about the
+        # malformed source, which is the one it can actually act on. Kept small
+        # enough that the pre-parse body guard is not what answers.
+        client, _ = make_client()
+        sources = [
+            {"kind": "voicemail", "label": f"S{n}", "text": "x"}
+            for n in range(TEST_LIMITS.max_sources + 1)
+        ]
+        response = client.post("/v1/jobs", json={"sources": sources}, headers=auth())
+        assert response.status_code == 422
+
+    def test_an_absurd_body_is_refused_before_it_is_parsed(self):
+        client, _ = make_client()
+        response = client.post(
+            "/v1/jobs",
+            content=b'{"sources": []}',
+            headers=auth()
+            | {
+                "content-type": "application/json",
+                "content-length": str(TEST_LIMITS.max_total_bytes * 4),
+            },
+        )
+        assert response.status_code == 413
+        assert "request body" in response.json()["detail"]
 
 
 class TestPoll:
@@ -224,7 +346,9 @@ class TestReport:
 
     def test_queued_job_report_is_409(self):
         store = InMemoryJobStore()
-        record = JobRecord.create(owner_subject="alice", description="an app")
+        record = JobRecord.create(
+            owner_subject="alice", sources=[Source.description("an app")]
+        )
         asyncio.run(store.create(record))
         client, _ = make_client(store=store)
         response = client.get(f"/v1/jobs/{record.id}/report", headers=auth())
