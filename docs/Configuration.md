@@ -294,6 +294,15 @@ inheriting a default for a contract its callers can see.
 | `STRIDE_PROMPTS_DIR` | `prompts/` |
 | `STRIDE_TIERS_FILE` | `config/model_tiers.toml` |
 | `STRIDE_SAMPLING` | `config/sampling.toml` |
+It is not, however, a count of **requests**. On the OpenAI/Azure path LiteLLM
+sets the provider SDK's own `max_retries` from the value it is given, so the
+first attempt retries at the SDK level as well and the worst case per node is
+`2 * attempts - 1` requests — five at the shipped `3`, and up to thirty in the
+seconds the six analysts run in parallel. That burst, not the per-job total, is
+what trips a per-minute request quota. Lowering `STRIDE_RETRY_ATTEMPTS` is what
+shrinks it; passing `max_retries` on the adapter does not, because the
+retry-count LiteLLM is given overwrites it.
+
 | `STRIDE_RESILIENCE` | `config/resilience.toml` |
 | `STRIDE_BLESSED_FINGERPRINTS` | `config/blessed-fingerprints.toml` |
 

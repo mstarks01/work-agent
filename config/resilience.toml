@@ -31,6 +31,13 @@
 # timeout-only path silently gave one. The retryable status set and the backoff
 # curve remain the library's own — anything not listed here is deliberately
 # unset rather than pinned to a number this project has never measured.
+#
+# It is NOT a count of requests per node. LiteLLM sets the provider SDK's own
+# max_retries from num_retries, so the first attempt retries at the SDK level
+# too and the worst case is 2 * attempts - 1 requests: five here, and up to
+# thirty in the seconds the six analysts fan out. That burst is what trips a
+# per-minute request quota, and turning `attempts` DOWN is what shrinks it —
+# passing max_retries on the adapter does not, since num_retries overwrites it.
 
 version = 3
 attempts = 3
