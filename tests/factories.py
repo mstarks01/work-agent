@@ -11,6 +11,7 @@ stand-in. A copy that reported no ``model_version`` would let a whole class of
 provenance defect stay invisible to the eval lane.
 """
 
+import json
 from collections.abc import AsyncGenerator
 from datetime import UTC, datetime
 from pathlib import Path
@@ -265,6 +266,19 @@ def sample_report(
     )
 
 
+EMPTY_THREATS = '{"threats": []}'
+
+
+def threats_json(*threats: object) -> str:
+    """A review or analyst node's emission: the list inside its ``threats`` key.
+
+    The wrapper is the node's output-schema shape, not the domain's, so tests
+    build it here rather than each spelling it out — a bare array is what these
+    nodes emitted before the schema had to be convertible, and is now invalid.
+    """
+    return json.dumps({"threats": [t.model_dump(mode="json") for t in threats]})
+
+
 def served_build(requested: str) -> str:
     """The build a scripted model claims answered: the request plus a suffix."""
     return f"{requested}-served"
@@ -337,7 +351,7 @@ def scripted_pipeline(
         base = node in (EXTRACT_NODE, REPAIR_NODE)
         models[node] = llm_class(
             model=BASE_MODEL if base else STRONG_MODEL,
-            reply=replies.get(node, "[]"),
+            reply=replies.get(node, EMPTY_THREATS),
             seen=[],
         )
         return models[node]

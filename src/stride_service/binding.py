@@ -19,10 +19,13 @@ Constructor kwargs reach ``acompletion`` via ``_additional_args`` *before*
 neither here nor via ``LITELLM_DROP_PARAMS`` — because LiteLLM's default is
 fail-closed and the sampling fingerprint's honesty depends on it.
 
-Four build-time gates fire per tier, so a misconfiguration costs nothing rather
+Five build-time gates fire per tier, so a misconfiguration costs nothing rather
 than dying on node one of a paid-for job:
 
 * the **supported-param check** (:mod:`stride_service.model_gate`);
+* the **output-ceiling check** below, which the supported-param check cannot
+  make: every vendor *accepts* ``max_output_tokens``, and only the serving model
+  objects to a value above what it will produce;
 * the **removed-``temperature`` check** below, which covers that check's one
   documented blind spot on Claude;
 * the **native-structured-output check** below. Every LLM node binds an
@@ -53,6 +56,7 @@ from stride_service.model_gate import (
     assert_kwarg_supported,
     check_supported,
     emulates_structured_output,
+    output_ceiling,
 )
 from stride_service.model_tiers import TIER_NAMES, ModelTierConfig, TierName
 from stride_service.resilience import ResilienceConfig
@@ -133,6 +137,36 @@ def _check_temperature_unset(
         )
 
 
+def _check_output_ceiling(
+    vendor: Vendor, model: str, sampling: TierSampling, source: str
+) -> None:
+    """Fail closed when a tier asks for more output than its model will serve.
+
+    ``max_output_tokens`` is pinned rather than left to a vendor-derived
+    default, and the value that fits a tier's job is a property of the *job* —
+    the critic re-emits every draft it was given — while the ceiling is a
+    property of the model. The two are set independently and there is no reason
+    they agree, so the pair is checked here: every provider accepts the
+    parameter, and an over-ceiling value is rejected by the serving model at
+    request time, which is node one of a paid-for job.
+
+    An unrecognised model yields no ceiling and is not gated, the same
+    open-world residual :func:`check_supported` documents.
+    """
+    if sampling.max_output_tokens is None:
+        return
+    ceiling = output_ceiling(vendor, model)
+    if ceiling is None or sampling.max_output_tokens <= ceiling:
+        return
+    raise ModelGateError(
+        f"{source}: {vendor.name} serves at most {ceiling} output tokens for"
+        f" {model!r}, and this tier asks for {sampling.max_output_tokens}."
+        " Lower max_output_tokens for this tier in config/sampling.toml, or"
+        " select a model whose ceiling covers it — a tier that asks for more"
+        " than the model will produce is rejected on its first request."
+    )
+
+
 def _check_native_structured_output(
     vendor: Vendor, model: str, sampling: TierSampling, source: str
 ) -> None:
@@ -202,6 +236,7 @@ def build_tier_adapters(
             vendor, selection.model, tier_sampling.gate_params(), source=source
         )
         _check_temperature_unset(selection.model, tier_sampling, source)
+        _check_output_ceiling(vendor, selection.model, tier_sampling, source)
         _check_native_structured_output(vendor, selection.model, tier_sampling, source)
         adapters[tier] = LiteLlm(
             model=selection.route,

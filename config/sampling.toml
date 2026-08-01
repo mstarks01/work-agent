@@ -34,6 +34,13 @@
 #   both tiers, while its comment claimed "uncapped to 65,536". Pinning it makes
 #   the request say what the file says.
 #
+#   A PINNED CAP IS A FAILURE MODE, not just a bound: a completion truncated at
+#   the cap comes back with no text at all, so the node writes no output key and
+#   the next FunctionNode fails to bind its parameter. Nothing in the response is
+#   malformed, so no gate and no validator sees it. That is why the two values
+#   below are sized against measured output rather than left at a round number,
+#   and why binding.py checks each against its model's published ceiling.
+#
 # THE VALUE CHECK ON `thinking` IS OURS. reasoning_effort = "banana" passes the
 # provider gate on o3, so a pydantic Literal catches it here — the same class of
 # silent wrong as top_k, caught in the one place that can catch it.
@@ -64,6 +71,13 @@
 # Claude is the same model), and the floor is 4.7 rather than 4.6, which still
 # accepts the param.
 #
+# `constrain_output = false` IS NOT A WORKING ANSWER to a schema the provider
+# will not compile, despite reading like one. Measured live against Claude
+# Sonnet 4.6: with the extraction schema suppressed the model fences its JSON,
+# which ADK hands to validation unstripped, and omits required fields. Repair
+# sits on the same tier, equally unconstrained, and fails the same way. See
+# sampling.py.
+#
 # Env overrides STRIDE_SAMPLING_{TIER}_{PARAM} retune the OFFERED params
 # (temperature, top_p, seed, thinking, max_output_tokens) at deploy time,
 # validated exactly like the file value and captured by the run's fingerprint.
@@ -79,17 +93,38 @@
 
 version = 4
 
+# SIZING THE TWO CAPS. Measured, not chosen: token counts below are o200k_base
+# over artifacts in this repo, and reasoning tokens are spent against the same
+# cap, so each value is the measured output plus room to think.
+#
+#   base   extract emits one SystemModel. Across the 12 corpus cases that is a
+#          median of 1,810 tokens and a max of 2,565 — but the corpus systems are
+#          small, and max_source_bytes admits 100 KiB of transcript, which
+#          describes a far larger one. 16,384 is ~6x the largest measured model.
+#          The weaker-evidence half of this pair: 8,192 has not been observed to
+#          truncate here.
+#
+#   strong the critic re-emits EVERY draft it was given, plus a verdict and a
+#          confidence on each. The 18 shipped analyst exemplars measure at a
+#          median 400 tokens per ruled threat (max 441), and a job's drafted set
+#          runs larger than its reference set — 15-24 threats across the corpus,
+#          before the duplicates and misfiles the critic is there to reject. So
+#          24 drafts is ~9,600 tokens of visible output and 36 is ~14,400, both
+#          already over the 8,192 this file used to pin, with nothing left for
+#          reasoning. 32,768 covers a 36-draft ruling with ~18k to think in.
+#
+# Both are under every ceiling the pinned model map publishes for the models
+# this service can select except gpt-4o's 16,384 — which is the case the
+# build-time ceiling check exists to catch rather than leave to a 400.
+
 [tiers.base]
 temperature = 0.0        # pinned greedy decoding; the model's own default is 1.0.
                          # Unset this line if this tier runs Claude >= 4.7.
-max_output_tokens = 8192 # pinned: silence means a vendor-derived cap (see above)
+max_output_tokens = 16384 # pinned: silence means a vendor-derived cap (see above)
 candidate_count = 1      # reserved Self-MoA lever; loader rejects != 1
-constrain_output = true  # send this tier's node schema to the provider. Set
-                         # false where the provider will not take it -- see the
-                         # note above -- which gives up constrained generation
-                         # only: the node keeps its output_schema, the response
-                         # is still validated, and a bad extraction still
-                         # reaches the repair node.
+constrain_output = true  # send this tier's node schema to the provider.
+                         # Leave it true: setting it false is not currently a
+                         # working configuration -- see the note above.
 # top_p             unset -> model default; no published per-tier constant
 # seed              unset -> no numeric default; buys consistency, not
 #                   reproducibility, and is unavailable on Anthropic at all
@@ -101,14 +136,11 @@ constrain_output = true  # send this tier's node schema to the provider. Set
 [tiers.strong]
 temperature = 0.0        # pinned greedy decoding; the model's own default is 1.0.
                          # Unset this line if this tier runs Claude >= 4.7.
-max_output_tokens = 8192 # pinned: silence means a vendor-derived cap (see above)
+max_output_tokens = 32768 # pinned: silence means a vendor-derived cap (see above)
 candidate_count = 1      # reserved Self-MoA lever; loader rejects != 1
-constrain_output = true  # send this tier's node schema to the provider. Set
-                         # false where the provider will not take it -- see the
-                         # note above -- which gives up constrained generation
-                         # only: the node keeps its output_schema, the response
-                         # is still validated, and a bad extraction still
-                         # reaches the repair node.
+constrain_output = true  # send this tier's node schema to the provider.
+                         # Leave it true: setting it false is not currently a
+                         # working configuration -- see the note above.
 # top_p             unset -> model default; no published per-tier constant
 # seed              unset -> no numeric default; buys consistency, not
 #                   reproducibility, and is unavailable on Anthropic at all

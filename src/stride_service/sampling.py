@@ -21,17 +21,33 @@ Three things about the surface:
   ``off`` is worse than unportable — ``gemini-2.5-pro`` + ``none`` *passes* the
   gate as ``thinkingBudget: 0`` and then 400s at request time.
 * **``max_output_tokens`` is pinned**, because the default is vendor-dependent:
-  Anthropic derives a 5,120–8,192 cap only when the caller is silent.
+  Anthropic derives a 5,120–8,192 cap only when the caller is silent. It is
+  pinned per tier at a value sized against *measured* output — the tiers emit
+  different things, and the critic, which re-emits every draft it was given,
+  needs several times what one extraction does. Undersizing it does not
+  truncate visibly: the completion returns no text, the node writes no output
+  key, and the next FunctionNode fails to bind. ``binding.py`` checks each
+  tier's value against its model's published ceiling, which
+  :func:`~stride_service.model_gate.check_supported` cannot — every provider
+  accepts the param, and only the serving model objects to the value.
 * **``constrain_output`` decides whether the node's schema is sent at all.**
   Constrained generation is the default and the better answer where a provider
   will take it, but "will take it" is a property of the schema *and* the
   provider's own limits — a grammar compiler can reject a schema it is
   perfectly willing to honour in principle — and nothing computes that offline.
   So it is a per-tier choice a deployment makes, not one derived from the
-  vendor. Turning it off gives up constrained *generation* only: the node keeps
-  its ``output_schema``, the response is validated on arrival, and a failed
-  extraction still reaches the repair node. Eight of the graph's ten LLM nodes
-  already run this way, because ADK cannot convert their ``list[...]`` schemas.
+  vendor. Every LLM node carries a schema the adapter can convert, so this is
+  the only thing that decides whether one is sent.
+
+  **Turning it off is not currently a working configuration**, and the earlier
+  claim here that it gives up constrained *generation* only was wrong. Measured
+  against Claude Sonnet 4.6 with the extraction schema suppressed, the model
+  fenced its JSON in a ```` ```json ```` block — which ADK hands to validation
+  unstripped, so it fails before anything reads it — and omitted required
+  fields (every ``trust_boundaries[*].kind``). The repair node sits on the same
+  tier and is equally unconstrained, so the repair loop does not rescue it. The
+  field is kept because the *mechanism* is right, but a tier that turns it off
+  needs the graph to tolerate a fenced response first.
 
 Loading fails closed (OWASP A02/A10): an unsupported version, an unknown key or
 tier, an out-of-range value, or a ``candidate_count`` other than 1 raises
@@ -120,7 +136,10 @@ class _RawTier(BaseModel):
 
     No upper bound is placed on ``max_output_tokens``: the ceiling is a
     per-``(vendor, model)`` fact, and mirroring one here would be a table that
-    drifts against the provider actually serving the request.
+    drifts against the provider actually serving the request. It is enforced
+    where the pair is known — :func:`stride_service.binding._check_output_ceiling`
+    asks the model map at build time — so "unbounded here" means unbounded by
+    the *loader*, not unchecked.
     """
 
     model_config = ConfigDict(extra="forbid", frozen=True)

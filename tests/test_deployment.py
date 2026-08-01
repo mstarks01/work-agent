@@ -302,6 +302,42 @@ def test_unsetting_temperature_lets_the_same_selection_build(tmp_path):
     assert pipeline.node_models[graph.CRITIC_NODE] == f"anthropic/{CLAUDE_NATIVE}"
 
 
+def test_asking_for_more_output_than_the_model_serves_fails_the_build():
+    """The truncation failure, moved from request time to build time.
+
+    Every provider accepts ``max_output_tokens``, so the supported-param gate
+    passes an over-ceiling value and the serving model rejects it on node one.
+    Gemini 2.5 publishes 65,535, so this asks for more.
+    """
+    env = VERTEX_ENV | {"STRIDE_SAMPLING_BASE_MAX_OUTPUT_TOKENS": "200000"}
+
+    with pytest.raises(ModelGateError) as excinfo:
+        Deployment.from_env(env=env).pipeline()
+
+    message = str(excinfo.value)
+    assert "tiers.base" in message
+    assert "65535" in message and "200000" in message
+    # The message has to name the file to edit, like every other build wall.
+    assert "config/sampling.toml" in message
+
+
+def test_the_shipped_caps_clear_the_ceilings_of_a_selectable_model():
+    """The raised caps are only safe if the gate they rely on agrees."""
+    pipeline = Deployment.from_env(env=VERTEX_ENV).pipeline()
+
+    assert pipeline.tier_sampling["base"].max_output_tokens == 16384
+    assert pipeline.tier_sampling["strong"].max_output_tokens == 32768
+
+
+def test_a_value_exactly_at_the_ceiling_still_builds():
+    """The gate bounds the ask at the ceiling, not below it."""
+    env = VERTEX_ENV | {"STRIDE_SAMPLING_STRONG_MAX_OUTPUT_TOKENS": "65535"}
+
+    pipeline = Deployment.from_env(env=env).pipeline()
+
+    assert pipeline.tier_sampling["strong"].max_output_tokens == 65535
+
+
 def test_a_model_without_native_schema_support_fails_the_build(tmp_path):
     """The expensive failure shape: well-formed request, well-formed response.
 

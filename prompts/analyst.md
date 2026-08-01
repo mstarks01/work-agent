@@ -59,7 +59,7 @@ Work in this order, over the whole model before you write anything:
 
 ## Output
 
-Emit a list of draft threats. Each draft carries exactly seven fields — `id`, `category`, `title`, `description`, `affected_element_ids`, `severity`, `mitigations` — and nothing else. `verdict` and `confidence` do not exist for you; emitting one would make an unreviewed threat look reviewed.
+Emit an object with a single field, `threats`, holding your list of draft threats — `{"threats": [ ... ]}`. Emit nothing outside it. Each draft carries exactly seven fields — `id`, `category`, `title`, `description`, `affected_element_ids`, `severity`, `mitigations` — and nothing else. `verdict` and `confidence` do not exist for you; emitting one would make an unreviewed threat look reviewed.
 
 - **`id`** — your category's letter, a hyphen, and a two-digit sequence starting at `01`, numbered within your category only (`S-01`, `S-02`, …). Letters: spoofing `S`, tampering `T`, repudiation `R`, information-disclosure `I`, denial-of-service `D`, elevation-of-privilege `E`. Other analysts number independently; collisions across categories are impossible because the letters differ.
 - **`category`** — your own category, always. Filing outside your lane is a rejection, not a recategorization.
