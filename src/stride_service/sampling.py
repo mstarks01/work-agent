@@ -14,8 +14,9 @@ Three things about the surface:
   fingerprint attests to it.
 * **``thinking`` is a uniform ``low``/``medium``/``high`` enum**, not a
   per-tier integer budget. ``reasoning_effort`` reaches every vendor (Anthropic
-  → ``budget_tokens``, identically via Vertex; Gemini → ``thinkingConfig``;
-  OpenAI → passthrough), so no per-vendor budget range is mirrored here.
+  → adaptive ``thinking`` plus ``output_config.effort``, identically via Vertex;
+  Gemini → ``thinkingConfig``; OpenAI → passthrough), so no per-vendor budget
+  range is mirrored here.
   ``auto`` and ``off`` are excluded: ``auto`` raises on two vendors, and
   ``off`` is worse than unportable — ``gemini-2.5-pro`` + ``none`` *passes* the
   gate as ``thinkingBudget: 0`` and then 400s at request time.

@@ -92,8 +92,7 @@ is read — a key for a vendor the config does not select never authenticates
 anything.
 
 For Anthropic, `vendor = "anthropic"` in both tier tables with models such as
-`claude-haiku-4-5-20251001` on `base` and `claude-sonnet-4-5-20250929` on
-`strong`:
+`claude-sonnet-4-6` on `base` and `claude-opus-5` on `strong`:
 
 ```sh
 export STRIDE_ANTHROPIC_API_KEY=sk-ant-...   # the full key, not a prefix
@@ -106,9 +105,11 @@ For OpenAI, `vendor = "openai"` with models such as `gpt-4.1-mini` on `base` and
 export STRIDE_OPENAI_API_KEY=sk-...          # the full key, not a prefix
 ```
 
-Model names must be pinned — no `-latest`, `-preview` or `-exp`, and Anthropic
-requires the dated suffix shown above.
-[Configuration](Configuration.md#models-and-vendors) gives the rule per vendor.
+Model names must be pinned — no `-latest`, `-preview` or `-exp`. Claude takes
+the dateless ID shown above, which is the canonical snapshot from generation
+4.6 on; this service runs 4.6 and later only, so the older dated forms are
+rejected. [Configuration](Configuration.md#models-and-vendors) gives the rule
+per family.
 
 ### Selecting without editing the file
 

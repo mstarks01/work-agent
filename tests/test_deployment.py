@@ -22,6 +22,7 @@ from stride_service.deployment import (
 )
 from stride_service.errors import ConfigError
 from stride_service.jobs import InMemoryJobStore
+from stride_service.model_gate import ModelGateError
 from stride_service.model_tiers import ModelConfigError
 from stride_service.vendors import ProviderAuthError
 from tests.factories import PROJECT_ROOT
@@ -207,7 +208,7 @@ def test_a_credential_error_never_echoes_the_secret():
     # OWASP A09: a key echoed into a log or an error has leaked.
     env = VERTEX_ENV | {
         "STRIDE_MODEL_BASE_VENDOR": "anthropic",
-        "STRIDE_MODEL_BASE_MODEL": "claude-sonnet-4-5-20250929",
+        "STRIDE_MODEL_BASE_MODEL": "claude-sonnet-4-6",
     }
     with pytest.raises(ProviderAuthError) as excinfo:
         Deployment.from_env(env=env).pipeline()
@@ -222,6 +223,90 @@ def test_an_offline_resolver_short_circuits_the_credential_check():
     )
 
     assert pipeline.node_models[graph.EXTRACT_NODE] == "scripted"
+
+
+# --- The removed-temperature gate -------------------------------------------
+
+# Anthropic removed `temperature` from Claude 4.7 onward. `claude-opus-5` is the
+# case that matters: the pinned LiteLLM carries no entry for it, so
+# `check_supported` falls back to the provider's base config and *passes* — the
+# residual `model_gate` documents, and the whole reason the second check exists.
+# `claude-sonnet-5` is in that map and LiteLLM rejects it itself, which is why it
+# is deliberately not the model under test.
+CLAUDE_5 = "claude-opus-5"
+
+ANTHROPIC_ENV = {
+    "STRIDE_MODEL_BASE_VENDOR": "anthropic",
+    "STRIDE_MODEL_BASE_MODEL": CLAUDE_5,
+    "STRIDE_MODEL_STRONG_VENDOR": "anthropic",
+    "STRIDE_MODEL_STRONG_MODEL": CLAUDE_5,
+    # A name, not a secret: the loader checks a variable is declared, never that
+    # it authenticates, and nothing here reaches a provider.
+    "STRIDE_ANTHROPIC_API_KEY": "sk-ant-not-a-real-key",
+}
+
+NO_TEMPERATURE = """\
+version = 3
+[tiers.base]
+max_output_tokens = 8192
+[tiers.strong]
+max_output_tokens = 8192
+"""
+
+
+def test_a_claude_that_removed_temperature_fails_the_build():
+    """The shipped sampling pins temperature = 0.0, which 4.7+ rejects outright."""
+    with pytest.raises(ModelGateError) as excinfo:
+        Deployment.from_env(env=ANTHROPIC_ENV).pipeline()
+
+    message = str(excinfo.value)
+    assert "tiers.base" in message
+    assert "temperature" in message
+    # The message has to name the file to edit; this is a first-run wall.
+    assert "config/sampling.toml" in message
+
+
+def test_the_temperature_gate_is_keyed_on_the_model_not_the_vendor():
+    """Vertex-hosted Claude is the same model under the same removal.
+
+    A vendor-keyed rule would pass exactly the configuration the check exists
+    to stop, so the selection here is deliberately `vertex` + a Claude.
+    """
+    env = VERTEX_ENV | {
+        "STRIDE_MODEL_BASE_VENDOR": "vertex",
+        "STRIDE_MODEL_BASE_MODEL": CLAUDE_5,
+    }
+
+    with pytest.raises(ModelGateError, match="temperature"):
+        Deployment.from_env(env=env).pipeline()
+
+
+def test_unsetting_temperature_lets_the_same_selection_build(tmp_path):
+    """The fix the error message names, end to end."""
+    path = tmp_path / "sampling.toml"
+    path.write_text(NO_TEMPERATURE, encoding="utf-8")
+
+    pipeline = Deployment.from_env(
+        env=ANTHROPIC_ENV | {"STRIDE_SAMPLING": str(path)}
+    ).pipeline()
+
+    assert pipeline.node_models[graph.CRITIC_NODE] == f"anthropic/{CLAUDE_5}"
+
+
+def test_claude_4_6_keeps_the_pinned_temperature():
+    """The floor is 4.7, not the service's own 4.6 minimum.
+
+    4.6 still accepts the param, so pinned greedy decoding survives there
+    rather than being swept up by a vendor-wide ban.
+    """
+    env = ANTHROPIC_ENV | {
+        "STRIDE_MODEL_BASE_MODEL": "claude-sonnet-4-6",
+        "STRIDE_MODEL_STRONG_MODEL": "claude-sonnet-4-6",
+    }
+
+    pipeline = Deployment.from_env(env=env).pipeline()
+
+    assert pipeline.node_models[graph.CRITIC_NODE] == "anthropic/claude-sonnet-4-6"
 
 
 # --- One manifest, one gate -------------------------------------------------
