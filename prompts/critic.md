@@ -12,9 +12,7 @@ Structural checks are already done in code — element IDs resolve, threat-ID le
 
 The validated System Model, its derived boundary crossings, and the merged drafts from all six analysts:
 
-```
 {system_model}
-```
 
 ```
 {boundary_crossings}

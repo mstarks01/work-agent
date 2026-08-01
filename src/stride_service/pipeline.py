@@ -12,9 +12,10 @@ around it. A node's ``duration_ms`` is measured from the moment its last
 predecessor finished — the point the graph could have started it — to the
 event carrying its own output.
 
-The submitted description is untrusted text (OWASP LLM01): it enters session
-state as data for the extraction prompt's fenced ``{input_text}`` block and
-is never concatenated into an instruction here.
+The submitted sources are untrusted text (OWASP LLM01). This module never
+renders them: it hands the job's sources to the executor, which is the single
+place a job becomes prompt bytes, and takes back the digest that ties the
+report to what was submitted.
 
 Which config this runner is built from is not this module's business: see
 :class:`stride_service.deployment.Deployment`, which locates and loads it once
@@ -23,7 +24,6 @@ per process and hands back a configured runner.
 
 from __future__ import annotations
 
-import hashlib
 import logging
 from datetime import UTC, datetime
 
@@ -33,7 +33,6 @@ from stride_service.certification import CertificationGate, CertifyResult
 from stride_service.execution import GraphExecutor, GraphRun
 from stride_service.graph import (
     STATE_ANALYSIS,
-    STATE_INPUT_TEXT,
     STATE_REJECTION,
     Analysis,
     Pipeline,
@@ -95,23 +94,24 @@ class AdkPipelineRunner:
         wedges jobs is identifiable across runs without the service ever
         storing the untrusted text.
         """
-        source_sha256 = hashlib.sha256(job.description.encode("utf-8")).hexdigest()
+        input_ref = InputRef.of(
+            system_name=job.system_name or DEFAULT_SYSTEM_NAME, sources=job.sources
+        )
         try:
-            return await self._drive(job, on_node, source_sha256)
+            return await self._drive(job, on_node, input_ref)
         except Exception:
             logger.warning(
-                "job %s failed in the graph; source_sha256=%s", job.id, source_sha256
+                "job %s failed in the graph; source_sha256=%s",
+                job.id,
+                input_ref.source_sha256,
             )
             raise
 
     async def _drive(
-        self, job: JobRecord, on_node: NodeCallback, source_sha256: str
+        self, job: JobRecord, on_node: NodeCallback, input_ref: InputRef
     ) -> PipelineOutcome:
         graph_run = await self._executor.run(
-            {STATE_INPUT_TEXT: job.description},
-            job.description,
-            user_id=job.owner_subject,
-            on_node=on_node,
+            job.sources, user_id=job.owner_subject, on_node=on_node
         )
         state = graph_run.final_state
         if STATE_REJECTION in state:
@@ -122,7 +122,7 @@ class AdkPipelineRunner:
             )
 
         analysis = Analysis.from_state(state[STATE_ANALYSIS])
-        report = self._build_report(job, analysis, graph_run, source_sha256)
+        report = self._build_report(job, analysis, graph_run, input_ref)
         return PipelineCompleted(
             report=report, certification=self._certify(job, report)
         )
@@ -157,7 +157,7 @@ class AdkPipelineRunner:
         job: JobRecord,
         analysis: Analysis,
         graph_run: GraphRun,
-        source_sha256: str,
+        input_ref: InputRef,
     ) -> StrideReport:
         return StrideReport(
             job=Job(
@@ -165,10 +165,7 @@ class AdkPipelineRunner:
                 created_at=job.created_at,
                 completed_at=datetime.now(UTC),
             ),
-            input=InputRef(
-                system_name=job.system_name or DEFAULT_SYSTEM_NAME,
-                source_sha256=source_sha256,
-            ),
+            input=input_ref,
             nodes=graph_run.node_runs,
             sampling={
                 tier: params.model_dump()

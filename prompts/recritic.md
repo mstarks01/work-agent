@@ -28,9 +28,7 @@ The problems found in it, each naming the threat ID and what is wrong:
 
 The validated System Model and its boundary crossings, so a reference or a `needs-info` unknown you must repair points at an element that exists:
 
-```
 {system_model}
-```
 
 ```
 {boundary_crossings}

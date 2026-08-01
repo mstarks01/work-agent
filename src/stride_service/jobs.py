@@ -21,10 +21,9 @@ logged, never surfaced.
 
 from __future__ import annotations
 
-import hashlib
 import logging
 import os
-from collections.abc import Awaitable, Callable, Mapping
+from collections.abc import Awaitable, Callable, Mapping, Sequence
 from dataclasses import dataclass
 from datetime import UTC, datetime
 from typing import Literal, Protocol, Self
@@ -40,6 +39,7 @@ from stride_service.report import (
     StrideReport,
     build_summary,
 )
+from stride_service.sources import Source
 from stride_service.system_model import Process, SystemModel, TrustBoundary
 from stride_service.validation import ValidationIssue
 
@@ -61,11 +61,6 @@ _LEGAL_TRANSITIONS: dict[JobStatus, frozenset[JobStatus]] = {
 
 # Stored on a failed job in place of any internal detail.
 GENERIC_FAILURE_MESSAGE = "internal error while running the analysis pipeline"
-
-# Authoritative cap on a submitted description, in UTF-8 bytes. Enforced at
-# every entry point — the HTTP layer and the in-process engine — so untrusted
-# input is bounded before it reaches a model (OWASP LLM10).
-MAX_DESCRIPTION_BYTES = 100 * 1024
 
 
 class InvalidTransitionError(ValueError):
@@ -108,7 +103,7 @@ class JobRecord(BaseModel):
 
     id: str
     owner_subject: str
-    description: str
+    sources: list[Source] = Field(min_length=1)
     system_name: str | None = None
     status: JobStatus = "queued"
     created_at: datetime
@@ -126,14 +121,18 @@ class JobRecord(BaseModel):
 
     @classmethod
     def create(
-        cls, *, owner_subject: str, description: str, system_name: str | None = None
+        cls,
+        *,
+        owner_subject: str,
+        sources: Sequence[Source],
+        system_name: str | None = None,
     ) -> Self:
         """A fresh queued job with its initial status event recorded."""
         now = datetime.now(UTC)
         record = cls(
             id=f"job-{uuid4().hex}",
             owner_subject=owner_subject,
-            description=description,
+            sources=list(sources),
             system_name=system_name,
             created_at=now,
             updated_at=now,
@@ -292,11 +291,11 @@ class StubPipelineRunner:
                 created_at=job.created_at,
                 completed_at=datetime.now(UTC),
             ),
-            input=InputRef(
-                system_name=job.system_name or "Stub System",
-                source_sha256=hashlib.sha256(
-                    job.description.encode("utf-8")
-                ).hexdigest(),
+            # Built through the same constructor the real runner uses: two
+            # independent digest computations is how a fixture comes to carry
+            # an InputRef production would never produce.
+            input=InputRef.of(
+                system_name=job.system_name or "Stub System", sources=job.sources
             ),
             nodes=[NodeRun(node=node, duration_ms=0) for node in self.nodes],
             system_model=model,
