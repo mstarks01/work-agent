@@ -39,7 +39,7 @@ model = "gemini-2.5-flash"
 
 [tiers.strong]
 vendor = "anthropic"
-model = "claude-sonnet-4-5-20250929"
+model = "claude-opus-5"
 ```
 
 Supported vendors are `vertex`, `anthropic` and `openai`. Every one is reached
@@ -63,16 +63,36 @@ never logged, never in the report, and never in a fingerprint; errors name the
 variable, never its value.
 
 **Pinning** means naming a model specifically enough that it won't quietly
-change under you. The check is per-vendor and deliberately loose: it rejects
-names that openly float (`-latest`, `-preview`, `-exp`) and, where a vendor
-publishes a dated form, requires it (`claude-...@YYYYMMDD` on Vertex,
-`claude-...-YYYYMMDD` when called directly). Gemini 2.5 and later ship no
-numbered builds, so there the bare name is the most specific identifier
-available.
+change under you. The check is per model *family* and deliberately loose: it
+rejects names that openly float (`-latest`, `-preview`, `-exp`) and, where the
+vendor publishes a canonical form, requires that shape. Gemini 2.5 and later
+ship no numbered builds, so there the bare name is the most specific identifier
+available; the same is true of OpenAI's o-series.
 
-A loose rule is the right one here because it runs against three vendors'
-catalogs at once, and its predecessor — an allowlist of numbered Gemini builds —
-broke outright when Google retired them. The name check is only a proxy. The
+Claude is the family with a published form:
+
+```text
+claude-<name>-<major>[-<minor>]     e.g. claude-opus-5, claude-sonnet-4-6
+```
+
+Two things to know about it. The dateless ID is **not** an alias — from the 4.6
+generation on it is the canonical pinned snapshot, and Anthropic ships a new ID
+rather than moving weights under an existing one. And Vertex spells it the same
+way, so `vendor = "vertex"` and `vendor = "anthropic"` take the identical model
+string for the same model.
+
+**This service runs Claude 4.6 and later only.** A pre-4.6 name is rejected —
+either as unpinned, because those generations carry a snapshot date
+(`claude-sonnet-4-5-20250929` direct, `claude-sonnet-4-5@20250929` on Vertex)
+and their bare form really was a floating alias, or, when the shape is right
+but the version is too old (`claude-haiku-4-5`), as a generation, with the
+message naming the one it read. There is no mode that accepts both schemes.
+
+A loose rule is the right one for the rest because it runs against three
+vendors' catalogs at once, and its predecessor — an allowlist of numbered
+Gemini builds — broke outright when Google retired them. Claude's half avoids
+that trap by matching a shape rather than enumerating builds: a model released
+tomorrow already satisfies it. The name check is only a proxy either way. The
 real guarantee is the **served build read back from every response** and
 recorded for each node execution, described under
 [Architecture → Provenance and certification](Architecture.md#provenance-and-certification).
@@ -91,7 +111,7 @@ loader rejects, never a silent fallback.
 
 | Param | Shipped state | Notes |
 | --- | --- | --- |
-| `temperature` | pinned `0.0` | Greedy decoding; the model's own default is `1.0`. |
+| `temperature` | pinned `0.0` | Greedy decoding; the model's own default is `1.0`. **Must be unset on a tier running Claude 4.7 or later** — see below. |
 | `max_output_tokens` | pinned `8192` | Must be pinned: silence means a *vendor-derived* cap. |
 | `candidate_count` | pinned `1` | Reserved; the loader **rejects any value ≠ 1**. |
 | `top_p`, `presence_penalty`, `frequency_penalty` | **unset** | No verified per-tier constant to pin. |
@@ -100,8 +120,9 @@ loader rejects, never a silent fallback.
 
 `thinking` is a uniform `"low"` / `"medium"` / `"high"` enum. It reaches all
 three vendors, which is why there are no longer per-tier legal ranges: LiteLLM
-maps it to `budget_tokens` on Anthropic, `thinkingConfig` on Gemini, and passes
-it through on OpenAI o-series. `"auto"` and `"off"` are **not** accepted —
+maps it to adaptive `thinking` plus `output_config.effort` on Anthropic,
+`thinkingConfig` on Gemini, and passes it through on OpenAI o-series. `"auto"`
+and `"off"` are **not** accepted —
 `"auto"` raises on two vendors, and `"off"` is worse than unportable, since
 Gemini accepts it at build time and then fails the request.
 
@@ -132,6 +153,33 @@ The check asks the library itself rather than consulting a table this repo
 maintains, so it cannot drift away from the behaviour that actually fires at
 request time. The library's model data is read from the installed copy, so the
 answer never depends on a network fetch during startup.
+
+**Its one blind spot, and the check that covers it.** Asking the library means
+inheriting the limits of the library's model data: a model released after the
+pinned copy is unknown to it and falls back to the provider's *base* config,
+where anything the provider generally accepts passes. That is usually harmless
+— it is a name check, not an existence check — but one case is not. Anthropic
+removed `temperature` from **Claude 4.7 onward**: only the model's own default
+is accepted, and a request carrying the parameter is rejected. Since the shipped
+sampling pins `temperature = 0.0`, a tier naming a Claude newer than the pinned
+library would sail through startup and die on the first node of a paid job.
+
+So a second startup check runs beside the first: a tier on Claude 4.7 or later
+with `temperature` set is a startup error naming the tier and the file to edit.
+Two deliberate limits on it:
+
+- It keys on the **model**, not the vendor. Vertex-hosted Claude is the same
+  model under the same removal, and `vendor = "vertex"` must not be a way around
+  it.
+- The floor is **4.7, not 4.6**. Claude 4.6 still accepts `temperature`, so
+  pinned greedy decoding survives there rather than being swept up by a
+  vendor-wide ban.
+
+Unset the parameter for that tier and the model runs on its own default, which
+is the only value these generations serve. This is a floor, not a re-introduced
+support table: when the pinned library's model data catches up, the first check
+starts catching the same case and this one becomes redundant rather than
+contradictory.
 
 ### Resilience
 

@@ -27,8 +27,8 @@ class TestRouting:
         assert vendor_for("vertex").route("gemini-2.5-pro") == (
             "vertex_ai/gemini-2.5-pro"
         )
-        assert vendor_for("anthropic").route("claude-sonnet-4-5-20250929") == (
-            "anthropic/claude-sonnet-4-5-20250929"
+        assert vendor_for("anthropic").route("claude-sonnet-5") == (
+            "anthropic/claude-sonnet-5"
         )
 
     def test_the_litellm_provider_is_derived_from_the_prefix(self):
@@ -116,7 +116,7 @@ class TestCredentialMode:
 
 
 class TestPinnedFormRule:
-    """Deliberately an open-world denylist, and deliberately weak."""
+    """An open-world denylist, plus a closed shape for the one family with one."""
 
     @pytest.mark.parametrize("name", VENDOR_NAMES)
     def test_aliases_and_pre_ga_builds_are_rejected_everywhere(self, name):
@@ -134,18 +134,47 @@ class TestPinnedFormRule:
         vertex = vendor_for("vertex")
         # Gemini 2.5+ ships no numbered stable builds, so bare is most specific.
         assert vertex.validate_model("gemini-2.5-pro", source="t")
-        # Vertex Claude does publish a dated build, so bare is a floating alias.
-        assert vertex.validate_model("claude-sonnet-4-5@20250929", source="t")
-        with pytest.raises(ValueError, match="not pinned"):
-            vertex.validate_model("claude-sonnet-4-5", source="t")
+        # Claude's canonical form is the dateless ID, on Vertex as on the direct
+        # API — Google Cloud spells 4.6-and-later identically.
+        assert vertex.validate_model("claude-opus-5", source="t")
 
-    def test_anthropic_direct_uses_its_own_dated_suffix(self):
-        anthropic = vendor_for("anthropic")
-        assert anthropic.validate_model("claude-sonnet-4-5-20250929", source="t")
-        with pytest.raises(ValueError, match="not pinned"):
-            anthropic.validate_model("claude-sonnet-4-5", source="t")
+    @pytest.mark.parametrize("name", ["anthropic", "vertex"])
+    @pytest.mark.parametrize(
+        "model",
+        ["claude-opus-5", "claude-sonnet-5", "claude-opus-4-8", "claude-sonnet-4-6"],
+    )
+    def test_the_dateless_claude_id_is_the_pinned_form(self, name, model):
+        # Not an alias: Anthropic ships a new ID rather than moving weights
+        # under an existing one, so the dateless ID *is* the snapshot.
+        assert vendor_for(name).validate_model(model, source="t") == model
 
-    def test_openai_has_no_dated_form_to_require(self):
+    @pytest.mark.parametrize("name", ["anthropic", "vertex"])
+    @pytest.mark.parametrize(
+        "model",
+        [
+            # The pre-4.6 dated forms, direct and on Vertex.
+            "claude-sonnet-4-5-20250929",
+            "claude-haiku-4-5@20251001",
+            # The old name-after-version scheme, and the alias that fronted it.
+            "claude-3-7-sonnet-20250219",
+            "claude-3-opus",
+        ],
+    )
+    def test_pre_generation_forms_are_not_pinned_forms(self, name, model):
+        with pytest.raises(ValueError, match="not pinned"):
+            vendor_for(name).validate_model(model, source="t")
+
+    @pytest.mark.parametrize("name", ["anthropic", "vertex"])
+    @pytest.mark.parametrize("model", ["claude-haiku-4-5", "claude-opus-4-1"])
+    def test_a_supported_shape_below_the_floor_is_rejected_as_a_generation(
+        self, name, model
+    ):
+        # The identifier is well-formed; what fails is its generation, so the
+        # message says which one it read rather than calling it unpinned.
+        with pytest.raises(ValueError, match="supports 4.6 and later"):
+            vendor_for(name).validate_model(model, source="t")
+
+    def test_openai_has_no_canonical_form_to_require(self):
         assert vendor_for("openai").validate_model("o3", source="t") == "o3"
         assert vendor_for("openai").validate_model("gpt-4o", source="t") == "gpt-4o"
 
