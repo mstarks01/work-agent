@@ -1,5 +1,6 @@
 """Tests for the mechanical validity gate."""
 
+from stride_service.system_model import SystemModel
 from stride_service.validation import (
     MAX_ELEMENTS,
     allowed_asset_tags,
@@ -185,3 +186,67 @@ class TestNormalizeIds:
         model, issues = parse_and_validate({"not_a_field": True}, normalize_ids=True)
         assert model is None
         assert codes(issues) == ["schema"]
+
+
+class TestCitationsResolve:
+    """The fifth invalid-reference rule (#56).
+
+    The one gate rule taking data from outside the model: an excerpt's label
+    has to name a source the *job* carried, so the traceability chain a reader
+    follows leads somewhere.
+    """
+
+    LABELS = ("Kickoff call", "Payments doc")
+
+    def model_citing(self, label: str, excerpt: str = "a quote") -> SystemModel:
+        model = valid_model()
+        for element in model.elements():
+            element.source_excerpt = ""
+            element.source_label = ""
+        model.processes[0].source_excerpt = excerpt
+        model.processes[0].source_label = label
+        return model
+
+    def test_a_label_naming_one_of_the_jobs_sources_passes(self):
+        issues = validate(self.model_citing("Kickoff call"), source_labels=self.LABELS)
+        assert issues == []
+
+    def test_a_label_naming_no_source_the_job_carried_is_invalid(self):
+        # Worse than no citation: a reader who follows it finds nothing.
+        issues = validate(
+            self.model_citing("Some other call"), source_labels=self.LABELS
+        )
+        assert [issue.code for issue in issues] == ["invalid-reference"]
+        assert issues[0].field == "source_label"
+        assert issues[0].element_id == "process:web-app"
+
+    def test_an_excerpt_with_no_label_at_all_is_invalid(self):
+        # Excerpt and label are coupled: a quote with no label cites nothing.
+        issues = validate(self.model_citing(""), source_labels=self.LABELS)
+        assert [issue.code for issue in issues] == ["invalid-reference"]
+
+    def test_an_element_with_no_excerpt_needs_no_label(self):
+        model = self.model_citing("Kickoff call", excerpt="")
+        model.processes[0].source_label = ""
+        assert validate(model, source_labels=self.LABELS) == []
+
+    def test_the_rule_does_not_run_without_a_jobs_labels(self):
+        # A hand-authored model checked outside a job has no set to check
+        # against, and inventing one would fail it on a citation that is fine.
+        assert validate(self.model_citing("Anything at all")) == []
+
+    def test_the_speaker_is_never_gated(self):
+        # Its case is redactability, not correctness: a wrong or missing
+        # speaker must not fail a job.
+        model = self.model_citing("Kickoff call")
+        model.processes[0].source_speaker = "Someone Not On The Call"
+        assert validate(model, source_labels=self.LABELS) == []
+
+    def test_the_labels_reach_the_gate_through_parse_and_validate(self):
+        model, issues = parse_and_validate(
+            self.model_citing("Some other call").model_dump(mode="json"),
+            normalize_ids=True,
+            source_labels=self.LABELS,
+        )
+        assert model is not None
+        assert "invalid-reference" in codes(issues)

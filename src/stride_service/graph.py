@@ -196,6 +196,10 @@ be rejected for."""
 # report's traceability without failing any test.
 
 STATE_INPUT_TEXT = "input_text"
+# The job's source labels, for the one gate rule that takes data from outside
+# the model: a source_excerpt's citation has to name a source the job actually
+# carried. Written by the executor beside the rendered input, never by a node.
+STATE_SOURCE_LABELS = "source_labels"
 STATE_SYSTEM_MODEL = "system_model"
 STATE_BOUNDARY_CROSSINGS = "boundary_crossings"
 STATE_DRAFT_THREATS = "draft_threats"
@@ -293,7 +297,9 @@ def render_fenced(value: Any) -> str:
 # become the session's state delta.
 
 
-def validate_extraction(extracted_model: dict, ctx) -> Event:
+def validate_extraction(
+    extracted_model: dict, ctx, source_labels: list[str] | None = None
+) -> Event:
     """Run the mechanical validity gate and route on the result.
 
     Element IDs are derived here rather than demanded of the model (ticket
@@ -308,7 +314,9 @@ def validate_extraction(extracted_model: dict, ctx) -> Event:
     Both validate nodes run this same function — what differs is where their
     ``invalid`` edge points.
     """
-    model, issues = parse_and_validate(extracted_model, normalize_ids=True)
+    model, issues = parse_and_validate(
+        extracted_model, normalize_ids=True, source_labels=source_labels or ()
+    )
     if issues or model is None:
         parked = extracted_model if model is None else model.model_dump(mode="json")
         # Fenced for the same reason as the analysts' copy: this is the model

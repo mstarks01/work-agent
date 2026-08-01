@@ -74,6 +74,19 @@ class _Element(BaseModel):
     description: str = Field(default="", max_length=2000)
     assets: list[str] = Field(default_factory=list, max_length=len(CORE_ASSET_TAGS) * 4)
     source_excerpt: str = Field(default="", max_length=1000)
+    # Which Source the *excerpt* came from — the quote, not the element. A
+    # verbatim quote has exactly one origin by construction, so this field can
+    # never be half-true, where a list of labels beside one quote would leave
+    # the pairing unstated. An element drawing on several sources records that
+    # in ``notes``. Gate-enforced against the job's labels: see
+    # :func:`~stride_service.validation.validate`.
+    source_label: str = Field(default="", max_length=200)
+    # Who spoke the quote, where the text attributes it. Provenance on a quote,
+    # never a role and never a claim an analyst weighs. It exists to be
+    # *strippable*: a participant name inside a verbatim excerpt is unreachable,
+    # while one in its own field is a single delete. Never gated — a wrong or
+    # missing speaker must not fail a job.
+    source_speaker: str = Field(default="", max_length=200)
     notes: str = Field(default="", max_length=2000)
 
 
