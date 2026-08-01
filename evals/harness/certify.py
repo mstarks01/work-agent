@@ -62,6 +62,18 @@ _INT_PARAMS = frozenset({"seed", "max_output_tokens", "candidate_count"})
 # serializes as a quoted string like any other TOML literal.
 _STR_PARAMS = frozenset({"thinking"})
 
+# On the sampling surface but deliberately outside promotion. ``constrain_output``
+# is not a decoding value a sweep can tune towards — it records whether the
+# provider serving this tier will accept the graph's schema at all, which is a
+# property of the deployment rather than of the tuning. Promoting it would let a
+# sweep rewrite a *deployment's* answer to that question with its own.
+#
+# It still enters the sampling fingerprint, which is the part that matters:
+# constrained and unconstrained generation are different generation behaviour,
+# so a sweep measured one way does not certify a run made the other way. Skipped
+# here, compared there.
+_NOT_PROMOTABLE = frozenset({"constrain_output"})
+
 
 def promote(
     sampling: SamplingConfig,
@@ -121,7 +133,7 @@ def _wanted_values(sampling: SamplingConfig) -> dict[tuple[str, str], str]:
     wanted: dict[tuple[str, str], str] = {}
     for tier_name, tier in sampling.tiers.items():
         for param, value in tier.model_dump().items():
-            if value is not None:
+            if value is not None and param not in _NOT_PROMOTABLE:
                 wanted[(tier_name, param)] = _file_value(param, value)
     return wanted
 
