@@ -5,6 +5,14 @@
   "exemplar_proximity": "far",
   "provenance": "Synthetic system authored for this corpus (wayfinder ticket 029). Not derived from, or sanitized from, any real system: there is nothing to leak by omission.",
   "bootstrap": "agent-stand-in",
-  "source_sha256": "1bfb96ef3374b697ef78e76661daa3d2b227792a3b20d2d1ee1d526cde02652c",
-  "notes": "Internal-systems case 1 of 2 (ticket 029). The trust shape no other case carries is authority flowing upward through a build: a developer's input becomes the artifact that runs in 1,200 stores, so the weakest gate on the input side \u2014 an unreviewed manual rebuild and an unverified dependency download \u2014 is the real authority over the estate, and the elevation lane is where the case's must-finds concentrate rather than the usual spoofing lane. Far from the payments exemplar in mechanism as well as domain: nothing is pushed anywhere, both the build and the deploy are pulls initiated by the lower-trust side, which puts every flow direction against the intuition that data flow and initiation agree. It also carries the corpus's only fully described credential \u2014 a shared build token, stated as identical across pipelines and never rotated \u2014 which is what lets the repudiation lane be graded on a stated fact rather than on an unknown."
+  "sources": [
+    {
+      "kind": "description",
+      "label": "System description",
+      "file": "source.md",
+      "sha256": "1bfb96ef3374b697ef78e76661daa3d2b227792a3b20d2d1ee1d526cde02652c"
+    }
+  ],
+  "source_sha256": "07bdebd2c753c987d607e0f5eb4f1c22e14934ff863c035288d539d27b2ef05b",
+  "notes": "Internal-systems case 1 of 2 (ticket 029). The trust shape no other case carries is authority flowing upward through a build: a developer's input becomes the artifact that runs in 1,200 stores, so the weakest gate on the input side — an unreviewed manual rebuild and an unverified dependency download — is the real authority over the estate, and the elevation lane is where the case's must-finds concentrate rather than the usual spoofing lane. Far from the payments exemplar in mechanism as well as domain: nothing is pushed anywhere, both the build and the deploy are pulls initiated by the lower-trust side, which puts every flow direction against the intuition that data flow and initiation agree. It also carries the corpus's only fully described credential — a shared build token, stated as identical across pipelines and never rotated — which is what lets the repudiation lane be graded on a stated fact rather than on an unknown."
 }

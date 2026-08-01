@@ -5,6 +5,14 @@
   "exemplar_proximity": "far",
   "provenance": "internal-system (synthetic, sanitized)",
   "bootstrap": "agent-stand-in",
-  "source_sha256": "3da14d8d61e45baa73b0a7ee2b6935b0da3c1d47c62fdf9cb30ef4a09d6c67b6",
+  "sources": [
+    {
+      "kind": "description",
+      "label": "System description",
+      "file": "source.md",
+      "sha256": "3da14d8d61e45baa73b0a7ee2b6935b0da3c1d47c62fdf9cb30ef4a09d6c67b6"
+    }
+  ],
+  "source_sha256": "d2166ef0a5961b40e327c1ab69432b6f51e63321d6186c3c7842994eb902c814",
   "notes": "Far-domain case (ticket 009 decision 6). The external entities are machines rather than people, the crown-jewel asset is a model artifact loaded as code rather than a record set, and two threat shapes have no analogue in the payments exemplar at all: artifact-integrity supply chain, and model-mediated disclosure across tenants. Also the only case where a store created for debugging (the inference log) is more sensitive than the system's nominal data."
 }

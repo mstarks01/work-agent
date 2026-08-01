@@ -5,6 +5,14 @@
   "exemplar_proximity": "far",
   "provenance": "internal-system (synthetic, sanitized)",
   "bootstrap": "agent-stand-in",
-  "source_sha256": "df7757178c394258cbcf1643e81fca5b01f324058a0841824f008e74346da2d0",
-  "notes": "Far-domain case (ticket 009 decision 6). Batch rather than request/response: there is no user session anywhere, the trust decision is about a file's provenance rather than a caller's identity, availability failures are silent staleness inside a nightly window rather than visible downtime, and the sensitive data is health-related. Carries the one element type the payments exemplar has no analogue for \u2014 a scheduler's own metadata store acting as a control plane."
+  "sources": [
+    {
+      "kind": "description",
+      "label": "System description",
+      "file": "source.md",
+      "sha256": "df7757178c394258cbcf1643e81fca5b01f324058a0841824f008e74346da2d0"
+    }
+  ],
+  "source_sha256": "d2475a4d4d74674de1f87071603b3e9adfb174920656df1ba4454f26ebe0d40b",
+  "notes": "Far-domain case (ticket 009 decision 6). Batch rather than request/response: there is no user session anywhere, the trust decision is about a file's provenance rather than a caller's identity, availability failures are silent staleness inside a nightly window rather than visible downtime, and the sensitive data is health-related. Carries the one element type the payments exemplar has no analogue for — a scheduler's own metadata store acting as a control plane."
 }

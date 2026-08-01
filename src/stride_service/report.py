@@ -10,12 +10,15 @@ self-contained: every element reference resolves inside one payload.
 
 from __future__ import annotations
 
+import hashlib
 from collections import Counter
+from collections.abc import Sequence
 from datetime import datetime
 from typing import Literal, Self, get_args
 
 from pydantic import BaseModel, ConfigDict, Field, model_validator
 
+from stride_service.sources import Source
 from stride_service.system_model import BoundaryCrossing, SystemModel
 
 # The payload schema readers key on. Consumers that ignore unknown fields
@@ -250,13 +253,60 @@ class Job(BaseModel):
         return self
 
 
+class SourceRef(BaseModel):
+    """One submitted source, identified without carrying its text.
+
+    The label is the same key an element's ``source_label`` cites, so a reader
+    holding only the report can tell which source a quote came from and verify
+    that source's bytes against a digest — without the service ever storing the
+    untrusted text.
+    """
+
+    model_config = ConfigDict(extra="forbid")
+
+    kind: str = Field(min_length=1, max_length=50)
+    label: str = Field(min_length=1, max_length=200)
+    sha256: str = Field(pattern=r"^[0-9a-f]{64}$")
+
+
 class InputRef(BaseModel):
-    """Ties the report back to the exact submitted text."""
+    """Ties the report back to the exact submitted sources."""
 
     model_config = ConfigDict(extra="forbid")
 
     system_name: str = Field(min_length=1, max_length=200)
+    sources: list[SourceRef] = Field(min_length=1)
+    # Taken **over the refs**, not over the concatenated text: the refs are in
+    # the report, so this stays recomputable from the report alone — which a
+    # digest of bytes nobody kept would not be.
     source_sha256: str = Field(pattern=r"^[0-9a-f]{64}$")
+
+    @staticmethod
+    def aggregate_digest(refs: Sequence[SourceRef]) -> str:
+        """The one way the aggregate is computed, wherever a report is built.
+
+        Order-sensitive and separator-delimited, so two jobs whose labels and
+        digests merely concatenate to the same string do not collide.
+        """
+        joined = "\n".join(f"{ref.kind}\x1f{ref.label}\x1f{ref.sha256}" for ref in refs)
+        return hashlib.sha256(joined.encode("utf-8")).hexdigest()
+
+    @classmethod
+    def of(cls, *, system_name: str, sources: Sequence[Source]) -> Self:
+        """Build the reference for one job's sources, digests and all."""
+        refs = [
+            SourceRef(
+                kind=source.kind,
+                label=source.label,
+                sha256=hashlib.sha256(source.text.encode("utf-8")).hexdigest(),
+            )
+            for source in sources
+        ]
+        return cls(
+            system_name=system_name,
+            sources=refs,
+            source_sha256=cls.aggregate_digest(refs),
+        )
 
 
 class Summary(BaseModel):

@@ -35,7 +35,7 @@ logged, never returned.
 
 | Method | Path | Purpose |
 | --- | --- | --- |
-| `POST` | `/v1/jobs` | Submit a description; returns a job handle. |
+| `POST` | `/v1/jobs` | Submit an ordered list of sources; returns a job handle. |
 | `GET` | `/v1/jobs/{id}` | Poll: status, per-node progress, timestamps. Never the report. |
 | `GET` | `/v1/jobs/{id}/events` | The same progression as Server-Sent Events; resumable via `Last-Event-ID`. |
 | `GET` | `/v1/jobs/{id}/report` | The full [report](Report-Schema.md) once completed; `409` before, and `409` if the report is withheld (below). |
@@ -84,8 +84,27 @@ POST /v1/jobs
 Authorization: Bearer <jwt>
 Content-Type: application/json
 
-{"description": "Customers sign in and place orders...", "system_name": "Orders"}
+{
+  "sources": [
+    {"kind": "description", "label": "Architecture note",
+     "text": "Customers sign in and place orders..."},
+    {"kind": "transcript", "label": "Kickoff call, 14 May",
+     "text": "Ana: the orders DB is Postgres. Bob: I think it's 13."}
+  ],
+  "system_name": "Orders"
+}
 ```
+
+Each source is `{kind, label, text}`. `kind` is `description` or `transcript`
+and selects the guidance extraction reads the text under. `label` is yours: it
+must be unique within the job, at most 200 characters and single-line, and it
+is the key every `source_excerpt` in the report cites, so pick something you
+will recognise. Order is presentation only — **sources carry equal weight**, and
+an earlier one does not override a later one. A single-source job is a
+one-element list.
+
+The service takes **text only**. Decode `.vtt`, `.docx` or a meeting-tool export
+to text before submitting; there is no multipart upload and no file parsing.
 
 ```json
 201 Created
@@ -94,8 +113,24 @@ Location: /v1/jobs/job-ab12...
 ```
 
 Then `GET /v1/jobs/job-ab12...` until `status` is terminal, or subscribe to
-`GET /v1/jobs/job-ab12.../events`. The description is capped at 100 KiB (see
-[Configuration](Configuration.md)); an oversized body is rejected before parsing.
+`GET /v1/jobs/job-ab12.../events`.
+
+### What a submission is rejected for
+
+Bounds are this deployment's (see [Configuration](Configuration.md)); the
+shipped values are 100 KiB total across all sources and 10 sources. They are
+counted in **UTF-8 bytes**, not tokens, so what you may submit does not change
+when a deployment changes vendor. Shape is checked before size:
+
+| Status | Cause |
+| --- | --- |
+| `422` | A source is malformed: unknown `kind`, missing or over-long `label`, empty `text`, an unknown field. |
+| `400` | `sources` is present but empty. |
+| `413` | More sources than the deployment allows. The message names the count and the limit. |
+| `413` | The sources total more bytes than allowed. There is no per-source cap, so the message names **no** culprit — it carries a per-label byte breakdown instead, because the overspend belongs to the sum. |
+
+An absurdly large body is refused before it is parsed at all, by a coarse guard
+derived from the byte budget.
 
 ## Bearer auth
 

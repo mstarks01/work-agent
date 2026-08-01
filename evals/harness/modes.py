@@ -26,8 +26,7 @@ take plain data.
 
 from __future__ import annotations
 
-import hashlib
-from collections.abc import Mapping
+from collections.abc import Mapping, Sequence
 from dataclasses import dataclass, replace
 from datetime import UTC, datetime
 from typing import Any
@@ -41,7 +40,6 @@ from stride_service.graph import (
     ENTRY_PREPARE,
     STATE_ANALYSIS,
     STATE_EXTRACTED_MODEL,
-    STATE_INPUT_TEXT,
     STATE_MERGED_DRAFTS,
     STATE_REJECTION,
     STATE_VALID_MODEL,
@@ -61,6 +59,7 @@ from stride_service.report import (
 from stride_service.sampling import (
     SamplingConfig,
 )
+from stride_service.sources import Source
 from stride_service.system_model import SystemModel
 from stride_service.validation import ValidationIssue, parse_and_validate
 
@@ -171,7 +170,11 @@ def build_eval_pipeline(
     return deployment.pipeline(entry=entry, resolve_model=resolve_model)
 
 
-async def run_graph(pipeline: Pipeline, state: Mapping[str, Any], message: str) -> GraphRun:
+async def run_graph(
+    pipeline: Pipeline,
+    sources: Sequence[Source],
+    extra_state: Mapping[str, Any] | None = None,
+) -> GraphRun:
     """Drive one graph to completion and hand back the Graph Run.
 
     The shipped :class:`~stride_service.execution.GraphExecutor` drives it, so
@@ -182,14 +185,14 @@ async def run_graph(pipeline: Pipeline, state: Mapping[str, Any], message: str) 
     than one certifying an empty observation set.
     """
     executor = GraphExecutor(pipeline, app_name=EVAL_APP_NAME)
-    return await executor.run(state, message, user_id=EVAL_USER)
+    return await executor.run(
+        sources, user_id=EVAL_USER, extra_state=extra_state
+    )
 
 
 async def run_extraction(case: GoldenCase, pipeline: Pipeline) -> ExtractionResult:
     """Mode 1: the source text through ``extract``, and nothing else."""
-    graph_run = await run_graph(
-        pipeline, {STATE_INPUT_TEXT: case.source_text}, case.source_text
-    )
+    graph_run = await run_graph(pipeline, case.sources)
     state = graph_run.final_state
     if STATE_EXTRACTED_MODEL not in state:
         raise EvalRunError(f"{case.id}: extract produced no model")
@@ -248,17 +251,15 @@ async def run_analysis(case: GoldenCase, pipeline: Pipeline) -> AnalysisRun:
     """
     graph_run = await run_graph(
         pipeline,
+        case.sources,
         {STATE_VALID_MODEL: case.model.model_dump(mode="json")},
-        case.source_text,
     )
     return _run_from_graph(case, graph_run, pipeline)
 
 
 async def run_end_to_end(case: GoldenCase, pipeline: Pipeline) -> AnalysisRun:
     """Mode 3: text in, report out — the integration smoke test."""
-    graph_run = await run_graph(
-        pipeline, {STATE_INPUT_TEXT: case.source_text}, case.source_text
-    )
+    graph_run = await run_graph(pipeline, case.sources)
     return _run_from_graph(case, graph_run, pipeline)
 
 
@@ -291,12 +292,7 @@ def _run_from_graph(
     now = datetime.now(UTC)
     report = StrideReport(
         job=Job(id=f"eval-{case.id}", created_at=now, completed_at=now),
-        input=InputRef(
-            system_name=case.meta.title,
-            source_sha256=hashlib.sha256(
-                case.source_text.encode("utf-8")
-            ).hexdigest(),
-        ),
+        input=InputRef.of(system_name=case.meta.title, sources=case.sources),
         nodes=graph_run.node_runs,
         sampling={
             tier: params.model_dump()

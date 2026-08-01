@@ -26,6 +26,7 @@ from stride_service.jobs import (
     PipelineOutcome,
     StubPipelineRunner,
 )
+from stride_service.sources import SourceLimits
 from tests.test_api import FakeVerifier, auth, submit
 
 FP_A = "a" * 64
@@ -45,6 +46,10 @@ class CertifyingRunner(StubPipelineRunner):
         )
 
 
+# Certification is what these test; the input bounds only have to exist.
+TEST_LIMITS = SourceLimits(max_total_bytes=100 * 1024, max_sources=10)
+
+
 def gate(require_certified: bool = False) -> CertificationGate:
     return CertificationGate(
         manifest=BlessedManifest(version=MANIFEST_VERSION, tiers={"base": {FP_A}}),
@@ -58,6 +63,7 @@ def make_client(result: CertifyResult, gate_policy: CertificationGate) -> TestCl
         store=InMemoryJobStore(),
         runner=CertifyingRunner(result),
         verifier=FakeVerifier(),
+        limits=TEST_LIMITS,
     )
     app.state.certification = gate_policy
     return TestClient(app)
@@ -163,6 +169,7 @@ class TestNothingReachesTheClientView:
             store=InMemoryJobStore(),
             runner=CertifyingRunner(CertifyResult(certified=False)),
             verifier=FakeVerifier(),
+            limits=TEST_LIMITS,
         )
         app.state.certification = None
         assert fetch_report(TestClient(app)).status_code == 200
