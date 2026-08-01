@@ -108,6 +108,39 @@ _SCHEMA_PROBE: dict[str, Any] = {
 }
 
 
+def output_ceiling(vendor: Vendor, model: str) -> int | None:
+    """The most output tokens this ``(vendor, model)`` will serve, if known.
+
+    Asked of LiteLLM's model-cost map rather than mirrored in a table here, for
+    the reason :mod:`stride_service.sampling`'s raw tier gives for not bounding
+    ``max_output_tokens`` at load time: the ceiling is a per-``(vendor, model)``
+    fact, and a copy of it drifts against the provider actually serving the
+    request.
+
+    Deliberately **not** part of :func:`check_supported`. That gate is a
+    raise/no-raise question about whether a param can be *sent*, and
+    ``max_output_tokens`` above the ceiling sends perfectly well — every vendor
+    accepts the parameter, and only the serving model objects, at request time,
+    on node one of a paid-for job.
+
+    ``None`` where the map has no entry, which is the same open-world residual
+    :func:`check_supported` carries: an unrecognised model is not gated, because
+    the alternative is refusing to run a model the map has not caught up with.
+    """
+    try:
+        info = _litellm.get_model_info(
+            model=model, custom_llm_provider=vendor.litellm_provider
+        )
+    except Exception:  # noqa: BLE001 -- litellm raises a bare Exception here
+        # Narrowing is not available: an unmapped model raises ``Exception``
+        # itself, so the type carries nothing to match on. Probed in
+        # ``tests/test_model_gate.py`` so a version that starts raising
+        # something meaningful shows up as a test to tighten.
+        return None
+    ceiling = info.get("max_output_tokens")
+    return ceiling if isinstance(ceiling, int) else None
+
+
 def emulates_structured_output(vendor: Vendor, model: str) -> bool:
     """Whether schema constraint reaches this model *emulated*, not natively.
 

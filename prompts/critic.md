@@ -36,7 +36,7 @@ Run these five steps on each draft, in this order. Steps 1–3 gate: a draft tha
 
 ## Output
 
-Return every draft you were given — none disappear. Each carries the analyst's seven fields plus the two that are yours: a `verdict` and a `confidence` rating.
+Return an object with a single field, `threats`, holding every draft you were given — `{"threats": [ ... ]}`, nothing outside it, and none disappear. Each carries the analyst's seven fields plus the two that are yours: a `verdict` and a `confidence` rating.
 
 A verdict is `confirmed`, `needs-info`, or `rejected`. `confirmed` needs no reason. `needs-info` must state its reason and name the unknown attributes that caused it, each as the element ID and attribute name the threat depends on. `rejected` must state its reason plainly enough that a reader can tell which step killed it and why — the rejected set is an audit trail, and a reason like "not valid" tells that reader nothing.
 

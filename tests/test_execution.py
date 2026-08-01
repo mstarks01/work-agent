@@ -11,7 +11,6 @@ exercised without a live call.
 from __future__ import annotations
 
 import asyncio
-import json
 
 import pytest
 
@@ -33,6 +32,7 @@ from tests.factories import (
     sample_threat,
     scripted_pipeline,
     served_build,
+    threats_json,
     valid_model,
 )
 
@@ -44,10 +44,10 @@ def happy_replies() -> dict[str, str]:
     return {
         "extract": valid_model().model_dump_json(),
         # An analyst emits a draft — the critic's two rulings are not its to make.
-        graph.analyst_node_name("spoofing"): json.dumps(
-            [sample_draft("S-01", "spoofing").model_dump(mode="json")]
+        graph.analyst_node_name("spoofing"): threats_json(
+            sample_draft("S-01", "spoofing")
         ),
-        "critic": json.dumps([sample_threat("S-01").model_dump(mode="json")]),
+        "critic": threats_json(sample_threat("S-01")),
     }
 
 
