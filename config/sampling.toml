@@ -45,6 +45,18 @@
 # at all — it is a declared litellm param, so it is fail-closed, not silently
 # dropped.
 #
+# WHAT THE GATE CANNOT CHECK, AND THE ONE RULE THAT COVERS IT: litellm answers
+# from the model data in the installed copy, so a model released after that copy
+# is unknown to it and falls back to the provider's base config, where anything
+# generally accepted passes. Anthropic removed `temperature` from CLAUDE 4.7
+# ONWARD — only the model's own default is accepted — so a tier naming a Claude
+# newer than the pin would pass the gate carrying the pinned 0.0 below and die
+# on node one. binding.py adds a generation floor for exactly that case: Claude
+# >= 4.7 with temperature set fails the build. UNSET THE TEMPERATURE LINE for
+# any tier running one. It keys on the model, not the vendor (Vertex-hosted
+# Claude is the same model), and the floor is 4.7 rather than 4.6, which still
+# accepts the param.
+#
 # Env overrides STRIDE_SAMPLING_{TIER}_{PARAM} retune the OFFERED params
 # (temperature, top_p, seed, thinking, max_output_tokens) at deploy time,
 # validated exactly like the file value and captured by the run's fingerprint.
@@ -61,7 +73,8 @@
 version = 3
 
 [tiers.base]
-temperature = 0.0        # pinned greedy decoding; the model's own default is 1.0
+temperature = 0.0        # pinned greedy decoding; the model's own default is 1.0.
+                         # Unset this line if this tier runs Claude >= 4.7.
 max_output_tokens = 8192 # pinned: silence means a vendor-derived cap (see above)
 candidate_count = 1      # reserved Self-MoA lever; loader rejects != 1
 # top_p             unset -> model default; no published per-tier constant
@@ -73,7 +86,8 @@ candidate_count = 1      # reserved Self-MoA lever; loader rejects != 1
 #                   "high"; the wire value each becomes is the vendor's business
 
 [tiers.strong]
-temperature = 0.0        # pinned greedy decoding; the model's own default is 1.0
+temperature = 0.0        # pinned greedy decoding; the model's own default is 1.0.
+                         # Unset this line if this tier runs Claude >= 4.7.
 max_output_tokens = 8192 # pinned: silence means a vendor-derived cap (see above)
 candidate_count = 1      # reserved Self-MoA lever; loader rejects != 1
 # top_p             unset -> model default; no published per-tier constant

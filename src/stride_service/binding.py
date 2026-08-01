@@ -19,10 +19,12 @@ Constructor kwargs reach ``acompletion`` via ``_additional_args`` *before*
 neither here nor via ``LITELLM_DROP_PARAMS`` — because LiteLLM's default is
 fail-closed and the sampling fingerprint's honesty depends on it.
 
-Two build-time gates fire per tier, so a misconfiguration costs nothing rather
+Three build-time gates fire per tier, so a misconfiguration costs nothing rather
 than dying on node one of a paid-for job:
 
 * the **supported-param check** (:mod:`stride_service.model_gate`);
+* the **removed-``temperature`` check** below, which covers that check's one
+  documented blind spot on Claude;
 * the **credential check** (:meth:`Vendor.credential_kwargs`), which fires once
   per tier and fails closed under :class:`ProviderAuthError`.
 
@@ -41,7 +43,11 @@ from typing import TYPE_CHECKING, Self
 # Imported before anything that could pull in ``litellm``: this module's import
 # is what pins the model-cost map to the installed copy. See
 # :func:`stride_service.model_gate._import_litellm_hermetically`.
-from stride_service.model_gate import assert_kwarg_supported, check_supported
+from stride_service.model_gate import (
+    ModelGateError,
+    assert_kwarg_supported,
+    check_supported,
+)
 from stride_service.model_tiers import TIER_NAMES, ModelTierConfig, TierName
 from stride_service.resilience import ResilienceConfig
 from stride_service.sampling import (
@@ -50,6 +56,7 @@ from stride_service.sampling import (
     TierSampling,
     make_resolve_sampling,
 )
+from stride_service.vendors import claude_generation
 
 if TYPE_CHECKING:
     # Both deliberately type-only. A runtime ``from stride_service.graph import``
@@ -65,6 +72,48 @@ if TYPE_CHECKING:
 # swallowed and silently revert retry to a single try.
 _NUM_RETRIES_KWARG = "num_retries"
 
+# Anthropic removed ``temperature`` from Claude 4.7 onward: only the model's own
+# default is accepted and a request carrying the param is rejected. LiteLLM
+# knows this, and ``check_supported`` does catch it — but only for models
+# already in the pinned copy's model-cost map. A Claude released after that copy
+# falls back to the provider's base config and passes, which is the residual
+# ``model_gate`` documents ("not a de-facto existence check"). Since the shipped
+# sampling pins ``temperature = 0.0``, that residual is not theoretical: it is
+# every Anthropic deployment naming a model newer than the pin, dying on node
+# one of a paid-for job.
+#
+# Deliberately a **generation floor, not a support table**. Decision #12 removed
+# the per-``(vendor, model)`` sampling set from the registry because mirroring
+# what LiteLLM computes forks a subsystem that drifts; a floor does not fork it,
+# and when LiteLLM's map catches up this check becomes redundant rather than
+# contradictory. 4.6 still accepts ``temperature`` and is deliberately left
+# alone, so the floor is 4.7 rather than the service's own 4.6 minimum.
+_TEMPERATURE_REMOVED_FROM = (4, 7)
+
+
+def _check_temperature_unset(
+    model: str, sampling: TierSampling, source: str
+) -> None:
+    """Fail closed when a Claude generation that removed ``temperature`` is sent one.
+
+    Keyed on the **model**, not the vendor: Vertex-hosted Claude is the same
+    model under the same removal, so a vendor-keyed rule would pass exactly the
+    configuration it exists to stop. A non-Claude model parses to ``None`` and
+    is left entirely to :func:`check_supported`.
+    """
+    generation = claude_generation(model)
+    if sampling.temperature is None or generation is None:
+        return
+    if generation >= _TEMPERATURE_REMOVED_FROM:
+        removed = ".".join(str(part) for part in _TEMPERATURE_REMOVED_FROM)
+        raise ModelGateError(
+            f"{source}: Claude {removed} and later do not accept 'temperature',"
+            f" and {model!r} would reject the request; remove the temperature"
+            " line for this tier in config/sampling.toml. Unsetting it leaves"
+            " the model's own default, which is the only value these"
+            " generations serve."
+        )
+
 
 def build_tier_adapters(
     tiers: ModelTierConfig,
@@ -75,7 +124,8 @@ def build_tier_adapters(
     """One configured ``LiteLlm`` per tier, or fail closed before any call.
 
     Raises :class:`~stride_service.model_gate.ModelGateError` if a tier's
-    sampling is unsupported by its ``(vendor, model)``, and
+    sampling is unsupported by its ``(vendor, model)`` — whether LiteLLM says so
+    or :func:`_check_temperature_unset` does — and
     :class:`~stride_service.vendors.ProviderAuthError` if its credentials are
     missing.
     """
@@ -99,6 +149,7 @@ def build_tier_adapters(
         check_supported(
             vendor, selection.model, tier_sampling.gate_params(), source=source
         )
+        _check_temperature_unset(selection.model, tier_sampling, source)
         adapters[tier] = LiteLlm(
             model=selection.route,
             **{_NUM_RETRIES_KWARG: resilience.to_num_retries()},
