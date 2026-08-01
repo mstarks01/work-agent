@@ -47,4 +47,4 @@ Never satisfy the check by asserting a fact the model does not contain. Returnin
 
 ## Output
 
-Return every draft you were given — the same set, reconciled — each carrying the analyst's seven fields plus your `verdict` and `confidence`, in the same shape as the first review. Confirmed and needs-info threats stay together as actionable; rejected threats ride in the separate audit array. The difference against your previous ruling should touch only the threats the listed problems named.
+Return an object with a single field, `threats`, holding every draft you were given — `{"threats": [ ... ]}`, nothing outside it — the same set, reconciled, each carrying the analyst's seven fields plus your `verdict` and `confidence`, in the same shape as the first review. Confirmed and needs-info threats stay together as actionable; rejected threats ride in the separate audit array. The difference against your previous ruling should touch only the threats the listed problems named.

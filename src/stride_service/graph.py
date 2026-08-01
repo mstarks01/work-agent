@@ -88,6 +88,8 @@ from stride_service.prompts import (
 from stride_service.report import (
     STRIDE_CATEGORIES,
     DraftThreat,
+    DraftThreats,
+    ReviewedThreats,
     StrideCategory,
     Summary,
     Threat,
@@ -356,6 +358,30 @@ def prepare_analysis(valid_model: dict, ctx) -> dict[str, Any]:
     return {"element_count": len(model.elements()), "crossing_count": len(crossings)}
 
 
+def _threats_of(payload: object) -> list[Any]:
+    """The list inside an LLM node's emission, or empty if the node never ran.
+
+    The analyst and review nodes emit ``{"threats": [...]}`` rather than a bare
+    array, because a bare ``list[...]`` schema is one ADK cannot convert into a
+    response format — it sends none and the node generates unconstrained. The
+    wrapper is the schema's shape, not the domain's, so it is unwrapped here at
+    the boundary and nothing downstream carries it.
+
+    A missing key is a node that produced nothing, which is the same absence the
+    bare-list read treated as empty; a *malformed* payload is not this
+    function's to catch, since every element is validated by the caller.
+
+    ``None`` reaches here from a node that ran and emitted no text at all — see
+    :func:`route_review`. It is not a dict, so it reads as the empty list, which
+    is what makes "the critic returned nothing" the maximally malformed output
+    rather than a special case.
+    """
+    if not isinstance(payload, dict):
+        return []
+    threats = payload.get("threats")
+    return threats if isinstance(threats, list) else []
+
+
 def merge_drafts(valid_model: dict, ctx) -> dict[str, Any]:
     """Merge the six analysts' drafts into the single list the critic sees.
 
@@ -367,7 +393,7 @@ def merge_drafts(valid_model: dict, ctx) -> dict[str, Any]:
     drafts_by_category = {
         category: [
             DraftThreat.model_validate(draft)
-            for draft in ctx.state.get(analyst_state_key(category), [])
+            for draft in _threats_of(ctx.state.get(analyst_state_key(category)))
         ]
         for category in STRIDE_CATEGORIES
     }
@@ -380,7 +406,10 @@ def merge_drafts(valid_model: dict, ctx) -> dict[str, Any]:
 
 
 def route_review(
-    valid_model: dict, merged_drafts: list, reviewed_threats: list, ctx
+    valid_model: dict,
+    merged_drafts: list,
+    ctx,
+    reviewed_threats: dict | None = None,
 ) -> Event:
     """Run the mechanical check on the critic's output and route on the result.
 
@@ -394,19 +423,34 @@ def route_review(
     Both review nodes run this same function — what differs is where their
     ``revise`` edge points (``recritic`` for the first look, ``critic_failed``
     for the second), exactly as the two validate nodes share one function.
+
+    ``reviewed_threats`` defaults because **an LLM node that emits no text does
+    not write its output key at all**, and ADK binds a FunctionNode's parameters
+    from state: without the default, that node's silence surfaces here as a
+    parameter-binding ``ValueError`` naming this function, which reads as a
+    graph defect rather than as what it is. A model returns nothing when its
+    completion is truncated at ``max_output_tokens`` — reasoning tokens are
+    spent against that same cap, so the critic, whose output is every draft
+    re-emitted with a verdict, is the node that hits it first. Absent output is
+    output that dropped every draft, so it takes the ``revise`` edge the graph
+    already has: one bounded re-ask, then ``critic_failed`` raises the
+    ``CriticOutputError`` that names what did not reconcile.
     """
     model = SystemModel.model_validate(valid_model)
     drafts = [DraftThreat.model_validate(draft) for draft in merged_drafts]
-    reviewed = [Threat.model_validate(threat) for threat in reviewed_threats]
+    ruled = _threats_of(reviewed_threats)
+    reviewed = [Threat.model_validate(threat) for threat in ruled]
     issues = review_issues(drafts, reviewed, model)
     if issues:
-        ctx.state[STATE_PREVIOUS_REVIEW] = render(reviewed_threats)
+        ctx.state[STATE_PREVIOUS_REVIEW] = render(ruled)
         ctx.state[STATE_CRITIC_ISSUES] = render(issues)
         return Event(route=ROUTE_REVISE, output={"issue_count": len(issues)})
     return Event(route=ROUTE_ACCEPT, output={"reviewed_count": len(reviewed)})
 
 
-def fail_review(valid_model: dict, merged_drafts: list, reviewed_threats: list) -> dict:
+def fail_review(
+    valid_model: dict, merged_drafts: list, reviewed_threats: dict | None = None
+) -> dict:
     """Terminal node: the critic re-ask still did not reconcile, so the job fails.
 
     Reached only on the ``revise`` edge out of ``rereview``, which means the
@@ -414,10 +458,16 @@ def fail_review(valid_model: dict, merged_drafts: list, reviewed_threats: list) 
     runner as a failed job — not a *rejected* one: rejection means the input
     failed the validity gate and carries ``ValidationIssue``s, whereas a critic
     that will not return its own drafts whole is our defect and has none.
+
+    ``reviewed_threats`` defaults for the reason :func:`route_review` gives, and
+    most of all here: this is the node a silent critic *reaches*, so without the
+    default the run would die on parameter binding at the one place built to
+    report why it died.
     """
     model = SystemModel.model_validate(valid_model)
     drafts = [DraftThreat.model_validate(draft) for draft in merged_drafts]
-    reviewed = [Threat.model_validate(threat) for threat in reviewed_threats]
+    ruled = _threats_of(reviewed_threats)
+    reviewed = [Threat.model_validate(threat) for threat in ruled]
     # review_issues is non-empty here by construction; assemble_threats raises
     # the CriticOutputError naming exactly what still does not reconcile.
     assemble_threats(drafts, reviewed, model)
@@ -425,7 +475,10 @@ def fail_review(valid_model: dict, merged_drafts: list, reviewed_threats: list) 
 
 
 def assemble_report(
-    valid_model: dict, merged_drafts: list, reviewed_threats: list, ctx
+    valid_model: dict,
+    merged_drafts: list,
+    ctx,
+    reviewed_threats: dict | None = None,
 ) -> dict[str, Any]:
     """Build the report body deterministically from the critic's rulings.
 
@@ -434,10 +487,16 @@ def assemble_report(
     fails closed regardless — nothing reaches the report on output that did
     not survive the gate — then splits the ruled threats into the actionable
     and rejected arrays by verdict rather than any model's say-so.
+
+    ``reviewed_threats`` defaults to keep the three readers of that key spelled
+    the same way. Nothing can route here without it — an absent ruling drops
+    every draft, and dropped drafts are ``revise`` — so the default is
+    unreachable rather than a fallback this node relies on.
     """
     model = SystemModel.model_validate(valid_model)
     drafts = [DraftThreat.model_validate(draft) for draft in merged_drafts]
-    reviewed = [Threat.model_validate(threat) for threat in reviewed_threats]
+    ruled = _threats_of(reviewed_threats)
+    reviewed = [Threat.model_validate(threat) for threat in ruled]
     threats, rejected = assemble_threats(drafts, reviewed, model)
     analysis = Analysis(
         system_model=model,
@@ -638,7 +697,7 @@ def build_pipeline(
         instruction=_instruction(
             compose_critic_skills(skill_loader), compose_critic_prompt(prompt_loader)
         ),
-        output_schema=list[Threat],
+        output_schema=ReviewedThreats,
         output_key=STATE_REVIEWED_THREATS,
         resolve_model=resolve_model,
         resolve_sampling=resolve_sampling,
@@ -647,7 +706,7 @@ def build_pipeline(
     recritic = _llm_node(
         name=RECRITIC_NODE,
         instruction=recritic_instruction(skill_loader, prompt_loader),
-        output_schema=list[Threat],
+        output_schema=ReviewedThreats,
         output_key=STATE_REVIEWED_THREATS,
         resolve_model=resolve_model,
         resolve_sampling=resolve_sampling,
@@ -659,7 +718,7 @@ def build_pipeline(
             instruction=analyst_instruction(
                 skill_loader, prompt_loader, category, domain_packs
             ),
-            output_schema=list[DraftThreat],
+            output_schema=DraftThreats,
             output_key=analyst_state_key(category),
             resolve_model=resolve_model,
             resolve_sampling=resolve_sampling,

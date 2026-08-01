@@ -112,7 +112,7 @@ loader rejects, never a silent fallback.
 | Param | Shipped state | Notes |
 | --- | --- | --- |
 | `temperature` | pinned `0.0` | Greedy decoding; the model's own default is `1.0`. **Must be unset on a tier running Claude 4.7 or later** — see below. |
-| `max_output_tokens` | pinned `8192` | Must be pinned: silence means a *vendor-derived* cap. |
+| `max_output_tokens` | pinned `16384` base / `32768` strong | Must be pinned: silence means a *vendor-derived* cap. Sized against measured output — see below. |
 | `candidate_count` | pinned `1` | Reserved; the loader **rejects any value ≠ 1**. |
 | `constrain_output` | pinned `true` | Send this tier's node schema to the provider. Set `false` where the provider's schema compiler won't take it — see below. |
 | `top_p`, `presence_penalty`, `frequency_penalty` | **unset** | No verified per-tier constant to pin. |
@@ -126,6 +126,29 @@ maps it to adaptive `thinking` plus `output_config.effort` on Anthropic,
 and `"off"` are **not** accepted —
 `"auto"` raises on two vendors, and `"off"` is worse than unportable, since
 Gemini accepts it at build time and then fails the request.
+
+The two `max_output_tokens` values differ because the tiers emit different
+things, and they are **sized against measured output rather than chosen round**.
+`extract` produces one System Model — a median of 1,810 tokens across the twelve
+corpus cases, max 2,565 — while the critic re-emits *every* draft it was given
+with a verdict and a confidence added, at a measured median of 400 tokens per
+ruled threat. A 24-threat ruling is therefore ~9,600 tokens of visible output
+before the model has thought at all, and reasoning tokens are spent against this
+same cap.
+
+That matters more than a bound usually does, because **truncation at the cap is
+silent**. A completion cut off mid-generation comes back with no text part, so
+the node writes no output key, no validator sees anything malformed, and the
+next deterministic node fails to bind its parameter. Sizing these two values is
+what prevents that; the graph routing a missing critic ruling into its re-ask is
+what makes it legible when it happens anyway.
+
+A tier asking for more than its model will serve now **fails the build**: every
+provider accepts `max_output_tokens`, so the supported-param gate cannot see an
+over-ceiling value and the serving model rejects it at request time instead. The
+ceiling is read from the pinned model map per `(vendor, model)` — 16,384 on
+`gpt-4o`, 64,000 on Claude 4.6+, 65,535 on Gemini 2.5 — and a model the map does
+not know is not gated.
 
 > **`top_k` is gone from the surface** (it was removed in version 3). It is the
 > one parameter the build-time check provably cannot cover — LiteLLM re-injects
@@ -231,12 +254,27 @@ the schema stops going on the wire. It is **per tier, not per vendor**, because
 it is not a fact about the vendor: the same provider takes a smaller schema
 happily, and the same schema goes to another provider fine.
 
-What you give up is constrained *generation*, not the check. The node keeps its
-`output_schema`, the response is validated on arrival, and a failed extraction
-still reaches the repair node. **Eight of the graph's ten LLM nodes already run
-this way** — the six analysts and both critic passes bind `list[...]` schemas
-that ADK cannot convert, so no schema is sent for them either. Turning it off on
-`base` makes all ten uniform rather than introducing a new mode.
+**Setting it `false` is not currently a working configuration.** An earlier
+version of this page said it gives up constrained *generation* only, leaving
+validation and the repair loop to cover the difference. Measured live against
+`claude-sonnet-4-6` with the extraction schema suppressed, that is not what
+happens: the model fences its JSON in a ```` ```json ```` block, which ADK hands
+to validation unstripped so it fails before anything reads the content, and it
+omits required fields (every `trust_boundaries[*].kind`). `repair` sits on the
+same tier and is equally unconstrained, so the repair loop fails the same way
+and the job dies.
+
+The field is kept because the *mechanism* is right — the schema genuinely stops
+going on the wire — but a tier that turns it off needs the graph to tolerate a
+fenced response first. Where a provider will not compile a schema, the working
+answer today is to make the schema smaller, not to stop sending it.
+
+Every LLM node carries a schema the adapter can convert, so this setting is the
+only thing deciding whether one is sent. (That was not always true: the six
+analysts and both critic passes once bound bare `list[...]` schemas, which ADK
+cannot convert — it sent none and they generated unconstrained, silently. They
+now carry wrapper models, and a test asserts every node's schema survives the
+conversion.)
 
 It enters the sampling fingerprint, so a sweep measured with constrained output
 does not certify a run made without it. It is deliberately **not** promotable: a
@@ -255,6 +293,15 @@ whether a submission is accepted at all.
 
 `attempts` is a **total** count and is converted for the provider, which counts
 retries *after* the first try.
+
+It is not, however, a count of **requests**. On the OpenAI/Azure path LiteLLM
+sets the provider SDK's own `max_retries` from the value it is given, so the
+first attempt retries at the SDK level as well and the worst case per node is
+`2 * attempts - 1` requests — five at the shipped `3`, and up to thirty in the
+seconds the six analysts run in parallel. That burst, not the per-job total, is
+what trips a per-minute request quota. Lowering `STRIDE_RETRY_ATTEMPTS` is what
+shrinks it; passing `max_retries` on the adapter does not, because the
+retry-count LiteLLM is given overwrites it.
 
 `max_source_bytes` is the **total across all of a job's sources**, not a bound
 on any one of them: there is deliberately no per-source cap, since it would
