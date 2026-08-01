@@ -22,6 +22,7 @@ from stride_service.model_gate import (
     ModelGateError,
     assert_kwarg_supported,
     check_supported,
+    output_ceiling,
 )
 from stride_service.vendors import vendor_for
 
@@ -132,6 +133,49 @@ class TestKwargAssertion:
         # revert retry to a single try — the failure retry exists to prevent.
         with pytest.raises(ModelGateError, match="not a litellm parameter"):
             assert_kwarg_supported("num_retrys")
+
+
+class TestOutputCeiling:
+    """What the cost map says each model will actually produce.
+
+    The sampling caps are sized against measured output and then checked against
+    these numbers at build time, so a map that moves under a version bump has to
+    surface here rather than as a 400 on node one.
+    """
+
+    def test_the_supported_param_gate_does_not_see_an_over_ceiling_ask(self):
+        # The whole reason this is a separate check: gpt-4o serves 16,384, and
+        # asking for twice that is a well-formed request the gate waves through.
+        gate("openai", "gpt-4o", max_output_tokens=32768)
+
+    @pytest.mark.parametrize(
+        ("vendor", "model", "ceiling"),
+        [
+            ("openai", "gpt-4o", 16384),
+            ("anthropic", ANTHROPIC_CLAUDE, 64000),
+            ("vertex", GEMINI, 65535),
+        ],
+    )
+    def test_a_known_model_publishes_its_ceiling(self, vendor, model, ceiling):
+        assert output_ceiling(vendor_for(vendor), model) == ceiling
+
+    def test_an_unknown_model_is_not_gated(self):
+        # The same open-world residual check_supported carries: refusing to run
+        # a model the pinned map has not caught up with is the worse failure.
+        assert output_ceiling(vendor_for("openai"), "gpt-6-unreleased") is None
+
+    def test_an_unmapped_model_raises_a_bare_exception(self):
+        # Why output_ceiling catches `Exception` rather than something narrower.
+        # If a version bump starts raising a real type, this fails and the catch
+        # can be tightened.
+        from stride_service.model_gate import _litellm
+
+        with pytest.raises(Exception) as excinfo:
+            _litellm.get_model_info(
+                model="gpt-6-unreleased", custom_llm_provider="openai"
+            )
+
+        assert type(excinfo.value) is Exception
 
 
 class TestRetryLayering:
