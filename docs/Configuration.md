@@ -114,6 +114,7 @@ loader rejects, never a silent fallback.
 | `temperature` | pinned `0.0` | Greedy decoding; the model's own default is `1.0`. **Must be unset on a tier running Claude 4.7 or later** — see below. |
 | `max_output_tokens` | pinned `8192` | Must be pinned: silence means a *vendor-derived* cap. |
 | `candidate_count` | pinned `1` | Reserved; the loader **rejects any value ≠ 1**. |
+| `constrain_output` | pinned `true` | Send this tier's node schema to the provider. Set `false` where the provider's schema compiler won't take it — see below. |
 | `top_p`, `presence_penalty`, `frequency_penalty` | **unset** | No verified per-tier constant to pin. |
 | `seed` | **unset** | Buys consistency, not reproducibility — and Anthropic does not accept it at all. |
 | `thinking` | **unset** | Leaves the model's own preset. |
@@ -212,6 +213,36 @@ schema is honoured at all — and answers yes for models on both paths. It canno
 substitute for this check. The eval judge runs both at config-load time for the
 same reason (`evals/harness/judge.py`).
 
+**The check is scoped to tiers that send a schema.** A tier running
+`constrain_output = false` sends none, so how its provider *would* have
+constrained one is not a fact about anything that happens, and checking it there
+would reject a configuration on the strength of a request it never makes.
+
+### When the provider won't take the schema at all
+
+The check above asks *how* a provider constrains output. It cannot ask whether
+that provider's schema compiler will accept **this** schema. Anthropic rejects
+`SystemModel`'s with *"the compiled grammar is too large"* — a limit on the
+schema, not on structured output as such, and an unpublished one, so nothing
+computes it at build time.
+
+That is what `constrain_output` is for. Set it `false` on the affected tier and
+the schema stops going on the wire. It is **per tier, not per vendor**, because
+it is not a fact about the vendor: the same provider takes a smaller schema
+happily, and the same schema goes to another provider fine.
+
+What you give up is constrained *generation*, not the check. The node keeps its
+`output_schema`, the response is validated on arrival, and a failed extraction
+still reaches the repair node. **Eight of the graph's ten LLM nodes already run
+this way** — the six analysts and both critic passes bind `list[...]` schemas
+that ADK cannot convert, so no schema is sent for them either. Turning it off on
+`base` makes all ten uniform rather than introducing a new mode.
+
+It enters the sampling fingerprint, so a sweep measured with constrained output
+does not certify a run made without it. It is deliberately **not** promotable: a
+sweep tunes decoding values, and this is a deployment's answer about its
+provider.
+
 ### Resilience
 
 `attempts = 3`, `timeout_ms = 300000`, `max_source_bytes = 102400`,
@@ -290,6 +321,7 @@ validated **identically** to a file value. `{TIER}` is `BASE` or `STRONG`.
 | `STRIDE_SAMPLING_{TIER}_SEED` | Overrides the tier's `seed`. |
 | `STRIDE_SAMPLING_{TIER}_THINKING` | Overrides the tier's `thinking` (`low`/`medium`/`high`). |
 | `STRIDE_SAMPLING_{TIER}_MAX_OUTPUT_TOKENS` | Overrides the tier's `max_output_tokens`. |
+| `STRIDE_SAMPLING_{TIER}_CONSTRAIN_OUTPUT` | Overrides the tier's `constrain_output`. Only the literals `true` and `false` are accepted — anything else raises. |
 
 Only these are overridable. A variable naming a reserved (`candidate_count`),
 removed (`top_k`) or forbidden param raises `not overridable`. Treat this as a
