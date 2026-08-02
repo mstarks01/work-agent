@@ -56,6 +56,13 @@ element the model does not contain. Every check in this module fails closed — 
 raising FunctionNode aborts the workflow, which the runner turns into a failed
 job.
 
+One of those checks is for **silence** rather than for malformed content. An
+LLM node that emits no text writes no ``output_key``, so the absence arrives
+where the next node reads state, not as anything that raised. ``validate`` and
+``merge`` name it (:class:`SilentNodeError`) instead of reading it as an empty
+value, which is what keeps a truncated analyst from deleting a STRIDE category
+from a report that still finishes green.
+
 Security: the submitted text is untrusted and reaches the extraction prompt
 inside a fenced block that names it as data (OWASP LLM01); everything a
 model emits is untrusted output validated before use (LLM05) — by
@@ -223,6 +230,39 @@ def analyst_state_key(category: StrideCategory) -> str:
     return f"drafts_{category.replace('-', '_')}"
 
 
+class SilentNodeError(RuntimeError):
+    """An LLM node finished without emitting anything for the next node to read.
+
+    Not a malformed emission — *no* emission. ADK writes a node's ``output_key``
+    only from a final event carrying a non-thought text part, so a completion
+    that comes back with no text writes no key at all, raises nothing, and
+    leaves the hole to be discovered downstream. The usual cause is truncation:
+    the response was cut off at ``max_output_tokens``, which reasoning tokens
+    are spent against as well.
+
+    Absence is deliberately **not** read as emptiness. An analyst that finds no
+    threats in its lane emits ``{"threats": []}`` and its key is written; a
+    truncated one writes nothing. The two look identical once a missing key is
+    defaulted to an empty list, which is how a silently dropped STRIDE category
+    used to reach a finished report.
+
+    Ours to own rather than the input's, so it fails the job rather than
+    rejecting it — the same split :func:`fail_review` makes, and the reason this
+    is a ``RuntimeError`` beside :class:`~stride_service.pipeline.PipelineError`
+    rather than a ``ValueError`` beside the input errors.
+    """
+
+
+# Every SilentNodeError says the same two things: nothing was written, and here
+# is the knob. Kept in one place because the two raise sites are one bug.
+_TRUNCATION_HINT = (
+    "The node completed without emitting any text, which is what a completion"
+    " truncated at max_output_tokens looks like — reasoning tokens are spent"
+    " against that cap too. Raise max_output_tokens for this node's tier in"
+    " config/sampling.toml, or reduce what the node is asked to produce."
+)
+
+
 @dataclass(frozen=True)
 class Analysis:
     """What the graph produces: a report minus the facts only the runner has.
@@ -300,7 +340,7 @@ def render_fenced(value: Any) -> str:
 
 
 def validate_extraction(
-    extracted_model: dict, ctx, source_labels: list[str] | None = None
+    ctx, extracted_model: dict | None = None, source_labels: list[str] | None = None
 ) -> Event:
     """Run the mechanical validity gate and route on the result.
 
@@ -315,7 +355,21 @@ def validate_extraction(
     repair the pre-normalization IDs would cite elements it cannot find.
     Both validate nodes run this same function — what differs is where their
     ``invalid`` edge points.
+
+    ``extracted_model`` defaults so that a silent extraction is named rather
+    than hitting ADK's parameter binding, which would report a missing argument
+    to *this* function and read as a graph defect. It raises rather than routing
+    to ``repair``: an absent model is not an invalid one, ``repair`` is a
+    transcriber given issues to fix and there are none, and it sits on the same
+    tier under the same cap — so the pass most likely to truncate would be
+    followed by the pass that truncates identically, then a rejection carrying
+    validation issues nobody computed.
     """
+    if extracted_model is None:
+        raise SilentNodeError(
+            f"nothing was written to {STATE_EXTRACTED_MODEL!r}, so there is no"
+            f" model to validate. {_TRUNCATION_HINT}"
+        )
     model, issues = parse_and_validate(
         extracted_model, normalize_ids=True, source_labels=source_labels or ()
     )
@@ -388,7 +442,32 @@ def merge_drafts(valid_model: dict, ctx) -> dict[str, Any]:
     The mechanical half of the fan-in: :func:`join_drafts` fails closed if a
     draft cites an element the model does not contain or two analysts reused
     a threat ID, so the critic spends judgement on evidence and lanes only.
+
+    An analyst that emitted **nothing** fails the job here, before any of that.
+    Six lanes are what makes the output a STRIDE model rather than a list of
+    findings, so a lane that never ran is not a smaller report — it is a
+    different method, and one whose absence nothing downstream can see: the
+    critic rules what it is given, ``build_summary`` counts what exists, and
+    ``by_category`` omits a lane with no threats rather than carrying a zero. A
+    truncated analyst would delete a sixth of the analysis and finish green.
+
+    A lane that ran and found nothing is a different thing and stays legal — it
+    emits ``{"threats": []}``, its key is written, and ``_threats_of`` reads it
+    as the empty list it is. That distinction is the whole check: the absent
+    key, not the empty list.
     """
+    silent = [
+        category
+        for category in STRIDE_CATEGORIES
+        if ctx.state.get(analyst_state_key(category)) is None
+    ]
+    if silent:
+        keys = ", ".join(repr(analyst_state_key(c)) for c in silent)
+        raise SilentNodeError(
+            f"{len(silent)} of {len(STRIDE_CATEGORIES)} analysts wrote nothing"
+            f" ({keys}), so those STRIDE categories were never analyzed."
+            f" {_TRUNCATION_HINT}"
+        )
     model = SystemModel.model_validate(valid_model)
     drafts_by_category = {
         category: [
