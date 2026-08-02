@@ -54,6 +54,26 @@ class FakeContext:
         self.state = dict(state)
 
 
+def analyst_state(**drafts_by_category: list) -> dict[str, object]:
+    """State as six analysts that all ran leave it.
+
+    Every lane gets a key, because ``merge_drafts`` distinguishes an analyst
+    that found nothing (``{"threats": []}``, its key written) from one that
+    emitted nothing (no key at all, a truncated completion). A test seeding only
+    the lanes it cares about would be asserting against the second, which is a
+    failed job.
+    """
+    return {
+        graph.analyst_state_key(category): {
+            "threats": [
+                draft.model_dump(mode="json")
+                for draft in drafts_by_category.get(category.replace("-", "_"), [])
+            ]
+        }
+        for category in STRIDE_CATEGORIES
+    }
+
+
 @pytest.fixture
 def skill_loader() -> MarkdownLoader:
     return MarkdownLoader(PROJECT_ROOT / "skills")
@@ -423,7 +443,7 @@ def test_only_known_state_keys_remain_as_placeholders(pipeline):
 
 def test_validate_routes_valid_and_publishes_the_model():
     ctx = FakeContext()
-    event = graph.validate_extraction(valid_model().model_dump(mode="json"), ctx)
+    event = graph.validate_extraction(ctx, valid_model().model_dump(mode="json"))
     assert event.actions.route == graph.ROUTE_VALID
     assert ctx.state[graph.STATE_VALID_MODEL]["processes"][0]["id"] == "process:web-app"
 
@@ -432,7 +452,7 @@ def test_validate_routes_invalid_and_feeds_the_repair_prompt():
     broken = valid_model().model_dump(mode="json")
     broken["data_flows"][0]["destination"] = "process:does-not-exist"
     ctx = FakeContext()
-    event = graph.validate_extraction(broken, ctx)
+    event = graph.validate_extraction(ctx, broken)
 
     assert event.actions.route == graph.ROUTE_INVALID
     assert "process:does-not-exist" in ctx.state[graph.STATE_PREVIOUS_MODEL]
@@ -445,7 +465,7 @@ def test_validate_derives_ids_rather_than_spending_the_repair_pass():
     abbreviated = valid_model().model_dump(mode="json")
     abbreviated["processes"][0]["name"] = "Web App Frontend Service"
     ctx = FakeContext()
-    event = graph.validate_extraction(abbreviated, ctx)
+    event = graph.validate_extraction(ctx, abbreviated)
 
     assert event.actions.route == graph.ROUTE_VALID
     published = ctx.state[graph.STATE_VALID_MODEL]
@@ -461,7 +481,7 @@ def test_validate_parks_the_normalized_model_the_issues_cite():
     broken["processes"][0]["name"] = "Web App Frontend Service"
     broken["data_flows"][0]["source"] = "entity:does-not-exist"
     ctx = FakeContext()
-    event = graph.validate_extraction(broken, ctx)
+    event = graph.validate_extraction(ctx, broken)
 
     assert event.actions.route == graph.ROUTE_INVALID
     assert "process:web-app-frontend-service" in ctx.state[graph.STATE_PREVIOUS_MODEL]
@@ -470,7 +490,7 @@ def test_validate_parks_the_normalized_model_the_issues_cite():
 
 def test_validate_routes_invalid_on_unparseable_output():
     ctx = FakeContext()
-    event = graph.validate_extraction({"processes": "not a list"}, ctx)
+    event = graph.validate_extraction(ctx, {"processes": "not a list"})
     assert event.actions.route == graph.ROUTE_INVALID
     assert graph.STATE_VALID_MODEL not in ctx.state
 
@@ -480,6 +500,25 @@ def test_reject_parks_the_issues_for_the_runner():
     graph.reject_model('[{"code": "schema", "message": "bad"}]', ctx)
     issues = graph.rejection_issues(ctx.state[graph.STATE_REJECTION])
     assert [issue.code for issue in issues] == ["schema"]
+
+
+def test_validate_names_a_silent_extraction_rather_than_binding_against_it():
+    """The same silence as the analysts', one node earlier.
+
+    Without the default this surfaces as ADK failing to bind an argument to
+    ``validate``, which reads as a graph defect rather than as a truncated
+    extraction. It raises rather than routing to ``repair``: an absent model is
+    not an invalid one, and repair runs on the same tier under the same cap.
+    """
+    ctx = FakeContext()
+
+    with pytest.raises(graph.SilentNodeError) as excinfo:
+        graph.validate_extraction(ctx)
+
+    message = str(excinfo.value)
+    assert graph.STATE_EXTRACTED_MODEL in message
+    assert "max_output_tokens" in message
+    assert graph.STATE_VALID_MODEL not in ctx.state
 
 
 def test_prepare_derives_crossings_rather_than_trusting_them():
@@ -492,19 +531,11 @@ def test_prepare_derives_crossings_rather_than_trusting_them():
 
 
 def test_merge_joins_drafts_in_canonical_order():
-    drafts = {
-        "spoofing": [sample_draft("S-01", "spoofing")],
-        "tampering": [sample_draft("T-01", "tampering")],
-    }
     ctx = FakeContext(
-        **{
-            graph.analyst_state_key(category): {
-                "threats": [
-                    draft.model_dump(mode="json") for draft in category_drafts
-                ]
-            }
-            for category, category_drafts in drafts.items()
-        }
+        **analyst_state(
+            spoofing=[sample_draft("S-01", "spoofing")],
+            tampering=[sample_draft("T-01", "tampering")],
+        )
     )
     output = graph.merge_drafts(valid_model().model_dump(mode="json"), ctx)
 
@@ -513,11 +544,40 @@ def test_merge_joins_drafts_in_canonical_order():
     assert "S-01" in ctx.state[graph.STATE_DRAFT_THREATS]
 
 
+def test_merge_accepts_a_lane_that_ran_and_found_nothing():
+    """Empty is a finding; absent is a failure. The check is on the key."""
+    ctx = FakeContext(**analyst_state(spoofing=[sample_draft("S-01", "spoofing")]))
+
+    output = graph.merge_drafts(valid_model().model_dump(mode="json"), ctx)
+
+    assert output == {"draft_count": 1}
+
+
+def test_merge_fails_closed_when_an_analyst_emitted_nothing():
+    """The silent lane the report could not have shown.
+
+    A truncated analyst writes no output key. Defaulting that to an empty list
+    deletes a sixth of the method and finishes green: the critic rules what it
+    is handed, and ``build_summary`` omits a category with no threats rather
+    than carrying a zero, so nothing downstream can see the hole.
+    """
+    state = analyst_state(spoofing=[sample_draft("S-01", "spoofing")])
+    del state[graph.analyst_state_key("denial-of-service")]
+    ctx = FakeContext(**state)
+
+    with pytest.raises(graph.SilentNodeError) as excinfo:
+        graph.merge_drafts(valid_model().model_dump(mode="json"), ctx)
+
+    message = str(excinfo.value)
+    assert "1 of 6 analysts wrote nothing" in message
+    assert "drafts_denial_of_service" in message
+    # The message has to name the knob, like every other wall in this service.
+    assert "max_output_tokens" in message
+
+
 def test_merge_fails_closed_on_a_hallucinated_element():
     draft = sample_draft("S-01", affected_element_ids=["process:invented"])
-    ctx = FakeContext(
-        **{graph.analyst_state_key("spoofing"): {"threats": [draft.model_dump(mode="json")]}}
-    )
+    ctx = FakeContext(**analyst_state(spoofing=[draft]))
     with pytest.raises(DraftJoinError, match="process:invented"):
         graph.merge_drafts(valid_model().model_dump(mode="json"), ctx)
 
