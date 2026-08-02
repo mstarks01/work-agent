@@ -355,6 +355,32 @@ def test_every_node_schema_survives_the_trip_to_a_response_format(pipeline):
         assert response_format["json_schema"]["schema"]["type"] == "object"
 
 
+def test_no_node_is_ever_asked_for_a_derived_severity_band(pipeline):
+    """The band is derived, so the model must not be given the field.
+
+    OpenAI's strict structured outputs require every property to be listed as
+    required, and ADK's converter obliges — including for an optional one. A
+    ``level`` left in the schema is therefore not a field the model *may* fill
+    in but one it *must*, which is the model asserting a band the matrix owns.
+    Every threat it rules is then a chance to contradict the validator and kill
+    the node.
+
+    Read out of the converted response format rather than off the model, since
+    the schema on the wire is the thing that does the asking.
+    """
+    from google.adk.models.lite_llm import _to_litellm_response_format
+
+    for name, node in nodes_by_name(pipeline).items():
+        if not isinstance(node, LlmAgent):
+            continue
+        schema = _to_litellm_response_format(node.output_schema, "openai/gpt-4o")
+        severity = schema["json_schema"]["schema"].get("$defs", {}).get("Severity")
+        if severity is None:
+            continue
+        assert "level" not in severity["properties"], f"{name} asks for the band"
+        assert "level" not in severity["required"], f"{name} requires the band"
+
+
 def test_extract_and_repair_share_one_output_key(pipeline):
     """One validate function serves both passes because both land in one key."""
     by_name = nodes_by_name(pipeline)

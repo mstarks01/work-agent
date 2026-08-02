@@ -47,6 +47,20 @@ class TestSeverityMatrix:
         with pytest.raises(ValidationError, match="contradicts the matrix"):
             Severity(likelihood="low", impact="low", level="critical", justification="x")
 
+    def test_the_band_is_absent_from_the_schema_but_present_in_the_payload(self):
+        """Derived, never asked for — and the two halves stay independent.
+
+        ``level`` is kept off the JSON schema so a schema-constrained model is
+        never handed the field, while the value itself still rides the report.
+        The three assertions above keep working because ``SkipJsonSchema``
+        touches schema generation only, never validation.
+        """
+        assert "level" not in Severity.model_json_schema()["properties"]
+
+        severity = Severity(likelihood="high", impact="high", justification="x")
+
+        assert severity.model_dump()["level"] == "critical"
+
 
 class TestVerdictShapes:
     def test_confirmed_needs_no_reason_or_unknowns(self):
