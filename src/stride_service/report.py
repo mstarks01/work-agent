@@ -17,6 +17,7 @@ from datetime import datetime
 from typing import Literal, Self, get_args
 
 from pydantic import BaseModel, ConfigDict, Field, model_validator
+from pydantic.json_schema import SkipJsonSchema
 
 from stride_service.sources import Source
 from stride_service.system_model import BoundaryCrossing, SystemModel
@@ -76,13 +77,29 @@ def derive_severity_level(likelihood: Rating, impact: Rating) -> SeverityLevel:
 
 
 class Severity(BaseModel):
-    """Likelihood x impact, with the band derived — never asserted."""
+    """Likelihood x impact, with the band derived — never asserted.
+
+    ``level`` is :class:`SkipJsonSchema`-annotated, which keeps it off the wire
+    schema while leaving the field itself untouched — still validated, still
+    derived below, still in the report payload. That is not a cosmetic
+    trim. A node's ``output_schema`` becomes the provider's response format, and
+    OpenAI's strict structured outputs require *every* property to be listed as
+    required, so ADK's converter marks even an optional one as such. A ``level``
+    the model must emit is a model asserting the band — against the prompt,
+    which says never to state one, and against the validator below, which raises
+    when the assertion contradicts the matrix. Leaving it in the schema makes a
+    contradiction the model is *obliged* to risk on every threat it rules.
+
+    So the rule "derived, never asserted" is enforced where it becomes
+    unbreakable: the model is never given the field to fill in. The raise below
+    stays for every other way a value can arrive.
+    """
 
     model_config = ConfigDict(extra="forbid")
 
     likelihood: Rating
     impact: Rating
-    level: SeverityLevel | None = None
+    level: SkipJsonSchema[SeverityLevel | None] = None
     justification: str = Field(min_length=1, max_length=1000)
 
     @model_validator(mode="after")
