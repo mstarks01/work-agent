@@ -144,6 +144,16 @@ points:
   an empty Tampering section means "looked, found nothing", never "the analyst
   errored".
 
+That last guarantee is enforced, not assumed. An LLM node whose completion is
+truncated writes no output key at all — ADK saves one only from a final event
+carrying text — so "the analyst errored" and "the analyst found nothing" arrive
+as an *absent* key and an *empty* one. `merge_drafts` distinguishes them and
+fails the job on the first, naming the lanes and the knob; `validate_extraction`
+does the same one node earlier. Read as equivalent, a truncated analyst would
+delete a sixth of the analysis and finish green, because the critic rules what
+it is handed and `by_category` omits a lane with no threats rather than
+carrying a zero.
+
 ## Resilience
 
 Retry and timeout are configured in [`config/resilience.toml`](Configuration.md)
