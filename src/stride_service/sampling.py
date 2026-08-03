@@ -23,8 +23,9 @@ Three things about the surface:
 * **``max_output_tokens`` is pinned**, because the default is vendor-dependent:
   Anthropic derives a 5,120–8,192 cap only when the caller is silent. It is
   pinned per tier at a value sized against *measured* output — the tiers emit
-  different things, and the critic, which re-emits every draft it was given,
-  needs several times what one extraction does. Undersizing it does not
+  different things, and the strong tier, which rules on every draft in one pass
+  and reasons against the same cap, needs several times what one extraction
+  does. Undersizing it does not
   truncate visibly: the completion returns no text, the node writes no output
   key, and the next FunctionNode fails to bind. ``binding.py`` checks each
   tier's value against its model's published ceiling, which

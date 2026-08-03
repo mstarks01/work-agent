@@ -10,7 +10,7 @@ so :mod:`stride_service.graph` stops at an :class:`~stride_service.graph.Analysi
 and this module completes the :class:`~stride_service.report.StrideReport`
 around it. A node's ``duration_ms`` is measured from the moment its last
 predecessor finished — the point the graph could have started it — to the
-event carrying its own output.
+moment the executor observed its own output.
 
 The submitted sources are untrusted text (OWASP LLM01). This module never
 renders them: it hands the job's sources to the executor, which is the single
