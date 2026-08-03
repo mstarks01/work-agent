@@ -59,12 +59,13 @@ _BODY_SLACK = 2
 
 _SSE_POLL_SECONDS = 0.2
 
-# The size rungs of the input ladder, mapped to what HTTP calls them. An empty
+# The rungs of the input ladder, mapped to what HTTP calls them. An empty
 # list is a malformed request rather than an oversized one: a job with no input
 # is the wrong *shape*, and 413 would quote a byte count against a cap nobody
-# came near. Per-source well-formedness never reaches here — a bad source fails
-# body validation, which FastAPI answers with 422.
-_STATUS_BY_RUNG = {"empty": 400, "count": 413, "total": 413}
+# came near. A repeated label is the same kind of wrong — malformed at any size,
+# so 422 rather than a budget status. Per-source well-formedness never reaches
+# here: a bad source fails body validation, which FastAPI answers with 422 too.
+_STATUS_BY_RUNG = {"empty": 400, "duplicate-label": 422, "count": 413, "total": 413}
 
 _bearer_scheme = HTTPBearer(auto_error=False)
 
@@ -166,7 +167,7 @@ async def require_subject(
     request: Request,
     credentials: HTTPAuthorizationCredentials | None = Depends(_bearer_scheme),
 ) -> str:
-    """FastAPI dependency: verify the Ping JWT, return its subject."""
+    """FastAPI dependency: verify the bearer token, return its subject."""
     if credentials is None:
         raise _unauthorized()
     verifier: TokenVerifier = request.app.state.verifier

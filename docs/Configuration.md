@@ -99,7 +99,7 @@ recorded for each node execution, described under
 
 ### Sampling
 
-`config/sampling.toml` (`version = 3`) pins decoding parameters **per tier**, in
+`config/sampling.toml` (`version = 4`) pins decoding parameters **per tier**, in
 `[tiers.base]` and `[tiers.strong]` tables that reuse the node→tier map from
 `model_tiers.toml`. The eval harness and production read this same file, on
 purpose: grading a configuration you don't actually ship is how a test suite
@@ -382,6 +382,8 @@ it with a measurement — see [Tuning the models](../evals/TUNING.md).
 | --- | --- |
 | `STRIDE_RETRY_ATTEMPTS` | Total attempts per LLM call. |
 | `STRIDE_TIMEOUT_MS` | Per-request timeout, milliseconds. |
+| `STRIDE_MAX_SOURCE_BYTES` | Total UTF-8 bytes across all of a job's sources. |
+| `STRIDE_MAX_SOURCES` | How many sources one job may carry. |
 
 ### How strictly each override family is checked
 
