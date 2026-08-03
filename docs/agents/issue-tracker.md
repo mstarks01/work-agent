@@ -59,10 +59,21 @@ gh api --method POST repos/mstarks01/work-agent/issues/<child>/dependencies/bloc
 — 9 tickets, charted 2026-08-03. A **planning** map: it settles the spec for finding-level
 attribution — every threat carrying a non-empty record of what justifies it, a quote from the
 submitter's own words, a named unknown attribute, or a named derived fact — and stops at the spec.
-Frontier on charting: [#77](https://github.com/mstarks01/work-agent/issues/77) (naming, and the
-`Analyst` overload) and [#78](https://github.com/mstarks01/work-agent/issues/78) (render safety).
-[#79](https://github.com/mstarks01/work-agent/issues/79), the schema, is the narrow neck — six
-tickets wait on it.
+[#77](https://github.com/mstarks01/work-agent/issues/77) resolved 2026-08-03 and **fixes vocabulary
+the whole repo inherits**, so read it before touching this map or the code it names. The record is
+`grounds: list[Ground]` with kinds `quote` / `unknown-attribute` / `derived-fact`; *finding-level
+attribution* stays the concept name while `grounds` is the field, keeping it clear of `attribute`
+and of the two live senses of "attribution" (per-node regression attribution in the eval harness,
+speaker attribution at `source_speaker`). And **`Analyst` now names a human**: the six agents become
+**category agents**, keyed on what they do — `analyze/<category>` in `config/model_tiers.toml`,
+`analyze_<category>` as graph node and in report `nodes[].node`, `prompts/analyze.md`. That rename
+is a fail-closed config cutover carrying no shim, and it executes on the implementation branch
+folded into the *same* cutover as the schema change, so the config version bumps once.
+
+Frontier now: [#78](https://github.com/mstarks01/work-agent/issues/78) (render safety) and
+[#79](https://github.com/mstarks01/work-agent/issues/79), the schema — the narrow neck, which #77
+unblocked and which six tickets wait on. #79 inherits #77's vocabulary and decides `Ground`'s shape;
+#77 deliberately settled no field names or cardinality.
 
 [#49](https://github.com/mstarks01/work-agent/issues/49) completed 2026-07-31 and has
 moved to Completed efforts below; its spec was implemented and merged 2026-08-01.
