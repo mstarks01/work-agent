@@ -70,10 +70,31 @@ speaker attribution at `source_speaker`). And **`Analyst` now names a human**: t
 is a fail-closed config cutover carrying no shim, and it executes on the implementation branch
 folded into the *same* cutover as the schema change, so the config version bumps once.
 
-Frontier now: [#78](https://github.com/mstarks01/work-agent/issues/78) (render safety) and
-[#79](https://github.com/mstarks01/work-agent/issues/79), the schema — the narrow neck, which #77
-unblocked and which six tickets wait on. #79 inherits #77's vocabulary and decides `Ground`'s shape;
-#77 deliberately settled no field names or cardinality.
+[#78](https://github.com/mstarks01/work-agent/issues/78) resolved 2026-08-03 and settles **render
+safety** without touching the schema, so it constrains implementation rather than gating anyone:
+untrusted text never reaches `innerHTML` — values go to the DOM as `textContent`, `esc()` shrinks
+toward vestigial, and escaping quotes stops being a question because attributes are set by property
+assignment. `render_report`'s `<`→`\u003c` escape stays; it guards the script-block boundary, a
+different problem. The report page gains a **strict nonce CSP** with no `'unsafe-inline'`, replacing
+`webapp/main.py:47-49`'s rationale, which was stale twice over — the viewer is the app's own
+template now, and `render_report` already rewrites it on every request.
+`Source._single_line_label` broadens to **reject** C0/C1, bidi, zero-width and BOM in a
+`source_label`, one validator covering `/v1` and the in-process engine, fail-closed with no shim and
+nothing versioned; quotes stay exempt so verbatim matchability survives. Integrators get a
+**blanket** untrust rule in `docs/Report-Schema.md` — every string is untrusted — never a per-field
+table, which would have omitted `grounds` and is how this ticket came to exist.
+
+Resolving it found a **live stored XSS on `main`**: the element table's attrs column interpolates
+`technology`, `data_classification`, `protocol`, `authentication` and `assets` into `innerHTML`
+without `esc()` (`report_view.html:246-249`). Filed off-map as
+[#86](https://github.com/mstarks01/work-agent/issues/86) — ordinary work, no `wayfinder:` label —
+and fixed minimally on `fix/escape-element-attrs`. #78's rule supersedes that fix at implementation
+time.
+
+Frontier now: [#79](https://github.com/mstarks01/work-agent/issues/79), the schema — the narrow
+neck, which #77 unblocked and which six tickets wait on. #79 inherits #77's vocabulary and decides
+`Ground`'s shape; #77 deliberately settled no field names or cardinality. #78 constrains none of it:
+its rules hold for any shape #79 picks.
 
 [#49](https://github.com/mstarks01/work-agent/issues/49) completed 2026-07-31 and has
 moved to Completed efforts below; its spec was implemented and merged 2026-08-01.
