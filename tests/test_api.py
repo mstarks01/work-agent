@@ -185,7 +185,7 @@ class TestSubmit:
 
 
 class TestInputLadder:
-    """Four rungs, shape before size (#52)."""
+    """Five rungs, shape before size (#52)."""
 
     @pytest.mark.parametrize(
         "bad_source",
@@ -214,7 +214,60 @@ class TestInputLadder:
         assert response.headers["content-type"] == "application/problem+json"
         assert "at least one source" in response.json()["detail"]
 
-    def test_rung_three_too_many_sources_is_413_naming_the_count(self):
+    def test_rung_three_a_repeated_label_is_422_naming_the_label(self):
+        # A label is the citation key every source_excerpt names. Two sources
+        # sharing one both resolve against the gate's label set, so the report
+        # would cite 'Notes' with no way to say which 'Notes' it quoted.
+        client, _ = make_client()
+        response = client.post(
+            "/v1/jobs",
+            json={
+                "sources": [
+                    {"kind": "description", "label": "Notes", "text": "one"},
+                    {"kind": "transcript", "label": "Notes", "text": "two"},
+                ]
+            },
+            headers=auth(),
+        )
+        assert response.status_code == 422
+        assert response.headers["content-type"] == "application/problem+json"
+        detail = response.json()["detail"]
+        assert "unique" in detail
+        assert "Notes" in detail
+
+    def test_a_repeated_label_is_refused_at_any_size(self):
+        # Not a budget question: two tiny sources are nowhere near either cap,
+        # so this rung has to sit above them rather than beside them.
+        client, _ = make_client()
+        response = client.post(
+            "/v1/jobs",
+            json={
+                "sources": [
+                    {"kind": "description", "label": "Doc", "text": "a"},
+                    {"kind": "description", "label": "Doc", "text": "b"},
+                ]
+            },
+            headers=auth(),
+        )
+        assert response.status_code == 422
+
+    def test_distinct_labels_are_accepted(self):
+        # Guards the guard: the check must not reject an ordinary multi-source
+        # job, which is the shape the whole N-sources contract exists for.
+        client, _ = make_client()
+        response = client.post(
+            "/v1/jobs",
+            json={
+                "sources": [
+                    {"kind": "description", "label": "Doc", "text": "a"},
+                    {"kind": "transcript", "label": "Call", "text": "b"},
+                ]
+            },
+            headers=auth(),
+        )
+        assert response.status_code == 201
+
+    def test_rung_four_too_many_sources_is_413_naming_the_count(self):
         client, _ = make_client()
         sources = [
             {"kind": "description", "label": f"Doc {n}", "text": "x"}
@@ -226,7 +279,7 @@ class TestInputLadder:
         assert str(TEST_LIMITS.max_sources) in detail
         assert str(len(sources)) in detail
 
-    def test_rung_four_over_budget_names_no_culprit_but_breaks_it_down(self):
+    def test_rung_five_over_budget_names_no_culprit_but_breaks_it_down(self):
         # There is no per-source cap, so nothing here is individually too big:
         # the overspend belongs to the sum, and the caller gets the arithmetic
         # to decide what to cut.

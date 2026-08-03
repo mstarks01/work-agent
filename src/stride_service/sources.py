@@ -10,8 +10,10 @@ is a description-only job — there is no separate single-text path.
 changing the extraction prompt and this enum together. ``label`` is the key a
 ``source_excerpt`` cites, which is what keeps the traceability chain — threat to
 element to the user's own words to *which source spoke them* — intact across N
-sources. Order is presentation order only: the contract makes no authority
-claim, so an earlier source does not override a later one.
+sources; it is therefore **unique within a job**, since a citation naming two
+sources at once resolves while pointing nowhere. Order is presentation order
+only: the contract makes no authority claim, so an earlier source does not
+override a later one.
 
 Rendering is the whole untrusted-input surface (OWASP LLM01). Every caller byte
 lands inside a fenced block, and the fence is sized to its own content so a
@@ -29,6 +31,7 @@ a model differently.
 from __future__ import annotations
 
 import re
+from collections import Counter
 from collections.abc import Sequence
 from dataclasses import dataclass
 from typing import Literal, Self
@@ -137,7 +140,7 @@ class LimitBreach:
     reason. ``message`` is caller-facing and names no internal detail.
     """
 
-    rung: Literal["empty", "count", "total"]
+    rung: Literal["empty", "duplicate-label", "count", "total"]
     message: str
 
 
@@ -158,10 +161,18 @@ class SourceLimits:
 
         Ordered shape before size: an empty list is not a small job, it is a
         job with no input, and saying so is more use than quoting a byte count
-        of zero against a cap.
+        of zero against a cap. A repeated label is shape too — it is wrong at
+        any size — so it is answered before either budget.
         """
         if not sources:
             return LimitBreach("empty", "a job carries at least one source")
+        repeated = self._repeated_labels(sources)
+        if repeated:
+            return LimitBreach(
+                "duplicate-label",
+                f"source labels must be unique within a job; repeated: "
+                f"{', '.join(repr(label) for label in repeated)}",
+            )
         if len(sources) > self.max_sources:
             return LimitBreach(
                 "count",
@@ -177,6 +188,28 @@ class SourceLimits:
                 f"per source: {self._breakdown(sources)}",
             )
         return None
+
+    @staticmethod
+    def _repeated_labels(sources: Sequence[Source]) -> list[str]:
+        """Labels used by more than one source, in first-seen order.
+
+        A label is a **citation key**, not a caption: every ``source_excerpt``
+        in the report names one, and the validity gate checks that name against
+        the job's label set. Set membership cannot see a duplicate — two
+        sources sharing a label both resolve — so a report would cite ``'Notes'``
+        with no way to say *which* ``'Notes'`` it quoted, and the traceability
+        chain the gate exists to protect would be broken while passing it.
+
+        Rejected rather than de-duplicated for the reason labels are never
+        rewritten anywhere else here: renaming a caller's label would make the
+        report cite something they did not submit.
+        """
+        counts = Counter(source.label for source in sources)
+        seen: dict[str, None] = {}
+        for source in sources:
+            if counts[source.label] > 1:
+                seen[source.label] = None
+        return list(seen)
 
     @staticmethod
     def _breakdown(sources: Sequence[Source]) -> str:
