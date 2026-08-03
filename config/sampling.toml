@@ -11,6 +11,12 @@
 # loader rejects an unknown key, and a deliberately-unset param is a *commented*
 # line, not a silent absence.
 #
+# Version 4 adds `constrain_output` (see below). The field carries a default, so
+# a version-3 file would have loaded unchanged — the bump is deliberate anyway,
+# because the field enters the sampling fingerprint and so re-baselines every
+# blessed number. A silent default would have moved that line under deployments
+# that never read this file.
+#
 # Version 3 (wayfinder #13 / #15) is a hard cutover from version 2, forced by
 # going multi-vendor. Three changes, each because a version-2 construct turned
 # out to be either unportable or silently wrong:
@@ -79,7 +85,8 @@
 # sampling.py.
 #
 # Env overrides STRIDE_SAMPLING_{TIER}_{PARAM} retune the OFFERED params
-# (temperature, top_p, seed, thinking, max_output_tokens) at deploy time,
+# (temperature, top_p, seed, thinking, max_output_tokens, constrain_output) at
+# deploy time,
 # validated exactly like the file value and captured by the run's fingerprint.
 # Reserved params (candidate_count) and the deliberately-absent set below cannot
 # be set by env at all.

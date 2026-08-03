@@ -13,9 +13,10 @@ exemplar delta, and the ``valid-unlisted`` threats queued for the SME's next
 blessing pass. The metrics are judge-relative — track movement with them, never
 quote them as absolutes.
 
-``run`` needs live provider credentials. ``score`` is credential-free and
-replays a recorded artifact's produced threats through the scorer, which is
-what the PR job exercises.
+Both subcommands — ``run`` and ``calibrate`` — need live provider credentials,
+so neither runs on a PR. The credential-free lane is ``evals/verify_corpus.py``,
+which is what CI exercises; the live sweep runs on the weekly schedule in
+``.github/workflows/evals-live.yml``.
 """
 
 from __future__ import annotations

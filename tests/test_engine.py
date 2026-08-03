@@ -144,6 +144,20 @@ def test_no_sources_at_all_is_a_caller_error():
         asyncio.run(engine.analyze([]))
 
 
+def test_a_repeated_label_is_a_caller_error():
+    # The in-process path enforces the same shapes as the HTTP one, from the
+    # same SourceLimits — a label is a citation key, so two sources sharing one
+    # would make every excerpt citing it ambiguous.
+    engine = engine_for(StubPipelineRunner())
+    sources = [
+        Source.description("one", label="Notes"),
+        Source.transcript("two", label="Notes"),
+    ]
+
+    with pytest.raises(EngineInputError, match="unique"):
+        asyncio.run(engine.analyze(sources))
+
+
 def test_too_many_sources_is_a_caller_error():
     engine = engine_for(StubPipelineRunner())
     sources = [
