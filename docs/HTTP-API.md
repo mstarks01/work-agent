@@ -65,8 +65,19 @@ appears in `GET /v1/jobs/{id}`; it is operator-facing only. See
 
 ## Lifecycle
 
-```
-queued -> running -> completed | failed | rejected
+```mermaid
+flowchart LR
+    queued([queued]) --> running([running])
+    running -- report produced --> completed([completed])
+    running -- validity gate refused the input --> rejected([rejected])
+    running -- internal error --> failed([failed])
+
+    classDef live fill:#f1f5f9,stroke:#64748b,stroke-width:1.5px,color:#0f172a
+    classDef good fill:#dcfce7,stroke:#16a34a,stroke-width:1.5px,color:#052e16
+    classDef bad fill:#fee2e2,stroke:#dc2626,stroke-width:1.5px,color:#450a0a
+    class queued,running live
+    class completed good
+    class rejected,failed bad
 ```
 
 - `completed` — the report is available at `/v1/jobs/{id}/report`.
