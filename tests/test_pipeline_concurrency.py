@@ -36,7 +36,7 @@ from tests.factories import (
     STRONG_MODEL,
     ScriptedLlm,
     repo_tiers,
-    sample_threat,
+    sample_ruling,
     served_build,
     threats_json,
     valid_model,
@@ -84,7 +84,7 @@ def _build_shared_pipeline() -> graph.Pipeline:
     }
     replies = {
         graph.analyst_node_name("spoofing"): draft_json("S-01", "spoofing"),
-        graph.CRITIC_NODE: threats_json(sample_threat("S-01")),
+        graph.CRITIC_NODE: threats_json(sample_ruling("S-01")),
     }
 
     def resolve(tier_node: str) -> BaseLlm:

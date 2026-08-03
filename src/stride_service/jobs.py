@@ -21,6 +21,7 @@ logged, never surfaced.
 
 from __future__ import annotations
 
+import asyncio
 import logging
 import os
 from collections.abc import Awaitable, Callable, Mapping, Sequence
@@ -61,6 +62,16 @@ _LEGAL_TRANSITIONS: dict[JobStatus, frozenset[JobStatus]] = {
 
 # Stored on a failed job in place of any internal detail.
 GENERIC_FAILURE_MESSAGE = "internal error while running the analysis pipeline"
+
+# Stored on a job the deadline killed. Deliberately *not* the generic message:
+# a deadline is an operational fact about this deployment's bounds, not a
+# detail of how the pipeline is built, so saying it leaks nothing a caller
+# could act on (OWASP A09) while "internal error" would send them to retry an
+# identical submission against an identical bound. It names no node, no model
+# and no elapsed time — those go to the log, where the operator reads them.
+DEADLINE_FAILURE_MESSAGE = (
+    "the analysis exceeded this service's time budget and was stopped"
+)
 
 
 class InvalidTransitionError(ValueError):
@@ -305,11 +316,37 @@ class StubPipelineRunner:
         )
 
 
-async def execute_job(store: JobStore, runner: PipelineRunner, job_id: str) -> None:
-    """Drive one queued job through the runner to a terminal state.
+async def execute_job(
+    store: JobStore,
+    runner: PipelineRunner,
+    job_id: str,
+    *,
+    deadline_seconds: float,
+) -> None:
+    """Drive one queued job through the runner to a terminal state, under a deadline.
 
     Runner exceptions become a ``failed`` job carrying only the generic
     message — the exception itself is logged, never stored or surfaced.
+
+    ``deadline_seconds`` bounds the whole run rather than any one call, which is
+    the only place the bound can hold: the per-request timeout is multiplied by
+    the retry count, and again by the number of LLM stages on the graph's
+    longest path, so a job's tail was previously a product of numbers nobody
+    chose. It is a required keyword rather than a defaulted one — a default here
+    would be a deployment inheriting a deadline it never picked, which is the
+    state :data:`~stride_service.resilience.SUPPORTED_VERSION` 4 exists to end.
+
+    Expiry cancels the graph, so the in-flight provider calls are dropped rather
+    than left to finish into a job nobody is waiting on. What the run had
+    already completed is logged by node name: a deadline that keeps firing at
+    the same node is the evidence that sizes ``timeout_ms``, and it is not
+    recoverable from the record, whose event log the caller can see but the
+    operator's alert cannot.
+
+    A partial run is never a partial report. The deadline path stores no
+    ``report`` at all — six analyst lanes are what makes the output a STRIDE
+    model, and one that stopped halfway is a different method, not a shorter
+    answer.
     """
     record = await store.get(job_id)
     if record is None:
@@ -323,8 +360,23 @@ async def execute_job(store: JobStore, runner: PipelineRunner, job_id: str) -> N
         record.record_node(node)
         await store.save(record)
 
+    started = datetime.now(UTC)
     try:
-        outcome = await runner.run(record, on_node)
+        async with asyncio.timeout(deadline_seconds):
+            outcome = await runner.run(record, on_node)
+    except TimeoutError:
+        elapsed = (datetime.now(UTC) - started).total_seconds()
+        logger.error(
+            "job %s exceeded the %.0fs deadline after %.1fs; nodes completed: %s",
+            job_id,
+            deadline_seconds,
+            elapsed,
+            [event.node for event in record.events if event.kind == "node"] or "none",
+        )
+        record.transition("failed")
+        record.error = DEADLINE_FAILURE_MESSAGE
+        await store.save(record)
+        return
     except Exception:
         logger.exception("job %s failed in the pipeline", job_id)
         record.transition("failed")

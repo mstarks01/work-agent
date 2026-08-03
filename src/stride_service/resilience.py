@@ -1,10 +1,21 @@
 """Operational bounds that cannot change an answer.
 
-Four knobs. Two — attempts and timeout — are applied to every LLM call: on
-library defaults the nodes never retry and never time out, so a single 429 on
-any node would kill a paid-for job on first contact, and a stalled call would
-park a job in ``running`` forever. Two more bound the job's *input*: how many
-sources one job may carry, and how many UTF-8 bytes they may total.
+Six knobs. Three — attempts, timeout and the retry budget — are applied to every
+LLM call: on library defaults the nodes never retry and never time out, so a
+single 429 on any node would kill a paid-for job on first contact, and a stalled
+call would park a job in ``running`` forever. Two more bound the job's *input*:
+how many sources one job may carry, and how many UTF-8 bytes they may total. The
+sixth bounds the job's *duration*.
+
+``job_deadline_ms`` is the only one of the six that bounds a job as a whole,
+and it exists because the per-call knobs provably cannot. ``timeout_ms`` bounds
+one HTTP request; ``attempts`` multiplies it; the retry arithmetic below
+multiplies it again; and the graph runs five LLM stages in series on its
+longest path. Those compose to a worst case in the *hours* while every
+individual bound is respected — so before this knob, a job's tail was set by a
+product of four numbers nobody chose, and a wedged run held a ``running`` job
+until the process died. A deadline is the one bound whose worst case is the
+number written down.
 
 The input bounds are in **bytes, not tokens**. A token budget would make the
 public contract depend on which vendor a deployment's tiers happen to select,
@@ -22,32 +33,35 @@ timeout change only *how hard we try*, and the input bounds decide only whether
 a submission is accepted at all, never which answer it gets — so these are
 exactly the knobs to turn down mid-incident without a redeploy.
 
-There are no backoff knobs. ``litellm`` picks its backoff curve internally from
-the exception type, so an ``initial_delay`` / ``max_delay`` / ``exp_base`` /
-``jitter`` surface would read as a knob and connect to nothing.
+``attempts`` is a *total* count, and with the library's retry layer switched off
+it is now literally the request count per node. It did not used to be. LiteLLM's
+``num_retries`` counts retries *after* the first try, and worse, sets the
+provider SDK's own ``max_retries`` **from** that same value on the way to the
+client — so the first attempt carried its own SDK-level retries underneath, and
+the worst case per node was ``2 * attempts - 1`` requests: five at the shipped
+three, and up to thirty in the seconds the six analysts fan out. Against a
+per-minute quota that burst is what turns one 429 into a run spending its budget
+on retried 429s (OWASP LLM10). Passing ``max_retries`` did not close it —
+``num_retries`` overwrites it on the way to the client — which is what
+``tests/test_model_gate.py`` probes.
 
-Retry rides the adapter's constructor, and the arithmetic is explicit.
-``attempts`` is a *total* count while LiteLLM's ``num_retries`` counts retries
-*after* the first try, so passing ``attempts`` through verbatim would over-shoot
-to four tries where three are configured. Only ``attempts - 1`` reproduces the
-configured number.
+So the layer is off (``num_retries=0``, one request per call) and the loop lives
+in :mod:`stride_service.retry`, above the adapter where it can be bounded.
+``retry_budget_ratio`` is the knob that bounds it: retries draw from one
+process-wide token bucket credited by successful requests, so they are capped at
+a *share of working traffic* instead of at a count per node. Correlated failure
+— the only kind that storms — empties the bucket once for everyone and the
+service stops retrying, while an isolated failure sees a full bucket and is
+retried as before. Turning ``attempts`` down mid-incident still works and is
+still the blunt instrument; the budget is what makes it rarely necessary.
 
-That bounds LiteLLM's *own* retry layer. There is a second one beneath it that
-this file cannot reach: on the OpenAI/Azure path LiteLLM builds its provider
-client with the SDK's ``max_retries`` set **from** ``num_retries``, so the first
-attempt carries up to ``attempts - 1`` SDK-level retries of its own, while the
-attempts LiteLLM itself makes are pinned to zero. The worst case per node is
-therefore ``2 * attempts - 1`` HTTP requests — five at the shipped three, and up
-to thirty in the seconds the six analysts fan out. Against a per-minute request
-quota that burst is the thing that turns one 429 into a run that spends its
-budget on retried 429s (OWASP LLM10), so ``attempts`` is the knob to turn *down*
-mid-incident rather than up.
-
-Passing ``max_retries`` on the adapter does not close it — ``num_retries``
-overwrites the value on its way to the client — which is why this is written
-down and probed in ``tests/test_model_gate.py`` rather than pinned in
-:mod:`stride_service.binding`. A knob that connects to nothing is the surface
-version 2 removed the backoff params for.
+The backoff knobs version 2 removed stay removed, but the reasoning has changed
+and is worth keeping straight. They went because LiteLLM picked its own curve
+internally and the config surface connected to nothing. A curve now exists to
+describe — full jitter, with a provider's ``Retry-After`` overriding it — and it
+is pinned in :mod:`stride_service.retry` rather than re-opened here, because it
+does not vary by deployment. What varies is how much retrying a deployment will
+tolerate, and that is the one number this file carries.
 
 Loading fails closed: a malformed file, an out-of-range value, an unknown key or
 a stale version raises :class:`ResilienceConfigError` rather than silently
@@ -65,12 +79,13 @@ from typing import TypeVar
 from google.genai import types
 from pydantic import BaseModel, ConfigDict, Field, ValidationError
 
+from stride_service.retry import RetryBudget, RetryPolicy
 from stride_service.sources import SourceLimits
 
 # The only schema version this loader accepts. The version check fires before
 # shape validation, so a file on another schema is named as such rather than
 # reported as a set of stray keys under ``extra="forbid"``.
-SUPPORTED_VERSION = 3
+SUPPORTED_VERSION = 4
 
 _ENV_PREFIX = "STRIDE_"
 
@@ -78,6 +93,8 @@ ATTEMPTS_VAR = f"{_ENV_PREFIX}RETRY_ATTEMPTS"
 TIMEOUT_MS_VAR = f"{_ENV_PREFIX}TIMEOUT_MS"
 MAX_SOURCE_BYTES_VAR = f"{_ENV_PREFIX}MAX_SOURCE_BYTES"
 MAX_SOURCES_VAR = f"{_ENV_PREFIX}MAX_SOURCES"
+JOB_DEADLINE_MS_VAR = f"{_ENV_PREFIX}JOB_DEADLINE_MS"
+RETRY_BUDGET_RATIO_VAR = f"{_ENV_PREFIX}RETRY_BUDGET_RATIO"
 
 _T = TypeVar("_T", int, float)
 
@@ -101,14 +118,36 @@ class ResilienceConfig(BaseModel):
     timeout_ms: int = Field(gt=0)
     max_source_bytes: int = Field(gt=0)
     max_sources: int = Field(ge=1)
+    job_deadline_ms: int = Field(gt=0)
+    retry_budget_ratio: float = Field(gt=0, le=1)
 
-    def to_num_retries(self) -> int:
-        """LiteLLM's ``num_retries``: retries *after* the first try.
+    def retry_policy(self, budget_capacity: float) -> RetryPolicy:
+        """The retry loop this deployment runs, with its shared budget.
 
-        See the module docstring — this arithmetic is the whole reason the value
-        is not passed through verbatim.
+        ``budget_capacity`` is what one job may spend from a cold bucket, and
+        the caller supplies it because it is a fact about the *graph* — how many
+        LLM nodes there are to retry — not about this file. See
+        :class:`~stride_service.retry.RetryBudget`.
+
+        There is deliberately no ``to_num_retries``. The library's retry layer
+        is off, and a helper that still computed its parameter would read as
+        though something down there were still counting.
         """
-        return self.attempts - 1
+        return RetryPolicy(
+            attempts=self.attempts,
+            budget=RetryBudget(
+                capacity=budget_capacity, ratio=self.retry_budget_ratio
+            ),
+        )
+
+    def deadline_seconds(self) -> float:
+        """The job deadline as ``asyncio`` wants it: seconds, not milliseconds.
+
+        The file is in milliseconds to match ``timeout_ms`` beside it — one unit
+        for every duration an operator edits — and the conversion lives here so
+        no caller has to remember which of the two it is holding.
+        """
+        return self.job_deadline_ms / 1000
 
     def source_limits(self) -> SourceLimits:
         """The input bounds, as the value every entry point checks against."""
@@ -164,7 +203,8 @@ def load_resilience(
         raise ResilienceConfigError(
             f"{path}: unsupported version {version!r};"
             f" expected {SUPPORTED_VERSION}, which carries 'attempts',"
-            " 'timeout_ms', 'max_source_bytes' and 'max_sources'"
+            " 'timeout_ms', 'max_source_bytes', 'max_sources',"
+            " 'job_deadline_ms' and 'retry_budget_ratio'"
         )
 
     overrides = {
@@ -172,6 +212,8 @@ def load_resilience(
         "timeout_ms": _override(env, TIMEOUT_MS_VAR, int),
         "max_source_bytes": _override(env, MAX_SOURCE_BYTES_VAR, int),
         "max_sources": _override(env, MAX_SOURCES_VAR, int),
+        "job_deadline_ms": _override(env, JOB_DEADLINE_MS_VAR, int),
+        "retry_budget_ratio": _override(env, RETRY_BUDGET_RATIO_VAR, float),
     }
     raw.update({key: value for key, value in overrides.items() if value is not None})
 

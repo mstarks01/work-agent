@@ -186,7 +186,7 @@ carrying a zero.
 
 ## Resilience
 
-Retry and timeout are configured in [`config/resilience.toml`](Configuration.md)
+Retry, timeout and the per-job deadline are configured in [`config/resilience.toml`](Configuration.md)
 and attached to the adapter itself, so a retry is invisible to the graph and the
 report's `nodes` array is unchanged by one. A per-request timeout turns a hang
 into an error the retry can act on. Three attempts by default.

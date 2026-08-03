@@ -225,17 +225,57 @@ class DraftThreats(BaseModel):
     threats: list[DraftThreat]
 
 
-class ReviewedThreats(BaseModel):
-    """What the critic and its re-ask emit: the same wrapper over ruled threats.
+class ThreatRuling(BaseModel):
+    """The critic's ruling on one draft: the fields the critic owns, and no more.
 
-    Separate from :class:`DraftThreats` because the element type differs — a
-    reviewed threat carries the critic's ``verdict`` and ``confidence``. See
-    that class for why the wrapper exists at all.
+    A ruling is **not** a threat. It names the draft it rules on by ``id`` and
+    carries the two judgements that are the critic's — ``verdict`` and
+    ``confidence`` — leaving the analyst's seven fields where they already are.
+    :func:`~stride_service.critic.assemble_threats` merges a ruling onto the
+    draft it names to build the :class:`Threat` the report carries, so the
+    report's shape is unchanged.
+
+    WHY THE CRITIC NO LONGER RE-EMITS THE DRAFT. Its output was every draft
+    transcribed whole plus a verdict, which made the single longest call in the
+    graph proportional to the analysts' combined prose rather than to the
+    judgement it was asked for. The service already holds those drafts — they
+    are the same bytes it put in the critic's prompt — so the transcription
+    bought nothing and cost the run's largest block of output tokens. It also
+    cost correctness: re-emitting a description is a chance to alter it, and
+    a critic told "do not rewrite descriptions" could still do so silently.
+    Under this schema it cannot. That is why the element-reference check the
+    review seam used to run is gone — a ruling carries no element references
+    to break.
+
+    ``severity`` is the one draft field a ruling may replace, and only where
+    the critic's severity-calibration step changed a rating. ``None`` — the
+    common case — keeps the analyst's rating and justification as written.
+    Present, it replaces both together, which is what stops a corrected rating
+    from sitting beside a justification that argues for the old one. It is a
+    whole :class:`Severity` rather than loose scalars so a partial override
+    cannot be expressed.
     """
 
     model_config = ConfigDict(extra="forbid")
 
-    threats: list[Threat]
+    id: str = Field(pattern=r"^[STRIDE]-\d{2}$")
+    confidence: Rating
+    verdict: Verdict
+    severity: Severity | None = None
+
+
+class ThreatRulings(BaseModel):
+    """What the critic and its re-ask emit: the wrapper over one ruling per draft.
+
+    Separate from :class:`DraftThreats` because the element type differs. See
+    that class for why the wrapper exists at all, and why its field is still
+    spelled ``threats`` on both: it is the shape the provider constrains
+    generation to, not the domain's word for what is inside.
+    """
+
+    model_config = ConfigDict(extra="forbid")
+
+    threats: list[ThreatRuling]
 
 
 class NodeRun(BaseModel):

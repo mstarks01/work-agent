@@ -13,7 +13,7 @@ Both [`StrideEngine.from_config(env=...)`](Integration-Guide.md) and the
 | --- | --- |
 | `config/model_tiers.toml` | Maps each LLM node to a tier, and each tier to a `(vendor, model)` pair. |
 | `config/sampling.toml` | Decoding parameters, shared by production and evals. |
-| `config/resilience.toml` | Retry attempts and per-request timeout for LLM calls. |
+| `config/resilience.toml` | Retry attempts and budget, per-request timeout, input bounds, and the job deadline. |
 | `config/blessed-fingerprints.toml` | The generation identities this deployment has blessed. |
 | `skills/` | The per-category STRIDE skill Markdown baked into the image. |
 | `prompts/` | The agent prompt and exemplar Markdown. |
@@ -130,11 +130,12 @@ Gemini accepts it at build time and then fails the request.
 The two `max_output_tokens` values differ because the tiers emit different
 things, and they are **sized against measured output rather than chosen round**.
 `extract` produces one System Model — a median of 1,810 tokens across the twelve
-corpus cases, max 2,565 — while the critic re-emits *every* draft it was given
-with a verdict and a confidence added, at a measured median of 400 tokens per
-ruled threat. A 24-threat ruling is therefore ~9,600 tokens of visible output
-before the model has thought at all, and reasoning tokens are spent against this
-same cap.
+corpus cases, max 2,565. The critic emits one *ruling* per draft — an ID, a
+verdict, a confidence, and a replacement severity only where it corrected one —
+rather than the draft re-transcribed, which is roughly 60–90 tokens per ruled
+threat against the ~400 the old whole-draft shape measured at. Its 32,768 is
+therefore generous rather than tight: reasoning tokens are spent against this
+same cap, and on the strong tier that is where nearly all of it goes.
 
 That matters more than a bound usually does, because **truncation at the cap is
 silent**. A completion cut off mid-generation comes back with no text part, so
@@ -284,24 +285,66 @@ provider.
 ### Resilience
 
 `attempts = 3`, `timeout_ms = 300000`, `max_source_bytes = 102400`,
-`max_sources = 10` (`version = 3`). On library defaults the LLM nodes never
-retry and never time out, so a single 429 kills a paid-for job; the other two
-bound what one job may carry. Unlike sampling, all four **are**
-environment-overridable — none of them can move an eval score, because retry
-and timeout change how hard the service tries and the input bounds decide only
-whether a submission is accepted at all.
+`max_sources = 10`, `job_deadline_ms = 900000`, `retry_budget_ratio = 0.1`
+(`version = 4`). On library
+defaults the LLM nodes never retry and never time out, so a single 429 kills a
+paid-for job; two more bound what one job may carry, and the deadline bounds how
+long one may run. Unlike sampling, all five **are** environment-overridable —
+none of them can move an eval score, because retry and timeout change how hard
+the service tries, the input bounds decide only whether a submission is accepted
+at all, and the deadline only whether an answer arrives in time.
 
-`attempts` is a **total** count and is converted for the provider, which counts
-retries *after* the first try.
+`job_deadline_ms` is the only bound on a **job as a whole**, and the per-call
+knobs cannot substitute for it. `timeout_ms` bounds one request at 300 s,
+`attempts` allows 3 of them per node, and the graph runs five LLM stages in
+series on its longest path — 75 minutes, with every individual bound respected
+the whole way. It was over two hours before the retry amplification below was
+removed, which is the point: the product moves whenever any factor does, and
+only a deadline states the answer directly. 900 s is a **backstop, not an
+SLO**: one observed clean run is ~119 s, the longest legitimate path with a
+repair pass and a critic re-ask is ~200 s, and one transient retry on the
+slowest node puts it near 260 s. It fires on runs that are wedged, not merely
+slow. Turn it *down* to shed load mid-incident — a job killed at the deadline
+costs only what it had already spent, while one that hangs holds a worker.
 
-It is not, however, a count of **requests**. On the OpenAI/Azure path LiteLLM
-sets the provider SDK's own `max_retries` from the value it is given, so the
-first attempt retries at the SDK level as well and the worst case per node is
-`2 * attempts - 1` requests — five at the shipped `3`, and up to thirty in the
-seconds the six analysts run in parallel. That burst, not the per-job total, is
-what trips a per-minute request quota. Lowering `STRIDE_RETRY_ATTEMPTS` is what
-shrinks it; passing `max_retries` on the adapter does not, because the
-retry-count LiteLLM is given overwrites it.
+A job that exceeds it becomes `failed` with a message that says so, rather than
+the generic internal-error text: the deadline is a fact about this deployment's
+configuration, not a detail of how the pipeline is built, and "internal error"
+would send a caller straight back to retry an identical submission against an
+identical bound. The nodes that had completed go to the log, never to the
+caller — that is the evidence for sizing `timeout_ms`, which is still oversized
+against measured latency but needs a p99 across real submissions rather than a
+single trace.
+
+`attempts` is a **total** count, and it is now literally the request count per
+node. It did not used to be, and that gap was the 429 storm. On the OpenAI/Azure
+path LiteLLM sets the provider SDK's own `max_retries` from the retry count it
+is given, so the first attempt retried at the SDK level too and the worst case
+per node was `2 * attempts - 1` requests — five at the shipped `3`, and up to
+thirty in the seconds the six analysts run in parallel. Passing `max_retries` on
+the adapter did not close it, because the retry count LiteLLM is given overwrites
+it.
+
+So the library's retry layer is **off** (`num_retries = 0`, one request per call)
+and the loop runs a level up, in `stride_service.retry`, where it can be bounded.
+Two things become possible there that could not exist below the adapter:
+
+- **A shared budget.** `retry_budget_ratio` is one process-wide token bucket: a
+  retry costs a token, a successful request credits `0.1` of one. Retries are
+  capped at a share of *working traffic* rather than at a count per node — and a
+  count per node is precisely the wrong response to a provider-wide failure,
+  since it hands every node its full allowance regardless of what the other five
+  are seeing. Correlated failure empties the bucket once for everyone and the
+  service stops retrying; an isolated failure finds it full and is retried
+  exactly as before.
+- **Decorrelated timing.** Six analysts that start together fail together, and
+  on any fixed curve retry together, reconverging on the quota they just
+  tripped. Retries use full jitter — a uniform draw across the whole interval,
+  not a delay with noise added — and a provider's `Retry-After` overrides the
+  curve outright whenever one is sent.
+
+Lowering `STRIDE_RETRY_ATTEMPTS` still works and is still the blunt instrument.
+The budget is what makes reaching for it rare.
 
 `max_source_bytes` is the **total across all of a job's sources**, not a bound
 on any one of them: there is deliberately no per-source cap, since it would
@@ -384,6 +427,8 @@ it with a measurement — see [Tuning the models](../evals/TUNING.md).
 | `STRIDE_TIMEOUT_MS` | Per-request timeout, milliseconds. |
 | `STRIDE_MAX_SOURCE_BYTES` | Total UTF-8 bytes across all of a job's sources. |
 | `STRIDE_MAX_SOURCES` | How many sources one job may carry. |
+| `STRIDE_JOB_DEADLINE_MS` | Wall-clock budget for one whole job, milliseconds. Turn it down to shed load. |
+| `STRIDE_RETRY_BUDGET_RATIO` | Retries as a share of successful requests. Turn it down to give up sooner under sustained failure. |
 
 ### How strictly each override family is checked
 
@@ -440,6 +485,7 @@ Bounds enforced before or during analysis:
 | --- | --- | --- |
 | `max_source_bytes` | 100 KiB (UTF-8), total across all sources | Rejected at both entry points; deployment config. |
 | `max_sources` | 10 | Rejected at both entry points; deployment config. |
+| `job_deadline_ms` | 900 s per job, wall clock | `failed` at the deadline; deployment config. |
 | Source `label` | 200 characters, single-line, unique per job | Rejected as a malformed source. |
 | `MAX_SYSTEM_NAME_CHARS` | 200 | Rejected by the engine / API. |
 | `MAX_ELEMENTS` | 150 | A larger model is a `too-many-elements` [rejection](Report-Schema.md). |
