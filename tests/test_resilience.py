@@ -15,6 +15,7 @@ import pytest
 
 from stride_service.resilience import (
     ATTEMPTS_VAR,
+    JOB_DEADLINE_MS_VAR,
     MAX_SOURCE_BYTES_VAR,
     MAX_SOURCES_VAR,
     SUPPORTED_VERSION,
@@ -33,6 +34,8 @@ VALID = (
     "timeout_ms = 300000\n"
     "max_source_bytes = 102400\n"
     "max_sources = 10\n"
+    "job_deadline_ms = 900000\n"
+    "retry_budget_ratio = 0.1\n"
 )
 
 
@@ -49,6 +52,8 @@ def config(**kwargs) -> ResilienceConfig:
         "timeout_ms": 300000,
         "max_source_bytes": 102400,
         "max_sources": 10,
+        "job_deadline_ms": 900000,
+        "retry_budget_ratio": 0.1,
     }
     return ResilienceConfig(**(fields | kwargs))
 
@@ -59,26 +64,74 @@ def test_the_shipped_config_loads_with_the_decided_values():
     assert loaded.timeout_ms == 300000
     assert loaded.max_source_bytes == 100 * 1024
     assert loaded.max_sources == 10
+    assert loaded.job_deadline_ms == 900000
 
 
-def test_num_retries_is_attempts_minus_one():
-    # LiteLLM counts retries after the first try; attempts is a total. Passing
-    # 3 through verbatim would give four tries, and the old timeout-only path
-    # silently gave one — only the arithmetic reproduces the configured number.
-    assert config().to_num_retries() == 2
+def test_the_deadline_converts_to_the_seconds_asyncio_wants():
+    """The file is in milliseconds beside timeout_ms; asyncio takes seconds."""
+    assert config(job_deadline_ms=900000).deadline_seconds() == 900.0
+    assert config(job_deadline_ms=1500).deadline_seconds() == 1.5
 
 
-def test_a_single_attempt_means_no_retries():
-    assert config(attempts=1).to_num_retries() == 0
+def test_a_job_deadline_is_required_rather_than_defaulted():
+    """No value means "no deadline" — that was version 3, and it is the defect."""
+    fields = {
+        "version": SUPPORTED_VERSION,
+        "attempts": 3,
+        "timeout_ms": 300000,
+        "max_source_bytes": 102400,
+        "max_sources": 10,
+    }
+    with pytest.raises(Exception, match="job_deadline_ms"):
+        ResilienceConfig(**fields)
+
+
+def test_the_deadline_bounds_what_the_per_call_knobs_cannot():
+    """The arithmetic the deadline exists for, pinned so it stays visible.
+
+    ``timeout_ms`` bounds one request; ``attempts`` of them may be made per node
+    now that the library's retry layer is off; five LLM stages run in series on
+    the graph's longest path. The deadline has to be well under that product or
+    it is not a bound at all — and the product moves whenever any factor does,
+    which is why the deadline states the answer directly instead.
+    """
+    loaded = load_resilience(CONFIG_PATH, env={})
+    per_node = loaded.timeout_ms * loaded.attempts
+    unbounded_worst_case = per_node * 5
+    assert loaded.job_deadline_ms < unbounded_worst_case
+
+
+def test_the_policy_carries_attempts_as_a_total():
+    # attempts is a *total* count, and with LiteLLM's layer off it is now
+    # literally the request count per node rather than half of a product.
+    policy = config().retry_policy(budget_capacity=10)
+    assert policy.attempts == 3
+    assert config(attempts=1).retry_policy(budget_capacity=10).attempts == 1
+
+
+def test_the_policy_budget_starts_full_at_the_capacity_it_was_given():
+    # Full at the start, so an isolated failure in a healthy process is still
+    # retried immediately: the budget bounds sustained retrying, not a burst.
+    policy = config().retry_policy(budget_capacity=10)
+    assert policy.budget.tokens == 10
+    assert policy.budget.ratio == 0.1
+
+
+def test_a_zero_retry_budget_is_refused(tmp_path):
+    # A deployment that never retries says attempts = 1 and means it, rather
+    # than expressing it as a budget that can never be drawn on.
+    with pytest.raises(ValueError):
+        config(retry_budget_ratio=0)
 
 
 def test_http_options_carry_the_timeout():
     assert config().to_http_options().timeout == 300000
 
 
-def test_the_backoff_knobs_are_gone_from_the_schema():
-    # They appear nowhere in litellm, which picks its curve from the exception
-    # type, so as config they read as a knob and connected to nothing.
+def test_the_backoff_knobs_stay_out_of_the_schema():
+    # They were removed for connecting to nothing, and a curve now exists to
+    # describe — but it is pinned in stride_service.retry, because it does not
+    # vary by deployment. What varies is retry_budget_ratio.
     for knob in ("initial_delay", "max_delay", "exp_base", "jitter"):
         with pytest.raises(ValueError):
             config(**{knob: 1.0})
@@ -121,6 +174,14 @@ def test_env_overrides_attempts_and_timeout(tmp_path):
     loaded = load_resilience(path, env={ATTEMPTS_VAR: "5", TIMEOUT_MS_VAR: "120000"})
     assert loaded.attempts == 5
     assert loaded.timeout_ms == 120000
+
+
+def test_env_overrides_the_job_deadline(tmp_path):
+    """Turning it down sheds load mid-incident without an image rebuild."""
+    path = write(tmp_path, VALID)
+    loaded = load_resilience(path, env={JOB_DEADLINE_MS_VAR: "120000"})
+    assert loaded.job_deadline_ms == 120000
+    assert loaded.deadline_seconds() == 120.0
 
 
 def test_an_env_override_is_validated_like_a_file_value(tmp_path):

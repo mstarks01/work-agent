@@ -1,6 +1,7 @@
 # Resilience configuration (wayfinder ticket 038) — operational bounds for the
 # service, read by the production graph, the eval harness, and the eval judge
-# alike. Two knobs bound each LLM call; two bound a job's input.
+# alike. Three knobs bound each LLM call, two bound a job's input, one bounds a
+# job's duration.
 #
 # On their SDK defaults the LLM nodes never retry and never time out: a single
 # 429 on any node kills a paid-for job on first contact, and a stalled call
@@ -8,40 +9,107 @@
 #
 # Unlike config/sampling.toml, every value here IS env-overridable
 # (STRIDE_RETRY_ATTEMPTS, STRIDE_TIMEOUT_MS, STRIDE_MAX_SOURCE_BYTES,
-# STRIDE_MAX_SOURCES). Sampling is pinned because temperature changes WHAT the
-# model produces; nothing in this file can. Attempts and timeout change only HOW
+# STRIDE_MAX_SOURCES, STRIDE_JOB_DEADLINE_MS, STRIDE_RETRY_BUDGET_RATIO).
+# Sampling is pinned because temperature changes WHAT the model produces;
+# nothing in this file can. Attempts, timeout and the budget change only HOW
 # HARD we try; the input bounds decide only whether a submission is accepted at
-# all, never which answer it gets. So none of these can move an eval score, and
-# all of them are knobs to turn down mid-incident without an image rebuild.
+# all, and the deadline only whether an answer arrives in time — never which
+# answer it is. So none of these can move an eval score, and all of them are
+# knobs to turn down mid-incident without an image rebuild.
+#
+# Version 4 (wayfinder #61) adds `job_deadline_ms` and `retry_budget_ratio`, and
+# moves the retry loop out of LiteLLM into `stride_service.retry` — see the note
+# on each below. Hard cutover like the ones before it: a version-3 file fails the
+# check rather than inheriting defaults, because a deployment that has not chosen
+# a deadline or a retry budget is the state this version exists to end. Neither
+# key has a value meaning "unbounded" — that was version 3's behaviour, and it is
+# the defect.
 #
 # Version 3 (wayfinder #52) adds the two input bounds. This is a hard cutover:
 # a version-2 file fails the check, so every deployment edits its file rather
 # than inheriting a default for a contract its callers can see.
 #
 # Version 2 (wayfinder #15) dropped version 1's four backoff knobs —
-# initial_delay, max_delay, exp_base, jitter. They appear NOWHERE in litellm,
-# which picks its backoff curve internally from the exception type, so under the
-# LiteLlm adapter they were config that read as a knob and connected to nothing.
-# Their env vars (STRIDE_RETRY_INITIAL_DELAY / _MAX_DELAY / _EXP_BASE / _JITTER)
-# are gone with them.
+# initial_delay, max_delay, exp_base, jitter — because litellm picked its curve
+# internally and they connected to nothing. They stay dropped under version 4
+# even though a curve now exists to describe: it is pinned in
+# stride_service.retry because it does not vary by deployment. Their env vars
+# (STRIDE_RETRY_INITIAL_DELAY / _MAX_DELAY / _EXP_BASE / _JITTER) stay gone.
 #
-# `attempts` is a TOTAL count and is deliberately not passed through verbatim.
-# LiteLLM's num_retries counts retries AFTER the first try, so the binding sends
-# attempts - 1; passing 3 straight through would give four tries, and the old
-# timeout-only path silently gave one. The retryable status set and the backoff
-# curve remain the library's own — anything not listed here is deliberately
-# unset rather than pinned to a number this project has never measured.
+# `attempts` is a TOTAL count, and as of version 4 it is literally the request
+# count per node. It was not before, and that gap was the 429 storm. LiteLLM's
+# num_retries counts retries AFTER the first try AND sets the provider SDK's own
+# max_retries from the same value, so the first attempt retried underneath and
+# the worst case was 2 * attempts - 1 requests: five here, and up to thirty in
+# the seconds the six analysts fan out. That burst is what trips a per-minute
+# request quota. Passing max_retries on the adapter did not close it, since
+# num_retries overwrites it on the way to the client.
 #
-# It is NOT a count of requests per node. LiteLLM sets the provider SDK's own
-# max_retries from num_retries, so the first attempt retries at the SDK level
-# too and the worst case is 2 * attempts - 1 requests: five here, and up to
-# thirty in the seconds the six analysts fan out. That burst is what trips a
-# per-minute request quota, and turning `attempts` DOWN is what shrinks it —
-# passing max_retries on the adapter does not, since num_retries overwrites it.
+# So the library's layer is OFF — binding.py sends num_retries = 0, which is
+# exactly one request per call — and the loop runs one level up in
+# stride_service.retry, under `retry_budget_ratio` below. Turning `attempts`
+# down still works and is still the blunt instrument; the budget is what makes
+# reaching for it rare.
 
-version = 3
+version = 4
 attempts = 3
 timeout_ms = 300000
+
+# THE ONLY BOUND ON A JOB AS A WHOLE (wayfinder #61). Everything else in this
+# file bounds one HTTP request; nothing bounded the run those requests add up
+# to, so `execute_job` awaited the graph with no deadline at all and a wedged
+# run held a job in `running` until the process died.
+#
+# The per-call knobs cannot substitute for it, and the arithmetic is why:
+# timeout_ms bounds one request at 300 s, attempts allows 3 of them per node,
+# and the graph's longest path runs five LLM stages in series (extract, repair,
+# the analyst fan-out, critic, recritic). 300 s x 3 x 5 is 75 minutes, with
+# every individual bound respected the whole way — and it was over two hours
+# before the retry amplification was removed. That is the point rather than a
+# detail: the product moves whenever any factor does, and only a deadline
+# states the answer directly. A product of numbers nobody chose is not a bound.
+#
+# 900 s IS A BACKSTOP, NOT AN SLO, and it is sized against measured work rather
+# than against that worst case. One observed clean run is ~119 s end to end
+# (extract ~22 s, the six-analyst barrier ~38 s, critic ~58 s). The longest
+# legitimate path adds a repair pass and a critic re-ask for ~200 s, and one
+# transient retry on the slowest node puts it near 260 s. 900 s is ~3.5x that
+# and ~8x the observed median, so it fires on runs that are wedged rather than
+# merely slow. Turn it DOWN to shed load mid-incident: a job killed here costs
+# only what it had already spent, while one that hangs holds a worker.
+#
+# It does not replace turning `timeout_ms` down, which is still oversized
+# against measured latency — but sizing that one needs a p99 across real
+# submissions, not the single trace this number came from, and the failure it
+# guards is expensive in the other direction: a timeout under the legitimate
+# p99 turns slow-but-fine calls into retries and makes the tail worse. When a
+# job does exceed the deadline the log names the nodes that had landed, which
+# is the evidence that settles it.
+job_deadline_ms = 900000
+
+# THE ANTI-STORM BOUND. Retries draw from one process-wide token bucket: a retry
+# costs a token, a successful request credits `retry_budget_ratio` of one. So
+# retries are capped at a share of *working traffic* rather than at a count per
+# node, and that distinction is the whole mechanism.
+#
+# A per-node count is what produced the storm. Every node got its full allowance
+# regardless of what the other five were seeing, so a provider-wide 429 became
+# six analysts x five requests in the seconds they fan out — the failure that is
+# by definition correlated got the retry policy designed for isolated ones.
+# Under a shared budget the first few failures spend it and the rest fail fast,
+# which is the correct response to "the provider is down": stop asking.
+#
+# 0.1 is the gRPC/AWS convention and means retries can never exceed ~10% of
+# successful requests in steady state. It is a ceiling on sustained retrying,
+# not on a burst: the bucket starts full, so an isolated failure in a healthy
+# process is still retried immediately and nothing about the normal path
+# changes. Capacity is one token per LLM node in the graph, set in binding.py —
+# what a single job may spend from cold.
+#
+# Turn it DOWN to make the service give up sooner under sustained failure; 0
+# is not accepted, because a deployment that never retries should say
+# `attempts = 1` and mean it rather than express it as an empty budget.
+retry_budget_ratio = 0.1
 
 # The input bounds, in UTF-8 BYTES rather than tokens. A token budget would make
 # the public contract depend on which vendor the tiers select, so what a caller

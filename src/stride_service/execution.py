@@ -51,6 +51,18 @@ OnNode = Callable[[str], Awaitable[None]]
 class _NodeFinish:
     """When one graph node produced its output, and what build answered it.
 
+    ``at`` is when this driver **observed** the event, not ``event.timestamp``.
+    An LlmAgent's response event is constructed before the request goes out
+    (``base_llm_flow`` builds it, then calls the model) and
+    ``_finalize_model_response_event`` copies that timestamp onto the event it
+    yields, so ``event.timestamp`` marks when a node's request was *issued*.
+    Measuring from it charged every LLM node's latency to its successor: a
+    21-second extraction was reported as 5 ms on ``extract`` and 21,757 ms on
+    the ``validate`` FunctionNode that ran after it. Observation time is the
+    completion time by construction — the event does not reach this loop until
+    the node is done — and it is read from the same clock as ``started_at``,
+    which ``event.timestamp`` was not.
+
     ``served_model`` is the build the provider says actually ran, read off the
     event rather than assumed from the configured string. It is ``None`` when
     the event carries none — an offline stand-in, or a provider that did not
@@ -153,11 +165,12 @@ class GraphExecutor:
             session_id=session.id,
             new_message=types.Content(role="user", parts=[types.Part(text=rendered)]),
         ):
+            observed_at = datetime.now(UTC).timestamp()
             for node in _finished_nodes(event, self._node_names):
                 finishes.append(
                     _NodeFinish(
                         node=node,
-                        at=event.timestamp,
+                        at=observed_at,
                         served_model=getattr(event, "model_version", None),
                     )
                 )
@@ -179,7 +192,9 @@ class GraphExecutor:
 
         A node's ``duration_ms`` is measured from the moment its last
         predecessor finished — the point the graph could have started it — to
-        the event carrying its own output.
+        the moment this driver observed the node's own output. See
+        :class:`_NodeFinish` for why observation time rather than the event's
+        own timestamp.
         """
         finished_at = {finish.node: finish.at for finish in finishes}
         runs = []

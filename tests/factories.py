@@ -11,6 +11,7 @@ stand-in. A copy that reported no ``model_version`` would let a whole class of
 provenance defect stay invisible to the eval lane.
 """
 
+import asyncio
 import json
 from collections.abc import AsyncGenerator
 from datetime import UTC, datetime
@@ -41,6 +42,7 @@ from stride_service.report import (
     Severity,
     StrideReport,
     Threat,
+    ThreatRuling,
     Verdict,
     build_summary,
 )
@@ -206,6 +208,21 @@ def sample_draft(
     )
 
 
+def sample_ruling(threat_id: str = "S-01", **overrides: Any) -> ThreatRuling:
+    """The critic's ruling on one sample_draft(), overridable per test.
+
+    Carries no ``severity``, which is the common case: the analyst's rating
+    stands unless the calibration step replaced it.
+    """
+    fields: dict[str, Any] = {
+        "id": threat_id,
+        "confidence": "high",
+        "verdict": Verdict(status="confirmed"),
+    }
+    fields.update(overrides)
+    return ThreatRuling(**fields)
+
+
 def sample_threat(
     threat_id: str = "S-01",
     category: str = "spoofing",
@@ -306,6 +323,25 @@ class ScriptedLlm(BaseLlm):
             content=types.Content(role="model", parts=[types.Part(text=self.reply)]),
             model_version=served_build(self.model),
         )
+
+
+class SlowLlm(ScriptedLlm):
+    """A stand-in that takes measurable time to answer.
+
+    Every other stand-in replies instantly, which makes a whole class of timing
+    defect invisible: a model's latency can be charged to the wrong node and
+    every offline duration still reads as ~0 ms either way. This one waits long
+    enough to land on one side of a millisecond-resolution assertion.
+    """
+
+    delay_s: float = 0.05
+
+    async def generate_content_async(
+        self, llm_request, stream: bool = False
+    ) -> AsyncGenerator[LlmResponse, None]:
+        await asyncio.sleep(self.delay_s)
+        async for response in super().generate_content_async(llm_request, stream):
+            yield response
 
 
 class SilentLlm(ScriptedLlm):

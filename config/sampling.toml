@@ -111,14 +111,17 @@ version = 4
 #          The weaker-evidence half of this pair: 8,192 has not been observed to
 #          truncate here.
 #
-#   strong the critic re-emits EVERY draft it was given, plus a verdict and a
-#          confidence on each. The 18 shipped analyst exemplars measure at a
-#          median 400 tokens per ruled threat (max 441), and a job's drafted set
-#          runs larger than its reference set — 15-24 threats across the corpus,
-#          before the duplicates and misfiles the critic is there to reject. So
-#          24 drafts is ~9,600 tokens of visible output and 36 is ~14,400, both
-#          already over the 8,192 this file used to pin, with nothing left for
-#          reasoning. 32,768 covers a 36-draft ruling with ~18k to think in.
+#   strong the critic emits one RULING per draft — an ID, a verdict, a
+#          confidence, and a replacement severity only where it corrected one —
+#          not the draft re-transcribed. That is roughly 60-90 tokens per ruled
+#          threat against the ~400 the old whole-draft shape measured at, so a
+#          36-draft ruling is ~3,000 tokens of visible output rather than
+#          ~14,400. 32,768 is now generous rather than sized: it leaves nearly
+#          all of the budget to reasoning, which is what the strong tier
+#          actually spends it on. RETUNING IT DOWN IS AN OPEN QUESTION and an
+#          eval-gated one — the value enters the sampling fingerprint, so
+#          lowering it re-baselines every blessed number. Left where it is until
+#          a sweep says what the reasoning half really needs.
 #
 # Both are under every ceiling the pinned model map publishes for the models
 # this service can select except gpt-4o's 16,384 — which is the case the

@@ -11,8 +11,14 @@ and a param LiteLLM is never told cannot be caught by its fail-closed
 * **``seed``** and **``reasoning_effort``**. Put on the config instead, they
   would vanish silently while ``sampling_fingerprint`` went on attesting to a
   seed the request never carried.
-* **``num_retries``**, at ``attempts - 1``. See
-  :meth:`ResilienceConfig.to_num_retries` for why the arithmetic is explicit.
+* **``num_retries``**, pinned at **zero**. Not because retry is off — it is one
+  layer up, in :mod:`stride_service.retry` — but because this is the kwarg that
+  keeps the library's own retry layer, and the provider SDK's beneath it, down
+  to exactly one request per call. Left at ``attempts - 1`` it multiplied to
+  ``2 * attempts - 1`` requests per node, uncoordinated across the six analysts,
+  which is the burst that turns one 429 into a storm. The adapters this module
+  builds are :func:`~stride_service.retry.retrying_llm_class` subclasses sharing
+  one process-wide budget.
 
 Constructor kwargs reach ``acompletion`` via ``_additional_args`` *before*
 ``generation_params``, so the value survives. ``drop_params`` is never set —
@@ -58,8 +64,14 @@ from stride_service.model_gate import (
     emulates_structured_output,
     output_ceiling,
 )
-from stride_service.model_tiers import TIER_NAMES, ModelTierConfig, TierName
+from stride_service.model_tiers import (
+    LLM_NODES,
+    TIER_NAMES,
+    ModelTierConfig,
+    TierName,
+)
 from stride_service.resilience import ResilienceConfig
+from stride_service.retry import retrying_llm_class
 from stride_service.sampling import (
     SamplingConfig,
     SamplingResolver,
@@ -144,7 +156,7 @@ def _check_output_ceiling(
 
     ``max_output_tokens`` is pinned rather than left to a vendor-derived
     default, and the value that fits a tier's job is a property of the *job* —
-    the critic re-emits every draft it was given — while the ceiling is a
+    the critic rules on every draft in one pass — while the ceiling is a
     property of the model. The two are set independently and there is no reason
     they agree, so the pair is checked here: every provider accepts the
     parameter, and an over-ceiling value is rejected by the serving model at
@@ -225,6 +237,14 @@ def build_tier_adapters(
 
     assert_kwarg_supported(_NUM_RETRIES_KWARG)
 
+    # One policy, so one budget, shared by both tiers and every node on them.
+    # A per-tier budget would let the six analysts storm the strong tier while
+    # the base tier's untouched allowance sat beside it; a storm is a property
+    # of the process, not of a tier. Capacity is one retry per LLM node in the
+    # graph — what a single job may spend from a cold bucket.
+    policy = resilience.retry_policy(budget_capacity=len(LLM_NODES))
+    retrying = retrying_llm_class(LiteLlm, policy)
+
     adapters: dict[TierName, LiteLlm] = {}
     for tier in TIER_NAMES:
         selection = tiers.tiers[tier]
@@ -238,9 +258,14 @@ def build_tier_adapters(
         _check_temperature_unset(selection.model, tier_sampling, source)
         _check_output_ceiling(vendor, selection.model, tier_sampling, source)
         _check_native_structured_output(vendor, selection.model, tier_sampling, source)
-        adapters[tier] = LiteLlm(
+        adapters[tier] = retrying(
             model=selection.route,
-            **{_NUM_RETRIES_KWARG: resilience.to_num_retries()},
+            # Zero, and not because retry is off: it is one layer up, in
+            # ``stride_service.retry``. This kwarg is what keeps the library's
+            # own layer — and the provider SDK's, which it sets from this same
+            # value — down to exactly one request per call, so ``attempts``
+            # means requests instead of half of a product with them.
+            **{_NUM_RETRIES_KWARG: 0},
             **tier_sampling.constructor_kwargs(),
             **vendor.credential_kwargs(env),
         )
