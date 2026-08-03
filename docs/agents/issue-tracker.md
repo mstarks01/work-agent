@@ -91,10 +91,41 @@ without `esc()` (`report_view.html:246-249`). Filed off-map as
 and fixed minimally on `fix/escape-element-attrs`. #78's rule supersedes that fix at implementation
 time.
 
-Frontier now: [#79](https://github.com/mstarks01/work-agent/issues/79), the schema — the narrow
-neck, which #77 unblocked and which six tickets wait on. #79 inherits #77's vocabulary and decides
-`Ground`'s shape; #77 deliberately settled no field names or cardinality. #78 constrains none of it:
-its rules hold for any shape #79 picks.
+[#79](https://github.com/mstarks01/work-agent/issues/79) resolved 2026-08-03 and **opened the narrow
+neck** — five tickets unblocked at once. `grounds: list[Ground]` is an eighth analyst-owned field on
+`DraftThreat`, `min_length=1` and uncapped (matching `affected_element_ids`; `DraftThreat` caps no
+list). `Ground` is **one flat model** — `kind` plus every branch's fields, defaulted `""` — with a
+`_check_shape` validator that requires its own branch's fields and **forbids** the others. That is
+`Verdict`'s pattern (`report.py:135-160`), reused so the repo has one answer to "tagged variant in a
+provider-facing schema". The discriminated union was judged the more honest and more Pythonic shape
+and **lost to a measured fact**: provider schema compilers are the unpredictable part of this system
+(`config/sampling.toml:62-85` — Anthropic rejects `SystemModel`'s grammar as too large, and
+`constrain_output = false` is documented as *not* a working fallback), and this schema rides in six
+`strong`-tier `DraftThreats` requests. The accepted cost is that a mis-shaped entry is repaired
+rather than prevented.
+
+Branches: **quote** = `text` (1000, deliberately the same number as `source_excerpt`) +
+`source_label`; **unknown-attribute** = `element_id` + `attribute` spelled exactly like `UnknownRef`
+but a **separate type**, with `UnknownRef`'s critic-only ownership untouched; **derived-fact** =
+`flow_id` alone, a reference never a copy, with no free-text field — free text is checkable by no
+gate and would become the escape hatch for the findings whose justification matters most. Grounds
+gets a **new threat-level referential check** beside `_citation_issues`: `parse_and_validate`
+validates the system model only, so there was no threat gate to extend, and the critic's
+`related_unknowns` stays unchecked until #83 rules on it. `schema_version` → **2.0**, one bump for
+the whole cutover — earned by #77's node rename, which fails *silently* for a consumer keying on
+`analyst_spoofing` — plus the versioning policy `docs/Report-Schema.md` never stated: additive is
+minor, changing the meaning or spelling of an existing value is major.
+
+Frontier now: [#80](https://github.com/mstarks01/work-agent/issues/80),
+[#81](https://github.com/mstarks01/work-agent/issues/81),
+[#82](https://github.com/mstarks01/work-agent/issues/82),
+[#83](https://github.com/mstarks01/work-agent/issues/83) and
+[#84](https://github.com/mstarks01/work-agent/issues/84), all unblocked and unclaimed — the map's
+first genuinely parallel step, so expect concurrent sessions.
+[#85](https://github.com/mstarks01/work-agent/issues/85) still waits on one. #79 left three
+questions explicitly to siblings: verbatim quote verification is #80's, prompt instruction is #82's,
+and whether `related_unknowns` finally gains a check is #83's. #82 was retitled to "How a **category
+agent** is instructed…" — its old title carried the vocabulary #77 retired.
 
 [#49](https://github.com/mstarks01/work-agent/issues/49) completed 2026-07-31 and has
 moved to Completed efforts below; its spec was implemented and merged 2026-08-01.
