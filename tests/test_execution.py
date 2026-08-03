@@ -27,9 +27,10 @@ from tests.factories import (
     PROJECT_ROOT,
     STRONG_MODEL,
     SilentLlm,
+    SlowLlm,
     repo_tiers,
     sample_draft,
-    sample_threat,
+    sample_ruling,
     scripted_pipeline,
     served_build,
     threats_json,
@@ -47,7 +48,7 @@ def happy_replies() -> dict[str, str]:
         graph.analyst_node_name("spoofing"): threats_json(
             sample_draft("S-01", "spoofing")
         ),
-        "critic": threats_json(sample_threat("S-01")),
+        "critic": threats_json(sample_ruling("S-01")),
     }
 
 
@@ -160,6 +161,30 @@ def test_durations_are_measured_from_the_last_predecessor(graph_run):
     assert nodes[graph.ASSEMBLE_NODE].duration_ms <= max(
         node_run.duration_ms for node_run in graph_run.node_runs
     )
+
+
+def test_an_llm_nodes_latency_is_charged_to_that_node():
+    """The node that waited is the node whose duration shows the wait.
+
+    ADK builds an LlmAgent's response event *before* the request goes out, and
+    ``_finalize_model_response_event`` copies that timestamp onto the event it
+    yields — so ``event.timestamp`` marks when the call was issued, not when it
+    came back. Stamping from it charged every model's latency to whichever node
+    ran next: a 58-second critic was reported as 19 ms on ``critic`` and 58,035
+    ms on the ``router`` FunctionNode after it. The executor stamps observation
+    time instead.
+
+    This is the only test that can see the difference. Every other stand-in
+    answers in ~0 ms, which reads identically under both rules.
+    """
+    pipeline, _ = scripted_pipeline(happy_replies(), llm_class=SlowLlm)
+    nodes = by_node(drive(pipeline))
+
+    # The LLM nodes waited; the deterministic nodes that follow them did not.
+    assert nodes[graph.EXTRACT_NODE].duration_ms >= 40
+    assert nodes[graph.VALIDATE_NODE].duration_ms < 40
+    assert nodes[graph.CRITIC_NODE].duration_ms >= 40
+    assert nodes[graph.ROUTER_NODE].duration_ms < 40
 
 
 def test_extract_only_entry_stamps_just_the_one_node():

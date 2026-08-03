@@ -9,7 +9,7 @@ from stride_service.critic import (
     join_drafts,
 )
 from stride_service.report import Severity, UnknownRef, Verdict
-from tests.factories import sample_draft, sample_threat, valid_model
+from tests.factories import sample_draft, sample_ruling, valid_model
 
 
 @pytest.fixture
@@ -76,9 +76,9 @@ class TestJoinDrafts:
 class TestAssembleThreats:
     def test_confirmed_and_needs_info_stay_together(self, model):
         drafts = [sample_draft("S-01"), sample_draft("S-02")]
-        reviewed = [
-            sample_threat("S-01"),
-            sample_threat(
+        rulings = [
+            sample_ruling("S-01"),
+            sample_ruling(
                 "S-02",
                 verdict=Verdict(
                     status="needs-info",
@@ -91,58 +91,58 @@ class TestAssembleThreats:
                 ),
             ),
         ]
-        threats, rejected = assemble_threats(drafts, reviewed, model)
+        threats, rejected = assemble_threats(drafts, rulings, model)
         assert [t.id for t in threats] == ["S-01", "S-02"]
         assert rejected == []
 
     def test_rejected_threats_ride_in_the_audit_array(self, model):
         drafts = [sample_draft("S-01"), sample_draft("S-02")]
-        reviewed = [
-            sample_threat("S-01"),
-            sample_threat(
+        rulings = [
+            sample_ruling("S-01"),
+            sample_ruling(
                 "S-02",
                 verdict=Verdict(status="rejected", reason="duplicate of S-01"),
             ),
         ]
-        threats, rejected = assemble_threats(drafts, reviewed, model)
+        threats, rejected = assemble_threats(drafts, rulings, model)
         assert [t.id for t in threats] == ["S-01"]
         assert [t.id for t in rejected] == ["S-02"]
 
     def test_actionable_threats_are_sorted_most_severe_first(self, model):
-        drafts = [sample_draft(f"S-0{n}") for n in (1, 2, 3)]
-        reviewed = [
-            sample_threat("S-01", severity=severity("low", "low")),
-            sample_threat("S-02", severity=severity("high", "high")),
-            sample_threat("S-03", severity=severity("medium", "high")),
+        drafts = [
+            sample_draft("S-01", severity=severity("low", "low")),
+            sample_draft("S-02", severity=severity("high", "high")),
+            sample_draft("S-03", severity=severity("medium", "high")),
         ]
-        threats, _ = assemble_threats(drafts, reviewed, model)
+        rulings = [sample_ruling(f"S-0{n}") for n in (1, 2, 3)]
+        threats, _ = assemble_threats(drafts, rulings, model)
         assert [t.id for t in threats] == ["S-02", "S-03", "S-01"]
 
     def test_ties_break_on_threat_id(self, model):
         drafts = [sample_draft("S-02"), sample_draft("S-01")]
-        reviewed = [sample_threat("S-02"), sample_threat("S-01")]
-        threats, _ = assemble_threats(drafts, reviewed, model)
+        rulings = [sample_ruling("S-02"), sample_ruling("S-01")]
+        threats, _ = assemble_threats(drafts, rulings, model)
         assert [t.id for t in threats] == ["S-01", "S-02"]
 
     def test_a_dropped_draft_fails_closed(self, model):
         drafts = [sample_draft("S-01"), sample_draft("S-02")]
         with pytest.raises(CriticOutputError, match="dropped draft 'S-02'"):
-            assemble_threats(drafts, [sample_threat("S-01")], model)
+            assemble_threats(drafts, [sample_ruling("S-01")], model)
 
     def test_an_invented_threat_fails_closed(self, model):
         with pytest.raises(CriticOutputError, match="no analyst drafted"):
-            assemble_threats([sample_draft("S-01")], [sample_threat("S-02")], model)
+            assemble_threats([sample_draft("S-01")], [sample_ruling("S-02")], model)
 
-    def test_reference_added_by_the_critic_must_still_resolve(self, model):
+    def test_a_duplicated_ruling_fails_closed(self, model):
         drafts = [sample_draft("S-01")]
-        reviewed = [sample_threat("S-01", affected_element_ids=["process:ghost"])]
-        with pytest.raises(CriticOutputError, match="not in the system model"):
-            assemble_threats(drafts, reviewed, model)
+        rulings = [sample_ruling("S-01"), sample_ruling("S-01")]
+        with pytest.raises(CriticOutputError, match="used by 2 drafts"):
+            assemble_threats(drafts, rulings, model)
 
     def test_needs_info_unknowns_must_resolve(self, model):
         drafts = [sample_draft("S-01")]
-        reviewed = [
-            sample_threat(
+        rulings = [
+            sample_ruling(
                 "S-01",
                 verdict=Verdict(
                     status="needs-info",
@@ -154,7 +154,60 @@ class TestAssembleThreats:
             )
         ]
         with pytest.raises(CriticOutputError, match="hangs its needs-info verdict"):
-            assemble_threats(drafts, reviewed, model)
+            assemble_threats(drafts, rulings, model)
 
     def test_empty_analysis_assembles_to_empty_arrays(self, model):
         assert assemble_threats([], [], model) == ([], [])
+
+
+class TestRulingsMergeOntoDrafts:
+    """A ruling supplies judgement; every other field comes from the draft."""
+
+    def test_the_analysts_own_fields_survive_the_critic_untouched(self, model):
+        draft = sample_draft(
+            "S-01",
+            title="Session cookie theft",
+            description="Stolen cookies let an attacker impersonate the customer.",
+            affected_element_ids=["flow:customer-to-web-app:login"],
+        )
+        (threat,), _ = assemble_threats([draft], [sample_ruling("S-01")], model)
+        assert threat.title == draft.title
+        assert threat.description == draft.description
+        assert threat.affected_element_ids == draft.affected_element_ids
+        assert threat.mitigations == draft.mitigations
+
+    def test_a_ruling_without_severity_keeps_the_analysts_rating(self, model):
+        draft = sample_draft("S-01", severity=severity("low", "medium"))
+        (threat,), _ = assemble_threats([draft], [sample_ruling("S-01")], model)
+        assert threat.severity == draft.severity
+        assert threat.severity.level == "low"
+
+    def test_a_ruling_with_severity_replaces_the_rating_and_its_justification(
+        self, model
+    ):
+        draft = sample_draft("S-01", severity=severity("low", "low"))
+        corrected = Severity(
+            likelihood="high",
+            impact="high",
+            justification="The model states the flow is unauthenticated.",
+        )
+        rulings = [sample_ruling("S-01", severity=corrected)]
+        (threat,), _ = assemble_threats([draft], rulings, model)
+        assert threat.severity.likelihood == "high"
+        assert threat.severity.justification == corrected.justification
+        assert threat.severity.level == "critical"
+
+    def test_the_critics_judgements_reach_the_threat(self, model):
+        rulings = [sample_ruling("S-01", confidence="medium")]
+        (threat,), _ = assemble_threats([sample_draft("S-01")], rulings, model)
+        assert threat.confidence == "medium"
+        assert threat.verdict.status == "confirmed"
+
+    def test_threats_are_built_in_draft_order_not_ruling_order(self, model):
+        drafts = [sample_draft("S-01"), sample_draft("S-02")]
+        rulings = [
+            sample_ruling("S-02", verdict=Verdict(status="rejected", reason="dup")),
+            sample_ruling("S-01", verdict=Verdict(status="rejected", reason="dup")),
+        ]
+        _, rejected = assemble_threats(drafts, rulings, model)
+        assert [t.id for t in rejected] == ["S-01", "S-02"]

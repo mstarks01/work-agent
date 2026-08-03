@@ -5,6 +5,7 @@ import asyncio
 import pytest
 
 from stride_service.jobs import (
+    DEADLINE_FAILURE_MESSAGE,
     GENERIC_FAILURE_MESSAGE,
     InMemoryJobStore,
     InvalidTransitionError,
@@ -168,14 +169,39 @@ class TestBuildStore:
             build_store({"STRIDE_JOB_STORE": "redis"})
 
 
+class HangingRunner:
+    """A runner that never returns: the wedged run the deadline exists for.
+
+    It records whether it was cancelled, because "the job was marked failed" and
+    "the work actually stopped" are different claims — a deadline that gives up
+    on the await while the provider calls run on would free no worker.
+    """
+
+    def __init__(self, nodes: tuple[str, ...] = ()) -> None:
+        self.nodes = nodes
+        self.cancelled = False
+
+    async def run(self, job: JobRecord, on_node: NodeCallback) -> PipelineOutcome:
+        for node in self.nodes:
+            await on_node(node)
+        try:
+            await asyncio.sleep(3600)
+        except asyncio.CancelledError:
+            self.cancelled = True
+            raise
+        raise AssertionError("the hanging runner returned")
+
+
 class TestExecuteJob:
     @staticmethod
-    def run_with(runner) -> JobRecord:
+    def run_with(runner, deadline_seconds: float = 30) -> JobRecord:
         async def scenario():
             store = InMemoryJobStore()
             record = make_record()
             await store.create(record)
-            await execute_job(store, runner, record.id)
+            await execute_job(
+                store, runner, record.id, deadline_seconds=deadline_seconds
+            )
             return await store.get(record.id)
 
         return asyncio.run(scenario())
@@ -217,3 +243,52 @@ class TestExecuteJob:
         assert record.error == GENERIC_FAILURE_MESSAGE
         assert "hunter2" not in record.error
         assert record.report is None
+
+
+class TestJobDeadline:
+    """The one bound on a job as a whole (wayfinder #61).
+
+    The per-call knobs compose to a worst case in the hours while each is
+    individually respected, so before this the tail was a product of numbers
+    nobody chose and a wedged run held ``running`` until the process died.
+    """
+
+    def test_a_wedged_run_fails_at_the_deadline_instead_of_hanging(self):
+        record = TestExecuteJob.run_with(HangingRunner(), deadline_seconds=0.05)
+        assert record.status == "failed"
+        assert record.report is None
+
+    def test_the_deadline_actually_stops_the_work(self):
+        """Marking the job failed is not the same as freeing the worker."""
+        runner = HangingRunner()
+        TestExecuteJob.run_with(runner, deadline_seconds=0.05)
+        assert runner.cancelled
+
+    def test_a_deadline_failure_says_so_rather_than_reading_as_a_crash(self):
+        """Distinct from the generic message, and it names no internals.
+
+        "internal error" would send a caller straight back to retry an identical
+        submission against an identical bound; the deadline is a fact about this
+        deployment's configuration, not about how the pipeline is built.
+        """
+        record = TestExecuteJob.run_with(HangingRunner(), deadline_seconds=0.05)
+        assert record.error == DEADLINE_FAILURE_MESSAGE
+        assert record.error != GENERIC_FAILURE_MESSAGE
+
+    def test_the_nodes_that_landed_before_the_deadline_are_kept(self):
+        """The partial progress is the diagnostic; it is not a partial report."""
+        runner = HangingRunner(nodes=("extract", "validate", "prepare"))
+        record = TestExecuteJob.run_with(runner, deadline_seconds=0.05)
+
+        assert [e.node for e in record.events if e.kind == "node"] == [
+            "extract",
+            "validate",
+            "prepare",
+        ]
+        assert record.report is None
+        assert record.events[-1].status == "failed"
+
+    def test_a_run_inside_the_deadline_is_untouched(self):
+        record = TestExecuteJob.run_with(StubPipelineRunner(), deadline_seconds=30)
+        assert record.status == "completed"
+        assert record.report is not None

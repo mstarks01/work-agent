@@ -214,6 +214,7 @@ def create_app(
     runner: PipelineRunner | None = None,
     verifier: TokenVerifier | None = None,
     limits: SourceLimits | None = None,
+    job_deadline_seconds: float | None = None,
 ) -> FastAPI:
     """Build the service app; production defaults, injectable seams for tests.
 
@@ -224,10 +225,11 @@ def create_app(
     gate — a report it produced was never certified, so there is nothing for
     the route to withhold on.
 
-    ``limits`` bounds what one job may carry. It comes from the deployment
-    wherever there is one; a caller who injects a runner instead must state it,
-    because reading a second configuration behind their back is how an app
-    comes to enforce bounds its deployment never chose.
+    ``limits`` bounds what one job may carry, and ``job_deadline_seconds``
+    bounds how long one may run. Both come from the deployment wherever there
+    is one; a caller who injects a runner instead must state them, because
+    reading a second configuration behind their back is how an app comes to
+    enforce bounds its deployment never chose.
     """
     app = FastAPI(title="STRIDE Threat-Modeling Service")
     app.state.store = store if store is not None else build_store()
@@ -245,7 +247,15 @@ def create_app(
                 "a deployment"
             )
         limits = deployment.resilience.source_limits()
+    if job_deadline_seconds is None:
+        if deployment is None:
+            raise ConfigError(
+                "create_app needs job_deadline_seconds= when it is given a "
+                "runner instead of a deployment"
+            )
+        job_deadline_seconds = deployment.resilience.deadline_seconds()
     app.state.limits = limits
+    app.state.job_deadline_seconds = job_deadline_seconds
     max_body_bytes = limits.max_total_bytes * _BODY_SLACK
     app.state.verifier = verifier if verifier is not None else build_verifier()
 
@@ -304,7 +314,11 @@ def create_app(
         )
         await request.app.state.store.create(record)
         background_tasks.add_task(
-            execute_job, request.app.state.store, request.app.state.runner, record.id
+            execute_job,
+            request.app.state.store,
+            request.app.state.runner,
+            record.id,
+            deadline_seconds=request.app.state.job_deadline_seconds,
         )
         return JSONResponse(
             {"job_id": record.id, "status": record.status},
