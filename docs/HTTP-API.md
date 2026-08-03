@@ -137,6 +137,7 @@ when a deployment changes vendor. Shape is checked before size:
 | --- | --- |
 | `422` | A source is malformed: unknown `kind`, missing or over-long `label`, empty `text`, an unknown field. |
 | `400` | `sources` is present but empty. |
+| `422` | Two sources share a `label`. Refused at any size — a label is a citation key, so a repeated one leaves every excerpt naming it ambiguous. The message names the repeated labels. |
 | `413` | More sources than the deployment allows. The message names the count and the limit. |
 | `413` | The sources total more bytes than allowed. There is no per-source cap, so the message names **no** culprit — it carries a per-label byte breakdown instead, because the overspend belongs to the sum. |
 
