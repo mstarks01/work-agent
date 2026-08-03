@@ -23,7 +23,7 @@ from stride_service.deployment import (
 from stride_service.errors import ConfigError
 from stride_service.jobs import InMemoryJobStore
 from stride_service.model_gate import ModelGateError
-from stride_service.model_tiers import ModelConfigError
+from stride_service.model_tiers import LLM_NODES, ModelConfigError
 from stride_service.vendors import ProviderAuthError
 from tests.factories import PROJECT_ROOT
 
@@ -157,6 +157,39 @@ def test_the_ten_llm_nodes_share_two_adapters_one_per_tier():
     assert len(adapters) == 2
 
 
+def test_every_llm_node_carries_the_retry_loop():
+    """The wiring, without which every retry test still passes and nothing retries."""
+    pipeline = Deployment.from_env(env=VERTEX_ENV).pipeline()
+    nodes = {node.name: node for node in pipeline.workflow.graph.nodes}
+
+    for name in graph.TIER_NODE_BY_GRAPH_NODE:
+        policy = getattr(type(nodes[name].model), "retry_policy", None)
+        assert policy is not None, f"{name} has no retry loop"
+        assert policy.attempts == 3
+
+
+def test_both_tiers_draw_on_one_shared_retry_budget():
+    """A storm is a property of the process, not of a tier.
+
+    Two budgets would let the six analysts exhaust the strong tier's allowance
+    while the base tier's sat untouched beside it — and both are pointed at the
+    same provider quota.
+    """
+    pipeline = Deployment.from_env(env=VERTEX_ENV).pipeline()
+    nodes = {node.name: node for node in pipeline.workflow.graph.nodes}
+
+    budgets = {
+        id(type(nodes[name].model).retry_policy.budget)
+        for name in graph.TIER_NODE_BY_GRAPH_NODE
+    }
+    assert len(budgets) == 1
+    # Capacity is one retry per LLM node in the graph: what one job may spend
+    # from a cold bucket.
+    budget = type(nodes[graph.CRITIC_NODE].model).retry_policy.budget
+    assert budget.capacity == len(LLM_NODES)
+    assert budget.ratio == 0.1
+
+
 def test_the_pipeline_binds_retry_and_timeout():
     """Every LLM node carries the retry policy and the deadline."""
     from google.adk.models.lite_llm import LiteLlm
@@ -167,8 +200,10 @@ def test_the_pipeline_binds_retry_and_timeout():
     ]
 
     assert isinstance(critic.model, LiteLlm)
-    # attempts=3 is a total; LiteLLM counts retries after the first try.
-    assert critic.model._additional_args["num_retries"] == 2
+    # Zero on purpose: the library's retry layer is off so it cannot set the
+    # provider SDK's max_retries from it, and the loop runs one level up in
+    # stride_service.retry, where a shared budget can bound it.
+    assert critic.model._additional_args["num_retries"] == 0
     assert critic.generate_content_config.http_options.timeout == 300000
 
 
@@ -187,7 +222,10 @@ def test_env_overrides_the_retry_attempts_without_touching_the_model():
     pipeline = deployment.pipeline()
     nodes = {node.name: node for node in pipeline.workflow.graph.nodes}
 
-    assert nodes[graph.CRITIC_NODE].model._additional_args["num_retries"] == 4
+    # The override reaches the retry policy, not the adapter: the library's
+    # layer stays off whatever attempts says.
+    assert nodes[graph.CRITIC_NODE].model._additional_args["num_retries"] == 0
+    assert deployment.resilience.attempts == 5
     assert pipeline.node_models[graph.CRITIC_NODE] == "vertex_ai/gemini-2.5-pro"
 
 

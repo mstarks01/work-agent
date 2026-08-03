@@ -96,10 +96,11 @@ from stride_service.report import (
     STRIDE_CATEGORIES,
     DraftThreat,
     DraftThreats,
-    ReviewedThreats,
     StrideCategory,
     Summary,
     Threat,
+    ThreatRuling,
+    ThreatRulings,
     build_summary,
 )
 from stride_service.resilience import ResilienceConfig
@@ -495,9 +496,9 @@ def route_review(
     The check runs here rather than in :func:`assemble_report` because
     re-asking a malformed critic means deciding *before* assembly whether it is
     malformed. Clean output routes to ``accept``; a critic that dropped,
-    invented, duplicated or mis-referenced a threat routes to ``revise``, with
-    the failing ruling and the problem list parked where the re-ask prompt
-    reads them.
+    invented or duplicated a ruling, or hung a ``needs-info`` verdict on an
+    element the model does not contain, routes to ``revise``, with the failing
+    rulings and the problem list parked where the re-ask prompt reads them.
 
     Both review nodes run this same function — what differs is where their
     ``revise`` edge points (``recritic`` for the first look, ``critic_failed``
@@ -509,22 +510,22 @@ def route_review(
     parameter-binding ``ValueError`` naming this function, which reads as a
     graph defect rather than as what it is. A model returns nothing when its
     completion is truncated at ``max_output_tokens`` — reasoning tokens are
-    spent against that same cap, so the critic, whose output is every draft
-    re-emitted with a verdict, is the node that hits it first. Absent output is
-    output that dropped every draft, so it takes the ``revise`` edge the graph
-    already has: one bounded re-ask, then ``critic_failed`` raises the
-    ``CriticOutputError`` that names what did not reconcile.
+    spent against that same cap, so the critic, which rules on every draft in
+    one pass, is the node that hits it first. Absent output is output that
+    dropped every draft, so it takes the ``revise`` edge the graph already has:
+    one bounded re-ask, then ``critic_failed`` raises the ``CriticOutputError``
+    that names what did not reconcile.
     """
     model = SystemModel.model_validate(valid_model)
     drafts = [DraftThreat.model_validate(draft) for draft in merged_drafts]
     ruled = _threats_of(reviewed_threats)
-    reviewed = [Threat.model_validate(threat) for threat in ruled]
-    issues = review_issues(drafts, reviewed, model)
+    rulings = [ThreatRuling.model_validate(ruling) for ruling in ruled]
+    issues = review_issues(drafts, rulings, model)
     if issues:
         ctx.state[STATE_PREVIOUS_REVIEW] = render(ruled)
         ctx.state[STATE_CRITIC_ISSUES] = render(issues)
         return Event(route=ROUTE_REVISE, output={"issue_count": len(issues)})
-    return Event(route=ROUTE_ACCEPT, output={"reviewed_count": len(reviewed)})
+    return Event(route=ROUTE_ACCEPT, output={"reviewed_count": len(rulings)})
 
 
 def fail_review(
@@ -545,11 +546,13 @@ def fail_review(
     """
     model = SystemModel.model_validate(valid_model)
     drafts = [DraftThreat.model_validate(draft) for draft in merged_drafts]
-    ruled = _threats_of(reviewed_threats)
-    reviewed = [Threat.model_validate(threat) for threat in ruled]
+    rulings = [
+        ThreatRuling.model_validate(ruling)
+        for ruling in _threats_of(reviewed_threats)
+    ]
     # review_issues is non-empty here by construction; assemble_threats raises
     # the CriticOutputError naming exactly what still does not reconcile.
-    assemble_threats(drafts, reviewed, model)
+    assemble_threats(drafts, rulings, model)
     raise AssertionError("fail_review reached on reconciled critic output")
 
 
@@ -574,9 +577,11 @@ def assemble_report(
     """
     model = SystemModel.model_validate(valid_model)
     drafts = [DraftThreat.model_validate(draft) for draft in merged_drafts]
-    ruled = _threats_of(reviewed_threats)
-    reviewed = [Threat.model_validate(threat) for threat in ruled]
-    threats, rejected = assemble_threats(drafts, reviewed, model)
+    rulings = [
+        ThreatRuling.model_validate(ruling)
+        for ruling in _threats_of(reviewed_threats)
+    ]
+    threats, rejected = assemble_threats(drafts, rulings, model)
     analysis = Analysis(
         system_model=model,
         boundary_crossings=model.boundary_crossings(),
@@ -776,7 +781,7 @@ def build_pipeline(
         instruction=_instruction(
             compose_critic_skills(skill_loader), compose_critic_prompt(prompt_loader)
         ),
-        output_schema=ReviewedThreats,
+        output_schema=ThreatRulings,
         output_key=STATE_REVIEWED_THREATS,
         resolve_model=resolve_model,
         resolve_sampling=resolve_sampling,
@@ -785,7 +790,7 @@ def build_pipeline(
     recritic = _llm_node(
         name=RECRITIC_NODE,
         instruction=recritic_instruction(skill_loader, prompt_loader),
-        output_schema=ReviewedThreats,
+        output_schema=ThreatRulings,
         output_key=STATE_REVIEWED_THREATS,
         resolve_model=resolve_model,
         resolve_sampling=resolve_sampling,

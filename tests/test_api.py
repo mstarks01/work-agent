@@ -8,6 +8,7 @@ from fastapi.testclient import TestClient
 
 from stride_service.api import create_app
 from stride_service.auth import AuthenticationError
+from stride_service.errors import ConfigError
 from stride_service.jobs import (
     InMemoryJobStore,
     JobRecord,
@@ -55,6 +56,9 @@ def auth(token: str = "alice-token") -> dict[str, str]:
 # Small enough that an over-budget body is a few hundred bytes rather than a
 # hundred kilobytes, so the size tests stay readable.
 TEST_LIMITS = SourceLimits(max_total_bytes=512, max_sources=3)
+# Far above anything the stub runner takes: these tests are about the routes,
+# not the deadline. The deadline's own behaviour is tested in ``test_jobs``.
+TEST_DEADLINE_SECONDS = 30
 
 
 def make_client(
@@ -66,6 +70,7 @@ def make_client(
         runner=runner if runner is not None else StubPipelineRunner(),
         verifier=FakeVerifier(),
         limits=limits,
+        job_deadline_seconds=TEST_DEADLINE_SECONDS,
     )
     return TestClient(app), store
 
@@ -94,6 +99,33 @@ def parse_sse(body: str) -> list[dict]:
         frame["data"] = json.loads(frame["data"])
         frames.append(frame)
     return frames
+
+
+class TestInjectedBoundsMustBeStated:
+    """An injected runner brings no config, so its bounds must be named.
+
+    Reading a second configuration behind the caller's back is how an app comes
+    to enforce bounds its deployment never chose — the same rule ``limits`` has
+    always had, extended to the job deadline.
+    """
+
+    def test_a_runner_without_a_deadline_is_refused(self):
+        with pytest.raises(ConfigError, match="job_deadline_seconds"):
+            create_app(
+                store=InMemoryJobStore(),
+                runner=StubPipelineRunner(),
+                verifier=FakeVerifier(),
+                limits=TEST_LIMITS,
+            )
+
+    def test_a_runner_without_limits_is_refused(self):
+        with pytest.raises(ConfigError, match="limits"):
+            create_app(
+                store=InMemoryJobStore(),
+                runner=StubPipelineRunner(),
+                verifier=FakeVerifier(),
+                job_deadline_seconds=TEST_DEADLINE_SECONDS,
+            )
 
 
 class TestHealthAndAuth:

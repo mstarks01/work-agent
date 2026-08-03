@@ -47,10 +47,10 @@ def case():
     return load_case(CASE_DIR)
 
 
-def scripted_threat(case, category, *, promoted: bool) -> dict:
-    """One threat citing an element the blessed model really contains."""
+def scripted_draft(case, category) -> dict:
+    """One analyst draft citing an element the blessed model really contains."""
     reference = next(ref for ref in case.references if ref.category == category)
-    fields = {
+    return {
         "id": f"{CATEGORY_LETTERS[category]}-01",
         "category": category,
         "title": reference.claim,
@@ -63,10 +63,19 @@ def scripted_threat(case, category, *, promoted: bool) -> dict:
         ).model_dump(mode="json"),
         "mitigations": [Mitigation(summary="Scripted mitigation").model_dump()],
     }
-    if promoted:
-        fields["confidence"] = "high"
-        fields["verdict"] = Verdict(status="confirmed").model_dump(mode="json")
-    return fields
+
+
+def scripted_ruling(category) -> dict:
+    """The critic's ruling on one scripted draft: judgement only, keyed by ID.
+
+    Carries no ``severity``: the draft's rating stands, which is the common
+    case and the one the assemble seam merges through.
+    """
+    return {
+        "id": f"{CATEGORY_LETTERS[category]}-01",
+        "confidence": "high",
+        "verdict": Verdict(status="confirmed").model_dump(mode="json"),
+    }
 
 
 def build(case, entry, models: dict[str, ScriptedLlm]) -> object:
@@ -91,18 +100,11 @@ def _reply_for(case, graph_node: str) -> str:
         return json.dumps(case.model.model_dump(mode="json"))
     if graph_node == "critic":
         return json.dumps(
-            {
-                "threats": [
-                    scripted_threat(case, category, promoted=True)
-                    for category in STRIDE_CATEGORIES
-                ]
-            }
+            {"threats": [scripted_ruling(category) for category in STRIDE_CATEGORIES]}
         )
     for category in STRIDE_CATEGORIES:
         if graph_node == analyst_node_name(category):
-            return json.dumps(
-                {"threats": [scripted_threat(case, category, promoted=False)]}
-            )
+            return json.dumps({"threats": [scripted_draft(case, category)]})
     return '{"threats": []}'
 
 

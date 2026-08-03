@@ -22,12 +22,12 @@ from stride_service.model_tiers import LLM_NODES
 from stride_service.report import (
     STRIDE_CATEGORIES,
     DraftThreats,
-    ReviewedThreats,
+    ThreatRulings,
 )
 from stride_service.resilience import load_resilience
 from stride_service.sampling import load_sampling
 from stride_service.system_model import SystemModel
-from tests.factories import repo_tiers, sample_draft, sample_threat, valid_model
+from tests.factories import repo_tiers, sample_draft, sample_ruling, valid_model
 
 PROJECT_ROOT = __import__("pathlib").Path(__file__).resolve().parents[1]
 
@@ -329,7 +329,7 @@ def test_recritic_runs_on_the_critic_tier_and_emits_the_review_schema(pipeline):
     by_name = nodes_by_name(pipeline)
     recritic = by_name[graph.RECRITIC_NODE]
     assert isinstance(recritic, LlmAgent)
-    assert recritic.output_schema is ReviewedThreats
+    assert recritic.output_schema is ThreatRulings
     assert recritic.output_key == graph.STATE_REVIEWED_THREATS
     assert recritic.model == by_name[graph.CRITIC_NODE].model
 
@@ -344,7 +344,7 @@ def test_llm_nodes_emit_their_schema(pipeline):
     by_name = nodes_by_name(pipeline)
     assert by_name[graph.EXTRACT_NODE].output_schema is SystemModel
     assert by_name[graph.REPAIR_NODE].output_schema is SystemModel
-    assert by_name[graph.CRITIC_NODE].output_schema is ReviewedThreats
+    assert by_name[graph.CRITIC_NODE].output_schema is ThreatRulings
     for name in graph.ANALYST_GRAPH_NODES:
         assert by_name[name].output_schema is DraftThreats
 
@@ -584,14 +584,14 @@ def test_merge_fails_closed_on_a_hallucinated_element():
 
 def test_router_accepts_well_formed_critic_output():
     drafts = [sample_draft("S-01")]
-    reviewed = [sample_threat("S-01")]
+    rulings = [sample_ruling("S-01")]
     ctx = FakeContext()
     event = graph.route_review(
         valid_model().model_dump(mode="json"),
         [draft.model_dump(mode="json") for draft in drafts],
         ctx,
         reviewed_threats={
-            "threats": [threat.model_dump(mode="json") for threat in reviewed]
+            "threats": [ruling.model_dump(mode="json") for ruling in rulings]
         },
     )
     assert event.actions.route == graph.ROUTE_ACCEPT
@@ -601,14 +601,14 @@ def test_router_accepts_well_formed_critic_output():
 def test_router_revises_and_feeds_the_re_ask_prompt():
     """A dropped draft routes to the re-ask, parking the ruling and the issues."""
     drafts = [sample_draft("S-01"), sample_draft("T-01", category="tampering")]
-    reviewed = [sample_threat("S-01")]  # T-01 dropped
+    rulings = [sample_ruling("S-01")]  # T-01 dropped
     ctx = FakeContext()
     event = graph.route_review(
         valid_model().model_dump(mode="json"),
         [draft.model_dump(mode="json") for draft in drafts],
         ctx,
         reviewed_threats={
-            "threats": [threat.model_dump(mode="json") for threat in reviewed]
+            "threats": [ruling.model_dump(mode="json") for ruling in rulings]
         },
     )
     assert event.actions.route == graph.ROUTE_REVISE
@@ -658,22 +658,21 @@ def test_a_silent_re_ask_fails_naming_the_drafts_it_never_ruled():
 def test_fail_review_raises_the_still_unreconciled_issues():
     """The second look reached the terminal: the job fails, naming what is wrong."""
     drafts = [sample_draft("S-01"), sample_draft("T-01", category="tampering")]
-    reviewed = [sample_threat("S-01")]  # T-01 still dropped after the re-ask
+    rulings = [sample_ruling("S-01")]  # T-01 still dropped after the re-ask
     with pytest.raises(CriticOutputError, match="dropped draft 'T-01'"):
         graph.fail_review(
             valid_model().model_dump(mode="json"),
             [draft.model_dump(mode="json") for draft in drafts],
             reviewed_threats={
-                "threats": [threat.model_dump(mode="json") for threat in reviewed]
+                "threats": [ruling.model_dump(mode="json") for ruling in rulings]
             },
         )
 
 
 def test_assemble_splits_rulings_and_builds_the_summary():
-    confirmed = sample_threat("S-01")
-    rejected = sample_threat(
+    confirmed = sample_ruling("S-01")
+    rejected = sample_ruling(
         "T-01",
-        category="tampering",
         verdict={"status": "rejected", "reason": "duplicate of S-01"},
     )
     drafts = [
@@ -686,7 +685,7 @@ def test_assemble_splits_rulings_and_builds_the_summary():
         [draft.model_dump(mode="json") for draft in drafts],
         ctx,
         reviewed_threats={
-            "threats": [t.model_dump(mode="json") for t in (confirmed, rejected)]
+            "threats": [r.model_dump(mode="json") for r in (confirmed, rejected)]
         },
     )
 
@@ -707,6 +706,6 @@ def test_assemble_fails_closed_when_the_critic_drops_a_draft():
             [draft.model_dump(mode="json") for draft in drafts],
             ctx,
             reviewed_threats={
-                "threats": [sample_threat("S-01").model_dump(mode="json")]
+                "threats": [sample_ruling("S-01").model_dump(mode="json")]
             },
         )

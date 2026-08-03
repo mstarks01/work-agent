@@ -32,7 +32,7 @@ from tests.factories import (
     PROJECT_ROOT,
     repo_tiers,
     sample_draft,
-    sample_threat,
+    sample_ruling,
     served_build,
     threats_json,
     valid_model,
@@ -81,7 +81,7 @@ def happy_replies() -> dict[str, str]:
     return {
         "extract": valid_model().model_dump_json(),
         graph.analyst_node_name("spoofing"): draft_json("S-01", "spoofing"),
-        "critic": threats_json(sample_threat("S-01")),
+        "critic": threats_json(sample_ruling("S-01")),
     }
 
 
@@ -168,9 +168,7 @@ def test_each_analyst_gets_its_own_category_and_the_shared_model():
 def test_the_critic_sees_every_analysts_drafts_once():
     replies = happy_replies()
     replies[graph.analyst_node_name("tampering")] = draft_json("T-01", "tampering")
-    replies["critic"] = threats_json(
-        sample_threat("S-01"), sample_threat("T-01", category="tampering")
-    )
+    replies["critic"] = threats_json(sample_ruling("S-01"), sample_ruling("T-01"))
     pipeline, models = build(replies)
     outcome, _ = run(pipeline, job())
 
@@ -235,11 +233,9 @@ def test_a_malformed_critic_output_is_re_asked_once_and_then_assembled():
     """The critic drops a draft; the bounded re-ask returns the full set."""
     replies = happy_replies()
     replies[graph.analyst_node_name("tampering")] = draft_json("T-01", "tampering")
-    both = threats_json(
-        sample_threat("S-01"), sample_threat("T-01", category="tampering")
-    )
+    both = threats_json(sample_ruling("S-01"), sample_ruling("T-01"))
     # The critic drops T-01; the re-ask returns both drafts, reconciled.
-    replies["critic"] = threats_json(sample_threat("S-01"))
+    replies["critic"] = threats_json(sample_ruling("S-01"))
     replies["recritic"] = both
 
     pipeline, models = build(replies)
@@ -261,9 +257,7 @@ def test_a_malformed_critic_output_is_re_asked_once_and_then_assembled():
 
 def test_a_critic_that_will_not_reconcile_after_the_re_ask_fails_the_job_loudly():
     replies = happy_replies()
-    invented = threats_json(
-        sample_threat("S-01"), sample_threat("T-02", category="tampering")
-    )
+    invented = threats_json(sample_ruling("S-01"), sample_ruling("T-02"))
     # Both the critic and its re-ask return a threat no analyst drafted.
     replies["critic"] = invented
     replies["recritic"] = invented
@@ -304,9 +298,7 @@ def test_a_failed_job_logs_the_input_digest(caplog):
     import logging
 
     replies = happy_replies()
-    invented = threats_json(
-        sample_threat("S-01"), sample_threat("T-02", category="tampering")
-    )
+    invented = threats_json(sample_ruling("S-01"), sample_ruling("T-02"))
     replies["critic"] = invented
     replies["recritic"] = invented
     pipeline, _ = build(replies)
