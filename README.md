@@ -6,9 +6,17 @@ a [Google ADK](https://google.github.io/adk-docs/) multi-agent graph over
 per-tier models from any supported vendor — Vertex, Anthropic or OpenAI, with no
 privileged default.
 
-```
-sources (text) ──▶ extract ──▶ [ 6 STRIDE analysts in parallel ] ──▶ critic ──▶ StrideReport
-                     (base)              (strong)                     (strong)      (JSON)
+```mermaid
+flowchart LR
+    src[/"sources<br/>(text)"/] --> extract["extract<br/>(base)"]
+    extract --> analysts["6 STRIDE analysts<br/>in parallel<br/>(strong)"]
+    analysts --> critic["critic<br/>(strong)"]
+    critic --> report[/"StrideReport<br/>(JSON)"/]
+
+    classDef io fill:#f1f5f9,stroke:#64748b,stroke-width:1.5px,color:#0f172a
+    classDef llm fill:#ede9fe,stroke:#7c3aed,stroke-width:1.5px,color:#2e1065
+    class src,report io
+    class extract,analysts,critic llm
 ```
 
 An extraction pass builds the canonical **System Model** (a DFD); six per-category

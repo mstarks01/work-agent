@@ -10,16 +10,46 @@ runs between text in and report out.
 A static ADK Workflow with deterministic `FunctionNode` bookends around the
 model calls:
 
+```mermaid
+flowchart TD
+    start([text in]) --> extract["extract<br/>(base)"]
+    extract --> validate{{validate}}
+    validate -- valid --> prepare[prepare]
+    validate -- invalid --> repair["repair<br/>(base)"]
+    repair --> revalidate{{revalidate}}
+    revalidate -- valid --> prepare
+    revalidate -- invalid --> reject([rejected])
+
+    prepare --> analysts["6 STRIDE analysts,<br/>one per category, in parallel<br/>(strong)"]
+    analysts --> merge[merge]
+    merge --> critic["critic<br/>(strong)"]
+    critic --> router{{route_review}}
+
+    router -- accept --> assemble[assemble]
+    router -- revise --> recritic["recritic<br/>(strong)"]
+    recritic --> rereview{{rereview}}
+    rereview -- accept --> assemble
+    rereview -- revise --> failed([failed])
+    assemble --> report([StrideReport])
+
+    classDef llm fill:#ede9fe,stroke:#7c3aed,stroke-width:1.5px,color:#2e1065
+    classDef code fill:#e0f2fe,stroke:#0284c7,stroke-width:1.5px,color:#082f49
+    classDef gate fill:#fef3c7,stroke:#d97706,stroke-width:1.5px,color:#451a03
+    classDef good fill:#dcfce7,stroke:#16a34a,stroke-width:1.5px,color:#052e16
+    classDef bad fill:#fee2e2,stroke:#dc2626,stroke-width:1.5px,color:#450a0a
+    classDef io fill:#f1f5f9,stroke:#64748b,stroke-width:1.5px,color:#0f172a
+
+    class extract,repair,analysts,critic,recritic llm
+    class prepare,merge,assemble code
+    class validate,revalidate,router,rereview gate
+    class report good
+    class reject,failed bad
+    class start io
 ```
-extract -> validate -> prepare -> [6 analysts] -> merge -> critic -> route_review
-                |  ^                                                      |
-             (repair)                                            accept / revise
-                                                                   |        |
-                                                              assemble   recritic -> rereview
-                                                                              accept / revise
-                                                                                |        |
-                                                                           assemble  critic_failed
-```
+
+Purple nodes are model calls. Everything else is a deterministic `FunctionNode`:
+blue ones do work, amber ones only choose an edge, and the rounded ends are the
+run's three outcomes.
 
 - **extract** turns the untrusted text into a canonical system model (five DFD
   element types: external entity, process, data store, data flow, trust

@@ -29,12 +29,34 @@ sentence with the commands filled in.
 
 ## The workflow at a glance
 
-```
-1. Trust the judge         calibrate  ──▶ ≥90% agreement, or fix the judge prompt
-2. Establish a baseline    run ×5     ──▶ the metric averages AND their spread
-3. Change one lever        edit/env   ──▶ sampling, a prompt, or the corpus
-4. Re-run and compare      run ×5     ──▶ beat the baseline spread, per case
-5. Promote the winner      commit     ──▶ (sampling also updates the blessed list)
+```mermaid
+flowchart TD
+    subgraph setup["Once per tuning session"]
+        direction TB
+        s1["1. Trust the judge<br/>calibrate"]
+        s2["2. Establish a baseline<br/>run ×5 — the metric averages<br/>AND their spread"]
+        s1 -- "≥90% agreement,<br/>or fix the judge prompt" --> s2
+    end
+
+    subgraph tune["Repeat per idea"]
+        direction TB
+        s3["3. Change one lever<br/>edit/env — sampling,<br/>a prompt, or the corpus"]
+        s4["4. Re-run and compare<br/>run ×5"]
+        s5["5. Promote the winner<br/>commit — sampling also<br/>updates the blessed list"]
+        s3 --> s4
+        s4 -- "beats the baseline<br/>spread, per case" --> s5
+        s4 -. "it doesn't" .-> s3
+    end
+
+    s2 --> s3
+    s5 -. "next idea" .-> s3
+
+    classDef step fill:#e0f2fe,stroke:#0284c7,stroke-width:1.5px,color:#082f49
+    classDef win fill:#dcfce7,stroke:#16a34a,stroke-width:1.5px,color:#052e16
+    class s1,s2,s3,s4 step
+    class s5 win
+    style setup fill:#f8fafc,stroke:#94a3b8,stroke-dasharray:4 4,color:#0f172a
+    style tune fill:#f8fafc,stroke:#94a3b8,stroke-dasharray:4 4,color:#0f172a
 ```
 
 Do them in order. Steps 1–2 are setup you do once per tuning session; 3–5 are the
