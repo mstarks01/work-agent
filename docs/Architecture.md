@@ -244,6 +244,7 @@ and the selection seam are in place for all of them.
 | `stride_service.engine` | In-process `StrideEngine` facade. |
 | `stride_service.api` | The `/v1` FastAPI app. |
 | `stride_service.jobs` | Job lifecycle, `JobStore`, `PipelineRunner` seams. |
+| `stride_service.sources` | `Source`: the untrusted text a job is built from, the per-deployment bounds both entry points enforce, and the fenced render that is the only way caller bytes reach a model (OWASP LLM01). |
 | `stride_service.deployment` | One installation's config, resolved once: the files, the graph they configure, its runner and its certification gate. |
 | `stride_service.pipeline` | `AdkPipelineRunner`: one job's identity, input digest and certification around a Graph Run. |
 | `stride_service.execution` | Drives a built graph and stamps each node execution. Shared by the service and the eval harness. |
@@ -259,3 +260,4 @@ and the selection seam are in place for all of them.
 | `stride_service.model_gate` | The startup check that asks the provider library whether a tier's parameters are actually supported. |
 | `stride_service.certification` | Compares a run's fingerprints against the deployment's blessed manifest. |
 | `stride_service.auth` | Bearer-token (OIDC JWT) verification. |
+| `stride_service.errors` | `ConfigError`, the base every fail-closed config loader raises — so a caller can handle "this deployment cannot run" without enumerating which knob was wrong. |
