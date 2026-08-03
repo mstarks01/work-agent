@@ -55,9 +55,17 @@ gh api --method POST repos/mstarks01/work-agent/issues/<child>/dependencies/bloc
 
 ### The live map
 
-None. [#49](https://github.com/mstarks01/work-agent/issues/49) completed 2026-07-31 and has
+[#76 — Map: tie every finding back to the input text that justifies it](https://github.com/mstarks01/work-agent/issues/76)
+— 9 tickets, charted 2026-08-03. A **planning** map: it settles the spec for finding-level
+attribution — every threat carrying a non-empty record of what justifies it, a quote from the
+submitter's own words, a named unknown attribute, or a named derived fact — and stops at the spec.
+Frontier on charting: [#77](https://github.com/mstarks01/work-agent/issues/77) (naming, and the
+`Analyst` overload) and [#78](https://github.com/mstarks01/work-agent/issues/78) (render safety).
+[#79](https://github.com/mstarks01/work-agent/issues/79), the schema, is the narrow neck — six
+tickets wait on it.
+
+[#49](https://github.com/mstarks01/work-agent/issues/49) completed 2026-07-31 and has
 moved to Completed efforts below; its spec was implemented and merged 2026-08-01.
-Chart a new one only under the bar at the end of this file.
 
 ### Completed efforts
 
