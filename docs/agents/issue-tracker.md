@@ -228,9 +228,35 @@ naming the winner, so both sets of grounds survive in their own arrays. It also 
 record**: `related_unknowns` does have a referential check today — the `element_id` half, at
 `critic.py:72-82` — so only the `attribute` half was ever open.
 
-Frontier now: [#84](https://github.com/mstarks01/work-agent/issues/84) and
-[#85](https://github.com/mstarks01/work-agent/issues/85) — both open, unblocked and unclaimed, still
-a parallel step, so expect concurrent sessions. #85 carries constraints from #81, #82 and now #83.
+[#84](https://github.com/mstarks01/work-agent/issues/84) resolved 2026-08-04 and settles the
+**display**, against a three-variant prototype. Grounds render **after** the analysis as a
+kind-coded rail under Affected elements, each entry led by its branch in words (*Quoted from the
+submission* / *Unstated in the submission* / *Derived from the model*), in hues deliberately outside
+the severity ramp. Evidence-as-the-card's-lede served the map's submitter-facing goal most directly
+and **lost because the card's job on first read is triage**; margin citations lost because 260px
+cannot carry a 1000-char quote. Long quotes **clamp to three lines and expand in place** — anything
+that fits renders whole, with no affordance at all. An **unverified** quote (#80's marked-per-entry
+outcome) **drops its quotation marks**, which assert a span the service could not find, and names the
+failure in **visible text** — `⚠ not found in <label>`, never a `title`: #78 killed the tooltip
+*escaping* problem, not the fact that keyboard and touch cannot reach one. The **needs-info
+duplication stays** (a ground and `related_unknowns` naming one `element_id → attribute` have
+different authors — the agent's trigger, the critic's citation). The **element table gains nothing**
+and all attribution lives on findings, which is how #81's competing-quotes hazard is satisfied — and
+which **also settles the `notes`-beside-grounds fog** by the same argument.
+
+Two of its questions were **already answered elsewhere**: **`source_speaker` has nowhere to sit**,
+since #79's quote branch is `text` + `source_label`, #82 sources quotes from `{input_text}` whose
+transcript fences carry `Priya:` inline, and #80 verifies a quote that keeps its labels — the speaker
+rides inside the quote's own bytes and needs no chrome; and **rejected threats need no separate
+treatment**, rendering through the same card with the grounds #83 established they keep. It also
+**declined the silent confidence downgrade** the map had parked here: a viewer could only *infer* the
+reason, and an inference beside verified evidence is worse than silence, so it stays fog as a
+**schema** question awaiting a measurement. The three variants, losers included, live on
+`prototype/grounds-display` @ `94bac96` (`webapp/prototype_grounds_view.html`) — throwaway, and the
+branch is the citation until the map completes.
+
+Frontier now: [#85](https://github.com/mstarks01/work-agent/issues/85) alone — open, unblocked and
+unclaimed, and the **last** ticket on the map. #85 carries constraints from #81, #82, #83 and #84.
 For the record of how the map got here: #79 left three questions explicitly to siblings — verbatim
 quote verification was #80's, prompt instruction was #82's, `related_unknowns` was #83's, and all
 three are now closed. #82 was retitled to "How a **category agent** is instructed…" — its old title
@@ -239,7 +265,8 @@ every excerpt" as **false**, its `graph.py:285` reference being stale (`graph.py
 
 The measurement lives on `prototype/quote-verification` @ `6ed8d77`
 (`prototypes/quote_verification_prototype.py`), pushed — throwaway code, but re-runnable, and the
-branch is the citation until the map completes and it becomes an `archive/` tag.
+branch is the citation until the map completes and it becomes an `archive/` tag. #84's variants sit
+on `prototype/grounds-display` under the same rule.
 
 [#49](https://github.com/mstarks01/work-agent/issues/49) completed 2026-07-31 and has
 moved to Completed efforts below; its spec was implemented and merged 2026-08-01.
