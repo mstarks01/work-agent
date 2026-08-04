@@ -62,7 +62,10 @@ names appear exactly as the graph emits them, which is why a category agent read
 must be Python identifiers.
 
 **The report** — threat cards, a severity summary, the extracted DFD, and the
-served-build provenance for every LLM node.
+served-build provenance for every LLM node. Each card carries the threat's
+**grounds** under the analysis: the quotes, unknown attributes and boundary
+crossings the agent raised it on, with a quote the service could not find in its
+source marked as such rather than hidden.
 
 ## When the configuration is wrong
 
