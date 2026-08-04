@@ -4,7 +4,7 @@
 # is a reviewable diff here, promoted by an eval sweep.
 #
 # Keyed by tier, reusing model_tiers.toml's node -> tier map: `base` runs
-# extraction and repair, `strong` the six STRIDE analysts, the critic and the
+# extraction and repair, `strong` the six STRIDE category agents, the critic and the
 # re-ask. Every decoding param the surface admits is listed per tier — pinned to
 # a value, or left unset with a reason — so the file is the full record of what
 # each tier runs on. An omitted key is not "model default by accident": the

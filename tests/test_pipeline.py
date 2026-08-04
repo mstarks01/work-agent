@@ -220,7 +220,7 @@ def test_each_agent_gets_its_own_category_and_the_shared_model():
         assert "{" not in instruction.split("## Procedure")[0].split("```")[-1]
 
 
-def test_the_critic_sees_every_analysts_drafts_once():
+def test_the_critic_sees_each_category_agents_drafts_once():
     replies = happy_replies()
     replies[graph.analyze_node_name("tampering")] = draft_json("T-01", "tampering")
     replies["critic"] = threats_json(sample_ruling("S-01"), sample_ruling("T-01"))
@@ -313,7 +313,7 @@ def test_a_malformed_critic_output_is_re_asked_once_and_then_assembled():
 def test_a_critic_that_will_not_reconcile_after_the_re_ask_fails_the_job_loudly():
     replies = happy_replies()
     invented = threats_json(sample_ruling("S-01"), sample_ruling("T-02"))
-    # Both the critic and its re-ask return a threat no analyst drafted.
+    # Both the critic and its re-ask return a threat no category agent drafted.
     replies["critic"] = invented
     replies["recritic"] = invented
     pipeline, _ = build(replies)

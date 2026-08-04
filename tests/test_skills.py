@@ -125,7 +125,7 @@ class TestBoundaryDigest:
 
 
 class TestComposition:
-    def test_analyst_order_is_category_rubric_packs(self, skills_root):
+    def test_analyze_order_is_category_rubric_packs(self, skills_root):
         text = compose_analyze_skills(
             MarkdownLoader(skills_root), "spoofing", domain_packs=("web",)
         )
@@ -135,7 +135,7 @@ class TestComposition:
             < text.index("# Web Pack")
         )
 
-    def test_analyst_without_packs_omits_them(self, skills_root):
+    def test_analyze_without_packs_omits_them(self, skills_root):
         text = compose_analyze_skills(MarkdownLoader(skills_root), "spoofing")
         assert "# Web Pack" not in text
 

@@ -285,7 +285,7 @@ class TestAssembleThreats:
 class TestRulingsMergeOntoDrafts:
     """A ruling supplies judgement; every other field comes from the draft."""
 
-    def test_the_analysts_own_fields_survive_the_critic_untouched(self, model):
+    def test_the_agents_own_fields_survive_the_critic_untouched(self, model):
         draft = sample_draft(
             "S-01",
             title="Session cookie theft",
@@ -298,7 +298,7 @@ class TestRulingsMergeOntoDrafts:
         assert threat.affected_element_ids == draft.affected_element_ids
         assert threat.mitigations == draft.mitigations
 
-    def test_a_ruling_without_severity_keeps_the_analysts_rating(self, model):
+    def test_a_ruling_without_severity_keeps_the_agents_rating(self, model):
         draft = sample_draft("S-01", severity=severity("low", "medium"))
         (threat,), _ = assemble_threats([draft], [sample_ruling("S-01")], model)
         assert threat.severity == draft.severity

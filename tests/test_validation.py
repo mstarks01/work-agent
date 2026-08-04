@@ -118,7 +118,7 @@ class TestParseFailures:
 
 
 class TestElementCap:
-    """The ticket-010 admission cap: model size is bounded before analyst spend."""
+    """The ticket-010 admission cap: size is bounded before category-agent spend."""
 
     def sized(self, total):
         """A valid model padded with cloned processes to exactly ``total`` elements."""

@@ -82,7 +82,7 @@ def test_boundary_digest_assembles_within_budget():
     assert estimate_tokens(digest) <= DIGEST_TOKEN_BUDGET
 
 
-# There is no mechanically-pre-filtered element view: every analyst receives the
+# There is no mechanically-pre-filtered element view: every category agent receives
 # whole System Model, and ``## Applicability`` scopes only where a threat may be
 # *filed*. A skill that claims its input was filtered is telling the model
 # something false about what it is looking at.
