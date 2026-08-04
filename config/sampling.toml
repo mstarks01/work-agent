@@ -111,21 +111,38 @@ version = 4
 #          The weaker-evidence half of this pair: 8,192 has not been observed to
 #          truncate here.
 #
-#   strong the critic emits one RULING per draft — an ID, a verdict, a
-#          confidence, and a replacement severity only where it corrected one —
-#          not the draft re-transcribed. That is roughly 60-90 tokens per ruled
-#          threat against the ~400 the old whole-draft shape measured at, so a
-#          36-draft ruling is ~3,000 tokens of visible output rather than
-#          ~14,400. 32,768 is now generous rather than sized: it leaves nearly
-#          all of the budget to reasoning, which is what the strong tier
-#          actually spends it on. RETUNING IT DOWN IS AN OPEN QUESTION and an
-#          eval-gated one — the value enters the sampling fingerprint, so
-#          lowering it re-baselines every blessed number. Left where it is until
-#          a sweep says what the reasoning half really needs.
+#   strong TWO DIFFERENT EMITTERS SHARE THIS TIER, and sizing it against the
+#          smaller of them is what put 32,768 here. The critic emits one RULING
+#          per draft — an ID, a verdict, a confidence, and a replacement
+#          severity only where it corrected one, not the draft re-transcribed —
+#          roughly 60-90 tokens per ruled threat, so a 36-draft ruling is
+#          ~3,000 tokens of visible output. But the six analyze/<category>
+#          agents are on this tier too, and they emit the DRAFTS: ~400 tokens
+#          per threat with its grounds, which is the ~14,400-token whole-draft
+#          shape the paragraph above used to cite as the critic's *old* size.
+#          Those are the tier's real high-water mark, and nothing here was
+#          sized against them.
 #
-# Both are under every ceiling the pinned model map publishes for the models
-# this service can select except gpt-4o's 16,384 — which is the case the
-# build-time ceiling check exists to catch rather than leave to a 400.
+#          64,000 rather than a round 65,536, and that is the binding
+#          constraint rather than a preference: it is the FLOOR OF THE CEILING
+#          SET across the models a deployment may select on this tier — Claude
+#          Sonnet 4.6 publishes exactly 64,000, Gemini 2.5 Pro 65,535, and the
+#          Claude Opus and GPT-5.6 families 128,000. One token more and
+#          binding.py's ceiling check fails the build for any deployment
+#          running Sonnet here. That is the right direction for this to break
+#          in: a model with a lower ceiling now refuses to start rather than
+#          truncating mid-run.
+#
+#          STILL NOT A MEASURED VALUE. It is the most headroom available
+#          without narrowing which models the service can run, which is a
+#          different claim from "enough" — reasoning tokens are spent against
+#          this same cap, and on a high-effort reasoning model they are most of
+#          it. What it buys is 2x the room the truncation was observed at. A
+#          sweep still owes this tier a real number, in both directions.
+#
+# base is unchanged and cannot rise: 16,384 is exactly gpt-4o's published
+# ceiling, so it is already at the floor of its own ceiling set. It has not
+# been observed to truncate.
 
 [tiers.base]
 temperature = 0.0        # pinned greedy decoding; the model's own default is 1.0.
@@ -146,7 +163,7 @@ constrain_output = true  # send this tier's node schema to the provider.
 [tiers.strong]
 temperature = 0.0        # pinned greedy decoding; the model's own default is 1.0.
                          # Unset this line if this tier runs Claude >= 4.7.
-max_output_tokens = 32768 # pinned: silence means a vendor-derived cap (see above)
+max_output_tokens = 64000 # pinned: silence means a vendor-derived cap (see above)
 candidate_count = 1      # reserved Self-MoA lever; loader rejects != 1
 constrain_output = true  # send this tier's node schema to the provider.
                          # Leave it true: setting it false is not currently a
