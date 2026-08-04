@@ -5,6 +5,7 @@ import pytest
 from stride_service.critic import (
     CriticOutputError,
     DraftJoinError,
+    GroundsUnverifiedError,
     assemble_threats,
     join_drafts,
     mentioned_ids,
@@ -395,6 +396,30 @@ class TestQuoteVerification:
         drafts = self.quoting("a sentence the submitter never wrote")
         with pytest.raises(DraftJoinError, match="no ground that verifies"):
             join_drafts(drafts, model, SOURCES)
+
+    def test_the_fail_closed_error_carries_both_halves_of_the_rate(self, model):
+        """The raise site is the only moment the numerator and denominator
+        coexist — the job is over, so nothing downstream can recover them."""
+        drafts = self.quoting("a sentence the submitter never wrote")
+        drafts["tampering"] = [sample_draft("T-01", "tampering")]
+
+        with pytest.raises(GroundsUnverifiedError) as excinfo:
+            join_drafts(drafts, model, SOURCES)
+
+        assert excinfo.value.threat_ids == ("S-01",)
+        assert excinfo.value.draft_count == 2
+
+    def test_an_unresolvable_label_is_not_a_fail_closed_error(self, model):
+        """A draft citing a source that does not exist and a draft quoting one
+        that does wrongly are different faults, and only the second is evidence
+        about fabricated spans."""
+        drafts = self.quoting("log in to the web app")
+        drafts["spoofing"][0].grounds[0].source_label = "no-such-source"
+
+        with pytest.raises(DraftJoinError) as excinfo:
+            join_drafts(drafts, model, SOURCES)
+
+        assert not isinstance(excinfo.value, GroundsUnverifiedError)
 
     def test_the_text_check_does_not_run_without_sources(self, model):
         joined = join_drafts(self.quoting("never written anywhere"), model)

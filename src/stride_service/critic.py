@@ -57,6 +57,32 @@ class DraftJoinError(ValueError):
     """The merged category agents' drafts fail a mechanical check."""
 
 
+class GroundsUnverifiedError(DraftJoinError):
+    """Threats on which *no* ground verified — the fail-closed half of the
+    grounding policy.
+
+    A subclass rather than a distinctive message, because the faults it has to
+    be told apart from are genuinely different faults. A dangling element
+    reference or an unresolvable ``source_label`` is a draft citing something
+    that does not exist; this is a draft citing something that does exist and
+    quoting it wrongly. Only the second says anything about how often a model
+    fabricates a span, and a reader that has to pattern-match the prose to tell
+    them apart is guessing rather than measuring.
+
+    Both halves of that rate ride on the exception, because the raise is the
+    only moment they coexist: ``threat_ids`` are the threats that lost every
+    ground, and ``draft_count`` is the population they came from. Nothing
+    downstream of here sees either — the job is over.
+    """
+
+    def __init__(
+        self, message: str, *, threat_ids: Sequence[str], draft_count: int
+    ) -> None:
+        super().__init__(message)
+        self.threat_ids = tuple(threat_ids)
+        self.draft_count = draft_count
+
+
 class CriticOutputError(ValueError):
     """The critic's output does not account for exactly the drafts it saw."""
 
@@ -469,7 +495,7 @@ def _one_ground_issues(
 
 
 def _verify_quotes(
-    threats: Iterable[DraftThreat], sources: Mapping[str, str]
+    threats: Sequence[DraftThreat], sources: Mapping[str, str]
 ) -> list[UnverifiedGround]:
     """Check every quote ground against the source it names.
 
@@ -493,6 +519,7 @@ def _verify_quotes(
     """
     marks: list[UnverifiedGround] = []
     issues: list[str] = []
+    failed: list[str] = []
     for threat in threats:
         unverified = [
             index
@@ -501,6 +528,7 @@ def _verify_quotes(
             and not verify_quote(ground.text, sources.get(ground.source_label, ""))
         ]
         if len(unverified) == len(threat.grounds):
+            failed.append(threat.id)
             issues.append(
                 f"threat {threat.id!r} has no ground that verifies: all"
                 f" {len(unverified)} of its quotes are absent from the sources"
@@ -516,7 +544,9 @@ def _verify_quotes(
             for index in unverified
         ]
     if issues:
-        raise DraftJoinError("; ".join(issues))
+        raise GroundsUnverifiedError(
+            "; ".join(issues), threat_ids=failed, draft_count=len(threats)
+        )
     return marks
 
 
