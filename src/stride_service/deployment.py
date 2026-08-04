@@ -135,12 +135,8 @@ class Deployment:
     require_certified: bool = False
     # Held only to derive each vendor's credentials when the adapters are built.
     # Out of repr and equality: a deployment in a log must not carry a key.
-    env: Mapping[str, str] = field(
-        default_factory=dict, repr=False, compare=False
-    )
-    _built: dict[str, Any] = field(
-        default_factory=dict, repr=False, compare=False
-    )
+    env: Mapping[str, str] = field(default_factory=dict, repr=False, compare=False)
+    _built: dict[str, Any] = field(default_factory=dict, repr=False, compare=False)
 
     @classmethod
     def from_env(cls, env: Mapping[str, str] | None = None) -> Self:

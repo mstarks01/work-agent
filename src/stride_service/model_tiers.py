@@ -285,8 +285,7 @@ def load_model_tiers(
     version = raw.get("version")
     if version != SUPPORTED_VERSION:
         raise ModelConfigError(
-            f"{path}: unsupported version {version!r};"
-            f" expected {SUPPORTED_VERSION}"
+            f"{path}: unsupported version {version!r}; expected {SUPPORTED_VERSION}"
         )
 
     # After the version check, so a version-2 file reports the schema it is

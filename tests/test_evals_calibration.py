@@ -30,8 +30,7 @@ def pairs():
 @pytest.fixture(scope="module")
 def labels(pairs):
     return {
-        (pair.reference_claim, pair.candidate_claim): pair.human_match
-        for pair in pairs
+        (pair.reference_claim, pair.candidate_claim): pair.human_match for pair in pairs
     }
 
 

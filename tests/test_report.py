@@ -46,7 +46,9 @@ class TestSeverityMatrix:
 
     def test_contradicting_asserted_level_is_rejected(self):
         with pytest.raises(ValidationError, match="contradicts the matrix"):
-            Severity(likelihood="low", impact="low", level="critical", justification="x")
+            Severity(
+                likelihood="low", impact="low", level="critical", justification="x"
+            )
 
     def test_the_band_is_absent_from_the_schema_but_present_in_the_payload(self):
         """Derived, never asked for — and the two halves stay independent.

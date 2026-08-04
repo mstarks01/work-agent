@@ -135,9 +135,7 @@ class ResilienceConfig(BaseModel):
         """
         return RetryPolicy(
             attempts=self.attempts,
-            budget=RetryBudget(
-                capacity=budget_capacity, ratio=self.retry_budget_ratio
-            ),
+            budget=RetryBudget(capacity=budget_capacity, ratio=self.retry_budget_ratio),
         )
 
     def deadline_seconds(self) -> float:

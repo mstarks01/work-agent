@@ -238,9 +238,7 @@ def test_recall_and_artifact_over_the_whole_labelled_set(case, labelled_pairs):
         for pair in labelled_pairs
         if pair.case == case.id and pair.label == "match"
     ]
-    claims_by_reference = {
-        reference.claim: reference for reference in case.references
-    }
+    claims_by_reference = {reference.claim: reference for reference in case.references}
     produced = [
         threat_for(
             claims_by_reference[pair.reference_claim], index + 1, pair.candidate_claim

@@ -125,9 +125,7 @@ _NUM_RETRIES_KWARG = "num_retries"
 _TEMPERATURE_REMOVED_FROM = (4, 7)
 
 
-def _check_temperature_unset(
-    model: str, sampling: TierSampling, source: str
-) -> None:
+def _check_temperature_unset(model: str, sampling: TierSampling, source: str) -> None:
     """Fail closed when a Claude generation that removed ``temperature`` is sent one.
 
     Keyed on the **model**, not the vendor: Vertex-hosted Claude is the same
@@ -272,9 +270,7 @@ def build_tier_adapters(
     return adapters
 
 
-def make_resolve_model(
-    adapters: Mapping[TierName, LiteLlm], tiers: ModelTierConfig
-):
+def make_resolve_model(adapters: Mapping[TierName, LiteLlm], tiers: ModelTierConfig):
     """Node -> the adapter for its tier, the ``ModelResolver`` the graph wants.
 
     The node -> tier walk stays in the tier config, so this never re-derives it.

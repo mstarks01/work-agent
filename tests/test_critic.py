@@ -51,9 +51,7 @@ class TestJoinDrafts:
 
     def test_unresolvable_element_reference_fails_closed(self, model):
         drafts = {
-            "spoofing": [
-                sample_draft(affected_element_ids=["process:does-not-exist"])
-            ]
+            "spoofing": [sample_draft(affected_element_ids=["process:does-not-exist"])]
         }
         with pytest.raises(DraftJoinError, match="not in the system model"):
             join_drafts(drafts, model)

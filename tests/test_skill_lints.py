@@ -25,9 +25,7 @@ from stride_service.skills import (
 SKILLS_DIR = Path(__file__).resolve().parents[1] / "skills"
 
 loader = MarkdownLoader(SKILLS_DIR)
-domain_packs = sorted(
-    name for name in loader.names() if name.startswith("domains/")
-)
+domain_packs = sorted(name for name in loader.names() if name.startswith("domains/"))
 
 
 def test_category_files_match_stride_categories_exactly():
@@ -66,9 +64,7 @@ def test_domain_pack_within_token_cap(pack):
 
 def test_no_stray_skill_files():
     known_prefixes = ("stride/", "shared/", "domains/")
-    stray = [
-        name for name in loader.names() if not name.startswith(known_prefixes)
-    ]
+    stray = [name for name in loader.names() if not name.startswith(known_prefixes)]
     assert not stray
 
 

@@ -152,9 +152,7 @@ def test_analysis_mode_scores_against_the_reference_set(case):
     report = asyncio.run(modes.run_analysis(case, pipeline)).report
     # The scripted threats are titled with reference claims verbatim, so a
     # judge that matches identical strings is the honest stand-in here.
-    judge = ScriptedJudge(
-        (threat.title, threat.title) for threat in report.threats
-    )
+    judge = ScriptedJudge((threat.title, threat.title) for threat in report.threats)
 
     score = score_case(case, report.threats, judge)
 
@@ -216,9 +214,7 @@ def test_extraction_scoring_reports_missing_and_extra_elements(case):
         update={"processes": result.extracted.processes[:1]}
     )
 
-    score = modes.score_extraction(
-        case, modes.ExtractionResult(case.id, trimmed, ())
-    )
+    score = modes.score_extraction(case, modes.ExtractionResult(case.id, trimmed, ()))
 
     assert score.missing
     assert score.recall < 1.0

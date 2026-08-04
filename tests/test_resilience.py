@@ -142,9 +142,7 @@ def test_a_stale_version_fails_closed_with_no_shim(tmp_path, stale):
     # Version 2 is the case a live deployment actually hits on this upgrade: it
     # is a well-formed file for the *previous* schema, carrying no input bounds.
     # Accepting it would mean enforcing caps nobody configured.
-    path = write(
-        tmp_path, f"version = {stale}\nattempts = 3\ntimeout_ms = 300000\n"
-    )
+    path = write(tmp_path, f"version = {stale}\nattempts = 3\ntimeout_ms = 300000\n")
     with pytest.raises(ResilienceConfigError, match="unsupported version"):
         load_resilience(path, env={})
 
@@ -157,8 +155,9 @@ def test_the_version_error_names_the_keys_the_new_schema_wants(tmp_path):
 
 def test_input_bounds_are_required_not_defaulted(tmp_path):
     # No code default: a deployment either states its bounds or does not load.
-    path = write(tmp_path, f"version = {SUPPORTED_VERSION}\nattempts = 3\n"
-                 "timeout_ms = 300000\n")
+    path = write(
+        tmp_path, f"version = {SUPPORTED_VERSION}\nattempts = 3\ntimeout_ms = 300000\n"
+    )
     with pytest.raises(ResilienceConfigError):
         load_resilience(path, env={})
 

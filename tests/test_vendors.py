@@ -8,6 +8,8 @@ to a call) and a per-vendor reasoning kwarg (#15 made the surface uniform).
 
 from __future__ import annotations
 
+from dataclasses import FrozenInstanceError
+
 import pytest
 
 from stride_service.vendors import (
@@ -199,7 +201,7 @@ class TestWhatTheRegistryDeliberatelyOmits:
         assert not hasattr(vendor_for("vertex"), "reasoning_kwarg")
 
     def test_entries_are_frozen(self):
-        with pytest.raises(Exception):
+        with pytest.raises(FrozenInstanceError):
             vendor_for("vertex").prefix = "nope/"
 
     def test_every_named_vendor_has_an_entry(self):

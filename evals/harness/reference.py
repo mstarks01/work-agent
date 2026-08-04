@@ -172,9 +172,7 @@ def _load_model(case_dir: Path) -> SystemModel:
     return model
 
 
-def _load_references(
-    case_dir: Path, model: SystemModel
-) -> tuple[ReferenceThreat, ...]:
+def _load_references(case_dir: Path, model: SystemModel) -> tuple[ReferenceThreat, ...]:
     raw = _read_json(case_dir / "threats.json")
     if not isinstance(raw, list) or not raw:
         raise CorpusError(f"{case_dir.name}: threats.json must be a non-empty list")

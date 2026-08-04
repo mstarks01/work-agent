@@ -216,9 +216,7 @@ def test_drop_params_is_never_set_so_litellm_stays_fail_closed():
 
 
 def test_env_overrides_the_retry_attempts_without_touching_the_model():
-    deployment = Deployment.from_env(
-        env=VERTEX_ENV | {"STRIDE_RETRY_ATTEMPTS": "5"}
-    )
+    deployment = Deployment.from_env(env=VERTEX_ENV | {"STRIDE_RETRY_ATTEMPTS": "5"})
     pipeline = deployment.pipeline()
     nodes = {node.name: node for node in pipeline.workflow.graph.nodes}
 
@@ -389,7 +387,9 @@ def test_a_model_without_native_schema_support_fails_the_build(tmp_path):
     path.write_text(NO_TEMPERATURE, encoding="utf-8")
 
     with pytest.raises(ModelGateError) as excinfo:
-        Deployment.from_env(env=ANTHROPIC_ENV | {"STRIDE_SAMPLING": str(path)}).pipeline()
+        Deployment.from_env(
+            env=ANTHROPIC_ENV | {"STRIDE_SAMPLING": str(path)}
+        ).pipeline()
 
     message = str(excinfo.value)
     assert "tiers.base" in message
@@ -521,9 +521,7 @@ def test_the_route_enforces_the_gate_the_runner_certified_with():
     """The reach through the runner's private attribute this replaced."""
     deployment = Deployment.from_env(env=VERTEX_ENV)
 
-    app = create_app(
-        deployment=deployment, store=InMemoryJobStore(), verifier=object()
-    )
+    app = create_app(deployment=deployment, store=InMemoryJobStore(), verifier=object())
 
     assert app.state.certification is deployment.gate()
     assert app.state.runner is deployment.runner()

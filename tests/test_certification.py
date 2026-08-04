@@ -26,8 +26,13 @@ FP_B = "b" * 64
 FP_C = "c" * 64
 
 # extract/repair run on base; the category agents, critic and recritic on strong.
-_TIERS = {"extract": "base", "repair": "base", "critic": "strong",
-          "recritic": "strong", "analyze_spoofing": "strong"}
+_TIERS = {
+    "extract": "base",
+    "repair": "base",
+    "critic": "strong",
+    "recritic": "strong",
+    "analyze_spoofing": "strong",
+}
 ALL_NODES = tuple(_TIERS)
 
 
@@ -81,9 +86,7 @@ class TestPerExecutionSets:
         # A build that moved mid-run gives one node two hashes; that is the
         # drift signal, not a defect.
         blessed = manifest({"strong": {FP_A}})
-        assert certify(
-            observed(critic={FP_A}), blessed, tier_of, ALL_NODES
-        ).certified
+        assert certify(observed(critic={FP_A}), blessed, tier_of, ALL_NODES).certified
         drifted = certify(observed(critic={FP_A, FP_B}), blessed, tier_of, ALL_NODES)
         assert not drifted.certified
         assert [n.fingerprint for n in drifted.uncertified] == [FP_B]

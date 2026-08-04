@@ -222,9 +222,10 @@ class TestExecuteJob:
         ref = record.report.input
 
         assert [r.label for r in ref.sources] == [s.label for s in record.sources]
-        assert ref.sources[0].sha256 == hashlib.sha256(
-            record.sources[0].text.encode("utf-8")
-        ).hexdigest()
+        assert (
+            ref.sources[0].sha256
+            == hashlib.sha256(record.sources[0].text.encode("utf-8")).hexdigest()
+        )
         # Recomputable from the report alone: the aggregate is taken over the
         # refs, which the report carries.
         assert ref.source_sha256 == InputRef.aggregate_digest(ref.sources)
@@ -233,9 +234,7 @@ class TestExecuteJob:
         record = self.run_with(RejectingRunner())
         assert record.status == "rejected"
         assert record.report is None
-        assert [issue.code for issue in record.validation_issues] == [
-            "no-trust-zones"
-        ]
+        assert [issue.code for issue in record.validation_issues] == ["no-trust-zones"]
 
     def test_runner_exception_fails_closed_with_generic_error(self):
         record = self.run_with(FailingRunner())

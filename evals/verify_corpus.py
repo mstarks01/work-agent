@@ -122,8 +122,7 @@ def _check_sources(case_dir: Path, meta: dict) -> Iterator[str]:
             continue
         if source["kind"] not in SOURCE_KINDS:
             yield (
-                f"{where} kind {source['kind']!r} is not one of"
-                f" {sorted(SOURCE_KINDS)}"
+                f"{where} kind {source['kind']!r} is not one of {sorted(SOURCE_KINDS)}"
             )
         if source["label"] in seen_labels:
             yield f"{where} label {source['label']!r} is used twice in one case"
@@ -136,8 +135,7 @@ def _check_sources(case_dir: Path, meta: dict) -> Iterator[str]:
         expected = source_sha256(path)
         if source["sha256"] != expected:
             yield (
-                f"{where} sha256 does not match {source['file']}"
-                f" (expected {expected})"
+                f"{where} sha256 does not match {source['file']} (expected {expected})"
             )
             continue
         refs.append(
@@ -310,9 +308,7 @@ def check_calibration(
         if pair["case"] not in case_ids:
             problems.append(f"{where} names unknown case {pair['case']!r}")
         elif pair["reference_claim"] not in claims_by_case[pair["case"]]:
-            problems.append(
-                f"{where} reference_claim is not a claim in {pair['case']}"
-            )
+            problems.append(f"{where} reference_claim is not a claim in {pair['case']}")
         if pair["category"] not in STRIDE_CATEGORIES:
             problems.append(f"{where} category {pair['category']!r} is not a lane")
         if pair["label"] not in ("match", "no-match"):
