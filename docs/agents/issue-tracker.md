@@ -168,20 +168,48 @@ excerpt is **legitimate and ungoverned** — no gate, no prompt rule, not even a
 requirement, since a transcript remark can justify a threat against an element extracted from a
 design doc.
 
-Frontier now: [#82](https://github.com/mstarks01/work-agent/issues/82),
-[#83](https://github.com/mstarks01/work-agent/issues/83) and
-[#84](https://github.com/mstarks01/work-agent/issues/84), all unblocked and unclaimed — still a
-parallel step, so expect concurrent sessions. All three had constraints added to their bodies by
-#81; #82's stated constraint that "analysts already see every excerpt" was **struck as false**, and
-its `graph.py:285` reference was stale (`graph.py:409`). #81 deliberately left the critic seeing
-**no submitter words at all** and handed #83 the call on whether `critic.md` gains `{input_text}`.
-[#85](https://github.com/mstarks01/work-agent/issues/85) waits on #82 alone now. #79 left three
-questions explicitly to siblings: verbatim quote verification was #80's, prompt instruction is
-#82's, and whether `related_unknowns` finally gains a check is #83's. #82 was retitled to "How a
-**category agent** is instructed…" — its old title carried the vocabulary #77 retired. #80 hands
-#81 a working matcher and a measured rate for the *same field* it rules on, and hands #82 the one
-fact both its true rejections share: an unmarked elision, which `extract.md` rule 5 already
-forbids.
+[#82](https://github.com/mstarks01/work-agent/issues/82) resolved 2026-08-04 and writes the
+**agent-facing rule**, once and always-on in `analyze.md` and its exemplars — lane skills and the
+severity rubric untouched, `repair`/`recritic` out of the blast radius. It is a **Procedure step**
+(new step 6; Rate and Mitigate renumber), not an Output rule, because a rule satisfied *after* the
+threat is written is what manufactures a retrofitted quote. **The branch follows the trigger and is
+never chosen**: crossing → derived-fact, `unknown` attribute → unknown-attribute, a stated fact in
+the submitter's words → quote — so a threat carrying **no quote is correct**, which is how the
+map's settled decision 5 stops being a sentiment. Inside the quote branch, a
+**states-it/mentions-it** test with a contrast pair in `:66`'s style, closing back onto the branch
+rule rather than competing with it. **Quotes come from `{input_text}` only, never from `notes`** —
+#80's ladder *cannot* catch a note-sourced quote, since a note's contents are verbatim submitter
+words and therefore verify. Verbatim discipline **mirrors `extract.md` rule 5 word for word**. The
+check is disclosed; the normalization ladder and the fail-closed consequence are **not** — the first
+licenses the sloppiness it forgives, the second invites defensive padding. **One ground per
+load-bearing fact, no padding.**
+
+Two consequences land outside grounding proper. `analyze.md`'s `## Input` takes untrusted text for
+the first time, so it **carries `extract.md:15`'s data-not-instruction paragraph** (LLM01: #49's
+one-fenced-block-per-source rendering is only the delimiter half, and without the other half six
+`strong`-tier agents read attacker-controlled prose with nothing marking it as data), and `:21`'s
+"Every fact you may use is in there" is **rewritten** — false the moment `{input_text}` lands, and
+left standing it licenses mining raw text for elements extraction declined to model. And the
+**exemplar system gains a labelled source block**: it is tables only today (`:27-46`), so an
+exemplar quote ground would cite text the prompt never shows — teaching precisely the failure the
+ticket prevents — and the block doubles as the first depiction of the fenced-source shape
+`{input_text}` delivers. That block, `grounds` on all 18 exemplar drafts, and `:62`'s seven fields
+→ eight all fold into #85's cutover.
+
+Frontier now: [#83](https://github.com/mstarks01/work-agent/issues/83),
+[#84](https://github.com/mstarks01/work-agent/issues/84) and
+[#85](https://github.com/mstarks01/work-agent/issues/85) — #82's close unblocked #85, so all three
+are open, unblocked and unclaimed; still a parallel step, so expect concurrent sessions. #83 and #85
+carry constraints from both #81 and #82. #81 deliberately left the critic seeing **no submitter
+words at all** and handed #83 the call on whether `critic.md` gains `{input_text}`; #82 does not
+pre-empt it — it left `analyst.md:67`'s "this is what the critic checks its evidence step against"
+**verbatim** — but it does hand #83 a settled precedent to follow if the answer is yes, and the
+observation that a critic without `{input_text}` cannot detect a note-sourced quote either. #79 left
+three questions explicitly to siblings: verbatim quote verification was #80's, prompt instruction
+was #82's, and whether `related_unknowns` finally gains a check is #83's. #82 was retitled to "How a
+**category agent** is instructed…" — its old title carried the vocabulary #77 retired — and #81
+struck its stated constraint that "analysts already see every excerpt" as **false**, its
+`graph.py:285` reference being stale (`graph.py:409`).
 
 The measurement lives on `prototype/quote-verification` @ `6ed8d77`
 (`prototypes/quote_verification_prototype.py`), pushed — throwaway code, but re-runnable, and the
