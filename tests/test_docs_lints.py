@@ -70,6 +70,22 @@ def test_the_prose_carries_no_hand_written_engine_snippet():
     )
 
 
+def test_a_region_drops_the_blank_lines_that_pad_its_end_marker():
+    """A snippet ends where its code ends, not where the file's layout does.
+
+    An end marker placed just above a top-level definition sits in the two
+    blank lines the formatter requires there. They are the file's padding, not
+    the snippet's, and rendering them puts dead space inside the fence.
+    """
+    source = (REPO_ROOT / "examples" / "embed.py").read_text(encoding="utf-8")
+    assert "\n\n\n# docs-region-end: embed" in source, (
+        "this test is vacuous unless the fixture's end marker is still padded"
+    )
+
+    body = extract("examples/embed.py", "embed")
+    assert body == body.rstrip("\n") + "\n"
+
+
 def test_a_missing_region_is_an_error_not_a_silent_empty_block():
     with pytest.raises(IncludeError, match="expected exactly one"):
         extract("examples/embed.py", "no-such-region")
