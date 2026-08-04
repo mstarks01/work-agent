@@ -1,0 +1,718 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>PROTOTYPE — how a finding displays its attribution (#84)</title>
+<!--
+  THROWAWAY PROTOTYPE for wayfinder ticket #84 "How a finding displays its attribution".
+  Three variants of the threat card's grounds rendering on the existing report page,
+  switchable via ?variant=A|B|C and the floating bar at the bottom.
+
+  Not production markup. Data is synthetic: the system model is corpus case
+  05-cookbook-queue-webapp, the threats and every `grounds` entry are hand-authored to
+  exercise the cases #84 has to survive — all three branches, a 600-char multi-turn quote,
+  an unverified quote, a threat with no quote at all, needs-info, rejected, and a hostile
+  string that must render as literal text (#78 decision 1: untrusted text never reaches
+  innerHTML).
+
+  Run: open this file in a browser (file:// is fine), or `python3 -m http.server -d webapp`.
+-->
+<style>
+  .viz-root {
+    color-scheme: light;
+    --plane:#f9f9f7; --surface:#fcfcfb; --surface-2:#f2f2ee;
+    --ink:#0b0b0b; --ink-2:#52514e; --muted:#898781;
+    --border:rgba(11,11,11,0.10); --hairline:#e1e0d9;
+    --sev-critical:#d03b3b; --sev-high:#ec835a; --sev-medium:#fab219; --sev-low:#0ca30c;
+    --tint: color-mix(in srgb, var(--surface) 88%, transparent);
+    /* grounds: one hue per branch, deliberately outside the severity ramp */
+    --g-quote:#3f6fd0; --g-unknown:#8a6fb0; --g-derived:#3f8f86;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root:where(:not([data-theme="light"])) .viz-root {
+      color-scheme: dark;
+      --plane:#0d0d0d; --surface:#1a1a19; --surface-2:#242422;
+      --ink:#fff; --ink-2:#c3c2b7; --muted:#898781;
+      --border:rgba(255,255,255,0.10); --hairline:#2c2c2a;
+      --g-quote:#7ea3ec; --g-unknown:#b39bd6; --g-derived:#63b8ad;
+    }
+  }
+  :root[data-theme="dark"] .viz-root {
+    color-scheme: dark;
+    --plane:#0d0d0d; --surface:#1a1a19; --surface-2:#242422;
+    --ink:#fff; --ink-2:#c3c2b7; --muted:#898781;
+    --border:rgba(255,255,255,0.10); --hairline:#2c2c2a;
+    --g-quote:#7ea3ec; --g-unknown:#b39bd6; --g-derived:#63b8ad;
+  }
+
+  * { box-sizing: border-box; }
+  body { margin: 0; }
+  .viz-root { font-family: system-ui, -apple-system, "Segoe UI", sans-serif;
+    background: var(--plane); color: var(--ink); line-height: 1.5; padding: 32px 20px 120px; }
+  .wrap { max-width: 940px; margin: 0 auto; }
+
+  .topbar { display: flex; justify-content: space-between; align-items: flex-start; gap: 16px; }
+  h1 { font-size: 1.5rem; margin: 0 0 4px; letter-spacing: -0.01em; }
+  h2 { font-size: 0.8rem; text-transform: uppercase; letter-spacing: 0.08em;
+       color: var(--muted); margin: 40px 0 14px; font-weight: 600; }
+  .meta { color: var(--ink-2); font-size: 0.85rem; }
+  .meta code, code { font-family: ui-monospace, SFMono-Regular, Menlo, monospace; }
+  .toggle { border: 1px solid var(--border); background: var(--surface); color: var(--ink-2);
+    border-radius: 8px; padding: 6px 12px; font: inherit; font-size: 0.8rem; cursor: pointer; }
+
+  .tiles { display: grid; grid-template-columns: repeat(4, 1fr); gap: 12px; }
+  .tile { background: var(--surface); border: 1px solid var(--border); border-radius: 12px; padding: 16px; }
+  .tile .n { font-size: 1.9rem; font-weight: 650; letter-spacing: -0.02em; }
+  .tile .k { color: var(--muted); font-size: 0.78rem; text-transform: uppercase; letter-spacing: 0.06em; }
+
+  .card { background: var(--surface); border: 1px solid var(--border); border-left: 4px solid var(--muted);
+    border-radius: 12px; padding: 16px 18px; margin-bottom: 14px; }
+  .card.rejected { background: var(--surface-2); }
+  .card-head { display: flex; align-items: baseline; gap: 10px; flex-wrap: wrap; }
+  .card h3 { font-size: 1.02rem; margin: 0; flex: 1 1 260px; }
+  .tid { font-family: ui-monospace, monospace; color: var(--muted); font-size: 0.82rem; }
+  .cat { font-size: 0.72rem; text-transform: uppercase; letter-spacing: 0.06em; color: var(--ink-2); }
+  .desc { margin: 10px 0 12px; color: var(--ink-2); font-size: 0.92rem; }
+  .badges { display: flex; gap: 8px; flex-wrap: wrap; align-items: center; margin-top: 10px; }
+  .chip { display: inline-flex; align-items: center; gap: 6px; font-size: 0.75rem; font-weight: 600;
+    padding: 3px 9px; border-radius: 999px; border: 1px solid var(--border); white-space: nowrap; }
+  .chip .swatch { width: 9px; height: 9px; border-radius: 50%; flex: none; }
+  .chip.verdict { color: var(--ink-2); }
+  .chip.confidence { color: var(--muted); background: transparent; border-color: var(--hairline); }
+  .field { font-size: 0.85rem; margin-top: 8px; }
+  .field .lbl { color: var(--muted); text-transform: uppercase; letter-spacing: 0.05em; font-size: 0.68rem; }
+  .refs code { font-size: 0.8rem; background: var(--surface-2); border: 1px solid var(--border);
+    border-radius: 6px; padding: 1px 6px; margin-right: 6px; }
+  ul.mits { margin: 6px 0 0; padding-left: 18px; font-size: 0.88rem; color: var(--ink-2); }
+  .unknown { margin-top: 10px; padding: 9px 12px; border-radius: 9px; font-size: 0.85rem;
+    background: color-mix(in srgb, var(--sev-medium) 12%, var(--surface));
+    border: 1px solid color-mix(in srgb, var(--sev-medium) 40%, var(--border)); color: var(--ink-2); }
+
+  table { width: 100%; border-collapse: collapse; font-size: 0.84rem; }
+  th, td { text-align: left; padding: 8px 10px; border-bottom: 1px solid var(--hairline); vertical-align: top; }
+  th { color: var(--muted); text-transform: uppercase; letter-spacing: 0.05em; font-size: 0.68rem; font-weight: 600; }
+  td .unk { color: var(--sev-high); font-weight: 600; }
+  .caption { font-size: 0.78rem; color: var(--muted); margin: 8px 0 0; }
+
+  /* ---------- shared grounds atoms ---------- */
+  .g-kind { font-size: 0.66rem; text-transform: uppercase; letter-spacing: 0.07em; font-weight: 700; }
+  .g-quote-kind { color: var(--g-quote); }
+  .g-unknown-kind { color: var(--g-unknown); }
+  .g-derived-kind { color: var(--g-derived); }
+  .g-text { font-size: 0.9rem; color: var(--ink); }
+  .g-cite { font-size: 0.75rem; color: var(--muted); margin-top: 4px; display: flex;
+    flex-wrap: wrap; gap: 6px; align-items: center; }
+  .g-cite code { background: var(--surface-2); border: 1px solid var(--border);
+    border-radius: 6px; padding: 0 5px; }
+  .g-speaker { font-style: italic; }
+  .g-unverified { display: inline-flex; align-items: center; gap: 5px; font-size: 0.72rem;
+    font-weight: 600; color: var(--sev-high); border: 1px dashed color-mix(in srgb, var(--sev-high) 55%, var(--border));
+    border-radius: 999px; padding: 1px 8px; }
+  .g-more { background: none; border: none; padding: 0; margin-top: 4px; font: inherit;
+    font-size: 0.78rem; color: var(--g-quote); cursor: pointer; text-decoration: underline; }
+  .clamp { display: -webkit-box; -webkit-line-clamp: 3; -webkit-box-orient: vertical; overflow: hidden; }
+
+  /* ---------- Variant A: evidence rail under the description ---------- */
+  .A .grounds { margin-top: 12px; border-top: 1px solid var(--hairline); padding-top: 10px; }
+  .A .g-row { display: grid; grid-template-columns: 3px 1fr; gap: 10px; padding: 8px 0; }
+  .A .g-bar { border-radius: 2px; }
+  .A .g-quote .g-bar { background: var(--g-quote); }
+  .A .g-unknown-attribute .g-bar { background: var(--g-unknown); }
+  .A .g-derived-fact .g-bar { background: var(--g-derived); }
+  .A blockquote { margin: 3px 0 0; font-size: 0.9rem; color: var(--ink); }
+
+  /* ---------- Variant B: evidence as the card's lede ---------- */
+  .B .lede { background: var(--surface-2); border: 1px solid var(--border); border-radius: 10px;
+    padding: 12px 14px; margin-bottom: 12px; }
+  .B .lede .hdr { font-size: 0.68rem; text-transform: uppercase; letter-spacing: 0.07em;
+    color: var(--muted); margin-bottom: 8px; }
+  .B .g-row { padding: 6px 0; border-top: 1px solid var(--hairline); }
+  .B .g-row:first-of-type { border-top: none; padding-top: 0; }
+  .B blockquote { margin: 0; font-size: 0.95rem; border-left: 3px solid var(--g-quote); padding-left: 10px; }
+  .B .g-inline { font-size: 0.85rem; color: var(--ink-2); display: flex; gap: 8px; align-items: baseline; }
+  .B .sources { display: flex; flex-wrap: wrap; gap: 10px; }
+  .B .src { background: var(--surface); border: 1px solid var(--border); border-radius: 10px;
+    padding: 8px 12px; font-size: 0.8rem; color: var(--ink-2); }
+
+  /* ---------- Variant C: margin citations ---------- */
+  .C .card { display: grid; grid-template-columns: 1fr 260px; gap: 18px; }
+  .C .main { min-width: 0; }
+  .C .margin { border-left: 1px solid var(--hairline); padding-left: 14px; min-width: 0; }
+  .C .margin .hdr { font-size: 0.66rem; text-transform: uppercase; letter-spacing: 0.07em;
+    color: var(--muted); margin-bottom: 8px; }
+  .C .g-card { border: 1px solid var(--border); border-radius: 9px; padding: 8px 10px;
+    margin-bottom: 8px; background: var(--surface-2); font-size: 0.82rem; }
+  .C .g-card.g-quote { border-left: 3px solid var(--g-quote); }
+  .C .g-card.g-unknown-attribute { border-left: 3px solid var(--g-unknown); }
+  .C .g-card.g-derived-fact { border-left: 3px solid var(--g-derived); }
+  .C .excerpt-col { color: var(--ink-2); font-size: 0.8rem; font-style: italic; max-width: 320px; }
+  @media (max-width: 780px) { .C .card { grid-template-columns: 1fr; } .C .margin { border-left: none; padding-left: 0; border-top: 1px solid var(--hairline); padding-top: 12px; } }
+
+  /* ---------- prototype switcher (not part of the design) ---------- */
+  .switcher { position: fixed; bottom: 18px; left: 50%; transform: translateX(-50%);
+    display: flex; align-items: center; gap: 4px; background: #111; color: #fff;
+    border-radius: 999px; padding: 6px 8px; box-shadow: 0 6px 24px rgba(0,0,0,0.35);
+    font: 500 0.82rem system-ui, sans-serif; z-index: 50; }
+  .switcher button { background: transparent; border: none; color: #fff; font: inherit;
+    font-size: 1rem; cursor: pointer; padding: 2px 10px; border-radius: 999px; }
+  .switcher button:hover { background: rgba(255,255,255,0.15); }
+  .switcher .lab { padding: 0 8px; white-space: nowrap; }
+  .switcher .tag { opacity: 0.6; font-size: 0.7rem; text-transform: uppercase; letter-spacing: 0.08em; }
+</style>
+</head>
+<body>
+<div class="viz-root" id="root">
+  <div class="wrap">
+    <div class="topbar">
+      <div>
+        <h1 id="sysname"></h1>
+        <div class="meta" id="jobmeta"></div>
+      </div>
+      <button class="toggle" id="themebtn" type="button">Toggle theme</button>
+    </div>
+
+    <div id="sourcespanel"></div>
+
+    <h2>Summary</h2>
+    <div class="tiles" id="tiles"></div>
+
+    <h2>Threats</h2>
+    <div id="threats"></div>
+
+    <h2>Rejected — considered and dismissed</h2>
+    <div id="rejected"></div>
+
+    <h2>System model (extracted DFD)</h2>
+    <table id="elements"><thead><tr id="elhead"></tr></thead><tbody></tbody></table>
+    <div id="elcaption"></div>
+  </div>
+</div>
+
+<script type="application/json" id="report">
+{
+  "schema_version": "2.0",
+  "job": { "id": "run_7f3c1a2b", "status": "completed", "completed_at": "2026-08-04T09:12:44.000Z" },
+  "input": {
+    "system_name": "Queue-decoupled web application",
+    "sources": [
+      { "kind": "description", "label": "System description", "sha256": "20b0aa82c922766db2353cade33f7a26b38c60a3c7061244ef4686b7a647778b" },
+      { "kind": "transcript", "label": "Design call 2026-07-28", "sha256": "9c1d5e77a41b0f2ab3c9d0e8f6a52b7c4d3e2f1a0b9c8d7e6f5a4b3c2d1e0f99" }
+    ]
+  },
+  "summary": { "threat_count": 5, "needs_info_count": 2, "rejected_count": 1, "elements_analyzed": 14 },
+  "threats": [
+    {
+      "id": "S-01",
+      "category": "spoofing",
+      "title": "Unauthenticated enqueue onto the message queue",
+      "description": "Nothing states how the web application authenticates to the queue, so anything that reaches the queue may enqueue jobs the worker will execute.",
+      "affected_element_ids": ["flow:web-application-to-message-queue:enqueue-job", "store:message-queue"],
+      "severity": { "level": "high", "likelihood": "medium", "impact": "high",
+        "justification": "The worker executes whatever it consumes, and the queue sits across a tier boundary." },
+      "confidence": "medium",
+      "verdict": { "status": "confirmed", "reason": "", "related_unknowns": [] },
+      "grounds": [
+        { "kind": "unknown-attribute", "element_id": "flow:web-application-to-message-queue:enqueue-job", "attribute": "authentication" },
+        { "kind": "derived-fact", "flow_id": "flow:web-application-to-message-queue:enqueue-job" }
+      ],
+      "mitigations": [ { "summary": "Require the queue to authenticate publishers, and scope the application's credential to publish-only." } ]
+    },
+    {
+      "id": "I-01",
+      "category": "information-disclosure",
+      "title": "Application and log records unencrypted at rest",
+      "description": "The database holds both application records and log records, and encryption at rest is unstated for every store in the backend tier.",
+      "affected_element_ids": ["store:database"],
+      "severity": { "level": "medium", "likelihood": "medium", "impact": "high",
+        "justification": "Log records commonly carry identifiers even when the application records do not." },
+      "confidence": "high",
+      "verdict": { "status": "confirmed", "reason": "", "related_unknowns": [] },
+      "grounds": [
+        { "kind": "quote", "text": "The diagram does not say anything about how the web application authenticates to the queue, how the worker authenticates to the database, or whether anything is encrypted at rest.", "source_label": "System description" },
+        { "kind": "quote", "text": "Priya: honestly the database is the bit that worries me — it's got the app rows and it's also where the log records land, and nobody has ever told me it's encrypted. … Priya: I'd assume it isn't, but I'd rather someone checked than we all keep assuming. Marcus: yeah, and the logs are the part that would actually hurt, because we write the request payloads in there when something 500s and nobody has ever pruned that table.", "source_label": "Design call 2026-07-28" },
+        { "kind": "unknown-attribute", "element_id": "store:database", "attribute": "encryption_at_rest" }
+      ],
+      "mitigations": [ { "summary": "Enable storage-level encryption on the database and confirm the log table is covered by it." } ]
+    },
+    {
+      "id": "T-01",
+      "category": "tampering",
+      "title": "Worker consumes jobs it cannot attribute to the application",
+      "description": "The worker takes jobs off the queue with no stated authentication on either side of the queue, so a forged job is indistinguishable from a real one.",
+      "affected_element_ids": ["flow:background-worker-to-message-queue:consume-job", "process:background-worker"],
+      "severity": { "level": "high", "likelihood": "medium", "impact": "high",
+        "justification": "A forged job runs with the worker's database credentials." },
+      "confidence": "medium",
+      "verdict": { "status": "confirmed", "reason": "", "related_unknowns": [] },
+      "grounds": [
+        { "kind": "quote", "text": "the worker just picks up whatever is on the queue and trusts it completely", "source_label": "Design call 2026-07-28" },
+        { "kind": "unknown-attribute", "element_id": "flow:background-worker-to-message-queue:consume-job", "attribute": "authentication" }
+      ],
+      "mitigations": [ { "summary": "Sign job messages at publish time and reject unsigned jobs at the worker." } ]
+    },
+    {
+      "id": "E-01",
+      "category": "elevation-of-privilege",
+      "title": "Internet-facing tier reaches backend credentials store",
+      "description": "The web application is internet-facing and reads a config store holding its queue credentials; a compromise of the application yields the credential.",
+      "affected_element_ids": ["flow:web-application-to-web-application-config:read-configuration", "store:web-application-config"],
+      "severity": { "level": "medium", "likelihood": "low", "impact": "high",
+        "justification": "Requires application compromise first, but the credential is the reward." },
+      "confidence": "medium",
+      "verdict": { "status": "confirmed", "reason": "", "related_unknowns": [] },
+      "grounds": [
+        { "kind": "derived-fact", "flow_id": "flow:web-application-to-web-application-config:read-configuration" }
+      ],
+      "mitigations": [ { "summary": "Short-lived queue credentials issued per process rather than a static value in a config store." } ]
+    },
+    {
+      "id": "R-01",
+      "category": "repudiation",
+      "title": "Log records share a store with the data they describe",
+      "description": "Log records are kept in the same database the worker writes application records to, so anything able to alter records can alter the record of the alteration.",
+      "affected_element_ids": ["store:database", "flow:background-worker-to-database:read-write-records"],
+      "severity": { "level": "medium", "likelihood": "medium", "impact": "medium",
+        "justification": "Shared-store logging removes the independence an audit trail depends on." },
+      "confidence": "low",
+      "verdict": { "status": "needs-info",
+        "reason": "Whether the log records are written under the same credential as the application records is unstated.",
+        "related_unknowns": [ { "element_id": "flow:background-worker-to-database:read-write-records", "attribute": "authentication" } ] },
+      "grounds": [
+        { "kind": "quote", "text": "The database is also where\nwe keep the application's log records.", "source_label": "System description" },
+        { "kind": "unknown-attribute", "element_id": "flow:background-worker-to-database:read-write-records", "attribute": "authentication" }
+      ],
+      "mitigations": [ { "summary": "Write log records to an append-only store the worker cannot rewrite." } ]
+    },
+    {
+      "id": "D-01",
+      "category": "denial-of-service",
+      "title": "Unbounded queue depth stalls user-visible work",
+      "description": "Nothing bounds how many jobs may be enqueued, and the browser-facing application depends on the worker draining them.",
+      "affected_element_ids": ["store:message-queue", "process:web-application"],
+      "severity": { "level": "medium", "likelihood": "medium", "impact": "medium",
+        "justification": "A full queue degrades the internet-facing path without any compromise." },
+      "confidence": "low",
+      "verdict": { "status": "confirmed", "reason": "", "related_unknowns": [] },
+      "grounds": [
+        { "kind": "quote", "text": "we've never put a cap on the queue, it just grows until someone notices <img src=x onerror=alert('xss')>", "source_label": "Design call 2026-07-28" }
+      ],
+      "mitigations": [ { "summary": "Cap queue depth and shed or park jobs past the cap rather than accepting unboundedly." } ]
+    }
+  ],
+  "rejected_threats": [
+    {
+      "id": "S-02",
+      "category": "spoofing",
+      "title": "Browser-to-application traffic intercepted in transit",
+      "description": "An attacker on the public internet reads or alters page requests between the browser and the application.",
+      "affected_element_ids": ["flow:browser-to-web-application:page-request"],
+      "severity": { "level": "low", "likelihood": "low", "impact": "medium",
+        "justification": "The one crossing link is stated to be encrypted." },
+      "confidence": "high",
+      "verdict": { "status": "rejected", "reason": "The submitter states this link is encrypted, and it is the only link marked so.", "related_unknowns": [] },
+      "grounds": [
+        { "kind": "quote", "text": "The browser-to-application traffic is the one link marked as encrypted.", "source_label": "System description" },
+        { "kind": "derived-fact", "flow_id": "flow:browser-to-web-application:page-request" }
+      ],
+      "mitigations": []
+    }
+  ],
+  "unverified_grounds": [
+    { "threat_id": "T-01", "index": 0, "reason": "no matching span in \"Design call 2026-07-28\" under the normalization ladder" }
+  ],
+  "boundary_crossings": [
+    { "flow_id": "flow:browser-to-web-application:page-request", "source_zone": "boundary:public-internet", "destination_zone": "boundary:web-tier" },
+    { "flow_id": "flow:web-application-to-message-queue:enqueue-job", "source_zone": "boundary:web-tier", "destination_zone": "boundary:backend-tier" },
+    { "flow_id": "flow:web-application-to-web-application-config:read-configuration", "source_zone": "boundary:web-tier", "destination_zone": "boundary:web-tier" }
+  ],
+  "system_model": {
+    "external_entities": [
+      { "id": "entity:browser", "name": "browser", "kind": "external-system", "trust_zone": "boundary:public-internet", "assets": [],
+        "source_excerpt": "A user's browser talks to the web application over HTTP/S across the public internet.", "source_label": "System description", "source_speaker": "" }
+    ],
+    "processes": [
+      { "id": "process:web-application", "name": "web application", "technology": "unknown", "exposure": "internet-facing", "trust_zone": "boundary:web-tier",
+        "source_excerpt": "the web application runs in our web tier", "source_label": "System description", "source_speaker": "" },
+      { "id": "process:background-worker", "name": "background worker", "technology": "unknown", "exposure": "internal", "trust_zone": "boundary:backend-tier",
+        "source_excerpt": "a background worker process picks them up and does the work", "source_label": "System description", "source_speaker": "" }
+    ],
+    "data_stores": [
+      { "id": "store:message-queue", "name": "message queue", "technology": "unknown", "data_classification": "unknown", "encryption_at_rest": "unknown", "trust_zone": "boundary:backend-tier",
+        "source_excerpt": "It puts jobs onto a message queue, and a background worker process picks them up", "source_label": "System description", "source_speaker": "" },
+      { "id": "store:database", "name": "database", "technology": "unknown", "data_classification": "unknown", "encryption_at_rest": "unknown", "trust_zone": "boundary:backend-tier",
+        "source_excerpt": "the app rows and it's also where the log records land", "source_label": "Design call 2026-07-28", "source_speaker": "Priya" },
+      { "id": "store:web-application-config", "name": "web application config", "technology": "unknown", "data_classification": "unknown", "encryption_at_rest": "unknown", "trust_zone": "boundary:web-tier",
+        "source_excerpt": "Both of those config stores hold the credentials the process needs — the web application's queue credentials", "source_label": "System description", "source_speaker": "" }
+    ],
+    "data_flows": [
+      { "id": "flow:browser-to-web-application:page-request", "name": "page request", "source": "entity:browser", "destination": "process:web-application", "protocol": "HTTP/S", "authentication": "unknown", "encryption_in_transit": "encrypted (marked as the one encrypted link)",
+        "source_excerpt": "A user's browser talks to the web application over HTTP/S across the public internet.", "source_label": "System description", "source_speaker": "" },
+      { "id": "flow:web-application-to-message-queue:enqueue-job", "name": "enqueue job", "source": "process:web-application", "destination": "store:message-queue", "protocol": "unknown", "authentication": "unknown", "encryption_in_transit": "unknown",
+        "source_excerpt": "It puts jobs onto a message queue", "source_label": "System description", "source_speaker": "" },
+      { "id": "flow:background-worker-to-message-queue:consume-job", "name": "consume job", "source": "process:background-worker", "destination": "store:message-queue", "protocol": "unknown", "authentication": "unknown", "encryption_in_transit": "unknown",
+        "source_excerpt": "a background worker process picks them up and does the work", "source_label": "System description", "source_speaker": "" },
+      { "id": "flow:background-worker-to-database:read-write-records", "name": "read write records", "source": "process:background-worker", "destination": "store:database", "protocol": "unknown", "authentication": "unknown", "encryption_in_transit": "unknown",
+        "source_excerpt": "The background worker reads and writes the database.", "source_label": "System description", "source_speaker": "" },
+      { "id": "flow:web-application-to-web-application-config:read-configuration", "name": "read configuration", "source": "process:web-application", "destination": "store:web-application-config", "protocol": "unknown", "authentication": "unknown", "encryption_in_transit": "unknown",
+        "source_excerpt": "the web application has a web application config", "source_label": "System description", "source_speaker": "" }
+    ]
+  }
+}
+</script>
+
+<script>
+  const R = JSON.parse(document.getElementById("report").textContent);
+  const $ = (id) => document.getElementById(id);
+  const root = $("root");
+
+  // #78 decision 1: untrusted text reaches the DOM as textContent or DOM nodes, never innerHTML.
+  const el = (tag, cls, text) => {
+    const n = document.createElement(tag);
+    if (cls) n.className = cls;
+    if (text != null) n.textContent = text;   // textContent, always
+    return n;
+  };
+  const code = (t) => el("code", null, t);
+
+  const SEV = { critical: ["Critical","--sev-critical"], high: ["High","--sev-high"],
+                medium: ["Medium","--sev-medium"], low: ["Low","--sev-low"] };
+  const SEV_ORDER = ["critical","high","medium","low"];
+  const VERDICT = { confirmed: ["Confirmed","✓"], "needs-info": ["Needs info","?"], rejected: ["Rejected","✕"] };
+  const svar = (l) => `var(${SEV[l][1]})`;
+  const KIND = {
+    "quote": ["Quoted from the submission", "g-quote"],
+    "unknown-attribute": ["Unstated in the submission", "g-unknown"],
+    "derived-fact": ["Derived from the model", "g-derived"],
+  };
+  const SRC_KIND = Object.fromEntries(R.input.sources.map(s => [s.label, s.kind]));
+  const CROSSING = Object.fromEntries(R.boundary_crossings.map(c => [c.flow_id, c]));
+  const ELEMENTS = Object.fromEntries(
+    [...R.system_model.external_entities, ...R.system_model.processes,
+     ...R.system_model.data_stores, ...R.system_model.data_flows].map(e => [e.id, e]));
+
+  const unverified = (tid, i) =>
+    (R.unverified_grounds || []).find(u => u.threat_id === tid && u.index === i);
+
+  const VARIANTS = {
+    A: "Evidence rail",
+    B: "Evidence as the lede",
+    C: "Margin citations",
+  };
+  const variant = (new URLSearchParams(location.search).get("variant") || "A").toUpperCase();
+  const V = VARIANTS[variant] ? variant : "A";
+  root.classList.add(V);
+
+  /* ---------------- shared pieces ---------------- */
+
+  function unverifiedTag(u) {
+    const tag = el("span", "g-unverified", "⚠ unverified");
+    tag.title = u.reason;                       // property assignment, no markup context
+    return tag;
+  }
+
+  function quoteCite(g, u) {
+    const cite = el("div", "g-cite");
+    // DECIDED (#84): an unverified quote states the failure in words on the cite
+    // line — no tooltip, which keyboard and touch cannot reach.
+    if (u && V === "A") {
+      cite.append(el("span", "g-unverified", "⚠ not found in " + g.source_label));
+      return cite;
+    }
+    cite.append(el("span", null, "—"), code(g.source_label));
+    const kind = SRC_KIND[g.source_label];
+    if (kind) cite.append(el("span", null, kind));
+    if (u) cite.append(unverifiedTag(u));
+    return cite;
+  }
+
+  // Variant A + B use the same long-quote treatment: clamp to 3 lines, expand in place.
+  // DECIDED (#84): an unverified quote loses its quotation marks — they assert a
+  // verbatim span the service could not find.
+  function clampedQuote(text, unverified) {
+    const q = el("blockquote", "g-text clamp", unverified ? text : "“" + text + "”");
+    const wrap = el("div");
+    wrap.append(q);
+    if (text.length > 220) {
+      const btn = el("button", "g-more", "Show full quote");
+      btn.type = "button";
+      btn.addEventListener("click", () => {
+        const open = q.classList.toggle("clamp");
+        btn.textContent = open ? "Show full quote" : "Show less";
+      });
+      wrap.append(btn);
+    }
+    return wrap;
+  }
+
+  function elementName(id) {
+    const e = ELEMENTS[id];
+    return e ? e.name : id;
+  }
+
+  /* ---------------- Variant A — evidence rail ---------------- */
+
+  function groundsA(t) {
+    const box = el("div", "grounds");
+    box.append(el("div", "lbl", "Grounds — why this was raised"));
+    t.grounds.forEach((g, i) => {
+      const row = el("div", "g-row g-" + g.kind);
+      row.append(el("div", "g-bar"));
+      const body = el("div");
+      const kindLine = el("div", "g-kind " + KIND[g.kind][1] + "-kind", KIND[g.kind][0]);
+      body.append(kindLine);
+      if (g.kind === "quote") {
+        const u = unverified(t.id, i);
+        body.append(clampedQuote(g.text, !!u), quoteCite(g, u));
+      } else if (g.kind === "unknown-attribute") {
+        const line = el("div", "g-text");
+        line.append(code(g.attribute), el("span", null, " is unstated for "), code(g.element_id));
+        body.append(line);
+        body.append(el("div", "g-cite", elementName(g.element_id)));
+      } else {
+        const c = CROSSING[g.flow_id];
+        const line = el("div", "g-text");
+        line.append(el("span", null, "crossing on "), code(g.flow_id));
+        body.append(line);
+        const cite = el("div", "g-cite");
+        if (c) { cite.append(code(c.source_zone), el("span", null, "→"), code(c.destination_zone)); }
+        body.append(cite);
+      }
+      row.append(body);
+      box.append(row);
+    });
+    return box;
+  }
+
+  /* ---------------- Variant B — evidence as the lede ---------------- */
+
+  function groundsB(t) {
+    const lede = el("div", "lede");
+    lede.append(el("div", "hdr", "What in your input produced this"));
+    t.grounds.forEach((g, i) => {
+      const row = el("div", "g-row");
+      if (g.kind === "quote") {
+        row.append(clampedQuote(g.text), quoteCite(g, unverified(t.id, i)));
+      } else if (g.kind === "unknown-attribute") {
+        const line = el("div", "g-inline");
+        line.append(el("span", "g-kind g-unknown-kind", "unstated"), code(g.attribute),
+                    el("span", null, "on"), code(g.element_id));
+        row.append(line);
+      } else {
+        const c = CROSSING[g.flow_id];
+        const line = el("div", "g-inline");
+        line.append(el("span", "g-kind g-derived-kind", "derived"),
+                    el("span", null, "trust-boundary crossing on"), code(g.flow_id));
+        row.append(line);
+        if (c) {
+          const sub = el("div", "g-cite");
+          sub.append(code(c.source_zone), el("span", null, "→"), code(c.destination_zone));
+          row.append(sub);
+        }
+      }
+      lede.append(row);
+    });
+    return lede;
+  }
+
+  /* ---------------- Variant C — margin citations ---------------- */
+
+  function groundsC(t) {
+    const col = el("div", "margin");
+    col.append(el("div", "hdr", "Grounds"));
+    t.grounds.forEach((g, i) => {
+      const c = el("div", "g-card g-" + g.kind);
+      c.append(el("div", "g-kind " + KIND[g.kind][1] + "-kind", KIND[g.kind][0]));
+      if (g.kind === "quote") {
+        const short = g.text.length > 160 ? g.text.slice(0, 160) + "…" : g.text;
+        const q = el("div", "g-text", "“" + short + "”");
+        c.append(q);
+        if (g.text.length > 160) {
+          const btn = el("button", "g-more", "Expand");
+          btn.type = "button";
+          let open = false;
+          btn.addEventListener("click", () => {
+            open = !open;
+            q.textContent = "“" + (open ? g.text : short) + "”";
+            btn.textContent = open ? "Collapse" : "Expand";
+          });
+          c.append(btn);
+        }
+        c.append(quoteCite(g, unverified(t.id, i)));
+      } else if (g.kind === "unknown-attribute") {
+        const line = el("div", "g-text");
+        line.append(code(g.attribute));
+        c.append(line, el("div", "g-cite", elementName(g.element_id)));
+      } else {
+        const cr = CROSSING[g.flow_id];
+        c.append(el("div", "g-text", elementName(g.flow_id)));
+        const cite = el("div", "g-cite");
+        if (cr) cite.append(code(cr.source_zone), el("span", null, "→"), code(cr.destination_zone));
+        c.append(cite);
+      }
+      col.append(c);
+    });
+    return col;
+  }
+
+  /* ---------------- the card ---------------- */
+
+  function threatCard(t, rejected) {
+    const card = el("div", "card" + (rejected ? " rejected" : ""));
+    card.style.borderLeftColor = svar(t.severity.level);
+    const main = V === "C" ? el("div", "main") : card;
+
+    if (V === "B") main.append(groundsB(t));
+
+    const head = el("div", "card-head");
+    head.append(el("h3", null, t.title), el("span", "tid", t.id));
+    main.append(head);
+    main.append(el("div", "cat", t.category));
+
+    const badges = el("div", "badges");
+    const sev = el("span", "chip");
+    const sw = el("span", "swatch"); sw.style.background = svar(t.severity.level);
+    sev.append(sw, el("span", null, SEV[t.severity.level][0]));
+    sev.title = `likelihood ${t.severity.likelihood} × impact ${t.severity.impact}`;
+    const [vlabel, vglyph] = VERDICT[t.verdict.status];
+    badges.append(sev, el("span", "chip verdict", `${vglyph} ${vlabel}`),
+                  el("span", "chip confidence", `confidence: ${t.confidence}`));
+    main.append(badges);
+
+    main.append(el("div", "desc", t.description));
+
+    const rat = el("div", "field");
+    rat.append(el("span", "lbl", "Severity rationale"), el("div", null, t.severity.justification));
+    main.append(rat);
+
+    const refs = el("div", "field refs");
+    refs.append(el("span", "lbl", "Affected elements"));
+    const rl = el("div");
+    t.affected_element_ids.forEach(r => rl.append(code(r)));
+    refs.append(rl);
+    main.append(refs);
+
+    if (V === "A") main.append(groundsA(t));
+
+    if (t.verdict.status === "needs-info") {
+      const u = el("div", "unknown");
+      u.append(el("b", null, "Needs info. "), el("span", null, t.verdict.reason + " Unknown: "));
+      t.verdict.related_unknowns.forEach(r => {
+        u.append(code(r.element_id), el("span", null, " → "), code(r.attribute));
+      });
+      main.append(u);
+    }
+    if (t.verdict.status === "rejected") {
+      const r = el("div", "field");
+      r.append(el("span", "lbl", "Reason dismissed"), el("div", null, t.verdict.reason));
+      main.append(r);
+    }
+    if (t.mitigations && t.mitigations.length) {
+      const wrap = el("div", "field");
+      wrap.append(el("div", "lbl", "Mitigations"));
+      const list = el("ul", "mits");
+      t.mitigations.forEach(m => list.append(el("li", null, m.summary)));
+      wrap.append(list);
+      main.append(wrap);
+    }
+
+    if (V === "C") { card.append(main, groundsC(t)); }
+    return card;
+  }
+
+  /* ---------------- page ---------------- */
+
+  $("sysname").textContent = R.input.system_name;
+  $("jobmeta").append(el("span", null, `Job ${R.job.id} · ${R.job.status} · schema ${R.schema_version}`));
+
+  // Variant B also surfaces the source list up top — the citation keys quotes resolve against.
+  if (V === "B") {
+    const h = el("h2", null, "Sources");
+    const box = el("div", "sources");
+    R.input.sources.forEach(s => {
+      const c = el("div", "src");
+      c.append(el("b", null, s.label), el("span", null, ` · ${s.kind} · `), code(s.sha256.slice(0, 12) + "…"));
+      box.append(c);
+    });
+    $("sourcespanel").append(h, box);
+  }
+
+  [[R.summary.threat_count, "Actionable threats"], [R.summary.needs_info_count, "Needs info"],
+   [R.summary.rejected_count, "Rejected"], [R.summary.elements_analyzed, "Elements analysed"]]
+    .forEach(([n, k]) => {
+      const t = el("div", "tile");
+      t.append(el("div", "n", String(n)), el("div", "k", k));
+      $("tiles").append(t);
+    });
+
+  [...R.threats].sort((a, b) => SEV_ORDER.indexOf(a.severity.level) - SEV_ORDER.indexOf(b.severity.level))
+    .forEach(t => $("threats").append(threatCard(t, false)));
+  R.rejected_threats.forEach(t => $("rejected").append(threatCard(t, true)));
+
+  // Element table. Variant C is the only one that carries element provenance here;
+  // A and B keep all attribution on findings.
+  const cols = ["Type", "ID", "Name", "Trust zone", "Key attributes"];
+  if (V === "C") cols.push("From the source");
+  cols.forEach(c => $("elhead").append(el("th", null, c)));
+  const attrs = {
+    "external-entity": e => `kind: ${e.kind}`,
+    "process": e => `${e.technology} · exposure: ${e.exposure}`,
+    "data-store": e => `${e.technology} · ${e.data_classification} · at rest: ${e.encryption_at_rest}`,
+    "data-flow": e => `${e.protocol} · auth: ${e.authentication} · in transit: ${e.encryption_in_transit}`,
+  };
+  const rows = [
+    ...R.system_model.external_entities.map(e => ["external-entity", e]),
+    ...R.system_model.processes.map(e => ["process", e]),
+    ...R.system_model.data_stores.map(e => ["data-store", e]),
+    ...R.system_model.data_flows.map(e => ["data-flow", e]),
+  ];
+  const tb = $("elements").querySelector("tbody");
+  rows.forEach(([type, e]) => {
+    const tr = el("tr");
+    const zone = e.trust_zone || (e.source + " → " + e.destination);
+    const cell = (node) => { const td = el("td"); td.append(node); return td; };
+    [el("td", null, type), cell(code(e.id)), el("td", null, e.name),
+     cell(code(zone)), el("td", null, attrs[type](e))].forEach(td => tr.append(td));
+    if (V === "C") {
+      const td = el("td", "excerpt-col");
+      td.append(el("div", null, "“" + e.source_excerpt + "”"));
+      const cite = el("div", "g-cite");
+      cite.append(code(e.source_label));
+      if (e.source_speaker) cite.append(el("span", "g-speaker", e.source_speaker));
+      td.append(cite);
+      tr.append(td);
+    }
+    tb.append(tr);
+  });
+  if (V === "C") {
+    $("elcaption").append(el("p", "caption",
+      "“From the source” is why this element was extracted — not evidence for any finding above."));
+  }
+
+  $("themebtn").addEventListener("click", () => {
+    const cur = document.documentElement.getAttribute("data-theme");
+    const dark = cur ? cur === "dark" : matchMedia("(prefers-color-scheme: dark)").matches;
+    document.documentElement.setAttribute("data-theme", dark ? "light" : "dark");
+  });
+
+  /* ---------------- prototype switcher (throwaway chrome) ---------------- */
+  const keys = Object.keys(VARIANTS);
+  const go = (d) => {
+    const next = keys[(keys.indexOf(V) + d + keys.length) % keys.length];
+    location.search = "?variant=" + next;
+  };
+  const bar = el("div", "switcher");
+  const prev = el("button", null, "←"); prev.type = "button"; prev.addEventListener("click", () => go(-1));
+  const next = el("button", null, "→"); next.type = "button"; next.addEventListener("click", () => go(1));
+  const lab = el("div", "lab", `${V} — ${VARIANTS[V]}`);
+  bar.append(el("span", "tag", "prototype"), prev, lab, next);
+  document.body.append(bar);
+  document.addEventListener("keydown", (ev) => {
+    const t = ev.target;
+    if (t && (t.tagName === "INPUT" || t.tagName === "TEXTAREA" || t.isContentEditable)) return;
+    if (ev.key === "ArrowLeft") go(-1);
+    if (ev.key === "ArrowRight") go(1);
+  });
+</script>
+</body>
+</html>
