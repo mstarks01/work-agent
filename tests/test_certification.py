@@ -27,7 +27,7 @@ FP_C = "c" * 64
 
 # extract/repair run on base; the analysts, critic and recritic on strong.
 _TIERS = {"extract": "base", "repair": "base", "critic": "strong",
-          "recritic": "strong", "analyst_spoofing": "strong"}
+          "recritic": "strong", "analyze_spoofing": "strong"}
 ALL_NODES = tuple(_TIERS)
 
 

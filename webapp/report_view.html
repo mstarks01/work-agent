@@ -21,6 +21,12 @@
     --sev-high:     #ec835a;
     --sev-medium:   #fab219;
     --sev-low:      #0ca30c;
+    /* Grounds kinds. Deliberately outside the severity ramp above: nothing in
+       the grounds block is a severity signal, and a reader who has just learned
+       red-to-green means severity must not read these as a fourth band. */
+    --g-quote:      #3c6ecb;
+    --g-unknown:    #7a52c4;
+    --g-derived:    #1f8a86;
     --tint:         color-mix(in srgb, var(--surface) 88%, transparent);
   }
   @media (prefers-color-scheme: dark) {
@@ -34,12 +40,16 @@
       --muted:    #898781;
       --border:   rgba(255,255,255,0.10);
       --hairline: #2c2c2a;
+      --g-quote:  #7ea6ee;
+      --g-unknown:#ac8ce8;
+      --g-derived:#49b6b1;
     }
   }
   :root[data-theme="dark"] .viz-root {
     color-scheme: dark;
     --plane:#0d0d0d; --surface:#1a1a19; --surface-2:#242422;
     --ink:#ffffff; --ink-2:#c3c2b7; --muted:#898781; --border:rgba(255,255,255,0.10); --hairline:#2c2c2a;
+    --g-quote:#7ea6ee; --g-unknown:#ac8ce8; --g-derived:#49b6b1;
   }
 
   * { box-sizing: border-box; }
@@ -102,6 +112,26 @@
   .refs code { font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: 0.8rem;
     background: var(--surface-2); border: 1px solid var(--border); border-radius: 6px; padding: 1px 6px; margin-right: 6px; }
   ul.mits { margin: 6px 0 0; padding-left: 18px; font-size: 0.88rem; color: var(--ink-2); }
+
+  /* grounds rail — why the finding was raised, under the analysis */
+  .grounds { margin-top: 14px; padding-top: 12px; border-top: 1px solid var(--hairline); }
+  .ground { border-left: 3px solid var(--muted); padding-left: 11px; margin-top: 10px; }
+  .ground.quote { border-left-color: var(--g-quote); }
+  .ground.unknown-attribute { border-left-color: var(--g-unknown); }
+  .ground.derived-fact { border-left-color: var(--g-derived); }
+  .ground .kind { color: var(--muted); text-transform: uppercase; letter-spacing: 0.05em; font-size: 0.68rem; }
+  .ground .body { font-size: 0.88rem; color: var(--ink-2); margin-top: 3px; }
+  /* Three lines, and only when the quote is long enough to be worth hiding;
+     anything that fits renders whole with no affordance at all. */
+  .ground .body.clamped { display: -webkit-box; -webkit-line-clamp: 3; -webkit-box-orient: vertical; overflow: hidden; }
+  .ground .cite { font-size: 0.78rem; color: var(--muted); margin-top: 4px; }
+  /* An unverified quote says so in words, on the line that qualifies what the
+     reader is looking at — never in a `title`, which keyboard and touch cannot
+     reach. */
+  .ground .cite.unverified { color: var(--ink-2); font-weight: 600; }
+  .ground .more { background: none; border: 0; padding: 0; margin-top: 4px; font: inherit;
+    font-size: 0.78rem; color: var(--ink-2); text-decoration: underline; cursor: pointer; display: block; }
+  .ground code { font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: 0.8rem; }
 
   .unknown { margin-top: 10px; padding: 9px 12px; border-radius: 9px; font-size: 0.85rem;
     background: color-mix(in srgb, var(--sev-medium) 12%, var(--surface));
@@ -196,6 +226,22 @@
   const lbl = (text) => el("span", "lbl", text);
   const cell = (...kids) => { const n = el("td"); n.append(...kids); return n; };
 
+  // Each branch named in its own words, so the three read as different *kinds*
+  // of justification rather than three formattings of one.
+  const GROUND_KIND = {
+    "quote": "Quoted from the submission",
+    "unknown-attribute": "Unstated in the submission",
+    "derived-fact": "Derived from the model",
+  };
+  // Past this, a quote is clamped to three lines behind a toggle. Short quotes
+  // are the common case and get no affordance.
+  const CLAMP_OVER = 220;
+  // "<threat id>#<grounds index>" for every quote the service looked for in its
+  // named source and could not find.
+  const UNVERIFIED = new Map(
+    (R.unverified_grounds || []).map(u => [`${u.threat_id}#${u.index}`, u])
+  );
+
   const SEV = { critical: ["Critical","--sev-critical"], high: ["High","--sev-high"], medium: ["Medium","--sev-medium"], low: ["Low","--sev-low"] };
   const SEV_ORDER = ["critical","high","medium","low"];
   const VERDICT = { confirmed: ["Confirmed","✓"], "needs-info": ["Needs info","?"], rejected: ["Rejected","✕"] };
@@ -230,6 +276,50 @@
     $("mixlegend").append(item);
   });
 
+  // One grounds entry. Every string here is model-authored or lifted verbatim
+  // out of the submitter's own prose, so it goes in as text and never as markup.
+  function groundEntry(threatId, ground, index) {
+    const row = el("div", "ground " + ground.kind);
+    row.append(el("div", "kind", GROUND_KIND[ground.kind] || ground.kind));
+    const body = el("div", "body");
+    if (ground.kind === "quote") {
+      const unverified = UNVERIFIED.get(`${threatId}#${index}`);
+      // The quotation marks assert a verbatim span the service found. When it
+      // did not, they come off — the claim they make is the one that failed.
+      body.textContent = unverified ? ground.text : `“${ground.text}”`;
+      row.append(body);
+      if (ground.text.length > CLAMP_OVER) {
+        body.classList.add("clamped");
+        const more = el("button", "more", "Show full quote");
+        more.type = "button";
+        more.addEventListener("click", () => {
+          const clamped = body.classList.toggle("clamped");
+          more.textContent = clamped ? "Show full quote" : "Show less";
+        });
+        row.append(more);
+      }
+      const cite = el("div", "cite" + (unverified ? " unverified" : ""));
+      cite.append(unverified ? `⚠ not found in ${ground.source_label}`
+                             : `— ${ground.source_label}`);
+      row.append(cite);
+      return row;
+    }
+    if (ground.kind === "unknown-attribute") {
+      body.append(code(ground.element_id), " → ", code(ground.attribute));
+    } else {
+      body.append(code(ground.flow_id));
+    }
+    row.append(body);
+    return row;
+  }
+
+  function groundsBlock(t) {
+    const block = el("div", "grounds");
+    block.append(lbl("Grounds — why this was raised"));
+    t.grounds.forEach((g, i) => block.append(groundEntry(t.id, g, i)));
+    return block;
+  }
+
   function threatCard(t, rejected) {
     const card = el("div", "card" + (rejected ? " rejected" : ""));
     card.style.borderLeftColor = svar(t.severity.level);
@@ -263,6 +353,16 @@
     t.affected_element_ids.forEach(r => refs.append(code(r)));
     card.append(refs);
 
+    // After the analysis, not before it: the card's job on first read is
+    // triage, and attribution is what you turn to once a finding has your
+    // attention.
+    card.append(groundsBlock(t));
+
+    // A needs-info banner may repeat an element/attribute pair that also
+    // appears as an unknown-attribute ground above. Both stay: the ground is
+    // the category agent's *trigger*, the banner is the critic's citation for
+    // its *verdict*. Different authors, and this block's whole value is that it
+    // says who justified what.
     if (t.verdict.status === "needs-info" && t.verdict.related_unknowns.length) {
       const u = el("div","unknown");
       u.append(el("b", null, "Needs info."), ` ${t.verdict.reason} Unknown: `);

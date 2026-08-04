@@ -83,7 +83,7 @@ def _build_shared_pipeline() -> graph.Pipeline:
         for graph_node, tier_node in graph.TIER_NODE_BY_GRAPH_NODE.items()
     }
     replies = {
-        graph.analyst_node_name("spoofing"): draft_json("S-01", "spoofing"),
+        graph.analyze_node_name("spoofing"): draft_json("S-01", "spoofing"),
         graph.CRITIC_NODE: threats_json(sample_ruling("S-01")),
     }
 

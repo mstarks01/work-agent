@@ -83,7 +83,7 @@ def test_a_pro_override_reprints_only_pro_nodes():
     # Base nodes are untouched; every strong node's generation identity moved.
     assert base["extract"] == swept["extract"]
     assert base["critic"] != swept["critic"]
-    assert base["analyst_spoofing"] != swept["analyst_spoofing"]
+    assert base["analyze_spoofing"] != swept["analyze_spoofing"]
 
 
 def test_certify_flags_an_override_drifted_run():
@@ -101,12 +101,12 @@ def test_certify_flags_an_override_drifted_run():
     assert {n.node for n in drifted.uncertified} == {
         "critic",
         "recritic",
-        "analyst_spoofing",
-        "analyst_tampering",
-        "analyst_repudiation",
-        "analyst_information_disclosure",
-        "analyst_denial_of_service",
-        "analyst_elevation_of_privilege",
+        "analyze_spoofing",
+        "analyze_tampering",
+        "analyze_repudiation",
+        "analyze_information_disclosure",
+        "analyze_denial_of_service",
+        "analyze_elevation_of_privilege",
     }
 
 
