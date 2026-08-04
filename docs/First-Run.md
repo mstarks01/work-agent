@@ -50,7 +50,7 @@ model = "gemini-2.5-pro"
 ```
 
 The two tiers select independently: `base` is the workhorse (extraction,
-repair), `strong` is judgement (the six analysts, the critic, the re-ask). A
+repair), `strong` is judgement (the six category agents, the critic, the re-ask). A
 mixed pair — a cheap model from one vendor, judgement from another — is
 ordinary rather than a special case.
 
@@ -144,7 +144,7 @@ Click **Load example**, then **Analyze**. No typing.
 
 That loads [`examples/orders.md`](../examples/orders.md), a small e-commerce
 system described the way the extractor expects. The run takes roughly 40 seconds
-and streams each node as it finishes — extraction, six parallel STRIDE analysts,
+and streams each node as it finishes — extraction, six parallel category agents,
 then the grounding critic. When it completes you get the full report.
 
 What to look at first:
@@ -155,6 +155,9 @@ What to look at first:
   unstated (is the S3 bucket encrypted? is the admin console authenticated?), and
   those come back as `needs-info` rather than as invented findings. That contrast
   is the behaviour to understand before you write your own sources.
+- **The grounds under each threat** — the quote, unknown attribute or boundary
+  crossing the finding was raised on. This is the fastest way to judge whether a
+  finding is real, and the fastest way to see what your text left unsaid.
 - **Provenance** — the served model build and sampling fingerprint for every LLM
   node, which is what makes a report reproducible.
 

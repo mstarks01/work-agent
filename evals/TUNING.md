@@ -127,7 +127,7 @@ without editing the file, use an environment override (see
 what a sweep does:
 
 ```sh
-# Try a warmer temperature on the strong-tier analysts for one run:
+# Try a warmer temperature on the strong-tier category agents for one run:
 STRIDE_SAMPLING_STRONG_TEMPERATURE=0.4 \
   python -m evals.harness.run run --mode analysis --out warm-strong.json
 ```
@@ -146,7 +146,8 @@ costing recall on the far ones, which is the whole reason to test it.
 
 ### Prompts and exemplars
 
-The analyst prompts and their worked examples (`prompts/`) are the strongest
+The category-agent prompt and its worked examples (`prompts/analyze.md` and
+`prompts/exemplars/`) are the strongest
 lever on recall — and the *cause* of the near/far gap, since all the examples
 come from one domain (payments). Editing an exemplar or adding one from a
 different domain is the most direct way to move that gap. Measure it exactly like

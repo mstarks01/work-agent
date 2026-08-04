@@ -23,7 +23,7 @@ and the fields below are the authoritative account.
 
 ```python
 class StrideReport:
-    schema_version: str          # "1.1"
+    schema_version: str          # "2.0"
     disclaimer: str              # AI-generated, not human-reviewed
     job: Job                     # id, status="completed", timestamps, revise_rounds
     input: InputRef              # system_name + one ref per submitted source
@@ -33,6 +33,7 @@ class StrideReport:
     boundary_crossings: list[BoundaryCrossing]
     threats: list[Threat]        # confirmed + needs-info, severity-ordered
     rejected_threats: list[Threat]
+    unverified_grounds: list[UnverifiedGround]  # quote grounds not found in their source
     summary: Summary
 ```
 
@@ -47,6 +48,13 @@ inside an existing enum, or narrowing what a field may contain — is a **major*
 bump, because that is the change a consumer cannot detect by reading its own
 fields and will otherwise misread silently. One bump covers a whole cutover,
 however many changes it carries.
+
+> **`schema_version` 2.0** added [`grounds`](#grounds--why-the-finding-was-raised)
+> on every threat and `unverified_grounds` on the report — both additive, and
+> minor on their own. What earns the major is that `nodes[].node` changed the
+> *values* it carries: the six category nodes are now `analyze_<category>`, not
+> `analyst_<category>`. A consumer keying on `analyst_spoofing` does not error;
+> it matches nothing, silently.
 
 ## A threat
 
@@ -74,7 +82,8 @@ refs above), and an optional `source_speaker` (who said it, where the text
 attributes it). `source_speaker` is a separate field precisely so a name can be
 stripped; a name inside a verbatim excerpt cannot be. An element's `notes` may
 also quote submitted words — a speaker's hedge, or two sources disagreeing —
-so both fields ship raw caller text in the report JSON.
+so both fields ship raw caller text in the report JSON, as does every `quote`
+ground on a threat.
 
 ```python
 class Threat:
@@ -83,6 +92,7 @@ class Threat:
     title: str
     description: str
     affected_element_ids: list[str]  # element IDs in system_model — always resolve
+    grounds: list[Ground]            # why it was raised — at least one, never empty
     severity: Severity
     mitigations: list[Mitigation]    # {summary, detail}
     confidence: Rating               # low | medium | high (critic-calibrated)
@@ -92,6 +102,75 @@ class Threat:
 Category letters: `S` spoofing, `T` tampering, `R` repudiation,
 `I` information-disclosure, `D` denial-of-service, `E` elevation-of-privilege.
 A threat's `id` must carry its category letter.
+
+### Grounds — why the finding was raised
+
+Every threat carries at least one `Ground`: the evidence the category agent that
+drafted it says justifies it. `grounds` is never empty, and has no maximum.
+
+```python
+class Ground:
+    kind: "quote" | "unknown-attribute" | "derived-fact"
+    text: str                    # quote: the verbatim span, ≤1000 chars
+    source_label: str            # quote: names one of input.sources
+    element_id: str              # unknown-attribute: resolves in system_model
+    attribute: str               # unknown-attribute: the attribute that is `unknown`
+    flow_id: str                 # derived-fact: a data flow in system_model
+```
+
+| `kind` | Carries | Reads as |
+| --- | --- | --- |
+| `quote` | `text` + `source_label` | the submitter's own words said this |
+| `unknown-attribute` | `element_id` + `attribute` | this fact was never stated, so the threat stands unrefuted |
+| `derived-fact` | `flow_id` | this flow's boundary crossing is the fact relied on |
+
+**One flat model, not a discriminated union.** Fields belonging to the other two
+kinds are empty strings, and a record carrying a field its own kind does not
+claim is rejected on arrival rather than tolerated — so a consumer may read the
+fields its `kind` names and ignore the rest. Why the shape is flat rather than a
+tagged union, which it should be, is
+[ADR 0002](adr/0002-finding-level-attribution.md).
+
+A `derived-fact` names the flow and **never copies the zones it crosses**: they
+recompute from `boundary_crossings`, which the report already carries, so a
+renderer resolves them locally and there is no second copy to disagree with the
+first. A `quote`'s `source_label` always names one of the `SourceRef`s in
+`input.sources` — but the report never carries the source *text*, so a quote is
+checkable against its origin only by whoever holds the submission.
+
+The service does that check itself, at merge time, against the bytes that were
+submitted: a quote is matched to the source it names through a fixed ladder
+(whitespace runs collapse, typography and case fold, `…` marks an elision,
+inline markdown is ignored). It proves a quote is **present**, never that it
+supports the finding — that judgement stays the critic's.
+
+```python
+class UnverifiedGround:
+    threat_id: str               # the threat carrying it
+    index: int                   # position in that threat's `grounds` list
+    reason: str
+```
+
+A quote that could not be found is **marked, not removed**: the entry still
+renders, and `unverified_grounds` points at it by threat and index. A threat
+where *nothing* verified never reaches the report at all — the job fails
+instead. So an entry in this list means "one citation on an otherwise justified
+finding did not match", which is worth showing a reader and is not grounds for
+hiding the finding. The list is also empty when no source text was available to
+check against, so it is evidence of a *failed* check, never of a check having
+run.
+
+Two things `grounds` is deliberately not:
+
+- **Not an element's `source_excerpt`.** An excerpt says why an *element* is in
+  the model; a ground says why a *threat* was raised. They quote the same
+  submission and answer different questions, and the category agents cannot see
+  the excerpts — those fields are stripped from the model rendered to them.
+- **Not `verdict.related_unknowns`.** An `unknown-attribute` ground is
+  backward-looking (the unknown that prompted the finding) and agent-authored;
+  `related_unknowns` is forward-looking (the unknown that must be answered
+  before the finding can be ruled on) and critic-authored. When they name the
+  same attribute, that is agreement, not duplication.
 
 ### Severity is derived, never asserted
 
@@ -147,7 +226,7 @@ a result stands on its own without trusting any outside record.
 
 ```python
 class NodeRun:
-    node: str                        # graph node name, e.g. "extract", "critic"
+    node: str                        # graph node name: "extract", "analyze_spoofing", "critic", …
     model: str | None                # the SERVED build, vendor-prefixed; None for code-only nodes
     requested_model: str | None      # the CONFIGURED route this node asked for
     sampling_fingerprint: str | None # 64-hex identity hash of (served route, decoding params)
