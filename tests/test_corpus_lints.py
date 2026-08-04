@@ -73,16 +73,17 @@ def test_every_citation_names_a_source_the_case_declares():
         meta = verify_corpus._load_json(case_dir / "case.json")
         model = verify_corpus._load_json(case_dir / "model.json")
         problems = list(
-            verify_corpus._check_citations(
-                model, verify_corpus.declared_labels(meta)
-            )
+            verify_corpus._check_citations(model, verify_corpus.declared_labels(meta))
         )
         assert problems == [], f"{case_dir.name}: {problems}"
 
 
 def test_a_case_that_cites_an_undeclared_label_is_caught():
-    model = {"processes": [{"id": "process:x", "source_excerpt": "q",
-                            "source_label": "Nowhere"}]}
+    model = {
+        "processes": [
+            {"id": "process:x", "source_excerpt": "q", "source_label": "Nowhere"}
+        ]
+    }
     problems = list(verify_corpus._check_citations(model, {"System description"}))
     assert len(problems) == 1
     assert "does not declare" in problems[0]

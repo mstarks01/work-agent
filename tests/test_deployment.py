@@ -54,7 +54,7 @@ def test_from_env_resolves_the_repo_configs_without_credentials():
     """Reading config is cheap and credential-free; that is why it is eager."""
     deployment = Deployment.from_env(env=VERTEX_TIERS)
 
-    assert deployment.tiers.version == 3
+    assert deployment.tiers.version == 4
     assert set(deployment.sampling.tiers) == {"base", "strong"}
     assert deployment.resilience.attempts >= 1
     assert deployment.manifest.version == 2
@@ -171,7 +171,7 @@ def test_every_llm_node_carries_the_retry_loop():
 def test_both_tiers_draw_on_one_shared_retry_budget():
     """A storm is a property of the process, not of a tier.
 
-    Two budgets would let the six analysts exhaust the strong tier's allowance
+    Two budgets would let the six category agents exhaust the strong tier's allowance
     while the base tier's sat untouched beside it — and both are pointed at the
     same provider quota.
     """
@@ -216,9 +216,7 @@ def test_drop_params_is_never_set_so_litellm_stays_fail_closed():
 
 
 def test_env_overrides_the_retry_attempts_without_touching_the_model():
-    deployment = Deployment.from_env(
-        env=VERTEX_ENV | {"STRIDE_RETRY_ATTEMPTS": "5"}
-    )
+    deployment = Deployment.from_env(env=VERTEX_ENV | {"STRIDE_RETRY_ATTEMPTS": "5"})
     pipeline = deployment.pipeline()
     nodes = {node.name: node for node in pipeline.workflow.graph.nodes}
 
@@ -389,7 +387,9 @@ def test_a_model_without_native_schema_support_fails_the_build(tmp_path):
     path.write_text(NO_TEMPERATURE, encoding="utf-8")
 
     with pytest.raises(ModelGateError) as excinfo:
-        Deployment.from_env(env=ANTHROPIC_ENV | {"STRIDE_SAMPLING": str(path)}).pipeline()
+        Deployment.from_env(
+            env=ANTHROPIC_ENV | {"STRIDE_SAMPLING": str(path)}
+        ).pipeline()
 
     message = str(excinfo.value)
     assert "tiers.base" in message
@@ -521,9 +521,7 @@ def test_the_route_enforces_the_gate_the_runner_certified_with():
     """The reach through the runner's private attribute this replaced."""
     deployment = Deployment.from_env(env=VERTEX_ENV)
 
-    app = create_app(
-        deployment=deployment, store=InMemoryJobStore(), verifier=object()
-    )
+    app = create_app(deployment=deployment, store=InMemoryJobStore(), verifier=object())
 
     assert app.state.certification is deployment.gate()
     assert app.state.runner is deployment.runner()

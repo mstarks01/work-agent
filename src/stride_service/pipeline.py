@@ -175,5 +175,6 @@ class AdkPipelineRunner:
             boundary_crossings=analysis.boundary_crossings,
             threats=analysis.threats,
             rejected_threats=analysis.rejected_threats,
+            unverified_grounds=analysis.unverified_grounds,
             summary=analysis.summary,
         )

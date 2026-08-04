@@ -59,6 +59,8 @@ def analyze_orders(engine: StrideEngine) -> None:
 
     assert isinstance(outcome, PipelineCompleted)
     print(f"{outcome.report.summary.threat_count} threats")
+
+
 # docs-region-end: embed_sync
 
 

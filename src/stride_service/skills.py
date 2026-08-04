@@ -28,7 +28,7 @@ __all__ = [
     "SKILL_SECTION_HEADINGS",
     "STRIDE_CATEGORIES",
     "category_boundary_digest",
-    "compose_analyst_skills",
+    "compose_analyze_skills",
     "compose_critic_skills",
     "estimate_tokens",
     "extract_section",
@@ -61,7 +61,7 @@ def category_boundary_digest(loader: MarkdownLoader) -> str:
     """The critic's lane digest: the six ``## Scope`` sections, verbatim.
 
     Assembled mechanically in canonical STRIDE order so the critic dedupes
-    against the same lane definitions the analysts used.
+    against the same lane definitions the category agents used.
     """
     parts = ["# STRIDE Category Boundaries"]
     for category in STRIDE_CATEGORIES:
@@ -70,12 +70,12 @@ def category_boundary_digest(loader: MarkdownLoader) -> str:
     return "\n\n".join(parts) + "\n"
 
 
-def compose_analyst_skills(
+def compose_analyze_skills(
     loader: MarkdownLoader,
     category: StrideCategory,
     domain_packs: tuple[str, ...] = (),
 ) -> str:
-    """One analyst's skill text: category skill, shared rubric, domain packs.
+    """One category agent's skill text: category skill, shared rubric, domain packs.
 
     Stable-first order keeps the instruction prefix identical across jobs for
     the same category + pack selection, so it caches.

@@ -19,6 +19,7 @@ from evals.harness.judge import (
 from evals.harness.reference import ReferenceThreat
 from stride_service.report import (
     DraftThreat,
+    Ground,
     Severity,
     StrideCategory,
     Threat,
@@ -107,10 +108,15 @@ def draft_threat(
     likelihood: str = "high",
     impact: str = "high",
 ) -> DraftThreat:
-    """One analyst's draft, as ``merge_drafts`` parks it for the critic.
+    """One category agent's draft, as ``merge_drafts`` parks it for the critic.
 
     No verdict and no confidence: those are the critic's, and critic yield
     exists to measure what the critic did with drafts exactly this shape.
+
+    ``grounds`` is an ``unknown-attribute`` on the first cited element rather
+    than a quote, because nothing on the eval side scores grounds and a quote
+    would need a source to be verifiable against. The eval-side reference set
+    carries no grounds at all — a hand-authored one would be graded by nothing.
     """
     return DraftThreat(
         id=f"{CATEGORY_LETTERS[category]}-{sequence:02d}",
@@ -118,6 +124,13 @@ def draft_threat(
         title=title,
         description=f"{title} Details for the scorer's adjudication step.",
         affected_element_ids=list(element_ids),
+        grounds=[
+            Ground(
+                kind="unknown-attribute",
+                element_id=next(iter(element_ids)),
+                attribute="authentication",
+            )
+        ],
         severity=Severity(
             likelihood=likelihood, impact=impact, justification="scripted"
         ),

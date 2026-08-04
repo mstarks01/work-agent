@@ -13,6 +13,7 @@ import re
 from pathlib import Path
 
 import pytest
+from pydantic import ValidationError
 
 from stride_service.model_tiers import ModelTierConfig, TierSelection
 from stride_service.sampling import (
@@ -158,7 +159,7 @@ class TestFileValidation:
 
     def test_config_is_frozen(self, config_path):
         config = load_sampling(config_path(config_toml()), env={})
-        with pytest.raises(Exception):
+        with pytest.raises(ValidationError):
             config.version = 99
 
 
@@ -196,7 +197,9 @@ class TestThinkingEnum:
     def test_there_are_no_per_tier_legal_ranges_left(self, config_path):
         # Version 2 rejected "off" on pro and allowed it on flash. The enum is
         # uniform, so both tiers accept exactly the same three values.
-        text = config_toml(base_body='thinking = "high"\n', strong_body='thinking = "high"\n')
+        text = config_toml(
+            base_body='thinking = "high"\n', strong_body='thinking = "high"\n'
+        )
         config = load_sampling(config_path(text), env={})
         assert config.for_tier("base").thinking == "high"
         assert config.for_tier("strong").thinking == "high"
@@ -447,9 +450,7 @@ class TestConstrainOutput:
         )
         assert sampling_fingerprint(
             "anthropic/claude-opus-4-6", constrained.for_tier("base")
-        ) != sampling_fingerprint(
-            "anthropic/claude-opus-4-6", loose.for_tier("base")
-        )
+        ) != sampling_fingerprint("anthropic/claude-opus-4-6", loose.for_tier("base"))
 
     @pytest.mark.parametrize(
         ("value", "expected"), [("false", False), ("FALSE", False), ("true", True)]

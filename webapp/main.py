@@ -39,14 +39,22 @@ Security posture, all of it deliberate:
   JSON enters the viewer's ``<script>`` block — otherwise a description
   containing ``</script>`` closes it and the rest parses as HTML (A05 / LLM05).
   See :func:`render_report`.
+* **Untrusted text never reaches ``innerHTML``** in the viewer. It renders as
+  ``textContent`` or as constructed DOM nodes, so there is no escape helper to
+  forget to call — the discipline had already failed once, unnoticed, in the
+  element table's attribute column. This is the primary control; the CSP below
+  is defence in depth behind it.
 * **CSRF.** ``POST /analyze`` requires ``Sec-Fetch-Site: same-origin``. The
   header is browser-set and unspoofable from script, and it is checked before
   anything else so a cross-origin caller cannot even start a run.
 * **One run at a time** (LLM10). A second submission is refused with a message,
   not queued and held open.
-* **No CSP on the report page**, accepted rather than papered over: the
-  viewer's scripts are inline, and a nonce would mean editing a file that must
-  be served unedited. Loopback, single user, no session to steal.
+* **A strict nonce CSP on the report page.** ``default-src 'none'`` with a
+  per-response nonce for the one style block and the two script blocks, and no
+  ``'unsafe-inline'`` anywhere — which is why the viewer carries no ``style=""``
+  attributes and sets generated colours through ``element.style.*``, a CSSOM
+  write CSP does not govern. The viewer has no external resources and no
+  ``on*=`` handlers, so ``'none'`` costs nothing. See :func:`render_report`.
 """
 
 from __future__ import annotations
@@ -98,10 +106,24 @@ PORT = 8000
 MAX_RUNS = 20
 
 # The template's own script parses this same block. Matched by id rather than
-# by position, so the chrome can move without breaking injection.
+# by position, so the chrome can move without breaking injection; the trailing
+# ``[^>]*`` tolerates the nonce attribute the render pass fills in.
 _PAYLOAD_BLOCK = re.compile(
-    r'(<script type="application/json" id="report">)(.*?)(</script>)',
+    r'(<script type="application/json" id="report"[^>]*>)(.*?)(</script>)',
     re.DOTALL,
+)
+
+# Replaced with a fresh per-response nonce on every render. The viewer ships
+# with the placeholder in its three inline blocks, so a block added later
+# without one simply stops running rather than running unauthorised.
+_NONCE_PLACEHOLDER = "__CSP_NONCE__"
+
+# ``default-src 'none'`` and no ``'unsafe-inline'``: the viewer loads nothing
+# external, so everything it needs is the nonce. ``base-uri`` and
+# ``form-action`` are closed because neither has any use on a report page.
+_CSP = (
+    "default-src 'none'; script-src 'nonce-{nonce}'; style-src 'nonce-{nonce}'; "
+    "base-uri 'none'; form-action 'none'"
 )
 
 
@@ -189,12 +211,25 @@ def build_startup(env: Mapping[str, str] | None = None) -> Startup:
     return Startup(engine=engine, tiers=deployment.tiers, error=None)
 
 
-def render_report(report: StrideReport) -> str:
+@dataclass(frozen=True)
+class RenderedReport:
+    """A report page and the CSP header that authorises exactly its own nonce.
+
+    The two travel together so a caller cannot serve the page without the
+    policy: a nonce nothing authorises would leave the viewer's own scripts
+    blocked, and a policy without its page is meaningless.
+    """
+
+    html: str
+    csp: str
+
+
+def render_report(report: StrideReport) -> RenderedReport:
     """``report_view.html``, carrying this run's report.
 
     The template is a self-contained renderer for the report schema — no build
-    step, no framework, its own inline CSS and JS. This substitutes only the
-    contents of its JSON block and serves the result.
+    step, no framework, its own inline CSS and JS. This substitutes the contents
+    of its JSON block and its per-response CSP nonce, and serves the result.
 
     **The escape is the contract.** The report carries the submitter's own prose,
     so a description containing ``</script>`` would close the block and
@@ -203,9 +238,15 @@ def render_report(report: StrideReport) -> str:
     keeps the payload inert while remaining valid JSON, and the substitution
     goes through a function rather than a replacement string so that those
     backslashes are not themselves re-interpreted.
+
+    **The nonce is stamped before the payload is injected**, never after, so a
+    submitter who writes the placeholder into their own prose gets it back
+    verbatim as data instead of having it substituted.
     """
+    nonce = secrets.token_urlsafe(16)
+    template = VIEWER.read_text(encoding="utf-8").replace(_NONCE_PLACEHOLDER, nonce)
+
     payload = json.dumps(report.model_dump(mode="json")).replace("<", "\\u003c")
-    template = VIEWER.read_text(encoding="utf-8")
     rendered, count = _PAYLOAD_BLOCK.subn(
         lambda match: f"{match.group(1)}\n{payload}\n{match.group(3)}",
         template,
@@ -213,7 +254,7 @@ def render_report(report: StrideReport) -> str:
     )
     if count != 1:
         raise RuntimeError(f"{VIEWER} has no <script id='report'> block to inject into")
-    return rendered
+    return RenderedReport(html=rendered, csp=_CSP.format(nonce=nonce))
 
 
 def create_app(
@@ -267,9 +308,7 @@ def create_app(
                 status_code=409,
             )
         # Held on the run so the task is not garbage-collected mid-flight.
-        run.task = asyncio.create_task(
-            _drive(state.engine, analyses, run, sources)
-        )
+        run.task = asyncio.create_task(_drive(state.engine, analyses, run, sources))
         return JSONResponse({"run": run.id})
 
     @app.get("/events/{run_id}")
@@ -288,7 +327,10 @@ def create_app(
         run = analyses.get(run_id)
         if run is None or run.report is None:
             return PlainTextResponse("no such report", status_code=404)
-        return HTMLResponse(render_report(run.report))
+        rendered = render_report(run.report)
+        return HTMLResponse(
+            rendered.html, headers={"Content-Security-Policy": rendered.csp}
+        )
 
     return app
 
@@ -435,8 +477,7 @@ def _env_var_item(var: str, is_set: bool) -> str:
     """One variable's row — presence only, never the value (OWASP A09)."""
     css_class, label = ("set", "set") if is_set else ("not", "NOT SET")
     return (
-        f"<li><code>{_escape(var)}</code> "
-        f'<span class="{css_class}">{label}</span></li>'
+        f'<li><code>{_escape(var)}</code> <span class="{css_class}">{label}</span></li>'
     )
 
 

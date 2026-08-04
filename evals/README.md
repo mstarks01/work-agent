@@ -104,7 +104,7 @@ tool's published figures.
 - **element accuracy** — did the threat cite the right element? Scored, but never
   used to reject a match — citing the process where the reference cited the flow
   at its endpoint still counts as the same threat.
-- **ungrounded rate** — of the threats the tool produced that aren't in the
+- **unsupported rate** — of the threats the tool produced that aren't in the
   reference set, how many assert facts the model doesn't support? This is the one
   "extra threat" bucket that counts against the tool; a plausible, grounded extra
   does not.

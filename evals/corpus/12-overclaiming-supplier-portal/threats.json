@@ -11,7 +11,7 @@
       "likelihood": "medium",
       "impact": "medium"
     },
-    "notes": "Sign-in is the one control the source actually states, so this claim rests on a stated fact rather than on an unknown. Whether a second factor exists is never stated, and asserting its absence would be ungrounded."
+    "notes": "Sign-in is the one control the source actually states, so this claim rests on a stated fact rather than on an unknown. Whether a second factor exists is never stated, and asserting its absence would be unsupported."
   },
   {
     "category": "spoofing",

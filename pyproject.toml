@@ -44,6 +44,20 @@ default-groups = ["dev", "web"]
 [tool.hatch.build.targets.wheel]
 packages = ["src/stride_service"]
 
+[tool.ruff]
+# Stated rather than inferred from `requires-python`, so raising the floor to
+# 3.12 is a deliberate lint decision rather than a side effect. Rule selection
+# is deliberately ruff's default set: it is a curated cross-family subset, so
+# naming families here would enable far more than it pins. What holds it stable
+# is the exact `ruff` pin in uv.lock, which CI installs with `uv sync --locked`.
+target-version = "py311"
+
+[tool.ruff.format]
+# Hand-labelled data table: one tuple per row is the editing and grep unit, and
+# 88-column wrapping turns each of its ~400 rows into six lines. Only formatting
+# is opted out here — `ruff check` still covers the file.
+exclude = ["evals/judge_calibration/build_pairs.py"]
+
 [tool.pytest.ini_options]
 testpaths = ["tests"]
 # The eval harness (evals/harness) is imported by the offline eval tests but

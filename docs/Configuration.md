@@ -27,11 +27,12 @@ stops at startup with an error naming the vendors and the two places a selection
 can be made. There is no vendor you reach by doing nothing.
 
 Two tiers named on a capability axis — `base` (extraction, repair) and `strong`
-(the six analysts, the critic, the re-ask) — each select a `(vendor, model)` pair
-**independently**, so the two tiers may run different vendors at once.
+(the six category agents, the critic, the re-ask) — each select a
+`(vendor, model)` pair **independently**, so the two tiers may run different
+vendors at once.
 
 ```toml
-version = 3
+version = 4
 
 [tiers.base]
 vendor = "vertex"
@@ -272,7 +273,7 @@ answer today is to make the schema smaller, not to stop sending it.
 
 Every LLM node carries a schema the adapter can convert, so this setting is the
 only thing deciding whether one is sent. (That was not always true: the six
-analysts and both critic passes once bound bare `list[...]` schemas, which ADK
+category agents and both critic passes once bound bare `list[...]` schemas, which ADK
 cannot convert — it sent none and they generated unconstrained, silently. They
 now carry wrapper models, and a test asserts every node's schema survives the
 conversion.)
@@ -321,7 +322,7 @@ node. It did not used to be, and that gap was the 429 storm. On the OpenAI/Azure
 path LiteLLM sets the provider SDK's own `max_retries` from the retry count it
 is given, so the first attempt retried at the SDK level too and the worst case
 per node was `2 * attempts - 1` requests — five at the shipped `3`, and up to
-thirty in the seconds the six analysts run in parallel. Passing `max_retries` on
+thirty in the seconds the six category agents run in parallel. Passing `max_retries` on
 the adapter did not close it, because the retry count LiteLLM is given overwrites
 it.
 
@@ -337,7 +338,7 @@ Two things become possible there that could not exist below the adapter:
   are seeing. Correlated failure empties the bucket once for everyone and the
   service stops retrying; an isolated failure finds it full and is retried
   exactly as before.
-- **Decorrelated timing.** Six analysts that start together fail together, and
+- **Decorrelated timing.** Six category agents that start together fail together, and
   on any fixed curve retry together, reconverging on the quota they just
   tripped. Retries use full jitter — a uniform draw across the whole interval,
   not a delay with noise added — and a provider's `Retry-After` overrides the

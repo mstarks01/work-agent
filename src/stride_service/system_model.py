@@ -4,7 +4,7 @@ Terminology for this schema lives in CONTEXT.md.
 
 The five element types are the classic DFD-based STRIDE-per-element taxonomy.
 Free-form security-relevant attributes accept the sentinel value ``"unknown"``,
-meaning the input neither stated nor allowed inference of the fact; analysts
+meaning the input neither stated nor allowed inference of the fact; category agents
 treat an unknown control as unverified, never as present or absent. Inferred
 values are recorded in the attribute *and* in the top-level ``assumptions``
 list — never as silent guesses.
@@ -16,7 +16,7 @@ boundary iff its endpoints' zones differ.
 from __future__ import annotations
 
 import re
-from typing import ClassVar, Literal, Union
+from typing import ClassVar, Literal
 
 from pydantic import BaseModel, ConfigDict, Field
 
@@ -82,7 +82,7 @@ class _Element(BaseModel):
     # :func:`~stride_service.validation.validate`.
     source_label: str = Field(default="", max_length=200)
     # Who spoke the quote, where the text attributes it. Provenance on a quote,
-    # never a role and never a claim an analyst weighs. It exists to be
+    # never a role and never a claim a category agent weighs. It exists to be
     # *strippable*: a participant name inside a verbatim excerpt is unreachable,
     # while one in its own field is a single delete. Never gated — a wrong or
     # missing speaker must not fail a job.
@@ -141,7 +141,7 @@ class TrustBoundary(_Element):
     kind: Literal["network", "privilege", "tenant", "other"]
 
 
-Element = Union[ExternalEntity, Process, DataStore, DataFlow, TrustBoundary]
+Element = ExternalEntity | Process | DataStore | DataFlow | TrustBoundary
 
 
 def derive_element_id(element: Element) -> str:
@@ -155,8 +155,9 @@ def derive_element_id(element: Element) -> str:
         return make_flow_id(element.source, element.destination, element.name)
     return make_element_id(element.id_prefix, element.name)
 
+
 # Elements that belong to a trust zone (everything except flows and boundaries).
-ZonedElement = Union[ExternalEntity, Process, DataStore]
+ZonedElement = ExternalEntity | Process | DataStore
 
 
 class Assumption(BaseModel):

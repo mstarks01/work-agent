@@ -29,7 +29,7 @@ SAME_ORIGIN = {"Sec-Fetch-Site": "same-origin"}
 
 # The payload that breaks a naive injection: it closes the JSON block and the
 # rest of the page parses as HTML.
-BREAKOUT = '</script><img src=x onerror=alert(1)>'
+BREAKOUT = "</script><img src=x onerror=alert(1)>"
 
 
 @pytest.fixture
@@ -76,13 +76,9 @@ def posted(text: str) -> dict:
     }
 
 
-def run_to_completion(
-    client, text: str = "A web app talks to a database."
-) -> str:
+def run_to_completion(client, text: str = "A web app talks to a database.") -> str:
     """Submit, drain the event stream, and return the finished run's id."""
-    started = client.post(
-        "/analyze", json=posted(text), headers=SAME_ORIGIN
-    )
+    started = client.post("/analyze", json=posted(text), headers=SAME_ORIGIN)
     assert started.status_code == 200, started.text
     run_id = started.json()["run"]
     # Draining the stream is what lets the background task make progress.
@@ -118,9 +114,7 @@ def test_analyze_refuses_a_request_that_is_not_same_origin(client):
 
 
 def test_a_run_streams_one_tick_per_node_then_redirects(client):
-    started = client.post(
-        "/analyze", json=posted("A web app."), headers=SAME_ORIGIN
-    )
+    started = client.post("/analyze", json=posted("A web app."), headers=SAME_ORIGIN)
     run_id = started.json()["run"]
     events = client.get(f"/events/{run_id}").text
 
@@ -213,10 +207,10 @@ def test_the_injection_point_escapes_every_angle_bracket():
     outcome = asyncio.run(
         engine.analyze([Source.description("A web app.")], system_name=BREAKOUT)
     )
-    page = render_report(outcome.report)
+    page = render_report(outcome.report).html
 
     payload = re.search(
-        r'<script type="application/json" id="report">(.*?)</script>',
+        r'<script type="application/json" id="report"[^>]*>(.*?)</script>',
         page,
         re.DOTALL,
     )
@@ -255,7 +249,226 @@ def test_the_diagnostic_never_prints_a_credential_value(broken_client, monkeypat
 
 
 def test_analyze_is_closed_while_the_config_is_broken(broken_client):
-    response = broken_client.post(
-        "/analyze", json=posted("x"), headers=SAME_ORIGIN
-    )
+    response = broken_client.post("/analyze", json=posted("x"), headers=SAME_ORIGIN)
     assert response.status_code == 503
+
+
+# --- render safety (#78) ----------------------------------------------------
+#
+# Two independent controls, and the tests below hold them apart because they
+# fail differently. The *primary* control is that the viewer never interpolates
+# a value into an HTML string — that is decision 1, and no offline test can
+# execute the DOM, so it is guarded by a lint over the template. The *secondary*
+# control is the server-side escape at the injection point, which is testable
+# directly. The strict nonce CSP is defence in depth behind both.
+
+# What a model-authored field looks like when the submitter engineered it.
+MARKUP_PAYLOAD = "<img src=x onerror=alert(1)>"
+
+# The sinks that take a string and parse it as markup. None may appear in the
+# viewer's own code: decision 1 is that untrusted text reaches the DOM as
+# textContent or as constructed nodes, so that forgetting shows junk on screen
+# instead of executing script.
+HTML_STRING_SINKS = ("innerHTML", "outerHTML", "insertAdjacentHTML", "document.write")
+
+
+def viewer_javascript() -> str:
+    """The viewer's behaviour block, with its comments stripped.
+
+    Comments are removed so the lint reads what runs. The prose in this file
+    names ``innerHTML`` precisely because it is explaining why there isn't one,
+    and a substring check over the raw template would fail on its own docs.
+    """
+    from webapp.main import VIEWER
+
+    source = VIEWER.read_text(encoding="utf-8")
+    body = source.split('<script nonce="__CSP_NONCE__">')[-1].split("</script>")[0]
+    body = re.sub(r"/\*.*?\*/", "", body, flags=re.DOTALL)
+    return "\n".join(
+        line for line in body.splitlines() if not line.lstrip().startswith("//")
+    )
+
+
+@pytest.mark.parametrize("sink", HTML_STRING_SINKS)
+def test_the_viewer_has_no_html_string_sink(sink):
+    """Decision 1, as a lint: there is no sink left to forget to escape."""
+    assert sink not in viewer_javascript(), (
+        f"webapp/report_view.html uses {sink}. Every value in the report is "
+        f"untrusted — build DOM nodes or set textContent instead."
+    )
+
+
+def test_the_viewer_carries_no_escape_helper():
+    """The corollary. An escape helper would mean a sink somewhere to use it on.
+
+    #78's evidence for decision 1 was that "remember to call esc()" had already
+    failed once, unnoticed, in the element table's attribute column. The helper
+    going away is what makes that class of bug unwritable rather than merely
+    fixed.
+    """
+    assert "esc(" not in viewer_javascript()
+
+
+def model_with_markup_everywhere():
+    """A System Model whose every free-text field carries the payload.
+
+    These are exactly the ``str(max_length=200)`` fields extraction copies out
+    of the submitter's prose — the ones the element table renders, and the ones
+    the live bug (#86) put into ``innerHTML`` unescaped.
+    """
+    from tests.factories import valid_model
+
+    model = valid_model()
+    return model.model_copy(
+        update={
+            "processes": [
+                model.processes[0].model_copy(
+                    update={"technology": MARKUP_PAYLOAD, "name": MARKUP_PAYLOAD}
+                )
+            ],
+            "data_stores": [
+                model.data_stores[0].model_copy(
+                    update={
+                        "technology": MARKUP_PAYLOAD,
+                        "data_classification": MARKUP_PAYLOAD,
+                        "encryption_at_rest": MARKUP_PAYLOAD,
+                        "assets": [MARKUP_PAYLOAD],
+                    }
+                )
+            ],
+            "data_flows": [
+                flow.model_copy(
+                    update={
+                        "protocol": MARKUP_PAYLOAD,
+                        "authentication": MARKUP_PAYLOAD,
+                        "encryption_in_transit": MARKUP_PAYLOAD,
+                    }
+                )
+                for flow in model.data_flows
+            ],
+        }
+    )
+
+
+def report_with_markup_everywhere():
+    """A complete report carrying the payload in every free-text field.
+
+    Grounds included: a quote's ``text`` is submitter prose copied verbatim by
+    rule, and its ``source_label`` is a caller-chosen string, so the grounds
+    rail is now the newest place on the page where untrusted text lands.
+    """
+    from stride_service.report import Ground, Mitigation, Severity, Verdict
+    from tests.factories import sample_report, sample_threat
+
+    threat = sample_threat(
+        title=MARKUP_PAYLOAD,
+        description=MARKUP_PAYLOAD,
+        grounds=[
+            Ground(kind="quote", text=MARKUP_PAYLOAD, source_label=MARKUP_PAYLOAD),
+            Ground(
+                kind="unknown-attribute",
+                element_id=MARKUP_PAYLOAD,
+                attribute=MARKUP_PAYLOAD,
+            ),
+        ],
+        severity=Severity(
+            likelihood="medium", impact="high", justification=MARKUP_PAYLOAD
+        ),
+        mitigations=[Mitigation(summary=MARKUP_PAYLOAD)],
+        verdict=Verdict(status="rejected", reason=MARKUP_PAYLOAD),
+    )
+    report = sample_report(threats=[], rejected_threats=[threat])
+    return report.model_copy(update={"system_model": model_with_markup_everywhere()})
+
+
+def test_no_free_text_field_reaches_the_page_as_markup():
+    """#86's regression test, widened to every field that can carry prose.
+
+    The payload must not appear as markup anywhere in the served bytes, and it
+    must still survive as data — a report that renders the threat away is not a
+    fix. This covers the server-side half; the client-side half is the sink
+    lint above, since no offline test here can run the DOM.
+    """
+    page = render_report(report_with_markup_everywhere()).html
+
+    assert MARKUP_PAYLOAD not in page
+    assert "<img" not in page
+
+    payload = re.search(
+        r'<script type="application/json" id="report"[^>]*>(.*?)</script>',
+        page,
+        re.DOTALL,
+    )
+    decoded = json.loads(payload.group(1))
+    assert decoded["rejected_threats"][0]["title"] == MARKUP_PAYLOAD
+    assert decoded["rejected_threats"][0]["grounds"][0]["text"] == MARKUP_PAYLOAD
+    assert decoded["system_model"]["processes"][0]["technology"] == MARKUP_PAYLOAD
+
+
+def test_the_report_page_ships_a_strict_nonce_csp(client):
+    """Decision 2, including the part that is easy to get subtly wrong.
+
+    A nonce that authorises the policy but is missing from one of the page's
+    own blocks would silently stop that block running, so the check walks every
+    inline block rather than trusting the header alone.
+    """
+    run_id = run_to_completion(client)
+    response = client.get(f"/report/{run_id}")
+    csp = response.headers["Content-Security-Policy"]
+
+    assert "default-src 'none'" in csp
+    assert "base-uri 'none'" in csp
+    assert "form-action 'none'" in csp
+    # Styles are nonced too — no 'unsafe-inline' anywhere, for either directive.
+    assert "unsafe-inline" not in csp
+
+    nonce = re.search(r"script-src 'nonce-([^']+)'", csp).group(1)
+    assert f"style-src 'nonce-{nonce}'" in csp
+
+    blocks = re.findall(r"<(script|style)([^>]*)>", response.text)
+    assert blocks, "the viewer should carry inline blocks for the nonce to cover"
+    for tag, attributes in blocks:
+        assert f'nonce="{nonce}"' in attributes, (
+            f"a <{tag}> block carries no nonce, so the CSP would block it"
+        )
+    # The placeholder is fully substituted; none of it survives into the page.
+    assert "__CSP_NONCE__" not in response.text
+
+
+def test_every_render_gets_a_fresh_nonce(client):
+    """A nonce reused across responses is not a nonce."""
+    run_id = run_to_completion(client)
+    first = client.get(f"/report/{run_id}").headers["Content-Security-Policy"]
+    second = client.get(f"/report/{run_id}").headers["Content-Security-Policy"]
+    assert first != second
+
+
+def test_a_submitted_nonce_placeholder_is_not_substituted():
+    """The nonce is stamped before the payload lands, so this stays inert data."""
+    from tests.factories import sample_report, sample_threat
+
+    report = sample_report(threats=[sample_threat(title="__CSP_NONCE__")])
+    rendered = render_report(report)
+
+    nonce = re.search(r"script-src 'nonce-([^']+)'", rendered.csp).group(1)
+    payload = re.search(
+        r'<script type="application/json" id="report"[^>]*>(.*?)</script>',
+        rendered.html,
+        re.DOTALL,
+    )
+    assert json.loads(payload.group(1))["threats"][0]["title"] == "__CSP_NONCE__"
+    assert nonce not in payload.group(1)
+
+
+def test_the_viewer_has_no_inline_style_attribute():
+    """The CSP grants no 'unsafe-inline' for styles, so a style="" would break.
+
+    Generated colours go through ``element.style.*``, a CSSOM write the policy
+    does not govern; static ones are classes.
+    """
+    from webapp.main import VIEWER
+
+    markup = VIEWER.read_text(encoding="utf-8")
+    markup = re.sub(r"/\*.*?\*/", "", markup, flags=re.DOTALL)
+    markup = re.sub(r"<!--.*?-->", "", markup, flags=re.DOTALL)
+    assert "style=" not in markup

@@ -5,7 +5,7 @@ referential integrity of flow endpoints and ``trust_zone``, at least one trust
 zone, legal enum values (including the config-extendable asset-tag vocabulary),
 and assumptions referencing real elements. The admission cap on model size
 (:data:`MAX_ELEMENTS`) is enforced here because this is the one gate every
-extraction passes through before any analyst spend.
+extraction passes through before any category-agent spend.
 
 ID derivation lives in code: callers passing ``normalize_ids`` to
 :func:`parse_and_validate` get their IDs canonicalized before the gate runs, so
@@ -13,7 +13,7 @@ ID derivation lives in code: callers passing ``normalize_ids`` to
 enforced here for models that arrive hand-authored.
 
 Errors are structured (:class:`ValidationIssue`) so the repair pass can feed
-them back to the extraction agent verbatim. Analysts only ever see models for
+them back to the extraction agent verbatim. Category agents only ever see models for
 which :func:`validate` returns an empty list. On any failure the gate reports
 and denies — never silently auto-repairs.
 """
@@ -46,11 +46,11 @@ IssueCode = Literal[
 
 # Admission cap on model size. Deliberately loose: it is a
 # blast-radius guard, not a quality threshold. Every artifact downstream
-# scales with element count — six analysts each read the whole model, and the
+# scales with element count — six category agents each read the whole model, and the
 # critic reads every draft they produce in one pass — so an unbounded model
 # means unbounded spend and a critic dedupeing hundreds of drafts with no
 # error anywhere. Rejecting here costs one ``len()`` and happens before any
-# analyst call. Element count rather than a token estimate because it is the
+# category-agent call. Element count rather than a token estimate because it is the
 # number a user can act on: "split the system" is advice they can follow.
 #
 # Where quality actually decays with model size is unmeasured — the golden
@@ -81,7 +81,7 @@ def validate(
     max_elements: int = MAX_ELEMENTS,
     source_labels: Collection[str] = (),
 ) -> list[ValidationIssue]:
-    """Run every gate rule; an empty result means the model is analyst-ready.
+    """Run every gate rule; an empty result means the model is ready for analysis.
 
     The size cap is checked first and returns alone: a model too large to
     analyze cannot be made acceptable by fixing its IDs, and reporting the
@@ -256,7 +256,7 @@ def parse_and_validate(
 ) -> tuple[SystemModel | None, list[ValidationIssue]]:
     """Parse raw extraction output and run the validity gate.
 
-    Returns ``(model, issues)``. The model is analyst-ready only when
+    Returns ``(model, issues)``. The model is ready for analysis only when
     ``issues`` is empty; a model returned alongside issues exists solely so
     the repair pass has both the artifact and the errors. Schema-level
     failures return ``(None, issues)`` — fail closed, never a partial model.

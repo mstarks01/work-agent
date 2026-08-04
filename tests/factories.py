@@ -21,6 +21,7 @@ from typing import Any
 from google.adk.models.base_llm import BaseLlm
 from google.adk.models.llm_response import LlmResponse
 from google.genai import types
+from pydantic import Field
 
 from stride_service.binding import NodeBinding
 from stride_service.graph import (
@@ -35,6 +36,7 @@ from stride_service.markdown_loader import MarkdownLoader
 from stride_service.model_tiers import ModelTierConfig, load_model_tiers
 from stride_service.report import (
     DraftThreat,
+    Ground,
     InputRef,
     Job,
     Mitigation,
@@ -201,7 +203,7 @@ def sample_draft(
     category: str = "spoofing",
     **overrides: Any,
 ) -> DraftThreat:
-    """One analyst draft against valid_model(), before the critic rules on it."""
+    """One category agent's draft against valid_model(), before the critic rules."""
     threat = sample_threat(threat_id, category, **overrides)
     return DraftThreat.model_validate(
         threat.model_dump(exclude={"confidence", "verdict"})
@@ -211,7 +213,7 @@ def sample_draft(
 def sample_ruling(threat_id: str = "S-01", **overrides: Any) -> ThreatRuling:
     """The critic's ruling on one sample_draft(), overridable per test.
 
-    Carries no ``severity``, which is the common case: the analyst's rating
+    Carries no ``severity``, which is the common case: the agent's rating
     stands unless the calibration step replaced it.
     """
     fields: dict[str, Any] = {
@@ -236,6 +238,18 @@ def sample_threat(
         "description": "Stolen session cookies let an attacker impersonate"
         " the customer against the web app.",
         "affected_element_ids": ["flow:customer-to-web-app:login"],
+        # One quote and one derived fact, so a default draft exercises two
+        # branches rather than the cheapest one. The quote is a verbatim span of
+        # the source ``sample_report`` submits, so it verifies through the
+        # ladder; tests that need a failing quote override this field.
+        "grounds": [
+            Ground(
+                kind="quote",
+                text="Customers log in to the web app",
+                source_label=DEFAULT_DESCRIPTION_LABEL,
+            ),
+            Ground(kind="derived-fact", flow_id="flow:customer-to-web-app:login"),
+        ],
         "severity": Severity(
             likelihood="medium",
             impact="high",
@@ -287,7 +301,7 @@ EMPTY_THREATS = '{"threats": []}'
 
 
 def threats_json(*threats: object) -> str:
-    """A review or analyst node's emission: the list inside its ``threats`` key.
+    """A review or category-agent node's emission: the list inside its ``threats`` key.
 
     The wrapper is the node's output-schema shape, not the domain's, so tests
     build it here rather than each spelling it out — a bare array is what these
@@ -313,7 +327,7 @@ class ScriptedLlm(BaseLlm):
     """
 
     reply: str
-    seen: list[str] = []
+    seen: list[str] = Field(default_factory=list)
 
     async def generate_content_async(
         self, llm_request, stream: bool = False

@@ -9,20 +9,22 @@ privileged default.
 ```mermaid
 flowchart LR
     src[/"sources<br/>(text)"/] --> extract["extract<br/>(base)"]
-    extract --> analysts["6 STRIDE analysts<br/>in parallel<br/>(strong)"]
-    analysts --> critic["critic<br/>(strong)"]
+    extract --> analyze["6 category agents<br/>in parallel<br/>(strong)"]
+    analyze --> critic["critic<br/>(strong)"]
     critic --> report[/"StrideReport<br/>(JSON)"/]
 
     classDef io fill:#f1f5f9,stroke:#64748b,stroke-width:1.5px,color:#0f172a
     classDef llm fill:#ede9fe,stroke:#7c3aed,stroke-width:1.5px,color:#2e1065
     class src,report io
-    class extract,analysts,critic llm
+    class extract,analyze,critic llm
 ```
 
-An extraction pass builds the canonical **System Model** (a DFD); six per-category
-analysts draft threats against it in parallel; a grounding critic reviews the
+An extraction pass builds the canonical **System Model** (a DFD); six category
+agents draft threats against it in parallel, one per STRIDE category, each
+citing the grounds for every threat it raises; a grounding critic reviews the
 merged union in one pass — confirming, deduping, calibrating severity, and
-rejecting the ungrounded. See [`CONTEXT.md`](CONTEXT.md) for the domain glossary.
+rejecting what the model does not support. See [`CONTEXT.md`](CONTEXT.md) for
+the domain glossary.
 
 ## Two ways to call it
 
@@ -88,6 +90,16 @@ uv run ruff check .                        # lint
 uv run python evals/verify_corpus.py       # mechanical checks over the golden corpus
 uv run python examples/sync_docs.py --check # the docs' code blocks match examples/
 ```
+
+The tracked `pre-push` hook runs the two ruff checks CI runs. Git does not
+enable hooks for a clone on its own, so opt in once:
+
+```sh
+git config core.hooksPath .githooks
+```
+
+It is a convenience guard rather than a gate — CI is authoritative, and
+`git push --no-verify` skips it.
 
 Everything under `tests/` and `evals/verify_corpus.py` is credential-free and
 deterministic. The live eval commands (`python -m evals.harness.run ...`) need

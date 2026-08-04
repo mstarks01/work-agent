@@ -20,6 +20,13 @@ Lane contrast: being accepted *as* the web API is spoofing. Directing an honest,
     "flow:ledger-service-to-accounts-db:read-write-balances",
     "store:accounts-db"
   ],
+  "grounds": [
+    {
+      "kind": "quote",
+      "text": "that account has full read/write on every table",
+      "source_label": "Payments platform notes"
+    }
+  ],
   "severity": {
     "likelihood": "medium",
     "impact": "high",
@@ -54,6 +61,17 @@ The exemplar is reach across a trust boundary. `process:web-api` is `internet-fa
     "flow:web-api-to-ledger-service:post-transfer",
     "store:accounts-db"
   ],
+  "grounds": [
+    {
+      "kind": "quote",
+      "text": "not authenticated and not encrypted",
+      "source_label": "Payments platform notes"
+    },
+    {
+      "kind": "derived-fact",
+      "flow_id": "flow:web-api-to-ledger-service:post-transfer"
+    }
+  ],
   "severity": {
     "likelihood": "medium",
     "impact": "high",
@@ -86,6 +104,13 @@ The exemplar is reach across a trust boundary. `process:web-api` is `internet-fa
     "process:ledger-service",
     "flow:web-api-to-ledger-service:post-transfer",
     "store:accounts-db"
+  ],
+  "grounds": [
+    {
+      "kind": "unknown-attribute",
+      "element_id": "process:ledger-service",
+      "attribute": "exposure"
+    }
   ],
   "severity": {
     "likelihood": "medium",

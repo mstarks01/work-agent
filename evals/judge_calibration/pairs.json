@@ -357,7 +357,7 @@
     "reference_claim": "An attacker who reaches the Airflow metadata database recovers every partner key and connection string it holds, since its protection at rest is unverified.",
     "candidate_claim": "An attacker reads the partner keys out of the landing bucket.",
     "label": "no-match",
-    "note": "The keys are not in the bucket; the candidate asserts a fact the model does not support and should be adjudicated ungrounded, not matched."
+    "note": "The keys are not in the bucket; the candidate asserts a fact the model does not support and should be adjudicated unsupported, not matched."
   },
   {
     "case": "03-batch-data-pipeline",
@@ -445,7 +445,7 @@
     "reference_claim": "An attacker who can write to the registry swaps the model artifact and the model server loads it without any integrity verification.",
     "candidate_claim": "An attacker poisons the training data so the published model behaves incorrectly.",
     "label": "no-match",
-    "note": "Training-time poisoning is outside this model entirely \u2014 no training pipeline exists in it \u2014 so this is ungrounded, not a match."
+    "note": "Training-time poisoning is outside this model entirely \u2014 no training pipeline exists in it \u2014 so this is unsupported, not a match."
   },
   {
     "case": "04-ml-inference-service",
@@ -613,7 +613,7 @@
     "reference_claim": "An attacker who compromises the internet-facing web application reads the queue credentials from its config store.",
     "candidate_claim": "An attacker who compromises the web application recovers the database credentials from its config store.",
     "label": "no-match",
-    "note": "The web application's config holds queue credentials, not database ones; asserting otherwise is ungrounded in the model."
+    "note": "The web application's config holds queue credentials, not database ones; asserting otherwise is unsupported in the model."
   },
   {
     "case": "05-cookbook-queue-webapp",
@@ -869,7 +869,7 @@
     "reference_claim": "An attacker serves a node a firmware image that impersonates an official release, because the node authenticates neither the bucket nor the image's origin.",
     "candidate_claim": "An attacker registers a device that was never manufactured by the operator.",
     "label": "no-match",
-    "note": "Device enrolment is not described anywhere in the model; ungrounded rather than matched."
+    "note": "Device enrolment is not described anywhere in the model; unsupported rather than matched."
   },
   {
     "case": "02-iot-fleet-telemetry",
@@ -1005,7 +1005,7 @@
     "reference_claim": "An attacker connects to the exposed lobby port as another player, because how the lobby authenticates a client is unverified.",
     "candidate_claim": "An attacker takes over a player's account by resetting its password.",
     "label": "no-match",
-    "note": "No account-recovery path exists in the model; ungrounded rather than a match."
+    "note": "No account-recovery path exists in the model; unsupported rather than a match."
   },
   {
     "case": "06-cookbook-online-game",
@@ -1077,7 +1077,7 @@
     "reference_claim": "An attacker polls the deploy controller while claiming to be a store server, since what a store server presents to the controller is unverified.",
     "candidate_claim": "An attacker uses the store server's expired client certificate to poll the controller.",
     "label": "no-match",
-    "note": "Ungrounded: the model records what a store server presents as unknown, and no certificate exists in it."
+    "note": "Unsupported: the model records what a store server presents as unknown, and no certificate exists in it."
   },
   {
     "case": "07-cicd-store-deploy",
@@ -1085,7 +1085,7 @@
     "reference_claim": "An attacker pushes branches to the git server as a developer, because how developers authenticate to it is unverified.",
     "candidate_claim": "An attacker bypasses the multi-factor authentication on the git server to push as a developer.",
     "label": "no-match",
-    "note": "Ungrounded: authentication on that flow is unknown, so a candidate asserting MFA is present is claiming a control the model does not support."
+    "note": "Unsupported: authentication on that flow is unknown, so a candidate asserting MFA is present is claiming a control the model does not support."
   },
   {
     "case": "07-cicd-store-deploy",
@@ -1197,7 +1197,7 @@
     "reference_claim": "An attacker who reaches the image registry's storage reads the built images and whatever is baked into them, since protection at rest is unverified.",
     "candidate_claim": "An attacker recovers the registry's AES-256 encryption key and reads the images.",
     "label": "no-match",
-    "note": "Ungrounded: encryption at rest is unknown in the model, so the candidate invents the control it then defeats."
+    "note": "Unsupported: encryption at rest is unknown in the model, so the candidate invents the control it then defeats."
   },
   {
     "case": "07-cicd-store-deploy",
@@ -1341,7 +1341,7 @@
     "reference_claim": "An attacker who obtains a colleague's token acts as that colleague for the rest of its twelve hours, because nothing calls back to the broker and there is no way to pull a token back.",
     "candidate_claim": "An attacker who steals a colleague's token changes the groups inside it to become a store manager.",
     "label": "no-match",
-    "note": "Ungrounded: the tokens are signed, so editing claims is not available without the key, and the model supports no such action."
+    "note": "Unsupported: the tokens are signed, so editing claims is not available without the key, and the model supports no such action."
   },
   {
     "case": "08-sso-identity-broker",
@@ -1541,7 +1541,7 @@
     "reference_claim": "An attacker who controls the franchise provider reaches internal applications on the corporate network, because a sign-in it vouches for is treated like any other.",
     "candidate_claim": "An attacker on the franchise network reaches the corporate network directly.",
     "label": "no-match",
-    "note": "Ungrounded, and the point of the case: the model gives the franchise party no network path in, only the right to assert an identity."
+    "note": "Unsupported, and the point of the case: the model gives the franchise party no network path in, only the right to assert an identity."
   },
   {
     "case": "09-cookbook-sokify-retail",
@@ -1581,7 +1581,7 @@
     "reference_claim": "An attacker who obtains a copy of the catalogue spreadsheet sends SQL to the web API as the catalogue tool.",
     "candidate_claim": "An attacker steals a marketing employee's password and signs in to the catalogue tool.",
     "label": "no-match",
-    "note": "Ungrounded: the model describes no login on the spreadsheet, and inventing one turns a file-possession claim into a credential claim."
+    "note": "Unsupported: the model describes no login on the spreadsheet, and inventing one turns a file-possession claim into a credential claim."
   },
   {
     "case": "09-cookbook-sokify-retail",
@@ -1741,7 +1741,7 @@
     "reference_claim": "An attacker on the network path reads customer details out of the app's plain-HTTP traffic to the web API.",
     "candidate_claim": "An attacker reads customers' card numbers out of the app's HTTP traffic.",
     "label": "no-match",
-    "note": "Ungrounded, and deliberately so: the source states only that the database holds the card they paid with, never that cards cross this link. This is the invented fact the bootstrap made, preserved as a fixture."
+    "note": "Unsupported, and deliberately so: the source states only that the database holds the card they paid with, never that cards cross this link. This is the invented fact the bootstrap made, preserved as a fixture."
   },
   {
     "case": "09-cookbook-sokify-retail",
@@ -1773,7 +1773,7 @@
     "reference_claim": "An attacker who reaches the flat file reads every delivery address written into it.",
     "candidate_claim": "An attacker reads customers' card details out of the flat file.",
     "label": "no-match",
-    "note": "Ungrounded: the source is explicit that only addresses go in that file, so the candidate asserts contents the model denies."
+    "note": "Unsupported: the source is explicit that only addresses go in that file, so the candidate asserts contents the model denies."
   },
   {
     "case": "09-cookbook-sokify-retail",
@@ -1997,7 +1997,7 @@
     "reference_claim": "Content is changed directly in the database and no CMS record shows who changed it, because that path bypasses the CMS entirely.",
     "candidate_claim": "An attacker deletes the CMS audit log to hide the change they made.",
     "label": "no-match",
-    "note": "Ungrounded: the model describes no log to delete, and the reference's point is that the path was never recorded in the first place."
+    "note": "Unsupported: the model describes no log to delete, and the reference's point is that the path was never recorded in the first place."
   },
   {
     "case": "10-cookbook-generic-cms",
@@ -2021,7 +2021,7 @@
     "reference_claim": "An attacker sniffing the admin's unsecured MySQL connection reads account and comment records in clear text.",
     "candidate_claim": "An attacker reads readers' page requests in transit.",
     "label": "no-match",
-    "note": "Ungrounded: that link is stated to be HTTPS, so the candidate asserts a weakness the model contradicts."
+    "note": "Unsupported: that link is stated to be HTTPS, so the candidate asserts a weakness the model contradicts."
   },
   {
     "case": "10-cookbook-generic-cms",
@@ -2053,7 +2053,7 @@
     "reference_claim": "An attacker watching a reader's plain-HTTP asset fetches learns which pages that reader is viewing.",
     "candidate_claim": "An attacker reads the reader's session cookie out of the HTTP asset request.",
     "label": "no-match",
-    "note": "Ungrounded: the model says nothing about cookie scope, and the candidate turns a traffic-analysis claim into a session-theft one."
+    "note": "Unsupported: the model says nothing about cookie scope, and the candidate turns a traffic-analysis claim into a session-theft one."
   },
   {
     "case": "10-cookbook-generic-cms",
@@ -2125,7 +2125,7 @@
     "reference_claim": "An attacker who plants a script in the CDN bucket runs code in every reader's browser in the site's own context.",
     "candidate_claim": "An attacker uses the planted script to steal the admin's database credentials.",
     "label": "no-match",
-    "note": "Ungrounded: the admin never uses the site, so nothing in the model connects browser execution to that credential."
+    "note": "Unsupported: the admin never uses the site, so nothing in the model connects browser execution to that credential."
   },
   {
     "case": "11-sparse-shift-scheduling",
@@ -2173,7 +2173,7 @@
     "reference_claim": "An attacker presents itself to the file share as the payroll system and collects the weekly payroll export, since how the share identifies a collector is unverified.",
     "candidate_claim": "An attacker reads the payroll export from the file share because it is stored unencrypted.",
     "label": "no-match",
-    "note": "Asserts a fact the model does not support \u2014 encryption at rest is unknown, not absent \u2014 so this is ungrounded rather than a match."
+    "note": "Asserts a fact the model does not support \u2014 encryption at rest is unknown, not absent \u2014 so this is unsupported rather than a match."
   },
   {
     "case": "11-sparse-shift-scheduling",
@@ -2237,7 +2237,7 @@
     "reference_claim": "A store manager denies having made a rota change that disadvantaged a colleague, and nothing in the model records who changed what.",
     "candidate_claim": "An attacker deletes the audit records of a rota change to hide it.",
     "label": "no-match",
-    "note": "Ungrounded: the model has no audit store to delete from, which is the reference's own point."
+    "note": "Unsupported: the model has no audit store to delete from, which is the reference's own point."
   },
   {
     "case": "11-sparse-shift-scheduling",
@@ -2261,7 +2261,7 @@
     "reference_claim": "An attacker reads colleague names, contact details and availability from the rota database, because whether it is encrypted at rest is unverified.",
     "candidate_claim": "An attacker reads colleague contact details from the rota database, which is classified confidential and unencrypted.",
     "label": "no-match",
-    "note": "Ungrounded on two counts: data classification is unknown and encryption at rest is unknown, so both asserted facts are invented."
+    "note": "Unsupported on two counts: data classification is unknown and encryption at rest is unknown, so both asserted facts are invented."
   },
   {
     "case": "11-sparse-shift-scheduling",
@@ -2325,7 +2325,7 @@
     "reference_claim": "An attacker who obtains a supplier's vendor-issued password signs in as that supplier and uploads paperwork in their name.",
     "candidate_claim": "An attacker signs in as a supplier because the portal enforces no multi-factor authentication.",
     "label": "no-match",
-    "note": "Ungrounded: the source states a username and password and never states that nothing else is required, so the asserted absence is invented."
+    "note": "Unsupported: the source states a username and password and never states that nothing else is required, so the asserted absence is invented."
   },
   {
     "case": "12-overclaiming-supplier-portal",
@@ -2389,7 +2389,7 @@
     "reference_claim": "An attacker on the path of the nightly push alters the extract in transit, because the source contradicts itself over whether that transfer is encrypted.",
     "candidate_claim": "An attacker on the path of the nightly transfer modifies the extract, which is sent unencrypted.",
     "label": "no-match",
-    "note": "Ungrounded: encryption in transit is unknown because the source contradicts itself, and resolving the contradiction into a stated absence is the error this case exists to catch."
+    "note": "Unsupported: encryption in transit is unknown because the source contradicts itself, and resolving the contradiction into a stated absence is the error this case exists to catch."
   },
   {
     "case": "12-overclaiming-supplier-portal",
@@ -2405,7 +2405,7 @@
     "reference_claim": "An attacker with access inside the vendor platform alters a stored compliance document so a supplier appears certified when they are not.",
     "candidate_claim": "An attacker alters a compliance document in the vendor's platform, which stores documents without encryption.",
     "label": "no-match",
-    "note": "Ungrounded: encryption at rest on the document store is unknown, and enterprise-grade encryption throughout is a marketing claim rather than a stated property either way."
+    "note": "Unsupported: encryption at rest on the document store is unknown, and enterprise-grade encryption throughout is a marketing claim rather than a stated property either way."
   },
   {
     "case": "12-overclaiming-supplier-portal",
@@ -2421,7 +2421,7 @@
     "reference_claim": "A category manager denies having approved a supplier's paperwork, and the model holds no audit record we control or can produce.",
     "candidate_claim": "A category manager disputes an approval, and the platform's audit log shows the wrong actor.",
     "label": "no-match",
-    "note": "Ungrounded: there is no audit log element in the model, which is precisely the reference's claim."
+    "note": "Unsupported: there is no audit log element in the model, which is precisely the reference's claim."
   },
   {
     "case": "12-overclaiming-supplier-portal",

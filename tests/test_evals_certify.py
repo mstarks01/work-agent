@@ -83,7 +83,7 @@ def test_a_pro_override_reprints_only_pro_nodes():
     # Base nodes are untouched; every strong node's generation identity moved.
     assert base["extract"] == swept["extract"]
     assert base["critic"] != swept["critic"]
-    assert base["analyst_spoofing"] != swept["analyst_spoofing"]
+    assert base["analyze_spoofing"] != swept["analyze_spoofing"]
 
 
 def test_certify_flags_an_override_drifted_run():
@@ -93,20 +93,18 @@ def test_certify_flags_an_override_drifted_run():
     )
     manifest = _blessed_from(_build_fingerprints(default))
 
-    assert certify(
-        _build_fingerprints(default), manifest, tier_of, ALL_NODES
-    ).certified
+    assert certify(_build_fingerprints(default), manifest, tier_of, ALL_NODES).certified
     drifted = certify(_build_fingerprints(overridden), manifest, tier_of, ALL_NODES)
     assert not drifted.certified
     assert {n.node for n in drifted.uncertified} == {
         "critic",
         "recritic",
-        "analyst_spoofing",
-        "analyst_tampering",
-        "analyst_repudiation",
-        "analyst_information_disclosure",
-        "analyst_denial_of_service",
-        "analyst_elevation_of_privilege",
+        "analyze_spoofing",
+        "analyze_tampering",
+        "analyze_repudiation",
+        "analyze_information_disclosure",
+        "analyze_denial_of_service",
+        "analyze_elevation_of_privilege",
     }
 
 
@@ -127,7 +125,9 @@ def test_certify_flags_a_served_build_drifted_run():
 
 def _promote_setup(tmp_path):
     sampling_copy = tmp_path / "sampling.toml"
-    sampling_copy.write_text(SAMPLING_PATH.read_text(encoding="utf-8"), encoding="utf-8")
+    sampling_copy.write_text(
+        SAMPLING_PATH.read_text(encoding="utf-8"), encoding="utf-8"
+    )
     manifest_copy = tmp_path / "blessed.toml"
     return sampling_copy, manifest_copy
 
@@ -188,12 +188,16 @@ def test_promote_accumulates_blessed_builds(tmp_path):
     winner = load_sampling(SAMPLING_PATH)
 
     promote(
-        winner, {"base": "build-001"},
-        sampling_path=sampling_copy, manifest_path=manifest_copy,
+        winner,
+        {"base": "build-001"},
+        sampling_path=sampling_copy,
+        manifest_path=manifest_copy,
     )
     manifest = promote(
-        winner, {"base": "build-002"},
-        sampling_path=sampling_copy, manifest_path=manifest_copy,
+        winner,
+        {"base": "build-002"},
+        sampling_path=sampling_copy,
+        manifest_path=manifest_copy,
     )
 
     # A tier accumulates several blessed served-builds.
@@ -208,8 +212,10 @@ def test_promote_refuses_to_pin_a_previously_unset_param(tmp_path):
 
     with pytest.raises(CertificationError, match="tiers.strong.top_p"):
         promote(
-            winner, {"strong": "build-001"},
-            sampling_path=sampling_copy, manifest_path=manifest_copy,
+            winner,
+            {"strong": "build-001"},
+            sampling_path=sampling_copy,
+            manifest_path=manifest_copy,
         )
     # A rejected promotion leaves neither file touched.
     assert not manifest_copy.exists()
@@ -220,7 +226,9 @@ def test_the_manifest_lives_with_the_service_config_not_under_evals():
     # It moved to config/ when the service became what certifies: evals/ does
     # not ship, so a manifest under it was unreachable from the production image.
     paths = promotion_paths()
-    assert paths.blessed_fingerprints == REPO_ROOT / "config" / "blessed-fingerprints.toml"
+    assert (
+        paths.blessed_fingerprints == REPO_ROOT / "config" / "blessed-fingerprints.toml"
+    )
 
 
 def test_a_promotion_re_pins_the_file_the_sweep_actually_measured(tmp_path):

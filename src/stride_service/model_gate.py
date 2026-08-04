@@ -170,8 +170,10 @@ def emulates_structured_output(vendor: Vendor, model: str) -> bool:
         response_format=_SCHEMA_PROBE,
     )
     tools = params.get("tools") or []
-    return any(_tool_name(tool) == _litellm.constants.RESPONSE_FORMAT_TOOL_NAME
-               for tool in tools)
+    return any(
+        _tool_name(tool) == _litellm.constants.RESPONSE_FORMAT_TOOL_NAME
+        for tool in tools
+    )
 
 
 def _tool_name(tool: Any) -> str | None:

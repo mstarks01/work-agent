@@ -20,8 +20,8 @@ flowchart TD
     revalidate -- valid --> prepare
     revalidate -- invalid --> reject([rejected])
 
-    prepare --> analysts["6 STRIDE analysts,<br/>one per category, in parallel<br/>(strong)"]
-    analysts --> merge[merge]
+    prepare --> analyze["6 category agents,<br/>one per STRIDE category, in parallel<br/>(strong)"]
+    analyze --> merge[merge]
     merge --> critic["critic<br/>(strong)"]
     critic --> router{{route_review}}
 
@@ -39,7 +39,7 @@ flowchart TD
     classDef bad fill:#fee2e2,stroke:#dc2626,stroke-width:1.5px,color:#450a0a
     classDef io fill:#f1f5f9,stroke:#64748b,stroke-width:1.5px,color:#0f172a
 
-    class extract,repair,analysts,critic,recritic llm
+    class extract,repair,analyze,critic,recritic llm
     class prepare,merge,assemble code
     class validate,revalidate,router,rereview gate
     class report good
@@ -57,11 +57,20 @@ run's three outcomes.
 - **validate** is a mechanical gate. Failures route to **repair** (one bounded
   pass over the original text) and revalidate; a model that still fails, or is
   over the [150-element cap](Configuration.md), ends as a **rejection**.
-- **prepare** derives the per-analysis context.
-- **six analysts** run in parallel, one per STRIDE category, each drafting
-  threats in its lane.
-- **merge** joins the drafts; the **critic** rules on all of them in one pass —
-  verdicts, dedupe, severity calibration.
+- **prepare** derives the per-analysis context: the boundary crossings, and the
+  system model as the agents will see it — with `source_excerpt`, `source_label`
+  and `source_speaker` stripped, so the only submitter words downstream of here
+  are the ones a finding chose to quote.
+- **six category agents** (`analyze_<category>`) run in parallel, one per STRIDE
+  category, each drafting threats in its lane. Each threat cites at least one
+  **ground**: a quote from the submitted text, an `unknown` attribute, or a
+  boundary crossing.
+- **merge** joins the drafts and runs the mechanical half of the fan-in: every
+  reference resolves, no two lanes reused a threat ID, and every quote ground is
+  matched against the bytes of the source it names. An unverifiable quote is
+  marked and still renders; a threat where *nothing* verifies fails the job.
+  Then the **critic** rules on all of them in one pass — verdicts, dedupe,
+  severity calibration — spending judgement only on what code cannot check.
 - **route_review** runs the mechanical checks the assembler depends on. If the
   critic's output fails them, one bounded **recritic** re-ask runs; a second
   failure is a `failed` job, not a rejection.
@@ -77,11 +86,12 @@ Every LLM node runs on one of two **model tiers** — named for the job they do,
 not for any vendor's product line:
 
 - **`base`** — the workhorse: `extract` and `repair`.
-- **`strong`** — judgement: the six analysts, the `critic`, and the `recritic`.
+- **`strong`** — judgement: the six category agents, the `critic`, and the
+  `recritic`.
 
 [`config/model_tiers.toml`](Configuration.md) maps nodes to tiers and each tier
 to a `(vendor, model)` pair. Deterministic `FunctionNode`s carry no model. The
-`strong` tier is where the token budget goes — the six-way analyst fan-out plus
+`strong` tier is where the token budget goes — the six-way category fan-out plus
 the critic and its re-ask.
 
 The two tiers choose their vendor **independently**, so `base` and `strong` can
@@ -171,15 +181,15 @@ points:
 - **rejected** — the input failed the validity gate; carries the
   `ValidationIssue`s.
 - **failed** (raises) — an internal error. No partial report is ever produced:
-  an empty Tampering section means "looked, found nothing", never "the analyst
-  errored".
+  an empty Tampering section means "looked, found nothing", never "the Tampering
+  agent errored".
 
 That last guarantee is enforced, not assumed. An LLM node whose completion is
 truncated writes no output key at all — ADK saves one only from a final event
-carrying text — so "the analyst errored" and "the analyst found nothing" arrive
+carrying text — so "the agent errored" and "the agent found nothing" arrive
 as an *absent* key and an *empty* one. `merge_drafts` distinguishes them and
 fails the job on the first, naming the lanes and the knob; `validate_extraction`
-does the same one node earlier. Read as equivalent, a truncated analyst would
+does the same one node earlier. Read as equivalent, a truncated agent would
 delete a sixth of the analysis and finish green, because the critic rules what
 it is handed and `by_category` omits a lane with no threats rather than
 carrying a zero.
@@ -204,7 +214,7 @@ across every call.
 - **Isolation is per session, not per caller.** Two analyses submitted at the
   same time by the same caller still get separate sessions, so they can never
   read or overwrite each other's state.
-- **Within a single analysis**, the six analysts run in parallel but each writes
+- **Within a single analysis**, the six category agents run in parallel but each writes
   to its own category-keyed slot in the session, so the parallel branches don't
   clobber one another before the merge.
 - **Untrusted input stays contained.** Because a job's text lives only in its own

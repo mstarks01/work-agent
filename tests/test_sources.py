@@ -64,12 +64,68 @@ class TestWellFormedness:
         with pytest.raises(ValidationError):
             Source(kind="description", label="   ", text="hi")
 
-    @pytest.mark.parametrize("break_char", ["\n", "\r", " ", " "])
+    @pytest.mark.parametrize("break_char", ["\n", "\r", "\u2028", "\u2029"])
     def test_a_label_spanning_lines_is_rejected(self, break_char):
         # The header inside the fence is positional, so a second line in the
         # label would make the text below it unreadable as text.
         with pytest.raises(ValidationError):
             Source(kind="description", label=f"Doc{break_char}v2", text="hi")
+
+    @pytest.mark.parametrize(
+        ("name", "char"),
+        [
+            ("C0 control", "\x07"),
+            ("tab", "\t"),
+            ("C1 control", "\x85"),
+            ("delete", "\x7f"),
+            ("bidi override", "\u202e"),
+            ("bidi isolate", "\u2066"),
+            ("zero-width space", "\u200b"),
+            ("zero-width joiner", "\u200d"),
+            ("word joiner", "\u2060"),
+            ("soft hyphen", "\xad"),
+            ("BOM", "\ufeff"),
+        ],
+    )
+    def test_a_label_carrying_an_invisible_or_control_character_is_rejected(
+        self, name, char
+    ):
+        """#78 decision 3, at the input boundary rather than at each renderer.
+
+        A label is chrome rendered beside a quote the report attributes to the
+        caller, so a character that renders as something other than what it is
+        spoofs the UI. That is not XSS, so the viewer's textContent rule does
+        not reach it — nothing here is executing.
+        """
+        with pytest.raises(ValidationError):
+            Source(kind="description", label=f"Contract{char}v2", text="hi")
+
+    @pytest.mark.parametrize(
+        "label",
+        [
+            "Kickoff call — 2026-07-14",
+            "Réunion d'équipe",
+            "契約書 v2",
+            "مواصفات النظام",
+            "Spec (v1.2) [draft] #3 · 50% done",
+        ],
+    )
+    def test_an_ordinary_label_is_still_accepted(self, label):
+        """The gate rejects a property, not a script. Accents, non-Latin scripts
+        and punctuation are all ordinary citation keys and must survive it —
+        including right-to-left text, which needs no override character to
+        render correctly."""
+        assert Source(kind="description", label=label, text="hi").label == label
+
+    def test_a_rejected_label_is_never_silently_repaired(self):
+        """Reject, not strip: a label is bounded but never rewritten.
+
+        Normalising would break the citation the caller submitted, and would
+        silently break both label uniqueness and the gate resolving a
+        ``source_excerpt``'s ``source_label`` against the job's labels.
+        """
+        with pytest.raises(ValidationError):
+            Source(kind="description", label="Spec\u200bv2", text="hi")
 
     def test_empty_text_is_rejected(self):
         with pytest.raises(ValidationError):
@@ -81,9 +137,7 @@ class TestWellFormedness:
 
     def test_an_unknown_field_is_rejected(self):
         with pytest.raises(ValidationError):
-            Source(
-                kind="description", label="Doc", text="hi", authority="primary"
-            )
+            Source(kind="description", label="Doc", text="hi", authority="primary")
 
     def test_a_source_is_frozen(self):
         source = Source.description("hi")
