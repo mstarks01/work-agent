@@ -55,225 +55,80 @@ gh api --method POST repos/mstarks01/work-agent/issues/<child>/dependencies/bloc
 
 ### The live map
 
-[#76 — Map: tie every finding back to the input text that justifies it](https://github.com/mstarks01/work-agent/issues/76)
-— 9 tickets, charted 2026-08-03. A **planning** map: it settles the spec for finding-level
-attribution — every threat carrying a non-empty record of what justifies it, a quote from the
-submitter's own words, a named unknown attribute, or a named derived fact — and stops at the spec.
-[#77](https://github.com/mstarks01/work-agent/issues/77) resolved 2026-08-03 and **fixes vocabulary
-the whole repo inherits**, so read it before touching this map or the code it names. The record is
-`grounds: list[Ground]` with kinds `quote` / `unknown-attribute` / `derived-fact`; *finding-level
-attribution* stays the concept name while `grounds` is the field, keeping it clear of `attribute`
-and of the two live senses of "attribution" (per-node regression attribution in the eval harness,
-speaker attribution at `source_speaker`). And **`Analyst` now names a human**: the six agents become
-**category agents**, keyed on what they do — `analyze/<category>` in `config/model_tiers.toml`,
-`analyze_<category>` as graph node and in report `nodes[].node`, `prompts/analyze.md`. That rename
-is a fail-closed config cutover carrying no shim, and it executes on the implementation branch
-folded into the *same* cutover as the schema change, so the config version bumps once.
-
-[#78](https://github.com/mstarks01/work-agent/issues/78) resolved 2026-08-03 and settles **render
-safety** without touching the schema, so it constrains implementation rather than gating anyone:
-untrusted text never reaches `innerHTML` — values go to the DOM as `textContent`, `esc()` shrinks
-toward vestigial, and escaping quotes stops being a question because attributes are set by property
-assignment. `render_report`'s `<`→`\u003c` escape stays; it guards the script-block boundary, a
-different problem. The report page gains a **strict nonce CSP** with no `'unsafe-inline'`, replacing
-`webapp/main.py:47-49`'s rationale, which was stale twice over — the viewer is the app's own
-template now, and `render_report` already rewrites it on every request.
-`Source._single_line_label` broadens to **reject** C0/C1, bidi, zero-width and BOM in a
-`source_label`, one validator covering `/v1` and the in-process engine, fail-closed with no shim and
-nothing versioned; quotes stay exempt so verbatim matchability survives. Integrators get a
-**blanket** untrust rule in `docs/Report-Schema.md` — every string is untrusted — never a per-field
-table, which would have omitted `grounds` and is how this ticket came to exist.
-
-Resolving it found a **live stored XSS on `main`**: the element table's attrs column interpolates
-`technology`, `data_classification`, `protocol`, `authentication` and `assets` into `innerHTML`
-without `esc()` (`report_view.html:246-249`). Filed off-map as
-[#86](https://github.com/mstarks01/work-agent/issues/86) — ordinary work, no `wayfinder:` label —
-and fixed minimally on `fix/escape-element-attrs`. #78's rule supersedes that fix at implementation
-time.
-
-[#79](https://github.com/mstarks01/work-agent/issues/79) resolved 2026-08-03 and **opened the narrow
-neck** — five tickets unblocked at once. `grounds: list[Ground]` is an eighth analyst-owned field on
-`DraftThreat`, `min_length=1` and uncapped (matching `affected_element_ids`; `DraftThreat` caps no
-list). `Ground` is **one flat model** — `kind` plus every branch's fields, defaulted `""` — with a
-`_check_shape` validator that requires its own branch's fields and **forbids** the others. That is
-`Verdict`'s pattern (`report.py:135-160`), reused so the repo has one answer to "tagged variant in a
-provider-facing schema". The discriminated union was judged the more honest and more Pythonic shape
-and **lost to a measured fact**: provider schema compilers are the unpredictable part of this system
-(`config/sampling.toml:62-85` — Anthropic rejects `SystemModel`'s grammar as too large, and
-`constrain_output = false` is documented as *not* a working fallback), and this schema rides in six
-`strong`-tier `DraftThreats` requests. The accepted cost is that a mis-shaped entry is repaired
-rather than prevented.
-
-Branches: **quote** = `text` (1000, deliberately the same number as `source_excerpt`) +
-`source_label`; **unknown-attribute** = `element_id` + `attribute` spelled exactly like `UnknownRef`
-but a **separate type**, with `UnknownRef`'s critic-only ownership untouched; **derived-fact** =
-`flow_id` alone, a reference never a copy, with no free-text field — free text is checkable by no
-gate and would become the escape hatch for the findings whose justification matters most. Grounds
-gets a **new threat-level referential check** beside `_citation_issues`: `parse_and_validate`
-validates the system model only, so there was no threat gate to extend, and the critic's
-`related_unknowns` stays unchecked until #83 rules on it. `schema_version` → **2.0**, one bump for
-the whole cutover — earned by #77's node rename, which fails *silently* for a consumer keying on
-`analyst_spoofing` — plus the versioning policy `docs/Report-Schema.md` never stated: additive is
-minor, changing the meaning or spelling of an existing value is major.
-
-[#80](https://github.com/mstarks01/work-agent/issues/80) resolved 2026-08-04 and answers **yes,
-mechanically and cheaply** — but the headline is a fact about the *input*, not the model. Exact
-substring rejects **78.2%** of the corpus's 206 element excerpts because the sources are
-**hard-wrapped**, so a two-word quote straddles a newline nobody typed; collapsing whitespace runs
-alone takes that to 1.0%, and every other rung in the ladder recovered nothing. The pinned policy
-is NFKC + typographic folds, case, inline markdown markers, whitespace collapse, then `…`-separated
-fragments matched in order — leaving **0 false rejections** in 206 plus one true one, a quote that
-excised a span unmarked and stitched together a sentence the source never contains. Punctuation
--blindness is refused (buys nothing) and so is a similarity threshold (the fabricated quote scores
-0.963, above any threshold a human would pick by intuition). The check runs in `join_drafts` beside
-#79's set-membership check, while the source text is still held, and inherits `_citation_issues`'
-no-sources escape. **Consequence: marked per entry, closed per threat** — an unverifiable quote
-still renders, flagged on a **service-owned** list on `Analysis` rather than a field on
-analyst-owned `Ground`, and the job fails closed only when *no* ground on a threat verifies.
-Failing closed on any bad quote lost to the Rule of Three: 0/206 licenses ≤1.46% per quote, which
-at 18.7 threats per job is a 24% chance of killing a job over a cosmetic mismatch, on evidence that
-is 12 synthetic single-source cases.
-
-Resolving it **corrected #79 on a mechanism, not a decision**: there is *no draft repair path*.
-`repair` is extraction-only and `recritic` is critic-only, so a bad draft raises out of
-`merge_drafts` and fails the job — #80 had to supply a consequence rather than inherit one. And it
-exposed a real evidence gap: the corpus carries **zero transcript sources**, so the across-turns
-and speaker-label cases rest on a constructed probe, now fog.
-
-[#81](https://github.com/mstarks01/work-agent/issues/81) resolved 2026-08-04: `source_excerpt`
-**survives with its job restated** — it answers *why this element exists*, `grounds` answer *why
-this threat was raised*. Field, gate rule and 13 corpus cases unchanged, so **no cutover and
-nothing versions**. It is kept for three things grounds cannot do: a threat-less element has no
-other provenance, the verbatim-span requirement is pressure against invented elements, and
-`_citation_issues` exists only because excerpts do. `CONTEXT.md`'s **Source Excerpt** entry loses
-the threat→element→words chain to `grounds` and loses its "extraction evals" claim — **nothing
-scores excerpts**; `score_extraction` is element-ID set arithmetic plus `crossings_match`
-(`modes.py:212-227`), and the real consumers are `verify_corpus.py:157-183`'s lint and a human
-blesser at `BLESSING.md:131`.
-
-**Read this before touching the analyze path.** Resolving #81 found that a category agent
-**never sees the submitter's source text** — `analyst.md` templates against `{system_model}` and
-`{boundary_crossings}` only, so the excerpts inside the rendered model were the only submitter words
-reaching it, which made the map's settled decision 1 (*authored, not derived*) unimplementable. Two
-changes follow, both now constraints on #82 rather than open questions: `analyst.md` **gains
-`{input_text}`** — no new plumbing, `execution.py:146-151` already writes the key and refuses a
-caller override, and `run_analysis` passes `case.sources` even when injecting the blessed model at
-`prepare`, so all three eval modes stay green — and `prepare_analysis` **strips `source_excerpt`,
-`source_label` and `source_speaker`** from the model it renders to the analysts *and the critic*,
-while `STATE_VALID_MODEL` keeps them for the report. That removes the nearest-excerpt shortcut #82
-asks about instead of wording against it; `notes` is untouched, and no label is stranded because
-each rides inside its own fence (`sources.py:21`). The accepted cost is that the bytes an analyst
-saw are no longer the bytes the report carries. A finding's quote disagreeing with its element's
-excerpt is **legitimate and ungoverned** — no gate, no prompt rule, not even a same-source
-requirement, since a transcript remark can justify a threat against an element extracted from a
-design doc.
-
-[#82](https://github.com/mstarks01/work-agent/issues/82) resolved 2026-08-04 and writes the
-**agent-facing rule**, once and always-on in `analyze.md` and its exemplars — lane skills and the
-severity rubric untouched, `repair`/`recritic` out of the blast radius. It is a **Procedure step**
-(new step 6; Rate and Mitigate renumber), not an Output rule, because a rule satisfied *after* the
-threat is written is what manufactures a retrofitted quote. **The branch follows the trigger and is
-never chosen**: crossing → derived-fact, `unknown` attribute → unknown-attribute, a stated fact in
-the submitter's words → quote — so a threat carrying **no quote is correct**, which is how the
-map's settled decision 5 stops being a sentiment. Inside the quote branch, a
-**states-it/mentions-it** test with a contrast pair in `:66`'s style, closing back onto the branch
-rule rather than competing with it. **Quotes come from `{input_text}` only, never from `notes`** —
-#80's ladder *cannot* catch a note-sourced quote, since a note's contents are verbatim submitter
-words and therefore verify. Verbatim discipline **mirrors `extract.md` rule 5 word for word**. The
-check is disclosed; the normalization ladder and the fail-closed consequence are **not** — the first
-licenses the sloppiness it forgives, the second invites defensive padding. **One ground per
-load-bearing fact, no padding.**
-
-Two consequences land outside grounding proper. `analyze.md`'s `## Input` takes untrusted text for
-the first time, so it **carries `extract.md:15`'s data-not-instruction paragraph** (LLM01: #49's
-one-fenced-block-per-source rendering is only the delimiter half, and without the other half six
-`strong`-tier agents read attacker-controlled prose with nothing marking it as data), and `:21`'s
-"Every fact you may use is in there" is **rewritten** — false the moment `{input_text}` lands, and
-left standing it licenses mining raw text for elements extraction declined to model. And the
-**exemplar system gains a labelled source block**: it is tables only today (`:27-46`), so an
-exemplar quote ground would cite text the prompt never shows — teaching precisely the failure the
-ticket prevents — and the block doubles as the first depiction of the fenced-source shape
-`{input_text}` delivers. That block, `grounds` on all 18 exemplar drafts, and `:62`'s seven fields
-→ eight all fold into #85's cutover.
-
-[#83](https://github.com/mstarks01/work-agent/issues/83) resolved 2026-08-04 and settles the critic
-**without changing a schema** — nothing versions, no cutover, so it constrains implementation rather
-than gating anyone. The critic **reviews** grounds, **cannot touch** them, and sees **no submitter
-text**: `critic.md` does *not* gain `{input_text}`, because a quote's `text` rides inline on the
-draft the critic already reads, so judging *does this support the threat* needs no source text, while
-judging *is it faithfully excerpted* is #80's measured ladder — and `critic.md:9` forbids re-spending
-judgement on a check code has run. Weighed against 100 KiB in the graph's longest call (the call
-`ThreatRuling` exists to keep small), a second competing evidence base in the one node with verdict
-power, and the widest LLM01 surface in the graph. **#82's note-sourced-quote gap closes for free**:
-#81 strips the three source fields but leaves `notes`, so a quote lifted from an element's `notes` is
-visible to the critic exactly where #80's ladder is blind — so #82's conditional import of
-`extract.md:15` into `critic.md` never fires. The review's **only lever is `confidence`, never
-`verdict`**: #80 set the fail-closed policy for grounds by measurement, and a sixth gating step would
-put a looser, model-judged, unmeasured trigger *ahead* of it. Grounds enter confidence as a
-**downgrade-only modifier** — step 5's definition and anchors stay verbatim, `report.py:203` stays
-accurate, unsupporting grounds may lower and good grounds never raise, since a perfect quote cannot
-make an `unknown`-rooted threat more certain and #82's branch rule means such a threat is *correctly*
-`low`. `attribute` gains an **exists-only** check at both sites — `_unresolved_unknown_ref_issues`
-and #79's grounds surface — with **no** value-is-`unknown` rule: it misfires on a stated-but-vague
-value, and the sites' blast radii differ sharply (bounded `recritic` re-ask versus an unrecoverable
-`DraftJoinError`). `analyze.md` discloses nothing new and `analyst.md:67` stays **verbatim**,
-following #82's own rule that naming a consequence invites padding; `recritic.md:39`/`:43` broaden in
-place, because a fault the re-ask cannot name is one it cannot fix.
-
-Three of #83's six open points were **already settled by code**, not decided: `ThreatRuling`
-(`report.py:259-264`) gives the critic no field to edit grounds through and `_ruled` rebuilds from
-the draft the service holds; rejected threats keep grounds because `assemble_threats` builds every
-ruling into a `Threat` and *then* splits; and dedupe never merges — `critic.md:33` rejects the loser
-naming the winner, so both sets of grounds survive in their own arrays. It also **corrects #79's
-record**: `related_unknowns` does have a referential check today — the `element_id` half, at
-`critic.py:72-82` — so only the `attribute` half was ever open.
-
-[#84](https://github.com/mstarks01/work-agent/issues/84) resolved 2026-08-04 and settles the
-**display**, against a three-variant prototype. Grounds render **after** the analysis as a
-kind-coded rail under Affected elements, each entry led by its branch in words (*Quoted from the
-submission* / *Unstated in the submission* / *Derived from the model*), in hues deliberately outside
-the severity ramp. Evidence-as-the-card's-lede served the map's submitter-facing goal most directly
-and **lost because the card's job on first read is triage**; margin citations lost because 260px
-cannot carry a 1000-char quote. Long quotes **clamp to three lines and expand in place** — anything
-that fits renders whole, with no affordance at all. An **unverified** quote (#80's marked-per-entry
-outcome) **drops its quotation marks**, which assert a span the service could not find, and names the
-failure in **visible text** — `⚠ not found in <label>`, never a `title`: #78 killed the tooltip
-*escaping* problem, not the fact that keyboard and touch cannot reach one. The **needs-info
-duplication stays** (a ground and `related_unknowns` naming one `element_id → attribute` have
-different authors — the agent's trigger, the critic's citation). The **element table gains nothing**
-and all attribution lives on findings, which is how #81's competing-quotes hazard is satisfied — and
-which **also settles the `notes`-beside-grounds fog** by the same argument.
-
-Two of its questions were **already answered elsewhere**: **`source_speaker` has nowhere to sit**,
-since #79's quote branch is `text` + `source_label`, #82 sources quotes from `{input_text}` whose
-transcript fences carry `Priya:` inline, and #80 verifies a quote that keeps its labels — the speaker
-rides inside the quote's own bytes and needs no chrome; and **rejected threats need no separate
-treatment**, rendering through the same card with the grounds #83 established they keep. It also
-**declined the silent confidence downgrade** the map had parked here: a viewer could only *infer* the
-reason, and an inference beside verified evidence is worse than silence, so it stays fog as a
-**schema** question awaiting a measurement. The three variants, losers included, live on
-`prototype/grounds-display` @ `94bac96` (`webapp/prototype_grounds_view.html`) — throwaway, and the
-branch is the citation until the map completes.
-
-Frontier now: [#85](https://github.com/mstarks01/work-agent/issues/85) alone — open, unblocked and
-unclaimed, and the **last** ticket on the map. #85 carries constraints from #81, #82, #83 and #84.
-For the record of how the map got here: #79 left three questions explicitly to siblings — verbatim
-quote verification was #80's, prompt instruction was #82's, `related_unknowns` was #83's, and all
-three are now closed. #82 was retitled to "How a **category agent** is instructed…" — its old title
-carried the vocabulary #77 retired — and #81 struck its stated constraint that "analysts already see
-every excerpt" as **false**, its `graph.py:285` reference being stale (`graph.py:409`).
-
-The measurement lives on `prototype/quote-verification` @ `6ed8d77`
-(`prototypes/quote_verification_prototype.py`), pushed — throwaway code, but re-runnable, and the
-branch is the citation until the map completes and it becomes an `archive/` tag. #84's variants sit
-on `prototype/grounds-display` under the same rule.
-
-[#49](https://github.com/mstarks01/work-agent/issues/49) completed 2026-07-31 and has
-moved to Completed efforts below; its spec was implemented and merged 2026-08-01.
+**None.** [#76](https://github.com/mstarks01/work-agent/issues/76) completed 2026-08-04 and has
+moved to Completed efforts below. Chart a new one only against the bar at the end of this file.
 
 ### Completed efforts
 
 Completed on GitHub Issues (canonical):
+
+- [#76 — Map: tie every finding back to the input text that justifies it](https://github.com/mstarks01/work-agent/issues/76)
+  — 9 tickets, charted 2026-08-03 and completed 2026-08-04. A **planning** map: it settled the
+  spec for **finding-level attribution** — every threat carrying a non-empty, machine-checkable
+  record of what justifies it — and stopped at the spec. **Not yet implemented.** The
+  implementation is a cutover whose plan is [#85](https://github.com/mstarks01/work-agent/issues/85);
+  the live corpus sweep it needs is filed as
+  [#87](https://github.com/mstarks01/work-agent/issues/87), open. Read #85 first — it carries the
+  order of operations — then #77 for the vocabulary the whole repo inherits, then the other seven
+  resolution comments.
+
+  **#77 fixes vocabulary that reaches every file.** The record is `grounds: list[Ground]` with
+  kinds `quote` / `unknown-attribute` / `derived-fact`; *finding-level attribution* is the concept
+  name, `grounds` the field, kept clear of `attribute` and of the two live senses of
+  "attribution". And **`Analyst` now names a human**: the six agents become **category agents** —
+  `analyze/<category>` in `config/model_tiers.toml`, `analyze_<category>` as graph node and in
+  report `nodes[].node`, `prompts/analyze.md`.
+
+  The route in one pass. `Ground` is **one flat model** — `kind` plus every branch's fields,
+  defaulted `""`, with a `_check_shape` validator requiring its own branch's fields and forbidding
+  the others, reusing `Verdict`'s pattern (#79). The discriminated union was the more honest shape
+  and lost to a measured fact: provider schema compilers are the unpredictable part of this system
+  and this rides in six `strong`-tier requests. Branches: **quote** = `text` (1000) +
+  `source_label`; **unknown-attribute** = `element_id` + `attribute`, a separate type from
+  `UnknownRef`; **derived-fact** = `flow_id` alone, no free-text escape hatch. `schema_version` →
+  **2.0**, one bump for the whole cutover, earned by #77's silently-breaking node rename.
+  Quote verification is **substring-per-fragment under a five-step pinned ladder** run in
+  `join_drafts` (#80): exact substring rejects **78.2%** of 206 corpus excerpts because the
+  sources are hard-wrapped, whitespace collapse alone takes that to 1.0%, and the pinned ladder
+  leaves **0 false rejections** plus one true one. Consequence is **marked per entry, closed per
+  threat** — an unverifiable quote still renders, and the job fails closed only when *no* ground
+  on a threat verifies. `source_excerpt` **survives with its job restated** (#81): the excerpt
+  answers why the element exists, grounds why the threat was raised. Instruction is a **Procedure
+  step** in `analyze.md`, once and always-on (#82), and **the branch follows the trigger rather
+  than being chosen**, so a threat carrying no quote is *correct*. The critic **reviews** grounds,
+  **cannot touch** them, and sees **no submitter text**; its only lever is `confidence` as a
+  **downgrade-only** modifier, never `verdict` (#83). Grounds render **after** the analysis as a
+  kind-coded rail under Affected elements, an unverified quote losing its quotation marks and
+  naming the failure in visible text (#84). Render safety is settled without touching the schema
+  (#78): untrusted text never reaches `innerHTML`, and the report page gains a **strict nonce
+  CSP**. The corpus **does not change** — all 224 reference threats stay untouched, because
+  `ReferenceThreat` deliberately does not carry what it does not grade (#85).
+
+  Three findings outlived their tickets. **Resolving #78 found a live stored XSS on `main`** in
+  the element table's attrs column, filed off-map as
+  [#86](https://github.com/mstarks01/work-agent/issues/86) and fixed on
+  `fix/escape-element-attrs`; #78's rule supersedes that fix at implementation time. **Resolving
+  #81 found that a category agent never sees the submitter's source text**, which made the map's
+  own settled decision 1 unimplementable — `analyze.md` gains `{input_text}` and
+  `prepare_analysis` strips the three source fields from the model rendered to the agents *and*
+  the critic. And **#85 found the eval side's `ungrounded` metric collides with the new field** —
+  it means *hallucinated*, not *carrying no grounds* — renaming it `unsupported` across 96 sites.
+
+  Corrections worth knowing: #80 corrected #79 on a mechanism — **there is no draft repair path**,
+  so a bad draft raises out of `merge_drafts` and fails the job. #83 corrected #79's record —
+  `related_unknowns` does have a referential check today, the `element_id` half. #85 corrected its
+  own ticket twice: the exemplar guard is `tests/test_prompt_lints.py`, not
+  `test_corpus_lints.py`, and reference grounding was assumed to be the bulk of the work when it
+  is none of it.
+
+  **PII residue** is the one thing ruled out of scope on closing, inherited from #49's fog: grounds
+  put more submitted prose and more speaker names on screen, and only `source_speaker` is
+  strippable. Provenance weighting by source kind and service-side retention of submitted text
+  were ruled out while charting.
+
+  Prototypes: `prototype/quote-verification` @ `6ed8d77` (#80's measurement, re-runnable) and
+  `prototype/grounds-display` @ `94bac96` (#84's three variants, losers included). Both throwaway
+  and both due the `archive/` tag treatment described at the end of this section.
 
 - [#49 — Map: accept call transcripts as job input](https://github.com/mstarks01/work-agent/issues/49)
   — 10 tickets, charted and completed 2026-07-31. A **planning** map: it settled the spec for
