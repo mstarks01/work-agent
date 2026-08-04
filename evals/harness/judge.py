@@ -59,11 +59,11 @@ DEFAULT_JUDGE_PROMPTS_DIR = EVALS_ROOT / "prompts"
 CLAIM_PROMPT_NAME = "judge_claim_equivalence"
 ADJUDICATION_PROMPT_NAME = "judge_adjudication"
 
-# ``ungrounded`` is the only gating bucket: a threat asserting a fact the
+# ``unsupported`` is the only gating bucket: a threat asserting a fact the
 # blessed model does not support is the failure that destroys trust in a
 # security report. ``valid-unlisted`` is explicitly *not* a failure —
 # references are non-exhaustive by construction.
-Bucket = Literal["ungrounded", "valid-unlisted", "noise"]
+Bucket = Literal["unsupported", "valid-unlisted", "noise"]
 
 RulingT = TypeVar("RulingT", bound=BaseModel)
 

@@ -109,7 +109,7 @@ list). When tuning, watch these three:
 | --- | --- | --- |
 | **must-find recall** (per case) | goes up, or holds, on **every** case | An aggregate average hides one case collapsing. Always read per case. |
 | **near/far exemplar delta** | shrinks or holds | A change can lift average recall while widening this gap — a worse model that looks better. The far-domain cases are the honest test. |
-| **critic yield** (a pair) | kills more junk (`killed-ungrounded`) without killing real findings (`killed-real`) | A kill count alone tells you nothing — read both halves together. |
+| **critic yield** (a pair) | kills more junk (`killed-unsupported`) without killing real findings (`killed-real`) | A kill count alone tells you nothing — read both halves together. |
 
 All of these are *relative to the judge*. Use them to compare configurations and
 track movement; never quote them as absolute scores or against other tools.
