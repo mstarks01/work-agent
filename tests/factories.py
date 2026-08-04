@@ -21,6 +21,7 @@ from typing import Any
 from google.adk.models.base_llm import BaseLlm
 from google.adk.models.llm_response import LlmResponse
 from google.genai import types
+from pydantic import Field
 
 from stride_service.binding import NodeBinding
 from stride_service.graph import (
@@ -326,7 +327,7 @@ class ScriptedLlm(BaseLlm):
     """
 
     reply: str
-    seen: list[str] = []
+    seen: list[str] = Field(default_factory=list)
 
     async def generate_content_async(
         self, llm_request, stream: bool = False

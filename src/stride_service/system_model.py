@@ -16,7 +16,7 @@ boundary iff its endpoints' zones differ.
 from __future__ import annotations
 
 import re
-from typing import ClassVar, Literal, Union
+from typing import ClassVar, Literal
 
 from pydantic import BaseModel, ConfigDict, Field
 
@@ -141,7 +141,7 @@ class TrustBoundary(_Element):
     kind: Literal["network", "privilege", "tenant", "other"]
 
 
-Element = Union[ExternalEntity, Process, DataStore, DataFlow, TrustBoundary]
+Element = ExternalEntity | Process | DataStore | DataFlow | TrustBoundary
 
 
 def derive_element_id(element: Element) -> str:
@@ -155,8 +155,9 @@ def derive_element_id(element: Element) -> str:
         return make_flow_id(element.source, element.destination, element.name)
     return make_element_id(element.id_prefix, element.name)
 
+
 # Elements that belong to a trust zone (everything except flows and boundaries).
-ZonedElement = Union[ExternalEntity, Process, DataStore]
+ZonedElement = ExternalEntity | Process | DataStore
 
 
 class Assumption(BaseModel):

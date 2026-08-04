@@ -92,7 +92,9 @@ def _build_shared_pipeline() -> graph.Pipeline:
         if node == graph.EXTRACT_NODE:
             return MarkerExtractLlm(model=BASE_MODEL)
         model_name = BASE_MODEL if node == graph.REPAIR_NODE else STRONG_MODEL
-        return ScriptedLlm(model=model_name, reply=replies.get(node, EMPTY_THREATS), seen=[])
+        return ScriptedLlm(
+            model=model_name, reply=replies.get(node, EMPTY_THREATS), seen=[]
+        )
 
     tiers = repo_tiers()
     sampling = load_sampling(PROJECT_ROOT / "config" / "sampling.toml", env={})
@@ -113,9 +115,7 @@ def _marker_job(index: int) -> tuple[str, JobRecord]:
     record = JobRecord.create(
         owner_subject="ping|shared-caller",
         sources=[
-            Source.description(
-                f"Customers log in to the web app. Job token {marker}."
-            )
+            Source.description(f"Customers log in to the web app. Job token {marker}.")
         ],
         system_name=f"System-{index:04x}",
     )
@@ -130,7 +130,9 @@ async def _ignore_node(node: str) -> None:
 async def _run_all(count: int) -> list[tuple[int, str, object]]:
     global _barrier
     _barrier = asyncio.Barrier(count)
-    runner = AdkPipelineRunner(_build_shared_pipeline())  # one shared runner + session service
+    runner = AdkPipelineRunner(
+        _build_shared_pipeline()
+    )  # one shared runner + session service
 
     async def one(index: int) -> tuple[int, str, object]:
         marker, record = _marker_job(index)

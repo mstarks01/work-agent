@@ -573,9 +573,7 @@ def severity_axis_agreement(matched: Sequence[MatchedPair]) -> dict[str, float]:
         "likelihood": ratio(
             sum(1 for pair in matched if pair.likelihood_agrees), len(matched)
         ),
-        "impact": ratio(
-            sum(1 for pair in matched if pair.impact_agrees), len(matched)
-        ),
+        "impact": ratio(sum(1 for pair in matched if pair.impact_agrees), len(matched)),
     }
 
 

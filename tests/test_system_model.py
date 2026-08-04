@@ -121,8 +121,7 @@ class TestNormalizeElementIds:
         model = valid_model()
         assert derive_element_id(model.processes[0]) == "process:web-app"
         assert (
-            derive_element_id(model.data_flows[0])
-            == "flow:customer-to-web-app:login"
+            derive_element_id(model.data_flows[0]) == "flow:customer-to-web-app:login"
         )
 
     def test_abbreviated_id_is_replaced_by_the_name_slug(self):

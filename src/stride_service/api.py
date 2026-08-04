@@ -20,7 +20,7 @@ import asyncio
 import logging
 from datetime import datetime
 from http import HTTPStatus
-from typing import Any
+from typing import Annotated, Any
 from uuid import uuid4
 
 from fastapi import BackgroundTasks, Depends, FastAPI, HTTPException, Request
@@ -165,7 +165,9 @@ def _unauthorized() -> HTTPException:
 
 async def require_subject(
     request: Request,
-    credentials: HTTPAuthorizationCredentials | None = Depends(_bearer_scheme),
+    credentials: Annotated[
+        HTTPAuthorizationCredentials | None, Depends(_bearer_scheme)
+    ],
 ) -> str:
     """FastAPI dependency: verify the bearer token, return its subject."""
     if credentials is None:

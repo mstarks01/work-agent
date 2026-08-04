@@ -64,7 +64,7 @@ class TestWellFormedness:
         with pytest.raises(ValidationError):
             Source(kind="description", label="   ", text="hi")
 
-    @pytest.mark.parametrize("break_char", ["\n", "\r", " ", " "])
+    @pytest.mark.parametrize("break_char", ["\n", "\r", "\u2028", "\u2029"])
     def test_a_label_spanning_lines_is_rejected(self, break_char):
         # The header inside the fence is positional, so a second line in the
         # label would make the text below it unreadable as text.
@@ -78,13 +78,13 @@ class TestWellFormedness:
             ("tab", "\t"),
             ("C1 control", "\x85"),
             ("delete", "\x7f"),
-            ("bidi override", "‮"),
-            ("bidi isolate", "⁦"),
-            ("zero-width space", "​"),
-            ("zero-width joiner", "‍"),
-            ("word joiner", "⁠"),
-            ("soft hyphen", "­"),
-            ("BOM", "﻿"),
+            ("bidi override", "\u202e"),
+            ("bidi isolate", "\u2066"),
+            ("zero-width space", "\u200b"),
+            ("zero-width joiner", "\u200d"),
+            ("word joiner", "\u2060"),
+            ("soft hyphen", "\xad"),
+            ("BOM", "\ufeff"),
         ],
     )
     def test_a_label_carrying_an_invisible_or_control_character_is_rejected(
@@ -125,7 +125,7 @@ class TestWellFormedness:
         ``source_excerpt``'s ``source_label`` against the job's labels.
         """
         with pytest.raises(ValidationError):
-            Source(kind="description", label="Spec​v2", text="hi")
+            Source(kind="description", label="Spec\u200bv2", text="hi")
 
     def test_empty_text_is_rejected(self):
         with pytest.raises(ValidationError):
@@ -137,9 +137,7 @@ class TestWellFormedness:
 
     def test_an_unknown_field_is_rejected(self):
         with pytest.raises(ValidationError):
-            Source(
-                kind="description", label="Doc", text="hi", authority="primary"
-            )
+            Source(kind="description", label="Doc", text="hi", authority="primary")
 
     def test_a_source_is_frozen(self):
         source = Source.description("hi")
