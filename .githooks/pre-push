@@ -1,0 +1,37 @@
+#!/usr/bin/env bash
+#
+# Run the same two ruff checks CI runs, before a push rather than after it.
+#
+# This is a convenience guard, not a gate: CI is authoritative, and the push
+# this blocks would have failed there anyway. That asymmetry decides the two
+# judgement calls below — a missing `uv` warns and lets the push through
+# rather than blocking work on a machine where the hook cannot run, and
+# `--no-verify` is advertised on failure rather than left to be looked up.
+#
+# Tracked, so it is reviewed like the workflow it mirrors. Enable it per
+# clone (it is not automatic, by git's design):
+#
+#     git config core.hooksPath .githooks
+#
+set -euo pipefail
+
+if ! command -v uv >/dev/null 2>&1; then
+    echo "pre-push: uv not on PATH, skipping ruff — CI will still run it" >&2
+    exit 0
+fi
+
+# Both invocations mirror .github/workflows/ci.yml exactly, including the
+# markdown exclusion; a difference here would mean a push passes locally and
+# fails in CI, which is the one outcome this hook exists to prevent.
+if ! uv run ruff check .; then
+    echo >&2
+    echo "pre-push: ruff check failed. Fix, or push with --no-verify." >&2
+    exit 1
+fi
+
+if ! uv run ruff format --check . --exclude '*.md'; then
+    echo >&2
+    echo "pre-push: ruff format failed. Run 'uv run ruff format . --exclude \"*.md\"'," >&2
+    echo "or push with --no-verify." >&2
+    exit 1
+fi

@@ -91,6 +91,16 @@ uv run python evals/verify_corpus.py       # mechanical checks over the golden c
 uv run python examples/sync_docs.py --check # the docs' code blocks match examples/
 ```
 
+The tracked `pre-push` hook runs the two ruff checks CI runs. Git does not
+enable hooks for a clone on its own, so opt in once:
+
+```sh
+git config core.hooksPath .githooks
+```
+
+It is a convenience guard rather than a gate — CI is authoritative, and
+`git push --no-verify` skips it.
+
 Everything under `tests/` and `evals/verify_corpus.py` is credential-free and
 deterministic. The live eval commands (`python -m evals.harness.run ...`) need
 configured provider credentials — see [evals/TUNING.md](evals/TUNING.md).
