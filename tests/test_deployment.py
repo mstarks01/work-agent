@@ -22,9 +22,9 @@ from stride_service.deployment import (
 )
 from stride_service.errors import ConfigError
 from stride_service.jobs import InMemoryJobStore
-from stride_service.model_gate import ModelGateError
+from stride_service.model_gate import ModelGateError, output_ceiling
 from stride_service.model_tiers import LLM_NODES, ModelConfigError
-from stride_service.vendors import ProviderAuthError
+from stride_service.vendors import ProviderAuthError, vendor_for
 from tests.factories import PROJECT_ROOT
 
 # The shipped config selects nothing, so every resolution here has to choose a
@@ -362,7 +362,31 @@ def test_the_shipped_caps_clear_the_ceilings_of_a_selectable_model():
     pipeline = Deployment.from_env(env=VERTEX_ENV).pipeline()
 
     assert pipeline.tier_sampling["base"].max_output_tokens == 16384
-    assert pipeline.tier_sampling["strong"].max_output_tokens == 32768
+    assert pipeline.tier_sampling["strong"].max_output_tokens == 64000
+
+
+@pytest.mark.parametrize(
+    ("vendor", "model"),
+    [
+        ("vertex", "gemini-2.5-pro"),
+        ("anthropic", "claude-sonnet-4-6"),
+        ("anthropic", "claude-opus-4-6"),
+        ("openai", "gpt-5.6"),
+    ],
+)
+def test_the_strong_cap_fits_every_model_selectable_on_that_tier(vendor, model):
+    """What pins ``strong`` to 64,000 rather than a rounder 65,536.
+
+    The tier is not a Vertex tier — a deployment picks its vendor, so the cap
+    has to clear the *lowest* ceiling any of them publishes, and Claude Sonnet
+    4.6's 64,000 is that floor. This asks litellm directly rather than through a
+    build, so a model whose ceiling drops below the shipped cap surfaces here as
+    a named failure instead of as a build wall in somebody's deployment.
+    """
+    ceiling = output_ceiling(vendor_for(vendor), model)
+
+    assert ceiling is not None, f"{vendor}/{model} left the cost map"
+    assert ceiling >= 64000
 
 
 def test_a_value_exactly_at_the_ceiling_still_builds():

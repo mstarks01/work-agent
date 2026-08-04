@@ -9,6 +9,7 @@ classification is the one part that genuinely depends on them.
 from __future__ import annotations
 
 import asyncio
+from dataclasses import dataclass
 
 import pytest
 from litellm import APIConnectionError, RateLimitError
@@ -17,6 +18,7 @@ from stride_service.retry import (
     RetryBudget,
     RetryBudgetExhausted,
     RetryPolicy,
+    TruncatedCompletionError,
     _backoff_seconds,
     _retry_after_seconds,
     retrying_llm_class,
@@ -32,12 +34,36 @@ def rate_limited(**headers) -> RateLimitError:
     )
 
 
+@dataclass(frozen=True)
+class FakeResponse:
+    """The response shape, minimal but not *less* than a response.
+
+    ``finish_reason`` is here rather than left off because a bare string stood in
+    for a response until the truncation check needed to read one, and that
+    substitution is the same shape as the bug it was hiding: what a provider
+    says about *how* a completion ended is part of the answer, not metadata
+    around it.
+    """
+
+    text: str
+    finish_reason: str | None = None
+
+
+def truncated(text: str = "half a doc") -> FakeResponse:
+    """What a provider that returns its partial output hands back at the cap."""
+    return FakeResponse(text=text, finish_reason="MAX_TOKENS")
+
+
+def texts(responses) -> list[str]:
+    return [response.text for response in responses]
+
+
 class FakeLlm:
     """A stand-in provider adapter: a scripted sequence of outcomes per call.
 
-    ``outcomes`` is consumed one entry per call — an exception to raise, or a
-    string to yield as the response. It counts calls, which is the number every
-    claim in this module is really about.
+    ``outcomes`` is consumed one entry per call — an exception to raise, a
+    :class:`FakeResponse` to yield, or a string wrapped into one. It counts
+    calls, which is the number every claim in this module is really about.
     """
 
     def __init__(self, model: str = "fake/model", outcomes=(), **_kwargs) -> None:
@@ -50,6 +76,8 @@ class FakeLlm:
         outcome = self.outcomes.pop(0) if self.outcomes else "ok"
         if isinstance(outcome, BaseException):
             raise outcome
+        if isinstance(outcome, str):
+            outcome = FakeResponse(text=outcome)
         yield outcome
 
 
@@ -218,12 +246,12 @@ class TestShouldRetry:
 class TestRetryingAdapter:
     def test_a_clean_call_makes_one_request(self):
         base = FakeLlm(outcomes=["ok"])
-        assert drive(base, policy()) == ["ok"]
+        assert texts(drive(base, policy())) == ["ok"]
         assert base.calls == 1
 
     def test_a_transient_failure_is_retried_and_the_answer_survives(self):
         base = FakeLlm(outcomes=[rate_limited(), "ok"])
-        assert drive(base, policy()) == ["ok"]
+        assert texts(drive(base, policy())) == ["ok"]
         assert base.calls == 2
 
     def test_success_credits_the_budget(self):
@@ -254,7 +282,7 @@ class TestRetryingAdapter:
     def test_a_partial_generator_never_reaches_the_caller(self):
         """Buffering is what makes the retry safe rather than duplicating."""
         base = FakeLlm(outcomes=[APIConnectionError("dropped", "openai", "m"), "ok"])
-        assert drive(base, policy()) == ["ok"]
+        assert texts(drive(base, policy())) == ["ok"]
 
     def test_a_streaming_call_is_passed_straight_through(self):
         # A replayed half-stream would be worse than no retry at all.
@@ -262,6 +290,107 @@ class TestRetryingAdapter:
         with pytest.raises(RateLimitError):
             drive(base, policy(), stream=True)
         assert base.calls == 1
+
+
+class TestTruncationIsRefused:
+    """The vendor difference that used to reach a validator as a parse error.
+
+    A provider that returns its partial output at ``max_output_tokens`` produces
+    a response nothing downstream can tell from a complete one — the text is
+    there, it is simply half of a document. ADK hands it to ``validate_schema``,
+    and the run dies inside pydantic naming a column offset, having already paid
+    for every node that ran first. ``finish_reason`` is the one place the
+    difference is still legible, and this is the only object in the service that
+    sees it for every node.
+    """
+
+    def test_a_length_stop_fails_the_node(self):
+        base = FakeLlm(outcomes=[truncated()])
+        with pytest.raises(TruncatedCompletionError):
+            drive(base, policy())
+
+    def test_the_partial_output_never_reaches_the_caller(self):
+        """The whole point: a fragment must not be validated as an answer."""
+        base = FakeLlm(outcomes=[truncated('{"threats":[{"id":')])
+        with pytest.raises(TruncatedCompletionError):
+            drive(base, policy())
+
+    def test_it_is_not_retried(self):
+        """The same request against the same cap truncates again."""
+        base = FakeLlm(outcomes=[truncated(), "ok"])
+        with pytest.raises(TruncatedCompletionError):
+            drive(base, policy(attempts=3))
+        assert base.calls == 1
+
+    def test_it_spends_no_retry_budget(self):
+        pol = policy()
+        pol.budget.tokens = 5
+        with pytest.raises(TruncatedCompletionError):
+            drive(FakeLlm(outcomes=[truncated()]), pol)
+        assert pol.budget.tokens <= 5.1
+
+    def test_the_message_names_the_model_and_the_knob(self):
+        """An operator reading this should not have to find the cap themselves."""
+        base = FakeLlm(model="openai/gpt-5.6-sol", outcomes=[truncated()])
+        with pytest.raises(TruncatedCompletionError) as excinfo:
+            drive(base, policy())
+        message = str(excinfo.value)
+        assert "openai/gpt-5.6-sol" in message
+        assert "max_output_tokens" in message
+        assert "config/sampling.toml" in message
+
+    def test_a_normal_stop_is_untouched(self):
+        base = FakeLlm(outcomes=[FakeResponse(text="ok", finish_reason="STOP")])
+        assert texts(drive(base, policy())) == ["ok"]
+
+    def test_an_absent_finish_reason_is_not_truncation(self):
+        """Vendors that say nothing are the silent half, and graph.py's to catch."""
+        base = FakeLlm(outcomes=[FakeResponse(text="ok")])
+        assert texts(drive(base, policy())) == ["ok"]
+
+    def test_a_truncation_anywhere_in_the_sequence_counts(self):
+        """One call yields one response today; the collection is still a sequence."""
+        cls = retrying_llm_class(FakeLlm, policy())
+        adapter = cls(model="fake/model")
+
+        async def two_parts(llm_request, stream=False):
+            yield FakeResponse(text="first", finish_reason="STOP")
+            yield truncated("second")
+
+        adapter._attempt_with_retries = lambda _req: _collect(two_parts(None))
+        with pytest.raises(TruncatedCompletionError):
+            asyncio.run(_drain(adapter))
+
+
+class TestTheFinishReasonContract:
+    """The one assumption the fake cannot carry: what ADK actually puts there.
+
+    Every test above scripts the string ``_reject_truncated`` matches on, which
+    proves the check works and nothing about whether it will ever fire. These
+    two probe the installed library instead — the same reason
+    ``test_model_gate.py`` probes litellm rather than mirroring its behaviour.
+    A version that changes either mapping shows up here as a failing test
+    rather than as a truncation that sails through in production.
+    """
+
+    def test_adk_maps_a_length_stop_onto_the_string_we_match(self):
+        from google.adk.models.lite_llm import _map_finish_reason
+
+        assert _map_finish_reason("length") == "MAX_TOKENS"
+
+    def test_a_normal_stop_maps_somewhere_else(self):
+        from google.adk.models.lite_llm import _map_finish_reason
+
+        assert _map_finish_reason("stop") != "MAX_TOKENS"
+
+
+async def _collect(agen) -> list:
+    return [item async for item in agen]
+
+
+async def _drain(adapter) -> None:
+    async for _ in adapter.generate_content_async(None):
+        pass
 
 
 class TestTheStormItself:
@@ -305,7 +434,7 @@ class TestTheStormItself:
         # one unlucky lane retries exactly as it always did.
         pol = policy(attempts=3, capacity=10)
         base = FakeLlm(outcomes=[rate_limited(), "ok"])
-        assert drive(base, pol) == ["ok"]
+        assert texts(drive(base, pol)) == ["ok"]
         assert base.calls == 2
 
     def test_the_budget_is_shared_across_lanes_not_per_lane(self):
