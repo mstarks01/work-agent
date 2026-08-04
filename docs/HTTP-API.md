@@ -136,6 +136,7 @@ when a deployment changes vendor. Shape is checked before size:
 | Status | Cause |
 | --- | --- |
 | `422` | A source is malformed: unknown `kind`, missing or over-long `label`, empty `text`, an unknown field. |
+| `422` | A `label` carries a control, bidi or zero-width character. A label is a citation key rendered as chrome beside the text it names, so a character that renders as something other than what it is can misrepresent the report. Rejected rather than stripped: a label is bounded but never rewritten, so repairing one would cite something you did not submit. Line breaks are refused for the same reason. |
 | `400` | `sources` is present but empty. |
 | `422` | Two sources share a `label`. Refused at any size — a label is a citation key, so a repeated one leaves every excerpt naming it ambiguous. The message names the repeated labels. |
 | `413` | More sources than the deployment allows. The message names the count and the limit. |
