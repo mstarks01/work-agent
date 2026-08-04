@@ -140,11 +140,41 @@ Resolving it **corrected #79 on a mechanism, not a decision**: there is *no draf
 exposed a real evidence gap: the corpus carries **zero transcript sources**, so the across-turns
 and speaker-label cases rest on a constructed probe, now fog.
 
-Frontier now: [#81](https://github.com/mstarks01/work-agent/issues/81),
-[#82](https://github.com/mstarks01/work-agent/issues/82),
+[#81](https://github.com/mstarks01/work-agent/issues/81) resolved 2026-08-04: `source_excerpt`
+**survives with its job restated** — it answers *why this element exists*, `grounds` answer *why
+this threat was raised*. Field, gate rule and 13 corpus cases unchanged, so **no cutover and
+nothing versions**. It is kept for three things grounds cannot do: a threat-less element has no
+other provenance, the verbatim-span requirement is pressure against invented elements, and
+`_citation_issues` exists only because excerpts do. `CONTEXT.md`'s **Source Excerpt** entry loses
+the threat→element→words chain to `grounds` and loses its "extraction evals" claim — **nothing
+scores excerpts**; `score_extraction` is element-ID set arithmetic plus `crossings_match`
+(`modes.py:212-227`), and the real consumers are `verify_corpus.py:157-183`'s lint and a human
+blesser at `BLESSING.md:131`.
+
+**Read this before touching the analyze path.** Resolving #81 found that a category agent
+**never sees the submitter's source text** — `analyst.md` templates against `{system_model}` and
+`{boundary_crossings}` only, so the excerpts inside the rendered model were the only submitter words
+reaching it, which made the map's settled decision 1 (*authored, not derived*) unimplementable. Two
+changes follow, both now constraints on #82 rather than open questions: `analyst.md` **gains
+`{input_text}`** — no new plumbing, `execution.py:146-151` already writes the key and refuses a
+caller override, and `run_analysis` passes `case.sources` even when injecting the blessed model at
+`prepare`, so all three eval modes stay green — and `prepare_analysis` **strips `source_excerpt`,
+`source_label` and `source_speaker`** from the model it renders to the analysts *and the critic*,
+while `STATE_VALID_MODEL` keeps them for the report. That removes the nearest-excerpt shortcut #82
+asks about instead of wording against it; `notes` is untouched, and no label is stranded because
+each rides inside its own fence (`sources.py:21`). The accepted cost is that the bytes an analyst
+saw are no longer the bytes the report carries. A finding's quote disagreeing with its element's
+excerpt is **legitimate and ungoverned** — no gate, no prompt rule, not even a same-source
+requirement, since a transcript remark can justify a threat against an element extracted from a
+design doc.
+
+Frontier now: [#82](https://github.com/mstarks01/work-agent/issues/82),
 [#83](https://github.com/mstarks01/work-agent/issues/83) and
 [#84](https://github.com/mstarks01/work-agent/issues/84), all unblocked and unclaimed — still a
-parallel step, so expect concurrent sessions.
+parallel step, so expect concurrent sessions. All three had constraints added to their bodies by
+#81; #82's stated constraint that "analysts already see every excerpt" was **struck as false**, and
+its `graph.py:285` reference was stale (`graph.py:409`). #81 deliberately left the critic seeing
+**no submitter words at all** and handed #83 the call on whether `critic.md` gains `{input_text}`.
 [#85](https://github.com/mstarks01/work-agent/issues/85) waits on #82 alone now. #79 left three
 questions explicitly to siblings: verbatim quote verification was #80's, prompt instruction is
 #82's, and whether `related_unknowns` finally gains a check is #83's. #82 was retitled to "How a
