@@ -92,7 +92,13 @@ def extract(source: str, region: str | None) -> str:
         )
     if ends[0] < starts[0]:
         raise IncludeError(f"{source}: region {region!r} ends before it starts")
-    return "".join(lines[starts[0] + 1 : ends[0]])
+    region = lines[starts[0] + 1 : ends[0]]
+    # An end marker sitting just above a top-level definition carries the two
+    # blank lines the formatter puts there. That padding is the file's layout,
+    # not the snippet's, so it must not reach the fence.
+    while region and not region[-1].strip():
+        region.pop()
+    return "".join(region)
 
 
 def _fence_language(source: str) -> str:
