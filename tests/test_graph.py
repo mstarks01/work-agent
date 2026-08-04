@@ -55,9 +55,9 @@ class FakeContext:
 
 
 def analyze_state(**drafts_by_category: list) -> dict[str, object]:
-    """State as six analysts that all ran leave it.
+    """State as six category agents that all ran leave it.
 
-    Every lane gets a key, because ``merge_drafts`` distinguishes an analyst
+    Every lane gets a key, because ``merge_drafts`` distinguishes a category agent
     that found nothing (``{"threats": []}``, its key written) from one that
     emitted nothing (no key at all, a truncated completion). A test seeding only
     the lanes it cares about would be asserting against the second, which is a
@@ -190,7 +190,7 @@ def test_each_llm_node_binds_its_own_tier_sampling(
 ):
     """Sampling is resolved per node, not shared graph-wide.
 
-    ``extract``/``repair`` run on base, the analysts and critic/recritic on
+    ``extract``/``repair`` run on base, the category agents and critic/recritic on
     strong; with the two tiers pinned to different decoding params, each node
     must carry *its* tier's ``GenerateContentConfig``.
     """
@@ -285,7 +285,7 @@ def test_deterministic_bookends_carry_no_model(pipeline):
     assert isinstance(nodes_by_name(pipeline)[graph.JOIN_NODE], JoinNode)
 
 
-def test_six_analysts_fan_out_from_prepare_and_join(pipeline):
+def test_six_category_agents_fan_out_from_prepare_and_join(pipeline):
     edges = pipeline.workflow.graph.edges
     fanned = {
         edge.to_node.name for edge in edges if edge.from_node.name == graph.PREPARE_NODE
@@ -356,7 +356,7 @@ def test_every_node_schema_survives_the_trip_to_a_response_format(pipeline):
     adapter can turn it into a response format. A bare ``list[...]`` cannot be
     turned into one: ADK logs a warning, returns ``None``, and the node
     generates unconstrained — with nothing in the request, the response or the
-    report to show for it. That is why the analysts and both review passes
+    report to show for it. That is why the category agents and both review passes
     carry wrapper models rather than lists.
 
     Asserted against ADK's own converter rather than a shape of our choosing,
@@ -503,7 +503,7 @@ def test_reject_parks_the_issues_for_the_runner():
 
 
 def test_validate_names_a_silent_extraction_rather_than_binding_against_it():
-    """The same silence as the analysts', one node earlier.
+    """The same silence as the category agents', one node earlier.
 
     Without the default this surfaces as ADK failing to bind an argument to
     ``validate``, which reads as a graph defect rather than as a truncated

@@ -262,7 +262,7 @@ jobs:
       # Layer 3 of the examples' honesty mechanism (#30). The offline lane
       # proves the docs show these files and that their branching runs against
       # a stub; only a live run can show that examples/orders.md still extracts
-      # into a usable model and that the analysts still return threats for it.
+      # into a usable model and that the category agents still return threats for it.
       #
       # This is the sole check on the sample's extraction quality, which was
       # accepted as an unverified risk when the sample was purpose-built rather

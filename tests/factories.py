@@ -202,7 +202,7 @@ def sample_draft(
     category: str = "spoofing",
     **overrides: Any,
 ) -> DraftThreat:
-    """One analyst draft against valid_model(), before the critic rules on it."""
+    """One category agent's draft against valid_model(), before the critic rules."""
     threat = sample_threat(threat_id, category, **overrides)
     return DraftThreat.model_validate(
         threat.model_dump(exclude={"confidence", "verdict"})
@@ -212,7 +212,7 @@ def sample_draft(
 def sample_ruling(threat_id: str = "S-01", **overrides: Any) -> ThreatRuling:
     """The critic's ruling on one sample_draft(), overridable per test.
 
-    Carries no ``severity``, which is the common case: the analyst's rating
+    Carries no ``severity``, which is the common case: the agent's rating
     stands unless the calibration step replaced it.
     """
     fields: dict[str, Any] = {
@@ -300,7 +300,7 @@ EMPTY_THREATS = '{"threats": []}'
 
 
 def threats_json(*threats: object) -> str:
-    """A review or analyst node's emission: the list inside its ``threats`` key.
+    """A review or category-agent node's emission: the list inside its ``threats`` key.
 
     The wrapper is the node's output-schema shape, not the domain's, so tests
     build it here rather than each spelling it out — a bare array is what these

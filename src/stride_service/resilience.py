@@ -39,7 +39,7 @@ it is now literally the request count per node. It did not used to be. LiteLLM's
 provider SDK's own ``max_retries`` **from** that same value on the way to the
 client — so the first attempt carried its own SDK-level retries underneath, and
 the worst case per node was ``2 * attempts - 1`` requests: five at the shipped
-three, and up to thirty in the seconds the six analysts fan out. Against a
+three, and up to thirty in the seconds the six category agents fan out. Against a
 per-minute quota that burst is what turns one 429 into a run spending its budget
 on retried 429s (OWASP LLM10). Passing ``max_retries`` did not close it —
 ``num_retries`` overwrites it on the way to the client — which is what

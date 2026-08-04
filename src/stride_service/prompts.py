@@ -55,7 +55,7 @@ EXEMPLAR_TOKEN_CAP = 1500
 CRITIC_PROMPT_TOKEN_CAP = 1500
 RECRITIC_PROMPT_TOKEN_CAP = 1000
 # Raised from 1500 with the sources cutover (#53, #56). The original was sized
-# against the *analyst's* 6-8K envelope, but extract loads no skills, so this
+# against the *category agent's* 6-8K envelope, but extract loads no skills, so this
 # file is the whole instruction — around 5% of a full-budget call. Buying room
 # for the seven reading rules and their worked examples is cheaper than
 # deleting the only worked examples the prompt has.

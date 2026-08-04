@@ -1,7 +1,7 @@
 """Both sides of the critic, scored from one run.
 
 The critic is the most expensive node in the graph — one strong-tier pass over
-every analyst's output — and this module is the evidence that it earns that
+every category agent's output — and this module is the evidence that it earns that
 cost. It is deliberately two-sided: a critic that kills unsupported threats is
 earning its cost, and the *same* critic killing threats that matched a
 reference is destroying real findings. Only the pair means anything. A kill
@@ -259,7 +259,7 @@ def _dispositions(score: CaseScore) -> dict[str, tuple[Disposition, int | None]]
     """Every produced threat's fate in one scoring pass, keyed by threat ID.
 
     Threat IDs are unique within a run — :func:`~stride_service.critic.
-    join_drafts` fails closed if two analysts reuse one — so a dict is a safe
+    join_drafts` fails closed if two category agents reuse one — so a dict is a safe
     index. The scorer's outcomes are mutually exclusive by construction: a
     threat is matched, or a lane error, or ``needs-info``, or adjudicated into
     exactly one bucket. ``unscored`` should be unreachable, and is here so that

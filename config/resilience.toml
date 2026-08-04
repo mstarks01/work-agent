@@ -41,7 +41,7 @@
 # num_retries counts retries AFTER the first try AND sets the provider SDK's own
 # max_retries from the same value, so the first attempt retried underneath and
 # the worst case was 2 * attempts - 1 requests: five here, and up to thirty in
-# the seconds the six analysts fan out. That burst is what trips a per-minute
+# the seconds the six category agents fan out. That burst is what trips a per-minute
 # request quota. Passing max_retries on the adapter did not close it, since
 # num_retries overwrites it on the way to the client.
 #
@@ -63,7 +63,7 @@ timeout_ms = 300000
 # The per-call knobs cannot substitute for it, and the arithmetic is why:
 # timeout_ms bounds one request at 300 s, attempts allows 3 of them per node,
 # and the graph's longest path runs five LLM stages in series (extract, repair,
-# the analyst fan-out, critic, recritic). 300 s x 3 x 5 is 75 minutes, with
+# the category-agent fan-out, critic, recritic). 300 s x 3 x 5 is 75 minutes, with
 # every individual bound respected the whole way — and it was over two hours
 # before the retry amplification was removed. That is the point rather than a
 # detail: the product moves whenever any factor does, and only a deadline
@@ -71,7 +71,7 @@ timeout_ms = 300000
 #
 # 900 s IS A BACKSTOP, NOT AN SLO, and it is sized against measured work rather
 # than against that worst case. One observed clean run is ~119 s end to end
-# (extract ~22 s, the six-analyst barrier ~38 s, critic ~58 s). The longest
+# (extract ~22 s, the six-agent barrier ~38 s, critic ~58 s). The longest
 # legitimate path adds a repair pass and a critic re-ask for ~200 s, and one
 # transient retry on the slowest node puts it near 260 s. 900 s is ~3.5x that
 # and ~8x the observed median, so it fires on runs that are wedged rather than
@@ -94,8 +94,8 @@ job_deadline_ms = 900000
 #
 # A per-node count is what produced the storm. Every node got its full allowance
 # regardless of what the other five were seeing, so a provider-wide 429 became
-# six analysts x five requests in the seconds they fan out — the failure that is
-# by definition correlated got the retry policy designed for isolated ones.
+# six category agents x five requests in the seconds they fan out — the failure
+# that is by definition correlated got the retry policy designed for isolated ones.
 # Under a shared budget the first few failures spend it and the rest fail fast,
 # which is the correct response to "the provider is down": stop asking.
 #

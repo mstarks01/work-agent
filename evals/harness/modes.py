@@ -2,14 +2,14 @@
 
 Two artifacts per case buy three modes, and the point of the split is
 **attribution**: an end-to-end-only fixture cannot say whether a recall miss
-was an analyst failure or an element ``extract`` never produced.
+was a category-agent failure or an element ``extract`` never produced.
 
 * **extraction** — source text vs. the blessed model. Runs the shipped
   ``extract`` node alone and puts its emission through the same shipped
   validity gate ``validate`` uses.
 * **analysis** — the blessed model injected at ``prepare``, scored against the
   reference threats. Deterministic input, so every threat number is
-  attributable to the analysts and critic.
+  attributable to the category agents and critic.
 * **end-to-end** — text in, report out. The integration smoke test.
 
 All three drive the *shipped* graph via
@@ -246,7 +246,7 @@ def _crossings_match(blessed: SystemModel, extracted: SystemModel | None) -> boo
 async def run_analysis(case: GoldenCase, pipeline: Pipeline) -> AnalysisRun:
     """Mode 2: the blessed model injected at ``prepare``.
 
-    The seeded ``valid_model`` is the blessed one, so the analysts see exactly
+    The seeded ``valid_model`` is the blessed one, so the category agents see exactly
     what the SME blessed and nothing depends on that run's extraction.
     """
     graph_run = await run_graph(

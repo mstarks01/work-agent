@@ -61,7 +61,7 @@ def category_boundary_digest(loader: MarkdownLoader) -> str:
     """The critic's lane digest: the six ``## Scope`` sections, verbatim.
 
     Assembled mechanically in canonical STRIDE order so the critic dedupes
-    against the same lane definitions the analysts used.
+    against the same lane definitions the category agents used.
     """
     parts = ["# STRIDE Category Boundaries"]
     for category in STRIDE_CATEGORIES:
@@ -75,7 +75,7 @@ def compose_analyze_skills(
     category: StrideCategory,
     domain_packs: tuple[str, ...] = (),
 ) -> str:
-    """One analyst's skill text: category skill, shared rubric, domain packs.
+    """One category agent's skill text: category skill, shared rubric, domain packs.
 
     Stable-first order keeps the instruction prefix identical across jobs for
     the same category + pack selection, so it caches.

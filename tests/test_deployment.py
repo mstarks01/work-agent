@@ -171,7 +171,7 @@ def test_every_llm_node_carries_the_retry_loop():
 def test_both_tiers_draw_on_one_shared_retry_budget():
     """A storm is a property of the process, not of a tier.
 
-    Two budgets would let the six analysts exhaust the strong tier's allowance
+    Two budgets would let the six category agents exhaust the strong tier's allowance
     while the base tier's sat untouched beside it — and both are pointed at the
     same provider quota.
     """
