@@ -26,7 +26,7 @@ from stride_service.graph import (
     ENTRY_PREPARE,
     EXTRACT_NODE,
     TIER_NODE_BY_GRAPH_NODE,
-    analyst_node_name,
+    analyze_node_name,
 )
 from stride_service.report import (
     CATEGORY_LETTERS,
@@ -48,7 +48,13 @@ def case():
 
 
 def scripted_draft(case, category) -> dict:
-    """One analyst draft citing an element the blessed model really contains."""
+    """One category agent's draft citing an element the blessed model contains.
+
+    Grounded on an ``unknown-attribute`` rather than a quote: the corpus case
+    ships real sources, so a scripted quote would have to be a verbatim span of
+    one to survive the fan-in's ladder, and these tests are about the modes
+    rather than about grounding.
+    """
     reference = next(ref for ref in case.references if ref.category == category)
     return {
         "id": f"{CATEGORY_LETTERS[category]}-01",
@@ -56,6 +62,13 @@ def scripted_draft(case, category) -> dict:
         "title": reference.claim,
         "description": f"{reference.claim} Scripted for the offline mode test.",
         "affected_element_ids": list(reference.affected_element_ids),
+        "grounds": [
+            {
+                "kind": "unknown-attribute",
+                "element_id": reference.affected_element_ids[0],
+                "attribute": "name",
+            }
+        ],
         "severity": Severity(
             likelihood=reference.severity.likelihood,
             impact=reference.severity.impact,
@@ -103,7 +116,7 @@ def _reply_for(case, graph_node: str) -> str:
             {"threats": [scripted_ruling(category) for category in STRIDE_CATEGORIES]}
         )
     for category in STRIDE_CATEGORIES:
-        if graph_node == analyst_node_name(category):
+        if graph_node == analyze_node_name(category):
             return json.dumps({"threats": [scripted_draft(case, category)]})
     return '{"threats": []}'
 
@@ -118,7 +131,7 @@ def test_analysis_mode_injects_the_blessed_model_at_prepare(case):
     # whole point of the mode.
     assert "extract" not in models
     assert report.system_model == case.model
-    spoofing = models[analyst_node_name("spoofing")].seen[0]
+    spoofing = models[analyze_node_name("spoofing")].seen[0]
     assert "flow:shopper-to-storefront-api:place-order" in spoofing
 
 

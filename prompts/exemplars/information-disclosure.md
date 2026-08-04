@@ -19,6 +19,17 @@ Same path, two lanes: rewriting those messages is tampering, reading them is you
     "process:web-api",
     "process:ledger-service"
   ],
+  "grounds": [
+    {
+      "kind": "quote",
+      "text": "not authenticated and not encrypted",
+      "source_label": "Payments platform notes"
+    },
+    {
+      "kind": "derived-fact",
+      "flow_id": "flow:web-api-to-ledger-service:post-transfer"
+    }
+  ],
   "severity": {
     "likelihood": "medium",
     "impact": "high",
@@ -52,6 +63,13 @@ Same path, two lanes: rewriting those messages is tampering, reading them is you
     "flow:ledger-service-to-accounts-db:read-write-balances",
     "process:ledger-service"
   ],
+  "grounds": [
+    {
+      "kind": "quote",
+      "text": "that account has full read/write on every table",
+      "source_label": "Payments platform notes"
+    }
+  ],
   "severity": {
     "likelihood": "medium",
     "impact": "high",
@@ -82,6 +100,13 @@ Same path, two lanes: rewriting those messages is tampering, reading them is you
   "description": "`store:accounts-db` is classified confidential and tagged `pii` and `financial`, but its `encryption_at_rest` attribute is `unknown`. If that unknown resolves to unencrypted storage, anyone who obtains a copy of the underlying media — a snapshot exported to a less-protected project, a backup bucket with broader read access, a replica in another environment, decommissioned disks — reads the full dataset without touching `process:ledger-service` or presenting any database credential. Shadow copies routinely inherit the data but not the access controls of the live store. This draft is conditional on the `encryption_at_rest` attribute; it is not a claim that the store is unencrypted.",
   "affected_element_ids": [
     "store:accounts-db"
+  ],
+  "grounds": [
+    {
+      "kind": "unknown-attribute",
+      "element_id": "store:accounts-db",
+      "attribute": "encryption_at_rest"
+    }
   ],
   "severity": {
     "likelihood": "medium",

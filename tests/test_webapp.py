@@ -359,13 +359,26 @@ def model_with_markup_everywhere():
 
 
 def report_with_markup_everywhere():
-    """A complete report carrying the payload in every free-text field."""
-    from stride_service.report import Mitigation, Severity, Verdict
+    """A complete report carrying the payload in every free-text field.
+
+    Grounds included: a quote's ``text`` is submitter prose copied verbatim by
+    rule, and its ``source_label`` is a caller-chosen string, so the grounds
+    rail is now the newest place on the page where untrusted text lands.
+    """
+    from stride_service.report import Ground, Mitigation, Severity, Verdict
     from tests.factories import sample_report, sample_threat
 
     threat = sample_threat(
         title=MARKUP_PAYLOAD,
         description=MARKUP_PAYLOAD,
+        grounds=[
+            Ground(kind="quote", text=MARKUP_PAYLOAD, source_label=MARKUP_PAYLOAD),
+            Ground(
+                kind="unknown-attribute",
+                element_id=MARKUP_PAYLOAD,
+                attribute=MARKUP_PAYLOAD,
+            ),
+        ],
         severity=Severity(
             likelihood="medium", impact="high", justification=MARKUP_PAYLOAD
         ),
@@ -396,6 +409,7 @@ def test_no_free_text_field_reaches_the_page_as_markup():
     )
     decoded = json.loads(payload.group(1))
     assert decoded["rejected_threats"][0]["title"] == MARKUP_PAYLOAD
+    assert decoded["rejected_threats"][0]["grounds"][0]["text"] == MARKUP_PAYLOAD
     assert decoded["system_model"]["processes"][0]["technology"] == MARKUP_PAYLOAD
 
 

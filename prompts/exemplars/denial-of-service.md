@@ -19,6 +19,17 @@ The model states no rate limiting. Silence is not a control — rate likelihood 
     "flow:customer-to-web-api:submit-payment",
     "process:ledger-service"
   ],
+  "grounds": [
+    {
+      "kind": "quote",
+      "text": "the only thing we expose to the internet",
+      "source_label": "Payments platform notes"
+    },
+    {
+      "kind": "derived-fact",
+      "flow_id": "flow:customer-to-web-api:submit-payment"
+    }
+  ],
   "severity": {
     "likelihood": "high",
     "impact": "medium",
@@ -53,6 +64,13 @@ The exemplar is the cascade. `store:accounts-db` is a shared dependency: its con
     "flow:ledger-service-to-accounts-db:read-write-balances",
     "store:audit-log"
   ],
+  "grounds": [
+    {
+      "kind": "quote",
+      "text": "a small fixed connection pool, so a slow query anywhere backs everything up",
+      "source_label": "Payments platform notes"
+    }
+  ],
   "severity": {
     "likelihood": "medium",
     "impact": "high",
@@ -85,6 +103,17 @@ The exemplar is the cascade. `store:accounts-db` is a shared dependency: its con
     "process:web-api",
     "flow:payments-provider-to-web-api:settlement-webhook",
     "process:ledger-service"
+  ],
+  "grounds": [
+    {
+      "kind": "derived-fact",
+      "flow_id": "flow:payments-provider-to-web-api:settlement-webhook"
+    },
+    {
+      "kind": "unknown-attribute",
+      "element_id": "flow:payments-provider-to-web-api:settlement-webhook",
+      "attribute": "authentication"
+    }
   ],
   "severity": {
     "likelihood": "medium",

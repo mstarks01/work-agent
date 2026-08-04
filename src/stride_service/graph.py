@@ -2,10 +2,10 @@
 
 The topology::
 
-    START -> extract -> validate -+-valid--> prepare -> 6 analysts -> join
-                                  |             ^                       |
-                                  +-invalid-> repair                    v
-                                                 |                    merge
+    START -> extract -> validate -+-valid--> prepare -> 6 category agents -> join
+                                  |             ^                             |
+                                  +-invalid-> repair                          v
+                                                 |                          merge
                                           revalidate -+-invalid-> reject |
                                                       |                  v
                                                       +-valid-> prepare  critic
@@ -47,30 +47,34 @@ canonical names in :data:`stride_service.model_tiers.LLM_NODES`), its skills
 through :mod:`stride_service.skills`, and its prompt through
 :mod:`stride_service.prompts`. Graph node names must be Python identifiers,
 so ``analyze/information-disclosure`` in the tier config is
-``analyst_information_disclosure`` here; :data:`TIER_NODE_BY_GRAPH_NODE` is
-the only place that correspondence lives. The two halves are mid-cutover and
-deliberately so: the tier keys moved with ``config/model_tiers.toml`` v4, and
-the graph names move with the report schema, since renaming those is what a
-consumer reading ``nodes[].node`` would otherwise misread in silence.
+``analyze_information_disclosure`` here; :data:`TIER_NODE_BY_GRAPH_NODE` is
+the only place that correspondence lives. Both halves now spell the six
+category agents the same way — the tier keys moved with
+``config/model_tiers.toml`` v4 and the graph names with report schema 2.0,
+which is the bump these names earned: a consumer keying on ``analyst_spoofing``
+in ``nodes[].node`` does not error, it matches nothing, silently.
 
 The bookends are deliberately deterministic, because mechanical work belongs in
-code: analysts cannot receive a malformed view, and the report cannot cite an
-element the model does not contain. Every check in this module fails closed — a
-raising FunctionNode aborts the workflow, which the runner turns into a failed
-job.
+code: category agents cannot receive a malformed view, the report cannot cite an
+element the model does not contain, and a quote a finding rests on is matched
+against the submitter's own bytes rather than taken on trust. Every check in
+this module fails closed — a raising FunctionNode aborts the workflow, which
+the runner turns into a failed job.
 
 One of those checks is for **silence** rather than for malformed content. An
 LLM node that emits no text writes no ``output_key``, so the absence arrives
 where the next node reads state, not as anything that raised. ``validate`` and
 ``merge`` name it (:class:`SilentNodeError`) instead of reading it as an empty
-value, which is what keeps a truncated analyst from deleting a STRIDE category
-from a report that still finishes green.
+value, which is what keeps a truncated category agent from deleting a STRIDE
+category from a report that still finishes green.
 
 Security: the submitted text is untrusted and reaches the extraction prompt
-inside a fenced block that names it as data (OWASP LLM01); everything a
-model emits is untrusted output validated before use (LLM05) — by
-``output_schema`` at the node boundary, then by the System Model gate and
-the critic seams here.
+**and now the six category agents' prompts** inside a fenced block that names it
+as data (OWASP LLM01) — the agents read it so they can quote it, which is the
+whole of finding-level attribution and is why ``analyze.md`` carries the same
+data-not-instruction paragraph ``extract.md`` does. Everything a model emits is
+untrusted output validated before use (LLM05) — by ``output_schema`` at the node
+boundary, then by the System Model gate and the critic seams here.
 """
 
 from __future__ import annotations
@@ -89,7 +93,7 @@ from google.genai import types
 from stride_service.critic import assemble_threats, join_drafts, review_issues
 from stride_service.markdown_loader import MarkdownLoader
 from stride_service.prompts import (
-    compose_analyst_prompt,
+    compose_analyze_prompt,
     compose_critic_prompt,
     compose_extract_prompt,
     compose_recritic_prompt,
@@ -104,6 +108,7 @@ from stride_service.report import (
     Threat,
     ThreatRuling,
     ThreatRulings,
+    UnverifiedGround,
     build_summary,
 )
 from stride_service.resilience import ResilienceConfig
@@ -111,7 +116,7 @@ from stride_service.sampling import (
     SamplingResolver,
     TierSampling,
 )
-from stride_service.skills import compose_analyst_skills, compose_critic_skills
+from stride_service.skills import compose_analyze_skills, compose_critic_skills
 from stride_service.sources import fence_for
 from stride_service.system_model import BoundaryCrossing, SystemModel
 from stride_service.validation import ValidationIssue, parse_and_validate
@@ -144,13 +149,13 @@ CRITIC_FAILED_NODE = "critic_failed"
 ASSEMBLE_NODE = "assemble"
 
 
-def analyst_node_name(category: StrideCategory) -> str:
-    """This category analyst's graph node name (an identifier, unlike the ID)."""
-    return f"analyst_{category.replace('-', '_')}"
+def analyze_node_name(category: StrideCategory) -> str:
+    """This category agent's graph node name (an identifier, unlike the ID)."""
+    return f"analyze_{category.replace('-', '_')}"
 
 
-ANALYST_GRAPH_NODES: tuple[str, ...] = tuple(
-    analyst_node_name(category) for category in STRIDE_CATEGORIES
+ANALYZE_GRAPH_NODES: tuple[str, ...] = tuple(
+    analyze_node_name(category) for category in STRIDE_CATEGORIES
 )
 
 # Graph node name -> the canonical LLM node name the tier config keys on.
@@ -160,7 +165,7 @@ TIER_NODE_BY_GRAPH_NODE: dict[str, str] = {
     CRITIC_NODE: "critic",
     RECRITIC_NODE: "recritic",
     **{
-        analyst_node_name(category): f"analyze/{category}"
+        analyze_node_name(category): f"analyze/{category}"
         for category in STRIDE_CATEGORIES
     },
 }
@@ -179,7 +184,7 @@ ENTRY_EXTRACT_ONLY: Entry = "extract-only"
 """The extraction eval mode: run ``extract`` and stop, leaving its emission at
 :data:`STATE_EXTRACTED_MODEL` for the caller to put through the same
 :func:`~stride_service.validation.parse_and_validate` gate ``validate`` uses.
-Spending six analysts and a critic to score an extraction would be six kinds
+Spending six category agents and a critic to score an extraction would be six kinds
 of noise on one number."""
 
 ROUTE_VALID = "valid"
@@ -209,10 +214,16 @@ be rejected for."""
 # report's traceability without failing any test.
 
 STATE_INPUT_TEXT = "input_text"
-# The job's source labels, for the one gate rule that takes data from outside
-# the model: a source_excerpt's citation has to name a source the job actually
-# carried. Written by the executor beside the rendered input, never by a node.
-STATE_SOURCE_LABELS = "source_labels"
+# The job's sources as ``label -> text``, for the two checks that take data
+# from outside the model: the gate rule that a ``source_excerpt``'s citation
+# names a source the job actually carried, and the fan-in's check that a
+# finding's quote is really in the source it names. Written by the executor
+# beside the rendered input, never by a node.
+#
+# The structured counterpart of :data:`STATE_INPUT_TEXT`, which holds the same
+# bytes *rendered* — one key per view, under this module's rule that a rendered
+# key is written once and never read back by Python.
+STATE_SOURCE_TEXTS = "source_texts"
 STATE_SYSTEM_MODEL = "system_model"
 STATE_BOUNDARY_CROSSINGS = "boundary_crossings"
 STATE_DRAFT_THREATS = "draft_threats"
@@ -224,13 +235,14 @@ STATE_CRITIC_ISSUES = "critic_issues"
 STATE_EXTRACTED_MODEL = "extracted_model"
 STATE_VALID_MODEL = "valid_model"
 STATE_MERGED_DRAFTS = "merged_drafts"
+STATE_UNVERIFIED_GROUNDS = "unverified_grounds"
 STATE_REVIEWED_THREATS = "reviewed_threats"
 STATE_ANALYSIS = "analysis"
 STATE_REJECTION = "rejection"
 
 
-def analyst_state_key(category: StrideCategory) -> str:
-    """Where one analyst parks its drafts for the merge node."""
+def analyze_state_key(category: StrideCategory) -> str:
+    """Where one category agent parks its drafts for the merge node."""
     return f"drafts_{category.replace('-', '_')}"
 
 
@@ -244,7 +256,7 @@ class SilentNodeError(RuntimeError):
     the response was cut off at ``max_output_tokens``, which reasoning tokens
     are spent against as well.
 
-    Absence is deliberately **not** read as emptiness. An analyst that finds no
+    Absence is deliberately **not** read as emptiness. An agent that finds no
     threats in its lane emits ``{"threats": []}`` and its key is written; a
     truncated one writes nothing. The two look identical once a missing key is
     defaulted to an empty list, which is how a silently dropped STRIDE category
@@ -280,6 +292,9 @@ class Analysis:
     boundary_crossings: list[BoundaryCrossing]
     threats: list[Threat]
     rejected_threats: list[Threat]
+    # Service-owned, computed at the fan-in, and covering both arrays above —
+    # a rejected threat keeps its grounds, so it keeps their marks too.
+    unverified_grounds: list[UnverifiedGround]
     summary: Summary
 
     def to_state(self) -> dict[str, Any]:
@@ -292,6 +307,9 @@ class Analysis:
             "threats": [threat.model_dump(mode="json") for threat in self.threats],
             "rejected_threats": [
                 threat.model_dump(mode="json") for threat in self.rejected_threats
+            ],
+            "unverified_grounds": [
+                mark.model_dump(mode="json") for mark in self.unverified_grounds
             ],
             "summary": self.summary.model_dump(mode="json"),
         }
@@ -308,6 +326,10 @@ class Analysis:
             threats=[Threat.model_validate(threat) for threat in data["threats"]],
             rejected_threats=[
                 Threat.model_validate(threat) for threat in data["rejected_threats"]
+            ],
+            unverified_grounds=[
+                UnverifiedGround.model_validate(mark)
+                for mark in data["unverified_grounds"]
             ],
             summary=Summary.model_validate(data["summary"]),
         )
@@ -344,7 +366,7 @@ def render_fenced(value: Any) -> str:
 
 
 def validate_extraction(
-    ctx, extracted_model: dict | None = None, source_labels: list[str] | None = None
+    ctx, extracted_model: dict | None = None, source_texts: dict | None = None
 ) -> Event:
     """Run the mechanical validity gate and route on the result.
 
@@ -375,11 +397,11 @@ def validate_extraction(
             f" model to validate. {_TRUNCATION_HINT}"
         )
     model, issues = parse_and_validate(
-        extracted_model, normalize_ids=True, source_labels=source_labels or ()
+        extracted_model, normalize_ids=True, source_labels=source_texts or ()
     )
     if issues or model is None:
         parked = extracted_model if model is None else model.model_dump(mode="json")
-        # Fenced for the same reason as the analysts' copy: this is the model
+        # Fenced for the same reason as the agents' copy: this is the model
         # built from caller words, handed straight back to a model.
         ctx.state[STATE_PREVIOUS_MODEL] = render_fenced(parked)
         ctx.state[STATE_VALIDATION_ISSUES] = render(
@@ -401,15 +423,67 @@ def reject_model(validation_issues: str, ctx) -> dict[str, Any]:
     return {"rejected": True}
 
 
-def prepare_analysis(valid_model: dict, ctx) -> dict[str, Any]:
-    """Derive boundary crossings and render the analysts' shared view.
+# Element fields stripped from the model rendered to the six category agents
+# and the critic. They survive on STATE_VALID_MODEL, so the report still
+# carries them.
+_ELEMENT_SOURCE_FIELDS = ("source_excerpt", "source_label", "source_speaker")
 
-    Crossings are computed here rather than extracted, so no analyst can be
-    handed a crossing that contradicts the zones in the model it is reading.
+
+def _without_source_fields(valid_model: dict) -> dict:
+    """The model as a reasoning view: every element's own quote removed.
+
+    Two reasons, and the second is the one that matters. Once the full source
+    text is in the same request as ``{input_text}``, an element's excerpt is a
+    lossy duplicate of bytes already there. And leaving it in preserves exactly
+    the failure finding-level attribution was written against — an agent
+    reaching for the nearest excerpt instead of the span that actually
+    triggered its finding. Removing the shortcut is stronger than wording
+    against it, and it makes the two quotes structurally independent: an agent
+    cannot align its quote to an element's excerpt because it can no longer see
+    it. That disagreement is legitimate and ungoverned; the two spans are
+    chosen by different readers from different views.
+
+    Nothing is stranded. A quote ground must name its ``source_label``, and the
+    label rides *inside* each fence by construction, so every label a job
+    carries is visible in ``{input_text}``.
+
+    ``notes`` is deliberately untouched: the prompt binds it as context for the
+    needs-info question, and it is also what lets the critic recognise a quote
+    lifted out of a note — a quote the ladder cannot tell from a legitimate one,
+    because it *is* verbatim submitter text.
+
+    The honest cost: the bytes an agent saw are no longer the bytes the report
+    carries.
+    """
+    stripped = dict(valid_model)
+    for collection, entries in stripped.items():
+        if collection == "assumptions" or not isinstance(entries, list):
+            continue
+        stripped[collection] = [
+            {
+                field: value
+                for field, value in element.items()
+                if field not in _ELEMENT_SOURCE_FIELDS
+            }
+            for element in entries
+        ]
+    return stripped
+
+
+def prepare_analysis(valid_model: dict, ctx) -> dict[str, Any]:
+    """Derive boundary crossings and render the category agents' shared view.
+
+    Crossings are computed here rather than extracted, so no agent can be handed
+    a crossing that contradicts the zones in the model it is reading.
+
+    The rendered view is the *stripped* model — see
+    :func:`_without_source_fields`. The critic templates against this same key,
+    so it is stripped there too, and neither reads a submitter's words except
+    the ones a finding chose to quote.
     """
     model = SystemModel.model_validate(valid_model)
     crossings = model.boundary_crossings()
-    ctx.state[STATE_SYSTEM_MODEL] = render_fenced(valid_model)
+    ctx.state[STATE_SYSTEM_MODEL] = render_fenced(_without_source_fields(valid_model))
     ctx.state[STATE_BOUNDARY_CROSSINGS] = render(
         [crossing.model_dump(mode="json") for crossing in crossings]
     )
@@ -419,7 +493,7 @@ def prepare_analysis(valid_model: dict, ctx) -> dict[str, Any]:
 def _threats_of(payload: object) -> list[Any]:
     """The list inside an LLM node's emission, or empty if the node never ran.
 
-    The analyst and review nodes emit ``{"threats": [...]}`` rather than a bare
+    The category agent and review nodes emit ``{"threats": [...]}`` rather than a bare
     array, because a bare ``list[...]`` schema is one ADK cannot convert into a
     response format — it sends none and the node generates unconstrained. The
     wrapper is the schema's shape, not the domain's, so it is unwrapped here at
@@ -440,20 +514,30 @@ def _threats_of(payload: object) -> list[Any]:
     return threats if isinstance(threats, list) else []
 
 
-def merge_drafts(valid_model: dict, ctx) -> dict[str, Any]:
-    """Merge the six analysts' drafts into the single list the critic sees.
+def merge_drafts(
+    valid_model: dict, ctx, source_texts: dict | None = None
+) -> dict[str, Any]:
+    """Merge the six category agents' drafts into the single list the critic sees.
 
     The mechanical half of the fan-in: :func:`join_drafts` fails closed if a
-    draft cites an element the model does not contain or two analysts reused
-    a threat ID, so the critic spends judgement on evidence and lanes only.
+    draft cites an element the model does not contain, if two agents reused a
+    threat ID, if a grounds reference does not resolve, or if no ground on a
+    threat verifies at all — so the critic spends judgement on evidence, lanes
+    and whether a verbatim quote actually supports what it was filed under.
 
-    An analyst that emitted **nothing** fails the job here, before any of that.
+    It also returns what it could *not* verify: quote grounds absent from the
+    source they name are marked rather than dropped, and the marks are parked
+    for :func:`assemble_report` to carry into the report. ``source_texts``
+    defaults to ``None`` so the in-process engine, which drives a hand-authored
+    model with no job behind it, is not failed on a citation that is not wrong.
+
+    An agent that emitted **nothing** fails the job here, before any of that.
     Six lanes are what makes the output a STRIDE model rather than a list of
     findings, so a lane that never ran is not a smaller report — it is a
     different method, and one whose absence nothing downstream can see: the
     critic rules what it is given, ``build_summary`` counts what exists, and
     ``by_category`` omits a lane with no threats rather than carrying a zero. A
-    truncated analyst would delete a sixth of the analysis and finish green.
+    truncated agent would delete a sixth of the analysis and finish green.
 
     A lane that ran and found nothing is a different thing and stays legal — it
     emits ``{"threats": []}``, its key is written, and ``_threats_of`` reads it
@@ -463,29 +547,32 @@ def merge_drafts(valid_model: dict, ctx) -> dict[str, Any]:
     silent = [
         category
         for category in STRIDE_CATEGORIES
-        if ctx.state.get(analyst_state_key(category)) is None
+        if ctx.state.get(analyze_state_key(category)) is None
     ]
     if silent:
-        keys = ", ".join(repr(analyst_state_key(c)) for c in silent)
+        keys = ", ".join(repr(analyze_state_key(c)) for c in silent)
         raise SilentNodeError(
-            f"{len(silent)} of {len(STRIDE_CATEGORIES)} analysts wrote nothing"
-            f" ({keys}), so those STRIDE categories were never analyzed."
-            f" {_TRUNCATION_HINT}"
+            f"{len(silent)} of {len(STRIDE_CATEGORIES)} category agents wrote"
+            f" nothing ({keys}), so those STRIDE categories were never"
+            f" analyzed. {_TRUNCATION_HINT}"
         )
     model = SystemModel.model_validate(valid_model)
     drafts_by_category = {
         category: [
             DraftThreat.model_validate(draft)
-            for draft in _threats_of(ctx.state.get(analyst_state_key(category)))
+            for draft in _threats_of(ctx.state.get(analyze_state_key(category)))
         ]
         for category in STRIDE_CATEGORIES
     }
-    merged = join_drafts(drafts_by_category, model)
+    merged, unverified = join_drafts(drafts_by_category, model, source_texts or {})
     ctx.state[STATE_MERGED_DRAFTS] = [draft.model_dump(mode="json") for draft in merged]
+    ctx.state[STATE_UNVERIFIED_GROUNDS] = [
+        mark.model_dump(mode="json") for mark in unverified
+    ]
     ctx.state[STATE_DRAFT_THREATS] = render(
         [draft.model_dump(mode="json") for draft in merged]
     )
-    return {"draft_count": len(merged)}
+    return {"draft_count": len(merged), "unverified_count": len(unverified)}
 
 
 def route_review(
@@ -564,6 +651,7 @@ def assemble_report(
     merged_drafts: list,
     ctx,
     reviewed_threats: dict | None = None,
+    unverified_grounds: list | None = None,
 ) -> dict[str, Any]:
     """Build the report body deterministically from the critic's rulings.
 
@@ -577,6 +665,11 @@ def assemble_report(
     the same way. Nothing can route here without it — an absent ruling drops
     every draft, and dropped drafts are ``revise`` — so the default is
     unreachable rather than a fallback this node relies on.
+
+    ``unverified_grounds`` defaults because ``merge`` writes an empty list when
+    nothing failed and when the job carried no sources to check against, and an
+    empty list is indistinguishable from the absent key ADK would bind here.
+    Both mean the same thing: no quote was found wanting.
     """
     model = SystemModel.model_validate(valid_model)
     drafts = [DraftThreat.model_validate(draft) for draft in merged_drafts]
@@ -590,6 +683,9 @@ def assemble_report(
         boundary_crossings=model.boundary_crossings(),
         threats=threats,
         rejected_threats=rejected,
+        unverified_grounds=[
+            UnverifiedGround.model_validate(mark) for mark in unverified_grounds or []
+        ],
         summary=build_summary(threats, rejected, model),
     )
     ctx.state[STATE_ANALYSIS] = analysis.to_state()
@@ -696,27 +792,27 @@ def _extract_node(
 def _instruction(skills: str, prompt: str) -> str:
     """Skill text then prompt text: what to know, then what to do with it.
 
-    Stable-first order, so the six analysts and every job for one category
+    Stable-first order, so the six category agents and every job for one category
     share the longest possible cacheable prefix (tickets 006 and 013).
     """
     return f"{skills.strip()}\n\n{prompt.strip()}\n"
 
 
-def analyst_instruction(
+def analyze_instruction(
     skill_loader: MarkdownLoader,
     prompt_loader: MarkdownLoader,
     category: StrideCategory,
     domain_packs: Sequence[str] = (),
 ) -> str:
-    """One analyst's full instruction, with ``{category}`` already filled in.
+    """One category agent's full instruction, with ``{category}`` already filled in.
 
     ``{category}`` is the one placeholder resolved here rather than by ADK:
-    the six analysts run in parallel against a single session state, which
-    cannot hold six different values for one key. The job-varying
+    the six category agents run in parallel against a single session state,
+    which cannot hold six different values for one key. The job-varying
     placeholders stay for ADK to template.
     """
-    skills = compose_analyst_skills(skill_loader, category, tuple(domain_packs))
-    prompt = compose_analyst_prompt(prompt_loader, category)
+    skills = compose_analyze_skills(skill_loader, category, tuple(domain_packs))
+    prompt = compose_analyze_prompt(prompt_loader, category)
     return _instruction(skills, prompt.replace("{category}", category))
 
 
@@ -757,7 +853,7 @@ def build_pipeline(
     the end-to-end eval mode. ``"prepare"`` is the **analysis** eval mode: a
     blessed System Model is seeded at :data:`STATE_VALID_MODEL` and the
     extraction half is left out entirely, so threat numbers are attributable to
-    the analysts and critic rather than to an element ``extract`` never
+    the category agents and critic rather than to an element ``extract`` never
     produced. It is a parameter here, not a second topology in the eval tree,
     because two definitions of the same graph drift.
     """
@@ -799,14 +895,14 @@ def build_pipeline(
         resolve_sampling=resolve_sampling,
         resilience=resilience,
     )
-    analysts = [
+    agents = [
         _llm_node(
-            name=analyst_node_name(category),
-            instruction=analyst_instruction(
+            name=analyze_node_name(category),
+            instruction=analyze_instruction(
                 skill_loader, prompt_loader, category, domain_packs
             ),
             output_schema=DraftThreats,
-            output_key=analyst_state_key(category),
+            output_key=analyze_state_key(category),
             resolve_model=resolve_model,
             resolve_sampling=resolve_sampling,
             resilience=resilience,
@@ -853,15 +949,15 @@ def build_pipeline(
         name=name,
         edges=[
             *head_edges,
-            (prepare, tuple(analysts)),
-            *((analyst, join) for analyst in analysts),
+            (prepare, tuple(agents)),
+            *((agent, join) for agent in agents),
             (join, merge, critic, router),
             (router, {ROUTE_ACCEPT: assemble, ROUTE_REVISE: recritic}),
             (recritic, rereview),
             (rereview, {ROUTE_ACCEPT: assemble, ROUTE_REVISE: critic_failed}),
         ],
     )
-    llm_nodes = [*extraction_nodes, *analysts, critic, recritic]
+    llm_nodes = [*extraction_nodes, *agents, critic, recritic]
     return Pipeline(
         workflow=workflow,
         node_models={node.name: _model_name(node.model) for node in llm_nodes},

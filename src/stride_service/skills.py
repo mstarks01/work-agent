@@ -28,7 +28,7 @@ __all__ = [
     "SKILL_SECTION_HEADINGS",
     "STRIDE_CATEGORIES",
     "category_boundary_digest",
-    "compose_analyst_skills",
+    "compose_analyze_skills",
     "compose_critic_skills",
     "estimate_tokens",
     "extract_section",
@@ -70,7 +70,7 @@ def category_boundary_digest(loader: MarkdownLoader) -> str:
     return "\n\n".join(parts) + "\n"
 
 
-def compose_analyst_skills(
+def compose_analyze_skills(
     loader: MarkdownLoader,
     category: StrideCategory,
     domain_packs: tuple[str, ...] = (),

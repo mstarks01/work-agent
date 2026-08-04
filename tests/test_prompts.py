@@ -9,7 +9,7 @@ from stride_service.markdown_loader import (
 from stride_service.prompts import (
     PROMPT_BODY_NAMES,
     PROMPT_SECTION_HEADINGS,
-    compose_analyst_prompt,
+    compose_analyze_prompt,
     compose_critic_prompt,
     compose_extract_prompt,
     compose_repair_prompt,
@@ -28,7 +28,7 @@ def prompt_text(title, body="Body."):
 @pytest.fixture
 def prompts_root(tmp_path):
     for name in PROMPT_BODY_NAMES:
-        body = "Analyze as the {category} analyst." if name == "analyst" else "Body."
+        body = "Analyze as the {category} agent." if name == "analyze" else "Body."
         (tmp_path / f"{name}.md").write_text(prompt_text(name, body))
     exemplars = tmp_path / "exemplars"
     exemplars.mkdir()
@@ -56,30 +56,30 @@ class TestSharedLoader:
             loader.load("../outside")
 
 
-class TestComposeAnalystPrompt:
+class TestComposeAnalyzePrompt:
     def test_body_precedes_category_exemplars(self, loader):
-        composed = compose_analyst_prompt(loader, "tampering")
+        composed = compose_analyze_prompt(loader, "tampering")
         assert composed.index("## Role") < composed.index("Exemplars.")
 
     def test_only_the_requested_category_is_included(self, loader):
-        composed = compose_analyst_prompt(loader, "tampering")
+        composed = compose_analyze_prompt(loader, "tampering")
         assert "# tampering" in composed
         assert "# spoofing" not in composed
 
     def test_shared_body_is_identical_across_categories(self, loader):
         prefixes = {
-            compose_analyst_prompt(loader, category).split("# ")[1]
+            compose_analyze_prompt(loader, category).split("# ")[1]
             for category in STRIDE_CATEGORIES
         }
         assert len(prefixes) == 1
 
     def test_state_placeholders_survive_composition(self, loader):
-        assert "{category}" in compose_analyst_prompt(loader, "spoofing")
+        assert "{category}" in compose_analyze_prompt(loader, "spoofing")
 
     def test_missing_exemplar_file_fails_closed(self, loader, prompts_root):
         (prompts_root / "exemplars" / "spoofing.md").unlink()
         with pytest.raises(MarkdownNotFoundError):
-            compose_analyst_prompt(loader, "spoofing")
+            compose_analyze_prompt(loader, "spoofing")
 
 
 class TestComposePeerPrompts:
