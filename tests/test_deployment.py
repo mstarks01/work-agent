@@ -54,7 +54,7 @@ def test_from_env_resolves_the_repo_configs_without_credentials():
     """Reading config is cheap and credential-free; that is why it is eager."""
     deployment = Deployment.from_env(env=VERTEX_TIERS)
 
-    assert deployment.tiers.version == 3
+    assert deployment.tiers.version == 4
     assert set(deployment.sampling.tiers) == {"base", "strong"}
     assert deployment.resilience.attempts >= 1
     assert deployment.manifest.version == 2

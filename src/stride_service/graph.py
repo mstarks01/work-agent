@@ -46,9 +46,12 @@ Every LLM node binds its model through the caller's ``resolve_model`` (the
 canonical names in :data:`stride_service.model_tiers.LLM_NODES`), its skills
 through :mod:`stride_service.skills`, and its prompt through
 :mod:`stride_service.prompts`. Graph node names must be Python identifiers,
-so ``analyst/information-disclosure`` in the tier config is
+so ``analyze/information-disclosure`` in the tier config is
 ``analyst_information_disclosure`` here; :data:`TIER_NODE_BY_GRAPH_NODE` is
-the only place that correspondence lives.
+the only place that correspondence lives. The two halves are mid-cutover and
+deliberately so: the tier keys moved with ``config/model_tiers.toml`` v4, and
+the graph names move with the report schema, since renaming those is what a
+consumer reading ``nodes[].node`` would otherwise misread in silence.
 
 The bookends are deliberately deterministic, because mechanical work belongs in
 code: analysts cannot receive a malformed view, and the report cannot cite an
@@ -157,7 +160,7 @@ TIER_NODE_BY_GRAPH_NODE: dict[str, str] = {
     CRITIC_NODE: "critic",
     RECRITIC_NODE: "recritic",
     **{
-        analyst_node_name(category): f"analyst/{category}"
+        analyst_node_name(category): f"analyze/{category}"
         for category in STRIDE_CATEGORIES
     },
 }
