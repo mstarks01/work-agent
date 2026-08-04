@@ -37,6 +37,14 @@ from evals.harness.critic_yield import (
     aggregate_yield,
     score_case_with_yield,
 )
+from evals.harness.grounds import (
+    CAUGHT,
+    CaseGrounds,
+    GroundsFailure,
+    aggregate_grounds,
+    classify_failure,
+    measure_grounds,
+)
 from evals.harness.judge import Judge, PinnedJudge, load_judge_config
 from evals.harness.reference import GoldenCase, load_corpus
 from evals.harness.scorer import (
@@ -88,6 +96,10 @@ class ModeRun:
     every execution within a case. A sweep is the only place a real per-node
     number comes from — a single job's numbers are one sample of one system —
     so it is folded here rather than left to whoever reads the artifact.
+
+    ``grounds`` and ``grounds_failures`` are the two halves of the same
+    instrument: what the cases that finished did with ``grounds``, and what the
+    cases that did not finished on. A case appears in exactly one of them.
     """
 
     payloads: list[dict[str, Any]]
@@ -96,6 +108,8 @@ class ModeRun:
     observations: dict[str, frozenset[str]]
     expected_nodes: list[str]
     usage: dict[str, TokenUsage]
+    grounds: list[CaseGrounds]
+    grounds_failures: list[GroundsFailure]
 
 
 def _observe(observed: dict[str, set[str]], nodes: Iterable[NodeRun]) -> None:
@@ -113,6 +127,14 @@ async def _run_mode(
     than from the report: the extraction mode produces no report, and sourcing
     observations from one would leave the single tier that mode exercises the
     only tier it could never certify.
+
+    A case whose drafts the fan-in rejects is **counted and survived** rather
+    than allowed to abort the sweep — a mis-shaped ``Ground`` and a threat that
+    loses every ground are both rates somebody asked for, and a sweep that dies
+    on the first one reports neither. It stays a Tier 1 failure: the case is
+    recorded, its failure is listed, and the run still exits non-zero. Only the
+    fan-in's own exceptions are caught (:data:`~evals.harness.grounds.CAUGHT`);
+    a provider timeout is not a measurement and still ends the sweep.
     """
     pipeline = modes.build_eval_pipeline(
         modes.MODE_ENTRIES[mode], deployment=deployment
@@ -124,6 +146,8 @@ async def _run_mode(
     # Every execution the sweep performed, kept flat so the per-node totals
     # come from the one tested fold rather than a second one written here.
     executions: list[NodeRun] = []
+    grounds: list[CaseGrounds] = []
+    grounds_failures: list[GroundsFailure] = []
 
     for case in cases:
         if mode == "extraction":
@@ -139,17 +163,39 @@ async def _run_mode(
             ]
             continue
 
-        run = (
-            await modes.run_analysis(case, pipeline)
-            if mode == "analysis"
-            else await modes.run_end_to_end(case, pipeline)
-        )
+        try:
+            run = (
+                await modes.run_analysis(case, pipeline)
+                if mode == "analysis"
+                else await modes.run_end_to_end(case, pipeline)
+            )
+        except CAUGHT as error:
+            failure = classify_failure(case.id, error)
+            grounds_failures.append(failure)
+            failures.append(f"{case.id}: {failure.kind}: {failure.detail}")
+            payloads.append({"case": case.id, "grounds_failure": failure.to_json()})
+            continue
+
         runs[case.id] = run
         _observe(observed, run.report.nodes)
         executions += run.report.nodes
         issues = report_issues(run.report)
         failures += [f"{case.id}: {issue}" for issue in issues]
-        payloads.append({"case": case.id, "structural_issues": issues})
+        measurement = measure_grounds(
+            case.id, run.merged_drafts, run.report.unverified_grounds
+        )
+        grounds.append(measurement)
+        # The measurement rides in the artifact rather than being recomputed
+        # from it later: the report stays in memory and never reaches
+        # ``mode_output``, so a number not written here is a number nobody can
+        # recover from a finished sweep.
+        payloads.append(
+            {
+                "case": case.id,
+                "structural_issues": issues,
+                "grounds": measurement.to_json(),
+            }
+        )
 
     return ModeRun(
         payloads=payloads,
@@ -158,6 +204,8 @@ async def _run_mode(
         observations={node: frozenset(prints) for node, prints in observed.items()},
         expected_nodes=list(pipeline.node_sampling),
         usage=usage_by_node(executions),
+        grounds=grounds,
+        grounds_failures=grounds_failures,
     )
 
 
@@ -250,6 +298,47 @@ def _print_yields(yields: Sequence[CriticYield]) -> None:
         )
 
 
+def _print_grounds(
+    measurements: Sequence[CaseGrounds], failures: Sequence[GroundsFailure]
+) -> None:
+    """The three measurements, printed with the branch mix beside the rates.
+
+    ``quoteless`` is on the same line as the rates and is not a fault:
+    ``analyze.md``'s branch rule predicts a real share of findings whose
+    trigger was an unknown or a crossing rather than the submitter's words.
+    Read low with suspicion, not high.
+    """
+    for entry in measurements:
+        counts = entry.kind_counts
+        print(
+            f"{entry.case_id:<26} grounds {entry.ground_count}"
+            f" on {entry.threat_count} threats ({entry.grounds_per_threat:.2f} ea)"
+            f"  q/u/d {counts['quote']}/{counts['unknown-attribute']}"
+            f"/{counts['derived-fact']}"
+            f"  quoteless {entry.quoteless_rate:.0%}"
+            f"  unverified {entry.unverified_count}/{entry.quote_count}"
+        )
+    for failure in failures:
+        scope = (
+            f": {len(failure.threat_ids)}/{failure.draft_count} threats"
+            if failure.kind == "fail-closed"
+            else ""
+        )
+        print(f"{failure.case_id:<26} grounds FAILED ({failure.kind}{scope})")
+    if measurements or failures:
+        totals = aggregate_grounds(measurements, failures)
+        print(
+            f"grounds: {totals['grounds_per_threat']:.2f} per threat,"
+            f" quoteless {totals['quoteless_rate']:.0%},"
+            f" unverified {totals['unverified_rate']:.1%},"
+            f" failed cases {totals['failed_cases']}"
+            f" (mis-shape {totals['mis_shape_cases']},"
+            f" fail-closed {totals['fail_closed_cases']},"
+            f" other {totals['other_failed_cases']})"
+            " (instrument, non-gating)"
+        )
+
+
 def command_run(args: argparse.Namespace) -> int:
     cases = _select(load_corpus(args.corpus), args.case)
     # One deployment for the whole sweep: the graph it runs, the manifest it is
@@ -273,6 +362,10 @@ def command_run(args: argparse.Namespace) -> int:
     # Both halves, never ``certified`` alone: it is narrow by design and is
     # vacuously true of a sweep that observed no fingerprint at all.
     trusted = certification.certified and certification.complete
+
+    # Before the judge, and unconditional: the grounds measurements cost no
+    # provider call, so ``--no-scoring`` still emits them.
+    _print_grounds(mode_run.grounds, mode_run.grounds_failures)
 
     scores: list[CaseScore] = []
     yields: list[CriticYield] = []
@@ -304,6 +397,15 @@ def command_run(args: argparse.Namespace) -> int:
         "exemplar_delta": exemplar_delta(scores) if scores else None,
         "critic_yield": [entry.to_json() for entry in yields],
         "critic_yield_aggregate": aggregate_yield(yields) if yields else None,
+        "grounds": [entry.to_json() for entry in mode_run.grounds],
+        "grounds_failures": [
+            failure.to_json() for failure in mode_run.grounds_failures
+        ],
+        "grounds_aggregate": (
+            aggregate_grounds(mode_run.grounds, mode_run.grounds_failures)
+            if mode_run.grounds or mode_run.grounds_failures
+            else None
+        ),
         "unlisted_for_promotion": unlisted_for_promotion(scores),
     }
     if args.out:
