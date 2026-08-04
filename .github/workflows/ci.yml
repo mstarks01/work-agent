@@ -48,6 +48,18 @@ jobs:
       - name: Install dependencies
         run: uv sync --locked
 
+      # Ruff's rule selection is its default set, held stable by the exact pin
+      # in the uv.lock installed above — see the note in pyproject.toml.
+      - name: Lint
+        run: uv run ruff check .
+
+      # Markdown is excluded because ruff would reformat the illustrative code
+      # fences in docs/ — schema sketches whose aligned trailing comments are
+      # prose, not source. The formatter's one source-tree exemption
+      # (evals/judge_calibration/build_pairs.py) lives in pyproject.toml.
+      - name: Format
+        run: uv run ruff format --check . --exclude '*.md'
+
       - name: Corpus lints
         run: uv run python evals/verify_corpus.py
 
