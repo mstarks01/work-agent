@@ -59,7 +59,7 @@ def config_path(tmp_path):
 
 
 class TestNodeInventory:
-    def test_llm_nodes_are_bookends_plus_analysts_plus_critic(self):
+    def test_llm_nodes_are_bookends_plus_category_agents_plus_critic(self):
         assert LLM_NODES[:2] == ("extract", "repair")
         # The critic and its bounded re-ask close the list.
         assert LLM_NODES[-2:] == ("critic", "recritic")

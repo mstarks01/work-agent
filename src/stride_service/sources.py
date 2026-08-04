@@ -258,7 +258,7 @@ def fence_for(body: str) -> str:
     run anywhere in the body is enough — and is what makes a hostile transcript
     carrying its own fence stay inside the block.
 
-    Shared with the seam that renders the System Model into an analyst prompt:
+    Shared with the seam that renders the System Model into a category agent's prompt:
     ``json.dumps`` escapes quotes and newlines but **not** backticks, so a
     ``notes`` or ``source_excerpt`` value that carries a fence would otherwise
     close a static one node downstream of here.

@@ -344,7 +344,7 @@ async def execute_job(
     operator's alert cannot.
 
     A partial run is never a partial report. The deadline path stores no
-    ``report`` at all — six analyst lanes are what makes the output a STRIDE
+    ``report`` at all — six category lanes are what makes the output a STRIDE
     model, and one that stopped halfway is a different method, not a shorter
     answer.
     """

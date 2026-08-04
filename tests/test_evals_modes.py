@@ -127,7 +127,7 @@ def test_analysis_mode_injects_the_blessed_model_at_prepare(case):
 
     report = asyncio.run(modes.run_analysis(case, pipeline)).report
 
-    # No extraction ran, and the analysts saw exactly the blessed model — the
+    # No extraction ran, and the category agents saw exactly the blessed model — the
     # whole point of the mode.
     assert "extract" not in models
     assert report.system_model == case.model

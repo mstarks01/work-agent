@@ -71,7 +71,7 @@ class MarkdownLoader:
     """Loads Markdown from a directory of files.
 
     Names are root-relative POSIX paths without the ``.md`` suffix, e.g.
-    ``"stride/spoofing"``, ``"shared/severity_rubric"``, ``"analyst"`` or
+    ``"stride/spoofing"``, ``"shared/severity_rubric"``, ``"analyze"`` or
     ``"exemplars/tampering"``. This is the canonical directory-in,
     named-items-out interface for the service, used for both skills and
     prompts.

@@ -15,7 +15,7 @@ and a param LiteLLM is never told cannot be caught by its fail-closed
   layer up, in :mod:`stride_service.retry` — but because this is the kwarg that
   keeps the library's own retry layer, and the provider SDK's beneath it, down
   to exactly one request per call. Left at ``attempts - 1`` it multiplied to
-  ``2 * attempts - 1`` requests per node, uncoordinated across the six analysts,
+  ``2 * attempts - 1`` requests per node, uncoordinated across the six category agents,
   which is the burst that turns one 429 into a storm. The adapters this module
   builds are :func:`~stride_service.retry.retrying_llm_class` subclasses sharing
   one process-wide budget.
@@ -238,7 +238,7 @@ def build_tier_adapters(
     assert_kwarg_supported(_NUM_RETRIES_KWARG)
 
     # One policy, so one budget, shared by both tiers and every node on them.
-    # A per-tier budget would let the six analysts storm the strong tier while
+    # A per-tier budget would let the six category agents storm the strong tier while
     # the base tier's untouched allowance sat beside it; a storm is a property
     # of the process, not of a tier. Capacity is one retry per LLM node in the
     # graph — what a single job may spend from a cold bucket.

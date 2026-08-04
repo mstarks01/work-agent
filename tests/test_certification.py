@@ -25,7 +25,7 @@ FP_A = "a" * 64
 FP_B = "b" * 64
 FP_C = "c" * 64
 
-# extract/repair run on base; the analysts, critic and recritic on strong.
+# extract/repair run on base; the category agents, critic and recritic on strong.
 _TIERS = {"extract": "base", "repair": "base", "critic": "strong",
           "recritic": "strong", "analyze_spoofing": "strong"}
 ALL_NODES = tuple(_TIERS)
