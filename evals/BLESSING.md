@@ -180,7 +180,7 @@ bar**, and they're what lets the scorer be tested with no live calls at all.
   matches: matching is decided on the claim, and element agreement is scored
   separately.
 - **Include candidates that assert facts the model doesn't support.** Those are
-  no-match — and downstream they're the "ungrounded" bucket that counts against
+  no-match — and downstream they're the "unsupported" bucket that counts against
   the tool.
 - **Keep the set balanced;** `verify_corpus.py` fails if either label drops below
   30%.
