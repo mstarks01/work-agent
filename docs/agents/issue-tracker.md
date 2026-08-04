@@ -55,13 +55,80 @@ gh api --method POST repos/mstarks01/work-agent/issues/<child>/dependencies/bloc
 
 ### The live map
 
-None. [#49](https://github.com/mstarks01/work-agent/issues/49) completed 2026-07-31 and has
-moved to Completed efforts below; its spec was implemented and merged 2026-08-01.
-Chart a new one only under the bar at the end of this file.
+**None.** [#76](https://github.com/mstarks01/work-agent/issues/76) completed 2026-08-04 and has
+moved to Completed efforts below. Chart a new one only against the bar at the end of this file.
 
 ### Completed efforts
 
 Completed on GitHub Issues (canonical):
+
+- [#76 — Map: tie every finding back to the input text that justifies it](https://github.com/mstarks01/work-agent/issues/76)
+  — 9 tickets, charted 2026-08-03 and completed 2026-08-04. A **planning** map: it settled the
+  spec for **finding-level attribution** — every threat carrying a non-empty, machine-checkable
+  record of what justifies it — and stopped at the spec. **Not yet implemented.** The
+  implementation is a cutover whose plan is [#85](https://github.com/mstarks01/work-agent/issues/85);
+  the live corpus sweep it needs is filed as
+  [#87](https://github.com/mstarks01/work-agent/issues/87), open. Read #85 first — it carries the
+  order of operations — then #77 for the vocabulary the whole repo inherits, then the other seven
+  resolution comments.
+
+  **#77 fixes vocabulary that reaches every file.** The record is `grounds: list[Ground]` with
+  kinds `quote` / `unknown-attribute` / `derived-fact`; *finding-level attribution* is the concept
+  name, `grounds` the field, kept clear of `attribute` and of the two live senses of
+  "attribution". And **`Analyst` now names a human**: the six agents become **category agents** —
+  `analyze/<category>` in `config/model_tiers.toml`, `analyze_<category>` as graph node and in
+  report `nodes[].node`, `prompts/analyze.md`.
+
+  The route in one pass. `Ground` is **one flat model** — `kind` plus every branch's fields,
+  defaulted `""`, with a `_check_shape` validator requiring its own branch's fields and forbidding
+  the others, reusing `Verdict`'s pattern (#79). The discriminated union was the more honest shape
+  and lost to a measured fact: provider schema compilers are the unpredictable part of this system
+  and this rides in six `strong`-tier requests. Branches: **quote** = `text` (1000) +
+  `source_label`; **unknown-attribute** = `element_id` + `attribute`, a separate type from
+  `UnknownRef`; **derived-fact** = `flow_id` alone, no free-text escape hatch. `schema_version` →
+  **2.0**, one bump for the whole cutover, earned by #77's silently-breaking node rename.
+  Quote verification is **substring-per-fragment under a five-step pinned ladder** run in
+  `join_drafts` (#80): exact substring rejects **78.2%** of 206 corpus excerpts because the
+  sources are hard-wrapped, whitespace collapse alone takes that to 1.0%, and the pinned ladder
+  leaves **0 false rejections** plus one true one. Consequence is **marked per entry, closed per
+  threat** — an unverifiable quote still renders, and the job fails closed only when *no* ground
+  on a threat verifies. `source_excerpt` **survives with its job restated** (#81): the excerpt
+  answers why the element exists, grounds why the threat was raised. Instruction is a **Procedure
+  step** in `analyze.md`, once and always-on (#82), and **the branch follows the trigger rather
+  than being chosen**, so a threat carrying no quote is *correct*. The critic **reviews** grounds,
+  **cannot touch** them, and sees **no submitter text**; its only lever is `confidence` as a
+  **downgrade-only** modifier, never `verdict` (#83). Grounds render **after** the analysis as a
+  kind-coded rail under Affected elements, an unverified quote losing its quotation marks and
+  naming the failure in visible text (#84). Render safety is settled without touching the schema
+  (#78): untrusted text never reaches `innerHTML`, and the report page gains a **strict nonce
+  CSP**. The corpus **does not change** — all 224 reference threats stay untouched, because
+  `ReferenceThreat` deliberately does not carry what it does not grade (#85).
+
+  Three findings outlived their tickets. **Resolving #78 found a live stored XSS on `main`** in
+  the element table's attrs column, filed off-map as
+  [#86](https://github.com/mstarks01/work-agent/issues/86) and fixed on
+  `fix/escape-element-attrs`; #78's rule supersedes that fix at implementation time. **Resolving
+  #81 found that a category agent never sees the submitter's source text**, which made the map's
+  own settled decision 1 unimplementable — `analyze.md` gains `{input_text}` and
+  `prepare_analysis` strips the three source fields from the model rendered to the agents *and*
+  the critic. And **#85 found the eval side's `ungrounded` metric collides with the new field** —
+  it means *hallucinated*, not *carrying no grounds* — renaming it `unsupported` across 96 sites.
+
+  Corrections worth knowing: #80 corrected #79 on a mechanism — **there is no draft repair path**,
+  so a bad draft raises out of `merge_drafts` and fails the job. #83 corrected #79's record —
+  `related_unknowns` does have a referential check today, the `element_id` half. #85 corrected its
+  own ticket twice: the exemplar guard is `tests/test_prompt_lints.py`, not
+  `test_corpus_lints.py`, and reference grounding was assumed to be the bulk of the work when it
+  is none of it.
+
+  **PII residue** is the one thing ruled out of scope on closing, inherited from #49's fog: grounds
+  put more submitted prose and more speaker names on screen, and only `source_speaker` is
+  strippable. Provenance weighting by source kind and service-side retention of submitted text
+  were ruled out while charting.
+
+  Prototypes: `prototype/quote-verification` @ `6ed8d77` (#80's measurement, re-runnable) and
+  `prototype/grounds-display` @ `94bac96` (#84's three variants, losers included). Both throwaway
+  and both due the `archive/` tag treatment described at the end of this section.
 
 - [#49 — Map: accept call transcripts as job input](https://github.com/mstarks01/work-agent/issues/49)
   — 10 tickets, charted and completed 2026-07-31. A **planning** map: it settled the spec for
