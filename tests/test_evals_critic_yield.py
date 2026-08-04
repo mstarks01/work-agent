@@ -1,7 +1,7 @@
 """Critic yield, offline, with zero provider calls.
 
 The instrument has one job: say what the critic killed *and* what killing it
-cost. These tests hold the two halves apart — a critic that kills an ungrounded
+cost. These tests hold the two halves apart — a critic that kills an unsupported
 draft and a critic that kills a must-find draft must never produce the same
 number — and pin the two properties the whole measurement rests on: the judged
 claim is the same string on both sides, and the post-critic score is exactly
@@ -95,22 +95,22 @@ def test_needs_info_bypass_still_applies_to_ruled_threats(case):
     assert score.adjudicated == ()
 
 
-def test_killing_an_ungrounded_draft_is_the_critic_earning_its_cost(case):
+def test_killing_an_unsupported_draft_is_the_critic_earning_its_cost(case):
     kept = _draft_for(_must_find(case), 1)
     junk = draft_threat(
         9, "tampering", "An attacker edits a table that does not exist."
     )
-    judge = _identity_judge([kept], buckets={junk.id: "ungrounded"})
+    judge = _identity_judge([kept], buckets={junk.id: "unsupported"})
 
     scored = score_case_with_yield(case, [kept, junk], [promote(kept)], judge)
     result = scored.critic_yield
 
     assert [entry.threat_id for entry in result.killed] == [junk.id]
-    assert result.killed[0].disposition == "ungrounded"
-    assert result.ungrounded_killed == 1
+    assert result.killed[0].disposition == "unsupported"
+    assert result.unsupported_killed == 1
     assert result.matched_killed == 0
     assert result.kill_precision == 1.0
-    assert result.ungrounded_kill_rate == 1.0
+    assert result.unsupported_kill_rate == 1.0
 
 
 def test_killing_a_matched_draft_is_the_number_that_can_veto_the_pattern(case):
@@ -123,7 +123,7 @@ def test_killing_a_matched_draft_is_the_number_that_can_veto_the_pattern(case):
 
     # The same kill count as the test above, and it means the opposite thing.
     assert result.kill_count == 1
-    assert result.ungrounded_killed == 0
+    assert result.unsupported_killed == 0
     assert result.matched_killed == 1
     assert result.must_find_killed == 1
     assert result.matched_kill_rate == 1.0
@@ -240,7 +240,7 @@ def test_aggregate_pools_counts_rather_than_averaging_rates(case):
         case,
         [kept, junk],
         [promote(kept)],
-        _identity_judge([kept], buckets={junk.id: "ungrounded"}),
+        _identity_judge([kept], buckets={junk.id: "unsupported"}),
     ).critic_yield
     small = score_case_with_yield(
         case, [kept], [promote(kept)], _identity_judge([kept])
@@ -251,7 +251,7 @@ def test_aggregate_pools_counts_rather_than_averaging_rates(case):
     assert totals["cases"] == 2
     assert totals["drafts_in"] == 3
     assert totals["killed"] == 1
-    assert totals["ungrounded_killed"] == 1
+    assert totals["unsupported_killed"] == 1
     # Pooled: 1 kill in 3 drafts, not the mean of 50% and 0%.
     assert totals["kill_rate"] == round(1 / 3, 3)
 
@@ -270,15 +270,15 @@ def test_the_cli_reports_both_sides_per_case_and_pooled(case, capsys):
         report=_report_with(case, [promote(kept)]),
         merged_drafts=(kept, junk),
     )
-    judge = _identity_judge([kept], buckets={junk.id: "ungrounded"})
+    judge = _identity_judge([kept], buckets={junk.id: "unsupported"})
 
     scores, yields = run._score_runs([case], {case.id: analysis}, judge)
     run._print_yields(yields)
 
     assert [score.case_id for score in scores] == [case.id]
-    assert yields[0].ungrounded_killed == 1
+    assert yields[0].unsupported_killed == 1
     printed = capsys.readouterr().out
-    assert "killed-ungrounded 1/1" in printed
+    assert "killed-unsupported 1/1" in printed
     assert "killed-real 0/1" in printed
 
 
@@ -315,6 +315,6 @@ def test_an_untouched_critic_yields_nothing_and_breaks_nothing(case):
 
     assert result.killed == ()
     assert result.kill_rate == 0.0
-    assert result.ungrounded_kill_rate == 0.0
+    assert result.unsupported_kill_rate == 0.0
     assert result.matched_kill_rate == 0.0
     assert result.to_json()["counts"]["drafts_in"] == 1

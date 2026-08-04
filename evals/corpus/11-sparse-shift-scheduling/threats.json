@@ -93,7 +93,7 @@
       "likelihood": "low",
       "impact": "medium"
     },
-    "notes": "Encryption in transit is stated as undocumented, not as absent; an analyst asserting there is no TLS here is ungrounded."
+    "notes": "Encryption in transit is stated as undocumented, not as absent; an analyst asserting there is no TLS here is unsupported."
   },
   {
     "category": "repudiation",

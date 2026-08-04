@@ -127,24 +127,24 @@ def test_unmatched_is_never_counted_as_a_false_positive(case):
     score = score_case(case, produced, judge)
 
     assert score.bucket_counts == {
-        "ungrounded": 0,
+        "unsupported": 0,
         "valid-unlisted": 1,
         "noise": 0,
     }
-    assert score.ungrounded_rate == 0.0
+    assert score.unsupported_rate == 0.0
     assert unlisted_for_promotion([score])[0]["claim"] == (
         "A grounded but unlisted claim."
     )
 
 
-def test_ungrounded_is_the_gating_bucket(case):
+def test_unsupported_is_the_gating_bucket(case):
     produced = [produced_threat(1, "spoofing", "An attacker abuses a made-up service.")]
-    judge = ScriptedJudge(buckets={"S-01": "ungrounded"})
+    judge = ScriptedJudge(buckets={"S-01": "unsupported"})
 
     score = score_case(case, produced, judge)
 
-    assert score.bucket_counts["ungrounded"] == 1
-    assert score.ungrounded_rate == 1.0
+    assert score.bucket_counts["unsupported"] == 1
+    assert score.unsupported_rate == 1.0
 
 
 def test_needs_info_threats_bypass_adjudication(case):
