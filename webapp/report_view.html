@@ -4,7 +4,7 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>STRIDE Report — Orders Service</title>
-<style>
+<style nonce="__CSP_NONCE__">
   /* Palette roles (dataviz reference instance). Status hues are fixed, never themed. */
   .viz-root {
     color-scheme: light;
@@ -90,7 +90,7 @@
   .cat { font-size: 0.72rem; text-transform: uppercase; letter-spacing: 0.06em; color: var(--ink-2); }
   .desc { margin: 10px 0 12px; color: var(--ink-2); font-size: 0.92rem; }
 
-  .badges { display: flex; gap: 8px; flex-wrap: wrap; align-items: center; }
+  .badges { display: flex; gap: 8px; flex-wrap: wrap; align-items: center; margin-top: 10px; }
   .chip { display: inline-flex; align-items: center; gap: 6px; font-size: 0.75rem; font-weight: 600;
     padding: 3px 9px; border-radius: 999px; border: 1px solid var(--border); white-space: nowrap; }
   .chip .swatch { width: 9px; height: 9px; border-radius: 50%; flex: none; }
@@ -122,6 +122,13 @@
     border-radius: 8px; padding: 4px 10px; }
   .node b { font-weight: 600; color: var(--ink); }
   .node .m { color: var(--muted); font-family: ui-monospace, SFMono-Regular, Menlo, monospace; }
+
+  /* Spacing that used to ride in style="" attributes. The report page runs
+     under a strict nonce CSP with no 'unsafe-inline', which blocks inline
+     style attributes; a class costs nothing and a generated one-off colour
+     goes through element.style.* instead, which CSP does not govern. */
+  .mixwrap { margin-top: 18px; }
+  .belowtable { margin-top: 12px; }
 </style>
 </head>
 <body>
@@ -138,7 +145,7 @@
 
     <h2>Summary</h2>
     <div class="tiles" id="tiles"></div>
-    <div style="margin-top:18px">
+    <div class="mixwrap">
       <div class="mix" id="mix"></div>
       <div class="mixlegend" id="mixlegend"></div>
     </div>
@@ -153,8 +160,8 @@
     <table id="elements"><thead><tr>
       <th>Type</th><th>ID</th><th>Name</th><th>Trust zone</th><th>Key attributes</th>
     </tr></thead><tbody></tbody></table>
-    <div id="crossings" style="margin-top:12px"></div>
-    <div id="assumptions" style="margin-top:12px"></div>
+    <div id="crossings" class="belowtable"></div>
+    <div id="assumptions" class="belowtable"></div>
 
     <h2>Pipeline</h2>
     <div class="nodes" id="nodes"></div>
@@ -163,13 +170,31 @@
 
 <!-- webapp/main.py replaces the contents of the block below with the run's
      report JSON, every `<` escaped, before serving this page. -->
-<script type="application/json" id="report">{}</script>
+<script type="application/json" id="report" nonce="__CSP_NONCE__">{}</script>
 
-<script>
+<script nonce="__CSP_NONCE__">
+  // Every string in R is untrusted: model-authored from the submitter's own
+  // prose, or supplied by the caller. None of it is escaped for HTML.
+  //
+  // So nothing on this page interpolates a value into innerHTML. Text goes in
+  // as textContent and structure is built as DOM nodes — which is why there is
+  // no escape helper here to forget to call. That discipline had already
+  // failed once, unnoticed, in the element table's attribute column. Forgetting
+  // `textContent` now shows junk on screen instead of executing script.
+  //
+  // `append` is the primitive that makes this cheap: it takes nodes and
+  // strings, and a string always becomes a text node, never markup.
   const R = JSON.parse(document.getElementById("report").textContent);
   const $ = (id) => document.getElementById(id);
-  const el = (t, cls, html) => { const n = document.createElement(t); if (cls) n.className = cls; if (html != null) n.innerHTML = html; return n; };
-  const esc = (s) => String(s).replace(/[&<>]/g, c => ({ "&":"&amp;", "<":"&lt;", ">":"&gt;" }[c]));
+  const el = (tag, cls, text) => {
+    const n = document.createElement(tag);
+    if (cls) n.className = cls;
+    if (text != null) n.textContent = text;
+    return n;
+  };
+  const code = (text) => el("code", null, text);
+  const lbl = (text) => el("span", "lbl", text);
+  const cell = (...kids) => { const n = el("td"); n.append(...kids); return n; };
 
   const SEV = { critical: ["Critical","--sev-critical"], high: ["High","--sev-high"], medium: ["Medium","--sev-medium"], low: ["Low","--sev-low"] };
   const SEV_ORDER = ["critical","high","medium","low"];
@@ -179,7 +204,9 @@
   // header
   $("sysname").textContent = R.input.system_name;
   const fmt = (t) => new Date(t).toISOString().replace("T"," ").replace(".000Z"," UTC");
-  $("jobmeta").innerHTML = `Job <code>${esc(R.job.id)}</code> · ${esc(R.job.status)} · ${fmt(R.job.completed_at)} · schema ${esc(R.schema_version)}`;
+  $("jobmeta").append(
+    "Job ", code(R.job.id), ` · ${R.job.status} · ${fmt(R.job.completed_at)} · schema ${R.schema_version}`
+  );
   $("disclaimer").textContent = R.disclaimer;
 
   // stat tiles
@@ -189,14 +216,17 @@
     [R.summary.rejected_count, "Rejected"],
     [R.summary.elements_analyzed, "Elements analysed"],
   ];
-  tiles.forEach(([n, k]) => { const t = el("div","tile"); t.append(el("div","n",String(n)), el("div","k",esc(k))); $("tiles").append(t); });
+  tiles.forEach(([n, k]) => { const t = el("div","tile"); t.append(el("div","n",String(n)), el("div","k",k)); $("tiles").append(t); });
 
   // severity mix bar (only levels present, in severity order) with direct-labelled legend
   const present = SEV_ORDER.filter(l => R.summary.by_severity[l]);
   const total = present.reduce((a,l) => a + R.summary.by_severity[l], 0) || 1;
   present.forEach(l => { const s = el("span"); s.style.flex = R.summary.by_severity[l]; s.style.background = svar(l); $("mix").append(s); });
   present.forEach(l => {
-    const item = el("div"); item.innerHTML = `<span class="swatch" style="background:${svar(l)}"></span>${SEV[l][0]} · ${R.summary.by_severity[l]}`;
+    const item = el("div");
+    const swatch = el("span", "swatch");
+    swatch.style.background = svar(l);
+    item.append(swatch, `${SEV[l][0]} · ${R.summary.by_severity[l]}`);
     $("mixlegend").append(item);
   });
 
@@ -204,34 +234,51 @@
     const card = el("div", "card" + (rejected ? " rejected" : ""));
     card.style.borderLeftColor = svar(t.severity.level);
     const head = el("div","card-head");
-    head.append(el("h3", null, esc(t.title)), el("span","tid", esc(t.id)));
+    head.append(el("h3", null, t.title), el("span","tid", t.id));
     card.append(head);
-    card.append(el("div","cat", esc(t.category)));
+    card.append(el("div","cat", t.category));
 
-    const badges = el("div","badges"); badges.style.marginTop = "10px";
-    const sev = el("span","chip"); sev.innerHTML = `<span class="swatch" style="background:${svar(t.severity.level)}"></span>${SEV[t.severity.level][0]}`;
+    const badges = el("div","badges");
+    const sev = el("span","chip");
+    const sevSwatch = el("span","swatch");
+    sevSwatch.style.background = svar(t.severity.level);
+    sev.append(sevSwatch, SEV[t.severity.level][0]);
+    // A property assignment, not an attribute: there is no markup context to
+    // escape out of, which is why no quote handling is needed anywhere here.
     sev.title = `likelihood ${t.severity.likelihood} × impact ${t.severity.impact} → ${t.severity.level}`;
     const [vlabel, vglyph] = VERDICT[t.verdict.status];
     const vd = el("span","chip verdict", `${vglyph} ${vlabel}`);
-    const conf = el("span","chip confidence", `confidence: ${esc(t.confidence)}`);
+    const conf = el("span","chip confidence", `confidence: ${t.confidence}`);
     badges.append(sev, vd, conf);
     card.append(badges);
 
-    card.append(el("div","desc", esc(t.description)));
-    card.append(el("div","field", `<span class="lbl">Severity rationale</span><br>${esc(t.severity.justification)}`));
+    card.append(el("div","desc", t.description));
 
-    const refs = el("div","field refs"); refs.innerHTML = `<span class="lbl">Affected elements</span><br>` + t.affected_element_ids.map(r => `<code>${esc(r)}</code>`).join("");
+    const rationale = el("div","field");
+    rationale.append(lbl("Severity rationale"), el("br"), t.severity.justification);
+    card.append(rationale);
+
+    const refs = el("div","field refs");
+    refs.append(lbl("Affected elements"), el("br"));
+    t.affected_element_ids.forEach(r => refs.append(code(r)));
     card.append(refs);
 
     if (t.verdict.status === "needs-info" && t.verdict.related_unknowns.length) {
-      const u = t.verdict.related_unknowns.map(r => `<code>${esc(r.element_id)}</code> → <code>${esc(r.attribute)}</code>`).join(", ");
-      card.append(el("div","unknown", `<b>Needs info.</b> ${esc(t.verdict.reason)} Unknown: ${u}`));
+      const u = el("div","unknown");
+      u.append(el("b", null, "Needs info."), ` ${t.verdict.reason} Unknown: `);
+      t.verdict.related_unknowns.forEach((r, i) => {
+        if (i) u.append(", ");
+        u.append(code(r.element_id), " → ", code(r.attribute));
+      });
+      card.append(u);
     }
     if (t.verdict.status === "rejected") {
-      card.append(el("div","field", `<span class="lbl">Reason dismissed</span><br>${esc(t.verdict.reason)}`));
+      const why = el("div","field");
+      why.append(lbl("Reason dismissed"), el("br"), t.verdict.reason);
+      card.append(why);
     }
     if (t.mitigations && t.mitigations.length) {
-      const list = el("ul","mits"); t.mitigations.forEach(m => list.append(el("li", null, esc(m.summary))));
+      const list = el("ul","mits"); t.mitigations.forEach(m => list.append(el("li", null, m.summary)));
       const wrap = el("div","field"); wrap.append(el("div","lbl","Mitigations"), list); card.append(wrap);
     }
     return card;
@@ -241,14 +288,23 @@
   ordered.forEach(t => $("threats").append(threatCard(t, false)));
   R.rejected_threats.forEach(t => $("rejected").append(threatCard(t, true)));
 
-  // system model table
+  // system model table. Each entry returns the cell's children rather than a
+  // string of markup — `technology`, `protocol`, `authentication` and
+  // `data_classification` are free-text copied out of submitted prose, and this
+  // column is where the unescaped-innerHTML bug lived.
   const attrs = {
-    "external-entity": e => `kind: ${e.kind}` + (e.assets.length ? ` · assets: ${e.assets.join(", ")}` : ""),
-    "process": e => `${e.technology} · exposure: ${e.exposure}`,
-    "data-store": e => `${e.technology} · ${e.data_classification} · at rest: ${mark(e.encryption_at_rest)}`,
-    "data-flow": e => `${e.protocol} · auth: ${e.authentication} · in transit: ${mark(e.encryption_in_transit)}`,
+    "external-entity": e => [
+      `kind: ${e.kind}` + (e.assets.length ? ` · assets: ${e.assets.join(", ")}` : ""),
+    ],
+    "process": e => [`${e.technology} · exposure: ${e.exposure}`],
+    "data-store": e => [
+      `${e.technology} · ${e.data_classification} · at rest: `, mark(e.encryption_at_rest),
+    ],
+    "data-flow": e => [
+      `${e.protocol} · auth: ${e.authentication} · in transit: `, mark(e.encryption_in_transit),
+    ],
   };
-  function mark(v){ return v === "unknown" ? `<span class="unk">unknown</span>` : esc(v); }
+  function mark(v){ return v === "unknown" ? el("span", "unk", "unknown") : v; }
   const rows = [
     ...R.system_model.external_entities.map(e => ["external-entity", e]),
     ...R.system_model.processes.map(e => ["process", e]),
@@ -259,28 +315,49 @@
   rows.forEach(([type, e]) => {
     const zone = e.trust_zone || (e.source + " → " + e.destination);
     const tr = el("tr");
-    tr.innerHTML = `<td>${type}</td><td><code>${esc(e.id)}</code></td><td>${esc(e.name)}</td><td><code>${esc(zone)}</code></td><td>${attrs[type](e)}</td>`;
+    tr.append(
+      cell(type), cell(code(e.id)), cell(e.name), cell(code(zone)), cell(...attrs[type](e))
+    );
     tb.append(tr);
   });
   R.boundary_crossings.forEach(c => {
-    $("crossings").append(el("div","crossing", `Boundary crossing: <code>${esc(c.flow_id)}</code> — <code>${esc(c.source_zone)}</code> → <code>${esc(c.destination_zone)}</code>`));
+    const d = el("div","crossing");
+    d.append(
+      "Boundary crossing: ", code(c.flow_id), " — ",
+      code(c.source_zone), " → ", code(c.destination_zone)
+    );
+    $("crossings").append(d);
   });
   R.system_model.assumptions.forEach(a => {
-    $("assumptions").append(el("div","assume", `Assumption: ${esc(a.assumption)} (<code>${esc(a.element_id)}</code>) — ${esc(a.basis)}`));
+    const d = el("div","assume");
+    d.append(`Assumption: ${a.assumption} (`, code(a.element_id), `) — ${a.basis}`);
+    $("assumptions").append(d);
   });
 
   // pipeline
   R.nodes.forEach(n => {
-    const fp = n.sampling_fingerprint
-      ? ` · <code class="m" title="generation-identity fingerprint: sha256(served model, resolved tier sampling)\n${esc(n.sampling_fingerprint)}">fp ${esc(n.sampling_fingerprint.slice(0, 12))}…</code>`
-      : "";
-    $("nodes").append(el("div","node", `<b>${esc(n.node)}</b> <span class="m">${n.model ? esc(n.model) : "code"}</span> · ${n.duration_ms} ms${fp}`));
+    const row = el("div","node");
+    row.append(
+      el("b", null, n.node), " ",
+      el("span", "m", n.model ? n.model : "code"), ` · ${n.duration_ms} ms`
+    );
+    if (n.sampling_fingerprint) {
+      const fp = el("code", "m", `fp ${n.sampling_fingerprint.slice(0, 12)}…`);
+      fp.title = `generation-identity fingerprint: sha256(served model, resolved tier sampling)\n${n.sampling_fingerprint}`;
+      row.append(" · ", fp);
+    }
+    $("nodes").append(row);
   });
   // per-tier resolved sampling (provenance clear block)
   Object.entries(R.sampling || {}).forEach(([tier, params]) => {
     const set = Object.entries(params).filter(([, v]) => v !== null)
-      .map(([k, v]) => `${esc(k)} = ${esc(String(v))}`).join(", ");
-    $("nodes").append(el("div","node m", `<b>tier ${esc(tier)}</b> sampling · ${set} <span class="m">(others: model default)</span>`));
+      .map(([k, v]) => `${k} = ${v}`).join(", ");
+    const row = el("div","node m");
+    row.append(
+      el("b", null, `tier ${tier}`), ` sampling · ${set} `,
+      el("span", "m", "(others: model default)")
+    );
+    $("nodes").append(row);
   });
 
   // theme toggle

@@ -71,6 +71,62 @@ class TestWellFormedness:
         with pytest.raises(ValidationError):
             Source(kind="description", label=f"Doc{break_char}v2", text="hi")
 
+    @pytest.mark.parametrize(
+        ("name", "char"),
+        [
+            ("C0 control", "\x07"),
+            ("tab", "\t"),
+            ("C1 control", "\x85"),
+            ("delete", "\x7f"),
+            ("bidi override", "‮"),
+            ("bidi isolate", "⁦"),
+            ("zero-width space", "​"),
+            ("zero-width joiner", "‍"),
+            ("word joiner", "⁠"),
+            ("soft hyphen", "­"),
+            ("BOM", "﻿"),
+        ],
+    )
+    def test_a_label_carrying_an_invisible_or_control_character_is_rejected(
+        self, name, char
+    ):
+        """#78 decision 3, at the input boundary rather than at each renderer.
+
+        A label is chrome rendered beside a quote the report attributes to the
+        caller, so a character that renders as something other than what it is
+        spoofs the UI. That is not XSS, so the viewer's textContent rule does
+        not reach it — nothing here is executing.
+        """
+        with pytest.raises(ValidationError):
+            Source(kind="description", label=f"Contract{char}v2", text="hi")
+
+    @pytest.mark.parametrize(
+        "label",
+        [
+            "Kickoff call — 2026-07-14",
+            "Réunion d'équipe",
+            "契約書 v2",
+            "مواصفات النظام",
+            "Spec (v1.2) [draft] #3 · 50% done",
+        ],
+    )
+    def test_an_ordinary_label_is_still_accepted(self, label):
+        """The gate rejects a property, not a script. Accents, non-Latin scripts
+        and punctuation are all ordinary citation keys and must survive it —
+        including right-to-left text, which needs no override character to
+        render correctly."""
+        assert Source(kind="description", label=label, text="hi").label == label
+
+    def test_a_rejected_label_is_never_silently_repaired(self):
+        """Reject, not strip: a label is bounded but never rewritten.
+
+        Normalising would break the citation the caller submitted, and would
+        silently break both label uniqueness and the gate resolving a
+        ``source_excerpt``'s ``source_label`` against the job's labels.
+        """
+        with pytest.raises(ValidationError):
+            Source(kind="description", label="Spec​v2", text="hi")
+
     def test_empty_text_is_rejected(self):
         with pytest.raises(ValidationError):
             Source(kind="transcript", label="Call", text="")
