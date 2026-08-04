@@ -117,9 +117,7 @@ class TestRequireCertifiedWithholds:
             certified=False,
             uncertified=({"node": "critic", "fingerprint": FP_A},),
         )
-        body = fetch_report(
-            make_client(result, gate(require_certified=True))
-        ).json()
+        body = fetch_report(make_client(result, gate(require_certified=True))).json()
 
         assert body["uncertified_nodes"] == [{"node": "critic", "fingerprint": FP_A}]
         # Enough for the operator who turned the knob on; nothing that leaks the

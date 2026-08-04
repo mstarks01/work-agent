@@ -362,9 +362,11 @@ def test_a_failed_job_logs_the_input_digest(caplog):
         system_name=record.system_name, sources=record.sources
     ).source_sha256
 
-    with caplog.at_level(logging.WARNING, logger="stride_service.pipeline"):
-        with pytest.raises(Exception, match="T-02"):
-            run(pipeline, record)
+    with (
+        caplog.at_level(logging.WARNING, logger="stride_service.pipeline"),
+        pytest.raises(Exception, match="T-02"),
+    ):
+        run(pipeline, record)
 
     assert any(digest in message for message in caplog.messages)
     # the text itself is never logged

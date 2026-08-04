@@ -185,9 +185,7 @@ async def run_graph(
     than one certifying an empty observation set.
     """
     executor = GraphExecutor(pipeline, app_name=EVAL_APP_NAME)
-    return await executor.run(
-        sources, user_id=EVAL_USER, extra_state=extra_state
-    )
+    return await executor.run(sources, user_id=EVAL_USER, extra_state=extra_state)
 
 
 async def run_extraction(case: GoldenCase, pipeline: Pipeline) -> ExtractionResult:
@@ -295,8 +293,7 @@ def _run_from_graph(
         input=InputRef.of(system_name=case.meta.title, sources=case.sources),
         nodes=graph_run.node_runs,
         sampling={
-            tier: params.model_dump()
-            for tier, params in pipeline.tier_sampling.items()
+            tier: params.model_dump() for tier, params in pipeline.tier_sampling.items()
         },
         system_model=analysis.system_model,
         boundary_crossings=analysis.boundary_crossings,

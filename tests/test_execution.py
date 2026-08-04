@@ -259,9 +259,9 @@ class TestSourceRendering:
             return await executor.run(
                 [Source.description("text")],
                 user_id="test-user",
-                extra_state={graph.STATE_VALID_MODEL: valid_model().model_dump(
-                    mode="json"
-                )},
+                extra_state={
+                    graph.STATE_VALID_MODEL: valid_model().model_dump(mode="json")
+                },
             )
 
         run = asyncio.run(scenario())

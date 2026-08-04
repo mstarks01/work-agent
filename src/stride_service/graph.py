@@ -637,8 +637,7 @@ def fail_review(
     model = SystemModel.model_validate(valid_model)
     drafts = [DraftThreat.model_validate(draft) for draft in merged_drafts]
     rulings = [
-        ThreatRuling.model_validate(ruling)
-        for ruling in _threats_of(reviewed_threats)
+        ThreatRuling.model_validate(ruling) for ruling in _threats_of(reviewed_threats)
     ]
     # review_issues is non-empty here by construction; assemble_threats raises
     # the CriticOutputError naming exactly what still does not reconcile.
@@ -674,8 +673,7 @@ def assemble_report(
     model = SystemModel.model_validate(valid_model)
     drafts = [DraftThreat.model_validate(draft) for draft in merged_drafts]
     rulings = [
-        ThreatRuling.model_validate(ruling)
-        for ruling in _threats_of(reviewed_threats)
+        ThreatRuling.model_validate(ruling) for ruling in _threats_of(reviewed_threats)
     ]
     threats, rejected = assemble_threats(drafts, rulings, model)
     analysis = Analysis(

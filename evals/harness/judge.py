@@ -147,8 +147,7 @@ def load_judge_config(path: Path | str = DEFAULT_JUDGE_CONFIG_PATH) -> JudgeConf
     version = raw.get("version")
     if version != SUPPORTED_VERSION:
         raise JudgeConfigError(
-            f"{path}: unsupported version {version!r};"
-            f" expected {SUPPORTED_VERSION}"
+            f"{path}: unsupported version {version!r}; expected {SUPPORTED_VERSION}"
         )
     try:
         return JudgeConfig(**raw)

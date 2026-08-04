@@ -308,9 +308,7 @@ def create_app(
                 status_code=409,
             )
         # Held on the run so the task is not garbage-collected mid-flight.
-        run.task = asyncio.create_task(
-            _drive(state.engine, analyses, run, sources)
-        )
+        run.task = asyncio.create_task(_drive(state.engine, analyses, run, sources))
         return JSONResponse({"run": run.id})
 
     @app.get("/events/{run_id}")
@@ -479,8 +477,7 @@ def _env_var_item(var: str, is_set: bool) -> str:
     """One variable's row — presence only, never the value (OWASP A09)."""
     css_class, label = ("set", "set") if is_set else ("not", "NOT SET")
     return (
-        f"<li><code>{_escape(var)}</code> "
-        f'<span class="{css_class}">{label}</span></li>'
+        f'<li><code>{_escape(var)}</code> <span class="{css_class}">{label}</span></li>'
     )
 
 

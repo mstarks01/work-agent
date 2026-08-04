@@ -175,9 +175,7 @@ def _score_runs(
     )
 
 
-def _models_record(
-    deployment: Deployment, judge: PinnedJudge | None
-) -> dict[str, Any]:
+def _models_record(deployment: Deployment, judge: PinnedJudge | None) -> dict[str, Any]:
     """What this run asked its providers for, and what they say they served.
 
     The tier strings are stable GA identifiers, not immutable builds, so the

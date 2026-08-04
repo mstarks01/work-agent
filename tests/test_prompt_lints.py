@@ -79,9 +79,7 @@ SOURCE_BLOCK_RE = re.compile(
     re.MULTILINE | re.DOTALL,
 )
 # Element and flow IDs as the prompts write them: `type:normalized-name`.
-ELEMENT_ID_RE = re.compile(
-    r"`((?:entity|process|store|flow|boundary):[a-z0-9:-]+)`"
-)
+ELEMENT_ID_RE = re.compile(r"`((?:entity|process|store|flow|boundary):[a-z0-9:-]+)`")
 
 
 def json_blocks(text):

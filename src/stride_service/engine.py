@@ -93,9 +93,7 @@ class StrideEngine:
         check fails, and re-reading the config to find that out is how the two
         could disagree.
         """
-        return cls(
-            deployment.runner(), limits=deployment.resilience.source_limits()
-        )
+        return cls(deployment.runner(), limits=deployment.resilience.source_limits())
 
     async def analyze(
         self,

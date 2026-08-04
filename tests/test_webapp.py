@@ -29,7 +29,7 @@ SAME_ORIGIN = {"Sec-Fetch-Site": "same-origin"}
 
 # The payload that breaks a naive injection: it closes the JSON block and the
 # rest of the page parses as HTML.
-BREAKOUT = '</script><img src=x onerror=alert(1)>'
+BREAKOUT = "</script><img src=x onerror=alert(1)>"
 
 
 @pytest.fixture
@@ -76,13 +76,9 @@ def posted(text: str) -> dict:
     }
 
 
-def run_to_completion(
-    client, text: str = "A web app talks to a database."
-) -> str:
+def run_to_completion(client, text: str = "A web app talks to a database.") -> str:
     """Submit, drain the event stream, and return the finished run's id."""
-    started = client.post(
-        "/analyze", json=posted(text), headers=SAME_ORIGIN
-    )
+    started = client.post("/analyze", json=posted(text), headers=SAME_ORIGIN)
     assert started.status_code == 200, started.text
     run_id = started.json()["run"]
     # Draining the stream is what lets the background task make progress.
@@ -118,9 +114,7 @@ def test_analyze_refuses_a_request_that_is_not_same_origin(client):
 
 
 def test_a_run_streams_one_tick_per_node_then_redirects(client):
-    started = client.post(
-        "/analyze", json=posted("A web app."), headers=SAME_ORIGIN
-    )
+    started = client.post("/analyze", json=posted("A web app."), headers=SAME_ORIGIN)
     run_id = started.json()["run"]
     events = client.get(f"/events/{run_id}").text
 
@@ -255,9 +249,7 @@ def test_the_diagnostic_never_prints_a_credential_value(broken_client, monkeypat
 
 
 def test_analyze_is_closed_while_the_config_is_broken(broken_client):
-    response = broken_client.post(
-        "/analyze", json=posted("x"), headers=SAME_ORIGIN
-    )
+    response = broken_client.post("/analyze", json=posted("x"), headers=SAME_ORIGIN)
     assert response.status_code == 503
 
 
@@ -271,7 +263,7 @@ def test_analyze_is_closed_while_the_config_is_broken(broken_client):
 # directly. The strict nonce CSP is defence in depth behind both.
 
 # What a model-authored field looks like when the submitter engineered it.
-MARKUP_PAYLOAD = '<img src=x onerror=alert(1)>'
+MARKUP_PAYLOAD = "<img src=x onerror=alert(1)>"
 
 # The sinks that take a string and parse it as markup. None may appear in the
 # viewer's own code: decision 1 is that untrusted text reaches the DOM as
