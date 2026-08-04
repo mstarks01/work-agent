@@ -116,16 +116,46 @@ the whole cutover — earned by #77's node rename, which fails *silently* for a 
 `analyst_spoofing` — plus the versioning policy `docs/Report-Schema.md` never stated: additive is
 minor, changing the meaning or spelling of an existing value is major.
 
-Frontier now: [#80](https://github.com/mstarks01/work-agent/issues/80),
-[#81](https://github.com/mstarks01/work-agent/issues/81),
+[#80](https://github.com/mstarks01/work-agent/issues/80) resolved 2026-08-04 and answers **yes,
+mechanically and cheaply** — but the headline is a fact about the *input*, not the model. Exact
+substring rejects **78.2%** of the corpus's 206 element excerpts because the sources are
+**hard-wrapped**, so a two-word quote straddles a newline nobody typed; collapsing whitespace runs
+alone takes that to 1.0%, and every other rung in the ladder recovered nothing. The pinned policy
+is NFKC + typographic folds, case, inline markdown markers, whitespace collapse, then `…`-separated
+fragments matched in order — leaving **0 false rejections** in 206 plus one true one, a quote that
+excised a span unmarked and stitched together a sentence the source never contains. Punctuation
+-blindness is refused (buys nothing) and so is a similarity threshold (the fabricated quote scores
+0.963, above any threshold a human would pick by intuition). The check runs in `join_drafts` beside
+#79's set-membership check, while the source text is still held, and inherits `_citation_issues`'
+no-sources escape. **Consequence: marked per entry, closed per threat** — an unverifiable quote
+still renders, flagged on a **service-owned** list on `Analysis` rather than a field on
+analyst-owned `Ground`, and the job fails closed only when *no* ground on a threat verifies.
+Failing closed on any bad quote lost to the Rule of Three: 0/206 licenses ≤1.46% per quote, which
+at 18.7 threats per job is a 24% chance of killing a job over a cosmetic mismatch, on evidence that
+is 12 synthetic single-source cases.
+
+Resolving it **corrected #79 on a mechanism, not a decision**: there is *no draft repair path*.
+`repair` is extraction-only and `recritic` is critic-only, so a bad draft raises out of
+`merge_drafts` and fails the job — #80 had to supply a consequence rather than inherit one. And it
+exposed a real evidence gap: the corpus carries **zero transcript sources**, so the across-turns
+and speaker-label cases rest on a constructed probe, now fog.
+
+Frontier now: [#81](https://github.com/mstarks01/work-agent/issues/81),
 [#82](https://github.com/mstarks01/work-agent/issues/82),
 [#83](https://github.com/mstarks01/work-agent/issues/83) and
-[#84](https://github.com/mstarks01/work-agent/issues/84), all unblocked and unclaimed — the map's
-first genuinely parallel step, so expect concurrent sessions.
-[#85](https://github.com/mstarks01/work-agent/issues/85) still waits on one. #79 left three
-questions explicitly to siblings: verbatim quote verification is #80's, prompt instruction is #82's,
-and whether `related_unknowns` finally gains a check is #83's. #82 was retitled to "How a **category
-agent** is instructed…" — its old title carried the vocabulary #77 retired.
+[#84](https://github.com/mstarks01/work-agent/issues/84), all unblocked and unclaimed — still a
+parallel step, so expect concurrent sessions.
+[#85](https://github.com/mstarks01/work-agent/issues/85) waits on #82 alone now. #79 left three
+questions explicitly to siblings: verbatim quote verification was #80's, prompt instruction is
+#82's, and whether `related_unknowns` finally gains a check is #83's. #82 was retitled to "How a
+**category agent** is instructed…" — its old title carried the vocabulary #77 retired. #80 hands
+#81 a working matcher and a measured rate for the *same field* it rules on, and hands #82 the one
+fact both its true rejections share: an unmarked elision, which `extract.md` rule 5 already
+forbids.
+
+The measurement lives on `prototype/quote-verification` @ `6ed8d77`
+(`prototypes/quote_verification_prototype.py`), pushed — throwaway code, but re-runnable, and the
+branch is the citation until the map completes and it becomes an `archive/` tag.
 
 [#49](https://github.com/mstarks01/work-agent/issues/49) completed 2026-07-31 and has
 moved to Completed efforts below; its spec was implemented and merged 2026-08-01.
