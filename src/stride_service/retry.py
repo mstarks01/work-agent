@@ -40,7 +40,12 @@ re-opened as configuration: it does not vary by deployment, and the one number
 that does — how much retrying a deployment will tolerate — is
 ``retry_budget_ratio`` in ``config/resilience.toml``.
 
-Nothing here can change an answer, only whether and when one is asked for again.
+Retrying is not quite all this module does any more, and the exception is
+deliberate. :class:`RetryingLlm` is the one object this service owns that sees
+every raw response from every provider for every node, which makes it the only
+place a **length-stopped completion** can be caught uniformly — see
+:func:`_reject_truncated`. Nothing here can change an answer; it can now refuse
+one that the provider already told us is incomplete.
 """
 
 from __future__ import annotations
@@ -62,6 +67,48 @@ logger = logging.getLogger(__name__)
 # 429 usually does.
 _BACKOFF_BASE_SECONDS = 1.0
 _BACKOFF_CAP_SECONDS = 30.0
+
+# ADK maps LiteLLM's ``finish_reason="length"`` onto this member of
+# ``google.genai.types.FinishReason`` and hangs it on every non-streaming
+# response. Compared as a bare string rather than imported, because
+# ``FinishReason`` subclasses ``str`` and this module stays free of the provider
+# libraries at import time — the same reason ``_retryable_types`` is deferred.
+_MAX_TOKENS_FINISH_REASON = "MAX_TOKENS"
+
+# The remedy half of every truncation message, shared with
+# ``graph._TRUNCATION_HINT`` because a run can reach truncation from either
+# direction and both want the operator to turn the same knob. It lives in this
+# module for a mechanical reason: ``retry`` imports nothing from the package, so
+# ``graph`` can import *it* without the cycle the other direction would make.
+TRUNCATION_REMEDY = (
+    "Raise max_output_tokens for this node's tier in config/sampling.toml, or"
+    " reduce what the node is asked to produce."
+)
+
+
+class TruncatedCompletionError(RuntimeError):
+    """A completion stopped at ``max_output_tokens`` with its output half-written.
+
+    The vendor-visible twin of :class:`~stride_service.graph.SilentNodeError`,
+    and the reason both exist: *providers do not agree on what truncation looks
+    like*. Anthropic and Vertex return no text at all, so the node writes no
+    ``output_key`` and the hole is found downstream by a node that can name it.
+    OpenAI returns the **partial** text, which ADK hands to ``validate_schema``
+    unaware that it is a fragment — the run then dies inside pydantic on a
+    ``ValidationError`` naming a column offset, with the drafts already paid
+    for and nothing in the message pointing at the cap.
+
+    So this is checked where the difference is still visible. ``finish_reason``
+    says truncation outright on both paths, which is strictly better evidence
+    than :class:`~stride_service.graph.SilentNodeError`'s inference from an
+    absent key — it names the node's model and fires before the partial text
+    reaches a validator that will misdescribe it.
+
+    **Deliberately not retryable.** It is not in :func:`_retryable_types` and
+    must not be: the same request against the same cap truncates again, and the
+    second ask is a paid-for identical answer. That is the rule the whole module
+    already applies to a malformed request or a rejected credential.
+    """
 
 
 class RetryBudgetExhausted(RuntimeError):
@@ -219,6 +266,35 @@ class RetryPolicy:
         return self.budget.withdraw()
 
 
+def _reject_truncated(responses: Sequence, model: str) -> None:
+    """Raise if the provider stopped any of ``responses`` at the token cap.
+
+    Every response is checked rather than just the last: a non-streaming call
+    yields one today, but the collection is a sequence and a truncated part
+    anywhere in it is a truncated answer.
+
+    ``finish_reason`` is read instead of ``error_code``, which ADK sets to the
+    same value. The former is the provider's own word for what happened; the
+    latter is ADK's overloading of an error channel for a response that carries
+    no error, and it stops being set the day that overloading is reconsidered.
+    """
+    truncated = any(
+        response.finish_reason == _MAX_TOKENS_FINISH_REASON for response in responses
+    )
+    if not truncated:
+        return
+    logger.error(
+        "%s: completion stopped at max_output_tokens with partial output;"
+        " failing the node rather than validating a fragment",
+        model,
+    )
+    raise TruncatedCompletionError(
+        f"{model} stopped at max_output_tokens with its output incomplete, so"
+        f" what it emitted is a fragment rather than an answer."
+        f" {TRUNCATION_REMEDY}"
+    )
+
+
 def retrying_llm_class(litellm_cls: type, policy: RetryPolicy) -> type:
     """A ``LiteLlm`` subclass that owns its retries, built against one policy.
 
@@ -243,6 +319,12 @@ def retrying_llm_class(litellm_cls: type, policy: RetryPolicy) -> type:
         and is passed straight through — this service binds an ``output_schema``
         on every node and so never streams, and a retry policy that silently
         replayed half a stream would be worse than none.
+
+        The truncation check rides on that same split, and for the same reason:
+        a streamed answer is yielded before any chunk carries a
+        ``finish_reason``, so there is nothing left to refuse by the time the
+        caller has seen the text. Unreached today, and it stays that way for as
+        long as every node carries a schema.
         """
 
         # ClassVar, not a field: shared by every instance built against this
@@ -259,7 +341,12 @@ def retrying_llm_class(litellm_cls: type, policy: RetryPolicy) -> type:
                     yield response
                 return
 
-            for response in await self._attempt_with_retries(llm_request):
+            # Checked here rather than inside ``_attempt_with_retries`` so that
+            # method keeps its one job — surviving transport failures — and a
+            # truncation is never mistaken for one of them.
+            responses = await self._attempt_with_retries(llm_request)
+            _reject_truncated(responses, self.model)
+            for response in responses:
                 yield response
 
         async def _attempt_with_retries(self, llm_request) -> Sequence:
