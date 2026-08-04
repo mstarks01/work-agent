@@ -31,6 +31,7 @@ a model differently.
 from __future__ import annotations
 
 import re
+import unicodedata
 from collections import Counter
 from collections.abc import Sequence
 from dataclasses import dataclass
@@ -58,7 +59,28 @@ MAX_LABEL_CHARS = 200
 # the label, second the separator — so a label spanning lines would make the
 # text below it unreadable as text. Includes the Unicode line separators, which
 # a caller can paste without seeing.
+
 _LINE_BREAKS = ("\n", "\r", "\u2028", "\u2029")
+
+# Also rejected in a label, by Unicode general category. ``Cc`` is the C0 and C1
+# control characters; ``Cf`` the invisible formatting ones — the bidi overrides
+# and isolates, the zero-width space and joiners, the soft hyphen, the BOM.
+#
+# Both render as something other than what they are, and a label is rendered as
+# chrome beside a quote the report attributes to the caller. On the loopback
+# webapp the submitter is both attacker and victim and it hardly matters; for an
+# integrator rendering a *third party's* submission, a label that reorders the
+# text around it is UI spoofing — which the viewer's ``textContent`` rule does
+# not reach, because nothing here is executing.
+#
+# Rejected rather than stripped, for the reason ``MAX_LABEL_CHARS`` gives: a
+# label is bounded but never rewritten. Normalising one would also silently
+# break the uniqueness check and the gate that resolves a ``source_excerpt``'s
+# ``source_label`` against the job's labels.
+#
+# Categories rather than an enumerated list of code points: a list is a thing
+# that rots as Unicode grows, and the property is what actually matters.
+_FORMATTING_CATEGORIES = frozenset({"Cc", "Cf"})
 
 # All that ``kind`` still selects: one phrase telling the model what register
 # the text below is in. It sits outside the fence, so it is this module's bytes
@@ -97,6 +119,10 @@ class Source(BaseModel):
             raise ValueError("label must not be blank")
         if any(char in value for char in _LINE_BREAKS):
             raise ValueError("label must be a single line")
+        if any(unicodedata.category(char) in _FORMATTING_CATEGORIES for char in value):
+            raise ValueError(
+                "label must not contain control, bidi or zero-width characters"
+            )
         return value
 
     @field_validator("text")

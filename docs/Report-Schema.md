@@ -194,6 +194,29 @@ report.model_dump_json()          # str
 report.model_dump(mode="json")    # dict
 ```
 
+## Rendering this report
+
+**Every string in this document is untrusted.** It is either derived from the
+prose someone submitted or supplied by the caller, and none of it is escaped for
+your medium. The service does not sanitise it, because it cannot know whether
+you are rendering to HTML, a terminal, a PDF or a Slack message.
+
+So, wherever a value from this report reaches a user interface:
+
+- Render it as **text**, never as markup — `textContent`, a templating engine
+  with autoescape on, or your platform's equivalent.
+- Never assign it to `innerHTML`, `outerHTML`, `insertAdjacentHTML`, or
+  concatenate it into a string you then parse as markup.
+- Set attributes by **property assignment** (`node.title = value`), not by
+  building an attribute string.
+
+This is a blanket rule rather than a per-field trust table, deliberately: a
+table has to be maintained on every schema change or it silently starts lying,
+and a field added later is exactly the one that gets missed.
+
+`webapp/report_view.html` is a worked example — it builds DOM nodes throughout
+and carries no escape helper at all, so there is nothing to forget to call.
+
 ## The other outcome
 
 An input that cannot be modelled yields no report — the engine returns a
