@@ -27,11 +27,12 @@ stops at startup with an error naming the vendors and the two places a selection
 can be made. There is no vendor you reach by doing nothing.
 
 Two tiers named on a capability axis — `base` (extraction, repair) and `strong`
-(the six analysts, the critic, the re-ask) — each select a `(vendor, model)` pair
-**independently**, so the two tiers may run different vendors at once.
+(the six category agents, the critic, the re-ask) — each select a
+`(vendor, model)` pair **independently**, so the two tiers may run different
+vendors at once.
 
 ```toml
-version = 3
+version = 4
 
 [tiers.base]
 vendor = "vertex"

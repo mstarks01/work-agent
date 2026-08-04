@@ -1,7 +1,7 @@
 """Model-tier configuration for the graph's LLM nodes.
 
 Exactly two vendor-neutral tiers: ``base`` runs extraction and repair,
-``strong`` the six STRIDE analysts, the critic and the critic re-ask. Each tier
+``strong`` the six STRIDE category agents, the critic and the critic re-ask. Each tier
 independently selects a ``(vendor, model)`` **pair**, so the two tiers may run
 different vendors at once, and no vendor is privileged.
 
@@ -42,7 +42,7 @@ from stride_service.vendors import VENDOR_NAMES, Vendor, VendorName, vendor_for
 
 # The only schema version this loader accepts. A file on any other version
 # fails its own check rather than being migrated in place.
-SUPPORTED_VERSION = 3
+SUPPORTED_VERSION = 4
 
 TierName = Literal["base", "strong"]
 TIER_NAMES: tuple[TierName, ...] = ("base", "strong")
@@ -52,10 +52,22 @@ TIER_NAMES: tuple[TierName, ...] = ("base", "strong")
 # is the bounded critic re-ask: a distinct LLM node so it is pinned in its own
 # right, running the same judgement as the critic and so always on the same
 # tier.
-ANALYST_NODES: tuple[str, ...] = tuple(
-    f"analyst/{category}" for category in STRIDE_CATEGORIES
+#
+# One agent per STRIDE category, named for what it does. ``Analyst`` names the
+# human reading the report, so it is not a node name here or anywhere else.
+# These are the *tier config* keys; the graph's own node names are a separate
+# namespace (they must be Python identifiers), mapped in
+# :data:`stride_service.graph.TIER_NODE_BY_GRAPH_NODE`.
+CATEGORY_NODES: tuple[str, ...] = tuple(
+    f"analyze/{category}" for category in STRIDE_CATEGORIES
 )
-LLM_NODES: tuple[str, ...] = ("extract", "repair", *ANALYST_NODES, "critic", "recritic")
+LLM_NODES: tuple[str, ...] = (
+    "extract",
+    "repair",
+    *CATEGORY_NODES,
+    "critic",
+    "recritic",
+)
 
 _ENV_PREFIX = "STRIDE_MODEL_"
 _VENDOR_FIELD = "VENDOR"
