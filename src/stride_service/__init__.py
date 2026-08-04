@@ -45,7 +45,7 @@ from stride_service.markdown_loader import (
     MarkdownNotFoundError,
 )
 from stride_service.model_tiers import (
-    ANALYST_NODES,
+    CATEGORY_NODES,
     LLM_NODES,
     TIER_NAMES,
     ModelConfigError,
@@ -82,7 +82,7 @@ from stride_service.skills import (
     SKILL_SECTION_HEADINGS,
     STRIDE_CATEGORIES,
     category_boundary_digest,
-    compose_analyst_skills,
+    compose_analyze_skills,
     compose_critic_skills,
     estimate_tokens,
     extract_section,
@@ -122,7 +122,7 @@ from stride_service.validation import (
 )
 
 __all__ = [
-    "ANALYST_NODES",
+    "CATEGORY_NODES",
     "CATEGORY_SKILL_TOKEN_CAP",
     "CORE_ASSET_TAGS",
     "DEFAULT_CALLER",
@@ -202,7 +202,7 @@ __all__ = [
     "build_summary",
     "build_verifier",
     "category_boundary_digest",
-    "compose_analyst_skills",
+    "compose_analyze_skills",
     "compose_critic_skills",
     "create_app",
     "derive_element_id",

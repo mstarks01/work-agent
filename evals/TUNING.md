@@ -109,7 +109,7 @@ list). When tuning, watch these three:
 | --- | --- | --- |
 | **must-find recall** (per case) | goes up, or holds, on **every** case | An aggregate average hides one case collapsing. Always read per case. |
 | **near/far exemplar delta** | shrinks or holds | A change can lift average recall while widening this gap — a worse model that looks better. The far-domain cases are the honest test. |
-| **critic yield** (a pair) | kills more junk (`killed-ungrounded`) without killing real findings (`killed-real`) | A kill count alone tells you nothing — read both halves together. |
+| **critic yield** (a pair) | kills more junk (`killed-unsupported`) without killing real findings (`killed-real`) | A kill count alone tells you nothing — read both halves together. |
 
 All of these are *relative to the judge*. Use them to compare configurations and
 track movement; never quote them as absolute scores or against other tools.
@@ -127,7 +127,7 @@ without editing the file, use an environment override (see
 what a sweep does:
 
 ```sh
-# Try a warmer temperature on the strong-tier analysts for one run:
+# Try a warmer temperature on the strong-tier category agents for one run:
 STRIDE_SAMPLING_STRONG_TEMPERATURE=0.4 \
   python -m evals.harness.run run --mode analysis --out warm-strong.json
 ```
@@ -146,7 +146,8 @@ costing recall on the far ones, which is the whole reason to test it.
 
 ### Prompts and exemplars
 
-The analyst prompts and their worked examples (`prompts/`) are the strongest
+The category-agent prompt and its worked examples (`prompts/analyze.md` and
+`prompts/exemplars/`) are the strongest
 lever on recall — and the *cause* of the near/far gap, since all the examples
 come from one domain (payments). Editing an exemplar or adding one from a
 different domain is the most direct way to move that gap. Measure it exactly like

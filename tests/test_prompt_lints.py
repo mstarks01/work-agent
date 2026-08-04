@@ -11,6 +11,23 @@ as much as the shape ones.
 ``## Output`` sections are prose-only by design — the machine-enforced shape
 lives in ``DraftThreat`` and nowhere else — so a fenced block appearing there
 is the drift this guards against.
+
+THE THREE GROUNDS LINTS exist because the exemplar system now ships a labelled
+source block, and the reason it ships one is mechanical rather than editorial:
+an exemplar quote citing text the prompt never shows would teach precisely the
+failure finding-level attribution exists to prevent — that a plausible-sounding
+quote can be produced from nothing. That is a property, so it is checked rather
+than left to the author's care. The quote check runs the **shipped** ladder,
+imported rather than reimplemented, so the exemplars are held to the identical
+rule the agent is held to; a divergence between the two would be invisible
+otherwise.
+
+One hazard for whoever edits the source block: :func:`exemplar_system_ids`
+takes its known-ID set from the *whole* ``## Input`` section, which now contains
+free submitter prose. A backticked ``type:slug`` written into that prose would
+silently widen the set. Submitter prose has no reason to spell an element ID —
+the block reads the way a real ``source.md`` does, and those never do — but the
+trap is worth knowing about.
 """
 
 import json
@@ -20,10 +37,11 @@ from pathlib import Path
 import pytest
 from pydantic import ValidationError
 
+from stride_service.grounding import verify_quote
 from stride_service.markdown_loader import MarkdownLoader, split_sections
 from stride_service.prompts import (
-    ANALYST_PROMPT_NAME,
-    ANALYST_PROMPT_TOKEN_CAP,
+    ANALYZE_PROMPT_NAME,
+    ANALYZE_PROMPT_TOKEN_CAP,
     CRITIC_PROMPT_NAME,
     CRITIC_PROMPT_TOKEN_CAP,
     EXEMPLAR_TOKEN_CAP,
@@ -35,7 +53,7 @@ from stride_service.prompts import (
     RECRITIC_PROMPT_TOKEN_CAP,
     REPAIR_PROMPT_NAME,
     REPAIR_PROMPT_TOKEN_CAP,
-    compose_analyst_prompt,
+    compose_analyze_prompt,
     exemplar_name,
 )
 from stride_service.report import CATEGORY_LETTERS, STRIDE_CATEGORIES, DraftThreat
@@ -46,7 +64,7 @@ PROMPTS_DIR = Path(__file__).resolve().parents[1] / "prompts"
 loader = MarkdownLoader(PROMPTS_DIR)
 
 BODY_TOKEN_CAPS = {
-    ANALYST_PROMPT_NAME: ANALYST_PROMPT_TOKEN_CAP,
+    ANALYZE_PROMPT_NAME: ANALYZE_PROMPT_TOKEN_CAP,
     CRITIC_PROMPT_NAME: CRITIC_PROMPT_TOKEN_CAP,
     RECRITIC_PROMPT_NAME: RECRITIC_PROMPT_TOKEN_CAP,
     EXTRACT_PROMPT_NAME: EXTRACT_PROMPT_TOKEN_CAP,
@@ -54,10 +72,14 @@ BODY_TOKEN_CAPS = {
 }
 
 JSON_BLOCK_RE = re.compile(r"^```json\n(.*?)^```", re.MULTILINE | re.DOTALL)
-# Element and flow IDs as the prompts write them: `type:normalized-name`.
-ELEMENT_ID_RE = re.compile(
-    r"`((?:entity|process|store|flow|boundary):[a-z0-9:-]+)`"
+# The exemplar system's rendered source: a fence, the `label:` line, the `----`
+# rule, then the text — the shape ``render_sources`` produces for a real job.
+SOURCE_BLOCK_RE = re.compile(
+    r"^(?P<fence>`{3,})\nlabel: (?P<label>.+)\n----\n(?P<text>.*?)^(?P=fence)$",
+    re.MULTILINE | re.DOTALL,
 )
+# Element and flow IDs as the prompts write them: `type:normalized-name`.
+ELEMENT_ID_RE = re.compile(r"`((?:entity|process|store|flow|boundary):[a-z0-9:-]+)`")
 
 
 def json_blocks(text):
@@ -70,8 +92,30 @@ def exemplar_sections(category):
 
 def exemplar_system_ids():
     """Every element/flow ID the shared exemplar system defines."""
-    input_section = split_sections(loader.load(ANALYST_PROMPT_NAME))["Input"]
+    input_section = split_sections(loader.load(ANALYZE_PROMPT_NAME))["Input"]
     return set(ELEMENT_ID_RE.findall(input_section))
+
+
+def exemplar_source_block():
+    """The exemplar system's one source, as ``(label, text)``.
+
+    Found by shape rather than by position: a fenced block whose first line is
+    ``label:`` is exactly what :func:`~stride_service.sources.render_sources`
+    emits, which is the shape the block exists to depict.
+    """
+    input_section = split_sections(loader.load(ANALYZE_PROMPT_NAME))["Input"]
+    match = SOURCE_BLOCK_RE.search(input_section)
+    assert match, "the exemplar system carries no labelled source block"
+    return match.group("label").strip(), match.group("text")
+
+
+def exemplar_drafts(category):
+    """Every draft in one exemplar file, parsed."""
+    return [
+        DraftThreat.model_validate(json.loads(block))
+        for body in exemplar_sections(category).values()
+        for block in json_blocks(body)
+    ]
 
 
 @pytest.mark.parametrize("name", PROMPT_BODY_NAMES)
@@ -140,6 +184,56 @@ def test_exemplar_references_resolve_in_the_exemplar_system(category):
 
 
 @pytest.mark.parametrize("category", STRIDE_CATEGORIES)
+def test_exemplar_quote_grounds_verify_against_block(category):
+    """Every exemplar quote is really in the block the prompt shows.
+
+    Through the shipped ladder, imported — the exemplars are held to the exact
+    rule ``join_drafts`` holds the agent to, so the two cannot drift apart
+    unnoticed. An exemplar quoting text that appears nowhere would teach the
+    one thing this whole feature exists to prevent.
+    """
+    _, text = exemplar_source_block()
+    unfindable = [
+        (draft.id, ground.text)
+        for draft in exemplar_drafts(category)
+        for ground in draft.grounds
+        if ground.kind == "quote" and not verify_quote(ground.text, text)
+    ]
+    assert not unfindable
+
+
+@pytest.mark.parametrize("category", STRIDE_CATEGORIES)
+def test_exemplar_quote_labels_match_the_block(category):
+    """A quote resolves to a source, which here is the block's declared label."""
+    label, _ = exemplar_source_block()
+    mislabelled = [
+        (draft.id, ground.source_label)
+        for draft in exemplar_drafts(category)
+        for ground in draft.grounds
+        if ground.kind == "quote" and ground.source_label != label
+    ]
+    assert not mislabelled
+
+
+@pytest.mark.parametrize("category", STRIDE_CATEGORIES)
+def test_exemplar_ground_refs_resolve(category):
+    """A ground's element and flow references exist in the exemplar system.
+
+    The reference lint beside this one covers ``affected_element_ids`` only, so
+    without this all three grounds reference surfaces would be unchecked.
+    """
+    known_ids = exemplar_system_ids()
+    dangling = [
+        (draft.id, ref)
+        for draft in exemplar_drafts(category)
+        for ground in draft.grounds
+        for ref in (ground.element_id, ground.flow_id)
+        if ref and ref not in known_ids
+    ]
+    assert not dangling
+
+
+@pytest.mark.parametrize("category", STRIDE_CATEGORIES)
 def test_exemplar_file_within_token_cap(category):
     tokens = estimate_tokens(loader.load(exemplar_name(category)))
     assert tokens <= EXEMPLAR_TOKEN_CAP
@@ -159,12 +253,16 @@ def test_no_non_markdown_files_under_prompts():
     assert not stray
 
 
-# Worst-case analyst instruction is skill text (~2.2K) plus this; the envelope
-# is 6-8K, so the composed prompt has ~4K of room.
-COMPOSED_ANALYST_TOKEN_BUDGET = 3500
+# Worst-case category-agent instruction is skill text (~2.2K) plus this; the
+# envelope is 6-8K, so the composed prompt has ~4K of room.
+#
+# Raised from 3500 with the body cap, and it had to move with it: the composed
+# budget binds first, so a body cap the composed budget cannot accommodate is a
+# cap nothing can reach.
+COMPOSED_ANALYZE_TOKEN_BUDGET = 3800
 
 
 @pytest.mark.parametrize("category", STRIDE_CATEGORIES)
-def test_composed_analyst_prompt_within_budget(category):
-    composed = compose_analyst_prompt(loader, category)
-    assert estimate_tokens(composed) <= COMPOSED_ANALYST_TOKEN_BUDGET
+def test_composed_analyze_prompt_within_budget(category):
+    composed = compose_analyze_prompt(loader, category)
+    assert estimate_tokens(composed) <= COMPOSED_ANALYZE_TOKEN_BUDGET

@@ -48,9 +48,7 @@ logger = logging.getLogger(__name__)
 
 JobStatus = Literal["queued", "running", "completed", "failed", "rejected"]
 
-TERMINAL_STATUSES: frozenset[JobStatus] = frozenset(
-    {"completed", "failed", "rejected"}
-)
+TERMINAL_STATUSES: frozenset[JobStatus] = frozenset({"completed", "failed", "rejected"})
 
 _LEGAL_TRANSITIONS: dict[JobStatus, frozenset[JobStatus]] = {
     "queued": frozenset({"running"}),
@@ -165,13 +163,17 @@ class JobRecord(BaseModel):
         self._append_event(kind="node", node=node)
 
     def _append_event(
-        self, *, kind: Literal["status", "node"], status: JobStatus | None = None,
+        self,
+        *,
+        kind: Literal["status", "node"],
+        status: JobStatus | None = None,
         node: str | None = None,
     ) -> None:
         now = datetime.now(UTC)
         self.events.append(
-            JobEvent(seq=len(self.events) + 1, kind=kind, at=now, status=status,
-                     node=node)
+            JobEvent(
+                seq=len(self.events) + 1, kind=kind, at=now, status=status, node=node
+            )
         )
         self.updated_at = now
 
@@ -344,7 +346,7 @@ async def execute_job(
     operator's alert cannot.
 
     A partial run is never a partial report. The deadline path stores no
-    ``report`` at all — six analyst lanes are what makes the output a STRIDE
+    ``report`` at all — six category lanes are what makes the output a STRIDE
     model, and one that stopped halfway is a different method, not a shorter
     answer.
     """

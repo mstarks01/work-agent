@@ -33,7 +33,7 @@ from google.genai import types
 
 from stride_service.graph import (
     STATE_INPUT_TEXT,
-    STATE_SOURCE_LABELS,
+    STATE_SOURCE_TEXTS,
     Pipeline,
 )
 from stride_service.report import NodeRun
@@ -149,10 +149,15 @@ class GraphExecutor:
                 "not seeded by the caller"
             )
         seed[STATE_INPUT_TEXT] = rendered
-        # The gate checks each citation against this set. It travels beside the
-        # rendered text because both are facts about the job rather than about
-        # the model, and both are the executor's to write.
-        seed[STATE_SOURCE_LABELS] = [source.label for source in sources]
+        # The same bytes, structured: the validity gate checks each element's
+        # citation against these labels, and the draft fan-in checks each
+        # finding's quote against the text under the label it names. Both travel
+        # beside the rendered copy because both are facts about the job rather
+        # than about the model, and both are the executor's to write. Keyed by
+        # label safely — a job with two sources sharing one is refused before it
+        # reaches here, since a citation naming two sources at once resolves
+        # while pointing nowhere.
+        seed[STATE_SOURCE_TEXTS] = {source.label: source.text for source in sources}
 
         session = await self._session_service.create_session(
             app_name=self._app_name, user_id=user_id, state=seed

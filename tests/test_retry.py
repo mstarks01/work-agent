@@ -147,7 +147,9 @@ class TestRetryAfter:
     def test_an_unparseable_value_falls_through_to_the_curve(self):
         # A date-formatted Retry-After: an unreadable hint is no hint, and
         # guessing at a date is worse than backing off.
-        assert _retry_after_seconds(rate_limited(**{"retry-after": "Wed, 21 Oct"})) is None
+        assert (
+            _retry_after_seconds(rate_limited(**{"retry-after": "Wed, 21 Oct"})) is None
+        )
 
     def test_no_headers_at_all_is_no_hint(self):
         assert _retry_after_seconds(rate_limited()) is None
@@ -174,7 +176,7 @@ class TestBackoff:
     def test_full_jitter_draws_across_the_whole_interval(self):
         """Not a fixed delay plus noise — the draw starts at zero.
 
-        That is what actually decorrelates six analysts that failed at the same
+        That is what actually decorrelates six category agents that failed at the same
         instant; a curve with jitter merely added keeps them clustered.
         """
         draws = [_backoff_seconds(3) for _ in range(200)]
@@ -265,7 +267,7 @@ class TestRetryingAdapter:
 class TestTheStormItself:
     """The property the whole change is for.
 
-    Six analysts hitting a provider that is refusing everything is the shape
+    Six category agents hitting a provider that is refusing everything is the shape
     that used to become thirty requests. What bounds it is that the budget is
     *shared*: a per-node allowance gives every node its full count regardless
     of what the others are seeing, which is exactly the wrong response to a
@@ -285,9 +287,7 @@ class TestTheStormItself:
                 async for _ in adapter.generate_content_async(None):
                     pass
 
-            await asyncio.gather(
-                *(one(a) for a in adapters), return_exceptions=True
-            )
+            await asyncio.gather(*(one(a) for a in adapters), return_exceptions=True)
 
         asyncio.run(scenario())
         return sum(adapter.calls for adapter in adapters)

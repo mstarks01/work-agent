@@ -227,9 +227,7 @@ def test_over_long_system_name_is_a_caller_error():
 def test_analyze_sync_runs_outside_a_loop():
     engine = engine_for(StubPipelineRunner())
 
-    outcome = engine.analyze_sync(
-        [Source.description("text")], system_name="Checkout"
-    )
+    outcome = engine.analyze_sync([Source.description("text")], system_name="Checkout")
 
     assert isinstance(outcome, PipelineCompleted)
     assert outcome.report.input.system_name == "Checkout"

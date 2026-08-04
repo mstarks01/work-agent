@@ -13,7 +13,7 @@ Mechanical first, judgement only where nothing else will do:
 4. **Adjudication of the unmatched** (judged, three buckets). Unmatched is
    *not* treated as a false positive: references are non-exhaustive by
    construction, so that rule would punish finding real threats and push every
-   tuning cycle toward under-reporting. Only ``ungrounded`` gates.
+   tuning cycle toward under-reporting. Only ``unsupported`` gates.
 5. **Severity calibration** (mechanical). ``derive_severity_level`` is shipped
    arithmetic; comparing bands needs no judge.
 
@@ -243,9 +243,9 @@ class CaseScore:
         return {bucket: counts.get(bucket, 0) for bucket in _BUCKETS}
 
     @property
-    def ungrounded_rate(self) -> float:
+    def unsupported_rate(self) -> float:
         """The one gating Tier 3 number: hallucination is what destroys trust."""
-        return ratio(self.bucket_counts["ungrounded"], self.produced_count)
+        return ratio(self.bucket_counts["unsupported"], self.produced_count)
 
     @property
     def severity_exact_rate(self) -> float:
@@ -276,7 +276,7 @@ class CaseScore:
                 "lane_accuracy": round(self.lane_accuracy, 3),
                 "element_accuracy": round(self.element_accuracy, 3),
                 "element_jaccard": round(self.element_jaccard, 3),
-                "ungrounded_rate": round(self.ungrounded_rate, 3),
+                "unsupported_rate": round(self.unsupported_rate, 3),
                 "severity_exact_rate": round(self.severity_exact_rate, 3),
             },
             "severity_confusion": self.severity_confusion,
@@ -289,7 +289,7 @@ class CaseScore:
         }
 
 
-_BUCKETS: tuple[Bucket, ...] = ("ungrounded", "valid-unlisted", "noise")
+_BUCKETS: tuple[Bucket, ...] = ("unsupported", "valid-unlisted", "noise")
 
 
 def ratio(numerator: float, denominator: float) -> float:
@@ -573,9 +573,7 @@ def severity_axis_agreement(matched: Sequence[MatchedPair]) -> dict[str, float]:
         "likelihood": ratio(
             sum(1 for pair in matched if pair.likelihood_agrees), len(matched)
         ),
-        "impact": ratio(
-            sum(1 for pair in matched if pair.impact_agrees), len(matched)
-        ),
+        "impact": ratio(sum(1 for pair in matched if pair.impact_agrees), len(matched)),
     }
 
 

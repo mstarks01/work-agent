@@ -165,7 +165,7 @@ That names the actors, the flows, three trust zones (public edge, VPC, the
 management network), the transport and auth on the exposed path, and the
 sensitive data — enough for a grounded model. What it leaves unsaid (is the S3
 bucket encrypted? is the admin console authenticated?) becomes `unknown`, which
-is exactly the signal the analysts act on.
+is exactly the signal the category agents act on.
 
 ## The three outcomes
 

@@ -68,6 +68,8 @@ async def main(engine: StrideEngine) -> None:
 
     assert isinstance(outcome, PipelineCompleted)
     summarise(outcome.report)
+
+
 # docs-region-end: embed
 
 

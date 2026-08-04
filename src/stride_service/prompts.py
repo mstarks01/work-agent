@@ -9,10 +9,10 @@ Composition here is concatenation only: the ``{category}``, ``{system_model}``,
 for ADK state templating to fill at run time.
 
 Order is stable-first, mirroring
-:func:`~stride_service.skills.compose_analyst_skills`: the one shared
-``analyst.md`` body precedes the per-category exemplar file, so the six
-analysts share the longest possible cacheable prefix. The token caps here are
-enforced by ``tests/test_prompt_lints.py``.
+:func:`~stride_service.skills.compose_analyze_skills`: the one shared
+``analyze.md`` body precedes the per-category exemplar file, so the six
+category agents share the longest possible cacheable prefix. The token caps
+here are enforced by ``tests/test_prompt_lints.py``.
 """
 
 from __future__ import annotations
@@ -25,7 +25,7 @@ from stride_service.report import StrideCategory
 PROMPT_SECTION_HEADINGS: tuple[str, ...] = ("Role", "Input", "Procedure", "Output")
 
 # The prompt bodies, by node kind.
-ANALYST_PROMPT_NAME = "analyst"
+ANALYZE_PROMPT_NAME = "analyze"
 CRITIC_PROMPT_NAME = "critic"
 RECRITIC_PROMPT_NAME = "recritic"
 EXTRACT_PROMPT_NAME = "extract"
@@ -33,7 +33,7 @@ REPAIR_PROMPT_NAME = "repair"
 PROMPT_BODY_NAMES: tuple[str, ...] = (
     EXTRACT_PROMPT_NAME,
     REPAIR_PROMPT_NAME,
-    ANALYST_PROMPT_NAME,
+    ANALYZE_PROMPT_NAME,
     CRITIC_PROMPT_NAME,
     RECRITIC_PROMPT_NAME,
 )
@@ -41,12 +41,21 @@ PROMPT_BODY_NAMES: tuple[str, ...] = (
 EXEMPLARS_PREFIX = "exemplars/"
 
 # Token caps per prompt file, checked in CI by the lint tests.
-ANALYST_PROMPT_TOKEN_CAP = 2000
+#
+# Raised from 2000 with the finding-attribution cutover, and to
+# ``EXTRACT_PROMPT_TOKEN_CAP`` exactly. The two differed precisely *because*
+# ``analyze.md`` did not read submitter text; it now carries the same ``## Input``
+# responsibility ``extract.md`` does — fenced submitter sources and the
+# data-not-instruction paragraph alike — so equalizing them follows from the
+# change rather than conceding to it. What the room buys: the labelled exemplar
+# source block, Procedure step 6, the rewritten ``## Input``, and the eighth
+# output field.
+ANALYZE_PROMPT_TOKEN_CAP = 2200
 EXEMPLAR_TOKEN_CAP = 1500
 CRITIC_PROMPT_TOKEN_CAP = 1500
 RECRITIC_PROMPT_TOKEN_CAP = 1000
 # Raised from 1500 with the sources cutover (#53, #56). The original was sized
-# against the *analyst's* 6-8K envelope, but extract loads no skills, so this
+# against the *category agent's* 6-8K envelope, but extract loads no skills, so this
 # file is the whole instruction — around 5% of a full-budget call. Buying room
 # for the seven reading rules and their worked examples is cheaper than
 # deleting the only worked examples the prompt has.
@@ -59,18 +68,18 @@ def exemplar_name(category: StrideCategory) -> str:
     return f"{EXEMPLARS_PREFIX}{category}"
 
 
-def compose_analyst_prompt(loader: MarkdownLoader, category: StrideCategory) -> str:
-    """One analyst's prompt: the shared body, then that category's exemplars.
+def compose_analyze_prompt(loader: MarkdownLoader, category: StrideCategory) -> str:
+    """One category agent's prompt: the shared body, then that category's exemplars.
 
-    ``{category}`` is left in place — one templated body serves all six
-    analysts rather than six near-identical copies.
+    ``{category}`` is left in place — one templated body serves all six agents
+    rather than six near-identical copies.
     """
-    parts = [loader.load(ANALYST_PROMPT_NAME), loader.load(exemplar_name(category))]
+    parts = [loader.load(ANALYZE_PROMPT_NAME), loader.load(exemplar_name(category))]
     return "\n\n".join(part.strip() for part in parts) + "\n"
 
 
 def compose_critic_prompt(loader: MarkdownLoader) -> str:
-    """The critic's prompt: the five judgement steps over all six analysts' drafts.
+    """The critic's prompt: the five judgement steps over all six agents' drafts.
 
     No exemplars — the critic rules on drafts it is given rather than
     producing new ones, and the mechanical checks it must not re-perform run

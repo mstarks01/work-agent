@@ -64,8 +64,7 @@ class OidcSettings(BaseModel):
     ) -> OidcSettings:
         """Read ``<prefix>_*`` settings from the env, failing closed on any gap."""
         env_vars = {
-            field: f"{prefix}_{suffix}"
-            for field, suffix in _OIDC_ENV_SUFFIXES.items()
+            field: f"{prefix}_{suffix}" for field, suffix in _OIDC_ENV_SUFFIXES.items()
         }
         values = {field: environ.get(var, "") for field, var in env_vars.items()}
         missing = [env_vars[field] for field, value in values.items() if not value]

@@ -59,11 +59,11 @@ DEFAULT_JUDGE_PROMPTS_DIR = EVALS_ROOT / "prompts"
 CLAIM_PROMPT_NAME = "judge_claim_equivalence"
 ADJUDICATION_PROMPT_NAME = "judge_adjudication"
 
-# ``ungrounded`` is the only gating bucket: a threat asserting a fact the
+# ``unsupported`` is the only gating bucket: a threat asserting a fact the
 # blessed model does not support is the failure that destroys trust in a
 # security report. ``valid-unlisted`` is explicitly *not* a failure —
 # references are non-exhaustive by construction.
-Bucket = Literal["ungrounded", "valid-unlisted", "noise"]
+Bucket = Literal["unsupported", "valid-unlisted", "noise"]
 
 RulingT = TypeVar("RulingT", bound=BaseModel)
 
@@ -147,8 +147,7 @@ def load_judge_config(path: Path | str = DEFAULT_JUDGE_CONFIG_PATH) -> JudgeConf
     version = raw.get("version")
     if version != SUPPORTED_VERSION:
         raise JudgeConfigError(
-            f"{path}: unsupported version {version!r};"
-            f" expected {SUPPORTED_VERSION}"
+            f"{path}: unsupported version {version!r}; expected {SUPPORTED_VERSION}"
         )
     try:
         return JudgeConfig(**raw)
@@ -368,7 +367,7 @@ class PinnedJudge:
         if self._resilience is not None:
             # The one place LiteLLM's own retry layer is deliberately left on.
             # The graph turns it off and runs the loop in
-            # ``stride_service.retry`` because six analysts firing at once turn
+            # ``stride_service.retry`` because six category agents firing at once turn
             # its ``2 * attempts - 1`` amplification into a 429 storm; the judge
             # is a sequential eval-time caller with nothing to fan out, so it
             # has no storm to protect against and no reason to carry a budget of

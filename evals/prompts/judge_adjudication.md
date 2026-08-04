@@ -16,14 +16,14 @@ finding. "Not in the reference" is not evidence of anything by itself.
 
 ## The three buckets
 
-- **`ungrounded`** — the threat asserts a fact the System Model does not
+- **`unsupported`** — the threat asserts a fact the System Model does not
   support. This is the bucket that matters. It covers: naming an element the
   model does not contain; asserting a control is *absent* when the attribute is
   `unknown` (unknown means unverified, never absent); asserting a trust
   boundary is crossed when the two elements' `trust_zone` values are the same,
   or that one is not crossed when they differ; inventing a technology,
   protocol, data classification or asset tag the model does not record.
-  Grounded reasoning *from* recorded unknowns is not ungrounded — a threat that
+  Grounded reasoning *from* recorded unknowns is not unsupported — a threat that
   says "authentication on this flow is unverified, so an attacker may be able
   to X" is grounded.
 - **`valid-unlisted`** — the threat is grounded in the model and describes a
@@ -38,9 +38,9 @@ finding. "Not in the reference" is not evidence of anything by itself.
 
 Where a threat could arguably be `valid-unlisted` or `noise`, prefer
 `valid-unlisted` unless the duplication or vacuity is plain. Where it could be
-`ungrounded` or `valid-unlisted`, the deciding question is narrow: **is there a
+`unsupported` or `valid-unlisted`, the deciding question is narrow: **is there a
 specific fact asserted here that the model contradicts or does not contain?**
-If you cannot point at one, it is not ungrounded.
+If you cannot point at one, it is not unsupported.
 
 Do not judge severity, wording, or whether the threat is worth acting on.
 
@@ -48,8 +48,8 @@ Do not judge severity, wording, or whether the threat is worth acting on.
 
 Return JSON with exactly two fields:
 
-- `bucket` — `ungrounded`, `valid-unlisted`, or `noise`.
-- `rationale` — one sentence. For `ungrounded`, name the exact unsupported
+- `bucket` — `unsupported`, `valid-unlisted`, or `noise`.
+- `rationale` — one sentence. For `unsupported`, name the exact unsupported
   fact and what the model says instead; for `noise`, name the claim it
   duplicates. This is read by humans auditing the run and by the SME deciding
   what to promote into the reference set.
