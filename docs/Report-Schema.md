@@ -40,6 +40,14 @@ class StrideReport:
 of drafts the critic ruled out. Both are the same `Threat` type — placement is
 decided by the verdict.
 
+**How `schema_version` moves.** Adding a field is a **minor** bump: a consumer
+reading the fields it already knows is unaffected. Changing the *meaning* or the
+*spelling* of something that already exists — renaming a field, renaming a value
+inside an existing enum, or narrowing what a field may contain — is a **major**
+bump, because that is the change a consumer cannot detect by reading its own
+fields and will otherwise misread silently. One bump covers a whole cutover,
+however many changes it carries.
+
 ## A threat
 
 `InputRef` ties the report to what was submitted without carrying the text:

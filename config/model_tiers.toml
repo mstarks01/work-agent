@@ -1,10 +1,21 @@
 # Model-tier configuration — source of truth for tier -> (vendor, model) and
 # LLM node -> tier.
 #
-# Version 3 (wayfinder #5 / #9 / #15) is a hard cutover from version 2, not a
-# migration: the `flash`/`pro` tier keys became the vendor-neutral `base` and
-# `strong`, and each tier's bare model string became a (vendor, model) pair.
-# There is no v2 shim — a version-2 file fails the loader's version check.
+# Version 4 (#77 / #85) is a hard cutover from version 3, not a migration: the
+# six `analyst/<category>` node keys became `analyze/<category>`. There is no v3
+# shim — a version-3 file fails the loader's version check, which is the point:
+# a stale key would otherwise be reported as "unknown node" and "missing node"
+# in the same breath, and the fix is a rename, not a merge.
+#
+# WHY THE KEYS MOVED: `Analyst` now names a human — the person reading the
+# report — so the six nodes are named for what they do. They analyse one STRIDE
+# category each, hence `analyze/<category>`. The graph's own node names are a
+# separate namespace and move in the same cutover as the report schema; see
+# `TIER_NODE_BY_GRAPH_NODE` in graph.py for the mapping between the two.
+#
+# Version 3 (wayfinder #5 / #9 / #15) was itself a hard cutover from version 2:
+# the `flash`/`pro` tier keys became the vendor-neutral `base` and `strong`, and
+# each tier's bare model string became a (vendor, model) pair.
 #
 # WHY A PAIR, NOT A ROUTER STRING: `vertex_ai/gemini-2.5-pro` would have to be
 # parsed back apart by all three consumers that need the vendor as a key — the
@@ -14,8 +25,8 @@
 # classes). The prefix lives in exactly one place: the vendor registry.
 #
 # TIER NAMES are a capability axis, not a vendor's product line: `base` is the
-# workhorse (extraction, repair), `strong` is judgement (the six analysts, the
-# critic, the re-ask). The old `flash`/`pro` were Gemini product names and would
+# workhorse (extraction, repair), `strong` is judgement (the six category
+# agents, the critic, the re-ask). The old `flash`/`pro` were Gemini product names and would
 # be an active lie under a Claude or GPT model string. The two tiers select
 # independently, so mixed-vendor pairs are ordinary, not a special case.
 #
@@ -50,7 +61,7 @@
 # picked. The three vendors are reached through one adapter and differ only in
 # the credential mode each implies; none is cheaper to select than the others.
 
-version = 3
+version = 4
 
 # CHOOSE A VENDOR AND MODEL FOR EACH TIER. Uncomment one pair per tier below, or
 # set STRIDE_MODEL_{BASE,STRONG}_VENDOR together with the matching _MODEL — the
@@ -73,12 +84,12 @@ version = 3
 [nodes]
 extract = "base"
 repair = "base"
-"analyst/spoofing" = "strong"
-"analyst/tampering" = "strong"
-"analyst/repudiation" = "strong"
-"analyst/information-disclosure" = "strong"
-"analyst/denial-of-service" = "strong"
-"analyst/elevation-of-privilege" = "strong"
+"analyze/spoofing" = "strong"
+"analyze/tampering" = "strong"
+"analyze/repudiation" = "strong"
+"analyze/information-disclosure" = "strong"
+"analyze/denial-of-service" = "strong"
+"analyze/elevation-of-privilege" = "strong"
 critic = "strong"
 # The bounded critic re-ask (ticket 038): same judgement as the critic, so
 # always the same tier — a separate line here only so it is pinned, never so it

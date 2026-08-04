@@ -6,7 +6,7 @@ from typing import ClassVar
 import pytest
 
 from stride_service.model_tiers import (
-    ANALYST_NODES,
+    CATEGORY_NODES,
     LLM_NODES,
     SUPPORTED_VERSION,
     TIER_NAMES,
@@ -63,8 +63,8 @@ class TestNodeInventory:
         assert LLM_NODES[:2] == ("extract", "repair")
         # The critic and its bounded re-ask close the list.
         assert LLM_NODES[-2:] == ("critic", "recritic")
-        assert len(ANALYST_NODES) == 6
-        assert all(node.startswith("analyst/") for node in ANALYST_NODES)
+        assert len(CATEGORY_NODES) == 6
+        assert all(node.startswith("analyze/") for node in CATEGORY_NODES)
 
     def test_exactly_two_tiers_named_on_a_capability_axis(self):
         # Not flash/pro: those were one vendor's product names and would be an
@@ -118,7 +118,7 @@ class TestRepoConfig:
         assert config.nodes["extract"] == "base"
         assert config.nodes["repair"] == "base"
         assert config.nodes["critic"] == "strong"
-        for node in ANALYST_NODES:
+        for node in CATEGORY_NODES:
             assert config.nodes[node] == "strong"
 
 

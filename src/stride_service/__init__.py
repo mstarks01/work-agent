@@ -45,7 +45,7 @@ from stride_service.markdown_loader import (
     MarkdownNotFoundError,
 )
 from stride_service.model_tiers import (
-    ANALYST_NODES,
+    CATEGORY_NODES,
     LLM_NODES,
     TIER_NAMES,
     ModelConfigError,
@@ -122,7 +122,7 @@ from stride_service.validation import (
 )
 
 __all__ = [
-    "ANALYST_NODES",
+    "CATEGORY_NODES",
     "CATEGORY_SKILL_TOKEN_CAP",
     "CORE_ASSET_TAGS",
     "DEFAULT_CALLER",
