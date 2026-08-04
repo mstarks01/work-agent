@@ -26,7 +26,7 @@ from stride_service.graph import (
     ENTRY_PREPARE,
     EXTRACT_NODE,
     TIER_NODE_BY_GRAPH_NODE,
-    analyst_node_name,
+    analyze_node_name,
 )
 from stride_service.report import (
     CATEGORY_LETTERS,
@@ -48,7 +48,13 @@ def case():
 
 
 def scripted_draft(case, category) -> dict:
-    """One analyst draft citing an element the blessed model really contains."""
+    """One category agent's draft citing an element the blessed model contains.
+
+    Grounded on an ``unknown-attribute`` rather than a quote: the corpus case
+    ships real sources, so a scripted quote would have to be a verbatim span of
+    one to survive the fan-in's ladder, and these tests are about the modes
+    rather than about grounding.
+    """
     reference = next(ref for ref in case.references if ref.category == category)
     return {
         "id": f"{CATEGORY_LETTERS[category]}-01",
@@ -56,6 +62,13 @@ def scripted_draft(case, category) -> dict:
         "title": reference.claim,
         "description": f"{reference.claim} Scripted for the offline mode test.",
         "affected_element_ids": list(reference.affected_element_ids),
+        "grounds": [
+            {
+                "kind": "unknown-attribute",
+                "element_id": reference.affected_element_ids[0],
+                "attribute": "name",
+            }
+        ],
         "severity": Severity(
             likelihood=reference.severity.likelihood,
             impact=reference.severity.impact,
@@ -103,7 +116,7 @@ def _reply_for(case, graph_node: str) -> str:
             {"threats": [scripted_ruling(category) for category in STRIDE_CATEGORIES]}
         )
     for category in STRIDE_CATEGORIES:
-        if graph_node == analyst_node_name(category):
+        if graph_node == analyze_node_name(category):
             return json.dumps({"threats": [scripted_draft(case, category)]})
     return '{"threats": []}'
 
@@ -114,11 +127,11 @@ def test_analysis_mode_injects_the_blessed_model_at_prepare(case):
 
     report = asyncio.run(modes.run_analysis(case, pipeline)).report
 
-    # No extraction ran, and the analysts saw exactly the blessed model — the
+    # No extraction ran, and the category agents saw exactly the blessed model — the
     # whole point of the mode.
     assert "extract" not in models
     assert report.system_model == case.model
-    spoofing = models[analyst_node_name("spoofing")].seen[0]
+    spoofing = models[analyze_node_name("spoofing")].seen[0]
     assert "flow:shopper-to-storefront-api:place-order" in spoofing
 
 
@@ -139,9 +152,7 @@ def test_analysis_mode_scores_against_the_reference_set(case):
     report = asyncio.run(modes.run_analysis(case, pipeline)).report
     # The scripted threats are titled with reference claims verbatim, so a
     # judge that matches identical strings is the honest stand-in here.
-    judge = ScriptedJudge(
-        (threat.title, threat.title) for threat in report.threats
-    )
+    judge = ScriptedJudge((threat.title, threat.title) for threat in report.threats)
 
     score = score_case(case, report.threats, judge)
 
@@ -203,9 +214,7 @@ def test_extraction_scoring_reports_missing_and_extra_elements(case):
         update={"processes": result.extracted.processes[:1]}
     )
 
-    score = modes.score_extraction(
-        case, modes.ExtractionResult(case.id, trimmed, ())
-    )
+    score = modes.score_extraction(case, modes.ExtractionResult(case.id, trimmed, ()))
 
     assert score.missing
     assert score.recall < 1.0

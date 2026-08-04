@@ -4,9 +4,10 @@ from pathlib import Path
 from typing import ClassVar
 
 import pytest
+from pydantic import ValidationError
 
 from stride_service.model_tiers import (
-    ANALYST_NODES,
+    CATEGORY_NODES,
     LLM_NODES,
     SUPPORTED_VERSION,
     TIER_NAMES,
@@ -59,12 +60,12 @@ def config_path(tmp_path):
 
 
 class TestNodeInventory:
-    def test_llm_nodes_are_bookends_plus_analysts_plus_critic(self):
+    def test_llm_nodes_are_bookends_plus_category_agents_plus_critic(self):
         assert LLM_NODES[:2] == ("extract", "repair")
         # The critic and its bounded re-ask close the list.
         assert LLM_NODES[-2:] == ("critic", "recritic")
-        assert len(ANALYST_NODES) == 6
-        assert all(node.startswith("analyst/") for node in ANALYST_NODES)
+        assert len(CATEGORY_NODES) == 6
+        assert all(node.startswith("analyze/") for node in CATEGORY_NODES)
 
     def test_exactly_two_tiers_named_on_a_capability_axis(self):
         # Not flash/pro: those were one vendor's product names and would be an
@@ -118,7 +119,7 @@ class TestRepoConfig:
         assert config.nodes["extract"] == "base"
         assert config.nodes["repair"] == "base"
         assert config.nodes["critic"] == "strong"
-        for node in ANALYST_NODES:
+        for node in CATEGORY_NODES:
             assert config.nodes[node] == "strong"
 
 
@@ -135,9 +136,7 @@ class TestResolution:
         assert config.resolve_model("extract").route == "vertex_ai/gemini-2.5-flash"
 
     def test_the_two_tiers_may_run_different_vendors_at_once(self, config_path):
-        text = config_toml(
-            strong_vendor="anthropic", strong="claude-opus-5"
-        )
+        text = config_toml(strong_vendor="anthropic", strong="claude-opus-5")
         config = load_model_tiers(config_path(text), env={})
         assert config.resolve_model("extract").vendor == "vertex"
         assert config.resolve_model("critic").vendor == "anthropic"
@@ -162,9 +161,7 @@ class TestEnvOverrides:
         vendor_var, model_var = env_vars_for("base")
         env = {vendor_var: "anthropic", model_var: "claude-opus-5"}
         config = load_model_tiers(config_path(config_toml()), env=env)
-        assert config.resolve_model("extract").route == (
-            "anthropic/claude-opus-5"
-        )
+        assert config.resolve_model("extract").route == ("anthropic/claude-opus-5")
 
     def test_the_path_variable_can_actually_be_set(self, config_path):
         """``STRIDE_TIERS_FILE`` points the loader at a valid file and is read.
@@ -349,7 +346,7 @@ class TestFileValidation:
 
     def test_config_is_frozen(self, config_path):
         config = load_model_tiers(config_path(config_toml()), env={})
-        with pytest.raises(Exception):
+        with pytest.raises(ValidationError):
             config.version = 2
 
     def test_os_environ_is_default_env(self, config_path, monkeypatch):

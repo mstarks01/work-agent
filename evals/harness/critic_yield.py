@@ -1,8 +1,8 @@
 """Both sides of the critic, scored from one run.
 
 The critic is the most expensive node in the graph — one strong-tier pass over
-every analyst's output — and this module is the evidence that it earns that
-cost. It is deliberately two-sided: a critic that kills ungrounded threats is
+every category agent's output — and this module is the evidence that it earns that
+cost. It is deliberately two-sided: a critic that kills unsupported threats is
 earning its cost, and the *same* critic killing threats that matched a
 reference is destroying real findings. Only the pair means anything. A kill
 count alone can be read as either.
@@ -58,7 +58,7 @@ Disposition = Literal[
     "matched-must-find",
     "matched-expected",
     "lane-error",
-    "ungrounded",
+    "unsupported",
     "valid-unlisted",
     "noise",
     "needs-info",
@@ -100,8 +100,8 @@ class CriticYield:
     drafts_in: int
     threats_out: int
     killed: tuple[KilledDraft, ...]
-    ungrounded_before: int
-    ungrounded_after: int
+    unsupported_before: int
+    unsupported_after: int
     matched_before: int
     matched_after: int
     must_find_before: int
@@ -111,9 +111,9 @@ class CriticYield:
     # --- the two numbers that matter -------------------------------------
 
     @property
-    def ungrounded_killed(self) -> int:
-        """The critic earning its cost: ungrounded drafts it removed."""
-        return sum(1 for draft in self.killed if draft.disposition == "ungrounded")
+    def unsupported_killed(self) -> int:
+        """The critic earning its cost: unsupported drafts it removed."""
+        return sum(1 for draft in self.killed if draft.disposition == "unsupported")
 
     @property
     def matched_killed(self) -> int:
@@ -143,9 +143,9 @@ class CriticYield:
         return ratio(self.kill_count, self.drafts_in)
 
     @property
-    def ungrounded_kill_rate(self) -> float:
-        """Of the ungrounded drafts it was handed, the share it caught."""
-        return ratio(self.ungrounded_killed, self.ungrounded_before)
+    def unsupported_kill_rate(self) -> float:
+        """Of the unsupported drafts it was handed, the share it caught."""
+        return ratio(self.unsupported_killed, self.unsupported_before)
 
     @property
     def matched_kill_rate(self) -> float:
@@ -154,14 +154,14 @@ class CriticYield:
 
     @property
     def kill_precision(self) -> float:
-        """Of what it killed, the share that was ungrounded.
+        """Of what it killed, the share that was unsupported.
 
         Deliberately *not* the inverse of :attr:`matched_kill_rate`: a killed
         ``valid-unlisted`` draft is neither a win nor a loss here, because the
         reference sets are non-exhaustive by construction and the corpus
         feedback loop, not this instrument, is what settles those.
         """
-        return ratio(self.ungrounded_killed, self.kill_count)
+        return ratio(self.unsupported_killed, self.kill_count)
 
     def to_json(self) -> dict[str, Any]:
         return {
@@ -170,9 +170,9 @@ class CriticYield:
                 "drafts_in": self.drafts_in,
                 "threats_out": self.threats_out,
                 "killed": self.kill_count,
-                "ungrounded_before": self.ungrounded_before,
-                "ungrounded_after": self.ungrounded_after,
-                "ungrounded_killed": self.ungrounded_killed,
+                "unsupported_before": self.unsupported_before,
+                "unsupported_after": self.unsupported_after,
+                "unsupported_killed": self.unsupported_killed,
                 "matched_before": self.matched_before,
                 "matched_after": self.matched_after,
                 "matched_killed": self.matched_killed,
@@ -183,7 +183,7 @@ class CriticYield:
             },
             "metrics": {
                 "kill_rate": round(self.kill_rate, 3),
-                "ungrounded_kill_rate": round(self.ungrounded_kill_rate, 3),
+                "unsupported_kill_rate": round(self.unsupported_kill_rate, 3),
                 "matched_kill_rate": round(self.matched_kill_rate, 3),
                 "kill_precision": round(self.kill_precision, 3),
             },
@@ -245,8 +245,8 @@ def _yield(
         drafts_in=pre.produced_count,
         threats_out=post.produced_count,
         killed=killed,
-        ungrounded_before=pre.bucket_counts["ungrounded"],
-        ungrounded_after=post.bucket_counts["ungrounded"],
+        unsupported_before=pre.bucket_counts["unsupported"],
+        unsupported_after=post.bucket_counts["unsupported"],
         matched_before=len(pre.matched),
         matched_after=len(post.matched),
         must_find_before=pre.must_find_matched,
@@ -259,7 +259,7 @@ def _dispositions(score: CaseScore) -> dict[str, tuple[Disposition, int | None]]
     """Every produced threat's fate in one scoring pass, keyed by threat ID.
 
     Threat IDs are unique within a run — :func:`~stride_service.critic.
-    join_drafts` fails closed if two analysts reuse one — so a dict is a safe
+    join_drafts` fails closed if two category agents reuse one — so a dict is a safe
     index. The scorer's outcomes are mutually exclusive by construction: a
     threat is matched, or a lane error, or ``needs-info``, or adjudicated into
     exactly one bucket. ``unscored`` should be unreachable, and is here so that
@@ -292,8 +292,8 @@ def aggregate_yield(yields: Sequence[CriticYield]) -> dict[str, Any]:
     """
     drafts_in = sum(entry.drafts_in for entry in yields)
     killed = sum(entry.kill_count for entry in yields)
-    ungrounded_before = sum(entry.ungrounded_before for entry in yields)
-    ungrounded_killed = sum(entry.ungrounded_killed for entry in yields)
+    unsupported_before = sum(entry.unsupported_before for entry in yields)
+    unsupported_killed = sum(entry.unsupported_killed for entry in yields)
     matched_before = sum(entry.matched_before for entry in yields)
     matched_killed = sum(entry.matched_killed for entry in yields)
     must_find_killed = sum(entry.must_find_killed for entry in yields)
@@ -302,11 +302,13 @@ def aggregate_yield(yields: Sequence[CriticYield]) -> dict[str, Any]:
         "drafts_in": drafts_in,
         "threats_out": sum(entry.threats_out for entry in yields),
         "killed": killed,
-        "ungrounded_killed": ungrounded_killed,
+        "unsupported_killed": unsupported_killed,
         "matched_killed": matched_killed,
         "must_find_killed": must_find_killed,
         "kill_rate": round(ratio(killed, drafts_in), 3),
-        "ungrounded_kill_rate": round(ratio(ungrounded_killed, ungrounded_before), 3),
+        "unsupported_kill_rate": round(
+            ratio(unsupported_killed, unsupported_before), 3
+        ),
         "matched_kill_rate": round(ratio(matched_killed, matched_before), 3),
-        "kill_precision": round(ratio(ungrounded_killed, killed), 3),
+        "kill_precision": round(ratio(unsupported_killed, killed), 3),
     }

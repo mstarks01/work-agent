@@ -121,7 +121,7 @@ gh workflow run "Evals (live Vertex)" -f mode=extraction
 ```
 
 `extraction` is the cheap mode — it exercises the whole auth path against the
-`base` tier without spending six analysts and a critic per case.
+`base` tier without spending six category agents and a critic per case.
 
 ## Cost
 
@@ -135,7 +135,7 @@ Confirmed against Vertex list pricing (standard tier, July 2026) for the models
 | Gemini 2.5 Flash | $0.30 / 1M | $2.50 / 1M |
 
 A full `end-to-end` sweep is twelve cases × (one `base` extraction + six
-`strong` analysts + one `strong` critic), plus the judge's calls during scoring.
+`strong` category agents + one `strong` critic), plus the judge's calls during scoring.
 Output tokens dominate at $10/1M, and the eight-way `strong` fan-out is the
 whole bill. The original "~$0.30/case" estimate is the right order of magnitude
 for a run that stays inside the corpus's 8–20 element sizing, but it is an

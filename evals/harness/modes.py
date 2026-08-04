@@ -2,14 +2,14 @@
 
 Two artifacts per case buy three modes, and the point of the split is
 **attribution**: an end-to-end-only fixture cannot say whether a recall miss
-was an analyst failure or an element ``extract`` never produced.
+was a category-agent failure or an element ``extract`` never produced.
 
 * **extraction** — source text vs. the blessed model. Runs the shipped
   ``extract`` node alone and puts its emission through the same shipped
   validity gate ``validate`` uses.
 * **analysis** — the blessed model injected at ``prepare``, scored against the
   reference threats. Deterministic input, so every threat number is
-  attributable to the analysts and critic.
+  attributable to the category agents and critic.
 * **end-to-end** — text in, report out. The integration smoke test.
 
 All three drive the *shipped* graph via
@@ -185,9 +185,7 @@ async def run_graph(
     than one certifying an empty observation set.
     """
     executor = GraphExecutor(pipeline, app_name=EVAL_APP_NAME)
-    return await executor.run(
-        sources, user_id=EVAL_USER, extra_state=extra_state
-    )
+    return await executor.run(sources, user_id=EVAL_USER, extra_state=extra_state)
 
 
 async def run_extraction(case: GoldenCase, pipeline: Pipeline) -> ExtractionResult:
@@ -246,7 +244,7 @@ def _crossings_match(blessed: SystemModel, extracted: SystemModel | None) -> boo
 async def run_analysis(case: GoldenCase, pipeline: Pipeline) -> AnalysisRun:
     """Mode 2: the blessed model injected at ``prepare``.
 
-    The seeded ``valid_model`` is the blessed one, so the analysts see exactly
+    The seeded ``valid_model`` is the blessed one, so the category agents see exactly
     what the SME blessed and nothing depends on that run's extraction.
     """
     graph_run = await run_graph(
@@ -295,13 +293,13 @@ def _run_from_graph(
         input=InputRef.of(system_name=case.meta.title, sources=case.sources),
         nodes=graph_run.node_runs,
         sampling={
-            tier: params.model_dump()
-            for tier, params in pipeline.tier_sampling.items()
+            tier: params.model_dump() for tier, params in pipeline.tier_sampling.items()
         },
         system_model=analysis.system_model,
         boundary_crossings=analysis.boundary_crossings,
         threats=analysis.threats,
         rejected_threats=analysis.rejected_threats,
+        unverified_grounds=analysis.unverified_grounds,
         summary=analysis.summary,
     )
     drafts = tuple(

@@ -79,7 +79,7 @@ def test_an_unknown_node_fails_closed(tiers, sampling):
     binding = NodeBinding.from_configs(tiers, sampling, _resolver)
 
     with pytest.raises(ModelConfigError, match="unknown LLM node"):
-        binding.resolve_sampling("analyst/nonexistent")
+        binding.resolve_sampling("analyze/nonexistent")
 
 
 def test_resolve_model_stays_the_callers(tiers, sampling):

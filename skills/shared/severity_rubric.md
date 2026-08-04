@@ -35,4 +35,4 @@ What is lost if the threat succeeds? Anchor on model facts:
 - Do not inflate likelihood to express high impact, or vice versa — the matrix combines them; each axis is rated on its own evidence.
 - Threats conditioned on `unknown` attributes keep their conditional framing: rate as stated above and leave resolution to the needs-info verdict path.
 - An element's `notes` **never moves a rating.** It carries what someone said about a fact — a hedge, an admitted gap, two sources contradicting each other — rather than the fact itself, so an `unknown` attribute rates identically whether a speaker was unsure about it, two people disagreed about it, or nobody raised it at all. Read `notes` to sharpen the question you ask or the mitigation you name; never to raise or lower likelihood or impact.
-- The critic calibrates ratings across categories for consistency: identical fact patterns must receive identical ratings regardless of which analyst produced them.
+- The critic calibrates ratings across categories for consistency: identical fact patterns must receive identical ratings regardless of which agent produced them.

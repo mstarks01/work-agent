@@ -175,9 +175,7 @@ def _score_runs(
     )
 
 
-def _models_record(
-    deployment: Deployment, judge: PinnedJudge | None
-) -> dict[str, Any]:
+def _models_record(deployment: Deployment, judge: PinnedJudge | None) -> dict[str, Any]:
     """What this run asked its providers for, and what they say they served.
 
     The tier strings are stable GA identifiers, not immutable builds, so the
@@ -204,7 +202,7 @@ def _print_scores(scores: Sequence[CaseScore]) -> None:
             f"  recall {score.recall:.2f}"
             f"  lane {score.lane_accuracy:.2f}"
             f"  element {score.element_accuracy:.2f}"
-            f"  ungrounded {score.ungrounded_rate:.2f}"
+            f"  unsupported {score.unsupported_rate:.2f}"
         )
     if scores:
         delta = exemplar_delta(scores)
@@ -218,14 +216,14 @@ def _print_scores(scores: Sequence[CaseScore]) -> None:
 def _print_yields(yields: Sequence[CriticYield]) -> None:
     """Both sides of the critic, always printed together.
 
-    ``killed-real`` is deliberately on the same line as ``killed-ungrounded``:
+    ``killed-real`` is deliberately on the same line as ``killed-unsupported``:
     a kill count read on its own says nothing about whether the critic is
     filtering noise or destroying findings.
     """
     for entry in yields:
         print(
             f"{entry.case_id:<26} critic {entry.drafts_in}->{entry.threats_out}"
-            f"  killed-ungrounded {entry.ungrounded_killed}/{entry.ungrounded_before}"
+            f"  killed-unsupported {entry.unsupported_killed}/{entry.unsupported_before}"
             f"  killed-real {entry.matched_killed}/{entry.matched_before}"
             f"  (must-find {entry.must_find_killed})"
         )
@@ -234,7 +232,7 @@ def _print_yields(yields: Sequence[CriticYield]) -> None:
         print(
             f"critic yield: killed {totals['killed']}/{totals['drafts_in']}"
             f" ({totals['kill_rate']:.0%}),"
-            f" ungrounded caught {totals['ungrounded_kill_rate']:.0%},"
+            f" unsupported caught {totals['unsupported_kill_rate']:.0%},"
             f" real destroyed {totals['matched_kill_rate']:.0%}"
             " (instrument, non-gating)"
         )

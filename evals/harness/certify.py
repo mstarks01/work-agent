@@ -216,7 +216,6 @@ def _rewrite_line(
     return param, f"{rebuilt.rstrip()}\n"
 
 
-
 def _dump_manifest(manifest: BlessedManifest) -> str:
     """Serialize the manifest to TOML, sorted for a stable, reviewable diff.
 

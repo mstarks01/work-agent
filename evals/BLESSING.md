@@ -124,12 +124,13 @@ pass:
    transit, encryption at rest, exposure, and data classification: does the text
    state it? If not, is it `unknown`? A plausible value the text never gave is
    the most common and most damaging error — and inventing an *absence* ("no
-   encryption") is worse than inventing a control, because analysts file
+   encryption") is worse than inventing a control, because category agents file
    confident findings on it.
 4. **Every stated qualifier** — "shared", "never rotated", "full read/write",
-   "does not check": is it in an attribute an analyst will read, or did it only
+   "does not check": is it in an attribute a category agent will read, or did it only
    survive as a quoted excerpt? A qualifier stranded in a quote is invisible
-   downstream. This is the single most repeated extraction failure.
+   downstream — literally so: `source_excerpt` is stripped from the model the
+   category agents read. This is the single most repeated extraction failure.
 5. **Every inference** — does each non-`unknown` value the text *didn't* state
    appear in the model's `assumptions` list, with a basis? An inferred value with
    no matching assumption is a bug.
@@ -180,7 +181,7 @@ bar**, and they're what lets the scorer be tested with no live calls at all.
   matches: matching is decided on the claim, and element agreement is scored
   separately.
 - **Include candidates that assert facts the model doesn't support.** Those are
-  no-match — and downstream they're the "ungrounded" bucket that counts against
+  no-match — and downstream they're the "unsupported" bucket that counts against
   the tool.
 - **Keep the set balanced;** `verify_corpus.py` fails if either label drops below
   30%.
@@ -212,3 +213,19 @@ artifact). Review the recurring ones and promote them into the reference set at
 the next blessing pass — which is just steps 4–6 again, for that one case.
 Promoting a threat is always a reviewed change with a human explaining why; it's
 never automatic.
+
+**A promoted threat arrives carrying `grounds`, and loses them.** A reference
+threat keeps its six fields, so write step 4's entry as you would any other and
+drop the grounds on the way in. That is deliberate, not an oversight: a
+hand-authored ground would be graded by nothing. Grounds are produced by a
+category agent and checked against the case's real `source.md` at merge time, so
+adding them here would mean extending `ReferenceThreat` *and* writing a scorer
+to measure agreement between a human's choice of evidence and an agent's — which
+is not a property this corpus exists to measure, and would put every reference
+threat on the maintenance path for it. Do not carry what you do not grade.
+
+The grounds are still worth *reading* before you promote. A threat whose only
+ground is an `unknown-attribute` is telling you the case leaves that attribute
+unstated, which is a fact about your `model.json`, and a `quote` ground points
+at the sentence in `source.md` that a real reference entry should have been
+written from.

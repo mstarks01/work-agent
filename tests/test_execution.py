@@ -16,6 +16,7 @@ import pytest
 
 from stride_service import graph
 from stride_service.execution import GraphExecutor
+from stride_service.report import Ground
 from stride_service.sampling import (
     TierSampling,
     load_sampling,
@@ -44,8 +45,8 @@ def happy_replies() -> dict[str, str]:
     """Extraction succeeds; spoofing drafts one threat; the critic confirms it."""
     return {
         "extract": valid_model().model_dump_json(),
-        # An analyst emits a draft — the critic's two rulings are not its to make.
-        graph.analyst_node_name("spoofing"): threats_json(
+        # A category agent emits a draft — the critic's two rulings are not its to make.
+        graph.analyze_node_name("spoofing"): threats_json(
             sample_draft("S-01", "spoofing")
         ),
         "critic": threats_json(sample_ruling("S-01")),
@@ -209,9 +210,24 @@ class TestSourceRendering:
             Source.description("a web app storing orders", label="Doc"),
             Source.transcript("Ana: it writes to Postgres.", label="Kickoff call"),
         ]
-        # The scripted model must cite a label this job carries, or the gate
-        # rejects it before the run reaches an analysis.
-        replies = happy_replies() | {"extract": valid_model("Doc").model_dump_json()}
+        # The scripted models must cite labels this job carries: the gate checks
+        # each element's excerpt citation, and the draft fan-in checks each
+        # finding's quote against the source it names.
+        draft = sample_draft(
+            "S-01",
+            "spoofing",
+            grounds=[
+                Ground(
+                    kind="quote",
+                    text="a web app storing orders",
+                    source_label="Doc",
+                )
+            ],
+        )
+        replies = happy_replies() | {
+            "extract": valid_model("Doc").model_dump_json(),
+            graph.analyze_node_name("spoofing"): threats_json(draft),
+        }
         pipeline, models = scripted_pipeline(replies)
 
         drive(pipeline, sources=sources)
@@ -243,9 +259,9 @@ class TestSourceRendering:
             return await executor.run(
                 [Source.description("text")],
                 user_id="test-user",
-                extra_state={graph.STATE_VALID_MODEL: valid_model().model_dump(
-                    mode="json"
-                )},
+                extra_state={
+                    graph.STATE_VALID_MODEL: valid_model().model_dump(mode="json")
+                },
             )
 
         run = asyncio.run(scenario())

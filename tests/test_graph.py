@@ -54,17 +54,17 @@ class FakeContext:
         self.state = dict(state)
 
 
-def analyst_state(**drafts_by_category: list) -> dict[str, object]:
-    """State as six analysts that all ran leave it.
+def analyze_state(**drafts_by_category: list) -> dict[str, object]:
+    """State as six category agents that all ran leave it.
 
-    Every lane gets a key, because ``merge_drafts`` distinguishes an analyst
+    Every lane gets a key, because ``merge_drafts`` distinguishes a category agent
     that found nothing (``{"threats": []}``, its key written) from one that
     emitted nothing (no key at all, a truncated completion). A test seeding only
     the lanes it cares about would be asserting against the second, which is a
     failed job.
     """
     return {
-        graph.analyst_state_key(category): {
+        graph.analyze_state_key(category): {
             "threats": [
                 draft.model_dump(mode="json")
                 for draft in drafts_by_category.get(category.replace("-", "_"), [])
@@ -190,7 +190,7 @@ def test_each_llm_node_binds_its_own_tier_sampling(
 ):
     """Sampling is resolved per node, not shared graph-wide.
 
-    ``extract``/``repair`` run on base, the analysts and critic/recritic on
+    ``extract``/``repair`` run on base, the category agents and critic/recritic on
     strong; with the two tiers pinned to different decoding params, each node
     must carry *its* tier's ``GenerateContentConfig``.
     """
@@ -205,7 +205,7 @@ def test_each_llm_node_binds_its_own_tier_sampling(
     strong_nodes = (
         graph.CRITIC_NODE,
         graph.RECRITIC_NODE,
-        *graph.ANALYST_GRAPH_NODES,
+        *graph.ANALYZE_GRAPH_NODES,
     )
     for name in base_nodes:
         config = nodes[name].generate_content_config
@@ -285,7 +285,7 @@ def test_deterministic_bookends_carry_no_model(pipeline):
     assert isinstance(nodes_by_name(pipeline)[graph.JOIN_NODE], JoinNode)
 
 
-def test_six_analysts_fan_out_from_prepare_and_join(pipeline):
+def test_six_category_agents_fan_out_from_prepare_and_join(pipeline):
     edges = pipeline.workflow.graph.edges
     fanned = {
         edge.to_node.name for edge in edges if edge.from_node.name == graph.PREPARE_NODE
@@ -293,8 +293,8 @@ def test_six_analysts_fan_out_from_prepare_and_join(pipeline):
     joined = {
         edge.from_node.name for edge in edges if edge.to_node.name == graph.JOIN_NODE
     }
-    assert fanned == set(graph.ANALYST_GRAPH_NODES) == joined
-    assert len(graph.ANALYST_GRAPH_NODES) == len(STRIDE_CATEGORIES) == 6
+    assert fanned == set(graph.ANALYZE_GRAPH_NODES) == joined
+    assert len(graph.ANALYZE_GRAPH_NODES) == len(STRIDE_CATEGORIES) == 6
 
 
 def test_one_repair_pass_then_rejection(pipeline):
@@ -345,7 +345,7 @@ def test_llm_nodes_emit_their_schema(pipeline):
     assert by_name[graph.EXTRACT_NODE].output_schema is SystemModel
     assert by_name[graph.REPAIR_NODE].output_schema is SystemModel
     assert by_name[graph.CRITIC_NODE].output_schema is ThreatRulings
-    for name in graph.ANALYST_GRAPH_NODES:
+    for name in graph.ANALYZE_GRAPH_NODES:
         assert by_name[name].output_schema is DraftThreats
 
 
@@ -356,7 +356,7 @@ def test_every_node_schema_survives_the_trip_to_a_response_format(pipeline):
     adapter can turn it into a response format. A bare ``list[...]`` cannot be
     turned into one: ADK logs a warning, returns ``None``, and the node
     generates unconstrained — with nothing in the request, the response or the
-    report to show for it. That is why the analysts and both review passes
+    report to show for it. That is why the category agents and both review passes
     carry wrapper models rather than lists.
 
     Asserted against ADK's own converter rather than a shape of our choosing,
@@ -411,22 +411,22 @@ def test_extract_and_repair_share_one_output_key(pipeline):
 # --- Instructions -----------------------------------------------------------
 
 
-def test_analyst_instruction_carries_skill_then_prompt_then_exemplars(
+def test_analyze_instruction_carries_skill_then_prompt_then_exemplars(
     skill_loader, prompt_loader
 ):
-    instruction = graph.analyst_instruction(skill_loader, prompt_loader, "spoofing")
+    instruction = graph.analyze_instruction(skill_loader, prompt_loader, "spoofing")
     scope = instruction.index("# Spoofing")
-    role = instruction.index("# STRIDE Category Analyst")
+    role = instruction.index("# STRIDE Category Agent")
     exemplars = instruction.index("Exemplars")
     assert scope < role < exemplars
 
 
 def test_category_placeholder_is_filled_at_build_time(skill_loader, prompt_loader):
-    """Six analysts share one session state, which cannot hold six categories."""
+    """Six category agents share one session state, which cannot hold six categories."""
     for category in STRIDE_CATEGORIES:
-        instruction = graph.analyst_instruction(skill_loader, prompt_loader, category)
+        instruction = graph.analyze_instruction(skill_loader, prompt_loader, category)
         assert "{category}" not in instruction
-        assert f"**{category}** analyst" in instruction
+        assert f"**{category}** agent" in instruction
 
 
 def test_only_known_state_keys_remain_as_placeholders(pipeline):
@@ -503,7 +503,7 @@ def test_reject_parks_the_issues_for_the_runner():
 
 
 def test_validate_names_a_silent_extraction_rather_than_binding_against_it():
-    """The same silence as the analysts', one node earlier.
+    """The same silence as the category agents', one node earlier.
 
     Without the default this surfaces as ADK failing to bind an argument to
     ``validate``, which reads as a graph defect rather than as a truncated
@@ -530,46 +530,72 @@ def test_prepare_derives_crossings_rather_than_trusting_them():
     assert "process:web-app" in ctx.state[graph.STATE_SYSTEM_MODEL]
 
 
+def test_prepare_strips_the_source_fields_from_the_rendered_model():
+    """The agents and the critic read the model; only ``{input_text}`` has quotes.
+
+    Once the full source text is in the same request, an element's excerpt is a
+    lossy duplicate of it — and leaving it in preserves exactly the failure
+    finding-level attribution was written against: an agent reaching for the
+    nearest excerpt instead of the span that triggered its finding.
+    """
+    valid = valid_model().model_dump(mode="json")
+    excerpt = valid["processes"][0]["source_excerpt"]
+    assert excerpt, "the fixture must carry an excerpt for this to prove anything"
+    ctx = FakeContext()
+
+    graph.prepare_analysis(valid, ctx)
+
+    rendered = ctx.state[graph.STATE_SYSTEM_MODEL]
+    assert excerpt not in rendered
+    for field in ("source_excerpt", "source_label", "source_speaker"):
+        assert field not in rendered
+    # notes stays: the prompt binds it, and it is what lets the critic spot a
+    # quote lifted out of a note — which the ladder verifies happily.
+    assert "notes" in rendered
+    # The report's copy is untouched; only the model's view was narrowed.
+    assert valid["processes"][0]["source_excerpt"] == excerpt
+
+
 def test_merge_joins_drafts_in_canonical_order():
     ctx = FakeContext(
-        **analyst_state(
+        **analyze_state(
             spoofing=[sample_draft("S-01", "spoofing")],
             tampering=[sample_draft("T-01", "tampering")],
         )
     )
     output = graph.merge_drafts(valid_model().model_dump(mode="json"), ctx)
 
-    assert output == {"draft_count": 2}
+    assert output == {"draft_count": 2, "unverified_count": 0}
     assert [d["id"] for d in ctx.state[graph.STATE_MERGED_DRAFTS]] == ["S-01", "T-01"]
     assert "S-01" in ctx.state[graph.STATE_DRAFT_THREATS]
 
 
 def test_merge_accepts_a_lane_that_ran_and_found_nothing():
     """Empty is a finding; absent is a failure. The check is on the key."""
-    ctx = FakeContext(**analyst_state(spoofing=[sample_draft("S-01", "spoofing")]))
+    ctx = FakeContext(**analyze_state(spoofing=[sample_draft("S-01", "spoofing")]))
 
     output = graph.merge_drafts(valid_model().model_dump(mode="json"), ctx)
 
-    assert output == {"draft_count": 1}
+    assert output == {"draft_count": 1, "unverified_count": 0}
 
 
-def test_merge_fails_closed_when_an_analyst_emitted_nothing():
+def test_merge_fails_closed_when_a_category_agent_emitted_nothing():
     """The silent lane the report could not have shown.
 
-    A truncated analyst writes no output key. Defaulting that to an empty list
+    A truncated agent writes no output key. Defaulting that to an empty list
     deletes a sixth of the method and finishes green: the critic rules what it
     is handed, and ``build_summary`` omits a category with no threats rather
     than carrying a zero, so nothing downstream can see the hole.
     """
-    state = analyst_state(spoofing=[sample_draft("S-01", "spoofing")])
-    del state[graph.analyst_state_key("denial-of-service")]
+    state = analyze_state(spoofing=[sample_draft("S-01", "spoofing")])
+    del state[graph.analyze_state_key("denial-of-service")]
     ctx = FakeContext(**state)
 
     with pytest.raises(graph.SilentNodeError) as excinfo:
         graph.merge_drafts(valid_model().model_dump(mode="json"), ctx)
 
     message = str(excinfo.value)
-    assert "1 of 6 analysts wrote nothing" in message
+    assert "1 of 6 category agents wrote nothing" in message
     assert "drafts_denial_of_service" in message
     # The message has to name the knob, like every other wall in this service.
     assert "max_output_tokens" in message
@@ -577,7 +603,7 @@ def test_merge_fails_closed_when_an_analyst_emitted_nothing():
 
 def test_merge_fails_closed_on_a_hallucinated_element():
     draft = sample_draft("S-01", affected_element_ids=["process:invented"])
-    ctx = FakeContext(**analyst_state(spoofing=[draft]))
+    ctx = FakeContext(**analyze_state(spoofing=[draft]))
     with pytest.raises(DraftJoinError, match="process:invented"):
         graph.merge_drafts(valid_model().model_dump(mode="json"), ctx)
 

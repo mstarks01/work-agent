@@ -162,7 +162,7 @@ def _read_json(path: Path) -> object:
 def _load_model(case_dir: Path) -> SystemModel:
     """The blessed model, put through the shipped validity gate.
 
-    Analysts only ever see valid models in production; a case whose blessed
+    Category agents only ever see valid models in production; a case whose blessed
     model would be rejected there cannot ground a score here.
     """
     model, issues = parse_and_validate(_read_json(case_dir / "model.json"))
@@ -172,9 +172,7 @@ def _load_model(case_dir: Path) -> SystemModel:
     return model
 
 
-def _load_references(
-    case_dir: Path, model: SystemModel
-) -> tuple[ReferenceThreat, ...]:
+def _load_references(case_dir: Path, model: SystemModel) -> tuple[ReferenceThreat, ...]:
     raw = _read_json(case_dir / "threats.json")
     if not isinstance(raw, list) or not raw:
         raise CorpusError(f"{case_dir.name}: threats.json must be a non-empty list")

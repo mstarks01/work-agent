@@ -5,6 +5,7 @@ import pytest
 from pydantic import ValidationError
 
 from stride_service.report import (
+    Ground,
     Severity,
     StrideReport,
     UnknownRef,
@@ -45,7 +46,9 @@ class TestSeverityMatrix:
 
     def test_contradicting_asserted_level_is_rejected(self):
         with pytest.raises(ValidationError, match="contradicts the matrix"):
-            Severity(likelihood="low", impact="low", level="critical", justification="x")
+            Severity(
+                likelihood="low", impact="low", level="critical", justification="x"
+            )
 
     def test_the_band_is_absent_from_the_schema_but_present_in_the_payload(self):
         """Derived, never asked for — and the two halves stay independent.
@@ -96,7 +99,65 @@ class TestVerdictShapes:
             )
 
 
+class TestGround:
+    """The flat model's ``_check_shape``, which stands in for a union.
+
+    The union would forbid a nonsense combination in the schema itself; the
+    flat object is the portable shape across six independently-vendored
+    ``strong``-tier agents, and this validator is what buys back the guarantee
+    — on arrival rather than at generation time.
+    """
+
+    @pytest.mark.parametrize(
+        "fields",
+        [
+            {"kind": "quote", "text": "they never added MFA", "source_label": "Doc"},
+            {
+                "kind": "unknown-attribute",
+                "element_id": "store:orders-db",
+                "attribute": "encryption_at_rest",
+            },
+            {"kind": "derived-fact", "flow_id": "flow:a-to-b:x"},
+        ],
+    )
+    def test_each_branch_accepts_its_own_fields(self, fields):
+        assert Ground(**fields).kind == fields["kind"]
+
+    @pytest.mark.parametrize(
+        "fields",
+        [
+            {"kind": "quote", "text": "they never added MFA"},  # no label
+            {"kind": "quote", "source_label": "Doc"},  # no text
+            {"kind": "unknown-attribute", "element_id": "store:orders-db"},
+            {"kind": "unknown-attribute", "attribute": "exposure"},
+            {"kind": "derived-fact"},
+        ],
+    )
+    def test_a_branch_missing_its_own_fields_is_rejected(self, fields):
+        with pytest.raises(ValidationError, match="must carry"):
+            Ground(**fields)
+
+    def test_another_branchs_fields_are_forbidden_not_ignored(self):
+        """A quote carrying an element_id is a shape error, not a tolerated extra."""
+        with pytest.raises(ValidationError, match="must not carry"):
+            Ground(
+                kind="quote",
+                text="they never added MFA",
+                source_label="Doc",
+                element_id="store:orders-db",
+            )
+
+    def test_unknown_fields_are_forbidden(self):
+        with pytest.raises(ValidationError):
+            Ground(kind="derived-fact", flow_id="flow:a-to-b:x", fact="invented")
+
+
 class TestThreat:
+    def test_at_least_one_ground_is_required(self):
+        """A finding with no machine-checkable justification is what this forbids."""
+        with pytest.raises(ValidationError):
+            sample_threat(grounds=[])
+
     def test_id_must_carry_the_category_letter(self):
         with pytest.raises(ValidationError, match="category letter"):
             sample_threat(threat_id="S-01", category="tampering")

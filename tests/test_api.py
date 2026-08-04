@@ -369,9 +369,7 @@ class TestPoll:
         assert response.status_code == 200
         body = response.json()
         assert body["status"] == "completed"
-        assert [p["node"] for p in body["progress"]] == list(
-            StubPipelineRunner.nodes
-        )
+        assert [p["node"] for p in body["progress"]] == list(StubPipelineRunner.nodes)
         assert "report" not in body
         assert "validation_issues" not in body
         assert "error" not in body
@@ -471,7 +469,5 @@ class TestEvents:
             headers=auth() | {"Last-Event-ID": "3"},
         )
         frames = parse_sse(response.text)
-        assert [int(f["id"]) for f in frames] == list(
-            range(4, 4 + len(frames))
-        )
+        assert [int(f["id"]) for f in frames] == list(range(4, 4 + len(frames)))
         assert frames[-1]["data"]["status"] == "completed"

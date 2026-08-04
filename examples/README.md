@@ -49,8 +49,8 @@ that here, and they answer different questions:
   credentials, no models, no cost. That is what catches an example that imports
   cleanly but mishandles a rejection.
 - **The models still answer, weekly.** Neither check above runs a model, so
-  neither can tell you the sample still extracts well or that the analysts still
-  return threats for it. A live run of `embed.py` over `orders.md` does, and it
+  neither can tell you the sample still extracts well or that the category
+  agents still return threats for it. A live run of `embed.py` over `orders.md` does, and it
   is part of the Monday 06:00 UTC sweep in
   [`evals-live.yml`](../.github/workflows/evals-live.yml).
 

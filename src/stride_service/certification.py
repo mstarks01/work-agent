@@ -269,6 +269,4 @@ class CertificationGate:
 
     def withholds(self, result: CertifyResult) -> bool:
         """Whether this verdict means the report must not be served."""
-        return not result.complete or (
-            self.require_certified and not result.certified
-        )
+        return not result.complete or (self.require_certified and not result.certified)

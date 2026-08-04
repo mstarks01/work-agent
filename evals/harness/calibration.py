@@ -117,9 +117,7 @@ class CalibrationResult:
             "bar": AGREEMENT_BAR,
             "meets_bar": self.meets_bar,
             "false_matches": [entry.to_json() for entry in self.false_matches],
-            "false_non_matches": [
-                entry.to_json() for entry in self.false_non_matches
-            ],
+            "false_non_matches": [entry.to_json() for entry in self.false_non_matches],
         }
 
 
@@ -158,9 +156,7 @@ def load_pairs(path: Path | str = DEFAULT_PAIRS_PATH) -> tuple[LabelledPair, ...
     return tuple(pairs)
 
 
-def measure_agreement(
-    judge: Judge, pairs: Sequence[LabelledPair]
-) -> CalibrationResult:
+def measure_agreement(judge: Judge, pairs: Sequence[LabelledPair]) -> CalibrationResult:
     """Run the judge over every labelled pair and compare with the human."""
     if not pairs:
         raise CalibrationError("no labelled pairs to calibrate against")
