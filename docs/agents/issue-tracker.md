@@ -196,20 +196,46 @@ ticket prevents — and the block doubles as the first depiction of the fenced-s
 `{input_text}` delivers. That block, `grounds` on all 18 exemplar drafts, and `:62`'s seven fields
 → eight all fold into #85's cutover.
 
-Frontier now: [#83](https://github.com/mstarks01/work-agent/issues/83),
-[#84](https://github.com/mstarks01/work-agent/issues/84) and
-[#85](https://github.com/mstarks01/work-agent/issues/85) — #82's close unblocked #85, so all three
-are open, unblocked and unclaimed; still a parallel step, so expect concurrent sessions. #83 and #85
-carry constraints from both #81 and #82. #81 deliberately left the critic seeing **no submitter
-words at all** and handed #83 the call on whether `critic.md` gains `{input_text}`; #82 does not
-pre-empt it — it left `analyst.md:67`'s "this is what the critic checks its evidence step against"
-**verbatim** — but it does hand #83 a settled precedent to follow if the answer is yes, and the
-observation that a critic without `{input_text}` cannot detect a note-sourced quote either. #79 left
-three questions explicitly to siblings: verbatim quote verification was #80's, prompt instruction
-was #82's, and whether `related_unknowns` finally gains a check is #83's. #82 was retitled to "How a
-**category agent** is instructed…" — its old title carried the vocabulary #77 retired — and #81
-struck its stated constraint that "analysts already see every excerpt" as **false**, its
-`graph.py:285` reference being stale (`graph.py:409`).
+[#83](https://github.com/mstarks01/work-agent/issues/83) resolved 2026-08-04 and settles the critic
+**without changing a schema** — nothing versions, no cutover, so it constrains implementation rather
+than gating anyone. The critic **reviews** grounds, **cannot touch** them, and sees **no submitter
+text**: `critic.md` does *not* gain `{input_text}`, because a quote's `text` rides inline on the
+draft the critic already reads, so judging *does this support the threat* needs no source text, while
+judging *is it faithfully excerpted* is #80's measured ladder — and `critic.md:9` forbids re-spending
+judgement on a check code has run. Weighed against 100 KiB in the graph's longest call (the call
+`ThreatRuling` exists to keep small), a second competing evidence base in the one node with verdict
+power, and the widest LLM01 surface in the graph. **#82's note-sourced-quote gap closes for free**:
+#81 strips the three source fields but leaves `notes`, so a quote lifted from an element's `notes` is
+visible to the critic exactly where #80's ladder is blind — so #82's conditional import of
+`extract.md:15` into `critic.md` never fires. The review's **only lever is `confidence`, never
+`verdict`**: #80 set the fail-closed policy for grounds by measurement, and a sixth gating step would
+put a looser, model-judged, unmeasured trigger *ahead* of it. Grounds enter confidence as a
+**downgrade-only modifier** — step 5's definition and anchors stay verbatim, `report.py:203` stays
+accurate, unsupporting grounds may lower and good grounds never raise, since a perfect quote cannot
+make an `unknown`-rooted threat more certain and #82's branch rule means such a threat is *correctly*
+`low`. `attribute` gains an **exists-only** check at both sites — `_unresolved_unknown_ref_issues`
+and #79's grounds surface — with **no** value-is-`unknown` rule: it misfires on a stated-but-vague
+value, and the sites' blast radii differ sharply (bounded `recritic` re-ask versus an unrecoverable
+`DraftJoinError`). `analyze.md` discloses nothing new and `analyst.md:67` stays **verbatim**,
+following #82's own rule that naming a consequence invites padding; `recritic.md:39`/`:43` broaden in
+place, because a fault the re-ask cannot name is one it cannot fix.
+
+Three of #83's six open points were **already settled by code**, not decided: `ThreatRuling`
+(`report.py:259-264`) gives the critic no field to edit grounds through and `_ruled` rebuilds from
+the draft the service holds; rejected threats keep grounds because `assemble_threats` builds every
+ruling into a `Threat` and *then* splits; and dedupe never merges — `critic.md:33` rejects the loser
+naming the winner, so both sets of grounds survive in their own arrays. It also **corrects #79's
+record**: `related_unknowns` does have a referential check today — the `element_id` half, at
+`critic.py:72-82` — so only the `attribute` half was ever open.
+
+Frontier now: [#84](https://github.com/mstarks01/work-agent/issues/84) and
+[#85](https://github.com/mstarks01/work-agent/issues/85) — both open, unblocked and unclaimed, still
+a parallel step, so expect concurrent sessions. #85 carries constraints from #81, #82 and now #83.
+For the record of how the map got here: #79 left three questions explicitly to siblings — verbatim
+quote verification was #80's, prompt instruction was #82's, `related_unknowns` was #83's, and all
+three are now closed. #82 was retitled to "How a **category agent** is instructed…" — its old title
+carried the vocabulary #77 retired — and #81 struck its stated constraint that "analysts already see
+every excerpt" as **false**, its `graph.py:285` reference being stale (`graph.py:409`).
 
 The measurement lives on `prototype/quote-verification` @ `6ed8d77`
 (`prototypes/quote_verification_prototype.py`), pushed — throwaway code, but re-runnable, and the
