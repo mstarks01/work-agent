@@ -14,7 +14,7 @@ import hashlib
 from collections import Counter
 from collections.abc import Sequence
 from datetime import datetime
-from typing import Literal, Self, get_args
+from typing import ClassVar, Literal, Self, get_args
 
 from pydantic import BaseModel, ConfigDict, Field, model_validator
 from pydantic.json_schema import SkipJsonSchema
@@ -24,8 +24,16 @@ from stride_service.system_model import BoundaryCrossing, SystemModel
 
 # The payload schema readers key on. Consumers that ignore unknown fields
 # tolerate a minor bump; a major bump is a breaking change to a field's
-# meaning.
-SCHEMA_VERSION = "1.1"
+# meaning. The policy, stated once here and in docs/Report-Schema.md:
+# **additive fields are a minor bump; changing the meaning or the spelling of
+# an existing value is major.**
+#
+# 2.0 is that rule applied to the finding-attribution cutover. ``grounds``
+# becoming required on every threat is additive and would have been minor on
+# its own; what earns the major is that ``nodes[].node`` changed the *values*
+# it carries, from ``analyst_<category>`` to ``analyze_<category>``. A consumer
+# keying on ``analyst_spoofing`` does not error — it matches nothing, silently.
+SCHEMA_VERSION = "2.0"
 
 DEFAULT_DISCLAIMER = (
     "AI-generated threat model. Not reviewed by a human security analyst."
@@ -47,6 +55,13 @@ STRIDE_CATEGORIES: tuple[StrideCategory, ...] = get_args(StrideCategory)
 Rating = Literal["low", "medium", "high"]
 SeverityLevel = Literal["low", "medium", "high", "critical"]
 VerdictStatus = Literal["confirmed", "needs-info", "rejected"]
+
+# What a finding can cite in its own support. Spelled out rather than terse
+# (``unknown`` / ``derived``) because a bare ``unknown`` collides: it is already
+# a legal *attribute value* across the System Model, so ``kind="unknown"`` would
+# read as "the kind is unknown" rather than "the ground is an unknown
+# attribute".
+GroundKind = Literal["quote", "unknown-attribute", "derived-fact"]
 
 # Threat IDs are <category letter>-<per-category sequence>, e.g. "S-01".
 CATEGORY_LETTERS: dict[StrideCategory, str] = {
@@ -133,6 +148,102 @@ class UnknownRef(BaseModel):
     attribute: str = Field(min_length=1, max_length=100)
 
 
+class Ground(BaseModel):
+    """What justifies one finding: a quote, a named unknown, or a derived fact.
+
+    Category-agent-owned and authored, never derived from the affected
+    elements' ``source_excerpt``s: a derived citation would always render *a*
+    quote and frequently the wrong one. An excerpt says why an *element*
+    exists; a ground says why a *threat* was raised.
+
+    ONE FLAT MODEL, NOT A DISCRIMINATED UNION. The union is the more honest
+    shape — it forbids a nonsense combination in the schema itself, so a
+    constrained model cannot generate one — and it was rejected anyway on a
+    measured fact rather than a preference: **provider schema compilers are the
+    unpredictable part of this system.** ``config/sampling.toml`` records that
+    one vendor rejects ``SystemModel``'s compiled grammar as "too large", and
+    that ``constrain_output = false`` is not a working answer to a schema a
+    provider will not compile — unconstrained, the model fences its JSON and
+    omits required fields. So the cost of a grammar a vendor chokes on is a
+    dead run, not a degraded one, and this schema rides in ``DraftThreats`` on
+    the ``strong`` tier for **six** category agents whose vendor is selected
+    independently. ``oneOf`` is the construct with the thinnest, least uniform
+    support across those vendors; the flat object is the portable shape.
+
+    :class:`Verdict` is already exactly this pattern, so the repo has one
+    answer to "tagged variant in a provider-facing schema" rather than two.
+
+    What is given up, stated plainly: the schema no longer prevents a mis-shaped
+    ``Ground`` at generation time. It is caught on arrival, by the validator
+    below, and there is no re-ask path for a category agent's drafts — a
+    mis-shape fails the job at :func:`~stride_service.critic.join_drafts`.
+
+    The branches, and why each carries what it does:
+
+    * ``quote`` — ``text`` + ``source_label``. 1000 characters is the same
+      number as an element's ``source_excerpt``: one repo answer to "how long
+      is a quoted span", not two. The label is what makes the quote resolvable
+      to a :class:`SourceRef`, and the text is checked against that source's
+      bytes by :mod:`stride_service.grounding`.
+    * ``unknown-attribute`` — ``element_id`` + ``attribute``, spelled
+      identically to :class:`UnknownRef`'s two fields so the shared referent is
+      obvious, but a **separate type**. A ground is *backward-looking* — the
+      unknown that made the agent raise the threat. ``related_unknowns`` is
+      *forward-looking* — the unknown the critic says must be answered before
+      the threat can be ruled on. Different author, different moment, different
+      job; when they coincide that is signal, not redundancy.
+    * ``derived-fact`` — ``flow_id`` alone, a **reference and never a copy**.
+      The crossing's zones are recomputed from the system model the report
+      already embeds, so a renderer holding only the report resolves them; a
+      copy could disagree with what it was derived from, and then neither is
+      answerable as the report's answer. There is deliberately no free-text
+      ``fact`` field: free text is verifiable by no gate, and it would become
+      the escape hatch an agent reaches for when it has neither a quote nor an
+      unknown — precisely the finding whose justification matters most.
+    """
+
+    model_config = ConfigDict(extra="forbid")
+
+    kind: GroundKind
+    text: str = Field(default="", max_length=1000)  # quote
+    source_label: str = Field(default="", max_length=200)  # quote
+    element_id: str = Field(default="", max_length=300)  # unknown-attribute
+    attribute: str = Field(default="", max_length=100)  # unknown-attribute
+    flow_id: str = Field(default="", max_length=300)  # derived-fact
+
+    # Which fields each branch requires. Everything not listed for a branch is
+    # forbidden on it — a quote carrying an element_id is a shape error, not a
+    # tolerated extra, because the two readings of such a record differ and
+    # nothing downstream could choose between them.
+    _REQUIRED: ClassVar[dict[GroundKind, tuple[str, ...]]] = {
+        "quote": ("text", "source_label"),
+        "unknown-attribute": ("element_id", "attribute"),
+        "derived-fact": ("flow_id",),
+    }
+
+    @model_validator(mode="after")
+    def _check_shape(self) -> Self:
+        required = self._REQUIRED[self.kind]
+        missing = [field for field in required if not getattr(self, field)]
+        if missing:
+            raise ValueError(
+                f"a {self.kind} ground must carry {', '.join(required)};"
+                f" missing {', '.join(missing)}"
+            )
+        present = [
+            field
+            for branch, fields in self._REQUIRED.items()
+            if branch != self.kind
+            for field in fields
+            if field not in required and getattr(self, field)
+        ]
+        if present:
+            raise ValueError(
+                f"a {self.kind} ground must not carry {', '.join(sorted(present))}"
+            )
+        return self
+
+
 class Verdict(BaseModel):
     """The critic's ruling on one threat.
 
@@ -164,12 +275,16 @@ class Verdict(BaseModel):
 
 
 class DraftThreat(BaseModel):
-    """One analyst's draft finding: the seven fields an analyst owns.
+    """One category agent's draft finding: the eight fields the agent owns.
 
-    Everything a category analyst produces and nothing it may rule on —
+    Everything a category agent produces and nothing it may rule on —
     ``verdict`` and ``confidence`` are the critic's, and appear only once a
     draft is promoted to a :class:`Threat`. This is the shape the prompt
     exemplars are lint-parsed against.
+
+    ``grounds`` is ``min_length=1`` with **no maximum**, exactly like
+    ``affected_element_ids``: this model caps no list, and runaway output stays
+    governed where it already is, at the tier's ``max_output_tokens``.
     """
 
     model_config = ConfigDict(extra="forbid")
@@ -179,6 +294,7 @@ class DraftThreat(BaseModel):
     title: str = Field(min_length=1, max_length=200)
     description: str = Field(min_length=1, max_length=4000)
     affected_element_ids: list[str] = Field(min_length=1)
+    grounds: list[Ground] = Field(min_length=1)
     severity: Severity
     mitigations: list[Mitigation] = Field(default_factory=list)
 
@@ -205,7 +321,7 @@ class Threat(DraftThreat):
 
 
 class DraftThreats(BaseModel):
-    """What an analyst node emits: an object wrapping its list of drafts.
+    """What a category agent node emits: an object wrapping its list of drafts.
 
     The wrapper exists for the *schema*, not for the domain. A node's
     ``output_schema`` is what the graph asks the provider to constrain
@@ -230,14 +346,14 @@ class ThreatRuling(BaseModel):
 
     A ruling is **not** a threat. It names the draft it rules on by ``id`` and
     carries the two judgements that are the critic's — ``verdict`` and
-    ``confidence`` — leaving the analyst's seven fields where they already are.
+    ``confidence`` — leaving the agent's eight fields where they already are.
     :func:`~stride_service.critic.assemble_threats` merges a ruling onto the
     draft it names to build the :class:`Threat` the report carries, so the
     report's shape is unchanged.
 
     WHY THE CRITIC NO LONGER RE-EMITS THE DRAFT. Its output was every draft
     transcribed whole plus a verdict, which made the single longest call in the
-    graph proportional to the analysts' combined prose rather than to the
+    graph proportional to the category agents' combined prose rather than to the
     judgement it was asked for. The service already holds those drafts — they
     are the same bytes it put in the critic's prompt — so the transcription
     bought nothing and cost the run's largest block of output tokens. It also
@@ -249,7 +365,7 @@ class ThreatRuling(BaseModel):
 
     ``severity`` is the one draft field a ruling may replace, and only where
     the critic's severity-calibration step changed a rating. ``None`` — the
-    common case — keeps the analyst's rating and justification as written.
+    common case — keeps the agent's rating and justification as written.
     Present, it replaces both together, which is what stops a corrected rating
     from sitting beside a justification that argues for the old one. It is a
     whole :class:`Severity` rather than loose scalars so a partial override
@@ -400,6 +516,34 @@ class InputRef(BaseModel):
         )
 
 
+class UnverifiedGround(BaseModel):
+    """A quote ground the service looked for in its named source and did not find.
+
+    **Service-owned, and deliberately outside :class:`Ground`.** ``Ground`` is
+    agent-owned and ``extra="forbid"``; a verification field on it would ride
+    into the six ``strong``-tier provider schemas as a field the agent could
+    set about its own honesty. The same separation keeps :class:`UnknownRef`
+    critic-only.
+
+    A reference rather than a copy: the threat's ``id`` plus the index of the
+    entry in its ``grounds`` list. The entry itself still renders — dropping it
+    is not available, since ``grounds`` is ``min_length=1`` and dropping the
+    last one would either produce an invalid draft or delete the finding, and
+    silently removing a threat is the worst outcome a security tool can have.
+
+    Marked per entry, failed closed per threat: a threat with one bad quote
+    beside good ones is still justified, and
+    :func:`~stride_service.critic.join_drafts` fails the job only where *no*
+    ground on a threat verifies at all.
+    """
+
+    model_config = ConfigDict(extra="forbid")
+
+    threat_id: str = Field(pattern=r"^[STRIDE]-\d{2}$")
+    index: int = Field(ge=0)
+    reason: str = Field(min_length=1, max_length=500)
+
+
 class Summary(BaseModel):
     """Counts the front-end can render without walking the threat list."""
 
@@ -464,6 +608,10 @@ class StrideReport(BaseModel):
     boundary_crossings: list[BoundaryCrossing]
     threats: list[Threat]  # confirmed + needs-info, severity-ordered
     rejected_threats: list[Threat] = Field(default_factory=list)
+    # Which quote grounds did not verify against the source they name. Empty on
+    # the common run, and empty too on a job whose sources were never supplied
+    # to the checker — see :func:`~stride_service.critic.join_drafts`.
+    unverified_grounds: list[UnverifiedGround] = Field(default_factory=list)
     summary: Summary
 
     @model_validator(mode="after")
@@ -521,4 +669,30 @@ class StrideReport(BaseModel):
                 for ref in refs
                 if ref not in known_ids
             ]
+        return issues + self._unverified_mark_issues()
+
+    def _unverified_mark_issues(self) -> list[str]:
+        """Every unverified mark points at a grounds entry this report carries.
+
+        A mark naming a threat or an index that is not here is worse than no
+        mark: the viewer drops the quotation marks off nothing, and the entry
+        the service actually failed to verify renders as though it had passed.
+        """
+        grounds_count = {
+            threat.id: len(threat.grounds)
+            for threat in (*self.threats, *self.rejected_threats)
+        }
+        issues = []
+        for mark in self.unverified_grounds:
+            count = grounds_count.get(mark.threat_id)
+            if count is None:
+                issues.append(
+                    f"unverified ground names threat {mark.threat_id!r}, which"
+                    " is not in this report"
+                )
+            elif mark.index >= count:
+                issues.append(
+                    f"unverified ground names index {mark.index} on threat"
+                    f" {mark.threat_id!r}, which carries {count} grounds"
+                )
         return issues

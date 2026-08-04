@@ -12,7 +12,7 @@ from stride_service.skills import (
     SKILL_SECTION_HEADINGS,
     STRIDE_CATEGORIES,
     category_boundary_digest,
-    compose_analyst_skills,
+    compose_analyze_skills,
     compose_critic_skills,
     estimate_tokens,
     extract_section,
@@ -126,7 +126,7 @@ class TestBoundaryDigest:
 
 class TestComposition:
     def test_analyst_order_is_category_rubric_packs(self, skills_root):
-        text = compose_analyst_skills(
+        text = compose_analyze_skills(
             MarkdownLoader(skills_root), "spoofing", domain_packs=("web",)
         )
         assert (
@@ -136,12 +136,12 @@ class TestComposition:
         )
 
     def test_analyst_without_packs_omits_them(self, skills_root):
-        text = compose_analyst_skills(MarkdownLoader(skills_root), "spoofing")
+        text = compose_analyze_skills(MarkdownLoader(skills_root), "spoofing")
         assert "# Web Pack" not in text
 
     def test_unknown_pack_raises(self, skills_root):
         with pytest.raises(MarkdownNotFoundError):
-            compose_analyst_skills(
+            compose_analyze_skills(
                 MarkdownLoader(skills_root), "spoofing", domain_packs=("mainframe",)
             )
 

@@ -53,11 +53,11 @@ credential check passed — and it does not show sampling parameters. The
 and the report itself carries it.
 
 **Progress, per node.** A run takes around 40 seconds. The page streams **every**
-graph node as it finishes — the model calls (`extract`, the six `analyst_*`
+graph node as it finishes — the model calls (`extract`, the six `analyze_*`
 nodes, `critic`) and the deterministic ones between them (`validate`, `prepare`,
 `merge`, `router`, `assemble`) alike — rather than showing you a blank tab. Node
-names appear exactly as the graph emits them, which is why the analysts read
-`analyst_denial_of_service` rather than the `analyze/denial-of-service` that
+names appear exactly as the graph emits them, which is why a category agent reads
+`analyze_denial_of_service` rather than the `analyze/denial-of-service` that
 [`config/model_tiers.toml`](../config/model_tiers.toml) keys on: graph node names
 must be Python identifiers.
 

@@ -35,6 +35,7 @@ from stride_service.markdown_loader import MarkdownLoader
 from stride_service.model_tiers import ModelTierConfig, load_model_tiers
 from stride_service.report import (
     DraftThreat,
+    Ground,
     InputRef,
     Job,
     Mitigation,
@@ -236,6 +237,18 @@ def sample_threat(
         "description": "Stolen session cookies let an attacker impersonate"
         " the customer against the web app.",
         "affected_element_ids": ["flow:customer-to-web-app:login"],
+        # One quote and one derived fact, so a default draft exercises two
+        # branches rather than the cheapest one. The quote is a verbatim span of
+        # the source ``sample_report`` submits, so it verifies through the
+        # ladder; tests that need a failing quote override this field.
+        "grounds": [
+            Ground(
+                kind="quote",
+                text="Customers log in to the web app",
+                source_label=DEFAULT_DESCRIPTION_LABEL,
+            ),
+            Ground(kind="derived-fact", flow_id="flow:customer-to-web-app:login"),
+        ],
         "severity": Severity(
             likelihood="medium",
             impact="high",

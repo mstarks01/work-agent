@@ -24,9 +24,9 @@ from stride_service.jobs import (
     StubPipelineRunner,
 )
 from stride_service.pipeline import AdkPipelineRunner, PipelineError
-from stride_service.report import STRIDE_CATEGORIES, InputRef
+from stride_service.report import STRIDE_CATEGORIES, Ground, InputRef
 from stride_service.sampling import TierSampling, load_sampling, sampling_fingerprint
-from stride_service.sources import Source
+from stride_service.sources import DEFAULT_DESCRIPTION_LABEL, Source
 from tests.factories import (
     BASE_MODEL,
     PROJECT_ROOT,
@@ -80,7 +80,7 @@ def happy_replies() -> dict[str, str]:
     """Extraction succeeds; spoofing drafts one threat; the critic confirms it."""
     return {
         "extract": valid_model().model_dump_json(),
-        graph.analyst_node_name("spoofing"): draft_json("S-01", "spoofing"),
+        graph.analyze_node_name("spoofing"): draft_json("S-01", "spoofing"),
         "critic": threats_json(sample_ruling("S-01")),
     }
 
@@ -100,9 +100,64 @@ def test_a_clean_run_produces_a_report():
 
     assert visited[0] == graph.EXTRACT_NODE
     assert visited[-1] == graph.ASSEMBLE_NODE
-    assert set(graph.ANALYST_GRAPH_NODES) <= set(visited)
+    assert set(graph.ANALYZE_GRAPH_NODES) <= set(visited)
     assert graph.REPAIR_NODE not in visited
     assert graph.REJECT_NODE not in visited
+
+
+def test_an_unfindable_quote_is_marked_on_the_report_and_still_renders():
+    """The per-entry half of the policy, end to end.
+
+    The job's one source says nothing about MFA, so that quote cannot verify —
+    but a threat with one bad quote beside a good ground is still a justified
+    finding, so it reaches the report with the failure recorded beside it
+    rather than being dropped or killing the run.
+    """
+    draft = sample_draft(
+        "S-01",
+        "spoofing",
+        grounds=[
+            Ground(
+                kind="quote",
+                text="we never got round to MFA",
+                source_label=DEFAULT_DESCRIPTION_LABEL,
+            ),
+            Ground(kind="derived-fact", flow_id="flow:customer-to-web-app:login"),
+        ],
+    )
+    replies = happy_replies() | {
+        graph.analyze_node_name("spoofing"): threats_json(draft)
+    }
+    pipeline, _ = build(replies)
+
+    outcome, _ = run(pipeline, job())
+
+    report = outcome.report
+    assert [threat.id for threat in report.threats] == ["S-01"]
+    assert len(report.threats[0].grounds) == 2
+    assert [(m.threat_id, m.index) for m in report.unverified_grounds] == [("S-01", 0)]
+
+
+def test_a_threat_no_ground_supports_fails_the_job():
+    """The per-threat half: nothing holds, so nothing ships."""
+    draft = sample_draft(
+        "S-01",
+        "spoofing",
+        grounds=[
+            Ground(
+                kind="quote",
+                text="we never got round to MFA",
+                source_label=DEFAULT_DESCRIPTION_LABEL,
+            )
+        ],
+    )
+    replies = happy_replies() | {
+        graph.analyze_node_name("spoofing"): threats_json(draft)
+    }
+    pipeline, _ = build(replies)
+
+    with pytest.raises(Exception, match="no ground that verifies"):
+        run(pipeline, job())
 
 
 def test_the_report_carries_the_graph_runs_node_stamps():
@@ -154,20 +209,20 @@ def test_each_llm_node_fingerprint_recomputes_from_the_artifact():
         assert node_run.sampling_fingerprint == expected
 
 
-def test_each_analyst_gets_its_own_category_and_the_shared_model():
+def test_each_agent_gets_its_own_category_and_the_shared_model():
     pipeline, models = build(happy_replies())
     run(pipeline, job())
 
     for category in STRIDE_CATEGORIES:
-        instruction = models[graph.analyst_node_name(category)].seen[0]
-        assert f"**{category}** analyst" in instruction
+        instruction = models[graph.analyze_node_name(category)].seen[0]
+        assert f"**{category}** agent" in instruction
         assert "process:web-app" in instruction  # {system_model} templated in
         assert "{" not in instruction.split("## Procedure")[0].split("```")[-1]
 
 
 def test_the_critic_sees_every_analysts_drafts_once():
     replies = happy_replies()
-    replies[graph.analyst_node_name("tampering")] = draft_json("T-01", "tampering")
+    replies[graph.analyze_node_name("tampering")] = draft_json("T-01", "tampering")
     replies["critic"] = threats_json(sample_ruling("S-01"), sample_ruling("T-01"))
     pipeline, models = build(replies)
     outcome, _ = run(pipeline, job())
@@ -214,13 +269,13 @@ def test_a_model_that_fails_twice_is_rejected_with_its_issues():
     assert any("process:does-not-exist" in issue.message for issue in outcome.issues)
     assert visited[-1] == graph.REJECT_NODE
     assert graph.PREPARE_NODE not in visited
-    assert not set(graph.ANALYST_GRAPH_NODES) & set(visited)
+    assert not set(graph.ANALYZE_GRAPH_NODES) & set(visited)
 
 
 def test_a_hallucinated_element_reference_fails_the_job_loudly():
     """The merge seam refuses drafts the System Model cannot account for."""
     replies = happy_replies()
-    replies[graph.analyst_node_name("spoofing")] = threats_json(
+    replies[graph.analyze_node_name("spoofing")] = threats_json(
         sample_draft("S-01", affected_element_ids=["process:invented"])
     )
     pipeline, _ = build(replies)
@@ -232,7 +287,7 @@ def test_a_hallucinated_element_reference_fails_the_job_loudly():
 def test_a_malformed_critic_output_is_re_asked_once_and_then_assembled():
     """The critic drops a draft; the bounded re-ask returns the full set."""
     replies = happy_replies()
-    replies[graph.analyst_node_name("tampering")] = draft_json("T-01", "tampering")
+    replies[graph.analyze_node_name("tampering")] = draft_json("T-01", "tampering")
     both = threats_json(sample_ruling("S-01"), sample_ruling("T-01"))
     # The critic drops T-01; the re-ask returns both drafts, reconciled.
     replies["critic"] = threats_json(sample_ruling("S-01"))
