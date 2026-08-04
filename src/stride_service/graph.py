@@ -112,6 +112,7 @@ from stride_service.report import (
     build_summary,
 )
 from stride_service.resilience import ResilienceConfig
+from stride_service.retry import TRUNCATION_REMEDY
 from stride_service.sampling import (
     SamplingResolver,
     TierSampling,
@@ -256,6 +257,14 @@ class SilentNodeError(RuntimeError):
     the response was cut off at ``max_output_tokens``, which reasoning tokens
     are spent against as well.
 
+    That shape is a **vendor behaviour, not the shape of truncation**. Anthropic
+    and Vertex return no text; OpenAI returns the fragment it had written, which
+    never reaches here because it writes its key like any other answer.
+    :class:`~stride_service.retry.TruncatedCompletionError` catches that one
+    upstream, off ``finish_reason``, before a validator sees a partial document
+    and misreports it as malformed. This class remains the net for the silent
+    half, where nothing but the absent key says anything happened at all.
+
     Absence is deliberately **not** read as emptiness. An agent that finds no
     threats in its lane emits ``{"threats": []}`` and its key is written; a
     truncated one writes nothing. The two look identical once a missing key is
@@ -271,11 +280,16 @@ class SilentNodeError(RuntimeError):
 
 # Every SilentNodeError says the same two things: nothing was written, and here
 # is the knob. Kept in one place because the two raise sites are one bug.
+#
+# Only the first half is this module's. The knob is the same one
+# :class:`~stride_service.retry.TruncatedCompletionError` names, because the two
+# are one failure seen from either side of a vendor difference, so the remedy is
+# imported rather than restated.
 _TRUNCATION_HINT = (
     "The node completed without emitting any text, which is what a completion"
-    " truncated at max_output_tokens looks like — reasoning tokens are spent"
-    " against that cap too. Raise max_output_tokens for this node's tier in"
-    " config/sampling.toml, or reduce what the node is asked to produce."
+    " truncated at max_output_tokens looks like on a vendor that returns no"
+    " partial output — reasoning tokens are spent against that cap too."
+    f" {TRUNCATION_REMEDY}"
 )
 
 
