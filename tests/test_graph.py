@@ -570,6 +570,53 @@ def test_merge_joins_drafts_in_canonical_order():
     assert "S-01" in ctx.state[graph.STATE_DRAFT_THREATS]
 
 
+def test_ruling_view_keeps_every_field_the_critic_rules_on():
+    """The guard on ``_ruling_view``'s ``exclude_defaults``.
+
+    Narrowing the prompt view is only free while nothing a verdict is reached
+    from can fall through it. A ``DraftThreat`` field added with a default
+    would vanish here whenever it held that default — so this names the fields
+    the five steps read and fails the moment one stops arriving.
+    """
+    draft = sample_draft("S-01", "spoofing")
+
+    (view,) = graph._ruling_view([draft])
+
+    for field in ("id", "category", "description", "affected_element_ids"):
+        assert field in view, f"the critic rules on {field!r}"
+    assert view["severity"]["likelihood"] and view["severity"]["justification"]
+    # Step 5 reads grounds for relevance, so each entry keeps its own branch.
+    assert [ground["kind"] for ground in view["grounds"]] == ["quote", "derived-fact"]
+    assert view["grounds"][0]["text"] == "Customers log in to the web app"
+    assert view["grounds"][1]["flow_id"] == "flow:customer-to-web-app:login"
+
+
+def test_ruling_view_drops_what_no_verdict_is_reached_from():
+    """Mitigations and a Ground's empty branches, gone from the prompt only."""
+    draft = sample_draft("S-01", "spoofing")
+    assert draft.mitigations, "the fixture must carry one for this to prove anything"
+
+    (view,) = graph._ruling_view([draft])
+
+    assert "mitigations" not in view
+    # A quote carries text and source_label; the other four fields are the
+    # empty string its own validator requires them to be.
+    assert set(view["grounds"][0]) == {"kind", "text", "source_label"}
+    assert set(view["grounds"][1]) == {"kind", "flow_id"}
+
+
+def test_merge_keeps_mitigations_out_of_the_prompt_but_in_the_report():
+    """The drafts the report is built from are not the drafts the critic reads."""
+    ctx = FakeContext(**analyze_state(spoofing=[sample_draft("S-01", "spoofing")]))
+
+    graph.merge_drafts(valid_model().model_dump(mode="json"), ctx)
+
+    assert "Set HttpOnly" not in ctx.state[graph.STATE_DRAFT_THREATS]
+    assert ctx.state[graph.STATE_MERGED_DRAFTS][0]["mitigations"] == [
+        {"summary": "Set HttpOnly and Secure on cookies", "detail": ""}
+    ]
+
+
 def test_merge_accepts_a_lane_that_ran_and_found_nothing():
     """Empty is a finding; absent is a failure. The check is on the key."""
     ctx = FakeContext(**analyze_state(spoofing=[sample_draft("S-01", "spoofing")]))

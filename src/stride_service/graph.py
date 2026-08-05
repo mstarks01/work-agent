@@ -484,6 +484,47 @@ def _without_source_fields(valid_model: dict) -> dict:
     return stripped
 
 
+# Draft fields stripped from the set rendered to the critic and its re-ask.
+# They survive on STATE_MERGED_DRAFTS, so assemble_threats still carries them
+# into the report exactly as the agent wrote them.
+_DRAFT_UNRULED_FIELDS = frozenset({"mitigations"})
+
+
+def _ruling_view(drafts: Sequence[DraftThreat]) -> list[dict]:
+    """The drafts as the critic reads them: no mitigations, no empty branches.
+
+    The critic's five steps read ``description`` (evidence), ``category``
+    (lane), ``affected_element_ids`` (duplicate), ``severity`` (calibration)
+    and ``grounds`` (confidence). ``mitigations`` is read by none of them, and
+    the prompt already says so — it is held beside the ruling and copied into
+    the report untouched. A :class:`~stride_service.report.Mitigation` is a
+    200-character summary plus 2000 characters of detail, and a draft carries a
+    list of them, so this is the largest block in the longest prompt the graph
+    sends that no judgement is spent on. Same argument as
+    :func:`_without_source_fields`, one node further down.
+
+    ``exclude_defaults`` is what drops the empty branches of a
+    :class:`~stride_service.report.Ground`. That model is one flat object
+    rather than a discriminated union — a deliberate choice, for provider
+    schema-compiler reasons it documents itself — so four of its six fields are
+    the empty string on any given ground, and rendering them spends a line each
+    on a field whose own validator forbids it carrying anything.
+
+    THE HAZARD THIS BUYS, stated rather than left to be discovered: a field
+    added to ``DraftThreat`` with a default now disappears from the critic's
+    view whenever it holds that default, silently and with nothing downstream
+    able to see it. Every field the five steps read is required today and so
+    cannot be dropped; ``test_ruling_view_keeps_every_field_the_critic_rules_on``
+    is what holds that true for the next field.
+    """
+    return [
+        draft.model_dump(
+            mode="json", exclude=_DRAFT_UNRULED_FIELDS, exclude_defaults=True
+        )
+        for draft in drafts
+    ]
+
+
 def prepare_analysis(valid_model: dict, ctx) -> dict[str, Any]:
     """Derive boundary crossings and render the category agents' shared view.
 
@@ -557,6 +598,11 @@ def merge_drafts(
     emits ``{"threats": []}``, its key is written, and ``_threats_of`` reads it
     as the empty list it is. That distinction is the whole check: the absent
     key, not the empty list.
+
+    Two state keys, two shapes, on purpose. ``STATE_MERGED_DRAFTS`` holds the
+    drafts whole, because that is what ``assemble_threats`` merges rulings onto
+    to build the report. ``STATE_DRAFT_THREATS`` is the *prompt* view, narrowed
+    by :func:`_ruling_view` to the fields a verdict is actually reached from.
     """
     silent = [
         category
@@ -583,9 +629,7 @@ def merge_drafts(
     ctx.state[STATE_UNVERIFIED_GROUNDS] = [
         mark.model_dump(mode="json") for mark in unverified
     ]
-    ctx.state[STATE_DRAFT_THREATS] = render(
-        [draft.model_dump(mode="json") for draft in merged]
-    )
+    ctx.state[STATE_DRAFT_THREATS] = render(_ruling_view(merged))
     return {"draft_count": len(merged), "unverified_count": len(unverified)}
 
 
