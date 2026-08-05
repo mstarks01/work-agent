@@ -16,7 +16,7 @@ import pytest
 
 from stride_service import graph
 from stride_service.execution import GraphExecutor
-from stride_service.report import Ground
+from stride_service.report import Ground, usage_by_node
 from stride_service.sampling import (
     TierSampling,
     load_sampling,
@@ -29,6 +29,7 @@ from tests.factories import (
     STRONG_MODEL,
     SilentLlm,
     SlowLlm,
+    UnmeteredLlm,
     repo_tiers,
     sample_draft,
     sample_ruling,
@@ -121,6 +122,66 @@ def test_a_node_with_no_served_build_carries_no_fingerprint():
     assert extract.sampling_fingerprint is None
     # What was asked for is still known, and still recorded.
     assert extract.requested_model == BASE_MODEL
+
+
+def test_node_runs_record_what_the_provider_says_each_call_cost(graph_run):
+    """Each provider counter lands in its own vendor-neutral field.
+
+    The scripted usage block carries five distinct values precisely so a
+    transposed pair in the mapping fails here rather than being averaged away
+    in a roll-up later.
+    """
+    critic = by_node(graph_run)[graph.CRITIC_NODE]
+
+    assert critic.usage is not None
+    assert critic.usage.prompt_tokens == 1100
+    assert critic.usage.cached_prompt_tokens == 700
+    assert critic.usage.completion_tokens == 300
+    # The number the accounting exists for: spent against max_output_tokens
+    # and invisible in the emission that node produced.
+    assert critic.usage.reasoning_tokens == 9000
+    assert critic.usage.total_tokens == 10400
+
+
+def test_a_deterministic_node_costs_nothing_and_records_nothing(graph_run):
+    assert by_node(graph_run)[graph.ASSEMBLE_NODE].usage is None
+
+
+def test_usage_is_recorded_even_when_the_served_build_is_not():
+    """The two are independent: a missing build costs the fingerprint only."""
+    pipeline, _ = scripted_pipeline(happy_replies(), llm_class=SilentLlm)
+    extract = by_node(drive(pipeline))[graph.EXTRACT_NODE]
+
+    assert extract.model is None
+    assert extract.sampling_fingerprint is None
+    assert extract.usage is not None
+    assert extract.usage.prompt_tokens == 1100
+
+
+def test_a_provider_that_meters_nothing_yields_no_usage_at_all():
+    """An unmeasured call must not read as a free one."""
+    pipeline, _ = scripted_pipeline(happy_replies(), llm_class=UnmeteredLlm)
+    extract = by_node(drive(pipeline))[graph.EXTRACT_NODE]
+
+    assert extract.model == served_build(BASE_MODEL)
+    assert extract.usage is None
+
+
+def test_usage_by_node_sums_a_nodes_executions(graph_run):
+    """The critic on a revise path runs twice; the question is what it cost."""
+    critic = by_node(graph_run)[graph.CRITIC_NODE]
+    twice = [critic, critic.model_copy()]
+
+    totals = usage_by_node(twice)
+
+    assert totals[graph.CRITIC_NODE].reasoning_tokens == 18000
+    assert totals[graph.CRITIC_NODE].total_tokens == 20800
+
+
+def test_usage_by_node_omits_what_was_never_measured(graph_run):
+    """Absent, not zeroed — a node with no usage is not a node that cost nothing."""
+    assert graph.ASSEMBLE_NODE not in usage_by_node(graph_run.node_runs)
+    assert graph.CRITIC_NODE in usage_by_node(graph_run.node_runs)
 
 
 def test_every_llm_node_fingerprint_recomputes_from_its_tier_sampling(graph_run):

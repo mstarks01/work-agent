@@ -12,7 +12,7 @@ from __future__ import annotations
 
 import hashlib
 from collections import Counter
-from collections.abc import Sequence
+from collections.abc import Iterable, Sequence
 from datetime import datetime
 from typing import ClassVar, Literal, Self, get_args
 
@@ -33,7 +33,12 @@ from stride_service.system_model import BoundaryCrossing, SystemModel
 # its own; what earns the major is that ``nodes[].node`` changed the *values*
 # it carries, from ``analyst_<category>`` to ``analyze_<category>``. A consumer
 # keying on ``analyst_spoofing`` does not error — it matches nothing, silently.
-SCHEMA_VERSION = "2.0"
+#
+# 2.1 adds ``nodes[].usage``. Purely additive — an optional object on a record
+# that already existed, no field changing meaning or spelling — so it is minor
+# by the rule above, and a 2.0 consumer that ignores unknown fields reads a 2.1
+# report unchanged.
+SCHEMA_VERSION = "2.1"
 
 DEFAULT_DISCLAIMER = (
     "AI-generated threat model. Not reviewed by a human security analyst."
@@ -394,6 +399,48 @@ class ThreatRulings(BaseModel):
     threats: list[ThreatRuling]
 
 
+class TokenUsage(BaseModel):
+    """What one node execution spent, as the provider reported it.
+
+    Vendor-neutral field names, on the same principle as the model tiers: the
+    provider's own spellings (``prompt_token_count``,
+    ``candidates_token_count``, ``thoughts_token_count``,
+    ``cached_content_token_count``) are one vendor's product vocabulary, and
+    this record outlives the vendor it was read from.
+    ``stride_service.execution`` owns the mapping.
+
+    NOTHING HERE IS DERIVED, and that is the point. ``total_tokens`` is
+    recorded rather than summed, and no validator asserts a relationship
+    between the parts, because the parts do not agree across vendors on what
+    they contain: Gemini reports ``thoughts`` *outside* ``candidates``, while
+    an OpenAI-family reasoning model counts them *inside* completion tokens.
+    A sum check would fail honest data from one of them, and a derived total
+    would silently mean two different things depending on who answered. Same
+    rule NodeRun already applies to ``model`` and ``requested_model``: record
+    both, compute neither.
+
+    ``reasoning_tokens`` is the field this record was added for. It is spent
+    against the tier's ``max_output_tokens`` and it is invisible in the
+    output, so a node can be the run's largest consumer while looking small.
+    ``cached_prompt_tokens`` is the other one: it is the only direct evidence
+    of whether a prefix a prompt was laid out to cache actually cached.
+
+    Every field defaults to 0 rather than being required — a provider that
+    reports three of the five is common, and dropping the record for the two
+    it withheld would lose the three it gave. A node that reported *nothing*
+    carries no ``TokenUsage`` at all, so an all-zero record never stands in
+    for an absent one.
+    """
+
+    model_config = ConfigDict(extra="forbid")
+
+    prompt_tokens: int = Field(default=0, ge=0)
+    cached_prompt_tokens: int = Field(default=0, ge=0)
+    completion_tokens: int = Field(default=0, ge=0)
+    reasoning_tokens: int = Field(default=0, ge=0)
+    total_tokens: int = Field(default=0, ge=0)
+
+
 class NodeRun(BaseModel):
     """Per-node execution metadata: which model ran, its sampling identity, timing.
 
@@ -417,6 +464,14 @@ class NodeRun(BaseModel):
     and the report's top-level per-tier ``sampling`` clear block. It is computed
     per node *execution*, so a build that moves mid-run gives one node two
     hashes. A deterministic FunctionNode carries none of the three.
+
+    ``usage`` is what the node execution cost, ``None`` for a deterministic
+    FunctionNode and for any LLM node whose provider reported nothing. It is
+    deliberately *not* coupled to ``model`` the way ``sampling_fingerprint``
+    is: a fingerprint keyed on a served build is incoherent without one, but a
+    token count is a fact about the call regardless of whether the provider
+    also named the build that served it, and refusing to record it would
+    discard a real measurement to satisfy a symmetry nobody needs.
     """
 
     model_config = ConfigDict(extra="forbid")
@@ -426,6 +481,7 @@ class NodeRun(BaseModel):
     requested_model: str | None = None  # configured
     sampling_fingerprint: str | None = Field(default=None, pattern=r"^[0-9a-f]{64}$")
     duration_ms: int = Field(ge=0)
+    usage: TokenUsage | None = None
 
     @model_validator(mode="after")
     def _fingerprint_needs_model(self) -> Self:
@@ -574,6 +630,37 @@ def build_summary(
         rejected_count=len(rejected_threats),
         elements_analyzed=len(system_model.elements()),
     )
+
+
+def usage_by_node(nodes: Iterable[NodeRun]) -> dict[str, TokenUsage]:
+    """Total tokens per node name, summed across that node's executions.
+
+    The question this exists to answer is "which node costs the most", and a
+    bare ``nodes`` list does not answer it: the critic on a revise path
+    contributes two records, and reading a per-node total off the list means
+    every caller writing the same fold. Keyed by node name rather than by tier
+    because the tier is already answerable from the node, and the interesting
+    comparison — the critic against one category agent, both on ``strong`` — is
+    the one a tier roll-up destroys.
+
+    Nodes reporting no usage contribute nothing and are absent from the result,
+    rather than present with a zeroed record that reads as a free call.
+    """
+    totals: dict[str, TokenUsage] = {}
+    for node in nodes:
+        if node.usage is None:
+            continue
+        running = totals.get(node.node)
+        if running is None:
+            totals[node.node] = node.usage.model_copy()
+            continue
+        totals[node.node] = TokenUsage(
+            **{
+                field: getattr(running, field) + getattr(node.usage, field)
+                for field in TokenUsage.model_fields
+            }
+        )
+    return totals
 
 
 class StrideReport(BaseModel):
