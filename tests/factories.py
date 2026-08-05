@@ -315,6 +315,25 @@ def served_build(requested: str) -> str:
     return f"{requested}-served"
 
 
+def scripted_usage() -> types.GenerateContentResponseUsageMetadata:
+    """The usage block a scripted model reports, in the provider's own spelling.
+
+    Five distinct values, none of them a sum of the others, so a test can tell
+    which neutral field each provider counter landed in — a block of equal
+    numbers would pass a mapping that transposed two of them. ``thoughts`` sits
+    outside ``candidates`` here, which is the Gemini-family reading; the
+    recorded fields are deliberately not cross-checked, so the OpenAI-family
+    reading is equally recordable.
+    """
+    return types.GenerateContentResponseUsageMetadata(
+        prompt_token_count=1100,
+        cached_content_token_count=700,
+        candidates_token_count=300,
+        thoughts_token_count=9000,
+        total_token_count=10400,
+    )
+
+
 class ScriptedLlm(BaseLlm):
     """One node's model: replays a fixed emission and records the request.
 
@@ -324,6 +343,11 @@ class ScriptedLlm(BaseLlm):
     "recorded what was asked for" apart from "recorded what ran", and it is
     what makes the generation-identity path reachable at all without a live
     provider.
+
+    It reports ``usage_metadata`` for the same reason: a stand-in that
+    answered for free would leave the token-accounting path unreachable
+    offline, and the one number the accounting exists to surface — reasoning
+    tokens — is the one no visible output would reveal.
     """
 
     reply: str
@@ -336,6 +360,7 @@ class ScriptedLlm(BaseLlm):
         yield LlmResponse(
             content=types.Content(role="model", parts=[types.Part(text=self.reply)]),
             model_version=served_build(self.model),
+            usage_metadata=scripted_usage(),
         )
 
 
@@ -363,6 +388,11 @@ class SilentLlm(ScriptedLlm):
 
     Stands for a provider that reported no served build. Such a node must end
     up with no fingerprint rather than one keyed on what was merely requested.
+
+    It still reports usage, which is the point of keeping the two apart: a
+    token count is a fact about the call whether or not the provider also named
+    the build that served it, so the missing build must cost the fingerprint
+    and nothing else.
     """
 
     async def generate_content_async(
@@ -370,7 +400,26 @@ class SilentLlm(ScriptedLlm):
     ) -> AsyncGenerator[LlmResponse, None]:
         self.seen.append(llm_request.config.system_instruction or "")
         yield LlmResponse(
-            content=types.Content(role="model", parts=[types.Part(text=self.reply)])
+            content=types.Content(role="model", parts=[types.Part(text=self.reply)]),
+            usage_metadata=scripted_usage(),
+        )
+
+
+class UnmeteredLlm(ScriptedLlm):
+    """A stand-in whose response carries no usage block at all.
+
+    The other half of :class:`SilentLlm`: a provider that named its build and
+    metered nothing. Such a node must carry no ``usage`` rather than a zeroed
+    one, so a roll-up cannot read an unmeasured call as a free call.
+    """
+
+    async def generate_content_async(
+        self, llm_request, stream: bool = False
+    ) -> AsyncGenerator[LlmResponse, None]:
+        self.seen.append(llm_request.config.system_instruction or "")
+        yield LlmResponse(
+            content=types.Content(role="model", parts=[types.Part(text=self.reply)]),
+            model_version=served_build(self.model),
         )
 
 
