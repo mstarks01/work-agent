@@ -80,6 +80,14 @@ SOURCE_BLOCK_RE = re.compile(
 )
 # Element and flow IDs as the prompts write them: `type:normalized-name`.
 ELEMENT_ID_RE = re.compile(r"`((?:entity|process|store|flow|boundary):[a-z0-9:-]+)`")
+# A job-varying placeholder ADK templates from session state at run time. The
+# first one in an instruction is where its cacheable prefix stops.
+PLACEHOLDER_RE = re.compile(r"\{[a-z_]+\}")
+# The shared exemplar system: everything under its H3 up to the next heading of
+# the same level or higher.
+EXEMPLAR_SYSTEM_RE = re.compile(
+    r"^### The exemplar system\n(?P<body>.*?)(?=^#{1,3} )", re.MULTILINE | re.DOTALL
+)
 
 
 def json_blocks(text):
@@ -90,10 +98,24 @@ def exemplar_sections(category):
     return split_sections(loader.load(exemplar_name(category)))
 
 
+def exemplar_system():
+    """The ``### The exemplar system`` subsection of ``analyze.md``.
+
+    Found by its own heading rather than by which H2 contains it. The block is
+    static reference material, so it sits wherever the prompt's static content
+    sits — it moved out of ``## Input`` when the static/variable split was
+    tightened for caching, and a helper keyed on the enclosing H2 had to be
+    rewritten to follow it. Keyed on the heading that names it, it does not.
+    """
+    body = loader.load(ANALYZE_PROMPT_NAME)
+    match = EXEMPLAR_SYSTEM_RE.search(body)
+    assert match, "analyze.md carries no '### The exemplar system' subsection"
+    return match.group("body")
+
+
 def exemplar_system_ids():
     """Every element/flow ID the shared exemplar system defines."""
-    input_section = split_sections(loader.load(ANALYZE_PROMPT_NAME))["Input"]
-    return set(ELEMENT_ID_RE.findall(input_section))
+    return set(ELEMENT_ID_RE.findall(exemplar_system()))
 
 
 def exemplar_source_block():
@@ -103,8 +125,7 @@ def exemplar_source_block():
     ``label:`` is exactly what :func:`~stride_service.sources.render_sources`
     emits, which is the shape the block exists to depict.
     """
-    input_section = split_sections(loader.load(ANALYZE_PROMPT_NAME))["Input"]
-    match = SOURCE_BLOCK_RE.search(input_section)
+    match = SOURCE_BLOCK_RE.search(exemplar_system())
     assert match, "the exemplar system carries no labelled source block"
     return match.group("label").strip(), match.group("text")
 
@@ -129,6 +150,35 @@ def test_prompt_body_sections_are_nonempty(name):
     sections = split_sections(loader.load(name))
     empty = [heading for heading, body in sections.items() if not body]
     assert not empty
+
+
+@pytest.mark.parametrize("name", PROMPT_BODY_NAMES)
+def test_nothing_static_follows_the_last_placeholder(name):
+    """Static prose after the last placeholder is prose that can never cache.
+
+    A prompt's cacheable prefix ends at its first job-varying byte, so every
+    static word written *after* one is paid for on every call forever. The
+    framing a section needs — what the blocks are, that they are data and not
+    instruction, what standing each carries — says the same thing whether it
+    precedes the placeholder or follows it, and only one of those positions is
+    free.
+
+    The rule is mechanical because the pull is real: the natural way to write
+    an input section is to show the input and then explain it, which is exactly
+    the layout that costs the most. Closing fences and whitespace are all that
+    may trail, since a fence opened before a placeholder has to shut after it.
+    """
+    section = split_sections(loader.load(name))["Input"]
+    last = None
+    for match in PLACEHOLDER_RE.finditer(section):
+        last = match
+    assert last, f"{name}'s Input section carries no placeholder at all"
+    trailing = [line.strip() for line in section[last.end() :].splitlines()]
+    stray = [line for line in trailing if line and set(line) != {"`"}]
+    assert not stray, (
+        f"{name} carries static prose after its last placeholder, which can"
+        f" never cache — move it above the placeholder it frames: {stray}"
+    )
 
 
 @pytest.mark.parametrize("name", PROMPT_BODY_NAMES)

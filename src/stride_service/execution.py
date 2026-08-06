@@ -36,7 +36,7 @@ from stride_service.graph import (
     STATE_SOURCE_TEXTS,
     Pipeline,
 )
-from stride_service.report import NodeRun
+from stride_service.report import NodeRun, TokenUsage
 from stride_service.sampling import sampling_fingerprint
 from stride_service.sources import Source, render_sources
 from stride_service.vendors import join_served
@@ -68,11 +68,15 @@ class _NodeFinish:
     the event carries none — an offline stand-in, or a provider that did not
     report one — and a node with no served build gets no fingerprint rather
     than one attesting to a model nobody confirmed.
+
+    ``usage`` is what the provider says the call cost, on the same terms: read
+    off the event, ``None`` when the event carries none.
     """
 
     node: str
     at: float
     served_model: str | None
+    usage: TokenUsage | None = None
 
 
 @dataclass(frozen=True)
@@ -177,6 +181,7 @@ class GraphExecutor:
                         node=node,
                         at=observed_at,
                         served_model=getattr(event, "model_version", None),
+                        usage=_usage_of(event),
                     )
                 )
                 if on_node is not None:
@@ -221,6 +226,7 @@ class GraphExecutor:
                     requested_model=requested,
                     sampling_fingerprint=self._fingerprint(finish.node, served),
                     duration_ms=max(round((finish.at - ready_at) * 1000), 0),
+                    usage=finish.usage,
                 )
             )
         return runs
@@ -238,6 +244,47 @@ class GraphExecutor:
         if served_route is None or sampling is None:
             return None
         return sampling_fingerprint(served_route, sampling)
+
+
+# The provider's spelling for each vendor-neutral TokenUsage field. This is the
+# whole of the mapping, and it lives here rather than on the model because
+# reading a provider's vocabulary off an event is the driver's job — the same
+# reason ``model_version`` is read here and not in ``report``.
+_USAGE_FIELDS: Mapping[str, str] = {
+    "prompt_tokens": "prompt_token_count",
+    "cached_prompt_tokens": "cached_content_token_count",
+    "completion_tokens": "candidates_token_count",
+    "reasoning_tokens": "thoughts_token_count",
+    "total_tokens": "total_token_count",
+}
+
+
+def _usage_of(event) -> TokenUsage | None:
+    """What the provider says this event's call cost, or ``None`` if it said nothing.
+
+    A field the provider withheld arrives as ``None`` and is recorded as 0,
+    which is the honest reading only because the all-withheld case is caught
+    first: an event with no usage block at all, or one whose every counter is
+    absent, yields ``None`` rather than a zeroed record. That distinction is
+    the same one ``merge_drafts`` draws between a lane that ran and found
+    nothing and a lane that never ran — a free call and an unmeasured call
+    are not the same fact, and a summed report cannot tell them apart after
+    the fact.
+
+    Counters are read defensively because this runs against every vendor the
+    ``strong`` and ``base`` tiers can independently select, and the usage block
+    is the least uniform part of a completion response.
+    """
+    metadata = getattr(event, "usage_metadata", None)
+    if metadata is None:
+        return None
+    counts = {
+        field: getattr(metadata, provider_field, None)
+        for field, provider_field in _USAGE_FIELDS.items()
+    }
+    if all(count is None for count in counts.values()):
+        return None
+    return TokenUsage(**{field: count or 0 for field, count in counts.items()})
 
 
 def _served_route(requested_route: str | None, served_model: str | None) -> str | None:
