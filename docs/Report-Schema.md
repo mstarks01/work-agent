@@ -23,11 +23,11 @@ and the fields below are the authoritative account.
 
 ```python
 class StrideReport:
-    schema_version: str          # "2.0"
+    schema_version: str          # "2.1"
     disclaimer: str              # AI-generated, not human-reviewed
     job: Job                     # id, status="completed", timestamps, revise_rounds
     input: InputRef              # system_name + one ref per submitted source
-    nodes: list[NodeRun]         # per-node model, sampling fingerprint, duration_ms
+    nodes: list[NodeRun]         # per-node model, sampling fingerprint, duration_ms, token usage
     sampling: dict[str, dict]    # per-tier resolved decoding params (provenance)
     system_model: SystemModel    # the canonical model the analysis ran on
     boundary_crossings: list[BoundaryCrossing]
@@ -231,6 +231,14 @@ class NodeRun:
     requested_model: str | None      # the CONFIGURED route this node asked for
     sampling_fingerprint: str | None # 64-hex identity hash of (served route, decoding params)
     duration_ms: int
+    usage: TokenUsage | None         # what the provider says the call cost; None if unmetered
+
+class TokenUsage:
+    prompt_tokens: int
+    cached_prompt_tokens: int        # the part of prompt_tokens served from cache
+    completion_tokens: int
+    reasoning_tokens: int            # spent against max_output_tokens, absent from the output
+    total_tokens: int
 ```
 
 - **`sampling`** lists the decoding parameters each tier actually used, once per
@@ -246,9 +254,20 @@ class NodeRun:
   anyone can verify it. Code-only nodes (like `assemble`) have all three as
   `null`.
 
+- **`usage`** is what the provider reported the call cost, in vendor-neutral
+  field names. `null` for code-only nodes, and for any LLM node whose provider
+  metered nothing — an *unmeasured* call is never recorded as a free one.
+  Nothing here is derived: `total_tokens` is recorded rather than summed, and
+  the parts are not cross-checked, because vendors disagree on whether
+  `reasoning_tokens` sits inside `completion_tokens` or beside it. Sum them
+  yourself only if you know who answered.
+
 > **`schema_version` 1.1** added `requested_model` and redefined `model` as the
 > served build rather than the configured string. A consumer keying on `model`
 > now reads what answered.
+
+> **`schema_version` 2.1** added `nodes[].usage`. Purely additive; a 2.0
+> consumer that ignores unknown fields is unaffected.
 
 The report records both model fields and **compares neither**. It doesn't need
 to: if the build moves, the fingerprint moves with it, and the run stops

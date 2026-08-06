@@ -47,7 +47,7 @@ from evals.harness.scorer import (
 from evals.harness.structural import report_issues
 from stride_service.certification import CertifyResult, certify, fingerprints_of
 from stride_service.deployment import Deployment
-from stride_service.report import NodeRun
+from stride_service.report import NodeRun, TokenUsage, usage_by_node
 
 EVALS_ROOT = Path(__file__).resolve().parents[1]
 DEFAULT_CORPUS_DIR = EVALS_ROOT / "corpus"
@@ -83,6 +83,11 @@ class ModeRun:
     :func:`~stride_service.certification.certify` rules on. ``expected_nodes``
     is the *built* graph's LLM nodes, so a mode that enters at ``extract`` and
     stops is not held to the tiers it never routes through.
+
+    ``usage`` is the sweep's token cost per node, summed across every case and
+    every execution within a case. A sweep is the only place a real per-node
+    number comes from — a single job's numbers are one sample of one system —
+    so it is folded here rather than left to whoever reads the artifact.
     """
 
     payloads: list[dict[str, Any]]
@@ -90,6 +95,7 @@ class ModeRun:
     runs: dict[str, modes.AnalysisRun]
     observations: dict[str, frozenset[str]]
     expected_nodes: list[str]
+    usage: dict[str, TokenUsage]
 
 
 def _observe(observed: dict[str, set[str]], nodes: Iterable[NodeRun]) -> None:
@@ -115,11 +121,15 @@ async def _run_mode(
     payloads: list[dict[str, Any]] = []
     runs: dict[str, modes.AnalysisRun] = {}
     observed: dict[str, set[str]] = {}
+    # Every execution the sweep performed, kept flat so the per-node totals
+    # come from the one tested fold rather than a second one written here.
+    executions: list[NodeRun] = []
 
     for case in cases:
         if mode == "extraction":
             result = await modes.run_extraction(case, pipeline)
             _observe(observed, result.node_runs)
+            executions += result.node_runs
             score = modes.score_extraction(case, result)
             payloads.append(score.to_json())
             failures += [
@@ -136,6 +146,7 @@ async def _run_mode(
         )
         runs[case.id] = run
         _observe(observed, run.report.nodes)
+        executions += run.report.nodes
         issues = report_issues(run.report)
         failures += [f"{case.id}: {issue}" for issue in issues]
         payloads.append({"case": case.id, "structural_issues": issues})
@@ -146,6 +157,7 @@ async def _run_mode(
         runs=runs,
         observations={node: frozenset(prints) for node, prints in observed.items()},
         expected_nodes=list(pipeline.node_sampling),
+        usage=usage_by_node(executions),
     )
 
 
@@ -257,6 +269,7 @@ def command_run(args: argparse.Namespace) -> int:
         mode_run.expected_nodes,
     )
     _print_certification(certification)
+    _print_usage(mode_run.usage)
     # Both halves, never ``certified`` alone: it is narrow by design and is
     # vacuously true of a sweep that observed no fingerprint at all.
     trusted = certification.certified and certification.complete
@@ -278,6 +291,9 @@ def command_run(args: argparse.Namespace) -> int:
         "certification": certification.to_json(),
         "node_fingerprints": {
             node: sorted(prints) for node, prints in mode_run.observations.items()
+        },
+        "node_usage": {
+            node: usage.model_dump() for node, usage in mode_run.usage.items()
         },
         "structural_failures": failures,
         "mode_output": mode_run.payloads,
@@ -308,6 +324,35 @@ def command_run(args: argparse.Namespace) -> int:
             file=sys.stderr,
         )
     return 1 if failures or uncertified_blocks else 0
+
+
+def _print_usage(usage: dict[str, TokenUsage]) -> None:
+    """The sweep's token cost per node, dearest first.
+
+    Printed rather than left in the artifact because "which node costs the
+    most" is a question people ask far more often than they open the JSON, and
+    because the answer is not guessable from the graph's shape: reasoning
+    tokens are spent against the same cap as the output and appear in none of
+    it, so a node emitting a few hundred visible tokens can be the sweep's
+    largest consumer.
+
+    Sorted on ``total_tokens`` because that is the column the provider bills.
+    A node whose provider metered nothing is absent from ``usage`` entirely and
+    so does not appear here — an unmeasured node must not read as a cheap one.
+    """
+    if not usage:
+        print("token usage: nothing metered — no provider reported usage")
+        return
+    print("token usage (whole sweep, per node):")
+    header = f"  {'node':34} {'prompt':>10} {'cached':>10} {'output':>10}"
+    print(f"{header} {'reasoning':>10} {'total':>11}")
+    dearest = sorted(usage.items(), key=lambda pair: -pair[1].total_tokens)
+    for node, spent in dearest:
+        print(
+            f"  {node:34} {spent.prompt_tokens:10,} {spent.cached_prompt_tokens:10,}"
+            f" {spent.completion_tokens:10,} {spent.reasoning_tokens:10,}"
+            f" {spent.total_tokens:11,}"
+        )
 
 
 def _print_certification(result: CertifyResult) -> None:

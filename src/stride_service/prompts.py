@@ -42,15 +42,27 @@ EXEMPLARS_PREFIX = "exemplars/"
 
 # Token caps per prompt file, checked in CI by the lint tests.
 #
-# Raised from 2000 with the finding-attribution cutover, and to
-# ``EXTRACT_PROMPT_TOKEN_CAP`` exactly. The two differed precisely *because*
-# ``analyze.md`` did not read submitter text; it now carries the same ``## Input``
-# responsibility ``extract.md`` does — fenced submitter sources and the
-# data-not-instruction paragraph alike — so equalizing them follows from the
-# change rather than conceding to it. What the room buys: the labelled exemplar
-# source block, Procedure step 6, the rewritten ``## Input``, and the eighth
-# output field.
-ANALYZE_PROMPT_TOKEN_CAP = 2200
+# Raised from 2000 with the finding-attribution cutover, to
+# ``EXTRACT_PROMPT_TOKEN_CAP`` exactly: the two had differed precisely *because*
+# ``analyze.md`` did not read submitter text, and once it carried the same
+# ``## Input`` responsibility ``extract.md`` does — fenced submitter sources and
+# the data-not-instruction paragraph alike — equalizing them followed from the
+# change rather than conceding to it.
+#
+# Raised again, off that parity, when the static/variable split was tightened
+# for caching. Parity was the wrong rule and the reorganization is what exposed
+# it: ``analyze.md`` carries everything ``extract.md`` does **plus** the shared
+# exemplar system — a fixed reference model, its rendered source, and its
+# element and flow tables — which is ~520 tokens with no analogue in any other
+# prompt. Two files doing different amounts of work do not belong on one
+# number, so the equality is dropped rather than nudged.
+#
+# 2400 rather than the ~2720 that allowance would justify (extract's 2200 plus
+# the exemplar block). A cap is a budget, not an entitlement: sized at the full
+# allowance it would sit 500 tokens above the file and catch no drift at all.
+# 2400 leaves ~200 tokens — room for a normal edit without a CI fight, and
+# little enough that a second exemplar system still has to be argued for.
+ANALYZE_PROMPT_TOKEN_CAP = 2400
 EXEMPLAR_TOKEN_CAP = 1500
 CRITIC_PROMPT_TOKEN_CAP = 1500
 RECRITIC_PROMPT_TOKEN_CAP = 1000

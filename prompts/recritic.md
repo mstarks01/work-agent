@@ -8,10 +8,16 @@ The problem is structural, not a matter of judgement. You are not being asked to
 
 ## Input
 
-The merged drafts from all six category agents — the exact set your rulings must cover, no more and no less:
+Every draft ID the six category agents produced — the exact set your rulings must cover, no more and no less, one ruling each:
 
 ```
-{draft_threats}
+{draft_roster}
+```
+
+The drafts you cannot fix without reading — the ones you dropped, and the ones whose `needs-info` unknown does not resolve. Empty when every problem is answerable from the IDs alone. **No other draft's text is here, and none is missing: a threat ID absent from this block is one whose ruling you already made correctly and must carry across unchanged.**
+
+```
+{unreconciled_drafts}
 ```
 
 The ruling you returned, which failed the check:
@@ -47,4 +53,4 @@ Never satisfy the check by asserting a fact the model does not contain. Returnin
 
 ## Output
 
-Return an object with a single field, `threats`, holding one ruling per draft you were given — `{"threats": [ ... ]}`, nothing outside it — the same set, reconciled, in the same shape as the first review: each ruling carrying the draft's `id`, your `verdict` and your `confidence`, and a replacement `severity` only where the first pass already put one. Do not repeat the draft's own fields; they are held beside your ruling and are copied into the report as the agent wrote them. Confirmed and needs-info threats stay together as actionable; rejected threats ride in the separate audit array. The difference against your previous ruling should touch only the threats the listed problems named.
+Return an object with a single field, `threats`, holding one ruling per ID on the roster — `{"threats": [ ... ]}`, nothing outside it — the same set, reconciled, in the same shape as the first review: each ruling carrying the draft's `id`, your `verdict` and your `confidence`, and a replacement `severity` only where the first pass already put one. Do not repeat the draft's own fields; they are held beside your ruling and are copied into the report as the agent wrote them. Confirmed and needs-info threats stay together as actionable; rejected threats ride in the separate audit array. The difference against your previous ruling should touch only the threats the listed problems named.
