@@ -232,6 +232,8 @@ STATE_PREVIOUS_MODEL = "previous_model"
 STATE_VALIDATION_ISSUES = "validation_issues"
 STATE_PREVIOUS_REVIEW = "previous_review"
 STATE_CRITIC_ISSUES = "critic_issues"
+STATE_DRAFT_ROSTER = "draft_roster"
+STATE_UNRECONCILED_DRAFTS = "unreconciled_drafts"
 
 STATE_EXTRACTED_MODEL = "extracted_model"
 STATE_VALID_MODEL = "valid_model"
@@ -648,6 +650,15 @@ def route_review(
     element the model does not contain, routes to ``revise``, with the failing
     rulings and the problem list parked where the re-ask prompt reads them.
 
+    The re-ask sees the drafts as a **roster of IDs plus the few it must
+    read**, not as the whole set again. Its job is structural — cover exactly
+    the drafted IDs, once each, with unknowns that resolve — and an ID carries
+    the whole of that claim. The two drafts a structural fix cannot be made
+    without reading are named by
+    :attr:`~stride_service.critic.ReviewProblems.implicated`, which is computed
+    beside the messages so the prompt and the check cannot disagree about which
+    threats are in trouble.
+
     Both review nodes run this same function — what differs is where their
     ``revise`` edge points (``recritic`` for the first look, ``critic_failed``
     for the second), exactly as the two validate nodes share one function.
@@ -668,11 +679,18 @@ def route_review(
     drafts = [DraftThreat.model_validate(draft) for draft in merged_drafts]
     ruled = _threats_of(reviewed_threats)
     rulings = [ThreatRuling.model_validate(ruling) for ruling in ruled]
-    issues = review_issues(drafts, rulings, model)
-    if issues:
+    problems = review_issues(drafts, rulings, model)
+    if problems:
         ctx.state[STATE_PREVIOUS_REVIEW] = render(ruled)
-        ctx.state[STATE_CRITIC_ISSUES] = render(issues)
-        return Event(route=ROUTE_REVISE, output={"issue_count": len(issues)})
+        ctx.state[STATE_CRITIC_ISSUES] = render(problems.messages)
+        # The roster is the covering set the re-ask must reproduce, and an ID is
+        # the whole of that claim — the re-ask reproduces rulings, not drafts.
+        # Only the drafts it cannot fix without reading travel in full.
+        ctx.state[STATE_DRAFT_ROSTER] = render([draft.id for draft in drafts])
+        ctx.state[STATE_UNRECONCILED_DRAFTS] = render(
+            _ruling_view([draft for draft in drafts if draft.id in problems.implicated])
+        )
+        return Event(route=ROUTE_REVISE, output={"issue_count": len(problems.messages)})
     return Event(route=ROUTE_ACCEPT, output={"reviewed_count": len(rulings)})
 
 
