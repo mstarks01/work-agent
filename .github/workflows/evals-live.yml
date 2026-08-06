@@ -50,8 +50,12 @@ on:
     # assembly moved out of pipeline.py; binding.py and model_gate.py were
     # missed when tier binding and the build-time gates moved out of
     # deployment.py. That is the ordinary cost of a filter naming files rather
-    # than behaviour -- a path filter can always be fooled, which is what the
-    # scheduled sweep is for.
+    # than behaviour -- a path filter can always be fooled.
+    #
+    # WITHOUT THE BACKSTOP: nothing catches it when it is. The scheduled sweep
+    # was the answer to "the filter has gone stale again", and it is gone, so a
+    # responsibility that moves to an unlisted file is now invisible until
+    # someone dispatches a run by hand. The list has already been short twice.
     paths:
       - "prompts/**"
       - "skills/**"
@@ -67,9 +71,15 @@ on:
       - "src/stride_service/report.py"
       - "src/stride_service/system_model.py"
       - ".github/workflows/evals-live.yml"
-  schedule:
-    # Weekly backstop sweep — Mondays 06:00 UTC.
-    - cron: "0 6 * * 1"
+  # NO `schedule`. There was a Monday 06:00 UTC backstop sweep here until
+  # federation went unconfigured indefinitely. A scheduled run fails closed when
+  # credentials are absent -- deliberately, see the preflight below -- so with no
+  # federation it failed every week, and a check that always fails is a check
+  # nobody reads. Removing it is the honest state: this repository has no
+  # unattended live coverage, rather than an alarm it has learned to ignore.
+  #
+  # Restoring it is one `schedule:` block, and the three comments below marked
+  # WITHOUT THE BACKSTOP say what comes back with it.
   workflow_dispatch:
     inputs:
       mode:
@@ -160,9 +170,13 @@ jobs:
       #
       # Skipping is allowed on `pull_request` alone. A PR that touches a path
       # filter has not asked for a live run, and a red check for absent
-      # infrastructure teaches people to ignore this workflow. `schedule` and
-      # `workflow_dispatch` did ask, so for them missing credentials fail the
+      # infrastructure teaches people to ignore this workflow.
+      # `workflow_dispatch` did ask, so for it missing credentials fail the
       # job: a sweep that silently runs nothing is worse than one that stops.
+      #
+      # That asymmetry is why the schedule was removed rather than left to fail
+      # quietly -- a scheduled run is on the failing side of it, every week,
+      # forever, until federation exists.
       #
       # Only variable *names* are reported. None of the four is secret, but a
       # preflight step is not the place that decision gets re-litigated.
@@ -256,7 +270,11 @@ jobs:
       # is not on the PR path-filtered trigger: it costs judge calls and its
       # failure blocks a *judge* change, not a prompt change.
       - name: Judge-vs-human agreement
-        if: steps.preflight.outputs.configured == 'true' && (github.event_name == 'schedule' || inputs.calibrate)
+        # WITHOUT THE BACKSTOP: `inputs.calibrate` is the only way this runs.
+        # It used to fire unattended on the weekly schedule as well, so judge
+        # drift was measured whether or not anyone asked; now it is measured
+        # only when someone dispatches with the box ticked.
+        if: steps.preflight.outputs.configured == 'true' && inputs.calibrate
         run: uv run python -m evals.harness.run calibrate --out judge-agreement.json
 
       # Layer 3 of the examples' honesty mechanism (#30). The offline lane
@@ -269,9 +287,13 @@ jobs:
       # than promoted out of the golden corpus.
       #
       # Note: `examples/**` is deliberately NOT on this workflow's PR path
-      # filter, so an examples-only pull request does not fire this and the
-      # Monday sweep is the real guarantee. examples/README.md says so in those
-      # words -- keep the two in step if the filter ever changes.
+      # filter, so an examples-only pull request does not fire this.
+      #
+      # WITHOUT THE BACKSTOP: that gap no longer closes on its own. The Monday
+      # sweep used to be the guarantee behind the omitted path filter, so a
+      # sample that quietly became hard to extract was caught within a week.
+      # Nothing catches it now. examples/README.md carried that promise in those
+      # words and has been corrected in the same commit -- keep the two in step.
       #
       # Credentials come from the job-level STRIDE_VERTEX_* block, like every
       # other live step here.
