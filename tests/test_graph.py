@@ -8,6 +8,7 @@ canonical name resolves to.
 
 from __future__ import annotations
 
+import json
 import re
 
 import pytest
@@ -23,6 +24,8 @@ from stride_service.report import (
     STRIDE_CATEGORIES,
     DraftThreats,
     ThreatRulings,
+    UnknownRef,
+    Verdict,
 )
 from stride_service.resilience import load_resilience
 from stride_service.sampling import load_sampling
@@ -43,6 +46,8 @@ RUNTIME_PLACEHOLDERS = frozenset(
         graph.STATE_VALIDATION_ISSUES,
         graph.STATE_PREVIOUS_REVIEW,
         graph.STATE_CRITIC_ISSUES,
+        graph.STATE_DRAFT_ROSTER,
+        graph.STATE_UNRECONCILED_DRAFTS,
     }
 )
 
@@ -570,6 +575,53 @@ def test_merge_joins_drafts_in_canonical_order():
     assert "S-01" in ctx.state[graph.STATE_DRAFT_THREATS]
 
 
+def test_ruling_view_keeps_every_field_the_critic_rules_on():
+    """The guard on ``_ruling_view``'s ``exclude_defaults``.
+
+    Narrowing the prompt view is only free while nothing a verdict is reached
+    from can fall through it. A ``DraftThreat`` field added with a default
+    would vanish here whenever it held that default — so this names the fields
+    the five steps read and fails the moment one stops arriving.
+    """
+    draft = sample_draft("S-01", "spoofing")
+
+    (view,) = graph._ruling_view([draft])
+
+    for field in ("id", "category", "description", "affected_element_ids"):
+        assert field in view, f"the critic rules on {field!r}"
+    assert view["severity"]["likelihood"] and view["severity"]["justification"]
+    # Step 5 reads grounds for relevance, so each entry keeps its own branch.
+    assert [ground["kind"] for ground in view["grounds"]] == ["quote", "derived-fact"]
+    assert view["grounds"][0]["text"] == "Customers log in to the web app"
+    assert view["grounds"][1]["flow_id"] == "flow:customer-to-web-app:login"
+
+
+def test_ruling_view_drops_what_no_verdict_is_reached_from():
+    """Mitigations and a Ground's empty branches, gone from the prompt only."""
+    draft = sample_draft("S-01", "spoofing")
+    assert draft.mitigations, "the fixture must carry one for this to prove anything"
+
+    (view,) = graph._ruling_view([draft])
+
+    assert "mitigations" not in view
+    # A quote carries text and source_label; the other four fields are the
+    # empty string its own validator requires them to be.
+    assert set(view["grounds"][0]) == {"kind", "text", "source_label"}
+    assert set(view["grounds"][1]) == {"kind", "flow_id"}
+
+
+def test_merge_keeps_mitigations_out_of_the_prompt_but_in_the_report():
+    """The drafts the report is built from are not the drafts the critic reads."""
+    ctx = FakeContext(**analyze_state(spoofing=[sample_draft("S-01", "spoofing")]))
+
+    graph.merge_drafts(valid_model().model_dump(mode="json"), ctx)
+
+    assert "Set HttpOnly" not in ctx.state[graph.STATE_DRAFT_THREATS]
+    assert ctx.state[graph.STATE_MERGED_DRAFTS][0]["mitigations"] == [
+        {"summary": "Set HttpOnly and Secure on cookies", "detail": ""}
+    ]
+
+
 def test_merge_accepts_a_lane_that_ran_and_found_nothing():
     """Empty is a finding; absent is a failure. The check is on the key."""
     ctx = FakeContext(**analyze_state(spoofing=[sample_draft("S-01", "spoofing")]))
@@ -640,6 +692,91 @@ def test_router_revises_and_feeds_the_re_ask_prompt():
     assert event.actions.route == graph.ROUTE_REVISE
     assert "T-01" in ctx.state[graph.STATE_CRITIC_ISSUES]
     assert "S-01" in ctx.state[graph.STATE_PREVIOUS_REVIEW]
+
+
+def _revise(drafts, rulings):
+    """Drive the router to its ``revise`` edge and hand back the parked state."""
+    ctx = FakeContext()
+    event = graph.route_review(
+        valid_model().model_dump(mode="json"),
+        [draft.model_dump(mode="json") for draft in drafts],
+        ctx,
+        reviewed_threats={
+            "threats": [ruling.model_dump(mode="json") for ruling in rulings]
+        },
+    )
+    assert event.actions.route == graph.ROUTE_REVISE
+    return ctx.state
+
+
+def test_the_re_ask_roster_names_every_drafted_id():
+    """The covering set the re-ask must reproduce, in canonical order."""
+    drafts = [sample_draft("S-01"), sample_draft("T-01", category="tampering")]
+
+    state = _revise(drafts, [sample_ruling("S-01")])
+
+    assert json.loads(state[graph.STATE_DRAFT_ROSTER]) == ["S-01", "T-01"]
+
+
+def test_the_re_ask_reads_only_the_drafts_it_cannot_fix_blind():
+    """A dropped draft travels in full; one already ruled correctly does not.
+
+    The two drafts carry distinguishable titles, so "the correct one's prose is
+    absent" is checked against its own words rather than against a default the
+    fixture shares with every other draft.
+    """
+    drafts = [
+        sample_draft("S-01", title="RULED CORRECTLY"),
+        sample_draft("T-01", category="tampering", title="THE DROPPED ONE"),
+    ]
+
+    state = _revise(drafts, [sample_ruling("S-01")])  # T-01 dropped
+
+    unreconciled = json.loads(state[graph.STATE_UNRECONCILED_DRAFTS])
+    assert [draft["id"] for draft in unreconciled] == ["T-01"]
+    assert "THE DROPPED ONE" in state[graph.STATE_UNRECONCILED_DRAFTS]
+    # S-01 was ruled correctly, so its prose is not re-sent — the roster is the
+    # whole of what the re-ask is told about it.
+    assert "RULED CORRECTLY" not in state[graph.STATE_UNRECONCILED_DRAFTS]
+    assert "S-01" in state[graph.STATE_DRAFT_ROSTER]
+
+
+def test_an_unresolved_unknown_sends_the_draft_it_hangs_on():
+    """Repointing or replacing a needs-info verdict needs the threat's substance."""
+    drafts = [sample_draft("S-01")]
+    ruling = sample_ruling(
+        "S-01",
+        verdict=Verdict(
+            status="needs-info",
+            reason="encryption unstated",
+            related_unknowns=[UnknownRef(element_id="store:ghost", attribute="x")],
+        ),
+    )
+
+    state = _revise(drafts, [ruling])
+
+    unreconciled = json.loads(state[graph.STATE_UNRECONCILED_DRAFTS])
+    assert [draft["id"] for draft in unreconciled] == ["S-01"]
+
+
+def test_a_duplicate_ruling_sends_no_draft_at_all():
+    """Dropping one of two rulings on one ID is answerable from the rulings."""
+    drafts = [sample_draft("S-01")]
+
+    state = _revise(drafts, [sample_ruling("S-01"), sample_ruling("S-01")])
+
+    assert json.loads(state[graph.STATE_UNRECONCILED_DRAFTS]) == []
+    assert json.loads(state[graph.STATE_DRAFT_ROSTER]) == ["S-01"]
+
+
+def test_the_re_ask_never_sees_a_field_the_critic_could_not_rule_on():
+    """``_ruling_view`` narrows here too — one view of a draft, not two."""
+    drafts = [sample_draft("S-01"), sample_draft("T-01", category="tampering")]
+
+    state = _revise(drafts, [sample_ruling("S-01")])
+
+    (dropped,) = json.loads(state[graph.STATE_UNRECONCILED_DRAFTS])
+    assert "mitigations" not in dropped
 
 
 def test_a_critic_that_emitted_nothing_routes_to_the_re_ask():

@@ -10,7 +10,9 @@ Structural checks are already done in code — element IDs resolve, threat-ID le
 
 ## Input
 
-The validated System Model, its derived boundary crossings, and the merged drafts from all six category agents:
+Your skill text above carries the severity rubric and the six category scope definitions — the same lane boundaries the agents were given. Judge lanes against those definitions, not against your own sense of the categories.
+
+Then follow the validated System Model, its derived boundary crossings, and the merged drafts from all six category agents:
 
 {system_model}
 
@@ -21,8 +23,6 @@ The validated System Model, its derived boundary crossings, and the merged draft
 ```
 {draft_threats}
 ```
-
-Your skill text above carries the severity rubric and the six category scope definitions — the same lane boundaries the agents were given. Judge lanes against those definitions, not against your own sense of the categories.
 
 ## Procedure
 

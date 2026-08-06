@@ -100,9 +100,44 @@ def _attribute_names(element: Element) -> frozenset[str]:
     return frozenset(type(element).model_fields)
 
 
+class CriticIssue(NamedTuple):
+    """One unresolved-unknown problem, and the threat whose ruling carries it.
+
+    The ID rides beside the message because two callers need different halves.
+    The re-ask prompt reads the *message*; the seam that builds that prompt
+    reads the *ID*, to decide which drafts the re-ask has to be shown in full.
+    Recovering the ID by parsing it back out of the message would make the
+    wording of an error string load-bearing for what the graph sends a model.
+    """
+
+    threat_id: str
+    message: str
+
+
+class ReviewProblems(NamedTuple):
+    """The mechanical check's verdict on one set of rulings.
+
+    ``messages`` is what the re-ask is asked to fix, in the words it reads.
+    ``implicated`` is the subset of *drafted* IDs whose drafts the re-ask
+    cannot fix without reading: a draft it never ruled, which it must rule
+    now, and a draft whose needs-info verdict must be repointed or replaced by
+    a verdict the stated facts support. Neither is answerable from an ID.
+
+    Both come out of one pass so they cannot disagree about what went wrong —
+    the reason this is a record rather than two functions over the same inputs.
+    Falsy when the rulings are assemblable, so callers read it as the check.
+    """
+
+    messages: list[str]
+    implicated: frozenset[str]
+
+    def __bool__(self) -> bool:
+        return bool(self.messages)
+
+
 def _unresolved_unknown_ref_issues(
     rulings: Iterable[ThreatRuling], system_model: SystemModel
-) -> list[str]:
+) -> list[CriticIssue]:
     """Every ``related_unknowns`` entry naming an element or attribute not there.
 
     The ``attribute`` half is checked to the same depth as the grounds surface
@@ -127,15 +162,21 @@ def _unresolved_unknown_ref_issues(
             element = by_id.get(ref.element_id)
             if element is None:
                 issues.append(
-                    f"threat {ruling.id!r} hangs its needs-info verdict on"
-                    f" element {ref.element_id!r}, which is not in the system"
-                    " model"
+                    CriticIssue(
+                        ruling.id,
+                        f"threat {ruling.id!r} hangs its needs-info verdict on"
+                        f" element {ref.element_id!r}, which is not in the system"
+                        " model",
+                    )
                 )
             elif ref.attribute not in _attribute_names(element):
                 issues.append(
-                    f"threat {ruling.id!r} hangs its needs-info verdict on"
-                    f" attribute {ref.attribute!r}, which element"
-                    f" {ref.element_id!r} does not have"
+                    CriticIssue(
+                        ruling.id,
+                        f"threat {ruling.id!r} hangs its needs-info verdict on"
+                        f" attribute {ref.attribute!r}, which element"
+                        f" {ref.element_id!r} does not have",
+                    )
                 )
     return issues
 
@@ -323,12 +364,12 @@ def review_issues(
     drafts: Sequence[DraftThreat],
     rulings: Sequence[ThreatRuling],
     system_model: SystemModel,
-) -> list[str]:
+) -> ReviewProblems:
     """Every way the critic's rulings fail to account for the drafts it saw.
 
-    The mechanical check, returned as a list rather than raised, so the graph
-    can *route* on it: an empty list means the rulings are assemblable, a
-    non-empty one is what the bounded re-ask is asked to fix. The critic must
+    The mechanical check, returned rather than raised, so the graph can *route*
+    on it: a falsy result means the rulings are assemblable, a truthy one is
+    what the bounded re-ask is asked to fix. The critic must
     rule on exactly the drafted set — no threat invented, none dropped — with
     unique IDs, and each ``needs-info`` verdict naming only unknowns the model
     actually contains. Verdict shape and the ID's category letter are enforced
@@ -344,17 +385,22 @@ def review_issues(
     """
     drafted_ids = {draft.id for draft in drafts}
     ruled_ids = {ruling.id for ruling in rulings}
-    issues = [
-        f"critic dropped draft {threat_id!r}"
-        for threat_id in sorted(drafted_ids - ruled_ids)
-    ]
-    issues += [
+    dropped = sorted(drafted_ids - ruled_ids)
+    unresolved = _unresolved_unknown_ref_issues(rulings, system_model)
+    messages = [f"critic dropped draft {threat_id!r}" for threat_id in dropped]
+    messages += [
         f"critic returned threat {threat_id!r}, which no category agent drafted"
         for threat_id in sorted(ruled_ids - drafted_ids)
     ]
-    issues += _duplicate_id_issues(rulings)
-    issues += _unresolved_unknown_ref_issues(rulings, system_model)
-    return issues
+    messages += _duplicate_id_issues(rulings)
+    messages += [issue.message for issue in unresolved]
+    # A duplicate ID implicates no draft: the re-ask drops one of two rulings on
+    # an ID it already ruled, which is answerable from the rulings alone. An
+    # invented ID implicates none either — there is no draft behind it to show.
+    implicated = set(dropped) | {
+        issue.threat_id for issue in unresolved if issue.threat_id in drafted_ids
+    }
+    return ReviewProblems(messages=messages, implicated=frozenset(implicated))
 
 
 def _ruled(draft: DraftThreat, ruling: ThreatRuling) -> Threat:
@@ -392,9 +438,9 @@ def assemble_threats(
     :func:`join_drafts` left them — so the audit array does not inherit
     whatever order the critic happened to emit its rulings in.
     """
-    issues = review_issues(drafts, rulings, system_model)
-    if issues:
-        raise CriticOutputError("; ".join(issues))
+    problems = review_issues(drafts, rulings, system_model)
+    if problems:
+        raise CriticOutputError("; ".join(problems.messages))
 
     ruling_by_id = {ruling.id: ruling for ruling in rulings}
     reviewed = [_ruled(draft, ruling_by_id[draft.id]) for draft in drafts]
