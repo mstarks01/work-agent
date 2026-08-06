@@ -1,0 +1,238 @@
+# Live golden-case evals against the two API-key vendors: Anthropic and OpenAI.
+#
+# The sibling `evals-live.yml` covers Vertex and cannot cover these: it
+# authenticates through Workload Identity Federation, and federation has no
+# meaning for a vendor that authenticates with a bearer key. That file says so
+# in its own header -- "a tier pointed at Anthropic or OpenAI would need an API
+# key in a repository secret instead, and none of the federation below would
+# apply to it". This is that workflow.
+#
+# WHY IT IS SEPARATE RATHER THAN A THIRD MATRIX LEG OVER THERE. The Vertex job
+# holds `id-token: write`, because exchanging an OIDC token is how it gets
+# credentials at all. A job that holds a long-lived third-party API key must not
+# also hold an identity it could exchange for cloud credentials, and matrix legs
+# share their job's permissions. Two files is what keeps `id-token: write` and
+# `secrets.STRIDE_*_API_KEY` in disjoint jobs. Do not merge them.
+#
+# `pull_request_target` is PROHIBITED repository-wide and the reasoning in
+# evals-live.yml applies here unchanged -- more so, since the credential here is
+# long-lived rather than a short-lived exchange.
+#
+# NO `pull_request` TRIGGER, deliberately, and this is the main way this file
+# differs from its sibling:
+#
+#   * Cost. A prompt-touching PR already fires the Vertex sweep. Firing all
+#     three would triple the spend on every such PR to re-detect one regression.
+#   * Exposure. Every trigger path is a path along which a long-lived key is
+#     mounted into a runner. Vertex's short-lived exchange tolerates a PR
+#     trigger far better than a bearer key does.
+#
+# So regression detection at PR time stays Vertex's job, and this file answers a
+# different question: does the graph still run end to end on the vendors nobody
+# has ever exercised? Run it on demand before trusting a non-Vertex deployment,
+# and weekly as a backstop.
+name: Evals (live API-key vendors)
+
+on:
+  schedule:
+    # Mondays 07:00 UTC -- one hour behind the Vertex sweep, so the two do not
+    # arrive together. They share a concurrency group, so a collision would
+    # queue rather than double-spend, but queueing behind a 90-minute job is a
+    # worse way to discover that than not colliding in the first place.
+    - cron: "0 7 * * 1"
+  workflow_dispatch:
+    inputs:
+      mode:
+        description: "Eval mode"
+        type: choice
+        options: [end-to-end, analysis, extraction]
+        default: end-to-end
+      vendor:
+        description: "Which vendor to sweep"
+        type: choice
+        options: [both, anthropic, openai]
+        default: both
+
+permissions: {}
+
+# The same group as evals-live.yml, on purpose: quota is shared across the whole
+# repository, so "one live run at a time" has to hold across every workflow that
+# spends it, not within each one. cancel-in-progress is false for the reason
+# stated there -- cancelling mid-run spends the money and keeps none of the
+# result.
+concurrency:
+  group: evals-live
+  cancel-in-progress: false
+
+jobs:
+  live:
+    name: Golden-case evals (${{ matrix.vendor }})
+    runs-on: ubuntu-latest
+    timeout-minutes: 90
+    permissions:
+      contents: read
+      # NO id-token. See the header: this job holds a bearer key, so it must
+      # not also hold an exchangeable cloud identity. Adding it here to "reuse"
+      # the Vertex auth is the change this comment exists to stop.
+
+    strategy:
+      # One leg at a time. The concurrency group above serializes across
+      # workflows; without this the two legs of one workflow would still run
+      # concurrently, which is the same shared quota spent twice at once.
+      max-parallel: 1
+      # fail-fast off: the OpenAI leg's result is worth having even when the
+      # Anthropic leg fails, and vice versa. They are independent measurements,
+      # not stages of one.
+      fail-fast: false
+      matrix:
+        include:
+          # Pinned per tier, not read from config/model_tiers.toml -- which
+          # selects no vendor at all, so a live sweep has to name one. Pinned
+          # here for the reason the Vertex file pins its own: an eval baseline
+          # is only meaningful against a known pair, and reading it from a file
+          # that may be edited between runs is how a re-baseline goes unnoticed.
+          #
+          # Both pairs were chosen against the build-time gates rather than for
+          # capability, and each pin is load-bearing:
+          #
+          #   * Anthropic is pinned to Claude 4.6 exactly, and there is no
+          #     choice about that. The service floors at 4.6 ("this service
+          #     supports 4.6 and later" -- model_tiers rejects 4.5 and earlier
+          #     outright), while binding.py fails the build when a Claude >= 4.7
+          #     is sent a `temperature`, and config/sampling.toml pins
+          #     `temperature = 0.0` on both tiers. Floor and ceiling meet: 4.6 is
+          #     the only admissible generation. claude-haiku-4-5 fails the floor
+          #     and claude-opus-4-8 fails the ceiling; both were tried. Widening
+          #     this means unsetting temperature for that tier first, and that
+          #     re-baselines the tier's sampling fingerprint.
+          #   * Both models must clear their tier's pinned `max_output_tokens`
+          #     (16,384 base / 64,000 strong) and support native structured
+          #     output, since every LLM node binds an output schema and an
+          #     emulated one fails mid-job. gpt-4o publishes exactly 16,384,
+          #     which is why it is the base pin and cannot be the strong one.
+          - vendor: anthropic
+            secret_name: STRIDE_ANTHROPIC_API_KEY
+            base_model: claude-sonnet-4-6
+            strong_model: claude-opus-4-6
+          - vendor: openai
+            secret_name: STRIDE_OPENAI_API_KEY
+            base_model: gpt-4o
+            strong_model: gpt-5.6
+
+    # Skips the leg the dispatcher did not ask for. `both` is the default and
+    # the scheduled behaviour, so the common path runs everything.
+    if: >-
+      github.event_name != 'workflow_dispatch'
+      || inputs.vendor == 'both'
+      || inputs.vendor == matrix.vendor
+
+    env:
+      # The vendor registry reads its own STRIDE_-prefixed variables and nothing
+      # else: an ambient credential this deployment did not declare must not be
+      # able to authenticate a run, which is the ASI03 inherited-credential
+      # path. That is why this is STRIDE_ANTHROPIC_API_KEY rather than the
+      # ANTHROPIC_API_KEY LiteLLM would otherwise pick up on its own.
+      STRIDE_MODEL_BASE_VENDOR: ${{ matrix.vendor }}
+      STRIDE_MODEL_BASE_MODEL: ${{ matrix.base_model }}
+      STRIDE_MODEL_STRONG_VENDOR: ${{ matrix.vendor }}
+      STRIDE_MODEL_STRONG_MODEL: ${{ matrix.strong_model }}
+
+    steps:
+      - name: Check out
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - name: Set up uv and Python
+        uses: astral-sh/setup-uv@11f9893b081a58869d3b5fccaea48c9e9e46f990 # v8.3.2
+        with:
+          enable-cache: true
+
+      - name: Install dependencies
+        run: uv sync --locked
+
+      # Always fails rather than skips when the key is absent, which is the
+      # opposite of the Vertex preflight's pull_request branch -- and follows
+      # from the same rule. That file skips a PR because "a PR that touches a
+      # path filter has not asked for a live run"; every trigger this workflow
+      # has did ask, so there is no event here for which silence is right.
+      #
+      # Only the secret's NAME is ever printed.
+      - name: Check the vendor key is configured
+        shell: bash
+        env:
+          VENDOR_API_KEY: ${{ secrets[matrix.secret_name] }}
+          SECRET_NAME: ${{ matrix.secret_name }}
+          VENDOR: ${{ matrix.vendor }}
+        run: |
+          set -euo pipefail
+
+          if [[ -n "${VENDOR_API_KEY:-}" ]]; then
+            exit 0
+          fi
+
+          {
+            echo "## Live evals did not run (${VENDOR})"
+            echo
+            echo "No API key is configured for this vendor."
+            echo
+            echo "Unset repository secret: \`${SECRET_NAME}\`"
+            echo
+            echo "Set it with:"
+            echo
+            echo '```sh'
+            echo "gh secret set ${SECRET_NAME}"
+            echo '```'
+            echo
+            echo "The name is vendor-scoped on purpose: the registry reads only"
+            echo "its own STRIDE_-prefixed variables, so a plain"
+            echo "\`${VENDOR^^}_API_KEY\` will not authenticate a run."
+          } >>"$GITHUB_STEP_SUMMARY"
+
+          echo "::error::A ${GITHUB_EVENT_NAME} event asked for a live ${VENDOR}" \
+               "sweep, but ${SECRET_NAME} is not set. See the job summary."
+          exit 1
+
+      # --no-scoring, and this is a real limitation rather than a saving.
+      #
+      # The judge is pinned to vertex/gemini-2.5-pro in evals/config/judge.toml,
+      # deliberately: its legitimacy "rests on measured agreement against hand
+      # labels rather than on sharing a vendor with the system under test". So a
+      # SCORED sweep of Anthropic or OpenAI needs Vertex credentials too -- for
+      # the judge, not for the system -- and this job has none and must not
+      # acquire them (see the permissions block).
+      #
+      # What still runs is the whole graph and every Tier 1 structural gate:
+      # extraction, the six category agents, the critic and its re-ask,
+      # assembly, and the checks that a report parses, resolves its references,
+      # agrees with its own summary, and did not lose a category to a truncated
+      # node. Those are the failures a never-exercised vendor actually has.
+      # What is missing is must-find recall and the severity confusion -- the
+      # judge-relative numbers.
+      #
+      # Making this scored is a follow-up that needs the judge reachable from a
+      # job that holds no cloud identity. Splitting scoring into its own job
+      # that reads the artifact is the shape that keeps the credentials
+      # disjoint; it is not built here because federation is unprovisioned, so
+      # it could not be tested.
+      - name: Run golden-case evals (structural gates only)
+        env:
+          EVAL_MODE: ${{ inputs.mode || 'end-to-end' }}
+          STRIDE_ANTHROPIC_API_KEY: ${{ secrets.STRIDE_ANTHROPIC_API_KEY }}
+          STRIDE_OPENAI_API_KEY: ${{ secrets.STRIDE_OPENAI_API_KEY }}
+        run: |
+          uv run python -m evals.harness.run run \
+            --mode "$EVAL_MODE" \
+            --no-scoring \
+            --out "eval-artifact-${{ matrix.vendor }}.json"
+
+      # always(), so a failed sweep still surfaces whatever it produced. Unlike
+      # the Vertex job there is no preflight-skip case to exclude: this workflow
+      # fails rather than skips on a missing key, so a run that got here ran.
+      - name: Upload run artifact
+        if: always()
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: eval-artifact-${{ matrix.vendor }}
+          path: eval-artifact-${{ matrix.vendor }}.json
+          if-no-files-found: ignore
