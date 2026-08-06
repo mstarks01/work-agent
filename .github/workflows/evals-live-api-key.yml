@@ -29,17 +29,26 @@
 #
 # So regression detection at PR time stays Vertex's job, and this file answers a
 # different question: does the graph still run end to end on the vendors nobody
-# has ever exercised? Run it on demand before trusting a non-Vertex deployment,
-# and weekly as a backstop.
+# has ever exercised? Run it on demand, before trusting a non-Vertex deployment.
 name: Evals (live API-key vendors)
 
 on:
-  schedule:
-    # Mondays 07:00 UTC -- one hour behind the Vertex sweep, so the two do not
-    # arrive together. They share a concurrency group, so a collision would
-    # queue rather than double-spend, but queueing behind a 90-minute job is a
-    # worse way to discover that than not colliding in the first place.
-    - cron: "0 7 * * 1"
+  # NO `schedule`, and dispatch-only is the whole trigger surface. A weekly
+  # backstop was drafted here and removed before it ever ran, for the reason the
+  # Vertex sweep's own cron was removed: the preflight below fails closed when a
+  # key is absent, both secrets are unset, so a scheduled run would have failed
+  # every week until someone configured a vendor. A check that always fails is a
+  # check nobody reads.
+  #
+  # This one has less claim to a schedule than the Vertex sweep did in any case:
+  # that cron was the backstop behind a path filter that can be fooled, whereas
+  # this workflow has no PR trigger to back up. It answers "does the graph still
+  # run on a vendor nobody has tried", which is a question someone asks
+  # deliberately, before trusting a non-Vertex deployment.
+  #
+  # If both secrets are ever set, a cron here is one block -- offset from the
+  # Vertex sweep's, since they share a concurrency group and queueing behind a
+  # 90-minute job is a poor way to discover a collision.
   workflow_dispatch:
     inputs:
       mode:
@@ -119,8 +128,11 @@ jobs:
             base_model: gpt-4o
             strong_model: gpt-5.6
 
-    # Skips the leg the dispatcher did not ask for. `both` is the default and
-    # the scheduled behaviour, so the common path runs everything.
+    # Skips the leg the dispatcher did not ask for. `both` is the input's
+    # default, so dispatching without choosing runs everything. The
+    # event_name guard is kept rather than simplified away: it is what keeps
+    # this correct if a non-dispatch trigger is ever added back, where
+    # `inputs.vendor` is null and every leg should run.
     if: >-
       github.event_name != 'workflow_dispatch'
       || inputs.vendor == 'both'
