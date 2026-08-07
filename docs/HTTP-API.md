@@ -11,7 +11,7 @@ production wiring.
 ```python
 from stride_service import create_app
 
-app = create_app()   # configured store, real pipeline, configured JWT verifier
+app = create_app()  # configured store, real pipeline, configured JWT verifier
 ```
 
 See [Configuration](Configuration.md) for the required
