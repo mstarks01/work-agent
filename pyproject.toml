@@ -27,11 +27,13 @@ dev = [
     "ruff>=0.16.0",
 ]
 # The lite first-run web app's server (#32). A dependency-group, not an extra
-# and not a wheel dependency: `webapp/` is deliberately outside the wheel, so
-# `stride-service[web]` would advertise a `pip install` path that cannot work —
-# pipeline.py resolves skills/, prompts/ and config/*.toml from the repo root,
-# which from site-packages is empty. Groups never enter the built distribution,
-# so the integrator at route step 5 inherits none of this.
+# and not a wheel dependency: `webapp/main.py` is a standalone driver script
+# outside `src/stride_service`, same as `examples/`, so no `pip install` path
+# names it — there is no console script and no `[web]` extra. That is
+# independent of what the wheel bundles for the *engine* (see force-include
+# below): the app itself simply isn't packaged. Groups never enter the built
+# distribution either, so the integrator at route step 5 inherits none of
+# this — their dependency surface stays whatever `src/stride_service` needs.
 web = [
     "uvicorn>=0.30",
 ]
@@ -43,6 +45,19 @@ default-groups = ["dev", "web"]
 
 [tool.hatch.build.targets.wheel]
 packages = ["src/stride_service"]
+
+[tool.hatch.build.targets.wheel.force-include]
+# The other half of what a run needs, alongside the engine code `packages`
+# already covers. Bundled under the package namespace rather than left at the
+# wheel root so `pip install stride-service` (or `stride-service[web]`, which
+# is still meaningless per the comment above) resolves everything from one
+# installed location with no additional fetch. The source of truth stays these
+# top-level directories -- editing a prompt or a config default still means
+# editing the file here, not something under `_bundled/`, which only exists in
+# a built wheel. See deployment.py's DEFAULT_* resolution for the read side.
+"skills" = "stride_service/_bundled/skills"
+"prompts" = "stride_service/_bundled/prompts"
+"config" = "stride_service/_bundled/config"
 
 [tool.ruff]
 # Stated rather than inferred from `requires-python`, so raising the floor to
