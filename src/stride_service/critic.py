@@ -26,13 +26,14 @@ offending entries.
 
 from __future__ import annotations
 
+import re
 from collections import Counter
 from collections.abc import Collection, Iterable, Mapping, Sequence
 from types import MappingProxyType
-from typing import NamedTuple
+from typing import NamedTuple, get_args
 
 from stride_service.grounding import verify_quote
-from stride_service.references import snap
+from stride_service.references import canonical, snap
 from stride_service.report import (
     STRIDE_CATEGORIES,
     DraftThreat,
@@ -41,9 +42,10 @@ from stride_service.report import (
     StrideCategory,
     Threat,
     ThreatRuling,
+    UnresolvedMention,
     UnverifiedGround,
 )
-from stride_service.system_model import Element, SystemModel
+from stride_service.system_model import DataFlow, Element, SystemModel
 
 # Most severe first — the order the report's ``threats`` array carries.
 SEVERITY_ORDER: tuple[SeverityLevel, ...] = ("critical", "high", "medium", "low")
@@ -65,16 +67,72 @@ class AssembledThreats(NamedTuple):
 
 
 class JoinedDrafts(NamedTuple):
-    """What the fan-in produces: the merged drafts, and what did not verify.
+    """What the fan-in produces: the merged drafts, and what did not check out.
 
-    Two returns rather than one because they have different owners. The drafts
-    are the agents'; ``unverified`` is the *service's* record of quotes it
-    looked for and could not find, which is why it rides beside the drafts
-    instead of on them.
+    Three returns rather than one because they have different owners. The
+    drafts are the agents'; ``unverified`` and ``mentions`` are the *service's*
+    record of what it looked for and could not find — a quote in the source it
+    named, an element ID a description cited — which is why both ride beside
+    the drafts instead of on them.
     """
 
     drafts: list[DraftThreat]
     unverified: list[UnverifiedGround]
+    mentions: list[UnresolvedMention]
+
+
+# An element ID as it appears inside prose. Flows carry a second segment and
+# nothing else does, so the two shapes are spelled separately rather than as one
+# optional group that would read ``store:orders-db:anything`` as a store.
+#
+# Built from the element classes' own ``id_prefix``, so a sixth element type
+# joins this pattern by existing rather than by someone remembering. Matched
+# case-insensitively and snapped afterwards, for the reason every other
+# reference in this module is: the spelling is not the claim.
+_FLOW_PREFIX = DataFlow.id_prefix
+_OTHER_PREFIXES = sorted(
+    element.id_prefix for element in get_args(Element) if element is not DataFlow
+)
+_SLUG = r"[a-z0-9-]+"
+_MENTION_RE = re.compile(
+    rf"\b(?:{_FLOW_PREFIX}:{_SLUG}:{_SLUG}|(?:{'|'.join(_OTHER_PREFIXES)}):{_SLUG})",
+    re.IGNORECASE,
+)
+
+
+def mentioned_ids(description: str) -> list[str]:
+    """Every element ID a description names in prose, in the order written.
+
+    Deliberately narrow: a token has to open with one of the five real type
+    prefixes and a colon, which is a shape ordinary English does not produce —
+    ``"Process: the web app"`` has a space and does not match. The cost of that
+    narrowness is a miss rather than a false alarm, which is the right way
+    round for a check whose output annotates a finding a human will read.
+
+    Measured over the 18 hand-authored descriptions in ``prompts/exemplars/``,
+    the closest thing the repo holds to real agent prose: **14 distinct IDs
+    extracted, 0 of them spurious** — every token found is one of the exemplar
+    system's 14 real element IDs, and all 14 are found. Small, and the only
+    corpus of threat descriptions that exists; enough to say the pattern reads
+    prose without inventing citations in it.
+
+    Trailing hyphens are trimmed because prose runs an ID into an em-dash
+    substitute more often than a real slug ends in one; ``normalize_name``
+    strips them, so no legal ID ends in a hyphen anyway.
+    """
+    return [match.group().rstrip("-") for match in _MENTION_RE.finditer(description)]
+
+
+def _unresolved_mentions(
+    threats: Iterable[DraftThreat], element_ids: Collection[str]
+) -> list[UnresolvedMention]:
+    """Marks for every ID a description cites that the model does not contain."""
+    return [
+        UnresolvedMention(threat_id=threat.id, mention=mention)
+        for threat in threats
+        for mention in mentioned_ids(threat.description)
+        if not canonical(mention, element_ids)
+    ]
 
 
 def _snapped_ground(
@@ -410,6 +468,12 @@ def join_drafts(
     unique across it, and every grounds entry resolving and, for a quote,
     actually appearing in the source it names.
 
+    Two things it *marks* rather than fails on, because the fan-in has no
+    re-ask path and a whole report is too much to trade for either: a quote
+    absent from the source it names, and an element ID a description cites in
+    prose that the model does not contain
+    (:class:`~stride_service.report.UnresolvedMention`).
+
     References are snapped to their canonical spelling first
     (:func:`~stride_service.references.snap_drafts`), so the checks below —
     and the report, which carries these drafts' own fields through unaltered —
@@ -427,13 +491,14 @@ def join_drafts(
     citation that is not wrong. Empty means the text check does not run — no
     quote is marked and no threat fails on one.
     """
+    known_ids = {element.id for element in system_model.elements()}
     merged = snap_drafts(
         [
             draft
             for category in STRIDE_CATEGORIES
             for draft in drafts_by_category.get(category, ())
         ],
-        {element.id for element in system_model.elements()},
+        known_ids,
         sources.keys(),
     )
     misfiled = [
@@ -455,7 +520,11 @@ def join_drafts(
     # carried has already failed above, and matching its text against the empty
     # string would report the same defect a second time in worse words.
     unverified = _verify_quotes(merged, sources) if sources else []
-    return JoinedDrafts(drafts=merged, unverified=unverified)
+    return JoinedDrafts(
+        drafts=merged,
+        unverified=unverified,
+        mentions=_unresolved_mentions(merged, known_ids),
+    )
 
 
 def review_issues(

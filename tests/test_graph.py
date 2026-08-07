@@ -570,7 +570,11 @@ def test_merge_joins_drafts_in_canonical_order():
     )
     output = graph.merge_drafts(valid_model().model_dump(mode="json"), ctx)
 
-    assert output == {"draft_count": 2, "unverified_count": 0}
+    assert output == {
+        "draft_count": 2,
+        "unverified_count": 0,
+        "unresolved_mention_count": 0,
+    }
     assert [d["id"] for d in ctx.state[graph.STATE_MERGED_DRAFTS]] == ["S-01", "T-01"]
     assert "S-01" in ctx.state[graph.STATE_DRAFT_THREATS]
 
@@ -628,7 +632,11 @@ def test_merge_accepts_a_lane_that_ran_and_found_nothing():
 
     output = graph.merge_drafts(valid_model().model_dump(mode="json"), ctx)
 
-    assert output == {"draft_count": 1, "unverified_count": 0}
+    assert output == {
+        "draft_count": 1,
+        "unverified_count": 0,
+        "unresolved_mention_count": 0,
+    }
 
 
 def test_merge_fails_closed_when_a_category_agent_emitted_nothing():

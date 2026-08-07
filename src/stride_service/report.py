@@ -38,7 +38,13 @@ from stride_service.system_model import BoundaryCrossing, SystemModel
 # that already existed, no field changing meaning or spelling — so it is minor
 # by the rule above, and a 2.0 consumer that ignores unknown fields reads a 2.1
 # report unchanged.
-SCHEMA_VERSION = "2.1"
+#
+# 2.2 adds ``unresolved_mentions``, the marks for element IDs a description
+# cites in prose that the model does not contain. A new optional top-level
+# list, exactly the shape ``unverified_grounds`` already had, so it is minor by
+# the same rule: a 2.1 consumer that ignores unknown fields reads a 2.2 report
+# unchanged, and one that renders the marks gains a signal it never had.
+SCHEMA_VERSION = "2.2"
 
 DEFAULT_DISCLAIMER = (
     "AI-generated threat model. Not reviewed by a human security analyst."
@@ -622,6 +628,39 @@ class UnverifiedGround(BaseModel):
     reason: str = Field(min_length=1, max_length=500)
 
 
+class UnresolvedMention(BaseModel):
+    """An element ID a description names in prose that the model does not contain.
+
+    A **mention**, never a reference: ``affected_element_ids`` is the threat's
+    structural claim about what it acts on, and one that does not resolve fails
+    the job at :func:`~stride_service.critic.join_drafts`. This is the softer
+    thing beside it — an ID written into the argument, which the analyze prompt
+    asks for ("cite element and flow IDs inline") and which nothing checked
+    until now. The description is the part a reader actually reads, so an ID in
+    it that names nothing is a claim about a system this report does not
+    describe.
+
+    **Marked, never fatal**, for the reason :class:`UnverifiedGround` is: the
+    fan-in has no re-ask path, and discarding six lanes of analysis over a
+    mistyped ID in prose trades a whole report for a typo. The mark rides
+    beside the threats exactly as an unverified quote does, and the same
+    argument applies to why it is service-owned rather than a field on
+    :class:`DraftThreat` — an agent must not be able to report on its own
+    accuracy.
+
+    The most valuable thing it catches is not a typo. The analyze prompt is
+    built around one worked exemplar system, and it spends a whole section
+    telling the agent never to cite that system's IDs. A description arguing
+    about ``process:web-api`` in a job whose model has no such element is that
+    contamination, in the one field where it reads as ordinary analysis.
+    """
+
+    model_config = ConfigDict(extra="forbid")
+
+    threat_id: str = Field(pattern=r"^[STRIDE]-\d{2}$")
+    mention: str = Field(min_length=1, max_length=300)
+
+
 class Summary(BaseModel):
     """Counts the front-end can render without walking the threat list."""
 
@@ -721,6 +760,7 @@ class StrideReport(BaseModel):
     # the common run, and empty too on a job whose sources were never supplied
     # to the checker — see :func:`~stride_service.critic.join_drafts`.
     unverified_grounds: list[UnverifiedGround] = Field(default_factory=list)
+    unresolved_mentions: list[UnresolvedMention] = Field(default_factory=list)
     summary: Summary
 
     @model_validator(mode="after")
@@ -778,7 +818,7 @@ class StrideReport(BaseModel):
                 for ref in refs
                 if ref not in known_ids
             ]
-        return issues + self._unverified_mark_issues()
+        return issues + self._unverified_mark_issues() + self._mention_mark_issues()
 
     def _unverified_mark_issues(self) -> list[str]:
         """Every unverified mark points at a grounds entry this report carries.
@@ -805,3 +845,18 @@ class StrideReport(BaseModel):
                     f" {mark.threat_id!r}, which carries {count} grounds"
                 )
         return issues
+
+    def _mention_mark_issues(self) -> list[str]:
+        """Every unresolved mention points at a threat this report carries.
+
+        Same rule as the unverified marks, and same reason: a mark on a threat
+        that is not here annotates nothing, while the description that really
+        cites a missing element renders as though it had checked out.
+        """
+        threat_ids = {threat.id for threat in (*self.threats, *self.rejected_threats)}
+        return [
+            f"unresolved mention names threat {mark.threat_id!r}, which is not"
+            " in this report"
+            for mark in self.unresolved_mentions
+            if mark.threat_id not in threat_ids
+        ]
