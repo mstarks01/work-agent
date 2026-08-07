@@ -8,10 +8,11 @@ from stride_service.critic import (
     assemble_threats,
     join_drafts,
     mentioned_ids,
+    numbering_gaps,
     snap_drafts,
     snap_rulings,
 )
-from stride_service.report import Ground, Severity, UnknownRef, Verdict
+from stride_service.report import Ground, Mitigation, Severity, UnknownRef, Verdict
 from stride_service.sources import DEFAULT_DESCRIPTION_LABEL
 from tests.factories import sample_draft, sample_ruling, valid_model
 
@@ -25,6 +26,10 @@ CROSSING = "flow:customer-to-web-app:login"
 @pytest.fixture
 def model():
     return valid_model()
+
+
+def mitigation(summary="Set HttpOnly and Secure on cookies"):
+    return Mitigation(summary=summary)
 
 
 def severity(likelihood="medium", impact="high"):
@@ -275,6 +280,92 @@ class TestUnresolvedMentions:
             "process:ghost",
             "store:phantom",
         ]
+
+
+class TestMissingMitigations:
+    """Empty is licensed for one reason, and the grounds say whether it holds."""
+
+    def drafted(self, *, mitigations, grounds=None):
+        fields = {"mitigations": mitigations}
+        if grounds is not None:
+            fields["grounds"] = grounds
+        return {"spoofing": [sample_draft("S-01", **fields)]}
+
+    def test_a_threat_carrying_a_countermeasure_is_not_marked(self, model):
+        joined = join_drafts(self.drafted(mitigations=[mitigation()]), model)
+        assert joined.unmitigated == []
+
+    def test_empty_with_no_unknown_behind_it_is_marked(self, model):
+        joined = join_drafts(self.drafted(mitigations=[]), model)
+        assert [m.threat_id for m in joined.unmitigated] == ["S-01"]
+
+    def test_empty_on_a_threat_conditional_on_an_unknown_is_licensed(self, model):
+        """The one case the prompt allows, recognized by the branch its trigger picks."""
+        joined = join_drafts(
+            self.drafted(
+                mitigations=[],
+                grounds=[
+                    Ground(
+                        kind="unknown-attribute",
+                        element_id="store:orders-db",
+                        attribute="encryption_at_rest",
+                    )
+                ],
+            ),
+            model,
+        )
+        assert joined.unmitigated == []
+
+    def test_the_mark_never_costs_the_finding(self, model):
+        joined = join_drafts(self.drafted(mitigations=[]), model)
+        assert [draft.id for draft in joined.drafts] == ["S-01"]
+
+
+class TestNumberingGaps:
+    """A lane's own drafts should run 01..N; a gap is reported, never repaired."""
+
+    def test_a_contiguous_lane_reports_nothing(self):
+        assert numbering_gaps([sample_draft("S-01"), sample_draft("S-02")]) == []
+
+    def test_a_gap_is_named_with_the_ids_that_produced_it(self):
+        [gap] = numbering_gaps(
+            [sample_draft("S-01"), sample_draft("S-02"), sample_draft("S-05")]
+        )
+        assert "spoofing" in gap
+        assert "S-01, S-02, S-05" in gap
+        assert "01..03" in gap
+
+    def test_a_lane_not_starting_at_01_is_a_gap(self):
+        assert numbering_gaps([sample_draft("S-02"), sample_draft("S-03")])
+
+    def test_lanes_are_numbered_independently(self):
+        """Each agent numbers within its own category, so each is judged alone."""
+        assert (
+            numbering_gaps(
+                [
+                    sample_draft("S-01"),
+                    sample_draft("T-01", "tampering"),
+                    sample_draft("T-02", "tampering"),
+                ]
+            )
+            == []
+        )
+
+    def test_only_the_offending_lane_is_named(self):
+        gaps = numbering_gaps(
+            [
+                sample_draft("S-01"),
+                sample_draft("T-01", "tampering"),
+                sample_draft("T-03", "tampering"),
+            ]
+        )
+        assert len(gaps) == 1
+        assert "tampering" in gaps[0]
+
+    def test_the_ids_are_left_exactly_as_the_agent_wrote_them(self, model):
+        """Reported, never renumbered: an ID must not move between two runs."""
+        drafts = {"spoofing": [sample_draft("S-01"), sample_draft("S-05")]}
+        assert [d.id for d in join_drafts(drafts, model).drafts] == ["S-01", "S-05"]
 
 
 class TestQuoteVerification:
