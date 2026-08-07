@@ -108,6 +108,7 @@ from stride_service.report import (
     Threat,
     ThreatRuling,
     ThreatRulings,
+    UnresolvedMention,
     UnverifiedGround,
     build_summary,
 )
@@ -239,6 +240,7 @@ STATE_EXTRACTED_MODEL = "extracted_model"
 STATE_VALID_MODEL = "valid_model"
 STATE_MERGED_DRAFTS = "merged_drafts"
 STATE_UNVERIFIED_GROUNDS = "unverified_grounds"
+STATE_UNRESOLVED_MENTIONS = "unresolved_mentions"
 STATE_REVIEWED_THREATS = "reviewed_threats"
 STATE_ANALYSIS = "analysis"
 STATE_REJECTION = "rejection"
@@ -311,6 +313,7 @@ class Analysis:
     # Service-owned, computed at the fan-in, and covering both arrays above —
     # a rejected threat keeps its grounds, so it keeps their marks too.
     unverified_grounds: list[UnverifiedGround]
+    unresolved_mentions: list[UnresolvedMention]
     summary: Summary
 
     def to_state(self) -> dict[str, Any]:
@@ -326,6 +329,9 @@ class Analysis:
             ],
             "unverified_grounds": [
                 mark.model_dump(mode="json") for mark in self.unverified_grounds
+            ],
+            "unresolved_mentions": [
+                mark.model_dump(mode="json") for mark in self.unresolved_mentions
             ],
             "summary": self.summary.model_dump(mode="json"),
         }
@@ -346,6 +352,10 @@ class Analysis:
             unverified_grounds=[
                 UnverifiedGround.model_validate(mark)
                 for mark in data["unverified_grounds"]
+            ],
+            unresolved_mentions=[
+                UnresolvedMention.model_validate(mark)
+                for mark in data["unresolved_mentions"]
             ],
             summary=Summary.model_validate(data["summary"]),
         )
@@ -626,13 +636,21 @@ def merge_drafts(
         ]
         for category in STRIDE_CATEGORIES
     }
-    merged, unverified = join_drafts(drafts_by_category, model, source_texts or {})
+    joined = join_drafts(drafts_by_category, model, source_texts or {})
+    merged = joined.drafts
     ctx.state[STATE_MERGED_DRAFTS] = [draft.model_dump(mode="json") for draft in merged]
     ctx.state[STATE_UNVERIFIED_GROUNDS] = [
-        mark.model_dump(mode="json") for mark in unverified
+        mark.model_dump(mode="json") for mark in joined.unverified
+    ]
+    ctx.state[STATE_UNRESOLVED_MENTIONS] = [
+        mark.model_dump(mode="json") for mark in joined.mentions
     ]
     ctx.state[STATE_DRAFT_THREATS] = render(_ruling_view(merged))
-    return {"draft_count": len(merged), "unverified_count": len(unverified)}
+    return {
+        "draft_count": len(merged),
+        "unverified_count": len(joined.unverified),
+        "unresolved_mention_count": len(joined.mentions),
+    }
 
 
 def route_review(
@@ -727,6 +745,7 @@ def assemble_report(
     ctx,
     reviewed_threats: dict | None = None,
     unverified_grounds: list | None = None,
+    unresolved_mentions: list | None = None,
 ) -> dict[str, Any]:
     """Build the report body deterministically from the critic's rulings.
 
@@ -745,6 +764,8 @@ def assemble_report(
     nothing failed and when the job carried no sources to check against, and an
     empty list is indistinguishable from the absent key ADK would bind here.
     Both mean the same thing: no quote was found wanting.
+    ``unresolved_mentions`` defaults for exactly the same reason, and means
+    that every element ID the descriptions cite resolves.
     """
     model = SystemModel.model_validate(valid_model)
     drafts = [DraftThreat.model_validate(draft) for draft in merged_drafts]
@@ -759,6 +780,9 @@ def assemble_report(
         rejected_threats=rejected,
         unverified_grounds=[
             UnverifiedGround.model_validate(mark) for mark in unverified_grounds or []
+        ],
+        unresolved_mentions=[
+            UnresolvedMention.model_validate(mark) for mark in unresolved_mentions or []
         ],
         summary=build_summary(threats, rejected, model),
     )
