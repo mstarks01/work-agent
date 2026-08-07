@@ -138,6 +138,16 @@
     border: 1px solid color-mix(in srgb, var(--sev-medium) 40%, var(--border)); color: var(--ink-2); }
   .unknown code { font-family: ui-monospace, SFMono-Regular, Menlo, monospace; }
 
+  /* Service marks: what the service checked on this draft and could not
+     confirm. Deliberately outside the severity ramp *and* outside the grounds
+     hues — these say something about how complete a finding is, not about how
+     bad it is, and a reader who has learned two colour languages already must
+     not be handed a third. Same treatment as an unverified quote's cite, which
+     is the mark this repo already had. */
+  .caveat { margin-top: 8px; font-size: 0.78rem; color: var(--ink-2); font-weight: 600; }
+  .caveat code { font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+    font-size: 0.78rem; font-weight: 400; }
+
   /* tables */
   table { width: 100%; border-collapse: collapse; font-size: 0.84rem; }
   th, td { text-align: left; padding: 8px 10px; border-bottom: 1px solid var(--hairline); vertical-align: top; }
@@ -241,6 +251,18 @@
   const UNVERIFIED = new Map(
     (R.unverified_grounds || []).map(u => [`${u.threat_id}#${u.index}`, u])
   );
+  // Every element ID a description cites that the embedded model does not
+  // contain, gathered under the threat that cites it. Defaulted like the map
+  // above: a report from before these marks existed simply has none.
+  const MENTIONS = new Map();
+  (R.unresolved_mentions || []).forEach(m => {
+    if (!MENTIONS.has(m.threat_id)) MENTIONS.set(m.threat_id, []);
+    MENTIONS.get(m.threat_id).push(m.mention);
+  });
+  // Threats offering no countermeasure and carrying no unknown that would
+  // excuse offering none. The excused ones are not in this set and get no
+  // note — their unknown-attribute ground already says why the list is empty.
+  const UNMITIGATED = new Set((R.missing_mitigations || []).map(m => m.threat_id));
 
   const SEV = { critical: ["Critical","--sev-critical"], high: ["High","--sev-high"], medium: ["Medium","--sev-medium"], low: ["Low","--sev-low"] };
   const SEV_ORDER = ["critical","high","medium","low"];
@@ -344,6 +366,17 @@
 
     card.append(el("div","desc", t.description));
 
+    // Directly under the argument it qualifies. The prose above cites an
+    // element this report does not describe, which a reader following the ID
+    // into the model table below would otherwise discover by finding nothing.
+    const mentions = MENTIONS.get(t.id);
+    if (mentions && mentions.length) {
+      const note = el("div", "caveat");
+      note.append("⚠ Cited above but not in the system model: ");
+      mentions.forEach((m, i) => { if (i) note.append(", "); note.append(code(m)); });
+      card.append(note);
+    }
+
     const rationale = el("div","field");
     rationale.append(lbl("Severity rationale"), el("br"), t.severity.justification);
     card.append(rationale);
@@ -380,6 +413,11 @@
     if (t.mitigations && t.mitigations.length) {
       const list = el("ul","mits"); t.mitigations.forEach(m => list.append(el("li", null, m.summary)));
       const wrap = el("div","field"); wrap.append(el("div","lbl","Mitigations"), list); card.append(wrap);
+    } else if (UNMITIGATED.has(t.id)) {
+      // Where the Mitigations block would have been, so its absence is stated
+      // rather than left as a gap the reader has to notice.
+      card.append(el("div", "caveat",
+        "⚠ No mitigation proposed, and this finding does not rest on an unknown that would explain why."));
     }
     return card;
   }

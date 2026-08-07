@@ -298,6 +298,43 @@ def test_the_viewer_has_no_html_string_sink(sink):
     )
 
 
+def test_the_viewer_reads_every_service_mark_the_report_carries():
+    """A mark computed and never rendered is half a check.
+
+    Written after exactly that happened: ``unresolved_mentions`` and
+    ``missing_mitigations`` shipped on the report — validated, threaded through
+    graph state, in the payload — while the viewer named only
+    ``unverified_grounds``, the mark they were both modelled on. The service
+    had done the work and the reader was never told.
+
+    The field list is *derived* rather than written down, so the next mark is
+    caught by existing: a service mark is a top-level list whose element type
+    carries a ``threat_id``, which is what makes it a note about a finding
+    rather than part of one.
+    """
+    from typing import get_args, get_origin
+
+    from stride_service.report import StrideReport
+
+    marks = []
+    for name, field in StrideReport.model_fields.items():
+        annotation = field.annotation
+        if get_origin(annotation) is not list:
+            continue
+        (item,) = get_args(annotation)
+        if hasattr(item, "model_fields") and "threat_id" in item.model_fields:
+            marks.append(name)
+
+    assert marks, "no service marks found on StrideReport — has the shape changed?"
+    javascript = viewer_javascript()
+    unread = [name for name in marks if f"R.{name}" not in javascript]
+    assert not unread, (
+        f"the report carries {unread} and the viewer never reads them. A mark"
+        " the service computes and nothing shows is a check that stops one step"
+        " short of the person it was for."
+    )
+
+
 def test_the_viewer_carries_no_escape_helper():
     """The corollary. An escape helper would mean a sink somewhere to use it on.
 
