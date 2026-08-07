@@ -574,6 +574,7 @@ def test_merge_joins_drafts_in_canonical_order():
         "draft_count": 2,
         "unverified_count": 0,
         "unresolved_mention_count": 0,
+        "missing_mitigation_count": 0,
     }
     assert [d["id"] for d in ctx.state[graph.STATE_MERGED_DRAFTS]] == ["S-01", "T-01"]
     assert "S-01" in ctx.state[graph.STATE_DRAFT_THREATS]
@@ -636,6 +637,7 @@ def test_merge_accepts_a_lane_that_ran_and_found_nothing():
         "draft_count": 1,
         "unverified_count": 0,
         "unresolved_mention_count": 0,
+        "missing_mitigation_count": 0,
     }
 
 

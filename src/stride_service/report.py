@@ -44,7 +44,11 @@ from stride_service.system_model import BoundaryCrossing, SystemModel
 # list, exactly the shape ``unverified_grounds`` already had, so it is minor by
 # the same rule: a 2.1 consumer that ignores unknown fields reads a 2.2 report
 # unchanged, and one that renders the marks gains a signal it never had.
-SCHEMA_VERSION = "2.2"
+#
+# 2.3 adds ``missing_mitigations``, on the same argument again: a third
+# optional top-level list of service-owned marks, no existing field changing
+# meaning or spelling.
+SCHEMA_VERSION = "2.3"
 
 DEFAULT_DISCLAIMER = (
     "AI-generated threat model. Not reviewed by a human security analyst."
@@ -661,6 +665,30 @@ class UnresolvedMention(BaseModel):
     mention: str = Field(min_length=1, max_length=300)
 
 
+class MissingMitigation(BaseModel):
+    """A threat offering no countermeasure, and no reason for offering none.
+
+    ``mitigations`` is allowed to be empty, but only for one stated reason: the
+    threat is conditional on an ``unknown``, and no countermeasure can be named
+    without first learning that fact. The prompt says exactly that, and the
+    branch rule makes it checkable — a threat triggered by an unknown carries an
+    ``unknown-attribute`` ground, because that is the branch its trigger
+    dictates. So "empty for the legitimate reason" and "empty with no reason"
+    are mechanically distinguishable, and only the second is recorded here.
+
+    A completeness signal rather than a correctness one, which is why it is a
+    mark and not a failure: a finding with no recommended action is still a
+    finding, and a reader who can see *which* findings came with nothing to do
+    about them knows something the threat list alone does not tell them. The
+    same fan-in argument applies as ever — nothing here is worth six lanes of
+    analysis.
+    """
+
+    model_config = ConfigDict(extra="forbid")
+
+    threat_id: str = Field(pattern=r"^[STRIDE]-\d{2}$")
+
+
 class Summary(BaseModel):
     """Counts the front-end can render without walking the threat list."""
 
@@ -761,6 +789,7 @@ class StrideReport(BaseModel):
     # to the checker — see :func:`~stride_service.critic.join_drafts`.
     unverified_grounds: list[UnverifiedGround] = Field(default_factory=list)
     unresolved_mentions: list[UnresolvedMention] = Field(default_factory=list)
+    missing_mitigations: list[MissingMitigation] = Field(default_factory=list)
     summary: Summary
 
     @model_validator(mode="after")
@@ -818,7 +847,12 @@ class StrideReport(BaseModel):
                 for ref in refs
                 if ref not in known_ids
             ]
-        return issues + self._unverified_mark_issues() + self._mention_mark_issues()
+        return (
+            issues
+            + self._unverified_mark_issues()
+            + self._threat_mark_issues(self.unresolved_mentions, "unresolved mention")
+            + self._threat_mark_issues(self.missing_mitigations, "missing mitigation")
+        )
 
     def _unverified_mark_issues(self) -> list[str]:
         """Every unverified mark points at a grounds entry this report carries.
@@ -846,17 +880,20 @@ class StrideReport(BaseModel):
                 )
         return issues
 
-    def _mention_mark_issues(self) -> list[str]:
-        """Every unresolved mention points at a threat this report carries.
+    def _threat_mark_issues(
+        self, marks: Iterable[UnresolvedMention | MissingMitigation], what: str
+    ) -> list[str]:
+        """Every threat-level mark points at a threat this report carries.
 
         Same rule as the unverified marks, and same reason: a mark on a threat
-        that is not here annotates nothing, while the description that really
-        cites a missing element renders as though it had checked out.
+        that is not here annotates nothing, while the threat that really earned
+        it renders as though it had checked out. Shared across both mark types
+        because the rule is the mark's *shape* — a threat ID and nothing else —
+        rather than anything about what either records.
         """
         threat_ids = {threat.id for threat in (*self.threats, *self.rejected_threats)}
         return [
-            f"unresolved mention names threat {mark.threat_id!r}, which is not"
-            " in this report"
-            for mark in self.unresolved_mentions
+            f"{what} names threat {mark.threat_id!r}, which is not in this report"
+            for mark in marks
             if mark.threat_id not in threat_ids
         ]
