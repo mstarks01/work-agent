@@ -1,5 +1,7 @@
 """Tests for the mechanical validity gate."""
 
+from typing import ClassVar
+
 from stride_service.system_model import SystemModel
 from stride_service.validation import (
     MAX_ELEMENTS,
@@ -189,14 +191,18 @@ class TestNormalizeIds:
 
 
 class TestCitationsResolve:
-    """The fifth invalid-reference rule (#56).
+    """The fifth invalid-reference rule (#56), and the excerpt check beside it.
 
     The one gate rule taking data from outside the model: an excerpt's label
-    has to name a source the *job* carried, so the traceability chain a reader
-    follows leads somewhere.
+    has to name a source the *job* carried, and the span it quotes has to be
+    findable in that source, so the traceability chain a reader follows both
+    resolves and leads somewhere true.
     """
 
-    LABELS = ("Kickoff call", "Payments doc")
+    SOURCES: ClassVar[dict[str, str]] = {
+        "Kickoff call": "Ana: a quote, and the orders DB is not encrypted.",
+        "Payments doc": "Payments settle nightly.",
+    }
 
     def model_citing(self, label: str, excerpt: str = "a quote") -> SystemModel:
         model = valid_model()
@@ -208,31 +214,29 @@ class TestCitationsResolve:
         return model
 
     def test_a_label_naming_one_of_the_jobs_sources_passes(self):
-        issues = validate(self.model_citing("Kickoff call"), source_labels=self.LABELS)
+        issues = validate(self.model_citing("Kickoff call"), sources=self.SOURCES)
         assert issues == []
 
     def test_a_label_naming_no_source_the_job_carried_is_invalid(self):
         # Worse than no citation: a reader who follows it finds nothing.
-        issues = validate(
-            self.model_citing("Some other call"), source_labels=self.LABELS
-        )
+        issues = validate(self.model_citing("Some other call"), sources=self.SOURCES)
         assert [issue.code for issue in issues] == ["invalid-reference"]
         assert issues[0].field == "source_label"
         assert issues[0].element_id == "process:web-app"
 
     def test_an_excerpt_with_no_label_at_all_is_invalid(self):
         # Excerpt and label are coupled: a quote with no label cites nothing.
-        issues = validate(self.model_citing(""), source_labels=self.LABELS)
+        issues = validate(self.model_citing(""), sources=self.SOURCES)
         assert [issue.code for issue in issues] == ["invalid-reference"]
 
     def test_an_element_with_no_excerpt_needs_no_label(self):
         model = self.model_citing("Kickoff call", excerpt="")
         model.processes[0].source_label = ""
-        assert validate(model, source_labels=self.LABELS) == []
+        assert validate(model, sources=self.SOURCES) == []
 
-    def test_the_rule_does_not_run_without_a_jobs_labels(self):
-        # A hand-authored model checked outside a job has no set to check
-        # against, and inventing one would fail it on a citation that is fine.
+    def test_the_rule_does_not_run_without_the_jobs_sources(self):
+        # A hand-authored model checked outside a job has nothing to check
+        # against, and inventing it would fail it on a citation that is fine.
         assert validate(self.model_citing("Anything at all")) == []
 
     def test_the_speaker_is_never_gated(self):
@@ -240,13 +244,102 @@ class TestCitationsResolve:
         # speaker must not fail a job.
         model = self.model_citing("Kickoff call")
         model.processes[0].source_speaker = "Someone Not On The Call"
-        assert validate(model, source_labels=self.LABELS) == []
+        assert validate(model, sources=self.SOURCES) == []
 
-    def test_the_labels_reach_the_gate_through_parse_and_validate(self):
+    def test_the_sources_reach_the_gate_through_parse_and_validate(self):
         model, issues = parse_and_validate(
             self.model_citing("Some other call").model_dump(mode="json"),
             normalize_ids=True,
-            source_labels=self.LABELS,
+            sources=self.SOURCES,
         )
         assert model is not None
+        assert "invalid-reference" in codes(issues)
+
+
+class TestExcerptsVerify:
+    """An excerpt is checked against the source it cites, not just its label.
+
+    The same question :mod:`stride_service.grounding` answers for a threat's
+    quote ground, asked of the citation that ties an element to the words it
+    came from. Failing closed is affordable here and nowhere else: extraction
+    has the ``repair`` pass, so the transcriber is shown its own fabrication
+    with the source still in front of it.
+    """
+
+    SOURCES = TestCitationsResolve.SOURCES
+
+    def model_quoting(self, excerpt: str) -> SystemModel:
+        return TestCitationsResolve().model_citing("Kickoff call", excerpt)
+
+    def test_an_excerpt_present_in_its_source_passes(self):
+        assert validate(self.model_quoting("a quote"), sources=self.SOURCES) == []
+
+    def test_an_excerpt_absent_from_its_source_is_unverifiable(self):
+        issues = validate(
+            self.model_quoting("words nobody submitted"), sources=self.SOURCES
+        )
+        assert [issue.code for issue in issues] == ["unverifiable-excerpt"]
+        assert issues[0].field == "source_excerpt"
+        assert issues[0].element_id == "process:web-app"
+
+    def test_an_excerpt_present_in_a_different_source_still_fails(self):
+        """It is checked against the source it *cites*, not against all of them."""
+        issues = validate(
+            self.model_quoting("Payments settle nightly"), sources=self.SOURCES
+        )
+        assert [issue.code for issue in issues] == ["unverifiable-excerpt"]
+
+    def test_the_ladders_rungs_apply_here_too(self):
+        """Whitespace and case fold, because a source is hard-wrapped prose."""
+        model = self.model_quoting("A   QUOTE")
+        assert validate(model, sources=self.SOURCES) == []
+
+    def test_a_source_carried_with_no_text_skips_the_text_half(self):
+        # The label still has to resolve; there is simply nothing to search.
+        assert (
+            validate(self.model_quoting("anything"), sources={"Kickoff call": ""}) == []
+        )
+
+    def test_an_unresolvable_label_is_reported_instead_of_the_text(self):
+        """One defect per element: a label naming nothing has no source to search."""
+        model = TestCitationsResolve().model_citing("Nowhere", "words nobody submitted")
+        assert [i.code for i in validate(model, sources=self.SOURCES)] == [
+            "invalid-reference"
+        ]
+
+
+class TestExcerptLabelsSnap:
+    """A label differing only in spelling is the job's label, not a new one.
+
+    ``repair`` gets one pass; spending it on a re-cased word is spending it on
+    nothing. The rewrite rides on ``normalize_ids`` for the reason IDs do — it
+    is on exactly where a model arrives from a model.
+    """
+
+    SOURCES = TestCitationsResolve.SOURCES
+
+    def test_a_respelled_label_resolves_rather_than_failing(self):
+        model = TestCitationsResolve().model_citing("KICKOFF   CALL")
+        assert validate(model, sources=self.SOURCES) == []
+
+    def test_normalization_rewrites_it_to_the_jobs_spelling(self):
+        model, issues = parse_and_validate(
+            TestCitationsResolve()
+            .model_citing("KICKOFF   CALL")
+            .model_dump(mode="json"),
+            normalize_ids=True,
+            sources=self.SOURCES,
+        )
+        assert issues == []
+        assert model is not None
+        assert model.processes[0].source_label == "Kickoff call"
+
+    def test_a_label_naming_nothing_is_left_for_the_gate_to_report(self):
+        model, issues = parse_and_validate(
+            TestCitationsResolve().model_citing("Nowhere").model_dump(mode="json"),
+            normalize_ids=True,
+            sources=self.SOURCES,
+        )
+        assert model is not None
+        assert model.processes[0].source_label == "Nowhere"
         assert "invalid-reference" in codes(issues)
