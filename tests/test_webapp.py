@@ -42,7 +42,9 @@ def tiers():
 def client(tiers):
     """The app wired to a stub runner — no models, no credentials, no cost."""
     startup = Startup(
-        engine=StrideEngine(StubPipelineRunner(), limits=WEBAPP_LIMITS),
+        engine=StrideEngine(
+            StubPipelineRunner(), limits=WEBAPP_LIMITS, deadline_seconds=TEST_DEADLINE
+        ),
         tiers=tiers,
         error=None,
     )
@@ -65,6 +67,10 @@ def broken_client(tiers):
 # The demo app has one textarea, so it posts one description-kind source. Its
 # label is the app's, not the user's: the form asks for text, not a citation key.
 WEBAPP_LIMITS = SourceLimits(max_total_bytes=100 * 1024, max_sources=10)
+
+# Ample: no test here is exercising the deadline, and a tight one would make
+# an unrelated slow run flake. The bound itself is covered in test_engine.py.
+TEST_DEADLINE = 30.0
 
 
 def posted(text: str) -> dict:
@@ -157,7 +163,9 @@ def test_a_second_submission_is_refused_while_one_is_running(tiers):
     """LLM10, at the HTTP surface: refused with a message, not held open."""
     analyses = Analyses()
     startup = Startup(
-        engine=StrideEngine(StubPipelineRunner(), limits=WEBAPP_LIMITS),
+        engine=StrideEngine(
+            StubPipelineRunner(), limits=WEBAPP_LIMITS, deadline_seconds=TEST_DEADLINE
+        ),
         tiers=tiers,
         error=None,
     )
@@ -203,7 +211,9 @@ def test_the_injection_point_escapes_every_angle_bracket():
 
     from webapp.main import VIEWER
 
-    engine = StrideEngine(StubPipelineRunner(), limits=WEBAPP_LIMITS)
+    engine = StrideEngine(
+        StubPipelineRunner(), limits=WEBAPP_LIMITS, deadline_seconds=TEST_DEADLINE
+    )
     outcome = asyncio.run(
         engine.analyze([Source.description("A web app.")], system_name=BREAKOUT)
     )
