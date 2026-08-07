@@ -168,6 +168,46 @@ def test_a_description_citing_a_missing_element_is_marked_on_the_report():
     ]
 
 
+def test_a_threat_with_no_countermeasure_is_marked_on_the_report():
+    """A completeness signal, carried to the reader rather than costing the run."""
+    draft = sample_draft("S-01", "spoofing", mitigations=[])
+    replies = happy_replies() | {
+        graph.analyze_node_name("spoofing"): threats_json(draft)
+    }
+    pipeline, _ = build(replies)
+
+    outcome, _ = run(pipeline, job())
+
+    report = outcome.report
+    assert [threat.id for threat in report.threats] == ["S-01"]
+    assert [m.threat_id for m in report.missing_mitigations] == ["S-01"]
+
+
+def test_a_lane_that_skips_a_number_is_logged_and_not_renumbered(caplog):
+    """The numbering rule is about the agents, so it lands in the log, not the report.
+
+    A gap breaks nothing downstream — the IDs are unique and their letters
+    match — so the drafts reach the report exactly as written, and the drift is
+    recorded where the run's other operational facts are.
+    """
+    import logging
+
+    replies = happy_replies() | {
+        graph.analyze_node_name("spoofing"): threats_json(
+            sample_draft("S-01"), sample_draft("S-05")
+        ),
+        "critic": threats_json(sample_ruling("S-01"), sample_ruling("S-05")),
+    }
+    pipeline, _ = build(replies)
+
+    with caplog.at_level(logging.WARNING, logger="stride_service.graph"):
+        outcome, _ = run(pipeline, job())
+
+    assert [threat.id for threat in outcome.report.threats] == ["S-01", "S-05"]
+    assert any("S-01, S-05" in message for message in caplog.messages)
+    assert any("not 01..02" in message for message in caplog.messages)
+
+
 def test_a_threat_no_ground_supports_fails_the_job():
     """The per-threat half: nothing holds, so nothing ships."""
     draft = sample_draft(
