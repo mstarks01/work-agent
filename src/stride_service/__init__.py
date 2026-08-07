@@ -17,6 +17,7 @@ from stride_service.deployment import ConfigPaths, Deployment
 from stride_service.engine import (
     DEFAULT_CALLER,
     MAX_SYSTEM_NAME_CHARS,
+    EngineDeadlineError,
     EngineInputError,
     StrideEngine,
 )
@@ -150,6 +151,7 @@ __all__ = [
     "DataStore",
     "Deployment",
     "Element",
+    "EngineDeadlineError",
     "EngineInputError",
     "ExternalEntity",
     "InMemoryJobStore",

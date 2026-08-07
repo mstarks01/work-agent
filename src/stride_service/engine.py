@@ -19,15 +19,20 @@ an internal failure raises. That trichotomy is the job lifecycle's ``completed
 The submitted sources are untrusted text (OWASP LLM01): the engine bounds them
 and hands them to the pipeline, which places them in session state as fenced
 data for the extraction prompt and never concatenates them into an instruction.
-The engine adds no new trust surface — it only re-asserts, for the in-process
-path, the input bounds the HTTP layer already enforces, from the same
-deployment config and in the same order.
+The engine adds no new trust surface — it re-asserts, for the in-process path,
+the bounds the HTTP layer already enforces, from the same deployment config and
+in the same order: what one submission may carry, and how long one run may take.
+Both halves matter and only the first used to be here. ``execute_job`` bounded
+the job route's duration while :meth:`StrideEngine.analyze` handed straight to
+the runner, so the first-run app and every library embedder ran with no time
+budget at all — the state ``job_deadline_ms`` exists to end.
 """
 
 from __future__ import annotations
 
 import asyncio
 import logging
+import time
 from collections.abc import Mapping, Sequence
 from typing import Self
 
@@ -56,6 +61,20 @@ class EngineInputError(ValueError):
     """A submission broke the engine's input contract before any model ran."""
 
 
+class EngineDeadlineError(TimeoutError):
+    """A run was stopped because it exceeded this deployment's time budget.
+
+    A :class:`TimeoutError` subclass so a caller that already handles the
+    asyncio spelling keeps working, and a named type so one that wants to tell
+    "this deployment stopped it" apart from "something else timed out" can.
+
+    A partial run is never a partial report: nothing is returned on this path,
+    for the reason :func:`~stride_service.jobs.execute_job` gives — six category
+    lanes are what makes the output a STRIDE model, and one that stopped halfway
+    is a different method rather than a shorter answer.
+    """
+
+
 async def _ignore_node(node: str) -> None:
     """Default node callback: the in-process caller wants only the result."""
 
@@ -70,9 +89,16 @@ class StrideEngine:
     concurrent tasks.
     """
 
-    def __init__(self, runner: PipelineRunner, *, limits: SourceLimits) -> None:
+    def __init__(
+        self,
+        runner: PipelineRunner,
+        *,
+        limits: SourceLimits,
+        deadline_seconds: float,
+    ) -> None:
         self._runner = runner
         self._limits = limits
+        self._deadline_seconds = deadline_seconds
 
     @classmethod
     def from_config(cls, env: Mapping[str, str] | None = None) -> Self:
@@ -93,7 +119,11 @@ class StrideEngine:
         check fails, and re-reading the config to find that out is how the two
         could disagree.
         """
-        return cls(deployment.runner(), limits=deployment.resilience.source_limits())
+        return cls(
+            deployment.runner(),
+            limits=deployment.resilience.source_limits(),
+            deadline_seconds=deployment.resilience.deadline_seconds(),
+        )
 
     async def analyze(
         self,
@@ -118,6 +148,18 @@ class StrideEngine:
         ``on_node``, if given, is awaited with each node name as it completes,
         for progress or tracing.
 
+        The run is bounded by this deployment's ``job_deadline_ms``, and
+        expiry raises :class:`EngineDeadlineError`. The bound belongs here
+        rather than to each caller for the reason
+        :mod:`stride_service.resilience` gives: ``timeout_ms`` bounds one HTTP
+        request, ``attempts`` multiplies it, the retry budget multiplies it
+        again, and five LLM stages run in series on the graph's longest path, so
+        the per-call knobs compose to a worst case in the hours while each one
+        is individually respected. A provider ``Retry-After`` is deliberately
+        uncapped (:mod:`stride_service.retry`) precisely because a deadline
+        above it is what bounds the wait — without one here, an in-process run
+        had no bound at all.
+
         Usage::
 
             outcome = await engine.analyze(
@@ -129,7 +171,28 @@ class StrideEngine:
                 issues = outcome.issues
         """
         job = self._build_job(sources, system_name=system_name, caller=caller)
-        return await self._runner.run(job, on_node or _ignore_node)
+        started = time.monotonic()
+        try:
+            async with asyncio.timeout(self._deadline_seconds) as bound:
+                return await self._runner.run(job, on_node or _ignore_node)
+        except TimeoutError as exc:
+            # Only *this* bound expiring is a deadline. A TimeoutError raised
+            # inside the graph is somebody else's timeout and keeps its own
+            # identity rather than being relabelled as the job's budget.
+            if not bound.expired():
+                raise
+            # Node names go to the log rather than into the message, matching
+            # ``execute_job``: a deadline that keeps firing at the same node is
+            # what sizes ``timeout_ms``, and it is the operator who needs it.
+            logger.error(
+                "in-process run exceeded the %.0fs deadline after %.1fs",
+                self._deadline_seconds,
+                time.monotonic() - started,
+            )
+            raise EngineDeadlineError(
+                "the analysis exceeded this deployment's time budget"
+                f" of {self._deadline_seconds:.0f}s and was stopped"
+            ) from exc
 
     def analyze_sync(
         self,
