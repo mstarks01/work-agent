@@ -7,8 +7,10 @@ import jwt
 import pytest
 from cryptography.hazmat.primitives import serialization
 from cryptography.hazmat.primitives.asymmetric import rsa
+from pydantic import ValidationError
 
 from stride_service.auth import (
+    JWKS_TIMEOUT_SECONDS,
     AuthConfigError,
     AuthenticationError,
     OidcJwtVerifier,
@@ -156,3 +158,35 @@ class TestBuildVerifier:
     def test_selected_provider_still_needs_its_config(self):
         with pytest.raises(AuthConfigError, match="STRIDE_OIDC_ISSUER"):
             build_verifier({"STRIDE_AUTH_PROVIDER": "oidc"})
+
+
+class TestJwksTransport:
+    def test_plaintext_jwks_url_is_refused(self):
+        # The signing keys fetched from here are the whole basis on which a
+        # token is trusted, so plaintext transport makes verification forgeable
+        # by anyone on the path.
+        with pytest.raises(ValidationError, match="https"):
+            OidcSettings(
+                issuer=ISSUER,
+                audience=AUDIENCE,
+                jwks_url="http://ping.example.com/jwks",
+            )
+
+    def test_plaintext_jwks_url_from_env_is_an_auth_config_error(self):
+        # Every other failure this loader produces is an AuthConfigError, and a
+        # caller covering configuration mistakes should not have to catch
+        # pydantic's exception as well to cover the same class of mistake.
+        env = {
+            "STRIDE_OIDC_ISSUER": ISSUER,
+            "STRIDE_OIDC_AUDIENCE": AUDIENCE,
+            "STRIDE_OIDC_JWKS_URL": "http://ping.example.com/jwks",
+        }
+        with pytest.raises(AuthConfigError, match="https"):
+            OidcSettings.from_env(env, prefix="STRIDE_OIDC")
+
+    def test_the_jwks_fetch_carries_this_services_timeout(self):
+        # Stated rather than inherited: PyJWKClient's own default is 30s, which
+        # is a request-path stall an unreachable provider can impose.
+        verifier = OidcJwtVerifier(settings())
+
+        assert verifier._jwks_client.timeout == JWKS_TIMEOUT_SECONDS
