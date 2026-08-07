@@ -54,7 +54,9 @@ logger = logging.getLogger(__name__)
 # The raw-body guard is **derived** from the deployment's byte budget rather
 # than configured beside it: it exists only to refuse an absurd payload before
 # the JSON is parsed, and doubling the budget leaves ample room for framing and
-# escaping. It is not the contract — the budget is (OWASP LLM10).
+# escaping. It is not the contract — the budget is (OWASP LLM10). Enforced by
+# :class:`BodyLimitMiddleware`, which counts what arrives rather than trusting
+# what was declared.
 _BODY_SLACK = 2
 
 _SSE_POLL_SECONDS = 0.2
@@ -68,6 +70,105 @@ _SSE_POLL_SECONDS = 0.2
 _STATUS_BY_RUNG = {"empty": 400, "duplicate-label": 422, "count": 413, "total": 413}
 
 _bearer_scheme = HTTPBearer(auto_error=False)
+
+_SUBMIT_PATH = "/v1/jobs"
+
+
+class BodyLimitMiddleware:
+    """Refuse an over-sized submission body, declared or not.
+
+    Pure ASGI rather than a ``@app.middleware("http")`` function because the
+    bound has to sit on the **receive channel**: the header-only version of this
+    check read ``Content-Length`` and let anything without one through, so a
+    chunked request — which carries no ``Content-Length`` at all — bypassed it
+    entirely and was buffered and parsed in full before the source budget was
+    ever consulted. A declared length is a claim; counting what arrives is the
+    check (OWASP LLM10).
+
+    Both halves are kept. The declared length is answered before a single byte
+    is read, which is what lets an honest client be refused cheaply; the running
+    count is what makes the bound true for a client that declares nothing or
+    declares a lie.
+
+    The body is drained here and replayed to the app rather than counted as the
+    app pulls it, because a guard that raises out of ``receive`` does not get to
+    write the response: FastAPI wraps any exception escaping its body parse in a
+    400 ``There was an error parsing the body``, so the refusal would arrive as
+    the wrong status with the cap unmentioned. Draining costs nothing this route
+    was not already paying — the JSON body is buffered whole to be parsed — and
+    the buffer is bounded by the cap it enforces.
+
+    The cap is the deployment's byte budget with slack, not the budget itself:
+    this exists only to refuse an absurd payload before the JSON is parsed, and
+    :class:`~stride_service.sources.SourceLimits` remains the contract.
+    """
+
+    def __init__(self, app, *, max_bytes: int, path: str = _SUBMIT_PATH) -> None:
+        self._app = app
+        self._max_bytes = max_bytes
+        self._path = path
+
+    async def __call__(self, scope, receive, send) -> None:
+        if (
+            scope["type"] != "http"
+            or scope["method"] != "POST"
+            or scope["path"] != self._path
+        ):
+            await self._app(scope, receive, send)
+            return
+
+        if self._declared_over_cap(scope):
+            await self._refuse(scope, receive, send)
+            return
+
+        body = bytearray()
+        disconnected = False
+        while True:
+            message = await receive()
+            if message["type"] == "http.disconnect":
+                disconnected = True
+                break
+            body += message.get("body", b"")
+            if len(body) > self._max_bytes:
+                await self._refuse(scope, receive, send)
+                return
+            if not message.get("more_body", False):
+                break
+
+        await self._app(scope, _replay(bytes(body), disconnected, receive), send)
+
+    def _declared_over_cap(self, scope) -> bool:
+        for name, value in scope.get("headers", ()):
+            if name == b"content-length":
+                declared = value.decode("latin-1").strip()
+                return declared.isdigit() and int(declared) > self._max_bytes
+        return False
+
+    async def _refuse(self, scope, receive, send) -> None:
+        response = _problem_response(
+            413, f"request body exceeds the {self._max_bytes} byte limit"
+        )
+        await response(scope, receive, send)
+
+
+def _replay(body: bytes, disconnected: bool, receive):
+    """A receive channel that hands the drained body over exactly once.
+
+    After it, the app falls through to the original channel, so a disconnect
+    arriving later still reaches whoever is watching for one.
+    """
+    delivered = False
+
+    async def replayed():
+        nonlocal delivered
+        if disconnected:
+            return {"type": "http.disconnect"}
+        if not delivered:
+            delivered = True
+            return {"type": "http.request", "body": body, "more_body": False}
+        return await receive()
+
+    return replayed
 
 
 class JobSubmission(BaseModel):
@@ -282,22 +383,13 @@ def create_app(
         logger.exception("unhandled error %s", error_id)
         return _problem_response(500, "an internal error occurred", error_id=error_id)
 
-    @app.middleware("http")
-    async def _limit_submission_body(request: Request, call_next):
-        if request.method == "POST" and request.url.path == "/v1/jobs":
-            content_length = request.headers.get("content-length", "")
-            if content_length.isdigit() and int(content_length) > max_body_bytes:
-                return _problem_response(
-                    413,
-                    f"request body exceeds the {max_body_bytes} byte limit",
-                )
-        return await call_next(request)
+    app.add_middleware(BodyLimitMiddleware, max_bytes=max_body_bytes)
 
     @app.get("/healthz")
     async def healthz() -> dict[str, str]:
         return {"status": "ok"}
 
-    @app.post("/v1/jobs", status_code=201)
+    @app.post(_SUBMIT_PATH, status_code=201)
     async def submit_job(
         submission: JobSubmission,
         request: Request,
