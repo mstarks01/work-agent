@@ -374,8 +374,12 @@ inheriting a default for a contract its callers can see.
 | `STRIDE_BLESSED_FINGERPRINTS` | `config/blessed-fingerprints.toml` |
 
 A variable **picks which file is read**; it never layers a second file over the
-first. A set-but-empty value is a deploy mistake and raises rather than falling
-back to the repo copy.
+first. A set-but-empty value is a deploy mistake and raises rather than
+falling back to a default. Unset, the default is this checkout's top-level
+copy when running from a clone, or the copy bundled into the wheel
+(`stride_service/_bundled/`) when installed via `pip` — whichever the
+installation has. Either way exactly one file exists at a resolved default
+path; nothing merges the two.
 
 These apply to the **whole deployment**, not only the service: an eval sweep
 reads the same files, and promoting a sweep winner re-pins the same

@@ -18,11 +18,13 @@ whatever you type, and every analysis costs whatever your vendor charges.
 
 The app lives in a top-level `webapp/` directory and **never ships in the wheel**.
 There is no `pip install` that gets you this app, no console script, and no
-`[web]` extra — deliberately. The engine resolves `skills/`, `prompts/` and
-`config/*.toml` relative to the repo root, so a wheel-installed copy would need
-six `STRIDE_*` environment variables set by hand before **Load example** could
-work. A first-run surface whose headline gesture needs six variables is not a
-first-run surface.
+`[web]` extra — deliberately. `webapp/main.py` is a standalone driver script
+outside `src/stride_service`, the same as `examples/`, so no packaging
+mechanism names it; that's independent of what the wheel bundles for the
+*engine* itself (skills, prompts, config all ship with it — see
+[Configuration](Configuration.md#config-paths-override-where-files-are-read-from)).
+The app is clone-only because it's a demonstration script, not because the
+engine it embeds would be missing anything if installed elsewhere.
 
 Its server, `uvicorn`, is in a `web` dependency group that `uv sync` installs by
 default. Dependency groups never enter the built distribution, so if you embed
