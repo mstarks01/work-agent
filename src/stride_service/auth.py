@@ -13,6 +13,13 @@ mechanism entirely.
 Failure detail is asymmetric on purpose: the *reason* a token was rejected is
 logged, while callers see one generic :class:`AuthenticationError` — token
 errors must not become an oracle for probing the verifier.
+
+The JWKS endpoint is held to two bounds the library does not impose: it must be
+``https`` (see :meth:`OidcSettings._https_jwks`), and its fetch may not stall a
+request past :data:`JWKS_TIMEOUT_SECONDS`. A fetch that fails or times out
+raises ``PyJWKClientConnectionError``, which is a ``PyJWTError`` and so lands on
+the same fail-closed path as a bad token: the request is refused rather than
+served on an unverified subject.
 """
 
 from __future__ import annotations
@@ -23,7 +30,7 @@ from collections.abc import Callable, Mapping
 from typing import Protocol
 
 import jwt
-from pydantic import BaseModel, ConfigDict, Field
+from pydantic import BaseModel, ConfigDict, Field, ValidationError, field_validator
 
 logger = logging.getLogger(__name__)
 
@@ -32,6 +39,14 @@ _OIDC_ENV_SUFFIXES = {
     "audience": "AUDIENCE",
     "jwks_url": "JWKS_URL",
 }
+
+# How long a JWKS fetch may hold a request before verification gives up.
+# PyJWKClient's own default is 30s, which is a request-path stall an unreachable
+# or slow identity provider can impose on every unverified token at once — the
+# keys are cached, so this is paid on a cold cache and on every rotation. Stated
+# rather than inherited: the number belongs to this service's latency budget,
+# not to the library's.
+JWKS_TIMEOUT_SECONDS = 5.0
 
 
 class AuthConfigError(ValueError):
@@ -58,6 +73,24 @@ class OidcSettings(BaseModel):
     jwks_url: str = Field(min_length=1)
     algorithms: tuple[str, ...] = ("RS256",)
 
+    @field_validator("jwks_url")
+    @classmethod
+    def _https_jwks(cls, value: str) -> str:
+        """Refuse a JWKS URL that is not HTTPS.
+
+        The signing keys fetched from here are the whole basis on which a token
+        is trusted, so plaintext transport makes token verification forgeable by
+        anyone on the path: substitute the key set, sign your own token, become
+        any subject. Refused rather than warned about, and with no loopback
+        exemption — this is deploy-time configuration, and a local identity
+        provider that speaks HTTP is a test fixture, which reaches
+        :class:`OidcJwtVerifier` by constructing it directly rather than through
+        the environment.
+        """
+        if not value.lower().startswith("https://"):
+            raise ValueError("jwks_url must be an https:// URL")
+        return value
+
     @classmethod
     def from_env(
         cls, environ: Mapping[str, str] = os.environ, *, prefix: str
@@ -72,7 +105,13 @@ class OidcSettings(BaseModel):
             raise AuthConfigError(
                 f"OIDC auth is not configured: set {', '.join(sorted(missing))}"
             )
-        return cls(**values)
+        try:
+            return cls(**values)
+        except ValidationError as exc:
+            # Every other failure this loader can produce is an AuthConfigError,
+            # and a caller that catches the configuration error should not have
+            # to catch pydantic's as well to cover the same class of mistake.
+            raise AuthConfigError(f"OIDC auth is misconfigured: {exc}") from exc
 
 
 class SigningKeyClient(Protocol):
@@ -88,7 +127,9 @@ class OidcJwtVerifier:
         self, settings: OidcSettings, jwks_client: SigningKeyClient | None = None
     ) -> None:
         self._settings = settings
-        self._jwks_client = jwks_client or jwt.PyJWKClient(settings.jwks_url)
+        self._jwks_client = jwks_client or jwt.PyJWKClient(
+            settings.jwks_url, timeout=JWKS_TIMEOUT_SECONDS
+        )
 
     def verify(self, token: str) -> str:
         """Return the token subject, or raise :class:`AuthenticationError`."""
