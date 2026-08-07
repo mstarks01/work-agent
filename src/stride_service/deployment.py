@@ -58,16 +58,36 @@ from stride_service.pipeline import AdkPipelineRunner
 from stride_service.resilience import ResilienceConfig, load_resilience
 from stride_service.sampling import SamplingConfig, load_sampling
 
-# The repo layout baked into the image: Markdown and config next to the
-# package, not fetched at run time. A variable picks a different file; it never
-# layers a second one over the first.
-_REPO_ROOT = Path(__file__).resolve().parents[2]
-DEFAULT_SKILLS_DIR = _REPO_ROOT / "skills"
-DEFAULT_PROMPTS_DIR = _REPO_ROOT / "prompts"
-DEFAULT_MODEL_TIERS_PATH = _REPO_ROOT / "config" / "model_tiers.toml"
-DEFAULT_SAMPLING_PATH = _REPO_ROOT / "config" / "sampling.toml"
-DEFAULT_RESILIENCE_PATH = _REPO_ROOT / "config" / "resilience.toml"
-DEFAULT_BLESSED_FINGERPRINTS_PATH = _REPO_ROOT / "config" / "blessed-fingerprints.toml"
+# Two layouts resolve to the same defaults, not fetched at run time either way.
+# A wheel built from this project bundles skills/, prompts/ and config/ under
+# stride_service/_bundled/ (see pyproject.toml's force-include), so an
+# external `pip install stride-service` needs nothing else. An editable/dev
+# install has no _bundled/ -- hatchling's editable mode links back to the
+# source tree rather than copying force-included data -- so this repo's own
+# tests, evals and CI fall through to the checkout's top-level directories
+# instead. Either way a variable picks a different file outright; it never
+# layers a second one over whichever default applied.
+_PACKAGE_DIR = Path(__file__).resolve().parent
+_BUNDLED_DIR = _PACKAGE_DIR / "_bundled"
+_REPO_ROOT = _PACKAGE_DIR.parents[1]
+
+
+def _default_dir(name: str) -> Path:
+    bundled = _BUNDLED_DIR / name
+    return bundled if bundled.is_dir() else _REPO_ROOT / name
+
+
+def _default_config_path(filename: str) -> Path:
+    bundled = _BUNDLED_DIR / "config" / filename
+    return bundled if bundled.is_file() else _REPO_ROOT / "config" / filename
+
+
+DEFAULT_SKILLS_DIR = _default_dir("skills")
+DEFAULT_PROMPTS_DIR = _default_dir("prompts")
+DEFAULT_MODEL_TIERS_PATH = _default_config_path("model_tiers.toml")
+DEFAULT_SAMPLING_PATH = _default_config_path("sampling.toml")
+DEFAULT_RESILIENCE_PATH = _default_config_path("resilience.toml")
+DEFAULT_BLESSED_FINGERPRINTS_PATH = _default_config_path("blessed-fingerprints.toml")
 
 SKILLS_DIR_VAR = "STRIDE_SKILLS_DIR"
 PROMPTS_DIR_VAR = "STRIDE_PROMPTS_DIR"

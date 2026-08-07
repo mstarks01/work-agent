@@ -55,7 +55,7 @@ stub runner need none of it.
 
 | Path | What lives here |
 |---|---|
-| `src/stride_service/` | The shipped engine — the only thing in the wheel. Graph, agents, config loaders, report schema, HTTP API. |
+| `src/stride_service/` | The shipped engine. Graph, agents, config loaders, report schema, HTTP API. |
 | `config/` | Versioned config that stops startup rather than falling back: `model_tiers.toml`, `sampling.toml`, `resilience.toml`, `blessed-fingerprints.toml`. |
 | `prompts/` | Agent prompts and per-category exemplars. |
 | `skills/` | The per-category STRIDE skill Markdown baked into the image. |
@@ -65,8 +65,12 @@ stub runner need none of it.
 | `evals/` | Golden-case corpus, scorer, and the [eval harness](evals/README.md). **Never ships** in the image. |
 | `tests/` | Offline test suite (no credentials required). |
 
-The wheel carries the engine, but a *run* also needs `config/`, `prompts/` and
-`skills/` repo-adjacent or pointed at by the `STRIDE_*_DIR` variables.
+The wheel bundles `config/`, `prompts/` and `skills/` alongside the engine
+(under `stride_service/_bundled/`), so `pip install stride-service` elsewhere
+resolves them with no extra step. This checkout's own `config/`, `prompts/`
+and `skills/` stay the source of truth — edit them here, not the bundled copy,
+which only exists inside a built wheel. The `STRIDE_*_DIR` variables still
+redirect any of them, in either layout.
 
 ## Documentation
 

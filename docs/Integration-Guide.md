@@ -14,7 +14,7 @@ prefix at construction, so a fresh engine per call pays that cost every time.
 ```python
 from stride_service import StrideEngine
 
-engine = StrideEngine.from_config()   # repo prompts, repo config, pinned models
+engine = StrideEngine.from_config()   # bundled prompts, bundled config, pinned models
 ```
 
 If [config](Configuration.md) is missing or invalid, `from_config()` raises

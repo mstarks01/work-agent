@@ -18,10 +18,14 @@ uv sync
 
 [uv](https://docs.astral.sh/uv/) handles the virtualenv. Python ≥ 3.11.
 
-Everything below runs from this clone. The wheel carries the engine, but a run
-also needs `config/`, `prompts/` and `skills/` alongside it, so working from a
-checkout is the supported path — see [Configuration](Configuration.md) for the
-`STRIDE_*_DIR` overrides if you need to relocate them later.
+Everything below runs from this clone — it doubles as the fastest way to try
+the web app and to edit the prompts and skills you're about to embed. A
+`pip install`ed wheel works too and needs no `STRIDE_*_DIR` variables to find
+its config, prompts or skills — they ship bundled with the engine — but a
+clone is still where `webapp/main.py` and `examples/` live, so it's the path
+this guide follows. See [Configuration](Configuration.md) for the
+`STRIDE_*_DIR` overrides if you want either layout to read from somewhere
+else.
 
 ## 2. Choose a vendor and set its auth
 

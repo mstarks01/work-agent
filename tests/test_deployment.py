@@ -96,6 +96,53 @@ def test_a_path_variable_picks_the_file_and_never_layers_a_second(tmp_path):
     assert deployment.paths.sampling == custom
 
 
+def test_default_dir_prefers_the_bundled_copy_when_present(tmp_path, monkeypatch):
+    """A wheel install bundles skills/prompts under stride_service/_bundled/."""
+    from stride_service import deployment as module
+
+    bundled_skills = tmp_path / "skills"
+    bundled_skills.mkdir()
+    monkeypatch.setattr(module, "_BUNDLED_DIR", tmp_path)
+
+    assert module._default_dir("skills") == bundled_skills
+
+
+def test_default_dir_falls_back_to_the_repo_copy_when_unbundled(tmp_path, monkeypatch):
+    """An editable install has no _bundled/ -- every other test here relies on this."""
+    from stride_service import deployment as module
+
+    monkeypatch.setattr(module, "_BUNDLED_DIR", tmp_path / "does-not-exist")
+
+    assert module._default_dir("skills") == module._REPO_ROOT / "skills"
+
+
+def test_default_config_path_prefers_the_bundled_copy_when_present(
+    tmp_path, monkeypatch
+):
+    from stride_service import deployment as module
+
+    bundled_config = tmp_path / "config"
+    bundled_config.mkdir()
+    bundled_file = bundled_config / "sampling.toml"
+    bundled_file.write_text("version = 4\n", encoding="utf-8")
+    monkeypatch.setattr(module, "_BUNDLED_DIR", tmp_path)
+
+    assert module._default_config_path("sampling.toml") == bundled_file
+
+
+def test_default_config_path_falls_back_to_the_repo_copy_when_unbundled(
+    tmp_path, monkeypatch
+):
+    from stride_service import deployment as module
+
+    monkeypatch.setattr(module, "_BUNDLED_DIR", tmp_path / "does-not-exist")
+
+    assert (
+        module._default_config_path("sampling.toml")
+        == module._REPO_ROOT / "config" / "sampling.toml"
+    )
+
+
 @pytest.mark.parametrize(
     "var", [MODEL_TIERS_VAR, SAMPLING_VAR, RESILIENCE_VAR, BLESSED_FINGERPRINTS_VAR]
 )
