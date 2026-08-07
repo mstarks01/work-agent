@@ -413,7 +413,7 @@ def validate_extraction(
             f" model to validate. {_TRUNCATION_HINT}"
         )
     model, issues = parse_and_validate(
-        extracted_model, normalize_ids=True, source_labels=source_texts or ()
+        extracted_model, normalize_ids=True, sources=source_texts or {}
     )
     if issues or model is None:
         parked = extracted_model if model is None else model.model_dump(mode="json")

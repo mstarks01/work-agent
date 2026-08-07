@@ -21,11 +21,14 @@ and denies — never silently auto-repairs.
 from __future__ import annotations
 
 from collections import Counter
-from collections.abc import Collection
+from collections.abc import Collection, Mapping
+from types import MappingProxyType
 from typing import Literal
 
 from pydantic import BaseModel, ConfigDict, ValidationError
 
+from stride_service.grounding import verify_quote
+from stride_service.references import canonical
 from stride_service.system_model import (
     CORE_ASSET_TAGS,
     Element,
@@ -42,6 +45,7 @@ IssueCode = Literal[
     "no-trust-zones",
     "illegal-asset-tag",
     "too-many-elements",
+    "unverifiable-excerpt",
 ]
 
 # Admission cap on model size. Deliberately loose: it is a
@@ -79,7 +83,7 @@ def validate(
     model: SystemModel,
     extra_asset_tags: Collection[str] = (),
     max_elements: int = MAX_ELEMENTS,
-    source_labels: Collection[str] = (),
+    sources: Mapping[str, str] = MappingProxyType({}),
 ) -> list[ValidationIssue]:
     """Run every gate rule; an empty result means the model is ready for analysis.
 
@@ -196,14 +200,14 @@ def validate(
                 )
             )
 
-    issues.extend(_citation_issues(elements, source_labels))
+    issues.extend(_citation_issues(elements, sources))
     return issues
 
 
 def _citation_issues(
-    elements: Collection[Element], source_labels: Collection[str]
+    elements: Collection[Element], sources: Mapping[str, str]
 ) -> list[ValidationIssue]:
-    """The traceability chain resolves, or the model does not pass.
+    """The traceability chain resolves *and* leads somewhere, or the model fails.
 
     Excerpt and label are **coupled**: a quote with no label cites nothing, and
     a label naming a source the job never carried asserts a chain that is not
@@ -211,15 +215,29 @@ def _citation_issues(
     follows it finds a source that does not exist. Set membership is
     mechanical, so it belongs here rather than in a prompt.
 
+    The label resolving is only half the chain. The other half — is the quoted
+    span actually *in* that source — is the same question
+    :mod:`stride_service.grounding` answers for a threat's ``quote`` ground,
+    asked here of the excerpt that ties an element to the words it came from.
+    The two were never different questions; only one of them used to be asked.
+    That ladder was calibrated on exactly this data — "the 12 corpus cases' 206
+    element excerpts" — at **0 false rejections in 206**, so turning it on here
+    is the one rung in this repo whose cost was measured before it was spent.
+
+    Failing closed is affordable because extraction has the ``repair`` pass: an
+    excerpt the gate cannot find is cited back to the transcriber that wrote
+    it, with the source still in front of it. That is the opposite of the draft
+    seam, where the same failure has nowhere to go.
+
     This is the one gate rule taking data from outside the model. Where no
-    labels are supplied the rule does not run: a hand-authored model checked
-    without a job has no set to check against, and inventing one would fail
-    every such model on a citation that is not wrong.
+    sources are supplied neither half runs: a hand-authored model checked
+    without a job has nothing to check against, and inventing it would fail
+    every such model on a citation that is not wrong. A source carried with
+    empty text skips the text half alone, for the same reason.
     """
-    if not source_labels:
+    if not sources:
         return []
 
-    legal = frozenset(source_labels)
     issues: list[ValidationIssue] = []
     for element in elements:
         if not element.source_excerpt:
@@ -234,14 +252,31 @@ def _citation_issues(
                     field="source_label",
                 )
             )
-        elif element.source_label not in legal:
+            continue
+        # Snapped rather than matched exactly, for the reason element IDs are
+        # derived: which spelling of the job's label arrived is mechanical, and
+        # ``repair``'s one pass is too scarce to spend on a re-cased word.
+        label = canonical(element.source_label, sources)
+        if not label:
             issues.append(
                 ValidationIssue(
                     code="invalid-reference",
                     message=f"source_label {element.source_label!r} does not name one"
-                    f" of this job's sources {sorted(legal)}",
+                    f" of this job's sources {sorted(sources)}",
                     element_id=element.id,
                     field="source_label",
+                )
+            )
+        elif sources[label] and not verify_quote(
+            element.source_excerpt, sources[label]
+        ):
+            issues.append(
+                ValidationIssue(
+                    code="unverifiable-excerpt",
+                    message=f"source_excerpt {element.source_excerpt!r} is not found"
+                    f" in the source it cites, {label!r}",
+                    element_id=element.id,
+                    field="source_excerpt",
                 )
             )
     return issues
@@ -252,7 +287,7 @@ def parse_and_validate(
     extra_asset_tags: Collection[str] = (),
     max_elements: int = MAX_ELEMENTS,
     normalize_ids: bool = False,
-    source_labels: Collection[str] = (),
+    sources: Mapping[str, str] = MappingProxyType({}),
 ) -> tuple[SystemModel | None, list[ValidationIssue]]:
     """Parse raw extraction output and run the validity gate.
 
@@ -267,7 +302,15 @@ def parse_and_validate(
     **off by default and on only where a model arrives from a model**: hand-
     authored artifacts — the golden corpus above all — want a mismatch
     reported, because there the two disagreeing fields are an authoring error
-    a human should see rather than a slug to canonicalize.
+    a human should see rather than a slug to canonicalize. It carries the same
+    decision for an element's ``source_label``, which that pass snaps to the
+    job's own spelling: same flag, same reason, so a model arriving from a
+    model has one policy about its spellings rather than two.
+
+    ``sources`` maps each of the job's source labels to that source's text. The
+    keys are what a ``source_label`` must name; the values are what a
+    ``source_excerpt`` must be found in. Empty — the default — runs neither
+    half, which is what a hand-authored model checked outside a job wants.
     """
     try:
         model = SystemModel.model_validate(data)
@@ -282,5 +325,5 @@ def parse_and_validate(
         ]
         return None, issues
     if normalize_ids:
-        model = normalize_element_ids(model)
-    return model, validate(model, extra_asset_tags, max_elements, source_labels)
+        model = normalize_element_ids(model, sources)
+    return model, validate(model, extra_asset_tags, max_elements, sources)

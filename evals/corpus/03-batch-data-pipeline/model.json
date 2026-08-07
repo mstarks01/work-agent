@@ -159,7 +159,7 @@
       "name": "run queries",
       "description": "Analyst queries the warehouse under a dataset-wide grant.",
       "assets": ["pii", "health"],
-      "source_excerpt": "they authenticate with SSO, but the grant is dataset-wide — we have not split member-identifying columns out",
+      "source_excerpt": "they…authenticate with SSO, but the grant is dataset-wide — we have not split member-identifying columns out",
       "source_label": "System description",
       "source": "entity:data-analyst",
       "destination": "store:claims-warehouse",

@@ -31,6 +31,7 @@ from stride_service.sampling import load_sampling
 from stride_service.sources import Source
 from tests.factories import (
     BASE_MODEL,
+    DESCRIPTION_TEXT,
     EMPTY_THREATS,
     PROJECT_ROOT,
     STRONG_MODEL,
@@ -114,9 +115,7 @@ def _marker_job(index: int) -> tuple[str, JobRecord]:
     marker = f"MARK-{index:04x}"
     record = JobRecord.create(
         owner_subject="ping|shared-caller",
-        sources=[
-            Source.description(f"Customers log in to the web app. Job token {marker}.")
-        ],
+        sources=[Source.description(f"{DESCRIPTION_TEXT} Job token {marker}.")],
         system_name=f"System-{index:04x}",
     )
     record.transition("running")

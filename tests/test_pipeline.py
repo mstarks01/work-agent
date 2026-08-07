@@ -29,6 +29,7 @@ from stride_service.sampling import TierSampling, load_sampling, sampling_finger
 from stride_service.sources import DEFAULT_DESCRIPTION_LABEL, Source
 from tests.factories import (
     BASE_MODEL,
+    DESCRIPTION_TEXT,
     PROJECT_ROOT,
     repo_tiers,
     sample_draft,
@@ -53,7 +54,7 @@ def draft_json(threat_id: str, category: str) -> str:
     return threats_json(sample_draft(threat_id, category))
 
 
-def job(text: str = "Customers log in to the web app.") -> JobRecord:
+def job(text: str = DESCRIPTION_TEXT) -> JobRecord:
     record = JobRecord.create(
         owner_subject="ping|user-1",
         sources=[Source.description(text)],
@@ -251,7 +252,7 @@ def test_an_invalid_extraction_is_repaired_once_and_then_analyzed():
     ]
     repair_instruction = models["repair"].seen[0]
     assert "process:does-not-exist" in repair_instruction  # the failed model
-    assert "Customers log in to the web app." in repair_instruction  # original text
+    assert DESCRIPTION_TEXT in repair_instruction  # original text
 
 
 def test_a_model_that_fails_twice_is_rejected_with_its_issues():
@@ -329,13 +330,11 @@ def test_the_stub_and_the_real_runner_compute_one_input_ref():
     runner. If the two ever computed it differently, every fixture and every
     offline test would assert against a reference production never emits.
     """
-    record = job("Customers log in to the web app.")
+    record = job(DESCRIPTION_TEXT)
     pipeline, _ = build(happy_replies())
 
     outcome, _ = run(pipeline, record)
-    stub_report = asyncio.run(
-        StubPipelineRunner().run(job("Customers log in to the web app."), _ignore)
-    )
+    stub_report = asyncio.run(StubPipelineRunner().run(job(DESCRIPTION_TEXT), _ignore))
 
     assert isinstance(outcome, PipelineCompleted)
     assert outcome.report.input.model_dump() == stub_report.report.input.model_dump()
@@ -357,7 +356,9 @@ def test_a_failed_job_logs_the_input_digest(caplog):
     replies["critic"] = invented
     replies["recritic"] = invented
     pipeline, _ = build(replies)
-    record = job("A poison description.")
+    # Distinct from the shared text so the digest is this job's, but still
+    # carrying the spans the scripted model's excerpts quote.
+    record = job(f"{DESCRIPTION_TEXT} A poison description.")
     digest = InputRef.of(
         system_name=record.system_name, sources=record.sources
     ).source_sha256
