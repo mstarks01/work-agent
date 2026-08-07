@@ -13,9 +13,11 @@ import asyncio
 import pytest
 from pydantic import ValidationError
 
+from stride_service.deployment import DEFAULT_RESILIENCE_PATH
 from stride_service.engine import (
     DEFAULT_CALLER,
     MAX_SYSTEM_NAME_CHARS,
+    EngineDeadlineError,
     EngineInputError,
     StrideEngine,
 )
@@ -27,6 +29,7 @@ from stride_service.jobs import (
     StubPipelineRunner,
 )
 from stride_service.pipeline import AdkPipelineRunner
+from stride_service.resilience import load_resilience
 from stride_service.sources import Source, SourceLimits
 from tests.factories import DESCRIPTION_TEXT
 from tests.test_pipeline import build, happy_replies
@@ -54,9 +57,13 @@ class RecordingRunner:
 # config/resilience.toml and are asserted in test_resilience.
 TEST_LIMITS = SourceLimits(max_total_bytes=512, max_sources=3)
 
+# Ample: no test here is exercising the deadline, and a tight one would make
+# an unrelated slow run flake. The bound itself is covered in test_engine.py.
+TEST_DEADLINE = 30.0
+
 
 def engine_for(runner) -> StrideEngine:
-    return StrideEngine(runner, limits=TEST_LIMITS)
+    return StrideEngine(runner, limits=TEST_LIMITS, deadline_seconds=TEST_DEADLINE)
 
 
 def analyze(engine: StrideEngine, text: str, **kwargs) -> PipelineOutcome:
@@ -264,9 +271,61 @@ def test_from_config_builds_an_adk_runner():
 
 def test_engine_drives_the_real_graph_to_a_report():
     pipeline, _ = build(happy_replies())
-    engine = StrideEngine(AdkPipelineRunner(pipeline), limits=TEST_LIMITS)
+    engine = StrideEngine(
+        AdkPipelineRunner(pipeline), limits=TEST_LIMITS, deadline_seconds=TEST_DEADLINE
+    )
 
     outcome = analyze(engine, DESCRIPTION_TEXT)
 
     assert isinstance(outcome, PipelineCompleted)
     assert any(threat.id == "S-01" for threat in outcome.report.threats)
+
+
+class StallingRunner:
+    """Never finishes on its own — stands in for a wedged provider call."""
+
+    async def run(self, job, on_node) -> PipelineOutcome:
+        await asyncio.sleep(3600)
+        raise AssertionError("the deadline should have stopped this run")
+
+
+def test_a_wedged_run_is_stopped_by_the_deployments_deadline():
+    # The bound the in-process path did not used to have: ``execute_job`` wraps
+    # the job route in ``asyncio.timeout`` while ``analyze`` handed straight to
+    # the runner, so the first-run app and every library embedder ran unbounded.
+    engine = StrideEngine(StallingRunner(), limits=TEST_LIMITS, deadline_seconds=0.05)
+
+    with pytest.raises(EngineDeadlineError, match="time budget"):
+        analyze(engine, DESCRIPTION_TEXT)
+
+
+def test_a_timeout_from_inside_the_graph_keeps_its_own_identity():
+    # Only *this* bound expiring is a deadline. A TimeoutError raised by the
+    # graph is somebody else's timeout and must not be relabelled as the job's
+    # budget, which would send an operator to the wrong knob.
+    engine = engine_for(RecordingRunner(TimeoutError("provider read timed out")))
+
+    with pytest.raises(TimeoutError) as caught:
+        analyze(engine, DESCRIPTION_TEXT)
+    assert not isinstance(caught.value, EngineDeadlineError)
+
+
+def test_the_deadline_comes_from_the_deployments_resilience_config():
+    engine = StrideEngine.from_config(
+        env={
+            "STRIDE_MODEL_BASE_VENDOR": "vertex",
+            "STRIDE_MODEL_BASE_MODEL": "gemini-2.5-flash",
+            "STRIDE_MODEL_STRONG_VENDOR": "vertex",
+            "STRIDE_MODEL_STRONG_MODEL": "gemini-2.5-pro",
+            "STRIDE_VERTEX_PROJECT": "test-project",
+            "STRIDE_VERTEX_LOCATION": "us-central1",
+            "GOOGLE_APPLICATION_CREDENTIALS": "/nonexistent/adc.json",
+        }
+    )
+
+    # The shipped number, not one this test picked: an engine that invented its
+    # own bound would be the defect the deadline exists to prevent.
+    assert (
+        engine._deadline_seconds
+        == load_resilience(DEFAULT_RESILIENCE_PATH).deadline_seconds()
+    )

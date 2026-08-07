@@ -78,16 +78,24 @@ def test_every_example_exposes_the_injected_engine_contract(example):
 # The shipped bounds; the examples are about the call shape, not the caps.
 EXAMPLE_LIMITS = SourceLimits(max_total_bytes=100 * 1024, max_sources=10)
 
+# Ample: no test here is exercising the deadline, and a tight one would make
+# an unrelated slow run flake. The bound itself is covered in test_engine.py.
+TEST_DEADLINE = 30.0
+
 
 def test_the_example_reports_a_completed_run(example, capsys):
-    engine = StrideEngine(StubPipelineRunner(), limits=EXAMPLE_LIMITS)
+    engine = StrideEngine(
+        StubPipelineRunner(), limits=EXAMPLE_LIMITS, deadline_seconds=TEST_DEADLINE
+    )
     asyncio.run(example.main(engine))
     assert capsys.readouterr().out, "a completed run must print something"
 
 
 def test_the_example_handles_a_rejection_without_raising(example, capsys):
     """The bug this whole mechanism exists to catch: silence on rejection."""
-    engine = StrideEngine(RejectingRunner(), limits=EXAMPLE_LIMITS)
+    engine = StrideEngine(
+        RejectingRunner(), limits=EXAMPLE_LIMITS, deadline_seconds=TEST_DEADLINE
+    )
     asyncio.run(example.main(engine))
 
     captured = capsys.readouterr()
@@ -100,7 +108,9 @@ def test_the_example_handles_a_rejection_without_raising(example, capsys):
 
 def test_the_example_lets_an_internal_failure_propagate(example):
     """Fail closed: nothing partial is invented on the way out."""
-    engine = StrideEngine(ExplodingRunner(), limits=EXAMPLE_LIMITS)
+    engine = StrideEngine(
+        ExplodingRunner(), limits=EXAMPLE_LIMITS, deadline_seconds=TEST_DEADLINE
+    )
     with pytest.raises(RuntimeError):
         asyncio.run(example.main(engine))
 

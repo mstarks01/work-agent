@@ -6,7 +6,7 @@ import json
 import pytest
 from fastapi.testclient import TestClient
 
-from stride_service.api import create_app
+from stride_service.api import _BODY_SLACK, create_app
 from stride_service.auth import AuthenticationError
 from stride_service.errors import ConfigError
 from stride_service.jobs import (
@@ -359,6 +359,45 @@ class TestInputLadder:
         )
         assert response.status_code == 413
         assert "request body" in response.json()["detail"]
+
+    def test_an_undeclared_body_is_counted_rather_than_trusted(self):
+        # The bypass the header-only guard had: a chunked request carries no
+        # content-length at all, so a check that reads the header sees nothing
+        # to compare and waves the whole payload through to be buffered and
+        # parsed. Streaming the body from a generator is what makes httpx send
+        # it chunked.
+        client, _ = make_client()
+        over_cap = TEST_LIMITS.max_total_bytes * _BODY_SLACK * 2
+
+        def chunks():
+            sent = 0
+            while sent < over_cap:
+                yield b"x" * 256
+                sent += 256
+
+        response = client.post(
+            "/v1/jobs",
+            content=chunks(),
+            headers=auth() | {"content-type": "application/json"},
+        )
+        assert response.status_code == 413
+        assert "request body" in response.json()["detail"]
+
+    def test_an_undeclared_body_under_the_cap_still_reaches_the_route(self):
+        # The other half: counting must not refuse a chunked request that is
+        # simply small. This one is well-formed and under budget, so it is the
+        # route that answers, not the guard.
+        client, _ = make_client()
+        body = json.dumps(
+            {"sources": [{"kind": "description", "label": "Doc", "text": "a system"}]}
+        ).encode()
+
+        response = client.post(
+            "/v1/jobs",
+            content=iter([body]),
+            headers=auth() | {"content-type": "application/json"},
+        )
+        assert response.status_code == 201
 
 
 class TestPoll:
