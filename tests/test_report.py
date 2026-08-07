@@ -85,6 +85,11 @@ class TestVerdictShapes:
         )
         assert verdict.related_unknowns[0].attribute == "encryption_at_rest"
 
+    def test_an_unknown_ref_takes_a_pointer_spelled_attribute_bare(self):
+        """The critic's ``related_unknowns`` reads field names the same way."""
+        ref = UnknownRef(element_id="store:orders-db", attribute="/encryption_at_rest")
+        assert ref.attribute == "encryption_at_rest"
+
     def test_rejected_requires_a_reason(self):
         with pytest.raises(ValidationError, match="must state a reason"):
             Verdict(status="rejected")
@@ -150,6 +155,30 @@ class TestGround:
     def test_unknown_fields_are_forbidden(self):
         with pytest.raises(ValidationError):
             Ground(kind="derived-fact", flow_id="flow:a-to-b:x", fact="invented")
+
+    def test_a_pointer_spelled_attribute_arrives_bare(self):
+        """``/exposure`` names the field ``exposure``, and is stored as it."""
+        ground = Ground(
+            kind="unknown-attribute",
+            element_id="process:web-api",
+            attribute="/exposure",
+        )
+        assert ground.attribute == "exposure"
+
+    def test_stripping_the_pointer_does_not_invent_a_field(self):
+        """The prefix is cut; whether the name resolves is still asked later."""
+        ground = Ground(
+            kind="unknown-attribute",
+            element_id="process:web-api",
+            attribute="/invented",
+        )
+        assert ground.attribute == "invented"
+
+    def test_an_attribute_that_is_only_a_pointer_prefix_is_rejected(self):
+        with pytest.raises(ValidationError, match="must carry"):
+            Ground(
+                kind="unknown-attribute", element_id="process:web-api", attribute="/"
+            )
 
 
 class TestThreat:

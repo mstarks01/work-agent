@@ -103,12 +103,29 @@ def repo_tiers() -> ModelTierConfig:
     )
 
 
+DESCRIPTION_TEXT = (
+    "Customers log in to the web app; customers log in from the browser."
+    " The web app runs on Cloud Run, and orders are stored in Postgres."
+)
+"""The submitted text every scripted job carries.
+
+Every ``source_excerpt`` in :func:`valid_model` and the quote ground in
+:func:`sample_threat` are verbatim spans of *this string*, because the gate now
+checks an excerpt against the source it cites the same way the fan-in checks a
+threat's quote. A fixture citing words its own job never carried is the exact
+defect that check exists to catch, and one used by 29 tests would have failed
+all of them.
+"""
+
+
 def valid_model(source_label: str = DEFAULT_DESCRIPTION_LABEL) -> SystemModel:
     """The shared gate-passing model.
 
     ``source_label`` is a parameter because the citation rule checks it against
     the *job's* labels: a model whose excerpts cite a source the job did not
     carry is invalid, so a test submitting its own labels must say so here too.
+    Its excerpts are spans of :data:`DESCRIPTION_TEXT`, so it also passes the
+    rule that the excerpt is really *in* that source.
     """
     return SystemModel(
         external_entities=[
@@ -282,7 +299,7 @@ def sample_report(
         ),
         input=InputRef.of(
             system_name="Order Service",
-            sources=[Source.description("Customers log in to the web app.")],
+            sources=[Source.description(DESCRIPTION_TEXT)],
         ),
         nodes=[
             NodeRun(node="extract", model="gemini-2.5-flash", duration_ms=3200),
