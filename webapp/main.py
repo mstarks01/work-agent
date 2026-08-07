@@ -81,6 +81,7 @@ from pydantic import ValidationError
 
 from stride_service import (
     ConfigError,
+    EngineDeadlineError,
     EngineInputError,
     PipelineCompleted,
     Source,
@@ -352,6 +353,14 @@ async def _drive(
         # Raised before any model ran — no sources, too many, or more bytes
         # than this deployment allows. The message is about the caller's input
         # and is safe to show.
+        await _emit(run, "failed", {"message": str(exc)})
+    except EngineDeadlineError as exc:
+        # Distinct from the generic failure for the reason
+        # ``jobs.DEADLINE_FAILURE_MESSAGE`` gives: a deadline is an operational
+        # fact about this deployment's bounds, and saying so beats sending the
+        # submitter to retry an identical description against an identical
+        # budget. It names no node and no model — those are in the server log.
+        logger.warning("run %s hit the deployment's time budget", run.id)
         await _emit(run, "failed", {"message": str(exc)})
     except Exception:
         # The traceback goes to the server log and never to the browser (A10).
