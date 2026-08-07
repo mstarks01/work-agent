@@ -25,6 +25,7 @@ from stride_service.sampling import (
 from stride_service.sources import Source, render_sources
 from tests.factories import (
     BASE_MODEL,
+    DESCRIPTION_TEXT,
     PROJECT_ROOT,
     STRONG_MODEL,
     SilentLlm,
@@ -39,7 +40,7 @@ from tests.factories import (
     valid_model,
 )
 
-DESCRIPTION = "Customers log in to the web app."
+DESCRIPTION = DESCRIPTION_TEXT
 
 
 def happy_replies() -> dict[str, str]:
@@ -268,7 +269,9 @@ class TestSourceRendering:
 
     def test_what_extraction_sees_is_the_rendered_sources(self):
         sources = [
-            Source.description("a web app storing orders", label="Doc"),
+            Source.description(
+                f"{DESCRIPTION_TEXT} A web app storing orders.", label="Doc"
+            ),
             Source.transcript("Ana: it writes to Postgres.", label="Kickoff call"),
         ]
         # The scripted models must cite labels this job carries: the gate checks
@@ -318,7 +321,7 @@ class TestSourceRendering:
 
         async def scenario():
             return await executor.run(
-                [Source.description("text")],
+                [Source.description(DESCRIPTION_TEXT)],
                 user_id="test-user",
                 extra_state={
                     graph.STATE_VALID_MODEL: valid_model().model_dump(mode="json")

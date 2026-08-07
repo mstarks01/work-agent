@@ -14,9 +14,9 @@ import hashlib
 from collections import Counter
 from collections.abc import Iterable, Sequence
 from datetime import datetime
-from typing import ClassVar, Literal, Self, get_args
+from typing import Annotated, ClassVar, Literal, Self, get_args
 
-from pydantic import BaseModel, ConfigDict, Field, model_validator
+from pydantic import BaseModel, BeforeValidator, ConfigDict, Field, model_validator
 from pydantic.json_schema import SkipJsonSchema
 
 from stride_service.sources import Source
@@ -144,13 +144,35 @@ class Mitigation(BaseModel):
     detail: str = Field(default="", max_length=2000)
 
 
+def _bare_attribute(value: str) -> str:
+    """An attribute name with any JSON-pointer prefix a model wrapped it in cut.
+
+    Providers reach for pointer syntax unprompted: a run against
+    ``gpt-5.6-sol`` grounded a threat on ``"/exposure"`` where the prompt and
+    every exemplar spell it ``exposure``. The referent was right — ``Process``
+    has that field — and the job died at :func:`~stride_service.critic.
+    join_drafts` on the slash alone, taking all six lanes' work with it.
+
+    Which spelling of a field name arrives is mechanical, so it is settled
+    here rather than argued with in a prompt. The check itself does not
+    loosen: the bare name still has to be a field the element's type actually
+    declares, so ``/invented`` fails exactly as ``invented`` does.
+    """
+    return value.lstrip("/") if isinstance(value, str) else value
+
+
+# Applied before the length constraints at each use site, so what is measured
+# and what is compared against the element's fields are the same string.
+AttributeName = Annotated[str, BeforeValidator(_bare_attribute)]
+
+
 class UnknownRef(BaseModel):
     """Points a needs-info verdict at the unknown attribute that caused it."""
 
     model_config = ConfigDict(extra="forbid")
 
     element_id: str = Field(max_length=300)
-    attribute: str = Field(min_length=1, max_length=100)
+    attribute: AttributeName = Field(min_length=1, max_length=100)
 
 
 class Ground(BaseModel):
@@ -213,7 +235,7 @@ class Ground(BaseModel):
     text: str = Field(default="", max_length=1000)  # quote
     source_label: str = Field(default="", max_length=200)  # quote
     element_id: str = Field(default="", max_length=300)  # unknown-attribute
-    attribute: str = Field(default="", max_length=100)  # unknown-attribute
+    attribute: AttributeName = Field(default="", max_length=100)  # unknown-attribute
     flow_id: str = Field(default="", max_length=300)  # derived-fact
 
     # Which fields each branch requires. Everything not listed for a branch is

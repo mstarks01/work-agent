@@ -44,8 +44,11 @@ The judge fixtures live alongside, in `evals/judge_calibration/`:
 
 Run `python evals/verify_corpus.py` to check everything mechanical about the
 above; it must be green before a case merges. It checks that every declared file
-exists and digests as claimed, that labels are unique, and that every
-`source_label` in `model.json` names a source the case declares. `--write-sha`
+exists and digests as claimed, that labels are unique, that every
+`source_label` in `model.json` names a source the case declares, and that
+every `source_excerpt` is really found in the source it cites — the same
+ladder the service runs, so a case cannot be blessed in a shape the gate
+would reject. `--write-sha`
 restamps each source's digest and the aggregate over them.
 
 ## The workflow
@@ -201,6 +204,7 @@ Merge checklist:
 - [ ] sanitization confirmed; provenance and licence recorded in `case.json`
 - [ ] `sources` declared in `case.json`, one entry per input file
 - [ ] every `source_label` in `model.json` names one of those labels
+- [ ] every `source_excerpt` is a verbatim span of the source it cites, with `…` marking any cut
 - [ ] digests and the aggregate stamped (`--write-sha`)
 - [ ] tier assignment reviewed: some must-find, not all
 
