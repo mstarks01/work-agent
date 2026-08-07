@@ -139,6 +139,35 @@ def test_an_unfindable_quote_is_marked_on_the_report_and_still_renders():
     assert [(m.threat_id, m.index) for m in report.unverified_grounds] == [("S-01", 0)]
 
 
+def test_a_description_citing_a_missing_element_is_marked_on_the_report():
+    """The prose half of the same policy, end to end.
+
+    ``affected_element_ids`` naming a missing element kills the job; the same
+    ID written into the *description* is marked instead. The fan-in has no
+    re-ask path, so a mistyped ID in prose must not cost six lanes of analysis
+    — but a reader still has to be told the argument cites a system this
+    report does not describe.
+    """
+    draft = sample_draft(
+        "S-01",
+        "spoofing",
+        description="The attacker pivots from process:web-app into"
+        " process:web-api, which this model does not contain.",
+    )
+    replies = happy_replies() | {
+        graph.analyze_node_name("spoofing"): threats_json(draft)
+    }
+    pipeline, _ = build(replies)
+
+    outcome, _ = run(pipeline, job())
+
+    report = outcome.report
+    assert [threat.id for threat in report.threats] == ["S-01"]
+    assert [(m.threat_id, m.mention) for m in report.unresolved_mentions] == [
+        ("S-01", "process:web-api")
+    ]
+
+
 def test_a_threat_no_ground_supports_fails_the_job():
     """The per-threat half: nothing holds, so nothing ships."""
     draft = sample_draft(
