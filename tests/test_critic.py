@@ -7,6 +7,7 @@ from stride_service.critic import (
     DraftJoinError,
     assemble_threats,
     join_drafts,
+    mentioned_ids,
     snap_drafts,
     snap_rulings,
 )
@@ -182,6 +183,98 @@ class TestGroundReferences:
             Ground(kind="quote", text="anything", source_label="Never submitted")
         )
         assert join_drafts(drafts, model).drafts
+
+
+class TestMentionedIds:
+    """What counts as an element ID written into prose."""
+
+    @pytest.mark.parametrize(
+        "description, expected",
+        [
+            ("An attacker reaches process:web-app.", ["process:web-app"]),
+            (
+                "Rides `flow:customer-to-web-app:login` inward.",
+                ["flow:customer-to-web-app:login"],
+            ),
+            (
+                "From entity:customer through process:web-app to store:orders-db",
+                ["entity:customer", "process:web-app", "store:orders-db"],
+            ),
+            ("Crosses boundary:internet.", ["boundary:internet"]),
+            ("Spelled Process:Web-App by the agent.", ["Process:Web-App"]),
+        ],
+    )
+    def test_ids_are_found_however_they_are_written(self, description, expected):
+        assert mentioned_ids(description) == expected
+
+    @pytest.mark.parametrize(
+        "description",
+        [
+            "Process: the web app transforms orders.",  # a colon in prose
+            "It runs on Cloud Run and stores to Postgres.",
+            "The store holds orders; the process reads them.",
+            "TLS 1.3 protects the hop.",
+        ],
+    )
+    def test_ordinary_prose_produces_nothing(self, description):
+        """A miss is the acceptable failure here; a false alarm is not."""
+        assert mentioned_ids(description) == []
+
+    def test_a_flow_keeps_both_segments(self):
+        """``store:orders-db:x`` must not read as a store followed by junk."""
+        assert mentioned_ids("see store:orders-db:x") == ["store:orders-db"]
+
+    def test_trailing_punctuation_is_not_part_of_the_id(self):
+        assert mentioned_ids("reaches process:web-app, then stops.") == [
+            "process:web-app"
+        ]
+
+
+class TestUnresolvedMentions:
+    """Marked, never fatal: the fan-in has no re-ask path to spend on prose."""
+
+    def drafted(self, description, threat_id="S-01"):
+        return {"spoofing": [sample_draft(threat_id, description=description)]}
+
+    def test_an_id_the_model_contains_is_not_marked(self, model):
+        joined = join_drafts(
+            self.drafted("An attacker reaches process:web-app."), model
+        )
+        assert joined.mentions == []
+
+    def test_an_id_the_model_lacks_is_marked_and_the_job_survives(self, model):
+        joined = join_drafts(self.drafted("It pivots into process:ghost."), model)
+
+        assert [(m.threat_id, m.mention) for m in joined.mentions] == [
+            ("S-01", "process:ghost")
+        ]
+        assert len(joined.drafts) == 1
+
+    def test_the_exemplar_systems_ids_are_what_this_really_catches(self, model):
+        """analyze.md forbids citing its worked exemplar; nothing checked it."""
+        joined = join_drafts(
+            self.drafted(
+                "The attacker posts to process:web-api and reaches store:accounts-db."
+            ),
+            model,
+        )
+        assert [m.mention for m in joined.mentions] == [
+            "process:web-api",
+            "store:accounts-db",
+        ]
+
+    def test_a_respelled_id_resolves_rather_than_being_marked(self, model):
+        joined = join_drafts(self.drafted("Reaches Process:Web-App first."), model)
+        assert joined.mentions == []
+
+    def test_marks_are_per_mention_not_per_threat(self, model):
+        joined = join_drafts(
+            self.drafted("From process:ghost through store:phantom."), model
+        )
+        assert [m.mention for m in joined.mentions] == [
+            "process:ghost",
+            "store:phantom",
+        ]
 
 
 class TestQuoteVerification:

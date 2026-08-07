@@ -37,6 +37,7 @@ from pathlib import Path
 import pytest
 from pydantic import ValidationError
 
+from stride_service.critic import mentioned_ids
 from stride_service.grounding import verify_quote
 from stride_service.markdown_loader import MarkdownLoader, split_sections
 from stride_service.prompts import (
@@ -231,6 +232,26 @@ def test_exemplar_references_resolve_in_the_exemplar_system(category):
             draft = DraftThreat.model_validate(json.loads(block))
             unknown = set(draft.affected_element_ids) - known_ids
             assert not unknown, f"{draft.id} cites {sorted(unknown)}"
+
+
+@pytest.mark.parametrize("category", STRIDE_CATEGORIES)
+def test_exemplar_descriptions_cite_only_ids_the_exemplar_system_has(category):
+    """The prose half, through the extractor the service marks reports with.
+
+    An exemplar naming an element its own worked system does not contain would
+    be teaching the very thing ``UnresolvedMention`` exists to catch, in the
+    six prompts that demonstrate what a good description looks like.
+    """
+    known_ids = exemplar_system_ids()
+    for body in exemplar_sections(category).values():
+        for block in json_blocks(body):
+            draft = DraftThreat.model_validate(json.loads(block))
+            unknown = [
+                mention
+                for mention in mentioned_ids(draft.description)
+                if mention not in known_ids
+            ]
+            assert not unknown, f"{draft.id} description cites {sorted(unknown)}"
 
 
 @pytest.mark.parametrize("category", STRIDE_CATEGORIES)

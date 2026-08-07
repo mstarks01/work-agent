@@ -23,7 +23,7 @@ and the fields below are the authoritative account.
 
 ```python
 class StrideReport:
-    schema_version: str          # "2.1"
+    schema_version: str          # "2.2"
     disclaimer: str              # AI-generated, not human-reviewed
     job: Job                     # id, status="completed", timestamps, revise_rounds
     input: InputRef              # system_name + one ref per submitted source
@@ -34,6 +34,7 @@ class StrideReport:
     threats: list[Threat]        # confirmed + needs-info, severity-ordered
     rejected_threats: list[Threat]
     unverified_grounds: list[UnverifiedGround]  # quote grounds not found in their source
+    unresolved_mentions: list[UnresolvedMention]  # element IDs a description cites that do not exist
     summary: Summary
 ```
 
@@ -160,6 +161,37 @@ hiding the finding. The list is also empty when no source text was available to
 check against, so it is evidence of a *failed* check, never of a check having
 run.
 
+## `unresolved_mentions` — IDs the prose cites that do not exist
+
+A threat names the elements it acts on twice: structurally in
+`affected_element_ids`, and in prose inside `description`, which the analyze
+prompt asks agents to write with element and flow IDs cited inline. The two are
+checked differently on purpose.
+
+```python
+class UnresolvedMention:
+    threat_id: str               # the threat whose description cites it
+    mention: str                 # the ID as written, e.g. "process:web-api"
+```
+
+A structural reference that does not resolve **fails the job** — it is the
+threat's claim about what it acts on, and a claim about a missing element is
+not a finding. The same ID written into the argument is **marked** instead, for
+the reason an unfindable quote is: merge has no re-ask path, and a whole report
+is too much to trade for a mistyped ID in a sentence.
+
+The mark is worth more than typo-catching. The analyze prompt is built around a
+single worked exemplar system and spends a section telling the agent never to
+cite that system's IDs. A description arguing about `process:web-api` in a job
+whose model has no such element is that contamination reaching the one field a
+reader reads as ordinary analysis — and nothing checked it before 2.2.
+
+Detection is deliberately narrow: a token has to open with one of the five real
+type prefixes and a colon, a shape ordinary English does not produce
+(`"Process: the web app"` has a space and is not a mention). It errs toward
+missing a citation rather than flagging prose, which is the right way round for
+a mark that annotates a finding a human will read.
+
 Two things `grounds` is deliberately not:
 
 - **Not an element's `source_excerpt`.** An excerpt says why an *element* is in
@@ -268,6 +300,10 @@ class TokenUsage:
 
 > **`schema_version` 2.1** added `nodes[].usage`. Purely additive; a 2.0
 > consumer that ignores unknown fields is unaffected.
+
+> **`schema_version` 2.2** added `unresolved_mentions`. Purely additive — a new
+> optional top-level list of the same shape `unverified_grounds` already had —
+> so a 2.1 consumer that ignores unknown fields is unaffected.
 
 The report records both model fields and **compares neither**. It doesn't need
 to: if the build moves, the fingerprint moves with it, and the run stops
