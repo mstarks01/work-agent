@@ -42,6 +42,7 @@ evals/
 | `harness/judge.py` | The pinned judge, its two calls, and the `Judge` seam for testing. |
 | `harness/scorer.py` | The scoring pipeline: prefilter → judge → match → bucket → severity. |
 | `harness/critic_yield.py` | What the critic added and removed, scored on both sides. |
+| `harness/grounds.py` | What the category agents did with `grounds` — the branch mix, the padding number and the unverified-quote rate — plus the two failures the grounding path kills a case with. Judge-free. |
 | `harness/calibration.py` | Judge-vs-human agreement over the labelled fixtures. |
 | `harness/certify.py` | Promoting a winning configuration: rewrites `config/sampling.toml` and records its fingerprints as blessed. The certification check itself lives in the service (`stride_service.certification`), which this imports. |
 | `harness/modes.py` | The three run modes over the shipped graph. |
@@ -94,7 +95,8 @@ every other number meaningless.
 
 Every number here is measured **by the judge** — use them to compare
 configurations and track movement, never as absolute scores or against another
-tool's published figures.
+tool's published figures. The **grounds** measurements at the end are the
+exception: they are counted mechanically and mean the same thing across judges.
 
 - **must-find recall** — did the tool find the threats a case marks as
   essential? Reported **per case**, never averaged: an average hides one case
@@ -112,6 +114,25 @@ tool's published figures.
   removed (good) *against* how many real threats it removed (bad). A kill count
   on its own tells you nothing about which of those two is happening.
 - **near/far exemplar delta** — see below.
+
+The **grounds** measurements are judge-free, and each one watches a prompt rule
+that nothing enforces mechanically:
+
+- **grounds per threat** — `analyze.md` asks for one ground per load-bearing
+  fact with no padding, so this should stay low. Rising means the agents are
+  filling the field rather than citing what triggered them.
+- **quoteless rate** — the share of findings carrying no quote. A finding whose
+  trigger was an unknown attribute or a boundary crossing is *correctly*
+  quoteless, so read this **low with suspicion, not high**: a rate near zero is
+  evidence the agents are manufacturing quotes to fill a required field.
+- **unverified rate** — of the quotes the agents wrote, the share the shipped
+  ladder (`stride_service.grounding`) could not find in the source they name.
+  Denominated in quotes, never in grounds.
+- **failed cases** — the two ways the grounding path kills a case, counted
+  rather than allowed to abort the sweep: `mis-shape` (a `Ground` carrying a
+  combination of fields no branch permits) and `fail-closed` (a threat on which
+  no ground verified at all). Both remain structural failures, so a run that
+  hits either still exits non-zero.
 
 ## The corpus
 
