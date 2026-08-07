@@ -201,7 +201,7 @@ from evals.harness.certify import promote
 from stride_service.model_tiers import load_model_tiers
 from stride_service.sampling import load_sampling
 
-winner = load_sampling("config/sampling.toml")   # after editing it to the winning values
+winner = load_sampling("config/sampling.toml")  # after editing it to the winning values
 tiers = load_model_tiers("config/model_tiers.toml")
 
 # served_models: the exact model string each node ran on in the winning sweep
