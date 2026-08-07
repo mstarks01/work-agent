@@ -177,5 +177,6 @@ class AdkPipelineRunner:
             rejected_threats=analysis.rejected_threats,
             unverified_grounds=analysis.unverified_grounds,
             unresolved_mentions=analysis.unresolved_mentions,
+            missing_mitigations=analysis.missing_mitigations,
             summary=analysis.summary,
         )

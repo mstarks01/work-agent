@@ -23,7 +23,7 @@ and the fields below are the authoritative account.
 
 ```python
 class StrideReport:
-    schema_version: str          # "2.2"
+    schema_version: str          # "2.3"
     disclaimer: str              # AI-generated, not human-reviewed
     job: Job                     # id, status="completed", timestamps, revise_rounds
     input: InputRef              # system_name + one ref per submitted source
@@ -35,6 +35,7 @@ class StrideReport:
     rejected_threats: list[Threat]
     unverified_grounds: list[UnverifiedGround]  # quote grounds not found in their source
     unresolved_mentions: list[UnresolvedMention]  # element IDs a description cites that do not exist
+    missing_mitigations: list[MissingMitigation]  # threats offering no countermeasure, unexcused
     summary: Summary
 ```
 
@@ -192,6 +193,37 @@ type prefixes and a colon, a shape ordinary English does not produce
 missing a citation rather than flagging prose, which is the right way round for
 a mark that annotates a finding a human will read.
 
+## `missing_mitigations` — findings with nothing to do about them
+
+`mitigations` may be empty, but the prompt licenses that for exactly one case:
+the threat is conditional on an `unknown`, and no countermeasure can be named
+without first learning that fact.
+
+```python
+class MissingMitigation:
+    threat_id: str               # the threat offering no countermeasure
+```
+
+That case is mechanically recognizable, so the report distinguishes it. A
+threat triggered by an `unknown` carries an `unknown-attribute` ground —
+the trigger dictates the branch — so an empty `mitigations` list *with* such a
+ground is the licensed case and is not marked. An empty list *without* one is.
+
+This is a **completeness** signal, not a correctness one, which is why it is a
+mark rather than a failure: a finding with no recommended action is still a
+finding. What it buys a reader is the ability to see which findings arrived
+with nothing to do about them, and to tell those apart from the ones that
+correctly said "answer this unknown first".
+
+## What is checked but never reported
+
+Threat IDs are asked to run `01..N` within each category. A lane that emits
+`S-01, S-02, S-05` has drifted from that, and the service **logs it and changes
+nothing** — the IDs are unique, their letters match, and every downstream check
+passes, so a gap costs a reader nothing and renumbering would move a finding's
+identity between two runs of the same input. It is a fact about the agents, and
+it lives in the run's logs rather than in this payload.
+
 Two things `grounds` is deliberately not:
 
 - **Not an element's `source_excerpt`.** An excerpt says why an *element* is in
@@ -304,6 +336,9 @@ class TokenUsage:
 > **`schema_version` 2.2** added `unresolved_mentions`. Purely additive — a new
 > optional top-level list of the same shape `unverified_grounds` already had —
 > so a 2.1 consumer that ignores unknown fields is unaffected.
+
+> **`schema_version` 2.3** added `missing_mitigations`, a third optional
+> top-level list of service-owned marks. Additive on the same argument.
 
 The report records both model fields and **compares neither**. It doesn't need
 to: if the build moves, the fingerprint moves with it, and the run stops

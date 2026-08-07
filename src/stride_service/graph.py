@@ -80,6 +80,7 @@ boundary, then by the System Model gate and the critic seams here.
 from __future__ import annotations
 
 import json
+import logging
 from collections.abc import Callable, Sequence
 from dataclasses import dataclass
 from typing import TYPE_CHECKING, Any, Literal
@@ -90,7 +91,12 @@ from google.adk.models.base_llm import BaseLlm
 from google.adk.workflow import START, FunctionNode, JoinNode, Workflow
 from google.genai import types
 
-from stride_service.critic import assemble_threats, join_drafts, review_issues
+from stride_service.critic import (
+    assemble_threats,
+    join_drafts,
+    numbering_gaps,
+    review_issues,
+)
 from stride_service.markdown_loader import MarkdownLoader
 from stride_service.prompts import (
     compose_analyze_prompt,
@@ -103,6 +109,7 @@ from stride_service.report import (
     STRIDE_CATEGORIES,
     DraftThreat,
     DraftThreats,
+    MissingMitigation,
     StrideCategory,
     Summary,
     Threat,
@@ -132,6 +139,8 @@ if TYPE_CHECKING:
 # runs on. A ``BaseLlm`` instance is accepted so tests can drive the whole
 # graph without a Vertex endpoint.
 ModelResolver = Callable[[str], str | BaseLlm]
+
+logger = logging.getLogger(__name__)
 
 # --- Node names -------------------------------------------------------------
 
@@ -241,6 +250,7 @@ STATE_VALID_MODEL = "valid_model"
 STATE_MERGED_DRAFTS = "merged_drafts"
 STATE_UNVERIFIED_GROUNDS = "unverified_grounds"
 STATE_UNRESOLVED_MENTIONS = "unresolved_mentions"
+STATE_MISSING_MITIGATIONS = "missing_mitigations"
 STATE_REVIEWED_THREATS = "reviewed_threats"
 STATE_ANALYSIS = "analysis"
 STATE_REJECTION = "rejection"
@@ -314,6 +324,7 @@ class Analysis:
     # a rejected threat keeps its grounds, so it keeps their marks too.
     unverified_grounds: list[UnverifiedGround]
     unresolved_mentions: list[UnresolvedMention]
+    missing_mitigations: list[MissingMitigation]
     summary: Summary
 
     def to_state(self) -> dict[str, Any]:
@@ -332,6 +343,9 @@ class Analysis:
             ],
             "unresolved_mentions": [
                 mark.model_dump(mode="json") for mark in self.unresolved_mentions
+            ],
+            "missing_mitigations": [
+                mark.model_dump(mode="json") for mark in self.missing_mitigations
             ],
             "summary": self.summary.model_dump(mode="json"),
         }
@@ -356,6 +370,10 @@ class Analysis:
             unresolved_mentions=[
                 UnresolvedMention.model_validate(mark)
                 for mark in data["unresolved_mentions"]
+            ],
+            missing_mitigations=[
+                MissingMitigation.model_validate(mark)
+                for mark in data["missing_mitigations"]
             ],
             summary=Summary.model_validate(data["summary"]),
         )
@@ -645,11 +663,19 @@ def merge_drafts(
     ctx.state[STATE_UNRESOLVED_MENTIONS] = [
         mark.model_dump(mode="json") for mark in joined.mentions
     ]
+    ctx.state[STATE_MISSING_MITIGATIONS] = [
+        mark.model_dump(mode="json") for mark in joined.unmitigated
+    ]
+    # Logged rather than reported: a lane that numbered its drafts 01, 02, 05
+    # broke nothing a reader could act on, and the agents are who it is about.
+    for gap in numbering_gaps(merged):
+        logger.warning(gap)
     ctx.state[STATE_DRAFT_THREATS] = render(_ruling_view(merged))
     return {
         "draft_count": len(merged),
         "unverified_count": len(joined.unverified),
         "unresolved_mention_count": len(joined.mentions),
+        "missing_mitigation_count": len(joined.unmitigated),
     }
 
 
@@ -746,6 +772,7 @@ def assemble_report(
     reviewed_threats: dict | None = None,
     unverified_grounds: list | None = None,
     unresolved_mentions: list | None = None,
+    missing_mitigations: list | None = None,
 ) -> dict[str, Any]:
     """Build the report body deterministically from the critic's rulings.
 
@@ -764,8 +791,10 @@ def assemble_report(
     nothing failed and when the job carried no sources to check against, and an
     empty list is indistinguishable from the absent key ADK would bind here.
     Both mean the same thing: no quote was found wanting.
-    ``unresolved_mentions`` defaults for exactly the same reason, and means
-    that every element ID the descriptions cite resolves.
+    ``unresolved_mentions`` and ``missing_mitigations`` default for exactly
+    the same reason: an empty list means every element ID the descriptions
+    cite resolves, and every threat either carries a countermeasure or has
+    the unknown that excuses carrying none.
     """
     model = SystemModel.model_validate(valid_model)
     drafts = [DraftThreat.model_validate(draft) for draft in merged_drafts]
@@ -783,6 +812,9 @@ def assemble_report(
         ],
         unresolved_mentions=[
             UnresolvedMention.model_validate(mark) for mark in unresolved_mentions or []
+        ],
+        missing_mitigations=[
+            MissingMitigation.model_validate(mark) for mark in missing_mitigations or []
         ],
         summary=build_summary(threats, rejected, model),
     )
