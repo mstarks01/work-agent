@@ -37,7 +37,7 @@ from pathlib import Path
 import pytest
 from pydantic import ValidationError
 
-from stride_service.critic import mentioned_ids
+from stride_service.critic import mentioned_ids, numbering_gaps
 from stride_service.grounding import verify_quote
 from stride_service.markdown_loader import MarkdownLoader, split_sections
 from stride_service.prompts import (
@@ -252,6 +252,22 @@ def test_exemplar_descriptions_cite_only_ids_the_exemplar_system_has(category):
                 if mention not in known_ids
             ]
             assert not unknown, f"{draft.id} description cites {sorted(unknown)}"
+
+
+@pytest.mark.parametrize("category", STRIDE_CATEGORIES)
+def test_exemplar_drafts_carry_a_mitigation_or_the_unknown_that_excuses_one(category):
+    """An exemplar must not model the shape the service marks as incomplete."""
+    for draft in exemplar_drafts(category):
+        licensed = any(ground.kind == "unknown-attribute" for ground in draft.grounds)
+        assert draft.mitigations or licensed, (
+            f"{draft.id} offers no mitigation and no unknown-attribute ground"
+        )
+
+
+@pytest.mark.parametrize("category", STRIDE_CATEGORIES)
+def test_exemplar_drafts_are_numbered_from_01_without_gaps(category):
+    """The numbering rule the prompt states, demonstrated by the prompt's own drafts."""
+    assert numbering_gaps(exemplar_drafts(category)) == []
 
 
 @pytest.mark.parametrize("category", STRIDE_CATEGORIES)

@@ -35,9 +35,11 @@ from typing import NamedTuple, get_args
 from stride_service.grounding import verify_quote
 from stride_service.references import canonical, snap
 from stride_service.report import (
+    CATEGORY_LETTERS,
     STRIDE_CATEGORIES,
     DraftThreat,
     Ground,
+    MissingMitigation,
     SeverityLevel,
     StrideCategory,
     Threat,
@@ -69,16 +71,24 @@ class AssembledThreats(NamedTuple):
 class JoinedDrafts(NamedTuple):
     """What the fan-in produces: the merged drafts, and what did not check out.
 
-    Three returns rather than one because they have different owners. The
-    drafts are the agents'; ``unverified`` and ``mentions`` are the *service's*
-    record of what it looked for and could not find — a quote in the source it
-    named, an element ID a description cited — which is why both ride beside
-    the drafts instead of on them.
+    Four returns rather than one because they have different owners. The drafts
+    are the agents'; the three mark lists are the *service's* record of what
+    each draft failed to make good on — a quote that is not in the source it
+    named, an element ID a description cited that does not exist, a threat
+    offering no countermeasure and no reason for offering none. All three ride
+    beside the drafts rather than on them, because a field an agent could set
+    about its own accuracy is not evidence of it.
+
+    None of the three is fatal, and that is the whole policy of this seam:
+    checks that decide whether a finding *means* anything fail closed, and
+    checks that describe how complete it is are recorded for a reader. The
+    fan-in has no re-ask path, so the second kind must never cost a report.
     """
 
     drafts: list[DraftThreat]
     unverified: list[UnverifiedGround]
     mentions: list[UnresolvedMention]
+    unmitigated: list[MissingMitigation]
 
 
 # An element ID as it appears inside prose. Flows carry a second segment and
@@ -132,6 +142,62 @@ def _unresolved_mentions(
         for threat in threats
         for mention in mentioned_ids(threat.description)
         if not canonical(mention, element_ids)
+    ]
+
+
+def _missing_mitigations(
+    threats: Iterable[DraftThreat],
+) -> list[MissingMitigation]:
+    """Marks for threats offering no countermeasure and no reason for none.
+
+    The prompt licenses an empty ``mitigations`` for exactly one case — the
+    threat is conditional on an ``unknown`` and no countermeasure can be named
+    without first learning that fact — and step 6's branch rule makes that case
+    recognizable: a threat triggered by an unknown carries an
+    ``unknown-attribute`` ground, because the trigger dictates the branch. So
+    the licensed empty and the unlicensed one are told apart by the draft's own
+    grounds, with no judgement asked of anybody.
+    """
+    return [
+        MissingMitigation(threat_id=threat.id)
+        for threat in threats
+        if not threat.mitigations
+        and not any(ground.kind == "unknown-attribute" for ground in threat.grounds)
+    ]
+
+
+def numbering_gaps(threats: Iterable[DraftThreat]) -> list[str]:
+    """Every lane whose drafts are not numbered ``01..N``, as messages.
+
+    The prompt asks each agent for "a two-digit sequence starting at ``01``,
+    numbered within your category only". A lane that emits ``S-01, S-02, S-05``
+    has not followed it.
+
+    **Returned rather than raised, and deliberately not on the report.** A gap
+    breaks nothing: IDs are opaque handles, they are unique, their letters
+    match, and every downstream check passes. Renumbering would make them
+    comply, and is refused — rewriting a finding's identity to satisfy a
+    cosmetic rule is a bigger liberty than the rule is worth, and it would move
+    a threat's ID between two runs of the same input.
+
+    So this is a signal about the *agents*, not about the report, and it is
+    logged where the other operational facts about a run are rather than shown
+    to a reader who can do nothing with it. Worth having because it is free and
+    because nothing else in the graph would ever mention it: an agent quietly
+    drifting from its output contract is the kind of thing that is obvious in
+    hindsight and invisible in advance.
+    """
+    numbers_by_category: dict[StrideCategory, list[int]] = {}
+    for threat in threats:
+        numbers_by_category.setdefault(threat.category, []).append(
+            int(threat.id.split("-", 1)[1])
+        )
+    return [
+        f"the {category} lane numbered its {len(numbers)} drafts"
+        f" {', '.join(sorted(f'{CATEGORY_LETTERS[category]}-{n:02d}' for n in numbers))},"
+        f" not 01..{len(numbers):02d}"
+        for category, numbers in numbers_by_category.items()
+        if sorted(numbers) != list(range(1, len(numbers) + 1))
     ]
 
 
@@ -524,6 +590,7 @@ def join_drafts(
         drafts=merged,
         unverified=unverified,
         mentions=_unresolved_mentions(merged, known_ids),
+        unmitigated=_missing_mitigations(merged),
     )
 
 
