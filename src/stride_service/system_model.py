@@ -16,9 +16,12 @@ boundary iff its endpoints' zones differ.
 from __future__ import annotations
 
 import re
+from collections.abc import Collection
 from typing import ClassVar, Literal
 
 from pydantic import BaseModel, ConfigDict, Field
+
+from stride_service.references import canonical
 
 UNKNOWN = "unknown"
 
@@ -254,7 +257,9 @@ def _rewrite_id(element: Element, rewrites: dict[str, str]) -> None:
         element.id = derived
 
 
-def normalize_element_ids(model: SystemModel) -> SystemModel:
+def normalize_element_ids(
+    model: SystemModel, source_labels: Collection[str] = ()
+) -> SystemModel:
     """Return a copy whose IDs are derived from names, references rewritten.
 
     An element ID is a pure function of type and name, so a model that emits
@@ -273,6 +278,15 @@ def normalize_element_ids(model: SystemModel) -> SystemModel:
     real defect surfacing, not one introduced: two elements sharing a name are
     the class/instance duplication the gate's ``duplicate-id`` rule exists to
     catch.
+
+    ``source_labels`` extends the same idea to the one reference an element
+    carries that points *outside* the model: a ``source_label`` naming one of
+    the job's sources. It is snapped to the job's own spelling
+    (:func:`~stride_service.references.canonical`) for the reason IDs are
+    derived — which spelling of a name arrived is mechanical — and by the same
+    rule, a label naming no source is left untouched for the gate to report.
+    The caller's label is never rewritten; the *model's echo of it* is, so the
+    report cites the bytes the caller actually submitted.
     """
     normalized = model.model_copy(deep=True)
     zoned = (
@@ -299,5 +313,11 @@ def normalize_element_ids(model: SystemModel) -> SystemModel:
         assumption.element_id = rewrites.get(
             assumption.element_id, assumption.element_id
         )
+
+    if source_labels:
+        for element in normalized.elements():
+            element.source_label = (
+                canonical(element.source_label, source_labels) or element.source_label
+            )
 
     return normalized

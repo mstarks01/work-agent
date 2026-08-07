@@ -66,14 +66,17 @@ def test_the_recorded_aggregate_is_taken_over_the_refs():
         assert meta["source_sha256"] == InputRef.aggregate_digest(refs)
 
 
-def test_every_citation_names_a_source_the_case_declares():
-    # The corpus exercises the gate rule it is graded through: the service
-    # rejects a model citing a label its job never carried.
+def test_every_citation_resolves_and_its_excerpt_verifies():
+    # The corpus exercises the gate rules it is graded through: the service
+    # rejects a model citing a label its job never carried, and one whose
+    # excerpt is not in the source it names.
     for case_dir in verify_corpus.case_dirs():
         meta = verify_corpus._load_json(case_dir / "case.json")
         model = verify_corpus._load_json(case_dir / "model.json")
         problems = list(
-            verify_corpus._check_citations(model, verify_corpus.declared_labels(meta))
+            verify_corpus._check_citations(
+                model, verify_corpus.declared_sources(case_dir, meta)
+            )
         )
         assert problems == [], f"{case_dir.name}: {problems}"
 
@@ -84,6 +87,49 @@ def test_a_case_that_cites_an_undeclared_label_is_caught():
             {"id": "process:x", "source_excerpt": "q", "source_label": "Nowhere"}
         ]
     }
-    problems = list(verify_corpus._check_citations(model, {"System description"}))
+    problems = list(verify_corpus._check_citations(model, {"System description": "q"}))
     assert len(problems) == 1
     assert "does not declare" in problems[0]
+
+
+def test_an_excerpt_that_stitches_across_an_unmarked_cut_is_caught():
+    """The defect this check found in case 03, pinned so it cannot return.
+
+    The source reads "They are on the warehouse network and authenticate with
+    SSO"; excising the middle and joining subject to predicate makes a sentence
+    the source never contains. Marking the cut with ``…`` makes it verbatim
+    again, which is the fix the corpus took.
+    """
+    source = {"Doc": "They are on the warehouse network and authenticate with SSO."}
+    stitched = {
+        "processes": [
+            {
+                "id": "process:x",
+                "source_excerpt": "They authenticate with SSO",
+                "source_label": "Doc",
+            }
+        ]
+    }
+    problems = list(verify_corpus._check_citations(stitched, source))
+    assert len(problems) == 1
+    assert "not found in the source it cites" in problems[0]
+
+    marked = {
+        "processes": [
+            {
+                "id": "process:x",
+                "source_excerpt": "They…authenticate with SSO",
+                "source_label": "Doc",
+            }
+        ]
+    }
+    assert list(verify_corpus._check_citations(marked, source)) == []
+
+
+def test_a_source_declared_with_no_readable_text_skips_the_excerpt_half():
+    # The missing file is _check_sources' to report, not this function's to
+    # report a second time as an unverifiable quote.
+    model = {
+        "processes": [{"id": "process:x", "source_excerpt": "q", "source_label": "Doc"}]
+    }
+    assert list(verify_corpus._check_citations(model, {"Doc": ""})) == []
