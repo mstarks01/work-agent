@@ -19,6 +19,7 @@ from typing import get_args
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "src"))
 
+from stride_service.grounding import verify_quote
 from stride_service.report import (
     STRIDE_CATEGORIES,
     InputRef,
@@ -86,16 +87,27 @@ def source_sha256(source_path: Path) -> str:
     return hashlib.sha256(source_path.read_bytes()).hexdigest()
 
 
-def declared_labels(meta: dict) -> set[str]:
-    """The labels this case's sources declare, for the citation lint."""
+def declared_sources(case_dir: Path, meta: dict) -> dict[str, str]:
+    """This case's sources as label to text, for the citation lint.
+
+    The text and not just the label, because a citation resolving is only half
+    of what the service checks. A source whose file is missing or unreadable
+    maps to the empty string rather than being dropped: its label still has to
+    be citable, and :func:`_check_sources` is what reports the missing file.
+    """
     sources = meta.get("sources")
     if not isinstance(sources, list):
-        return set()
-    return {
-        source.get("label")
-        for source in sources
-        if isinstance(source, dict) and isinstance(source.get("label"), str)
-    }
+        return {}
+    declared: dict[str, str] = {}
+    for source in sources:
+        if not isinstance(source, dict) or not isinstance(source.get("label"), str):
+            continue
+        path = (
+            case_dir / source["file"] if isinstance(source.get("file"), str) else None
+        )
+        text = path.read_text(encoding="utf-8") if path and path.is_file() else ""
+        declared[source["label"]] = text
+    return declared
 
 
 def _check_sources(case_dir: Path, meta: dict) -> Iterator[str]:
@@ -151,13 +163,24 @@ def _check_sources(case_dir: Path, meta: dict) -> Iterator[str]:
             )
 
 
-def _check_citations(model: object, labels: set[str]) -> Iterator[str]:
-    """Every ``source_label`` in the model names a source the case declares.
+def _check_citations(model: object, sources: dict[str, str]) -> Iterator[str]:
+    """Every citation in the model resolves to a case source, and is really in it.
 
-    This is what ties the corpus to the gate rule it exists to exercise: the
-    service rejects a model citing a label its job never carried, so a corpus
-    whose labels drifted from its own case.json would be grading a shape the
+    This is what ties the corpus to the gate rules it exists to exercise: the
+    service rejects a model citing a label its job never carried *and* one
+    whose excerpt cannot be found in the source it names, so a corpus that
+    drifted from its own case.json on either count would be grading a shape the
     service would refuse.
+
+    Re-asserted here rather than delegated to :func:`parse_and_validate`, for
+    the reason ``evals/harness/structural.py`` gives about its own gates: a
+    check that would silently weaken if someone relaxed the shipped validator
+    is not a check. The corpus is the thing those validators are measured
+    against, so it verifies itself.
+
+    A source declared with no readable text skips the excerpt half alone — the
+    label must still resolve, and the missing file is :func:`_check_sources`'
+    to report rather than this function's to report twice.
     """
     if not isinstance(model, dict):
         return
@@ -176,10 +199,15 @@ def _check_citations(model: object, labels: set[str]) -> Iterator[str]:
                     f"model.json: {element.get('id')} has a source_excerpt with"
                     " no source_label"
                 )
-            elif label not in labels:
+            elif label not in sources:
                 yield (
                     f"model.json: {element.get('id')} cites source_label"
                     f" {label!r}, which this case does not declare"
+                )
+            elif sources[label] and not verify_quote(excerpt, sources[label]):
+                yield (
+                    f"model.json: {element.get('id')} quotes {excerpt!r}, which is"
+                    f" not found in the source it cites, {label!r}"
                 )
 
 
@@ -264,7 +292,7 @@ def check_case(case_dir: Path) -> list[str]:
     problems.extend(_check_case_metadata(case_dir, meta))
 
     raw_model = _load_json(case_dir / "model.json")
-    problems.extend(_check_citations(raw_model, declared_labels(meta)))
+    problems.extend(_check_citations(raw_model, declared_sources(case_dir, meta)))
 
     model, issues = parse_and_validate(raw_model)
     problems.extend(f"model.json: {issue.code}: {issue.message}" for issue in issues)

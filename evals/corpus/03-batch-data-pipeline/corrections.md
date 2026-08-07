@@ -11,6 +11,7 @@ Applying these in reverse to `model.json` reconstructs the bootstrap artifact.
 | 4 | `flow:ingest-scheduler-to-landing-bucket:list-and-read-files.description` | "scheduler reads landed files" | includes the unchecked-depositor fact | The single most load-bearing sentence in the source — "It does not check that a file came from the partner whose folder it landed in" — survived only as a `source_excerpt`, not in any attribute an analyst reads. |
 | 5 | `flow:data-analyst-to-claims-warehouse:run-queries.authentication` | `company SSO` | `company SSO; dataset-wide grant with no column-level restriction` | Authentication was recorded, authorization scope dropped. The stated weakness is the grant, not the sign-in. |
 | 6 | `store:claims-warehouse.assets` | `["pii"]` | `["pii", "health", "business-critical-data"]` | Insurance claim records are health data; the bootstrap used the generic tag and stopped. |
+| 7 | `flow:data-analyst-to-claims-warehouse:run-queries.source_excerpt` | `they authenticate with SSO, …` | `they…authenticate with SSO, …` | The source reads "They are on the warehouse network and authenticate with SSO". The excerpt cut the middle and stitched the subject onto the predicate unmarked, producing a sentence the source does not contain. The `…` marks the cut, which is what makes the span verbatim again. Found by the excerpt check added to `verify_corpus.py`, not by eye. |
 
 ## Signal
 

@@ -7,6 +7,8 @@ from stride_service.critic import (
     DraftJoinError,
     assemble_threats,
     join_drafts,
+    snap_drafts,
+    snap_rulings,
 )
 from stride_service.report import Ground, Severity, UnknownRef, Verdict
 from stride_service.sources import DEFAULT_DESCRIPTION_LABEL
@@ -68,6 +70,12 @@ class TestJoinDrafts:
         assert "process:ghost" in str(excinfo.value)
         assert "store:ghost" in str(excinfo.value)
 
+    def test_a_respelled_element_reference_resolves_and_is_canonicalized(self, model):
+        """The fold runs before the check, and the report carries the job's ID."""
+        drafts = {"spoofing": [sample_draft(affected_element_ids=["Process:Web-App"])]}
+        [joined] = join_drafts(drafts, model).drafts
+        assert joined.affected_element_ids == ["process:web-app"]
+
     def test_duplicate_threat_ids_fail_closed(self, model):
         drafts = {"spoofing": [sample_draft("S-01"), sample_draft("S-01")]}
         with pytest.raises(DraftJoinError, match="used by 2 drafts"):
@@ -121,12 +129,52 @@ class TestGroundReferences:
         with pytest.raises(DraftJoinError, match="does not have"):
             join_drafts(drafts, model, SOURCES)
 
+    def test_a_pointer_spelled_attribute_resolves(self, model):
+        """A field name arriving as ``/exposure`` is the field ``exposure``.
+
+        The spelling is the provider's, not the prompt's, and it used to kill
+        the job here — six lanes of drafts thrown away over a leading slash on
+        a name whose element really does carry the field.
+        """
+        drafts = self.grounded(
+            Ground(
+                kind="unknown-attribute",
+                element_id="process:web-app",
+                attribute="/exposure",
+            )
+        )
+        assert join_drafts(drafts, model, SOURCES).drafts
+
+    def test_a_pointer_spelled_attribute_the_element_lacks_still_fails(self, model):
+        drafts = self.grounded(
+            Ground(
+                kind="unknown-attribute",
+                element_id="entity:customer",
+                attribute="/encryption_at_rest",
+            )
+        )
+        with pytest.raises(DraftJoinError, match="does not have"):
+            join_drafts(drafts, model, SOURCES)
+
     def test_a_derived_fact_naming_a_flow_that_does_not_cross(self, model):
         drafts = self.grounded(
             Ground(kind="derived-fact", flow_id="flow:not-a:crossing")
         )
         with pytest.raises(DraftJoinError, match="not a derived boundary crossing"):
             join_drafts(drafts, model, SOURCES)
+
+    def test_a_respelled_source_label_resolves_to_the_jobs_label(self, model):
+        """A quote whose label differs only in case cites the caller's bytes."""
+        drafts = self.grounded(
+            Ground(
+                kind="quote",
+                text="log in to the web app",
+                source_label=LABEL.upper(),
+            )
+        )
+        joined = join_drafts(drafts, model, SOURCES)
+        assert joined.drafts[0].grounds[0].source_label == LABEL
+        assert joined.unverified == []
 
     def test_the_label_half_does_not_run_without_sources(self, model):
         """The gate's own escape: no set to check against is not a wrong citation."""
@@ -331,3 +379,91 @@ class TestRulingsMergeOntoDrafts:
         ]
         _, rejected = assemble_threats(drafts, rulings, model)
         assert [t.id for t in rejected] == ["S-01", "S-02"]
+
+
+ELEMENT_IDS = frozenset(
+    {"entity:customer", "process:web-app", "store:orders-db", "flow:a-to-b:x"}
+)
+
+
+class TestSnapDrafts:
+    def test_affected_elements_arrive_in_the_jobs_spelling(self):
+        draft = sample_draft(affected_element_ids=["Process:Web-App"])
+        [snapped] = snap_drafts([draft], ELEMENT_IDS)
+        assert snapped.affected_element_ids == ["process:web-app"]
+
+    def test_an_unresolvable_reference_is_left_as_written(self):
+        """The check that reports it can only name what the agent typed."""
+        draft = sample_draft(affected_element_ids=["process:ghost"])
+        [snapped] = snap_drafts([draft], ELEMENT_IDS)
+        assert snapped.affected_element_ids == ["process:ghost"]
+
+    @pytest.mark.parametrize(
+        "ground, field, expected",
+        [
+            (
+                Ground(
+                    kind="unknown-attribute",
+                    element_id="Process:Web-App",
+                    attribute="exposure",
+                ),
+                "element_id",
+                "process:web-app",
+            ),
+            (
+                Ground(kind="derived-fact", flow_id="Flow:A-to-B:X"),
+                "flow_id",
+                "flow:a-to-b:x",
+            ),
+        ],
+    )
+    def test_each_ground_branch_snaps_its_own_reference(self, ground, field, expected):
+        draft = sample_draft(grounds=[ground])
+        [snapped] = snap_drafts([draft], ELEMENT_IDS)
+        assert getattr(snapped.grounds[0], field) == expected
+
+    def test_a_quote_label_snaps_to_the_jobs_label(self):
+        draft = sample_draft(
+            grounds=[
+                Ground(
+                    kind="quote", text="anything", source_label="system  DESCRIPTION"
+                )
+            ]
+        )
+        [snapped] = snap_drafts([draft], ELEMENT_IDS, {"System description"})
+        assert snapped.grounds[0].source_label == "System description"
+
+    def test_without_labels_a_quote_is_untouched(self):
+        """The in-process engine carries no sources, so there is nothing to snap."""
+        draft = sample_draft(
+            grounds=[Ground(kind="quote", text="anything", source_label="Whatever")]
+        )
+        [snapped] = snap_drafts([draft], ELEMENT_IDS)
+        assert snapped.grounds[0].source_label == "Whatever"
+
+    def test_nothing_but_references_changes(self):
+        draft = sample_draft(affected_element_ids=["Process:Web-App"])
+        [snapped] = snap_drafts([draft], ELEMENT_IDS)
+        assert snapped.model_dump(exclude={"affected_element_ids"}) == draft.model_dump(
+            exclude={"affected_element_ids"}
+        )
+
+
+class TestSnapRulings:
+    def test_a_needs_info_element_snaps(self):
+        ruling = sample_ruling(
+            verdict=Verdict(
+                status="needs-info",
+                reason="exposure unknown",
+                related_unknowns=[
+                    UnknownRef(element_id="Process:Web-App", attribute="exposure")
+                ],
+            )
+        )
+        [snapped] = snap_rulings([ruling], ELEMENT_IDS)
+        assert snapped.verdict.related_unknowns[0].element_id == "process:web-app"
+
+    def test_a_ruling_carrying_no_unknowns_is_unchanged(self):
+        ruling = sample_ruling()
+        [snapped] = snap_rulings([ruling], ELEMENT_IDS)
+        assert snapped == ruling

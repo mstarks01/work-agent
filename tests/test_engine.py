@@ -28,6 +28,7 @@ from stride_service.jobs import (
 )
 from stride_service.pipeline import AdkPipelineRunner
 from stride_service.sources import Source, SourceLimits
+from tests.factories import DESCRIPTION_TEXT
 from tests.test_pipeline import build, happy_replies
 
 
@@ -65,7 +66,7 @@ def analyze(engine: StrideEngine, text: str, **kwargs) -> PipelineOutcome:
 def test_a_completed_run_returns_the_report():
     engine = engine_for(StubPipelineRunner())
 
-    outcome = analyze(engine, "Customers log in to the web app.")
+    outcome = analyze(engine, DESCRIPTION_TEXT)
 
     assert isinstance(outcome, PipelineCompleted)
     assert outcome.report.job.id.startswith("job-")
@@ -265,7 +266,7 @@ def test_engine_drives_the_real_graph_to_a_report():
     pipeline, _ = build(happy_replies())
     engine = StrideEngine(AdkPipelineRunner(pipeline), limits=TEST_LIMITS)
 
-    outcome = analyze(engine, "Customers log in to the web app.")
+    outcome = analyze(engine, DESCRIPTION_TEXT)
 
     assert isinstance(outcome, PipelineCompleted)
     assert any(threat.id == "S-01" for threat in outcome.report.threats)

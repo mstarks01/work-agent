@@ -32,6 +32,7 @@ from types import MappingProxyType
 from typing import NamedTuple
 
 from stride_service.grounding import verify_quote
+from stride_service.references import snap
 from stride_service.report import (
     STRIDE_CATEGORIES,
     DraftThreat,
@@ -74,6 +75,88 @@ class JoinedDrafts(NamedTuple):
 
     drafts: list[DraftThreat]
     unverified: list[UnverifiedGround]
+
+
+def _snapped_ground(
+    ground: Ground, element_ids: Collection[str], labels: Collection[str]
+) -> Ground:
+    """One grounds entry with its branch's reference in canonical spelling."""
+    if ground.kind == "quote":
+        # Only when the job carries labels at all: the in-process engine drives a
+        # hand-authored model with none, and an empty known set snaps nothing.
+        if not labels:
+            return ground
+        return ground.model_copy(
+            update={"source_label": snap(ground.source_label, labels)}
+        )
+    if ground.kind == "unknown-attribute":
+        return ground.model_copy(
+            update={"element_id": snap(ground.element_id, element_ids)}
+        )
+    return ground.model_copy(update={"flow_id": snap(ground.flow_id, element_ids)})
+
+
+def snap_drafts(
+    drafts: Iterable[DraftThreat],
+    element_ids: Collection[str],
+    source_labels: Collection[str] = (),
+) -> list[DraftThreat]:
+    """Every reference a draft carries, in the spelling the job holds.
+
+    Run at the fan-in before the checks, so what those checks compare — and what
+    the report goes on to carry — is the canonical spelling rather than whatever
+    each of six independently-vendored agents happened to type. The drafts reach
+    the report unaltered otherwise: this rewrites references and nothing else.
+
+    ``element_ids`` covers flow references too, because a flow *is* an element
+    and its ID is in the same set. Whether that flow is a derived boundary
+    crossing is a different question, asked afterwards by the check that owns it.
+    """
+    return [
+        draft.model_copy(
+            update={
+                "affected_element_ids": [
+                    snap(ref, element_ids) for ref in draft.affected_element_ids
+                ],
+                "grounds": [
+                    _snapped_ground(ground, element_ids, source_labels)
+                    for ground in draft.grounds
+                ],
+            }
+        )
+        for draft in drafts
+    ]
+
+
+def snap_rulings(
+    rulings: Iterable[ThreatRuling], element_ids: Collection[str]
+) -> list[ThreatRuling]:
+    """The same fold over the one reference a ruling carries.
+
+    A ruling names no element of its own — that was given up deliberately when
+    the critic stopped re-emitting drafts — except inside a ``needs-info``
+    verdict's ``related_unknowns``, which points at the unknown that has to be
+    answered. Unresolvable there is not fatal on the first look: it routes to
+    the bounded ``recritic``. Snapping it means a re-ask is spent on a critic
+    that pointed somewhere real rather than on one that mis-typed a slug.
+    """
+    return [
+        ruling.model_copy(
+            update={
+                "verdict": ruling.verdict.model_copy(
+                    update={
+                        "related_unknowns": [
+                            ref.model_copy(
+                                update={"element_id": snap(ref.element_id, element_ids)}
+                            )
+                            for ref in ruling.verdict.related_unknowns
+                        ]
+                    }
+                )
+            }
+        )
+        for ruling in rulings
+    ]
 
 
 def _unresolved_reference_issues(
@@ -157,7 +240,11 @@ def _unresolved_unknown_ref_issues(
     """
     by_id = {element.id: element for element in system_model.elements()}
     issues = []
-    for ruling in rulings:
+    # Snapped for the check as well as for the report, so the router and
+    # assembly agree about which references resolve. Assembly snaps the rulings
+    # it actually carries; here a local copy is enough, because nothing in this
+    # function's return survives it.
+    for ruling in snap_rulings(rulings, by_id.keys()):
         for ref in ruling.verdict.related_unknowns:
             element = by_id.get(ref.element_id)
             if element is None:
@@ -323,6 +410,13 @@ def join_drafts(
     unique across it, and every grounds entry resolving and, for a quote,
     actually appearing in the source it names.
 
+    References are snapped to their canonical spelling first
+    (:func:`~stride_service.references.snap_drafts`), so the checks below —
+    and the report, which carries these drafts' own fields through unaltered —
+    see the spelling the job holds rather than each agent's. That is
+    recognition and never resolution: a reference naming nothing is left
+    exactly as written, for the check to report in the agent's own words.
+
     The fan-in is where this belongs because it is the first point at which all
     six lanes' drafts, the System Model and the job's sources exist together.
 
@@ -333,11 +427,15 @@ def join_drafts(
     citation that is not wrong. Empty means the text check does not run — no
     quote is marked and no threat fails on one.
     """
-    merged = [
-        draft
-        for category in STRIDE_CATEGORIES
-        for draft in drafts_by_category.get(category, ())
-    ]
+    merged = snap_drafts(
+        [
+            draft
+            for category in STRIDE_CATEGORIES
+            for draft in drafts_by_category.get(category, ())
+        ],
+        {element.id for element in system_model.elements()},
+        sources.keys(),
+    )
     misfiled = [
         f"draft {draft.id!r} is filed under {category!r} but its category is"
         f" {draft.category!r}"
@@ -442,6 +540,7 @@ def assemble_threats(
     if problems:
         raise CriticOutputError("; ".join(problems.messages))
 
+    rulings = snap_rulings(rulings, {element.id for element in system_model.elements()})
     ruling_by_id = {ruling.id: ruling for ruling in rulings}
     reviewed = [_ruled(draft, ruling_by_id[draft.id]) for draft in drafts]
     actionable = [t for t in reviewed if t.verdict.status != "rejected"]
