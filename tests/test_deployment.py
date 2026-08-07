@@ -116,7 +116,9 @@ def test_default_dir_falls_back_to_the_repo_copy_when_unbundled(tmp_path, monkey
     assert module._default_dir("skills") == module._REPO_ROOT / "skills"
 
 
-def test_default_config_path_prefers_the_bundled_copy_when_present(tmp_path, monkeypatch):
+def test_default_config_path_prefers_the_bundled_copy_when_present(
+    tmp_path, monkeypatch
+):
     from stride_service import deployment as module
 
     bundled_config = tmp_path / "config"
