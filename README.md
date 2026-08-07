@@ -8,10 +8,10 @@ privileged default.
 
 ```mermaid
 flowchart LR
-    src[/"sources<br/>(text)"/] --> extract["extract<br/>(base)"]
+    src(["sources<br/>(text)"]) --> extract["extract<br/>(base)"]
     extract --> analyze["6 category agents<br/>in parallel<br/>(strong)"]
     analyze --> critic["critic<br/>(strong)"]
-    critic --> report[/"StrideReport<br/>(JSON)"/]
+    critic --> report(["StrideReport<br/>(JSON)"])
 
     classDef io fill:#f1f5f9,stroke:#64748b,stroke-width:1.5px,color:#0f172a
     classDef llm fill:#ede9fe,stroke:#7c3aed,stroke-width:1.5px,color:#2e1065
