@@ -128,15 +128,11 @@ jobs:
             base_model: gpt-4o
             strong_model: gpt-5.6
 
-    # Skips the leg the dispatcher did not ask for. `both` is the input's
-    # default, so dispatching without choosing runs everything. The
-    # event_name guard is kept rather than simplified away: it is what keeps
-    # this correct if a non-dispatch trigger is ever added back, where
-    # `inputs.vendor` is null and every leg should run.
-    if: >-
-      github.event_name != 'workflow_dispatch'
-      || inputs.vendor == 'both'
-      || inputs.vendor == matrix.vendor
+    # There is no job-level `if:` here comparing against `matrix.vendor`,
+    # deliberately -- the `matrix` context is not available to a job's own
+    # `if:`, only to its steps: the condition is evaluated before the matrix
+    # is expanded into per-leg job instances, so a leg-skip has to live on
+    # the steps instead. See the two step-level `if:` guards below.
 
     env:
       # The vendor registry reads its own STRIDE_-prefixed variables and nothing
@@ -170,7 +166,17 @@ jobs:
       # has did ask, so there is no event here for which silence is right.
       #
       # Only the secret's NAME is ever printed.
+      #
+      # Skips the leg the dispatcher did not ask for. `both` is the input's
+      # default, so dispatching without choosing runs everything. The
+      # event_name guard is kept rather than simplified away: it is what keeps
+      # this correct if a non-dispatch trigger is ever added back, where
+      # `inputs.vendor` is null and every leg should run.
       - name: Check the vendor key is configured
+        if: >-
+          github.event_name != 'workflow_dispatch'
+          || inputs.vendor == 'both'
+          || inputs.vendor == matrix.vendor
         shell: bash
         env:
           VENDOR_API_KEY: ${{ secrets[matrix.secret_name] }}
@@ -228,6 +234,10 @@ jobs:
       # disjoint; it is not built here because federation is unprovisioned, so
       # it could not be tested.
       - name: Run golden-case evals (structural gates only)
+        if: >-
+          github.event_name != 'workflow_dispatch'
+          || inputs.vendor == 'both'
+          || inputs.vendor == matrix.vendor
         env:
           EVAL_MODE: ${{ inputs.mode || 'end-to-end' }}
           STRIDE_ANTHROPIC_API_KEY: ${{ secrets.STRIDE_ANTHROPIC_API_KEY }}
@@ -241,8 +251,14 @@ jobs:
       # always(), so a failed sweep still surfaces whatever it produced. Unlike
       # the Vertex job there is no preflight-skip case to exclude: this workflow
       # fails rather than skips on a missing key, so a run that got here ran.
+      # ANDed with the same leg check as the steps above it, so a leg the
+      # dispatcher did not ask for doesn't upload a nonexistent artifact.
       - name: Upload run artifact
-        if: always()
+        if: >-
+          always() &&
+          (github.event_name != 'workflow_dispatch'
+          || inputs.vendor == 'both'
+          || inputs.vendor == matrix.vendor)
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         with:
           name: eval-artifact-${{ matrix.vendor }}
