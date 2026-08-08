@@ -12,6 +12,7 @@ import pytest
 from pydantic import BaseModel, ValidationError
 
 from evals.harness.grounds import (
+    GroundMisShape,
     aggregate_grounds,
     classify_failure,
     measure_grounds,
@@ -140,12 +141,14 @@ class TestClassifyFailure:
         assert failure.threat_ids == ("S-01",)
         assert failure.fail_closed_rate == 0.25
 
-    def test_a_mis_shaped_ground_is_told_apart_by_its_error_location(self):
-        """``Ground._check_shape`` raising sits at ``("grounds", i)`` — the
-        signature the harness matches on, rather than the message prose.
+    def test_a_mis_shaped_ground_ends_the_sweep_rather_than_scoring_it(self):
+        """The one fault here that is not an agent behaviour, so not a rate.
 
-        Validated from a raw dict, which is the shape ``merge_drafts`` really
-        hands :meth:`DraftThreat.model_validate` when an agent emits one.
+        Every ``Ground`` is built by ``resolve_proposals`` out of a catalog
+        entry, so a mis-shaped one is this service assembling its own record
+        wrongly. Counting it would pool measurements taken from a build already
+        known to be broken — the same rule the sweep applies to a provider
+        timeout.
         """
         with pytest.raises(ValidationError) as excinfo:
             DraftThreat.model_validate(
@@ -161,14 +164,15 @@ class TestClassifyFailure:
                 )
             )
 
-        assert classify_failure("case-a", excinfo.value).kind == "mis-shape"
+        with pytest.raises(GroundMisShape, match="defect in this build"):
+            classify_failure("case-a", excinfo.value)
 
-    def test_a_mis_shape_is_recognised_at_any_depth_a_draft_is_revalidated_at(self):
+    def test_it_is_recognised_at_any_depth_a_draft_is_revalidated_at(self):
         """Matched on the ``loc`` tail, so the depth does not have to be known.
 
         A draft is revalidated wherever it is read back out of session state,
         which nests the same fault under a different path. Matching a fixed
-        path would report this tripwire as zero from every site but one."""
+        path would leave the tripwire silent at every site but one."""
         with pytest.raises(ValidationError) as excinfo:
             ThreatsHolder.model_validate(
                 {
@@ -183,7 +187,8 @@ class TestClassifyFailure:
             )
 
         assert excinfo.value.errors()[0]["loc"] == ("threats", 0, "grounds", 0)
-        assert classify_failure("case-a", excinfo.value).kind == "mis-shape"
+        with pytest.raises(GroundMisShape):
+            classify_failure("case-a", excinfo.value)
 
     def test_an_invented_evidence_reference_is_its_own_kind(self):
         """The one way an agent's evidence selection can fail.
@@ -201,18 +206,19 @@ class TestClassifyFailure:
         assert failure.kind == "unresolved-evidence"
         assert "crossing:flow:not-real" in failure.detail
 
-    def test_a_ground_missing_its_branch_fields_is_also_a_mis_shape(self):
+    def test_a_ground_missing_its_branch_fields_trips_it_too(self):
         """The other half of ``_check_shape``: a branch that carries none of
         what it requires."""
         with pytest.raises(ValidationError) as excinfo:
             DraftThreat.model_validate(draft_payload(grounds=[{"kind": "quote"}]))
 
-        assert classify_failure("case-a", excinfo.value).kind == "mis-shape"
+        with pytest.raises(GroundMisShape):
+            classify_failure("case-a", excinfo.value)
 
-    def test_an_empty_grounds_list_is_not_a_mis_shape(self):
-        """A different defect, and one the flat-``Ground`` decision did not
-        cause: the agent wrote no grounds at all rather than a nonsense
-        combination. Its error sits on ``grounds`` itself, not on an entry."""
+    def test_an_empty_grounds_list_does_not_trip_it(self):
+        """A different defect, and one an agent *can* reach — a proposal that
+        named no evidence. Its error sits on ``grounds`` itself rather than on
+        an entry, so it scores as a case failure instead of a build defect."""
         with pytest.raises(ValidationError) as excinfo:
             DraftThreat.model_validate(draft_payload(grounds=[]))
 
@@ -266,6 +272,5 @@ class TestAggregate:
         assert totals["failed_cases"] == 2
         assert totals["fail_closed_cases"] == 1
         assert totals["other_failed_cases"] == 1
-        assert totals["mis_shape_cases"] == 0
         assert totals["fail_closed_threats"] == 2
         assert totals["threats"] == 0
