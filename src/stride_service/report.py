@@ -479,6 +479,24 @@ class ThreatProposal(BaseModel):
     # what this removes: ``"1"`` against a ``^\d{2}$`` pattern is a spelling
     # error that fails the node, and a sequence has no spelling.
     sequence: int = Field(ge=1, le=99)
+    # THE LENGTH AND CARDINALITY CAPS BELOW ARE FATAL, AND THAT IS ACCEPTED
+    # RATHER THAN OVERLOOKED. Unlike the rules this class exists to remove, they
+    # *are* expressible in a JSON schema — but providers enforce ``maxLength``
+    # and ``minItems`` no more reliably than ``pattern``, so an agent can still
+    # exceed one, and the raise lands at the node boundary where it costs the
+    # lane and its five siblings.
+    #
+    # Neither remedy that worked elsewhere applies. There is no "select rather
+    # than construct" form of an over-long description, so it cannot be made
+    # unrepresentable; and the analyst path has no re-ask to relocate the check
+    # to — ``repair`` is extraction-only and ``recritic`` critic-only — so it
+    # cannot be made recoverable either. What is left is to truncate, which
+    # infers what the agent meant and is refused on principle, or to size the
+    # caps so the ceiling is not one a model reaches.
+    #
+    # Sized against measured output: the 18 exemplar descriptions run 524-811
+    # characters, median 702, against 4000. Roughly 5x headroom, and the risk
+    # is a filed decision rather than an accident of where a constraint sits.
     title: str = Field(min_length=1, max_length=200)
     description: str = Field(min_length=1, max_length=4000)
     affected_element_ids: list[str] = Field(min_length=1)
