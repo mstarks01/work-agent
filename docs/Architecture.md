@@ -57,18 +57,24 @@ run's three outcomes.
 - **validate** is a mechanical gate. Failures route to **repair** (one bounded
   pass over the original text) and revalidate; a model that still fails, or is
   over the [150-element cap](Configuration.md), ends as a **rejection**.
-- **prepare** derives the per-analysis context: the boundary crossings, and the
-  system model as the agents will see it — with `source_excerpt`, `source_label`
-  and `source_speaker` stripped, so the only submitter words downstream of here
-  are the ones a finding chose to quote.
+- **prepare** derives the per-analysis context, all of it a pure function of the
+  validated model: the boundary crossings; the **deterministic candidates** for
+  each lane; the **domain packs** this system earns; and the system model as the
+  agents will see it — with `source_excerpt`, `source_label` and
+  `source_speaker` stripped, so the only submitter words downstream of here are
+  the ones a finding chose to quote.
 - **six category agents** (`analyze_<category>`) run in parallel, one per STRIDE
   category, each drafting threats in its lane. Each threat cites at least one
   **ground**: a quote from the submitted text, an `unknown` attribute, or a
-  boundary crossing.
+  boundary crossing. A **candidate is never one of those** — it is a structural
+  lead code found, which an agent may investigate and reject, and which nothing
+  downstream of the prompt reads.
 - **merge** joins the drafts and runs the mechanical half of the fan-in: every
   reference resolves, no two lanes reused a threat ID, and every quote ground is
   matched against the bytes of the source it names. An unverifiable quote is
-  marked and still renders; a threat where *nothing* verifies fails the job.
+  marked and still renders; a threat where *nothing* verifies fails the job. It
+  also computes the per-lane [`coverage`](Report-Schema.md#coverage--what-each-lane-was-offered)
+  account over the drafts.
   Then the **critic** rules on all of them in one pass — verdicts, dedupe,
   severity calibration — spending judgement only on what code cannot check.
 - **route_review** runs the mechanical checks the assembler depends on. If the
@@ -264,6 +270,10 @@ and the selection seam are in place for all of them.
 | `stride_service.execution` | Drives a built graph and stamps each node execution. Shared by the service and the eval harness. |
 | `stride_service.graph` | Topology and node functions. |
 | `stride_service.system_model` | Canonical model + validity helpers. |
+| `stride_service.analysis` | Deterministic traversal of a validated model: flows, reachability, paths, unknown controls. No security claims. |
+| `stride_service.candidates` | The rule table. Structural conditions an agent should investigate — leads, never findings, never evidence. |
+| `stride_service.domains` | Which `skills/domains/` packs a model earns, decided from its own technology fields. |
+| `stride_service.coverage` | Per-lane accounting: what each agent was offered, and what its drafts cite. |
 | `stride_service.report` | `StrideReport` and the severity model. |
 | `stride_service.validation` | The mechanical validity gate. |
 | `stride_service.critic` | The mechanical checks around the critic step — the ones no model should be asked to perform. |

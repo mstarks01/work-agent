@@ -4,9 +4,10 @@ Prompt content lives in ``prompts/`` as Markdown and loads through the same
 :class:`~stride_service.markdown_loader.MarkdownLoader` the skills use — a
 skill is *what to know*, a prompt is *what to do with this job's input*.
 Composition here is concatenation only: the ``{category}``, ``{system_model}``,
-``{boundary_crossings}``, ``{evidence_catalog}``, ``{draft_threats}``,
-``{input_text}``, ``{previous_model}`` and ``{validation_issues}``
-placeholders stay untouched for ADK state templating to fill at run time.
+``{boundary_crossings}``, ``{evidence_catalog}``, ``{candidates}``,
+``{domain_skills}``, ``{draft_threats}``, ``{input_text}``,
+``{previous_model}`` and ``{validation_issues}`` placeholders stay untouched
+for ADK state templating to fill at run time.
 
 Order is stable-first, mirroring
 :func:`~stride_service.skills.compose_analyze_skills`: the one shared
@@ -57,19 +58,27 @@ EXEMPLARS_PREFIX = "exemplars/"
 # prompt. Two files doing different amounts of work do not belong on one
 # number, so the equality is dropped rather than nudged.
 #
-# 2550 rather than the ~2720 that allowance would justify (extract's 2200 plus
-# the exemplar block). A cap is a budget, not an entitlement: sized at the full
-# allowance it would sit above the file and catch no drift at all. This leaves
-# ~80 tokens — room for a normal edit without a CI fight, and little enough
-# that a second exemplar system still has to be argued for.
+# A cap is a budget, not an entitlement: sized at the full allowance it would
+# sit above the file and catch no drift at all, so it is sized to leave ~90
+# tokens — room for a normal edit without a CI fight, and little enough that a
+# second exemplar system still has to be argued for.
 #
-# The exemplar block is the whole of the difference, and it grew by the one
-# thing an agent cannot be shown any other way: the exemplar system's evidence
-# catalog. An agent selects references out of that catalog rather than
-# constructing grounds, so an exemplar whose worked system had no catalog would
-# demonstrate IDs arriving from nowhere — the exact habit the closed set
-# exists to break.
-ANALYZE_PROMPT_TOKEN_CAP = 2550
+# THREE DERIVED BLOCKS NOW SHARE THIS BUDGET, and they arrived separately, so
+# the number is stated once here rather than nudged by each:
+#
+# * the **evidence catalog**, which an agent selects references out of rather
+#   than constructing grounds — an exemplar system without one would
+#   demonstrate IDs arriving from nowhere, the exact habit a closed set exists
+#   to break;
+# * **candidates**, the leads each lane's rules fire on, plus the paragraph
+#   fixing their standing and the Procedure step that works them;
+# * **domain packs**, whose block is a name and a sentence here because the
+#   pack text itself rides in the skills, not in this file.
+#
+# ~180 tokens for the candidate half and ~130 for the catalog, on a body that
+# was 2239 before either. A fourth derived block should be argued for against
+# what an agent can actually hold in mind, not against this number.
+ANALYZE_PROMPT_TOKEN_CAP = 2950
 EXEMPLAR_TOKEN_CAP = 1500
 CRITIC_PROMPT_TOKEN_CAP = 1500
 # The re-ask has to be able to name and fix every fault `review_issues` can
