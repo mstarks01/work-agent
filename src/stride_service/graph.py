@@ -97,6 +97,7 @@ from stride_service.critic import (
     numbering_gaps,
     review_issues,
 )
+from stride_service.evidence import evidence_catalog, resolve_proposals
 from stride_service.markdown_loader import MarkdownLoader
 from stride_service.prompts import (
     compose_analyze_prompt,
@@ -108,11 +109,12 @@ from stride_service.prompts import (
 from stride_service.report import (
     STRIDE_CATEGORIES,
     DraftThreat,
-    DraftThreats,
     MissingMitigation,
     StrideCategory,
     Summary,
     Threat,
+    ThreatProposal,
+    ThreatProposals,
     ThreatRuling,
     ThreatRulings,
     UnresolvedMention,
@@ -237,6 +239,7 @@ STATE_INPUT_TEXT = "input_text"
 STATE_SOURCE_TEXTS = "source_texts"
 STATE_SYSTEM_MODEL = "system_model"
 STATE_BOUNDARY_CROSSINGS = "boundary_crossings"
+STATE_EVIDENCE_CATALOG = "evidence_catalog"
 STATE_DRAFT_THREATS = "draft_threats"
 STATE_PREVIOUS_MODEL = "previous_model"
 STATE_VALIDATION_ISSUES = "validation_issues"
@@ -556,10 +559,18 @@ def _ruling_view(drafts: Sequence[DraftThreat]) -> list[dict]:
 
 
 def prepare_analysis(valid_model: dict, ctx) -> dict[str, Any]:
-    """Derive boundary crossings and render the category agents' shared view.
+    """Derive the category agents' shared view: crossings, evidence, and the model.
 
     Crossings are computed here rather than extracted, so no agent can be handed
-    a crossing that contradicts the zones in the model it is reading.
+    a crossing that contradicts the zones in the model it is reading. The
+    evidence catalog is derived from that same model in the same breath and for
+    the same reason — it is the closed set of facts an agent may cite, and a
+    ref it resolves against later has to be one it was actually shown.
+
+    Agents are shown the catalog's **references only**. Each one spells out the
+    fact it stands for, and the fields behind it are the element and flow IDs
+    of the model rendered directly above; sending the resolved objects too
+    would spend tokens restating what the agent is about to read anyway.
 
     The rendered view is the *stripped* model — see
     :func:`_without_source_fields`. The critic templates against this same key,
@@ -568,11 +579,17 @@ def prepare_analysis(valid_model: dict, ctx) -> dict[str, Any]:
     """
     model = SystemModel.model_validate(valid_model)
     crossings = model.boundary_crossings()
+    catalog = evidence_catalog(model)
     ctx.state[STATE_SYSTEM_MODEL] = render_fenced(_without_source_fields(valid_model))
     ctx.state[STATE_BOUNDARY_CROSSINGS] = render(
         [crossing.model_dump(mode="json") for crossing in crossings]
     )
-    return {"element_count": len(model.elements()), "crossing_count": len(crossings)}
+    ctx.state[STATE_EVIDENCE_CATALOG] = render(list(catalog))
+    return {
+        "element_count": len(model.elements()),
+        "crossing_count": len(crossings),
+        "evidence_count": len(catalog),
+    }
 
 
 def _threats_of(payload: object) -> list[Any]:
@@ -602,10 +619,19 @@ def _threats_of(payload: object) -> list[Any]:
 def merge_drafts(
     valid_model: dict, ctx, source_texts: dict | None = None
 ) -> dict[str, Any]:
-    """Merge the six category agents' drafts into the single list the critic sees.
+    """Merge the six category agents' proposals into the single list the critic sees.
 
-    The mechanical half of the fan-in: :func:`join_drafts` fails closed if a
-    draft cites an element the model does not contain, if two agents reused a
+    Resolution first: an agent emits a
+    :class:`~stride_service.report.ThreatProposal`, which *names* its evidence,
+    and :func:`~stride_service.evidence.resolve_proposals` turns each reference
+    back into the ground the catalog holds for it. The catalog is re-derived
+    here from the same validated model :func:`prepare_analysis` derived it
+    from, rather than parked in state and read back — it is a pure function of
+    that model, so deriving it twice is what guarantees the set an agent chose
+    from and the set its choice is resolved against are the same set.
+
+    Then the mechanical half of the fan-in: :func:`join_drafts` fails closed if
+    a draft cites an element the model does not contain, if two agents reused a
     threat ID, if a grounds reference does not resolve, or if no ground on a
     threat verifies at all — so the critic spends judgement on evidence, lanes
     and whether a verbatim quote actually supports what it was filed under.
@@ -647,11 +673,15 @@ def merge_drafts(
             f" analyzed. {_TRUNCATION_HINT}"
         )
     model = SystemModel.model_validate(valid_model)
+    catalog = evidence_catalog(model)
     drafts_by_category = {
-        category: [
-            DraftThreat.model_validate(draft)
-            for draft in _threats_of(ctx.state.get(analyze_state_key(category)))
-        ]
+        category: resolve_proposals(
+            (
+                ThreatProposal.model_validate(proposal)
+                for proposal in _threats_of(ctx.state.get(analyze_state_key(category)))
+            ),
+            catalog,
+        )
         for category in STRIDE_CATEGORIES
     }
     joined = join_drafts(drafts_by_category, model, source_texts or {})
@@ -1031,7 +1061,7 @@ def build_pipeline(
             instruction=analyze_instruction(
                 skill_loader, prompt_loader, category, domain_packs
             ),
-            output_schema=DraftThreats,
+            output_schema=ThreatProposals,
             output_key=analyze_state_key(category),
             resolve_model=resolve_model,
             resolve_sampling=resolve_sampling,

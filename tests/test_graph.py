@@ -22,7 +22,7 @@ from stride_service.markdown_loader import MarkdownLoader
 from stride_service.model_tiers import LLM_NODES
 from stride_service.report import (
     STRIDE_CATEGORIES,
-    DraftThreats,
+    ThreatProposals,
     ThreatRulings,
     UnknownRef,
     Verdict,
@@ -30,7 +30,13 @@ from stride_service.report import (
 from stride_service.resilience import load_resilience
 from stride_service.sampling import load_sampling
 from stride_service.system_model import SystemModel
-from tests.factories import repo_tiers, sample_draft, sample_ruling, valid_model
+from tests.factories import (
+    repo_tiers,
+    sample_draft,
+    sample_proposal,
+    sample_ruling,
+    valid_model,
+)
 
 PROJECT_ROOT = __import__("pathlib").Path(__file__).resolve().parents[1]
 
@@ -40,6 +46,7 @@ RUNTIME_PLACEHOLDERS = frozenset(
     {
         graph.STATE_SYSTEM_MODEL,
         graph.STATE_BOUNDARY_CROSSINGS,
+        graph.STATE_EVIDENCE_CATALOG,
         graph.STATE_DRAFT_THREATS,
         graph.STATE_INPUT_TEXT,
         graph.STATE_PREVIOUS_MODEL,
@@ -59,8 +66,14 @@ class FakeContext:
         self.state = dict(state)
 
 
-def analyze_state(**drafts_by_category: list) -> dict[str, object]:
+def analyze_state(**proposals_by_category: list) -> dict[str, object]:
     """State as six category agents that all ran leave it.
+
+    Proposals, not drafts: a category agent's node emits
+    :class:`~stride_service.report.ThreatProposals`, and ``merge_drafts``
+    resolves each proposal's references into the grounds a draft carries. A
+    test seeding drafts here would be asserting against a shape no agent can
+    produce.
 
     Every lane gets a key, because ``merge_drafts`` distinguishes a category agent
     that found nothing (``{"threats": []}``, its key written) from one that
@@ -71,8 +84,10 @@ def analyze_state(**drafts_by_category: list) -> dict[str, object]:
     return {
         graph.analyze_state_key(category): {
             "threats": [
-                draft.model_dump(mode="json")
-                for draft in drafts_by_category.get(category.replace("-", "_"), [])
+                proposal.model_dump(mode="json")
+                for proposal in proposals_by_category.get(
+                    category.replace("-", "_"), []
+                )
             ]
         }
         for category in STRIDE_CATEGORIES
@@ -351,7 +366,7 @@ def test_llm_nodes_emit_their_schema(pipeline):
     assert by_name[graph.REPAIR_NODE].output_schema is SystemModel
     assert by_name[graph.CRITIC_NODE].output_schema is ThreatRulings
     for name in graph.ANALYZE_GRAPH_NODES:
-        assert by_name[name].output_schema is DraftThreats
+        assert by_name[name].output_schema is ThreatProposals
 
 
 def test_every_node_schema_survives_the_trip_to_a_response_format(pipeline):
@@ -530,9 +545,24 @@ def test_prepare_derives_crossings_rather_than_trusting_them():
     ctx = FakeContext()
     output = graph.prepare_analysis(valid_model().model_dump(mode="json"), ctx)
 
-    assert output == {"element_count": 7, "crossing_count": 1}
+    assert output == {"element_count": 7, "crossing_count": 1, "evidence_count": 3}
     assert "flow:customer-to-web-app:login" in ctx.state[graph.STATE_BOUNDARY_CROSSINGS]
     assert "process:web-app" in ctx.state[graph.STATE_SYSTEM_MODEL]
+
+
+def test_prepare_shows_the_agents_the_evidence_catalog_as_references():
+    """The closed set an agent picks from, and no more than that.
+
+    Rendered as bare IDs: the fields behind each one are the element and flow
+    IDs of the model in the block above, so sending the resolved objects too
+    would restate what the agent is already reading.
+    """
+    ctx = FakeContext()
+    graph.prepare_analysis(valid_model().model_dump(mode="json"), ctx)
+
+    rendered = json.loads(ctx.state[graph.STATE_EVIDENCE_CATALOG])
+    assert "crossing:flow:customer-to-web-app:login" in rendered
+    assert all(isinstance(ref, str) for ref in rendered)
 
 
 def test_prepare_strips_the_source_fields_from_the_rendered_model():
@@ -564,8 +594,8 @@ def test_prepare_strips_the_source_fields_from_the_rendered_model():
 def test_merge_joins_drafts_in_canonical_order():
     ctx = FakeContext(
         **analyze_state(
-            spoofing=[sample_draft("S-01", "spoofing")],
-            tampering=[sample_draft("T-01", "tampering")],
+            spoofing=[sample_proposal("S-01", "spoofing")],
+            tampering=[sample_proposal("T-01", "tampering")],
         )
     )
     output = graph.merge_drafts(valid_model().model_dump(mode="json"), ctx)
@@ -617,7 +647,7 @@ def test_ruling_view_drops_what_no_verdict_is_reached_from():
 
 def test_merge_keeps_mitigations_out_of_the_prompt_but_in_the_report():
     """The drafts the report is built from are not the drafts the critic reads."""
-    ctx = FakeContext(**analyze_state(spoofing=[sample_draft("S-01", "spoofing")]))
+    ctx = FakeContext(**analyze_state(spoofing=[sample_proposal("S-01", "spoofing")]))
 
     graph.merge_drafts(valid_model().model_dump(mode="json"), ctx)
 
@@ -629,7 +659,7 @@ def test_merge_keeps_mitigations_out_of_the_prompt_but_in_the_report():
 
 def test_merge_accepts_a_lane_that_ran_and_found_nothing():
     """Empty is a finding; absent is a failure. The check is on the key."""
-    ctx = FakeContext(**analyze_state(spoofing=[sample_draft("S-01", "spoofing")]))
+    ctx = FakeContext(**analyze_state(spoofing=[sample_proposal("S-01", "spoofing")]))
 
     output = graph.merge_drafts(valid_model().model_dump(mode="json"), ctx)
 
@@ -649,7 +679,7 @@ def test_merge_fails_closed_when_a_category_agent_emitted_nothing():
     is handed, and ``build_summary`` omits a category with no threats rather
     than carrying a zero, so nothing downstream can see the hole.
     """
-    state = analyze_state(spoofing=[sample_draft("S-01", "spoofing")])
+    state = analyze_state(spoofing=[sample_proposal("S-01", "spoofing")])
     del state[graph.analyze_state_key("denial-of-service")]
     ctx = FakeContext(**state)
 
@@ -664,8 +694,8 @@ def test_merge_fails_closed_when_a_category_agent_emitted_nothing():
 
 
 def test_merge_fails_closed_on_a_hallucinated_element():
-    draft = sample_draft("S-01", affected_element_ids=["process:invented"])
-    ctx = FakeContext(**analyze_state(spoofing=[draft]))
+    proposal = sample_proposal("S-01", affected_element_ids=["process:invented"])
+    ctx = FakeContext(**analyze_state(spoofing=[proposal]))
     with pytest.raises(DraftJoinError, match="process:invented"):
         graph.merge_drafts(valid_model().model_dump(mode="json"), ctx)
 

@@ -20,15 +20,13 @@ Note the phrasing. "The login flow lacks MFA" is a control observation and would
     "flow:customer-to-web-api:submit-payment",
     "store:accounts-db"
   ],
-  "grounds": [
+  "evidence_refs": [
+    "crossing:flow:customer-to-web-api:submit-payment"
+  ],
+  "quotes": [
     {
-      "kind": "quote",
       "text": "sign in with an email and password and get a session cookie; we never added MFA",
       "source_label": "Payments platform notes"
-    },
-    {
-      "kind": "derived-fact",
-      "flow_id": "flow:customer-to-web-api:submit-payment"
     }
   ],
   "severity": {
@@ -65,15 +63,13 @@ Note the phrasing. "The login flow lacks MFA" is a control observation and would
     "flow:web-api-to-ledger-service:post-transfer",
     "store:accounts-db"
   ],
-  "grounds": [
+  "evidence_refs": [
+    "crossing:flow:web-api-to-ledger-service:post-transfer"
+  ],
+  "quotes": [
     {
-      "kind": "quote",
       "text": "not authenticated and not encrypted",
       "source_label": "Payments platform notes"
-    },
-    {
-      "kind": "derived-fact",
-      "flow_id": "flow:web-api-to-ledger-service:post-transfer"
     }
   ],
   "severity": {
@@ -105,17 +101,11 @@ Note the phrasing. "The login flow lacks MFA" is a control observation and would
     "process:web-api",
     "flow:payments-provider-to-web-api:settlement-webhook"
   ],
-  "grounds": [
-    {
-      "kind": "derived-fact",
-      "flow_id": "flow:payments-provider-to-web-api:settlement-webhook"
-    },
-    {
-      "kind": "unknown-attribute",
-      "element_id": "flow:payments-provider-to-web-api:settlement-webhook",
-      "attribute": "authentication"
-    }
+  "evidence_refs": [
+    "crossing:flow:payments-provider-to-web-api:settlement-webhook",
+    "unknown:flow:payments-provider-to-web-api:settlement-webhook:authentication"
   ],
+  "quotes": [],
   "severity": {
     "likelihood": "medium",
     "impact": "high",

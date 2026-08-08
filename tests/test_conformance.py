@@ -50,7 +50,7 @@ from stride_service.graph import Pipeline, build_pipeline
 from stride_service.markdown_loader import MarkdownLoader
 from stride_service.model_gate import ModelGateError
 from stride_service.model_tiers import ModelTierConfig, load_model_tiers
-from stride_service.report import DraftThreats, ThreatRulings
+from stride_service.report import ThreatProposals, ThreatRulings
 from stride_service.resilience import load_resilience
 from stride_service.sampling import load_sampling, sampling_fingerprint
 from stride_service.system_model import SystemModel
@@ -321,7 +321,7 @@ class TestSchemasAreProviderIndependent:
         model class alone, so calling it twice is identical by construction and
         there is no seam a provider could reach.
         """
-        for schema_source in (SystemModel, DraftThreats, ThreatRulings):
+        for schema_source in (SystemModel, ThreatProposals, ThreatRulings):
             assert schema_source.model_json_schema() == (
                 schema_source.model_json_schema()
             )

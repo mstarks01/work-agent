@@ -42,7 +42,7 @@ from tests.factories import (
     threats_json,
     valid_model,
 )
-from tests.test_pipeline import draft_json
+from tests.test_pipeline import proposal_json
 
 MARKER = re.compile(r"MARK-[0-9a-f]{4}")
 
@@ -84,7 +84,7 @@ def _build_shared_pipeline() -> graph.Pipeline:
         for graph_node, tier_node in graph.TIER_NODE_BY_GRAPH_NODE.items()
     }
     replies = {
-        graph.analyze_node_name("spoofing"): draft_json("S-01", "spoofing"),
+        graph.analyze_node_name("spoofing"): proposal_json("S-01", "spoofing"),
         graph.CRITIC_NODE: threats_json(sample_ruling("S-01")),
     }
 

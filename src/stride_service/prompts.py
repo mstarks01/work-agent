@@ -4,9 +4,9 @@ Prompt content lives in ``prompts/`` as Markdown and loads through the same
 :class:`~stride_service.markdown_loader.MarkdownLoader` the skills use — a
 skill is *what to know*, a prompt is *what to do with this job's input*.
 Composition here is concatenation only: the ``{category}``, ``{system_model}``,
-``{boundary_crossings}``, ``{draft_threats}``, ``{input_text}``,
-``{previous_model}`` and ``{validation_issues}`` placeholders stay untouched
-for ADK state templating to fill at run time.
+``{boundary_crossings}``, ``{evidence_catalog}``, ``{draft_threats}``,
+``{input_text}``, ``{previous_model}`` and ``{validation_issues}``
+placeholders stay untouched for ADK state templating to fill at run time.
 
 Order is stable-first, mirroring
 :func:`~stride_service.skills.compose_analyze_skills`: the one shared
@@ -57,15 +57,27 @@ EXEMPLARS_PREFIX = "exemplars/"
 # prompt. Two files doing different amounts of work do not belong on one
 # number, so the equality is dropped rather than nudged.
 #
-# 2400 rather than the ~2720 that allowance would justify (extract's 2200 plus
+# 2550 rather than the ~2720 that allowance would justify (extract's 2200 plus
 # the exemplar block). A cap is a budget, not an entitlement: sized at the full
-# allowance it would sit 500 tokens above the file and catch no drift at all.
-# 2400 leaves ~200 tokens — room for a normal edit without a CI fight, and
-# little enough that a second exemplar system still has to be argued for.
-ANALYZE_PROMPT_TOKEN_CAP = 2400
+# allowance it would sit above the file and catch no drift at all. This leaves
+# ~80 tokens — room for a normal edit without a CI fight, and little enough
+# that a second exemplar system still has to be argued for.
+#
+# The exemplar block is the whole of the difference, and it grew by the one
+# thing an agent cannot be shown any other way: the exemplar system's evidence
+# catalog. An agent selects references out of that catalog rather than
+# constructing grounds, so an exemplar whose worked system had no catalog would
+# demonstrate IDs arriving from nowhere — the exact habit the closed set
+# exists to break.
+ANALYZE_PROMPT_TOKEN_CAP = 2550
 EXEMPLAR_TOKEN_CAP = 1500
 CRITIC_PROMPT_TOKEN_CAP = 1500
-RECRITIC_PROMPT_TOKEN_CAP = 1000
+# The re-ask has to be able to name and fix every fault `review_issues` can
+# report, so this cap moves when that set does — it grew with the three verdict
+# shape rules, which are re-askable rather than fatal and so need a procedure
+# step. 1100 leaves ~100 tokens; a fault class costs roughly a third of that,
+# which is the right amount of friction for adding one.
+RECRITIC_PROMPT_TOKEN_CAP = 1100
 # Raised from 1500 with the sources cutover (#53, #56). The original was sized
 # against the *category agent's* 6-8K envelope, but extract loads no skills, so this
 # file is the whole instruction — around 5% of a full-budget call. Buying room

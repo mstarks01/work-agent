@@ -19,15 +19,13 @@ Keep the lane straight. Speaking *as* the web API is spoofing; altering the mess
     "process:ledger-service",
     "store:accounts-db"
   ],
-  "grounds": [
+  "evidence_refs": [
+    "crossing:flow:web-api-to-ledger-service:post-transfer"
+  ],
+  "quotes": [
     {
-      "kind": "quote",
       "text": "not authenticated and not encrypted",
       "source_label": "Payments platform notes"
-    },
-    {
-      "kind": "derived-fact",
-      "flow_id": "flow:web-api-to-ledger-service:post-transfer"
     }
   ],
   "severity": {
@@ -63,9 +61,9 @@ Keep the lane straight. Speaking *as* the web API is spoofing; altering the mess
     "flow:ledger-service-to-accounts-db:read-write-balances",
     "process:ledger-service"
   ],
-  "grounds": [
+  "evidence_refs": [],
+  "quotes": [
     {
-      "kind": "quote",
       "text": "a single shared password out of an environment variable, and that account has full read/write on every table",
       "source_label": "Payments platform notes"
     }
@@ -103,13 +101,10 @@ The same flow carries `encryption_in_transit: unknown`. The model does not say t
     "store:accounts-db",
     "process:ledger-service"
   ],
-  "grounds": [
-    {
-      "kind": "unknown-attribute",
-      "element_id": "flow:ledger-service-to-accounts-db:read-write-balances",
-      "attribute": "encryption_in_transit"
-    }
+  "evidence_refs": [
+    "unknown:flow:ledger-service-to-accounts-db:read-write-balances:encryption_in_transit"
   ],
+  "quotes": [],
   "severity": {
     "likelihood": "low",
     "impact": "high",

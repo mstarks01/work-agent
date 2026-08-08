@@ -9,7 +9,7 @@ in.
 from __future__ import annotations
 
 import pytest
-from pydantic import ValidationError
+from pydantic import BaseModel, ValidationError
 
 from evals.harness.grounds import (
     aggregate_grounds,
@@ -17,10 +17,17 @@ from evals.harness.grounds import (
     measure_grounds,
 )
 from stride_service.critic import DraftJoinError, GroundsUnverifiedError
-from stride_service.report import DraftThreat, DraftThreats, Ground, UnverifiedGround
+from stride_service.evidence import EvidenceResolutionError
+from stride_service.report import DraftThreat, Ground, UnverifiedGround
 from tests.eval_factories import draft_threat
 
 LABEL = "design-doc"
+
+
+class ThreatsHolder(BaseModel):
+    """A draft one level down, the depth session state hands one back at."""
+
+    threats: list[DraftThreat]
 
 
 def grounded(sequence: int, *grounds: Ground, category="spoofing") -> DraftThreat:
@@ -156,13 +163,14 @@ class TestClassifyFailure:
 
         assert classify_failure("case-a", excinfo.value).kind == "mis-shape"
 
-    def test_a_mis_shape_is_recognised_at_the_agent_nodes_depth_too(self):
-        """The depth it is really caught at. ADK validates a node's
-        ``output_schema`` on the way into state, so the category agent's own
-        ``DraftThreats`` check fires before ``merge_drafts`` is ever reached —
-        and matching only the shallower path would report this rate as zero."""
+    def test_a_mis_shape_is_recognised_at_any_depth_a_draft_is_revalidated_at(self):
+        """Matched on the ``loc`` tail, so the depth does not have to be known.
+
+        A draft is revalidated wherever it is read back out of session state,
+        which nests the same fault under a different path. Matching a fixed
+        path would report this tripwire as zero from every site but one."""
         with pytest.raises(ValidationError) as excinfo:
-            DraftThreats.model_validate(
+            ThreatsHolder.model_validate(
                 {
                     "threats": [
                         draft_payload(
@@ -176,6 +184,22 @@ class TestClassifyFailure:
 
         assert excinfo.value.errors()[0]["loc"] == ("threats", 0, "grounds", 0)
         assert classify_failure("case-a", excinfo.value).kind == "mis-shape"
+
+    def test_an_invented_evidence_reference_is_its_own_kind(self):
+        """The one way an agent's evidence selection can fail.
+
+        It is a ``DraftJoinError`` subclass, so it would otherwise pool into
+        ``other`` beside dangling element IDs and duplicate threat IDs — and
+        the number worth watching after the cutover is exactly this one."""
+        failure = classify_failure(
+            "case-a",
+            EvidenceResolutionError(
+                "threat 'S-01' cites evidence 'crossing:flow:not-real'"
+            ),
+        )
+
+        assert failure.kind == "unresolved-evidence"
+        assert "crossing:flow:not-real" in failure.detail
 
     def test_a_ground_missing_its_branch_fields_is_also_a_mis_shape(self):
         """The other half of ``_check_shape``: a branch that carries none of

@@ -24,7 +24,7 @@ from stride_service.jobs import (
     StubPipelineRunner,
 )
 from stride_service.pipeline import AdkPipelineRunner, PipelineError
-from stride_service.report import STRIDE_CATEGORIES, Ground, InputRef
+from stride_service.report import STRIDE_CATEGORIES, InputRef
 from stride_service.sampling import TierSampling, load_sampling, sampling_fingerprint
 from stride_service.sources import DEFAULT_DESCRIPTION_LABEL, Source
 from tests.factories import (
@@ -32,7 +32,7 @@ from tests.factories import (
     DESCRIPTION_TEXT,
     PROJECT_ROOT,
     repo_tiers,
-    sample_draft,
+    sample_proposal,
     sample_ruling,
     served_build,
     threats_json,
@@ -50,8 +50,9 @@ VERTEX_ENV = {
 }
 
 
-def draft_json(threat_id: str, category: str) -> str:
-    return threats_json(sample_draft(threat_id, category))
+def proposal_json(threat_id: str, category: str) -> str:
+    """One category agent's whole emission: the shape its node's schema names."""
+    return threats_json(sample_proposal(threat_id, category))
 
 
 def job(text: str = DESCRIPTION_TEXT) -> JobRecord:
@@ -81,7 +82,7 @@ def happy_replies() -> dict[str, str]:
     """Extraction succeeds; spoofing drafts one threat; the critic confirms it."""
     return {
         "extract": valid_model().model_dump_json(),
-        graph.analyze_node_name("spoofing"): draft_json("S-01", "spoofing"),
+        graph.analyze_node_name("spoofing"): proposal_json("S-01", "spoofing"),
         "critic": threats_json(sample_ruling("S-01")),
     }
 
@@ -114,20 +115,19 @@ def test_an_unfindable_quote_is_marked_on_the_report_and_still_renders():
     finding, so it reaches the report with the failure recorded beside it
     rather than being dropped or killing the run.
     """
-    draft = sample_draft(
+    proposal = sample_proposal(
         "S-01",
         "spoofing",
-        grounds=[
-            Ground(
-                kind="quote",
-                text="we never got round to MFA",
-                source_label=DEFAULT_DESCRIPTION_LABEL,
-            ),
-            Ground(kind="derived-fact", flow_id="flow:customer-to-web-app:login"),
+        quotes=[
+            {
+                "text": "we never got round to MFA",
+                "source_label": DEFAULT_DESCRIPTION_LABEL,
+            }
         ],
+        evidence_refs=["crossing:flow:customer-to-web-app:login"],
     )
     replies = happy_replies() | {
-        graph.analyze_node_name("spoofing"): threats_json(draft)
+        graph.analyze_node_name("spoofing"): threats_json(proposal)
     }
     pipeline, _ = build(replies)
 
@@ -148,14 +148,14 @@ def test_a_description_citing_a_missing_element_is_marked_on_the_report():
     — but a reader still has to be told the argument cites a system this
     report does not describe.
     """
-    draft = sample_draft(
+    proposal = sample_proposal(
         "S-01",
         "spoofing",
         description="The attacker pivots from process:web-app into"
         " process:web-api, which this model does not contain.",
     )
     replies = happy_replies() | {
-        graph.analyze_node_name("spoofing"): threats_json(draft)
+        graph.analyze_node_name("spoofing"): threats_json(proposal)
     }
     pipeline, _ = build(replies)
 
@@ -170,9 +170,9 @@ def test_a_description_citing_a_missing_element_is_marked_on_the_report():
 
 def test_a_threat_with_no_countermeasure_is_marked_on_the_report():
     """A completeness signal, carried to the reader rather than costing the run."""
-    draft = sample_draft("S-01", "spoofing", mitigations=[])
+    proposal = sample_proposal("S-01", "spoofing", mitigations=[])
     replies = happy_replies() | {
-        graph.analyze_node_name("spoofing"): threats_json(draft)
+        graph.analyze_node_name("spoofing"): threats_json(proposal)
     }
     pipeline, _ = build(replies)
 
@@ -194,7 +194,7 @@ def test_a_lane_that_skips_a_number_is_logged_and_not_renumbered(caplog):
 
     replies = happy_replies() | {
         graph.analyze_node_name("spoofing"): threats_json(
-            sample_draft("S-01"), sample_draft("S-05")
+            sample_proposal("S-01"), sample_proposal("S-05")
         ),
         "critic": threats_json(sample_ruling("S-01"), sample_ruling("S-05")),
     }
@@ -210,19 +210,19 @@ def test_a_lane_that_skips_a_number_is_logged_and_not_renumbered(caplog):
 
 def test_a_threat_no_ground_supports_fails_the_job():
     """The per-threat half: nothing holds, so nothing ships."""
-    draft = sample_draft(
+    proposal = sample_proposal(
         "S-01",
         "spoofing",
-        grounds=[
-            Ground(
-                kind="quote",
-                text="we never got round to MFA",
-                source_label=DEFAULT_DESCRIPTION_LABEL,
-            )
+        quotes=[
+            {
+                "text": "we never got round to MFA",
+                "source_label": DEFAULT_DESCRIPTION_LABEL,
+            }
         ],
+        evidence_refs=[],
     )
     replies = happy_replies() | {
-        graph.analyze_node_name("spoofing"): threats_json(draft)
+        graph.analyze_node_name("spoofing"): threats_json(proposal)
     }
     pipeline, _ = build(replies)
 
@@ -292,7 +292,7 @@ def test_each_agent_gets_its_own_category_and_the_shared_model():
 
 def test_the_critic_sees_each_category_agents_drafts_once():
     replies = happy_replies()
-    replies[graph.analyze_node_name("tampering")] = draft_json("T-01", "tampering")
+    replies[graph.analyze_node_name("tampering")] = proposal_json("T-01", "tampering")
     replies["critic"] = threats_json(sample_ruling("S-01"), sample_ruling("T-01"))
     pipeline, models = build(replies)
     outcome, _ = run(pipeline, job())
@@ -346,7 +346,7 @@ def test_a_hallucinated_element_reference_fails_the_job_loudly():
     """The merge seam refuses drafts the System Model cannot account for."""
     replies = happy_replies()
     replies[graph.analyze_node_name("spoofing")] = threats_json(
-        sample_draft("S-01", affected_element_ids=["process:invented"])
+        sample_proposal("S-01", affected_element_ids=["process:invented"])
     )
     pipeline, _ = build(replies)
 
@@ -357,7 +357,7 @@ def test_a_hallucinated_element_reference_fails_the_job_loudly():
 def test_a_malformed_critic_output_is_re_asked_once_and_then_assembled():
     """The critic drops a draft; the bounded re-ask returns the full set."""
     replies = happy_replies()
-    replies[graph.analyze_node_name("tampering")] = draft_json("T-01", "tampering")
+    replies[graph.analyze_node_name("tampering")] = proposal_json("T-01", "tampering")
     both = threats_json(sample_ruling("S-01"), sample_ruling("T-01"))
     # The critic drops T-01; the re-ask returns both drafts, reconciled.
     replies["critic"] = threats_json(sample_ruling("S-01"))
@@ -378,6 +378,67 @@ def test_a_malformed_critic_output_is_re_asked_once_and_then_assembled():
     # The re-ask saw the failing ruling and the problem it must fix.
     re_ask_instruction = models["recritic"].seen[0]
     assert "T-01" in re_ask_instruction  # named in {critic_issues}
+
+
+def test_a_mis_shaped_verdict_is_re_asked_rather_than_killing_the_job():
+    """The regression this seam exists for, end to end.
+
+    A ``needs-info`` that names no unknown is a fault, and it used to be a
+    *fatal* one: the rule lived in ``Verdict``'s validator, which ADK runs on
+    the way into session state, so the critic node raised and took the whole
+    run — six lanes of drafting and the single most expensive call in the graph
+    — with it. The re-ask that exists for exactly this never got to run.
+    """
+    replies = happy_replies()
+    replies["critic"] = json.dumps(
+        {
+            "threats": [
+                {
+                    "id": "S-01",
+                    "confidence": "high",
+                    "verdict": {"status": "needs-info", "reason": "control unverified"},
+                }
+            ]
+        }
+    )
+    replies["recritic"] = threats_json(sample_ruling("S-01"))
+    pipeline, models = build(replies)
+
+    outcome, visited = run(pipeline, job())
+
+    assert isinstance(outcome, PipelineCompleted)
+    assert [threat.id for threat in outcome.report.threats] == ["S-01"]
+    assert graph.RECRITIC_NODE in visited
+    assert graph.CRITIC_FAILED_NODE not in visited
+    # The re-ask was told which ruling, and what about it — and was shown the
+    # draft, because naming the unknown cannot be done from an ID alone.
+    re_ask = models["recritic"].seen[0]
+    assert "names no unknown attribute" in re_ask
+    assert "S-01" in re_ask
+
+
+def test_a_verdict_still_mis_shaped_after_the_re_ask_fails_as_critic_output():
+    """Re-askable is not ignorable. The second failure is still fatal — but it
+    arrives as the service's own ``CriticOutputError`` naming the fault, not as
+    a schema traceback out of a cancelled node."""
+    replies = happy_replies()
+    unreasoned = json.dumps(
+        {
+            "threats": [
+                {
+                    "id": "S-01",
+                    "confidence": "high",
+                    "verdict": {"status": "rejected"},
+                }
+            ]
+        }
+    )
+    replies["critic"] = unreasoned
+    replies["recritic"] = unreasoned
+    pipeline, _ = build(replies)
+
+    with pytest.raises(Exception, match="states no reason"):
+        run(pipeline, job())
 
 
 def test_a_critic_that_will_not_reconcile_after_the_re_ask_fails_the_job_loudly():

@@ -1,7 +1,7 @@
 """A sweep survives the failures it is measuring, and still fails the run.
 
-Two of #91's three measurements only exist on the path where the job dies — a
-mis-shaped ``Ground`` and a threat that loses every ground both raise out of
+Some of #91's measurements only exist on the path where the job dies — a threat
+that loses every ground and an invented evidence reference both raise out of
 ``merge_drafts``. A sweep that aborts on the first one reports neither, so
 these pin the two properties that make the numbers obtainable at all: the
 remaining cases still run, and the case that died is still a Tier 1 failure.
@@ -25,6 +25,7 @@ from evals.harness import modes
 from evals.harness.reference import load_case
 from evals.harness.run import _run_mode
 from stride_service.deployment import Deployment
+from stride_service.evidence import evidence_catalog
 from stride_service.graph import (
     ENTRY_PREPARE,
     TIER_NODE_BY_GRAPH_NODE,
@@ -65,7 +66,7 @@ class QueuedLlm(ScriptedLlm):
             self.reply = default
 
 
-def draft(case, category, grounds: list[dict], sequence: int = 1) -> dict:
+def proposal(case, category, evidence: dict[str, Any], sequence: int = 1) -> dict:
     reference = next(ref for ref in case.references if ref.category == category)
     return {
         "id": f"{CATEGORY_LETTERS[category]}-{sequence:02d}",
@@ -73,47 +74,53 @@ def draft(case, category, grounds: list[dict], sequence: int = 1) -> dict:
         "title": reference.claim,
         "description": f"{reference.claim} Scripted for the sweep test.",
         "affected_element_ids": list(reference.affected_element_ids),
-        "grounds": grounds,
         "severity": {
             "likelihood": reference.severity.likelihood,
             "impact": reference.severity.impact,
             "justification": "scripted",
         },
+        **evidence,
     }
 
 
-def sound_grounds(case, category) -> list[dict]:
-    """An ``unknown-attribute`` ground: verified by set membership, always."""
-    reference = next(ref for ref in case.references if ref.category == category)
-    return [
+def sound_evidence(case) -> dict[str, Any]:
+    """One real ``unknown-attribute`` entry: verified by set membership, always."""
+    return {
+        "evidence_refs": [
+            next(
+                ref
+                for ref in evidence_catalog(case.model)
+                if ref.startswith("unknown:")
+            )
+        ]
+    }
+
+
+FABRICATED = {
+    "quotes": [
         {
-            "kind": "unknown-attribute",
-            "element_id": reference.affected_element_ids[0],
-            "attribute": "name",
+            "text": "a sentence that appears in no source this job carries",
+            "source_label": "",
         }
     ]
+}
+# The successor to the mis-shaped ``Ground``. An agent selects from a closed
+# set, so the only way its evidence can fail is by naming something outside it.
+INVENTED = {"evidence_refs": ["crossing:flow:not-a-flow-in-this-model"]}
 
 
-FABRICATED = [
-    {
-        "kind": "quote",
-        "text": "a sentence that appears in no source this job carries",
-        "source_label": "",
-    }
-]
-MIS_SHAPED = [{"kind": "quote", "text": "anything", "source_label": "", "flow_id": "f"}]
-
-
-def sweep(monkeypatch, case, spoofing_first: list[dict] | None) -> Any:
+def sweep(monkeypatch, case, spoofing_first: dict[str, Any] | None) -> Any:
     """Two cases through one pipeline: the first optionally broken, then a clean one.
 
-    ``spoofing_first`` is the spoofing agent's grounds on the *first* case only;
-    ``None`` runs both cases clean.
+    ``spoofing_first`` is the spoofing agent's evidence on the *first* case
+    only; ``None`` runs both cases clean.
     """
     label = case.sources[0].label
     first = spoofing_first
-    if first is not None:
-        first = [{**ground, "source_label": label} for ground in first]
+    if first is not None and "quotes" in first:
+        first = first | {
+            "quotes": [{**quote, "source_label": label} for quote in first["quotes"]]
+        }
 
     def resolve(tier_node: str) -> BaseLlm:
         graph_node = next(
@@ -147,16 +154,16 @@ def _reply_for(case, graph_node: str) -> str:
     for category in STRIDE_CATEGORIES:
         if graph_node == analyze_node_name(category):
             return json.dumps(
-                {"threats": [draft(case, category, sound_grounds(case, category))]}
+                {"threats": [proposal(case, category, sound_evidence(case))]}
             )
     return '{"threats": []}'
 
 
-def _replies_for(case, graph_node: str, first: list[dict] | None) -> list[str]:
+def _replies_for(case, graph_node: str, first: dict[str, Any] | None) -> list[str]:
     """The spoofing agent's first emission, when the test wants it broken."""
     if first is None or graph_node != analyze_node_name("spoofing"):
         return []
-    return [json.dumps({"threats": [draft(case, "spoofing", first)]})]
+    return [json.dumps({"threats": [proposal(case, "spoofing", first)]})]
 
 
 def test_a_clean_sweep_measures_every_case(monkeypatch, case):
@@ -188,14 +195,17 @@ def test_a_fail_closed_case_is_counted_and_the_sweep_continues(monkeypatch, case
     assert [entry.case_id for entry in run.grounds] == ["case-second"]
 
 
-def test_a_mis_shaped_ground_is_counted_and_the_sweep_continues(monkeypatch, case):
-    run = sweep(monkeypatch, case, MIS_SHAPED)
+def test_an_invented_reference_is_counted_and_the_sweep_continues(monkeypatch, case):
+    """An agent cannot mis-shape a ``Ground`` — it never writes one — so this is
+    the whole of what its evidence selection can get wrong, and it must be
+    counted as its own kind rather than pooled with unrelated join faults."""
+    run = sweep(monkeypatch, case, INVENTED)
 
-    assert [f.kind for f in run.grounds_failures] == ["mis-shape"]
+    assert [f.kind for f in run.grounds_failures] == ["unresolved-evidence"]
     assert [entry.case_id for entry in run.grounds] == ["case-second"]
 
 
-@pytest.mark.parametrize("broken", [FABRICATED, MIS_SHAPED])
+@pytest.mark.parametrize("broken", [FABRICATED, INVENTED])
 def test_a_counted_case_is_still_a_tier_1_failure(monkeypatch, case, broken):
     """Surviving the failure must not turn it green — the run still exits
     non-zero, and the case is named in the failure list."""

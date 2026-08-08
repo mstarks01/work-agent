@@ -44,6 +44,7 @@ from stride_service.report import (
     Severity,
     StrideReport,
     Threat,
+    ThreatProposal,
     ThreatRuling,
     Verdict,
     build_summary,
@@ -225,6 +226,34 @@ def sample_draft(
     return DraftThreat.model_validate(
         threat.model_dump(exclude={"confidence", "verdict"})
     )
+
+
+def sample_proposal(
+    threat_id: str = "S-01",
+    category: str = "spoofing",
+    **overrides: Any,
+) -> ThreatProposal:
+    """What a category agent emits for sample_draft(), before resolution.
+
+    The same two facts the draft is grounded on, *named* rather than
+    serialized: the quote as a candidate, the crossing as a catalog ID. So
+    resolving this against ``valid_model()``'s catalog reproduces
+    ``sample_draft()`` exactly, which is the property the two fixtures exist
+    together to let a test assert.
+    """
+    threat = sample_threat(threat_id, category)
+    fields: dict[str, Any] = threat.model_dump(
+        mode="json", exclude={"confidence", "verdict", "grounds"}
+    )
+    fields["quotes"] = [
+        {
+            "text": "Customers log in to the web app",
+            "source_label": DEFAULT_DESCRIPTION_LABEL,
+        }
+    ]
+    fields["evidence_refs"] = ["crossing:flow:customer-to-web-app:login"]
+    fields.update(overrides)
+    return ThreatProposal.model_validate(fields)
 
 
 def sample_ruling(threat_id: str = "S-01", **overrides: Any) -> ThreatRuling:
