@@ -40,12 +40,13 @@ model = "gemini-2.5-flash"
 
 [tiers.strong]
 vendor = "anthropic"
-model = "claude-opus-5"
+model = "claude-opus-4-6"
 ```
 
 Supported vendors are `vertex`, `anthropic` and `openai`. Every one is reached
 through a single adapter (LiteLLM); there is no per-vendor code path, and Gemini
-reaches Vertex the same way everything else does.
+reaches Vertex the same way everything else does. The pair above is deliberately
+mixed, because that is an ordinary configuration rather than an advanced one.
 
 **Auth is derived from the vendor, never configured alongside it.** Each vendor
 owns its credential mode, so an unrepresentable pairing like `vertex` + an API
@@ -282,6 +283,53 @@ It enters the sampling fingerprint, so a sweep measured with constrained output
 does not certify a run made without it. It is deliberately **not** promotable: a
 sweep tunes decoding values, and this is a deployment's answer about its
 provider.
+
+### Provider capabilities
+
+Providers legitimately differ, and the service reports the difference rather
+than smoothing it over. To see what a pair supports before selecting it — no
+credentials, no network:
+
+```sh
+uv run python -m stride_service.conformance
+```
+
+Every cell is one of three words, and the third one is the point:
+
+| | meaning |
+| --- | --- |
+| `supported` | the provider accepts it, and the pinned model map is what says so |
+| `unsupported` | the provider rejects it |
+| `unknown` | the pinned model map has no entry for this model — nothing here knows |
+
+`unknown` is not a polite `unsupported`. LiteLLM answers for a model it has never
+heard of out of the provider's *base* config, which is frequently right and is
+not a fact about that model; reporting the fallback as though it were checked is
+how an open-world gap becomes a false assurance. A pair that reports `unknown`
+still binds — refusing to run a model the map has not caught up with would be
+worse — but nothing has verified it.
+
+Differences the matrix shows today, none of them defects:
+
+- `seed` is accepted on Vertex-hosted Gemini and on OpenAI, and rejected by
+  Anthropic — including Vertex-hosted Claude, since the constraint belongs to the
+  model rather than the host.
+- `reasoning_effort` reaches Gemini, Claude and the OpenAI reasoning models, and
+  is rejected by `gpt-4o`.
+- Output ceilings differ by roughly eight times across the profiled pairs
+  (16,384 on `gpt-4o`; 128,000 on `gpt-5.6` and `claude-opus-4-6`).
+
+None of these fails conformance. What conformance requires is that the
+*application* behaves identically given the same capability: the same
+build-time refusal naming the same tier, the same fingerprint rule, the same
+report schema. Capability parity is not a goal — the issue that introduced this
+matrix lists "force all providers to expose identical sampling controls" as an
+explicit non-goal.
+
+The suite behind it is `tests/test_conformance.py`, which runs in the offline
+lane on every pull request for all three vendors equally. It proves what each
+provider *would be asked for*. It is not evidence that any vendor has served a
+request; that needs the live lanes, and they are unprovisioned.
 
 ### Resilience
 

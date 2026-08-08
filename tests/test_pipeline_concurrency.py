@@ -114,7 +114,7 @@ def _marker_job(index: int) -> tuple[str, JobRecord]:
     """
     marker = f"MARK-{index:04x}"
     record = JobRecord.create(
-        owner_subject="ping|shared-caller",
+        owner_subject="idp|shared-caller",
         sources=[Source.description(f"{DESCRIPTION_TEXT} Job token {marker}.")],
         system_name=f"System-{index:04x}",
     )

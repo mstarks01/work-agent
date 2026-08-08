@@ -65,3 +65,62 @@ jobs:
 
       - name: Test suite
         run: uv run pytest -q
+
+      # The vendor conformance matrix, rendered into the job summary.
+      #
+      # Credential-free by construction: every cell comes from the pinned
+      # litellm's LOCAL model-cost map, so this covers Vertex, Anthropic and
+      # OpenAI equally in a job that holds no key and no cloud identity. That
+      # equality is the point -- coverage that only runs where credentials
+      # happen to exist is how one vendor ends up better assured than the
+      # others, which is what #116 was about.
+      #
+      # The assertions are in tests/test_conformance.py above; this step only
+      # renders, and exits zero whatever the matrix says. An `unsupported` cell
+      # is a capability difference, not a failure.
+      #
+      # always(), so the matrix is still published when the suite above fails --
+      # a capability that moved under a dependency bump is frequently the
+      # explanation for that failure, and printing it only on success hides it
+      # exactly when it is wanted.
+      - name: Provider capability matrix
+        if: always()
+        run: |
+          {
+            echo "## Provider capability matrix"
+            echo
+            uv run python -m stride_service.conformance
+          } >>"$GITHUB_STEP_SUMMARY"
+
+      # Says what did NOT run, in the same summary as what did.
+      #
+      # A green offline check reads as "the providers work" unless something
+      # states otherwise, and nothing did: the Vertex sweep skips on every PR
+      # because Workload Identity Federation is unprovisioned, and the API-key
+      # sweep is dispatch-only with both secrets unset. No live lane in this
+      # repository has ever completed a run against any vendor.
+      #
+      # This is deliberately a *statement*, not a check that fails. Provisioning
+      # was ruled an ops concern, so an unprovisioned repository is a supported
+      # state -- but a supported state that is silent is indistinguishable from
+      # a validated one, and that is the specific dishonesty #116 asked to
+      # remove.
+      - name: Report unexercised coverage
+        if: always()
+        run: |
+          {
+            echo "## Unexercised coverage"
+            echo
+            echo "The matrix above is **static capability**, computed from the"
+            echo "pinned model map. It is not evidence that any vendor served a"
+            echo "request."
+            echo
+            echo "| Lane | Vendors | State |"
+            echo "| --- | --- | --- |"
+            echo "| Offline conformance (this job) | vertex, anthropic, openai | exercised |"
+            echo "| Evals (live Vertex) | vertex | **unexercised** — federation unprovisioned |"
+            echo "| Evals (live API-key vendors) | anthropic, openai | **unexercised** — dispatch-only, secrets unset |"
+            echo
+            echo "See [.github/WORKLOAD_IDENTITY.md](.github/WORKLOAD_IDENTITY.md)"
+            echo "and [docs/adr/0003-no-privileged-vendor.md](docs/adr/0003-no-privileged-vendor.md)."
+          } >>"$GITHUB_STEP_SUMMARY"
