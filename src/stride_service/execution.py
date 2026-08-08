@@ -84,8 +84,10 @@ class GraphRun:
     """One drive of the graph: what the session ended holding, and what ran.
 
     ``node_runs`` is in the order the nodes finished, one entry per node
-    *execution* — so the critic on a revise path appears twice, which is what
-    makes a build that moves mid-run visible.
+    *execution*. The graph cannot loop and ``critic``/``recritic`` are distinct
+    nodes, so one drive gives each node at most one entry; multiplicity for a
+    single node name appears only where a caller accumulates several drives,
+    as an eval sweep does across its corpus.
     """
 
     final_state: dict[str, Any]
@@ -235,8 +237,8 @@ class GraphExecutor:
         """This node execution's generation identity, or ``None`` if unknowable.
 
         Computed per *execution*, so 12 cases give one node 12 hashes and a
-        build that moves mid-run gives it two — which is the drift signal, not
-        a defect. Without a served build there is nothing honest to hash, so
+        build that moves mid-sweep gives it two — which is the drift signal,
+        not a defect. Without a served build there is nothing honest to hash, so
         the node carries no fingerprint at all rather than one keyed on what
         was merely requested.
         """
