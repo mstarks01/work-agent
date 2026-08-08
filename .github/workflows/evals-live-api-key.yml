@@ -1,5 +1,11 @@
 # Live golden-case evals against the two API-key vendors: Anthropic and OpenAI.
 #
+# The model pins in the matrix below are the same pairs
+# `stride_service.conformance.REFERENCE_MODELS` profiles, and that is enforced
+# rather than remembered: `tests/test_conformance.py` fails if a model pinned
+# here is one the offline suite has never seen. A live lane sweeping an
+# unprofiled pair is how a vendor ends up "covered" by a job nobody has run.
+#
 # The sibling `evals-live.yml` covers Vertex and cannot cover these: it
 # authenticates through Workload Identity Federation, and federation has no
 # meaning for a vendor that authenticates with a bearer key. That file says so

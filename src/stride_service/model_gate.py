@@ -108,6 +108,34 @@ _SCHEMA_PROBE: dict[str, Any] = {
 }
 
 
+def model_info(vendor: Vendor, model: str) -> dict[str, Any] | None:
+    """LiteLLM's map entry for this ``(vendor, model)``, or ``None`` if unmapped.
+
+    The one place the open-world residual is *observable* rather than merely
+    documented. Everything else in this module answers a supportedness question
+    by asking LiteLLM and reading the answer, and for an unmapped model LiteLLM
+    answers from the provider's base config instead of saying it does not know.
+    That fallback is right for a gate — refusing to run a model the map has not
+    caught up with is worse than letting it through — and wrong for a *report*,
+    which must be able to distinguish "this provider does not support it" from
+    "nobody here knows". :mod:`stride_service.conformance` is that reader.
+
+    Returned whole rather than as a bool, since the only two callers both want a
+    field out of it and a second lookup would ask LiteLLM the same question
+    twice.
+    """
+    try:
+        return _litellm.get_model_info(
+            model=model, custom_llm_provider=vendor.litellm_provider
+        )
+    except Exception:  # noqa: BLE001 -- litellm raises a bare Exception here
+        # Narrowing is not available: an unmapped model raises ``Exception``
+        # itself, so the type carries nothing to match on. Probed in
+        # ``tests/test_model_gate.py`` so a version that starts raising
+        # something meaningful shows up as a test to tighten.
+        return None
+
+
 def output_ceiling(vendor: Vendor, model: str) -> int | None:
     """The most output tokens this ``(vendor, model)`` will serve, if known.
 
@@ -127,15 +155,8 @@ def output_ceiling(vendor: Vendor, model: str) -> int | None:
     :func:`check_supported` carries: an unrecognised model is not gated, because
     the alternative is refusing to run a model the map has not caught up with.
     """
-    try:
-        info = _litellm.get_model_info(
-            model=model, custom_llm_provider=vendor.litellm_provider
-        )
-    except Exception:  # noqa: BLE001 -- litellm raises a bare Exception here
-        # Narrowing is not available: an unmapped model raises ``Exception``
-        # itself, so the type carries nothing to match on. Probed in
-        # ``tests/test_model_gate.py`` so a version that starts raising
-        # something meaningful shows up as a test to tighten.
+    info = model_info(vendor, model)
+    if info is None:
         return None
     ceiling = info.get("max_output_tokens")
     return ceiling if isinstance(ceiling, int) else None
