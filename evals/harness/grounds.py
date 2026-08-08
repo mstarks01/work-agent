@@ -24,11 +24,13 @@ policy the service does not run.
 
 **Some of the numbers only exist on the failure path**, which is why
 :class:`GroundsFailure` sits beside the measurement rather than in it. A threat
-that loses every ground, an invented evidence reference and a mis-shaped
-``Ground`` all kill the job where they are found, so none reaches a report —
-measuring them means surviving them per case and counting. All stay Tier 1
-failures: a counted case is still a failed case, and the sweep still exits
-non-zero.
+that loses every ground and an invented evidence reference both kill the job
+where they are found, so neither reaches a report — measuring them means
+surviving them per case and counting. Both stay Tier 1 failures: a counted case
+is still a failed case, and the sweep still exits non-zero.
+
+A mis-shaped ``Ground`` is the one thing here that is **not** measured, because
+it is not an agent behaviour any more (:class:`GroundMisShape`).
 
 **Non-gating.** Every rate here is an instrument. No threshold is asserted,
 because none has been observed yet — the whole point is the first sweep.
@@ -52,14 +54,17 @@ from stride_service.report import (
     UnverifiedGround,
 )
 
-# Why the grounding path killed a case. ``mis-shape`` and ``fail-closed`` are
-# the two #91 asks for by name; ``unresolved-evidence`` is an agent naming a
-# catalog entry that does not exist, which is the only way its evidence
-# selection can fail; ``other`` is every remaining way the fan-in can reject a
-# set of drafts — a dangling element reference, a duplicate ID, an unresolvable
-# label — kept distinct so no measured rate quietly absorbs a defect that is
-# not about grounds at all.
-FailureKind = Literal["mis-shape", "fail-closed", "unresolved-evidence", "other"]
+# Why the grounding path killed a case, where the cause is an *agent's* doing.
+# ``fail-closed`` is one of the two #91 asks for by name; ``unresolved-evidence``
+# is an agent naming a catalog entry that does not exist, which is the only way
+# its evidence selection can fail; ``other`` is every remaining way the fan-in
+# can reject a set of drafts — a dangling element reference, a duplicate ID, an
+# unresolvable label — kept distinct so no measured rate quietly absorbs a
+# defect that is not about grounds at all.
+#
+# A mis-shaped ``Ground`` is deliberately **not** among them: see
+# :class:`GroundMisShape`.
+FailureKind = Literal["fail-closed", "unresolved-evidence", "other"]
 
 _KINDS: tuple[GroundKind, ...] = ("quote", "unknown-attribute", "derived-fact")
 
@@ -185,6 +190,25 @@ class CaseGrounds:
         }
 
 
+class GroundMisShape(RuntimeError):
+    """A ``Ground`` this service assembled wrongly. Never an agent's doing.
+
+    THE OTHER #91 RATE USED TO LIVE HERE, AND ITS EXPECTED VALUE IS NOW ZERO.
+    No model writes a ``Ground``: a category agent selects catalog entries and
+    proposes quotes, and :func:`~stride_service.evidence.resolve_proposals`
+    builds the record out of the entry it looked up. So a mis-shape is this
+    service mis-assembling its own data structure, and there is no agent
+    behaviour behind it to have a rate.
+
+    It therefore **ends the sweep** rather than being counted and survived. The
+    counted kinds are things models do, and a number is the right answer to
+    each; this is a code defect, and continuing would pool measurements taken
+    from a build that is known to be broken. Same rule the module already
+    applies to a provider timeout: not everything that can go wrong during a
+    measurement is a measurement.
+    """
+
+
 @dataclass(frozen=True)
 class GroundsFailure:
     """A case the grounding path killed, recorded as a number rather than a crash.
@@ -255,34 +279,31 @@ def measure_grounds(
 def classify_failure(case_id: str, error: Exception) -> GroundsFailure:
     """Name what the fan-in rejected, without pattern-matching its prose.
 
-    Three signals, all structural, all type checks or ``loc`` shapes rather
-    than message prose. A fail-closed threat arrives as
+    Structural signals only, all type checks or ``loc`` shapes rather than
+    message prose. A fail-closed threat arrives as
     :class:`~stride_service.critic.GroundsUnverifiedError`; an invented
     reference as :class:`~stride_service.evidence.EvidenceResolutionError`,
     which is checked first because it is the narrower of two ``DraftJoinError``
-    subclasses' siblings; and a mis-shaped ``Ground`` as a
-    :class:`pydantic.ValidationError` whose ``loc`` **ends** in
-    ``("grounds", <index>)`` with type ``value_error`` — the signature of
-    ``Ground._check_shape`` raising.
+    subclasses' siblings.
 
-    THE MIS-SHAPE COUNT IS A TRIPWIRE, AND ITS EXPECTED VALUE IS ZERO. No model
-    writes a ``Ground``: an agent selects catalog entries and proposes quotes,
-    and :func:`~stride_service.evidence.resolve_proposals` builds the record
-    from the entry it looked up. So a mis-shape here is this service
-    mis-assembling its own data structure, not an agent misunderstanding a
-    prompt, and a non-zero reading is a code defect to be found rather than a
-    rate to be tuned. Matched on the ``loc`` tail because the fault can surface
-    wherever a draft is revalidated out of session state, not at one fixed
-    depth.
+    **Raises rather than classifies** on a mis-shaped ``Ground``, recognised as
+    a :class:`pydantic.ValidationError` whose ``loc`` **ends** in
+    ``("grounds", <index>)`` with type ``value_error`` — the signature of
+    ``Ground._check_shape``. That is not a kind of case failure, it is
+    :class:`GroundMisShape`, and the reason is that no agent can produce one.
+    Matched on the ``loc`` tail rather than a fixed path because a draft is
+    revalidated wherever it is read back out of session state, which nests the
+    same fault at different depths.
 
     ``unresolved-evidence`` is where an agent's evidence selection actually
-    fails now, and it is the number to read against how legible the catalog is:
-    an agent can only pick from the closed set it was shown or name something
-    that is not in it.
+    fails, and it is the number to read against how legible the catalog is: an
+    agent can only pick from the closed set it was shown or name something that
+    is not in it.
 
-    A *missing* or empty ``grounds`` list is deliberately not a mis-shape: its
-    error sits on the list rather than on an entry, and it is a different
-    defect from a nonsense field combination.
+    A *missing* or empty ``grounds`` list is deliberately neither: its error
+    sits on the list rather than on an entry, it is reachable from a proposal
+    that named no evidence, and it is a different defect from a nonsense field
+    combination.
 
     Everything else is ``other`` on purpose. Absorbing an unrelated defect into
     a measured rate would make these numbers report faults the grounding path
@@ -301,7 +322,11 @@ def classify_failure(case_id: str, error: Exception) -> GroundsFailure:
             case_id=case_id, kind="unresolved-evidence", detail=str(error)
         )
     if isinstance(error, ValidationError) and _is_ground_mis_shape(error):
-        return GroundsFailure(case_id=case_id, kind="mis-shape", detail=str(error))
+        raise GroundMisShape(
+            "a Ground reached validation mis-shaped, which no agent can cause:"
+            " every Ground is built by resolve_proposals out of a catalog entry."
+            f" This is a defect in this build, not a measurement. {error}"
+        ) from error
     return GroundsFailure(case_id=case_id, kind="other", detail=str(error))
 
 
@@ -359,7 +384,6 @@ def aggregate_grounds(
         "quoteless_rate": round(ratio(quoteless, threats), 3),
         "unverified_rate": round(ratio(unverified, quotes), 3),
         "failed_cases": len(failures),
-        "mis_shape_cases": by_kind.get("mis-shape", 0),
         "fail_closed_cases": by_kind.get("fail-closed", 0),
         "unresolved_evidence_cases": by_kind.get("unresolved-evidence", 0),
         "other_failed_cases": by_kind.get("other", 0),
