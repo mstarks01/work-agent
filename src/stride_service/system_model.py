@@ -147,6 +147,25 @@ class TrustBoundary(_Element):
 Element = ExternalEntity | Process | DataStore | DataFlow | TrustBoundary
 
 
+def attribute_names(element: Element) -> tuple[str, ...]:
+    """The security-relevant attributes of one element, in declaration order.
+
+    An element's type-specific fields and nothing else: the five subclasses
+    declare exactly the facts STRIDE reasons from, while ``_Element`` carries
+    identity and provenance — ``id``, ``name``, ``description``, ``assets``,
+    the three source fields and ``notes`` — which say what an element *is*
+    rather than what is true of it. Derived from the classes themselves, so a
+    field added to either side moves the line without anything here changing.
+
+    Declaration order rather than a set, because
+    :func:`~stride_service.evidence.evidence_catalog` walks this to build
+    stable evidence IDs and a set's iteration order is not the model's.
+    """
+    return tuple(
+        name for name in type(element).model_fields if name not in _Element.model_fields
+    )
+
+
 def derive_element_id(element: Element) -> str:
     """The deterministic ID an element's type, name, and endpoints imply.
 
