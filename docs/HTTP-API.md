@@ -170,28 +170,62 @@ Each backend reads its own prefixed settings. The `oidc` backend is a standard
 | `STRIDE_OIDC_ISSUER` | Expected `iss` claim — your IdP's issuer URL. |
 | `STRIDE_OIDC_AUDIENCE` | Expected `aud` claim — the API's identifier at the IdP. |
 | `STRIDE_OIDC_JWKS_URL` | JWKS endpoint the IdP publishes its signing keys at. |
+| `STRIDE_OIDC_ALGORITHMS` | *Optional.* Comma-separated accepted signing algorithms. Defaults to `RS256`. |
 
-Tokens must be RS256-signed and carry `exp`, `iss`, `aud`, and `sub`; anything
-else is rejected with a single generic error (the real reason is logged, never
-returned).
+Tokens must carry `exp`, `iss`, `aud`, and `sub`, and be signed with one of the
+accepted algorithms; anything else is rejected with a single generic error (the
+real reason is logged, never returned).
+
+#### Signing algorithms
+
+`RS256` is the default because it is OIDC Core's mandatory-to-implement
+algorithm, so a deployment that sets nothing works against any compliant IdP. An
+IdP signing something else — `ES256` is common — is configured, not code-changed:
+
+```bash
+export STRIDE_OIDC_ALGORITHMS="ES256"        # or "RS256,ES256" during a rotation
+```
+
+The accepted set is an **allowlist**, and configuration chooses from it rather
+than extending it: `RS256/384/512`, `PS256/384/512`, `ES256/384/512`, `EdDSA`.
+
+Two things it will not accept, and the refusal is deliberate:
+
+- **`none`** — the unsigned-JWT algorithm. Accepting it makes every token
+  forgeable.
+- **`HS*`** — HMAC. Keys here arrive from a JWKS endpoint and are *public*, so
+  accepting a symmetric algorithm alongside asymmetric ones is the classic
+  key-confusion attack: an attacker re-signs a token they wrote using the public
+  key as the HMAC secret, and verification passes because the verifier treated a
+  verification key as a signing key.
+
+The list is also never read from the IdP's discovery document. Letting the party
+being verified declare how it is verified inverts the trust relationship the
+check exists to establish. A rejected algorithm fails at startup, naming what it
+rejected — not at the first request.
 
 ### Supported identity providers
 
 The `oidc` backend speaks plain OIDC, so it works with **any OIDC-compliant
-identity provider**. For each, the three settings come from the IdP's OIDC
-discovery document (`<issuer>/.well-known/openid-configuration` → `issuer` and
-`jwks_uri`); the audience is the API/resource identifier you register for this
-service. Switching providers is a values change only — the variable names stay
-`STRIDE_OIDC_*`.
+identity provider**. Nothing in the implementation knows the name of one: the
+configuration surface is issuer, audience, JWKS endpoint and signing algorithms,
+which is OIDC's own vocabulary. For each provider, the settings come from its
+discovery document (`<issuer>/.well-known/openid-configuration` → `issuer`,
+`jwks_uri` and `id_token_signing_alg_values_supported`); the audience is the
+API/resource identifier you register for this service. Switching providers is a
+values change only — the variable names stay `STRIDE_OIDC_*`.
+
+Listed alphabetically. None is more supported than any other, and the list is
+illustrative rather than exhaustive — an IdP absent from it is not unsupported.
 
 | Provider | Typical issuer (`STRIDE_OIDC_ISSUER`) |
 | --- | --- |
-| Ping (PingOne / PingFederate) | `https://auth.pingone.com/<env-id>/as` |
-| Okta | `https://<org>.okta.com/oauth2/<auth-server-id>` |
 | Auth0 | `https://<tenant>.auth0.com/` |
-| Microsoft Entra ID (Azure AD) | `https://login.microsoftonline.com/<tenant-id>/v2.0` |
 | AWS Cognito | `https://cognito-idp.<region>.amazonaws.com/<pool-id>` |
 | Keycloak | `https://<host>/realms/<realm>` |
+| Microsoft Entra ID (Azure AD) | `https://login.microsoftonline.com/<tenant-id>/v2.0` |
+| Okta | `https://<org>.okta.com/oauth2/<auth-server-id>` |
+| Ping (PingOne / PingFederate) | `https://auth.pingone.com/<env-id>/as` |
 
 ### Example: Okta
 
@@ -212,8 +246,10 @@ service. Switching providers is a values change only — the variable names stay
 4. Start the app. Callers pass `Authorization: Bearer <token>` on every `/v1`
    request; see the [HTTP API](HTTP-API.md) for the routes.
 
-Pointing at a different OIDC IdP (Ping, Auth0, Entra, …) is the same three
-settings from that IdP's discovery document — no code change.
+Okta is the worked example because one had to be, not because it is preferred.
+Pointing at a different OIDC IdP (Auth0, Entra, Ping, …) is the same settings
+read from that IdP's discovery document — no code change, and a different
+signing algorithm is `STRIDE_OIDC_ALGORITHMS` rather than a patch.
 
 ### Adding a new backend
 

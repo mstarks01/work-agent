@@ -56,7 +56,7 @@ def draft_json(threat_id: str, category: str) -> str:
 
 def job(text: str = DESCRIPTION_TEXT) -> JobRecord:
     record = JobRecord.create(
-        owner_subject="ping|user-1",
+        owner_subject="idp|user-1",
         sources=[Source.description(text)],
         system_name="Order Service",
     )
