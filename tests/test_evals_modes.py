@@ -70,8 +70,7 @@ def scripted_proposal(case, category) -> dict:
     """
     reference = next(ref for ref in case.references if ref.category == category)
     return {
-        "id": f"{CATEGORY_LETTERS[category]}-01",
-        "category": category,
+        "sequence": 1,
         "title": reference.claim,
         "description": f"{reference.claim} Scripted for the offline mode test.",
         "affected_element_ids": list(reference.affected_element_ids),

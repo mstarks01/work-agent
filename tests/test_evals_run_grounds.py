@@ -31,7 +31,7 @@ from stride_service.graph import (
     TIER_NODE_BY_GRAPH_NODE,
     analyze_node_name,
 )
-from stride_service.report import CATEGORY_LETTERS, STRIDE_CATEGORIES
+from stride_service.report import STRIDE_CATEGORIES
 from stride_service.sampling import load_sampling
 from tests.factories import TEST_TIER_ENV, ScriptedLlm
 from tests.test_evals_modes import scripted_ruling
@@ -69,8 +69,7 @@ class QueuedLlm(ScriptedLlm):
 def proposal(case, category, evidence: dict[str, Any], sequence: int = 1) -> dict:
     reference = next(ref for ref in case.references if ref.category == category)
     return {
-        "id": f"{CATEGORY_LETTERS[category]}-{sequence:02d}",
-        "category": category,
+        "sequence": sequence,
         "title": reference.claim,
         "description": f"{reference.claim} Scripted for the sweep test.",
         "affected_element_ids": list(reference.affected_element_ids),
