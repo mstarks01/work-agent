@@ -573,7 +573,25 @@ class ThreatRuling(BaseModel):
 
     model_config = ConfigDict(extra="forbid")
 
-    id: str = Field(pattern=r"^[STRIDE]-\d{2}$")
+    # NO PATTERN, DELIBERATELY, AND NOTHING IS GIVEN UP BY DROPPING IT. The
+    # critic does not compose this ID — it copies one off the roster it was
+    # handed — and :func:`~stride_service.critic.review_issues` already requires
+    # the ruled set to equal the drafted set exactly. That is a *stronger*
+    # constraint than any pattern: an ID matching a drafted one is well-formed
+    # by construction, because the draft's own ``id`` carries the pattern.
+    #
+    # So a pattern here could only ever fire on an ID the reconciliation was
+    # about to reject anyway — and it fired earlier and fatally, at the node
+    # boundary, where a raise kills the critic's single pass over every draft
+    # and the bounded re-ask never runs. Without it, ``"S-1"`` arrives as two
+    # precise re-askable problems: one draft dropped, one threat returned that
+    # nobody drafted.
+    #
+    # The length bound stays because an unbounded string from a model is worth
+    # capping on principle (OWASP LLM10), and 300 is the same number every other
+    # ID field here carries. It is not the well-formedness check and cannot be
+    # read as one — a real ID is four characters.
+    id: str = Field(max_length=300)
     confidence: Rating
     # The unruled shape: a verdict whose fields disagree with each other is a
     # problem for the review seam to report and the re-ask to fix, not a reason
