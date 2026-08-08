@@ -46,6 +46,7 @@ from stride_service.report import (
     ThreatRuling,
     UnresolvedMention,
     UnverifiedGround,
+    Verdict,
 )
 from stride_service.system_model import DataFlow, Element, SystemModel
 
@@ -368,6 +369,57 @@ class ReviewProblems(NamedTuple):
         return bool(self.messages)
 
 
+def _verdict_shape_issues(rulings: Iterable[ThreatRuling]) -> list[CriticIssue]:
+    """Every ruling whose verdict's fields disagree with its own ``status``.
+
+    The three rules :class:`~stride_service.report.Verdict` states, asked here
+    rather than in the schema. The schema is the wrong place for them twice
+    over: a provider cannot be made to enforce a dependency between fields, and
+    a validator that raises does so at the node boundary, killing the critic
+    node — one pass over every draft in the job — with the re-ask that exists
+    for exactly this class of problem still unreached.
+
+    So they are returned, like every other problem this module finds, and the
+    router sends them to ``recritic``. Each names its threat, because the fix
+    is per-ruling: a reason to write, an unknown to name, or a list to drop.
+
+    Deliberately three separate messages rather than one per ruling. A critic
+    that rejected a threat without a reason *and* attached unknowns to it has
+    two independent things to fix, and a merged message would leave the second
+    to be discovered on the pass that no longer exists.
+    """
+    issues = []
+    for ruling in rulings:
+        verdict = ruling.verdict
+        if verdict.status == "needs-info" and not verdict.related_unknowns:
+            issues.append(
+                CriticIssue(
+                    ruling.id,
+                    f"threat {ruling.id!r} is ruled needs-info but names no"
+                    " unknown attribute in related_unknowns, so nothing says"
+                    " what has to be answered",
+                )
+            )
+        if verdict.status != "needs-info" and verdict.related_unknowns:
+            issues.append(
+                CriticIssue(
+                    ruling.id,
+                    f"threat {ruling.id!r} is ruled {verdict.status} but carries"
+                    " related_unknowns, which is only meaningful on a"
+                    " needs-info verdict",
+                )
+            )
+        if verdict.status != "confirmed" and not verdict.reason:
+            issues.append(
+                CriticIssue(
+                    ruling.id,
+                    f"threat {ruling.id!r} is ruled {verdict.status} and states"
+                    " no reason",
+                )
+            )
+    return issues
+
+
 def _unresolved_unknown_ref_issues(
     rulings: Iterable[ThreatRuling], system_model: SystemModel
 ) -> list[CriticIssue]:
@@ -633,12 +685,21 @@ def review_issues(
 
     The mechanical check, returned rather than raised, so the graph can *route*
     on it: a falsy result means the rulings are assemblable, a truthy one is
-    what the bounded re-ask is asked to fix. The critic must
-    rule on exactly the drafted set — no threat invented, none dropped — with
-    unique IDs, and each ``needs-info`` verdict naming only unknowns the model
-    actually contains. Verdict shape and the ID's category letter are enforced
-    by :class:`~stride_service.report.ThreatRuling` itself and never re-checked
-    here.
+    what the bounded re-ask is asked to fix. The critic must rule on exactly the
+    drafted set — no threat invented, none dropped — with unique IDs, with each
+    verdict carrying the fields its own ``status`` calls for, and each
+    ``needs-info`` naming only unknowns the model actually contains.
+
+    **Verdict shape is checked here rather than by the schema**, and that is
+    the reason this function is worth reading twice. The rules are conditional
+    on ``status``, which no provider schema can express, so they can only be
+    enforced after the fact — and enforcing them in a pydantic validator means
+    enforcing them at the node boundary, where a raise kills the critic node
+    and the whole job with it. Every other problem in this list gets a bounded
+    re-ask; a missing reason is not a worse fault than a dropped draft, and
+    there is no reason for it to be the fatal one. The ID's category letter
+    stays on :class:`~stride_service.report.ThreatRuling` — a pattern on a
+    single field is something a schema *can* carry.
 
     Element references are deliberately **not** checked: a ruling carries none.
     They are the join seam's business (:func:`join_drafts` fails closed on a
@@ -650,19 +711,26 @@ def review_issues(
     drafted_ids = {draft.id for draft in drafts}
     ruled_ids = {ruling.id for ruling in rulings}
     dropped = sorted(drafted_ids - ruled_ids)
-    unresolved = _unresolved_unknown_ref_issues(rulings, system_model)
+    per_ruling = _verdict_shape_issues(rulings) + _unresolved_unknown_ref_issues(
+        rulings, system_model
+    )
     messages = [f"critic dropped draft {threat_id!r}" for threat_id in dropped]
     messages += [
         f"critic returned threat {threat_id!r}, which no category agent drafted"
         for threat_id in sorted(ruled_ids - drafted_ids)
     ]
     messages += _duplicate_id_issues(rulings)
-    messages += [issue.message for issue in unresolved]
+    messages += [issue.message for issue in per_ruling]
     # A duplicate ID implicates no draft: the re-ask drops one of two rulings on
     # an ID it already ruled, which is answerable from the rulings alone. An
     # invented ID implicates none either — there is no draft behind it to show.
+    #
+    # Every per-ruling problem does implicate one. Naming the unknown a
+    # needs-info hangs on, or writing the reason a rejection owes a reader,
+    # cannot be done from an ID — both are claims about a specific threat, and
+    # a re-ask that cannot read it would have to invent one.
     implicated = set(dropped) | {
-        issue.threat_id for issue in unresolved if issue.threat_id in drafted_ids
+        issue.threat_id for issue in per_ruling if issue.threat_id in drafted_ids
     }
     return ReviewProblems(messages=messages, implicated=frozenset(implicated))
 
@@ -675,12 +743,20 @@ def _ruled(draft: DraftThreat, ruling: ThreatRuling) -> Threat:
     a description or an element reference. ``severity`` is the single exception
     and the single overridable field: the calibration step is allowed to replace
     a rating, and does so together with the justification that argues for it.
+
+    The verdict is **rebuilt** rather than carried across, promoting the
+    critic's unruled :class:`~stride_service.report.ProposedVerdict` to the
+    :class:`~stride_service.report.Verdict` the report defines. It cannot fail:
+    :func:`review_issues` has already passed on exactly these rulings, and its
+    three verdict checks are that model's validator asked one seam earlier. A
+    raise here would mean the two had drifted, which is why the promotion is
+    left able to raise rather than coerced.
     """
     return Threat(
         **draft.model_dump(exclude={"severity"}),
         severity=ruling.severity or draft.severity,
         confidence=ruling.confidence,
-        verdict=ruling.verdict,
+        verdict=Verdict.model_validate(ruling.verdict.model_dump()),
     )
 
 

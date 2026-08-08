@@ -16,7 +16,7 @@ import pytest
 
 from stride_service import graph
 from stride_service.execution import GraphExecutor, _NodeFinish
-from stride_service.report import Ground, usage_by_node
+from stride_service.report import usage_by_node
 from stride_service.sampling import (
     TierSampling,
     load_sampling,
@@ -32,7 +32,7 @@ from tests.factories import (
     SlowLlm,
     UnmeteredLlm,
     repo_tiers,
-    sample_draft,
+    sample_proposal,
     sample_ruling,
     scripted_pipeline,
     served_build,
@@ -47,9 +47,9 @@ def happy_replies() -> dict[str, str]:
     """Extraction succeeds; spoofing drafts one threat; the critic confirms it."""
     return {
         "extract": valid_model().model_dump_json(),
-        # A category agent emits a draft — the critic's two rulings are not its to make.
+        # A category agent proposes — the critic's two rulings are not its to make.
         graph.analyze_node_name("spoofing"): threats_json(
-            sample_draft("S-01", "spoofing")
+            sample_proposal("S-01", "spoofing")
         ),
         "critic": threats_json(sample_ruling("S-01")),
     }
@@ -302,20 +302,15 @@ class TestSourceRendering:
         # The scripted models must cite labels this job carries: the gate checks
         # each element's excerpt citation, and the draft fan-in checks each
         # finding's quote against the source it names.
-        draft = sample_draft(
+        proposal = sample_proposal(
             "S-01",
             "spoofing",
-            grounds=[
-                Ground(
-                    kind="quote",
-                    text="a web app storing orders",
-                    source_label="Doc",
-                )
-            ],
+            quotes=[{"text": "a web app storing orders", "source_label": "Doc"}],
+            evidence_refs=[],
         )
         replies = happy_replies() | {
             "extract": valid_model("Doc").model_dump_json(),
-            graph.analyze_node_name("spoofing"): threats_json(draft),
+            graph.analyze_node_name("spoofing"): threats_json(proposal),
         }
         pipeline, models = scripted_pipeline(replies)
 
