@@ -697,9 +697,16 @@ def review_issues(
     enforcing them at the node boundary, where a raise kills the critic node
     and the whole job with it. Every other problem in this list gets a bounded
     re-ask; a missing reason is not a worse fault than a dropped draft, and
-    there is no reason for it to be the fatal one. The ID's category letter
-    stays on :class:`~stride_service.report.ThreatRuling` — a pattern on a
-    single field is something a schema *can* carry.
+    there is no reason for it to be the fatal one.
+
+    **A malformed threat ID is checked here too, and by accident rather than by
+    design.** Nothing below looks at an ID's spelling: the set comparison at the
+    top requires the ruled IDs to equal the drafted ones, which an ill-formed ID
+    fails on both sides at once — the draft it meant to name reads as dropped,
+    and the ID it actually wrote reads as invented. That is a stronger
+    constraint than a pattern and it produces better messages, so
+    :class:`~stride_service.report.ThreatRuling` carries no pattern to fire
+    first and fatally.
 
     Element references are deliberately **not** checked: a ruling carries none.
     They are the join seam's business (:func:`join_drafts` fails closed on a
