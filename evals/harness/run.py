@@ -38,7 +38,13 @@ from pathlib import Path
 from typing import Any
 
 from evals.harness import modes
-from evals.harness.calibration import AGREEMENT_BAR, load_pairs, measure_agreement
+from evals.harness.calibration import (
+    AGREEMENT_BAR,
+    LabelledPair,
+    compare_judges,
+    load_pairs,
+    measure_agreement,
+)
 from evals.harness.certify import PromotionPlan, plan_promotion, promote
 from evals.harness.critic_yield import (
     CriticYield,
@@ -78,15 +84,35 @@ EVALS_ROOT = Path(__file__).resolve().parents[1]
 DEFAULT_CORPUS_DIR = EVALS_ROOT / "corpus"
 
 
-def _live_judge(deployment: Deployment) -> PinnedJudge:
+def _live_judge(
+    deployment: Deployment, config_path: Path | str | None = None
+) -> PinnedJudge:
     """The pinned judge, retry-and-timeout-hardened like the graph.
 
     A calibration or scoring sweep is hours of paid work; without the same
     resilience config the graph carries, one 429 to the judge throws all of it
     away. It is the deployment's config, not a second read of the file, so the
     judge cannot end up hardened differently from the graph it is scoring.
+
+    ``config_path`` selects a *candidate* judge for calibration. It is
+    deliberately not offered to ``run``: a scored sweep must be measured by the
+    judge its numbers will be compared against, which is the one in
+    ``evals/config/judge.toml``. Pointing a sweep at some other judge produces
+    numbers that look like the tracked series and are not comparable to it.
     """
-    return PinnedJudge(load_judge_config(), resilience=deployment.resilience)
+    config = load_judge_config(config_path) if config_path else load_judge_config()
+    return PinnedJudge(config, resilience=deployment.resilience)
+
+
+def _judge_label(config_path: Path | str | None) -> str:
+    """How a candidate judge is named in a comparison report.
+
+    ``vendor/model`` rather than the file path: the path is where a candidate
+    was written down, and the pair is what was actually measured. Two files
+    naming the same pair would otherwise read as two candidates.
+    """
+    config = load_judge_config(config_path) if config_path else load_judge_config()
+    return f"{config.vendor}/{config.model}"
 
 
 def _select(cases: Sequence[GoldenCase], wanted: Sequence[str]) -> list[GoldenCase]:
@@ -256,16 +282,30 @@ def _score_runs(
     )
 
 
-def _models_record(deployment: Deployment, judge: PinnedJudge | None) -> dict[str, Any]:
+def _models_record(
+    deployment: Deployment,
+    judge: PinnedJudge | None,
+    judge_config_path: Path | str | None = None,
+) -> dict[str, Any]:
     """What this run asked its providers for, and what they say they served.
 
     The tier strings are stable GA identifiers, not immutable builds, so the
     artifact records both halves. A metric that moved between two runs with
     different ``judge_served`` values is a model change, not a regression, and
     nothing else in the artifact would show that.
+
+    ``judge_config_path`` records the *candidate* a calibration measured, which
+    is not always the shipped one. Reading the default here while the run used
+    a candidate would attribute a number to the wrong judge — the exact
+    mislabelling this record exists to prevent. A comparison passes neither,
+    since it measured several and names them in its own payload.
     """
     tiers = deployment.tiers
-    judge_config = load_judge_config()
+    judge_config = (
+        load_judge_config(judge_config_path)
+        if judge_config_path
+        else load_judge_config()
+    )
     return {
         "tiers_config_version": tiers.version,
         "tiers": dict(tiers.tiers),
@@ -635,10 +675,29 @@ def _print_promotion(
 
 
 def command_calibrate(args: argparse.Namespace) -> int:
-    """The >= 90% judge-human bar; failing it blocks a judge change."""
+    """The >= 90% judge-human bar; failing it blocks a judge change.
+
+    One ``--judge-config`` (or none) measures a single judge and gates on it.
+    Several put the candidates side by side over the identical pairs, which is
+    the selection exercise: a production judge chosen on measured agreement
+    rather than on which platform the project started on.
+    """
     deployment = Deployment.from_env()
-    judge = _live_judge(deployment)
-    result = measure_agreement(judge, load_pairs())
+    pairs = load_pairs()
+    if len(args.judge_config) > 1:
+        return _calibrate_many(deployment, pairs, args)
+    config_path = args.judge_config[0] if args.judge_config else None
+    return _calibrate_one(deployment, pairs, config_path, args.out)
+
+
+def _calibrate_one(
+    deployment: Deployment,
+    pairs: Sequence[LabelledPair],
+    config_path: str | None,
+    out: str | None,
+) -> int:
+    judge = _live_judge(deployment, config_path)
+    result = measure_agreement(judge, pairs)
     print(
         f"judge-human agreement {result.agreement:.1%} over {result.total} pairs"
         f" (bar {AGREEMENT_BAR:.0%})"
@@ -647,13 +706,84 @@ def command_calibrate(args: argparse.Namespace) -> int:
         f"  false matches {len(result.false_matches)},"
         f" false non-matches {len(result.false_non_matches)}"
     )
-    if args.out:
-        payload = {**result.to_json(), "models": _models_record(deployment, judge)}
-        Path(args.out).write_text(json.dumps(payload, indent=2) + "\n", "utf-8")
+    if out:
+        payload = {
+            **result.to_json(),
+            "models": _models_record(deployment, judge, config_path),
+        }
+        Path(out).write_text(json.dumps(payload, indent=2) + "\n", "utf-8")
     if result.meets_bar:
         return 0
     print(
         "judge does not meet the agreement bar: the judge prompt needs work,"
+        " not a lowered bar",
+        file=sys.stderr,
+    )
+    return 1
+
+
+def _calibrate_many(
+    deployment: Deployment, pairs: Sequence[LabelledPair], args: argparse.Namespace
+) -> int:
+    """Several candidate judges over the same pairs, reported side by side.
+
+    Exits non-zero only when **no** candidate clears the bar. A single judge
+    below the bar is that judge's problem; every candidate below it is the
+    measurement system's, and there is no judge to select.
+    """
+    judges = {
+        _judge_label(path): _live_judge(deployment, path) for path in args.judge_config
+    }
+    comparison = compare_judges(judges, pairs)
+
+    width = max(len(label) for label in judges)
+    print(f"judge-human agreement over {len(pairs)} pairs (bar {AGREEMENT_BAR:.0%})")
+    for candidate in comparison.candidates:
+        mark = "ok " if candidate.result.meets_bar else "BAR"
+        print(
+            f"  {mark} {candidate.label:<{width}}  {candidate.result.agreement:.1%}"
+            f"  (false match {len(candidate.result.false_matches)},"
+            f" false non-match {len(candidate.result.false_non_matches)})"
+        )
+
+    # The half a per-judge accuracy cannot show: two judges at the same
+    # agreement can still disagree with each other on every pair they each got
+    # wrong, and that is what decides whether a conclusion is judge-dependent.
+    print("\njudge-vs-judge agreement (the human labels aside)")
+    labels = [candidate.label for candidate in comparison.candidates]
+    for index, first in enumerate(labels):
+        for second in labels[index + 1 :]:
+            print(
+                f"  {first} vs {second}:"
+                f" {comparison.agreement_between(first, second):.1%}"
+            )
+
+    divergences = comparison.divergences()
+    print(f"\n{len(divergences)} of {len(pairs)} pairs are ruled differently")
+    if divergences:
+        print(
+            "Report these as uncertainty rather than picking a winner: a"
+            " conclusion that moves with the judge's vendor is not a finding"
+            " about the models being compared."
+        )
+
+    if args.out:
+        payload = {
+            **comparison.to_json(),
+            "models": _models_record(deployment, judge=None),
+        }
+        Path(args.out).write_text(json.dumps(payload, indent=2) + "\n", "utf-8")
+
+    if comparison.meets_bar:
+        print(f"\nhighest agreement: {comparison.best.label}")
+        print(
+            "Selecting it is a reviewed commit to evals/config/judge.toml with"
+            " a version bump, not something this command applies — a judge"
+            " change silently re-scores every historical number."
+        )
+        return 0
+    print(
+        "no candidate meets the agreement bar: the judge prompt needs work,"
         " not a lowered bar",
         file=sys.stderr,
     )
@@ -685,6 +815,18 @@ def main(argv: Sequence[str] | None = None) -> int:
         "calibrate", help="measure judge-human agreement over the fixtures"
     )
     calibrate_parser.add_argument("--out", help="where to write the agreement report")
+    calibrate_parser.add_argument(
+        "--judge-config",
+        action="append",
+        default=[],
+        metavar="PATH",
+        help=(
+            "a candidate judge config to measure instead of evals/config/judge.toml."
+            " Repeat it to put candidates side by side over the same pairs, which"
+            " also reports judge-vs-judge agreement — pass one per model family to"
+            " see whether a conclusion depends on the judge's vendor."
+        ),
+    )
     calibrate_parser.set_defaults(func=command_calibrate)
 
     promote_parser = subparsers.add_parser(

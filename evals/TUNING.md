@@ -75,6 +75,55 @@ This must report **≥90% agreement**. If it doesn't, the fix is the judge promp
 (`evals/prompts/`), not a lower bar — a lenient judge inflates recall silently,
 which is the expensive way to be wrong. Don't tune anything until this passes.
 
+### Comparing candidate judges
+
+The judge is a `(vendor, model)` pair like any tier, so "is this the right
+judge?" is a measurable question rather than a historical one. Write a config
+per candidate and pass each with `--judge-config`:
+
+```sh
+python -m evals.harness.run calibrate \
+  --judge-config evals/config/judge.toml \
+  --judge-config /tmp/judge-anthropic.toml \
+  --judge-config /tmp/judge-openai.toml \
+  --out judge-comparison.json
+```
+
+Two numbers come back, and the second is the one a single agreement percentage
+cannot give you:
+
+- **agreement with the human labels**, per candidate — accuracy, which is what
+  selects a production judge.
+- **agreement between candidates**, human labels aside. Two judges can both sit
+  at 92% and still disagree with each other on every pair they each got wrong.
+  That is exactly the case where *"model A beats model B"* turns over when the
+  judge changes vendor, and per-candidate accuracy would show none of it.
+
+Every pair the candidates ruled differently is listed whole, because the
+actionable question is *which kind of claim* they split on.
+
+The exercise fails only when **no** candidate clears the bar — one weak
+candidate is that candidate's problem, none clearing it is the measurement
+system's. Nothing is applied automatically: adopting a judge is a reviewed
+commit to `evals/config/judge.toml` with a version bump, because a judge change
+silently re-scores every historical number.
+
+A candidate must clear the same load-time gates a tier does. Greedy decoding is
+required of the judge, so an OpenAI o-series model is rejected when the config
+loads rather than hours into a sweep — it constrains `temperature` to exactly
+`1`. `uv run python -m stride_service.conformance` shows which pairs qualify.
+
+**This runs locally, not in CI, and that is a structural constraint rather than
+an omission.** A three-family comparison needs Vertex ADC *and* both API keys
+inside one job, and this repository deliberately keeps `id-token: write` and
+`secrets.STRIDE_*_API_KEY` in disjoint jobs — a job holding a long-lived
+third-party key must not also hold an identity it could exchange for cloud
+credentials (see the header of `.github/workflows/evals-live-api-key.yml`). So
+either run it from a workstation holding all three credentials, or split it into
+per-candidate jobs that each emit an artifact and a fourth that combines them.
+The second is the shape that keeps the credentials disjoint; it is not built
+here because none of the three lanes is provisioned, so it could not be tested.
+
 ## Step 2 — Establish a baseline (and its spread)
 
 You can't tell a real gain from luck without knowing how much the numbers move
