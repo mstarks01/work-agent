@@ -22,7 +22,7 @@ and no provider call happens at all.
 from __future__ import annotations
 
 import json
-from collections.abc import Sequence
+from collections.abc import Mapping, Sequence
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Any, Literal
@@ -94,12 +94,23 @@ class Disagreement:
 
 @dataclass(frozen=True)
 class CalibrationResult:
-    """Agreement, the two error directions, and every disagreement."""
+    """Agreement, the two error directions, and every disagreement.
+
+    ``rulings`` is what this judge answered for every pair, in the order the
+    pairs were given. It exists so two judges can be compared *to each other*
+    and not only to the human: agreement against the labels tells you each
+    judge's accuracy, and nothing about whether the two would reach the same
+    conclusion — two judges at 92% can disagree with each other on every one of
+    the pairs they each got wrong. It is deliberately absent from
+    :meth:`to_json`, where a hundred booleans would bury the disagreements a
+    reader is actually there to read.
+    """
 
     total: int
     agreements: int
     false_matches: tuple[Disagreement, ...]
     false_non_matches: tuple[Disagreement, ...]
+    rulings: tuple[bool, ...] = ()
 
     @property
     def agreement(self) -> float:
@@ -119,6 +130,137 @@ class CalibrationResult:
             "false_matches": [entry.to_json() for entry in self.false_matches],
             "false_non_matches": [entry.to_json() for entry in self.false_non_matches],
         }
+
+
+@dataclass(frozen=True)
+class Candidate:
+    """One judge in a comparison: what it is, and how it scored."""
+
+    label: str
+    result: CalibrationResult
+
+    def to_json(self) -> dict[str, Any]:
+        return {"judge": self.label, **self.result.to_json()}
+
+
+@dataclass(frozen=True)
+class JudgeComparison:
+    """Several judges measured over the *same* labelled pairs.
+
+    This answers the question a single agreement number cannot: does a
+    conclusion depend on which vendor's model was asked? Selecting a production
+    judge on measured agreement is the first half of that
+    ([#116](https://github.com/mstarks01/work-agent/issues/116)); the second is
+    whether the judges that *did* meet the bar would have ruled the same way.
+
+    The objective is explicitly **not** unanimity. Judges are allowed to differ;
+    what must not happen is a comparison of two subject models flipping because
+    the judge changed vendor. Where agreement between judges is materially lower
+    than agreement with the human, that is the finding, and it is reported as
+    uncertainty rather than resolved by picking a favourite.
+    """
+
+    candidates: tuple[Candidate, ...]
+    pairs: tuple[LabelledPair, ...]
+
+    @property
+    def best(self) -> Candidate:
+        """The highest-agreement candidate; ties break on the order given.
+
+        A recommendation, never an application. Nothing here rewrites
+        ``evals/config/judge.toml`` — changing the judge re-scores history, so
+        it stays a reviewed commit that bumps the config version.
+        """
+        return max(self.candidates, key=lambda candidate: candidate.result.agreement)
+
+    @property
+    def meets_bar(self) -> bool:
+        """Whether *any* candidate clears the bar.
+
+        The single-judge check asks whether the production judge is defensible.
+        A comparison asks whether a defensible judge exists at all — so it fails
+        only when none does, which is a statement about the measurement system
+        rather than about one model.
+        """
+        return any(candidate.result.meets_bar for candidate in self.candidates)
+
+    def agreement_between(self, first: str, second: str) -> float:
+        """How often two candidates ruled the same way, human labels aside."""
+        left = self._rulings(first)
+        right = self._rulings(second)
+        if not left:
+            return 0.0
+        matched = sum(1 for a, b in zip(left, right, strict=True) if a == b)
+        return matched / len(left)
+
+    def divergences(self) -> tuple[dict[str, Any], ...]:
+        """Every pair the candidates did not all rule the same way.
+
+        Kept whole rather than counted, for the reason :class:`Disagreement`
+        is: a rate says the judges differ somewhere, and the actionable question
+        is *on what kind of claim*, which only the pairs themselves answer.
+        """
+        divergent = []
+        for index, pair in enumerate(self.pairs):
+            rulings = {
+                candidate.label: candidate.result.rulings[index]
+                for candidate in self.candidates
+            }
+            if len(set(rulings.values())) == 1:
+                continue
+            divergent.append(
+                {
+                    "case": pair.case,
+                    "category": pair.category,
+                    "reference_claim": pair.reference_claim,
+                    "candidate_claim": pair.candidate_claim,
+                    "human": pair.label,
+                    "judges": {
+                        label: "match" if match else "no-match"
+                        for label, match in rulings.items()
+                    },
+                }
+            )
+        return tuple(divergent)
+
+    def to_json(self) -> dict[str, Any]:
+        labels = [candidate.label for candidate in self.candidates]
+        return {
+            "bar": AGREEMENT_BAR,
+            "meets_bar": self.meets_bar,
+            "best": self.best.label,
+            "candidates": [candidate.to_json() for candidate in self.candidates],
+            "pairwise_agreement": {
+                f"{first} vs {second}": round(self.agreement_between(first, second), 4)
+                for index, first in enumerate(labels)
+                for second in labels[index + 1 :]
+            },
+            "divergences": list(self.divergences()),
+        }
+
+    def _rulings(self, label: str) -> tuple[bool, ...]:
+        for candidate in self.candidates:
+            if candidate.label == label:
+                return candidate.result.rulings
+        raise CalibrationError(f"no candidate labelled {label!r}")
+
+
+def compare_judges(
+    judges: Mapping[str, Judge], pairs: Sequence[LabelledPair]
+) -> JudgeComparison:
+    """Measure several judges over one set of pairs.
+
+    Every judge sees the identical pairs in the identical order — the whole
+    comparison rests on that, since agreement between two candidates is computed
+    positionally.
+    """
+    if not judges:
+        raise CalibrationError("no judges to compare")
+    candidates = tuple(
+        Candidate(label=label, result=measure_agreement(judge, pairs))
+        for label, judge in judges.items()
+    )
+    return JudgeComparison(candidates=candidates, pairs=tuple(pairs))
 
 
 def load_pairs(path: Path | str = DEFAULT_PAIRS_PATH) -> tuple[LabelledPair, ...]:
@@ -162,10 +304,12 @@ def measure_agreement(judge: Judge, pairs: Sequence[LabelledPair]) -> Calibratio
         raise CalibrationError("no labelled pairs to calibrate against")
 
     agreements = 0
+    rulings: list[bool] = []
     false_matches: list[Disagreement] = []
     false_non_matches: list[Disagreement] = []
     for pair in pairs:
         ruling = judge.equivalent(pair.to_claim_pair())
+        rulings.append(ruling.match)
         if ruling.match == pair.human_match:
             agreements += 1
             continue
@@ -182,4 +326,5 @@ def measure_agreement(judge: Judge, pairs: Sequence[LabelledPair]) -> Calibratio
         agreements=agreements,
         false_matches=tuple(false_matches),
         false_non_matches=tuple(false_non_matches),
+        rulings=tuple(rulings),
     )
