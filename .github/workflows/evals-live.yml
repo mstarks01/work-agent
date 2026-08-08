@@ -220,6 +220,9 @@ jobs:
             echo "Workload Identity Federation is not configured for this repository."
             echo
             echo "Unset repository variables:"
+            # The backticks are markdown, not command substitution: this
+            # renders each unset variable name as code in the step summary.
+            # shellcheck disable=SC2016
             printf -- '- `%s`\n' "${missing[@]}"
             echo
             echo "See [.github/WORKLOAD_IDENTITY.md](.github/WORKLOAD_IDENTITY.md)"
