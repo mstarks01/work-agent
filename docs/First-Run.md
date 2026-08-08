@@ -45,6 +45,80 @@ configured separately.
 ```toml
 # config/model_tiers.toml
 [tiers.base]
+vendor = "<vertex|anthropic|openai>"
+model = "<model>"
+
+[tiers.strong]
+vendor = "<vertex|anthropic|openai>"
+model = "<model>"
+```
+
+The two tiers select independently: `base` is the workhorse (extraction,
+repair), `strong` is judgement (the six category agents, the critic, the re-ask). A
+mixed pair — a cheap model from one vendor, judgement from another — is
+ordinary rather than a special case.
+
+The three sections below are equivalent and interchangeable. They are in
+alphabetical order, which is the only order that does not imply a
+recommendation — pick on credentials you already have, price, or the capability
+matrix in [Configuration](Configuration.md#provider-capabilities), not on which
+one this page happens to list first.
+
+### Anthropic
+
+Authenticates with an API key. A pair that binds under the shipped sampling:
+
+```toml
+[tiers.base]
+vendor = "anthropic"
+model = "claude-sonnet-4-6"
+
+[tiers.strong]
+vendor = "anthropic"
+model = "claude-opus-4-6"
+```
+
+```sh
+export STRIDE_ANTHROPIC_API_KEY=sk-ant-...   # the full key, not a prefix
+```
+
+**Claude 4.6 is the only generation that binds here, and it is worth knowing
+why before you reach for a newer one.** This service floors at 4.6, and Anthropic
+removed `temperature` from 4.7 onward while `config/sampling.toml` pins it at
+`0.0` — so a floor and a ceiling meet on a single generation. A tier naming
+`claude-opus-5` is refused at startup, by name, rather than failing on the first
+node of a paid-for job. Moving to a newer Claude means unsetting that tier's
+`temperature` first, which re-baselines its sampling fingerprint.
+
+### OpenAI
+
+Authenticates with an API key.
+
+```toml
+[tiers.base]
+vendor = "openai"
+model = "gpt-4o"
+
+[tiers.strong]
+vendor = "openai"
+model = "gpt-5.6"
+```
+
+```sh
+export STRIDE_OPENAI_API_KEY=sk-...          # the full key, not a prefix
+```
+
+`gpt-4o` publishes an output ceiling of exactly 16,384 tokens, which is what the
+`base` tier asks for and why it cannot serve `strong` — that tier asks for
+64,000. An o-series model cannot serve either tier: they constrain `temperature`
+to exactly `1`, and the shipped sampling pins `0.0`.
+
+### Vertex
+
+Authenticates with Application Default Credentials, never an API key.
+
+```toml
+[tiers.base]
 vendor = "vertex"
 model = "gemini-2.5-flash"
 
@@ -53,17 +127,7 @@ vendor = "vertex"
 model = "gemini-2.5-pro"
 ```
 
-The two tiers select independently: `base` is the workhorse (extraction,
-repair), `strong` is judgement (the six category agents, the critic, the re-ask). A
-mixed pair — a cheap model from one vendor, judgement from another — is
-ordinary rather than a special case.
-
-Then the credentials for whichever vendor you named.
-
-### Vertex
-
-Vertex authenticates with Application Default Credentials, never an API key. For
-a local first run, mint them against your own account:
+For a local first run, mint credentials against your own account:
 
 ```sh
 gcloud auth application-default login
@@ -89,31 +153,29 @@ Do not create a service-account key for this. CI does not use one either — it
 federates short-lived credentials from GitHub's OIDC token, a separate one-time
 setup described in [WORKLOAD_IDENTITY](../.github/WORKLOAD_IDENTITY.md).
 
-### Anthropic or OpenAI
+Vertex also serves Claude, spelled with the identical model ID — `vendor =
+"vertex"` with `model = "claude-opus-4-6"` is a valid pair, and it is a
+*different* generation identity from the same model reached through
+`vendor = "anthropic"`.
 
-Both authenticate with an API key, and only the vendor your tiers actually name
-is read — a key for a vendor the config does not select never authenticates
-anything.
+### Checking a pair before you commit to it
 
-For Anthropic, `vendor = "anthropic"` in both tier tables with models such as
-`claude-sonnet-4-6` on `base` and `claude-opus-5` on `strong`:
+Only the vendor your tiers actually name is read: a key for a vendor the config
+does not select never authenticates anything. Model names must be pinned — no
+`-latest`, `-preview` or `-exp` — and Claude takes its dateless 4.6+ ID.
+[Configuration](Configuration.md#models-and-vendors) gives the rule per family.
 
-```sh
-export STRIDE_ANTHROPIC_API_KEY=sk-ant-...   # the full key, not a prefix
-```
-
-For OpenAI, `vendor = "openai"` with models such as `gpt-4.1-mini` on `base` and
-`gpt-4.1` on `strong`:
+To see what any pair supports before choosing it, and without credentials:
 
 ```sh
-export STRIDE_OPENAI_API_KEY=sk-...          # the full key, not a prefix
+uv run python -m stride_service.conformance
 ```
 
-Model names must be pinned — no `-latest`, `-preview` or `-exp`. Claude takes
-the dateless ID shown above, which is the canonical snapshot from generation
-4.6 on; this service runs 4.6 and later only, so the older dated forms are
-rejected. [Configuration](Configuration.md#models-and-vendors) gives the rule
-per family.
+That prints the capability matrix for every profiled pair — which sampling
+parameters each accepts, whether it can be constrained to a schema natively, and
+its output ceiling. Cells read `supported`, `unsupported`, or `unknown`, and
+`unknown` means exactly that: the pinned model map has never heard of the model,
+not that the capability is missing.
 
 ### Selecting without editing the file
 
