@@ -193,30 +193,75 @@ build plus that tier's decoding parameters — and both the service and the eval
 harness check those fingerprints against the ones this deployment has
 **blessed**, in `config/blessed-fingerprints.toml`. Promoting a sampling winner
 has to update *both* the config file and that blessed list, or the two disagree
-and every run reads as uncertified. The `promote` helper writes both from one configuration so
-they can't drift apart:
+and every run reads as uncertified. One command writes both, from the winning
+artifact:
 
-```python
-from evals.harness.certify import promote
-from stride_service.model_tiers import load_model_tiers
-from stride_service.sampling import load_sampling
+```sh
+# Preview: shows every identity that would be certified, writes nothing.
+python -m evals.harness.run promote candidate.json
 
-winner = load_sampling("config/sampling.toml")  # after editing it to the winning values
-tiers = load_model_tiers("config/model_tiers.toml")
-
-# served_models: the exact model string each node ran on in the winning sweep
-# (read them from the run artifact's node results).
-promote(winner, served_models, tiers.resolve_tier)
+# Apply, once the block above says what you expected.
+python -m evals.harness.run promote candidate.json --yes
 ```
 
-This rewrites `config/sampling.toml` in place (keeping its comments) and records
-the winning fingerprints in `config/blessed-fingerprints.toml`, keyed by tier.
-Commit both.
+It needs no credentials. Everything it certifies was **observed during the
+sweep** and written into the artifact's `provenance` block — which served build
+answered for each tier, and the sampling that was resolved alongside it. You do
+not supply the model strings, and there is no way to: promotion recomputes each
+fingerprint from the recorded served build and sampling with the same function
+the service certifies against, and refuses an artifact whose stored hashes don't
+follow from the identities beside them.
 
-> Note: `promote` refuses to pin a parameter the file deliberately leaves unset
-> (like `top_p`). Those are unset because there's no measured value to
-> pin — turning one on is a real decision that belongs in a reviewed edit with a
-> reason, not a silent sweep write.
+The preview is the point of the two-step. It prints, per tier, the requested
+route, the build that actually answered, every decoding parameter (with `unset`
+shown as `unset`, never as a zero), and the full fingerprint that will be
+blessed:
+
+```text
+STRONG
+  requested: vertex_ai/gemini-2.5-pro
+  served:    vertex_ai/gemini-2.5-pro-002
+  nodes:     analyze_spoofing, analyze_tampering, critic
+
+  temperature:         0.0
+  top_p:               unset
+  max_output_tokens:   64000
+  ...
+
+  fingerprint:
+    792c8e41...
+```
+
+`--yes` rewrites `config/sampling.toml` in place (keeping its comments) and adds
+the fingerprints to `config/blessed-fingerprints.toml`, keyed by tier. Commit
+both. Blessing is additive — an existing blessed build stays blessed, and
+promoting the same artifact twice adds nothing the second time.
+
+**When a tier was answered by two builds.** A sweep is hours long and providers
+rotate, so one tier can present two served builds in a single run. Promotion
+refuses rather than picking:
+
+```sh
+python -m evals.harness.run promote candidate.json \
+  --served strong=vertex_ai/gemini-2.5-pro-002 --yes
+```
+
+`--served` **selects among what was observed** — a build the sweep never saw is
+rejected, so the flag can narrow what gets blessed and can never introduce it.
+Run it again naming the other build if both should be certified; the manifest
+accumulates.
+
+Two refusals worth knowing about, both deliberate:
+
+> `promote` refuses to pin a parameter the file deliberately leaves unset (like
+> `top_p`). Those are unset because there's no measured value to pin — turning
+> one on is a real decision that belongs in a reviewed edit with a reason, not a
+> silent sweep write.
+
+> It also refuses an artifact measured under a different `sampling.toml` schema
+> version, or one carrying an `artifact_version` it doesn't know. Both are hard
+> cutovers: re-run the sweep rather than re-pinning values across a schema
+> change, which would bless a fingerprint describing parameters no run carried.
 
 ### Certification
 

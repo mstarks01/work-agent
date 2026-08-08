@@ -23,8 +23,10 @@ from __future__ import annotations
 
 import json
 from collections.abc import Mapping
+from dataclasses import dataclass
 from pathlib import Path
 
+from evals.harness.provenance import ProvenanceError, RunProvenance, TierIdentity
 from stride_service.certification import (
     MANIFEST_VERSION,
     BlessedManifest,
@@ -33,7 +35,7 @@ from stride_service.certification import (
 )
 from stride_service.deployment import ConfigPaths, Deployment
 from stride_service.model_tiers import TIER_NAMES
-from stride_service.sampling import SamplingConfig, sampling_fingerprint
+from stride_service.sampling import SamplingConfig, TierSampling, sampling_fingerprint
 
 
 def promotion_paths(deployment: Deployment | None = None) -> ConfigPaths:
@@ -126,6 +128,124 @@ def promote(
     sampling_path.write_text(rewritten, encoding="utf-8")
     Path(manifest_path).write_text(_dump_manifest(manifest), encoding="utf-8")
     return manifest
+
+
+@dataclass(frozen=True)
+class TierPromotion:
+    """One tier's half of a promotion, resolved down to a single served build."""
+
+    tier: str
+    requested_models: tuple[str, ...]
+    served_model: str
+    sampling: TierSampling
+    fingerprint: str
+    nodes: tuple[str, ...]
+    # Every build this tier was answered by, kept even once one is selected:
+    # the operator approving a promotion should see what they are *not*
+    # blessing, not only what they are.
+    observed_served_models: tuple[str, ...]
+
+
+@dataclass(frozen=True)
+class PromotionPlan:
+    """What a promotion would write, assembled from an artifact and nothing else.
+
+    Built before anything is written so the operator approves a concrete list of
+    identities rather than a command. Every fingerprint here is **recomputed**
+    by :func:`~stride_service.sampling.sampling_fingerprint` from the served
+    build and that tier's sampling — the artifact's stored hashes are verified
+    against the same function and never copied forward, so an edited artifact
+    cannot smuggle a fingerprint into the manifest.
+    """
+
+    sampling: SamplingConfig
+    tiers: tuple[TierPromotion, ...]
+
+    @property
+    def served_builds(self) -> dict[str, str]:
+        """The ``tier -> served build`` mapping :func:`promote` blesses."""
+        return {entry.tier: entry.served_model for entry in self.tiers}
+
+
+def plan_promotion(
+    provenance: RunProvenance, chosen: Mapping[str, str] | None = None
+) -> PromotionPlan:
+    """Resolve an artifact into the exact set of identities a promotion blesses.
+
+    ``chosen`` names one served build per tier and is required only where the
+    sweep observed more than one — a tier answered by two builds is not
+    resolvable by this code, because both produced numbers that went into the
+    same aggregate and picking either would be the tool deciding what the
+    operator certified. It **selects among observations**; a build the sweep
+    never saw is rejected, so the choice can narrow what is blessed and never
+    introduce it.
+
+    Raises :class:`ProvenanceError` on anything unresolvable, so a caller that
+    is already handling a bad artifact handles an ambiguous one the same way.
+    """
+    provenance.verify()
+    identities = provenance.tier_identities()
+    if not identities:
+        raise ProvenanceError(
+            "the artifact recorded no generation identities: this sweep"
+            " observed no served build, so there is nothing to bless"
+        )
+
+    chosen = dict(chosen or {})
+    unknown = sorted(set(chosen) - set(identities))
+    if unknown:
+        raise ProvenanceError(
+            f"--served names tier(s) {unknown} that this sweep did not exercise;"
+            f" it exercised {sorted(identities)}"
+        )
+
+    sampling = provenance.sampling_config()
+    return PromotionPlan(
+        sampling=sampling,
+        tiers=tuple(
+            _tier_promotion(tier, identity, chosen.get(tier), sampling)
+            for tier, identity in identities.items()
+        ),
+    )
+
+
+def _tier_promotion(
+    tier: str,
+    identity: TierIdentity,
+    chosen: str | None,
+    sampling: SamplingConfig,
+) -> TierPromotion:
+    """One tier's promotion, refusing rather than choosing among served builds."""
+    served = _select_served(tier, identity, chosen)
+    tier_sampling = sampling.for_tier(tier)
+    return TierPromotion(
+        tier=tier,
+        requested_models=identity.requested_models,
+        served_model=served,
+        sampling=tier_sampling,
+        fingerprint=sampling_fingerprint(served, tier_sampling),
+        nodes=identity.nodes,
+        observed_served_models=identity.served_models,
+    )
+
+
+def _select_served(tier: str, identity: TierIdentity, chosen: str | None) -> str:
+    if chosen is not None:
+        if chosen not in identity.served_models:
+            raise ProvenanceError(
+                f"--served {tier}={chosen}: this sweep never observed that build"
+                f" on {tier}. Observed: {', '.join(identity.served_models)}"
+            )
+        return chosen
+    if identity.ambiguous:
+        raise ProvenanceError(
+            f"tier {tier!r} was answered by {len(identity.served_models)} different"
+            f" served builds ({', '.join(identity.served_models)}), so its numbers"
+            " came from a mix. Name the one to bless with"
+            f" --served {tier}=<build>, and repeat the promotion for the other if"
+            " both should be certified"
+        )
+    return identity.served_models[0]
 
 
 def _wanted_values(sampling: SamplingConfig) -> dict[tuple[str, str], str]:

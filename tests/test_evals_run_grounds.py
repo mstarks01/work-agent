@@ -24,6 +24,7 @@ from pydantic import Field
 from evals.harness import modes
 from evals.harness.reference import load_case
 from evals.harness.run import _run_mode
+from stride_service.deployment import Deployment
 from stride_service.graph import (
     ENTRY_PREPARE,
     TIER_NODE_BY_GRAPH_NODE,
@@ -31,7 +32,7 @@ from stride_service.graph import (
 )
 from stride_service.report import CATEGORY_LETTERS, STRIDE_CATEGORIES
 from stride_service.sampling import load_sampling
-from tests.factories import ScriptedLlm
+from tests.factories import TEST_TIER_ENV, ScriptedLlm
 from tests.test_evals_modes import scripted_ruling
 
 REPO_ROOT = Path(__file__).resolve().parents[1]
@@ -131,7 +132,11 @@ def sweep(monkeypatch, case, spoofing_first: list[dict] | None) -> Any:
     )
     monkeypatch.setattr(modes, "build_eval_pipeline", lambda *a, **k: pipeline)
     second = replace(case, meta=case.meta.model_copy(update={"id": "case-second"}))
-    return asyncio.run(_run_mode([case, second], "analysis", deployment=None))
+    # A real deployment even though the pipeline is scripted: the sweep folds
+    # each execution's tier and sampling into its provenance record, and both
+    # come from the deployment rather than from the graph.
+    deployment = Deployment.from_env(env=TEST_TIER_ENV)
+    return asyncio.run(_run_mode([case, second], "analysis", deployment))
 
 
 def _reply_for(case, graph_node: str) -> str:
