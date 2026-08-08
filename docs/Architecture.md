@@ -159,7 +159,11 @@ is one deployment's claim about it.
 
 The lists ship **empty**, so until you promote a measured baseline every run
 reads as uncertified. That is recorded, not fatal — a gate that fires before
-anyone knows the normal range just trains people to switch it off.
+anyone knows the normal range just trains people to switch it off. Promoting one
+is `python -m evals.harness.run promote <artifact> --yes`, which derives the
+blessed fingerprints from the served builds the sweep observed rather than from
+anything typed in by hand — see
+[TUNING.md](../evals/TUNING.md#step-5--promote-the-winner).
 `unexercised` is different: every tier has a node that always runs, so it cannot
 happen on a run that produced a report at all. It is an internal assertion, and
 enforcing it costs nothing.
