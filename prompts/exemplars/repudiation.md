@@ -10,8 +10,7 @@ The lane test: the harm here is not that someone impersonated a customer (spoofi
 
 ```json
 {
-  "id": "R-01",
-  "category": "repudiation",
+  "sequence": 1,
   "title": "A customer can deny a transfer because audit records name only the ledger service",
   "description": "Transfers initiated by `entity:customer` over `flow:customer-to-web-api:submit-payment` are recorded by `process:ledger-service` through `flow:ledger-service-to-audit-log:append-transfer-record`, whose entries are tagged with the ledger service identity only. No record in `store:audit-log` binds the transfer to the initiating customer, and the session cookie on the inbound flow is not carried through to the log entry. A customer disputing a transfer — genuinely defrauded or acting in bad faith — cannot be contradicted by evidence, and the operator cannot distinguish the two cases. Second-order: chargeback and fraud handling has no factual basis, so `financial` losses are absorbed by the operator and `entity:customer` records are never conclusive.",
   "affected_element_ids": [
@@ -53,8 +52,7 @@ The lane test: the harm here is not that someone impersonated a customer (spoofi
 
 ```json
 {
-  "id": "R-02",
-  "category": "repudiation",
+  "sequence": 2,
   "title": "Compromising the ledger service destroys accountability for every transfer",
   "description": "`process:ledger-service` is the sole writer to `store:audit-log` over `flow:ledger-service-to-audit-log:append-transfer-record`, using its own service account, and it accepts work over `flow:web-api-to-ledger-service:post-transfer` with `authentication: none`. An attacker who reaches `boundary:dmz` and drives, or ultimately compromises, that process controls both the action and the record of it: entries can be omitted for the transfers the attacker makes, and fabricated for transfers that never happened. Second-order: because no independent party writes to `store:audit-log`, every prior record becomes unreliable once this identity is suspected — the accountability loss is retrospective across the whole corpus, not limited to the incident window.",
   "affected_element_ids": [
@@ -98,8 +96,7 @@ The lane test: the harm here is not that someone impersonated a customer (spoofi
 
 ```json
 {
-  "id": "R-03",
-  "category": "repudiation",
+  "sequence": 3,
   "title": "Settlement confirmations may be unattributable to the payments provider",
   "description": "`flow:payments-provider-to-web-api:settlement-webhook` crosses from `boundary:public-internet` into `boundary:dmz` with `authentication: unknown`. If that unknown resolves to an unsigned callback, nothing in the received settlement confirmation ties it to `entity:payments-provider`: the operator cannot prove to the provider that a given settlement was sent, and the provider can deny having sent one that was acted on. Disputes over money already moved through `process:ledger-service` would have no evidence on either side. This draft is conditional on the `authentication` attribute of that flow; it is not a claim that the callback is unsigned.",
   "affected_element_ids": [

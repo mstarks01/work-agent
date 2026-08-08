@@ -96,10 +96,18 @@ class TestJoinDrafts:
         with pytest.raises(DraftJoinError, match="used by 2 drafts"):
             join_drafts(drafts, model)
 
-    def test_draft_filed_under_the_wrong_category_fails_closed(self, model):
+    def test_a_lane_and_its_drafts_cannot_disagree_about_the_category(self, model):
+        """There is nothing left here to check, and that is the point.
+
+        A draft's category is stamped from the lane by ``resolve_proposals``
+        rather than written by the agent, so this seam would be comparing a
+        value against the one it was copied from. Whether a threat *belongs* in
+        its lane is a question about the finding's content, and it is the
+        critic's second judgement step.
+        """
         drafts = {"spoofing": [sample_draft("T-01", "tampering")]}
-        with pytest.raises(DraftJoinError, match="filed under 'spoofing'"):
-            join_drafts(drafts, model)
+
+        assert join_drafts(drafts, model).drafts[0].category == "tampering"
 
 
 class TestGroundReferences:
