@@ -88,7 +88,20 @@ Live — needs credentials for whichever vendor the tiers are configured to use
 python -m evals.harness.run run --mode analysis --out artifact.json
 python -m evals.harness.run run --mode extraction --case 01-payments-checkout
 python -m evals.harness.run calibrate --out agreement.json
+
+# Several candidate judges over the same pairs, side by side. Reports agreement
+# with the human labels per candidate AND agreement between candidates, which is
+# what says whether a conclusion depends on the judge's vendor. See TUNING.md.
+python -m evals.harness.run calibrate \
+  --judge-config evals/config/judge.toml \
+  --judge-config /tmp/judge-anthropic.toml \
+  --out judge-comparison.json
 ```
+
+`--judge-config` is offered on `calibrate` only. A scored `run` is always
+measured by the judge in `evals/config/judge.toml`: pointing a sweep at some
+other judge produces numbers that look like the tracked series and are not
+comparable to it.
 
 Offline again, once a sweep has been reviewed — `promote` needs no credentials,
 because everything it certifies was observed during the run and written into the
