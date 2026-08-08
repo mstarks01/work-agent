@@ -48,7 +48,12 @@ from stride_service.system_model import BoundaryCrossing, SystemModel
 # 2.3 adds ``missing_mitigations``, on the same argument again: a third
 # optional top-level list of service-owned marks, no existing field changing
 # meaning or spelling.
-SCHEMA_VERSION = "2.3"
+#
+# 2.4 adds ``coverage``, the per-category account of what deterministic
+# analysis put in front of each agent and how much of it the drafts came back
+# citing. Optional, additive, service-owned and computed in code, so the same
+# rule applies a fourth time.
+SCHEMA_VERSION = "2.4"
 
 DEFAULT_DISCLAIMER = (
     "AI-generated threat model. Not reviewed by a human security analyst."
@@ -702,6 +707,44 @@ class Summary(BaseModel):
     elements_analyzed: int = Field(ge=0)
 
 
+class CategoryCoverage(BaseModel):
+    """What one category agent was offered, and how much of it its drafts cite.
+
+    The question this answers is the one a bare threat count cannot: whether
+    "no threat here" means *examined and cleared* or *never looked at*. Every
+    number is computed in code from the System Model, the deterministic
+    candidate triggers and the agent's own drafts — none of it is asserted by
+    a model, which is the whole reason it is worth recording.
+
+    **Read ``*_cited`` as cited, not as considered.** An agent that examined a
+    flow and correctly concluded there was no threat cites nothing, and is
+    indistinguishable here from one that never read it. The fields are named
+    for what they measure rather than for what a reader would like them to
+    mean; the honest use is the aggregate — a category citing two of forty
+    structural leads across a corpus is a coverage signal, one agent's zero on
+    one case is not.
+
+    ``elements`` is the whole model rather than the subset a category's
+    ``## Applicability`` scopes: applicability lives in the skill text, and a
+    second copy of it in code would be a second definition to drift.
+    """
+
+    model_config = ConfigDict(extra="forbid")
+
+    category: StrideCategory
+    drafts: int = Field(ge=0)
+    rules: int = Field(ge=0)  # rules in this lane
+    rules_fired: int = Field(ge=0)  # of those, how many produced a candidate
+    candidates: int = Field(ge=0)
+    candidates_cited: int = Field(ge=0)
+    elements: int = Field(ge=0)
+    elements_cited: int = Field(ge=0)
+    boundary_crossings: int = Field(ge=0)
+    boundary_crossings_cited: int = Field(ge=0)
+    unknown_controls: int = Field(ge=0)
+    unknown_controls_cited: int = Field(ge=0)
+
+
 def build_summary(
     threats: list[Threat],
     rejected_threats: list[Threat],
@@ -790,6 +833,11 @@ class StrideReport(BaseModel):
     unverified_grounds: list[UnverifiedGround] = Field(default_factory=list)
     unresolved_mentions: list[UnresolvedMention] = Field(default_factory=list)
     missing_mitigations: list[MissingMitigation] = Field(default_factory=list)
+    # Per-category coverage accounting, computed at the fan-in over the drafts
+    # the critic was handed — before any verdict, because coverage is a fact
+    # about what the six agents did with the system, not about what survived
+    # review. Empty on a report built without it (the stub runner's).
+    coverage: list[CategoryCoverage] = Field(default_factory=list)
     summary: Summary
 
     @model_validator(mode="after")

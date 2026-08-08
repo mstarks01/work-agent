@@ -91,12 +91,15 @@ from google.adk.models.base_llm import BaseLlm
 from google.adk.workflow import START, FunctionNode, JoinNode, Workflow
 from google.genai import types
 
+from stride_service.candidates import generate_candidates
+from stride_service.coverage import build_coverage
 from stride_service.critic import (
     assemble_threats,
     join_drafts,
     numbering_gaps,
     review_issues,
 )
+from stride_service.domains import select_domain_packs
 from stride_service.markdown_loader import MarkdownLoader
 from stride_service.prompts import (
     compose_analyze_prompt,
@@ -107,6 +110,7 @@ from stride_service.prompts import (
 )
 from stride_service.report import (
     STRIDE_CATEGORIES,
+    CategoryCoverage,
     DraftThreat,
     DraftThreats,
     MissingMitigation,
@@ -125,7 +129,11 @@ from stride_service.sampling import (
     SamplingResolver,
     TierSampling,
 )
-from stride_service.skills import compose_analyze_skills, compose_critic_skills
+from stride_service.skills import (
+    compose_analyze_skills,
+    compose_critic_skills,
+    compose_domain_skills,
+)
 from stride_service.sources import fence_for
 from stride_service.system_model import BoundaryCrossing, SystemModel
 from stride_service.validation import ValidationIssue, parse_and_validate
@@ -237,6 +245,10 @@ STATE_INPUT_TEXT = "input_text"
 STATE_SOURCE_TEXTS = "source_texts"
 STATE_SYSTEM_MODEL = "system_model"
 STATE_BOUNDARY_CROSSINGS = "boundary_crossings"
+# The domain packs this job's model earned, already composed to text. One key
+# for all six agents, because the selection is a fact about the model rather
+# than about a lane.
+STATE_DOMAIN_SKILLS = "domain_skills"
 STATE_DRAFT_THREATS = "draft_threats"
 STATE_PREVIOUS_MODEL = "previous_model"
 STATE_VALIDATION_ISSUES = "validation_issues"
@@ -248,6 +260,7 @@ STATE_UNRECONCILED_DRAFTS = "unreconciled_drafts"
 STATE_EXTRACTED_MODEL = "extracted_model"
 STATE_VALID_MODEL = "valid_model"
 STATE_MERGED_DRAFTS = "merged_drafts"
+STATE_COVERAGE = "coverage"
 STATE_UNVERIFIED_GROUNDS = "unverified_grounds"
 STATE_UNRESOLVED_MENTIONS = "unresolved_mentions"
 STATE_MISSING_MITIGATIONS = "missing_mitigations"
@@ -259,6 +272,18 @@ STATE_REJECTION = "rejection"
 def analyze_state_key(category: StrideCategory) -> str:
     """Where one category agent parks its drafts for the merge node."""
     return f"drafts_{category.replace('-', '_')}"
+
+
+def candidates_state_key(category: StrideCategory) -> str:
+    """Where ``prepare`` parks one lane's deterministic candidates.
+
+    Six keys rather than one, for the reason ``{category}`` is substituted at
+    build time: the six agents run in parallel against a single session state,
+    which cannot hold six values for one key, and handing every agent all six
+    lanes' candidates would spend five sixths of the block on other people's
+    leads.
+    """
+    return f"candidates_{category.replace('-', '_')}"
 
 
 class SilentNodeError(RuntimeError):
@@ -325,6 +350,8 @@ class Analysis:
     unverified_grounds: list[UnverifiedGround]
     unresolved_mentions: list[UnresolvedMention]
     missing_mitigations: list[MissingMitigation]
+    # Per-lane coverage accounting, computed at the fan-in over the drafts.
+    coverage: list[CategoryCoverage]
     summary: Summary
 
     def to_state(self) -> dict[str, Any]:
@@ -347,6 +374,7 @@ class Analysis:
             "missing_mitigations": [
                 mark.model_dump(mode="json") for mark in self.missing_mitigations
             ],
+            "coverage": [row.model_dump(mode="json") for row in self.coverage],
             "summary": self.summary.model_dump(mode="json"),
         }
 
@@ -374,6 +402,9 @@ class Analysis:
             missing_mitigations=[
                 MissingMitigation.model_validate(mark)
                 for mark in data["missing_mitigations"]
+            ],
+            coverage=[
+                CategoryCoverage.model_validate(row) for row in data.get("coverage", [])
             ],
             summary=Summary.model_validate(data["summary"]),
         )
@@ -555,24 +586,66 @@ def _ruling_view(drafts: Sequence[DraftThreat]) -> list[dict]:
     ]
 
 
-def prepare_analysis(valid_model: dict, ctx) -> dict[str, Any]:
-    """Derive boundary crossings and render the category agents' shared view.
+def prepare_analysis(
+    valid_model: dict, ctx, skill_loader: MarkdownLoader
+) -> dict[str, Any]:
+    """Derive the whole deterministic view the six category agents reason from.
 
     Crossings are computed here rather than extracted, so no agent can be handed
-    a crossing that contradicts the zones in the model it is reading.
+    a crossing that contradicts the zones in the model it is reading. The same
+    argument now carries three more artifacts, all of them functions of the
+    validated model alone:
 
-    The rendered view is the *stripped* model — see
-    :func:`_without_source_fields`. The critic templates against this same key,
-    so it is stripped there too, and neither reads a submitter's words except
-    the ones a finding chose to quote.
+    * **Candidates** (:mod:`stride_service.candidates`) — the structural
+      conditions each lane's rules fire on, parked per category so an agent
+      reads only its own. They are *leads*, and nothing downstream of the
+      prompt reads them: a candidate cannot become a threat, cannot ground
+      one, and does not appear in the report.
+    * **Domain packs** (:mod:`stride_service.domains`) — the reference
+      material this model earns. Selected here rather than composed into the
+      instruction because the selection is per-job and the graph is built once.
+    * **The stripped model** — see :func:`_without_source_fields`. The critic
+      templates against this same key, so it is stripped there too, and neither
+      reads a submitter's words except the ones a finding chose to quote.
+
+    ``skill_loader`` is bound by :func:`prepare_node` rather than read from
+    state: it is a repo path, not a fact about the job, and ADK binds a
+    FunctionNode's parameters from session state.
+
+    Candidate facts carry caller-authored attribute values, so they are fenced
+    with :func:`render_fenced` exactly as the model is — the bytes are a subset
+    of what already rides in ``{system_model}`` and they get the same
+    treatment. The pack text is repo-authored and needs none.
     """
     model = SystemModel.model_validate(valid_model)
     crossings = model.boundary_crossings()
+    candidates = generate_candidates(model)
+    packs = select_domain_packs(model)
+
     ctx.state[STATE_SYSTEM_MODEL] = render_fenced(_without_source_fields(valid_model))
     ctx.state[STATE_BOUNDARY_CROSSINGS] = render(
         [crossing.model_dump(mode="json") for crossing in crossings]
     )
-    return {"element_count": len(model.elements()), "crossing_count": len(crossings)}
+    ctx.state[STATE_DOMAIN_SKILLS] = compose_domain_skills(skill_loader, packs)
+    for category, candidate_set in candidates.items():
+        ctx.state[candidates_state_key(category)] = render_fenced(
+            candidate_set.model_dump(mode="json")
+        )
+    return {
+        "element_count": len(model.elements()),
+        "crossing_count": len(crossings),
+        "candidate_count": sum(len(each.candidates) for each in candidates.values()),
+        "domain_packs": list(packs),
+    }
+
+
+def prepare_node(skill_loader: MarkdownLoader) -> FunctionNode:
+    """The ``prepare`` node, with this deployment's skill tree bound to it."""
+
+    def prepare_analysis_node(valid_model: dict, ctx) -> dict[str, Any]:
+        return prepare_analysis(valid_model, ctx, skill_loader)
+
+    return FunctionNode(func=prepare_analysis_node, name=PREPARE_NODE)
 
 
 def _threats_of(payload: object) -> list[Any]:
@@ -670,6 +743,14 @@ def merge_drafts(
     # broke nothing a reader could act on, and the agents are who it is about.
     for gap in numbering_gaps(merged):
         logger.warning(gap)
+    # Coverage is computed here, over the drafts, because the question it
+    # answers — did this lane look at the system — is about what the six agents
+    # did, not about what survived review. The candidates are regenerated
+    # rather than read back from state: they are a pure function of the same
+    # validated model, so the two derivations cannot disagree, and the fan-in
+    # stays free of a dependency on a key ``prepare`` wrote for the prompt.
+    coverage = build_coverage(drafts_by_category, generate_candidates(model), model)
+    ctx.state[STATE_COVERAGE] = [row.model_dump(mode="json") for row in coverage]
     ctx.state[STATE_DRAFT_THREATS] = render(_ruling_view(merged))
     return {
         "draft_count": len(merged),
@@ -773,6 +854,7 @@ def assemble_report(
     unverified_grounds: list | None = None,
     unresolved_mentions: list | None = None,
     missing_mitigations: list | None = None,
+    coverage: list | None = None,
 ) -> dict[str, Any]:
     """Build the report body deterministically from the critic's rulings.
 
@@ -794,7 +876,9 @@ def assemble_report(
     ``unresolved_mentions`` and ``missing_mitigations`` default for exactly
     the same reason: an empty list means every element ID the descriptions
     cite resolves, and every threat either carries a countermeasure or has
-    the unknown that excuses carrying none.
+    the unknown that excuses carrying none. ``coverage`` defaults so a graph
+    driven from a seeded state that never ran ``merge`` still assembles — an
+    absent account is recorded as absent rather than fabricated at zero.
     """
     model = SystemModel.model_validate(valid_model)
     drafts = [DraftThreat.model_validate(draft) for draft in merged_drafts]
@@ -816,6 +900,7 @@ def assemble_report(
         missing_mitigations=[
             MissingMitigation.model_validate(mark) for mark in missing_mitigations or []
         ],
+        coverage=[CategoryCoverage.model_validate(row) for row in coverage or []],
         summary=build_summary(threats, rejected, model),
     )
     ctx.state[STATE_ANALYSIS] = analysis.to_state()
@@ -932,18 +1017,27 @@ def analyze_instruction(
     skill_loader: MarkdownLoader,
     prompt_loader: MarkdownLoader,
     category: StrideCategory,
-    domain_packs: Sequence[str] = (),
 ) -> str:
-    """One category agent's full instruction, with ``{category}`` already filled in.
+    """One category agent's full instruction, with the per-lane names resolved.
 
-    ``{category}`` is the one placeholder resolved here rather than by ADK:
-    the six category agents run in parallel against a single session state,
-    which cannot hold six different values for one key. The job-varying
-    placeholders stay for ADK to template.
+    Two substitutions happen here rather than in ADK, for one reason: the six
+    category agents run in parallel against a single session state, which
+    cannot hold six different values for one key.
+
+    * ``{category}`` becomes this agent's category.
+    * ``{candidates}`` becomes *the name of this lane's state key*
+      (:func:`candidates_state_key`), so what ADK templates at run time is
+      ``{candidates_spoofing}`` — one prompt file, six bindings, no lane
+      reading another's leads.
+
+    The job-varying placeholders stay for ADK to template.
     """
-    skills = compose_analyze_skills(skill_loader, category, tuple(domain_packs))
+    skills = compose_analyze_skills(skill_loader, category)
     prompt = compose_analyze_prompt(prompt_loader, category)
-    return _instruction(skills, prompt.replace("{category}", category))
+    resolved = prompt.replace("{category}", category).replace(
+        "{candidates}", f"{{{candidates_state_key(category)}}}"
+    )
+    return _instruction(skills, resolved)
 
 
 def recritic_instruction(
@@ -966,7 +1060,6 @@ def build_pipeline(
     skill_loader: MarkdownLoader,
     prompt_loader: MarkdownLoader,
     binding: NodeBinding,
-    domain_packs: Sequence[str] = (),
     entry: Entry = ENTRY_EXTRACT,
     name: str = "stride_pipeline",
 ) -> Pipeline:
@@ -1028,9 +1121,7 @@ def build_pipeline(
     agents = [
         _llm_node(
             name=analyze_node_name(category),
-            instruction=analyze_instruction(
-                skill_loader, prompt_loader, category, domain_packs
-            ),
+            instruction=analyze_instruction(skill_loader, prompt_loader, category),
             output_schema=DraftThreats,
             output_key=analyze_state_key(category),
             resolve_model=resolve_model,
@@ -1040,7 +1131,7 @@ def build_pipeline(
         for category in STRIDE_CATEGORIES
     ]
 
-    prepare = FunctionNode(func=prepare_analysis, name=PREPARE_NODE)
+    prepare = prepare_node(skill_loader)
     join = JoinNode(name=JOIN_NODE)
     merge = FunctionNode(func=merge_drafts, name=MERGE_NODE)
     router = FunctionNode(func=route_review, name=ROUTER_NODE)

@@ -345,8 +345,15 @@ def test_no_non_markdown_files_under_prompts():
 #
 # Raised from 3500 with the body cap, and it had to move with it: the composed
 # budget binds first, so a body cap the composed budget cannot accommodate is a
-# cap nothing can reach.
-COMPOSED_ANALYZE_TOKEN_BUDGET = 3800
+# cap nothing can reach. Raised again with the body cap for the same reason
+# when candidates and domain packs arrived.
+#
+# What the envelope now also carries, and what this number does not: the
+# job-varying block grew by up to two domain packs (~1.4K at the
+# ``DOMAIN_PACK_TOKEN_CAP``) plus one lane's candidates. Those are runtime
+# values rather than prompt text, capped where they are produced — this budget
+# governs the static instruction only.
+COMPOSED_ANALYZE_TOKEN_BUDGET = 4100
 
 
 @pytest.mark.parametrize("category", STRIDE_CATEGORIES)
