@@ -345,10 +345,10 @@ to: if the build moves, the fingerprint moves with it, and the run stops
 matching any list of blessed fingerprints — so the drift surfaces there rather
 than through comparison logic here.
 
-The fingerprint is computed **per node execution**. A node that ran more than
-once — the critic on a revise path — appears once per execution, and a build
-that moved partway through a run gives one node two different fingerprints.
-That is the signal, not a defect.
+The fingerprint is computed **per node execution**. One analysis cannot loop, so
+a node appears once in it; across an eval sweep a node appears once per case, and
+a build that moved partway through gives that one node two different
+fingerprints. That is the signal, not a defect.
 
 The fingerprint, not `seed`, is what makes a result reproducible to reason
 about: `seed` is best-effort, and some vendors don't accept it at all. The

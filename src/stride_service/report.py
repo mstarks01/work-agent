@@ -494,8 +494,9 @@ class NodeRun(BaseModel):
     ``sampling_fingerprint`` is the generation-identity hash: ``sha256(served
     route, resolved tier sampling)``, recomputable from this node's ``model``
     and the report's top-level per-tier ``sampling`` clear block. It is computed
-    per node *execution*, so a build that moves mid-run gives one node two
-    hashes. A deterministic FunctionNode carries none of the three.
+    per node *execution*, so a build that moves partway through an eval sweep
+    gives one node two hashes. A deterministic FunctionNode carries none of the
+    three.
 
     ``usage`` is what the node execution cost, ``None`` for a deterministic
     FunctionNode and for any LLM node whose provider reported nothing. It is
@@ -725,9 +726,10 @@ def usage_by_node(nodes: Iterable[NodeRun]) -> dict[str, TokenUsage]:
     """Total tokens per node name, summed across that node's executions.
 
     The question this exists to answer is "which node costs the most", and a
-    bare ``nodes`` list does not answer it: the critic on a revise path
-    contributes two records, and reading a per-node total off the list means
-    every caller writing the same fold. Keyed by node name rather than by tier
+    bare ``nodes`` list does not answer it: a sweep hands over every case's
+    executions at once, so one node contributes one record per case, and
+    reading a per-node total off the list means every caller writing the same
+    fold. Keyed by node name rather than by tier
     because the tier is already answerable from the node, and the interesting
     comparison — the critic against one category agent, both on ``strong`` — is
     the one a tier roll-up destroys.

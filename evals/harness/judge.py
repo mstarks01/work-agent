@@ -343,9 +343,9 @@ class PinnedJudge:
         The configured string is only a request: for generations that ship no
         numbered builds, the stable identifier resolves to whichever build is
         current, so reproducibility rests on recording what answered rather than
-        on the string alone. More than one entry in a single run means the build
-        moved mid-run — exactly the fact a phantom regression would otherwise be
-        blamed on the prompt.
+        on the string alone. One judge scores every case in a sweep, so more than
+        one entry means the build moved partway through it — exactly the fact a
+        phantom regression would otherwise be blamed on the prompt.
         """
         return tuple(sorted(self._served_versions))
 
