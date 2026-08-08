@@ -205,8 +205,14 @@ class GraphExecutor:
         the moment this driver observed the node's own output. See
         :class:`_NodeFinish` for why observation time rather than the event's
         own timestamp.
+
+        Predecessors resolve per *execution*, not per name: ``finished_at``
+        is built as the walk proceeds, so each finish sees only what landed
+        before it. A name-keyed map of every finish would hand a repeated
+        predecessor's *last* time to an earlier successor, dating it after its
+        own finish and reporting the clamped 0 ms this module exists to stop.
         """
-        finished_at = {finish.node: finish.at for finish in finishes}
+        finished_at: dict[str, float] = {}
         runs = []
         for finish in finishes:
             ready_at = max(
@@ -229,6 +235,7 @@ class GraphExecutor:
                     usage=finish.usage,
                 )
             )
+            finished_at[finish.node] = finish.at
         return runs
 
     def _fingerprint(self, node: str, served_route: str | None) -> str | None:
