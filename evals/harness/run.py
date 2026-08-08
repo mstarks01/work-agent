@@ -310,7 +310,14 @@ def _models_record(
     )
     return {
         "tiers_config_version": tiers.version,
-        "tiers": dict(tiers.tiers),
+        # Dumped, not handed over whole: a ``TierSelection`` is a pydantic model
+        # and the artifact is written with ``json.dumps``, which cannot encode
+        # one. Nothing offline caught that, because the artifact is only built
+        # on a live sweep.
+        "tiers": {
+            tier: selection.model_dump(mode="json")
+            for tier, selection in tiers.tiers.items()
+        },
         "judge_config_version": judge_config.version,
         "judge": judge_config.model,
         "judge_served": list(judge.served_model_versions) if judge else [],
