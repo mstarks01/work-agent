@@ -40,7 +40,7 @@ from pathlib import Path
 import pytest
 from pydantic import ValidationError
 
-from stride_service.critic import mentioned_ids, numbering_gaps
+from stride_service.critic import mentioned_ids
 from stride_service.evidence import CROSSING_PREFIX, UNKNOWN_PREFIX
 from stride_service.grounding import verify_quote
 from stride_service.markdown_loader import MarkdownLoader, split_sections
@@ -61,7 +61,7 @@ from stride_service.prompts import (
     compose_analyze_prompt,
     exemplar_name,
 )
-from stride_service.report import CATEGORY_LETTERS, STRIDE_CATEGORIES, ThreatProposal
+from stride_service.report import STRIDE_CATEGORIES, ThreatProposal
 from stride_service.skills import estimate_tokens
 
 PROMPTS_DIR = Path(__file__).resolve().parents[1] / "prompts"
@@ -239,15 +239,19 @@ def test_each_exemplar_section_holds_exactly_one_json_block(category):
 def test_every_exemplar_block_parses_as_a_threat_proposal(category):
     """The exemplars are parsed against the schema the agent emits, not the one
     the service resolves it into — an exemplar the node's own output schema
-    would reject is a worked example of a dead run."""
+    would reject is a worked example of a dead run.
+
+    ``extra="forbid"`` is doing real work here: an exemplar spelling out an
+    ``id`` or a ``category`` would be teaching an agent to emit two fields the
+    lane already determines, and it fails this parse rather than being read as
+    harmless decoration."""
     for heading, body in exemplar_sections(category).items():
         for block in json_blocks(body):
             try:
                 proposal = ThreatProposal.model_validate(json.loads(block))
             except (ValidationError, json.JSONDecodeError) as exc:
                 pytest.fail(f"{category} '## {heading}': {exc}")
-            assert proposal.category == category
-            assert proposal.id.startswith(f"{CATEGORY_LETTERS[category]}-")
+            assert proposal.sequence >= 1
 
 
 @pytest.mark.parametrize("category", STRIDE_CATEGORIES)
@@ -294,8 +298,14 @@ def test_exemplar_drafts_carry_a_mitigation_or_the_unknown_that_excuses_one(cate
 
 @pytest.mark.parametrize("category", STRIDE_CATEGORIES)
 def test_exemplar_drafts_are_numbered_from_01_without_gaps(category):
-    """The numbering rule the prompt states, demonstrated by the prompt's own drafts."""
-    assert numbering_gaps(exemplar_proposals(category)) == []
+    """The numbering rule the prompt states, demonstrated by its own drafts.
+
+    Asserted on ``sequence``, which is what an agent now supplies and therefore
+    what it can get wrong. ``numbering_gaps`` asks the same question one seam
+    later, of the composed IDs the service builds out of these numbers.
+    """
+    sequences = sorted(p.sequence for p in exemplar_proposals(category))
+    assert sequences == list(range(1, len(sequences) + 1))
 
 
 @pytest.mark.parametrize("category", STRIDE_CATEGORIES)

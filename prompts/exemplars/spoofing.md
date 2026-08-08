@@ -10,8 +10,7 @@ Note the phrasing. "The login flow lacks MFA" is a control observation and would
 
 ```json
 {
-  "id": "S-01",
-  "category": "spoofing",
+  "sequence": 1,
   "title": "Credential stuffing lets an attacker transact as any customer",
   "description": "An attacker on the public internet replays credentials from breach corpora, or runs a real-time phishing proxy, against the login backing `flow:customer-to-web-api:submit-payment`, which authenticates `entity:customer` with a password and a session cookie and no second factor. A successful login yields a session indistinguishable from the genuine customer's, so the attacker submits payment instructions on that customer's behalf through `process:web-api`. Second-order: the accepted instruction is written through to `store:accounts-db`, so the impersonation reaches the customer's balances and account-holder PII, not just the web tier.",
   "affected_element_ids": [
@@ -53,8 +52,7 @@ Note the phrasing. "The login flow lacks MFA" is a control observation and would
 
 ```json
 {
-  "id": "S-02",
-  "category": "spoofing",
+  "sequence": 2,
   "title": "Any dmz foothold can impersonate the web API to the ledger service",
   "description": "`flow:web-api-to-ledger-service:post-transfer` carries `authentication: none`; `process:ledger-service` accepts transfer instructions because they arrive from `boundary:dmz`, not because the caller proved an identity. An attacker who reaches that zone by any route — a compromised neighbor, SSRF through `process:web-api`, a stolen workload — originates gRPC calls that the ledger treats as authentic web-API traffic. Second-order: that identity commands transfers against `store:accounts-db` for every customer, so a foothold in a low-value zone converts directly into authority over `financial` assets in `boundary:core` and a crossing the model already flags.",
   "affected_element_ids": [
@@ -92,8 +90,7 @@ Note the phrasing. "The login flow lacks MFA" is a control observation and would
 
 ```json
 {
-  "id": "S-03",
-  "category": "spoofing",
+  "sequence": 3,
   "title": "Forged settlement callbacks if the webhook's authentication is absent",
   "description": "`flow:payments-provider-to-web-api:settlement-webhook` crosses from `boundary:public-internet` into `boundary:dmz` with `authentication: unknown`. If that unknown resolves to no verification — no signature, no mutual TLS — anyone who learns the endpoint URL can impersonate `entity:payments-provider` and post fabricated settlement confirmations to `process:web-api`. Second-order: the ledger acts on those confirmations, so forged settlements become balance changes in `store:accounts-db`. This draft is conditional on the `authentication` attribute of that flow; it is not a claim that the control is missing.",
   "affected_element_ids": [

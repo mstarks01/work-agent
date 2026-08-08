@@ -463,8 +463,17 @@ class ThreatProposal(BaseModel):
 
     model_config = ConfigDict(extra="forbid")
 
-    id: str = Field(pattern=r"^[STRIDE]-\d{2}$")
-    category: StrideCategory
+    # A number, not an ID, and no category beside it. There is one node per
+    # STRIDE category and ``analyze_instruction`` fills ``{category}`` at build
+    # time, so the lane is the graph's fact: an agent restating it is an agent
+    # given a constant to contradict, and the ID's letter is a pure function of
+    # what it would be restating. :func:`~stride_service.evidence.resolve_proposals`
+    # composes both from the lane it is resolving.
+    #
+    # An integer rather than a two-digit string, because a string reintroduces
+    # what this removes: ``"1"`` against a ``^\d{2}$`` pattern is a spelling
+    # error that fails the node, and a sequence has no spelling.
+    sequence: int = Field(ge=1, le=99)
     title: str = Field(min_length=1, max_length=200)
     description: str = Field(min_length=1, max_length=4000)
     affected_element_ids: list[str] = Field(min_length=1)
@@ -475,11 +484,10 @@ class ThreatProposal(BaseModel):
 
     @model_validator(mode="after")
     def _check_shape(self) -> Self:
-        _check_category_letter(self.id, self.category)
         if not self.evidence_refs and not self.quotes:
             raise ValueError(
-                f"threat {self.id!r} justifies itself with nothing: name at"
-                " least one evidence reference or quote"
+                f"the draft numbered {self.sequence} justifies itself with"
+                " nothing: name at least one evidence reference or quote"
             )
         return self
 

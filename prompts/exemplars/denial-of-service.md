@@ -10,8 +10,7 @@ The model states no rate limiting. Silence is not a control — rate likelihood 
 
 ```json
 {
-  "id": "D-01",
-  "category": "denial-of-service",
+  "sequence": 1,
   "title": "Request flooding on the payment endpoint exhausts the web API",
   "description": "`process:web-api` is `internet-facing`, so the attacker population is the whole internet, and each request on `flow:customer-to-web-api:submit-payment` costs a TLS session, a synchronous gRPC call to `process:ledger-service`, and a write through to `store:accounts-db`. An attacker with commodity tooling saturates the endpoint at a fraction of that cost, and no compensating control appears in the model. Second-order: the load does not stop at the dmz — it is propagated across `flow:web-api-to-ledger-service:post-transfer` into `boundary:core`, so a flood aimed at the public surface degrades a component tagged `availability-critical`, and legitimate payments fail while the attack runs.",
   "affected_element_ids": [
@@ -52,8 +51,7 @@ The exemplar is the cascade. `store:accounts-db` is a shared dependency: its con
 
 ```json
 {
-  "id": "D-02",
-  "category": "denial-of-service",
+  "sequence": 2,
   "title": "Database connection exhaustion cascades into total transfer outage",
   "description": "Every payment path terminates at `store:accounts-db` over `flow:ledger-service-to-accounts-db:read-write-balances`, whose PostgreSQL connections and throughput are a finite shared resource. Sustained traffic through `process:web-api`, or slow-running queries induced by expensive request shapes, exhausts that capacity. Second-order: `process:ledger-service` (`availability-critical`) cannot complete or roll back transfers once the pool is starved, `flow:ledger-service-to-audit-log:append-transfer-record` stops producing records so the outage window is also an accountability gap, and the failure surfaces to `entity:customer` as declined payments even though nothing in the dmz is under direct attack.",
   "affected_element_ids": [
@@ -93,8 +91,7 @@ The exemplar is the cascade. `store:accounts-db` is a shared dependency: its con
 
 ```json
 {
-  "id": "D-03",
-  "category": "denial-of-service",
+  "sequence": 3,
   "title": "Settlement webhook may be an unauthenticated work amplifier",
   "description": "`flow:payments-provider-to-web-api:settlement-webhook` reaches `process:web-api` from `boundary:public-internet` with `authentication: unknown`. If that unknown resolves to no verification, the endpoint does real settlement work — ledger calls and database writes — for any caller who knows the URL, with no credential to revoke and no account to rate-limit against. An attacker replays or fabricates deliveries at volume, and the cost lands in `boundary:core` rather than at the edge. Second-order: the amplified load reaches `process:ledger-service` and `store:accounts-db`, the same shared dependency the transfer path needs. This draft is conditional on the `authentication` attribute of that flow.",
   "affected_element_ids": [

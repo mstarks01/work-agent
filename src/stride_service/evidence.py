@@ -52,7 +52,13 @@ from __future__ import annotations
 from collections.abc import Iterable, Mapping
 
 from stride_service.critic import DraftJoinError
-from stride_service.report import DraftThreat, Ground, ThreatProposal
+from stride_service.report import (
+    CATEGORY_LETTERS,
+    DraftThreat,
+    Ground,
+    StrideCategory,
+    ThreatProposal,
+)
 from stride_service.system_model import UNKNOWN, SystemModel, attribute_names
 
 #: An evidence catalog: each reference, in a stable order, against the ground
@@ -133,7 +139,7 @@ def evidence_catalog(model: SystemModel) -> EvidenceCatalog:
 
 
 def _grounds_of(
-    proposal: ThreatProposal, catalog: Mapping[str, Ground]
+    proposal: ThreatProposal, threat_id: str, catalog: Mapping[str, Ground]
 ) -> tuple[list[Ground], list[str]]:
     """One proposal's grounds, and every reference of its that named nothing.
 
@@ -156,7 +162,7 @@ def _grounds_of(
         ground = catalog.get(ref.strip())
         if ground is None:
             unresolved.append(
-                f"threat {proposal.id!r} cites evidence {ref!r}, which is not"
+                f"threat {threat_id!r} cites evidence {ref!r}, which is not"
                 " in this job's evidence catalog"
             )
         else:
@@ -165,15 +171,24 @@ def _grounds_of(
 
 
 def resolve_proposals(
-    proposals: Iterable[ThreatProposal], catalog: Mapping[str, Ground]
+    proposals: Iterable[ThreatProposal],
+    catalog: Mapping[str, Ground],
+    category: StrideCategory,
 ) -> list[DraftThreat]:
-    """Turn one lane's proposals into drafts, resolving every reference.
+    """Turn one lane's proposals into drafts: resolve the evidence, stamp the lane.
 
-    The catalog is the sole source of truth: a resolved ground is the entry
-    itself, so it carries the branch and the fields that branch requires, and
-    the :class:`~stride_service.report.DraftThreat` this returns cannot be
-    mis-shaped whatever an agent emitted. The agent's other seven fields pass
-    through untouched — this resolves evidence and nothing else.
+    The catalog is the sole source of truth for evidence: a resolved ground is
+    the entry itself, so it carries the branch and the fields that branch
+    requires, and the :class:`~stride_service.report.DraftThreat` this returns
+    cannot be mis-shaped whatever an agent emitted.
+
+    ``category`` is the lane being resolved, and it arrives as an argument
+    because that is where the fact lives — the graph builds one node per STRIDE
+    category and knows which is which before any model runs. The threat ID is
+    composed from it and the agent's ``sequence``, so a draft's category, its
+    ID's letter and the node that produced it agree by construction rather than
+    by an agent keeping three spellings in line. Everything else passes through
+    untouched.
 
     Every unresolvable reference across the whole batch is reported together,
     rather than the first one aborting the pass. An agent that misread the
@@ -183,14 +198,15 @@ def resolve_proposals(
     drafts = []
     issues: list[str] = []
     for proposal in proposals:
-        grounds, unresolved = _grounds_of(proposal, catalog)
+        threat_id = f"{CATEGORY_LETTERS[category]}-{proposal.sequence:02d}"
+        grounds, unresolved = _grounds_of(proposal, threat_id, catalog)
         issues += unresolved
         if unresolved:
             continue
         drafts.append(
             DraftThreat(
-                id=proposal.id,
-                category=proposal.category,
+                id=threat_id,
+                category=category,
                 title=proposal.title,
                 description=proposal.description,
                 affected_element_ids=proposal.affected_element_ids,
