@@ -417,6 +417,36 @@ def test_a_mis_shaped_verdict_is_re_asked_rather_than_killing_the_job():
     assert "S-01" in re_ask
 
 
+def test_a_mistyped_ruling_id_is_re_asked_rather_than_killing_the_job():
+    """End to end, the third node-boundary raise removed from the critic.
+
+    ``"S-1"`` used to fail ``ThreatRuling``'s pattern inside the node's
+    output_schema, ending the run. It now reconciles as a drop plus an
+    invention — two problems the re-ask is already told how to fix, with no
+    prompt change needed for the new fault.
+    """
+    replies = happy_replies()
+    replies["critic"] = json.dumps(
+        {
+            "threats": [
+                {"id": "S-1", "confidence": "high", "verdict": {"status": "confirmed"}}
+            ]
+        }
+    )
+    replies["recritic"] = threats_json(sample_ruling("S-01"))
+    pipeline, models = build(replies)
+
+    outcome, visited = run(pipeline, job())
+
+    assert isinstance(outcome, PipelineCompleted)
+    assert [threat.id for threat in outcome.report.threats] == ["S-01"]
+    assert graph.RECRITIC_NODE in visited
+    assert graph.CRITIC_FAILED_NODE not in visited
+    re_ask = models["recritic"].seen[0]
+    assert "dropped draft 'S-01'" in re_ask
+    assert "'S-1', which no category agent drafted" in re_ask
+
+
 def test_a_verdict_still_mis_shaped_after_the_re_ask_fails_as_critic_output():
     """Re-askable is not ignorable. The second failure is still fatal — but it
     arrives as the service's own ``CriticOutputError`` naming the fault, not as

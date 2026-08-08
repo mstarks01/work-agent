@@ -146,6 +146,29 @@ class TestProposedVerdictCarriesNoRuleBetweenFields:
 
         assert rulings.threats[0].verdict.status == verdict["status"]
 
+    def test_a_malformed_threat_id_survives_the_node_too(self):
+        """The critic copies IDs off a roster; a mistyped one is not a shape
+        error worth a dead run.
+
+        ``review_issues`` requires the ruled set to equal the drafted set, which
+        an ill-formed ID fails on both sides at once — so a pattern here could
+        only fire on an ID the reconciliation was about to reject anyway, and it
+        fired earlier and fatally.
+        """
+        rulings = ThreatRulings.model_validate(
+            {
+                "threats": [
+                    {
+                        "id": "S-1",
+                        "confidence": "high",
+                        "verdict": {"status": "confirmed"},
+                    }
+                ]
+            }
+        )
+
+        assert rulings.threats[0].id == "S-1"
+
     def test_the_field_level_constraints_are_untouched(self):
         """Only the rules *between* fields moved. A closed vocabulary is
         something a provider schema can carry, so it stays where it was."""
