@@ -129,7 +129,7 @@ class TestResolveProposals:
         catalog = evidence_catalog(valid_model())
         proposal = sample_proposal("S-01", evidence_refs=[ENCRYPTION_REF], quotes=[])
 
-        (draft,) = resolve_proposals([proposal], catalog)
+        (draft,) = resolve_proposals([proposal], catalog, "spoofing")
 
         assert draft.grounds == [catalog[ENCRYPTION_REF]]
 
@@ -141,7 +141,7 @@ class TestResolveProposals:
             quotes=[{"text": "Customers log in", "source_label": "Description"}],
         )
 
-        (draft,) = resolve_proposals([proposal], catalog)
+        (draft,) = resolve_proposals([proposal], catalog, "spoofing")
 
         assert draft.grounds == [
             Ground(kind="quote", text="Customers log in", source_label="Description")
@@ -158,7 +158,7 @@ class TestResolveProposals:
             quotes=[{"text": "Customers log in", "source_label": "Description"}],
         )
 
-        (draft,) = resolve_proposals([proposal], catalog)
+        (draft,) = resolve_proposals([proposal], catalog, "spoofing")
 
         assert [ground.kind for ground in draft.grounds] == [
             "quote",
@@ -170,7 +170,7 @@ class TestResolveProposals:
         """The agent's other seven fields reach the report as written."""
         catalog = evidence_catalog(valid_model())
 
-        (draft,) = resolve_proposals([sample_proposal()], catalog)
+        (draft,) = resolve_proposals([sample_proposal()], catalog, "spoofing")
 
         assert draft == sample_draft()
 
@@ -178,8 +178,8 @@ class TestResolveProposals:
         catalog = evidence_catalog(valid_model())
         proposals = [sample_proposal("S-01"), sample_proposal("S-02")]
 
-        assert resolve_proposals(proposals, catalog) == resolve_proposals(
-            proposals, catalog
+        assert resolve_proposals(proposals, catalog, "spoofing") == resolve_proposals(
+            proposals, catalog, "spoofing"
         )
 
     def test_a_reference_naming_nothing_fails_deterministically(self):
@@ -191,7 +191,7 @@ class TestResolveProposals:
         )
 
         with pytest.raises(EvidenceResolutionError, match="crossing:flow:not-real"):
-            resolve_proposals([proposal], catalog)
+            resolve_proposals([proposal], catalog, "spoofing")
 
     def test_every_bad_reference_in_the_batch_is_reported_at_once(self):
         """The fan-in has no re-ask path, so it gets one chance to say what was
@@ -203,7 +203,7 @@ class TestResolveProposals:
         ]
 
         with pytest.raises(EvidenceResolutionError) as excinfo:
-            resolve_proposals(proposals, catalog)
+            resolve_proposals(proposals, catalog, "spoofing")
 
         assert "crossing:flow:ghost" in str(excinfo.value)
         assert "unknown:store:ghost:x" in str(excinfo.value)
@@ -216,7 +216,7 @@ class TestResolveProposals:
             "S-01", evidence_refs=[f"  {ENCRYPTION_REF} "], quotes=[]
         )
 
-        (draft,) = resolve_proposals([proposal], catalog)
+        (draft,) = resolve_proposals([proposal], catalog, "spoofing")
 
         assert draft.grounds == [catalog[ENCRYPTION_REF]]
 
@@ -266,11 +266,45 @@ class TestTheMisShapeIsUnreachable:
             "S-01", evidence_refs=[LOGIN_CROSSING_REF], quotes=[]
         )
 
-        (draft,) = resolve_proposals([proposal], catalog)
+        (draft,) = resolve_proposals([proposal], catalog, "spoofing")
 
         assert draft.grounds[0].kind == "derived-fact"
         assert draft.grounds[0].flow_id == "flow:customer-to-web-app:login"
         assert not draft.grounds[0].attribute
+
+    def test_an_agent_cannot_name_a_lane_or_a_threat_id_at_all(self):
+        """The category-letter mismatch, gone the way the mis-shape went.
+
+        An agent used to restate its own category and compose an ID whose
+        letter had to agree with it — two spellings of a constant the graph
+        fills in at build time, and a disagreement between them failed the node
+        and cancelled the five sibling lanes.
+        """
+        assert "id" not in ThreatProposal.model_fields
+        assert "category" not in ThreatProposal.model_fields
+        with pytest.raises(ValidationError, match="extra_forbidden"):
+            ThreatProposal.model_validate(
+                sample_proposal().model_dump() | {"id": "S-01", "category": "tampering"}
+            )
+
+    def test_the_lane_supplies_the_letter_and_the_category(self):
+        catalog = evidence_catalog(valid_model())
+        proposal = sample_proposal("S-07", evidence_refs=[ENCRYPTION_REF], quotes=[])
+
+        (draft,) = resolve_proposals([proposal], catalog, "tampering")
+
+        assert draft.id == "T-07"
+        assert draft.category == "tampering"
+
+    def test_a_sequence_has_no_spelling_to_get_wrong(self):
+        """Why the field is an integer. A two-digit string would have brought
+        the node-boundary raise back as a pattern mismatch on ``"1"``."""
+        assert (
+            ThreatProposal.model_validate(
+                sample_proposal().model_dump() | {"sequence": "7"}
+            ).sequence
+            == 7
+        )
 
     def test_a_proposal_justifying_itself_with_nothing_is_refused(self):
         """``grounds``' ``min_length=1``, expressed over the pair of lists."""

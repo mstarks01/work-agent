@@ -10,8 +10,7 @@ Same path, two lanes: rewriting those messages is tampering, reading them is you
 
 ```json
 {
-  "id": "I-01",
-  "category": "information-disclosure",
+  "sequence": 1,
   "title": "Transfer instructions readable on the wire between the web API and the ledger",
   "description": "`flow:web-api-to-ledger-service:post-transfer` carries gRPC transfer instructions — customer identifiers, amounts, destination accounts — from `boundary:dmz` into `boundary:core` with `encryption_in_transit: none`. Anyone able to observe that path (a compromised node in either zone, a misconfigured span port, a sidecar with packet capture) reads the payment activity of every customer in real time, without needing to authenticate to anything. Second-order: the observed identifiers are the inputs the ledger uses against `store:accounts-db`, so a passive observer accumulates the account mapping needed to target specific customers in later attacks.",
   "affected_element_ids": [
@@ -52,8 +51,7 @@ Same path, two lanes: rewriting those messages is tampering, reading them is you
 
 ```json
 {
-  "id": "I-02",
-  "category": "information-disclosure",
+  "sequence": 2,
   "title": "A leaked static database password exposes every account holder's records",
   "description": "The shared static password on `flow:ledger-service-to-accounts-db:read-write-balances` lives in an environment variable of `process:ledger-service` and grants full read access to `store:accounts-db`. Environment variables surface in crash dumps, process listings, error pages, container image layers, and log output, so disclosure does not require compromising the process outright. An attacker holding the password queries the store directly from anywhere in `boundary:core`, reading balances and account-holder PII in bulk. Second-order: this is corpus-scale rather than per-request disclosure — one small leak yields the entire confidential dataset, and the read leaves no trace in `store:audit-log`, which only records transfers made through the ledger.",
   "affected_element_ids": [
@@ -92,8 +90,7 @@ Same path, two lanes: rewriting those messages is tampering, reading them is you
 
 ```json
 {
-  "id": "I-03",
-  "category": "information-disclosure",
+  "sequence": 3,
   "title": "Account data exposed through backups if the store is unencrypted at rest",
   "description": "`store:accounts-db` is classified confidential and tagged `pii` and `financial`, but its `encryption_at_rest` attribute is `unknown`. If that unknown resolves to unencrypted storage, anyone who obtains a copy of the underlying media — a snapshot exported to a less-protected project, a backup bucket with broader read access, a replica in another environment, decommissioned disks — reads the full dataset without touching `process:ledger-service` or presenting any database credential. Shadow copies routinely inherit the data but not the access controls of the live store. This draft is conditional on the `encryption_at_rest` attribute; it is not a claim that the store is unencrypted.",
   "affected_element_ids": [
