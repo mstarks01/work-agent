@@ -62,7 +62,13 @@ EXEMPLARS_PREFIX = "exemplars/"
 # allowance it would sit 500 tokens above the file and catch no drift at all.
 # 2400 leaves ~200 tokens — room for a normal edit without a CI fight, and
 # little enough that a second exemplar system still has to be argued for.
-ANALYZE_PROMPT_TOKEN_CAP = 2400
+#
+# Raised to 2700 when deterministic candidates and domain packs arrived. Two new
+# ``## Input`` blocks, the paragraph fixing their standing (leads and reference
+# material, neither of them evidence) and the Procedure step that works them:
+# ~180 tokens of instruction that is the whole agent-facing half of that
+# feature. The headroom stays where it was, at ~70 tokens.
+ANALYZE_PROMPT_TOKEN_CAP = 2700
 EXEMPLAR_TOKEN_CAP = 1500
 CRITIC_PROMPT_TOKEN_CAP = 1500
 RECRITIC_PROMPT_TOKEN_CAP = 1000
