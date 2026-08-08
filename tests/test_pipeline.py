@@ -380,6 +380,67 @@ def test_a_malformed_critic_output_is_re_asked_once_and_then_assembled():
     assert "T-01" in re_ask_instruction  # named in {critic_issues}
 
 
+def test_a_mis_shaped_verdict_is_re_asked_rather_than_killing_the_job():
+    """The regression this seam exists for, end to end.
+
+    A ``needs-info`` that names no unknown is a fault, and it used to be a
+    *fatal* one: the rule lived in ``Verdict``'s validator, which ADK runs on
+    the way into session state, so the critic node raised and took the whole
+    run — six lanes of drafting and the single most expensive call in the graph
+    — with it. The re-ask that exists for exactly this never got to run.
+    """
+    replies = happy_replies()
+    replies["critic"] = json.dumps(
+        {
+            "threats": [
+                {
+                    "id": "S-01",
+                    "confidence": "high",
+                    "verdict": {"status": "needs-info", "reason": "control unverified"},
+                }
+            ]
+        }
+    )
+    replies["recritic"] = threats_json(sample_ruling("S-01"))
+    pipeline, models = build(replies)
+
+    outcome, visited = run(pipeline, job())
+
+    assert isinstance(outcome, PipelineCompleted)
+    assert [threat.id for threat in outcome.report.threats] == ["S-01"]
+    assert graph.RECRITIC_NODE in visited
+    assert graph.CRITIC_FAILED_NODE not in visited
+    # The re-ask was told which ruling, and what about it — and was shown the
+    # draft, because naming the unknown cannot be done from an ID alone.
+    re_ask = models["recritic"].seen[0]
+    assert "names no unknown attribute" in re_ask
+    assert "S-01" in re_ask
+
+
+def test_a_verdict_still_mis_shaped_after_the_re_ask_fails_as_critic_output():
+    """Re-askable is not ignorable. The second failure is still fatal — but it
+    arrives as the service's own ``CriticOutputError`` naming the fault, not as
+    a schema traceback out of a cancelled node."""
+    replies = happy_replies()
+    unreasoned = json.dumps(
+        {
+            "threats": [
+                {
+                    "id": "S-01",
+                    "confidence": "high",
+                    "verdict": {"status": "rejected"},
+                }
+            ]
+        }
+    )
+    replies["critic"] = unreasoned
+    replies["recritic"] = unreasoned
+    pipeline, _ = build(replies)
+
+    with pytest.raises(Exception, match="states no reason"):
+        run(pipeline, job())
+
+
 def test_a_critic_that_will_not_reconcile_after_the_re_ask_fails_the_job_loudly():
     replies = happy_replies()
     invented = threats_json(sample_ruling("S-01"), sample_ruling("T-02"))

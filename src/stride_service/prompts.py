@@ -72,7 +72,12 @@ EXEMPLARS_PREFIX = "exemplars/"
 ANALYZE_PROMPT_TOKEN_CAP = 2550
 EXEMPLAR_TOKEN_CAP = 1500
 CRITIC_PROMPT_TOKEN_CAP = 1500
-RECRITIC_PROMPT_TOKEN_CAP = 1000
+# The re-ask has to be able to name and fix every fault `review_issues` can
+# report, so this cap moves when that set does — it grew with the three verdict
+# shape rules, which are re-askable rather than fatal and so need a procedure
+# step. 1100 leaves ~100 tokens; a fault class costs roughly a third of that,
+# which is the right amount of friction for adding one.
+RECRITIC_PROMPT_TOKEN_CAP = 1100
 # Raised from 1500 with the sources cutover (#53, #56). The original was sized
 # against the *category agent's* 6-8K envelope, but extract loads no skills, so this
 # file is the whole instruction — around 5% of a full-budget call. Buying room
