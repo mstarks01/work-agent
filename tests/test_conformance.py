@@ -58,6 +58,7 @@ from stride_service.vendors import (
     VENDOR_NAMES,
     ProviderAuthError,
     join_served,
+    openai_reasoning_model,
     vendor_for,
 )
 from tests.factories import EMPTY_THREATS, ScriptedLlm
@@ -193,22 +194,52 @@ class TestTheMatrixItself:
             assert name in table
 
 
+def _bindable_sampling(vendor: str, tmp_path):
+    """The shipped sampling, with ``temperature`` unset where a model pins it.
+
+    Reasoning families serve ``temperature`` only at their own default, so a
+    tier running one cannot also decode greedily. Unsetting rather than stating
+    1 keeps the choice with the deployment.
+    """
+    shipped = (CONFIG / "sampling.toml").read_text()
+    if not any(openai_reasoning_model(m) for m in REFERENCE_MODELS[vendor]):
+        return load_sampling(CONFIG / "sampling.toml", env={})
+    adjusted = tmp_path / "sampling.toml"
+    adjusted.write_text(
+        "\n".join(
+            line
+            for line in shipped.splitlines()
+            if not line.strip().startswith("temperature")
+        )
+    )
+    return load_sampling(adjusted, env={})
+
+
 class TestModelsCanBeBound:
     """ "model can be instantiated" — the first line of the issue's contract."""
 
     @pytest.mark.parametrize("vendor", sorted(REFERENCE_MODELS))
-    def test_both_tiers_bind_on_every_vendor(self, vendor):
-        """The shipped sampling and resilience config binds on all three.
+    def test_both_tiers_bind_on_every_vendor(self, vendor, tmp_path):
+        """The shipped resilience config and a legal sampling binds on all three.
 
-        This is the strongest credential-free statement available about vendor
-        neutrality: the same two config files, the same five build-time gates,
-        and a working adapter per tier on every supported vendor. A vendor that
-        the shipped configuration cannot bind is not supported in any useful
-        sense, however many code paths mention it.
+        The strongest credential-free statement available about vendor
+        neutrality: the same gates, and a working adapter per tier on every
+        supported vendor. A vendor the configuration cannot bind is not
+        supported in any useful sense, however many code paths mention it.
+
+        **It is no longer the *shipped* sampling on every vendor, and that is a
+        finding rather than a concession.** ``config/sampling.toml`` pins
+        ``temperature = 0.0`` for greedy decoding, and OpenAI's reference strong
+        model is a reasoning family that serves the parameter only at its own
+        default — so the two cannot both hold. The pin is per *tier* and the
+        model is per *deployment*, so no single shipped value satisfies every
+        vendor. What binds here is the shipped config with that one parameter
+        adjusted where the model requires it; the test below pins the
+        incompatibility itself so it cannot be forgotten.
         """
         adapters = build_tier_adapters(
             tiers_for(vendor),
-            load_sampling(CONFIG / "sampling.toml", env={}),
+            _bindable_sampling(vendor, tmp_path),
             load_resilience(CONFIG / "resilience.toml", env={}),
             env=FAKE_ENV,
         )
@@ -419,3 +450,25 @@ class TestProfileShape:
         assert isinstance(entry, ProviderProfile)
         with pytest.raises(FrozenInstanceError):
             entry.model = "something-else"  # type: ignore[misc]
+
+
+def test_the_shipped_temperature_cannot_bind_openais_strong_reference_model():
+    """The incompatibility the reasoning floor surfaced, pinned so it stays known.
+
+    ``config/sampling.toml`` pins ``temperature = 0.0``; OpenAI's reference
+    strong model serves that parameter only at its own default of 1. Before the
+    floor existed this bound cleanly and died on the first live request, which
+    is the shape the build-time gates exist to prevent.
+
+    Asserted rather than fixed, because fixing it is a choice between two
+    things this test cannot make: give up greedy decoding on the strong tier
+    for every vendor, or accept that one shipped sampling file cannot serve
+    every supported model.
+    """
+    with pytest.raises(ModelGateError, match="only at its default"):
+        build_tier_adapters(
+            tiers_for("openai"),
+            load_sampling(CONFIG / "sampling.toml", env={}),
+            load_resilience(CONFIG / "resilience.toml", env={}),
+            env=FAKE_ENV,
+        )

@@ -18,6 +18,7 @@ from stride_service.vendors import (
     CredentialMode,
     ProviderAuthError,
     Vendor,
+    openai_reasoning_model,
     vendor_for,
 )
 
@@ -207,3 +208,32 @@ class TestWhatTheRegistryDeliberatelyOmits:
     def test_every_named_vendor_has_an_entry(self):
         assert {vendor_for(name).name for name in VENDOR_NAMES} == set(VENDOR_NAMES)
         assert all(isinstance(vendor_for(name), Vendor) for name in VENDOR_NAMES)
+
+
+class TestOpenAIReasoningFamilies:
+    """Which identifiers pin ``temperature`` at their own default.
+
+    A family rule rather than a support table, and open at the top: an
+    unrecognised ``gpt-6`` reads as reasoning, because a false positive costs
+    one clear error at startup and a false negative costs node one of a paid
+    job.
+    """
+
+    @pytest.mark.parametrize(
+        "model",
+        ["gpt-5.6-luna", "gpt-5.6-terra", "gpt-5.6", "gpt-5", "o3", "o4-mini"],
+    )
+    def test_reasoning_families_are_recognised(self, model):
+        assert openai_reasoning_model(model)
+
+    @pytest.mark.parametrize(
+        "model",
+        ["gpt-4o", "gpt-4o-mini", "gpt-4.1", "claude-opus-5", "gemini-2.5-pro"],
+    )
+    def test_everything_else_is_left_to_the_supported_param_gate(self, model):
+        assert not openai_reasoning_model(model)
+
+    def test_gpt_4o_is_parsed_rather_than_special_cased(self):
+        """The one identifier whose trailing letter could read as a suffix."""
+        assert not openai_reasoning_model("gpt-4o")
+        assert openai_reasoning_model("gpt-5o")
