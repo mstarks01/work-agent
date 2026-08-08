@@ -1,5 +1,12 @@
 # Live golden-case evals against real Vertex.
 #
+# NOT the vendor-coverage lane, and reading it as one is the mistake #116 was
+# filed about. Application-level provider coverage is `ci.yml`'s offline
+# conformance suite, which exercises Vertex, Anthropic and OpenAI equally on
+# every pull request because it needs no credentials at all. This workflow
+# answers the question that one cannot: does a real provider actually serve
+# this graph. It has never answered it -- see the preflight below.
+#
 # Vertex because this workflow *chooses* Vertex, in the STRIDE_MODEL_* block
 # below. The shipped config/model_tiers.toml selects no vendor at all, so a live
 # sweep has to name one; this is the only place that choice is written down, and
