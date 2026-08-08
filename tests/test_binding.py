@@ -13,9 +13,10 @@ import dataclasses
 
 import pytest
 
-from stride_service.binding import NodeBinding
+from stride_service.binding import NodeBinding, build_tier_adapters
 from stride_service.graph import TIER_NODE_BY_GRAPH_NODE
-from stride_service.model_tiers import ModelConfigError
+from stride_service.model_gate import ModelGateError
+from stride_service.model_tiers import ModelConfigError, load_model_tiers
 from stride_service.resilience import load_resilience
 from stride_service.sampling import load_sampling
 from tests.factories import PROJECT_ROOT, repo_tiers
@@ -104,3 +105,58 @@ def test_the_binding_is_frozen(tiers, sampling):
 
     with pytest.raises(dataclasses.FrozenInstanceError):
         binding.resilience = None
+
+
+class TestReasoningTemperatureFloor:
+    """The build-time gate for OpenAI families that pin ``temperature``.
+
+    The residual it covers has now bitten twice: the shipped sampling pins
+    ``temperature = 0.0``, LiteLLM's cost map does not know a model released
+    after the pinned copy, ``check_supported`` falls through to the provider's
+    base config, and the build passes a configuration the provider rejects on
+    the first request.
+    """
+
+    def _binding(self, model: str, sampling_toml: str, tmp_path):
+        config = tmp_path / "sampling.toml"
+        config.write_text(sampling_toml)
+        tiers = load_model_tiers(
+            PROJECT_ROOT / "config" / "model_tiers.toml",
+            env={
+                "STRIDE_MODEL_BASE_VENDOR": "openai",
+                "STRIDE_MODEL_BASE_MODEL": model,
+                "STRIDE_MODEL_STRONG_VENDOR": "openai",
+                "STRIDE_MODEL_STRONG_MODEL": model,
+            },
+        )
+        # ``build_tier_adapters`` rather than ``NodeBinding.from_configs``: the
+        # gates fire where the adapters are actually built, and ``from_configs``
+        # deliberately short-circuits that by taking a resolver instead.
+        return build_tier_adapters(
+            tiers,
+            load_sampling(config, env={}),
+            load_resilience(PROJECT_ROOT / "config" / "resilience.toml"),
+            env={"STRIDE_OPENAI_API_KEY": "sk-test-not-a-real-key"},
+        )
+
+    def test_greedy_decoding_on_a_reasoning_model_fails_the_build(self, tmp_path):
+        with pytest.raises(ModelGateError, match="only at its default"):
+            self._binding("gpt-5.6-terra", DIVERGENT.replace("1.0", "0.0"), tmp_path)
+
+    def test_the_message_names_the_knob_and_the_cost(self, tmp_path):
+        """Two things ops needs: which line to change, and that changing it
+        gives up reproducibility."""
+        with pytest.raises(ModelGateError) as excinfo:
+            self._binding("gpt-5.6-terra", DIVERGENT.replace("1.0", "0.0"), tmp_path)
+
+        message = str(excinfo.value)
+        assert "config/sampling.toml" in message
+        assert "greedily" in message
+
+    def test_the_default_value_is_permitted(self, tmp_path):
+        """Where this differs from the Claude rule: the parameter still exists
+        on these models, so stating it at 1 asks for what it will get."""
+        assert self._binding("gpt-5.6-terra", DIVERGENT.replace("0.0", "1.0"), tmp_path)
+
+    def test_a_non_reasoning_openai_model_is_untouched(self, tmp_path):
+        assert self._binding("gpt-4o", DIVERGENT.replace("1.0", "0.0"), tmp_path)
