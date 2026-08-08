@@ -626,6 +626,21 @@ class TestVerdictShapeIsReAskableRatherThanFatal:
 
         assert len(problems.messages) == 2
 
+    def test_a_malformed_threat_id_reads_as_a_drop_and_an_invention(self, model):
+        """Both halves of the same typo, each nameable by the re-ask.
+
+        The pattern this replaces said only "that is not an ID". These two say
+        which draft went unruled and which ID nobody drafted, which is what a
+        re-ask needs to put it right.
+        """
+        ruling = sample_ruling("S-01").model_copy(update={"id": "S-1"})
+
+        problems = review_issues([sample_draft("S-01")], [ruling], model)
+
+        assert "dropped draft 'S-01'" in "; ".join(problems.messages)
+        assert "'S-1', which no category agent drafted" in "; ".join(problems.messages)
+        assert problems.implicated == frozenset({"S-01"})
+
     def test_assembly_still_fails_closed_on_one(self, model):
         """Re-askable is not ignorable: nothing reaches the report on rulings
         the seam refused."""
