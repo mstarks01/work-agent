@@ -3,20 +3,23 @@
 The counterpart of ``test_skill_lints.py`` for prompt content (tickets 019,
 020): the four agent prompts carry exactly the four fixed H2 headings in
 order, the six exemplar files match the ``StrideCategory`` literals, and
-every fenced ``json`` block in them parses as a ``DraftThreat`` citing only
+every fenced ``json`` block in them parses as a ``ThreatProposal`` citing only
 elements the exemplar system defines. An exemplar that cites an element that
 does not exist teaches the model to hallucinate IDs, so that check is worth
 as much as the shape ones.
 
 ``## Output`` sections are prose-only by design — the machine-enforced shape
-lives in ``DraftThreat`` and nowhere else — so a fenced block appearing there
+lives in ``ThreatProposal`` and nowhere else — so a fenced block appearing there
 is the drift this guards against.
 
-THE THREE GROUNDS LINTS exist because the exemplar system now ships a labelled
-source block, and the reason it ships one is mechanical rather than editorial:
-an exemplar quote citing text the prompt never shows would teach precisely the
-failure finding-level attribution exists to prevent — that a plausible-sounding
-quote can be produced from nothing. That is a property, so it is checked rather
+THE EVIDENCE LINTS exist because the exemplar system ships a labelled source
+block and an evidence catalog, and both ship for mechanical rather than
+editorial reasons. An exemplar quote citing text the prompt never shows would
+teach precisely the failure finding-level attribution exists to prevent — that
+a plausible-sounding quote can be produced from nothing. An exemplar citing an
+evidence ID its own worked system's catalog does not list would teach the other
+half: that an ID can be composed rather than copied, which is the one thing an
+agent must never do with one. Both are properties, so both are checked rather
 than left to the author's care. The quote check runs the **shipped** ladder,
 imported rather than reimplemented, so the exemplars are held to the identical
 rule the agent is held to; a divergence between the two would be invisible
@@ -38,6 +41,7 @@ import pytest
 from pydantic import ValidationError
 
 from stride_service.critic import mentioned_ids, numbering_gaps
+from stride_service.evidence import CROSSING_PREFIX, UNKNOWN_PREFIX
 from stride_service.grounding import verify_quote
 from stride_service.markdown_loader import MarkdownLoader, split_sections
 from stride_service.prompts import (
@@ -57,7 +61,7 @@ from stride_service.prompts import (
     compose_analyze_prompt,
     exemplar_name,
 )
-from stride_service.report import CATEGORY_LETTERS, STRIDE_CATEGORIES, DraftThreat
+from stride_service.report import CATEGORY_LETTERS, STRIDE_CATEGORIES, ThreatProposal
 from stride_service.skills import estimate_tokens
 
 PROMPTS_DIR = Path(__file__).resolve().parents[1] / "prompts"
@@ -131,10 +135,29 @@ def exemplar_source_block():
     return match.group("label").strip(), match.group("text")
 
 
-def exemplar_drafts(category):
-    """Every draft in one exemplar file, parsed."""
+def exemplar_catalog():
+    """The exemplar system's evidence catalog, as the list of IDs it renders to.
+
+    Found by shape, like the source block: the one fenced block in the section
+    that parses as a JSON array of strings, which is exactly what
+    ``prepare_analysis`` puts in front of an agent.
+    """
+    for block in re.findall(
+        r"^`{3,}\n(.*?)^`{3,}$", exemplar_system(), re.MULTILINE | re.DOTALL
+    ):
+        try:
+            parsed = json.loads(block)
+        except json.JSONDecodeError:
+            continue
+        if isinstance(parsed, list) and all(isinstance(ref, str) for ref in parsed):
+            return parsed
+    raise AssertionError("the exemplar system carries no evidence catalog block")
+
+
+def exemplar_proposals(category):
+    """Every proposal in one exemplar file, parsed."""
     return [
-        DraftThreat.model_validate(json.loads(block))
+        ThreatProposal.model_validate(json.loads(block))
         for body in exemplar_sections(category).values()
         for block in json_blocks(body)
     ]
@@ -213,15 +236,18 @@ def test_each_exemplar_section_holds_exactly_one_json_block(category):
 
 
 @pytest.mark.parametrize("category", STRIDE_CATEGORIES)
-def test_every_exemplar_block_parses_as_a_draft_threat(category):
+def test_every_exemplar_block_parses_as_a_threat_proposal(category):
+    """The exemplars are parsed against the schema the agent emits, not the one
+    the service resolves it into — an exemplar the node's own output schema
+    would reject is a worked example of a dead run."""
     for heading, body in exemplar_sections(category).items():
         for block in json_blocks(body):
             try:
-                draft = DraftThreat.model_validate(json.loads(block))
+                proposal = ThreatProposal.model_validate(json.loads(block))
             except (ValidationError, json.JSONDecodeError) as exc:
                 pytest.fail(f"{category} '## {heading}': {exc}")
-            assert draft.category == category
-            assert draft.id.startswith(f"{CATEGORY_LETTERS[category]}-")
+            assert proposal.category == category
+            assert proposal.id.startswith(f"{CATEGORY_LETTERS[category]}-")
 
 
 @pytest.mark.parametrize("category", STRIDE_CATEGORIES)
@@ -229,9 +255,9 @@ def test_exemplar_references_resolve_in_the_exemplar_system(category):
     known_ids = exemplar_system_ids()
     for body in exemplar_sections(category).values():
         for block in json_blocks(body):
-            draft = DraftThreat.model_validate(json.loads(block))
-            unknown = set(draft.affected_element_ids) - known_ids
-            assert not unknown, f"{draft.id} cites {sorted(unknown)}"
+            proposal = ThreatProposal.model_validate(json.loads(block))
+            unknown = set(proposal.affected_element_ids) - known_ids
+            assert not unknown, f"{proposal.id} cites {sorted(unknown)}"
 
 
 @pytest.mark.parametrize("category", STRIDE_CATEGORIES)
@@ -245,33 +271,35 @@ def test_exemplar_descriptions_cite_only_ids_the_exemplar_system_has(category):
     known_ids = exemplar_system_ids()
     for body in exemplar_sections(category).values():
         for block in json_blocks(body):
-            draft = DraftThreat.model_validate(json.loads(block))
+            proposal = ThreatProposal.model_validate(json.loads(block))
             unknown = [
                 mention
-                for mention in mentioned_ids(draft.description)
+                for mention in mentioned_ids(proposal.description)
                 if mention not in known_ids
             ]
-            assert not unknown, f"{draft.id} description cites {sorted(unknown)}"
+            assert not unknown, f"{proposal.id} description cites {sorted(unknown)}"
 
 
 @pytest.mark.parametrize("category", STRIDE_CATEGORIES)
 def test_exemplar_drafts_carry_a_mitigation_or_the_unknown_that_excuses_one(category):
     """An exemplar must not model the shape the service marks as incomplete."""
-    for draft in exemplar_drafts(category):
-        licensed = any(ground.kind == "unknown-attribute" for ground in draft.grounds)
-        assert draft.mitigations or licensed, (
-            f"{draft.id} offers no mitigation and no unknown-attribute ground"
+    for proposal in exemplar_proposals(category):
+        licensed = any(
+            ref.startswith(f"{UNKNOWN_PREFIX}:") for ref in proposal.evidence_refs
+        )
+        assert proposal.mitigations or licensed, (
+            f"{proposal.id} offers no mitigation and no unknown-attribute evidence"
         )
 
 
 @pytest.mark.parametrize("category", STRIDE_CATEGORIES)
 def test_exemplar_drafts_are_numbered_from_01_without_gaps(category):
     """The numbering rule the prompt states, demonstrated by the prompt's own drafts."""
-    assert numbering_gaps(exemplar_drafts(category)) == []
+    assert numbering_gaps(exemplar_proposals(category)) == []
 
 
 @pytest.mark.parametrize("category", STRIDE_CATEGORIES)
-def test_exemplar_quote_grounds_verify_against_block(category):
+def test_exemplar_quotes_verify_against_block(category):
     """Every exemplar quote is really in the block the prompt shows.
 
     Through the shipped ladder, imported — the exemplars are held to the exact
@@ -281,10 +309,10 @@ def test_exemplar_quote_grounds_verify_against_block(category):
     """
     _, text = exemplar_source_block()
     unfindable = [
-        (draft.id, ground.text)
-        for draft in exemplar_drafts(category)
-        for ground in draft.grounds
-        if ground.kind == "quote" and not verify_quote(ground.text, text)
+        (proposal.id, quote.text)
+        for proposal in exemplar_proposals(category)
+        for quote in proposal.quotes
+        if not verify_quote(quote.text, text)
     ]
     assert not unfindable
 
@@ -294,29 +322,53 @@ def test_exemplar_quote_labels_match_the_block(category):
     """A quote resolves to a source, which here is the block's declared label."""
     label, _ = exemplar_source_block()
     mislabelled = [
-        (draft.id, ground.source_label)
-        for draft in exemplar_drafts(category)
-        for ground in draft.grounds
-        if ground.kind == "quote" and ground.source_label != label
+        (proposal.id, quote.source_label)
+        for proposal in exemplar_proposals(category)
+        for quote in proposal.quotes
+        if quote.source_label != label
     ]
     assert not mislabelled
 
 
 @pytest.mark.parametrize("category", STRIDE_CATEGORIES)
-def test_exemplar_ground_refs_resolve(category):
-    """A ground's element and flow references exist in the exemplar system.
+def test_exemplar_evidence_refs_are_in_the_exemplar_catalog(category):
+    """Every ID an exemplar cites is one its own worked system offers.
 
-    The reference lint beside this one covers ``affected_element_ids`` only, so
-    without this all three grounds reference surfaces would be unchecked.
+    Membership, exactly as the resolver asks it. The reference lint beside this
+    one covers ``affected_element_ids`` only, so without this the surface an
+    agent copies from would be unchecked — and an exemplar composing an ID that
+    resolves against nothing teaches an agent to do the same, at the one seam
+    where that fails the whole lane.
+    """
+    catalog = set(exemplar_catalog())
+    dangling = [
+        (proposal.id, ref)
+        for proposal in exemplar_proposals(category)
+        for ref in proposal.evidence_refs
+        if ref not in catalog
+    ]
+    assert not dangling
+
+
+def test_the_exemplar_catalog_names_only_elements_the_system_defines():
+    """The other end of the same chain: the catalog's own IDs resolve.
+
+    A catalog is derived from a System Model at run time, so every entry names
+    a real element by construction. The exemplar system's is hand-written, and
+    an entry naming nothing would make the lint above pass against a fiction.
     """
     known_ids = exemplar_system_ids()
-    dangling = [
-        (draft.id, ref)
-        for draft in exemplar_drafts(category)
-        for ground in draft.grounds
-        for ref in (ground.element_id, ground.flow_id)
-        if ref and ref not in known_ids
-    ]
+    dangling = []
+    for ref in exemplar_catalog():
+        if ref.startswith(f"{CROSSING_PREFIX}:"):
+            element = ref.split(":", 1)[1]
+        elif ref.startswith(f"{UNKNOWN_PREFIX}:"):
+            element = ref.split(":", 1)[1].rsplit(":", 1)[0]
+        else:
+            dangling.append(ref)
+            continue
+        if element not in known_ids:
+            dangling.append(ref)
     assert not dangling
 
 
@@ -343,10 +395,9 @@ def test_no_non_markdown_files_under_prompts():
 # Worst-case category-agent instruction is skill text (~2.2K) plus this; the
 # envelope is 6-8K, so the composed prompt has ~4K of room.
 #
-# Raised from 3500 with the body cap, and it had to move with it: the composed
-# budget binds first, so a body cap the composed budget cannot accommodate is a
-# cap nothing can reach.
-COMPOSED_ANALYZE_TOKEN_BUDGET = 3800
+# Moves with the body cap, and has to: the composed budget binds first, so a
+# body cap the composed budget cannot accommodate is a cap nothing can reach.
+COMPOSED_ANALYZE_TOKEN_BUDGET = 3900
 
 
 @pytest.mark.parametrize("category", STRIDE_CATEGORIES)
