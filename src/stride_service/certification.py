@@ -134,8 +134,8 @@ def certify(
 
     ``observations`` maps a node to **every** fingerprint that node presented:
     one per execution, so twelve eval cases give one node twelve, and a build
-    that moves mid-run gives it two. An empty set is illegal — a node that never
-    ran is simply absent.
+    that moves mid-sweep gives it two. An empty set is illegal — a node that
+    never ran is simply absent.
 
     ``expected_nodes`` is the built graph's LLM nodes, which is where the
     expectation of what *should* have run comes from. It is deliberately
@@ -175,9 +175,11 @@ def fingerprints_of(nodes: Iterable[NodeRun]) -> dict[str, frozenset[str]]:
     """The node -> fingerprint sets a run of node executions presents.
 
     Only LLM nodes carry a fingerprint: a deterministic FunctionNode has none
-    and is skipped rather than certified against an empty set. A node appearing
-    more than once — the critic on a revise path — contributes every hash it
-    presented, which is what makes a mid-run build move visible.
+    and is skipped rather than certified against an empty set. A node maps to
+    a *set* because one node can present several hashes: a sweep runs each node
+    once per case, so twelve cases give one node twelve, and a build that moves
+    partway through gives it two distinct ones. A single service run cannot
+    loop, so there it is one hash per node.
 
     Takes the node runs rather than a report because the two callers hold
     different things: the service certifies a finished report, while a sweep
