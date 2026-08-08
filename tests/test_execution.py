@@ -169,7 +169,7 @@ def test_a_provider_that_meters_nothing_yields_no_usage_at_all():
 
 
 def test_usage_by_node_sums_a_nodes_executions(graph_run):
-    """The critic on a revise path runs twice; the question is what it cost."""
+    """A sweep runs one node once per case; the question is what it all cost."""
     critic = by_node(graph_run)[graph.CRITIC_NODE]
     twice = [critic, critic.model_copy()]
 

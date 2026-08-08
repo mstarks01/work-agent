@@ -83,8 +83,8 @@ class TestPerExecutionSets:
     """A node maps to every hash it presented, not one."""
 
     def test_a_node_that_ran_twice_certifies_only_if_both_are_blessed(self):
-        # A build that moved mid-run gives one node two hashes; that is the
-        # drift signal, not a defect.
+        # A build that moved partway through a sweep gives one node two hashes;
+        # that is the drift signal, not a defect.
         blessed = manifest({"strong": {FP_A}})
         assert certify(observed(critic={FP_A}), blessed, tier_of, ALL_NODES).certified
         drifted = certify(observed(critic={FP_A, FP_B}), blessed, tier_of, ALL_NODES)
