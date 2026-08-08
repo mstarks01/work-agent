@@ -173,9 +173,9 @@ async def _run_mode(
     it could never certify.
 
     A case whose drafts the fan-in rejects is **counted and survived** rather
-    than allowed to abort the sweep — a mis-shaped ``Ground`` and a threat that
-    loses every ground are both rates somebody asked for, and a sweep that dies
-    on the first one reports neither. It stays a Tier 1 failure: the case is
+    than allowed to abort the sweep — a threat that loses every ground and an
+    invented evidence reference are both rates somebody asked for, and a sweep
+    that dies on the first one reports neither. It stays a Tier 1 failure: the case is
     recorded, its failure is listed, and the run still exits non-zero. Only the
     fan-in's own exceptions are caught (:data:`~evals.harness.grounds.CAUGHT`);
     a provider timeout is not a measurement and still ends the sweep.
