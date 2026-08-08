@@ -1,4 +1,4 @@
-"""The eval CLI: run a mode over the corpus, or calibrate the judge.
+"""The eval CLI: run a mode over the corpus, calibrate the judge, promote a winner.
 
 Gating is **Tier 1 structural only**. A report that does not parse, whose
 references dangle, whose severity bands contradict the matrix or whose summary
@@ -13,10 +13,17 @@ exemplar delta, and the ``valid-unlisted`` threats queued for the SME's next
 blessing pass. The metrics are judge-relative — track movement with them, never
 quote them as absolutes.
 
-Both subcommands — ``run`` and ``calibrate`` — need live provider credentials,
-so neither runs on a PR. The credential-free lane is ``evals/verify_corpus.py``,
-which is what CI exercises; the live sweep runs on the weekly schedule in
+``run`` and ``calibrate`` need live provider credentials, so neither runs on a
+PR. The credential-free lane is ``evals/verify_corpus.py``, which is what CI
+exercises; the live sweep runs on the weekly schedule in
 ``.github/workflows/evals-live.yml``.
+
+``promote`` needs **no** credentials: it works from a finished artifact, whose
+``provenance`` block records what each node execution actually ran on. That is
+the point of recording it — the served builds are observations, made once
+during the sweep, and rediscovering them afterwards is not something an
+operator should have to do
+([#117](https://github.com/mstarks01/work-agent/issues/117)).
 """
 
 from __future__ import annotations
@@ -25,13 +32,14 @@ import argparse
 import asyncio
 import json
 import sys
-from collections.abc import Iterable, Sequence
+from collections.abc import Sequence
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
 
 from evals.harness import modes
 from evals.harness.calibration import AGREEMENT_BAR, load_pairs, measure_agreement
+from evals.harness.certify import PromotionPlan, plan_promotion, promote
 from evals.harness.critic_yield import (
     CriticYield,
     aggregate_yield,
@@ -46,6 +54,15 @@ from evals.harness.grounds import (
     measure_grounds,
 )
 from evals.harness.judge import Judge, PinnedJudge, load_judge_config
+from evals.harness.provenance import (
+    ARTIFACT_VERSION,
+    UNSET,
+    EvalArtifact,
+    ProvenanceError,
+    RunProvenance,
+    load_artifact,
+    provenance_of,
+)
 from evals.harness.reference import GoldenCase, load_corpus
 from evals.harness.scorer import (
     CaseScore,
@@ -53,7 +70,7 @@ from evals.harness.scorer import (
     unlisted_for_promotion,
 )
 from evals.harness.structural import report_issues
-from stride_service.certification import CertifyResult, certify, fingerprints_of
+from stride_service.certification import CertificationError, CertifyResult, certify
 from stride_service.deployment import Deployment
 from stride_service.report import NodeRun, TokenUsage, usage_by_node
 
@@ -86,10 +103,12 @@ def _select(cases: Sequence[GoldenCase], wanted: Sequence[str]) -> list[GoldenCa
 class ModeRun:
     """Everything one sweep of one mode produced.
 
-    ``observations`` maps a node to every fingerprint it presented across the
-    whole sweep — twelve cases give one node twelve — and is what
-    :func:`~stride_service.certification.certify` rules on. ``expected_nodes``
-    is the *built* graph's LLM nodes, so a mode that enters at ``extract`` and
+    ``provenance`` is the sweep's generation identities — per node execution,
+    what was requested, what answered, and the hash that pair produced. Both
+    the certification verdict and the artifact are derived from it, so the
+    thing a promotion reads back is the same record the verdict was computed
+    from rather than a parallel one written alongside. ``expected_nodes`` is
+    the *built* graph's LLM nodes, so a mode that enters at ``extract`` and
     stops is not held to the tiers it never routes through.
 
     ``usage`` is the sweep's token cost per node, summed across every case and
@@ -105,17 +124,16 @@ class ModeRun:
     payloads: list[dict[str, Any]]
     failures: list[str]
     runs: dict[str, modes.AnalysisRun]
-    observations: dict[str, frozenset[str]]
+    provenance: RunProvenance
     expected_nodes: list[str]
     usage: dict[str, TokenUsage]
     grounds: list[CaseGrounds]
     grounds_failures: list[GroundsFailure]
 
-
-def _observe(observed: dict[str, set[str]], nodes: Iterable[NodeRun]) -> None:
-    """Fold one case's node executions into the sweep's observation set."""
-    for node, prints in fingerprints_of(nodes).items():
-        observed.setdefault(node, set()).update(prints)
+    @property
+    def observations(self) -> dict[str, frozenset[str]]:
+        """The node -> fingerprint sets the certification verdict rules on."""
+        return self.provenance.observations()
 
 
 async def _run_mode(
@@ -123,10 +141,10 @@ async def _run_mode(
 ) -> ModeRun:
     """Run one mode over the selected cases, collecting Tier 1 failures.
 
-    The per-node fingerprints come back too, taken from the node runs rather
+    The generation identities come back too, taken from the node runs rather
     than from the report: the extraction mode produces no report, and sourcing
-    observations from one would leave the single tier that mode exercises the
-    only tier it could never certify.
+    them from one would leave the single tier that mode exercises the only tier
+    it could never certify.
 
     A case whose drafts the fan-in rejects is **counted and survived** rather
     than allowed to abort the sweep — a mis-shaped ``Ground`` and a threat that
@@ -142,9 +160,9 @@ async def _run_mode(
     failures: list[str] = []
     payloads: list[dict[str, Any]] = []
     runs: dict[str, modes.AnalysisRun] = {}
-    observed: dict[str, set[str]] = {}
-    # Every execution the sweep performed, kept flat so the per-node totals
-    # come from the one tested fold rather than a second one written here.
+    # Every execution the sweep performed, kept flat so the per-node totals,
+    # the certification verdict and the artifact's provenance are three views
+    # of one list rather than three folds that could disagree.
     executions: list[NodeRun] = []
     grounds: list[CaseGrounds] = []
     grounds_failures: list[GroundsFailure] = []
@@ -152,7 +170,6 @@ async def _run_mode(
     for case in cases:
         if mode == "extraction":
             result = await modes.run_extraction(case, pipeline)
-            _observe(observed, result.node_runs)
             executions += result.node_runs
             score = modes.score_extraction(case, result)
             payloads.append(score.to_json())
@@ -177,7 +194,6 @@ async def _run_mode(
             continue
 
         runs[case.id] = run
-        _observe(observed, run.report.nodes)
         executions += run.report.nodes
         issues = report_issues(run.report)
         failures += [f"{case.id}: {issue}" for issue in issues]
@@ -201,7 +217,12 @@ async def _run_mode(
         payloads=payloads,
         failures=failures,
         runs=runs,
-        observations={node: frozenset(prints) for node, prints in observed.items()},
+        provenance=provenance_of(
+            executions,
+            tier_of=deployment.tier_of,
+            sampling=deployment.sampling,
+            tiers_config_version=deployment.tiers.version,
+        ),
         expected_nodes=list(pipeline.node_sampling),
         usage=usage_by_node(executions),
         grounds=grounds,
@@ -377,14 +398,18 @@ def command_run(args: argparse.Namespace) -> int:
         _print_yields(yields)
 
     artifact = {
+        "artifact_version": ARTIFACT_VERSION,
         "mode": args.mode,
         "cases": [case.id for case in cases],
         "models": _models_record(deployment, judge),
         "gating": "tier-1-structural-only",
         "certification": certification.to_json(),
-        "node_fingerprints": {
-            node: sorted(prints) for node, prints in mode_run.observations.items()
-        },
+        # What actually generated, per node execution — the record `promote`
+        # reads back. It replaces the `node_fingerprints` map, which carried
+        # the hashes without the served builds they were computed from, so a
+        # promotion could not be driven from a finished sweep at all
+        # ([#117](https://github.com/mstarks01/work-agent/issues/117)).
+        "provenance": mode_run.provenance.to_json(),
         "node_usage": {
             node: usage.model_dump() for node, usage in mode_run.usage.items()
         },
@@ -485,6 +510,130 @@ def _print_certification(result: CertifyResult) -> None:
         print("certification: all node fingerprints blessed")
 
 
+def _served_choice(value: str) -> tuple[str, str]:
+    """Parse one ``--served TIER=BUILD`` selection.
+
+    Split on the *first* ``=`` only: a served build is a vendor-prefixed
+    provider string, and nothing forbids one containing the character.
+    """
+    tier, sep, served = value.partition("=")
+    if not sep or not tier.strip() or not served.strip():
+        raise argparse.ArgumentTypeError(f"expected TIER=SERVED_BUILD, got {value!r}")
+    return tier.strip(), served.strip()
+
+
+def command_promote(args: argparse.Namespace) -> int:
+    """Bless a finished sweep's generation identities, from the artifact alone.
+
+    The whole point is that nothing is reconstructed by hand: the served builds
+    were observed during the sweep and recorded, so promotion reads them rather
+    than asking the operator to rediscover what answered
+    ([#117](https://github.com/mstarks01/work-agent/issues/117)).
+
+    A preview by default, because promotion rewrites two config files this
+    deployment then runs on. ``--yes`` is the second step, and it is the same
+    computed plan that gets written — the preview is not a separate rendering
+    that could describe something else.
+    """
+    deployment = Deployment.from_env()
+    try:
+        artifact = load_artifact(args.artifact)
+        _check_sampling_schema(artifact.provenance, deployment)
+        plan = plan_promotion(artifact.provenance, dict(args.served))
+    except CertificationError as error:
+        print(f"refusing to promote: {error}", file=sys.stderr)
+        return 1
+
+    paths = deployment.paths
+    _print_promotion(artifact, plan, paths.sampling, paths.blessed_fingerprints)
+    if not args.yes:
+        print(
+            "\nNothing written. Re-run with --yes to re-pin the sampling file"
+            " and bless the fingerprints above."
+        )
+        return 0
+
+    try:
+        manifest = promote(
+            plan.sampling,
+            plan.served_builds,
+            sampling_path=paths.sampling,
+            manifest_path=paths.blessed_fingerprints,
+        )
+    except CertificationError as error:
+        print(f"promotion failed, nothing written: {error}", file=sys.stderr)
+        return 1
+
+    print(f"\nre-pinned {paths.sampling}")
+    print(f"blessed into {paths.blessed_fingerprints}:")
+    for tier in sorted(manifest.tiers):
+        print(f"  {tier}: {len(manifest.blessed_for(tier))} fingerprint(s)")
+    print("Commit both files: a blessed set is a reviewed claim about this deployment.")
+    return 0
+
+
+def _check_sampling_schema(provenance: RunProvenance, deployment: Deployment) -> None:
+    """Refuse an artifact measured against a different sampling schema.
+
+    Promotion re-pins values *into* this deployment's file, so values measured
+    under one schema written into a file on another would produce a blessed
+    fingerprint describing parameters no run ever carried. There is no
+    migration: the sampling file's versions are hard cutovers, and a stale
+    artifact is re-measured rather than reinterpreted.
+    """
+    measured = provenance.sampling_config_version
+    current = deployment.sampling.version
+    if measured != current:
+        raise ProvenanceError(
+            f"the artifact was measured under sampling schema v{measured} and"
+            f" this deployment reads v{current}; re-run the sweep rather than"
+            " promoting values across a schema change"
+        )
+
+
+def _print_promotion(
+    artifact: EvalArtifact,
+    plan: PromotionPlan,
+    sampling_path: Path,
+    manifest_path: Path,
+) -> None:
+    """Show exactly what would be certified, before anything is written."""
+    print("Configuration selected for promotion")
+    print(f"  artifact:  {artifact.path}")
+    print(f"  measured:  mode {artifact.mode}, {len(artifact.cases)} case(s)")
+    print(f"  re-pins:   {sampling_path}")
+    print(f"  blesses:   {manifest_path}")
+    if artifact.structural_failures:
+        print(
+            f"  WARNING:   this sweep reported"
+            f" {len(artifact.structural_failures)} structural failure(s)"
+        )
+    if not artifact.trusted:
+        print(
+            "  WARNING:   this sweep read as untrusted — it was not itself"
+            " certified against an existing blessed set"
+        )
+
+    for entry in plan.tiers:
+        print(f"\n{entry.tier.upper()}")
+        print(f"  requested: {', '.join(entry.requested_models)}")
+        print(f"  served:    {entry.served_model}")
+        print(f"  nodes:     {', '.join(entry.nodes)}")
+        not_blessed = [
+            served
+            for served in entry.observed_served_models
+            if served != entry.served_model
+        ]
+        if not_blessed:
+            print(f"  NOT blessed (also observed): {', '.join(not_blessed)}")
+        print()
+        for param, value in entry.sampling.model_dump().items():
+            shown = UNSET if value is None else value
+            print(f"  {param + ':':<20} {shown}")
+        print("\n  fingerprint:")
+        print(f"    {entry.fingerprint}")
+
+
 def command_calibrate(args: argparse.Namespace) -> int:
     """The >= 90% judge-human bar; failing it blocks a judge change."""
     deployment = Deployment.from_env()
@@ -537,6 +686,30 @@ def main(argv: Sequence[str] | None = None) -> int:
     )
     calibrate_parser.add_argument("--out", help="where to write the agreement report")
     calibrate_parser.set_defaults(func=command_calibrate)
+
+    promote_parser = subparsers.add_parser(
+        "promote",
+        help="bless a finished sweep's generation identities from its artifact",
+    )
+    promote_parser.add_argument("artifact", help="the run artifact to promote")
+    promote_parser.add_argument(
+        "--served",
+        action="append",
+        default=[],
+        type=_served_choice,
+        metavar="TIER=BUILD",
+        help=(
+            "which served build to bless for a tier the sweep saw answered by"
+            " more than one. It selects among what was observed and cannot"
+            " introduce a build the sweep never saw."
+        ),
+    )
+    promote_parser.add_argument(
+        "--yes",
+        action="store_true",
+        help="write the files; without it the promotion is only previewed",
+    )
+    promote_parser.set_defaults(func=command_promote)
 
     args = parser.parse_args(argv)
     return args.func(args)

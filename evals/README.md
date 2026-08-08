@@ -44,6 +44,7 @@ evals/
 | `harness/critic_yield.py` | What the critic added and removed, scored on both sides. |
 | `harness/grounds.py` | What the category agents did with `grounds` — the branch mix, the padding number and the unverified-quote rate — plus the two failures the grounding path kills a case with. Judge-free. |
 | `harness/calibration.py` | Judge-vs-human agreement over the labelled fixtures. |
+| `harness/provenance.py` | What each node execution actually ran on — tier, requested route, served build, fingerprint — written into the artifact and read back by a promotion. |
 | `harness/certify.py` | Promoting a winning configuration: rewrites `config/sampling.toml` and records its fingerprints as blessed. The certification check itself lives in the service (`stride_service.certification`), which this imports. |
 | `harness/modes.py` | The three run modes over the shipped graph. |
 | `harness/run.py` | The command-line entry point. |
@@ -61,6 +62,13 @@ which ones it asked for. Stable model identifiers name the current build rather
 than a frozen one, so two runs that report different served versions have run on
 different models — that's a model change, not a regression, and nothing else in
 the output would reveal it.
+
+Those served builds land in the artifact's `provenance` block, one entry per node
+execution, which is what makes promotion a command rather than an archaeology
+exercise: a fingerprint is `sha256(served build, tier sampling)`, and neither half
+is recoverable from the configured tier strings. The block carries an
+`artifact_version` beside it at the artifact's root; a promotion refuses any
+version it does not know rather than interpreting it best-effort.
 
 ## Running
 
@@ -81,6 +89,17 @@ python -m evals.harness.run run --mode analysis --out artifact.json
 python -m evals.harness.run run --mode extraction --case 01-payments-checkout
 python -m evals.harness.run calibrate --out agreement.json
 ```
+
+Offline again, once a sweep has been reviewed — `promote` needs no credentials,
+because everything it certifies was observed during the run and written into the
+artifact:
+
+```sh
+python -m evals.harness.run promote artifact.json          # preview, writes nothing
+python -m evals.harness.run promote artifact.json --yes    # re-pin and bless
+```
+
+See [TUNING.md](TUNING.md#step-5--promote-the-winner).
 
 A `run` fails (exits non-zero) **only** on a structural problem — a report that
 doesn't parse, references that don't resolve, a severity that contradicts the
