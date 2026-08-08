@@ -89,6 +89,55 @@ def test_shipped_judge_config_is_pinned_and_versioned():
     validate_model_string(config.model, config.vendor, source="judge.model")
 
 
+def test_a_candidate_judge_loads_on_every_supported_vendor(tmp_path):
+    """The judge is not vendor-locked, and this is what says so.
+
+    The shipped *value* is Vertex/Gemini and the *mechanism* has been
+    vendor-neutral since the v3 cutover — but nothing asserted the second, so
+    the file read as a coupling. Selecting a judge on measured agreement
+    ([#116](https://github.com/mstarks01/work-agent/issues/116)) requires
+    loading candidates from other families, so a regression here would block
+    the calibration rather than show up as a bad number.
+
+    Each pair also clears the load-time gates every tier clears: the pinned-form
+    rule, greedy decoding under the supported-param check, and native structured
+    output.
+    """
+    candidates = {
+        "anthropic": "claude-sonnet-4-6",
+        "openai": "gpt-5.6",
+        "vertex": "gemini-2.5-pro",
+    }
+    for vendor, model in candidates.items():
+        path = tmp_path / f"judge-{vendor}.toml"
+        path.write_text(
+            f'version = 3\nvendor = "{vendor}"\nmodel = "{model}"\n'
+            "temperature = 0.0\norder_seed = 20260721\n"
+        )
+
+        config = load_judge_config(path)
+
+        assert (config.vendor, config.model) == (vendor, model)
+
+
+def test_a_judge_requiring_greedy_decoding_refuses_an_o_series_model(tmp_path):
+    """Not vendor bias — a capability difference, caught at load rather than mid-sweep.
+
+    Greedy decoding is required of the judge so a re-run cannot flip a verdict,
+    and o-series models constrain ``temperature`` to exactly ``1``. The pair is
+    therefore unrepresentable, and it fails where a candidate is chosen instead
+    of hours into a paid sweep.
+    """
+    path = tmp_path / "judge.toml"
+    path.write_text(
+        'version = 3\nvendor = "openai"\nmodel = "o3"\n'
+        "temperature = 0.0\norder_seed = 20260721\n"
+    )
+
+    with pytest.raises(ValueError):
+        load_judge_config(path)
+
+
 def test_alias_judge_model_is_refused(tmp_path):
     path = tmp_path / "judge.toml"
     path.write_text(
