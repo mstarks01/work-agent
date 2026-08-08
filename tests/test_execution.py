@@ -15,7 +15,7 @@ import asyncio
 import pytest
 
 from stride_service import graph
-from stride_service.execution import GraphExecutor
+from stride_service.execution import GraphExecutor, _NodeFinish
 from stride_service.report import Ground, usage_by_node
 from stride_service.sampling import (
     TierSampling,
@@ -224,6 +224,31 @@ def test_durations_are_measured_from_the_last_predecessor(graph_run):
     assert nodes[graph.ASSEMBLE_NODE].duration_ms <= max(
         node_run.duration_ms for node_run in graph_run.node_runs
     )
+
+
+def test_a_repeated_node_is_timed_against_the_predecessor_that_preceded_it():
+    """Each execution measures from the predecessor finish *before* it.
+
+    Unreachable through :meth:`run` — the graph cannot loop, so no node name
+    repeats in a drive — which is why this drives ``_node_runs`` directly with
+    a finish sequence that repeats. Resolving predecessors against a name-keyed
+    map of every finish gives the first ``validate`` the *second* ``extract``'s
+    time, dating it after its own finish, and the clamp then reports 0 ms with
+    nothing saying the number is wrong.
+    """
+    pipeline, _ = scripted_pipeline(happy_replies())
+    executor = GraphExecutor(pipeline, app_name="stride-test")
+    looped = [
+        _NodeFinish(node=graph.EXTRACT_NODE, at=1.0, served_model=None),
+        _NodeFinish(node=graph.VALIDATE_NODE, at=2.0, served_model=None),
+        _NodeFinish(node=graph.EXTRACT_NODE, at=3.0, served_model=None),
+        _NodeFinish(node=graph.VALIDATE_NODE, at=4.0, served_model=None),
+    ]
+
+    runs = executor._node_runs(looped, 0.0)
+
+    validates = [run for run in runs if run.node == graph.VALIDATE_NODE]
+    assert [run.duration_ms for run in validates] == [1000, 1000]
 
 
 def test_an_llm_nodes_latency_is_charged_to_that_node():
