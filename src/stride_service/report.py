@@ -279,12 +279,19 @@ class Ground(BaseModel):
         return self
 
 
-class Verdict(BaseModel):
-    """The critic's ruling on one threat.
+class ProposedVerdict(BaseModel):
+    """The critic's ruling on one threat, as the critic emits it.
 
-    ``needs-info`` must name the unknown attributes that caused it;
-    ``needs-info`` and ``rejected`` must state a reason.
+    The three fields and **no rule between them**, which is what makes this the
+    shape a provider can be asked to generate: nothing a critic writes here is
+    a shape error, so nothing it writes can fail the node on the way into
+    state. Whether the combination is *coherent* — a ``needs-info`` that names
+    what must be answered, a non-``confirmed`` that says why — is asked at the
+    review seam, which can send it back.
 
+    Every field's own constraint still applies. ``status`` is a closed
+    vocabulary and a ``reason`` still has a maximum length; what moved is only
+    the part that depends on another field's value.
     """
 
     model_config = ConfigDict(extra="forbid")
@@ -292,6 +299,32 @@ class Verdict(BaseModel):
     status: VerdictStatus
     reason: str = Field(default="", max_length=1000)
     related_unknowns: list[UnknownRef] = Field(default_factory=list)
+
+
+class Verdict(ProposedVerdict):
+    """The critic's ruling on one threat, as the report carries it.
+
+    ``needs-info`` must name the unknown attributes that caused it;
+    ``needs-info`` and ``rejected`` must state a reason.
+
+    THREE RULES BETWEEN FIELDS, AND NOT ONE OF THEM IS IN THE SCHEMA. Which
+    fields a verdict must and must not carry depends on its own ``status``, and
+    that dependency is not expressible in a JSON schema a provider will
+    reliably compile — the same constraint :class:`Ground` documents at length.
+
+    So this class is **not what the critic emits**. It emits
+    :class:`ProposedVerdict`, which is these fields with no rule between them,
+    and :func:`~stride_service.critic.review_issues` checks the three at the
+    seam that owns "is this critic output well-formed" — where a failure routes
+    to the bounded ``recritic`` re-ask. Raising here instead would kill the node
+    on the way into state, taking the whole job with it, and the re-ask built
+    for exactly this would never run.
+
+    What survives here is the invariant on the *report*: a ``Verdict`` is
+    constructed only by :func:`~stride_service.critic.assemble_threats`, out of
+    a proposal the review seam has already passed, so the check below is this
+    service auditing its own construction rather than refereeing a model's.
+    """
 
     @model_validator(mode="after")
     def _check_shape(self) -> Self:
@@ -511,7 +544,10 @@ class ThreatRuling(BaseModel):
 
     id: str = Field(pattern=r"^[STRIDE]-\d{2}$")
     confidence: Rating
-    verdict: Verdict
+    # The unruled shape: a verdict whose fields disagree with each other is a
+    # problem for the review seam to report and the re-ask to fix, not a reason
+    # to fail the node. assemble_threats builds the canonical Verdict.
+    verdict: ProposedVerdict
     severity: Severity | None = None
 
 

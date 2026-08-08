@@ -10,10 +10,18 @@ from stride_service.critic import (
     join_drafts,
     mentioned_ids,
     numbering_gaps,
+    review_issues,
     snap_drafts,
     snap_rulings,
 )
-from stride_service.report import Ground, Mitigation, Severity, UnknownRef, Verdict
+from stride_service.report import (
+    Ground,
+    Mitigation,
+    ProposedVerdict,
+    Severity,
+    UnknownRef,
+    Verdict,
+)
 from stride_service.sources import DEFAULT_DESCRIPTION_LABEL
 from tests.factories import sample_draft, sample_ruling, valid_model
 
@@ -535,6 +543,97 @@ class TestAssembleThreats:
 
     def test_empty_analysis_assembles_to_empty_arrays(self, model):
         assert assemble_threats([], [], model) == ([], [])
+
+
+class TestVerdictShapeIsReAskableRatherThanFatal:
+    """The three rules a ``Verdict``'s own status implies, checked at this seam.
+
+    Each one arrives as a :class:`ProposedVerdict`, which is what the critic
+    node emits and what its ``output_schema`` therefore accepts without
+    raising. That is the point: enforcing these in the schema means enforcing
+    them at the node boundary, where a raise takes the critic's single pass
+    over every draft in the job with it, and the bounded re-ask built for
+    exactly this class of problem never runs.
+    """
+
+    @pytest.fixture
+    def model(self):
+        return valid_model()
+
+    def _rulings(self, **verdict):
+        return [sample_ruling("S-01", verdict=ProposedVerdict(**verdict))]
+
+    def test_a_needs_info_naming_no_unknown_is_reported(self, model):
+        problems = review_issues(
+            [sample_draft("S-01")],
+            self._rulings(status="needs-info", reason="unclear"),
+            model,
+        )
+
+        assert "names no unknown attribute" in "; ".join(problems.messages)
+
+    def test_unknowns_on_a_verdict_that_is_not_needs_info_are_reported(self, model):
+        problems = review_issues(
+            [sample_draft("S-01")],
+            self._rulings(
+                status="confirmed",
+                related_unknowns=[
+                    UnknownRef(element_id="store:orders-db", attribute="technology")
+                ],
+            ),
+            model,
+        )
+
+        assert "only meaningful on a needs-info verdict" in "; ".join(problems.messages)
+
+    def test_a_rejection_without_a_reason_is_reported(self, model):
+        problems = review_issues(
+            [sample_draft("S-01")], self._rulings(status="rejected"), model
+        )
+
+        assert "states no reason" in "; ".join(problems.messages)
+
+    def test_the_threat_is_implicated_so_the_re_ask_can_read_it(self, model):
+        """Neither naming the unknown nor writing the reason can be done from an
+        ID — both are claims about a specific threat."""
+        problems = review_issues(
+            [sample_draft("S-01")], self._rulings(status="rejected"), model
+        )
+
+        assert problems.implicated == frozenset({"S-01"})
+
+    def test_two_independent_faults_on_one_ruling_are_two_messages(self, model):
+        """A merged message would leave the second to be found on a pass that
+        no longer exists."""
+        problems = review_issues(
+            [sample_draft("S-01")],
+            self._rulings(
+                status="rejected",
+                related_unknowns=[
+                    UnknownRef(element_id="store:orders-db", attribute="technology")
+                ],
+            ),
+            model,
+        )
+
+        assert len(problems.messages) == 2
+
+    def test_assembly_still_fails_closed_on_one(self, model):
+        """Re-askable is not ignorable: nothing reaches the report on rulings
+        the seam refused."""
+        with pytest.raises(CriticOutputError, match="states no reason"):
+            assemble_threats(
+                [sample_draft("S-01")], self._rulings(status="rejected"), model
+            )
+
+    def test_a_passing_ruling_is_promoted_to_the_reports_own_verdict(self, model):
+        """``ProposedVerdict`` in, ``Verdict`` out — so a threat on the report
+        carries the shape the report defines, whatever the critic emitted."""
+        threats, _ = assemble_threats(
+            [sample_draft("S-01")], self._rulings(status="confirmed"), model
+        )
+
+        assert type(threats[0].verdict) is Verdict
 
 
 class TestRulingsMergeOntoDrafts:
