@@ -42,41 +42,44 @@ name: Evals (live Vertex)
 
 on:
   pull_request:
-    # Path-filtered to the agentic surface. report.py and system_model.py
-    # count as agentic: they define the schemas bound as node output schemas,
-    # so a change there changes what the models are asked to emit.
-    # deployment.py, binding.py and model_gate.py count for a different reason
-    # -- none of them touches a prompt or a schema, but between them they decide
-    # which config the graph is built from, which (vendor, model) each tier
-    # binds, and which pairs are allowed to bind at all. A change to any of the
-    # three can change which model runs and on what sampling.
+    # Path-filtered to the agentic surface, by naming the *package* and
+    # subtracting from it rather than by listing the files that make it up. A
+    # list of filenames covers the responsibilities that existed when it was
+    # written and stays still when one of them moves to a new module, so it
+    # goes short silently and the sweep stops firing for exactly the change
+    # that most needs it. Subtraction fails the other way: a new module is
+    # swept until someone rules it out, and the cost of being wrong is a
+    # spurious run rather than a gap nobody sees.
     #
-    # The list has now been short twice, both times the same way: it named the
-    # files that existed when a responsibility was written down, and stayed
-    # still when that responsibility moved. deployment.py was missed when graph
-    # assembly moved out of pipeline.py; binding.py and model_gate.py were
-    # missed when tier binding and the build-time gates moved out of
-    # deployment.py. That is the ordinary cost of a filter naming files rather
-    # than behaviour -- a path filter can always be fooled.
+    # The four exclusions are the modules the eval harness cannot reach. The
+    # harness drives `GraphExecutor` in process against a `Deployment`, so the
+    # HTTP surface and its bearer check are off the path entirely,
+    # `conformance.py` reports capabilities without gating anything, and
+    # `StrideEngine` is the *other* in-process entry point rather than the one
+    # evals use. Everything else in the package is on the transitive import
+    # closure of `evals/` and is therefore swept, including the three that
+    # carry an eval outcome without touching a prompt or a schema:
+    # `validation.py` decides rejected vs. completed, `execution.py` renders
+    # the sources every node sees, and `retry.py` decides whether a node's
+    # answer arrives at all.
     #
-    # WITHOUT THE BACKSTOP: nothing catches it when it is. The scheduled sweep
-    # was the answer to "the filter has gone stale again", and it is gone, so a
-    # responsibility that moves to an unlisted file is now invisible until
-    # someone dispatches a run by hand. The list has already been short twice.
+    # `tests/test_workflow_lints.py` recomputes that closure and fails when
+    # this list and it disagree, so the exclusions are enforced rather than
+    # remembered.
+    #
+    # WITHOUT THE BACKSTOP: nothing catches what subtraction still cannot see.
+    # The scheduled sweep is gone, so a responsibility that moves out of
+    # `src/stride_service/` altogether -- into `evals/`, or into a new
+    # top-level package -- is invisible until someone dispatches a run by hand.
     paths:
       - "prompts/**"
       - "skills/**"
       - "config/**"
-      - "src/stride_service/graph.py"
-      - "src/stride_service/prompts.py"
-      - "src/stride_service/skills.py"
-      - "src/stride_service/critic.py"
-      - "src/stride_service/deployment.py"
-      - "src/stride_service/binding.py"
-      - "src/stride_service/model_gate.py"
-      - "src/stride_service/pipeline.py"
-      - "src/stride_service/report.py"
-      - "src/stride_service/system_model.py"
+      - "src/stride_service/**"
+      - "!src/stride_service/api.py"
+      - "!src/stride_service/auth.py"
+      - "!src/stride_service/conformance.py"
+      - "!src/stride_service/engine.py"
       - ".github/workflows/evals-live.yml"
   # NO `schedule`. There was a Monday 06:00 UTC backstop sweep here until
   # federation went unconfigured indefinitely. A scheduled run fails closed when
