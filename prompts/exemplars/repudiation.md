@@ -20,15 +20,13 @@ The lane test: the harm here is not that someone impersonated a customer (spoofi
     "store:audit-log",
     "flow:ledger-service-to-audit-log:append-transfer-record"
   ],
-  "grounds": [
+  "evidence_refs": [
+    "crossing:flow:customer-to-web-api:submit-payment"
+  ],
+  "quotes": [
     {
-      "kind": "quote",
       "text": "the entry names the ledger service and never the customer",
       "source_label": "Payments platform notes"
-    },
-    {
-      "kind": "derived-fact",
-      "flow_id": "flow:customer-to-web-api:submit-payment"
     }
   ],
   "severity": {
@@ -65,14 +63,13 @@ The lane test: the harm here is not that someone impersonated a customer (spoofi
     "flow:ledger-service-to-audit-log:append-transfer-record",
     "flow:web-api-to-ledger-service:post-transfer"
   ],
-  "grounds": [
+  "evidence_refs": [],
+  "quotes": [
     {
-      "kind": "quote",
       "text": "the entry names the ledger service and never the customer",
       "source_label": "Payments platform notes"
     },
     {
-      "kind": "quote",
       "text": "not authenticated and not encrypted",
       "source_label": "Payments platform notes"
     }
@@ -110,17 +107,11 @@ The lane test: the harm here is not that someone impersonated a customer (spoofi
     "process:web-api",
     "flow:payments-provider-to-web-api:settlement-webhook"
   ],
-  "grounds": [
-    {
-      "kind": "derived-fact",
-      "flow_id": "flow:payments-provider-to-web-api:settlement-webhook"
-    },
-    {
-      "kind": "unknown-attribute",
-      "element_id": "flow:payments-provider-to-web-api:settlement-webhook",
-      "attribute": "authentication"
-    }
+  "evidence_refs": [
+    "crossing:flow:payments-provider-to-web-api:settlement-webhook",
+    "unknown:flow:payments-provider-to-web-api:settlement-webhook:authentication"
   ],
+  "quotes": [],
   "severity": {
     "likelihood": "medium",
     "impact": "medium",

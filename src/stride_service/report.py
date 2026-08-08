@@ -188,32 +188,30 @@ class UnknownRef(BaseModel):
 class Ground(BaseModel):
     """What justifies one finding: a quote, a named unknown, or a derived fact.
 
-    Category-agent-owned and authored, never derived from the affected
-    elements' ``source_excerpt``s: a derived citation would always render *a*
-    quote and frequently the wrong one. An excerpt says why an *element*
-    exists; a ground says why a *threat* was raised.
+    Chosen by a category agent, constructed by the service. An agent names the
+    fact it relied on — a catalog entry, or a span and the source it came from
+    — and :func:`~stride_service.evidence.resolve_proposals` builds the record.
+    Never derived from the affected elements' ``source_excerpt``s: a derived
+    citation would always render *a* quote and frequently the wrong one. An
+    excerpt says why an *element* exists; a ground says why a *threat* was
+    raised.
 
-    ONE FLAT MODEL, NOT A DISCRIMINATED UNION. The union is the more honest
-    shape — it forbids a nonsense combination in the schema itself, so a
-    constrained model cannot generate one — and it was rejected anyway on a
-    measured fact rather than a preference: **provider schema compilers are the
-    unpredictable part of this system.** ``config/sampling.toml`` records that
-    one vendor rejects ``SystemModel``'s compiled grammar as "too large", and
-    that ``constrain_output = false`` is not a working answer to a schema a
-    provider will not compile — unconstrained, the model fences its JSON and
-    omits required fields. So the cost of a grammar a vendor chokes on is a
-    dead run, not a degraded one, and this schema rides in ``DraftThreats`` on
-    the ``strong`` tier for **six** category agents whose vendor is selected
-    independently. ``oneOf`` is the construct with the thinnest, least uniform
-    support across those vendors; the flat object is the portable shape.
+    NO MODEL EVER GENERATES ONE, which is what makes a flat object safe here.
+    The three branches carry different required fields, and that relationship
+    is not expressible in a JSON schema a provider will reliably compile —
+    ``oneOf`` has the thinnest, least uniform support across the vendors a
+    category agent may be routed to, and ``config/sampling.toml`` records what
+    an uncompilable grammar costs: one vendor rejects ``SystemModel``'s as "too
+    large", and ``constrain_output = false`` is no answer, because
+    unconstrained the model fences its JSON and omits required fields. A dead
+    run, not a degraded one. Since the only writer is code holding a catalog
+    entry, the constraint never has to reach a schema compiler at all, and the
+    validator below is checking this module's own arithmetic rather than
+    refereeing a model's guess.
 
-    :class:`Verdict` is already exactly this pattern, so the repo has one
-    answer to "tagged variant in a provider-facing schema" rather than two.
-
-    What is given up, stated plainly: the schema no longer prevents a mis-shaped
-    ``Ground`` at generation time. It is caught on arrival, by the validator
-    below, and there is no re-ask path for a category agent's drafts — a
-    mis-shape fails the job at :func:`~stride_service.critic.join_drafts`.
+    :class:`Verdict` is the tagged variant that *is* generated, and it is this
+    same flat shape, so the repo has one answer to "tagged variant in a
+    provider-facing schema" rather than two.
 
     The branches, and why each carries what it does:
 
@@ -286,6 +284,7 @@ class Verdict(BaseModel):
 
     ``needs-info`` must name the unknown attributes that caused it;
     ``needs-info`` and ``rejected`` must state a reason.
+
     """
 
     model_config = ConfigDict(extra="forbid")
@@ -311,13 +310,37 @@ class Verdict(BaseModel):
         return self
 
 
-class DraftThreat(BaseModel):
-    """One category agent's draft finding: the eight fields the agent owns.
+def _check_category_letter(threat_id: str, category: StrideCategory) -> None:
+    """Raise unless a threat ID carries its category's letter.
 
-    Everything a category agent produces and nothing it may rule on —
-    ``verdict`` and ``confidence`` are the critic's, and appear only once a
+    Shared by the shape a category agent emits and the shape the service
+    resolves it into, so the rule is stated once. A proposal that fails it is
+    rejected at the node boundary, which is the earliest point either shape
+    exists.
+    """
+    letter = CATEGORY_LETTERS[category]
+    if not threat_id.startswith(f"{letter}-"):
+        raise ValueError(
+            f"threat ID {threat_id!r} does not carry the {category}"
+            f" category letter {letter!r}"
+        )
+
+
+class DraftThreat(BaseModel):
+    """One draft finding: the eight fields a category agent's answer becomes.
+
+    Everything a category agent's proposal establishes and nothing it may rule
+    on — ``verdict`` and ``confidence`` are the critic's, and appear only once a
     draft is promoted to a :class:`Threat`. This is the shape the prompt
     exemplars are lint-parsed against.
+
+    **Built by the service, never emitted by an agent.** An agent answers in
+    :class:`ThreatProposal`, which names its evidence rather than serializing
+    it, and :func:`~stride_service.evidence.resolve_proposals` constructs this
+    from that answer. So a ``grounds`` list here is code's own output: every
+    entry either came out of the evidence catalog whole or is a quote assembled
+    from the two fields an agent supplied, and neither route can express a
+    mis-shaped :class:`Ground`.
 
     ``grounds`` is ``min_length=1`` with **no maximum**, exactly like
     ``affected_element_ids``: this model caps no list, and runaway output stays
@@ -337,12 +360,7 @@ class DraftThreat(BaseModel):
 
     @model_validator(mode="after")
     def _check_id_matches_category(self) -> Self:
-        letter = CATEGORY_LETTERS[self.category]
-        if not self.id.startswith(f"{letter}-"):
-            raise ValueError(
-                f"threat ID {self.id!r} does not carry the {self.category}"
-                f" category letter {letter!r}"
-            )
+        _check_category_letter(self.id, self.category)
         return self
 
 
@@ -357,12 +375,88 @@ class Threat(DraftThreat):
     verdict: Verdict
 
 
-class DraftThreats(BaseModel):
-    """What a category agent node emits: an object wrapping its list of drafts.
+class QuoteCandidate(BaseModel):
+    """A span an agent claims is in one of the job's sources, and which source.
+
+    The two fields a ``quote`` :class:`Ground` carries, and deliberately not
+    that ground itself: an agent proposes the span, and
+    :func:`~stride_service.evidence.resolve_proposals` builds the ground. Both
+    fields are required here where the ground defaults them to the empty
+    string, because a candidate exists only to be checked and neither half of
+    the check has anything to run against alone — a labelless quote names no
+    source to search, and a textless label cites nothing.
+
+    The lengths are the ground's own, so a candidate that validates always
+    resolves into a ground that validates.
+    """
+
+    model_config = ConfigDict(extra="forbid")
+
+    text: str = Field(min_length=1, max_length=1000)
+    source_label: str = Field(min_length=1, max_length=200)
+
+
+class ThreatProposal(BaseModel):
+    """What a category agent actually emits: a finding that *names* its evidence.
+
+    THE FIELD A MODEL NO LONGER SERIALIZES. A :class:`Ground` is a flat object
+    whose legal field combination depends on its own ``kind``, and that
+    relationship is unrepresentable in the JSON schema a provider compiles —
+    the reasons are :class:`Ground`'s own docstring's. It was therefore carried
+    by prompt instruction, which makes a mis-shaped ground an expected
+    stochastic outcome rather than a defect: an agent that picked the right
+    fact and spelled it into the wrong branch killed the node, and with it all
+    six lanes, at a seam with no re-ask path.
+
+    So the agent stops spelling it. ``evidence_refs`` holds IDs copied from the
+    evidence catalog the service derived from the validated System Model, and
+    ``quotes`` holds spans plus the source each came from. Both are flat lists
+    of a single shape, which a schema compiler can express exactly; nothing an
+    agent can put in either is a shape error, and a reference naming nothing
+    fails deterministically against the catalog rather than probabilistically
+    against a validator.
+
+    What is given up: the branch is no longer the agent's to state. That is the
+    point — the branch was always dictated by the trigger, so an agent choosing
+    it was an agent given a mechanical job to get wrong. The catalog entry
+    carries the branch, and picking the entry picks it.
+
+    At least one entry across the two lists, which is ``grounds``'
+    ``min_length=1`` expressed over the pair: a finding with no justification
+    at all is the one thing neither list may say. Which list carries it is free
+    — a threat triggered by a crossing or an unknown legitimately quotes
+    nothing.
+    """
+
+    model_config = ConfigDict(extra="forbid")
+
+    id: str = Field(pattern=r"^[STRIDE]-\d{2}$")
+    category: StrideCategory
+    title: str = Field(min_length=1, max_length=200)
+    description: str = Field(min_length=1, max_length=4000)
+    affected_element_ids: list[str] = Field(min_length=1)
+    evidence_refs: list[str] = Field(default_factory=list)
+    quotes: list[QuoteCandidate] = Field(default_factory=list)
+    severity: Severity
+    mitigations: list[Mitigation] = Field(default_factory=list)
+
+    @model_validator(mode="after")
+    def _check_shape(self) -> Self:
+        _check_category_letter(self.id, self.category)
+        if not self.evidence_refs and not self.quotes:
+            raise ValueError(
+                f"threat {self.id!r} justifies itself with nothing: name at"
+                " least one evidence reference or quote"
+            )
+        return self
+
+
+class ThreatProposals(BaseModel):
+    """What a category agent node emits: an object wrapping its list of proposals.
 
     The wrapper exists for the *schema*, not for the domain. A node's
     ``output_schema`` is what the graph asks the provider to constrain
-    generation to, and a bare ``list[DraftThreat]`` cannot be asked for: ADK
+    generation to, and a bare ``list[ThreatProposal]`` cannot be asked for: ADK
     cannot convert a generic alias into a response format, so it sends none and
     the node generates unconstrained — silently, with only a log line. Wrapping
     the list in a model gives the conversion something it can carry, and an
@@ -371,11 +465,15 @@ class DraftThreats(BaseModel):
 
     Nothing downstream sees it: the graph unwraps at the node boundary, so the
     domain keeps working in lists.
+
+    ``threats`` rather than ``proposals`` because the field name is the agent's
+    output contract and the prompt has always spelled it that way. What changed
+    is the shape of an entry, not what an agent is being asked for.
     """
 
     model_config = ConfigDict(extra="forbid")
 
-    threats: list[DraftThreat]
+    threats: list[ThreatProposal]
 
 
 class ThreatRuling(BaseModel):
