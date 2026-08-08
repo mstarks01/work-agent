@@ -178,5 +178,6 @@ class AdkPipelineRunner:
             unverified_grounds=analysis.unverified_grounds,
             unresolved_mentions=analysis.unresolved_mentions,
             missing_mitigations=analysis.missing_mitigations,
+            coverage=analysis.coverage,
             summary=analysis.summary,
         )

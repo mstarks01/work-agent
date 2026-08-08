@@ -23,7 +23,7 @@ and the fields below are the authoritative account.
 
 ```python
 class StrideReport:
-    schema_version: str          # "2.3"
+    schema_version: str          # "2.4"
     disclaimer: str              # AI-generated, not human-reviewed
     job: Job                     # id, status="completed", timestamps, revise_rounds
     input: InputRef              # system_name + one ref per submitted source
@@ -36,6 +36,7 @@ class StrideReport:
     unverified_grounds: list[UnverifiedGround]  # quote grounds not found in their source
     unresolved_mentions: list[UnresolvedMention]  # element IDs a description cites that do not exist
     missing_mitigations: list[MissingMitigation]  # threats offering no countermeasure, unexcused
+    coverage: list[CategoryCoverage]             # per-lane account of what each agent was offered
     summary: Summary
 ```
 
@@ -223,6 +224,46 @@ finding. What it buys a reader is the ability to see which findings arrived
 with nothing to do about them, and to tell those apart from the ones that
 correctly said "answer this unknown first".
 
+## `coverage` — what each lane was offered
+
+A threat count says how much a category agent found. It cannot say whether a
+lane that found nothing had examined the system and cleared it, or had never
+looked at half of it. `coverage` carries one row per STRIDE category — always
+all six, including a lane that filed nothing.
+
+```python
+class CategoryCoverage:
+    category: StrideCategory
+    drafts: int                  # threats this lane filed, before the critic ruled
+    rules: int                   # deterministic triggers defined in this lane
+    rules_fired: int             # of those, how many produced a candidate here
+    candidates: int              # structural leads handed to this agent
+    candidates_cited: int        # leads whose every element the drafts cite
+    elements: int                # elements in the system model
+    elements_cited: int
+    boundary_crossings: int
+    boundary_crossings_cited: int
+    unknown_controls: int        # attributes stating no verified control
+    unknown_controls_cited: int
+```
+
+Every number is computed in code, from the system model, the deterministic
+candidate triggers and the agent's own drafts. None of it is asserted by a
+model, which is the reason it is worth recording at all.
+
+**Read `*_cited` as cited, not as considered.** An agent that examined a flow
+and correctly concluded there was no threat cites nothing, and is
+indistinguishable here from one that never read it — there is no observable
+that separates them, since a model's own claim to have looked is exactly the
+assertion this design declines to trust. The fields are named for what they
+measure. The honest use is the aggregate: a category citing two of forty
+structural leads across a corpus is a signal, one agent's zero on one case is
+not.
+
+Counted over the **drafts**, not the ruled threats: coverage is a fact about
+what the six agents did with the system, and a draft the critic later rejects
+was still part of the system being examined.
+
 ## What is checked but never reported
 
 Threat IDs are asked to run `01..N` within each category. A lane that emits
@@ -352,6 +393,9 @@ class TokenUsage:
 
 > **`schema_version` 2.3** added `missing_mitigations`, a third optional
 > top-level list of service-owned marks. Additive on the same argument.
+
+> **`schema_version` 2.4** added `coverage`. Additive again: a fourth optional
+> top-level list, service-owned and computed in code.
 
 The report records both model fields and **compares neither**. It doesn't need
 to: if the build moves, the fingerprint moves with it, and the run stops
