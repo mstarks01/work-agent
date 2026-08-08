@@ -55,6 +55,10 @@ RUNTIME_PLACEHOLDERS = frozenset(
         graph.STATE_CRITIC_ISSUES,
         graph.STATE_DRAFT_ROSTER,
         graph.STATE_UNRECONCILED_DRAFTS,
+        graph.STATE_DOMAIN_SKILLS,
+        # One per lane: ``{candidates}`` in the prompt file is resolved to this
+        # agent's own key at build time.
+        *(graph.candidates_state_key(category) for category in STRIDE_CATEGORIES),
     }
 )
 
@@ -541,16 +545,20 @@ def test_validate_names_a_silent_extraction_rather_than_binding_against_it():
     assert graph.STATE_VALID_MODEL not in ctx.state
 
 
-def test_prepare_derives_crossings_rather_than_trusting_them():
+def test_prepare_derives_crossings_rather_than_trusting_them(skill_loader):
     ctx = FakeContext()
-    output = graph.prepare_analysis(valid_model().model_dump(mode="json"), ctx)
+    output = graph.prepare_analysis(
+        valid_model().model_dump(mode="json"), ctx, skill_loader
+    )
 
-    assert output == {"element_count": 7, "crossing_count": 1, "evidence_count": 3}
+    assert output["element_count"] == 7
+    assert output["crossing_count"] == 1
+    assert output["evidence_count"] == 3
     assert "flow:customer-to-web-app:login" in ctx.state[graph.STATE_BOUNDARY_CROSSINGS]
     assert "process:web-app" in ctx.state[graph.STATE_SYSTEM_MODEL]
 
 
-def test_prepare_shows_the_agents_the_evidence_catalog_as_references():
+def test_prepare_shows_the_agents_the_evidence_catalog_as_references(skill_loader):
     """The closed set an agent picks from, and no more than that.
 
     Rendered as bare IDs: the fields behind each one are the element and flow
@@ -558,14 +566,14 @@ def test_prepare_shows_the_agents_the_evidence_catalog_as_references():
     would restate what the agent is already reading.
     """
     ctx = FakeContext()
-    graph.prepare_analysis(valid_model().model_dump(mode="json"), ctx)
+    graph.prepare_analysis(valid_model().model_dump(mode="json"), ctx, skill_loader)
 
     rendered = json.loads(ctx.state[graph.STATE_EVIDENCE_CATALOG])
     assert "crossing:flow:customer-to-web-app:login" in rendered
     assert all(isinstance(ref, str) for ref in rendered)
 
 
-def test_prepare_strips_the_source_fields_from_the_rendered_model():
+def test_prepare_strips_the_source_fields_from_the_rendered_model(skill_loader):
     """The agents and the critic read the model; only ``{input_text}`` has quotes.
 
     Once the full source text is in the same request, an element's excerpt is a
@@ -578,7 +586,7 @@ def test_prepare_strips_the_source_fields_from_the_rendered_model():
     assert excerpt, "the fixture must carry an excerpt for this to prove anything"
     ctx = FakeContext()
 
-    graph.prepare_analysis(valid, ctx)
+    graph.prepare_analysis(valid, ctx, skill_loader)
 
     rendered = ctx.state[graph.STATE_SYSTEM_MODEL]
     assert excerpt not in rendered
@@ -898,6 +906,104 @@ def test_assemble_splits_rulings_and_builds_the_summary():
     assert [t.id for t in analysis.rejected_threats] == ["T-01"]
     assert analysis.summary.threat_count == 1
     assert analysis.summary.rejected_count == 1
+
+
+# --- Deterministic candidates, domain packs, coverage -----------------------
+
+
+def test_prepare_parks_each_lanes_candidates_under_its_own_key(skill_loader):
+    """Six agents, one session state: a lane cannot read another's leads."""
+    ctx = FakeContext()
+    graph.prepare_analysis(valid_model().model_dump(mode="json"), ctx, skill_loader)
+
+    for category in STRIDE_CATEGORIES:
+        parked = ctx.state[graph.candidates_state_key(category)]
+        assert f'"category": "{category}"' in parked
+        others = set(STRIDE_CATEGORIES) - {category}
+        assert not any(f'"category": "{other}"' in parked for other in others)
+
+
+def test_prepare_fences_candidate_facts(skill_loader):
+    """Facts carry caller words, so they get the model's own fencing."""
+    ctx = FakeContext()
+    graph.prepare_analysis(valid_model().model_dump(mode="json"), ctx, skill_loader)
+
+    parked = ctx.state[graph.candidates_state_key("information-disclosure")]
+    assert parked.startswith("```")
+
+
+def test_prepare_selects_domain_packs_from_the_model(skill_loader):
+    ctx = FakeContext()
+    output = graph.prepare_analysis(
+        valid_model().model_dump(mode="json"), ctx, skill_loader
+    )
+
+    # The fixture runs FastAPI over HTTPS against Cloud SQL Postgres.
+    assert output["domain_packs"] == ["http-api", "databases"]
+    assert "# HTTP and API Security" in ctx.state[graph.STATE_DOMAIN_SKILLS]
+
+
+def test_prepare_renders_no_pack_block_when_none_is_earned(skill_loader):
+    model = valid_model()
+    model.processes[0].technology = "a shell script"
+    model.data_stores[0].technology = "a flat file"
+    for flow in model.data_flows:
+        flow.protocol = "local"
+        flow.authentication = "a shared unix account"
+    ctx = FakeContext()
+
+    graph.prepare_analysis(model.model_dump(mode="json"), ctx, skill_loader)
+
+    assert ctx.state[graph.STATE_DOMAIN_SKILLS] == ""
+
+
+def test_each_agent_is_bound_to_its_own_candidate_key(skill_loader, prompt_loader):
+    for category in STRIDE_CATEGORIES:
+        instruction = graph.analyze_instruction(skill_loader, prompt_loader, category)
+        assert f"{{{graph.candidates_state_key(category)}}}" in instruction
+        assert "{candidates}" not in instruction
+
+
+def test_merge_accounts_for_coverage_over_the_drafts():
+    ctx = FakeContext(**analyze_state(spoofing=[sample_proposal("S-01", "spoofing")]))
+
+    graph.merge_drafts(valid_model().model_dump(mode="json"), ctx)
+
+    rows = ctx.state[graph.STATE_COVERAGE]
+    assert [row["category"] for row in rows] == list(STRIDE_CATEGORIES)
+    spoofing = next(row for row in rows if row["category"] == "spoofing")
+    assert spoofing["drafts"] == 1
+    assert spoofing["elements"] == 7
+
+
+def test_coverage_reaches_the_report_through_assemble():
+    ctx = FakeContext()
+    graph.assemble_report(
+        valid_model().model_dump(mode="json"),
+        [sample_draft("S-01").model_dump(mode="json")],
+        ctx,
+        reviewed_threats={"threats": [sample_ruling("S-01").model_dump(mode="json")]},
+        coverage=[
+            {
+                "category": "spoofing",
+                "drafts": 1,
+                "rules": 2,
+                "rules_fired": 0,
+                "candidates": 0,
+                "candidates_cited": 0,
+                "elements": 7,
+                "elements_cited": 2,
+                "boundary_crossings": 1,
+                "boundary_crossings_cited": 1,
+                "unknown_controls": 2,
+                "unknown_controls_cited": 1,
+            }
+        ],
+    )
+
+    analysis = graph.Analysis.from_state(ctx.state[graph.STATE_ANALYSIS])
+    assert [row.category for row in analysis.coverage] == ["spoofing"]
+    assert analysis.coverage[0].boundary_crossings_cited == 1
 
 
 def test_assemble_fails_closed_when_the_critic_drops_a_draft():

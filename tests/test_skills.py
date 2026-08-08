@@ -14,6 +14,7 @@ from stride_service.skills import (
     category_boundary_digest,
     compose_analyze_skills,
     compose_critic_skills,
+    compose_domain_skills,
     estimate_tokens,
     extract_section,
     split_sections,
@@ -125,25 +126,27 @@ class TestBoundaryDigest:
 
 
 class TestComposition:
-    def test_analyze_order_is_category_rubric_packs(self, skills_root):
-        text = compose_analyze_skills(
-            MarkdownLoader(skills_root), "spoofing", domain_packs=("web",)
-        )
-        assert (
-            text.index("Lane boundary for spoofing.")
-            < text.index("# Severity Rubric")
-            < text.index("# Web Pack")
+    def test_analyze_order_is_category_then_rubric(self, skills_root):
+        text = compose_analyze_skills(MarkdownLoader(skills_root), "spoofing")
+        assert text.index("Lane boundary for spoofing.") < text.index(
+            "# Severity Rubric"
         )
 
-    def test_analyze_without_packs_omits_them(self, skills_root):
+    def test_analyze_never_carries_packs(self, skills_root):
+        """Packs are per-job, so they ride in state rather than the instruction."""
         text = compose_analyze_skills(MarkdownLoader(skills_root), "spoofing")
         assert "# Web Pack" not in text
 
+    def test_domain_skills_compose_in_selection_order(self, skills_root):
+        text = compose_domain_skills(MarkdownLoader(skills_root), ("web",))
+        assert text.startswith("# Web Pack")
+
+    def test_no_packs_composes_to_empty(self, skills_root):
+        assert compose_domain_skills(MarkdownLoader(skills_root), ()) == ""
+
     def test_unknown_pack_raises(self, skills_root):
         with pytest.raises(MarkdownNotFoundError):
-            compose_analyze_skills(
-                MarkdownLoader(skills_root), "spoofing", domain_packs=("mainframe",)
-            )
+            compose_domain_skills(MarkdownLoader(skills_root), ("mainframe",))
 
     def test_critic_gets_rubric_then_digest_only(self, skills_root):
         text = compose_critic_skills(MarkdownLoader(skills_root))
