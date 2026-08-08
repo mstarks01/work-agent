@@ -60,6 +60,31 @@ jobs:
       - name: Format
         run: uv run ruff format --check . --exclude '*.md'
 
+      # Lints the workflow files themselves, including this one.
+      #
+      # Fetched as a version-pinned release binary and checked against its
+      # published sha256 rather than run as a third-party action: the reasoning
+      # is the same one that pins the actions above by commit SHA, and a
+      # checksummed tarball needs no token exposure at all. Bumping the version
+      # means bumping the digest with it -- a mismatch fails the step closed.
+      #
+      # The runner ships shellcheck, so actionlint also lints the `run:` blocks
+      # here, matching what .githooks/pre-push reports locally. It exits
+      # non-zero on informational findings, so a false positive belongs behind a
+      # `# shellcheck disable=...` directive in the workflow that provokes it.
+      - name: Workflow lint
+        env:
+          ACTIONLINT_VERSION: 1.7.12
+          ACTIONLINT_SHA256: 8aca8db96f1b94770f1b0d72b6dddcb1ebb8123cb3712530b08cc387b349a3d8
+        run: |
+          set -euo pipefail
+          archive="actionlint_${ACTIONLINT_VERSION}_linux_amd64.tar.gz"
+          curl -fsSL -o "$archive" \
+            "https://github.com/rhysd/actionlint/releases/download/v${ACTIONLINT_VERSION}/${archive}"
+          echo "${ACTIONLINT_SHA256}  ${archive}" | sha256sum -c -
+          tar xzf "$archive" actionlint
+          ./actionlint
+
       - name: Corpus lints
         run: uv run python evals/verify_corpus.py
 
