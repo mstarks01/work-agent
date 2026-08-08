@@ -237,14 +237,18 @@ def sample_proposal(
 
     The same two facts the draft is grounded on, *named* rather than
     serialized: the quote as a candidate, the crossing as a catalog ID. So
-    resolving this against ``valid_model()``'s catalog reproduces
-    ``sample_draft()`` exactly, which is the property the two fixtures exist
-    together to let a test assert.
+    resolving this against ``valid_model()``'s catalog, in the lane the second
+    argument names, reproduces ``sample_draft()`` exactly — the property the
+    two fixtures exist together to let a test assert.
     """
     threat = sample_threat(threat_id, category)
     fields: dict[str, Any] = threat.model_dump(
-        mode="json", exclude={"confidence", "verdict", "grounds"}
+        mode="json", exclude={"confidence", "verdict", "grounds", "id", "category"}
     )
+    # Called with the threat ID the resolved draft will carry, because that is
+    # what a test is talking about — the proposal itself names only the number,
+    # and the lane supplies the letter.
+    fields["sequence"] = int(threat_id.split("-")[1])
     fields["quotes"] = [
         {
             "text": "Customers log in to the web app",

@@ -10,8 +10,7 @@ Lane contrast: being accepted *as* the web API is spoofing. Directing an honest,
 
 ```json
 {
-  "id": "E-01",
-  "category": "elevation-of-privilege",
+  "sequence": 1,
   "title": "The ledger service lends its full database authority to any caller",
   "description": "`process:ledger-service` performs transfers using the standing full read/write credential on `flow:ledger-service-to-accounts-db:read-write-balances`, and takes its instructions from `flow:web-api-to-ledger-service:post-transfer`, which carries `authentication: none`. Nothing binds an instruction to an authorized customer at the point authority is exercised: the caller supplies the account identifiers and the ledger acts on them with its own privilege, the classic confused deputy. An attacker who can reach the ledger moves funds between arbitrary accounts — horizontal escalation across the entire customer base — without ever holding a customer credential. Second-order: the same standing authority covers all rows of `store:accounts-db`, so any code-execution flaw in this process inherits it wholesale.",
   "affected_element_ids": [
@@ -51,8 +50,7 @@ The exemplar is reach across a trust boundary. `process:web-api` is `internet-fa
 
 ```json
 {
-  "id": "E-02",
-  "category": "elevation-of-privilege",
+  "sequence": 2,
   "title": "A compromised web API escalates into core-zone transfer authority",
   "description": "`process:web-api` is `internet-facing` in `boundary:dmz` and holds no `financial` assets of its own. But it is the origin of `flow:web-api-to-ledger-service:post-transfer`, which crosses into `boundary:core` and is accepted with `authentication: none`. Any flaw yielding code execution or request forgery in the web tier therefore grants the attacker whatever `process:ledger-service` will do — and that process exercises full read/write authority over `store:accounts-db`. Second-order: the escalation chain converts an edge foothold into standing authority in the highest-trust zone, and because the transfers are made through the legitimate ledger path they appear in `store:audit-log` as ordinary activity.",
   "affected_element_ids": [
@@ -94,8 +92,7 @@ The exemplar is reach across a trust boundary. `process:web-api` is `internet-fa
 
 ```json
 {
-  "id": "E-03",
-  "category": "elevation-of-privilege",
+  "sequence": 3,
   "title": "Direct transfer authority if the ledger service is reachable beyond the core zone",
   "description": "`process:ledger-service` has `exposure: unknown`, and it accepts transfer instructions over `flow:web-api-to-ledger-service:post-transfer` with `authentication: none` while holding full authority over `store:accounts-db`. If that unknown resolves to reachability beyond `boundary:core` — a load balancer, a peered network, a management interface — the attacker population for that unauthenticated surface is no longer limited to holders of a dmz foothold, and the escalation in E-01 becomes directly available without any prior compromise. This draft is conditional on the `exposure` attribute of `process:ledger-service`; it is not a claim that the process is externally reachable.",
   "affected_element_ids": [

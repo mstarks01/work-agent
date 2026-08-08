@@ -681,6 +681,7 @@ def merge_drafts(
                 for proposal in _threats_of(ctx.state.get(analyze_state_key(category)))
             ),
             catalog,
+            category,
         )
         for category in STRIDE_CATEGORIES
     }

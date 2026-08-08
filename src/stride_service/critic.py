@@ -616,6 +616,14 @@ def join_drafts(
     unique across it, and every grounds entry resolving and, for a quote,
     actually appearing in the source it names.
 
+    **Whether a draft sits in the right lane is not among them, and cannot be.**
+    A draft's category is stamped from the lane by
+    :func:`~stride_service.evidence.resolve_proposals` rather than written by
+    the agent, so comparing the two would compare a value against the value it
+    was copied from. The question that survives is whether the threat *belongs*
+    in the lane it was found in, which is about the finding's content rather
+    than its serialization, and is the critic's second judgement step.
+
     Two things it *marks* rather than fails on, because the fan-in has no
     re-ask path and a whole report is too much to trade for either: a quote
     absent from the source it names, and an element ID a description cites in
@@ -649,16 +657,8 @@ def join_drafts(
         known_ids,
         sources.keys(),
     )
-    misfiled = [
-        f"draft {draft.id!r} is filed under {category!r} but its category is"
-        f" {draft.category!r}"
-        for category, drafts in drafts_by_category.items()
-        for draft in drafts
-        if draft.category != category
-    ]
     issues = (
-        misfiled
-        + _duplicate_id_issues(merged)
+        _duplicate_id_issues(merged)
         + _unresolved_reference_issues(merged, system_model)
         + _ground_reference_issues(merged, system_model, sources)
     )

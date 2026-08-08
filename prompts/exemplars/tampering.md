@@ -10,8 +10,7 @@ Keep the lane straight. Speaking *as* the web API is spoofing; altering the mess
 
 ```json
 {
-  "id": "T-01",
-  "category": "tampering",
+  "sequence": 1,
   "title": "On-path modification of transfer instructions between web API and ledger",
   "description": "`flow:web-api-to-ledger-service:post-transfer` moves gRPC transfer instructions from `boundary:dmz` into `boundary:core` with `encryption_in_transit: none`. An attacker positioned on that path — a compromised sidecar, a node in the dmz, or anything that can redirect traffic — rewrites the amount, the destination account, or the customer ID in a message the ledger has no way to distinguish from the original, since the flow also carries `authentication: none`. Second-order: `process:ledger-service` commits the altered instruction to `store:accounts-db`, so the modification becomes an authoritative balance, and `flow:ledger-service-to-audit-log:append-transfer-record` records the forged version as fact.",
   "affected_element_ids": [
@@ -52,8 +51,7 @@ Keep the lane straight. Speaking *as* the web API is spoofing; altering the mess
 
 ```json
 {
-  "id": "T-02",
-  "category": "tampering",
+  "sequence": 2,
   "title": "A leaked static database password grants direct writes to every balance",
   "description": "`flow:ledger-service-to-accounts-db:read-write-balances` uses a shared static password from an environment variable with full read/write scope. Possession is authority: an attacker who obtains it from a crash dump, an image layer, a log line, or a compromised `process:ledger-service` writes to `store:accounts-db` directly, bypassing whatever validation the ledger applies. Balances, account-holder records, and transaction rows can be rewritten arbitrarily. Second-order: the corruption is invisible to `store:audit-log`, because writes made outside `process:ledger-service` never traverse `flow:ledger-service-to-audit-log:append-transfer-record`, so reconciliation against the audit trail cannot detect them.",
   "affected_element_ids": [
@@ -92,8 +90,7 @@ The same flow carries `encryption_in_transit: unknown`. The model does not say t
 
 ```json
 {
-  "id": "T-03",
-  "category": "tampering",
+  "sequence": 3,
   "title": "Balance writes modifiable on the wire if database transport is unprotected",
   "description": "`flow:ledger-service-to-accounts-db:read-write-balances` carries `encryption_in_transit: unknown`. If that unknown resolves to plaintext PostgreSQL, an attacker with a position inside `boundary:core` can alter statements and result sets in flight — changing an amount as it is written, or a balance as it is read back by `process:ledger-service`. Both endpoints sit in the same zone, so this requires a prior foothold there. This draft is conditional on that attribute; it is not a claim that transport protection is absent.",
   "affected_element_ids": [
