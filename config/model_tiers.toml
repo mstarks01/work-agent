@@ -63,20 +63,39 @@
 
 version = 4
 
-# CHOOSE A VENDOR AND MODEL FOR EACH TIER. Uncomment one pair per tier below, or
-# set STRIDE_MODEL_{BASE,STRONG}_VENDOR together with the matching _MODEL — the
-# two halves must move together, since a vendor without its model is not a
-# usable selection. Model identifiers must be pinned: no `-latest`, `-preview`
-# or `-exp`, and Claude takes its dateless 4.6+ ID. docs/First-Run.md step 2
-# walks through each vendor's credentials; docs/Configuration.md has the rules.
+# CHOOSE A VENDOR AND MODEL FOR EACH TIER. Fill in the template below, or set
+# STRIDE_MODEL_{BASE,STRONG}_VENDOR together with the matching _MODEL — the two
+# halves must move together, since a vendor without its model is not a usable
+# selection. Model identifiers must be pinned: no `-latest`, `-preview` or
+# `-exp`, and Claude takes its dateless 4.6+ ID. docs/First-Run.md step 2 walks
+# through each vendor's credentials; docs/Configuration.md has the rules.
 #
 # [tiers.base]
-# vendor = "vertex"     # or "anthropic" or "openai"
-# model = "gemini-2.5-flash"
+# vendor = "<vertex|anthropic|openai>"
+# model = "<model>"
 #
 # [tiers.strong]
-# vendor = "vertex"
-# model = "gemini-2.5-pro"
+# vendor = "<vertex|anthropic|openai>"
+# model = "<model>"
+#
+# A TEMPLATE RATHER THAN A WORKED PAIR, and that is the same decision as the
+# empty tier tables above. This block used to show a Vertex/Gemini pair, which
+# made "no privileged default" true of the mechanism while the one example a
+# reader could copy said otherwise. The vendors below are alphabetical, equally
+# detailed, and every one of them is a real pair the offline conformance suite
+# profiles (src/stride_service/conformance.py):
+#
+#   anthropic   base "claude-sonnet-4-6"     strong "claude-opus-4-6"
+#   openai      base "gpt-4o"                strong "gpt-5.6"
+#   vertex      base "gemini-2.5-flash"      strong "gemini-2.5-pro"
+#
+# The Anthropic pin is 4.6 on both tiers and is NOT free choice: this service
+# floors at Claude 4.6, and Claude 4.7 onward no longer accepts `temperature`,
+# which config/sampling.toml pins at 0.0. Floor and ceiling meet, so 4.6 is the
+# only generation that binds under the shipped sampling. Naming a newer Claude
+# means unsetting that tier's temperature first, which re-baselines its sampling
+# fingerprint. Run `uv run python -m stride_service.conformance` to see what each
+# pair supports before choosing.
 #
 # The two tiers select independently, so a mixed pair — a cheap workhorse from
 # one vendor, judgement from another — is ordinary rather than a special case.
