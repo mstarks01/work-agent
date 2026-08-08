@@ -165,6 +165,35 @@ def claude_generation(model: str) -> tuple[int, int] | None:
     return int(match["major"]), int(match["minor"] or 0)
 
 
+# OpenAI's reasoning families serve ``temperature`` at exactly its default of
+# 1 and reject any other value. Two shapes name one: the o-series (``o3``,
+# ``o4-mini``) and GPT from major 5 onward (``gpt-5.6-terra``). ``gpt-4o`` is
+# neither, and parses to major 4 rather than being special-cased.
+_O_SERIES_ID = re.compile(r"o\d+[a-z0-9.\-]*")
+_GPT_ID = re.compile(r"gpt-(?P<major>\d+)(?:\.\d+)?[a-z0-9.\-]*")
+_REASONING_FROM_GPT_MAJOR = 5
+
+
+def openai_reasoning_model(model: str) -> bool:
+    """Whether an OpenAI identifier names a family that pins ``temperature``.
+
+    A **family rule, not a support table**, for the reason the Claude floor in
+    :mod:`stride_service.binding` is a generation floor: mirroring what LiteLLM
+    computes forks a subsystem that drifts, while a rule keyed on the
+    identifier stops being load-bearing — rather than starting to contradict —
+    once LiteLLM's map catches up.
+
+    Open at the top on purpose. An unrecognised ``gpt-6`` reads as reasoning
+    and a config pinning ``temperature = 0.0`` for it fails the build. That is
+    the safe direction to be wrong in: a false positive costs one clear error
+    at startup, while a false negative costs node one of a paid-for job.
+    """
+    if _O_SERIES_ID.fullmatch(model):
+        return True
+    match = _GPT_ID.fullmatch(model)
+    return match is not None and int(match["major"]) >= _REASONING_FROM_GPT_MAJOR
+
+
 def _check_generation(model: str, minimum: tuple[int, int], source: str) -> None:
     """Reject an identifier older than the minimum supported generation."""
     generation = claude_generation(model)

@@ -25,15 +25,18 @@ Constructor kwargs reach ``acompletion`` via ``_additional_args`` *before*
 neither here nor via ``LITELLM_DROP_PARAMS`` — because LiteLLM's default is
 fail-closed and the sampling fingerprint's honesty depends on it.
 
-Five build-time gates fire per tier, so a misconfiguration costs nothing rather
+Six build-time gates fire per tier, so a misconfiguration costs nothing rather
 than dying on node one of a paid-for job:
 
 * the **supported-param check** (:mod:`stride_service.model_gate`);
 * the **output-ceiling check** below, which the supported-param check cannot
   make: every vendor *accepts* ``max_output_tokens``, and only the serving model
   objects to a value above what it will produce;
-* the **removed-``temperature`` check** below, which covers that check's one
+* the **removed-``temperature`` check** below, which covers that check's
   documented blind spot on Claude;
+* the **pinned-``temperature`` check** below, which covers the same blind spot
+  on OpenAI's reasoning families, where the parameter survives but only at its
+  own default;
 * the **native-structured-output check** below. Every LLM node binds an
   ``output_schema``, and a model the provider library cannot constrain natively
   gets that constraint *emulated* — which sends an unresolved schema and fails
@@ -78,7 +81,11 @@ from stride_service.sampling import (
     TierSampling,
     make_resolve_sampling,
 )
-from stride_service.vendors import Vendor, claude_generation
+from stride_service.vendors import (
+    Vendor,
+    claude_generation,
+    openai_reasoning_model,
+)
 
 if TYPE_CHECKING:
     # Both deliberately type-only. A runtime ``from stride_service.graph import``
@@ -144,6 +151,47 @@ def _check_temperature_unset(model: str, sampling: TierSampling, source: str) ->
             " line for this tier in config/sampling.toml. Unsetting it leaves"
             " the model's own default, which is the only value these"
             " generations serve."
+        )
+
+
+# OpenAI's reasoning families serve ``temperature`` at exactly 1 and reject
+# every other value. Same shape as the Claude floor above, same residual behind
+# it, and the second time this residual has bitten rather than the first: the
+# shipped sampling pins ``temperature = 0.0``, LiteLLM's pinned cost map does
+# not know a model released after it, ``check_supported`` falls through to the
+# provider's base config, and the build passes a configuration the provider
+# rejects on node one.
+#
+# ONE is permitted rather than only-unset, which is where this differs from the
+# Claude rule. Anthropic removed the parameter, so any value is wrong there and
+# the message says to delete the line. OpenAI still *accepts* it at its
+# default, so a tier that states 1 explicitly is asking for exactly what it
+# will get — and a sweep that has to run non-greedily on a reasoning model
+# needs to be able to say so.
+_REASONING_TEMPERATURE = 1.0
+
+
+def _check_reasoning_temperature(
+    model: str, sampling: TierSampling, source: str
+) -> None:
+    """Fail closed when an OpenAI reasoning family is sent a temperature it pins.
+
+    Keyed on the **model**, like its Claude counterpart and for a weaker version
+    of the same reason: nothing stops a reasoning identifier arriving through a
+    gateway under a non-OpenAI vendor, and a vendor-keyed rule would pass it.
+    A model that is not one of these families is left entirely to
+    :func:`~stride_service.model_gate.check_supported`.
+    """
+    if sampling.temperature is None or not openai_reasoning_model(model):
+        return
+    if sampling.temperature != _REASONING_TEMPERATURE:
+        raise ModelGateError(
+            f"{source}: {model!r} is an OpenAI reasoning model and serves"
+            f" 'temperature' only at its default of {_REASONING_TEMPERATURE:g};"
+            f" {sampling.temperature:g} would be rejected on the first request."
+            " Set it to 1 for this tier in config/sampling.toml, or unset it —"
+            " and note that either way this tier is no longer decoding greedily,"
+            " so its runs are no longer reproducible."
         )
 
 
@@ -254,6 +302,7 @@ def build_tier_adapters(
             vendor, selection.model, tier_sampling.gate_params(), source=source
         )
         _check_temperature_unset(selection.model, tier_sampling, source)
+        _check_reasoning_temperature(selection.model, tier_sampling, source)
         _check_output_ceiling(vendor, selection.model, tier_sampling, source)
         _check_native_structured_output(vendor, selection.model, tier_sampling, source)
         adapters[tier] = retrying(
