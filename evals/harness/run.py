@@ -178,7 +178,9 @@ async def _run_mode(
     that dies on the first one reports neither. It stays a Tier 1 failure: the case is
     recorded, its failure is listed, and the run still exits non-zero. Only the
     fan-in's own exceptions are caught (:data:`~evals.harness.grounds.CAUGHT`);
-    a provider timeout is not a measurement and still ends the sweep.
+    a provider timeout is not a measurement and still ends the sweep, and
+    neither is a :class:`~evals.harness.grounds.GroundMisShape`, which is this
+    service assembling its own record wrongly rather than anything a model did.
     """
     pipeline = modes.build_eval_pipeline(
         modes.MODE_ENTRIES[mode], deployment=deployment
@@ -393,8 +395,7 @@ def _print_grounds(
             f" quoteless {totals['quoteless_rate']:.0%},"
             f" unverified {totals['unverified_rate']:.1%},"
             f" failed cases {totals['failed_cases']}"
-            f" (mis-shape {totals['mis_shape_cases']},"
-            f" fail-closed {totals['fail_closed_cases']},"
+            f" (fail-closed {totals['fail_closed_cases']},"
             f" other {totals['other_failed_cases']})"
             " (instrument, non-gating)"
         )
