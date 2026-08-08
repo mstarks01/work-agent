@@ -179,10 +179,17 @@ lanes that would exercise it do not run.
   offline suite, so the two cannot drift apart silently.
 - `docs/First-Run.md` no longer has a copyable configuration that cannot start.
 - **Still open, and not closed by this work**: the eval judge remains
-  `vertex`/`gemini-2.5-pro`, uncalibrated. Selecting a judge on measured
-  agreement means running candidate judges from three families over
-  `evals/judge_calibration/pairs.json`, which needs live credentials for all
-  three — so it is blocked on the same unprovisioned infrastructure, not on
-  effort. Until it runs, no eval conclusion of the form "model A beats model B"
-  should be quoted without noting that the judge shares a vendor with one of
-  them.
+  `vertex`/`gemini-2.5-pro`, uncalibrated. The *harness* for selecting one on
+  measured agreement now exists — `calibrate --judge-config`, repeatable, which
+  reports per-candidate agreement with the human labels and, separately,
+  agreement between candidates. Only the numbers are missing, and they need live
+  credentials for all three families. Until they exist, no eval conclusion of the
+  form "model A beats model B" should be quoted without noting that the judge
+  shares a vendor with one of them.
+- The judge comparison **cannot run in CI as the workflows are shaped**, and
+  that follows from a security decision rather than an oversight: it needs Vertex
+  ADC and both API keys in one job, while this repository keeps `id-token: write`
+  and `secrets.STRIDE_*_API_KEY` in disjoint jobs. Splitting it into
+  per-candidate jobs that each emit an artifact, plus one that combines them, is
+  the shape that keeps the credentials disjoint. Not built here, because no lane
+  is provisioned and it could not be tested.
