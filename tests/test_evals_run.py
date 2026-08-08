@@ -9,8 +9,14 @@ nothing came to announce "all node fingerprints blessed" and write
 
 from __future__ import annotations
 
-from evals.harness.run import _print_certification
+import json
+
+import pytest
+
+from evals.harness.run import _models_record, _print_certification
 from stride_service.certification import CertifyResult, UncertifiedNode
+from stride_service.deployment import Deployment
+from tests.factories import TEST_CREDENTIAL_ENV, TEST_TIER_ENV
 
 BLESSED = "a" * 64
 
@@ -61,3 +67,40 @@ def test_an_incomplete_and_uncertified_run_reports_both(capsys):
     out = capsys.readouterr().out
     assert "INCOMPLETE" in out
     assert "UNCERTIFIED" in out
+
+
+class TestTheArtifactCanActuallyBeWritten:
+    """The artifact is built with ``json.dumps`` and only on a live sweep.
+
+    That combination is why a plain type error survived here unseen: no offline
+    test builds the artifact, and the one code path that does needs provider
+    credentials. A live run then failed *after* every case had been paid for,
+    with the numbers already computed and nowhere to put them.
+
+    So the pieces the artifact assembles are checked for encodability here,
+    where it costs nothing.
+    """
+
+    @pytest.fixture
+    def deployment(self):
+        return Deployment.from_env(env={**TEST_TIER_ENV, **TEST_CREDENTIAL_ENV})
+
+    def test_the_models_record_is_json_encodable(self, deployment):
+        """``tiers.tiers`` maps to pydantic ``TierSelection`` models, which
+        ``json.dumps`` cannot encode and which reach the artifact whole unless
+        this record dumps them."""
+        json.dumps(_models_record(deployment, None))
+
+    def test_the_record_keeps_the_pair_it_is_read_for(self, deployment):
+        """Encodable is not enough: ``promote`` reads the vendor and model back
+        off a finished sweep, so dumping must not flatten them away."""
+        record = _models_record(deployment, None)
+
+        assert (
+            record["tiers"]["base"]["vendor"]
+            == TEST_TIER_ENV["STRIDE_MODEL_BASE_VENDOR"]
+        )
+        assert (
+            record["tiers"]["strong"]["model"]
+            == TEST_TIER_ENV["STRIDE_MODEL_STRONG_MODEL"]
+        )
