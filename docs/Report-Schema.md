@@ -110,6 +110,14 @@ A threat's `id` must carry its category letter.
 Every threat carries at least one `Ground`: the evidence the category agent that
 drafted it says justifies it. `grounds` is never empty, and has no maximum.
 
+**Chosen by an agent, constructed by the service.** A category agent names the
+facts it relied on — an ID from the evidence catalog the service derives from
+the validated model, or a quoted span and the source it came from — and the
+service builds these records from that selection. No model writes a `Ground`,
+which is why the flat encoding below is safe: the conditional relationship
+between `kind` and the fields it requires never has to survive a schema
+compiler. See [ADR 0004](adr/0004-evidence-references.md).
+
 ```python
 class Ground:
     kind: "quote" | "unknown-attribute" | "derived-fact"
@@ -128,9 +136,9 @@ class Ground:
 
 **One flat model, not a discriminated union.** Fields belonging to the other two
 kinds are empty strings, and a record carrying a field its own kind does not
-claim is rejected on arrival rather than tolerated — so a consumer may read the
-fields its `kind` names and ignore the rest. Why the shape is flat rather than a
-tagged union, which it should be, is
+claim is rejected on construction rather than tolerated — so a consumer may read
+the fields its `kind` names and ignore the rest. Why the shape is flat rather
+than a tagged union, which it should be, is
 [ADR 0002](adr/0002-finding-level-attribution.md).
 
 A `derived-fact` names the flow and **never copies the zones it crosses**: they
@@ -265,6 +273,11 @@ class Verdict:
   attribute is named in `related_unknowns` (`{element_id, attribute}`). Stays in
   `threats`.
 - `rejected` — not grounded. Moves to `rejected_threats`.
+
+Those three conditional rules hold on every verdict in a report, but they are
+**not enforced on the critic's output** — that shape is checked at the review
+seam, where a violation routes to a bounded re-ask instead of failing the job.
+See [ADR 0005](adr/0005-verdict-shape-is-re-askable.md).
 
 ## Summary
 

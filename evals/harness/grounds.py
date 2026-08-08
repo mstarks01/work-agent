@@ -22,12 +22,13 @@ marks it counts are the ones :func:`~stride_service.critic.join_drafts` already
 produced with the *shipped* checker, so a sweep cannot grade a normalization
 policy the service does not run.
 
-**Two of the numbers only exist on the failure path**, which is why
-:class:`GroundsFailure` sits beside the measurement rather than in it. A
-mis-shaped ``Ground`` and a threat that loses every ground both kill the job
-where they are found, so neither reaches a report — measuring them means
-surviving them per case and counting. Both stay Tier 1 failures: a counted
-case is still a failed case, and the sweep still exits non-zero.
+**Some of the numbers only exist on the failure path**, which is why
+:class:`GroundsFailure` sits beside the measurement rather than in it. A threat
+that loses every ground, an invented evidence reference and a mis-shaped
+``Ground`` all kill the job where they are found, so none reaches a report —
+measuring them means surviving them per case and counting. All stay Tier 1
+failures: a counted case is still a failed case, and the sweep still exits
+non-zero.
 
 **Non-gating.** Every rate here is an instrument. No threshold is asserted,
 because none has been observed yet — the whole point is the first sweep.
@@ -43,6 +44,7 @@ from typing import Any, Literal
 from pydantic import ValidationError
 
 from stride_service.critic import DraftJoinError, GroundsUnverifiedError
+from stride_service.evidence import EvidenceResolutionError
 from stride_service.report import (
     DraftThreat,
     GroundKind,
@@ -51,11 +53,13 @@ from stride_service.report import (
 )
 
 # Why the grounding path killed a case. ``mis-shape`` and ``fail-closed`` are
-# the two #91 asks for by name; ``other`` is every other way the fan-in can
-# reject a set of drafts — a dangling element reference, a duplicate ID, an
-# unresolvable label — kept distinct so neither measured rate quietly absorbs
-# a defect that is not about grounds at all.
-FailureKind = Literal["mis-shape", "fail-closed", "other"]
+# the two #91 asks for by name; ``unresolved-evidence`` is an agent naming a
+# catalog entry that does not exist, which is the only way its evidence
+# selection can fail; ``other`` is every remaining way the fan-in can reject a
+# set of drafts — a dangling element reference, a duplicate ID, an unresolvable
+# label — kept distinct so no measured rate quietly absorbs a defect that is
+# not about grounds at all.
+FailureKind = Literal["mis-shape", "fail-closed", "unresolved-evidence", "other"]
 
 _KINDS: tuple[GroundKind, ...] = ("quote", "unknown-attribute", "derived-fact")
 
@@ -187,10 +191,9 @@ class GroundsFailure:
 
     ``threat_ids`` and ``draft_count`` are populated only for ``fail-closed``,
     where :class:`~stride_service.critic.GroundsUnverifiedError` carries both
-    halves of the rate off the raise site. A ``mis-shape`` has no comparable
-    population — the draft never became a model, so there is nothing to count
-    it against — and it is reported as an occurrence per case, which is what
-    the flat-``Ground`` decision was asked to be revisited against.
+    halves of the rate off the raise site. The other kinds have no comparable
+    population — the batch never became drafts, so there is nothing to count
+    them against — and each is reported as an occurrence per case.
     """
 
     case_id: str
@@ -252,29 +255,38 @@ def measure_grounds(
 def classify_failure(case_id: str, error: Exception) -> GroundsFailure:
     """Name what the fan-in rejected, without pattern-matching its prose.
 
-    Two signals, both structural. A fail-closed threat arrives as
-    :class:`~stride_service.critic.GroundsUnverifiedError`, which exists so
-    that this call is a type check. A mis-shaped ``Ground`` arrives as a
+    Three signals, all structural, all type checks or ``loc`` shapes rather
+    than message prose. A fail-closed threat arrives as
+    :class:`~stride_service.critic.GroundsUnverifiedError`; an invented
+    reference as :class:`~stride_service.evidence.EvidenceResolutionError`,
+    which is checked first because it is the narrower of two ``DraftJoinError``
+    subclasses' siblings; and a mis-shaped ``Ground`` as a
     :class:`pydantic.ValidationError` whose ``loc`` **ends** in
     ``("grounds", <index>)`` with type ``value_error`` — the signature of
     ``Ground._check_shape`` raising.
 
-    Matched on the tail rather than the whole path because the mis-shape is
-    found at **two different depths**, and measured at only one of them it
-    would read as zero. ADK validates a node's ``output_schema`` on the way
-    into state, so a category agent's mis-shaped ground raises inside its own
-    node at ``("threats", i, "grounds", j)`` — before ``merge_drafts`` is
-    reached at all. The shallower ``("grounds", j)`` is the same fault arriving
-    at the fan-in, which is where it lands for any path that reaches
-    ``DraftThreat.model_validate`` with the node check behind it.
+    THE MIS-SHAPE COUNT IS A TRIPWIRE, AND ITS EXPECTED VALUE IS ZERO. No model
+    writes a ``Ground``: an agent selects catalog entries and proposes quotes,
+    and :func:`~stride_service.evidence.resolve_proposals` builds the record
+    from the entry it looked up. So a mis-shape here is this service
+    mis-assembling its own data structure, not an agent misunderstanding a
+    prompt, and a non-zero reading is a code defect to be found rather than a
+    rate to be tuned. Matched on the ``loc`` tail because the fault can surface
+    wherever a draft is revalidated out of session state, not at one fixed
+    depth.
+
+    ``unresolved-evidence`` is where an agent's evidence selection actually
+    fails now, and it is the number to read against how legible the catalog is:
+    an agent can only pick from the closed set it was shown or name something
+    that is not in it.
 
     A *missing* or empty ``grounds`` list is deliberately not a mis-shape: its
     error sits on the list rather than on an entry, and it is a different
-    defect from the nonsense combination the flat-``Ground`` decision accepted.
+    defect from a nonsense field combination.
 
     Everything else is ``other`` on purpose. Absorbing an unrelated defect into
-    either measured rate would make the number that revisits the flat-``Ground``
-    decision report faults that decision never caused.
+    a measured rate would make these numbers report faults the grounding path
+    never caused.
     """
     if isinstance(error, GroundsUnverifiedError):
         return GroundsFailure(
@@ -283,6 +295,10 @@ def classify_failure(case_id: str, error: Exception) -> GroundsFailure:
             detail=str(error),
             threat_ids=error.threat_ids,
             draft_count=error.draft_count,
+        )
+    if isinstance(error, EvidenceResolutionError):
+        return GroundsFailure(
+            case_id=case_id, kind="unresolved-evidence", detail=str(error)
         )
     if isinstance(error, ValidationError) and _is_ground_mis_shape(error):
         return GroundsFailure(case_id=case_id, kind="mis-shape", detail=str(error))
@@ -300,11 +316,11 @@ def _is_ground_mis_shape(error: ValidationError) -> bool:
 
 
 # What ``_run_mode`` catches per case: the two exception types a grounds fault
-# can arrive as. ``DraftJoinError`` is the fan-in's; ``ValidationError`` is
-# every schema check the run passes through, including the ``output_schema``
-# ADK applies at each category agent node — which is where a mis-shaped
-# ``Ground`` is really caught. Anything else still aborts the sweep loudly: a
-# provider timeout is not a measurement.
+# can arrive as. ``DraftJoinError`` is the fan-in's, and covers evidence
+# resolution through :class:`~stride_service.evidence.EvidenceResolutionError`;
+# ``ValidationError`` is every schema check the run passes through, including
+# the ``output_schema`` ADK applies at each category agent node. Anything else
+# still aborts the sweep loudly: a provider timeout is not a measurement.
 CAUGHT: tuple[type[Exception], ...] = (DraftJoinError, ValidationError)
 
 
@@ -345,6 +361,7 @@ def aggregate_grounds(
         "failed_cases": len(failures),
         "mis_shape_cases": by_kind.get("mis-shape", 0),
         "fail_closed_cases": by_kind.get("fail-closed", 0),
+        "unresolved_evidence_cases": by_kind.get("unresolved-evidence", 0),
         "other_failed_cases": by_kind.get("other", 0),
         "fail_closed_threats": sum(
             len(failure.threat_ids)

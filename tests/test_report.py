@@ -6,8 +6,10 @@ from pydantic import ValidationError
 
 from stride_service.report import (
     Ground,
+    ProposedVerdict,
     Severity,
     StrideReport,
+    ThreatRulings,
     UnknownRef,
     Verdict,
     build_summary,
@@ -102,6 +104,53 @@ class TestVerdictShapes:
                     UnknownRef(element_id="store:orders-db", attribute="x")
                 ],
             )
+
+
+class TestProposedVerdictCarriesNoRuleBetweenFields:
+    """What the critic emits accepts everything the report's shape refuses.
+
+    The whole of the fix: each of the three combinations below used to raise
+    inside ``ThreatRulings`` on the way into session state, which kills the
+    critic node — one pass over every draft in the job — and with it the run.
+    They are faults, and they are reported by ``review_issues`` and fixed by
+    the bounded re-ask, which is the machinery that already existed for exactly
+    this and that a raise here made unreachable.
+    """
+
+    MIS_SHAPED = (
+        {"status": "needs-info", "reason": "encryption unknown"},
+        {
+            "status": "confirmed",
+            "related_unknowns": [{"element_id": "store:orders-db", "attribute": "x"}],
+        },
+        {"status": "rejected"},
+    )
+
+    @pytest.mark.parametrize("verdict", MIS_SHAPED)
+    def test_the_report_shape_still_refuses_it(self, verdict):
+        with pytest.raises(ValidationError):
+            Verdict.model_validate(verdict)
+
+    @pytest.mark.parametrize("verdict", MIS_SHAPED)
+    def test_the_critic_facing_shape_accepts_it(self, verdict):
+        assert ProposedVerdict.model_validate(verdict).status == verdict["status"]
+
+    @pytest.mark.parametrize("verdict", MIS_SHAPED)
+    def test_it_survives_the_nodes_own_output_schema(self, verdict):
+        """The depth that matters. ADK validates ``output_schema`` on the way
+        into state, so anything raising here is a dead job rather than a
+        re-ask."""
+        rulings = ThreatRulings.model_validate(
+            {"threats": [{"id": "S-01", "confidence": "high", "verdict": verdict}]}
+        )
+
+        assert rulings.threats[0].verdict.status == verdict["status"]
+
+    def test_the_field_level_constraints_are_untouched(self):
+        """Only the rules *between* fields moved. A closed vocabulary is
+        something a provider schema can carry, so it stays where it was."""
+        with pytest.raises(ValidationError):
+            ProposedVerdict.model_validate({"status": "maybe"})
 
 
 class TestGround:

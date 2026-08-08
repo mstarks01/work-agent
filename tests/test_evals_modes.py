@@ -20,6 +20,7 @@ from evals.harness import modes
 from evals.harness.reference import load_case
 from evals.harness.structural import report_issues
 from stride_service.certification import fingerprints_of
+from stride_service.evidence import evidence_catalog
 from stride_service.graph import (
     ENTRY_EXTRACT,
     ENTRY_EXTRACT_ONLY,
@@ -47,13 +48,25 @@ def case():
     return load_case(CASE_DIR)
 
 
-def scripted_draft(case, category) -> dict:
-    """One category agent's draft citing an element the blessed model contains.
+def unknown_ref(case) -> str:
+    """One ``unknown-attribute`` entry from the blessed model's own catalog.
 
-    Grounded on an ``unknown-attribute`` rather than a quote: the corpus case
-    ships real sources, so a scripted quote would have to be a verbatim span of
-    one to survive the fan-in's ladder, and these tests are about the modes
-    rather than about grounding.
+    Any entry serves — nothing in these tests scores which fact was cited — but
+    it must be a real one, because an agent's reference is resolved against the
+    catalog the service derives from this same model.
+    """
+    return next(
+        ref for ref in evidence_catalog(case.model) if ref.startswith("unknown:")
+    )
+
+
+def scripted_proposal(case, category) -> dict:
+    """One category agent's emission citing an element the blessed model contains.
+
+    Evidence rather than a quote: the corpus case ships real sources, so a
+    scripted quote would have to be a verbatim span of one to survive the
+    fan-in's ladder, and these tests are about the modes rather than about
+    grounding.
     """
     reference = next(ref for ref in case.references if ref.category == category)
     return {
@@ -62,13 +75,7 @@ def scripted_draft(case, category) -> dict:
         "title": reference.claim,
         "description": f"{reference.claim} Scripted for the offline mode test.",
         "affected_element_ids": list(reference.affected_element_ids),
-        "grounds": [
-            {
-                "kind": "unknown-attribute",
-                "element_id": reference.affected_element_ids[0],
-                "attribute": "name",
-            }
-        ],
+        "evidence_refs": [unknown_ref(case)],
         "severity": Severity(
             likelihood=reference.severity.likelihood,
             impact=reference.severity.impact,
@@ -117,7 +124,7 @@ def _reply_for(case, graph_node: str) -> str:
         )
     for category in STRIDE_CATEGORIES:
         if graph_node == analyze_node_name(category):
-            return json.dumps({"threats": [scripted_draft(case, category)]})
+            return json.dumps({"threats": [scripted_proposal(case, category)]})
     return '{"threats": []}'
 
 
