@@ -1,12 +1,17 @@
 #!/usr/bin/env bash
 #
-# Run the same two ruff checks CI runs, before a push rather than after it.
+# Lint before a push rather than after it: the two ruff checks CI runs, plus
+# actionlint over the workflow files.
 #
-# This is a convenience guard, not a gate: CI is authoritative, and the push
-# this blocks would have failed there anyway. That asymmetry decides the two
-# judgement calls below — a missing `uv` warns and lets the push through
-# rather than blocking work on a machine where the hook cannot run, and
-# `--no-verify` is advertised on failure rather than left to be looked up.
+# This is a convenience guard, not a gate: CI is authoritative, and a missing
+# tool warns and lets the push through rather than blocking work on a machine
+# where the hook cannot run. `--no-verify` is advertised on failure rather
+# than left to be looked up.
+#
+# All three mirror .github/workflows/ci.yml, so what they block would have
+# failed there anyway. Keep them in step: a check here that CI does not run
+# would fail a push CI accepts, and one CI runs that is missing here gives
+# back the round trip the hook exists to save.
 #
 # Tracked, so it is reviewed like the workflow it mirrors. Enable it per
 # clone (it is not automatic, by git's design):
@@ -15,23 +20,41 @@
 #
 set -euo pipefail
 
-if ! command -v uv >/dev/null 2>&1; then
+# Each tool is skipped independently, so an absent uv still leaves actionlint
+# to run and vice versa.
+if command -v uv >/dev/null 2>&1; then
+    # Both invocations mirror .github/workflows/ci.yml exactly, including the
+    # markdown exclusion; a difference here would mean a push passes locally
+    # and fails in CI, which is the one outcome this hook exists to prevent.
+    if ! uv run ruff check .; then
+        echo >&2
+        echo "pre-push: ruff check failed. Fix, or push with --no-verify." >&2
+        exit 1
+    fi
+
+    if ! uv run ruff format --check . --exclude '*.md'; then
+        echo >&2
+        echo "pre-push: ruff format failed. Run 'uv run ruff format . --exclude \"*.md\"'," >&2
+        echo "or push with --no-verify." >&2
+        exit 1
+    fi
+else
     echo "pre-push: uv not on PATH, skipping ruff — CI will still run it" >&2
-    exit 0
 fi
 
-# Both invocations mirror .github/workflows/ci.yml exactly, including the
-# markdown exclusion; a difference here would mean a push passes locally and
-# fails in CI, which is the one outcome this hook exists to prevent.
-if ! uv run ruff check .; then
-    echo >&2
-    echo "pre-push: ruff check failed. Fix, or push with --no-verify." >&2
-    exit 1
-fi
-
-if ! uv run ruff format --check . --exclude '*.md'; then
-    echo >&2
-    echo "pre-push: ruff format failed. Run 'uv run ruff format . --exclude \"*.md\"'," >&2
-    echo "or push with --no-verify." >&2
-    exit 1
+# No argument: actionlint discovers .github/workflows/ itself from the repo
+# root, the same as the CI step. It exits non-zero on informational findings
+# too, so a finding that is a false positive needs a `# shellcheck disable=...`
+# directive in the workflow rather than being left to be re-read on every push.
+#
+# The version is whatever is installed locally, against a pinned one in CI, so
+# a local pass is indicative rather than authoritative.
+if command -v actionlint >/dev/null 2>&1; then
+    if ! actionlint; then
+        echo >&2
+        echo "pre-push: actionlint failed. Fix, or push with --no-verify." >&2
+        exit 1
+    fi
+else
+    echo "pre-push: actionlint not on PATH, skipping — CI will still run it" >&2
 fi
