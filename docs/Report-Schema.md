@@ -274,6 +274,11 @@ class Verdict:
   `threats`.
 - `rejected` — not grounded. Moves to `rejected_threats`.
 
+Those three conditional rules hold on every verdict in a report, but they are
+**not enforced on the critic's output** — that shape is checked at the review
+seam, where a violation routes to a bounded re-ask instead of failing the job.
+See [ADR 0005](adr/0005-verdict-shape-is-re-askable.md).
+
 ## Summary
 
 Counts a UI can render without walking the threat list:
