@@ -102,6 +102,60 @@ class TestBoundaryCrossings:
             model.boundary_crossings()
 
 
+class TestSharedNames:
+    """The class/instance duplication a typed ID hides from ``duplicate-id``."""
+
+    @staticmethod
+    def doubled():
+        """The gate-passing model with its store renamed onto the process.
+
+        Renamed and then normalized, which is the path a model really takes:
+        the name is authoritative, the ID follows, and every reference to it
+        follows too.
+        """
+        model = valid_model()
+        model.data_stores[0].name = "Web App"
+        return normalize_element_ids(model)
+
+    def test_a_process_and_a_store_sharing_a_name_are_reported(self):
+        assert self.doubled().shared_names() == {
+            "web-app": ["process:web-app", "store:web-app"]
+        }
+
+    def test_the_gate_passes_the_very_pair_this_reports(self):
+        # The whole reason the mark exists: two types make two IDs, and
+        # `duplicate-id` compares whole IDs, so nothing here is a gate failure.
+        assert validate(self.doubled()) == []
+
+    def test_distinct_names_report_nothing(self):
+        assert valid_model().shared_names() == {}
+
+    def test_a_same_type_collision_belongs_to_the_gate_instead(self):
+        # Two processes of one name hold one ID, so this is `duplicate-id`'s to
+        # report and must not be doubled up as a shared name.
+        model = valid_model()
+        model.processes.append(model.processes[0].model_copy(deep=True))
+        assert model.shared_names() == {}
+        assert "duplicate-id" in {issue.code for issue in validate(model)}
+
+    def test_a_trust_boundary_sharing_a_name_is_not_a_collision(self):
+        # A boundary is a zone, not a thing in the system, so a process named
+        # after the zone it sits in is ordinary naming.
+        model = valid_model()
+        model.processes[0].name = "Internal Network"
+        normalized = normalize_element_ids(model)
+        assert normalized.get("process:internal-network") is not None
+        assert normalized.shared_names() == {}
+
+    def test_three_types_on_one_name_come_back_together(self):
+        model = valid_model()
+        model.data_stores[0].name = "Web App"
+        model.external_entities[0].name = "Web App"
+        assert normalize_element_ids(model).shared_names() == {
+            "web-app": ["entity:web-app", "process:web-app", "store:web-app"]
+        }
+
+
 class TestNormalizeElementIds:
     """IDs are derived in code, and references follow."""
 

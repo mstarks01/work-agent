@@ -183,6 +183,34 @@ def test_a_threat_with_no_countermeasure_is_marked_on_the_report():
     assert [m.threat_id for m in report.missing_mitigations] == ["S-01"]
 
 
+def test_one_name_on_two_types_is_marked_and_does_not_fail_the_run():
+    """The suspicion the gate cannot raise, carried to the reader instead.
+
+    The extraction names its store after its process, which the gate passes —
+    two types make two IDs — so the job completes and the reader gets the mark.
+    """
+    model = valid_model()
+    model.data_stores[0].name = "Web App"
+    replies = happy_replies() | {"extract": model.model_dump_json()}
+    pipeline, _ = build(replies)
+
+    outcome, _ = run(pipeline, job())
+
+    assert isinstance(outcome, PipelineCompleted)
+    report = outcome.report
+    assert [(m.name_slug, m.element_ids) for m in report.shared_element_names] == [
+        ("web-app", ["process:web-app", "store:web-app"])
+    ]
+
+
+def test_a_clean_model_carries_no_shared_name_marks():
+    pipeline, _ = build(happy_replies())
+
+    outcome, _ = run(pipeline, job())
+
+    assert outcome.report.shared_element_names == []
+
+
 def test_a_lane_that_skips_a_number_is_logged_and_not_renumbered(caplog):
     """The numbering rule is about the agents, so it lands in the log, not the report.
 
