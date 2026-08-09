@@ -44,43 +44,48 @@ Lane contrast: being accepted *as* the web API is spoofing. Directing an honest,
 }
 ```
 
-## Second-order: zone escape from the dmz into the core
+## Second-order, in system B: a tenant boundary the attacker fills in
 
-The exemplar is reach across a trust boundary. `process:web-api` is `internet-facing` and holds nothing valuable itself; its worth to an attacker is the path it opens. Score impact on the zone entered, not on the element compromised.
+Written against exemplar system B. Escalation does not need a privilege bug when the system asks the caller which privileges to apply. Here the tenant — the only thing separating one customer's data from another's — is a field in untrusted input, and the identity that acts on it holds authority over all of them.
 
 ```json
 {
   "sequence": 2,
-  "title": "A compromised web API escalates into core-zone transfer authority",
-  "description": "`process:web-api` is `internet-facing` in `boundary:dmz` and holds no `financial` assets of its own. But it is the origin of `flow:web-api-to-ledger-service:post-transfer`, which crosses into `boundary:core` and is accepted with `authentication: none`. Any flaw yielding code execution or request forgery in the web tier therefore grants the attacker whatever `process:ledger-service` will do — and that process exercises full read/write authority over `store:accounts-db`. Second-order: the escalation chain converts an edge foothold into standing authority in the highest-trust zone, and because the transfers are made through the legitimate ledger path they appear in `store:audit-log` as ordinary activity.",
+  "title": "A publisher selects its own tenant and writes into any customer's partition",
+  "description": "`process:stream-processor` reads the tenant key out of the device payload carried on `flow:sensor-gateway-to-mqtt-broker:publish-telemetry`, which crosses from `boundary:field` into `boundary:ingest`, and then writes under that key over `flow:stream-processor-to-telemetry-store:write-readings` using a service account holding write on every tenant partition. Nothing between the two re-derives the tenant from an authenticated identity, so a publisher that sets another customer's tenant in its own payload is not defeating an authorization check — it is supplying the input that check would have been made from. Second-order: the writing identity already spans the whole of `store:telemetry-store`, so the escalation is from one fleet's data to every tenant's in a single hop, and the readings land through the ordinary ingest path rather than an anomalous one.",
   "affected_element_ids": [
-    "process:web-api",
-    "process:ledger-service",
-    "flow:web-api-to-ledger-service:post-transfer",
-    "store:accounts-db"
+    "entity:sensor-gateway",
+    "process:stream-processor",
+    "flow:sensor-gateway-to-mqtt-broker:publish-telemetry",
+    "flow:stream-processor-to-telemetry-store:write-readings",
+    "store:telemetry-store"
   ],
   "evidence_refs": [
-    "crossing:flow:web-api-to-ledger-service:post-transfer"
+    "crossing:flow:sensor-gateway-to-mqtt-broker:publish-telemetry"
   ],
   "quotes": [
     {
-      "text": "not authenticated and not encrypted",
-      "source_label": "Payments platform notes"
+      "text": "takes the tenant_id straight out of the device payload",
+      "source_label": "Fleet telemetry platform notes"
+    },
+    {
+      "text": "Its service account can write every tenant's partition.",
+      "source_label": "Fleet telemetry platform notes"
     }
   ],
   "severity": {
-    "likelihood": "medium",
+    "likelihood": "high",
     "impact": "high",
-    "justification": "Likelihood is medium: the entry point faces the internet, but the attacker needs an initial flaw in `process:web-api` before the escalation is available. Impact is high: the attacker crosses a derived boundary crossing into `boundary:core` and reaches `financial` and `pii` data across all customers."
+    "justification": "Likelihood is high: the tenant arrives on a derived crossing into `boundary:ingest` and the attacker needs only to set a field, with no flaw to find in `process:stream-processor`. Impact is high: the write reaches `store:telemetry-store`, classified confidential and tagged `business-critical-data`, for tenants the publisher has no relationship with."
   },
   "mitigations": [
     {
-      "summary": "Authorize the caller at the zone boundary",
-      "detail": "Require a verified workload identity plus per-request customer authorization on `flow:web-api-to-ledger-service:post-transfer`, so dmz code execution does not equal core authority."
+      "summary": "Take the tenant from the authenticated publisher",
+      "detail": "Resolve the tenant in `process:stream-processor` from the credential that authenticated the publish, and reject a payload whose declared tenant disagrees with it."
     },
     {
-      "summary": "Constrain what the ledger will do for the web tier",
-      "detail": "Limit the operations, amounts, and accounts the web-API identity may request, so a compromised edge cannot exercise unbounded transfer authority."
+      "summary": "Scope the write identity to one tenant at a time",
+      "detail": "Replace the platform-wide service account on `flow:stream-processor-to-telemetry-store:write-readings` with a per-tenant credential, so a wrong tenant key fails the write instead of performing it."
     }
   ]
 }

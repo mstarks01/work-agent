@@ -84,33 +84,44 @@ Keep the lane straight. Speaking *as* the web API is spoofing; altering the mess
 }
 ```
 
-## Unknown-conditional: unverified transport to the accounts database
+## Unknown-conditional, in system B: unverified authorization on the topic
 
-The same flow carries `encryption_in_transit: unknown`. The model does not say the connection is plaintext — it says nobody recorded it. Write the threat conditionally, name the attribute, and let the critic mark it needs-info; asserting "the database connection is unencrypted" would state a fact the model does not contain.
+Written against exemplar system B. The submitter's own words are the trigger here — an admitted gap, recorded as `authentication: unknown` on the internal subscription rather than as an absent control. Condition the threat on the attribute and quote the admission; asserting "nothing checks topic access" would state a fact the model does not contain.
 
 ```json
 {
   "sequence": 3,
-  "title": "Balance writes modifiable on the wire if database transport is unprotected",
-  "description": "`flow:ledger-service-to-accounts-db:read-write-balances` carries `encryption_in_transit: unknown`. If that unknown resolves to plaintext PostgreSQL, an attacker with a position inside `boundary:core` can alter statements and result sets in flight — changing an amount as it is written, or a balance as it is read back by `process:ledger-service`. Both endpoints sit in the same zone, so this requires a prior foothold there. This draft is conditional on that attribute; it is not a claim that transport protection is absent.",
+  "title": "Fabricated readings enter the pipeline if topic access is unchecked",
+  "description": "`flow:mqtt-broker-to-stream-processor:consume-topic` carries `authentication: unknown` and crosses from `boundary:ingest` into `boundary:platform`. If that unknown resolves to no check on who may attach to a topic, then any party who reaches `process:mqtt-broker` can publish onto the topic `process:stream-processor` consumes, and the processor treats the arriving payloads as gateway telemetry because they came off the expected topic. The attacker modifies the fleet's picture rather than reading it: suppressed alarm thresholds, invented readings, altered volumes written on into `store:telemetry-store` as though a device had reported them. This draft is conditional on that flow's `authentication` attribute; it is not a claim that topic authorization is missing.",
   "affected_element_ids": [
-    "flow:ledger-service-to-accounts-db:read-write-balances",
-    "store:accounts-db",
-    "process:ledger-service"
+    "process:mqtt-broker",
+    "process:stream-processor",
+    "flow:mqtt-broker-to-stream-processor:consume-topic",
+    "store:telemetry-store"
   ],
   "evidence_refs": [
-    "unknown:flow:ledger-service-to-accounts-db:read-write-balances:encryption_in_transit"
+    "crossing:flow:mqtt-broker-to-stream-processor:consume-topic",
+    "unknown:flow:mqtt-broker-to-stream-processor:consume-topic:authentication"
   ],
-  "quotes": [],
+  "quotes": [
+    {
+      "text": "I could not tell you what, if anything, checks that a subscriber is allowed on a topic",
+      "source_label": "Fleet telemetry platform notes"
+    }
+  ],
   "severity": {
-    "likelihood": "low",
+    "likelihood": "medium",
     "impact": "high",
-    "justification": "Likelihood is low and conditional on the unknown `encryption_in_transit` value: the path is entirely inside `boundary:core`, so a foothold is a prerequisite, and the control may in fact be present. Impact is high: modified writes land in a confidential store tagged `financial` and `pii`."
+    "justification": "Likelihood is medium and conditional on the unknown `authentication` value: `process:mqtt-broker` is `internet-facing` so reaching it is cheap, but the control may in fact be present. Impact is high: falsified readings persist in `store:telemetry-store`, classified confidential and tagged `business-critical-data`, and are acted on as genuine."
   },
   "mitigations": [
     {
-      "summary": "Record and then enforce TLS on the database connection",
-      "detail": "Establish the current transport setting; if it is plaintext, require TLS with server-certificate verification on `flow:ledger-service-to-accounts-db:read-write-balances`."
+      "summary": "Record the topic authorization model, then enforce it",
+      "detail": "Establish what governs publish and subscribe on `flow:mqtt-broker-to-stream-processor:consume-topic`; if nothing does, restrict each credential to its own fleet's topics."
+    },
+    {
+      "summary": "Make the processor verify what it consumed",
+      "detail": "Have `process:stream-processor` accept only payloads signed by a device credential, so topic position alone does not make a reading authentic."
     }
   ]
 }
