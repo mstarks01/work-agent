@@ -21,7 +21,7 @@ from typing import Any
 from google.adk.models.base_llm import BaseLlm
 from google.adk.models.llm_response import LlmResponse
 from google.genai import types
-from pydantic import Field
+from pydantic import BaseModel, Field
 
 from stride_service.binding import NodeBinding
 from stride_service.graph import (
@@ -29,6 +29,7 @@ from stride_service.graph import (
     EXTRACT_NODE,
     REPAIR_NODE,
     TIER_NODE_BY_GRAPH_NODE,
+    Entry,
     Pipeline,
     build_pipeline,
 )
@@ -350,7 +351,7 @@ def sample_report(
 EMPTY_THREATS = '{"threats": []}'
 
 
-def threats_json(*threats: object) -> str:
+def threats_json(*threats: BaseModel) -> str:
     """A review or category-agent node's emission: the list inside its ``threats`` key.
 
     The wrapper is the node's output-schema shape, not the domain's, so tests
@@ -477,7 +478,7 @@ def scripted_pipeline(
     replies: dict[str, str],
     *,
     llm_class: type[ScriptedLlm] = ScriptedLlm,
-    entry: str = ENTRY_EXTRACT,
+    entry: Entry = ENTRY_EXTRACT,
 ) -> tuple[Pipeline, dict[str, ScriptedLlm]]:
     """The real graph, with every LLM node bound to its scripted stand-in.
 

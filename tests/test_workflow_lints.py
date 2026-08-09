@@ -31,13 +31,13 @@ def _imported_modules(source: Path, modules: set[str]) -> set[str]:
     """Which package modules ``source`` imports, however it spells the import."""
     found = set()
     for node in ast.walk(ast.parse(source.read_text(encoding="utf-8"))):
-        if isinstance(node, ast.ImportFrom) and (node.module or "").startswith(
-            "stride_service"
-        ):
-            head = node.module.split(".")[1:2]
-            found |= set(head) & modules
-            if not head:
-                found |= {alias.name for alias in node.names} & modules
+        if isinstance(node, ast.ImportFrom):
+            module = node.module or ""
+            if module.startswith("stride_service"):
+                head = module.split(".")[1:2]
+                found |= set(head) & modules
+                if not head:
+                    found |= {alias.name for alias in node.names} & modules
         elif isinstance(node, ast.Import):
             for alias in node.names:
                 found |= set(alias.name.split(".")[1:2]) & modules

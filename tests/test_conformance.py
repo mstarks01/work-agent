@@ -493,7 +493,7 @@ class TestProfileShape:
         entry = profile(vendor_for("openai"), "gpt-4o")
         assert isinstance(entry, ProviderProfile)
         with pytest.raises(FrozenInstanceError):
-            entry.model = "something-else"  # type: ignore[misc]
+            entry.model = "something-else"
 
 
 def test_the_shipped_temperature_cannot_bind_openais_strong_reference_model():

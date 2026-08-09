@@ -7,16 +7,9 @@ deterministic and credential-free, which is what lets it run on every PR.
 
 from __future__ import annotations
 
-import sys
-from pathlib import Path
-
 import pytest
 
-EVALS_ROOT = Path(__file__).resolve().parents[1] / "evals"
-sys.path.insert(0, str(EVALS_ROOT))
-
-import verify_corpus
-
+from evals import verify_corpus
 from stride_service.report import InputRef, SourceRef
 
 
@@ -35,7 +28,7 @@ def test_calibration_fixtures_pass_their_checks():
     claims_by_case = {
         case_dir.name: {
             threat["claim"]
-            for threat in verify_corpus._load_json(case_dir / "threats.json")
+            for threat in verify_corpus._load_json_array(case_dir / "threats.json")
         }
         for case_dir in verify_corpus.case_dirs()
     }
@@ -47,7 +40,7 @@ def test_calibration_fixtures_pass_their_checks():
 
 def test_each_declared_source_digests_to_what_it_claims():
     for case_dir in verify_corpus.case_dirs():
-        meta = verify_corpus._load_json(case_dir / "case.json")
+        meta = verify_corpus._load_json_object(case_dir / "case.json")
         for source in meta["sources"]:
             assert source["sha256"] == verify_corpus.source_sha256(
                 case_dir / source["file"]
@@ -58,7 +51,7 @@ def test_the_recorded_aggregate_is_taken_over_the_refs():
     # The same arithmetic a report's InputRef uses, so a case and a run of it
     # cannot disagree about what was submitted.
     for case_dir in verify_corpus.case_dirs():
-        meta = verify_corpus._load_json(case_dir / "case.json")
+        meta = verify_corpus._load_json_object(case_dir / "case.json")
         refs = [
             SourceRef(kind=s["kind"], label=s["label"], sha256=s["sha256"])
             for s in meta["sources"]
@@ -71,7 +64,7 @@ def test_every_citation_resolves_and_its_excerpt_verifies():
     # rejects a model citing a label its job never carried, and one whose
     # excerpt is not in the source it names.
     for case_dir in verify_corpus.case_dirs():
-        meta = verify_corpus._load_json(case_dir / "case.json")
+        meta = verify_corpus._load_json_object(case_dir / "case.json")
         model = verify_corpus._load_json(case_dir / "model.json")
         problems = list(
             verify_corpus._check_citations(

@@ -91,7 +91,7 @@ The project uses [uv](https://docs.astral.sh/uv/). Python ≥ 3.11.
 uv sync                                    # install deps into .venv
 uv run pytest                              # the offline suite — no credentials needed
 uv run ruff check .                        # lint
-uv run mypy                                # type check the shipped package
+uv run mypy                                # type check
 uv run python evals/verify_corpus.py       # mechanical checks over the golden corpus
 uv run python examples/sync_docs.py --check # the docs' code blocks match examples/
 ```
