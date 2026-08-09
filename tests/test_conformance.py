@@ -249,6 +249,50 @@ class TestModelsCanBeBound:
         assert adapters["base"].model == f"{prefix}{base}"
         assert adapters["strong"].model == f"{prefix}{strong}"
 
+    def test_no_vendor_reaches_its_provider_by_a_different_class(self, tmp_path):
+        """One adapter class for all three, which is the no-privileged-path claim.
+
+        ADK ships a native Gemini integration and warns on every run that this
+        service declines it (:mod:`stride_service.binding` says so in its own
+        header). Declining it is what makes "no vendor is privileged" true, and
+        prose cannot hold that: a native path reintroduced for one vendor would
+        leave every other assertion here passing, because the model strings,
+        the node table and the sampling would all still match.
+
+        So the class itself is the assertion. Identical across vendors means
+        no vendor has a route the others lack — and the shared class is where
+        the retry budget, the pinned ``num_retries=0`` and the credential gate
+        live, so a vendor that escaped it would escape those too.
+
+        The comparison is on the *ancestry* rather than the class object:
+        :func:`~stride_service.retry.retrying_llm_class` mints one subclass per
+        call, so two identically-wired adapters are never the same class. What
+        must match is everything behind that subclass.
+        """
+        # Deferred exactly as ``binding`` defers it, so this test cannot be the
+        # thing that pulls the provider library in ahead of the cost-map pin.
+        from google.adk.models.lite_llm import LiteLlm
+
+        ancestries = {}
+        for vendor in sorted(REFERENCE_MODELS):
+            adapters = build_tier_adapters(
+                tiers_for(vendor),
+                _bindable_sampling(vendor, tmp_path),
+                load_resilience(CONFIG / "resilience.toml", env={}),
+                env=FAKE_ENV,
+            )
+            # [1:] drops the per-call retry subclass; what remains is the route
+            # to the provider, which no vendor may differ on.
+            ancestries[vendor] = {
+                tier: type(adapter).__mro__[1:] for tier, adapter in adapters.items()
+            }
+            for adapter in adapters.values():
+                assert isinstance(adapter, LiteLlm)
+
+        reference = ancestries["vertex"]
+        for vendor, per_tier in ancestries.items():
+            assert per_tier == reference, f"{vendor} binds a different adapter class"
+
     @pytest.mark.parametrize("vendor", sorted(REFERENCE_MODELS))
     def test_a_missing_credential_fails_closed_naming_its_own_variable(self, vendor):
         """Equivalent failure behaviour, not an equivalent credential mode.
