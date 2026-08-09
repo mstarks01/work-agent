@@ -519,3 +519,171 @@ def test_the_viewer_has_no_inline_style_attribute():
     markup = re.sub(r"/\*.*?\*/", "", markup, flags=re.DOTALL)
     markup = re.sub(r"<!--.*?-->", "", markup, flags=re.DOTALL)
     assert "style=" not in markup
+
+
+# --- the other two pages (#114) ---------------------------------------------
+#
+# The report page had both controls and the form and diagnostic pages had
+# neither, which read as an oversight rather than a decision. These hold the
+# same two rules over all three: untrusted text reaches the DOM as text, and
+# every page carries a policy that authorises its own blocks and nothing else.
+
+
+def form_javascript() -> str:
+    """The form page's behaviour block, with its comments stripped.
+
+    The same treatment :func:`viewer_javascript` gives the viewer, and for the
+    same reason: the prose explains why there is no ``innerHTML``, so a
+    substring check over the raw template would fail on its own documentation.
+    """
+    from webapp.main import _FORM_PAGE
+
+    body = _FORM_PAGE.split('<script nonce="__CSP_NONCE__">')[-1].split("</script>")[0]
+    return "\n".join(
+        line for line in body.splitlines() if not line.lstrip().startswith("//")
+    )
+
+
+@pytest.mark.parametrize("sink", HTML_STRING_SINKS)
+def test_the_form_page_has_no_html_string_sink(sink):
+    """``fail()`` used to write ``innerHTML``, and submitter bytes reach it.
+
+    A source label travels label → ``LimitBreach.message`` → the ``failed``
+    event → the page, and a validator message travels the ``rejected`` event
+    the same way. Neither is escaped by ``sources.py``, which excludes line
+    breaks and control characters and says nothing about ``<``.
+    """
+    assert sink not in form_javascript(), (
+        f"the form page uses {sink}. Source labels and validator messages carry"
+        f" submitter bytes onto this page — build DOM nodes or set textContent."
+    )
+
+
+def test_the_form_page_carries_no_escape_helper():
+    """The corollary, the viewer's rule applied here.
+
+    The page had one and every call site remembered it. That is the arrangement
+    that had already failed once elsewhere, which is why the helper going away
+    is the fix rather than a fourth call site being added to it.
+    """
+    assert "escape(" not in form_javascript()
+
+
+@pytest.mark.parametrize("page", ["form", "diagnostic", "report"])
+def test_every_page_ships_a_nonce_csp(client, broken_client, page):
+    """No page is served bare, and each nonce covers its own page's blocks."""
+    if page == "form":
+        response = client.get("/")
+    elif page == "diagnostic":
+        response = broken_client.get("/")
+    else:
+        response = client.get(f"/report/{run_to_completion(client)}")
+
+    csp = response.headers["Content-Security-Policy"]
+    assert "default-src 'none'" in csp
+    assert "base-uri 'none'" in csp
+    assert "form-action 'none'" in csp
+    assert "unsafe-inline" not in csp
+    assert "__CSP_NONCE__" not in response.text
+
+    nonce = re.search(r"'nonce-([^']+)'", csp).group(1)
+    blocks = re.findall(r"<(script|style)([^>]*)>", response.text)
+    assert blocks, f"the {page} page carries no inline block for a nonce to cover"
+    for tag, attributes in blocks:
+        assert f'nonce="{nonce}"' in attributes, (
+            f"a <{tag}> block on the {page} page carries no nonce, so the CSP"
+            " would block it"
+        )
+
+
+def test_the_form_page_may_reach_its_own_origin_and_no_further(client):
+    """It fetches ``/example``, posts ``/analyze`` and opens ``/events``.
+
+    ``default-src 'none'`` alone would block all three, so this is the one
+    grant the form page needs that the report page does not.
+    """
+    csp = client.get("/").headers["Content-Security-Policy"]
+    assert "connect-src 'self'" in csp
+
+
+def test_the_diagnostic_page_is_granted_no_script_at_all(broken_client):
+    """It runs none, so ``script-src`` falls through to ``default-src 'none'``.
+
+    A page with nothing to authorise should not carry the grant that would
+    authorise something.
+    """
+    response = broken_client.get("/")
+    csp = response.headers["Content-Security-Policy"]
+    assert "script-src" not in csp
+    assert "connect-src" not in csp
+    assert "<script" not in response.text
+
+
+def test_every_page_render_gets_a_fresh_nonce(client, broken_client):
+    """A nonce reused across responses is not a nonce."""
+    for page_client in (client, broken_client):
+        first = page_client.get("/").headers["Content-Security-Policy"]
+        second = page_client.get("/").headers["Content-Security-Policy"]
+        assert first != second
+
+
+def test_a_config_error_spelling_the_placeholder_is_not_substituted(tiers):
+    """The nonce is stamped before the fields are filled, as on the report page.
+
+    An error message is content. One that happens to spell the placeholder must
+    come back as those characters rather than become a live nonce.
+    """
+    from stride_service import ConfigError
+    from webapp.main import diagnostic_page
+
+    page = diagnostic_page(
+        Startup(engine=None, tiers=tiers, error=ConfigError("__CSP_NONCE__"))
+    )
+
+    nonce = re.search(r"'nonce-([^']+)'", page.csp).group(1)
+    assert "__CSP_NONCE__" in page.html
+    assert page.html.count(nonce) == 1
+
+
+@pytest.mark.parametrize(
+    "path", ["/", "/example", "/analyze", "/events/nope", "/report/nope"]
+)
+def test_every_response_carries_the_sniffing_and_referrer_headers(client, path):
+    """Per response rather than per page, which is why they are not the CSP.
+
+    ``/example`` serves prose as ``text/plain`` and sniffing is what would let a
+    browser decide otherwise; a run id in an outbound ``Referer`` is the other
+    half. The 404s and the 405 are included on purpose — an error response is
+    still a response.
+    """
+    response = client.get(path)
+    assert response.headers["X-Content-Type-Options"] == "nosniff"
+    assert response.headers["Referrer-Policy"] == "no-referrer"
+
+
+def test_the_event_stream_still_streams_under_the_header_middleware(client):
+    """The headers are added to the frame, never by buffering the body.
+
+    A middleware that collected the response before editing it would turn the
+    per-node progress into one delivery at the end, which is the whole point of
+    the stream.
+    """
+    started = client.post("/analyze", json=posted("An app."), headers=SAME_ORIGIN)
+    with client.stream("GET", f"/events/{started.json()['run']}") as response:
+        assert response.headers["X-Content-Type-Options"] == "nosniff"
+        assert response.headers["content-type"].startswith("text/event-stream")
+        assert "event: done" in "".join(response.iter_text())
+
+
+def test_the_server_side_escape_covers_quotes():
+    """Every call site lands in text position today; that is not the guarantee.
+
+    An escape that is only adequate where it happens to be called is one
+    interpolation away from not being adequate, so the helper is correct in
+    attribute position too.
+    """
+    from webapp.main import _escape
+
+    escaped = _escape("\"><img src=x onerror=alert(1)>'")
+    for character in ("<", ">", '"', "'"):
+        assert character not in escaped
