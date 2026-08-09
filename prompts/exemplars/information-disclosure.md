@@ -84,31 +84,40 @@ Same path, two lanes: rewriting those messages is tampering, reading them is you
 }
 ```
 
-## Unknown-conditional: unverified encryption at rest
+## Unknown-conditional, in system B: unverified encryption at rest, shared tenancy
 
-`store:accounts-db` carries `encryption_at_rest: unknown`. Note the boundary the skill draws: disk encryption does nothing against an attacker with valid query access, so the conditional threat is specifically about the store's shadow copies — backups, snapshots, replicas, decommissioned media.
+Written against exemplar system B, and worth comparing with the canonical draft above: the same `encryption_at_rest: unknown` trigger, but the multi-tenant store changes what one copy costs. Note the boundary the skill draws — disk encryption does nothing against an attacker with valid query access, so the conditional threat is about the store's shadow copies.
 
 ```json
 {
   "sequence": 3,
-  "title": "Account data exposed through backups if the store is unencrypted at rest",
-  "description": "`store:accounts-db` is classified confidential and tagged `pii` and `financial`, but its `encryption_at_rest` attribute is `unknown`. If that unknown resolves to unencrypted storage, anyone who obtains a copy of the underlying media — a snapshot exported to a less-protected project, a backup bucket with broader read access, a replica in another environment, decommissioned disks — reads the full dataset without touching `process:ledger-service` or presenting any database credential. Shadow copies routinely inherit the data but not the access controls of the live store. This draft is conditional on the `encryption_at_rest` attribute; it is not a claim that the store is unencrypted.",
+  "title": "One snapshot exposes every tenant if the telemetry store is unencrypted at rest",
+  "description": "`store:telemetry-store` is classified confidential and tagged `business-critical-data`, and its `encryption_at_rest` attribute is `unknown`. If that unknown resolves to unencrypted storage, anyone obtaining a copy of the media — an exported snapshot, a backup with broader read access, a replica in a lower environment — reads the readings directly, without presenting a credential to `process:stream-processor` or touching the platform's own access path. What makes this worse than the same gap on a single-tenant store is that the partitions share one space: the tenant key separates customers inside a live query, and a raw copy carries no query, so one exported artifact discloses every fleet's operating data at once. This draft is conditional on the `encryption_at_rest` attribute; it is not a claim that the store is unencrypted.",
   "affected_element_ids": [
-    "store:accounts-db"
+    "store:telemetry-store"
   ],
   "evidence_refs": [
-    "unknown:store:accounts-db:encryption_at_rest"
+    "unknown:store:telemetry-store:encryption_at_rest"
   ],
-  "quotes": [],
+  "quotes": [
+    {
+      "text": "Nobody has confirmed whether that store is encrypted at rest.",
+      "source_label": "Fleet telemetry platform notes"
+    }
+  ],
   "severity": {
     "likelihood": "medium",
     "impact": "high",
-    "justification": "Likelihood is medium and conditional on the unknown `encryption_at_rest` value: backup and snapshot sprawl is common and needs no live access, but the control may in fact be present. Impact is high: a full copy of a confidential store tagged `pii` and `financial` is irreversible disclosure at corpus scale."
+    "justification": "Likelihood is medium and conditional on the unknown `encryption_at_rest` value: snapshot and backup sprawl needs no live access, but the control may in fact be present. Impact is high: a raw copy of a confidential store tagged `business-critical-data` discloses every tenant's fleet at once, and disclosure is irreversible."
   },
   "mitigations": [
     {
       "summary": "Record the at-rest posture, then enforce it on copies",
-      "detail": "Establish whether `store:accounts-db` is encrypted at rest; require customer-managed keys on the store and on every backup, snapshot, and replica, and restrict who may export them."
+      "detail": "Establish whether `store:telemetry-store` is encrypted at rest; require customer-managed keys on the store and on every backup, snapshot, and replica, and restrict who may export them."
+    },
+    {
+      "summary": "Make one copy cost one tenant",
+      "detail": "Key encryption per tenant so a single exported artifact cannot be read across the whole partition space."
     }
   ]
 }

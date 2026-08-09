@@ -33,11 +33,32 @@ def test_loads_every_shipped_case(corpus):
     assert [case.id for case in corpus] == sorted(case.id for case in corpus)
 
 
-def test_exactly_one_near_exemplar_control(corpus):
-    # Without the payments control there is nothing to subtract from, and the
+# One near control per exemplar system, and the pairing is definitional rather
+# than a judgement about resemblance: each control's domain is the domain its
+# exemplar system was written in. `docs/adr/0006-two-exemplar-systems.md` has
+# the reasoning; the short version is that "near" means "an architecture the
+# exemplars actually demonstrate", so adding an exemplar system without adding
+# its control leaves the delta measuring the wrong thing.
+NEAR_EXEMPLAR_CONTROLS = ["01-payments-checkout", "02-iot-fleet-telemetry"]
+
+
+def test_one_near_exemplar_control_per_exemplar_system(corpus):
+    # Without a control there is nothing to subtract from, and the
     # exemplar-domain-bias delta is unmeasurable.
     near = [case.id for case in corpus if case.meta.exemplar_proximity == "near"]
-    assert near == ["01-payments-checkout"]
+    assert near == NEAR_EXEMPLAR_CONTROLS
+
+
+def test_the_near_controls_are_outnumbered_by_far_cases(corpus):
+    """The delta compares two populations, so neither may be most of the corpus.
+
+    A guard on the instrument rather than on the corpus: `far_recall` is what
+    the honest question is asked of, and each near control taken out of the far
+    population costs it a case. At two of twelve that is comfortable; the check
+    exists so a third exemplar system cannot quietly make it not.
+    """
+    near = sum(1 for case in corpus if case.meta.exemplar_proximity == "near")
+    assert near * 2 < len(corpus) - near
 
 
 def test_every_case_carries_must_find_references(corpus):
