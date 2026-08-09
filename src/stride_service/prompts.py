@@ -61,9 +61,26 @@ EXEMPLARS_PREFIX = "exemplars/"
 # A cap is a budget, not an entitlement: sized at the full allowance it would
 # sit above the file and catch no drift at all, so it is sized to leave ~90
 # tokens — room for a normal edit without a CI fight, and little enough that a
-# second exemplar system still has to be argued for.
+# third exemplar system has to be argued for rather than added.
 #
-# THREE DERIVED BLOCKS NOW SHARE THIS BUDGET, and they arrived separately, so
+# THE SECOND EXEMPLAR SYSTEM IS WHAT THE LAST RAISE BOUGHT: ~500 tokens for a
+# fleet-telemetry platform beside the payments one, event-driven and
+# multi-tenant where the first is synchronous request/response, worked by six
+# of the eighteen exemplars. The cost is real and lands on all six agents on
+# every job. What it buys is that the exemplars stop teaching one architecture
+# alongside the method — an agent shown only payments has no way to tell which
+# parts of the reasoning were the domain, and the far-domain corpus cases are
+# where that shows up (docs/adr/0006-two-exemplar-systems.md).
+#
+# TWO is the argued number, not a step toward six. Cost here is linear in
+# systems and the diversity it buys is not: the first contrasting system breaks
+# a monoculture, the fifth mostly restates it, and per-technology depth has a
+# carrier that costs nothing on jobs that do not earn it — the domain packs in
+# ``skills/domains/``, selected per job. System B is deliberately smaller than
+# system A (four elements and three flows against six and five), because it
+# exists to contrast rather than to be a second full-fidelity model.
+#
+# THREE DERIVED BLOCKS ALSO SHARE THIS BUDGET, and they arrived separately, so
 # the number is stated once here rather than nudged by each:
 #
 # * the **evidence catalog**, which an agent selects references out of rather
@@ -78,7 +95,7 @@ EXEMPLARS_PREFIX = "exemplars/"
 # ~180 tokens for the candidate half and ~130 for the catalog, on a body that
 # was 2239 before either. A fourth derived block should be argued for against
 # what an agent can actually hold in mind, not against this number.
-ANALYZE_PROMPT_TOKEN_CAP = 2950
+ANALYZE_PROMPT_TOKEN_CAP = 3450
 EXEMPLAR_TOKEN_CAP = 1500
 CRITIC_PROMPT_TOKEN_CAP = 1500
 # The re-ask has to be able to name and fix every fault `review_issues` can

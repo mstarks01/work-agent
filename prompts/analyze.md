@@ -16,9 +16,15 @@ The two carry different standing. **The System Model states the facts you reason
 
 Two more blocks carry a third standing, weaker than both. **Candidates** are structural conditions code found in your lane, each with the `facts` the rule read and a `question` to answer. They are **leads, not findings** — code cannot tell whether a condition yields an attacker scenario, so investigating one and rejecting it is the system working, and filing all of them is not coverage. **Domain reference material**, where present, is analysis knowledge about a technology family. Neither block is citable: a candidate is never an entry in your evidence catalog — the crossing or `unknown` attribute the rule *read* is, and that is what you cite — and reference material is cited by nothing at all. Neither is exhaustive — the threats no rule triggered on are the ones only you can find.
 
-### The exemplar system
+### The exemplar systems
 
-The exemplars that follow this prompt are all written against one small reference system — **not** the system you are analyzing. Never cite its IDs in your own output. Its one source, rendered as yours will be:
+The exemplars that follow this prompt are written against two small reference systems — **not** the system you are analyzing. Never cite their IDs in your own output. Each exemplar works one of them end to end and never mixes the two, because a threat is an argument about one system.
+
+They differ on purpose. **A** is a synchronous request/response platform; **B** is event-driven and multi-tenant, and its trust problems arrive as data rather than as calls. The reasoning is the same in both, and that is the point of showing you two: what transfers is the method, never the architecture.
+
+#### Exemplar system A: payments platform
+
+Its one source, rendered as yours will be:
 
 ````
 label: Payments platform notes
@@ -62,6 +68,50 @@ Its evidence catalog, rendered as yours will be:
   "crossing:flow:customer-to-web-api:submit-payment",
   "crossing:flow:payments-provider-to-web-api:settlement-webhook",
   "crossing:flow:web-api-to-ledger-service:post-transfer"
+]
+```
+
+#### Exemplar system B: fleet telemetry platform
+
+Its one source:
+
+````
+label: Fleet telemetry platform notes
+----
+We run telemetry for a few hundred customer fleets. Every sensor gateway publishes to our MQTT broker over TLS, but they all share one client certificate — we burn the same cert into every device image, because rotating a cert per device was more work than we could justify.
+
+The broker sits on the public internet so gateways can reach it from anywhere. Its topics are consumed by the stream processor, and I could not tell you what, if anything, checks that a subscriber is allowed on a topic.
+
+The processor takes the tenant_id straight out of the device payload and writes the readings into the shared time-series store under that key. Its service account can write every tenant's partition.
+
+Nobody has confirmed whether that store is encrypted at rest.
+````
+
+Trust zones: `boundary:field` (network), `boundary:ingest` (network), `boundary:platform` (network).
+
+| Element | Type | Key attributes |
+|---|---|---|
+| `entity:sensor-gateway` | External Entity, external-system | zone `boundary:field` |
+| `process:mqtt-broker` | Process | managed MQTT; zone `boundary:ingest`; exposure `internet-facing`; assets `availability-critical` |
+| `process:stream-processor` | Process | stream consumer; zone `boundary:platform`; exposure `unknown`; assets `business-critical-data` |
+| `store:telemetry-store` | Data Store | time-series, one shared partition space keyed by tenant; zone `boundary:platform`; classification `confidential`; `encryption_at_rest: unknown`; assets `business-critical-data` |
+
+| Flow | Attributes |
+|---|---|
+| `flow:sensor-gateway-to-mqtt-broker:publish-telemetry` | MQTT over TLS; `authentication`: one client certificate shared by every device image; payload carries the tenant_id |
+| `flow:mqtt-broker-to-stream-processor:consume-topic` | topic subscription; `authentication: unknown`; carries raw device payloads |
+| `flow:stream-processor-to-telemetry-store:write-readings` | time-series write API; `authentication`: one service account holding write on every tenant partition; `encryption_in_transit: unknown` |
+
+Its evidence catalog:
+
+```
+[
+  "unknown:process:stream-processor:exposure",
+  "unknown:store:telemetry-store:encryption_at_rest",
+  "unknown:flow:mqtt-broker-to-stream-processor:consume-topic:authentication",
+  "unknown:flow:stream-processor-to-telemetry-store:write-readings:encryption_in_transit",
+  "crossing:flow:sensor-gateway-to-mqtt-broker:publish-telemetry",
+  "crossing:flow:mqtt-broker-to-stream-processor:consume-topic"
 ]
 ```
 

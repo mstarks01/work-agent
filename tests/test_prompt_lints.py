@@ -4,7 +4,7 @@ The counterpart of ``test_skill_lints.py`` for prompt content (tickets 019,
 020): the four agent prompts carry exactly the four fixed H2 headings in
 order, the six exemplar files match the ``StrideCategory`` literals, and
 every fenced ``json`` block in them parses as a ``ThreatProposal`` citing only
-elements the exemplar system defines. An exemplar that cites an element that
+elements an exemplar system defines. An exemplar that cites an element that
 does not exist teaches the model to hallucinate IDs, so that check is worth
 as much as the shape ones.
 
@@ -12,7 +12,15 @@ as much as the shape ones.
 lives in ``ThreatProposal`` and nowhere else — so a fenced block appearing there
 is the drift this guards against.
 
-THE EVIDENCE LINTS exist because the exemplar system ships a labelled source
+``analyze.md`` carries **two** worked reference systems
+(``docs/adr/0006-two-exemplar-systems.md``), so every check that resolves an
+exemplar's IDs, quotes or evidence refs first asks which system that draft is
+written against — :func:`owning_system`, which fails a draft whose cited
+elements no single system covers. Resolving against the union of the two would
+accept a draft that mixed them, and mixing is the one thing the prompt tells an
+agent never to do with them.
+
+THE EVIDENCE LINTS exist because each exemplar system ships a labelled source
 block and an evidence catalog, and both ship for mechanical rather than
 editorial reasons. An exemplar quote citing text the prompt never shows would
 teach precisely the failure finding-level attribution exists to prevent — that
@@ -25,12 +33,12 @@ imported rather than reimplemented, so the exemplars are held to the identical
 rule the agent is held to; a divergence between the two would be invisible
 otherwise.
 
-One hazard for whoever edits the source block: :func:`exemplar_system_ids`
-takes its known-ID set from the *whole* ``## Input`` section, which now contains
-free submitter prose. A backticked ``type:slug`` written into that prose would
-silently widen the set. Submitter prose has no reason to spell an element ID —
-the block reads the way a real ``source.md`` does, and those never do — but the
-trap is worth knowing about.
+One hazard for whoever edits a source block: :func:`system_ids` takes its
+known-ID set from the *whole* subsection, which contains free submitter prose.
+A backticked ``type:slug`` written into that prose would silently widen the
+set. Submitter prose has no reason to spell an element ID — the blocks read the
+way a real ``source.md`` does, and those never do — but the trap is worth
+knowing about.
 """
 
 import json
@@ -88,10 +96,11 @@ ELEMENT_ID_RE = re.compile(r"`((?:entity|process|store|flow|boundary):[a-z0-9:-]
 # A job-varying placeholder ADK templates from session state at run time. The
 # first one in an instruction is where its cacheable prefix stops.
 PLACEHOLDER_RE = re.compile(r"\{[a-z_]+\}")
-# The shared exemplar system: everything under its H3 up to the next heading of
-# the same level or higher.
+# One exemplar system: everything under its H4 up to the next heading of the
+# same level or higher.
 EXEMPLAR_SYSTEM_RE = re.compile(
-    r"^### The exemplar system\n(?P<body>.*?)(?=^#{1,3} )", re.MULTILINE | re.DOTALL
+    r"^#### Exemplar system (?P<name>[A-Z]):[^\n]*\n(?P<body>.*?)(?=^#{1,4} )",
+    re.MULTILINE | re.DOTALL,
 )
 
 
@@ -103,55 +112,85 @@ def exemplar_sections(category):
     return split_sections(loader.load(exemplar_name(category)))
 
 
-def exemplar_system():
-    """The ``### The exemplar system`` subsection of ``analyze.md``.
+def exemplar_systems():
+    """The ``#### Exemplar system X`` subsections of ``analyze.md``, by letter.
 
-    Found by its own heading rather than by which H2 contains it. The block is
-    static reference material, so it sits wherever the prompt's static content
-    sits — it moved out of ``## Input`` when the static/variable split was
-    tightened for caching, and a helper keyed on the enclosing H2 had to be
-    rewritten to follow it. Keyed on the heading that names it, it does not.
+    Found by their own headings rather than by which H2 contains them. The
+    blocks are static reference material, so they sit wherever the prompt's
+    static content sits, and a helper keyed on the enclosing heading would have
+    to be rewritten every time that moves. Keyed on the headings that name
+    them, this does not.
     """
     body = loader.load(ANALYZE_PROMPT_NAME)
-    match = EXEMPLAR_SYSTEM_RE.search(body)
-    assert match, "analyze.md carries no '### The exemplar system' subsection"
-    return match.group("body")
+    systems = {
+        match.group("name"): match.group("body")
+        for match in EXEMPLAR_SYSTEM_RE.finditer(body)
+    }
+    assert len(systems) >= 2, (
+        "analyze.md carries fewer than two '#### Exemplar system X' subsections. "
+        "One reference system is the exemplar-domain monoculture "
+        "docs/adr/0006-two-exemplar-systems.md exists to prevent."
+    )
+    return systems
+
+
+def system_ids(system):
+    """Every element/flow ID one exemplar system defines."""
+    return set(ELEMENT_ID_RE.findall(system))
 
 
 def exemplar_system_ids():
-    """Every element/flow ID the shared exemplar system defines."""
-    return set(ELEMENT_ID_RE.findall(exemplar_system()))
+    """Every element/flow ID any exemplar system defines."""
+    return set().union(*(system_ids(body) for body in exemplar_systems().values()))
 
 
-def exemplar_source_block():
-    """The exemplar system's one source, as ``(label, text)``.
+def source_block(system):
+    """One exemplar system's source, as ``(label, text)``.
 
     Found by shape rather than by position: a fenced block whose first line is
     ``label:`` is exactly what :func:`~stride_service.sources.render_sources`
     emits, which is the shape the block exists to depict.
     """
-    match = SOURCE_BLOCK_RE.search(exemplar_system())
-    assert match, "the exemplar system carries no labelled source block"
+    match = SOURCE_BLOCK_RE.search(system)
+    assert match, "an exemplar system carries no labelled source block"
     return match.group("label").strip(), match.group("text")
 
 
-def exemplar_catalog():
-    """The exemplar system's evidence catalog, as the list of IDs it renders to.
+def catalog(system):
+    """One exemplar system's evidence catalog, as the list of IDs it renders to.
 
     Found by shape, like the source block: the one fenced block in the section
     that parses as a JSON array of strings, which is exactly what
     ``prepare_analysis`` puts in front of an agent.
     """
-    for block in re.findall(
-        r"^`{3,}\n(.*?)^`{3,}$", exemplar_system(), re.MULTILINE | re.DOTALL
-    ):
+    for block in re.findall(r"^`{3,}\n(.*?)^`{3,}$", system, re.MULTILINE | re.DOTALL):
         try:
             parsed = json.loads(block)
         except json.JSONDecodeError:
             continue
         if isinstance(parsed, list) and all(isinstance(ref, str) for ref in parsed):
             return parsed
-    raise AssertionError("the exemplar system carries no evidence catalog block")
+    raise AssertionError("an exemplar system carries no evidence catalog block")
+
+
+def owning_system(proposal):
+    """Which exemplar system a draft is written against, by its own IDs.
+
+    The check that makes two systems safe rather than merely twice as much
+    material. Every other exemplar lint resolves against *this* system alone,
+    so a draft that reached across the two — citing payments elements while
+    quoting the telemetry source — fails here rather than passing a union that
+    would let it teach exactly the mixing the prompt forbids.
+    """
+    cited = set(proposal.affected_element_ids)
+    owners = [
+        name for name, body in exemplar_systems().items() if cited <= system_ids(body)
+    ]
+    assert len(owners) == 1, (
+        f"{proposal.id} cites {sorted(cited)}, which no single exemplar system "
+        f"covers (matched {owners}) — a draft argues about one system"
+    )
+    return exemplar_systems()[owners[0]]
 
 
 def exemplar_proposals(category):
@@ -256,12 +295,11 @@ def test_every_exemplar_block_parses_as_a_threat_proposal(category):
 
 @pytest.mark.parametrize("category", STRIDE_CATEGORIES)
 def test_exemplar_references_resolve_in_the_exemplar_system(category):
-    known_ids = exemplar_system_ids()
-    for body in exemplar_sections(category).values():
-        for block in json_blocks(body):
-            proposal = ThreatProposal.model_validate(json.loads(block))
-            unknown = set(proposal.affected_element_ids) - known_ids
-            assert not unknown, f"{proposal.id} cites {sorted(unknown)}"
+    """Every cited element exists, and all of them in the same worked system."""
+    for proposal in exemplar_proposals(category):
+        known_ids = system_ids(owning_system(proposal))
+        unknown = set(proposal.affected_element_ids) - known_ids
+        assert not unknown, f"{proposal.id} cites {sorted(unknown)}"
 
 
 @pytest.mark.parametrize("category", STRIDE_CATEGORIES)
@@ -272,16 +310,14 @@ def test_exemplar_descriptions_cite_only_ids_the_exemplar_system_has(category):
     be teaching the very thing ``UnresolvedMention`` exists to catch, in the
     six prompts that demonstrate what a good description looks like.
     """
-    known_ids = exemplar_system_ids()
-    for body in exemplar_sections(category).values():
-        for block in json_blocks(body):
-            proposal = ThreatProposal.model_validate(json.loads(block))
-            unknown = [
-                mention
-                for mention in mentioned_ids(proposal.description)
-                if mention not in known_ids
-            ]
-            assert not unknown, f"{proposal.id} description cites {sorted(unknown)}"
+    for proposal in exemplar_proposals(category):
+        known_ids = system_ids(owning_system(proposal))
+        unknown = [
+            mention
+            for mention in mentioned_ids(proposal.description)
+            if mention not in known_ids
+        ]
+        assert not unknown, f"{proposal.id} description cites {sorted(unknown)}"
 
 
 @pytest.mark.parametrize("category", STRIDE_CATEGORIES)
@@ -317,25 +353,28 @@ def test_exemplar_quotes_verify_against_block(category):
     unnoticed. An exemplar quoting text that appears nowhere would teach the
     one thing this whole feature exists to prevent.
     """
-    _, text = exemplar_source_block()
     unfindable = [
         (proposal.id, quote.text)
         for proposal in exemplar_proposals(category)
         for quote in proposal.quotes
-        if not verify_quote(quote.text, text)
+        if not verify_quote(quote.text, source_block(owning_system(proposal))[1])
     ]
     assert not unfindable
 
 
 @pytest.mark.parametrize("category", STRIDE_CATEGORIES)
 def test_exemplar_quote_labels_match_the_block(category):
-    """A quote resolves to a source, which here is the block's declared label."""
-    label, _ = exemplar_source_block()
+    """A quote resolves to a source, which here is the block's declared label.
+
+    With two worked systems the label is load-bearing rather than decorative:
+    it is what picks the block the quote above is verified against, exactly as
+    a real draft's ``source_label`` picks one of the job's sources.
+    """
     mislabelled = [
         (proposal.id, quote.source_label)
         for proposal in exemplar_proposals(category)
         for quote in proposal.quotes
-        if quote.source_label != label
+        if quote.source_label != source_block(owning_system(proposal))[0]
     ]
     assert not mislabelled
 
@@ -350,26 +389,27 @@ def test_exemplar_evidence_refs_are_in_the_exemplar_catalog(category):
     resolves against nothing teaches an agent to do the same, at the one seam
     where that fails the whole lane.
     """
-    catalog = set(exemplar_catalog())
     dangling = [
         (proposal.id, ref)
         for proposal in exemplar_proposals(category)
         for ref in proposal.evidence_refs
-        if ref not in catalog
+        if ref not in set(catalog(owning_system(proposal)))
     ]
     assert not dangling
 
 
-def test_the_exemplar_catalog_names_only_elements_the_system_defines():
+@pytest.mark.parametrize("name", sorted(exemplar_systems()))
+def test_the_exemplar_catalog_names_only_elements_the_system_defines(name):
     """The other end of the same chain: the catalog's own IDs resolve.
 
     A catalog is derived from a System Model at run time, so every entry names
-    a real element by construction. The exemplar system's is hand-written, and
+    a real element by construction. An exemplar system's is hand-written, and
     an entry naming nothing would make the lint above pass against a fiction.
     """
-    known_ids = exemplar_system_ids()
+    system = exemplar_systems()[name]
+    known_ids = system_ids(system)
     dangling = []
-    for ref in exemplar_catalog():
+    for ref in catalog(system):
         if ref.startswith(f"{CROSSING_PREFIX}:"):
             element = ref.split(":", 1)[1]
         elif ref.startswith(f"{UNKNOWN_PREFIX}:"):
@@ -380,6 +420,22 @@ def test_the_exemplar_catalog_names_only_elements_the_system_defines():
         if element not in known_ids:
             dangling.append(ref)
     assert not dangling
+
+
+def test_every_exemplar_system_is_worked_by_some_category():
+    """A second system nobody demonstrates is cost without diversity.
+
+    The whole point of carrying two is that agents see the method applied to
+    both, so a system that ships in the prompt and appears in no draft is
+    ~500 tokens on every job buying nothing.
+    """
+    worked = {
+        owning_system(proposal)
+        for category in STRIDE_CATEGORIES
+        for proposal in exemplar_proposals(category)
+    }
+    unworked = [name for name, body in exemplar_systems().items() if body not in worked]
+    assert not unworked, f"exemplar systems {unworked} are shown but never worked"
 
 
 @pytest.mark.parametrize("category", STRIDE_CATEGORIES)
@@ -402,8 +458,12 @@ def test_no_non_markdown_files_under_prompts():
     assert not stray
 
 
-# Worst-case category-agent instruction is skill text (~2.2K) plus this; the
-# envelope is 6-8K, so the composed prompt has ~4K of room.
+# Worst-case category-agent instruction is skill text (~2.2K) plus this, against
+# a 6-8K envelope. At this number the worst case sits around 7K, which is inside
+# the envelope and no longer comfortably so — the second exemplar system spent
+# most of the room that used to be here. The next thing that wants space in a
+# category agent's *static* instruction should be weighed against deleting
+# something, not against this line.
 #
 # Moves with the body cap, and has to: the composed budget binds first, so a
 # body cap the composed budget cannot accommodate is a cap nothing can reach.
@@ -413,7 +473,7 @@ def test_no_non_markdown_files_under_prompts():
 # ``DOMAIN_PACK_TOKEN_CAP``) plus one lane's candidates and the evidence
 # catalog. Those are runtime values rather than prompt text, capped where they
 # are produced — this budget governs the static instruction only.
-COMPOSED_ANALYZE_TOKEN_BUDGET = 4300
+COMPOSED_ANALYZE_TOKEN_BUDGET = 4800
 
 
 @pytest.mark.parametrize("category", STRIDE_CATEGORIES)

@@ -46,45 +46,47 @@ The lane test: the harm here is not that someone impersonated a customer (spoofi
 }
 ```
 
-## Second-order: the ledger writes its own evidence
+## Second-order, in system B: readings nobody can attribute to a device
 
-`process:ledger-service` both performs transfers and produces the only account of them, and it accepts instructions over an unauthenticated flow. The exemplar shows the reach: compromising one modest process does not lose one record, it makes the entire corpus of accountability worthless.
+Written against exemplar system B. Repudiation does not require anyone to tamper with a record — it is enough that the record was never capable of naming who acted. Here two facts compose: the credential identifies no single device, and the only tenant marking is one the publisher supplied.
 
 ```json
 {
   "sequence": 2,
-  "title": "Compromising the ledger service destroys accountability for every transfer",
-  "description": "`process:ledger-service` is the sole writer to `store:audit-log` over `flow:ledger-service-to-audit-log:append-transfer-record`, using its own service account, and it accepts work over `flow:web-api-to-ledger-service:post-transfer` with `authentication: none`. An attacker who reaches `boundary:dmz` and drives, or ultimately compromises, that process controls both the action and the record of it: entries can be omitted for the transfers the attacker makes, and fabricated for transfers that never happened. Second-order: because no independent party writes to `store:audit-log`, every prior record becomes unreliable once this identity is suspected — the accountability loss is retrospective across the whole corpus, not limited to the incident window.",
+  "title": "No stored reading can be tied to the device that produced it",
+  "description": "Every `entity:sensor-gateway` authenticates on `flow:sensor-gateway-to-mqtt-broker:publish-telemetry` with the same certificate, so the credential distinguishes the fleet software and not the device. `process:stream-processor` then files each reading in `store:telemetry-store` under a tenant the payload itself declared. Both halves of an attributable record are therefore missing: the transport identifies a population rather than a party, and the only party marking present is self-asserted by whoever published. A customer disputing a reading — a reported fault, a billed volume, an SLA breach — can say it was not their device, and the platform holds nothing that contradicts them. Second-order: this is not one unattributable event but a property of the whole store, so the first genuine dispute puts every historical reading for every tenant beyond defence, and an attacker publishing forged readings inherits that deniability rather than having to create it.",
   "affected_element_ids": [
-    "process:ledger-service",
-    "store:audit-log",
-    "flow:ledger-service-to-audit-log:append-transfer-record",
-    "flow:web-api-to-ledger-service:post-transfer"
+    "entity:sensor-gateway",
+    "process:stream-processor",
+    "flow:sensor-gateway-to-mqtt-broker:publish-telemetry",
+    "store:telemetry-store"
   ],
-  "evidence_refs": [],
+  "evidence_refs": [
+    "crossing:flow:sensor-gateway-to-mqtt-broker:publish-telemetry"
+  ],
   "quotes": [
     {
-      "text": "the entry names the ledger service and never the customer",
-      "source_label": "Payments platform notes"
+      "text": "they all share one client certificate",
+      "source_label": "Fleet telemetry platform notes"
     },
     {
-      "text": "not authenticated and not encrypted",
-      "source_label": "Payments platform notes"
+      "text": "takes the tenant_id straight out of the device payload",
+      "source_label": "Fleet telemetry platform notes"
     }
   ],
   "severity": {
-    "likelihood": "medium",
-    "impact": "high",
-    "justification": "Likelihood is medium: driving the ledger needs only a foothold in `boundary:dmz` given `authentication: none` on the inbound flow. Impact is high: `store:audit-log` is tagged `business-critical-data` and is the only evidence of `financial` actions, so the loss covers all history rather than one event."
+    "likelihood": "high",
+    "impact": "medium",
+    "justification": "Likelihood is high: no attacker is needed for the gap to bite — an ordinary billing or fault dispute reaches it, and the publish flow is a derived crossing out of `boundary:field` that any holder of the shared certificate can originate. Impact is medium: `store:telemetry-store` is tagged `business-critical-data` and its evidential value is lost across all tenants, but the readings themselves remain available and no `pii` is exposed by this threat alone."
   },
   "mitigations": [
     {
-      "summary": "Make audit entries append-only to their writer",
-      "detail": "Grant `process:ledger-service` append-only permission with retention lock on `store:audit-log`, so the acting party cannot omit or rewrite entries after the fact."
+      "summary": "Identify the device, not the fleet",
+      "detail": "Issue per-device credentials on `flow:sensor-gateway-to-mqtt-broker:publish-telemetry` and record the authenticated device identity with each reading, so a stored row names a party."
     },
     {
-      "summary": "Record transfers from a second, independent point",
-      "detail": "Have `process:web-api` log the accepted instruction independently, so two records must be corrupted rather than one."
+      "summary": "Stop trusting the payload for attribution",
+      "detail": "Have `process:stream-processor` derive the tenant from the authenticated publisher and reject a self-declared one, so the marking in `store:telemetry-store` is the platform's claim rather than the publisher's."
     }
   ]
 }

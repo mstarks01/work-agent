@@ -147,11 +147,11 @@ def mentioned_ids(description: str) -> list[str]:
     round for a check whose output annotates a finding a human will read.
 
     Measured over the 18 hand-authored descriptions in ``prompts/exemplars/``,
-    the closest thing the repo holds to real agent prose: **14 distinct IDs
-    extracted, 0 of them spurious** — every token found is one of the exemplar
-    system's 14 real element IDs, and all 14 are found. Small, and the only
-    corpus of threat descriptions that exists; enough to say the pattern reads
-    prose without inventing citations in it.
+    the closest thing the repo holds to real agent prose: **24 distinct IDs
+    extracted, 0 of them spurious** — every token found is one of the two
+    exemplar systems' 24 real element IDs, and all 24 are found. Small, and the
+    only corpus of threat descriptions that exists; enough to say the pattern
+    reads prose without inventing citations in it.
 
     Trailing hyphens are trimmed because prose runs an ID into an em-dash
     substitute more often than a real slug ends in one; ``normalize_name``
