@@ -46,39 +46,44 @@ Note the phrasing. "The login flow lacks MFA" is a control observation and would
 }
 ```
 
-## Second-order: impersonating the web API to the ledger
+## Second-order, in system B: one certificate speaks for every fleet
 
-`flow:web-api-to-ledger-service:post-transfer` has `authentication: none` — identity is inferred from network position. On its own that is a modest finding about an internal call. The value of the draft is the reach: any foothold in `boundary:dmz` inherits the ability to speak as `process:web-api`, and impact is scored on everything that identity commands, not on the compromised element.
+Written against exemplar system B, to show the same reasoning on an event-driven system. A shared credential is not one identity weakly held — it is every identity held by whoever extracts it once. The reach is what makes the draft: the credential's blast radius is the whole tenant population, not the device it came from.
 
 ```json
 {
   "sequence": 2,
-  "title": "Any dmz foothold can impersonate the web API to the ledger service",
-  "description": "`flow:web-api-to-ledger-service:post-transfer` carries `authentication: none`; `process:ledger-service` accepts transfer instructions because they arrive from `boundary:dmz`, not because the caller proved an identity. An attacker who reaches that zone by any route — a compromised neighbor, SSRF through `process:web-api`, a stolen workload — originates gRPC calls that the ledger treats as authentic web-API traffic. Second-order: that identity commands transfers against `store:accounts-db` for every customer, so a foothold in a low-value zone converts directly into authority over `financial` assets in `boundary:core` and a crossing the model already flags.",
+  "title": "One extracted device certificate lets an attacker publish as any fleet",
+  "description": "`flow:sensor-gateway-to-mqtt-broker:publish-telemetry` authenticates every `entity:sensor-gateway` with the same client certificate, burned into a device image an attacker can buy, dump, or pull from an update feed. `process:mqtt-broker` is `internet-facing`, so one extraction yields the ability to publish from anywhere as an apparently genuine gateway, and the certificate identifies the fleet software rather than a device. Second-order: the payload the impostor publishes names its own tenant, so `process:stream-processor` files the fabricated readings under whichever tenant the attacker chooses in `store:telemetry-store`, and the reach is every customer fleet on the platform rather than the one device that leaked. Revocation has the same shape: the certificate cannot be withdrawn from the impostor without cutting off every genuine gateway with it.",
   "affected_element_ids": [
-    "process:web-api",
-    "process:ledger-service",
-    "flow:web-api-to-ledger-service:post-transfer",
-    "store:accounts-db"
+    "entity:sensor-gateway",
+    "process:mqtt-broker",
+    "flow:sensor-gateway-to-mqtt-broker:publish-telemetry",
+    "process:stream-processor",
+    "store:telemetry-store"
   ],
   "evidence_refs": [
-    "crossing:flow:web-api-to-ledger-service:post-transfer"
+    "crossing:flow:sensor-gateway-to-mqtt-broker:publish-telemetry"
   ],
   "quotes": [
     {
-      "text": "not authenticated and not encrypted",
-      "source_label": "Payments platform notes"
+      "text": "they all share one client certificate",
+      "source_label": "Fleet telemetry platform notes"
     }
   ],
   "severity": {
-    "likelihood": "medium",
+    "likelihood": "high",
     "impact": "high",
-    "justification": "Likelihood is medium: no credential is needed, but the attacker must first hold a position in `boundary:dmz`. Impact is high: the impersonated identity drives transfers into `store:accounts-db` (`financial`, `pii`) across the whole customer base."
+    "justification": "Likelihood is high: the flow is a derived crossing into `boundary:ingest`, `process:mqtt-broker` is `internet-facing`, and extracting a static certificate from a device image needs no access to the platform at all. Impact is high: the impersonation reaches `store:telemetry-store`, classified confidential and tagged `business-critical-data`, across every tenant rather than one."
   },
   "mitigations": [
     {
-      "summary": "Authenticate the ledger call regardless of zone",
-      "detail": "Require mTLS or a workload-identity token on `flow:web-api-to-ledger-service:post-transfer`, so `process:ledger-service` verifies the caller rather than the source network."
+      "summary": "Give each device its own credential",
+      "detail": "Issue a per-device certificate at provisioning and bind it to the device's tenant on `flow:sensor-gateway-to-mqtt-broker:publish-telemetry`, so a compromised gateway is revocable alone and can speak only for its own fleet."
+    },
+    {
+      "summary": "Derive the tenant from the credential, not the payload",
+      "detail": "Have `process:stream-processor` take the tenant from the authenticated identity of the publisher, so a forged payload cannot select a tenant."
     }
   ]
 }

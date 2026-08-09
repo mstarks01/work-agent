@@ -85,34 +85,39 @@ The exemplar is the cascade. `store:accounts-db` is a shared dependency: its con
 }
 ```
 
-## Unknown-conditional: unauthenticated amplification through the webhook
+## Unknown-conditional, in system B: unverified reachability of the processor
 
-`flow:payments-provider-to-web-api:settlement-webhook` carries `authentication: unknown`. Condition the threat on that attribute and let the critic mark it needs-info; the model does not say the endpoint is open.
+Written against exemplar system B. The trigger is an `unknown` on an element rather than a flow: `process:stream-processor` carries `exposure: unknown`, so where the load can be applied is exactly what the model does not record. Condition the threat on that attribute; the model does not say the processor is reachable.
 
 ```json
 {
   "sequence": 3,
-  "title": "Settlement webhook may be an unauthenticated work amplifier",
-  "description": "`flow:payments-provider-to-web-api:settlement-webhook` reaches `process:web-api` from `boundary:public-internet` with `authentication: unknown`. If that unknown resolves to no verification, the endpoint does real settlement work — ledger calls and database writes — for any caller who knows the URL, with no credential to revoke and no account to rate-limit against. An attacker replays or fabricates deliveries at volume, and the cost lands in `boundary:core` rather than at the edge. Second-order: the amplified load reaches `process:ledger-service` and `store:accounts-db`, the same shared dependency the transfer path needs. This draft is conditional on the `authentication` attribute of that flow.",
+  "title": "The stream processor may be floodable without passing the broker",
+  "description": "`process:stream-processor` carries `exposure: unknown`. The design intent is that work reaches it only over `flow:mqtt-broker-to-stream-processor:consume-topic`, so `process:mqtt-broker` is where backpressure, quotas and disconnection would be applied. If that unknown resolves to reachability beyond `boundary:platform`, an attacker submits work directly to the processor and none of the broker's metering is in the path: the queue that is supposed to absorb a burst is bypassed rather than filled. Second-order: the processor is the sole writer on `flow:stream-processor-to-telemetry-store:write-readings`, so saturating it stalls ingest for every tenant at once and genuine readings from `entity:sensor-gateway` are delayed or dropped platform-wide, not for the fleet that was targeted. This draft is conditional on that element's `exposure` attribute; it is not a claim that the processor is exposed.",
   "affected_element_ids": [
-    "process:web-api",
-    "flow:payments-provider-to-web-api:settlement-webhook",
-    "process:ledger-service"
+    "process:stream-processor",
+    "process:mqtt-broker",
+    "flow:mqtt-broker-to-stream-processor:consume-topic",
+    "store:telemetry-store"
   ],
   "evidence_refs": [
-    "crossing:flow:payments-provider-to-web-api:settlement-webhook",
-    "unknown:flow:payments-provider-to-web-api:settlement-webhook:authentication"
+    "unknown:process:stream-processor:exposure",
+    "crossing:flow:mqtt-broker-to-stream-processor:consume-topic"
   ],
   "quotes": [],
   "severity": {
-    "likelihood": "medium",
+    "likelihood": "low",
     "impact": "medium",
-    "justification": "Likelihood is medium and conditional on the unknown `authentication` value: the endpoint is internet-reachable and the attack needs no credential if unverified, but the control may in fact be present. Impact is medium: an availability outage of the payment path, recoverable, with no data loss."
+    "justification": "Likelihood is low and conditional on the unknown `exposure` value: the stated design puts `process:stream-processor` inside `boundary:platform` behind the broker, and the attack needs that placement to be wrong. Impact is medium: ingest stalls for every tenant and `store:telemetry-store` falls behind, but the outage is recoverable and no data is disclosed."
   },
   "mitigations": [
     {
-      "summary": "Establish webhook authentication, then meter per consumer",
-      "detail": "Determine what verifies this callback; require per-consumer signatures, and apply rate limits and replay rejection keyed to the verified sender."
+      "summary": "Record where the processor is reachable from, then close it",
+      "detail": "Establish the network exposure of `process:stream-processor`; if it accepts work from outside `boundary:platform`, restrict it to the broker's subscription path."
+    },
+    {
+      "summary": "Meter at the consumer as well as the broker",
+      "detail": "Apply per-tenant concurrency and rate bounds inside `process:stream-processor`, so backpressure does not depend on every producer arriving through `process:mqtt-broker`."
     }
   ]
 }
