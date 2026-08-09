@@ -259,6 +259,41 @@ class SystemModel(BaseModel):
                 )
         return crossings
 
+    def shared_names(self) -> dict[str, list[str]]:
+        """Name slugs more than one zoned element claims, mapped to their IDs.
+
+        An element ID is ``type:name-slug``, so two elements of *different*
+        types can share a name and still hold distinct IDs. The gate's
+        ``duplicate-id`` rule compares whole IDs, so it passes them cleanly.
+        That pair is what ``extract.md``'s "nothing gets two types" warns
+        about: one real thing transcribed twice, once as a process and once as
+        a store.
+
+        **A suspicion, never a verdict.** It is not always wrong — a system
+        really can run a process and keep a store that share a name — so this
+        returns what it found and rules on nothing. Nothing routes on it; see
+        :class:`~stride_service.report.SharedElementName` for where it lands
+        and why it is marked rather than failed.
+
+        Reads IDs rather than names because the gate has already pinned every
+        ID to :func:`derive_element_id`, which is the name slug by
+        construction. Same-type collisions never appear here: two elements of
+        one type sharing a name hold the *same* ID, which is ``duplicate-id``'s
+        to report.
+
+        Zoned elements only. A trust boundary is a zone rather than a thing in
+        the system, so a boundary and a process sharing a name is ordinary
+        naming rather than a doubled transcription. Flows are excluded by that
+        logic and a stronger one: a flow ID is built from its endpoints, so it
+        is never a bare type-and-name pair.
+        """
+        by_slug: dict[str, set[str]] = {}
+        for element in (*self.external_entities, *self.processes, *self.data_stores):
+            by_slug.setdefault(element.id.split(":", 1)[-1], set()).add(element.id)
+        return {
+            slug: sorted(ids) for slug, ids in sorted(by_slug.items()) if len(ids) > 1
+        }
+
 
 def _rewrite_id(element: Element, rewrites: dict[str, str]) -> None:
     """Overwrite one element's ID with its derived form, recording the change.
