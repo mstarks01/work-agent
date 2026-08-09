@@ -52,7 +52,9 @@ TEST_LIMITS = SourceLimits(max_total_bytes=100 * 1024, max_sources=10)
 
 def gate(require_certified: bool = False) -> CertificationGate:
     return CertificationGate(
-        manifest=BlessedManifest(version=MANIFEST_VERSION, tiers={"base": {FP_A}}),
+        manifest=BlessedManifest(
+            version=MANIFEST_VERSION, tiers={"base": frozenset({FP_A})}
+        ),
         tier_of=lambda _node: "base",
         require_certified=require_certified,
     )

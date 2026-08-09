@@ -20,9 +20,11 @@ from evals.harness.reference import ReferenceThreat
 from stride_service.report import (
     DraftThreat,
     Ground,
+    Rating,
     Severity,
     StrideCategory,
     Threat,
+    UnknownRef,
     Verdict,
 )
 from stride_service.system_model import SystemModel
@@ -105,8 +107,8 @@ def draft_threat(
     title: str,
     *,
     element_ids: Iterable[str] = ("entity:shopper",),
-    likelihood: str = "high",
-    impact: str = "high",
+    likelihood: Rating = "high",
+    impact: Rating = "high",
 ) -> DraftThreat:
     """One category agent's draft, as ``merge_drafts`` parks it for the critic.
 
@@ -143,8 +145,8 @@ def produced_threat(
     title: str,
     *,
     element_ids: Iterable[str] = ("entity:shopper",),
-    likelihood: str = "high",
-    impact: str = "high",
+    likelihood: Rating = "high",
+    impact: Rating = "high",
     verdict_status: str = "confirmed",
 ) -> Threat:
     """One threat as the graph would emit it, titled with its claim."""
@@ -155,7 +157,9 @@ def produced_threat(
             status="needs-info",
             reason="authentication on this flow is unknown",
             related_unknowns=[
-                {"element_id": next(iter(element_ids)), "attribute": "authentication"}
+                UnknownRef(
+                    element_id=next(iter(element_ids)), attribute="authentication"
+                )
             ],
         )
     )

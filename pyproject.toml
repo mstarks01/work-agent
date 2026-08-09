@@ -23,6 +23,8 @@ dependencies = [
 [dependency-groups]
 dev = [
     "httpx>=0.27",
+    "mypy>=1.18",
+    "pip-audit>=2.9",
     "pytest>=8",
     "ruff>=0.16.0",
 ]
@@ -44,6 +46,10 @@ web = [
 default-groups = ["dev", "web"]
 
 [tool.hatch.build.targets.wheel]
+# `src/stride_service/py.typed` rides along inside the package, which is what
+# makes the annotations visible to an integrator's own checker -- without the
+# marker, PEP 561 says to treat an installed package as untyped however
+# thoroughly it is annotated.
 packages = ["src/stride_service"]
 
 [tool.hatch.build.targets.wheel.force-include]
@@ -66,6 +72,32 @@ packages = ["src/stride_service"]
 # naming families here would enable far more than it pins. What holds it stable
 # is the exact `ruff` pin in uv.lock, which CI installs with `uv sync --locked`.
 target-version = "py311"
+
+[tool.mypy]
+# Every Python file in the repository, not just the shipped package. The eval
+# harness and the corpus lints are where a `Literal` vocabulary is most often
+# re-spelled as a bare `str`, and the tests are what pin the Protocol seams --
+# checking only `src/` would leave the checker blind to exactly the drift it
+# was added for.
+files = ["src", "tests", "evals", "examples", "webapp"]
+# `src` on the path, so `src/stride_service/api.py` is the module
+# `stride_service.api` and not also `src.stride_service.api`. With the layouts
+# outside it -- `evals/` and `examples/` have no `__init__.py` -- that needs
+# each directory in `files` treated as its own package root.
+mypy_path = "src"
+explicit_package_bases = true
+# The `requires-python` floor rather than the version CI happens to install, so
+# a 3.12-only construct fails here instead of at an integrator's 3.11.
+python_version = "3.11"
+# Rule selection is mypy's default, on the same reasoning as ruff's above: the
+# exact pin in uv.lock is what holds it stable. Strict mode is a separate
+# decision, not a free tightening -- it would demand annotations on every
+# function in the repository, which is a change to the code, not to the gate.
+#
+# One addition, because a suppression that has stopped applying is worse than
+# none: it reads as a known-unfixable spot long after the checker or the
+# dependency it worked around has moved on.
+warn_unused_ignores = true
 
 [tool.ruff.format]
 # Hand-labelled data table: one tuple per row is the editing and grep unit, and

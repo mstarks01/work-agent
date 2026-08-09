@@ -102,6 +102,7 @@ from stride_service.critic import (
 from stride_service.domains import select_domain_packs
 from stride_service.evidence import evidence_catalog, resolve_proposals
 from stride_service.markdown_loader import MarkdownLoader
+from stride_service.model_tiers import TierName
 from stride_service.prompts import (
     compose_analyze_prompt,
     compose_critic_prompt,
@@ -218,6 +219,17 @@ fails the mechanical check: from ``router`` it reaches the bounded ``recritic``
 re-ask, and from ``rereview`` — the second look after that re-ask — it reaches
 ``critic_failed``, since a repeated failure is ours to own, not the input's to
 be rejected for."""
+
+
+def _routed(route: str, output: dict[str, Any]) -> Event:
+    """An ADK ``Event`` carrying the route the graph's edges match on.
+
+    ``route=`` is a convenience kwarg ADK's before-validator lifts onto
+    ``actions.route``; it is not a declared field, so the type checker cannot
+    see it. Routing through one constructor keeps that a single suppression.
+    """
+    return Event(route=route, output=output)  # type: ignore[call-arg]
+
 
 # --- State keys -------------------------------------------------------------
 #
@@ -496,10 +508,10 @@ def validate_extraction(
         ctx.state[STATE_VALIDATION_ISSUES] = render(
             [issue.model_dump(mode="json") for issue in issues]
         )
-        return Event(route=ROUTE_INVALID, output={"issue_count": len(issues)})
+        return _routed(ROUTE_INVALID, {"issue_count": len(issues)})
 
     ctx.state[STATE_VALID_MODEL] = model.model_dump(mode="json")
-    return Event(route=ROUTE_VALID, output={"issue_count": 0})
+    return _routed(ROUTE_VALID, {"issue_count": 0})
 
 
 def reject_model(validation_issues: str, ctx) -> dict[str, Any]:
@@ -594,7 +606,7 @@ def _ruling_view(drafts: Sequence[DraftThreat]) -> list[dict]:
     """
     return [
         draft.model_dump(
-            mode="json", exclude=_DRAFT_UNRULED_FIELDS, exclude_defaults=True
+            mode="json", exclude=set(_DRAFT_UNRULED_FIELDS), exclude_defaults=True
         )
         for draft in drafts
     ]
@@ -854,8 +866,8 @@ def route_review(
         ctx.state[STATE_UNRECONCILED_DRAFTS] = render(
             _ruling_view([draft for draft in drafts if draft.id in problems.implicated])
         )
-        return Event(route=ROUTE_REVISE, output={"issue_count": len(problems.messages)})
-    return Event(route=ROUTE_ACCEPT, output={"reviewed_count": len(rulings)})
+        return _routed(ROUTE_REVISE, {"issue_count": len(problems.messages)})
+    return _routed(ROUTE_ACCEPT, {"reviewed_count": len(rulings)})
 
 
 def fail_review(
@@ -975,7 +987,7 @@ class Pipeline:
 
     workflow: Workflow
     node_models: dict[str, str]
-    tier_sampling: dict[str, TierSampling]
+    tier_sampling: dict[TierName, TierSampling]
     node_sampling: dict[str, TierSampling]
 
 
@@ -1202,7 +1214,10 @@ def build_pipeline(
         revalidate = FunctionNode(func=validate_extraction, name=REVALIDATE_NODE)
         reject = FunctionNode(func=reject_model, name=REJECT_NODE)
         extraction_nodes = [extract, repair]
-        head_edges = [
+        # ``list[tuple[Any, ...]]`` because ADK does not export the alias for
+        # a chain element, and a routing-map literal only infers its declared
+        # key type under an expected type -- which a bare local has none of.
+        head_edges: list[tuple[Any, ...]] = [
             (START, extract, validate),
             (validate, {ROUTE_VALID: prepare, ROUTE_INVALID: repair}),
             (repair, revalidate),

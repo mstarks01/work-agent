@@ -152,14 +152,14 @@ def validate(
                     )
                 )
 
-    for element in (*model.external_entities, *model.processes, *model.data_stores):
-        if element.trust_zone not in boundary_ids:
+    for zoned in model.zoned_elements():
+        if zoned.trust_zone not in boundary_ids:
             issues.append(
                 ValidationIssue(
                     code="invalid-reference",
-                    message=f"trust_zone {element.trust_zone!r} does not reference"
+                    message=f"trust_zone {zoned.trust_zone!r} does not reference"
                     " an existing Trust Boundary element",
-                    element_id=element.id,
+                    element_id=zoned.id,
                     field="trust_zone",
                 )
             )

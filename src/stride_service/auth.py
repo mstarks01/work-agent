@@ -33,7 +33,7 @@ from __future__ import annotations
 import logging
 import os
 from collections.abc import Callable, Mapping
-from typing import Protocol
+from typing import Any, Protocol
 
 import jwt
 from pydantic import BaseModel, ConfigDict, Field, ValidationError, field_validator
@@ -187,7 +187,9 @@ class OidcSettings(BaseModel):
         env_vars = {
             field: f"{prefix}_{suffix}" for field, suffix in _OIDC_ENV_SUFFIXES.items()
         }
-        values: dict[str, object] = {
+        # ``Any``, not ``object``: these values are handed to pydantic as
+        # ``**kwargs``, and it — not this loader — decides each field's type.
+        values: dict[str, Any] = {
             field: environ.get(var, "") for field, var in env_vars.items()
         }
         missing = [env_vars[field] for field, value in values.items() if not value]
