@@ -60,6 +60,27 @@ jobs:
       - name: Format
         run: uv run ruff format --check . --exclude '*.md'
 
+      # Scope and rule selection are in pyproject.toml's [tool.mypy], so this
+      # step and a local `uv run mypy` check exactly the same thing.
+      - name: Type check
+        run: uv run mypy
+
+      # Audits the locked dependency closure, not the installed environment:
+      # `uv export --frozen` fails rather than re-resolving, so the input is the
+      # same reviewed uv.lock the install above used, and every hash in it is
+      # printed for a human to check against the advisory.
+      #
+      # Credential-free, like everything else in this job -- the advisory
+      # lookup is an anonymous request to PyPI, so the offline/live boundary
+      # described in the header is untouched. It does need egress, which is why
+      # a failure here can mean "the advisory service is down" as well as "a
+      # dependency is vulnerable"; the report distinguishes them.
+      - name: Dependency audit
+        run: |
+          set -euo pipefail
+          uv export --frozen --format requirements-txt --no-emit-project \
+            | uv run pip-audit --disable-pip --requirement /dev/stdin
+
       # Lints the workflow files themselves, including this one.
       #
       # Fetched as a version-pinned release binary and checked against its

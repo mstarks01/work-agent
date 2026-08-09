@@ -52,7 +52,13 @@ from evals.harness.judge import (
     UnmatchedThreat,
 )
 from evals.harness.reference import GoldenCase, ReferenceThreat
-from stride_service.report import DraftThreat, SeverityLevel, StrideCategory, Threat
+from stride_service.report import (
+    DraftThreat,
+    SeverityLevel,
+    StrideCategory,
+    Threat,
+    derive_severity_level,
+)
 
 
 def candidate_claim(threat: DraftThreat) -> str:
@@ -442,7 +448,12 @@ def _matched_pair(
         element_overlap=bool(shared),
         element_jaccard=ratio(len(shared), len(reference_ids | produced_ids)),
         reference_level=reference.severity.level,
-        produced_level=threat.severity.level,
+        # The matrix rather than the field: ``Severity.level`` is optional
+        # until the model validator derives it, and this is that same
+        # derivation, which is what the band comparison is defined as.
+        produced_level=derive_severity_level(
+            threat.severity.likelihood, threat.severity.impact
+        ),
         likelihood_agrees=reference.severity.likelihood == threat.severity.likelihood,
         impact_agrees=reference.severity.impact == threat.severity.impact,
     )
