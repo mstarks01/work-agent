@@ -1,7 +1,11 @@
 """The `/v1` job API: the only production surface the front-end calls.
 
 * ``POST /v1/jobs`` — submit an ordered list of sources, bounded in UTF-8 bytes
-  and in count by this deployment's config; returns a job handle.
+  and in count by this deployment's config; returns a job handle. A subject may
+  hold only ``max_active_jobs`` jobs in flight at once; a submission past that
+  is refused with 429 rather than queued, because a queued job still holds the
+  caller's place in the provider quota and a refusal is the only answer that
+  actually sheds the load (OWASP LLM10).
 * ``GET /v1/jobs/{id}`` — canonical poll: status, per-node progress,
   timestamps, error info; never the report.
 * ``GET /v1/jobs/{id}/events`` — the same progression as SSE, resumable via
@@ -321,6 +325,7 @@ def create_app(
     verifier: TokenVerifier | None = None,
     limits: SourceLimits | None = None,
     job_deadline_seconds: float | None = None,
+    max_active_jobs: int | None = None,
 ) -> FastAPI:
     """Build the service app; production defaults, injectable seams for tests.
 
@@ -331,11 +336,12 @@ def create_app(
     gate — a report it produced was never certified, so there is nothing for
     the route to withhold on.
 
-    ``limits`` bounds what one job may carry, and ``job_deadline_seconds``
-    bounds how long one may run. Both come from the deployment wherever there
-    is one; a caller who injects a runner instead must state them, because
-    reading a second configuration behind their back is how an app comes to
-    enforce bounds its deployment never chose.
+    ``limits`` bounds what one job may carry, ``job_deadline_seconds`` bounds
+    how long one may run, and ``max_active_jobs`` bounds how many one caller may
+    have in flight. All three come from the deployment wherever there is one; a
+    caller who injects a runner instead must state them, because reading a
+    second configuration behind their back is how an app comes to enforce bounds
+    its deployment never chose.
     """
     app = FastAPI(title="STRIDE Threat-Modeling Service")
     app.state.store = store if store is not None else build_store()
@@ -360,8 +366,16 @@ def create_app(
                 "runner instead of a deployment"
             )
         job_deadline_seconds = deployment.resilience.deadline_seconds()
+    if max_active_jobs is None:
+        if deployment is None:
+            raise ConfigError(
+                "create_app needs max_active_jobs= when it is given a runner "
+                "instead of a deployment"
+            )
+        max_active_jobs = deployment.resilience.max_active_jobs
     app.state.limits = limits
     app.state.job_deadline_seconds = job_deadline_seconds
+    app.state.max_active_jobs = max_active_jobs
     max_body_bytes = limits.max_total_bytes * _BODY_SLACK
     app.state.verifier = verifier if verifier is not None else build_verifier()
 
@@ -399,6 +413,31 @@ def create_app(
         background_tasks: BackgroundTasks,
         subject: str = Depends(require_subject),
     ) -> JSONResponse:
+        store: JobStore = request.app.state.store
+        ceiling: int = request.app.state.max_active_jobs
+        # Before the input ladder, not after: this is the caller's budget rather
+        # than a fact about the submission, so a caller at their ceiling gets the
+        # same answer whatever they sent. Checking it second would let an
+        # oversized body outrank it and make the ceiling probe-able through
+        # requests that were never going to run.
+        active = await store.active_for(subject)
+        if active >= ceiling:
+            # The refusal is the only place this bound is observable from
+            # outside the caller it refused, so it goes to the log the way a
+            # rejected token does: a caller sitting on the ceiling is either a
+            # client that needs a larger share or the consumption this exists
+            # to stop, and neither is visible from a 429 nobody recorded.
+            logger.warning(
+                "subject %s refused at the concurrency ceiling: %d in flight, limit %d",
+                subject,
+                active,
+                ceiling,
+            )
+            raise HTTPException(
+                status_code=429,
+                detail=f"this token already has {active} jobs in flight; the"
+                f" limit is {ceiling}. Wait for one to reach a terminal state.",
+            )
         breach = request.app.state.limits.breach(submission.sources)
         if breach is not None:
             raise HTTPException(
@@ -409,10 +448,10 @@ def create_app(
             sources=submission.sources,
             system_name=submission.system_name,
         )
-        await request.app.state.store.create(record)
+        await store.create(record)
         background_tasks.add_task(
             execute_job,
-            request.app.state.store,
+            store,
             request.app.state.runner,
             record.id,
             deadline_seconds=request.app.state.job_deadline_seconds,

@@ -13,9 +13,11 @@ from pathlib import Path
 
 import pytest
 
+from stride_service.report import STRIDE_CATEGORIES
 from stride_service.resilience import (
     ATTEMPTS_VAR,
     JOB_DEADLINE_MS_VAR,
+    MAX_ACTIVE_JOBS_VAR,
     MAX_SOURCE_BYTES_VAR,
     MAX_SOURCES_VAR,
     SUPPORTED_VERSION,
@@ -36,6 +38,7 @@ VALID = (
     "max_sources = 10\n"
     "job_deadline_ms = 900000\n"
     "retry_budget_ratio = 0.1\n"
+    "max_active_jobs = 3\n"
 )
 
 
@@ -54,6 +57,7 @@ def config(**kwargs) -> ResilienceConfig:
         "max_sources": 10,
         "job_deadline_ms": 900000,
         "retry_budget_ratio": 0.1,
+        "max_active_jobs": 3,
     }
     return ResilienceConfig(**(fields | kwargs))
 
@@ -65,6 +69,7 @@ def test_the_shipped_config_loads_with_the_decided_values():
     assert loaded.max_source_bytes == 100 * 1024
     assert loaded.max_sources == 10
     assert loaded.job_deadline_ms == 900000
+    assert loaded.max_active_jobs == 3
 
 
 def test_the_deadline_converts_to_the_seconds_asyncio_wants():
@@ -137,11 +142,12 @@ def test_the_backoff_knobs_stay_out_of_the_schema():
             config(**{knob: 1.0})
 
 
-@pytest.mark.parametrize("stale", [1, 2])
+@pytest.mark.parametrize("stale", [1, 2, 4])
 def test_a_stale_version_fails_closed_with_no_shim(tmp_path, stale):
-    # Version 2 is the case a live deployment actually hits on this upgrade: it
-    # is a well-formed file for the *previous* schema, carrying no input bounds.
-    # Accepting it would mean enforcing caps nobody configured.
+    # Version 4 is the case a live deployment actually hits: it is a well-formed
+    # file for the previous schema, carrying no per-caller ceiling. Accepting it
+    # would mean serving unbounded concurrent jobs per token — the state this
+    # version exists to end — under a file that looked valid.
     path = write(tmp_path, f"version = {stale}\nattempts = 3\ntimeout_ms = 300000\n")
     with pytest.raises(ResilienceConfigError, match="unsupported version"):
         load_resilience(path, env={})
@@ -160,6 +166,47 @@ def test_input_bounds_are_required_not_defaulted(tmp_path):
     )
     with pytest.raises(ResilienceConfigError):
         load_resilience(path, env={})
+
+
+def test_the_ceiling_is_required_rather_than_defaulted(tmp_path):
+    # No value means "unlimited" — that was version 4, and it is the defect. A
+    # deployment that has not chosen a per-caller ceiling does not load.
+    path = write(tmp_path, VALID.replace("max_active_jobs = 3\n", ""))
+    with pytest.raises(ResilienceConfigError, match="max_active_jobs"):
+        load_resilience(path, env={})
+
+
+def test_a_ceiling_of_zero_is_refused(tmp_path):
+    # A deployment that accepts no jobs at all should not be running, so zero is
+    # a misconfiguration rather than a way to spell "closed".
+    path = write(tmp_path, VALID.replace("max_active_jobs = 3", "max_active_jobs = 0"))
+    with pytest.raises(ResilienceConfigError):
+        load_resilience(path, env={})
+
+
+def test_a_serial_ceiling_of_one_is_legal(tmp_path):
+    # The first-run web app's gate expressed as a number: one job per caller.
+    path = write(tmp_path, VALID.replace("max_active_jobs = 3", "max_active_jobs = 1"))
+    assert load_resilience(path, env={}).max_active_jobs == 1
+
+
+def test_env_overrides_the_ceiling(tmp_path):
+    """Turning it down sheds load mid-incident without an image rebuild."""
+    path = write(tmp_path, VALID)
+    loaded = load_resilience(path, env={MAX_ACTIVE_JOBS_VAR: "1"})
+    assert loaded.max_active_jobs == 1
+
+
+def test_the_ceiling_is_sized_against_the_category_fan_out(tmp_path):
+    """The arithmetic the number was chosen by, pinned so it stays visible.
+
+    Each accepted job fans the six STRIDE category agents out in parallel on the
+    ``strong`` tier, so the burst a provider's per-minute quota actually sees is
+    six times this ceiling — the reason the knob is small, and the check anyone
+    raising it has to redo.
+    """
+    loaded = load_resilience(CONFIG_PATH, env={})
+    assert loaded.max_active_jobs * len(STRIDE_CATEGORIES) == 18
 
 
 def test_a_version_1_backoff_knob_is_rejected_not_ignored(tmp_path):

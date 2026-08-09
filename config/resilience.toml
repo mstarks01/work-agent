@@ -1,7 +1,7 @@
 # Resilience configuration (wayfinder ticket 038) — operational bounds for the
 # service, read by the production graph, the eval harness, and the eval judge
 # alike. Three knobs bound each LLM call, two bound a job's input, one bounds a
-# job's duration.
+# job's duration, and one bounds how many jobs a single caller may run at once.
 #
 # On their SDK defaults the LLM nodes never retry and never time out: a single
 # 429 on any node kills a paid-for job on first contact, and a stalled call
@@ -9,13 +9,22 @@
 #
 # Unlike config/sampling.toml, every value here IS env-overridable
 # (STRIDE_RETRY_ATTEMPTS, STRIDE_TIMEOUT_MS, STRIDE_MAX_SOURCE_BYTES,
-# STRIDE_MAX_SOURCES, STRIDE_JOB_DEADLINE_MS, STRIDE_RETRY_BUDGET_RATIO).
+# STRIDE_MAX_SOURCES, STRIDE_JOB_DEADLINE_MS, STRIDE_RETRY_BUDGET_RATIO,
+# STRIDE_MAX_ACTIVE_JOBS).
 # Sampling is pinned because temperature changes WHAT the model produces;
 # nothing in this file can. Attempts, timeout and the budget change only HOW
-# HARD we try; the input bounds decide only whether a submission is accepted at
-# all, and the deadline only whether an answer arrives in time — never which
-# answer it is. So none of these can move an eval score, and all of them are
-# knobs to turn down mid-incident without an image rebuild.
+# HARD we try; the input bounds and the concurrency ceiling decide only whether
+# a submission is accepted at all, and the deadline only whether an answer
+# arrives in time — never which answer it is. So none of these can move an eval
+# score, and all of them are knobs to turn down mid-incident without an image
+# rebuild.
+#
+# Version 5 (#113) adds `max_active_jobs`, the first bound here that is per
+# CALLER rather than per job — see the note on it below. Hard cutover like the
+# ones before it: a version-4 file fails the check rather than inheriting a
+# default, because a deployment that has not chosen a per-caller ceiling is the
+# state this version exists to end. The key has no value meaning "unlimited" —
+# that was version 4's behaviour, and it is the defect.
 #
 # Version 4 (wayfinder #61) adds `job_deadline_ms` and `retry_budget_ratio`, and
 # moves the retry loop out of LiteLLM into `stride_service.retry` — see the note
@@ -51,7 +60,7 @@
 # down still works and is still the blunt instrument; the budget is what makes
 # reaching for it rare.
 
-version = 4
+version = 5
 attempts = 3
 timeout_ms = 300000
 
@@ -126,3 +135,33 @@ retry_budget_ratio = 0.1
 # at either number: they move on evidence, not on taste.
 max_source_bytes = 102400
 max_sources = 10
+
+# THE ONLY BOUND ON A CALLER (#113). Everything else in this file bounds one
+# request, one job's input, or one job's duration. None of them bounds the
+# number of jobs, so a caller who respects every one of them and submits a
+# thousand submissions is inside the contract — and each accepted job fans six
+# category agents out on the `strong` tier, so this is the knob standing between
+# one token and the whole deployment's provider quota (OWASP LLM10).
+#
+# It counts jobs IN FLIGHT — `queued` plus `running` — not submissions per
+# interval. A concurrency ceiling is self-clearing, so it needs no window, no
+# timer and no state the job store does not already hold, and it bounds the
+# thing that actually costs money: simultaneous provider calls. A rate over a
+# window bounds that only indirectly, and needs a clock to do it.
+#
+# THE CEILING IS AS SHARED AS THE JOB STORE IS, and that is not a caveat but the
+# reason it is enforced through `JobStore.active_for` rather than out of process
+# memory. Behind two instances with the per-instance `memory` store, each
+# instance enforces this number and the effective ceiling is the sum — the same
+# defect `STRIDE_JOB_STORE` fails closed over. Configure it against one
+# instance's share, or register a shared store and get a shared ceiling with no
+# change here.
+#
+# 3 IS SIZED AGAINST THE FAN-OUT, NOT AGAINST DEMAND. Three concurrent jobs is
+# eighteen concurrent `strong`-tier requests at the category barrier, which is
+# the burst a per-minute request quota actually sees. Turn it UP only with a
+# quota that has been checked against 6x the new number; turn it DOWN to shed
+# load mid-incident. 1 is legal and makes the service strictly serial per
+# caller, matching the first-run web app's gate; 0 is not, because a deployment
+# that accepts no jobs should not be running.
+max_active_jobs = 3
