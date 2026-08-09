@@ -34,7 +34,7 @@ from stride_service.certification import (
     load_manifest,
 )
 from stride_service.deployment import ConfigPaths, Deployment
-from stride_service.model_tiers import TIER_NAMES
+from stride_service.model_tiers import TIER_NAMES, TierName
 from stride_service.sampling import SamplingConfig, TierSampling, sampling_fingerprint
 
 
@@ -115,10 +115,13 @@ def promote(
     )
 
     base = load_manifest(manifest_path) if Path(manifest_path).exists() else None
-    merged: dict[str, frozenset[str]] = {
-        tier: set(prints) for tier, prints in (base.tiers.items() if base else ())
-    }
-    for tier, served in served_builds.items():
+    merged: dict[TierName, frozenset[str]] = dict(base.tiers) if base else {}
+    # Walked in the vocabulary's order rather than the caller's, so the written
+    # manifest does not vary with the order a sweep happened to report tiers in.
+    for tier in TIER_NAMES:
+        served = served_builds.get(tier)
+        if served is None:
+            continue
         fingerprint = sampling_fingerprint(served, sampling.for_tier(tier))
         merged[tier] = frozenset({*merged.get(tier, frozenset()), fingerprint})
     manifest = BlessedManifest(version=MANIFEST_VERSION, tiers=merged)
@@ -210,7 +213,7 @@ def plan_promotion(
 
 
 def _tier_promotion(
-    tier: str,
+    tier: TierName,
     identity: TierIdentity,
     chosen: str | None,
     sampling: SamplingConfig,

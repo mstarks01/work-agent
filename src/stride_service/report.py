@@ -978,7 +978,10 @@ def build_summary(
 ) -> Summary:
     """Compute the summary block mechanically from the report's own contents."""
     by_category = Counter(threat.category for threat in threats)
-    by_severity = Counter(threat.severity.level for threat in threats)
+    by_severity = Counter(
+        derive_severity_level(threat.severity.likelihood, threat.severity.impact)
+        for threat in threats
+    )
     needs_info = sum(1 for t in threats if t.verdict.status == "needs-info")
     return Summary(
         threat_count=len(threats),

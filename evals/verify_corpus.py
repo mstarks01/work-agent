@@ -15,7 +15,7 @@ import json
 import sys
 from collections.abc import Iterator
 from pathlib import Path
-from typing import get_args
+from typing import Any, get_args
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "src"))
 
@@ -77,6 +77,28 @@ def case_dirs() -> list[Path]:
 def _load_json(path: Path) -> object:
     with path.open(encoding="utf-8") as handle:
         return json.load(handle)
+
+
+# The two shape-asserting loaders below are for the readers that walk a file's
+# contents directly. The lints that *report* on a shape -- `_check_citations`
+# and `_check_threats` -- take the bare `object` instead and narrow it
+# themselves, because "this file is not a list" is a finding they yield rather
+# than a crash. Everything else in this module would fail on the same file with
+# an AttributeError several frames from the cause; these say which file.
+def _load_json_object(path: Path) -> dict[str, Any]:
+    """A JSON file whose top level this module reads as an object."""
+    value = _load_json(path)
+    if not isinstance(value, dict):
+        raise TypeError(f"{path}: expected a JSON object at the top level")
+    return value
+
+
+def _load_json_array(path: Path) -> list[Any]:
+    """A JSON file whose top level this module reads as an array."""
+    value = _load_json(path)
+    if not isinstance(value, list):
+        raise TypeError(f"{path}: expected a JSON array at the top level")
+    return value
 
 
 SOURCE_FIELDS = frozenset(("kind", "label", "file", "sha256"))
@@ -288,7 +310,7 @@ def check_case(case_dir: Path) -> list[str]:
     if problems:
         return problems
 
-    meta = _load_json(case_dir / "case.json")
+    meta = _load_json_object(case_dir / "case.json")
     problems.extend(_check_case_metadata(case_dir, meta))
 
     raw_model = _load_json(case_dir / "model.json")
@@ -319,7 +341,7 @@ def check_calibration(
     case_ids: set[str], claims_by_case: dict[str, set[str]]
 ) -> list[str]:
     """Every mechanical failure in the judge-calibration fixtures."""
-    pairs = _load_json(CALIBRATION_PATH)
+    pairs = _load_json_array(CALIBRATION_PATH)
     problems: list[str] = []
     if len(pairs) < MIN_CALIBRATION_PAIRS:
         problems.append(
@@ -355,7 +377,7 @@ def check_calibration(
 def _severity_bands() -> Iterator[str]:
     """Guard the one arithmetic the corpus shares with production."""
     for case_dir in case_dirs():
-        for threat in _load_json(case_dir / "threats.json"):
+        for threat in _load_json_array(case_dir / "threats.json"):
             severity = threat.get("severity", {})
             likelihood: Rating = severity.get("likelihood")
             impact: Rating = severity.get("impact")
@@ -369,7 +391,7 @@ def write_shas() -> None:
     """Restamp every declared source's digest, and the aggregate over them."""
     for case_dir in case_dirs():
         meta_path = case_dir / "case.json"
-        meta = _load_json(meta_path)
+        meta = _load_json_object(meta_path)
         refs = []
         for source in meta.get("sources", []):
             source["sha256"] = source_sha256(case_dir / source["file"])
@@ -406,7 +428,7 @@ def main() -> int:
         threats_path = case_dir / "threats.json"
         if threats_path.exists():
             claims_by_case[case_dir.name] = {
-                threat["claim"] for threat in _load_json(threats_path)
+                threat["claim"] for threat in _load_json_array(threats_path)
             }
         for problem in problems:
             print(f"{case_dir.name}: {problem}")

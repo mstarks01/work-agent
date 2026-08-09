@@ -38,6 +38,7 @@ EXAMPLE_NAMES = ("embed", "embed_sync")
 def load(name: str):
     """Import an example by path — examples/ is not an importable package."""
     spec = importlib.util.spec_from_file_location(name, EXAMPLES / f"{name}.py")
+    assert spec is not None and spec.loader is not None
     module = importlib.util.module_from_spec(spec)
     spec.loader.exec_module(module)
     return module

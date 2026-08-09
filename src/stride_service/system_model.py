@@ -224,6 +224,10 @@ class SystemModel(BaseModel):
             *self.trust_boundaries,
         ]
 
+    def zoned_elements(self) -> list[ZonedElement]:
+        """The elements that carry a ``trust_zone``, in a stable order."""
+        return [*self.external_entities, *self.processes, *self.data_stores]
+
     def get(self, element_id: str) -> Element | None:
         """Look up an element by ID, or None if absent."""
         return {element.id: element for element in self.elements()}.get(element_id)
@@ -236,8 +240,7 @@ class SystemModel(BaseModel):
         STRIDE input, so it fails closed instead of skipping.
         """
         zone_by_id = {
-            element.id: element.trust_zone
-            for element in (*self.external_entities, *self.processes, *self.data_stores)
+            element.id: element.trust_zone for element in self.zoned_elements()
         }
         crossings = []
         for flow in self.data_flows:
@@ -288,7 +291,7 @@ class SystemModel(BaseModel):
         is never a bare type-and-name pair.
         """
         by_slug: dict[str, set[str]] = {}
-        for element in (*self.external_entities, *self.processes, *self.data_stores):
+        for element in self.zoned_elements():
             by_slug.setdefault(element.id.split(":", 1)[-1], set()).add(element.id)
         return {
             slug: sorted(ids) for slug, ids in sorted(by_slug.items()) if len(ids) > 1
@@ -343,14 +346,11 @@ def normalize_element_ids(
     report cites the bytes the caller actually submitted.
     """
     normalized = model.model_copy(deep=True)
-    zoned = (
-        *normalized.external_entities,
-        *normalized.processes,
-        *normalized.data_stores,
-    )
+    zoned = normalized.zoned_elements()
     rewrites: dict[str, str] = {}
 
-    for element in (*zoned, *normalized.trust_boundaries):
+    non_flows: list[Element] = [*zoned, *normalized.trust_boundaries]
+    for element in non_flows:
         _rewrite_id(element, rewrites)
 
     for element in zoned:

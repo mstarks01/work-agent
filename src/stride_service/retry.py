@@ -309,7 +309,7 @@ def retrying_llm_class(litellm_cls: type, policy: RetryPolicy) -> type:
     the adapters a deployment actually builds carry no retry loop at all.
     """
 
-    class RetryingLlm(litellm_cls):  # type: ignore[misc, valid-type]
+    class RetryingLlm(litellm_cls):
         """One tier's adapter, retrying under the process-wide budget.
 
         The responses of a non-streaming call are collected before any is
