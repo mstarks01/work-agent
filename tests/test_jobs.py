@@ -10,6 +10,7 @@ from stride_service.jobs import (
     InMemoryJobStore,
     InvalidTransitionError,
     JobRecord,
+    JobStatus,
     JobStoreConfigError,
     NodeCallback,
     PipelineOutcome,
@@ -149,6 +150,76 @@ class TestInMemoryJobStore:
             return before_save.status, after_save.status
 
         assert asyncio.run(scenario()) == ("queued", "running")
+
+
+class TestActiveFor:
+    """The seam the per-caller concurrency ceiling is enforced through (#113).
+
+    It lives on the store rather than beside the API so the ceiling is exactly
+    as shared as the deployment's storage is: an in-process counter would be
+    per-instance whatever backend was configured, so two instances would enforce
+    double the configured number and reset it on every deploy.
+    """
+
+    def counts(self, statuses: list[JobStatus], subject: str = "alice") -> int:
+        async def scenario():
+            store = InMemoryJobStore()
+            for status in statuses:
+                record = make_record()
+                await store.create(record)
+                if status != "queued":
+                    record.transition("running")
+                if status not in ("queued", "running"):
+                    record.transition(status)
+                await store.save(record)
+            return await store.active_for(subject)
+
+        return asyncio.run(scenario())
+
+    def test_an_empty_store_holds_nothing_in_flight(self):
+        assert self.counts([]) == 0
+
+    @pytest.mark.parametrize("status", ["queued", "running"])
+    def test_a_job_before_a_terminal_state_is_in_flight(self, status):
+        assert self.counts([status]) == 1
+
+    @pytest.mark.parametrize("status", ["completed", "failed", "rejected"])
+    def test_a_terminal_job_is_not(self, status):
+        # Every terminal state releases the slot, not just the happy one: a
+        # failed run holds no provider capacity, and counting it would let a
+        # burst of failures lock a caller out until the process restarted.
+        assert self.counts([status]) == 0
+
+    def test_only_the_named_subject_is_counted(self):
+        async def scenario():
+            store = InMemoryJobStore()
+            for owner in ("alice", "alice", "bob"):
+                await store.create(
+                    JobRecord.create(
+                        owner_subject=owner, sources=[Source.description("an app")]
+                    )
+                )
+            return await store.active_for("alice"), await store.active_for("bob")
+
+        assert asyncio.run(scenario()) == (2, 1)
+
+    def test_an_unknown_subject_holds_nothing(self):
+        assert self.counts(["queued"], subject="carol") == 0
+
+    def test_the_count_follows_the_records_rather_than_a_counter(self):
+        # The records are the truth. A maintained counter is a second copy that
+        # drifts the moment one path that ends a job forgets to decrement it.
+        async def scenario():
+            store = InMemoryJobStore()
+            record = make_record()
+            await store.create(record)
+            before = await store.active_for("alice")
+            record.transition("running")
+            record.transition("completed")
+            await store.save(record)
+            return before, await store.active_for("alice")
+
+        assert asyncio.run(scenario()) == (1, 0)
 
 
 class TestBuildStore:
