@@ -8,9 +8,16 @@
 # judge-vs-human agreement check over evals/judge_calibration/pairs.json
 # (>= 90%, ticket 009 decision 13), and re-baseline the tracked metrics.
 #
-# `pro` tier, Google-only. Self-preference bias is tolerable here specifically
-# because the judge rules on claim *equivalence* — a near-symmetric relation,
-# not a quality preference, which is where self-enhancement bias bites.
+# The judge names a (vendor, model) pair like any tier, and nothing here is
+# Google-only: the pair below is one selection among three vendors, not a
+# platform assumption. Judge and subject may therefore differ in vendor, which
+# is what removed the old defence against self-preference bias — that the two
+# always shared one. What stands in its place is measured: agreement against
+# the hand labels in evals/judge_calibration/pairs.json (>= 90%), which is
+# vendor-independent ground truth. That the judge rules on claim *equivalence*
+# — a near-symmetric relation rather than a quality preference, which is where
+# self-enhancement bias bites — bounds the exposure, but it no longer
+# substitutes for the measurement.
 #
 # temperature is pinned with the judge rather than read from
 # config/sampling.toml: that file is the configuration under test, and a judge
@@ -32,9 +39,9 @@
 # only: its legitimacy rests on measured agreement against the hand labels in
 # evals/judge_calibration/pairs.json (>= 90%), which is vendor-independent
 # ground truth, plus a greedy-decoding requirement so a re-run cannot flip a
-# verdict. This REOPENS the self-preference rationale below, which assumed
-# judge and subject always shared a vendor — that assumption is gone, and the
-# agreement check is what replaces it.
+# verdict. This is what reopened the self-preference question recorded at the
+# top of this file: the assumption that judge and subject always share a vendor
+# is gone, and the agreement check is what replaces it.
 #
 # The loader runs the build-time sampling gate over (vendor, model,
 # temperature), which is how "o-series cannot judge" fails closed: greedy
