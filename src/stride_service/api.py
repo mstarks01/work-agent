@@ -18,6 +18,7 @@ from __future__ import annotations
 
 import asyncio
 import logging
+from collections.abc import Mapping
 from datetime import datetime
 from http import HTTPStatus
 from typing import Annotated, Any
@@ -237,7 +238,7 @@ def _withheld_report(request: Request, record: JobRecord) -> JSONResponse | None
 def _problem_response(
     status_code: int,
     detail: str,
-    headers: dict[str, str] | None = None,
+    headers: Mapping[str, str] | None = None,
     **extensions: Any,
 ) -> JSONResponse:
     """An RFC 9457 ``application/problem+json`` response."""
@@ -298,7 +299,9 @@ def _status_view(record: JobRecord) -> JobStatusView:
         progress=[
             NodeCompletion(node=event.node, at=event.at)
             for event in record.events
-            if event.kind == "node"
+            # ``node`` is non-None on every node event; JobEvent's validator
+            # rejects the pairing that would make it None.
+            if event.kind == "node" and event.node is not None
         ],
         validation_issues=record.validation_issues or None,
         error=record.error,

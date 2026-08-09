@@ -338,14 +338,7 @@ def _control_values(element: Element) -> Iterator[tuple[str, str, ControlState]]
 
 def _zone_by_id(model: SystemModel) -> dict[str, str]:
     """Zoned element ID -> its trust zone. Flows and boundaries have none."""
-    return {
-        element.id: element.trust_zone
-        for element in (
-            *model.external_entities,
-            *model.processes,
-            *model.data_stores,
-        )
-    }
+    return {element.id: element.trust_zone for element in model.zoned_elements()}
 
 
 def endpoints_of(model: SystemModel, flow: DataFlow) -> tuple[Element | None, ...]:
