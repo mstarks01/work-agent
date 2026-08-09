@@ -369,7 +369,7 @@ def aggregate_grounds(
     quotes = sum(entry.quote_count for entry in measurements)
     unverified = sum(entry.unverified_count for entry in measurements)
     quoteless = sum(entry.quoteless_count for entry in measurements)
-    kinds = Counter()
+    kinds: Counter[str] = Counter()
     for entry in measurements:
         kinds.update(entry.kind_counts)
     by_kind = Counter(failure.kind for failure in failures)
