@@ -1,21 +1,37 @@
 """Operational bounds that cannot change an answer.
 
-Six knobs. Three — attempts, timeout and the retry budget — are applied to every
-LLM call: on library defaults the nodes never retry and never time out, so a
-single 429 on any node would kill a paid-for job on first contact, and a stalled
-call would park a job in ``running`` forever. Two more bound the job's *input*:
-how many sources one job may carry, and how many UTF-8 bytes they may total. The
-sixth bounds the job's *duration*.
+Seven knobs. Three — attempts, timeout and the retry budget — are applied to
+every LLM call: on library defaults the nodes never retry and never time out, so
+a single 429 on any node would kill a paid-for job on first contact, and a
+stalled call would park a job in ``running`` forever. Two more bound the job's
+*input*: how many sources one job may carry, and how many UTF-8 bytes they may
+total. The sixth bounds the job's *duration*, and the seventh bounds how many
+jobs one caller may have running at once.
 
-``job_deadline_ms`` is the only one of the six that bounds a job as a whole,
-and it exists because the per-call knobs provably cannot. ``timeout_ms`` bounds
-one HTTP request; ``attempts`` multiplies it; the retry arithmetic below
+``job_deadline_ms`` is the only one of the seven that bounds a *single* job as a
+whole, and it exists because the per-call knobs provably cannot. ``timeout_ms``
+bounds one HTTP request; ``attempts`` multiplies it; the retry arithmetic below
 multiplies it again; and the graph runs five LLM stages in series on its
 longest path. Those compose to a worst case in the *hours* while every
 individual bound is respected — so before this knob, a job's tail was set by a
 product of four numbers nobody chose, and a wedged run held a ``running`` job
 until the process died. A deadline is the one bound whose worst case is the
 number written down.
+
+``max_active_jobs`` is the only knob that bounds a *caller* rather than a job,
+and the other six are why it has to exist. Every one of them is per-job, so a
+caller who respects all six and simply submits a thousand submissions is inside
+the contract while spending the service's whole provider quota: each accepted
+job fans six category agents out on the ``strong`` tier, so ten concurrent
+submissions is sixty concurrent ``strong``-tier requests against one shared
+per-minute quota. Per-job budgets are not a per-caller budget, and the
+unbounded-consumption half of OWASP LLM10 is the latter.
+
+It bounds jobs *in flight*, not jobs per interval. A ceiling on concurrency is
+self-clearing — finishing a job is what buys the next one — so it needs no
+window, no timer and no state beyond the records the store already holds, and it
+bounds the thing that actually costs money: simultaneous provider calls. A
+submission rate says nothing about that on its own.
 
 The input bounds are in **bytes, not tokens**. A token budget would make the
 public contract depend on which vendor a deployment's tiers happen to select,
@@ -85,7 +101,7 @@ from stride_service.sources import SourceLimits
 # The only schema version this loader accepts. The version check fires before
 # shape validation, so a file on another schema is named as such rather than
 # reported as a set of stray keys under ``extra="forbid"``.
-SUPPORTED_VERSION = 4
+SUPPORTED_VERSION = 5
 
 _ENV_PREFIX = "STRIDE_"
 
@@ -95,6 +111,7 @@ MAX_SOURCE_BYTES_VAR = f"{_ENV_PREFIX}MAX_SOURCE_BYTES"
 MAX_SOURCES_VAR = f"{_ENV_PREFIX}MAX_SOURCES"
 JOB_DEADLINE_MS_VAR = f"{_ENV_PREFIX}JOB_DEADLINE_MS"
 RETRY_BUDGET_RATIO_VAR = f"{_ENV_PREFIX}RETRY_BUDGET_RATIO"
+MAX_ACTIVE_JOBS_VAR = f"{_ENV_PREFIX}MAX_ACTIVE_JOBS"
 
 _T = TypeVar("_T", int, float)
 
@@ -109,6 +126,9 @@ class ResilienceConfig(BaseModel):
     ``max_source_bytes`` is the total across *all* of a job's sources, not a
     bound on any one of them — an over-budget submission overspent as a whole,
     and no single source is at fault.
+
+    ``max_active_jobs`` is the one bound here that is per *caller* rather than
+    per job: how many jobs one token subject may have in flight at once.
     """
 
     model_config = ConfigDict(extra="forbid", frozen=True)
@@ -120,6 +140,7 @@ class ResilienceConfig(BaseModel):
     max_sources: int = Field(ge=1)
     job_deadline_ms: int = Field(gt=0)
     retry_budget_ratio: float = Field(gt=0, le=1)
+    max_active_jobs: int = Field(ge=1)
 
     def retry_policy(self, budget_capacity: float) -> RetryPolicy:
         """The retry loop this deployment runs, with its shared budget.
@@ -202,7 +223,7 @@ def load_resilience(
             f"{path}: unsupported version {version!r};"
             f" expected {SUPPORTED_VERSION}, which carries 'attempts',"
             " 'timeout_ms', 'max_source_bytes', 'max_sources',"
-            " 'job_deadline_ms' and 'retry_budget_ratio'"
+            " 'job_deadline_ms', 'retry_budget_ratio' and 'max_active_jobs'"
         )
 
     overrides = {
@@ -212,6 +233,7 @@ def load_resilience(
         "max_sources": _override(env, MAX_SOURCES_VAR, int),
         "job_deadline_ms": _override(env, JOB_DEADLINE_MS_VAR, int),
         "retry_budget_ratio": _override(env, RETRY_BUDGET_RATIO_VAR, float),
+        "max_active_jobs": _override(env, MAX_ACTIVE_JOBS_VAR, int),
     }
     raw.update({key: value for key, value in overrides.items() if value is not None})
 

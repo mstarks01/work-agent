@@ -67,6 +67,7 @@ def make_client(result: CertifyResult, gate_policy: CertificationGate) -> TestCl
         verifier=FakeVerifier(),
         limits=TEST_LIMITS,
         job_deadline_seconds=30,
+        max_active_jobs=10,
     )
     app.state.certification = gate_policy
     return TestClient(app)
@@ -172,6 +173,7 @@ class TestNothingReachesTheClientView:
             verifier=FakeVerifier(),
             limits=TEST_LIMITS,
             job_deadline_seconds=30,
+            max_active_jobs=10,
         )
         app.state.certification = None
         assert fetch_report(TestClient(app)).status_code == 200

@@ -35,7 +35,7 @@ logged, never returned.
 
 | Method | Path | Purpose |
 | --- | --- | --- |
-| `POST` | `/v1/jobs` | Submit an ordered list of sources; returns a job handle. |
+| `POST` | `/v1/jobs` | Submit an ordered list of sources; returns a job handle. `429` when this token is already at its [concurrency ceiling](#how-many-jobs-you-may-run-at-once). |
 | `GET` | `/v1/jobs/{id}` | Poll: status, per-node progress, timestamps. Never the report. |
 | `GET` | `/v1/jobs/{id}/events` | The same progression as Server-Sent Events; resumable via `Last-Event-ID`. |
 | `GET` | `/v1/jobs/{id}/report` | The full [report](Report-Schema.md) once completed; `409` before, and `409` if the report is withheld (below). |
@@ -144,6 +144,30 @@ when a deployment changes vendor. Shape is checked before size:
 
 An absurdly large body is refused before it is parsed at all, by a coarse guard
 derived from the byte budget.
+
+### How many jobs you may run at once
+
+Every rejection above is about the submission. One is about **you**: a token may
+hold only `max_active_jobs` jobs in flight — `queued` plus `running` — and the
+shipped value is 3.
+
+| Status | Cause |
+| --- | --- |
+| `429` | This token is already at its ceiling. The message names your current count and the limit. |
+
+This one is checked **before** the table above, so a caller at their ceiling
+gets `429` whatever they sent — it is a fact about the caller, not the payload,
+and checking it second would make the ceiling probe-able through requests that
+were never going to run.
+
+A submission past the ceiling is **refused, not queued**. Each accepted job fans
+six category agents out in parallel on the strongest model tier, so a queued job
+holds your place in the deployment's provider quota just as a running one does;
+only a refusal sheds the load. No `Retry-After` is sent, because what clears the
+ceiling is a job of yours reaching a terminal state rather than the passage of
+time — poll or subscribe to the jobs you have, then resubmit. The count is not
+a rate: nothing accrues over a window, and finishing a job immediately buys the
+next one. See [ADR 0007](adr/0007-per-caller-concurrency-ceiling.md).
 
 ## Bearer auth
 

@@ -2,6 +2,7 @@
 
 import asyncio
 import json
+import logging
 
 import pytest
 from fastapi.testclient import TestClient
@@ -12,6 +13,7 @@ from stride_service.errors import ConfigError
 from stride_service.jobs import (
     InMemoryJobStore,
     JobRecord,
+    JobStatus,
     NodeCallback,
     PipelineOutcome,
     PipelineRejected,
@@ -59,10 +61,17 @@ TEST_LIMITS = SourceLimits(max_total_bytes=512, max_sources=3)
 # Far above anything the stub runner takes: these tests are about the routes,
 # not the deadline. The deadline's own behaviour is tested in ``test_jobs``.
 TEST_DEADLINE_SECONDS = 30
+# High enough that the route tests never trip the ceiling — the stub runner
+# finishes each job before the next submission, but a test that submits several
+# should not depend on that. The ceiling's own behaviour is tested below.
+TEST_MAX_ACTIVE_JOBS = 100
 
 
 def make_client(
-    runner=None, store=None, limits: SourceLimits = TEST_LIMITS
+    runner=None,
+    store=None,
+    limits: SourceLimits = TEST_LIMITS,
+    max_active_jobs: int = TEST_MAX_ACTIVE_JOBS,
 ) -> tuple[TestClient, InMemoryJobStore]:
     store = store if store is not None else InMemoryJobStore()
     app = create_app(
@@ -71,6 +80,7 @@ def make_client(
         verifier=FakeVerifier(),
         limits=limits,
         job_deadline_seconds=TEST_DEADLINE_SECONDS,
+        max_active_jobs=max_active_jobs,
     )
     return TestClient(app), store
 
@@ -105,8 +115,8 @@ class TestInjectedBoundsMustBeStated:
     """An injected runner brings no config, so its bounds must be named.
 
     Reading a second configuration behind the caller's back is how an app comes
-    to enforce bounds its deployment never chose — the same rule ``limits`` has
-    always had, extended to the job deadline.
+    to enforce bounds its deployment never chose — the same rule for what a job
+    may carry, how long it may run, and how many a caller may have in flight.
     """
 
     def test_a_runner_without_a_deadline_is_refused(self):
@@ -124,6 +134,17 @@ class TestInjectedBoundsMustBeStated:
                 store=InMemoryJobStore(),
                 runner=StubPipelineRunner(),
                 verifier=FakeVerifier(),
+                job_deadline_seconds=TEST_DEADLINE_SECONDS,
+                max_active_jobs=TEST_MAX_ACTIVE_JOBS,
+            )
+
+    def test_a_runner_without_a_concurrency_ceiling_is_refused(self):
+        with pytest.raises(ConfigError, match="max_active_jobs"):
+            create_app(
+                store=InMemoryJobStore(),
+                runner=StubPipelineRunner(),
+                verifier=FakeVerifier(),
+                limits=TEST_LIMITS,
                 job_deadline_seconds=TEST_DEADLINE_SECONDS,
             )
 
@@ -483,6 +504,121 @@ class TestReport:
         job_id = submit(client)
         response = client.get(f"/v1/jobs/{job_id}/report", headers=auth())
         assert response.status_code == 409
+
+
+def seed(store: InMemoryJobStore, subject: str, status: JobStatus) -> JobRecord:
+    """Park a job of ``subject``'s in ``status`` directly in the store.
+
+    Submitting through the route cannot leave a job in flight: ``BackgroundTasks``
+    runs the stub to completion before ``TestClient`` returns, so every submitted
+    job is already terminal by the time the next one is sent.
+    """
+    record = JobRecord.create(
+        owner_subject=subject, sources=[Source.description("an app")]
+    )
+    if status != "queued":
+        record.transition("running")
+    if status not in ("queued", "running"):
+        record.transition(status)
+    asyncio.run(store.create(record))
+    return record
+
+
+class TestConcurrencyCeiling:
+    """The one bound that is per caller rather than per job (#113).
+
+    Every other bound the route enforces is about one submission — its shape,
+    its bytes, its duration. A caller who respects all of them and simply keeps
+    submitting spends the deployment's whole provider quota, because each
+    accepted job fans six category agents out on the ``strong`` tier
+    (OWASP LLM10).
+    """
+
+    @pytest.mark.parametrize("status", ["queued", "running"])
+    def test_a_submission_at_the_ceiling_is_refused(self, status):
+        store = InMemoryJobStore()
+        for _ in range(2):
+            seed(store, "alice", status)
+        client, _ = make_client(store=store, max_active_jobs=2)
+        response = client.post(
+            "/v1/jobs", json={"sources": one_source()}, headers=auth()
+        )
+        assert response.status_code == 429
+        assert response.headers["content-type"] == "application/problem+json"
+        assert "2" in response.json()["detail"]
+
+    def test_a_refusal_queues_nothing(self):
+        # A refusal that still created the record would be a queue with extra
+        # steps: the caller's place in the provider quota would be held anyway.
+        store = InMemoryJobStore()
+        seed(store, "alice", "running")
+        client, _ = make_client(store=store, max_active_jobs=1)
+        client.post("/v1/jobs", json={"sources": one_source()}, headers=auth())
+        assert asyncio.run(store.active_for("alice")) == 1
+
+    def test_below_the_ceiling_a_submission_is_accepted(self):
+        store = InMemoryJobStore()
+        seed(store, "alice", "running")
+        client, _ = make_client(store=store, max_active_jobs=2)
+        response = client.post(
+            "/v1/jobs", json={"sources": one_source()}, headers=auth()
+        )
+        assert response.status_code == 201
+
+    def test_terminal_jobs_do_not_hold_a_slot(self):
+        # The ceiling is self-clearing: finishing a job is what buys the next
+        # one, which is why it needs no window and no timer.
+        store = InMemoryJobStore()
+        for _ in range(5):
+            seed(store, "alice", "completed")
+        client, _ = make_client(store=store, max_active_jobs=1)
+        response = client.post(
+            "/v1/jobs", json={"sources": one_source()}, headers=auth()
+        )
+        assert response.status_code == 201
+
+    def test_the_ceiling_is_per_subject_not_per_service(self):
+        # One noisy token must not lock every other caller out — that would be
+        # the unbounded-consumption problem inverted, not solved.
+        store = InMemoryJobStore()
+        seed(store, "alice", "running")
+        client, _ = make_client(store=store, max_active_jobs=1)
+        response = client.post(
+            "/v1/jobs", json={"sources": one_source()}, headers=auth("bob-token")
+        )
+        assert response.status_code == 201
+
+    def test_the_ceiling_outranks_the_input_ladder(self):
+        # A caller at their ceiling gets the same answer whatever they sent:
+        # this is their budget, not a fact about the submission. Checking it
+        # after the ladder would let a malformed body outrank it and make the
+        # ceiling probe-able through requests that were never going to run.
+        store = InMemoryJobStore()
+        seed(store, "alice", "running")
+        client, _ = make_client(store=store, max_active_jobs=1)
+        response = client.post("/v1/jobs", json={"sources": []}, headers=auth())
+        assert response.status_code == 429
+
+    def test_a_refusal_is_logged(self, caplog):
+        # A 429 nobody recorded makes the bound observable only to the caller it
+        # refused; an operator cannot tell a client needing a larger share from
+        # the consumption the ceiling exists to stop.
+        store = InMemoryJobStore()
+        seed(store, "alice", "running")
+        client, _ = make_client(store=store, max_active_jobs=1)
+        with caplog.at_level(logging.WARNING, logger="stride_service.api"):
+            client.post("/v1/jobs", json={"sources": one_source()}, headers=auth())
+        assert "alice" in caplog.text
+        assert "concurrency ceiling" in caplog.text
+
+    def test_an_unauthenticated_submission_is_still_401(self):
+        # The ceiling is per subject, so it cannot be consulted before there is
+        # one. Auth stays the outermost gate.
+        store = InMemoryJobStore()
+        seed(store, "alice", "running")
+        client, _ = make_client(store=store, max_active_jobs=1)
+        response = client.post("/v1/jobs", json={"sources": one_source()})
+        assert response.status_code == 401
 
 
 class TestEvents:
