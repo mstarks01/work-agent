@@ -112,7 +112,11 @@ class CaseMetadata(BaseModel):
     title: str = Field(min_length=1)
     domain: str = Field(min_length=1)
     # The near/far split is the whole instrument for the exemplar-domain-bias
-    # delta, so it is typed, not a free string.
+    # delta, so it is typed, not a free string. "near" means the architecture
+    # one of ``analyze.md``'s worked exemplar systems is written in — a bit, not
+    # a scale, and it stays a bit however many systems there are: what the delta
+    # asks is whether recall depends on having been shown the architecture, and
+    # that question has two sides no matter how wide the near side gets.
     exemplar_proximity: Literal["near", "far"]
     provenance: str = Field(min_length=1)
     bootstrap: str = Field(min_length=1)
