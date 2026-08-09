@@ -1,17 +1,23 @@
 #!/usr/bin/env bash
 #
-# Lint before a push rather than after it: the two ruff checks CI runs, plus
-# actionlint over the workflow files.
+# Lint before a push rather than after it: the two ruff checks and the type
+# check CI runs, plus actionlint over the workflow files.
 #
 # This is a convenience guard, not a gate: CI is authoritative, and a missing
 # tool warns and lets the push through rather than blocking work on a machine
 # where the hook cannot run. `--no-verify` is advertised on failure rather
 # than left to be looked up.
 #
-# All three mirror .github/workflows/ci.yml, so what they block would have
+# All four mirror .github/workflows/ci.yml, so what they block would have
 # failed there anyway. Keep them in step: a check here that CI does not run
 # would fail a push CI accepts, and one CI runs that is missing here gives
 # back the round trip the hook exists to save.
+#
+# CI's dependency audit is the deliberate exception. It resolves advisories
+# over the network, so mirroring it here would put an outbound request and its
+# latency on every push, and it fails on the world changing rather than on
+# anything the push contains -- which is a report to read, not a round trip
+# this hook can save.
 #
 # Tracked, so it is reviewed like the workflow it mirrors. Enable it per
 # clone (it is not automatic, by git's design):
@@ -23,9 +29,10 @@ set -euo pipefail
 # Each tool is skipped independently, so an absent uv still leaves actionlint
 # to run and vice versa.
 if command -v uv >/dev/null 2>&1; then
-    # Both invocations mirror .github/workflows/ci.yml exactly, including the
-    # markdown exclusion; a difference here would mean a push passes locally
-    # and fails in CI, which is the one outcome this hook exists to prevent.
+    # All three invocations mirror .github/workflows/ci.yml exactly, including
+    # the markdown exclusion; a difference here would mean a push passes
+    # locally and fails in CI, which is the one outcome this hook exists to
+    # prevent.
     if ! uv run ruff check .; then
         echo >&2
         echo "pre-push: ruff check failed. Fix, or push with --no-verify." >&2
@@ -38,8 +45,15 @@ if command -v uv >/dev/null 2>&1; then
         echo "or push with --no-verify." >&2
         exit 1
     fi
+
+    # Bare, like the CI step: scope and rules come from pyproject.toml.
+    if ! uv run mypy; then
+        echo >&2
+        echo "pre-push: mypy failed. Fix, or push with --no-verify." >&2
+        exit 1
+    fi
 else
-    echo "pre-push: uv not on PATH, skipping ruff — CI will still run it" >&2
+    echo "pre-push: uv not on PATH, skipping ruff and mypy — CI will still run them" >&2
 fi
 
 # No argument: actionlint discovers .github/workflows/ itself from the repo

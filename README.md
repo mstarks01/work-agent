@@ -91,12 +91,13 @@ The project uses [uv](https://docs.astral.sh/uv/). Python ≥ 3.11.
 uv sync                                    # install deps into .venv
 uv run pytest                              # the offline suite — no credentials needed
 uv run ruff check .                        # lint
+uv run mypy                                # type check the shipped package
 uv run python evals/verify_corpus.py       # mechanical checks over the golden corpus
 uv run python examples/sync_docs.py --check # the docs' code blocks match examples/
 ```
 
-The tracked `pre-push` hook runs the two ruff checks CI runs. Git does not
-enable hooks for a clone on its own, so opt in once:
+The tracked `pre-push` hook runs the two ruff checks and the type check CI runs.
+Git does not enable hooks for a clone on its own, so opt in once:
 
 ```sh
 git config core.hooksPath .githooks

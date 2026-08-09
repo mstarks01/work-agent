@@ -74,8 +74,8 @@ class BlessedManifest(BaseModel):
     version: int
     tiers: dict[TierName, frozenset[Fingerprint]] = Field(default_factory=dict)
 
-    def blessed_for(self, tier: str) -> frozenset[str]:
-        """The fingerprints blessed for one tier — empty if the tier is unknown."""
+    def blessed_for(self, tier: TierName) -> frozenset[str]:
+        """The fingerprints blessed for one tier — empty if the manifest omits it."""
         return self.tiers.get(tier, frozenset())
 
 
