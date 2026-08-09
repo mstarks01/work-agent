@@ -48,6 +48,13 @@ through a single adapter (LiteLLM); there is no per-vendor code path, and Gemini
 reaches Vertex the same way everything else does. The pair above is deliberately
 mixed, because that is an ordinary configuration rather than an advanced one.
 
+**"Gemini support" means Vertex-hosted Gemini.** `vendor = "vertex"` is the only
+route to a Gemini model here, and it carries Vertex's ADC credential mode; the
+Gemini Developer API is not a binding this service offers. If it is added later
+it arrives as its own vendor rather than as a second credential mode on
+`vertex` — a vendor owns exactly one credential mode, and `vertex_ai/` already
+means "through Vertex" to the router prefix LiteLLM dispatches on.
+
 **Auth is derived from the vendor, never configured alongside it.** Each vendor
 owns its credential mode, so an unrepresentable pairing like `vertex` + an API
 key cannot be written down at all:
