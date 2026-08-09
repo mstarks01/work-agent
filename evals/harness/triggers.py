@@ -97,7 +97,7 @@ def _hit(reference: ReferenceThreat, model: SystemModel) -> TriggerHit:
     """
     fired = generate_candidates(model).get(reference.category)
     targets = set(reference.affected_element_ids)
-    rule_ids = ()
+    rule_ids: tuple[str, ...] = ()
     if fired is not None:
         rule_ids = tuple(
             sorted(

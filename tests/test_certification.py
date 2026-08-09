@@ -18,6 +18,7 @@ from stride_service.certification import (
     load_manifest,
     report_fingerprints,
 )
+from stride_service.model_tiers import TierName
 from stride_service.report import NodeRun, StrideReport
 from tests.factories import sample_report
 
@@ -26,7 +27,7 @@ FP_B = "b" * 64
 FP_C = "c" * 64
 
 # extract/repair run on base; the category agents, critic and recritic on strong.
-_TIERS = {
+_TIERS: dict[str, TierName] = {
     "extract": "base",
     "repair": "base",
     "critic": "strong",
@@ -36,12 +37,15 @@ _TIERS = {
 ALL_NODES = tuple(_TIERS)
 
 
-def tier_of(node: str) -> str:
+def tier_of(node: str) -> TierName:
     return _TIERS[node]
 
 
-def manifest(tiers: dict[str, set[str]]) -> BlessedManifest:
-    return BlessedManifest(version=MANIFEST_VERSION, tiers=tiers)
+def manifest(tiers: dict[TierName, set[str]]) -> BlessedManifest:
+    return BlessedManifest(
+        version=MANIFEST_VERSION,
+        tiers={tier: frozenset(prints) for tier, prints in tiers.items()},
+    )
 
 
 def observed(**nodes: set[str]) -> dict[str, frozenset[str]]:

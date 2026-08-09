@@ -207,9 +207,9 @@ class RunProvenance(BaseModel):
                 observed.setdefault(node, set()).add(execution.generation_fingerprint)
         return {node: frozenset(prints) for node, prints in observed.items()}
 
-    def tier_identities(self) -> dict[str, TierIdentity]:
+    def tier_identities(self) -> dict[TierName, TierIdentity]:
         """The per-tier summary, in the fixed tier order rather than a run's."""
-        by_tier: dict[str, list[NodeExecution]] = {}
+        by_tier: dict[TierName, list[NodeExecution]] = {}
         for execution in self.executions:
             by_tier.setdefault(execution.tier, []).append(execution)
         return {

@@ -22,6 +22,7 @@ from stride_service.certification import (
 )
 from stride_service.deployment import SAMPLING_VAR, Deployment
 from stride_service.graph import ENTRY_EXTRACT, TIER_NODE_BY_GRAPH_NODE
+from stride_service.model_tiers import TierName
 from stride_service.sampling import load_sampling, sampling_fingerprint
 from tests.factories import TEST_TIER_ENV, repo_tiers
 
@@ -30,17 +31,20 @@ SAMPLING_PATH = REPO_ROOT / "config" / "sampling.toml"
 _TIER_OF = repo_tiers().resolve_tier
 
 
-def tier_of(graph_node: str) -> str:
+def tier_of(graph_node: str) -> TierName:
     return _TIER_OF(TIER_NODE_BY_GRAPH_NODE[graph_node])
 
 
-def _manifest(tiers: dict[str, set[str]]) -> BlessedManifest:
-    return BlessedManifest(version=MANIFEST_VERSION, tiers=tiers)
+def _manifest(tiers: dict[TierName, set[str]]) -> BlessedManifest:
+    return BlessedManifest(
+        version=MANIFEST_VERSION,
+        tiers={tier: frozenset(prints) for tier, prints in tiers.items()},
+    )
 
 
 def _blessed_from(observations: dict[str, frozenset[str]]) -> BlessedManifest:
     """Bless every fingerprint a variant produced, collapsed onto its tier."""
-    tiers: dict[str, set[str]] = {}
+    tiers: dict[TierName, set[str]] = {}
     for node, prints in observations.items():
         tiers.setdefault(tier_of(node), set()).update(prints)
     return _manifest(tiers)
