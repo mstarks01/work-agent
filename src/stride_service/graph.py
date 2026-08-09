@@ -114,6 +114,7 @@ from stride_service.report import (
     CategoryCoverage,
     DraftThreat,
     MissingMitigation,
+    SharedElementName,
     StrideCategory,
     Summary,
     Threat,
@@ -355,6 +356,9 @@ class Analysis:
     missing_mitigations: list[MissingMitigation]
     # Per-lane coverage accounting, computed at the fan-in over the drafts.
     coverage: list[CategoryCoverage]
+    # The one mark about the model rather than the threats, so it is derived
+    # from the valid model rather than collected from the drafts.
+    shared_element_names: list[SharedElementName]
     summary: Summary
 
     def to_state(self) -> dict[str, Any]:
@@ -378,6 +382,9 @@ class Analysis:
                 mark.model_dump(mode="json") for mark in self.missing_mitigations
             ],
             "coverage": [row.model_dump(mode="json") for row in self.coverage],
+            "shared_element_names": [
+                mark.model_dump(mode="json") for mark in self.shared_element_names
+            ],
             "summary": self.summary.model_dump(mode="json"),
         }
 
@@ -408,6 +415,10 @@ class Analysis:
             ],
             coverage=[
                 CategoryCoverage.model_validate(row) for row in data.get("coverage", [])
+            ],
+            shared_element_names=[
+                SharedElementName.model_validate(mark)
+                for mark in data.get("shared_element_names", [])
             ],
             summary=Summary.model_validate(data["summary"]),
         )
@@ -929,6 +940,12 @@ def assemble_report(
             MissingMitigation.model_validate(mark) for mark in missing_mitigations or []
         ],
         coverage=[CategoryCoverage.model_validate(row) for row in coverage or []],
+        # Derived here rather than bound as a parameter: it is a fact about the
+        # model this node already holds, so no upstream node has to carry it.
+        shared_element_names=[
+            SharedElementName(name_slug=slug, element_ids=ids)
+            for slug, ids in model.shared_names().items()
+        ],
         summary=build_summary(threats, rejected, model),
     )
     ctx.state[STATE_ANALYSIS] = analysis.to_state()
