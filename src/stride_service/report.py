@@ -53,7 +53,14 @@ from stride_service.system_model import BoundaryCrossing, SystemModel
 # analysis put in front of each agent and how much of it the drafts came back
 # citing. Optional, additive, service-owned and computed in code, so the same
 # rule applies a fourth time.
-SCHEMA_VERSION = "2.4"
+#
+# 2.5 adds ``shared_element_names``, the marks for elements of different types
+# whose names normalize to one slug. A fifth optional top-level list of
+# service-owned marks, no existing field changing meaning or spelling, so the
+# rule holds a fifth time. Minor rather than major although it is the first
+# mark about the *model* rather than the threats: what a consumer must do with
+# an unknown field does not depend on what the field describes.
+SCHEMA_VERSION = "2.5"
 
 DEFAULT_DISCLAIMER = (
     "AI-generated threat model. Not reviewed by a human security analyst."
@@ -873,6 +880,46 @@ class MissingMitigation(BaseModel):
     threat_id: str = Field(pattern=r"^[STRIDE]-\d{2}$")
 
 
+class SharedElementName(BaseModel):
+    """Elements of different types whose names normalize to one slug.
+
+    ``extract.md`` tells the transcriber "nothing gets two types", and the
+    failure it has in mind is one real thing recorded twice — a `process:` and
+    a `store:` for the same web app. The validity gate cannot catch it: an ID
+    carries its type, so the two IDs differ and ``duplicate-id`` compares whole
+    IDs.
+
+    **THE GATE HAS ONE SEVERITY, AND THIS IS NOT IT.** Every
+    :class:`~stride_service.validation.ValidationIssue` is fatal — "returns an
+    empty list" *is* the definition of ready-for-analysis that
+    :func:`~stride_service.graph.validate_extraction` routes on — and a shared
+    name does not deserve that, because it is not always wrong. A system can
+    legitimately run a process and keep a store of the same name, and failing
+    extraction on the pair would reject a valid model *and* spend ``repair``'s
+    single pass telling a transcriber to rename something correct. So the
+    finding lands here instead, beside the other service-owned marks, and the
+    gate is left with the one severity it has.
+
+    A mark for a human, and pointedly not for ``repair``: that prompt is told
+    to change nothing the issues do not cite, and a maybe is the worst thing to
+    spend its one pass on. This is the first mark about the *model* rather than
+    about the threats — :class:`UnverifiedGround`, :class:`UnresolvedMention`
+    and :class:`MissingMitigation` all annotate findings — which is why it
+    holds element IDs rather than a ``threat_id``.
+
+    Service-owned and computed in code from the embedded model
+    (:meth:`~stride_service.system_model.SystemModel.shared_names`), so a
+    reader can check it against the very model the report carries.
+    """
+
+    model_config = ConfigDict(extra="forbid")
+
+    name_slug: str = Field(min_length=1, max_length=200)
+    # Two or more, always: a slug held by one element is not a collision, and
+    # the grouping never emits a singleton.
+    element_ids: list[str] = Field(min_length=2)
+
+
 class Summary(BaseModel):
     """Counts the front-end can render without walking the threat list."""
 
@@ -1013,6 +1060,10 @@ class StrideReport(BaseModel):
     unverified_grounds: list[UnverifiedGround] = Field(default_factory=list)
     unresolved_mentions: list[UnresolvedMention] = Field(default_factory=list)
     missing_mitigations: list[MissingMitigation] = Field(default_factory=list)
+    # Elements of different types sharing one name slug — a suspicion about the
+    # model rather than a fault in it, which is why it rides here and not in
+    # the validity gate. Recomputable from ``system_model`` by design.
+    shared_element_names: list[SharedElementName] = Field(default_factory=list)
     # Per-category coverage accounting, computed at the fan-in over the drafts
     # the critic was handed — before any verdict, because coverage is a fact
     # about what the six agents did with the system, not about what survived
