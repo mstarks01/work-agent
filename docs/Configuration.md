@@ -341,14 +341,39 @@ request; that needs the live lanes, and they are unprovisioned.
 ### Resilience
 
 `attempts = 3`, `timeout_ms = 300000`, `max_source_bytes = 102400`,
-`max_sources = 10`, `job_deadline_ms = 900000`, `retry_budget_ratio = 0.1`
-(`version = 4`). On library
+`max_sources = 10`, `job_deadline_ms = 900000`, `retry_budget_ratio = 0.1`,
+`max_active_jobs = 3` (`version = 5`). On library
 defaults the LLM nodes never retry and never time out, so a single 429 kills a
-paid-for job; two more bound what one job may carry, and the deadline bounds how
-long one may run. Unlike sampling, all five **are** environment-overridable —
-none of them can move an eval score, because retry and timeout change how hard
-the service tries, the input bounds decide only whether a submission is accepted
-at all, and the deadline only whether an answer arrives in time.
+paid-for job; two more bound what one job may carry, the deadline bounds how
+long one may run, and the ceiling bounds how many one caller may run at once.
+Unlike sampling, all of them **are** environment-overridable —
+none can move an eval score, because retry and timeout change how hard
+the service tries, the input bounds and the ceiling decide only whether a
+submission is accepted at all, and the deadline only whether an answer arrives
+in time.
+
+`max_active_jobs` is the only bound here that is per **caller** rather than per
+job, and the others are why it has to exist: a caller who respects every one of
+them and simply keeps submitting is inside the contract while spending the
+deployment's whole provider quota. Each accepted job fans the six STRIDE
+category agents out in parallel on the `strong` tier, so the shipped `3` is
+eighteen concurrent `strong`-tier requests — the burst a per-minute quota
+actually sees, and the arithmetic to redo before raising it. A submission past
+the ceiling is refused with `429`, never queued: a queued job holds the caller's
+place in the quota anyway, so only a refusal sheds load. It counts jobs **in
+flight** (`queued` plus `running`), not submissions per interval, so it is
+self-clearing — finishing a job is what buys the next one, and it needs no
+window, no timer and no state the job store does not already hold.
+
+The ceiling is exactly **as shared as the job store is**, which is why it is
+enforced through `JobStore.active_for` rather than out of process memory. Behind
+two instances of the per-instance `memory` store, each instance enforces the
+number and the effective ceiling is the sum — the same defect `STRIDE_JOB_STORE`
+[fails closed](HTTP-API.md#job-storage) over. Size it against one instance's share, or
+register a shared store and get a shared ceiling with no config change. Where
+the edge (a load balancer or API gateway) already enforces a per-caller quota,
+this is the backstop behind it, not a duplicate of it. See
+[ADR 0007](adr/0007-per-caller-concurrency-ceiling.md).
 
 `job_deadline_ms` is the only bound on a **job as a whole**, and the per-call
 knobs cannot substitute for it. `timeout_ms` bounds one request at 300 s,
@@ -489,6 +514,7 @@ it with a measurement — see [Tuning the models](../evals/TUNING.md).
 | `STRIDE_MAX_SOURCES` | How many sources one job may carry. |
 | `STRIDE_JOB_DEADLINE_MS` | Wall-clock budget for one whole job, milliseconds. Turn it down to shed load. |
 | `STRIDE_RETRY_BUDGET_RATIO` | Retries as a share of successful requests. Turn it down to give up sooner under sustained failure. |
+| `STRIDE_MAX_ACTIVE_JOBS` | Jobs one token subject may have in flight. Turn it down to shed load; raising it multiplies by six at the category fan-out. |
 
 ### How strictly each override family is checked
 
@@ -510,8 +536,8 @@ namespaces those two loaders own, so each can enumerate every variable it
 accepts and reject anything else in its namespace. The resilience knobs are bare
 `STRIDE_`-prefixed names, and `STRIDE_` belongs to the whole application — it
 also holds the config paths, the provider credentials and the job-store
-selector. No single loader can claim it, so the resilience loader reads the two
-names it knows and cannot see that you meant a third.
+selector. No single loader can claim it, so the resilience loader reads the
+names it knows and cannot see that you meant another.
 
 What makes the weaker guarantee tolerable is the **consequence**, which is also
 why the two families differ in the first place:
@@ -546,6 +572,7 @@ Bounds enforced before or during analysis:
 | `max_source_bytes` | 100 KiB (UTF-8), total across all sources | Rejected at both entry points; deployment config. |
 | `max_sources` | 10 | Rejected at both entry points; deployment config. |
 | `job_deadline_ms` | 900 s per job, wall clock | `failed` at the deadline; deployment config. |
+| `max_active_jobs` | 3 jobs in flight per token subject | `429` at submission; deployment config. |
 | Source `label` | 200 characters, single-line, unique per job | Rejected as a malformed source. |
 | `MAX_SYSTEM_NAME_CHARS` | 200 | Rejected by the engine / API. |
 | `MAX_ELEMENTS` | 150 | A larger model is a `too-many-elements` [rejection](Report-Schema.md). |
