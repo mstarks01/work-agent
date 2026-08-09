@@ -8,8 +8,9 @@ stream, and two open seams:
 * :class:`JobStore` — the API only ever talks to this interface. Backends are
   selected at deploy time by ``STRIDE_JOB_STORE`` and constructed through
   :func:`build_store`, so a durable or shared backend is one registry entry.
-  :class:`InMemoryJobStore` is the ``memory`` backend — the default,
-  non-durable and per-instance.
+  :class:`InMemoryJobStore` is the ``memory`` backend — the only one registered,
+  non-durable and per-instance. There is no default: :func:`build_store` fails
+  closed rather than choosing it for a deployment that did not.
 * :class:`PipelineRunner` — the API runs jobs through this interface, never
   against a graph directly. :class:`stride_service.pipeline.AdkPipelineRunner`
   is the implementation; :class:`StubPipelineRunner` is the no-model stand-in
@@ -179,13 +180,32 @@ class JobRecord(BaseModel):
 
 
 class JobStore(Protocol):
-    """Persistence seam for job records; the real backend is a deferred decision."""
+    """Persistence seam for job records; the real backend is a deferred decision.
+
+    :meth:`active_for` is the seam the per-caller concurrency ceiling is enforced
+    through, and it lives here rather than in process state on purpose: a counter
+    beside the API would be per-instance no matter what backend a deployment
+    configured, so behind two instances the effective ceiling would silently be
+    double the configured number and would reset on every deploy — precisely the
+    defect :func:`build_store` fails closed over. Asked of the store instead, the
+    ceiling is exactly as shared as the deployment's storage is, and a shared
+    backend makes it a shared ceiling with no change at the call site.
+
+    **Implementations must observe the count and the create atomically.** The API
+    calls :meth:`active_for` and then :meth:`create`, and a backend that lets
+    another submission land between them turns the ceiling into a number a burst
+    can overshoot. :class:`InMemoryJobStore` satisfies this by never awaiting
+    inside either method, so asyncio cannot interleave the pair; a networked
+    backend needs the check and the insert in one transaction.
+    """
 
     async def create(self, record: JobRecord) -> None: ...
 
     async def get(self, job_id: str) -> JobRecord | None: ...
 
     async def save(self, record: JobRecord) -> None: ...
+
+    async def active_for(self, subject: str) -> int: ...
 
 
 class InMemoryJobStore:
@@ -207,6 +227,24 @@ class InMemoryJobStore:
         if record.id not in self._records:
             raise ValueError(f"job {record.id!r} does not exist")
         self._records[record.id] = record.model_copy(deep=True)
+
+    async def active_for(self, subject: str) -> int:
+        """How many of ``subject``'s jobs have not reached a terminal state.
+
+        A scan rather than a maintained counter, because the records are the
+        truth and a counter is a second copy of it that can drift — every path
+        that ends a job would have to remember to decrement, and the one that
+        forgets leaks ceiling until the process restarts. This store retains
+        terminal records, so the scan is linear in everything the process has
+        ever run; that is the same growth the dict itself already has, and
+        bounding it is a property of the backend rather than of this count.
+        """
+        return sum(
+            1
+            for record in self._records.values()
+            if record.owner_subject == subject
+            and record.status not in TERMINAL_STATUSES
+        )
 
 
 class JobStoreConfigError(ValueError):
@@ -336,7 +374,7 @@ async def execute_job(
     longest path, so a job's tail was previously a product of numbers nobody
     chose. It is a required keyword rather than a defaulted one — a default here
     would be a deployment inheriting a deadline it never picked, which is the
-    state :data:`~stride_service.resilience.SUPPORTED_VERSION` 4 exists to end.
+    state ``job_deadline_ms`` was added to ``config/resilience.toml`` to end.
 
     Expiry cancels the graph, so the in-flight provider calls are dropped rather
     than left to finish into a job nobody is waiting on. What the run had

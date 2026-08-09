@@ -598,6 +598,21 @@ def test_the_route_enforces_the_gate_the_runner_certified_with():
     assert app.state.runner is deployment.runner()
 
 
+def test_the_app_enforces_the_bounds_its_deployment_configured():
+    """The wiring the shipped service runs on: config file to app state.
+
+    An injected bound has to be stated, so every route test names its own. This
+    is the path nothing else covers — a deployment's file reaching the route.
+    """
+    deployment = Deployment.from_env(env=VERTEX_ENV)
+
+    app = create_app(deployment=deployment, store=InMemoryJobStore(), verifier=object())
+
+    assert app.state.max_active_jobs == deployment.resilience.max_active_jobs
+    assert app.state.job_deadline_seconds == deployment.resilience.deadline_seconds()
+    assert app.state.limits == deployment.resilience.source_limits()
+
+
 def test_require_certified_is_off_unless_explicitly_affirmative():
     assert Deployment.from_env(env=VERTEX_TIERS).gate().require_certified is False
     assert (
