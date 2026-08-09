@@ -23,7 +23,7 @@ and the fields below are the authoritative account.
 
 ```python
 class StrideReport:
-    schema_version: str          # "2.4"
+    schema_version: str          # "2.5"
     disclaimer: str              # AI-generated, not human-reviewed
     job: Job                     # id, status="completed", timestamps, revise_rounds
     input: InputRef              # system_name + one ref per submitted source
@@ -36,6 +36,7 @@ class StrideReport:
     unverified_grounds: list[UnverifiedGround]  # quote grounds not found in their source
     unresolved_mentions: list[UnresolvedMention]  # element IDs a description cites that do not exist
     missing_mitigations: list[MissingMitigation]  # threats offering no countermeasure, unexcused
+    shared_element_names: list[SharedElementName]  # different-typed elements sharing one name slug
     coverage: list[CategoryCoverage]             # per-lane account of what each agent was offered
     summary: Summary
 ```
@@ -224,6 +225,40 @@ finding. What it buys a reader is the ability to see which findings arrived
 with nothing to do about them, and to tell those apart from the ones that
 correctly said "answer this unknown first".
 
+## `shared_element_names` — one name, two types
+
+An element ID is `type:name-slug`, so a model that records one real thing twice
+— once as `process:web-app`, once as `store:web-app` — holds two *distinct*
+IDs. The validity gate's `duplicate-id` rule compares whole IDs and passes the
+pair. `extract.md` tells the transcriber "nothing gets two types", and this is
+what that rule is about.
+
+```python
+class SharedElementName:
+    name_slug: str               # the slug both elements normalize to
+    element_ids: list[str]       # the two or more IDs that share it
+```
+
+**Why a mark and not a gate failure.** The gate has exactly one severity —
+every `ValidationIssue` is fatal, and an empty list *is* the definition of
+ready-for-analysis the graph routes on — and this does not deserve that,
+because it is not always wrong. A system can legitimately run a process and
+keep a store of the same name. Failing extraction on the pair would reject a
+valid model, and would spend `repair`'s single pass telling a transcriber to
+rename something correct. So it is reported to the reader and to nobody else:
+it never reaches `repair`, which is told to change nothing the issues do not
+cite.
+
+Only zoned elements are compared — external entities, processes and data
+stores. A trust boundary is a zone rather than a thing in the system, and a
+flow's ID is built from its endpoints rather than from a bare type-and-name
+pair. Same-type collisions never appear here: two elements of one type sharing
+a name hold the same ID, which is `duplicate-id`'s to report.
+
+This is the first mark about the **model** rather than about the threats, which
+is why it carries element IDs and no `threat_id`. It is recomputable from the
+report's own embedded `system_model`, by design.
+
 ## `coverage` — what each lane was offered
 
 A threat count says how much a category agent found. It cannot say whether a
@@ -396,6 +431,12 @@ class TokenUsage:
 
 > **`schema_version` 2.4** added `coverage`. Additive again: a fourth optional
 > top-level list, service-owned and computed in code.
+
+> **`schema_version` 2.5** added `shared_element_names`, a fifth optional
+> top-level list of service-owned marks. Additive on the same argument — minor
+> although it is the first mark describing the model rather than the threats,
+> since what a consumer must do with an unknown field does not depend on what
+> the field describes.
 
 The report records both model fields and **compares neither**. It doesn't need
 to: if the build moves, the fingerprint moves with it, and the run stops
