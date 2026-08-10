@@ -11,6 +11,7 @@ from __future__ import annotations
 
 import asyncio
 import json
+from dataclasses import fields
 from pathlib import Path
 
 import pytest
@@ -27,6 +28,7 @@ from stride_service.graph import (
     ENTRY_PREPARE,
     EXTRACT_NODE,
     TIER_NODE_BY_GRAPH_NODE,
+    Analysis,
     analyze_node_name,
 )
 from stride_service.report import (
@@ -34,6 +36,8 @@ from stride_service.report import (
     STRIDE_CATEGORIES,
     Mitigation,
     Severity,
+    SharedElementName,
+    StrideReport,
     Verdict,
 )
 from stride_service.sampling import load_sampling
@@ -148,6 +152,41 @@ def test_analysis_mode_output_passes_the_tier_1_gates(case):
 
     assert report_issues(report) == []
     assert len(report.threats) == len(STRIDE_CATEGORIES)
+
+
+def test_an_eval_report_carries_every_field_production_stamps(case):
+    """The eval report is the production shape or it measures a different one.
+
+    The pinned set is the guard, and it is pinned rather than derived on
+    purpose: every field :class:`~stride_service.graph.Analysis` and
+    :class:`~stride_service.report.StrideReport` share is one the eval seam has
+    to be *asked* to carry, and a field added to both without a decision here
+    is exactly how ``coverage`` came to be computed at the fan-in for a sweep
+    that then read an empty list for it.
+    """
+    pipeline = build(case, ENTRY_PREPARE, {})
+
+    run = asyncio.run(modes.run_analysis(case, pipeline))
+
+    analysis_fields = {field.name for field in fields(Analysis)}
+    shared = analysis_fields & StrideReport.model_fields.keys()
+    assert shared == {
+        "system_model",
+        "boundary_crossings",
+        "threats",
+        "rejected_threats",
+        "unverified_grounds",
+        "unresolved_mentions",
+        "missing_mitigations",
+        "shared_element_names",
+        "coverage",
+        "summary",
+    }
+    assert len(run.report.coverage) == len(STRIDE_CATEGORIES)
+    assert run.report.shared_element_names == [
+        SharedElementName(name_slug=slug, element_ids=ids)
+        for slug, ids in run.report.system_model.shared_names().items()
+    ]
 
 
 def test_analysis_mode_scores_against_the_reference_set(case):
