@@ -357,6 +357,13 @@ class EvalArtifact:
     untrusted. Refusing on them would be the wrong call: whether to bless a
     sweep with one failed case is a judgement, and the tool's job is to make
     sure it is a *made* one.
+
+    ``raw`` is the parsed document, kept whole. Promotion needs none of it, but
+    the artifact is the only record a finished sweep leaves, and an offline
+    instrument reading some other block of it —
+    :mod:`evals.harness.stability` reads ``scores`` — should go through the
+    loader that decides an artifact is admissible rather than opening the file
+    a second time under its own rules.
     """
 
     path: Path
@@ -365,6 +372,7 @@ class EvalArtifact:
     trusted: bool
     structural_failures: tuple[str, ...]
     provenance: RunProvenance
+    raw: dict[str, Any]
 
 
 def load_artifact(path: Path | str) -> EvalArtifact:
@@ -431,4 +439,5 @@ def load_artifact(path: Path | str) -> EvalArtifact:
             str(failure) for failure in raw.get("structural_failures", ())
         ),
         provenance=provenance,
+        raw=raw,
     )
