@@ -123,3 +123,38 @@ dependencies. The app reads it, substitutes your run's JSON into its
 
 It holds no report of its own, so opening it from disk shows nothing. It is a
 template belonging to this app, not a sample to look at.
+
+## How the pages are protected
+
+Two rules, held over all three pages rather than only the report page.
+
+**Untrusted text reaches the DOM as text.** Every value the submitter can
+influence renders as `textContent` or as a constructed node, never by assigning
+a string of markup. That includes the form page, which is not obvious: a source
+label and a validator message both travel back to it over SSE, and neither is
+escaped for markup on the way. There is no escape helper on any page, which is
+what makes forgetting one impossible rather than merely unlikely — the same
+discipline had already failed once, silently, in the report's element table.
+
+**Every page carries a strict nonce CSP,** `default-src 'none'` with a fresh
+per-response nonce on each inline block and no `'unsafe-inline'` anywhere. Each
+policy grants only what its own page does:
+
+| Page | Grants beyond `default-src 'none'` |
+| --- | --- |
+| Report | `script-src`/`style-src` nonce. It loads nothing and calls nothing. |
+| Form | the same, plus `connect-src 'self'` for `/example`, `/analyze`, `/events`. |
+| Diagnostic | `style-src` nonce only — it runs no script, so it is granted none. |
+
+`base-uri` and `form-action` are `'none'` everywhere; the form posts through
+fetch, so a navigation away from it would be something going wrong. A page and
+its policy are built together and served together, so serving one without the
+other is not something the code can express.
+
+Every response also carries `X-Content-Type-Options: nosniff` and
+`Referrer-Policy: no-referrer` — those are per response rather than per page,
+which is why they are not part of the CSP.
+
+None of this is what makes the app safe to run: **loopback binding is**. On
+`127.0.0.1` the submitter is both attacker and victim. These are the controls
+that keep that from being the only thing standing between the two.

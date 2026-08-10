@@ -39,27 +39,42 @@ Security posture, all of it deliberate:
   JSON enters the viewer's ``<script>`` block — otherwise a description
   containing ``</script>`` closes it and the rest parses as HTML (A05 / LLM05).
   See :func:`render_report`.
-* **Untrusted text never reaches ``innerHTML``** in the viewer. It renders as
+* **Untrusted text never reaches ``innerHTML``** on any page. It renders as
   ``textContent`` or as constructed DOM nodes, so there is no escape helper to
   forget to call — the discipline had already failed once, unnoticed, in the
   element table's attribute column. This is the primary control; the CSP below
-  is defence in depth behind it.
+  is defence in depth behind it. The form page is included: a source label and a
+  validator message both carry submitter bytes onto it over SSE, and both land
+  as text nodes. Server-side, the two f-string pages escape through
+  :func:`_escape`, which is quote-safe so that where a value lands is not part
+  of whether the escape is adequate.
 * **CSRF.** ``POST /analyze`` requires ``Sec-Fetch-Site: same-origin``. The
   header is browser-set and unspoofable from script, and it is checked before
   anything else so a cross-origin caller cannot even start a run.
 * **One run at a time** (LLM10). A second submission is refused with a message,
   not queued and held open.
-* **A strict nonce CSP on the report page.** ``default-src 'none'`` with a
-  per-response nonce for the one style block and the two script blocks, and no
-  ``'unsafe-inline'`` anywhere — which is why the viewer carries no ``style=""``
-  attributes and sets generated colours through ``element.style.*``, a CSSOM
-  write CSP does not govern. The viewer has no external resources and no
-  ``on*=`` handlers, so ``'none'`` costs nothing. See :func:`render_report`.
+* **A strict nonce CSP on every page.** ``default-src 'none'`` with a
+  per-response nonce for each inline block, and no ``'unsafe-inline'`` anywhere
+  — which is why the viewer carries no ``style=""`` attributes and sets
+  generated colours through ``element.style.*``, a CSSOM write CSP does not
+  govern. No page loads an external resource or carries an ``on*=`` handler, so
+  ``'none'`` costs nothing. Each policy grants what its own page does and
+  nothing else: the report page reaches the network not at all, the form page
+  only its own origin (``connect-src 'self'`` for ``/example``, ``/analyze`` and
+  ``/events``), and the diagnostic page runs no script, so it is granted no
+  ``script-src`` at all. A page and its policy are built together as a
+  :class:`RenderedPage` and served through :func:`_html`, so serving HTML
+  without its header is unspellable rather than merely discouraged.
+* **``nosniff`` and ``no-referrer`` on every response**, HTML or not, applied by
+  :class:`SecurityHeaders`. Content sniffing is what would let a browser treat
+  ``/example``'s ``text/plain`` prose as something else, and the referrer policy
+  keeps a run id out of outbound ``Referer`` headers.
 """
 
 from __future__ import annotations
 
 import asyncio
+import html
 import json
 import logging
 import os
@@ -78,6 +93,8 @@ from fastapi.responses import (
     StreamingResponse,
 )
 from pydantic import ValidationError
+from starlette.datastructures import MutableHeaders
+from starlette.types import ASGIApp, Message, Receive, Scope, Send
 
 from stride_service import (
     ConfigError,
@@ -126,6 +143,58 @@ _CSP = (
     "default-src 'none'; script-src 'nonce-{nonce}'; style-src 'nonce-{nonce}'; "
     "base-uri 'none'; form-action 'none'"
 )
+
+# The form page's policy differs from the report page's by exactly what the page
+# does: it calls ``/example``, ``/analyze`` and ``/events/{run}``, so it needs
+# ``connect-src 'self'`` and the report page does not. ``form-action`` stays
+# closed even though the page carries a ``<form>`` — the submit handler is
+# ``preventDefault()``-ed and posts through fetch, so a navigation away from
+# this form is something going wrong.
+_FORM_CSP = (
+    "default-src 'none'; script-src 'nonce-{nonce}'; style-src 'nonce-{nonce}'; "
+    "connect-src 'self'; base-uri 'none'; form-action 'none'"
+)
+
+# The diagnostic page runs no script and makes no request: it is one style block
+# and static prose. So it is granted neither ``script-src`` nor ``connect-src``
+# and both fall through to ``default-src 'none'`` — a page that has nothing to
+# authorise should not carry the grant that would authorise one.
+_DIAGNOSTIC_CSP = (
+    "default-src 'none'; style-src 'nonce-{nonce}'; base-uri 'none'; form-action 'none'"
+)
+
+
+class SecurityHeaders:
+    """``nosniff`` and ``no-referrer`` on every response, whatever served it.
+
+    Pure ASGI rather than a ``@app.middleware("http")`` function so it cannot
+    come between ``/events/{run}`` and its client: this only edits the header
+    frame on its way out and never touches the body, so a stream stays a stream.
+
+    Both headers are per *response* rather than per page, which is why they are
+    here and the CSP is not. ``nosniff`` matters most for the responses that are
+    not HTML — ``/example`` serves prose as ``text/plain``, and content sniffing
+    is precisely the mechanism that would let a browser decide otherwise.
+    ``no-referrer`` keeps a run id out of the ``Referer`` of anything the report
+    page's own links reach.
+    """
+
+    def __init__(self, app: ASGIApp) -> None:
+        self._app = app
+
+    async def __call__(self, scope: Scope, receive: Receive, send: Send) -> None:
+        if scope["type"] != "http":
+            await self._app(scope, receive, send)
+            return
+
+        async def _send(message: Message) -> None:
+            if message["type"] == "http.response.start":
+                headers = MutableHeaders(scope=message)
+                headers.setdefault("X-Content-Type-Options", "nosniff")
+                headers.setdefault("Referrer-Policy", "no-referrer")
+            await send(message)
+
+        await self._app(scope, receive, _send)
 
 
 @dataclass
@@ -213,19 +282,21 @@ def build_startup(env: Mapping[str, str] | None = None) -> Startup:
 
 
 @dataclass(frozen=True)
-class RenderedReport:
-    """A report page and the CSP header that authorises exactly its own nonce.
+class RenderedPage:
+    """A page and the CSP header that authorises exactly its own nonce.
 
     The two travel together so a caller cannot serve the page without the
-    policy: a nonce nothing authorises would leave the viewer's own scripts
-    blocked, and a policy without its page is meaningless.
+    policy: a nonce nothing authorises would leave the page's own blocks
+    blocked, and a policy without its page is meaningless. Every HTML response
+    this app serves is one of these — the three pages differ in what their
+    policy grants, never in whether they carry one.
     """
 
     html: str
     csp: str
 
 
-def render_report(report: StrideReport) -> RenderedReport:
+def render_report(report: StrideReport) -> RenderedPage:
     """``report_view.html``, carrying this run's report.
 
     The template is a self-contained renderer for the report schema — no build
@@ -255,7 +326,7 @@ def render_report(report: StrideReport) -> RenderedReport:
     )
     if count != 1:
         raise RuntimeError(f"{VIEWER} has no <script id='report'> block to inject into")
-    return RenderedReport(html=rendered, csp=_CSP.format(nonce=nonce))
+    return RenderedPage(html=rendered, csp=_CSP.format(nonce=nonce))
 
 
 def create_app(
@@ -270,12 +341,13 @@ def create_app(
     state = build_startup() if startup is None else startup
     analyses = Analyses() if analyses is None else analyses
     app = FastAPI(title="STRIDE first run", docs_url=None, redoc_url=None)
+    app.add_middleware(SecurityHeaders)
 
     @app.get("/", response_class=HTMLResponse)
     async def form_page() -> Response:
         if not state.ok:
-            return HTMLResponse(diagnostic_page(state), status_code=503)
-        return HTMLResponse(_page(_FORM_PAGE, tiers=_tier_lines(state.tiers)))
+            return _html(diagnostic_page(state), status_code=503)
+        return _html(_page(_FORM_PAGE, _FORM_CSP, tiers=_tier_lines(state.tiers)))
 
     @app.get("/example", response_class=PlainTextResponse)
     async def example() -> Response:
@@ -328,12 +400,23 @@ def create_app(
         run = analyses.get(run_id)
         if run is None or run.report is None:
             return PlainTextResponse("no such report", status_code=404)
-        rendered = render_report(run.report)
-        return HTMLResponse(
-            rendered.html, headers={"Content-Security-Policy": rendered.csp}
-        )
+        return _html(render_report(run.report))
 
     return app
+
+
+def _html(page: RenderedPage, status_code: int = 200) -> HTMLResponse:
+    """The only way this app serves HTML, so no page can be served bare.
+
+    A page and its policy are built together and travel together; taking a
+    :class:`RenderedPage` rather than a string is what makes "serve the HTML,
+    forget the header" unspellable rather than merely discouraged.
+    """
+    return HTMLResponse(
+        page.html,
+        status_code=status_code,
+        headers={"Content-Security-Policy": page.csp},
+    )
 
 
 async def _drive(
@@ -430,7 +513,7 @@ def _tier_lines(tiers: ModelTierConfig | None) -> str:
     )
 
 
-def diagnostic_page(state: Startup) -> str:
+def diagnostic_page(state: Startup) -> RenderedPage:
     """The fail-closed page that replaces the form when config is unusable.
 
     Carries the raised message (safe by construction — these errors name the
@@ -445,6 +528,7 @@ def diagnostic_page(state: Startup) -> str:
     """
     return _page(
         _DIAGNOSTIC_PAGE,
+        _DIAGNOSTIC_CSP,
         message=_escape(str(state.error)),
         vendors=_vendor_sections(state.tiers),
     )
@@ -491,19 +575,35 @@ def _env_var_item(var: str, is_set: bool) -> str:
 
 
 def _escape(text: str) -> str:
-    return text.replace("&", "&amp;").replace("<", "&lt;").replace(">", "&gt;")
+    """Server-side escape for the two f-string pages.
+
+    :func:`html.escape` rather than a hand-rolled three-character replace,
+    because the hand-rolled one covered ``&<>`` and not quotes: every call site
+    here lands in element text position, so it was correct, and it would have
+    stopped being correct the first time someone interpolated into an attribute
+    value. The stdlib version is right in both positions, so where a value goes
+    is no longer part of whether the escape is adequate.
+    """
+    return html.escape(text)
 
 
-def _page(template: str, **fields: str) -> str:
-    """Fill a page template.
+def _page(template: str, csp: str, **fields: str) -> RenderedPage:
+    """Fill a page template, and stamp the nonce its policy authorises.
 
     Substitution is by explicit token replacement rather than ``str.format``:
     the templates contain CSS and JavaScript, which are full of braces that
     ``format`` would try to interpret as fields.
+
+    **The nonce is stamped before the fields are filled**, never after, the same
+    ordering :func:`render_report` keeps and for the same reason: a field's value
+    is content, and content that happens to spell the placeholder must come back
+    as those characters rather than as a live nonce.
     """
+    nonce = secrets.token_urlsafe(16)
+    html = template.replace(_NONCE_PLACEHOLDER, nonce)
     for name, value in fields.items():
-        template = template.replace(f"<!--{name}-->", value)
-    return template
+        html = html.replace(f"<!--{name}-->", value)
+    return RenderedPage(html=html, csp=csp.format(nonce=nonce))
 
 
 _STYLE = """
@@ -528,7 +628,7 @@ _STYLE = """
 _FORM_PAGE = (
     """<!doctype html>
 <html lang="en"><head><meta charset="utf-8">
-<title>STRIDE — first run</title><style>"""
+<title>STRIDE — first run</title><style nonce="__CSP_NONCE__">"""
     + _STYLE
     + """</style></head>
 <body>
@@ -545,7 +645,7 @@ _FORM_PAGE = (
 </form>
 <div id="problem" class="problem" hidden></div>
 <ul id="ticks" hidden></ul>
-<script>
+<script nonce="__CSP_NONCE__">
   const form = document.getElementById("analyze");
   const box = document.getElementById("description");
   const ticks = document.getElementById("ticks");
@@ -556,15 +656,17 @@ _FORM_PAGE = (
     box.value = await (await fetch("/example")).text();
   });
 
-  const fail = (html) => {
-    problem.innerHTML = html;
+  // Nodes and strings, never markup. replaceChildren() inserts a string as a
+  // text node, so a source label or a validator message that spells markup
+  // shows the characters the submitter typed. Same rule as the report viewer,
+  // and for the same reason: with no escape helper on the page there is none
+  // to forget, and forgetting shows junk on screen instead of running.
+  const fail = (...content) => {
+    problem.replaceChildren(...content);
     problem.hidden = false;
     ticks.hidden = true;
     go.disabled = false;
   };
-
-  const escape = (s) => String(s).replace(/[&<>]/g,
-    (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;" }[c]));
 
   form.addEventListener("submit", async (event) => {
     event.preventDefault();
@@ -582,7 +684,7 @@ _FORM_PAGE = (
       }),
     });
     if (!started.ok) {
-      fail(escape((await started.json()).message));
+      fail((await started.json()).message);
       return;
     }
 
@@ -599,15 +701,21 @@ _FORM_PAGE = (
     });
     stream.addEventListener("rejected", (event) => {
       stream.close();
-      const issues = JSON.parse(event.data).issues
-        .map((i) => "<li><code>" + escape(i.code) + "</code> "
-                    + escape(i.message) + "</li>")
-        .join("");
-      fail("<b>That description could not be modelled.</b><ul>" + issues + "</ul>");
+      const lead = document.createElement("b");
+      lead.textContent = "That description could not be modelled.";
+      const list = document.createElement("ul");
+      for (const issue of JSON.parse(event.data).issues) {
+        const item = document.createElement("li");
+        const code = document.createElement("code");
+        code.textContent = issue.code;
+        item.append(code, " " + issue.message);
+        list.append(item);
+      }
+      fail(lead, list);
     });
     stream.addEventListener("failed", (event) => {
       stream.close();
-      fail(escape(JSON.parse(event.data).message));
+      fail(JSON.parse(event.data).message);
     });
   });
 </script>
@@ -618,7 +726,7 @@ _FORM_PAGE = (
 _DIAGNOSTIC_PAGE = (
     """<!doctype html>
 <html lang="en"><head><meta charset="utf-8">
-<title>STRIDE — configuration problem</title><style>"""
+<title>STRIDE — configuration problem</title><style nonce="__CSP_NONCE__">"""
     + _STYLE
     + """</style></head>
 <body>
