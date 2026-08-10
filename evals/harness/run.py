@@ -46,6 +46,12 @@ from evals.harness.calibration import (
     measure_agreement,
 )
 from evals.harness.certify import PromotionPlan, plan_promotion, promote
+from evals.harness.coverage import (
+    CITED_PAIRS,
+    LaneCoverage,
+    aggregate_coverage,
+    coverage_totals,
+)
 from evals.harness.critic_yield import (
     CriticYield,
     aggregate_yield,
@@ -75,10 +81,25 @@ from evals.harness.scorer import (
     exemplar_delta,
     unlisted_for_promotion,
 )
+from evals.harness.stability import (
+    CaseStability,
+    ScoredRun,
+    aggregate_stability,
+    comparability_warnings,
+    compare_runs,
+    load_runs,
+)
 from evals.harness.structural import report_issues
 from stride_service.certification import CertificationError, CertifyResult, certify
 from stride_service.deployment import Deployment
-from stride_service.report import NodeRun, TokenUsage, usage_by_node
+from stride_service.report import (
+    CategoryCoverage,
+    NodeLatency,
+    NodeRun,
+    TokenUsage,
+    latency_by_node,
+    usage_by_node,
+)
 
 EVALS_ROOT = Path(__file__).resolve().parents[1]
 DEFAULT_CORPUS_DIR = EVALS_ROOT / "corpus"
@@ -142,9 +163,21 @@ class ModeRun:
     number comes from — a single job's numbers are one sample of one system —
     so it is folded here rather than left to whoever reads the artifact.
 
+    ``latency`` is the same fold over the same executions, in wall-clock. It is
+    folded here for the same reason and one more: ``duration_ms`` is recorded
+    per node run and read back by nothing, so a sweep that does not fold it
+    measures the latency the Evaluation section of
+    [#115](https://github.com/mstarks01/work-agent/issues/115) asks for and
+    then throws it away.
+
     ``grounds`` and ``grounds_failures`` are the two halves of the same
     instrument: what the cases that finished did with ``grounds``, and what the
     cases that did not finished on. A case appears in exactly one of them.
+
+    ``coverage`` is every case's per-category coverage rows, unpooled. One
+    case's row is not a readable number — see
+    :mod:`evals.harness.coverage` — so what rides here is the input to the
+    aggregate rather than the aggregate itself.
     """
 
     payloads: list[dict[str, Any]]
@@ -153,8 +186,10 @@ class ModeRun:
     provenance: RunProvenance
     expected_nodes: list[str]
     usage: dict[str, TokenUsage]
+    latency: dict[str, NodeLatency]
     grounds: list[CaseGrounds]
     grounds_failures: list[GroundsFailure]
+    coverage: list[CategoryCoverage]
 
     @property
     def observations(self) -> dict[str, frozenset[str]]:
@@ -194,6 +229,7 @@ async def _run_mode(
     executions: list[NodeRun] = []
     grounds: list[CaseGrounds] = []
     grounds_failures: list[GroundsFailure] = []
+    coverage: list[CategoryCoverage] = []
 
     for case in cases:
         if mode == "extraction":
@@ -223,6 +259,7 @@ async def _run_mode(
 
         runs[case.id] = run
         executions += run.report.nodes
+        coverage += run.report.coverage
         issues = report_issues(run.report)
         failures += [f"{case.id}: {issue}" for issue in issues]
         measurement = measure_grounds(
@@ -253,8 +290,10 @@ async def _run_mode(
         ),
         expected_nodes=list(pipeline.node_sampling),
         usage=usage_by_node(executions),
+        latency=latency_by_node(executions),
         grounds=grounds,
         grounds_failures=grounds_failures,
+        coverage=coverage,
     )
 
 
@@ -428,13 +467,16 @@ def command_run(args: argparse.Namespace) -> int:
     )
     _print_certification(certification)
     _print_usage(mode_run.usage)
+    _print_latency(mode_run.latency)
     # Both halves, never ``certified`` alone: it is narrow by design and is
     # vacuously true of a sweep that observed no fingerprint at all.
     trusted = certification.certified and certification.complete
 
-    # Before the judge, and unconditional: the grounds measurements cost no
-    # provider call, so ``--no-scoring`` still emits them.
+    # Before the judge, and unconditional: the grounds and coverage
+    # measurements cost no provider call, so ``--no-scoring`` still emits them.
     _print_grounds(mode_run.grounds, mode_run.grounds_failures)
+    lanes = aggregate_coverage(mode_run.coverage)
+    _print_coverage(lanes, offered=bool(mode_run.coverage))
 
     scores: list[CaseScore] = []
     yields: list[CriticYield] = []
@@ -461,6 +503,10 @@ def command_run(args: argparse.Namespace) -> int:
         "node_usage": {
             node: usage.model_dump() for node, usage in mode_run.usage.items()
         },
+        "node_latency": {
+            node: {**latency.model_dump(), "mean_ms": round(latency.mean_ms)}
+            for node, latency in mode_run.latency.items()
+        },
         "structural_failures": failures,
         "mode_output": mode_run.payloads,
         # Aggregates carry the verdict so nothing downstream folds an
@@ -479,6 +525,11 @@ def command_run(args: argparse.Namespace) -> int:
             if mode_run.grounds or mode_run.grounds_failures
             else None
         ),
+        # Written whether or not anything was offered: an absent block and a
+        # block of zeroes would otherwise be indistinguishable to a reader
+        # comparing two sweeps.
+        "coverage": [lane.to_json() for lane in lanes],
+        "coverage_totals": coverage_totals(lanes),
         "unlisted_for_promotion": unlisted_for_promotion(scores),
     }
     if args.out:
@@ -528,6 +579,68 @@ def _print_usage(usage: dict[str, TokenUsage]) -> None:
             f" {spent.completion_tokens:10,} {spent.reasoning_tokens:10,}"
             f" {spent.total_tokens:11,}"
         )
+
+
+def _print_latency(latency: dict[str, NodeLatency]) -> None:
+    """The sweep's wall-clock per node, slowest total first.
+
+    Beside the token table because the two answer different questions about
+    the same executions and get confused for each other: the dearest node is
+    not the slowest one, and a deterministic derivation that costs nothing to
+    bill still costs the job its seconds.
+
+    ``slowest`` is printed next to the mean because it is the column a timeout
+    is set from.
+    """
+    if not latency:
+        print("latency: nothing ran")
+        return
+    print("latency (whole sweep, per node):")
+    print(f"  {'node':34} {'runs':>6} {'total ms':>12} {'mean ms':>10} {'slowest':>10}")
+    slowest = sorted(latency.items(), key=lambda pair: -pair[1].total_ms)
+    for node, spent in slowest:
+        print(
+            f"  {node:34} {spent.executions:6,} {spent.total_ms:12,}"
+            f" {round(spent.mean_ms):10,} {spent.slowest_ms:10,}"
+        )
+
+
+def _print_coverage(lanes: Sequence[LaneCoverage], offered: bool) -> None:
+    """What each lane was offered and how much of it its drafts cite.
+
+    Read as a rate over the whole sweep, never per case, and never as a score:
+    an agent that examined a lead and correctly rejected it cites nothing, so a
+    low rate is a question to ask rather than a failure. The number that is
+    unambiguous is a lane whose rules fire nowhere at all: those rules read a
+    shape this corpus does not have, or nothing at all.
+
+    The rules column is **firings over evaluations** — one rule against one
+    case — because pooling multiplies the lane's rules by the cases.
+    """
+    if not offered:
+        print("coverage: no case produced a report to account for")
+        return
+    print("coverage (whole sweep, per lane — cited, not considered):")
+    header = f"  {'category':22} {'drafts':>7} {'rules fired':>11}"
+    print(f"{header} {'candidates':>12} {'elements':>12} {'crossings':>12}")
+    for lane in lanes:
+        cited = [
+            f"{lane.totals[cited_field]}/{lane.totals[offered_field]}"
+            for offered_field, cited_field in CITED_PAIRS[:3]
+        ]
+        print(
+            f"  {lane.category:22} {lane.drafts:7,}"
+            f" {lane.rules_fired:>4}/{lane.rules:<5}"
+            f" {cited[0]:>12} {cited[1]:>12} {cited[2]:>12}"
+        )
+    totals = coverage_totals(lanes)
+    print(
+        f"coverage: {totals['rules_fired']}/{totals['rules']} rule evaluations fired,"
+        f" candidates cited {totals['cited_rates']['candidates_cited']:.0%},"
+        f" elements {totals['cited_rates']['elements_cited']:.0%},"
+        f" unknown controls {totals['cited_rates']['unknown_controls_cited']:.0%}"
+        " (instrument, non-gating)"
+    )
 
 
 def _print_certification(result: CertifyResult) -> None:
@@ -618,6 +731,68 @@ def command_promote(args: argparse.Namespace) -> int:
         print(f"  {tier}: {len(manifest.blessed_for(tier))} fingerprint(s)")
     print("Commit both files: a blessed set is a reviewed claim about this deployment.")
     return 0
+
+
+def command_stability(args: argparse.Namespace) -> int:
+    """Compare two or more finished sweeps for run-to-run stability.
+
+    Credential-free, like ``promote``: the artifacts already hold every
+    reference each sweep matched, so the comparison is arithmetic over records
+    rather than a re-run. Nothing here gates — the spread it prints is what a
+    future threshold would have to be derived from.
+    """
+    try:
+        runs = load_runs(args.artifact)
+        stability = compare_runs(runs)
+    except (ProvenanceError, ValueError) as error:
+        print(f"cannot compare: {error}", file=sys.stderr)
+        return 1
+
+    _print_stability(runs, stability)
+    if args.out:
+        report = {
+            "runs": [
+                {"artifact": run.label, "mode": run.mode, "models": run.models}
+                for run in runs
+            ],
+            "warnings": comparability_warnings(runs),
+            "cases": [entry.to_json() for entry in stability],
+            "aggregate": aggregate_stability(stability),
+        }
+        Path(args.out).write_text(json.dumps(report, indent=2) + "\n", "utf-8")
+        print(f"stability report written to {args.out}")
+    return 0
+
+
+def _print_stability(
+    runs: Sequence[ScoredRun], stability: Sequence[CaseStability]
+) -> None:
+    """The per-case spread, with what makes the runs incomparable printed first.
+
+    The warnings lead because they change what every number below means: a
+    spread measured across two judges is not run-to-run noise, and a reader who
+    meets that caveat after the table has already read the table.
+    """
+    for warning in comparability_warnings(runs):
+        print(f"WARNING: {warning}")
+    print(f"stability over {len(runs)} runs: {', '.join(run.label for run in runs)}")
+    print(f"  {'case':26} {'recalls':>22} {'spread':>8} {'always':>16} {'jaccard':>9}")
+    for entry in stability:
+        recalls = " ".join(f"{recall:.2f}" for recall in entry.recalls)
+        always = f"{entry.always}/{entry.references} (±{entry.sometimes})"
+        print(
+            f"  {entry.case_id:26} {recalls:>22} {entry.recall_spread:8.2f}"
+            f" {always:>16} {entry.mean_jaccard:9.2f}"
+        )
+    totals = aggregate_stability(stability)
+    print(
+        f"stability: {totals['always_matched']}/{totals['references']} references"
+        f" matched in every run ({totals['always_rate']:.0%}),"
+        f" volatile {totals['volatile_rate']:.0%},"
+        f" mean jaccard {totals['mean_jaccard']:.2f},"
+        f" worst case recall spread {totals['worst_case_recall_spread']:.2f}"
+        " (instrument, non-gating)"
+    )
 
 
 def _check_sampling_schema(provenance: RunProvenance, deployment: Deployment) -> None:
@@ -860,6 +1035,21 @@ def main(argv: Sequence[str] | None = None) -> int:
         help="write the files; without it the promotion is only previewed",
     )
     promote_parser.set_defaults(func=command_promote)
+
+    stability_parser = subparsers.add_parser(
+        "stability",
+        help="compare finished sweeps for run-to-run stability (no credentials)",
+    )
+    stability_parser.add_argument(
+        "artifact",
+        nargs="+",
+        help=(
+            "two or more scored run artifacts of the same corpus. Cases scored"
+            " by only some of them are excluded and named."
+        ),
+    )
+    stability_parser.add_argument("--out", help="where to write the stability report")
+    stability_parser.set_defaults(func=command_stability)
 
     args = parser.parse_args(argv)
     return args.func(args)

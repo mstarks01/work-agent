@@ -16,7 +16,7 @@ import pytest
 
 from stride_service import graph
 from stride_service.execution import GraphExecutor, _NodeFinish
-from stride_service.report import usage_by_node
+from stride_service.report import latency_by_node, usage_by_node
 from stride_service.sampling import (
     TierSampling,
     load_sampling,
@@ -183,6 +183,37 @@ def test_usage_by_node_omits_what_was_never_measured(graph_run):
     """Absent, not zeroed — a node with no usage is not a node that cost nothing."""
     assert graph.ASSEMBLE_NODE not in usage_by_node(graph_run.node_runs)
     assert graph.CRITIC_NODE in usage_by_node(graph_run.node_runs)
+
+
+def test_latency_by_node_sums_and_keeps_the_slowest(graph_run):
+    """The mean is not the number a timeout is set from, so both are kept."""
+    critic = by_node(graph_run)[graph.CRITIC_NODE]
+    faster = critic.model_copy(update={"duration_ms": 10})
+    slower = critic.model_copy(update={"duration_ms": 90})
+
+    folded = latency_by_node([faster, slower])[graph.CRITIC_NODE]
+
+    assert folded.executions == 2
+    assert folded.total_ms == 100
+    assert folded.mean_ms == 50
+    assert folded.slowest_ms == 90
+
+
+def test_latency_by_node_counts_the_deterministic_nodes_too(graph_run):
+    """Where usage omits them, latency must not: their seconds are real."""
+    latency = latency_by_node(graph_run.node_runs)
+
+    assert graph.ASSEMBLE_NODE in latency
+    assert latency[graph.ASSEMBLE_NODE].executions == 1
+
+
+def test_latency_by_node_charges_a_slow_model_to_its_own_node():
+    """The fold is only worth reading if the duration lands on the right node."""
+    pipeline, _ = scripted_pipeline(happy_replies(), llm_class=SlowLlm)
+    latency = latency_by_node(drive(pipeline).node_runs)
+
+    assert latency[graph.EXTRACT_NODE].total_ms >= 50
+    assert latency[graph.ASSEMBLE_NODE].total_ms < 50
 
 
 def test_every_llm_node_fingerprint_recomputes_from_its_tier_sampling(graph_run):

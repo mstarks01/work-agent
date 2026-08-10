@@ -22,6 +22,7 @@ from google.adk.models.base_llm import BaseLlm
 from pydantic import Field
 
 from evals.harness import modes
+from evals.harness.coverage import aggregate_coverage, coverage_totals
 from evals.harness.reference import load_case
 from evals.harness.run import _run_mode
 from stride_service.deployment import Deployment
@@ -220,3 +221,33 @@ def test_a_failed_case_names_its_kind_in_the_payload(monkeypatch, case):
     assert payload["case"] == case.id
     assert payload["grounds_failure"]["kind"] == "fail-closed"
     assert "grounds" not in payload
+
+
+def test_the_sweep_collects_every_case_s_coverage_rows(monkeypatch, case):
+    """One case's rows are unreadable; the sweep is where they become a rate."""
+    run = sweep(monkeypatch, case, None)
+
+    assert len(run.coverage) == 2 * len(STRIDE_CATEGORIES)
+    lanes = aggregate_coverage(run.coverage)
+    assert all(lane.cases == 2 for lane in lanes)
+    assert coverage_totals(lanes)["drafts"] == 2 * len(STRIDE_CATEGORIES)
+
+
+def test_a_failed_case_contributes_no_coverage(monkeypatch, case):
+    """No report, no accounting — a lane cannot be credited for a dead case."""
+    run = sweep(monkeypatch, case, FABRICATED)
+
+    assert len(run.coverage) == len(STRIDE_CATEGORIES)
+
+
+def test_the_sweep_folds_latency_over_every_node_it_ran(monkeypatch, case):
+    """``duration_ms`` is per execution and read back by nothing else."""
+    run = sweep(monkeypatch, case, None)
+
+    critic = run.latency["critic"]
+    assert critic.executions == 2
+    assert critic.slowest_ms <= critic.total_ms
+    # The deterministic derivations are absent from the token totals and
+    # present here, which is the difference the two folds exist to show.
+    assert ENTRY_PREPARE in run.latency
+    assert ENTRY_PREPARE not in run.usage
