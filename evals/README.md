@@ -43,6 +43,8 @@ evals/
 | `harness/scorer.py` | The scoring pipeline: prefilter → judge → match → bucket → severity. |
 | `harness/critic_yield.py` | What the critic added and removed, scored on both sides. |
 | `harness/grounds.py` | What the category agents did with `grounds` — the branch mix, the padding number and the unverified-quote rate — plus the two failures the grounding path kills a case with. Judge-free. |
+| `harness/coverage.py` | What each category agent was offered and how much of it its drafts cite, pooled over the sweep. Judge-free. |
+| `harness/stability.py` | Run-to-run stability: which references two or more finished sweeps agree on. Judge-free, and reads artifacts rather than re-running. |
 | `harness/calibration.py` | Judge-vs-human agreement over the labelled fixtures. |
 | `harness/provenance.py` | What each node execution actually ran on — tier, requested route, served build, fingerprint — written into the artifact and read back by a promotion. |
 | `harness/certify.py` | Promoting a winning configuration: rewrites `config/sampling.toml` and records its fingerprints as blessed. The certification check itself lives in the service (`stride_service.certification`), which this imports. |
@@ -114,6 +116,13 @@ python -m evals.harness.run promote artifact.json --yes    # re-pin and bless
 
 See [TUNING.md](TUNING.md#step-5--promote-the-winner).
 
+Also credential-free, over two or more finished sweeps of the same corpus —
+what one sweep cannot tell you is how much of its own number is sampling noise:
+
+```sh
+python -m evals.harness.run stability run-a.json run-b.json --out stability.json
+```
+
 A `run` fails (exits non-zero) **only** on a structural problem — a report that
 doesn't parse, references that don't resolve, a severity that contradicts the
 matrix, or a summary that disagrees with its own contents. Every quality metric
@@ -165,6 +174,28 @@ that nothing enforces mechanically:
   combination of fields no branch permits) and `fail-closed` (a threat on which
   no ground verified at all). Both remain structural failures, so a run that
   hits either still exits non-zero.
+
+**Coverage** is judge-free too, and is a rate over the whole sweep rather than a
+per-case number: it counts what deterministic code offered each lane —
+candidates, elements, boundary crossings, unknown controls — against how much of
+it the lane's drafts cite. Read it as *cited*, never as *considered*: an agent
+that examined a lead and correctly rejected it cites nothing. The `rules fired`
+column counts firings over evaluations — one rule against one case — and the
+unambiguous reading of it is zero: a lane whose rules fire nowhere in the corpus
+is reading a shape the corpus does not contain, or nothing at all.
+
+**Token usage and latency** are folded per node across the whole sweep and
+printed as two tables. They answer different questions about the same
+executions: the dearest node is not the slowest one, and the deterministic
+derivations cost no tokens while still costing the job its seconds.
+
+**Stability** needs two sweeps, so it is its own command rather than a metric of
+one run. It compares which *reference indices* each sweep matched — a corpus
+coordinate that means the same thing in every run, where a produced threat's ID
+and wording do not — and splits every reference into matched-in-every-run,
+matched-in-some, and matched-in-none. The middle bucket is the band a one-sweep
+recall number can move within while nothing has actually changed, which is what
+any comparison of two other numbers has to clear before it means anything.
 
 ## The corpus
 

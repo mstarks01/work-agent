@@ -1025,6 +1025,62 @@ def usage_by_node(nodes: Iterable[NodeRun]) -> dict[str, TokenUsage]:
     return totals
 
 
+class NodeLatency(BaseModel):
+    """What one node's executions cost in wall-clock, folded across a sweep.
+
+    The counterpart to :class:`TokenUsage`'s fold, and it differs in one way
+    that matters: **every** execution carries a ``duration_ms``, so a
+    deterministic FunctionNode appears here where it is absent from the usage
+    totals. That is the point — the deterministic derivations are the half of
+    the graph nobody bills for, and the only way to know they stay cheap is to
+    see them beside the nodes that do cost money.
+
+    ``slowest_ms`` is kept alongside the total because the mean is the wrong
+    number for the question latency is usually asked for: a retry budget and a
+    request timeout are both set from the tail, and a node whose mean is
+    comfortable can still be the one that trips them.
+    """
+
+    model_config = ConfigDict(extra="forbid")
+
+    executions: int = Field(ge=1)
+    total_ms: int = Field(ge=0)
+    slowest_ms: int = Field(ge=0)
+
+    @property
+    def mean_ms(self) -> float:
+        return self.total_ms / self.executions
+
+
+def latency_by_node(nodes: Iterable[NodeRun]) -> dict[str, NodeLatency]:
+    """Wall-clock per node name, folded across that node's executions.
+
+    Same fold as :func:`usage_by_node`, over the measurement the report keeps
+    and nothing downstream has ever read back: a sweep's node runs carry
+    ``duration_ms`` per execution, and without this the whole latency record
+    dies with the process that measured it.
+
+    A node absent from the result ran zero times in the sweep, which is a
+    different fact from running fast — hence ``executions`` on every row.
+    """
+    totals: dict[str, NodeLatency] = {}
+    for node in nodes:
+        running = totals.get(node.node)
+        if running is None:
+            totals[node.node] = NodeLatency(
+                executions=1,
+                total_ms=node.duration_ms,
+                slowest_ms=node.duration_ms,
+            )
+            continue
+        totals[node.node] = NodeLatency(
+            executions=running.executions + 1,
+            total_ms=running.total_ms + node.duration_ms,
+            slowest_ms=max(running.slowest_ms, node.duration_ms),
+        )
+    return totals
+
+
 class StrideReport(BaseModel):
     """The complete report payload the front-end retrieves for a finished job.
 

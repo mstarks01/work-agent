@@ -135,15 +135,19 @@ for i in 1 2 3 4 5; do
 done
 ```
 
-Then look at how each metric varies across the five runs. The **spread** is the
-point — it's your significance threshold for every later comparison. A quick way
-to eyeball must-find recall per case:
+Then measure how much the numbers move when nothing changed. The **spread** is
+the point — it's your significance threshold for every later comparison — and
+`stability` computes it from the artifacts, no credentials and no re-run:
 
 ```sh
-for f in baseline-*.json; do
-  jq -r '.scores[] | "\(.case_id)\t\(.recall)"' "$f"
-done | sort | column -t
+python -m evals.harness.run stability baseline-*.json --out baseline-spread.json
 ```
+
+Read two things off it. `worst_case_recall_spread` is the band any later
+comparison has to clear. `sometimes_matched` — references found in some runs and
+not others — is the same fact per reference, and it is the more useful one when
+a case's recall happens to land on the same number twice by finding different
+threats.
 
 If a metric's spread across the five runs is wider than any change you'd hope to
 see, that metric simply isn't sensitive enough to gate on — note it and rely on
@@ -222,6 +226,9 @@ Re-run the suite five times with your change and compare to the baseline band:
 
 - **Per-case must-find recall** — did any single case regress below its baseline
   spread? One case collapsing vetoes the change even if the average rises.
+- **Stability** — run `stability` over the five new artifacts too. A change that
+  lifts recall while widening the spread has bought an average with volatility,
+  and the next sweep may not reproduce it.
 - **Near/far delta** — did the gap widen? If so, you may have traded far-domain
   coverage for a better-looking average.
 - **Critic yield** — did `killed-real` (real findings the critic threw out) go
@@ -349,7 +356,9 @@ Not every metric stops the world. The gating is deliberately staged:
 | --- | --- | --- |
 | **Structural validity** (report parses, references resolve, severity matches the matrix, summary matches contents) | **Yes, always** | A malformed report is never a valid result. |
 | **Certification** (every fingerprint blessed) | Only under `--require-certified` | Surfaced on every run, so a configuration that has drifted is never trusted silently. |
-| **must-find recall, near/far delta, critic yield** | No — printed and recorded | These are findings to act on, not build breakers, until enough baselines exist to know what "normal" is. |
+| **must-find recall, near/far delta, critic yield, coverage** | No — printed and recorded | These are findings to act on, not build breakers, until enough baselines exist to know what "normal" is. |
+| **Token usage and latency** | No — printed and recorded | Cost and wall-clock per node. What they inform is a budget decision, not a correctness one. |
+| **Stability** | No — and it is not part of a run at all | It needs two finished sweeps, so it is its own command over their artifacts. |
 
 The shipped default remains `temperature = 0`. Tuning the per-tier values to
 something better is exactly the loop above — run it once you have live
