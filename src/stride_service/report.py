@@ -83,7 +83,18 @@ from stride_service.system_model import BoundaryCrossing, SystemModel
 # the fired rules retrieved for the agents. Additive and service-owned like the
 # rest of the block, and under the same rule — a document informed the
 # analysis, and no consumer may read one as support for a threat.
-SCHEMA_VERSION = "2.8"
+#
+# 2.9 adds ``unresolved_evidence``, a sixth optional list of service-owned
+# marks: evidence references a threat cited that its job's catalog did not
+# hold. Additive by the same rule as the four mark lists before it.
+#
+# What moved beside it is a *behaviour*, not a field. Such a reference used to
+# fail the whole job; it is now dropped and marked, and only a threat left with
+# no grounds at all still fails (#138). No existing field changes meaning or
+# spelling, so this stays minor — but a consumer that treated a returned report
+# as "every citation resolved" was relying on an absence rather than on a
+# field, and this list is where that guarantee now lives.
+SCHEMA_VERSION = "2.9"
 
 DEFAULT_DISCLAIMER = (
     "AI-generated threat model. Not reviewed by a human security analyst."
@@ -948,6 +959,40 @@ class UnresolvedMention(BaseModel):
     mention: str = Field(min_length=1, max_length=300)
 
 
+class UnresolvedEvidence(BaseModel):
+    """An evidence reference a threat cited that its job's catalog does not hold.
+
+    The catalog is closed and derived, so a reference outside it names no fact
+    and **no ground can be built from it** — which is what separates this from
+    :class:`UnverifiedGround`. An unverified quote is a real ground whose text
+    the service could not find; this is a ground that never existed. There is
+    nothing to render, so the entry is dropped and the mark records what was
+    asked for.
+
+    **Marked per reference, failed closed per threat**, exactly as an
+    unverified quote is. A threat citing three facts, one of them composed, is
+    still justified by the two that resolve; a threat whose evidence resolves to
+    nothing at all has no justification left and fails the job at
+    :func:`~stride_service.evidence.resolve_proposals`, because a finding with
+    no grounds is the one thing this schema does not permit.
+
+    This replaced a whole-job failure (#138). Agents compose well-formed
+    references — correct grammar, plausible element IDs, absent from the set —
+    and a live sweep lost 2 of 12 jobs that way. Discarding six lanes of
+    analysis because one threat named one fact that did not exist trades a
+    report for a citation error, which is the trade
+    :class:`UnresolvedMention` already refused to make.
+
+    Service-owned rather than a field on :class:`DraftThreat`, for the reason
+    every mark here is: an agent must not report on its own accuracy.
+    """
+
+    model_config = ConfigDict(extra="forbid")
+
+    threat_id: str = Field(pattern=r"^[STRIDE]-\d{2}$")
+    reference: str = Field(min_length=1, max_length=300)
+
+
 class MissingMitigation(BaseModel):
     """A threat offering no countermeasure, and no reason for offering none.
 
@@ -1210,6 +1255,7 @@ class StrideReport(BaseModel):
     # to the checker — see :func:`~stride_service.critic.join_drafts`.
     unverified_grounds: list[UnverifiedGround] = Field(default_factory=list)
     unresolved_mentions: list[UnresolvedMention] = Field(default_factory=list)
+    unresolved_evidence: list[UnresolvedEvidence] = Field(default_factory=list)
     missing_mitigations: list[MissingMitigation] = Field(default_factory=list)
     # Elements of different types sharing one name slug — a suspicion about the
     # model rather than a fault in it, which is why it rides here and not in

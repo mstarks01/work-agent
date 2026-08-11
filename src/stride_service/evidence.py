@@ -50,6 +50,7 @@ reported as itself, because the alternative — inferring which fact an agent
 from __future__ import annotations
 
 from collections.abc import Iterable, Mapping
+from typing import NamedTuple
 
 from stride_service.critic import DraftJoinError
 from stride_service.report import (
@@ -58,6 +59,7 @@ from stride_service.report import (
     Ground,
     StrideCategory,
     ThreatProposal,
+    UnresolvedEvidence,
 )
 from stride_service.system_model import UNKNOWN, SystemModel, attribute_names
 
@@ -73,13 +75,20 @@ CROSSING_PREFIX = "crossing"
 
 
 class EvidenceResolutionError(DraftJoinError):
-    """A proposal cites evidence this job's catalog does not contain.
+    """A proposal's evidence resolves to nothing at all, leaving it groundless.
+
+    Narrower than it was. A *single* reference the catalog does not contain is
+    dropped and marked (:class:`~stride_service.report.UnresolvedEvidence`), so
+    this no longer fires for a threat that cited one composed fact beside real
+    ones — that cost 2 of 12 jobs on a live sweep for citation errors (#138).
+    What still raises is a threat with **no grounds left**, which the schema
+    cannot represent and no critic could rule on.
 
     A :class:`~stride_service.critic.DraftJoinError` because it is one: a draft
-    naming a fact that does not exist is the same fault as a draft naming an
-    element that does not exist, discovered at the same seam, with the same
-    consequence. Callers that already handle the fan-in refusing a set of
-    drafts handle this without knowing it exists.
+    resting on nothing is the same fault as a draft naming an element that does
+    not exist, discovered at the same seam, with the same consequence. Callers
+    that already handle the fan-in refusing a set of drafts handle this without
+    knowing it exists.
     """
 
 
@@ -182,6 +191,19 @@ def _gloss(ground: Ground) -> str:
     return f"`{ground.attribute}` never stated"
 
 
+class Resolution(NamedTuple):
+    """One lane's drafts, and every reference of theirs that named nothing.
+
+    Two values because the second is no longer fatal on its own: a dropped
+    reference is recorded and the analysis continues, so the caller needs both
+    halves. Shaped like :class:`~stride_service.critic.JoinedDrafts` for the
+    same reason — the fan-in already carries marks beside drafts.
+    """
+
+    drafts: list[DraftThreat]
+    unresolved: list[UnresolvedEvidence]
+
+
 def _grounds_of(
     proposal: ThreatProposal, threat_id: str, catalog: Mapping[str, Ground]
 ) -> tuple[list[Ground], list[str]]:
@@ -196,6 +218,11 @@ def _grounds_of(
 
     A ref is stripped of surrounding whitespace before lookup — which spelling
     of a name arrived is mechanical — and matched exactly thereafter.
+
+    A reference that resolves to nothing is **dropped rather than raised on**.
+    Nothing can be built from it — the catalog is the only source of a ground's
+    branch and fields — so it leaves as a mark the caller records, and whether
+    the threat survives is decided by what is left, not by this function.
     """
     grounds = [
         Ground(kind="quote", text=quote.text, source_label=quote.source_label)
@@ -205,10 +232,7 @@ def _grounds_of(
     for ref in proposal.evidence_refs:
         ground = catalog.get(ref.strip())
         if ground is None:
-            unresolved.append(
-                f"threat {threat_id!r} cites evidence {ref!r}, which is not"
-                " in this job's evidence catalog"
-            )
+            unresolved.append(ref)
         else:
             grounds.append(ground)
     return grounds, unresolved
@@ -218,7 +242,7 @@ def resolve_proposals(
     proposals: Iterable[ThreatProposal],
     catalog: Mapping[str, Ground],
     category: StrideCategory,
-) -> list[DraftThreat]:
+) -> Resolution:
     """Turn one lane's proposals into drafts: resolve the evidence, stamp the lane.
 
     The catalog is the sole source of truth for evidence: a resolved ground is
@@ -234,18 +258,40 @@ def resolve_proposals(
     by an agent keeping three spellings in line. Everything else passes through
     untouched.
 
-    Every unresolvable reference across the whole batch is reported together,
-    rather than the first one aborting the pass. An agent that misread the
-    catalog usually misread it more than once, and a fan-in with no re-ask path
-    gets one chance to say what was wrong.
+    **A reference that names nothing costs its entry, not the job.** Agents
+    compose well-formed references to facts the catalog does not hold — correct
+    grammar, plausible element IDs — and failing the whole analysis over one
+    discards six lanes of work to punish a citation error (#138). So an
+    unresolvable reference is dropped and marked, and the threat stands on
+    whatever else it cited.
+
+    The line is *no grounds at all*. A threat whose every ground evaporates has
+    nothing supporting it, and a finding with empty ``grounds`` is the one
+    thing this schema refuses to represent — so that, and only that, still
+    raises. It is the same rule :func:`~stride_service.critic.join_drafts`
+    applies to unverified quotes: marked per entry, failed closed per threat.
+
+    Every such threat across the whole batch is reported together, rather than
+    the first one aborting the pass. An agent that misread the catalog usually
+    misread it more than once, and a fan-in with no re-ask path gets one chance
+    to say what was wrong.
     """
     drafts = []
-    issues: list[str] = []
+    marks: list[UnresolvedEvidence] = []
+    groundless: list[str] = []
     for proposal in proposals:
         threat_id = f"{CATEGORY_LETTERS[category]}-{proposal.sequence:02d}"
         grounds, unresolved = _grounds_of(proposal, threat_id, catalog)
-        issues += unresolved
-        if unresolved:
+        marks += [
+            UnresolvedEvidence(threat_id=threat_id, reference=ref[:300])
+            for ref in unresolved
+        ]
+        if not grounds:
+            groundless.append(
+                f"threat {threat_id!r} cites only evidence this job's catalog"
+                f" does not contain ({', '.join(repr(ref) for ref in unresolved)}),"
+                " so nothing is left to justify it"
+            )
             continue
         drafts.append(
             DraftThreat(
@@ -259,6 +305,6 @@ def resolve_proposals(
                 mitigations=proposal.mitigations,
             )
         )
-    if issues:
-        raise EvidenceResolutionError("; ".join(issues))
-    return drafts
+    if groundless:
+        raise EvidenceResolutionError("; ".join(groundless))
+    return Resolution(drafts, marks)

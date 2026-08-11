@@ -301,6 +301,7 @@ def _run_from_graph(
         rejected_threats=analysis.rejected_threats,
         unverified_grounds=analysis.unverified_grounds,
         unresolved_mentions=analysis.unresolved_mentions,
+        unresolved_evidence=analysis.unresolved_evidence,
         missing_mitigations=analysis.missing_mitigations,
         shared_element_names=analysis.shared_element_names,
         coverage=analysis.coverage,
