@@ -470,10 +470,12 @@ def test_no_non_markdown_files_under_prompts():
 #
 # What the envelope now also carries, and what this number does not: the
 # job-varying block grew by up to two domain packs (~1.4K at the
-# ``DOMAIN_PACK_TOKEN_CAP``) plus one lane's candidates and the evidence
-# catalog. Those are runtime values rather than prompt text, capped where they
-# are produced — this budget governs the static instruction only.
-COMPOSED_ANALYZE_TOKEN_BUDGET = 4800
+# ``DOMAIN_PACK_TOKEN_CAP``) plus one lane's candidates, the evidence catalog,
+# and — for a lane whose rules fired — up to two retrieved notes and one case
+# (~1.1K at their own caps). Those are runtime values rather than prompt text,
+# capped where they are produced; this budget governs the static instruction
+# only, and it moved by 100 with the body cap it has to accommodate.
+COMPOSED_ANALYZE_TOKEN_BUDGET = 4900
 
 
 @pytest.mark.parametrize("category", STRIDE_CATEGORIES)

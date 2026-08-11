@@ -57,8 +57,12 @@ RUNTIME_PLACEHOLDERS = frozenset(
         graph.STATE_UNRECONCILED_DRAFTS,
         graph.STATE_DOMAIN_SKILLS,
         # One per lane: ``{candidates}`` in the prompt file is resolved to this
-        # agent's own key at build time.
+        # agent's own key at build time. The retrieved corpus resolves the same
+        # way and for the same reason: six lanes, one session state, and
+        # material selected per lane by the rules that fired there.
         *(graph.candidates_state_key(category) for category in STRIDE_CATEGORIES),
+        *(graph.notes_state_key(category) for category in STRIDE_CATEGORIES),
+        *(graph.cases_state_key(category) for category in STRIDE_CATEGORIES),
     }
 )
 
@@ -108,6 +112,11 @@ def prompt_loader() -> MarkdownLoader:
     return MarkdownLoader(PROJECT_ROOT / "prompts")
 
 
+@pytest.fixture
+def knowledge_loader() -> MarkdownLoader:
+    return MarkdownLoader(PROJECT_ROOT / "knowledge")
+
+
 def _route_resolver(tiers):
     """Bind nodes to their tier's route string, standing in for the adapter.
 
@@ -119,12 +128,17 @@ def _route_resolver(tiers):
 
 
 @pytest.fixture
-def pipeline(skill_loader: MarkdownLoader, prompt_loader: MarkdownLoader):
+def pipeline(
+    skill_loader: MarkdownLoader,
+    prompt_loader: MarkdownLoader,
+    knowledge_loader: MarkdownLoader,
+):
     tiers = repo_tiers()
     sampling = load_sampling(PROJECT_ROOT / "config" / "sampling.toml", env={})
     return graph.build_pipeline(
         skill_loader=skill_loader,
         prompt_loader=prompt_loader,
+        knowledge_loader=knowledge_loader,
         binding=NodeBinding.from_configs(tiers, sampling, _route_resolver(tiers)),
     )
 
@@ -197,12 +211,15 @@ thinking = "high"
 """
 
 
-def _pipeline_with_sampling(skill_loader, prompt_loader, sampling_path, resilience):
+def _pipeline_with_sampling(
+    skill_loader, prompt_loader, knowledge_loader, sampling_path, resilience
+):
     tiers = repo_tiers()
     sampling = load_sampling(sampling_path, env={})
     return graph.build_pipeline(
         skill_loader=skill_loader,
         prompt_loader=prompt_loader,
+        knowledge_loader=knowledge_loader,
         binding=NodeBinding.from_configs(
             tiers, sampling, _route_resolver(tiers), resilience
         ),
@@ -210,7 +227,7 @@ def _pipeline_with_sampling(skill_loader, prompt_loader, sampling_path, resilien
 
 
 def test_each_llm_node_binds_its_own_tier_sampling(
-    skill_loader, prompt_loader, tmp_path
+    skill_loader, prompt_loader, knowledge_loader, tmp_path
 ):
     """Sampling is resolved per node, not shared graph-wide.
 
@@ -222,7 +239,9 @@ def test_each_llm_node_binds_its_own_tier_sampling(
     sampling_path.write_text(_DIVERGENT_SAMPLING, encoding="utf-8")
     resilience = load_resilience(PROJECT_ROOT / "config" / "resilience.toml", env={})
     nodes = nodes_by_name(
-        _pipeline_with_sampling(skill_loader, prompt_loader, sampling_path, resilience)
+        _pipeline_with_sampling(
+            skill_loader, prompt_loader, knowledge_loader, sampling_path, resilience
+        )
     )
 
     base_nodes = (graph.EXTRACT_NODE, graph.REPAIR_NODE)
@@ -244,7 +263,7 @@ def test_each_llm_node_binds_its_own_tier_sampling(
 
 
 def test_seed_and_reasoning_stay_off_the_node_config(
-    skill_loader, prompt_loader, tmp_path
+    skill_loader, prompt_loader, knowledge_loader, tmp_path
 ):
     """They ride the tier's adapter constructor instead.
 
@@ -255,7 +274,9 @@ def test_seed_and_reasoning_stay_off_the_node_config(
     sampling_path = tmp_path / "sampling.toml"
     sampling_path.write_text(_DIVERGENT_SAMPLING, encoding="utf-8")
     nodes = nodes_by_name(
-        _pipeline_with_sampling(skill_loader, prompt_loader, sampling_path, None)
+        _pipeline_with_sampling(
+            skill_loader, prompt_loader, knowledge_loader, sampling_path, None
+        )
     )
     config = nodes[graph.EXTRACT_NODE].generate_content_config
     assert config.seed is None
@@ -263,7 +284,7 @@ def test_seed_and_reasoning_stay_off_the_node_config(
 
 
 def test_per_node_sampling_composes_with_the_resilience_timeout(
-    skill_loader, prompt_loader, tmp_path
+    skill_loader, prompt_loader, knowledge_loader, tmp_path
 ):
     """The node's tier sampling and the resilience timeout ride the one config.
 
@@ -274,7 +295,9 @@ def test_per_node_sampling_composes_with_the_resilience_timeout(
     sampling_path.write_text(_DIVERGENT_SAMPLING, encoding="utf-8")
     resilience = load_resilience(PROJECT_ROOT / "config" / "resilience.toml", env={})
     nodes = nodes_by_name(
-        _pipeline_with_sampling(skill_loader, prompt_loader, sampling_path, resilience)
+        _pipeline_with_sampling(
+            skill_loader, prompt_loader, knowledge_loader, sampling_path, resilience
+        )
     )
 
     extract = nodes[graph.EXTRACT_NODE].generate_content_config
@@ -283,13 +306,15 @@ def test_per_node_sampling_composes_with_the_resilience_timeout(
 
 
 def test_llm_nodes_carry_no_http_options_without_resilience(
-    skill_loader, prompt_loader, tmp_path
+    skill_loader, prompt_loader, knowledge_loader, tmp_path
 ):
     """Resilience is optional (offline stand-ins); its absence leaves no timeout."""
     sampling_path = tmp_path / "sampling.toml"
     sampling_path.write_text(_DIVERGENT_SAMPLING, encoding="utf-8")
     nodes = nodes_by_name(
-        _pipeline_with_sampling(skill_loader, prompt_loader, sampling_path, None)
+        _pipeline_with_sampling(
+            skill_loader, prompt_loader, knowledge_loader, sampling_path, None
+        )
     )
     assert nodes[graph.CRITIC_NODE].generate_content_config.http_options is None
 
@@ -545,10 +570,12 @@ def test_validate_names_a_silent_extraction_rather_than_binding_against_it():
     assert graph.STATE_VALID_MODEL not in ctx.state
 
 
-def test_prepare_derives_crossings_rather_than_trusting_them(skill_loader):
+def test_prepare_derives_crossings_rather_than_trusting_them(
+    skill_loader, knowledge_loader
+):
     ctx = FakeContext()
     output = graph.prepare_analysis(
-        valid_model().model_dump(mode="json"), ctx, skill_loader
+        valid_model().model_dump(mode="json"), ctx, skill_loader, knowledge_loader
     )
 
     assert output["element_count"] == 7
@@ -558,7 +585,9 @@ def test_prepare_derives_crossings_rather_than_trusting_them(skill_loader):
     assert "process:web-app" in ctx.state[graph.STATE_SYSTEM_MODEL]
 
 
-def test_prepare_shows_the_agents_the_evidence_catalog_as_references(skill_loader):
+def test_prepare_shows_the_agents_the_evidence_catalog_as_references(
+    skill_loader, knowledge_loader
+):
     """The closed set an agent picks from, and no more than that.
 
     Rendered as bare IDs: the fields behind each one are the element and flow
@@ -566,14 +595,18 @@ def test_prepare_shows_the_agents_the_evidence_catalog_as_references(skill_loade
     would restate what the agent is already reading.
     """
     ctx = FakeContext()
-    graph.prepare_analysis(valid_model().model_dump(mode="json"), ctx, skill_loader)
+    graph.prepare_analysis(
+        valid_model().model_dump(mode="json"), ctx, skill_loader, knowledge_loader
+    )
 
     rendered = json.loads(ctx.state[graph.STATE_EVIDENCE_CATALOG])
     assert "crossing:flow:customer-to-web-app:login" in rendered
     assert all(isinstance(ref, str) for ref in rendered)
 
 
-def test_prepare_strips_the_source_fields_from_the_rendered_model(skill_loader):
+def test_prepare_strips_the_source_fields_from_the_rendered_model(
+    skill_loader, knowledge_loader
+):
     """The agents and the critic read the model; only ``{input_text}`` has quotes.
 
     Once the full source text is in the same request, an element's excerpt is a
@@ -586,7 +619,7 @@ def test_prepare_strips_the_source_fields_from_the_rendered_model(skill_loader):
     assert excerpt, "the fixture must carry an excerpt for this to prove anything"
     ctx = FakeContext()
 
-    graph.prepare_analysis(valid, ctx, skill_loader)
+    graph.prepare_analysis(valid, ctx, skill_loader, knowledge_loader)
 
     rendered = ctx.state[graph.STATE_SYSTEM_MODEL]
     assert excerpt not in rendered
@@ -911,10 +944,14 @@ def test_assemble_splits_rulings_and_builds_the_summary():
 # --- Deterministic candidates, domain packs, coverage -----------------------
 
 
-def test_prepare_parks_each_lanes_candidates_under_its_own_key(skill_loader):
+def test_prepare_parks_each_lanes_candidates_under_its_own_key(
+    skill_loader, knowledge_loader
+):
     """Six agents, one session state: a lane cannot read another's leads."""
     ctx = FakeContext()
-    graph.prepare_analysis(valid_model().model_dump(mode="json"), ctx, skill_loader)
+    graph.prepare_analysis(
+        valid_model().model_dump(mode="json"), ctx, skill_loader, knowledge_loader
+    )
 
     for category in STRIDE_CATEGORIES:
         parked = ctx.state[graph.candidates_state_key(category)]
@@ -923,19 +960,21 @@ def test_prepare_parks_each_lanes_candidates_under_its_own_key(skill_loader):
         assert not any(f'"category": "{other}"' in parked for other in others)
 
 
-def test_prepare_fences_candidate_facts(skill_loader):
+def test_prepare_fences_candidate_facts(skill_loader, knowledge_loader):
     """Facts carry caller words, so they get the model's own fencing."""
     ctx = FakeContext()
-    graph.prepare_analysis(valid_model().model_dump(mode="json"), ctx, skill_loader)
+    graph.prepare_analysis(
+        valid_model().model_dump(mode="json"), ctx, skill_loader, knowledge_loader
+    )
 
     parked = ctx.state[graph.candidates_state_key("information-disclosure")]
     assert parked.startswith("```")
 
 
-def test_prepare_selects_domain_packs_from_the_model(skill_loader):
+def test_prepare_selects_domain_packs_from_the_model(skill_loader, knowledge_loader):
     ctx = FakeContext()
     output = graph.prepare_analysis(
-        valid_model().model_dump(mode="json"), ctx, skill_loader
+        valid_model().model_dump(mode="json"), ctx, skill_loader, knowledge_loader
     )
 
     # The fixture runs FastAPI over HTTPS against Cloud SQL Postgres.
@@ -943,7 +982,9 @@ def test_prepare_selects_domain_packs_from_the_model(skill_loader):
     assert "# HTTP and API Security" in ctx.state[graph.STATE_DOMAIN_SKILLS]
 
 
-def test_prepare_renders_no_pack_block_when_none_is_earned(skill_loader):
+def test_prepare_renders_no_pack_block_when_none_is_earned(
+    skill_loader, knowledge_loader
+):
     model = valid_model()
     model.processes[0].technology = "a shell script"
     model.data_stores[0].technology = "a flat file"
@@ -952,7 +993,9 @@ def test_prepare_renders_no_pack_block_when_none_is_earned(skill_loader):
         flow.authentication = "a shared unix account"
     ctx = FakeContext()
 
-    graph.prepare_analysis(model.model_dump(mode="json"), ctx, skill_loader)
+    graph.prepare_analysis(
+        model.model_dump(mode="json"), ctx, skill_loader, knowledge_loader
+    )
 
     assert ctx.state[graph.STATE_DOMAIN_SKILLS] == ""
 
@@ -1023,7 +1066,9 @@ def test_assemble_fails_closed_when_the_critic_drops_a_draft():
 # --- Analysis context: what informed the run, never what proves a finding ----
 
 
-def test_prepare_records_the_packs_and_rules_the_agents_were_given(skill_loader):
+def test_prepare_records_the_packs_and_rules_the_agents_were_given(
+    skill_loader, knowledge_loader
+):
     """The record is written where the selection happens.
 
     Both halves are already computed here to build the prompt; recomputing them
@@ -1032,7 +1077,9 @@ def test_prepare_records_the_packs_and_rules_the_agents_were_given(skill_loader)
     derived-once-and-resolved-against-itself to avoid.
     """
     ctx = FakeContext()
-    graph.prepare_analysis(valid_model().model_dump(mode="json"), ctx, skill_loader)
+    graph.prepare_analysis(
+        valid_model().model_dump(mode="json"), ctx, skill_loader, knowledge_loader
+    )
 
     recorded = ctx.state[graph.STATE_ANALYSIS_CONTEXT]
 
@@ -1123,7 +1170,7 @@ class TestTheInstructionDigest:
         assert re.fullmatch(r"[0-9a-f]{64}", pipeline.instruction_sha256)
 
     def test_two_builds_of_the_same_configuration_agree(
-        self, pipeline, skill_loader, prompt_loader
+        self, pipeline, skill_loader, prompt_loader, knowledge_loader
     ):
         """The property a comparison across runs depends on.
 
@@ -1135,6 +1182,7 @@ class TestTheInstructionDigest:
         rebuilt = graph.build_pipeline(
             skill_loader=skill_loader,
             prompt_loader=prompt_loader,
+            knowledge_loader=knowledge_loader,
             binding=NodeBinding.from_configs(
                 tiers,
                 load_sampling(PROJECT_ROOT / "config" / "sampling.toml", env={}),
