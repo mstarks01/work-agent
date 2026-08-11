@@ -336,7 +336,45 @@ explicit non-goal.
 The suite behind it is `tests/test_conformance.py`, which runs in the offline
 lane on every pull request for all three vendors equally. It proves what each
 provider *would be asked for*. It is not evidence that any vendor has served a
-request; that needs the live lanes, and they are unprovisioned.
+request; that is the smoke below.
+
+### Checking that a provider actually serves the graph
+
+The matrix costs nothing and proves nothing about a live provider. This does the
+opposite — it needs credentials, and it is the only thing here that shows a
+vendor answering:
+
+```sh
+uv run python -m stride_service.smoke
+```
+
+One small system, once, through the shipped graph, on whichever pair your tiers
+select. Roughly eight model calls on a ~600-character input, which is what makes
+it cheap enough to run on every pull request rather than before a release. It
+reports eight answers:
+
+| | |
+| --- | --- |
+| model binding | each node reached the provider its tier selects |
+| structured extraction | a model came back and cleared the validity gate |
+| analyst structured output | all six category lanes parsed |
+| critic structured output | the ruling parsed and reached the report |
+| sampling parameter validation | the provider accepted this tier's params |
+| served-model capture | what actually answered, where the provider said |
+| execution fingerprint generation | the Generation Identity that implies |
+| provenance generation | the record is complete and recomputes from itself |
+
+Cells read `passed`, `failed` or `unknown`, and `unknown` means the *provider*
+left the question unanswered — a response carrying no served build has no
+identity to hash. That does not fail the run: the application did the right
+thing with what it was given. A failure is the application's, never the model's;
+nothing here scores threat-model quality, which is `evals/`'s job and is expected
+to differ between vendors.
+
+In CI this is `.github/workflows/provider-smoke.yml`, one lane per vendor on the
+same trigger. A lane whose credentials are absent reports itself **unexercised**
+in its job summary rather than passing quietly, so a green check list never
+implies a provider was tried.
 
 ### Resilience
 

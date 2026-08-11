@@ -15,6 +15,7 @@ from stride_service.report import (
     build_summary,
     derive_severity_level,
 )
+from stride_service.sampling import TierSampling, sampling_fingerprint
 from tests.factories import sample_report, sample_threat, valid_model
 
 
@@ -362,6 +363,69 @@ class TestSummary:
         assert summary.needs_info_count == 1
         assert summary.rejected_count == 1
         assert summary.elements_analyzed == len(model.elements())
+
+
+class TestTheSamplingClearBlock:
+    """The block records a resolved ``TierSampling``, so it has to be able to."""
+
+    def fully_set(self) -> TierSampling:
+        """Every param set, and none of them at its default.
+
+        The shipped file leaves most of them unset, so a fixture built from it
+        would exercise whichever types this repository happens to ship today —
+        which is how a param's type reaches the report untested.
+        """
+        return TierSampling(
+            temperature=0.2,
+            top_p=0.9,
+            seed=7,
+            max_output_tokens=1024,
+            candidate_count=1,
+            presence_penalty=0.1,
+            frequency_penalty=0.1,
+            thinking="low",
+            constrain_output=False,
+        )
+
+    def test_every_resolved_param_survives_a_round_trip_through_the_report(self):
+        """The drift guard, and it is about a failure that costs a whole run.
+
+        ``report.py`` cannot import ``sampling`` — that import cycles back
+        through skills — so the block's value types are written out by hand and
+        nothing but this ties them to the model they record. A param whose type
+        the block cannot carry does not fail at config load or at the
+        build-time gate: it fails at assembly, after every node has been paid
+        for. ``thinking`` did exactly that.
+        """
+        resolved = self.fully_set()
+        report = sample_report().model_copy(update={"sampling": {"base": {}}})
+
+        stored = StrideReport.model_validate(
+            {**report.model_dump(), "sampling": {"base": resolved.model_dump()}}
+        ).sampling["base"]
+
+        assert TierSampling(**stored) == resolved
+
+    def test_the_stored_block_recomputes_the_same_fingerprint(self):
+        """Round-tripping is the requirement; the fingerprint is why.
+
+        A value stored in a type that merely *validates* — a bool flattened to
+        a number, an enum to something else — would round-trip through
+        ``TierSampling`` and still hash differently, leaving every fingerprint
+        in the report unverifiable by the reader it was recorded for.
+        """
+        resolved = self.fully_set()
+        stored = StrideReport.model_validate(
+            {
+                **sample_report().model_dump(),
+                "sampling": {"base": resolved.model_dump()},
+            }
+        ).sampling["base"]
+
+        served = "openai/gpt-4.1-mini-2025-04-14"
+        assert sampling_fingerprint(served, TierSampling(**stored)) == (
+            sampling_fingerprint(served, resolved)
+        )
 
 
 class TestSerialization:
