@@ -520,6 +520,7 @@ def scripted_pipeline(
     pipeline = build_pipeline(
         skill_loader=MarkdownLoader(PROJECT_ROOT / "skills"),
         prompt_loader=MarkdownLoader(PROJECT_ROOT / "prompts"),
+        knowledge_loader=MarkdownLoader(PROJECT_ROOT / "knowledge"),
         binding=NodeBinding.from_configs(tiers, sampling, resolve),
         entry=entry,
     )
