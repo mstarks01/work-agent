@@ -125,7 +125,14 @@ EXEMPLARS_PREFIX = "exemplars/"
 # difference between a job returning and a job dying. Cheaper phrasings were
 # tried first — the row gloss deliberately does not repeat the element ID
 # standing in the left column beside it.
-ANALYZE_PROMPT_TOKEN_CAP = 3850
+#
+# 3850 -> 3900 is the scope line: ~44 tokens saying what the denominators are
+# and, at greater length, that they are not a quota. The numbers themselves are
+# job-varying and cost nothing here. The disclaimer is most of the spend and is
+# the part that had to be written — an agent handed "17 elements" with no
+# framing has been given a target, and inflating a lane's draft count is a worse
+# failure than the undercounting the line exists to fix.
+ANALYZE_PROMPT_TOKEN_CAP = 3900
 EXEMPLAR_TOKEN_CAP = 1500
 CRITIC_PROMPT_TOKEN_CAP = 1500
 # The re-ask has to be able to name and fix every fault `review_issues` can

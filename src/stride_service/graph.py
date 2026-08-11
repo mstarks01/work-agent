@@ -93,7 +93,7 @@ from google.adk.workflow import START, FunctionNode, JoinNode, Workflow
 from google.genai import types
 
 from stride_service.candidates import generate_candidates
-from stride_service.coverage import build_coverage
+from stride_service.coverage import build_coverage, lane_scope
 from stride_service.critic import (
     assemble_threats,
     join_drafts,
@@ -321,6 +321,15 @@ def notes_state_key(category: StrideCategory) -> str:
 def cases_state_key(category: StrideCategory) -> str:
     """Where ``prepare`` parks one lane's retrieved worked cases."""
     return f"cases_{category.replace('-', '_')}"
+
+
+def scope_state_key(category: StrideCategory) -> str:
+    """Where ``prepare`` parks one lane's denominators.
+
+    Per lane like the candidates key, and for the same reason: six agents share
+    one session state, and the rule counts differ per category anyway.
+    """
+    return f"scope_{category.replace('-', '_')}"
 
 
 def candidates_state_key(category: StrideCategory) -> str:
@@ -732,6 +741,9 @@ def prepare_analysis(
     for category, candidate_set in candidates.items():
         ctx.state[candidates_state_key(category)] = render_fenced(
             candidate_set.model_dump(mode="json")
+        )
+        ctx.state[scope_state_key(category)] = lane_scope(
+            category, model, candidate_set
         )
         # Retrieval is by *fired* rule, so a lane that triggered nothing gets
         # nothing: the material follows the leads rather than the category.
@@ -1208,6 +1220,7 @@ def analyze_instruction(
     resolved = (
         prompt.replace("{category}", category)
         .replace("{candidates}", f"{{{candidates_state_key(category)}}}")
+        .replace("{scope}", f"{{{scope_state_key(category)}}}")
         .replace("{reference_notes}", f"{{{notes_state_key(category)}}}")
         .replace("{prior_cases}", f"{{{cases_state_key(category)}}}")
     )

@@ -63,6 +63,7 @@ RUNTIME_PLACEHOLDERS = frozenset(
         *(graph.candidates_state_key(category) for category in STRIDE_CATEGORIES),
         *(graph.notes_state_key(category) for category in STRIDE_CATEGORIES),
         *(graph.cases_state_key(category) for category in STRIDE_CATEGORIES),
+        *(graph.scope_state_key(category) for category in STRIDE_CATEGORIES),
     }
 )
 
@@ -963,6 +964,24 @@ def test_prepare_parks_each_lanes_candidates_under_its_own_key(
         assert f'"category": "{category}"' in parked
         others = set(STRIDE_CATEGORIES) - {category}
         assert not any(f'"category": "{other}"' in parked for other in others)
+
+
+def test_prepare_gives_each_lane_its_own_denominators(skill_loader, knowledge_loader):
+    """The scope line is per lane because the rule counts are.
+
+    Elements and crossings are properties of the model and identical across the
+    six, but which rules ran and how many fired is not — and a lane reading
+    another's firing count would be told it had leads it never got.
+    """
+    ctx = FakeContext()
+    graph.prepare_analysis(
+        valid_model().model_dump(mode="json"), ctx, skill_loader, knowledge_loader
+    )
+
+    for category in STRIDE_CATEGORIES:
+        parked = ctx.state[graph.scope_state_key(category)]
+        assert f"{category} rules ran" in parked
+        assert "7 elements" in parked
 
 
 def test_prepare_fences_candidate_facts(skill_loader, knowledge_loader):
