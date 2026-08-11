@@ -23,7 +23,7 @@ and the fields below are the authoritative account.
 
 ```python
 class StrideReport:
-    schema_version: str          # "2.6"
+    schema_version: str          # "2.7"
     disclaimer: str              # AI-generated, not human-reviewed
     job: Job                     # id, status="completed", timestamps, revise_rounds
     input: InputRef              # system_name + one ref per submitted source
@@ -38,6 +38,7 @@ class StrideReport:
     missing_mitigations: list[MissingMitigation]  # threats offering no countermeasure, unexcused
     shared_element_names: list[SharedElementName]  # different-typed elements sharing one name slug
     coverage: list[CategoryCoverage]             # per-lane account of what each agent was offered
+    analysis_context: AnalysisContext | None     # what informed the analysis (never what proves it)
     summary: Summary
 ```
 
@@ -299,6 +300,40 @@ Counted over the **drafts**, not the ruled threats: coverage is a fact about
 what the six agents did with the system, and a draft the critic later rejects
 was still part of the system being examined.
 
+## `analysis_context` — what informed the run
+
+```python
+class AnalysisContext:
+    instruction_sha256: str   # digest of every LLM node's composed instruction
+    domain_packs: list[str]   # the reference packs this model earned, in selection order
+    fired_rules: list[str]    # the deterministic rules that matched, sorted
+```
+
+The report records what each node *ran on* (`nodes`, `sampling`) and what each
+finding *rests on* (`grounds`). This is the third thing: what the service put in
+front of the agents.
+
+- **`instruction_sha256`** digests every LLM node's composed instruction with the
+  `{placeholders}` still unexpanded, so it identifies the repo-authored text —
+  prompts, category skills, the shared rubric — and carries no submitted bytes.
+  The submission's own digest is `input.source_sha256` and stays separate. A
+  generation-identity fingerprint says nothing about the instructions, so
+  without this two runs with identical fingerprints and completely different
+  prompts are indistinguishable.
+- **`domain_packs`** are selected per job from the model's own technology fields,
+  so the same deployment gives two submissions different reference material.
+- **`fired_rules`** names the deterministic triggers that matched, where
+  `coverage` counts them.
+
+**None of it is evidence, and the separation is the point.** A pack named here
+did not ground anything and a rule named here did not find anything; what
+supports a finding is its `grounds`, unchanged. Reference material informs
+reasoning and is citable by nothing — a reader treating an entry here as support
+for a threat has it exactly backwards.
+
+`null` on a report from a runner that composes no analysis, which is the same
+absence an empty `coverage` records.
+
 ## What is checked but never reported
 
 Threat IDs are asked to run `01..N` within each category. A lane that emits
@@ -448,6 +483,12 @@ class TokenUsage:
 > report carrying a string here could never be produced. The first entry in this
 > list that is a fix rather than an addition: a deployment that set `thinking`
 > ran its whole graph and then failed to assemble a report.
+
+> **`schema_version` 2.7** added `analysis_context`: the instruction digest, the
+> domain packs the job's model earned, and the deterministic rules that fired.
+> Optional, service-owned and computed in code — additive on the same argument
+> as the four lists before it, and the first block describing what *informed*
+> the analysis rather than what it found.
 
 The report records both model fields and **compares neither**. It doesn't need
 to: if the build moves, the fingerprint moves with it, and the run stops

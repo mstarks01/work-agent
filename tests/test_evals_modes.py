@@ -319,6 +319,23 @@ def test_an_eval_reports_fingerprints_recompute_from_its_own_clear_block(case):
     }
 
 
+def test_an_eval_report_records_the_same_analysis_context_a_job_does(case):
+    """One record, two drivers.
+
+    A sweep's report is the artifact a promotion and a comparison read, so a
+    block only the service stamped would leave every eval number unattributable
+    to the packs and rules the run was actually given. ``Analysis.context`` is
+    the single composer for exactly that reason.
+    """
+    pipeline = build(case, ENTRY_EXTRACT, {})
+
+    report = asyncio.run(modes.run_end_to_end(case, pipeline)).report
+    context = report.analysis_context
+
+    assert context.instruction_sha256 == pipeline.instruction_sha256
+    assert context.fired_rules == sorted(set(context.fired_rules))
+
+
 def test_extraction_mode_observes_its_one_node(case):
     """The mode produces no report, and its ``extract`` identity counts anyway."""
     pipeline = build(case, ENTRY_EXTRACT_ONLY, {})
