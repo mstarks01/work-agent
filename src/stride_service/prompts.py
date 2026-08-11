@@ -110,7 +110,22 @@ EXEMPLARS_PREFIX = "exemplars/"
 # instruction to reject until something says it is somebody else's reasoning.
 # Both are the failure this prompt spends most of its length preventing, so the
 # blocks arrive with the same treatment candidates got.
-ANALYZE_PROMPT_TOKEN_CAP = 3550
+#
+# 3550 -> 3850 IS THE EVIDENCE CATALOG BECOMING A TABLE (#138). A live sweep put
+# 2 of 12 jobs on the floor because agents composed well-formed evidence
+# references to facts the catalog did not hold — correct grammar, plausible
+# element IDs, absent from the set — and a bad reference fails its whole job.
+# Rendered as a JSON array of ID strings the catalog read as a specimen of the
+# format; the two exemplar catalogs move to the table shape agents now receive,
+# which is most of the raise, and the rest is the paragraph in `## Input`
+# telling them to select rather than compose and what an *absent* row means.
+#
+# This is the most expensive block-shape change in the file and the easiest to
+# justify: every other line here improves a finding, and this one is the
+# difference between a job returning and a job dying. Cheaper phrasings were
+# tried first — the row gloss deliberately does not repeat the element ID
+# standing in the left column beside it.
+ANALYZE_PROMPT_TOKEN_CAP = 3850
 EXEMPLAR_TOKEN_CAP = 1500
 CRITIC_PROMPT_TOKEN_CAP = 1500
 # The re-ask has to be able to name and fix every fault `review_issues` can
