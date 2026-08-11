@@ -259,6 +259,16 @@
     if (!MENTIONS.has(m.threat_id)) MENTIONS.set(m.threat_id, []);
     MENTIONS.get(m.threat_id).push(m.mention);
   });
+  // Every evidence reference a threat cited that its job's catalog did not
+  // hold, gathered under the threat that cited it. Unlike an unverified quote
+  // there is nothing to render in the grounds list — no ground was ever built
+  // from these — so the note is the only trace a reader gets that the agent
+  // reached for a fact that does not exist.
+  const UNRESOLVED_EVIDENCE = new Map();
+  (R.unresolved_evidence || []).forEach(m => {
+    if (!UNRESOLVED_EVIDENCE.has(m.threat_id)) UNRESOLVED_EVIDENCE.set(m.threat_id, []);
+    UNRESOLVED_EVIDENCE.get(m.threat_id).push(m.reference);
+  });
   // Threats offering no countermeasure and carrying no unknown that would
   // excuse offering none. The excused ones are not in this set and get no
   // note — their unknown-attribute ground already says why the list is empty.
@@ -374,6 +384,17 @@
       const note = el("div", "caveat");
       note.append("⚠ Cited above but not in the system model: ");
       mentions.forEach((m, i) => { if (i) note.append(", "); note.append(code(m)); });
+      card.append(note);
+    }
+
+    // Beside it, and deliberately worded as a citation failure rather than a
+    // doubt about the finding: the grounds shown below are the ones that did
+    // resolve, and they are why this threat is still here.
+    const composed = UNRESOLVED_EVIDENCE.get(t.id);
+    if (composed && composed.length) {
+      const note = el("div", "caveat");
+      note.append("⚠ Cited evidence not in this job's catalog, and dropped: ");
+      composed.forEach((r, i) => { if (i) note.append(", "); note.append(code(r)); });
       card.append(note);
     }
 

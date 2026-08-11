@@ -65,6 +65,12 @@ counted separately by the eval sweep (`unresolved-evidence`), because the number
 worth watching after this change is exactly how often an agent composes an ID
 instead of copying one.
 
+> **Amended by [ADR 0009](0009-a-bad-reference-costs-its-entry.md).** That number
+> was watched, and it was 2 of 12 jobs. A single unresolvable reference is now
+> dropped and marked rather than fatal; only a threat left with no grounds at
+> all still raises `EvidenceResolutionError`. The closed set and the resolution
+> seam below are unchanged.
+
 **No repair, and no fuzzy matching.** An unresolvable reference is reported as
 itself. Inferring which fact an agent *meant* — reading a `derived-fact`
 carrying an `attribute` as an intended `unknown-attribute`, say — is mechanical
