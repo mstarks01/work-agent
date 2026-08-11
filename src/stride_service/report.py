@@ -60,7 +60,18 @@ from stride_service.system_model import BoundaryCrossing, SystemModel
 # rule holds a fifth time. Minor rather than major although it is the first
 # mark about the *model* rather than the threats: what a consumer must do with
 # an unknown field does not depend on what the field describes.
-SCHEMA_VERSION = "2.5"
+#
+# 2.6 widens the *values* the ``sampling`` clear block can carry to every type
+# a resolved sampling param holds — which now includes the reasoning effort's
+# enum string. No field is added, removed or renamed. It is the first entry
+# here that is a fix rather than an addition: the block was typed to numbers
+# only, so a deployment that set ``thinking`` — an offered, documented,
+# build-gated param — produced reports that could not be assembled at all, and
+# failed at the end of a paid-for run rather than at startup. No report with
+# such a value has ever existed, so nothing a 2.5 consumer already parses
+# changes meaning; what changes is that a value it never could have seen is now
+# reachable, and a consumer reading the block as numbers must widen with it.
+SCHEMA_VERSION = "2.6"
 
 DEFAULT_DISCLAIMER = (
     "AI-generated threat model. Not reviewed by a human security analyst."
@@ -82,6 +93,22 @@ STRIDE_CATEGORIES: tuple[StrideCategory, ...] = get_args(StrideCategory)
 Rating = Literal["low", "medium", "high"]
 SeverityLevel = Literal["low", "medium", "high", "critical"]
 VerdictStatus = Literal["confirmed", "needs-info", "rejected"]
+
+# One value in a report's per-tier sampling clear block. Wide on purpose: it is
+# every scalar type a resolved sampling param can hold, and the block is a
+# *record* of what a run resolved rather than a place a value is decided. The
+# enumeration is `TierSampling`'s field types — number, count, flag, and the
+# reasoning effort's enum string — and `tests/test_report.py` pins the two in
+# step, because a param whose type this cannot carry does not fail at load
+# time: it fails when the report is assembled, after the whole graph has been
+# paid for.
+#
+# Nothing is validated by being narrow here. The values arrive from a
+# `TierSampling` that already validated them — range, enum and reserved-param
+# rules all live there — and this module cannot import it without cycling
+# through skills. Narrowing this union would not add a check; it would only
+# decide which correctly-configured deployments can produce a report.
+SamplingValue = bool | int | float | str | None
 
 # What a finding can cite in its own support. Spelled out rather than terse
 # (``unknown`` / ``derived``) because a bare ``unknown`` collides: it is already
@@ -1108,7 +1135,7 @@ class StrideReport(BaseModel):
     # the stub runner's. An eval report carries this block like any other: a
     # sweep's fingerprints are evidence, and evidence nobody can recompute from
     # the artifact is an assertion.
-    sampling: dict[str, dict[str, float | int | None]] = Field(default_factory=dict)
+    sampling: dict[str, dict[str, SamplingValue]] = Field(default_factory=dict)
     system_model: SystemModel
     boundary_crossings: list[BoundaryCrossing]
     threats: list[Threat]  # confirmed + needs-info, severity-ordered
