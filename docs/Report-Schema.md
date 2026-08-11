@@ -23,7 +23,7 @@ and the fields below are the authoritative account.
 
 ```python
 class StrideReport:
-    schema_version: str          # "2.7"
+    schema_version: str          # "2.8"
     disclaimer: str              # AI-generated, not human-reviewed
     job: Job                     # id, status="completed", timestamps, revise_rounds
     input: InputRef              # system_name + one ref per submitted source
@@ -307,6 +307,7 @@ class AnalysisContext:
     instruction_sha256: str   # digest of every LLM node's composed instruction
     domain_packs: list[str]   # the reference packs this model earned, in selection order
     fired_rules: list[str]    # the deterministic rules that matched, sorted
+    knowledge_docs: list[str] # local-corpus documents those rules retrieved
 ```
 
 The report records what each node *ran on* (`nodes`, `sampling`) and what each
@@ -324,6 +325,11 @@ front of the agents.
   so the same deployment gives two submissions different reference material.
 - **`fired_rules`** names the deterministic triggers that matched, where
   `coverage` counts them.
+- **`knowledge_docs`** names what those rules retrieved from the local corpus —
+  `notes/<id>` for reference material, `cases/<id>` for a worked judgement,
+  unioned across the six lanes. Retrieval is local and deterministic, so this
+  list plus the checkout reproduces exactly the text the agents were shown. See
+  [ADR 0008](adr/0008-retrieval-by-fired-rule.md).
 
 **None of it is evidence, and the separation is the point.** A pack named here
 did not ground anything and a rule named here did not find anything; what
@@ -489,6 +495,11 @@ class TokenUsage:
 > Optional, service-owned and computed in code — additive on the same argument
 > as the four lists before it, and the first block describing what *informed*
 > the analysis rather than what it found.
+
+> **`schema_version` 2.8** added `knowledge_docs` to that block: the local-corpus
+> notes and cases the fired rules retrieved for the agents. Additive and
+> service-owned like the rest of it, and under the same rule — a document
+> informed the analysis and grounds nothing.
 
 The report records both model fields and **compares neither**. It doesn't need
 to: if the build moves, the fingerprint moves with it, and the run stops
