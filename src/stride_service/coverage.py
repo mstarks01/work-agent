@@ -40,7 +40,38 @@ from stride_service.report import (
 )
 from stride_service.system_model import SystemModel
 
-__all__ = ["build_coverage", "cited_element_ids"]
+__all__ = ["build_coverage", "cited_element_ids", "lane_scope"]
+
+
+def lane_scope(
+    category: StrideCategory, model: SystemModel, candidate_set: CandidateSet | None
+) -> str:
+    """One lane's denominators, as a line the agent reads before it starts.
+
+    The same numbers :func:`build_coverage` records afterwards, and derived
+    from the same three calls — which is the whole reason this lives here
+    rather than in the graph. A second derivation could disagree with the one
+    the report publishes, and then "17 elements" in the instruction and "17
+    elements" in the coverage row would be two claims rather than one fact.
+
+    Only the denominators. The ``*_cited`` halves need drafts that do not exist
+    yet, and an agent cannot be told what it is about to cite.
+
+    **What this is for**, and it is not a quota: a lane that files nothing
+    should be able to mean *examined and cleared* rather than *never looked*,
+    and an agent cannot say that about a system whose size it was never told.
+    An agent that files a threat per element to make a number go up has
+    misread it, which is why the prompt spends a sentence saying so.
+    """
+    offered = candidate_set.candidates if candidate_set else ()
+    fired = len({candidate.rule_id for candidate in offered})
+    return (
+        f"Scope for your lane: {len(model.elements())} elements, "
+        f"{len(model.boundary_crossings())} boundary crossings, "
+        f"{len(unknown_controls(model))} unstated controls. "
+        f"{len(rules_for(category))} {category} rules ran; {fired} fired, "
+        f"raising {len(offered)} candidates.\n"
+    )
 
 
 def cited_element_ids(drafts: Iterable[DraftThreat]) -> frozenset[str]:

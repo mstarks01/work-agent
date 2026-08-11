@@ -487,7 +487,7 @@ def test_no_non_markdown_files_under_prompts():
 # entry. It is job-varying so it does not land in this number, but it is not
 # free: a large model pays it per lane, which is the trade for jobs that no
 # longer die on a composed reference.
-COMPOSED_ANALYZE_TOKEN_BUDGET = 5200
+COMPOSED_ANALYZE_TOKEN_BUDGET = 5300
 
 
 @pytest.mark.parametrize("category", STRIDE_CATEGORIES)

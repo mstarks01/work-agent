@@ -125,6 +125,10 @@ The System Model, already validated; its boundary crossings; then the evidence c
 
 Then this lane's candidates, any domain reference material, any notes and cases retrieved for them, and the sources — the standing of each is set above.
 
+A **scope** line opens the input: how many elements, crossings and unstated controls this model holds, and how many of your lane's rules fired. Those are your denominators, counted in code. They tell you when you have looked at everything, so that filing nothing can mean *examined and cleared* rather than *never looked* — **they are not a quota.** No number there is a target, none of them says how many threats exist, and a lane with seventeen elements and one real threat should file one.
+
+{scope}
+
 {system_model}
 
 ```
