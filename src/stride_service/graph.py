@@ -102,6 +102,12 @@ from stride_service.critic import (
 )
 from stride_service.domains import select_domain_packs
 from stride_service.evidence import evidence_catalog, resolve_proposals
+from stride_service.knowledge import (
+    compose_cases,
+    compose_notes,
+    select_cases,
+    select_notes,
+)
 from stride_service.markdown_loader import MarkdownLoader
 from stride_service.model_tiers import TierName
 from stride_service.prompts import (
@@ -298,6 +304,21 @@ def analyze_state_key(category: StrideCategory) -> str:
     return f"drafts_{category.replace('-', '_')}"
 
 
+def notes_state_key(category: StrideCategory) -> str:
+    """Where ``prepare`` parks one lane's retrieved reference notes.
+
+    Per lane for the reason the candidates key is: six agents run in parallel
+    against one session state, which cannot hold six values for one key — and
+    the material differs per lane because the rules that selected it did.
+    """
+    return f"notes_{category.replace('-', '_')}"
+
+
+def cases_state_key(category: StrideCategory) -> str:
+    """Where ``prepare`` parks one lane's retrieved worked cases."""
+    return f"cases_{category.replace('-', '_')}"
+
+
 def candidates_state_key(category: StrideCategory) -> str:
     """Where ``prepare`` parks one lane's deterministic candidates.
 
@@ -387,6 +408,7 @@ class Analysis:
     # of the run's static provenance.
     domain_packs: list[str]
     fired_rules: list[str]
+    knowledge_docs: list[str]
     summary: Summary
 
     def context(self, instruction_sha256: str) -> AnalysisContext:
@@ -400,6 +422,7 @@ class Analysis:
             instruction_sha256=instruction_sha256,
             domain_packs=list(self.domain_packs),
             fired_rules=list(self.fired_rules),
+            knowledge_docs=list(self.knowledge_docs),
         )
 
     def to_state(self) -> dict[str, Any]:
@@ -428,6 +451,7 @@ class Analysis:
             ],
             "domain_packs": list(self.domain_packs),
             "fired_rules": list(self.fired_rules),
+            "knowledge_docs": list(self.knowledge_docs),
             "summary": self.summary.model_dump(mode="json"),
         }
 
@@ -465,6 +489,7 @@ class Analysis:
             ],
             domain_packs=list(data.get("domain_packs", [])),
             fired_rules=list(data.get("fired_rules", [])),
+            knowledge_docs=list(data.get("knowledge_docs", [])),
             summary=Summary.model_validate(data["summary"]),
         )
 
@@ -646,7 +671,10 @@ def _ruling_view(drafts: Sequence[DraftThreat]) -> list[dict]:
 
 
 def prepare_analysis(
-    valid_model: dict, ctx, skill_loader: MarkdownLoader
+    valid_model: dict,
+    ctx,
+    skill_loader: MarkdownLoader,
+    knowledge_loader: MarkdownLoader,
 ) -> dict[str, Any]:
     """Derive the whole deterministic view the six category agents reason from.
 
@@ -696,16 +724,26 @@ def prepare_analysis(
     )
     ctx.state[STATE_EVIDENCE_CATALOG] = render(list(catalog))
     ctx.state[STATE_DOMAIN_SKILLS] = compose_domain_skills(skill_loader, packs)
+    retrieved: list[str] = []
     for category, candidate_set in candidates.items():
         ctx.state[candidates_state_key(category)] = render_fenced(
             candidate_set.model_dump(mode="json")
         )
+        # Retrieval is by *fired* rule, so a lane that triggered nothing gets
+        # nothing: the material follows the leads rather than the category.
+        fired = {candidate.rule_id for candidate in candidate_set.candidates}
+        notes, cases = select_notes(fired), select_cases(fired)
+        ctx.state[notes_state_key(category)] = compose_notes(knowledge_loader, notes)
+        ctx.state[cases_state_key(category)] = compose_cases(knowledge_loader, cases)
+        retrieved += [f"notes/{name}" for name in notes]
+        retrieved += [f"cases/{name}" for name in cases]
     # The record of what the agents were given, written here because here is
     # where they are given it. Sorted and deduplicated: it is a set of rules
     # that matched, and firing order across six independent lanes is not a fact
     # about anything.
     ctx.state[STATE_ANALYSIS_CONTEXT] = {
         "domain_packs": list(packs),
+        "knowledge_docs": sorted(set(retrieved)),
         "fired_rules": sorted(
             {
                 candidate.rule_id
@@ -720,14 +758,22 @@ def prepare_analysis(
         "evidence_count": len(catalog),
         "candidate_count": sum(len(each.candidates) for each in candidates.values()),
         "domain_packs": list(packs),
+        "knowledge_docs": len(set(retrieved)),
     }
 
 
-def prepare_node(skill_loader: MarkdownLoader) -> FunctionNode:
-    """The ``prepare`` node, with this deployment's skill tree bound to it."""
+def prepare_node(
+    skill_loader: MarkdownLoader, knowledge_loader: MarkdownLoader
+) -> FunctionNode:
+    """The ``prepare`` node, with this deployment's Markdown roots bound to it.
+
+    Both loaders are bound here rather than read from state for the same
+    reason: they are repo paths, not facts about the job, and ADK binds a
+    FunctionNode's parameters from session state.
+    """
 
     def prepare_analysis_node(valid_model: dict, ctx) -> dict[str, Any]:
-        return prepare_analysis(valid_model, ctx, skill_loader)
+        return prepare_analysis(valid_model, ctx, skill_loader, knowledge_loader)
 
     return FunctionNode(func=prepare_analysis_node, name=PREPARE_NODE)
 
@@ -1012,6 +1058,7 @@ def assemble_report(
         ],
         domain_packs=list((analysis_context or {}).get("domain_packs", [])),
         fired_rules=list((analysis_context or {}).get("fired_rules", [])),
+        knowledge_docs=list((analysis_context or {}).get("knowledge_docs", [])),
         summary=build_summary(threats, rejected, model),
     )
     ctx.state[STATE_ANALYSIS] = analysis.to_state()
@@ -1146,13 +1193,19 @@ def analyze_instruction(
       (:func:`candidates_state_key`), so what ADK templates at run time is
       ``{candidates_spoofing}`` — one prompt file, six bindings, no lane
       reading another's leads.
+    * ``{reference_notes}`` and ``{prior_cases}`` become this lane's retrieved
+      corpus keys, on the same argument: the documents differ per lane because
+      the rules that selected them did.
 
     The job-varying placeholders stay for ADK to template.
     """
     skills = compose_analyze_skills(skill_loader, category)
     prompt = compose_analyze_prompt(prompt_loader, category)
-    resolved = prompt.replace("{category}", category).replace(
-        "{candidates}", f"{{{candidates_state_key(category)}}}"
+    resolved = (
+        prompt.replace("{category}", category)
+        .replace("{candidates}", f"{{{candidates_state_key(category)}}}")
+        .replace("{reference_notes}", f"{{{notes_state_key(category)}}}")
+        .replace("{prior_cases}", f"{{{cases_state_key(category)}}}")
     )
     return _instruction(skills, resolved)
 
@@ -1176,6 +1229,7 @@ def build_pipeline(
     *,
     skill_loader: MarkdownLoader,
     prompt_loader: MarkdownLoader,
+    knowledge_loader: MarkdownLoader,
     binding: NodeBinding,
     entry: Entry = ENTRY_EXTRACT,
     name: str = "stride_pipeline",
@@ -1249,7 +1303,7 @@ def build_pipeline(
         for category in STRIDE_CATEGORIES
     ]
 
-    prepare = prepare_node(skill_loader)
+    prepare = prepare_node(skill_loader, knowledge_loader)
     join = JoinNode(name=JOIN_NODE)
     merge = FunctionNode(func=merge_drafts, name=MERGE_NODE)
     router = FunctionNode(func=route_review, name=ROUTER_NODE)

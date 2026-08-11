@@ -78,7 +78,12 @@ from stride_service.system_model import BoundaryCrossing, SystemModel
 # is the first block recording what *informed* the analysis rather than what
 # the analysis found. It is not evidence and cannot become any: nothing here
 # supports a threat, and the ``grounds`` that do are untouched.
-SCHEMA_VERSION = "2.7"
+#
+# 2.8 adds ``knowledge_docs`` to that same block: the local-corpus documents
+# the fired rules retrieved for the agents. Additive and service-owned like the
+# rest of the block, and under the same rule — a document informed the
+# analysis, and no consumer may read one as support for a threat.
+SCHEMA_VERSION = "2.8"
 
 DEFAULT_DISCLAIMER = (
     "AI-generated threat model. Not reviewed by a human security analyst."
@@ -788,6 +793,12 @@ class AnalysisContext(BaseModel):
     ``coverage`` counts them. The count says how much attention was directed;
     the IDs say where — which is what an eval measuring candidate usefulness
     needs, and what a reader asking "why did the agent look there" reads.
+
+    ``knowledge_docs`` names what was retrieved from the local corpus for those
+    rules — ``notes/<id>`` for reference material and ``cases/<id>`` for a
+    worked judgement, unioned across the six lanes. Retrieval is deterministic
+    and local, so the pair (this list, this checkout) reproduces exactly the
+    text the agents were shown.
     """
 
     model_config = ConfigDict(extra="forbid", frozen=True)
@@ -795,6 +806,7 @@ class AnalysisContext(BaseModel):
     instruction_sha256: str = Field(pattern=r"^[0-9a-f]{64}$")
     domain_packs: list[str] = Field(default_factory=list)
     fired_rules: list[str] = Field(default_factory=list)
+    knowledge_docs: list[str] = Field(default_factory=list)
 
 
 class Job(BaseModel):

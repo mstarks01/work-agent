@@ -1,8 +1,9 @@
 """One installation's configuration, resolved once and shared by everything.
 
-A **Deployment** is the four config files plus the skills and prompts, located
-by ``STRIDE_*`` variables that pick *which* file is read. Every consumer — the
-HTTP service, the in-process engine, the first-run web app, the eval harness's
+A **Deployment** is the four config files plus the skills, prompts and the
+local knowledge corpus, located by ``STRIDE_*`` variables that pick *which*
+file is read. Every consumer — the HTTP service, the in-process engine, the
+first-run web app, the eval harness's
 pipeline builder and the eval CLI — assembles its configuration through this
 one object, so each file is read once per process, a deployment that redirects
 ``STRIDE_SAMPLING`` has its sweeps grading the configuration it actually runs,
@@ -59,9 +60,9 @@ from stride_service.resilience import ResilienceConfig, load_resilience
 from stride_service.sampling import SamplingConfig, load_sampling
 
 # Two layouts resolve to the same defaults, not fetched at run time either way.
-# A wheel built from this project bundles skills/, prompts/ and config/ under
-# stride_service/_bundled/ (see pyproject.toml's force-include), so an
-# external `pip install stride-service` needs nothing else. An editable/dev
+# A wheel built from this project bundles skills/, prompts/, knowledge/ and
+# config/ under stride_service/_bundled/ (see pyproject.toml's force-include),
+# so an external `pip install stride-service` needs nothing else. An editable/dev
 # install has no _bundled/ -- hatchling's editable mode links back to the
 # source tree rather than copying force-included data -- so this repo's own
 # tests, evals and CI fall through to the checkout's top-level directories
@@ -84,6 +85,7 @@ def _default_config_path(filename: str) -> Path:
 
 DEFAULT_SKILLS_DIR = _default_dir("skills")
 DEFAULT_PROMPTS_DIR = _default_dir("prompts")
+DEFAULT_KNOWLEDGE_DIR = _default_dir("knowledge")
 DEFAULT_MODEL_TIERS_PATH = _default_config_path("model_tiers.toml")
 DEFAULT_SAMPLING_PATH = _default_config_path("sampling.toml")
 DEFAULT_RESILIENCE_PATH = _default_config_path("resilience.toml")
@@ -91,6 +93,7 @@ DEFAULT_BLESSED_FINGERPRINTS_PATH = _default_config_path("blessed-fingerprints.t
 
 SKILLS_DIR_VAR = "STRIDE_SKILLS_DIR"
 PROMPTS_DIR_VAR = "STRIDE_PROMPTS_DIR"
+KNOWLEDGE_DIR_VAR = "STRIDE_KNOWLEDGE_DIR"
 MODEL_TIERS_VAR = "STRIDE_TIERS_FILE"
 SAMPLING_VAR = "STRIDE_SAMPLING"
 RESILIENCE_VAR = "STRIDE_RESILIENCE"
@@ -120,6 +123,7 @@ class ConfigPaths:
 
     skills: Path
     prompts: Path
+    knowledge: Path
     model_tiers: Path
     sampling: Path
     resilience: Path
@@ -130,6 +134,7 @@ class ConfigPaths:
         return cls(
             skills=_path(env, SKILLS_DIR_VAR, DEFAULT_SKILLS_DIR),
             prompts=_path(env, PROMPTS_DIR_VAR, DEFAULT_PROMPTS_DIR),
+            knowledge=_path(env, KNOWLEDGE_DIR_VAR, DEFAULT_KNOWLEDGE_DIR),
             model_tiers=_path(env, MODEL_TIERS_VAR, DEFAULT_MODEL_TIERS_PATH),
             sampling=_path(env, SAMPLING_VAR, DEFAULT_SAMPLING_PATH),
             resilience=_path(env, RESILIENCE_VAR, DEFAULT_RESILIENCE_PATH),
@@ -216,6 +221,7 @@ class Deployment:
         return build_pipeline(
             skill_loader=MarkdownLoader(self.paths.skills),
             prompt_loader=MarkdownLoader(self.paths.prompts),
+            knowledge_loader=MarkdownLoader(self.paths.knowledge),
             binding=NodeBinding.from_configs(
                 self.tiers, self.sampling, resolve_model, self.resilience
             ),

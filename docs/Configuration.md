@@ -486,6 +486,7 @@ inheriting a default for a contract its callers can see.
 | --- | --- |
 | `STRIDE_SKILLS_DIR` | `skills/` |
 | `STRIDE_PROMPTS_DIR` | `prompts/` |
+| `STRIDE_KNOWLEDGE_DIR` | `knowledge/` |
 | `STRIDE_TIERS_FILE` | `config/model_tiers.toml` |
 | `STRIDE_SAMPLING` | `config/sampling.toml` |
 | `STRIDE_RESILIENCE` | `config/resilience.toml` |
