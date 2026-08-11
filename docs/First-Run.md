@@ -177,6 +177,24 @@ its output ceiling. Cells read `supported`, `unsupported`, or `unknown`, and
 `unknown` means exactly that: the pinned model map has never heard of the model,
 not that the capability is missing.
 
+### Checking the pair you chose, once you have the credentials
+
+The matrix says what a provider would accept. Once your key or your ADC is in
+place, this says whether it answers:
+
+```sh
+uv run python -m stride_service.smoke
+```
+
+It runs one small system through the shipped graph on your selection — about
+eight model calls, cents rather than dollars — and reports whether each node
+bound, whether extraction, the six category agents and the critic returned
+output the service could parse, whether the provider took your sampling
+parameters, and what build actually answered. Run it before the first real job:
+a credential or a model pin that is wrong shows up here in a minute rather than
+partway through an analysis. [Configuration](Configuration.md#checking-that-a-provider-actually-serves-the-graph)
+explains what each answer means.
+
 ### Selecting without editing the file
 
 `STRIDE_MODEL_{BASE,STRONG}_VENDOR` and the matching `_MODEL` make the same
