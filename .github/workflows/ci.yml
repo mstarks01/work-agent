@@ -141,16 +141,22 @@ jobs:
       # Says what did NOT run, in the same summary as what did.
       #
       # A green offline check reads as "the providers work" unless something
-      # states otherwise, and nothing did: the Vertex sweep skips on every PR
-      # because Workload Identity Federation is unprovisioned, and the API-key
-      # sweep is dispatch-only with both secrets unset. No live lane in this
-      # repository has ever completed a run against any vendor.
+      # states otherwise, and nothing did: every live lane in this repository
+      # reports itself unexercised, because federation is unprovisioned and both
+      # API-key secrets are unset. No live lane has ever completed a run against
+      # any vendor.
       #
       # This is deliberately a *statement*, not a check that fails. Provisioning
       # was ruled an ops concern, so an unprovisioned repository is a supported
       # state -- but a supported state that is silent is indistinguishable from
       # a validated one, and that is the specific dishonesty #116 asked to
       # remove.
+      #
+      # The table names the lanes rather than the vendors' state, and that is
+      # the honest shape: `provider-smoke.yml` gives all three vendors the same
+      # lane on the same trigger, so what differs between them is which
+      # credentials a repository holds, not how much assurance the project has
+      # built for each.
       - name: Report unexercised coverage
         if: always()
         run: |
@@ -159,13 +165,15 @@ jobs:
             echo
             echo "The matrix above is **static capability**, computed from the"
             echo "pinned model map. It is not evidence that any vendor served a"
-            echo "request."
+            echo "request. Each live lane reports that for itself, in its own"
+            echo "summary, whether or not it ran."
             echo
-            echo "| Lane | Vendors | State |"
-            echo "| --- | --- | --- |"
-            echo "| Offline conformance (this job) | vertex, anthropic, openai | exercised |"
-            echo "| Evals (live Vertex) | vertex | **unexercised** — federation unprovisioned |"
-            echo "| Evals (live API-key vendors) | anthropic, openai | **unexercised** — dispatch-only, secrets unset |"
+            echo "| Lane | Vendors | What it answers | State |"
+            echo "| --- | --- | --- | --- |"
+            echo "| Offline conformance (this job) | vertex, anthropic, openai | what a provider would be asked for | exercised |"
+            echo "| Provider smoke | vertex, anthropic, openai | does the provider serve this graph | **unexercised** — no credentials configured |"
+            echo "| Evals (live Vertex) | vertex | threat-model quality | **unexercised** — federation unprovisioned |"
+            echo "| Evals (live API-key vendors) | anthropic, openai | threat-model quality | **unexercised** — dispatch-only, secrets unset |"
             echo
             echo "See [.github/WORKLOAD_IDENTITY.md](.github/WORKLOAD_IDENTITY.md)"
             echo "and [docs/adr/0003-no-privileged-vendor.md](docs/adr/0003-no-privileged-vendor.md)."

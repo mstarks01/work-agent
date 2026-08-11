@@ -51,12 +51,14 @@ on:
     # swept until someone rules it out, and the cost of being wrong is a
     # spurious run rather than a gap nobody sees.
     #
-    # The four exclusions are the modules the eval harness cannot reach. The
+    # The five exclusions are the modules the eval harness cannot reach. The
     # harness drives `GraphExecutor` in process against a `Deployment`, so the
     # HTTP surface and its bearer check are off the path entirely,
-    # `conformance.py` reports capabilities without gating anything, and
-    # `StrideEngine` is the *other* in-process entry point rather than the one
-    # evals use. Everything else in the package is on the transitive import
+    # `conformance.py` reports capabilities without gating anything, `smoke.py`
+    # is the live lane that reports alongside it (`provider-smoke.yml`, which
+    # carries its own filter), and `StrideEngine` is the *other* in-process
+    # entry point rather than the one evals use -- the one `smoke.py` drives.
+    # Everything else in the package is on the transitive import
     # closure of `evals/` and is therefore swept, including the three that
     # carry an eval outcome without touching a prompt or a schema:
     # `validation.py` decides rejected vs. completed, `execution.py` renders
@@ -80,6 +82,7 @@ on:
       - "!src/stride_service/auth.py"
       - "!src/stride_service/conformance.py"
       - "!src/stride_service/engine.py"
+      - "!src/stride_service/smoke.py"
       - ".github/workflows/evals-live.yml"
   # NO `schedule`. There was a Monday 06:00 UTC backstop sweep here until
   # federation went unconfigured indefinitely. A scheduled run fails closed when

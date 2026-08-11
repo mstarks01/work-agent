@@ -476,6 +476,27 @@ class TestTheLiveLanesSweepWhatWasProfiled:
                     f"{model} is profiled but no live lane sweeps it"
                 )
 
+    def test_the_smoke_lane_covers_every_vendor_on_the_profiled_pair(self):
+        """The smoke is the lane that has to be comparable across vendors.
+
+        The sweeps above are two files by credential class and one of them
+        carries a single vendor; this one file carries all three, so a vendor
+        missing from it is a vendor with no live coverage at all — which is the
+        imbalance
+        [#116](https://github.com/mstarks01/work-agent/issues/116) asked to
+        remove, reappearing in the lane built to remove it.
+        """
+        smoke = (
+            PROJECT_ROOT / ".github" / "workflows" / "provider-smoke.yml"
+        ).read_text(encoding="utf-8")
+
+        for vendor, models in REFERENCE_MODELS.items():
+            assert vendor in smoke, f"{vendor} has no lane in the provider smoke"
+            for model in models:
+                assert model in smoke, (
+                    f"{model} is profiled but the smoke lane does not pin it"
+                )
+
 
 class TestProfileShape:
     """The report object itself, since a CI summary is rendered from it."""
