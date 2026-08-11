@@ -180,5 +180,6 @@ class AdkPipelineRunner:
             missing_mitigations=analysis.missing_mitigations,
             shared_element_names=analysis.shared_element_names,
             coverage=analysis.coverage,
+            analysis_context=analysis.context(self._pipeline.instruction_sha256),
             summary=analysis.summary,
         )
