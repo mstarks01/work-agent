@@ -168,6 +168,39 @@ def test_a_description_citing_a_missing_element_is_marked_on_the_report():
     ]
 
 
+def test_a_composed_evidence_reference_is_marked_rather_than_fatal():
+    """The policy #138 narrowed, end to end.
+
+    A reference the catalog does not hold used to fail the whole job, and
+    agents compose well-formed ones — 2 of 12 jobs on a live sweep. The threat
+    now stands on whatever else it cited, and the reader is told what was
+    dropped. What still fails is a threat left with no grounds at all, which is
+    covered where resolution decides it.
+    """
+    proposal = sample_proposal(
+        "S-01",
+        "spoofing",
+        evidence_refs=[
+            "crossing:flow:customer-to-web-app:login",
+            "crossing:flow:ghost",
+        ],
+    )
+    replies = happy_replies() | {
+        graph.analyze_node_name("spoofing"): threats_json(proposal)
+    }
+    pipeline, _ = build(replies)
+
+    outcome, _ = run(pipeline, job())
+
+    report = outcome.report
+    assert [threat.id for threat in report.threats] == ["S-01"]
+    assert [(m.threat_id, m.reference) for m in report.unresolved_evidence] == [
+        ("S-01", "crossing:flow:ghost")
+    ]
+    # The surviving reference still grounds the finding it was cited for.
+    assert any(ground.kind == "derived-fact" for ground in report.threats[0].grounds)
+
+
 def test_a_threat_with_no_countermeasure_is_marked_on_the_report():
     """A completeness signal, carried to the reader rather than costing the run."""
     proposal = sample_proposal("S-01", "spoofing", mitigations=[])

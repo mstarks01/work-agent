@@ -177,6 +177,7 @@ def test_an_eval_report_carries_every_field_production_stamps(case):
         "rejected_threats",
         "unverified_grounds",
         "unresolved_mentions",
+        "unresolved_evidence",
         "missing_mitigations",
         "shared_element_names",
         "coverage",
