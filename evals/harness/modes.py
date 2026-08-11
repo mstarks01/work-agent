@@ -304,6 +304,7 @@ def _run_from_graph(
         missing_mitigations=analysis.missing_mitigations,
         shared_element_names=analysis.shared_element_names,
         coverage=analysis.coverage,
+        analysis_context=analysis.context(pipeline.instruction_sha256),
         summary=analysis.summary,
     )
     drafts = tuple(
