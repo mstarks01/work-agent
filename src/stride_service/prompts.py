@@ -93,9 +93,24 @@ EXEMPLARS_PREFIX = "exemplars/"
 #   pack text itself rides in the skills, not in this file.
 #
 # ~180 tokens for the candidate half and ~130 for the catalog, on a body that
-# was 2239 before either. A fourth derived block should be argued for against
+# was 2239 before either. A further derived block should be argued for against
 # what an agent can actually hold in mind, not against this number.
-ANALYZE_PROMPT_TOKEN_CAP = 3450
+#
+# THE FOURTH AND FIFTH BLOCKS ARE THE RETRIEVED CORPUS, and here is the
+# argument the line above asks for. ``knowledge/notes/`` and ``knowledge/cases/``
+# are selected per lane by the rules that actually fired
+# (:mod:`stride_service.knowledge`), so they cost ~57 tokens of *static* text
+# here — one clause in the Input section and two sentences fixing their
+# standing — while the material itself rides in the job-varying block and is
+# capped where it is retrieved, at two notes and one case per lane.
+#
+# The standing sentences are what earn their place rather than the pointer: a
+# retrieved note reads exactly like the System Model until something says it is
+# not a fact about this system, and a case ending in a rejection reads like an
+# instruction to reject until something says it is somebody else's reasoning.
+# Both are the failure this prompt spends most of its length preventing, so the
+# blocks arrive with the same treatment candidates got.
+ANALYZE_PROMPT_TOKEN_CAP = 3550
 EXEMPLAR_TOKEN_CAP = 1500
 CRITIC_PROMPT_TOKEN_CAP = 1500
 # The re-ask has to be able to name and fix every fault `review_issues` can
