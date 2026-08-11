@@ -93,7 +93,7 @@ from google.adk.workflow import START, FunctionNode, JoinNode, Workflow
 from google.genai import types
 
 from stride_service.candidates import generate_candidates
-from stride_service.coverage import build_coverage
+from stride_service.coverage import build_coverage, lane_scope
 from stride_service.critic import (
     assemble_threats,
     join_drafts,
@@ -101,7 +101,11 @@ from stride_service.critic import (
     review_issues,
 )
 from stride_service.domains import select_domain_packs
-from stride_service.evidence import evidence_catalog, resolve_proposals
+from stride_service.evidence import (
+    evidence_catalog,
+    render_catalog,
+    resolve_proposals,
+)
 from stride_service.knowledge import (
     compose_cases,
     compose_notes,
@@ -317,6 +321,15 @@ def notes_state_key(category: StrideCategory) -> str:
 def cases_state_key(category: StrideCategory) -> str:
     """Where ``prepare`` parks one lane's retrieved worked cases."""
     return f"cases_{category.replace('-', '_')}"
+
+
+def scope_state_key(category: StrideCategory) -> str:
+    """Where ``prepare`` parks one lane's denominators.
+
+    Per lane like the candidates key, and for the same reason: six agents share
+    one session state, and the rule counts differ per category anyway.
+    """
+    return f"scope_{category.replace('-', '_')}"
 
 
 def candidates_state_key(category: StrideCategory) -> str:
@@ -722,12 +735,15 @@ def prepare_analysis(
     ctx.state[STATE_BOUNDARY_CROSSINGS] = render(
         [crossing.model_dump(mode="json") for crossing in crossings]
     )
-    ctx.state[STATE_EVIDENCE_CATALOG] = render(list(catalog))
+    ctx.state[STATE_EVIDENCE_CATALOG] = render_catalog(catalog)
     ctx.state[STATE_DOMAIN_SKILLS] = compose_domain_skills(skill_loader, packs)
     retrieved: list[str] = []
     for category, candidate_set in candidates.items():
         ctx.state[candidates_state_key(category)] = render_fenced(
             candidate_set.model_dump(mode="json")
+        )
+        ctx.state[scope_state_key(category)] = lane_scope(
+            category, model, candidate_set
         )
         # Retrieval is by *fired* rule, so a lane that triggered nothing gets
         # nothing: the material follows the leads rather than the category.
@@ -1204,6 +1220,7 @@ def analyze_instruction(
     resolved = (
         prompt.replace("{category}", category)
         .replace("{candidates}", f"{{{candidates_state_key(category)}}}")
+        .replace("{scope}", f"{{{scope_state_key(category)}}}")
         .replace("{reference_notes}", f"{{{notes_state_key(category)}}}")
         .replace("{prior_cases}", f"{{{cases_state_key(category)}}}")
     )

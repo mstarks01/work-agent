@@ -138,6 +138,50 @@ def evidence_catalog(model: SystemModel) -> EvidenceCatalog:
     return catalog
 
 
+def render_catalog(catalog: Mapping[str, Ground]) -> str:
+    """The catalog as a table an agent selects from rather than a list it reads.
+
+    **Shape is the point, and it is a fix rather than a decoration.** Rendered
+    as a JSON array of ID strings, the catalog reads as a *specimen of the
+    format* as much as a closed list, and agents composed well-formed
+    references to facts it did not contain — correct grammar, plausible element
+    IDs, real attribute names, absent from the set (#138). Every such reference
+    fails its job, so this is not a cosmetic concern.
+
+    A table resists that in a way a list cannot. Each row carries prose derived
+    from *this* model, so there is no pattern to complete: an agent that wants
+    to cite a flow's authentication either finds the row or finds that the row
+    is not there. The gloss is what makes the second case legible — the reason
+    an attribute is absent is that the input *stated* it, which the ID alone
+    never says.
+
+    Order is the catalog's own, which is the model's, so the same System Model
+    renders the same table on every run.
+    """
+    rows = "\n".join(
+        f"| `{ref}` | {_gloss(ground)} |" for ref, ground in catalog.items()
+    )
+    return (
+        f"{len(catalog)} facts, and this table is all of them.\n\n"
+        "| cite this exactly | what it says |\n| --- | --- |\n"
+        f"{rows}\n"
+    )
+
+
+def _gloss(ground: Ground) -> str:
+    """What one catalogued fact asserts.
+
+    Deliberately short, and it does not repeat the element ID: that is the left
+    column already, and this text is paid for on all six agents' instructions
+    through the two exemplar catalogs. What it has to carry is the *kind* of
+    fact — an unstated attribute reads very differently from a derived crossing,
+    and an agent that conflates them cites the wrong one.
+    """
+    if ground.kind == "derived-fact":
+        return "crosses a trust boundary"
+    return f"`{ground.attribute}` never stated"
+
+
 def _grounds_of(
     proposal: ThreatProposal, threat_id: str, catalog: Mapping[str, Ground]
 ) -> tuple[list[Ground], list[str]]:
