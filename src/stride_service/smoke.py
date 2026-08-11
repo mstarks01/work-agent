@@ -64,7 +64,7 @@ from stride_service.graph import (
 )
 from stride_service.jobs import PipelineCompleted, PipelineRejected
 from stride_service.model_tiers import TierName
-from stride_service.report import NodeRun, StrideReport
+from stride_service.report import NodeRun, SamplingValue, StrideReport
 from stride_service.sampling import TierSampling, sampling_fingerprint
 from stride_service.sources import Source
 
@@ -352,7 +352,7 @@ def _check_sampling(report: StrideReport, deployment: Deployment) -> Check:
     return Check(SAMPLING, CheckResult.PASSED, rendered)
 
 
-def _render_params(params: Mapping[str, float | int | None]) -> str:
+def _render_params(params: Mapping[str, SamplingValue]) -> str:
     """One tier's set params, for a summary row. Unset params are omitted."""
     return ", ".join(
         f"{name}={value}" for name, value in params.items() if value is not None
