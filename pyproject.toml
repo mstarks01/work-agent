@@ -63,6 +63,7 @@ packages = ["src/stride_service"]
 # a built wheel. See deployment.py's DEFAULT_* resolution for the read side.
 "skills" = "stride_service/_bundled/skills"
 "prompts" = "stride_service/_bundled/prompts"
+"knowledge" = "stride_service/_bundled/knowledge"
 "config" = "stride_service/_bundled/config"
 
 [tool.ruff]
