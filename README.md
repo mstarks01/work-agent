@@ -107,8 +107,11 @@ It is a convenience guard rather than a gate — CI is authoritative, and
 `git push --no-verify` skips it.
 
 Everything under `tests/` and `evals/verify_corpus.py` is credential-free and
-deterministic. The live eval commands (`python -m evals.harness.run ...`) need
-configured provider credentials — see [evals/TUNING.md](evals/TUNING.md).
+deterministic. The live commands need configured provider credentials:
+`python -m stride_service.smoke` runs one small job through the shipped graph to
+check that the vendor you selected actually serves it, and the eval harness
+(`python -m evals.harness.run ...`) measures analysis quality over the golden
+corpus — see [evals/TUNING.md](evals/TUNING.md).
 
 ## Status
 
@@ -123,8 +126,12 @@ are worth stating separately, because they are different kinds of claim:
 - **Per-tier sampling is an open tuning loop.** The shipped decoding default is
   `temperature = 0`. Improving the per-tier values is a measured process against
   the golden corpus — see [evals/TUNING.md](evals/TUNING.md).
-- **No sanctioned baseline sweep has been run yet.** The live eval lane exists to
-  run it (weekly, Mondays 06:00 UTC). This is a not-yet rather than a cannot.
+- **No provider has served a request in CI.** Two kinds of live lane exist and
+  neither has run: the per-vendor [provider smoke](docs/Configuration.md#checking-that-a-provider-actually-serves-the-graph),
+  which asks whether a vendor serves this graph at all, and the golden-corpus
+  eval sweeps, which ask how good its threat models are. Both need credentials
+  this repository does not hold, and each says so in its own job summary rather
+  than passing quietly. This is a not-yet rather than a cannot.
 
 Persistent job and session backends are left as seams — the in-memory defaults
 are enough to get a report in process.

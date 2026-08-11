@@ -4,6 +4,11 @@ One-time setup that `.github/workflows/evals-live.yml` assumes: how a CI run
 gets short-lived Google Cloud credentials without any secret being stored in
 this repository.
 
+The same four variables enable the Vertex lane of
+`.github/workflows/provider-smoke.yml`, which is the cheaper of the two and the
+one to watch first: it runs one small job rather than the twelve-case corpus, so
+it answers "does Vertex serve this graph" for cents, on every pull request.
+
 This covers **Vertex only**, because that is what `evals-live.yml` selects in
 its `STRIDE_MODEL_*` block. The shipped configuration selects no vendor at all
 — see [Configuration](../docs/Configuration.md#models-and-vendors) — so the
@@ -113,6 +118,11 @@ variables, and fails it on `schedule` and `workflow_dispatch` — those asked fo
 a live run, and a sweep that silently runs nothing is worse than one that
 stops. A skipped PR run is therefore the expected state before this setup, not
 a symptom of it going wrong.
+
+`provider-smoke.yml`'s Vertex lane reads the same four variables and makes the
+same call on every event: it reports itself **unexercised** in the job summary
+and stops, rather than failing. It fires on pull requests, which did not ask for
+a live run.
 
 ## 6. Verify
 
