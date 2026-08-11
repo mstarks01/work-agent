@@ -79,6 +79,7 @@ boundary, then by the System Model gate and the critic seams here.
 
 from __future__ import annotations
 
+import hashlib
 import json
 import logging
 from collections.abc import Callable, Sequence
@@ -112,6 +113,7 @@ from stride_service.prompts import (
 )
 from stride_service.report import (
     STRIDE_CATEGORIES,
+    AnalysisContext,
     CategoryCoverage,
     DraftThreat,
     MissingMitigation,
@@ -281,6 +283,12 @@ STATE_UNVERIFIED_GROUNDS = "unverified_grounds"
 STATE_UNRESOLVED_MENTIONS = "unresolved_mentions"
 STATE_MISSING_MITIGATIONS = "missing_mitigations"
 STATE_REVIEWED_THREATS = "reviewed_threats"
+# What ``prepare`` put in front of the agents, for the report to record: the
+# packs this model earned and the rules that fired. Written where the selection
+# happens rather than recomputed at the fan-in, because a second derivation
+# could disagree with the one the agents actually read — the same reason the
+# evidence catalog is derived once and resolved against itself.
+STATE_ANALYSIS_CONTEXT = "analysis_context"
 STATE_ANALYSIS = "analysis"
 STATE_REJECTION = "rejection"
 
@@ -371,7 +379,28 @@ class Analysis:
     # The one mark about the model rather than the threats, so it is derived
     # from the valid model rather than collected from the drafts.
     shared_element_names: list[SharedElementName]
+    # What ``prepare`` put in front of the agents. Two halves of one record,
+    # carried loose rather than as an :class:`~stride_service.report.AnalysisContext`
+    # because its third field — the instruction digest — is a fact about the
+    # *built graph* rather than about this job, and the graph is not something
+    # a node holds. :meth:`context` joins them where the driver stamps the rest
+    # of the run's static provenance.
+    domain_packs: list[str]
+    fired_rules: list[str]
     summary: Summary
+
+    def context(self, instruction_sha256: str) -> AnalysisContext:
+        """This analysis's context block, given the built graph's digest.
+
+        The join is here rather than in each driver so the service and the eval
+        harness cannot record the block differently — the same reason the two
+        share one :class:`~stride_service.execution.GraphExecutor`.
+        """
+        return AnalysisContext(
+            instruction_sha256=instruction_sha256,
+            domain_packs=list(self.domain_packs),
+            fired_rules=list(self.fired_rules),
+        )
 
     def to_state(self) -> dict[str, Any]:
         """The JSON-safe form parked in session state."""
@@ -397,6 +426,8 @@ class Analysis:
             "shared_element_names": [
                 mark.model_dump(mode="json") for mark in self.shared_element_names
             ],
+            "domain_packs": list(self.domain_packs),
+            "fired_rules": list(self.fired_rules),
             "summary": self.summary.model_dump(mode="json"),
         }
 
@@ -432,6 +463,8 @@ class Analysis:
                 SharedElementName.model_validate(mark)
                 for mark in data.get("shared_element_names", [])
             ],
+            domain_packs=list(data.get("domain_packs", [])),
+            fired_rules=list(data.get("fired_rules", [])),
             summary=Summary.model_validate(data["summary"]),
         )
 
@@ -667,6 +700,20 @@ def prepare_analysis(
         ctx.state[candidates_state_key(category)] = render_fenced(
             candidate_set.model_dump(mode="json")
         )
+    # The record of what the agents were given, written here because here is
+    # where they are given it. Sorted and deduplicated: it is a set of rules
+    # that matched, and firing order across six independent lanes is not a fact
+    # about anything.
+    ctx.state[STATE_ANALYSIS_CONTEXT] = {
+        "domain_packs": list(packs),
+        "fired_rules": sorted(
+            {
+                candidate.rule_id
+                for candidate_set in candidates.values()
+                for candidate in candidate_set.candidates
+            }
+        ),
+    }
     return {
         "element_count": len(model.elements()),
         "crossing_count": len(crossings),
@@ -906,6 +953,7 @@ def assemble_report(
     unresolved_mentions: list | None = None,
     missing_mitigations: list | None = None,
     coverage: list | None = None,
+    analysis_context: dict | None = None,
 ) -> dict[str, Any]:
     """Build the report body deterministically from the critic's rulings.
 
@@ -930,6 +978,10 @@ def assemble_report(
     the unknown that excuses carrying none. ``coverage`` defaults so a graph
     driven from a seeded state that never ran ``merge`` still assembles — an
     absent account is recorded as absent rather than fabricated at zero.
+    ``analysis_context`` defaults for the same reason and records the same way:
+    a graph entered past ``prepare`` was given no packs and no candidates, and
+    an empty record says so rather than implying an analysis that ran without
+    them.
     """
     model = SystemModel.model_validate(valid_model)
     drafts = [DraftThreat.model_validate(draft) for draft in merged_drafts]
@@ -958,6 +1010,8 @@ def assemble_report(
             SharedElementName(name_slug=slug, element_ids=ids)
             for slug, ids in model.shared_names().items()
         ],
+        domain_packs=list((analysis_context or {}).get("domain_packs", [])),
+        fired_rules=list((analysis_context or {}).get("fired_rules", [])),
         summary=build_summary(threats, rejected, model),
     )
     ctx.state[STATE_ANALYSIS] = analysis.to_state()
@@ -983,12 +1037,18 @@ class Pipeline:
     model half is the *served* build, which is only known once a node has
     actually run and answered, so it is computed per node *execution* in
     :mod:`stride_service.pipeline` rather than once at build time.
+
+    ``instruction_sha256`` is the other half of "what produced this report", and
+    the half the fingerprint cannot reach: it digests every LLM node's composed
+    instruction, so a prompt or skill edit moves it while the model and sampling
+    stand still. See :func:`instruction_digest`.
     """
 
     workflow: Workflow
     node_models: dict[str, str]
     tier_sampling: dict[TierName, TierSampling]
     node_sampling: dict[str, TierSampling]
+    instruction_sha256: str
 
 
 def _generate_content_config(
@@ -1153,6 +1213,7 @@ def build_pipeline(
             node_models={extract.name: _model_name(extract.model)},
             tier_sampling=dict(binding.tier_sampling),
             node_sampling=_node_sampling([extract], resolve_sampling),
+            instruction_sha256=instruction_digest([extract]),
         )
 
     critic = _llm_node(
@@ -1244,12 +1305,43 @@ def build_pipeline(
         node_models={node.name: _model_name(node.model) for node in llm_nodes},
         tier_sampling=dict(binding.tier_sampling),
         node_sampling=_node_sampling(llm_nodes, resolve_sampling),
+        instruction_sha256=instruction_digest(llm_nodes),
     )
 
 
 def _model_name(model: str | BaseLlm) -> str:
     """The model string to record, however the node was bound to it."""
     return model if isinstance(model, str) else model.model
+
+
+def instruction_digest(llm_nodes: Sequence[LlmAgent]) -> str:
+    """One hash over what every LLM node was told, before any job reaches it.
+
+    Digested at build time, with the job-varying ``{placeholders}`` still
+    unexpanded — so this identifies the **repo-authored** text (prompts,
+    category skills, the shared rubric, the critic's digest) and contains no
+    submitter bytes at all. That is what makes it publishable beside a report:
+    the input's own digest is ``input.source_sha256`` and stays separate,
+    because "which instructions ran" and "which text was analysed" are
+    different questions and a hash that mixed them could answer neither.
+
+    Node names are part of the payload rather than only their text, so a
+    swap that gave two nodes each other's instruction moves the hash. Sorted,
+    because a dict ordering is not a fact about the graph.
+
+    It is deliberately **not** part of certification. A blessed fingerprint
+    attests to a generation identity — model and decoding params — and widening
+    it to the prompts would re-baseline every blessed pair on any prompt edit,
+    which is a decision about what a deployment sanctions rather than a fact
+    about a run. Recording it is what lets a reader notice; gating on it is a
+    separate choice nobody has made.
+    """
+    payload = json.dumps(
+        {node.name: node.instruction for node in llm_nodes},
+        sort_keys=True,
+        separators=(",", ":"),
+    )
+    return hashlib.sha256(payload.encode("utf-8")).hexdigest()
 
 
 def _node_sampling(

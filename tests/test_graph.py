@@ -1018,3 +1018,142 @@ def test_assemble_fails_closed_when_the_critic_drops_a_draft():
                 "threats": [sample_ruling("S-01").model_dump(mode="json")]
             },
         )
+
+
+# --- Analysis context: what informed the run, never what proves a finding ----
+
+
+def test_prepare_records_the_packs_and_rules_the_agents_were_given(skill_loader):
+    """The record is written where the selection happens.
+
+    Both halves are already computed here to build the prompt; recomputing them
+    at the fan-in would be a second derivation that could disagree with what
+    the agents actually read, which is the failure the evidence catalog is
+    derived-once-and-resolved-against-itself to avoid.
+    """
+    ctx = FakeContext()
+    graph.prepare_analysis(valid_model().model_dump(mode="json"), ctx, skill_loader)
+
+    recorded = ctx.state[graph.STATE_ANALYSIS_CONTEXT]
+
+    assert recorded["domain_packs"] == ["http-api", "databases"]
+    assert recorded["fired_rules"] == sorted(set(recorded["fired_rules"]))
+    assert "information-disclosure-store-at-rest-unverified" in recorded["fired_rules"]
+
+
+def test_the_context_reaches_the_report_through_assemble():
+    ctx = FakeContext()
+    graph.assemble_report(
+        valid_model().model_dump(mode="json"),
+        [sample_draft("S-01").model_dump(mode="json")],
+        ctx,
+        reviewed_threats={"threats": [sample_ruling("S-01").model_dump(mode="json")]},
+        analysis_context={
+            "domain_packs": ["http-api"],
+            "fired_rules": ["spoofing-unverified-boundary-auth"],
+        },
+    )
+
+    analysis = graph.Analysis.from_state(ctx.state[graph.STATE_ANALYSIS])
+
+    assert analysis.domain_packs == ["http-api"]
+    assert analysis.fired_rules == ["spoofing-unverified-boundary-auth"]
+
+
+def test_a_graph_entered_past_prepare_records_an_empty_context():
+    """Absent, not fabricated.
+
+    The analysis eval mode seeds a blessed model and enters at ``prepare``; a
+    graph driven from a state that never ran it was given no packs and no
+    candidates. An empty record says exactly that, where a missing block would
+    leave a reader guessing whether the run had them.
+    """
+    ctx = FakeContext()
+    graph.assemble_report(
+        valid_model().model_dump(mode="json"),
+        [sample_draft("S-01").model_dump(mode="json")],
+        ctx,
+        reviewed_threats={"threats": [sample_ruling("S-01").model_dump(mode="json")]},
+    )
+
+    analysis = graph.Analysis.from_state(ctx.state[graph.STATE_ANALYSIS])
+    context = analysis.context("0" * 64)
+
+    assert context.domain_packs == []
+    assert context.fired_rules == []
+
+
+class TestTheInstructionDigest:
+    """The half of "what produced this report" a fingerprint cannot reach.
+
+    A generation identity attests to the served model and the decoding params.
+    Two runs can share one and have been told completely different things —
+    the prompts, the category skills and the rubric are not in that hash and
+    cannot be, since they are known at build time and the served build is not.
+    """
+
+    def nodes(self, **instructions: str):
+        return [
+            LlmAgent(name=name, model="fake", instruction=text)
+            for name, text in instructions.items()
+        ]
+
+    def test_the_same_instructions_digest_the_same(self):
+        first = graph.instruction_digest(self.nodes(extract="a", critic="b"))
+        second = graph.instruction_digest(self.nodes(extract="a", critic="b"))
+        assert first == second
+
+    def test_editing_one_instruction_moves_it(self):
+        before = graph.instruction_digest(self.nodes(extract="a", critic="b"))
+        after = graph.instruction_digest(self.nodes(extract="a", critic="b "))
+        assert before != after
+
+    def test_swapping_two_nodes_instructions_moves_it(self):
+        """Node identity is part of the payload, not only the text.
+
+        A graph that handed the critic the extraction prompt and vice versa
+        would otherwise digest identically to the correct one, since the same
+        bytes are present either way.
+        """
+        forwards = graph.instruction_digest(self.nodes(extract="a", critic="b"))
+        crossed = graph.instruction_digest(self.nodes(extract="b", critic="a"))
+        assert forwards != crossed
+
+    def test_the_built_graph_digests_its_own_nodes(self, pipeline):
+        assert re.fullmatch(r"[0-9a-f]{64}", pipeline.instruction_sha256)
+
+    def test_two_builds_of_the_same_configuration_agree(
+        self, pipeline, skill_loader, prompt_loader
+    ):
+        """The property a comparison across runs depends on.
+
+        Instructions are composed at build time from the same files, so a
+        digest that moved between two builds of one checkout would make every
+        cross-run comparison meaningless — including the one this exists for.
+        """
+        tiers = repo_tiers()
+        rebuilt = graph.build_pipeline(
+            skill_loader=skill_loader,
+            prompt_loader=prompt_loader,
+            binding=NodeBinding.from_configs(
+                tiers,
+                load_sampling(PROJECT_ROOT / "config" / "sampling.toml", env={}),
+                _route_resolver(tiers),
+            ),
+        )
+        assert rebuilt.instruction_sha256 == pipeline.instruction_sha256
+
+    def test_it_carries_no_submitted_text(self, pipeline):
+        """Job bytes are hashed by ``input.source_sha256`` and only there.
+
+        The instructions are digested with their ``{placeholders}`` unexpanded,
+        so this identifies the repo-authored text and nothing a submitter
+        wrote — which is what makes it safe to publish beside a report.
+        """
+        instructions = "".join(
+            node.instruction
+            for node in pipeline.workflow.graph.nodes
+            if isinstance(node, LlmAgent)
+        )
+        assert "{system_model}" in instructions
+        assert "{input_text}" in instructions
