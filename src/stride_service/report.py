@@ -71,7 +71,14 @@ from stride_service.system_model import BoundaryCrossing, SystemModel
 # such a value has ever existed, so nothing a 2.5 consumer already parses
 # changes meaning; what changes is that a value it never could have seen is now
 # reachable, and a consumer reading the block as numbers must widen with it.
-SCHEMA_VERSION = "2.6"
+#
+# 2.7 adds ``analysis_context``: the instruction digest, the domain packs this
+# job's model earned, and the deterministic rules that fired. Optional,
+# service-owned and computed in code, so the additive rule holds again — and it
+# is the first block recording what *informed* the analysis rather than what
+# the analysis found. It is not evidence and cannot become any: nothing here
+# supports a threat, and the ``grounds`` that do are untouched.
+SCHEMA_VERSION = "2.7"
 
 DEFAULT_DISCLAIMER = (
     "AI-generated threat model. Not reviewed by a human security analyst."
@@ -744,6 +751,52 @@ class NodeRun(BaseModel):
         return self
 
 
+class AnalysisContext(BaseModel):
+    """What informed the analysis, as distinct from what proves a finding.
+
+    The report already records the two ends of a run: the served build and
+    sampling each node ran on (:class:`NodeRun`), and the facts each finding
+    rests on (``grounds``). Between them sits everything the service *put in
+    front of* the category agents — the instruction text they were given, the
+    reference packs this model earned, the deterministic rules that fired — and
+    none of it was recorded anywhere. Two runs of the same model on the same
+    input could differ because a pack selection flipped or a skill was edited,
+    and the report showed nothing.
+
+    **This is context, never evidence, and the separation is the whole design.**
+    A pack named here did not ground anything; a rule named here did not find
+    anything. What grounds a finding is its ``grounds``, unchanged. This block
+    answers a different question — *what was on the desk* — and a reader who
+    treated an entry here as support for a threat would be reading it exactly
+    backwards.
+
+    ``instruction_sha256`` digests the *composed instruction* of every LLM node
+    in the built graph, with the job-varying placeholders still unexpanded. So
+    it identifies the repo-authored text — prompts, category skills, the shared
+    rubric — and carries no submitter bytes at all, which is what makes it
+    publishable beside a report. The generation-identity fingerprint attests to
+    the model and the decoding params; it says nothing about the instructions,
+    so two runs with identical fingerprints and completely different prompts
+    are indistinguishable without this.
+
+    ``domain_packs`` is a fact about *this job's* model rather than the
+    deployment: selection is per-job (:mod:`stride_service.domains`), so the
+    same service gives two submissions different reference material, and the
+    names are the only record of which.
+
+    ``fired_rules`` names the deterministic triggers that matched, where
+    ``coverage`` counts them. The count says how much attention was directed;
+    the IDs say where — which is what an eval measuring candidate usefulness
+    needs, and what a reader asking "why did the agent look there" reads.
+    """
+
+    model_config = ConfigDict(extra="forbid", frozen=True)
+
+    instruction_sha256: str = Field(pattern=r"^[0-9a-f]{64}$")
+    domain_packs: list[str] = Field(default_factory=list)
+    fired_rules: list[str] = Field(default_factory=list)
+
+
 class Job(BaseModel):
     """Identity and timing of the run that produced this report.
 
@@ -1155,6 +1208,12 @@ class StrideReport(BaseModel):
     # about what the six agents did with the system, not about what survived
     # review. Empty on a report built without it (the stub runner's).
     coverage: list[CategoryCoverage] = Field(default_factory=list)
+    # What was in front of the agents: the instruction text, the reference
+    # packs this model earned, the rules that fired. Context, not evidence —
+    # see :class:`AnalysisContext`. ``None`` on a report built without it (the
+    # stub runner's), which is the same absence an empty ``coverage`` records
+    # rather than a claim that nothing informed the run.
+    analysis_context: AnalysisContext | None = None
     summary: Summary
 
     @model_validator(mode="after")

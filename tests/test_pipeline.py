@@ -608,3 +608,61 @@ def test_pipeline_error_names_the_job_when_the_graph_produces_nothing():
     assert "graph produced neither" in str(
         PipelineError("job x: graph produced neither")
     )
+
+
+def test_the_report_records_what_informed_the_analysis():
+    """Context, beside the run rather than inside a finding.
+
+    The report already carried the two ends — what each node ran on, and what
+    each finding rests on — and nothing in between. A pack selection that
+    flipped or a skill that was edited changed the analysis invisibly.
+    """
+    pipeline, _ = build(happy_replies())
+    outcome, _ = run(pipeline, job())
+
+    context = outcome.report.analysis_context
+
+    assert context.instruction_sha256 == pipeline.instruction_sha256
+    # The fixture runs FastAPI over HTTPS against Cloud SQL Postgres.
+    assert context.domain_packs == ["http-api", "databases"]
+    assert all(rule.split("-")[0] for rule in context.fired_rules)
+
+
+def test_two_jobs_on_one_deployment_share_an_instruction_digest():
+    """It identifies the instructions, not the submission.
+
+    Two different inputs through one built graph were told the same things, so
+    the digest must not move — otherwise it would be a second, weaker copy of
+    ``input.source_sha256`` and could not be compared across jobs at all.
+    """
+    pipeline, _ = build(happy_replies())
+
+    first, _ = run(pipeline, job())
+    second, _ = run(
+        pipeline, job(f"{DESCRIPTION_TEXT} The web app also emails receipts.")
+    )
+
+    assert first.report.input.source_sha256 != second.report.input.source_sha256
+    assert (
+        first.report.analysis_context.instruction_sha256
+        == second.report.analysis_context.instruction_sha256
+    )
+
+
+def test_nothing_turns_the_context_into_evidence():
+    """The one rule the block exists under, asserted where it could break.
+
+    A pack informed the analysis; it did not ground anything. The report's own
+    importers are what keep that true — ``AnalysisContext`` is built in the
+    graph and read by nobody, so there is no path from a pack name or a rule ID
+    to a ``Ground``.
+    """
+    from pathlib import Path
+
+    package = Path(__file__).resolve().parents[1] / "src" / "stride_service"
+    importers = {
+        path.name
+        for path in package.glob("*.py")
+        if "AnalysisContext" in path.read_text() and path.name != "report.py"
+    }
+    assert importers == {"graph.py"}
