@@ -196,12 +196,109 @@ class TestRenderCatalog:
         assert positions == sorted(positions)
 
 
+class TestABadReferenceCostsItsEntryNotTheJob:
+    """The fail-closed policy #138 narrowed.
+
+    Agents compose well-formed references to facts the catalog does not hold,
+    and failing the whole analysis over one discarded six lanes of work to
+    punish a citation error — 2 of 12 jobs on a live sweep. The rule is now the
+    one unverified quotes already had: marked per entry, failed closed per
+    threat.
+    """
+
+    def test_a_threat_survives_on_the_references_that_did_resolve(self):
+        catalog = evidence_catalog(valid_model())
+        proposal = sample_proposal(
+            "S-01",
+            evidence_refs=["crossing:flow:composed-by-the-agent", ENCRYPTION_REF],
+            quotes=[],
+        )
+
+        resolution = resolve_proposals([proposal], catalog, "spoofing")
+
+        (draft,) = resolution.drafts
+        assert draft.grounds == [catalog[ENCRYPTION_REF]]
+
+    def test_the_dropped_reference_is_recorded_against_its_threat(self):
+        """Dropped, not rendered: no ground was ever built from it.
+
+        Which is what separates this from an unverified quote — that is a real
+        ground whose text could not be found, so it still renders with a mark
+        beside it. Here there is nothing to render, and the mark is the only
+        trace a reader gets.
+        """
+        catalog = evidence_catalog(valid_model())
+        proposal = sample_proposal(
+            "S-01", evidence_refs=["crossing:flow:ghost", ENCRYPTION_REF], quotes=[]
+        )
+
+        (mark,) = resolve_proposals([proposal], catalog, "spoofing").unresolved
+
+        assert mark.threat_id == "S-01"
+        assert mark.reference == "crossing:flow:ghost"
+
+    def test_a_quote_is_enough_to_keep_a_threat_whose_references_all_fail(self):
+        """Grounds are grounds: the submitter's own words justify a finding."""
+        catalog = evidence_catalog(valid_model())
+        proposal = sample_proposal(
+            "S-01",
+            evidence_refs=["unknown:store:ghost:x"],
+            quotes=[{"text": "Customers log in", "source_label": "Description"}],
+        )
+
+        resolution = resolve_proposals([proposal], catalog, "spoofing")
+
+        assert len(resolution.drafts) == 1
+        assert len(resolution.unresolved) == 1
+
+    def test_a_threat_left_with_no_grounds_at_all_still_fails_the_job(self):
+        """Where the line is, and why it is there.
+
+        ``grounds`` is ``min_length=1``: a finding resting on nothing is the one
+        thing this schema refuses to represent, and no critic could rule on it.
+        Dropping the threat instead would delete a finding silently, which is
+        the worst outcome a security tool has available.
+        """
+        catalog = evidence_catalog(valid_model())
+        proposal = sample_proposal(
+            "S-01", evidence_refs=["crossing:flow:ghost"], quotes=[]
+        )
+
+        with pytest.raises(EvidenceResolutionError, match="nothing is left"):
+            resolve_proposals([proposal], catalog, "spoofing")
+
+    def test_one_groundless_threat_does_not_take_its_lane_down_with_it(self):
+        """Only the threat that cannot stand fails, and it fails the job.
+
+        The batch still reports together, so a run that dies says everything
+        that was wrong rather than the first thing.
+        """
+        catalog = evidence_catalog(valid_model())
+        proposals = [
+            sample_proposal("S-01", evidence_refs=[ENCRYPTION_REF], quotes=[]),
+            sample_proposal("S-02", evidence_refs=["crossing:flow:ghost"], quotes=[]),
+        ]
+
+        with pytest.raises(EvidenceResolutionError) as excinfo:
+            resolve_proposals(proposals, catalog, "spoofing")
+
+        assert "'S-02'" in str(excinfo.value)
+        assert "'S-01'" not in str(excinfo.value)
+
+    def test_a_clean_lane_records_no_marks(self):
+        catalog = evidence_catalog(valid_model())
+
+        resolution = resolve_proposals([sample_proposal()], catalog, "spoofing")
+
+        assert resolution.unresolved == []
+
+
 class TestResolveProposals:
     def test_a_reference_resolves_to_the_catalog_entry_it_names(self):
         catalog = evidence_catalog(valid_model())
         proposal = sample_proposal("S-01", evidence_refs=[ENCRYPTION_REF], quotes=[])
 
-        (draft,) = resolve_proposals([proposal], catalog, "spoofing")
+        (draft,) = resolve_proposals([proposal], catalog, "spoofing").drafts
 
         assert draft.grounds == [catalog[ENCRYPTION_REF]]
 
@@ -213,7 +310,7 @@ class TestResolveProposals:
             quotes=[{"text": "Customers log in", "source_label": "Description"}],
         )
 
-        (draft,) = resolve_proposals([proposal], catalog, "spoofing")
+        (draft,) = resolve_proposals([proposal], catalog, "spoofing").drafts
 
         assert draft.grounds == [
             Ground(kind="quote", text="Customers log in", source_label="Description")
@@ -230,7 +327,7 @@ class TestResolveProposals:
             quotes=[{"text": "Customers log in", "source_label": "Description"}],
         )
 
-        (draft,) = resolve_proposals([proposal], catalog, "spoofing")
+        (draft,) = resolve_proposals([proposal], catalog, "spoofing").drafts
 
         assert [ground.kind for ground in draft.grounds] == [
             "quote",
@@ -242,7 +339,7 @@ class TestResolveProposals:
         """The agent's other seven fields reach the report as written."""
         catalog = evidence_catalog(valid_model())
 
-        (draft,) = resolve_proposals([sample_proposal()], catalog, "spoofing")
+        (draft,) = resolve_proposals([sample_proposal()], catalog, "spoofing").drafts
 
         assert draft == sample_draft()
 
@@ -288,7 +385,7 @@ class TestResolveProposals:
             "S-01", evidence_refs=[f"  {ENCRYPTION_REF} "], quotes=[]
         )
 
-        (draft,) = resolve_proposals([proposal], catalog, "spoofing")
+        (draft,) = resolve_proposals([proposal], catalog, "spoofing").drafts
 
         assert draft.grounds == [catalog[ENCRYPTION_REF]]
 
@@ -338,7 +435,7 @@ class TestTheMisShapeIsUnreachable:
             "S-01", evidence_refs=[LOGIN_CROSSING_REF], quotes=[]
         )
 
-        (draft,) = resolve_proposals([proposal], catalog, "spoofing")
+        (draft,) = resolve_proposals([proposal], catalog, "spoofing").drafts
 
         assert draft.grounds[0].kind == "derived-fact"
         assert draft.grounds[0].flow_id == "flow:customer-to-web-app:login"
@@ -363,7 +460,7 @@ class TestTheMisShapeIsUnreachable:
         catalog = evidence_catalog(valid_model())
         proposal = sample_proposal("S-07", evidence_refs=[ENCRYPTION_REF], quotes=[])
 
-        (draft,) = resolve_proposals([proposal], catalog, "tampering")
+        (draft,) = resolve_proposals([proposal], catalog, "tampering").drafts
 
         assert draft.id == "T-07"
         assert draft.category == "tampering"

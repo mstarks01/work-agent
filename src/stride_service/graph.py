@@ -135,6 +135,7 @@ from stride_service.report import (
     ThreatProposals,
     ThreatRuling,
     ThreatRulings,
+    UnresolvedEvidence,
     UnresolvedMention,
     UnverifiedGround,
     build_summary,
@@ -291,6 +292,7 @@ STATE_MERGED_DRAFTS = "merged_drafts"
 STATE_COVERAGE = "coverage"
 STATE_UNVERIFIED_GROUNDS = "unverified_grounds"
 STATE_UNRESOLVED_MENTIONS = "unresolved_mentions"
+STATE_UNRESOLVED_EVIDENCE = "unresolved_evidence"
 STATE_MISSING_MITIGATIONS = "missing_mitigations"
 STATE_REVIEWED_THREATS = "reviewed_threats"
 # What ``prepare`` put in front of the agents, for the report to record: the
@@ -407,6 +409,7 @@ class Analysis:
     # a rejected threat keeps its grounds, so it keeps their marks too.
     unverified_grounds: list[UnverifiedGround]
     unresolved_mentions: list[UnresolvedMention]
+    unresolved_evidence: list[UnresolvedEvidence]
     missing_mitigations: list[MissingMitigation]
     # Per-lane coverage accounting, computed at the fan-in over the drafts.
     coverage: list[CategoryCoverage]
@@ -455,6 +458,9 @@ class Analysis:
             "unresolved_mentions": [
                 mark.model_dump(mode="json") for mark in self.unresolved_mentions
             ],
+            "unresolved_evidence": [
+                mark.model_dump(mode="json") for mark in self.unresolved_evidence
+            ],
             "missing_mitigations": [
                 mark.model_dump(mode="json") for mark in self.missing_mitigations
             ],
@@ -488,6 +494,10 @@ class Analysis:
             unresolved_mentions=[
                 UnresolvedMention.model_validate(mark)
                 for mark in data["unresolved_mentions"]
+            ],
+            unresolved_evidence=[
+                UnresolvedEvidence.model_validate(mark)
+                for mark in data.get("unresolved_evidence", [])
             ],
             missing_mitigations=[
                 MissingMitigation.model_validate(mark)
@@ -876,7 +886,7 @@ def merge_drafts(
         )
     model = SystemModel.model_validate(valid_model)
     catalog = evidence_catalog(model)
-    drafts_by_category = {
+    resolutions = {
         category: resolve_proposals(
             (
                 ThreatProposal.model_validate(proposal)
@@ -887,6 +897,17 @@ def merge_drafts(
         )
         for category in STRIDE_CATEGORIES
     }
+    drafts_by_category = {
+        category: resolution.drafts for category, resolution in resolutions.items()
+    }
+    # Every reference that named nothing, across all six lanes. Recorded rather
+    # than fatal: a threat standing on two real facts and one composed one is
+    # still justified by the two (#138).
+    ctx.state[STATE_UNRESOLVED_EVIDENCE] = [
+        mark.model_dump(mode="json")
+        for resolution in resolutions.values()
+        for mark in resolution.unresolved
+    ]
     joined = join_drafts(drafts_by_category, model, source_texts or {})
     merged = joined.drafts
     ctx.state[STATE_MERGED_DRAFTS] = [draft.model_dump(mode="json") for draft in merged]
@@ -1013,6 +1034,7 @@ def assemble_report(
     reviewed_threats: dict | None = None,
     unverified_grounds: list | None = None,
     unresolved_mentions: list | None = None,
+    unresolved_evidence: list | None = None,
     missing_mitigations: list | None = None,
     coverage: list | None = None,
     analysis_context: dict | None = None,
@@ -1058,6 +1080,10 @@ def assemble_report(
         rejected_threats=rejected,
         unverified_grounds=[
             UnverifiedGround.model_validate(mark) for mark in unverified_grounds or []
+        ],
+        unresolved_evidence=[
+            UnresolvedEvidence.model_validate(mark)
+            for mark in unresolved_evidence or []
         ],
         unresolved_mentions=[
             UnresolvedMention.model_validate(mark) for mark in unresolved_mentions or []
