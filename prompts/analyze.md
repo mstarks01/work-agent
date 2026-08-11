@@ -61,17 +61,17 @@ Trust zones: `boundary:public-internet` (network), `boundary:dmz` (network), `bo
 
 Its evidence catalog, rendered as yours will be:
 
-```
-[
-  "unknown:process:ledger-service:exposure",
-  "unknown:store:accounts-db:encryption_at_rest",
-  "unknown:flow:payments-provider-to-web-api:settlement-webhook:authentication",
-  "unknown:flow:ledger-service-to-accounts-db:read-write-balances:encryption_in_transit",
-  "crossing:flow:customer-to-web-api:submit-payment",
-  "crossing:flow:payments-provider-to-web-api:settlement-webhook",
-  "crossing:flow:web-api-to-ledger-service:post-transfer"
-]
-```
+7 facts, and this table is all of them.
+
+| cite this exactly | what it says |
+| --- | --- |
+| `unknown:process:ledger-service:exposure` | `exposure` never stated |
+| `unknown:store:accounts-db:encryption_at_rest` | `encryption_at_rest` never stated |
+| `unknown:flow:payments-provider-to-web-api:settlement-webhook:authentication` | `authentication` never stated |
+| `unknown:flow:ledger-service-to-accounts-db:read-write-balances:encryption_in_transit` | `encryption_in_transit` never stated |
+| `crossing:flow:customer-to-web-api:submit-payment` | crosses a trust boundary |
+| `crossing:flow:payments-provider-to-web-api:settlement-webhook` | crosses a trust boundary |
+| `crossing:flow:web-api-to-ledger-service:post-transfer` | crosses a trust boundary |
 
 #### Exemplar system B: fleet telemetry platform
 
@@ -106,20 +106,24 @@ Trust zones: `boundary:field` (network), `boundary:ingest` (network), `boundary:
 
 Its evidence catalog:
 
-```
-[
-  "unknown:process:stream-processor:exposure",
-  "unknown:store:telemetry-store:encryption_at_rest",
-  "unknown:flow:mqtt-broker-to-stream-processor:consume-topic:authentication",
-  "unknown:flow:stream-processor-to-telemetry-store:write-readings:encryption_in_transit",
-  "crossing:flow:sensor-gateway-to-mqtt-broker:publish-telemetry",
-  "crossing:flow:mqtt-broker-to-stream-processor:consume-topic"
-]
-```
+6 facts, and this table is all of them.
+
+| cite this exactly | what it says |
+| --- | --- |
+| `unknown:process:stream-processor:exposure` | `exposure` never stated |
+| `unknown:store:telemetry-store:encryption_at_rest` | `encryption_at_rest` never stated |
+| `unknown:flow:mqtt-broker-to-stream-processor:consume-topic:authentication` | `authentication` never stated |
+| `unknown:flow:stream-processor-to-telemetry-store:write-readings:encryption_in_transit` | `encryption_in_transit` never stated |
+| `crossing:flow:sensor-gateway-to-mqtt-broker:publish-telemetry` | crosses a trust boundary |
+| `crossing:flow:mqtt-broker-to-stream-processor:consume-topic` | crosses a trust boundary |
 
 ## Input
 
-The System Model, already validated; its boundary crossings; then the evidence catalog — every fact in that model you may cite, each as an ID. `unknown:<element>:<attribute>` is an attribute the input never stated; `crossing:<flow>` is a flow whose endpoints sit in different trust zones. The service derived both, so an ID is a fact rather than a claim, and copying one is how you cite it. Then this lane's candidates, any domain reference material, any notes and cases retrieved for them, and the sources — the standing of each is set above.
+The System Model, already validated; its boundary crossings; then the evidence catalog — a table of every fact in that model you may cite. The left column is the ID; the right says what that ID asserts. The service derived every row, so a row is a fact rather than a claim, and copying its ID verbatim is how you cite it.
+
+**Select from the table; never compose.** It is closed and it is complete: an ID you did not copy out of it names nothing, however well-formed it looks, and a threat citing one fails the whole job. If a fact you want to rest on has no row, that is the table telling you the input *stated* that attribute — so the fact is not an unstated one, and what you have is either a quote or a threat you should be resting on something else.
+
+Then this lane's candidates, any domain reference material, any notes and cases retrieved for them, and the sources — the standing of each is set above.
 
 {system_model}
 
