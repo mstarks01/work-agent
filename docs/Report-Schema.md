@@ -23,7 +23,7 @@ and the fields below are the authoritative account.
 
 ```python
 class StrideReport:
-    schema_version: str          # "2.8"
+    schema_version: str          # "2.9"
     disclaimer: str              # AI-generated, not human-reviewed
     job: Job                     # id, status="completed", timestamps, revise_rounds
     input: InputRef              # system_name + one ref per submitted source
@@ -35,6 +35,7 @@ class StrideReport:
     rejected_threats: list[Threat]
     unverified_grounds: list[UnverifiedGround]  # quote grounds not found in their source
     unresolved_mentions: list[UnresolvedMention]  # element IDs a description cites that do not exist
+    unresolved_evidence: list[UnresolvedEvidence]  # evidence refs cited that the catalog does not hold
     missing_mitigations: list[MissingMitigation]  # threats offering no countermeasure, unexcused
     shared_element_names: list[SharedElementName]  # different-typed elements sharing one name slug
     coverage: list[CategoryCoverage]             # per-lane account of what each agent was offered
@@ -172,6 +173,36 @@ finding did not match", which is worth showing a reader and is not grounds for
 hiding the finding. The list is also empty when no source text was available to
 check against, so it is evidence of a *failed* check, never of a check having
 run.
+
+## `unresolved_evidence` — references the catalog does not hold
+
+```python
+class UnresolvedEvidence:
+    threat_id: str               # the threat that cited it
+    reference: str               # the reference as written, e.g. "unknown:flow:ghost:authentication"
+```
+
+The [evidence catalog](#grounds--why-the-finding-was-raised) is closed and
+derived, so a reference outside it names no fact and **no ground can be built
+from it**. That is what separates this from `unverified_grounds`: an unverified
+quote is a real ground whose text the service could not find, and it still
+renders. Here there is nothing to render, so the entry is dropped and this mark
+is the only trace.
+
+**Marked per reference, failed closed per threat.** A threat citing three facts,
+one of them composed, is still justified by the two that resolve. A threat whose
+evidence resolves to *nothing at all* has no justification left and fails the
+job, because `grounds` is `min_length=1` and a finding resting on nothing is
+what this schema refuses to represent.
+
+This narrowed a whole-job failure in 2.9. Agents compose well-formed references
+— correct grammar, plausible element IDs, absent from the set — and a live sweep
+lost 2 of 12 jobs to it. Discarding six lanes of analysis because one threat
+named one fact that does not exist is the trade `unresolved_mentions` already
+refused to make. See [ADR 0009](adr/0009-a-bad-reference-costs-its-entry.md).
+
+A consumer that read "the job returned" as "every citation resolved" was relying
+on an absence; this list is where that guarantee now lives.
 
 ## `unresolved_mentions` — IDs the prose cites that do not exist
 
@@ -495,6 +526,12 @@ class TokenUsage:
 > Optional, service-owned and computed in code — additive on the same argument
 > as the four lists before it, and the first block describing what *informed*
 > the analysis rather than what it found.
+
+> **`schema_version` 2.9** added `unresolved_evidence`, a sixth optional list of
+> service-owned marks. Additive by the same rule as the marks before it. What
+> moved beside it is a *behaviour*: an evidence reference the catalog does not
+> hold used to fail the whole job, and is now dropped and marked, with only a
+> groundless threat still failing.
 
 > **`schema_version` 2.8** added `knowledge_docs` to that block: the local-corpus
 > notes and cases the fired rules retrieved for the agents. Additive and
