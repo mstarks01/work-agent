@@ -590,17 +590,22 @@ def test_prepare_shows_the_agents_the_evidence_catalog_as_references(
 ):
     """The closed set an agent picks from, and no more than that.
 
-    Rendered as bare IDs: the fields behind each one are the element and flow
-    IDs of the model in the block above, so sending the resolved objects too
-    would restate what the agent is already reading.
+    Rendered as a table of IDs and what each asserts, never as the resolved
+    objects: the fields behind an entry are element and flow IDs of the model in
+    the block above, so sending those too would restate what the agent is
+    already reading. The table shape is load-bearing rather than cosmetic — a
+    JSON array of IDs read as a specimen of the format and got composed from
+    (#138).
     """
     ctx = FakeContext()
     graph.prepare_analysis(
         valid_model().model_dump(mode="json"), ctx, skill_loader, knowledge_loader
     )
 
-    rendered = json.loads(ctx.state[graph.STATE_EVIDENCE_CATALOG])
-    assert "crossing:flow:customer-to-web-app:login" in rendered
+    rendered = ctx.state[graph.STATE_EVIDENCE_CATALOG]
+    assert "| `crossing:flow:customer-to-web-app:login` |" in rendered
+    assert "crosses a trust boundary" in rendered
+    assert not rendered.lstrip().startswith("["), "a list is what agents composed from"
     assert all(isinstance(ref, str) for ref in rendered)
 
 

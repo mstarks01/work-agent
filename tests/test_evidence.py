@@ -17,6 +17,7 @@ from stride_service.evidence import (
     EvidenceResolutionError,
     crossing_evidence_ref,
     evidence_catalog,
+    render_catalog,
     resolve_proposals,
     unknown_evidence_ref,
 )
@@ -122,6 +123,77 @@ class TestEvidenceCatalog:
         )
 
         assert evidence_catalog(empty) == {}
+
+
+class TestRenderCatalog:
+    """The shape agents select from — a fix for #138, not a presentation choice.
+
+    Agents composed well-formed references to facts the catalog did not hold,
+    which fails the whole job. A JSON array of IDs reads as a specimen of the
+    format; these pin the properties that make the rendering a menu instead.
+    """
+
+    def test_every_entry_appears_as_its_own_row(self):
+        catalog = evidence_catalog(valid_model())
+        rendered = render_catalog(catalog)
+
+        for ref in catalog:
+            assert f"| `{ref}` |" in rendered
+
+    def test_it_is_not_a_list_an_agent_could_pattern_complete(self):
+        rendered = render_catalog(evidence_catalog(valid_model()))
+
+        assert not rendered.lstrip().startswith("[")
+        assert "| cite this exactly |" in rendered
+
+    def test_it_states_how_many_facts_there_are(self):
+        """The count is what makes the set readable as closed rather than as a sample."""
+        catalog = evidence_catalog(valid_model())
+
+        assert f"{len(catalog)} facts" in render_catalog(catalog)
+
+    def test_the_two_kinds_of_fact_read_differently(self):
+        """An unstated attribute and a derived crossing are not interchangeable.
+
+        An agent that conflates them cites the wrong one, so the gloss carries
+        the distinction the ID prefix alone makes easy to skim past.
+        """
+        rendered = render_catalog(
+            {
+                "unknown:store:accounts-db:encryption_at_rest": Ground(
+                    kind="unknown-attribute",
+                    element_id="store:accounts-db",
+                    attribute="encryption_at_rest",
+                ),
+                "crossing:flow:a-to-b:call": Ground(
+                    kind="derived-fact", flow_id="flow:a-to-b:call"
+                ),
+            }
+        )
+
+        assert "`encryption_at_rest` never stated" in rendered
+        assert "crosses a trust boundary" in rendered
+
+    def test_an_empty_catalog_renders_no_rows(self):
+        """A model with every control stated and no crossing is legal, if rare."""
+        rendered = render_catalog({})
+
+        assert "0 facts" in rendered
+        assert "| `" not in rendered
+
+    def test_rendering_is_stable_across_calls(self):
+        """Two runs over one model must send byte-identical instructions."""
+        catalog = evidence_catalog(valid_model())
+
+        assert render_catalog(catalog) == render_catalog(catalog)
+
+    def test_row_order_is_the_catalogs_own(self):
+        """Which is the model's, so a diff between runs means the model moved."""
+        catalog = evidence_catalog(valid_model())
+        rendered = render_catalog(catalog)
+        positions = [rendered.index(f"| `{ref}` |") for ref in catalog]
+
+        assert positions == sorted(positions)
 
 
 class TestResolveProposals:
