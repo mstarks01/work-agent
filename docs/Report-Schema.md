@@ -23,7 +23,7 @@ and the fields below are the authoritative account.
 
 ```python
 class StrideReport:
-    schema_version: str          # "2.5"
+    schema_version: str          # "2.6"
     disclaimer: str              # AI-generated, not human-reviewed
     job: Job                     # id, status="completed", timestamps, revise_rounds
     input: InputRef              # system_name + one ref per submitted source
@@ -396,7 +396,10 @@ class TokenUsage:
 
 - **`sampling`** lists the decoding parameters each tier actually used, once per
   tier: `{"base": {"temperature": 0.0, ...}, "strong": {...}}`. A parameter left
-  to the model's default shows as `null`.
+  to the model's default shows as `null`. Values are whatever the param resolves
+  to — a number, a count, a boolean, or a string for `thinking`, whose values are
+  `"low"`, `"medium"` and `"high"` — so a consumer reading this block must not
+  assume numbers.
 - **`model`** is what *answered* — the build the provider reported, joined to its
   vendor prefix, e.g. `vertex_ai/gemini-2.5-pro-002`.
 - **`requested_model`** is what was *asked for* — the configured route, e.g.
@@ -437,6 +440,14 @@ class TokenUsage:
 > although it is the first mark describing the model rather than the threats,
 > since what a consumer must do with an unknown field does not depend on what
 > the field describes.
+
+> **`schema_version` 2.6** widened the *values* the `sampling` block can carry
+> to every type a resolved decoding param holds, which includes `thinking`'s
+> enum string. No field was added, removed or renamed, and nothing a 2.5
+> consumer already parses changed meaning — the block was typed to numbers, so a
+> report carrying a string here could never be produced. The first entry in this
+> list that is a fix rather than an addition: a deployment that set `thinking`
+> ran its whole graph and then failed to assemble a report.
 
 The report records both model fields and **compares neither**. It doesn't need
 to: if the build moves, the fingerprint moves with it, and the run stops

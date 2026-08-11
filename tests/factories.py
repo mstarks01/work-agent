@@ -50,7 +50,7 @@ from stride_service.report import (
     Verdict,
     build_summary,
 )
-from stride_service.sampling import load_sampling
+from stride_service.sampling import SamplingConfig, load_sampling
 from stride_service.sources import DEFAULT_DESCRIPTION_LABEL, Source
 from stride_service.system_model import (
     Assumption,
@@ -479,6 +479,7 @@ def scripted_pipeline(
     *,
     llm_class: type[ScriptedLlm] = ScriptedLlm,
     entry: Entry = ENTRY_EXTRACT,
+    sampling: SamplingConfig | None = None,
 ) -> tuple[Pipeline, dict[str, ScriptedLlm]]:
     """The real graph, with every LLM node bound to its scripted stand-in.
 
@@ -487,6 +488,12 @@ def scripted_pipeline(
     stamping under test are the shipped ones. The tier adapters are
     short-circuited by passing ``resolve_model`` directly: building them would
     run the credential check, which an offline test has no credentials to pass.
+
+    ``sampling`` substitutes another *legal* deployment's decoding params for
+    the shipped ones. The shipped file leaves several offered params unset, so
+    without this the only values any test ever stamps are the ones this
+    repository happens to ship — and a param no test sets is a param whose
+    journey to the report nothing checks.
     """
     models: dict[str, ScriptedLlm] = {}
     graph_node_of = {
@@ -507,7 +514,9 @@ def scripted_pipeline(
         return models[node]
 
     tiers = repo_tiers()
-    sampling = load_sampling(PROJECT_ROOT / "config" / "sampling.toml", env={})
+    sampling = sampling or load_sampling(
+        PROJECT_ROOT / "config" / "sampling.toml", env={}
+    )
     pipeline = build_pipeline(
         skill_loader=MarkdownLoader(PROJECT_ROOT / "skills"),
         prompt_loader=MarkdownLoader(PROJECT_ROOT / "prompts"),

@@ -285,6 +285,35 @@ def test_report_stamps_the_per_tier_sampling_clear_block():
     }
 
 
+def test_a_tier_running_a_reasoning_effort_still_produces_a_report():
+    """The clear block records every param a tier can resolve, not only numbers.
+
+    ``thinking`` is an offered param: the file documents it, the env overrides
+    reach it, the build-time gate checks it, and it enters the fingerprint. It
+    is also the only one whose resolved value is a string — and the block was
+    typed to numbers, so setting it produced reports that could not be
+    assembled. The cost of that shape is what makes this a regression test
+    rather than a schema nicety: nothing failed at startup, and nothing failed
+    at the gate. The job ran the whole graph, paid for every node, and died at
+    assembly.
+    """
+    sampling = load_sampling(
+        PROJECT_ROOT / "config" / "sampling.toml",
+        env={"STRIDE_SAMPLING_STRONG_THINKING": "low"},
+    )
+    pipeline, _ = build(happy_replies(), sampling=sampling)
+
+    outcome, _ = run(pipeline, job())
+
+    assert outcome.report.sampling["strong"]["thinking"] == "low"
+    # Round-trips rather than merely surviving: a value stored in a type the
+    # fingerprint cannot be recomputed from would satisfy the line above and
+    # leave every hash in the report unverifiable.
+    assert TierSampling(**outcome.report.sampling["strong"]) == sampling.for_tier(
+        "strong"
+    )
+
+
 def test_each_llm_node_fingerprint_recomputes_from_the_artifact():
     """The per-node hash is derivable from the clear block + served model alone.
 
