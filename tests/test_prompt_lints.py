@@ -159,18 +159,22 @@ def source_block(system):
 def catalog(system):
     """One exemplar system's evidence catalog, as the list of IDs it renders to.
 
-    Found by shape, like the source block: the one fenced block in the section
-    that parses as a JSON array of strings, which is exactly what
-    ``prepare_analysis`` puts in front of an agent.
+    Found by shape, like the source block: the rows of the table whose left
+    column is a backticked ID, which is exactly what ``prepare_analysis`` puts
+    in front of an agent (:func:`~stride_service.evidence.render_catalog`).
+    A table rather than a JSON array because a list of well-formed IDs reads as
+    a specimen of the format and got composed from rather than selected out of
+    (#138); the exemplars show the shape an agent actually receives, so they
+    moved with it.
     """
-    for block in re.findall(r"^`{3,}\n(.*?)^`{3,}$", system, re.MULTILINE | re.DOTALL):
-        try:
-            parsed = json.loads(block)
-        except json.JSONDecodeError:
-            continue
-        if isinstance(parsed, list) and all(isinstance(ref, str) for ref in parsed):
-            return parsed
-    raise AssertionError("an exemplar system carries no evidence catalog block")
+    refs = [
+        ref
+        for ref in re.findall(r"^\| `([^`]+)` \| ", system, re.MULTILINE)
+        if ref.startswith((f"{UNKNOWN_PREFIX}:", f"{CROSSING_PREFIX}:"))
+    ]
+    if not refs:
+        raise AssertionError("an exemplar system carries no evidence catalog block")
+    return refs
 
 
 def owning_system(proposal):
@@ -474,8 +478,16 @@ def test_no_non_markdown_files_under_prompts():
 # and — for a lane whose rules fired — up to two retrieved notes and one case
 # (~1.1K at their own caps). Those are runtime values rather than prompt text,
 # capped where they are produced; this budget governs the static instruction
-# only, and it moved by 100 with the body cap it has to accommodate.
-COMPOSED_ANALYZE_TOKEN_BUDGET = 4900
+# only, and it moves with the body cap it has to accommodate — by 100 for the
+# retrieved corpus, then by 300 for the evidence catalog becoming a table
+# (#138), which is argued at ``ANALYZE_PROMPT_TOKEN_CAP`` rather than restated
+# here.
+#
+# The catalog's *runtime* rendering grew too, by roughly one short clause per
+# entry. It is job-varying so it does not land in this number, but it is not
+# free: a large model pays it per lane, which is the trade for jobs that no
+# longer die on a composed reference.
+COMPOSED_ANALYZE_TOKEN_BUDGET = 5300
 
 
 @pytest.mark.parametrize("category", STRIDE_CATEGORIES)

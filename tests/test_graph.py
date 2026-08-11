@@ -63,6 +63,7 @@ RUNTIME_PLACEHOLDERS = frozenset(
         *(graph.candidates_state_key(category) for category in STRIDE_CATEGORIES),
         *(graph.notes_state_key(category) for category in STRIDE_CATEGORIES),
         *(graph.cases_state_key(category) for category in STRIDE_CATEGORIES),
+        *(graph.scope_state_key(category) for category in STRIDE_CATEGORIES),
     }
 )
 
@@ -590,17 +591,22 @@ def test_prepare_shows_the_agents_the_evidence_catalog_as_references(
 ):
     """The closed set an agent picks from, and no more than that.
 
-    Rendered as bare IDs: the fields behind each one are the element and flow
-    IDs of the model in the block above, so sending the resolved objects too
-    would restate what the agent is already reading.
+    Rendered as a table of IDs and what each asserts, never as the resolved
+    objects: the fields behind an entry are element and flow IDs of the model in
+    the block above, so sending those too would restate what the agent is
+    already reading. The table shape is load-bearing rather than cosmetic — a
+    JSON array of IDs read as a specimen of the format and got composed from
+    (#138).
     """
     ctx = FakeContext()
     graph.prepare_analysis(
         valid_model().model_dump(mode="json"), ctx, skill_loader, knowledge_loader
     )
 
-    rendered = json.loads(ctx.state[graph.STATE_EVIDENCE_CATALOG])
-    assert "crossing:flow:customer-to-web-app:login" in rendered
+    rendered = ctx.state[graph.STATE_EVIDENCE_CATALOG]
+    assert "| `crossing:flow:customer-to-web-app:login` |" in rendered
+    assert "crosses a trust boundary" in rendered
+    assert not rendered.lstrip().startswith("["), "a list is what agents composed from"
     assert all(isinstance(ref, str) for ref in rendered)
 
 
@@ -958,6 +964,24 @@ def test_prepare_parks_each_lanes_candidates_under_its_own_key(
         assert f'"category": "{category}"' in parked
         others = set(STRIDE_CATEGORIES) - {category}
         assert not any(f'"category": "{other}"' in parked for other in others)
+
+
+def test_prepare_gives_each_lane_its_own_denominators(skill_loader, knowledge_loader):
+    """The scope line is per lane because the rule counts are.
+
+    Elements and crossings are properties of the model and identical across the
+    six, but which rules ran and how many fired is not — and a lane reading
+    another's firing count would be told it had leads it never got.
+    """
+    ctx = FakeContext()
+    graph.prepare_analysis(
+        valid_model().model_dump(mode="json"), ctx, skill_loader, knowledge_loader
+    )
+
+    for category in STRIDE_CATEGORIES:
+        parked = ctx.state[graph.scope_state_key(category)]
+        assert f"{category} rules ran" in parked
+        assert "7 elements" in parked
 
 
 def test_prepare_fences_candidate_facts(skill_loader, knowledge_loader):
