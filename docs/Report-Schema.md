@@ -23,7 +23,7 @@ and the fields below are the authoritative account.
 
 ```python
 class StrideReport:
-    schema_version: str          # "2.9"
+    schema_version: str          # "2.10"
     disclaimer: str              # AI-generated, not human-reviewed
     job: Job                     # id, status="completed", timestamps, revise_rounds
     input: InputRef              # system_name + one ref per submitted source
@@ -537,6 +537,15 @@ class TokenUsage:
 > notes and cases the fired rules retrieved for the agents. Additive and
 > service-owned like the rest of it, and under the same rule — a document
 > informed the analysis and grounds nothing.
+
+> **`schema_version` 2.10** corrected what `coverage[].elements_cited` counts,
+> and holds every `*_cited` half to the total beside it. The definition above is
+> unchanged; the computation counted prose citations raw, so an ID a description
+> named that the model does not contain was counted as a cited element and the
+> numerator could exceed its denominator. Minor by the rule above — no field is
+> added, removed or renamed, and none changes meaning. Read it anyway if you
+> stored rows: one carrying more cited than offered no longer validates, and a
+> citation rate you computed off such a row was above 1.0 and is now correct.
 
 The report records both model fields and **compares neither**. It doesn't need
 to: if the build moves, the fingerprint moves with it, and the run stops

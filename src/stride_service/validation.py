@@ -27,7 +27,7 @@ from typing import Literal
 
 from pydantic import BaseModel, ConfigDict, ValidationError
 
-from stride_service.grounding import verify_quote
+from stride_service.grounding import normalize, verify_normalized
 from stride_service.references import canonical
 from stride_service.system_model import (
     CORE_ASSET_TAGS,
@@ -238,6 +238,9 @@ def _citation_issues(
     if not sources:
         return []
 
+    # Folded once, then reused across every element's excerpt — the gate admits
+    # up to ``MAX_ELEMENTS`` of them against the same handful of sources.
+    folded = {label: normalize(text) for label, text in sources.items()}
     issues: list[ValidationIssue] = []
     for element in elements:
         if not element.source_excerpt:
@@ -267,8 +270,8 @@ def _citation_issues(
                     field="source_label",
                 )
             )
-        elif sources[label] and not verify_quote(
-            element.source_excerpt, sources[label]
+        elif sources[label] and not verify_normalized(
+            element.source_excerpt, folded[label]
         ):
             issues.append(
                 ValidationIssue(

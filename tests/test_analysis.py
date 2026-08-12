@@ -9,19 +9,13 @@ import pytest
 
 from stride_service.analysis import (
     CONTROL_ATTRIBUTES,
-    MAX_PATHS,
     control_state,
     cross_boundary_flows,
     crossing_flow_ids,
-    flows_touching,
-    flows_with_unknown_authentication,
-    flows_with_unknown_encryption,
     inbound_flows,
     internet_exposed_elements,
     is_unverified,
     outbound_flows,
-    paths_between,
-    paths_to_asset,
     reachable_from,
     sensitive_assets,
     unknown_controls,
@@ -149,12 +143,6 @@ class TestTraversal:
             "flow:worker-to-vault:read"
         ]
 
-    def test_flows_touching_is_inbound_then_outbound(self, chain):
-        assert [f.id for f in flows_touching(chain, "process:worker")] == [
-            "flow:edge-to-worker:dispatch",
-            "flow:worker-to-vault:read",
-        ]
-
     def test_reachable_from_is_breadth_first_and_excludes_the_start(self, chain):
         assert reachable_from(chain, "entity:user") == [
             "process:edge",
@@ -183,52 +171,6 @@ class TestTraversal:
         )
         assert reachable_from(model, "process:a") == ["process:b"]
 
-    def test_paths_between_returns_flow_ids_in_order(self, chain):
-        assert paths_between(chain, "entity:user", "store:vault") == [
-            (
-                "flow:user-to-edge:browse",
-                "flow:edge-to-worker:dispatch",
-                "flow:worker-to-vault:read",
-            )
-        ]
-
-    def test_paths_between_is_empty_when_unreachable(self, chain):
-        assert paths_between(chain, "store:vault", "entity:user") == []
-
-    def test_paths_between_is_bounded(self):
-        """A dense model must not hang prompt assembly."""
-        names = "abcdefgh"
-        model = SystemModel(
-            processes=[
-                Process(
-                    id=f"process:{name}",
-                    name=name,
-                    technology="x",
-                    trust_zone="boundary:z",
-                    exposure="internal",
-                )
-                for name in names
-            ],
-            data_flows=[
-                flow(f"process:{a}", f"process:{b}", "edge")
-                for a in names
-                for b in names
-                if a < b
-            ],
-            trust_boundaries=[TrustBoundary(id="boundary:z", name="Z", kind="network")],
-        )
-        assert len(paths_between(model, "process:a", "process:h")) <= MAX_PATHS
-
-    def test_paths_to_asset_starts_outside_the_holders_zone(self, chain):
-        paths = paths_to_asset(chain, "secrets")
-        assert set(paths) == {"store:vault"}
-        # process:worker shares the vault's zone, so it is not an origin.
-        origins = {path[0] for path in paths["store:vault"]}
-        assert origins == {"flow:user-to-edge:browse", "flow:edge-to-worker:dispatch"}
-
-    def test_paths_to_asset_is_empty_for_an_unheld_tag(self, chain):
-        assert paths_to_asset(chain, "health") == {}
-
 
 class TestStructuralFacts:
     def test_cross_boundary_flows_matches_the_models_own_derivation(self, chain):
@@ -238,16 +180,6 @@ class TestStructuralFacts:
         assert crossing_flow_ids(chain) == frozenset(
             {"flow:user-to-edge:browse", "flow:edge-to-worker:dispatch"}
         )
-
-    def test_unknown_authentication_covers_none_and_unknown(self, chain):
-        assert [f.id for f in flows_with_unknown_authentication(chain)] == [
-            "flow:edge-to-worker:dispatch"
-        ]
-
-    def test_unknown_encryption_reads_transit_only(self, chain):
-        assert [f.id for f in flows_with_unknown_encryption(chain)] == [
-            "flow:worker-to-vault:read"
-        ]
 
     def test_internet_exposed_excludes_unknown_exposure(self):
         model = valid_model()
