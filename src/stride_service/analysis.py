@@ -36,7 +36,7 @@ this is analysis over it.
 from __future__ import annotations
 
 import re
-from collections.abc import Iterator, Sequence
+from collections.abc import Iterator
 from typing import Literal
 
 from pydantic import BaseModel, ConfigDict, Field
@@ -47,26 +47,19 @@ from stride_service.system_model import (
     DataFlow,
     Element,
     SystemModel,
-    TrustBoundary,
 )
 
 __all__ = [
     "CONTROL_ATTRIBUTES",
-    "MAX_PATHS",
-    "MAX_PATH_LENGTH",
     "ControlState",
     "UnknownControl",
     "control_state",
     "cross_boundary_flows",
     "crossing_flow_ids",
-    "flows_with_unknown_authentication",
-    "flows_with_unknown_encryption",
     "inbound_flows",
     "internet_exposed_elements",
     "is_unverified",
     "outbound_flows",
-    "paths_between",
-    "paths_to_asset",
     "reachable_from",
     "sensitive_assets",
     "unknown_controls",
@@ -103,15 +96,6 @@ SENSITIVE_ASSET_TAGS = frozenset(
 # that exists, and reading "no" as absence would delete a control the text
 # actually named.
 _LEADING_CONTROL_TOKEN_RE = re.compile(r"^\s*(unknown|none)\b", re.IGNORECASE)
-
-# Bounds on :func:`paths_between`. Simple-path enumeration is exponential in
-# the worst case and a System Model is caller-shaped, so both are capped: a
-# traversal helper that can hang the graph on a dense model is not
-# deterministic in any sense that matters. Sized for the shape these paths are
-# used for — a foothold and what it reaches next — not for exhaustive graph
-# theory.
-MAX_PATHS = 50
-MAX_PATH_LENGTH = 8
 
 
 class UnknownControl(BaseModel):
@@ -191,65 +175,9 @@ def reachable_from(model: SystemModel, element_id: str) -> list[str]:
     return order
 
 
-def paths_between(
-    model: SystemModel, source_id: str, destination_id: str
-) -> list[tuple[str, ...]]:
-    """Simple flow paths from source to destination, as tuples of flow IDs.
-
-    Depth-first with no element repeated, bounded by :data:`MAX_PATHS` and
-    :data:`MAX_PATH_LENGTH`. Truncation is silent by design: a caller wanting
-    "is there a route, and what does the short one look like" is answered by
-    the first few paths, and a helper that raised on a dense model would fail
-    a job over a fact nobody asked to be exhaustive about.
-    """
-    paths: list[tuple[str, ...]] = []
-
-    def walk(current: str, visited: frozenset[str], taken: tuple[str, ...]) -> None:
-        if len(taken) >= MAX_PATH_LENGTH:
-            return
-        for flow in outbound_flows(model, current):
-            # Checked per edge rather than per frame: an unwinding recursion
-            # would otherwise append one more path at every level on the way
-            # out, and the cap would be a suggestion.
-            if len(paths) >= MAX_PATHS:
-                return
-            if flow.destination == destination_id:
-                paths.append((*taken, flow.id))
-            elif flow.destination not in visited:
-                walk(flow.destination, visited | {flow.destination}, (*taken, flow.id))
-
-    walk(source_id, frozenset({source_id}), ())
-    return paths
-
-
 def sensitive_assets(element: Element) -> tuple[str, ...]:
     """The element's asset tags whose disclosure is itself a loss."""
     return tuple(tag for tag in element.assets if tag in SENSITIVE_ASSET_TAGS)
-
-
-def paths_to_asset(model: SystemModel, asset: str) -> dict[str, list[tuple[str, ...]]]:
-    """For each element carrying ``asset``, the paths reaching it from outside.
-
-    "Outside" is every element in a *different* trust zone, which is the only
-    structural definition of an attacker's starting point this module has. The
-    result is keyed by the asset-carrying element so a caller can ask "what is
-    the shortest way in" without re-walking the graph.
-    """
-    zones = _zone_by_id(model)
-    holders = [
-        element
-        for element in model.elements()
-        if asset in element.assets and element.id in zones
-    ]
-    return {
-        holder.id: [
-            path
-            for origin, origin_zone in zones.items()
-            if origin_zone != zones[holder.id]
-            for path in paths_between(model, origin, holder.id)
-        ]
-        for holder in holders
-    }
 
 
 def cross_boundary_flows(model: SystemModel) -> list[BoundaryCrossing]:
@@ -265,18 +193,6 @@ def cross_boundary_flows(model: SystemModel) -> list[BoundaryCrossing]:
 def crossing_flow_ids(model: SystemModel) -> frozenset[str]:
     """The IDs of the flows that cross a trust boundary."""
     return frozenset(crossing.flow_id for crossing in cross_boundary_flows(model))
-
-
-def flows_with_unknown_authentication(model: SystemModel) -> list[DataFlow]:
-    """Flows whose ``authentication`` is unverified or stated absent."""
-    return [flow for flow in model.data_flows if is_unverified(flow.authentication)]
-
-
-def flows_with_unknown_encryption(model: SystemModel) -> list[DataFlow]:
-    """Flows whose ``encryption_in_transit`` is unverified or stated absent."""
-    return [
-        flow for flow in model.data_flows if is_unverified(flow.encryption_in_transit)
-    ]
 
 
 def internet_exposed_elements(model: SystemModel) -> list[Element]:
@@ -321,11 +237,7 @@ def zone_kinds(model: SystemModel) -> dict[str, str]:
     rule, so this is the one lookup that turns "these zones differ" into
     "this crossing is a *privilege* transition".
     """
-    return {
-        boundary.id: boundary.kind
-        for boundary in model.trust_boundaries
-        if isinstance(boundary, TrustBoundary)
-    }
+    return {boundary.id: boundary.kind for boundary in model.trust_boundaries}
 
 
 def _control_values(element: Element) -> Iterator[tuple[str, str, ControlState]]:
@@ -339,21 +251,3 @@ def _control_values(element: Element) -> Iterator[tuple[str, str, ControlState]]
 def _zone_by_id(model: SystemModel) -> dict[str, str]:
     """Zoned element ID -> its trust zone. Flows and boundaries have none."""
     return {element.id: element.trust_zone for element in model.zoned_elements()}
-
-
-def endpoints_of(model: SystemModel, flow: DataFlow) -> tuple[Element | None, ...]:
-    """The flow's source and destination elements, or ``None`` where dangling.
-
-    A validated model has neither endpoint dangling; the ``None`` exists so a
-    trigger over a hand-built model degrades to "no candidate" rather than
-    raising inside prompt assembly.
-    """
-    return (model.get(flow.source), model.get(flow.destination))
-
-
-def flows_touching(model: SystemModel, element_id: str) -> Sequence[DataFlow]:
-    """Every flow with this element at either end, inbound first."""
-    return [
-        *inbound_flows(model, element_id),
-        *outbound_flows(model, element_id),
-    ]
