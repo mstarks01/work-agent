@@ -55,8 +55,21 @@ gh api --method POST repos/mstarks01/work-agent/issues/<child>/dependencies/bloc
 
 ### The live map
 
-**None.** [#76](https://github.com/mstarks01/work-agent/issues/76) completed 2026-08-04 and has
-moved to Completed efforts below. Chart a new one only against the bar at the end of this file.
+[#158 — Map: one validated system representation, many security frameworks](https://github.com/mstarks01/work-agent/issues/158)
+— charted 2026-08-12 from [#139](https://github.com/mstarks01/work-agent/issues/139), 11 tickets, 0 resolved.
+A **planning** map: it settles the spec for a framework-neutral analysis layer, where one extraction and one
+**Valid System Model** feed N in-repo framework packages, and it stops at the spec. STRIDE becomes the first
+package rather than the architecture; ASVS proves the second.
+
+The frontier is [#159](https://github.com/mstarks01/work-agent/issues/159) (inventory the STRIDE coupling
+surface), [#160](https://github.com/mstarks01/work-agent/issues/160) (what ASVS 5.0 needs a system
+representation to say) and [#161](https://github.com/mstarks01/work-agent/issues/161) (does a job select its
+frameworks). Everything else waits on [#162](https://github.com/mstarks01/work-agent/issues/162), the
+taxonomy ruling, which is the cost driver of the map.
+
+Two constraints ride the whole effort. A framework package is **in-repo only** — no third-party code loads.
+And the no-shim rule removes "decide later" from the report envelope, so
+[#168](https://github.com/mstarks01/work-agent/issues/168) cuts over once or declares no change.
 
 ### Completed efforts
 
