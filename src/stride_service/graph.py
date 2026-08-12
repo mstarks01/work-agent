@@ -784,7 +784,7 @@ def prepare_analysis(
         "evidence_count": len(catalog),
         "candidate_count": sum(len(each.candidates) for each in candidates.values()),
         "domain_packs": list(packs),
-        "knowledge_docs": len(set(retrieved)),
+        "knowledge_doc_count": len(set(retrieved)),
     }
 
 
