@@ -146,11 +146,6 @@ def _clip(value: str) -> str:
     return value[:MAX_FACT_CHARS]
 
 
-def _control_fact(value: str) -> dict[str, Fact]:
-    """An attribute's raw value and the state the leading token puts it in."""
-    return {"value": _clip(value), "state": control_state(value)}
-
-
 # --- Spoofing ---------------------------------------------------------------
 
 
