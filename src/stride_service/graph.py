@@ -124,11 +124,11 @@ from stride_service.prompts import (
 from stride_service.report import (
     STRIDE_CATEGORIES,
     AnalysisContext,
+    AnalysisMarks,
     CategoryCoverage,
     DraftThreat,
     InputRef,
     Job,
-    MissingMitigation,
     NodeRun,
     SharedElementName,
     StrideCategory,
@@ -139,9 +139,6 @@ from stride_service.report import (
     ThreatProposals,
     ThreatRuling,
     ThreatRulings,
-    UnresolvedEvidence,
-    UnresolvedMention,
-    UnverifiedGround,
     build_summary,
 )
 from stride_service.resilience import ResilienceConfig
@@ -294,10 +291,11 @@ STATE_EXTRACTED_MODEL = "extracted_model"
 STATE_VALID_MODEL = "valid_model"
 STATE_MERGED_DRAFTS = "merged_drafts"
 STATE_COVERAGE = "coverage"
-STATE_UNVERIFIED_GROUNDS = "unverified_grounds"
-STATE_UNRESOLVED_MENTIONS = "unresolved_mentions"
-STATE_UNRESOLVED_EVIDENCE = "unresolved_evidence"
-STATE_MISSING_MITIGATIONS = "missing_mitigations"
+# Every service-owned mark the fan-in produced, as one
+# :class:`~stride_service.report.AnalysisMarks`. One key rather than one per
+# mark kind: they share an owner, a standing and a policy, so a sixth kind is a
+# field on that model and nothing here.
+STATE_MARKS = "marks"
 STATE_REVIEWED_THREATS = "reviewed_threats"
 # What ``prepare`` put in front of the agents, for the report to record: the
 # packs this model earned and the rules that fired. Written where the selection
@@ -417,17 +415,12 @@ class Analysis:
     boundary_crossings: list[BoundaryCrossing]
     threats: list[Threat]
     rejected_threats: list[Threat]
-    # Service-owned, computed at the fan-in, and covering both arrays above —
-    # a rejected threat keeps its grounds, so it keeps their marks too.
-    unverified_grounds: list[UnverifiedGround]
-    unresolved_mentions: list[UnresolvedMention]
-    unresolved_evidence: list[UnresolvedEvidence]
-    missing_mitigations: list[MissingMitigation]
+    # Every service-owned mark, as one value. They cover both threat arrays
+    # above — a rejected threat keeps its grounds, so it keeps their marks too
+    # — plus the one mark that is about the model rather than about a threat.
+    marks: AnalysisMarks
     # Per-lane coverage accounting, computed at the fan-in over the drafts.
     coverage: list[CategoryCoverage]
-    # The one mark about the model rather than the threats, so it is derived
-    # from the valid model rather than collected from the drafts.
-    shared_element_names: list[SharedElementName]
     # What ``prepare`` put in front of the agents. Two halves of one record,
     # carried loose rather than as an :class:`~stride_service.report.AnalysisContext`
     # because its third field — the instruction digest — is a fact about the
@@ -486,11 +479,15 @@ class Analysis:
             boundary_crossings=self.boundary_crossings,
             threats=self.threats,
             rejected_threats=self.rejected_threats,
-            unverified_grounds=self.unverified_grounds,
-            unresolved_mentions=self.unresolved_mentions,
-            unresolved_evidence=self.unresolved_evidence,
-            missing_mitigations=self.missing_mitigations,
-            shared_element_names=self.shared_element_names,
+            # The report keeps its five top-level arrays; this is the one place
+            # the marks become them. Written out rather than unpacked, so the
+            # type checker sees each field, and held to the whole set by
+            # ``test_every_shared_field_is_carried``.
+            unverified_grounds=self.marks.unverified_grounds,
+            unresolved_mentions=self.marks.unresolved_mentions,
+            unresolved_evidence=self.marks.unresolved_evidence,
+            missing_mitigations=self.marks.missing_mitigations,
+            shared_element_names=self.marks.shared_element_names,
             coverage=self.coverage,
             analysis_context=self.context(pipeline.instruction_sha256),
             summary=self.summary,
@@ -507,22 +504,8 @@ class Analysis:
             "rejected_threats": [
                 threat.model_dump(mode="json") for threat in self.rejected_threats
             ],
-            "unverified_grounds": [
-                mark.model_dump(mode="json") for mark in self.unverified_grounds
-            ],
-            "unresolved_mentions": [
-                mark.model_dump(mode="json") for mark in self.unresolved_mentions
-            ],
-            "unresolved_evidence": [
-                mark.model_dump(mode="json") for mark in self.unresolved_evidence
-            ],
-            "missing_mitigations": [
-                mark.model_dump(mode="json") for mark in self.missing_mitigations
-            ],
+            "marks": self.marks.model_dump(mode="json"),
             "coverage": [row.model_dump(mode="json") for row in self.coverage],
-            "shared_element_names": [
-                mark.model_dump(mode="json") for mark in self.shared_element_names
-            ],
             "domain_packs": list(self.domain_packs),
             "fired_rules": list(self.fired_rules),
             "knowledge_docs": list(self.knowledge_docs),
@@ -549,28 +532,9 @@ class Analysis:
             rejected_threats=[
                 Threat.model_validate(threat) for threat in data["rejected_threats"]
             ],
-            unverified_grounds=[
-                UnverifiedGround.model_validate(mark)
-                for mark in data["unverified_grounds"]
-            ],
-            unresolved_mentions=[
-                UnresolvedMention.model_validate(mark)
-                for mark in data["unresolved_mentions"]
-            ],
-            unresolved_evidence=[
-                UnresolvedEvidence.model_validate(mark)
-                for mark in data["unresolved_evidence"]
-            ],
-            missing_mitigations=[
-                MissingMitigation.model_validate(mark)
-                for mark in data["missing_mitigations"]
-            ],
+            marks=AnalysisMarks.model_validate(data["marks"]),
             coverage=[
                 CategoryCoverage.model_validate(row) for row in data.get("coverage", [])
-            ],
-            shared_element_names=[
-                SharedElementName.model_validate(mark)
-                for mark in data.get("shared_element_names", [])
             ],
             domain_packs=list(data["domain_packs"]),
             fired_rules=list(data["fired_rules"]),
@@ -890,6 +854,24 @@ def _threats_of(payload: object) -> list[Any]:
     return threats if isinstance(threats, list) else []
 
 
+def _model_marks(model: SystemModel) -> AnalysisMarks:
+    """The marks that are about the model rather than about a threat.
+
+    One so far. Elements of different types whose names normalize to one slug
+    are a suspicion the validity gate cannot carry — its one severity is fatal,
+    and a system may legitimately run a process and keep a store of the same
+    name. Derived in :func:`assemble_report` rather than bound as a parameter:
+    it is a fact about the model that node already holds, so no upstream node
+    has to carry it, and deriving it in both places would double every entry.
+    """
+    return AnalysisMarks(
+        shared_element_names=[
+            SharedElementName(name_slug=slug, element_ids=ids)
+            for slug, ids in model.shared_names().items()
+        ]
+    )
+
+
 def merge_drafts(
     valid_model: dict, ctx, source_texts: dict | None = None
 ) -> dict[str, Any]:
@@ -911,8 +893,11 @@ def merge_drafts(
     and whether a verbatim quote actually supports what it was filed under.
 
     It also returns what it could *not* verify: quote grounds absent from the
-    source they name are marked rather than dropped, and the marks are parked
-    for :func:`assemble_report` to carry into the report. ``source_texts``
+    source they name are marked rather than dropped. Those marks join the ones
+    the evidence resolution produced and the one the model itself does
+    (:func:`_model_marks`) as a single
+    :class:`~stride_service.report.AnalysisMarks`, which is what
+    :func:`assemble_report` carries into the report. ``source_texts``
     defaults to ``None`` so the in-process engine, which drives a hand-authored
     model with no job behind it, is not failed on a citation that is not wrong.
 
@@ -962,26 +947,18 @@ def merge_drafts(
     drafts_by_category = {
         category: resolution.drafts for category, resolution in resolutions.items()
     }
-    # Every reference that named nothing, across all six lanes. Recorded rather
-    # than fatal: a threat standing on two real facts and one composed one is
-    # still justified by the two (#138).
-    ctx.state[STATE_UNRESOLVED_EVIDENCE] = [
-        mark.model_dump(mode="json")
-        for resolution in resolutions.values()
-        for mark in resolution.unresolved
-    ]
     joined = join_drafts(drafts_by_category, model, source_texts or {})
     merged = joined.drafts
     ctx.state[STATE_MERGED_DRAFTS] = [draft.model_dump(mode="json") for draft in merged]
-    ctx.state[STATE_UNVERIFIED_GROUNDS] = [
-        mark.model_dump(mode="json") for mark in joined.unverified
-    ]
-    ctx.state[STATE_UNRESOLVED_MENTIONS] = [
-        mark.model_dump(mode="json") for mark in joined.mentions
-    ]
-    ctx.state[STATE_MISSING_MITIGATIONS] = [
-        mark.model_dump(mode="json") for mark in joined.unmitigated
-    ]
+    # Every mark the fan-in produced, from both of its producers: the join
+    # across all six lanes, and each lane's own evidence resolution. Merged
+    # rather than parked separately — they share an owner, a standing and a
+    # policy, so one key carries them and ``assemble`` reads one parameter.
+    # The mark about the *model* is not here; see :func:`_model_marks`.
+    marks = joined.marks
+    for resolution in resolutions.values():
+        marks = marks.merged_with(resolution.marks)
+    ctx.state[STATE_MARKS] = marks.model_dump(mode="json")
     # Logged rather than reported: a lane that numbered its drafts 01, 02, 05
     # broke nothing a reader could act on, and the agents are who it is about.
     for gap in numbering_gaps(merged):
@@ -997,9 +974,9 @@ def merge_drafts(
     ctx.state[STATE_DRAFT_THREATS] = render(_ruling_view(merged))
     return {
         "draft_count": len(merged),
-        "unverified_count": len(joined.unverified),
-        "unresolved_mention_count": len(joined.mentions),
-        "missing_mitigation_count": len(joined.unmitigated),
+        "unverified_count": len(marks.unverified_grounds),
+        "unresolved_mention_count": len(marks.unresolved_mentions),
+        "missing_mitigation_count": len(marks.missing_mitigations),
     }
 
 
@@ -1094,10 +1071,7 @@ def assemble_report(
     merged_drafts: list,
     ctx,
     reviewed_threats: dict | None = None,
-    unverified_grounds: list | None = None,
-    unresolved_mentions: list | None = None,
-    unresolved_evidence: list | None = None,
-    missing_mitigations: list | None = None,
+    marks: dict | None = None,
     coverage: list | None = None,
     analysis_context: dict | None = None,
 ) -> dict[str, Any]:
@@ -1114,20 +1088,22 @@ def assemble_report(
     every draft, and dropped drafts are ``revise`` — so the default is
     unreachable rather than a fallback this node relies on.
 
-    ``unverified_grounds`` defaults because ``merge`` writes an empty list when
-    nothing failed and when the job carried no sources to check against, and an
-    empty list is indistinguishable from the absent key ADK would bind here.
-    Both mean the same thing: no quote was found wanting.
-    ``unresolved_mentions`` and ``missing_mitigations`` default for exactly
-    the same reason: an empty list means every element ID the descriptions
-    cite resolves, and every threat either carries a countermeasure or has
-    the unknown that excuses carrying none. ``coverage`` defaults so a graph
-    driven from a seeded state that never ran ``merge`` still assembles — an
-    absent account is recorded as absent rather than fabricated at zero.
-    ``analysis_context`` defaults for the same reason and records the same way:
-    a graph entered past ``prepare`` was given no packs and no candidates, and
-    an empty record says so rather than implying an analysis that ran without
-    them.
+    ``marks`` defaults because ``merge`` writes an all-empty
+    :class:`~stride_service.report.AnalysisMarks` when nothing was found
+    wanting, and that is indistinguishable from the absent key ADK would bind
+    here. Both mean the same thing: every quote verified, every mention
+    resolved, every reference named a fact, and every threat either carried a
+    countermeasure or had the unknown that excuses carrying none. ``coverage``
+    defaults so a graph driven from a seeded state that never ran ``merge``
+    still assembles — an absent account is recorded as absent rather than
+    fabricated at zero. ``analysis_context`` defaults for the same reason and
+    records the same way: a graph entered past ``prepare`` was given no packs
+    and no candidates, and an empty record says so rather than implying an
+    analysis that ran without them.
+
+    The one mark this node adds is :func:`_model_marks`, which is about the
+    System Model rather than about any threat and so is derived here rather
+    than carried from the fan-in.
     """
     model = SystemModel.model_validate(valid_model)
     drafts = [DraftThreat.model_validate(draft) for draft in merged_drafts]
@@ -1141,26 +1117,10 @@ def assemble_report(
         boundary_crossings=model.boundary_crossings(),
         threats=threats,
         rejected_threats=rejected,
-        unverified_grounds=[
-            UnverifiedGround.model_validate(mark) for mark in unverified_grounds or []
-        ],
-        unresolved_evidence=[
-            UnresolvedEvidence.model_validate(mark)
-            for mark in unresolved_evidence or []
-        ],
-        unresolved_mentions=[
-            UnresolvedMention.model_validate(mark) for mark in unresolved_mentions or []
-        ],
-        missing_mitigations=[
-            MissingMitigation.model_validate(mark) for mark in missing_mitigations or []
-        ],
+        marks=AnalysisMarks.model_validate(marks or {}).merged_with(
+            _model_marks(model)
+        ),
         coverage=[CategoryCoverage.model_validate(row) for row in coverage or []],
-        # Derived here rather than bound as a parameter: it is a fact about the
-        # model this node already holds, so no upstream node has to carry it.
-        shared_element_names=[
-            SharedElementName(name_slug=slug, element_ids=ids)
-            for slug, ids in model.shared_names().items()
-        ],
         domain_packs=list(context.get("domain_packs", [])),
         fired_rules=list(context.get("fired_rules", [])),
         knowledge_docs=list(context.get("knowledge_docs", [])),
