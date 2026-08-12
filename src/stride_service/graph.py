@@ -126,9 +126,13 @@ from stride_service.report import (
     AnalysisContext,
     CategoryCoverage,
     DraftThreat,
+    InputRef,
+    Job,
     MissingMitigation,
+    NodeRun,
     SharedElementName,
     StrideCategory,
+    StrideReport,
     Summary,
     Threat,
     ThreatProposal,
@@ -397,8 +401,16 @@ class Analysis:
     """What the graph produces: a report minus the facts only the runner has.
 
     Job identity and per-node timings belong to whoever ran the graph, so the
-    assemble node stops here and :mod:`stride_service.pipeline` stamps the
-    rest onto a :class:`~stride_service.report.StrideReport`.
+    assemble node stops here and a driver completes the rest through
+    :meth:`into_report`.
+
+    **This class owns the report's shape.** The graph has two drivers — the
+    service over a job, the eval harness over a corpus case — and each used to
+    copy every field across itself. The copies had to agree and nothing checked
+    that they did, so a field added here and missed in one driver produced a
+    report with a block silently absent. :meth:`into_report` is the one place
+    that mapping lives; a driver hands over the four things the graph cannot
+    know and reads nothing out of this object itself.
     """
 
     system_model: SystemModel
@@ -439,6 +451,49 @@ class Analysis:
             domain_packs=list(self.domain_packs),
             fired_rules=list(self.fired_rules),
             knowledge_docs=list(self.knowledge_docs),
+        )
+
+    def into_report(
+        self,
+        *,
+        job: Job,
+        input_ref: InputRef,
+        nodes: Sequence[NodeRun],
+        pipeline: Pipeline,
+    ) -> StrideReport:
+        """This analysis as a report, given what only a driver observed.
+
+        The four arguments are exactly the facts the graph does not hold. A
+        ``job`` identity and an ``input_ref`` belong to whoever asked for the
+        run; ``nodes`` is what the drive itself observed
+        (:class:`~stride_service.execution.GraphRun`); ``pipeline`` is the
+        built graph, which carries the per-tier sampling the report records in
+        the clear and the instruction digest the context block needs.
+
+        Every other field comes from ``self``, and no driver names one. That is
+        the whole point: the service and the eval harness produce the same
+        report shape by construction rather than by two field lists agreeing.
+        """
+        return StrideReport(
+            job=job,
+            input=input_ref,
+            nodes=list(nodes),
+            sampling={
+                tier: params.model_dump()
+                for tier, params in pipeline.tier_sampling.items()
+            },
+            system_model=self.system_model,
+            boundary_crossings=self.boundary_crossings,
+            threats=self.threats,
+            rejected_threats=self.rejected_threats,
+            unverified_grounds=self.unverified_grounds,
+            unresolved_mentions=self.unresolved_mentions,
+            unresolved_evidence=self.unresolved_evidence,
+            missing_mitigations=self.missing_mitigations,
+            shared_element_names=self.shared_element_names,
+            coverage=self.coverage,
+            analysis_context=self.context(pipeline.instruction_sha256),
+            summary=self.summary,
         )
 
     def to_state(self) -> dict[str, Any]:

@@ -5,11 +5,13 @@ API hands it a :class:`~stride_service.jobs.JobRecord` and a node callback, and
 gets back either a report or a structured rejection.
 
 Everything the graph cannot know is stamped here. Job identity, the input
-digest, and per-node timings belong to the run rather than to the analysis,
-so :mod:`stride_service.graph` stops at an :class:`~stride_service.graph.Analysis`
-and this module completes the :class:`~stride_service.report.StrideReport`
-around it. A node's ``duration_ms`` is measured from the moment its last
-predecessor finished — the point the graph could have started it — to the
+digest, and per-node timings belong to the run rather than to the analysis, so
+:mod:`stride_service.graph` stops at an :class:`~stride_service.graph.Analysis`
+and this module hands those four facts to
+:meth:`~stride_service.graph.Analysis.into_report`. The report's own shape is
+that method's, shared with the eval harness, so the two drivers cannot name
+different field sets. A node's ``duration_ms`` is measured from the moment its
+last predecessor finished — the point the graph could have started it — to the
 moment the executor observed its own output.
 
 The submitted sources are untrusted text (OWASP LLM01). This module never
@@ -30,7 +32,7 @@ from datetime import UTC, datetime
 from google.adk.sessions import BaseSessionService
 
 from stride_service.certification import CertificationGate, CertifyResult
-from stride_service.execution import GraphExecutor, GraphRun
+from stride_service.execution import GraphExecutor
 from stride_service.graph import (
     STATE_ANALYSIS,
     STATE_REJECTION,
@@ -122,7 +124,16 @@ class AdkPipelineRunner:
             )
 
         analysis = Analysis.from_state(state[STATE_ANALYSIS])
-        report = self._build_report(job, analysis, graph_run, input_ref)
+        report = analysis.into_report(
+            job=Job(
+                id=job.id,
+                created_at=job.created_at,
+                completed_at=datetime.now(UTC),
+            ),
+            input_ref=input_ref,
+            nodes=graph_run.node_runs,
+            pipeline=self._pipeline,
+        )
         return PipelineCompleted(
             report=report, certification=self._certify(job, report)
         )
@@ -151,36 +162,3 @@ class AdkPipelineRunner:
                 list(result.unexercised),
             )
         return result
-
-    def _build_report(
-        self,
-        job: JobRecord,
-        analysis: Analysis,
-        graph_run: GraphRun,
-        input_ref: InputRef,
-    ) -> StrideReport:
-        return StrideReport(
-            job=Job(
-                id=job.id,
-                created_at=job.created_at,
-                completed_at=datetime.now(UTC),
-            ),
-            input=input_ref,
-            nodes=graph_run.node_runs,
-            sampling={
-                tier: params.model_dump()
-                for tier, params in self._pipeline.tier_sampling.items()
-            },
-            system_model=analysis.system_model,
-            boundary_crossings=analysis.boundary_crossings,
-            threats=analysis.threats,
-            rejected_threats=analysis.rejected_threats,
-            unverified_grounds=analysis.unverified_grounds,
-            unresolved_mentions=analysis.unresolved_mentions,
-            unresolved_evidence=analysis.unresolved_evidence,
-            missing_mitigations=analysis.missing_mitigations,
-            shared_element_names=analysis.shared_element_names,
-            coverage=analysis.coverage,
-            analysis_context=analysis.context(self._pipeline.instruction_sha256),
-            summary=analysis.summary,
-        )
