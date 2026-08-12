@@ -1,0 +1,71 @@
+req_id,subject_class,subject,applies_when,model_carries
+V1.2.1,code-practice,the application's HTTP/HTML/XML output path,always,no
+V1.2.2,code-practice,the code that builds URLs,always,no
+V1.2.3,code-practice,the code that builds JavaScript and JSON,always,no
+V1.2.4,code-practice,the code that builds database queries,tech:database,partial
+V1.2.5,code-practice,the code that makes OS calls,always,no
+V1.3.1,code-practice,the HTML sanitization step,feature:rich-text-input,no
+V1.3.2,code-practice,use of eval() and expression languages,always,no
+V1.5.1,control-config,the XML parser's configuration,tech:xml-parser,no
+V2.1.1,document,the input validation rules document,always,no
+V2.2.1,code-practice,the input validation step,always,no
+V2.2.2,trust-layer,which side enforces input validation,feature:client-side-code,partial
+V2.3.1,code-practice,the business logic step sequence,feature:multi-step-flow,no
+V3.2.1,control-config,the response headers that fix rendering context,tech:browser-frontend,no
+V3.2.2,code-practice,the DOM text rendering call,tech:browser-frontend,no
+V3.3.1,control-config,the cookie's Secure attribute and name prefix,tech:cookies,no
+V3.4.1,control-config,the Strict-Transport-Security header,tech:browser-frontend,no
+V3.4.2,control-config,the CORS Access-Control-Allow-Origin value,tech:cors,no
+V3.5.1,control-config,the anti-forgery token,tech:browser-frontend,no
+V3.5.2,control-config,the CORS preflight trigger,tech:cors,no
+V3.5.3,component,the endpoint serving sensitive functionality,tech:browser-frontend,no
+V4.1.1,code-practice,the Content-Type response header,always,no
+V4.4.1,flow,the WebSocket connection's transport encryption,tech:websocket,partial
+V5.2.1,control-config,the accepted file size limit,feature:file-upload,no
+V5.2.2,code-practice,the file type validation step,feature:file-upload,no
+V5.3.1,component,the public folder holding uploaded files,feature:file-upload,partial
+V5.3.2,code-practice,the code that builds file paths,feature:file-upload,no
+V6.1.1,document,the anti-automation controls document,feature:authentication,partial
+V6.2.1,control-config,the password minimum length,feature:password-auth,partial
+V6.2.2,control-config,the password change function,feature:password-auth,partial
+V6.2.3,control-config,the password change function's inputs,feature:password-auth,partial
+V6.2.4,control-config,the breached password check,feature:password-auth,partial
+V6.2.5,control-config,the password composition rules,feature:password-auth,partial
+V6.2.6,control-config,the password input field's type,feature:password-auth,no
+V6.2.7,control-config,the password field's paste behaviour,feature:password-auth,no
+V6.2.8,code-practice,the password comparison step,feature:password-auth,partial
+V6.3.1,control-config,the rate limiting and anti-automation controls,feature:authentication,partial
+V6.3.2,identity,the default accounts,always,no
+V6.4.1,control-config,the initial password and activation code,feature:password-auth,partial
+V6.4.2,control-config,the password hint and secret question features,feature:password-auth,partial
+V7.2.1,trust-layer,which side verifies the session token,feature:sessions,partial
+V7.2.2,control-config,the session token's generation,feature:sessions,no
+V7.2.3,control-config,the reference token's entropy,feature:sessions,no
+V7.2.4,control-config,the session token rotation on authentication,feature:sessions,no
+V7.4.1,control-config,the session termination step,feature:sessions,no
+V7.4.2,identity,the user account's disable and delete path,feature:sessions,no
+V8.1.1,document,the authorization rules document,always,no
+V8.2.1,identity,the consumer's function-level permissions,always,no
+V8.2.2,identity,the consumer's data-item permissions,always,no
+V8.3.1,trust-layer,which side enforces authorization,always,partial
+V9.1.1,control-config,the token signature verification,tech:self-contained-tokens,no
+V9.1.2,control-config,the token algorithm allowlist,tech:self-contained-tokens,no
+V9.1.3,control-config,the token key material source,tech:self-contained-tokens,no
+V9.2.1,control-config,the token validity time span,tech:self-contained-tokens,no
+V10.4.1,component,the OAuth authorization server's redirect URI allowlist,tech:oauth,no
+V10.4.2,control-config,the authorization code's single use,tech:oauth,no
+V10.4.3,control-config,the authorization code's lifetime,tech:oauth,no
+V10.4.4,identity,the OAuth client's permitted grants,tech:oauth,no
+V10.4.5,control-config,the refresh token replay defence,tech:oauth,no
+V11.3.1,control-config,the cipher's block mode and padding,feature:encryption,partial
+V11.3.2,control-config,the cipher and mode,feature:encryption,partial
+V11.4.1,control-config,the hash function,always,no
+V12.1.1,control-config,the enabled TLS versions,always,partial
+V12.2.1,flow,the transport encryption on an external-facing connection,always,partial
+V12.2.2,component,the external-facing service's certificate,always,partial
+V13.4.1,component,the deployed source control metadata,always,no
+V14.2.1,data-class,sensitive data in a URL or query string,always,partial
+V14.3.1,data-class,authenticated data in client storage,tech:browser-frontend,no
+V15.1.1,document,the remediation time frames document,always,no
+V15.2.1,component,the third-party component's version,always,no
+V15.3.1,data-class,the fields a data object returns,always,no
