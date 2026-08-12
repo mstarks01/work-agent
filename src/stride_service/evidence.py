@@ -56,6 +56,7 @@ from stride_service.critic import DraftJoinError
 from stride_service.report import (
     CATEGORY_LETTERS,
     REFERENCE_MAX_CHARS,
+    AnalysisMarks,
     DraftThreat,
     Ground,
     StrideCategory,
@@ -197,12 +198,16 @@ class Resolution(NamedTuple):
 
     Two values because the second is no longer fatal on its own: a dropped
     reference is recorded and the analysis continues, so the caller needs both
-    halves. Shaped like :class:`~stride_service.critic.JoinedDrafts` for the
-    same reason — the fan-in already carries marks beside drafts.
+    halves. Shaped like :class:`~stride_service.critic.JoinedDrafts` — marks
+    beside drafts — and carrying the same
+    :class:`~stride_service.report.AnalysisMarks`, so the fan-in merges what
+    six lanes and the join produced without knowing which mark came from where.
+    Only ``unresolved_evidence`` is ever populated here; the other four lists
+    have no producer this early.
     """
 
     drafts: list[DraftThreat]
-    unresolved: list[UnresolvedEvidence]
+    marks: AnalysisMarks
 
 
 def _grounds_of(
@@ -278,12 +283,12 @@ def resolve_proposals(
     to say what was wrong.
     """
     drafts = []
-    marks: list[UnresolvedEvidence] = []
+    unresolved_evidence: list[UnresolvedEvidence] = []
     groundless: list[str] = []
     for proposal in proposals:
         threat_id = f"{CATEGORY_LETTERS[category]}-{proposal.sequence:02d}"
         grounds, unresolved = _grounds_of(proposal, catalog)
-        marks += [
+        unresolved_evidence += [
             UnresolvedEvidence(threat_id=threat_id, reference=ref[:REFERENCE_MAX_CHARS])
             for ref in unresolved
         ]
@@ -308,4 +313,4 @@ def resolve_proposals(
         )
     if groundless:
         raise EvidenceResolutionError("; ".join(groundless))
-    return Resolution(drafts, marks)
+    return Resolution(drafts, AnalysisMarks(unresolved_evidence=unresolved_evidence))

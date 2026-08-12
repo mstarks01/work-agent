@@ -38,16 +38,15 @@ from stride_service.graph import (
     ENTRY_EXTRACT,
     ENTRY_EXTRACT_ONLY,
     ENTRY_PREPARE,
-    STATE_ANALYSIS,
     STATE_EXTRACTED_MODEL,
     STATE_MERGED_DRAFTS,
-    STATE_REJECTION,
     STATE_VALID_MODEL,
-    Analysis,
     Entry,
+    GraphProducedNothing,
     ModelResolver,
     Pipeline,
-    rejection_issues,
+    Rejected,
+    result_of,
 )
 from stride_service.report import (
     DraftThreat,
@@ -266,47 +265,35 @@ def _run_from_graph(
 ) -> AnalysisRun:
     """Complete the graph's :class:`Analysis` into a report, as production does.
 
-    The eval stamps the same job/input/node metadata
-    :class:`~stride_service.pipeline.AdkPipelineRunner` stamps, because the
-    Tier 1 gates check a whole ``StrideReport`` — including the
-    self-containment invariants — and a stripped-down payload would test a
-    shape production never emits.
+    The report is built by :meth:`~stride_service.graph.Analysis.into_report`,
+    the same method :class:`~stride_service.pipeline.AdkPipelineRunner` calls,
+    so a sweep's reports carry every block a job's do. The Tier 1 gates check a
+    whole ``StrideReport`` — including the self-containment invariants — and a
+    stripped-down payload would test a shape production never emits.
 
-    That includes the node runs and the per-tier sampling clear block, without
-    which a sweep's reports would carry no fingerprints and its certification
-    verdict would be computed over nothing.
+    What the eval supplies is what only this driver knows: a case-derived job
+    identity and input reference. The node runs and the per-tier sampling clear
+    block ride along with the graph run and the pipeline, without which a
+    sweep's reports would carry no fingerprints and its certification verdict
+    would be computed over nothing.
     """
     state = graph_run.final_state
-    if STATE_REJECTION in state:
-        issues = rejection_issues(state[STATE_REJECTION])
-        detail = "; ".join(f"{issue.code}: {issue.message}" for issue in issues)
+    try:
+        result = result_of(state)
+    except GraphProducedNothing as exc:
+        raise EvalRunError(f"{case.id}: {exc}") from exc
+    if isinstance(result, Rejected):
+        detail = "; ".join(f"{issue.code}: {issue.message}" for issue in result.issues)
         raise EvalRunError(f"{case.id}: the graph rejected the model: {detail}")
-    if STATE_ANALYSIS not in state:
-        raise EvalRunError(f"{case.id}: graph produced neither analysis nor rejection")
     if STATE_MERGED_DRAFTS not in state:
         raise EvalRunError(f"{case.id}: graph produced an analysis with no drafts")
 
-    analysis = Analysis.from_state(state[STATE_ANALYSIS])
     now = datetime.now(UTC)
-    report = StrideReport(
+    report = result.into_report(
         job=Job(id=f"eval-{case.id}", created_at=now, completed_at=now),
-        input=InputRef.of(system_name=case.meta.title, sources=case.sources),
+        input_ref=InputRef.of(system_name=case.meta.title, sources=case.sources),
         nodes=graph_run.node_runs,
-        sampling={
-            tier: params.model_dump() for tier, params in pipeline.tier_sampling.items()
-        },
-        system_model=analysis.system_model,
-        boundary_crossings=analysis.boundary_crossings,
-        threats=analysis.threats,
-        rejected_threats=analysis.rejected_threats,
-        unverified_grounds=analysis.unverified_grounds,
-        unresolved_mentions=analysis.unresolved_mentions,
-        unresolved_evidence=analysis.unresolved_evidence,
-        missing_mitigations=analysis.missing_mitigations,
-        shared_element_names=analysis.shared_element_names,
-        coverage=analysis.coverage,
-        analysis_context=analysis.context(pipeline.instruction_sha256),
-        summary=analysis.summary,
+        pipeline=pipeline,
     )
     drafts = tuple(
         DraftThreat.model_validate(draft) for draft in state[STATE_MERGED_DRAFTS]
