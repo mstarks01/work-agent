@@ -37,6 +37,7 @@ from stride_service.references import canonical, snap
 from stride_service.report import (
     CATEGORY_LETTERS,
     STRIDE_CATEGORIES,
+    AnalysisMarks,
     DraftThreat,
     Ground,
     MissingMitigation,
@@ -98,24 +99,22 @@ class AssembledThreats(NamedTuple):
 class JoinedDrafts(NamedTuple):
     """What the fan-in produces: the merged drafts, and what did not check out.
 
-    Four returns rather than one because they have different owners. The drafts
-    are the agents'; the three mark lists are the *service's* record of what
-    each draft failed to make good on — a quote that is not in the source it
-    named, an element ID a description cited that does not exist, a threat
-    offering no countermeasure and no reason for offering none. All three ride
-    beside the drafts rather than on them, because a field an agent could set
-    about its own accuracy is not evidence of it.
+    Two returns rather than one because they have different owners. The drafts
+    are the agents'; the :class:`~stride_service.report.AnalysisMarks` are the
+    *service's* record of what each draft failed to make good on — a quote that
+    is not in the source it named, an element ID a description cited that does
+    not exist, a threat offering no countermeasure and no reason for offering
+    none. They ride beside the drafts rather than on them, because a field an
+    agent could set about its own accuracy is not evidence of it.
 
-    None of the three is fatal, and that is the whole policy of this seam:
+    None of the marks is fatal, and that is the whole policy of this seam:
     checks that decide whether a finding *means* anything fail closed, and
     checks that describe how complete it is are recorded for a reader. The
     fan-in has no re-ask path, so the second kind must never cost a report.
     """
 
     drafts: list[DraftThreat]
-    unverified: list[UnverifiedGround]
-    mentions: list[UnresolvedMention]
-    unmitigated: list[MissingMitigation]
+    marks: AnalysisMarks
 
 
 # An element ID as it appears inside prose. Flows carry a second segment and
@@ -675,9 +674,11 @@ def join_drafts(
     unverified = _verify_quotes(merged, sources) if sources else []
     return JoinedDrafts(
         drafts=merged,
-        unverified=unverified,
-        mentions=_unresolved_mentions(merged, known_ids),
-        unmitigated=_missing_mitigations(merged),
+        marks=AnalysisMarks(
+            unverified_grounds=unverified,
+            unresolved_mentions=_unresolved_mentions(merged, known_ids),
+            missing_mitigations=_missing_mitigations(merged),
+        ),
     )
 
 

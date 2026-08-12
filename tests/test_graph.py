@@ -25,6 +25,7 @@ from stride_service.markdown_loader import MarkdownLoader
 from stride_service.model_tiers import LLM_NODES
 from stride_service.report import (
     STRIDE_CATEGORIES,
+    AnalysisMarks,
     InputRef,
     Job,
     NodeRun,
@@ -670,6 +671,46 @@ def test_merge_joins_drafts_in_canonical_order():
     assert "S-01" in ctx.state[graph.STATE_DRAFT_THREATS]
 
 
+def test_merge_parks_every_mark_kind_under_one_key():
+    """One key, whatever the fan-in found.
+
+    The marks have one owner, one standing and one policy, so they travel as
+    one :class:`~stride_service.report.AnalysisMarks`. A sixth kind is a field
+    on that model and no new key here.
+    """
+    ctx = FakeContext(**analyze_state(spoofing=[sample_proposal("S-01", "spoofing")]))
+
+    graph.merge_drafts(valid_model().model_dump(mode="json"), ctx)
+
+    marks = AnalysisMarks.model_validate(ctx.state[graph.STATE_MARKS])
+    assert set(ctx.state[graph.STATE_MARKS]) == set(AnalysisMarks.model_fields)
+    assert marks.unverified_grounds == []
+    assert marks.unresolved_mentions == []
+    assert marks.unresolved_evidence == []
+    assert marks.missing_mitigations == []
+
+
+def test_the_marks_reach_the_report_through_assemble():
+    """What ``merge`` parked, plus the one mark ``assemble`` derives itself."""
+    ctx = FakeContext()
+    graph.assemble_report(
+        valid_model().model_dump(mode="json"),
+        [sample_draft("S-01").model_dump(mode="json")],
+        ctx,
+        reviewed_threats={"threats": [sample_ruling("S-01").model_dump(mode="json")]},
+        marks={
+            "missing_mitigations": [{"threat_id": "S-01"}],
+        },
+    )
+
+    analysis = graph.Analysis.from_state(ctx.state[graph.STATE_ANALYSIS])
+
+    assert [m.threat_id for m in analysis.marks.missing_mitigations] == ["S-01"]
+    # Derived from the model this node holds, never carried from the fan-in,
+    # so it is present on an analysis assembled from marks that omit it.
+    assert analysis.marks.shared_element_names == []
+
+
 def test_ruling_view_keeps_every_field_the_critic_rules_on():
     """The guard on ``_ruling_view``'s ``exclude_defaults``.
 
@@ -1209,17 +1250,21 @@ class TestIntoReport:
 
         Mechanical rather than enumerated, because an enumerated list is the
         second field list this method exists to remove. Any name an
-        ``Analysis`` and a ``StrideReport`` both carry must arrive unchanged.
+        ``Analysis`` and a ``StrideReport`` both carry must arrive unchanged,
+        and the marks count as the ``Analysis``'s own: it holds them on one
+        field, and the report spreads them across five.
         """
         analysis = self.analysis()
         report = self.report(pipeline)
-        shared = {field.name for field in fields(analysis)} & set(
-            StrideReport.model_fields
+        held = {field.name for field in fields(analysis)} | set(
+            AnalysisMarks.model_fields
         )
+        shared = held & set(StrideReport.model_fields)
 
         assert shared, "Analysis and StrideReport share no field names"
         for name in sorted(shared):
-            assert getattr(report, name) == getattr(analysis, name), name
+            holder = analysis if hasattr(analysis, name) else analysis.marks
+            assert getattr(report, name) == getattr(holder, name), name
 
     def test_the_driver_supplies_only_what_the_graph_cannot_know(self, pipeline):
         report = self.report(pipeline)
