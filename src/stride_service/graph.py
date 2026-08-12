@@ -82,8 +82,9 @@ from __future__ import annotations
 import hashlib
 import json
 import logging
-from collections.abc import Callable, Sequence
+from collections.abc import Callable, Mapping, Sequence
 from dataclasses import dataclass
+from types import MappingProxyType
 from typing import TYPE_CHECKING, Any, Literal
 
 from google.adk.agents import LlmAgent
@@ -186,14 +187,102 @@ CRITIC_FAILED_NODE = "critic_failed"
 ASSEMBLE_NODE = "assemble"
 
 
-def analyze_node_name(category: StrideCategory) -> str:
-    """This category agent's graph node name (an identifier, unlike the ID)."""
-    return f"analyze_{category.replace('-', '_')}"
-
-
-ANALYZE_GRAPH_NODES: tuple[str, ...] = tuple(
-    analyze_node_name(category) for category in STRIDE_CATEGORIES
+# The per-lane artifacts, as ``{placeholder}`` in ``analyze.md`` against the
+# state-key prefix it resolves to. **The only place that correspondence
+# lives**: :meth:`Lane.prompt_bindings` reads it to substitute, and
+# :meth:`Lane.state` reads it to write, so the key an agent's instruction reads
+# and the key ``prepare`` wrote cannot be different keys.
+#
+# Six keys per artifact rather than one, for the reason ``{category}`` is
+# substituted at build time: the six agents run in parallel against a single
+# session state, which cannot hold six values for one key. Handing every agent
+# all six lanes' material would also spend five sixths of the block on other
+# people's leads, and the material genuinely differs per lane — the candidate
+# rules that selected the corpus documents fired per lane, and the rule counts
+# behind the scope differ per category.
+LANE_ARTIFACTS: Mapping[str, str] = MappingProxyType(
+    {
+        "candidates": "candidates",
+        "scope": "scope",
+        "reference_notes": "notes",
+        "prior_cases": "cases",
+    }
 )
+
+
+@dataclass(frozen=True)
+class Lane:
+    """One category agent's lane: its graph node, its keys, its prompt bindings.
+
+    The graph runs six of these in parallel, one per STRIDE category, and every
+    per-lane name is derived here. That is the point: the write and the
+    substitution used to be spelled in three places — a key function, the
+    ``prepare`` write, the instruction's replace chain — held together by a
+    lint. A lane now hands out both from one declaration.
+    """
+
+    category: StrideCategory
+
+    @property
+    def slug(self) -> str:
+        """The category as an identifier, which a graph node name must be."""
+        return self.category.replace("-", "_")
+
+    @property
+    def node_name(self) -> str:
+        """This category agent's graph node name (an identifier, unlike the ID)."""
+        return f"analyze_{self.slug}"
+
+    @property
+    def drafts_key(self) -> str:
+        """Where this category agent parks its proposals for the merge node."""
+        return f"drafts_{self.slug}"
+
+    def key(self, artifact: str) -> str:
+        """Where ``prepare`` parks one of this lane's inputs."""
+        return f"{LANE_ARTIFACTS[artifact]}_{self.slug}"
+
+    @property
+    def prompt_bindings(self) -> dict[str, str]:
+        """What each ``{placeholder}`` in ``analyze.md`` becomes for this lane.
+
+        ``{category}`` becomes the category itself. Every other placeholder
+        becomes *the name of this lane's state key*, so what ADK templates at
+        run time is ``{candidates_spoofing}`` — one prompt file, six bindings,
+        no lane reading another's leads.
+        """
+        return {
+            "category": self.category,
+            **{name: f"{{{self.key(name)}}}" for name in LANE_ARTIFACTS},
+        }
+
+    def state(self, artifacts: Mapping[str, str]) -> dict[str, str]:
+        """This lane's state entries, given one rendered value per artifact.
+
+        Keyed by placeholder on the way in and by state key on the way out,
+        which is the whole translation. Fails closed on a partial set: a
+        missing artifact would leave the placeholder ADK templates pointing at
+        a key nothing wrote, and that raises at the first LLM call rather than
+        here.
+        """
+        if set(artifacts) != set(LANE_ARTIFACTS):
+            missing = sorted(set(LANE_ARTIFACTS) - set(artifacts))
+            extra = sorted(set(artifacts) - set(LANE_ARTIFACTS))
+            raise ValueError(
+                f"lane {self.category!r} state: missing {missing}, unknown {extra}"
+            )
+        return {self.key(name): value for name, value in artifacts.items()}
+
+
+LANES: tuple[Lane, ...] = tuple(Lane(category) for category in STRIDE_CATEGORIES)
+
+
+def analyze_node_name(category: StrideCategory) -> str:
+    """This category agent's graph node name, for a caller holding a category."""
+    return Lane(category).node_name
+
+
+ANALYZE_GRAPH_NODES: tuple[str, ...] = tuple(lane.node_name for lane in LANES)
 
 # Graph node name -> the canonical LLM node name the tier config keys on.
 TIER_NODE_BY_GRAPH_NODE: dict[str, str] = {
@@ -201,10 +290,7 @@ TIER_NODE_BY_GRAPH_NODE: dict[str, str] = {
     REPAIR_NODE: "repair",
     CRITIC_NODE: "critic",
     RECRITIC_NODE: "recritic",
-    **{
-        analyze_node_name(category): f"analyze/{category}"
-        for category in STRIDE_CATEGORIES
-    },
+    **{lane.node_name: f"analyze/{lane.category}" for lane in LANES},
 }
 
 # --- Routes -----------------------------------------------------------------
@@ -306,46 +392,8 @@ STATE_ANALYSIS_CONTEXT = "analysis_context"
 STATE_ANALYSIS = "analysis"
 STATE_REJECTION = "rejection"
 
-
-def analyze_state_key(category: StrideCategory) -> str:
-    """Where one category agent parks its drafts for the merge node."""
-    return f"drafts_{category.replace('-', '_')}"
-
-
-def notes_state_key(category: StrideCategory) -> str:
-    """Where ``prepare`` parks one lane's retrieved reference notes.
-
-    Per lane for the reason the candidates key is: six agents run in parallel
-    against one session state, which cannot hold six values for one key — and
-    the material differs per lane because the rules that selected it did.
-    """
-    return f"notes_{category.replace('-', '_')}"
-
-
-def cases_state_key(category: StrideCategory) -> str:
-    """Where ``prepare`` parks one lane's retrieved worked cases."""
-    return f"cases_{category.replace('-', '_')}"
-
-
-def scope_state_key(category: StrideCategory) -> str:
-    """Where ``prepare`` parks one lane's denominators.
-
-    Per lane like the candidates key, and for the same reason: six agents share
-    one session state, and the rule counts differ per category anyway.
-    """
-    return f"scope_{category.replace('-', '_')}"
-
-
-def candidates_state_key(category: StrideCategory) -> str:
-    """Where ``prepare`` parks one lane's deterministic candidates.
-
-    Six keys rather than one, for the reason ``{category}`` is substituted at
-    build time: the six agents run in parallel against a single session state,
-    which cannot hold six values for one key, and handing every agent all six
-    lanes' candidates would spend five sixths of the block on other people's
-    leads.
-    """
-    return f"candidates_{category.replace('-', '_')}"
+# The keys above are the graph's. The six *per-lane* keys are a lane's, and are
+# derived rather than spelled: see :class:`Lane` and :data:`LANE_ARTIFACTS`.
 
 
 class SilentNodeError(RuntimeError):
@@ -775,18 +823,22 @@ def prepare_analysis(
     ctx.state[STATE_DOMAIN_SKILLS] = compose_domain_skills(skill_loader, packs)
     retrieved: list[str] = []
     for category, candidate_set in candidates.items():
-        ctx.state[candidates_state_key(category)] = render_fenced(
-            candidate_set.model_dump(mode="json")
-        )
-        ctx.state[scope_state_key(category)] = lane_scope(
-            category, model, candidate_set
-        )
         # Retrieval is by *fired* rule, so a lane that triggered nothing gets
         # nothing: the material follows the leads rather than the category.
         fired = {candidate.rule_id for candidate in candidate_set.candidates}
         notes, cases = select_notes(fired), select_cases(fired)
-        ctx.state[notes_state_key(category)] = compose_notes(knowledge_loader, notes)
-        ctx.state[cases_state_key(category)] = compose_cases(knowledge_loader, cases)
+        # Keyed by the placeholder each fills, which is the vocabulary the
+        # prompt file uses; the lane turns that into its own six state keys.
+        ctx.state.update(
+            Lane(category).state(
+                {
+                    "candidates": render_fenced(candidate_set.model_dump(mode="json")),
+                    "scope": lane_scope(category, model, candidate_set),
+                    "reference_notes": compose_notes(knowledge_loader, notes),
+                    "prior_cases": compose_cases(knowledge_loader, cases),
+                }
+            )
+        )
         retrieved += [f"notes/{name}" for name in notes]
         retrieved += [f"cases/{name}" for name in cases]
     # The record of what the agents were given, written here because here is
@@ -919,30 +971,26 @@ def merge_drafts(
     to build the report. ``STATE_DRAFT_THREATS`` is the *prompt* view, narrowed
     by :func:`_ruling_view` to the fields a verdict is actually reached from.
     """
-    silent = [
-        category
-        for category in STRIDE_CATEGORIES
-        if ctx.state.get(analyze_state_key(category)) is None
-    ]
+    silent = [lane for lane in LANES if ctx.state.get(lane.drafts_key) is None]
     if silent:
-        keys = ", ".join(repr(analyze_state_key(c)) for c in silent)
+        keys = ", ".join(repr(lane.drafts_key) for lane in silent)
         raise SilentNodeError(
-            f"{len(silent)} of {len(STRIDE_CATEGORIES)} category agents wrote"
+            f"{len(silent)} of {len(LANES)} category agents wrote"
             f" nothing ({keys}), so those STRIDE categories were never"
             f" analyzed. {_TRUNCATION_HINT}"
         )
     model = SystemModel.model_validate(valid_model)
     catalog = evidence_catalog(model)
     resolutions = {
-        category: resolve_proposals(
+        lane.category: resolve_proposals(
             (
                 ThreatProposal.model_validate(proposal)
-                for proposal in _threats_of(ctx.state.get(analyze_state_key(category)))
+                for proposal in _threats_of(ctx.state.get(lane.drafts_key))
             ),
             catalog,
-            category,
+            lane.category,
         )
-        for category in STRIDE_CATEGORIES
+        for lane in LANES
     }
     drafts_by_category = {
         category: resolution.drafts for category, resolution in resolutions.items()
@@ -1249,31 +1297,22 @@ def analyze_instruction(
 ) -> str:
     """One category agent's full instruction, with the per-lane names resolved.
 
-    Two substitutions happen here rather than in ADK, for one reason: the six
+    These substitutions happen here rather than in ADK, for one reason: the six
     category agents run in parallel against a single session state, which
-    cannot hold six different values for one key.
+    cannot hold six different values for one key. So ``{candidates}`` becomes
+    *the name of this lane's state key* and what ADK templates at run time is
+    ``{candidates_spoofing}`` — one prompt file, six bindings, no lane reading
+    another's leads.
 
-    * ``{category}`` becomes this agent's category.
-    * ``{candidates}`` becomes *the name of this lane's state key*
-      (:func:`candidates_state_key`), so what ADK templates at run time is
-      ``{candidates_spoofing}`` — one prompt file, six bindings, no lane
-      reading another's leads.
-    * ``{reference_notes}`` and ``{prior_cases}`` become this lane's retrieved
-      corpus keys, on the same argument: the documents differ per lane because
-      the rules that selected them did.
-
-    The job-varying placeholders stay for ADK to template.
+    Which placeholder becomes which key is :attr:`Lane.prompt_bindings`, read
+    from the same :data:`LANE_ARTIFACTS` that :meth:`Lane.state` writes by. The
+    job-varying placeholders stay for ADK to template.
     """
     skills = compose_analyze_skills(skill_loader, category)
     prompt = compose_analyze_prompt(prompt_loader, category)
-    resolved = (
-        prompt.replace("{category}", category)
-        .replace("{candidates}", f"{{{candidates_state_key(category)}}}")
-        .replace("{scope}", f"{{{scope_state_key(category)}}}")
-        .replace("{reference_notes}", f"{{{notes_state_key(category)}}}")
-        .replace("{prior_cases}", f"{{{cases_state_key(category)}}}")
-    )
-    return _instruction(skills, resolved)
+    for placeholder, binding in Lane(category).prompt_bindings.items():
+        prompt = prompt.replace(f"{{{placeholder}}}", binding)
+    return _instruction(skills, prompt)
 
 
 def recritic_instruction(
@@ -1358,15 +1397,15 @@ def build_pipeline(
     )
     agents = [
         _llm_node(
-            name=analyze_node_name(category),
-            instruction=analyze_instruction(skill_loader, prompt_loader, category),
+            name=lane.node_name,
+            instruction=analyze_instruction(skill_loader, prompt_loader, lane.category),
             output_schema=ThreatProposals,
-            output_key=analyze_state_key(category),
+            output_key=lane.drafts_key,
             resolve_model=resolve_model,
             resolve_sampling=resolve_sampling,
             resilience=resilience,
         )
-        for category in STRIDE_CATEGORIES
+        for lane in LANES
     ]
 
     prepare = prepare_node(skill_loader, knowledge_loader)
