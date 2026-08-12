@@ -32,7 +32,7 @@ from collections.abc import Collection, Iterable, Mapping, Sequence
 from types import MappingProxyType
 from typing import NamedTuple, get_args
 
-from stride_service.grounding import verify_quote
+from stride_service.grounding import normalize, verify_normalized
 from stride_service.references import canonical, snap
 from stride_service.report import (
     CATEGORY_LETTERS,
@@ -569,6 +569,11 @@ def _verify_quotes(
     Nothing is filtered: this marks and it fails, and it removes neither an
     entry nor a threat from anything.
     """
+    # Each source folded once rather than once per quote. The ladder normalizes
+    # every character of the haystack, and a job runs ~19 threats against the
+    # same few submissions, so the per-quote form would re-fold whole documents
+    # to reach the same answer.
+    folded = {label: normalize(text) for label, text in sources.items()}
     marks: list[UnverifiedGround] = []
     issues: list[str] = []
     failed: list[str] = []
@@ -577,7 +582,7 @@ def _verify_quotes(
             index
             for index, ground in enumerate(threat.grounds)
             if ground.kind == "quote"
-            and not verify_quote(ground.text, sources.get(ground.source_label, ""))
+            and not verify_normalized(ground.text, folded.get(ground.source_label, ""))
         ]
         if len(unverified) == len(threat.grounds):
             failed.append(threat.id)

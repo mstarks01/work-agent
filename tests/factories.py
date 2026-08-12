@@ -317,8 +317,13 @@ def sample_threat(
 def sample_report(
     threats: list[Threat] | None = None,
     rejected_threats: list[Threat] | None = None,
+    **marks: Any,
 ) -> StrideReport:
-    """A complete, internally consistent report over valid_model()."""
+    """A complete, internally consistent report over valid_model().
+
+    ``marks`` passes the service-owned mark lists straight through, so a test
+    about mark placement states only the mark it is about.
+    """
     model = valid_model()
     if threats is None:
         threats = [sample_threat()]
@@ -345,6 +350,7 @@ def sample_report(
         threats=threats,
         rejected_threats=rejected_threats,
         summary=build_summary(threats, rejected_threats, model),
+        **marks,
     )
 
 
