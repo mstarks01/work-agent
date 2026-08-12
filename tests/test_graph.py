@@ -10,6 +10,9 @@ from __future__ import annotations
 
 import json
 import re
+from dataclasses import fields
+from datetime import UTC, datetime
+from typing import Any
 
 import pytest
 from google.adk.agents import LlmAgent
@@ -22,6 +25,10 @@ from stride_service.markdown_loader import MarkdownLoader
 from stride_service.model_tiers import LLM_NODES
 from stride_service.report import (
     STRIDE_CATEGORIES,
+    InputRef,
+    Job,
+    NodeRun,
+    StrideReport,
     ThreatProposals,
     ThreatRulings,
     UnknownRef,
@@ -29,6 +36,7 @@ from stride_service.report import (
 )
 from stride_service.resilience import load_resilience
 from stride_service.sampling import load_sampling
+from stride_service.sources import Source
 from stride_service.system_model import SystemModel
 from tests.factories import (
     repo_tiers,
@@ -69,10 +77,15 @@ RUNTIME_PLACEHOLDERS = frozenset(
 
 
 class FakeContext:
-    """Stands in for ADK's node context: the node functions only touch state."""
+    """Stands in for ADK's node context: the node functions only touch state.
 
-    def __init__(self, **state: object) -> None:
-        self.state = dict(state)
+    ``Any`` rather than ``object``, matching ADK's own state: a node parks
+    validated Pydantic dumps here and reads them back through
+    ``model_validate``, so a caller that narrows the value is the normal case.
+    """
+
+    def __init__(self, **state: Any) -> None:
+        self.state: dict[str, Any] = dict(state)
 
 
 def analyze_state(**proposals_by_category: list) -> dict[str, object]:
@@ -1152,6 +1165,76 @@ def test_a_graph_entered_past_prepare_records_an_empty_context():
 
     assert context.domain_packs == []
     assert context.fired_rules == []
+
+
+class TestIntoReport:
+    """The one mapping from an :class:`Analysis` to a report.
+
+    Both drivers — the service over a job, the eval harness over a corpus case
+    — reach the report through this method, so what these tests hold is what
+    used to be held by two field lists agreeing with each other.
+    """
+
+    def analysis(self) -> graph.Analysis:
+        ctx = FakeContext()
+        graph.assemble_report(
+            valid_model().model_dump(mode="json"),
+            [sample_draft("S-01").model_dump(mode="json")],
+            ctx,
+            reviewed_threats={
+                "threats": [sample_ruling("S-01").model_dump(mode="json")]
+            },
+            analysis_context={"domain_packs": ["http-api"], "fired_rules": ["r-01"]},
+        )
+        return graph.Analysis.from_state(ctx.state[graph.STATE_ANALYSIS])
+
+    def report(self, pipeline):
+        analysis = self.analysis()
+        return analysis.into_report(
+            job=Job(
+                id="job-01",
+                created_at=datetime(2026, 1, 1, tzinfo=UTC),
+                completed_at=datetime(2026, 1, 1, tzinfo=UTC),
+            ),
+            input_ref=InputRef.of(
+                system_name="Test system",
+                sources=[Source(kind="description", label="brief", text="text")],
+            ),
+            nodes=[NodeRun(node="extract", duration_ms=1)],
+            pipeline=pipeline,
+        )
+
+    def test_every_shared_field_is_carried(self, pipeline):
+        """A field on both sides that ``into_report`` forgets fails here.
+
+        Mechanical rather than enumerated, because an enumerated list is the
+        second field list this method exists to remove. Any name an
+        ``Analysis`` and a ``StrideReport`` both carry must arrive unchanged.
+        """
+        analysis = self.analysis()
+        report = self.report(pipeline)
+        shared = {field.name for field in fields(analysis)} & set(
+            StrideReport.model_fields
+        )
+
+        assert shared, "Analysis and StrideReport share no field names"
+        for name in sorted(shared):
+            assert getattr(report, name) == getattr(analysis, name), name
+
+    def test_the_driver_supplies_only_what_the_graph_cannot_know(self, pipeline):
+        report = self.report(pipeline)
+
+        assert report.job.id == "job-01"
+        assert report.input.system_name == "Test system"
+        assert [node.node for node in report.nodes] == ["extract"]
+        assert set(report.sampling) == set(pipeline.tier_sampling)
+
+    def test_the_context_joins_the_built_graph_s_digest(self, pipeline):
+        report = self.report(pipeline)
+
+        assert report.analysis_context is not None
+        assert report.analysis_context.instruction_sha256 == pipeline.instruction_sha256
+        assert report.analysis_context.domain_packs == ["http-api"]
 
 
 class TestTheInstructionDigest:
