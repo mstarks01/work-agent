@@ -38,16 +38,15 @@ from stride_service.graph import (
     ENTRY_EXTRACT,
     ENTRY_EXTRACT_ONLY,
     ENTRY_PREPARE,
-    STATE_ANALYSIS,
     STATE_EXTRACTED_MODEL,
     STATE_MERGED_DRAFTS,
-    STATE_REJECTION,
     STATE_VALID_MODEL,
-    Analysis,
     Entry,
+    GraphProducedNothing,
     ModelResolver,
     Pipeline,
-    rejection_issues,
+    Rejected,
+    result_of,
 )
 from stride_service.report import (
     DraftThreat,
@@ -279,18 +278,18 @@ def _run_from_graph(
     would be computed over nothing.
     """
     state = graph_run.final_state
-    if STATE_REJECTION in state:
-        issues = rejection_issues(state[STATE_REJECTION])
-        detail = "; ".join(f"{issue.code}: {issue.message}" for issue in issues)
+    try:
+        result = result_of(state)
+    except GraphProducedNothing as exc:
+        raise EvalRunError(f"{case.id}: {exc}") from exc
+    if isinstance(result, Rejected):
+        detail = "; ".join(f"{issue.code}: {issue.message}" for issue in result.issues)
         raise EvalRunError(f"{case.id}: the graph rejected the model: {detail}")
-    if STATE_ANALYSIS not in state:
-        raise EvalRunError(f"{case.id}: graph produced neither analysis nor rejection")
     if STATE_MERGED_DRAFTS not in state:
         raise EvalRunError(f"{case.id}: graph produced an analysis with no drafts")
 
-    analysis = Analysis.from_state(state[STATE_ANALYSIS])
     now = datetime.now(UTC)
-    report = analysis.into_report(
+    report = result.into_report(
         job=Job(id=f"eval-{case.id}", created_at=now, completed_at=now),
         input_ref=InputRef.of(system_name=case.meta.title, sources=case.sources),
         nodes=graph_run.node_runs,

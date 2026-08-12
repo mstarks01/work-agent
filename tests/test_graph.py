@@ -505,6 +505,121 @@ def test_only_known_state_keys_remain_as_placeholders(pipeline):
         assert found <= RUNTIME_PLACEHOLDERS, (node.name, found - RUNTIME_PLACEHOLDERS)
 
 
+# --- Session state ----------------------------------------------------------
+
+
+class TestSessionState:
+    """The two key families, and the rule that keeps them from drifting.
+
+    A rendered key holds bytes a model reads and Python does not. Keeping the
+    two copies of an artifact honest used to rest on a comment; it now rests on
+    there being no operation that reads a rendered key back.
+    """
+
+    def state(self) -> tuple[FakeContext, graph.SessionState]:
+        ctx = FakeContext()
+        return ctx, graph.SessionState(ctx)
+
+    def test_the_two_families_are_disjoint_and_cover_every_key(self):
+        assert not graph.RENDERED_KEYS & graph.STRUCTURED_KEYS
+
+        declared = {
+            value
+            for name, value in vars(graph).items()
+            if name.startswith("STATE_") and isinstance(value, str)
+        }
+        assert declared <= graph.RENDERED_KEYS | graph.STRUCTURED_KEYS
+
+    def test_a_rendered_key_is_written_and_never_read(self):
+        ctx, state = self.state()
+
+        state.prompt(graph.STATE_SYSTEM_MODEL, "rendered")
+
+        assert ctx.state[graph.STATE_SYSTEM_MODEL] == "rendered"
+        # The whole of the invariant: there is no method that reads it back.
+        with pytest.raises(graph.UndeclaredStateKey):
+            state.get(graph.STATE_SYSTEM_MODEL)
+
+    def test_a_structured_key_round_trips(self):
+        _, state = self.state()
+
+        state.put(graph.STATE_VALID_MODEL, {"processes": []})
+
+        assert state.get(graph.STATE_VALID_MODEL) == {"processes": []}
+
+    def test_a_structured_key_cannot_be_written_as_a_rendered_one(self):
+        _, state = self.state()
+
+        with pytest.raises(graph.UndeclaredStateKey):
+            state.prompt(graph.STATE_VALID_MODEL, "rendered")
+
+    def test_a_mistyped_key_fails_at_the_node_that_wrote_it(self):
+        """Rather than as a KeyError at the first LLM call that templates it."""
+        _, state = self.state()
+
+        with pytest.raises(graph.UndeclaredStateKey, match="candidtaes_spoofing"):
+            state.prompt("candidtaes_spoofing", "rendered")
+
+    def test_an_unwritten_structured_key_reads_as_none(self):
+        """Which is how a silent node is told from one that wrote an empty value."""
+        _, state = self.state()
+
+        assert state.get(graph.STATE_ANALYSIS) is None
+
+
+def test_no_node_writes_session_state_directly():
+    """The interface is only an interface while every node goes through it.
+
+    A source lint, because the alternative is a comment: ADK hands each node a
+    context whose ``state`` is a plain dict, so ``ctx.state[key] = value`` stays
+    available and silently bypasses both family checks.
+    """
+    source = (PROJECT_ROOT / "src" / "stride_service" / "graph.py").read_text()
+    direct = [
+        line.strip()
+        for line in source.splitlines()
+        if "ctx.state[" in line or "ctx.state.update(" in line
+    ]
+
+    assert direct == [], direct
+
+
+class TestReadingAFinishedRun:
+    """One reader for the graph's two terminal shapes, shared by both drivers."""
+
+    def analysis_state(self) -> dict:
+        ctx = FakeContext()
+        graph.assemble_report(
+            valid_model().model_dump(mode="json"),
+            [sample_draft("S-01").model_dump(mode="json")],
+            ctx,
+            reviewed_threats={
+                "threats": [sample_ruling("S-01").model_dump(mode="json")]
+            },
+        )
+        return ctx.state
+
+    def test_an_assembled_run_reads_as_its_analysis(self):
+        result = graph.result_of(self.analysis_state())
+
+        assert isinstance(result, graph.Analysis)
+        assert [threat.id for threat in result.threats] == ["S-01"]
+
+    def test_a_rejected_run_reads_as_its_issues(self):
+        ctx = FakeContext()
+        graph.reject_model('[{"code": "schema", "message": "bad"}]', ctx)
+
+        result = graph.result_of(ctx.state)
+
+        assert isinstance(result, graph.Rejected)
+        assert [issue.code for issue in result.issues] == ["schema"]
+
+    def test_neither_outcome_is_ours_to_own(self):
+        """Every path ends at ``assemble`` or ``reject``, so this is a defect."""
+        with pytest.raises(graph.GraphProducedNothing):
+            graph.result_of({})
+
+
 # --- Node functions ---------------------------------------------------------
 
 
