@@ -49,7 +49,7 @@ import pytest
 from pydantic import ValidationError
 
 from stride_service.critic import mentioned_ids
-from stride_service.evidence import CROSSING_PREFIX, UNKNOWN_PREFIX
+from stride_service.evidence import CROSSING_PREFIX, UNKNOWN_PREFIX, render_catalog
 from stride_service.grounding import verify_quote
 from stride_service.markdown_loader import MarkdownLoader, split_sections
 from stride_service.prompts import (
@@ -69,7 +69,7 @@ from stride_service.prompts import (
     compose_analyze_prompt,
     exemplar_name,
 )
-from stride_service.report import STRIDE_CATEGORIES, ThreatProposal
+from stride_service.report import STRIDE_CATEGORIES, Ground, ThreatProposal
 from stride_service.skills import estimate_tokens
 
 PROMPTS_DIR = Path(__file__).resolve().parents[1] / "prompts"
@@ -424,6 +424,35 @@ def test_the_exemplar_catalog_names_only_elements_the_system_defines(name):
         if element not in known_ids:
             dangling.append(ref)
     assert not dangling
+
+
+@pytest.mark.parametrize("name", sorted(exemplar_systems()))
+def test_the_exemplar_catalog_is_rendered_the_way_a_real_one_is(name):
+    """The exemplar table is what ``render_catalog`` would emit, byte for byte.
+
+    The two lints above pin the *IDs*; this pins the shape around them — the
+    count line, the header row, and the gloss in the right column. That shape
+    is the #138 fix rather than decoration, so an exemplar drifting from it
+    would teach agents to read a table they will not be given, which is the
+    failure the fix exists to prevent. Without this the drift is silent in the
+    direction that matters: :func:`~stride_service.evidence._gloss` is free to
+    change and nothing here would notice.
+
+    Rebuilding the grounds from the refs is exact rather than approximate — a
+    ref is *built* from a ground, and the two branches are separated by their
+    prefixes — so these are the objects a real catalog would hold.
+    """
+    system = exemplar_systems()[name]
+    entries = {}
+    for ref in catalog(system):
+        if ref.startswith(f"{CROSSING_PREFIX}:"):
+            entries[ref] = Ground(kind="derived-fact", flow_id=ref.split(":", 1)[1])
+        else:
+            element, attribute = ref.split(":", 1)[1].rsplit(":", 1)
+            entries[ref] = Ground(
+                kind="unknown-attribute", element_id=element, attribute=attribute
+            )
+    assert render_catalog(entries).strip() in system
 
 
 def test_every_exemplar_system_is_worked_by_some_category():
