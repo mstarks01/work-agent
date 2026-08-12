@@ -27,11 +27,12 @@ later rejects was still a part of the system being examined.
 
 from __future__ import annotations
 
-from collections.abc import Iterable, Mapping
+from collections.abc import Collection, Iterable, Mapping
 
 from stride_service.analysis import unknown_controls
 from stride_service.candidates import CandidateSet, rules_for
 from stride_service.critic import mentioned_ids
+from stride_service.references import canonical
 from stride_service.report import (
     STRIDE_CATEGORIES,
     CategoryCoverage,
@@ -74,21 +75,40 @@ def lane_scope(
     )
 
 
-def cited_element_ids(drafts: Iterable[DraftThreat]) -> frozenset[str]:
+def cited_element_ids(
+    drafts: Iterable[DraftThreat], element_ids: Collection[str]
+) -> frozenset[str]:
     """Every element ID these drafts point at, from both places one appears.
 
     ``affected_element_ids`` is the structured claim and prose citations are
     the argument; a flow named only in the description was still examined, so
     counting only the structured field would undercount coverage against the
     prompt's own instruction to cite IDs inline.
+
+    **Both halves are resolved against the model, and the prose half is why.**
+    A structural reference already resolves — :func:`~stride_service.critic.
+    join_drafts` fails the job on one that does not — but a prose mention is
+    marked rather than failed on, so a description naming ``process:web-api``
+    in a job with no such element reaches here. Counted raw it would make
+    ``elements_cited`` exceed ``elements``, and it would do so worst on exactly
+    the runs :class:`~stride_service.report.UnresolvedMention` exists to catch:
+    a lane contaminated by the exemplar system inflates the number that is
+    supposed to say how much of *this* system it looked at.
+
+    Resolution is :func:`~stride_service.references.canonical`, the same fold
+    the mark path applies, so one spelling of one element counts once. Reading
+    prose mentions raw would count ``Process:Auth-Service`` as an element of its
+    own here while the exact-membership tests below missed it — one mention
+    inflating one field and suppressing three.
     """
     return frozenset(
-        element_id
+        resolved
         for draft in drafts
-        for element_id in (
+        for reference in (
             *draft.affected_element_ids,
             *mentioned_ids(draft.description),
         )
+        if (resolved := canonical(reference, element_ids))
     )
 
 
@@ -102,7 +122,7 @@ def build_coverage(
     Every category gets a row, including a lane that filed nothing — a missing
     row would be the exact ambiguity this accounting exists to remove.
     """
-    element_total = len(model.elements())
+    elements = [element.id for element in model.elements()]
     crossings = model.boundary_crossings()
     controls = unknown_controls(model)
     return [
@@ -110,7 +130,7 @@ def build_coverage(
             category,
             drafts_by_category.get(category, []),
             candidates.get(category),
-            element_total=element_total,
+            element_ids=elements,
             crossing_flow_ids=[crossing.flow_id for crossing in crossings],
             control_element_ids=[control.element_id for control in controls],
         )
@@ -123,11 +143,11 @@ def _row(
     drafts: list[DraftThreat],
     candidate_set: CandidateSet | None,
     *,
-    element_total: int,
+    element_ids: Collection[str],
     crossing_flow_ids: list[str],
     control_element_ids: list[str],
 ) -> CategoryCoverage:
-    cited = cited_element_ids(drafts)
+    cited = cited_element_ids(drafts, element_ids)
     offered = candidate_set.candidates if candidate_set else ()
     return CategoryCoverage(
         category=category,
@@ -142,7 +162,7 @@ def _row(
         candidates_cited=sum(
             1 for candidate in offered if set(candidate.element_ids) <= cited
         ),
-        elements=element_total,
+        elements=len(element_ids),
         elements_cited=len(cited),
         boundary_crossings=len(crossing_flow_ids),
         boundary_crossings_cited=sum(
