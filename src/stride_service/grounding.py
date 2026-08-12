@@ -110,6 +110,18 @@ def normalize(text: str) -> str:
 def verify_quote(quote: str, source: str) -> bool:
     """Does ``quote`` appear in ``source`` under the pinned ladder?
 
+    The single-source form, for a caller holding raw text. A caller checking
+    many quotes against the same few sources should normalize each source once
+    and call :func:`verify_normalized` instead — the ladder folds every
+    character of the haystack, so re-folding a whole submission per quote is
+    the same answer paid for repeatedly.
+    """
+    return verify_normalized(quote, normalize(source))
+
+
+def verify_normalized(quote: str, haystack: str) -> bool:
+    """The same question, against a source :func:`normalize` already folded.
+
     The fifth rung: ``…`` splits the quote into fragments, each of which must
     appear **in order, after the last**. A quote marking a cut is a *sequence*
     of verbatim spans rather than one, so searching from a cursor is what makes
@@ -120,8 +132,10 @@ def verify_quote(quote: str, source: str) -> bool:
     The schema requires a ``quote`` ground to carry text, so a blank one has
     already failed validation — but ``"…"`` is non-blank and normalizes away to
     nothing, and letting it through would make it the universal citation.
+
+    ``haystack`` must be normalized already: a rung applied to one side only
+    would compare two different dialects of the same string.
     """
-    haystack = normalize(source)
     fragments = [normalize(raw) for raw in _ELLIPSIS.split(quote)]
     matched = False
     cursor = 0

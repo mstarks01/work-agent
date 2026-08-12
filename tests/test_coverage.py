@@ -73,7 +73,41 @@ def test_prose_citations_count_as_much_as_the_structured_field():
         affected_element_ids=["process:web-app"],
         description="reached through `store:orders-db` from `process:web-app`",
     )
-    assert cited_element_ids([draft]) == {"process:web-app", "store:orders-db"}
+    known = ["process:web-app", "store:orders-db"]
+    assert cited_element_ids([draft], known) == {"process:web-app", "store:orders-db"}
+
+
+def test_a_prose_citation_naming_nothing_is_not_a_cited_element():
+    """The mark path and the count path resolve against the same model.
+
+    An ID in prose that names no element is marked rather than failed on, so it
+    reaches the count. Left raw it would make ``elements_cited`` exceed
+    ``elements`` — and it would do so worst on the exemplar contamination
+    ``UnresolvedMention`` exists to catch.
+    """
+    draft = sample_draft(
+        "T-01",
+        category="tampering",
+        affected_element_ids=["process:web-app"],
+        description="`process:web-api` calls `store:ghost` and `Process:Web-App`",
+    )
+    known = ["process:web-app", "store:orders-db"]
+    # The case variant folds onto the element it names; the two absentees drop.
+    assert cited_element_ids([draft], known) == {"process:web-app"}
+
+
+def test_elements_cited_never_exceeds_the_model(model, candidates):
+    draft = sample_draft(
+        "T-01",
+        category="tampering",
+        affected_element_ids=["process:web-app"],
+        description="`process:web-api` and `store:ghost` are also implicated",
+    )
+    row = coverage_for(
+        "tampering", build_coverage({"tampering": [draft]}, candidates, model)
+    )
+    assert row.elements == len(model.elements())
+    assert row.elements_cited <= row.elements
 
 
 def test_crossings_and_unknown_controls_are_counted_against_citations(

@@ -50,7 +50,7 @@ from stride_service.analysis import (
     zone_kinds,
 )
 from stride_service.report import STRIDE_CATEGORIES, StrideCategory
-from stride_service.system_model import DataStore, ExternalEntity, SystemModel
+from stride_service.system_model import SystemModel
 
 __all__ = [
     "RULES",
@@ -177,7 +177,7 @@ def _unverified_external_caller(model: SystemModel) -> Iterator[Match]:
     external = {
         entity.id
         for entity in model.external_entities
-        if isinstance(entity, ExternalEntity) and entity.kind == "external-system"
+        if entity.kind == "external-system"
     }
     for flow in model.data_flows:
         if flow.source not in external or not is_unverified(flow.authentication):
@@ -212,9 +212,7 @@ def _unprotected_transit_crossing(model: SystemModel) -> Iterator[Match]:
 
 
 def _unverified_write_to_store(model: SystemModel) -> Iterator[Match]:
-    stores = {
-        store.id: store for store in model.data_stores if isinstance(store, DataStore)
-    }
+    stores = {store.id: store for store in model.data_stores}
     for flow in model.data_flows:
         store = stores.get(flow.destination)
         if store is None or not is_unverified(flow.authentication):
@@ -262,8 +260,9 @@ def _shared_authentication(model: SystemModel) -> Iterator[Match]:
 
 def _unattributable_action(model: SystemModel) -> Iterator[Match]:
     """Unverified callers writing into an element that holds a graded asset."""
+    by_id = {element.id: element for element in model.elements()}
     for flow in model.data_flows:
-        destination = model.get(flow.destination)
+        destination = by_id.get(flow.destination)
         if destination is None or not is_unverified(flow.authentication):
             continue
         assets = sensitive_assets(destination)
@@ -283,10 +282,11 @@ def _unattributable_action(model: SystemModel) -> Iterator[Match]:
 
 
 def _unprotected_sensitive_transit(model: SystemModel) -> Iterator[Match]:
+    by_id = {element.id: element for element in model.elements()}
     for flow in model.data_flows:
         if not is_unverified(flow.encryption_in_transit):
             continue
-        endpoints = [model.get(flow.source), model.get(flow.destination)]
+        endpoints = [by_id.get(flow.source), by_id.get(flow.destination)]
         assets = sorted(
             {
                 asset
@@ -359,12 +359,21 @@ def _shared_dependency(model: SystemModel) -> Iterator[Match]:
 
 def _privilege_zone_crossing(model: SystemModel) -> Iterator[Match]:
     kinds = zone_kinds(model)
+    # A crossing's flow ID names a Data Flow in the model it was derived from,
+    # so this lookup resolves. Indexed by type rather than reached for with a
+    # defaulted ``getattr``: the default would answer a missing flow with the
+    # empty string, whose ``control_state`` is ``stated`` — a rule reporting a
+    # control the model never named, which is the one thing this module may not
+    # do. A flow that somehow does not resolve yields no candidate instead.
+    flows = {flow.id: flow for flow in model.data_flows}
     for crossing in model.boundary_crossings():
         kind = kinds.get(crossing.destination_zone, "")
         if kind not in PRIVILEGE_ZONE_KINDS:
             continue
-        flow = model.get(crossing.flow_id)
-        authentication = getattr(flow, "authentication", "")
+        flow = flows.get(crossing.flow_id)
+        if flow is None:
+            continue
+        authentication = flow.authentication
         yield (
             (crossing.flow_id, crossing.destination_zone),
             {

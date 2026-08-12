@@ -52,7 +52,12 @@ def test_pooling_sums_the_counts_rather_than_averaging_the_rates(two_cases):
 
 
 def test_a_lane_offered_nothing_rates_zero_rather_than_dividing_by_it():
-    lane = lane_for("spoofing", aggregate_coverage([row("spoofing", candidates=0)]))
+    # Cited moves with offered: a lane handed no candidates cannot have cited
+    # one, and CategoryCoverage refuses the pair that says otherwise.
+    lane = lane_for(
+        "spoofing",
+        aggregate_coverage([row("spoofing", candidates=0, candidates_cited=0)]),
+    )
 
     assert lane.cited_rate("candidates", "candidates_cited") == 0.0
 

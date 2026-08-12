@@ -94,7 +94,22 @@ from stride_service.system_model import BoundaryCrossing, SystemModel
 # spelling, so this stays minor — but a consumer that treated a returned report
 # as "every citation resolved" was relying on an absence rather than on a
 # field, and this list is where that guarantee now lives.
-SCHEMA_VERSION = "2.9"
+# 2.10 corrects what ``coverage[].elements_cited`` counts, and holds every
+# ``*_cited`` half to the total beside it. The field's *definition* is unchanged
+# — the docs always read it as "of the elements in the model, how many the
+# drafts cite" — but the computation counted prose citations raw, so an ID a
+# description named that the model does not contain was counted as a cited
+# element. That put the numerator above its denominator, and it did so hardest
+# on the runs ``unresolved_mentions`` exists to flag.
+#
+# The second entry here that is a fix rather than an addition, and unlike 2.6 a
+# value this schema *did* emit is now refused: a stored row with more cited than
+# offered no longer re-validates. Minor by the rule above, because no field is
+# added, removed or renamed and none changes meaning — what changes is that the
+# number finally means what the field always said it did. A consumer that
+# computed a citation rate off an affected row read a rate over 1.0 and will now
+# read a smaller, correct one.
+SCHEMA_VERSION = "2.10"
 
 DEFAULT_DISCLAIMER = (
     "AI-generated threat model. Not reviewed by a human security analyst."
@@ -1027,6 +1042,15 @@ class MissingMitigation(BaseModel):
     threat_id: str = Field(pattern=r"^[STRIDE]-\d{2}$")
 
 
+# The marks whose whole placement claim is the threat they name, so one check
+# covers them all (:meth:`StrideReport._threat_mark_issues`).
+# :class:`UnverifiedGround` is deliberately absent: it also names an *index*
+# into that threat's grounds, so it needs the stricter check of its own.
+# :class:`SharedElementName` is absent because it annotates the model rather
+# than a threat.
+ThreatMark = UnresolvedMention | UnresolvedEvidence | MissingMitigation
+
+
 class SharedElementName(BaseModel):
     """Elements of different types whose names normalize to one slug.
 
@@ -1116,6 +1140,35 @@ class CategoryCoverage(BaseModel):
     boundary_crossings_cited: int = Field(ge=0)
     unknown_controls: int = Field(ge=0)
     unknown_controls_cited: int = Field(ge=0)
+
+    # Each ``*_cited`` half against the total it is cited out of. Every row here
+    # is read as a ratio — the docs say "two of forty structural leads" — so a
+    # numerator over its denominator is not a large number, it is a number with
+    # no meaning. The one way to produce one is to count something outside the
+    # model as cited, which is what :func:`~stride_service.coverage.
+    # cited_element_ids` resolves its references to prevent; this is that
+    # guarantee stated where a reader of the schema can see it.
+    _RATIOS: ClassVar[tuple[tuple[str, str], ...]] = (
+        ("candidates_cited", "candidates"),
+        ("elements_cited", "elements"),
+        ("boundary_crossings_cited", "boundary_crossings"),
+        ("unknown_controls_cited", "unknown_controls"),
+        ("rules_fired", "rules"),
+    )
+
+    @model_validator(mode="after")
+    def _check_ratios(self) -> Self:
+        over = [
+            f"{cited}={getattr(self, cited)} exceeds {total}={getattr(self, total)}"
+            for cited, total in self._RATIOS
+            if getattr(self, cited) > getattr(self, total)
+        ]
+        if over:
+            raise ValueError(
+                f"{self.category} coverage counts more cited than offered:"
+                f" {'; '.join(over)}"
+            )
+        return self
 
 
 def build_summary(
@@ -1343,6 +1396,7 @@ class StrideReport(BaseModel):
             issues
             + self._unverified_mark_issues()
             + self._threat_mark_issues(self.unresolved_mentions, "unresolved mention")
+            + self._threat_mark_issues(self.unresolved_evidence, "unresolved evidence")
             + self._threat_mark_issues(self.missing_mitigations, "missing mitigation")
         )
 
@@ -1372,16 +1426,17 @@ class StrideReport(BaseModel):
                 )
         return issues
 
-    def _threat_mark_issues(
-        self, marks: Iterable[UnresolvedMention | MissingMitigation], what: str
-    ) -> list[str]:
+    def _threat_mark_issues(self, marks: Iterable[ThreatMark], what: str) -> list[str]:
         """Every threat-level mark points at a threat this report carries.
 
         Same rule as the unverified marks, and same reason: a mark on a threat
         that is not here annotates nothing, while the threat that really earned
-        it renders as though it had checked out. Shared across both mark types
-        because the rule is the mark's *shape* — a threat ID and nothing else —
-        rather than anything about what either records.
+        it renders as though it had checked out. Shared across every mark type
+        because the rule is the mark's *shape* — it names one threat and the
+        rest of its fields say nothing about placement — rather than anything
+        about what each one records. A mark type added to :class:`StrideReport`
+        joins :data:`ThreatMark` and this call list together, or it carries a
+        claim about a threat that nothing checks.
         """
         threat_ids = {threat.id for threat in (*self.threats, *self.rejected_threats)}
         return [
