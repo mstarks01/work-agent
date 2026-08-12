@@ -207,11 +207,13 @@ can test.
 That is the whole of the standard's applicability guidance. It operates on a **chapter**, it
 tests **presence of a technology**, and it is prose.
 
-Nine chapters need a presence test. Eight apply to any web application:
+Nine chapters need a presence test. Eight apply to any web application — but read
+section 7 before you treat that as a floor, because "a web application" is itself a
+precondition the standard never tests:
 
 | Applicability | Chapters | Requirements | L1 |
 |---|---|---:|---:|
-| Always | V1, V2, V4, V8, V12, V13, V15, V16 | 143 | 25 |
+| Unconditional, **given the precondition** | V1, V2, V4, V8, V12, V13, V15, V16 | 143 | 25 |
 | Presence test | V3, V5, V6, V7, V9, V10, V11, V14, V17 | 202 | 45 |
 
 **64% of the standard sits behind a presence test.** The test asks about a browser frontend, a
@@ -355,3 +357,65 @@ All at tag `v5.0.0` of `https://github.com/OWASP/ASVS`:
 - `5.0/en/0x03-What-is-the-ASVS.md` — scope, levels, identifiers, the chapter filter rule.
 - `5.0/en/0x04-Assessment_and_Certification.md` — verification mechanisms, scope reports, non-applicable requirements.
 - `5.0/en/0x05-For-Users-Of-4.0.md` — the removed architecture chapter, the level rethink, the removed CWE and NIST mappings.
+
+---
+
+## 7. The precondition the standard never tests
+
+**Added after the ticket closed.** The section above calls eight chapters "always". That word
+carried an assumption I did not state, and the assumption is wrong for this repo's own corpus.
+
+ASVS scopes itself in its first sentence: it "defines security requirements for **web
+applications and services**". It never verifies that precondition. No requirement asks whether
+the target is a web application, because the standard assumes an operator settled that before
+opening it.
+
+So applicability has **three tiers**, not two:
+
+| Tier | Gate | Requirements |
+|---|---|---:|
+| 0 | Is the target a web application or service? | all 345 |
+| 1 | none, **given tier 0** | 143 |
+| 2 | one of nine technology or feature presence tests | 202 |
+
+Tier 0 is the same kind of fact as the nine presence tests — unstated in the model, and
+undecidable from silence. It differs in consequence: a wrong answer invalidates a whole run
+rather than one chapter.
+
+### The corpus fails tier 0 more often than expected
+
+Measured over the 80 Data Flows in the 12 corpus cases, by `protocol`:
+
+| Case | Web-marked flows | `unknown` | Other protocols |
+|---|---:|---:|---|
+| 03-batch-data-pipeline | **0** | 1 | SFTP, object storage API, BigQuery API, PostgreSQL wire protocol |
+| 06-cookbook-online-game | **0** | 6 | TCP 1234, TCP 1235, local |
+| 02-iot-fleet-telemetry | 2 | 0 | MQTT, Pub/Sub, local serial console, BigQuery API |
+| 07, 08, 11, 12 | 0 | all | — |
+
+Two cases plainly fail tier 0. One is mixed. Four carry `unknown` on every flow and cannot be
+judged at all. ASVS applies cleanly to fewer than half of this repo's own corpus.
+
+### The floor shrinks rather than vanishes
+
+Not every one of the 143 is web-bound. Of the 25 L1 requirements in the eight tier-1 chapters,
+about **7 name HTTP, HTML, a browser or a WebSocket outright** — `V1.2.1`, `V1.2.2`, `V1.2.3`,
+`V1.3.1`, `V4.1.1`, `V4.4.1`, `V12.2.1`. Chapter **V4 is named "API and Web Service"** and this
+file should have gated it. The other 18 are general software requirements: SQL injection, OS
+command injection, input validation, authorization, dependency currency, logging.
+
+A reduced set is **a fork of ASVS rather than ASVS**. The standard invites a fork and requires
+that one keep traceability, "so that passing requirement 4.1.1 means the same across all
+versions". A fork is not compliance, and a report must not call it one.
+
+### Where this lands
+
+Tier 0 is a **job-level precondition rather than a per-requirement rule**. It cannot ride the
+input ladder the way #161's unknown-framework rejection does, because it needs the extracted
+model. So it is a new gate: after extraction, before a package runs. **#164** owns it — a
+framework package declares its precondition, and the service refuses the framework when the
+**Valid System Model** fails it. This repo's habit says fail closed, and 143 rulings against a
+batch pipeline is the failure to avoid.
+
+This changes nothing in #162's ruling. It reinforces it: tier 0 is one more presence-shaped
+gate, and a control node answers it no better than a string does.
