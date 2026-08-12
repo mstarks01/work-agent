@@ -65,14 +65,17 @@ RUNTIME_PLACEHOLDERS = frozenset(
         graph.STATE_DRAFT_ROSTER,
         graph.STATE_UNRECONCILED_DRAFTS,
         graph.STATE_DOMAIN_SKILLS,
-        # One per lane: ``{candidates}`` in the prompt file is resolved to this
-        # agent's own key at build time. The retrieved corpus resolves the same
-        # way and for the same reason: six lanes, one session state, and
-        # material selected per lane by the rules that fired there.
-        *(graph.candidates_state_key(category) for category in STRIDE_CATEGORIES),
-        *(graph.notes_state_key(category) for category in STRIDE_CATEGORIES),
-        *(graph.cases_state_key(category) for category in STRIDE_CATEGORIES),
-        *(graph.scope_state_key(category) for category in STRIDE_CATEGORIES),
+        # Six per artifact: ``{candidates}`` in the prompt file is resolved to
+        # this agent's own key at build time, and the retrieved corpus and the
+        # scope resolve the same way and for the same reason — six lanes, one
+        # session state, and material selected per lane by the rules that fired
+        # there. Derived from the lanes rather than listed, so a seventh
+        # artifact does not need adding here as well.
+        *(
+            lane.key(artifact)
+            for lane in graph.LANES
+            for artifact in graph.LANE_ARTIFACTS
+        ),
     }
 )
 
@@ -105,7 +108,7 @@ def analyze_state(**proposals_by_category: list) -> dict[str, object]:
     failed job.
     """
     return {
-        graph.analyze_state_key(category): {
+        graph.Lane(category).drafts_key: {
             "threats": [
                 proposal.model_dump(mode="json")
                 for proposal in proposals_by_category.get(
@@ -781,7 +784,7 @@ def test_merge_fails_closed_when_a_category_agent_emitted_nothing():
     than carrying a zero, so nothing downstream can see the hole.
     """
     state = analyze_state(spoofing=[sample_proposal("S-01", "spoofing")])
-    del state[graph.analyze_state_key("denial-of-service")]
+    del state[graph.Lane("denial-of-service").drafts_key]
     ctx = FakeContext(**state)
 
     with pytest.raises(graph.SilentNodeError) as excinfo:
@@ -1014,7 +1017,7 @@ def test_prepare_parks_each_lanes_candidates_under_its_own_key(
     )
 
     for category in STRIDE_CATEGORIES:
-        parked = ctx.state[graph.candidates_state_key(category)]
+        parked = ctx.state[graph.Lane(category).key("candidates")]
         assert f'"category": "{category}"' in parked
         others = set(STRIDE_CATEGORIES) - {category}
         assert not any(f'"category": "{other}"' in parked for other in others)
@@ -1033,7 +1036,7 @@ def test_prepare_gives_each_lane_its_own_denominators(skill_loader, knowledge_lo
     )
 
     for category in STRIDE_CATEGORIES:
-        parked = ctx.state[graph.scope_state_key(category)]
+        parked = ctx.state[graph.Lane(category).key("scope")]
         assert f"{category} rules ran" in parked
         assert "7 elements" in parked
 
@@ -1045,7 +1048,7 @@ def test_prepare_fences_candidate_facts(skill_loader, knowledge_loader):
         valid_model().model_dump(mode="json"), ctx, skill_loader, knowledge_loader
     )
 
-    parked = ctx.state[graph.candidates_state_key("information-disclosure")]
+    parked = ctx.state[graph.Lane("information-disclosure").key("candidates")]
     assert parked.startswith("```")
 
 
@@ -1081,8 +1084,53 @@ def test_prepare_renders_no_pack_block_when_none_is_earned(
 def test_each_agent_is_bound_to_its_own_candidate_key(skill_loader, prompt_loader):
     for category in STRIDE_CATEGORIES:
         instruction = graph.analyze_instruction(skill_loader, prompt_loader, category)
-        assert f"{{{graph.candidates_state_key(category)}}}" in instruction
+        assert f"{{{graph.Lane(category).key('candidates')}}}" in instruction
         assert "{candidates}" not in instruction
+
+
+class TestALane:
+    """One category agent's names, all of them derived from the category.
+
+    The claim worth testing is not the spelling of any one key. It is that the
+    key a lane *writes* and the key its instruction *reads* are the same key,
+    for every artifact — which is what putting both behind one declaration buys.
+    """
+
+    def test_what_a_lane_writes_is_what_its_prompt_reads(self):
+        for lane in graph.LANES:
+            written = set(lane.state(dict.fromkeys(graph.LANE_ARTIFACTS, "text")))
+            read = {
+                binding.strip("{}")
+                for placeholder, binding in lane.prompt_bindings.items()
+                if placeholder != "category"
+            }
+            assert read == written, lane.category
+
+    def test_no_two_lanes_share_a_key(self):
+        keys = [
+            lane.key(artifact)
+            for lane in graph.LANES
+            for artifact in graph.LANE_ARTIFACTS
+        ]
+
+        assert len(set(keys)) == len(keys)
+
+    def test_a_partial_set_of_artifacts_fails_closed(self):
+        """A key nothing wrote would raise at the first LLM call, not here."""
+        with pytest.raises(ValueError, match="missing"):
+            graph.Lane("spoofing").state({"candidates": "text"})
+
+    def test_an_unknown_artifact_fails_closed(self):
+        with pytest.raises(ValueError, match="unknown"):
+            graph.Lane("spoofing").state(
+                {**dict.fromkeys(graph.LANE_ARTIFACTS, "text"), "invented": "text"}
+            )
+
+    def test_the_node_name_is_an_identifier(self):
+        """Unlike a category, which carries a hyphen ADK cannot take."""
+        for lane in graph.LANES:
+            assert lane.node_name.isidentifier()
+            assert lane.drafts_key.isidentifier()
 
 
 def test_merge_accounts_for_coverage_over_the_drafts():
