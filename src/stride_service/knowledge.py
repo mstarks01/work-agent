@@ -142,14 +142,13 @@ def _select(
     reason: an instruction that reordered between runs would make two otherwise
     identical jobs send different bytes.
     """
-    order = list(index)
-    matched = {
-        name: len(set(rules) & set(fired))
-        for name, rules in index.items()
-        if set(rules) & set(fired)
-    }
-    ranked = sorted(matched, key=lambda name: (-matched[name], order.index(name)))
-    return tuple(ranked[:limit])
+    fired_set = set(fired)
+    matched = [
+        (-hits, position, name)
+        for position, (name, rules) in enumerate(index.items())
+        if (hits := len(fired_set.intersection(rules)))
+    ]
+    return tuple(name for _, _, name in sorted(matched)[:limit])
 
 
 def select_notes(fired: Collection[str]) -> tuple[str, ...]:

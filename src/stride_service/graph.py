@@ -476,7 +476,14 @@ class Analysis:
 
     @classmethod
     def from_state(cls, data: dict[str, Any]) -> Analysis:
-        """Rebuild from session state, revalidating every part."""
+        """Rebuild from session state, revalidating every part.
+
+        Every key is read strictly. :meth:`to_state` writes all of them, and the
+        only writer of this blob is that method, so a missing key means state
+        this build did not produce — which fails here rather than rebuilding an
+        analysis whose empty marks and empty context cannot be told apart from
+        a run that genuinely had none.
+        """
         return cls(
             system_model=SystemModel.model_validate(data["system_model"]),
             boundary_crossings=[
@@ -497,7 +504,7 @@ class Analysis:
             ],
             unresolved_evidence=[
                 UnresolvedEvidence.model_validate(mark)
-                for mark in data.get("unresolved_evidence", [])
+                for mark in data["unresolved_evidence"]
             ],
             missing_mitigations=[
                 MissingMitigation.model_validate(mark)
@@ -510,9 +517,9 @@ class Analysis:
                 SharedElementName.model_validate(mark)
                 for mark in data.get("shared_element_names", [])
             ],
-            domain_packs=list(data.get("domain_packs", [])),
-            fired_rules=list(data.get("fired_rules", [])),
-            knowledge_docs=list(data.get("knowledge_docs", [])),
+            domain_packs=list(data["domain_packs"]),
+            fired_rules=list(data["fired_rules"]),
+            knowledge_docs=list(data["knowledge_docs"]),
             summary=Summary.model_validate(data["summary"]),
         )
 
@@ -1073,6 +1080,7 @@ def assemble_report(
         ThreatRuling.model_validate(ruling) for ruling in _threats_of(reviewed_threats)
     ]
     threats, rejected = assemble_threats(drafts, rulings, model)
+    context = analysis_context or {}
     analysis = Analysis(
         system_model=model,
         boundary_crossings=model.boundary_crossings(),
@@ -1098,9 +1106,9 @@ def assemble_report(
             SharedElementName(name_slug=slug, element_ids=ids)
             for slug, ids in model.shared_names().items()
         ],
-        domain_packs=list((analysis_context or {}).get("domain_packs", [])),
-        fired_rules=list((analysis_context or {}).get("fired_rules", [])),
-        knowledge_docs=list((analysis_context or {}).get("knowledge_docs", [])),
+        domain_packs=list(context.get("domain_packs", [])),
+        fired_rules=list(context.get("fired_rules", [])),
+        knowledge_docs=list(context.get("knowledge_docs", [])),
         summary=build_summary(threats, rejected, model),
     )
     ctx.state[STATE_ANALYSIS] = analysis.to_state()
