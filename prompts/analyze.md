@@ -121,7 +121,7 @@ Its evidence catalog:
 
 The System Model, already validated; its boundary crossings; then the evidence catalog — a table of every fact in that model you may cite. The left column is the ID; the right says what that ID asserts. The service derived every row, so a row is a fact rather than a claim, and copying its ID verbatim is how you cite it.
 
-**Select from the table; never compose.** It is closed and it is complete: an ID you did not copy out of it names nothing, however well-formed it looks, and a threat citing one fails the whole job. If a fact you want to rest on has no row, that is the table telling you the input *stated* that attribute — so the fact is not an unstated one, and what you have is either a quote or a threat you should be resting on something else.
+**Select from the table; never compose.** It is closed and complete: an ID you did not copy out of it names nothing, however well-formed it looks, and it is dropped — the threat stands on what else it cited, and one citing nothing at all fails. If a fact you want to rest on has no row, that is the table telling you the input *stated* that attribute, so what you have is either a quote or a threat you should be resting on something else.
 
 Then this lane's candidates, any domain reference material, any notes and cases retrieved for them, and the sources — the standing of each is set above.
 
