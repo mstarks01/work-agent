@@ -333,9 +333,9 @@ def _routed(route: str, output: dict[str, Any]) -> Event:
 
 # --- State keys -------------------------------------------------------------
 #
-# The six keys the prompt files template against carry *rendered* text, since
-# ADK substitutes ``str(value)`` into an instruction. The structured values
-# the FunctionNodes pass between themselves live under their own keys.
+# The keys the prompt files template against carry *rendered* text, since ADK
+# substitutes ``str(value)`` into an instruction. The structured values the
+# FunctionNodes pass between themselves live under their own keys.
 #
 # Two key families, and the invariant that keeps them honest:
 # *structured* keys are the code's view (Pydantic round-trips), *rendered*
@@ -344,8 +344,10 @@ def _routed(route: str, output: dict[str, Any]) -> Event:
 # what makes a failed job debuggable — so the rule that stops them drifting
 # is: **a rendered key is written once by the FunctionNode that derives it,
 # and never read by Python.** No node mutates an artifact after rendering it.
-# A future node that re-renders or edits one of these in place breaks the
-# report's traceability without failing any test.
+#
+# :class:`SessionState` is what holds that rule. Each key is declared into one
+# family below, and a node writes through the method for its family; there is
+# deliberately no way to read a rendered key back.
 
 STATE_INPUT_TEXT = "input_text"
 # The job's sources as ``label -> text``, for the two checks that take data
@@ -394,6 +396,100 @@ STATE_REJECTION = "rejection"
 
 # The keys above are the graph's. The six *per-lane* keys are a lane's, and are
 # derived rather than spelled: see :class:`Lane` and :data:`LANE_ARTIFACTS`.
+
+#: Keys holding bytes a model reads and Python does not. Written once by the
+#: node that derives them, then templated into an instruction by ADK.
+RENDERED_KEYS: frozenset[str] = frozenset(
+    {
+        STATE_INPUT_TEXT,
+        STATE_SYSTEM_MODEL,
+        STATE_BOUNDARY_CROSSINGS,
+        STATE_EVIDENCE_CATALOG,
+        STATE_DOMAIN_SKILLS,
+        STATE_DRAFT_THREATS,
+        STATE_PREVIOUS_MODEL,
+        STATE_VALIDATION_ISSUES,
+        STATE_PREVIOUS_REVIEW,
+        STATE_CRITIC_ISSUES,
+        STATE_DRAFT_ROSTER,
+        STATE_UNRECONCILED_DRAFTS,
+        *(lane.key(artifact) for lane in LANES for artifact in LANE_ARTIFACTS),
+    }
+)
+
+#: Keys holding values a later node or a driver reads back. Every one of them
+#: round-trips through a Pydantic model or a plain mapping.
+STRUCTURED_KEYS: frozenset[str] = frozenset(
+    {
+        STATE_SOURCE_TEXTS,
+        STATE_EXTRACTED_MODEL,
+        STATE_VALID_MODEL,
+        STATE_MERGED_DRAFTS,
+        STATE_COVERAGE,
+        STATE_MARKS,
+        STATE_REVIEWED_THREATS,
+        STATE_ANALYSIS_CONTEXT,
+        STATE_ANALYSIS,
+        STATE_REJECTION,
+        *(lane.drafts_key for lane in LANES),
+    }
+)
+
+
+class UndeclaredStateKey(KeyError):
+    """A node wrote or read a key no family declares.
+
+    Undeclared keys are how a rendered artifact and its structured counterpart
+    come to disagree, and how a typo becomes a ``KeyError`` at the first LLM
+    call instead of at the node that made it.
+    """
+
+
+class SessionState:
+    """The one way a node touches the session, with the two families kept apart.
+
+    ADK hands a FunctionNode a context whose ``state`` is a plain dict, and
+    binds the next node's parameters out of it by name. That leaves the two
+    key families indistinguishable at every call site, and the rule that keeps
+    a rendered artifact and its structured counterpart from drifting — *a
+    rendered key is written once and never read by Python* — was a comment.
+
+    Here it is the interface. :meth:`prompt` writes a rendered key and
+    :meth:`put` writes a structured one; each rejects a key from the other
+    family, and there is **no method that reads a rendered key at all**. The
+    rule holds because the operation does not exist, not because a reviewer
+    remembered it.
+
+    Both methods also reject a key neither family declares, so a mistyped key
+    fails at the node that wrote it rather than at the model call that would
+    have templated it.
+    """
+
+    def __init__(self, ctx) -> None:
+        self._state = ctx.state
+
+    def prompt(self, key: str, text: str) -> None:
+        """Write a rendered key: bytes for a model, never read back here."""
+        if key not in RENDERED_KEYS:
+            raise UndeclaredStateKey(f"{key!r} is not a rendered state key")
+        self._state[key] = text
+
+    def put(self, key: str, value: Any) -> None:
+        """Write a structured key: a value a later node or a driver reads."""
+        if key not in STRUCTURED_KEYS:
+            raise UndeclaredStateKey(f"{key!r} is not a structured state key")
+        self._state[key] = value
+
+    def get(self, key: str) -> Any:
+        """Read a structured key, or ``None`` where the node that writes it did not.
+
+        ``None`` is load-bearing rather than a convenience: an LLM node that
+        emits no text writes no key, and telling that absence from a written
+        empty value is what :class:`SilentNodeError` is for.
+        """
+        if key not in STRUCTURED_KEYS:
+            raise UndeclaredStateKey(f"{key!r} is not a structured state key")
+        return self._state.get(key)
 
 
 class SilentNodeError(RuntimeError):
@@ -655,17 +751,19 @@ def validate_extraction(
     model, issues = parse_and_validate(
         extracted_model, normalize_ids=True, sources=source_texts or {}
     )
+    state = SessionState(ctx)
     if issues or model is None:
         parked = extracted_model if model is None else model.model_dump(mode="json")
         # Fenced for the same reason as the agents' copy: this is the model
         # built from caller words, handed straight back to a model.
-        ctx.state[STATE_PREVIOUS_MODEL] = render_fenced(parked)
-        ctx.state[STATE_VALIDATION_ISSUES] = render(
-            [issue.model_dump(mode="json") for issue in issues]
+        state.prompt(STATE_PREVIOUS_MODEL, render_fenced(parked))
+        state.prompt(
+            STATE_VALIDATION_ISSUES,
+            render([issue.model_dump(mode="json") for issue in issues]),
         )
         return _routed(ROUTE_INVALID, {"issue_count": len(issues)})
 
-    ctx.state[STATE_VALID_MODEL] = model.model_dump(mode="json")
+    state.put(STATE_VALID_MODEL, model.model_dump(mode="json"))
     return _routed(ROUTE_VALID, {"issue_count": 0})
 
 
@@ -675,7 +773,7 @@ def reject_model(validation_issues: str, ctx) -> dict[str, Any]:
     Nothing is auto-repaired and nothing is analyzed on a model that never
     passed the gate — the user gets the validator's issues instead.
     """
-    ctx.state[STATE_REJECTION] = validation_issues
+    SessionState(ctx).put(STATE_REJECTION, validation_issues)
     return {"rejected": True}
 
 
@@ -815,12 +913,14 @@ def prepare_analysis(
     candidates = generate_candidates(model)
     packs = select_domain_packs(model)
 
-    ctx.state[STATE_SYSTEM_MODEL] = render_fenced(_without_source_fields(valid_model))
-    ctx.state[STATE_BOUNDARY_CROSSINGS] = render(
-        [crossing.model_dump(mode="json") for crossing in crossings]
+    state = SessionState(ctx)
+    state.prompt(STATE_SYSTEM_MODEL, render_fenced(_without_source_fields(valid_model)))
+    state.prompt(
+        STATE_BOUNDARY_CROSSINGS,
+        render([crossing.model_dump(mode="json") for crossing in crossings]),
     )
-    ctx.state[STATE_EVIDENCE_CATALOG] = render_catalog(catalog)
-    ctx.state[STATE_DOMAIN_SKILLS] = compose_domain_skills(skill_loader, packs)
+    state.prompt(STATE_EVIDENCE_CATALOG, render_catalog(catalog))
+    state.prompt(STATE_DOMAIN_SKILLS, compose_domain_skills(skill_loader, packs))
     retrieved: list[str] = []
     for category, candidate_set in candidates.items():
         # Retrieval is by *fired* rule, so a lane that triggered nothing gets
@@ -828,24 +928,24 @@ def prepare_analysis(
         fired = {candidate.rule_id for candidate in candidate_set.candidates}
         notes, cases = select_notes(fired), select_cases(fired)
         # Keyed by the placeholder each fills, which is the vocabulary the
-        # prompt file uses; the lane turns that into its own six state keys.
-        ctx.state.update(
-            Lane(category).state(
-                {
-                    "candidates": render_fenced(candidate_set.model_dump(mode="json")),
-                    "scope": lane_scope(category, model, candidate_set),
-                    "reference_notes": compose_notes(knowledge_loader, notes),
-                    "prior_cases": compose_cases(knowledge_loader, cases),
-                }
-            )
+        # prompt file uses; the lane turns that into its own four state keys.
+        lane_state = Lane(category).state(
+            {
+                "candidates": render_fenced(candidate_set.model_dump(mode="json")),
+                "scope": lane_scope(category, model, candidate_set),
+                "reference_notes": compose_notes(knowledge_loader, notes),
+                "prior_cases": compose_cases(knowledge_loader, cases),
+            }
         )
+        for key, text in lane_state.items():
+            state.prompt(key, text)
         retrieved += [f"notes/{name}" for name in notes]
         retrieved += [f"cases/{name}" for name in cases]
     # The record of what the agents were given, written here because here is
     # where they are given it. Sorted and deduplicated: it is a set of rules
     # that matched, and firing order across six independent lanes is not a fact
     # about anything.
-    ctx.state[STATE_ANALYSIS_CONTEXT] = {
+    context = {
         "domain_packs": list(packs),
         "knowledge_docs": sorted(set(retrieved)),
         "fired_rules": sorted(
@@ -856,6 +956,7 @@ def prepare_analysis(
             }
         ),
     }
+    state.put(STATE_ANALYSIS_CONTEXT, context)
     return {
         "element_count": len(model.elements()),
         "crossing_count": len(crossings),
@@ -971,7 +1072,8 @@ def merge_drafts(
     to build the report. ``STATE_DRAFT_THREATS`` is the *prompt* view, narrowed
     by :func:`_ruling_view` to the fields a verdict is actually reached from.
     """
-    silent = [lane for lane in LANES if ctx.state.get(lane.drafts_key) is None]
+    state = SessionState(ctx)
+    silent = [lane for lane in LANES if state.get(lane.drafts_key) is None]
     if silent:
         keys = ", ".join(repr(lane.drafts_key) for lane in silent)
         raise SilentNodeError(
@@ -985,7 +1087,7 @@ def merge_drafts(
         lane.category: resolve_proposals(
             (
                 ThreatProposal.model_validate(proposal)
-                for proposal in _threats_of(ctx.state.get(lane.drafts_key))
+                for proposal in _threats_of(state.get(lane.drafts_key))
             ),
             catalog,
             lane.category,
@@ -997,7 +1099,7 @@ def merge_drafts(
     }
     joined = join_drafts(drafts_by_category, model, source_texts or {})
     merged = joined.drafts
-    ctx.state[STATE_MERGED_DRAFTS] = [draft.model_dump(mode="json") for draft in merged]
+    state.put(STATE_MERGED_DRAFTS, [draft.model_dump(mode="json") for draft in merged])
     # Every mark the fan-in produced, from both of its producers: the join
     # across all six lanes, and each lane's own evidence resolution. Merged
     # rather than parked separately — they share an owner, a standing and a
@@ -1006,7 +1108,7 @@ def merge_drafts(
     marks = joined.marks
     for resolution in resolutions.values():
         marks = marks.merged_with(resolution.marks)
-    ctx.state[STATE_MARKS] = marks.model_dump(mode="json")
+    state.put(STATE_MARKS, marks.model_dump(mode="json"))
     # Logged rather than reported: a lane that numbered its drafts 01, 02, 05
     # broke nothing a reader could act on, and the agents are who it is about.
     for gap in numbering_gaps(merged):
@@ -1018,8 +1120,8 @@ def merge_drafts(
     # validated model, so the two derivations cannot disagree, and the fan-in
     # stays free of a dependency on a key ``prepare`` wrote for the prompt.
     coverage = build_coverage(drafts_by_category, generate_candidates(model), model)
-    ctx.state[STATE_COVERAGE] = [row.model_dump(mode="json") for row in coverage]
-    ctx.state[STATE_DRAFT_THREATS] = render(_ruling_view(merged))
+    state.put(STATE_COVERAGE, [row.model_dump(mode="json") for row in coverage])
+    state.prompt(STATE_DRAFT_THREATS, render(_ruling_view(merged)))
     return {
         "draft_count": len(merged),
         "unverified_count": len(marks.unverified_grounds),
@@ -1074,14 +1176,20 @@ def route_review(
     rulings = [ThreatRuling.model_validate(ruling) for ruling in ruled]
     problems = review_issues(drafts, rulings, model)
     if problems:
-        ctx.state[STATE_PREVIOUS_REVIEW] = render(ruled)
-        ctx.state[STATE_CRITIC_ISSUES] = render(problems.messages)
+        state = SessionState(ctx)
+        state.prompt(STATE_PREVIOUS_REVIEW, render(ruled))
+        state.prompt(STATE_CRITIC_ISSUES, render(problems.messages))
         # The roster is the covering set the re-ask must reproduce, and an ID is
         # the whole of that claim — the re-ask reproduces rulings, not drafts.
         # Only the drafts it cannot fix without reading travel in full.
-        ctx.state[STATE_DRAFT_ROSTER] = render([draft.id for draft in drafts])
-        ctx.state[STATE_UNRECONCILED_DRAFTS] = render(
-            _ruling_view([draft for draft in drafts if draft.id in problems.implicated])
+        state.prompt(STATE_DRAFT_ROSTER, render([draft.id for draft in drafts]))
+        state.prompt(
+            STATE_UNRECONCILED_DRAFTS,
+            render(
+                _ruling_view(
+                    [draft for draft in drafts if draft.id in problems.implicated]
+                )
+            ),
         )
         return _routed(ROUTE_REVISE, {"issue_count": len(problems.messages)})
     return _routed(ROUTE_ACCEPT, {"reviewed_count": len(rulings)})
@@ -1174,7 +1282,7 @@ def assemble_report(
         knowledge_docs=list(context.get("knowledge_docs", [])),
         summary=build_summary(threats, rejected, model),
     )
-    ctx.state[STATE_ANALYSIS] = analysis.to_state()
+    SessionState(ctx).put(STATE_ANALYSIS, analysis.to_state())
     return {"threat_count": len(threats), "rejected_count": len(rejected)}
 
 
@@ -1523,3 +1631,45 @@ def _node_sampling(
 def rejection_issues(rendered: str) -> list[ValidationIssue]:
     """Parse the rejection the graph parked in state back into issues."""
     return [ValidationIssue.model_validate(issue) for issue in json.loads(rendered)]
+
+
+@dataclass(frozen=True)
+class Rejected:
+    """The graph refused the input: no model ever passed the validity gate.
+
+    Rejected, not *failed*. The input never became a valid System Model, which
+    is the submitter's to fix, and the issues say what was wrong with it.
+    """
+
+    issues: list[ValidationIssue]
+
+
+class GraphProducedNothing(RuntimeError):
+    """The graph reached neither of its two terminal shapes.
+
+    Ours to own: every path through the topology ends at ``assemble`` or at
+    ``reject``, so a final state carrying neither is a defect in the graph
+    rather than anything about the job. Each driver catches this and names the
+    run it was driving.
+    """
+
+
+GraphResult = Analysis | Rejected
+
+
+def result_of(final_state: Mapping[str, Any]) -> GraphResult:
+    """What a finished drive left behind, as one of the graph's two outcomes.
+
+    The graph has two drivers — the service over a job, the eval harness over a
+    corpus case — and each used to read the terminal keys itself: the same two
+    membership tests and the same two parses, spelled twice. What differs
+    between them is only what they *do* with a rejection, so that is what they
+    keep; how a final state is read is here.
+    """
+    rejection = final_state.get(STATE_REJECTION)
+    if rejection is not None:
+        return Rejected(issues=rejection_issues(rejection))
+    analysis = final_state.get(STATE_ANALYSIS)
+    if analysis is None:
+        raise GraphProducedNothing("graph produced neither an analysis nor a rejection")
+    return Analysis.from_state(analysis)
