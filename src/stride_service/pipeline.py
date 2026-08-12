@@ -34,11 +34,10 @@ from google.adk.sessions import BaseSessionService
 from stride_service.certification import CertificationGate, CertifyResult
 from stride_service.execution import GraphExecutor
 from stride_service.graph import (
-    STATE_ANALYSIS,
-    STATE_REJECTION,
-    Analysis,
+    GraphProducedNothing,
     Pipeline,
-    rejection_issues,
+    Rejected,
+    result_of,
 )
 from stride_service.jobs import (
     JobRecord,
@@ -115,16 +114,14 @@ class AdkPipelineRunner:
         graph_run = await self._executor.run(
             job.sources, user_id=job.owner_subject, on_node=on_node
         )
-        state = graph_run.final_state
-        if STATE_REJECTION in state:
-            return PipelineRejected(issues=rejection_issues(state[STATE_REJECTION]))
-        if STATE_ANALYSIS not in state:
-            raise PipelineError(
-                f"job {job.id}: graph produced neither an analysis nor a rejection"
-            )
+        try:
+            result = result_of(graph_run.final_state)
+        except GraphProducedNothing as exc:
+            raise PipelineError(f"job {job.id}: {exc}") from exc
+        if isinstance(result, Rejected):
+            return PipelineRejected(issues=result.issues)
 
-        analysis = Analysis.from_state(state[STATE_ANALYSIS])
-        report = analysis.into_report(
+        report = result.into_report(
             job=Job(
                 id=job.id,
                 created_at=job.created_at,
