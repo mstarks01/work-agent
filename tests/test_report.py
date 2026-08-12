@@ -1,16 +1,23 @@
 """Tests for the STRIDE report schema: severity matrix, verdict shapes,
 report self-containment invariants, and JSON round-tripping."""
 
+from typing import get_args
+
 import pytest
 from pydantic import ValidationError
 
 from stride_service.report import (
+    CategoryCoverage,
     Ground,
+    MissingMitigation,
     ProposedVerdict,
     Severity,
     StrideReport,
+    ThreatMark,
     ThreatRulings,
     UnknownRef,
+    UnresolvedEvidence,
+    UnresolvedMention,
     Verdict,
     build_summary,
     derive_severity_level,
@@ -328,6 +335,68 @@ class TestReportInvariants:
         payload["summary"]["threat_count"] += 1
         with pytest.raises(ValidationError, match="summary does not match"):
             StrideReport.model_validate(payload)
+
+
+class TestEveryThreatMarkPointsAtAThreat:
+    """One rule over every mark, so a new mark type cannot arrive uncovered.
+
+    A mark naming a threat this report does not carry annotates nothing, while
+    the threat that really earned it renders as though it had checked out.
+    Parametrized over the whole of ``ThreatMark`` rather than written once per
+    type: the point is that the set is closed.
+    """
+
+    @pytest.mark.parametrize(
+        ("field", "mark", "what"),
+        [
+            (
+                "unresolved_mentions",
+                UnresolvedMention(threat_id="S-09", mention="process:ghost"),
+                "unresolved mention",
+            ),
+            (
+                "unresolved_evidence",
+                UnresolvedEvidence(
+                    threat_id="S-09", reference="unknown:process:ghost:exposure"
+                ),
+                "unresolved evidence",
+            ),
+            (
+                "missing_mitigations",
+                MissingMitigation(threat_id="S-09"),
+                "missing mitigation",
+            ),
+        ],
+    )
+    def test_a_mark_on_an_absent_threat_is_rejected(self, field, mark, what):
+        with pytest.raises(ValidationError, match=f"{what} names threat 'S-09'"):
+            sample_report(**{field: [mark]})
+
+    def test_every_mark_type_is_covered_by_the_check(self):
+        """The parametrization above is the whole of ``ThreatMark``."""
+        covered = {UnresolvedMention, UnresolvedEvidence, MissingMitigation}
+        assert set(get_args(ThreatMark)) == covered
+
+
+class TestCoverageRatios:
+    def test_a_lane_cannot_cite_more_than_it_was_offered(self):
+        with pytest.raises(
+            ValidationError, match="elements_cited=3 exceeds elements=2"
+        ):
+            CategoryCoverage(
+                category="spoofing",
+                drafts=1,
+                rules=2,
+                rules_fired=1,
+                candidates=0,
+                candidates_cited=0,
+                elements=2,
+                elements_cited=3,
+                boundary_crossings=0,
+                boundary_crossings_cited=0,
+                unknown_controls=0,
+                unknown_controls_cited=0,
+            )
 
 
 class TestSummary:
