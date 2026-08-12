@@ -34,6 +34,7 @@ from stride_service.graph import (
 from stride_service.report import (
     CATEGORY_LETTERS,
     STRIDE_CATEGORIES,
+    AnalysisMarks,
     Mitigation,
     Severity,
     SharedElementName,
@@ -158,17 +159,23 @@ def test_an_eval_report_carries_every_field_production_stamps(case):
     """The eval report is the production shape or it measures a different one.
 
     The pinned set is the guard, and it is pinned rather than derived on
-    purpose: every field :class:`~stride_service.graph.Analysis` and
+    purpose: every field an :class:`~stride_service.graph.Analysis` and a
     :class:`~stride_service.report.StrideReport` share is one the eval seam has
     to be *asked* to carry, and a field added to both without a decision here
     is exactly how ``coverage`` came to be computed at the fan-in for a sweep
     that then read an empty list for it.
+
+    The five marks are pinned through
+    :class:`~stride_service.report.AnalysisMarks`, which is where an
+    ``Analysis`` holds them now.
     """
     pipeline = build(case, ENTRY_PREPARE, {})
 
     run = asyncio.run(modes.run_analysis(case, pipeline))
 
-    analysis_fields = {field.name for field in fields(Analysis)}
+    analysis_fields = {field.name for field in fields(Analysis)} | set(
+        AnalysisMarks.model_fields
+    )
     shared = analysis_fields & StrideReport.model_fields.keys()
     assert shared == {
         "system_model",

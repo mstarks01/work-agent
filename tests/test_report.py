@@ -7,6 +7,7 @@ import pytest
 from pydantic import ValidationError
 
 from stride_service.report import (
+    AnalysisMarks,
     CategoryCoverage,
     Ground,
     MissingMitigation,
@@ -376,6 +377,53 @@ class TestEveryThreatMarkPointsAtAThreat:
         """The parametrization above is the whole of ``ThreatMark``."""
         covered = {UnresolvedMention, UnresolvedEvidence, MissingMitigation}
         assert set(get_args(ThreatMark)) == covered
+
+
+class TestAnalysisMarks:
+    """The five service-owned marks as one value.
+
+    The fan-in collects them from more than one producer, so merging is the
+    operation this type exists for.
+    """
+
+    def test_an_empty_set_is_the_common_case(self):
+        marks = AnalysisMarks()
+
+        assert all(getattr(marks, name) == [] for name in AnalysisMarks.model_fields)
+
+    def test_merging_concatenates_every_list_in_order(self):
+        first = AnalysisMarks(
+            unresolved_mentions=[
+                UnresolvedMention(threat_id="S-01", mention="process:ghost")
+            ]
+        )
+        second = AnalysisMarks(
+            unresolved_mentions=[
+                UnresolvedMention(threat_id="T-02", mention="store:ghost")
+            ],
+            missing_mitigations=[MissingMitigation(threat_id="R-03")],
+        )
+
+        merged = first.merged_with(second)
+
+        assert [mark.threat_id for mark in merged.unresolved_mentions] == [
+            "S-01",
+            "T-02",
+        ]
+        assert [mark.threat_id for mark in merged.missing_mitigations] == ["R-03"]
+        assert merged.unverified_grounds == []
+
+    def test_merging_covers_every_declared_mark(self):
+        """A sixth mark joins by being declared, not by editing ``merged_with``.
+
+        The method walks ``model_fields``, so this holds the whole set rather
+        than the four names that happen to exist today.
+        """
+        empty = AnalysisMarks()
+
+        merged = empty.merged_with(empty)
+
+        assert set(merged.model_dump()) == set(AnalysisMarks.model_fields)
 
 
 class TestCoverageRatios:

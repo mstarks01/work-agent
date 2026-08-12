@@ -234,7 +234,9 @@ class TestABadReferenceCostsItsEntryNotTheJob:
             "S-01", evidence_refs=["crossing:flow:ghost", ENCRYPTION_REF], quotes=[]
         )
 
-        (mark,) = resolve_proposals([proposal], catalog, "spoofing").unresolved
+        (mark,) = resolve_proposals(
+            [proposal], catalog, "spoofing"
+        ).marks.unresolved_evidence
 
         assert mark.threat_id == "S-01"
         assert mark.reference == "crossing:flow:ghost"
@@ -251,7 +253,7 @@ class TestABadReferenceCostsItsEntryNotTheJob:
         resolution = resolve_proposals([proposal], catalog, "spoofing")
 
         assert len(resolution.drafts) == 1
-        assert len(resolution.unresolved) == 1
+        assert len(resolution.marks.unresolved_evidence) == 1
 
     def test_a_threat_left_with_no_grounds_at_all_still_fails_the_job(self):
         """Where the line is, and why it is there.
@@ -292,7 +294,7 @@ class TestABadReferenceCostsItsEntryNotTheJob:
 
         resolution = resolve_proposals([sample_proposal()], catalog, "spoofing")
 
-        assert resolution.unresolved == []
+        assert resolution.marks.unresolved_evidence == []
 
 
 class TestResolveProposals:
