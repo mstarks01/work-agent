@@ -1091,6 +1091,54 @@ class SharedElementName(BaseModel):
     element_ids: list[str] = Field(min_length=2)
 
 
+class AnalysisMarks(BaseModel):
+    """Every service-owned mark one run produced, as one value.
+
+    The five lists below have one owner, one standing and one policy: the
+    *service* records them, they ride beside the findings rather than on them
+    (an agent must not report on its own accuracy), and none of them fails a
+    job. They used to travel as five loose parallel lists — through the fan-in,
+    through four session-state keys, through four parameters on the assemble
+    node, through four fields on an :class:`~stride_service.graph.Analysis` and
+    its two state methods — so adding the fifth cost about fifteen edits of one
+    shape. Here they are one field.
+
+    **Not the report's wire shape.** The report keeps its five top-level
+    arrays; :meth:`~stride_service.graph.Analysis.into_report` is where this
+    value becomes them. Nesting them there would break every consumer of a
+    published schema to save one of those fifteen edits.
+
+    Empty is the common case and means what it says: every quote verified,
+    every mention resolved, every reference named a fact, every threat carried
+    a countermeasure or the unknown that excuses carrying none, and no two
+    element types share a name.
+    """
+
+    model_config = ConfigDict(extra="forbid")
+
+    unverified_grounds: list[UnverifiedGround] = Field(default_factory=list)
+    unresolved_mentions: list[UnresolvedMention] = Field(default_factory=list)
+    unresolved_evidence: list[UnresolvedEvidence] = Field(default_factory=list)
+    missing_mitigations: list[MissingMitigation] = Field(default_factory=list)
+    shared_element_names: list[SharedElementName] = Field(default_factory=list)
+
+    def merged_with(self, other: AnalysisMarks) -> AnalysisMarks:
+        """Both sets of marks, this one's entries first in every list.
+
+        The fan-in collects marks from three producers — one per lane's
+        evidence resolution, the join across all six, and the model itself —
+        and this is how they become one value. It walks ``model_fields`` rather
+        than naming the five lists, so a sixth mark joins by being declared
+        above rather than by someone remembering this method.
+        """
+        return AnalysisMarks(
+            **{
+                name: [*getattr(self, name), *getattr(other, name)]
+                for name in AnalysisMarks.model_fields
+            }
+        )
+
+
 class Summary(BaseModel):
     """Counts the front-end can render without walking the threat list."""
 
