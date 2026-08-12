@@ -197,7 +197,7 @@ class TestGroundReferences:
         )
         joined = join_drafts(drafts, model, SOURCES)
         assert joined.drafts[0].grounds[0].source_label == LABEL
-        assert joined.unverified == []
+        assert joined.marks.unverified_grounds == []
 
     def test_the_label_half_does_not_run_without_sources(self, model):
         """The gate's own escape: no set to check against is not a wrong citation."""
@@ -262,12 +262,12 @@ class TestUnresolvedMentions:
         joined = join_drafts(
             self.drafted("An attacker reaches process:web-app."), model
         )
-        assert joined.mentions == []
+        assert joined.marks.unresolved_mentions == []
 
     def test_an_id_the_model_lacks_is_marked_and_the_job_survives(self, model):
         joined = join_drafts(self.drafted("It pivots into process:ghost."), model)
 
-        assert [(m.threat_id, m.mention) for m in joined.mentions] == [
+        assert [(m.threat_id, m.mention) for m in joined.marks.unresolved_mentions] == [
             ("S-01", "process:ghost")
         ]
         assert len(joined.drafts) == 1
@@ -280,20 +280,20 @@ class TestUnresolvedMentions:
             ),
             model,
         )
-        assert [m.mention for m in joined.mentions] == [
+        assert [m.mention for m in joined.marks.unresolved_mentions] == [
             "process:web-api",
             "store:accounts-db",
         ]
 
     def test_a_respelled_id_resolves_rather_than_being_marked(self, model):
         joined = join_drafts(self.drafted("Reaches Process:Web-App first."), model)
-        assert joined.mentions == []
+        assert joined.marks.unresolved_mentions == []
 
     def test_marks_are_per_mention_not_per_threat(self, model):
         joined = join_drafts(
             self.drafted("From process:ghost through store:phantom."), model
         )
-        assert [m.mention for m in joined.mentions] == [
+        assert [m.mention for m in joined.marks.unresolved_mentions] == [
             "process:ghost",
             "store:phantom",
         ]
@@ -310,11 +310,11 @@ class TestMissingMitigations:
 
     def test_a_threat_carrying_a_countermeasure_is_not_marked(self, model):
         joined = join_drafts(self.drafted(mitigations=[mitigation()]), model)
-        assert joined.unmitigated == []
+        assert joined.marks.missing_mitigations == []
 
     def test_empty_with_no_unknown_behind_it_is_marked(self, model):
         joined = join_drafts(self.drafted(mitigations=[]), model)
-        assert [m.threat_id for m in joined.unmitigated] == ["S-01"]
+        assert [m.threat_id for m in joined.marks.missing_mitigations] == ["S-01"]
 
     def test_empty_on_a_threat_conditional_on_an_unknown_is_licensed(self, model):
         """The one case the prompt allows, recognized by the branch its trigger picks."""
@@ -331,7 +331,7 @@ class TestMissingMitigations:
             ),
             model,
         )
-        assert joined.unmitigated == []
+        assert joined.marks.missing_mitigations == []
 
     def test_the_mark_never_costs_the_finding(self, model):
         joined = join_drafts(self.drafted(mitigations=[]), model)
@@ -394,7 +394,7 @@ class TestQuoteVerification:
 
     def test_a_verifying_quote_is_not_marked(self, model):
         joined = join_drafts(self.quoting("log in to the web app"), model, SOURCES)
-        assert joined.unverified == []
+        assert joined.marks.unverified_grounds == []
 
     def test_an_unfindable_quote_beside_a_good_ground_is_marked_not_fatal(self, model):
         """One bad quote beside good ones is still a justified finding."""
@@ -405,8 +405,10 @@ class TestQuoteVerification:
         joined = join_drafts(drafts, model, SOURCES)
 
         assert len(joined.drafts) == 1
-        assert [(m.threat_id, m.index) for m in joined.unverified] == [("S-01", 0)]
-        assert LABEL in joined.unverified[0].reason
+        assert [(m.threat_id, m.index) for m in joined.marks.unverified_grounds] == [
+            ("S-01", 0)
+        ]
+        assert LABEL in joined.marks.unverified_grounds[0].reason
 
     def test_a_threat_whose_every_ground_fails_kills_the_job(self, model):
         drafts = self.quoting("a sentence the submitter never wrote")
@@ -439,7 +441,7 @@ class TestQuoteVerification:
 
     def test_the_text_check_does_not_run_without_sources(self, model):
         joined = join_drafts(self.quoting("never written anywhere"), model)
-        assert joined.unverified == []
+        assert joined.marks.unverified_grounds == []
 
 
 class TestAssembleThreats:

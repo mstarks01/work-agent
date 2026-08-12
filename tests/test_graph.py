@@ -10,6 +10,9 @@ from __future__ import annotations
 
 import json
 import re
+from dataclasses import fields
+from datetime import UTC, datetime
+from typing import Any
 
 import pytest
 from google.adk.agents import LlmAgent
@@ -22,6 +25,11 @@ from stride_service.markdown_loader import MarkdownLoader
 from stride_service.model_tiers import LLM_NODES
 from stride_service.report import (
     STRIDE_CATEGORIES,
+    AnalysisMarks,
+    InputRef,
+    Job,
+    NodeRun,
+    StrideReport,
     ThreatProposals,
     ThreatRulings,
     UnknownRef,
@@ -29,6 +37,7 @@ from stride_service.report import (
 )
 from stride_service.resilience import load_resilience
 from stride_service.sampling import load_sampling
+from stride_service.sources import Source
 from stride_service.system_model import SystemModel
 from tests.factories import (
     repo_tiers,
@@ -56,23 +65,31 @@ RUNTIME_PLACEHOLDERS = frozenset(
         graph.STATE_DRAFT_ROSTER,
         graph.STATE_UNRECONCILED_DRAFTS,
         graph.STATE_DOMAIN_SKILLS,
-        # One per lane: ``{candidates}`` in the prompt file is resolved to this
-        # agent's own key at build time. The retrieved corpus resolves the same
-        # way and for the same reason: six lanes, one session state, and
-        # material selected per lane by the rules that fired there.
-        *(graph.candidates_state_key(category) for category in STRIDE_CATEGORIES),
-        *(graph.notes_state_key(category) for category in STRIDE_CATEGORIES),
-        *(graph.cases_state_key(category) for category in STRIDE_CATEGORIES),
-        *(graph.scope_state_key(category) for category in STRIDE_CATEGORIES),
+        # Six per artifact: ``{candidates}`` in the prompt file is resolved to
+        # this agent's own key at build time, and the retrieved corpus and the
+        # scope resolve the same way and for the same reason — six lanes, one
+        # session state, and material selected per lane by the rules that fired
+        # there. Derived from the lanes rather than listed, so a seventh
+        # artifact does not need adding here as well.
+        *(
+            lane.key(artifact)
+            for lane in graph.LANES
+            for artifact in graph.LANE_ARTIFACTS
+        ),
     }
 )
 
 
 class FakeContext:
-    """Stands in for ADK's node context: the node functions only touch state."""
+    """Stands in for ADK's node context: the node functions only touch state.
 
-    def __init__(self, **state: object) -> None:
-        self.state = dict(state)
+    ``Any`` rather than ``object``, matching ADK's own state: a node parks
+    validated Pydantic dumps here and reads them back through
+    ``model_validate``, so a caller that narrows the value is the normal case.
+    """
+
+    def __init__(self, **state: Any) -> None:
+        self.state: dict[str, Any] = dict(state)
 
 
 def analyze_state(**proposals_by_category: list) -> dict[str, object]:
@@ -91,7 +108,7 @@ def analyze_state(**proposals_by_category: list) -> dict[str, object]:
     failed job.
     """
     return {
-        graph.analyze_state_key(category): {
+        graph.Lane(category).drafts_key: {
             "threats": [
                 proposal.model_dump(mode="json")
                 for proposal in proposals_by_category.get(
@@ -488,6 +505,121 @@ def test_only_known_state_keys_remain_as_placeholders(pipeline):
         assert found <= RUNTIME_PLACEHOLDERS, (node.name, found - RUNTIME_PLACEHOLDERS)
 
 
+# --- Session state ----------------------------------------------------------
+
+
+class TestSessionState:
+    """The two key families, and the rule that keeps them from drifting.
+
+    A rendered key holds bytes a model reads and Python does not. Keeping the
+    two copies of an artifact honest used to rest on a comment; it now rests on
+    there being no operation that reads a rendered key back.
+    """
+
+    def state(self) -> tuple[FakeContext, graph.SessionState]:
+        ctx = FakeContext()
+        return ctx, graph.SessionState(ctx)
+
+    def test_the_two_families_are_disjoint_and_cover_every_key(self):
+        assert not graph.RENDERED_KEYS & graph.STRUCTURED_KEYS
+
+        declared = {
+            value
+            for name, value in vars(graph).items()
+            if name.startswith("STATE_") and isinstance(value, str)
+        }
+        assert declared <= graph.RENDERED_KEYS | graph.STRUCTURED_KEYS
+
+    def test_a_rendered_key_is_written_and_never_read(self):
+        ctx, state = self.state()
+
+        state.prompt(graph.STATE_SYSTEM_MODEL, "rendered")
+
+        assert ctx.state[graph.STATE_SYSTEM_MODEL] == "rendered"
+        # The whole of the invariant: there is no method that reads it back.
+        with pytest.raises(graph.UndeclaredStateKey):
+            state.get(graph.STATE_SYSTEM_MODEL)
+
+    def test_a_structured_key_round_trips(self):
+        _, state = self.state()
+
+        state.put(graph.STATE_VALID_MODEL, {"processes": []})
+
+        assert state.get(graph.STATE_VALID_MODEL) == {"processes": []}
+
+    def test_a_structured_key_cannot_be_written_as_a_rendered_one(self):
+        _, state = self.state()
+
+        with pytest.raises(graph.UndeclaredStateKey):
+            state.prompt(graph.STATE_VALID_MODEL, "rendered")
+
+    def test_a_mistyped_key_fails_at_the_node_that_wrote_it(self):
+        """Rather than as a KeyError at the first LLM call that templates it."""
+        _, state = self.state()
+
+        with pytest.raises(graph.UndeclaredStateKey, match="candidtaes_spoofing"):
+            state.prompt("candidtaes_spoofing", "rendered")
+
+    def test_an_unwritten_structured_key_reads_as_none(self):
+        """Which is how a silent node is told from one that wrote an empty value."""
+        _, state = self.state()
+
+        assert state.get(graph.STATE_ANALYSIS) is None
+
+
+def test_no_node_writes_session_state_directly():
+    """The interface is only an interface while every node goes through it.
+
+    A source lint, because the alternative is a comment: ADK hands each node a
+    context whose ``state`` is a plain dict, so ``ctx.state[key] = value`` stays
+    available and silently bypasses both family checks.
+    """
+    source = (PROJECT_ROOT / "src" / "stride_service" / "graph.py").read_text()
+    direct = [
+        line.strip()
+        for line in source.splitlines()
+        if "ctx.state[" in line or "ctx.state.update(" in line
+    ]
+
+    assert direct == [], direct
+
+
+class TestReadingAFinishedRun:
+    """One reader for the graph's two terminal shapes, shared by both drivers."""
+
+    def analysis_state(self) -> dict:
+        ctx = FakeContext()
+        graph.assemble_report(
+            valid_model().model_dump(mode="json"),
+            [sample_draft("S-01").model_dump(mode="json")],
+            ctx,
+            reviewed_threats={
+                "threats": [sample_ruling("S-01").model_dump(mode="json")]
+            },
+        )
+        return ctx.state
+
+    def test_an_assembled_run_reads_as_its_analysis(self):
+        result = graph.result_of(self.analysis_state())
+
+        assert isinstance(result, graph.Analysis)
+        assert [threat.id for threat in result.threats] == ["S-01"]
+
+    def test_a_rejected_run_reads_as_its_issues(self):
+        ctx = FakeContext()
+        graph.reject_model('[{"code": "schema", "message": "bad"}]', ctx)
+
+        result = graph.result_of(ctx.state)
+
+        assert isinstance(result, graph.Rejected)
+        assert [issue.code for issue in result.issues] == ["schema"]
+
+    def test_neither_outcome_is_ours_to_own(self):
+        """Every path ends at ``assemble`` or ``reject``, so this is a defect."""
+        with pytest.raises(graph.GraphProducedNothing):
+            graph.result_of({})
+
+
 # --- Node functions ---------------------------------------------------------
 
 
@@ -657,6 +789,46 @@ def test_merge_joins_drafts_in_canonical_order():
     assert "S-01" in ctx.state[graph.STATE_DRAFT_THREATS]
 
 
+def test_merge_parks_every_mark_kind_under_one_key():
+    """One key, whatever the fan-in found.
+
+    The marks have one owner, one standing and one policy, so they travel as
+    one :class:`~stride_service.report.AnalysisMarks`. A sixth kind is a field
+    on that model and no new key here.
+    """
+    ctx = FakeContext(**analyze_state(spoofing=[sample_proposal("S-01", "spoofing")]))
+
+    graph.merge_drafts(valid_model().model_dump(mode="json"), ctx)
+
+    marks = AnalysisMarks.model_validate(ctx.state[graph.STATE_MARKS])
+    assert set(ctx.state[graph.STATE_MARKS]) == set(AnalysisMarks.model_fields)
+    assert marks.unverified_grounds == []
+    assert marks.unresolved_mentions == []
+    assert marks.unresolved_evidence == []
+    assert marks.missing_mitigations == []
+
+
+def test_the_marks_reach_the_report_through_assemble():
+    """What ``merge`` parked, plus the one mark ``assemble`` derives itself."""
+    ctx = FakeContext()
+    graph.assemble_report(
+        valid_model().model_dump(mode="json"),
+        [sample_draft("S-01").model_dump(mode="json")],
+        ctx,
+        reviewed_threats={"threats": [sample_ruling("S-01").model_dump(mode="json")]},
+        marks={
+            "missing_mitigations": [{"threat_id": "S-01"}],
+        },
+    )
+
+    analysis = graph.Analysis.from_state(ctx.state[graph.STATE_ANALYSIS])
+
+    assert [m.threat_id for m in analysis.marks.missing_mitigations] == ["S-01"]
+    # Derived from the model this node holds, never carried from the fan-in,
+    # so it is present on an analysis assembled from marks that omit it.
+    assert analysis.marks.shared_element_names == []
+
+
 def test_ruling_view_keeps_every_field_the_critic_rules_on():
     """The guard on ``_ruling_view``'s ``exclude_defaults``.
 
@@ -727,7 +899,7 @@ def test_merge_fails_closed_when_a_category_agent_emitted_nothing():
     than carrying a zero, so nothing downstream can see the hole.
     """
     state = analyze_state(spoofing=[sample_proposal("S-01", "spoofing")])
-    del state[graph.analyze_state_key("denial-of-service")]
+    del state[graph.Lane("denial-of-service").drafts_key]
     ctx = FakeContext(**state)
 
     with pytest.raises(graph.SilentNodeError) as excinfo:
@@ -960,7 +1132,7 @@ def test_prepare_parks_each_lanes_candidates_under_its_own_key(
     )
 
     for category in STRIDE_CATEGORIES:
-        parked = ctx.state[graph.candidates_state_key(category)]
+        parked = ctx.state[graph.Lane(category).key("candidates")]
         assert f'"category": "{category}"' in parked
         others = set(STRIDE_CATEGORIES) - {category}
         assert not any(f'"category": "{other}"' in parked for other in others)
@@ -979,7 +1151,7 @@ def test_prepare_gives_each_lane_its_own_denominators(skill_loader, knowledge_lo
     )
 
     for category in STRIDE_CATEGORIES:
-        parked = ctx.state[graph.scope_state_key(category)]
+        parked = ctx.state[graph.Lane(category).key("scope")]
         assert f"{category} rules ran" in parked
         assert "7 elements" in parked
 
@@ -991,7 +1163,7 @@ def test_prepare_fences_candidate_facts(skill_loader, knowledge_loader):
         valid_model().model_dump(mode="json"), ctx, skill_loader, knowledge_loader
     )
 
-    parked = ctx.state[graph.candidates_state_key("information-disclosure")]
+    parked = ctx.state[graph.Lane("information-disclosure").key("candidates")]
     assert parked.startswith("```")
 
 
@@ -1027,8 +1199,53 @@ def test_prepare_renders_no_pack_block_when_none_is_earned(
 def test_each_agent_is_bound_to_its_own_candidate_key(skill_loader, prompt_loader):
     for category in STRIDE_CATEGORIES:
         instruction = graph.analyze_instruction(skill_loader, prompt_loader, category)
-        assert f"{{{graph.candidates_state_key(category)}}}" in instruction
+        assert f"{{{graph.Lane(category).key('candidates')}}}" in instruction
         assert "{candidates}" not in instruction
+
+
+class TestALane:
+    """One category agent's names, all of them derived from the category.
+
+    The claim worth testing is not the spelling of any one key. It is that the
+    key a lane *writes* and the key its instruction *reads* are the same key,
+    for every artifact — which is what putting both behind one declaration buys.
+    """
+
+    def test_what_a_lane_writes_is_what_its_prompt_reads(self):
+        for lane in graph.LANES:
+            written = set(lane.state(dict.fromkeys(graph.LANE_ARTIFACTS, "text")))
+            read = {
+                binding.strip("{}")
+                for placeholder, binding in lane.prompt_bindings.items()
+                if placeholder != "category"
+            }
+            assert read == written, lane.category
+
+    def test_no_two_lanes_share_a_key(self):
+        keys = [
+            lane.key(artifact)
+            for lane in graph.LANES
+            for artifact in graph.LANE_ARTIFACTS
+        ]
+
+        assert len(set(keys)) == len(keys)
+
+    def test_a_partial_set_of_artifacts_fails_closed(self):
+        """A key nothing wrote would raise at the first LLM call, not here."""
+        with pytest.raises(ValueError, match="missing"):
+            graph.Lane("spoofing").state({"candidates": "text"})
+
+    def test_an_unknown_artifact_fails_closed(self):
+        with pytest.raises(ValueError, match="unknown"):
+            graph.Lane("spoofing").state(
+                {**dict.fromkeys(graph.LANE_ARTIFACTS, "text"), "invented": "text"}
+            )
+
+    def test_the_node_name_is_an_identifier(self):
+        """Unlike a category, which carries a hyphen ADK cannot take."""
+        for lane in graph.LANES:
+            assert lane.node_name.isidentifier()
+            assert lane.drafts_key.isidentifier()
 
 
 def test_merge_accounts_for_coverage_over_the_drafts():
@@ -1152,6 +1369,80 @@ def test_a_graph_entered_past_prepare_records_an_empty_context():
 
     assert context.domain_packs == []
     assert context.fired_rules == []
+
+
+class TestIntoReport:
+    """The one mapping from an :class:`Analysis` to a report.
+
+    Both drivers — the service over a job, the eval harness over a corpus case
+    — reach the report through this method, so what these tests hold is what
+    used to be held by two field lists agreeing with each other.
+    """
+
+    def analysis(self) -> graph.Analysis:
+        ctx = FakeContext()
+        graph.assemble_report(
+            valid_model().model_dump(mode="json"),
+            [sample_draft("S-01").model_dump(mode="json")],
+            ctx,
+            reviewed_threats={
+                "threats": [sample_ruling("S-01").model_dump(mode="json")]
+            },
+            analysis_context={"domain_packs": ["http-api"], "fired_rules": ["r-01"]},
+        )
+        return graph.Analysis.from_state(ctx.state[graph.STATE_ANALYSIS])
+
+    def report(self, pipeline):
+        analysis = self.analysis()
+        return analysis.into_report(
+            job=Job(
+                id="job-01",
+                created_at=datetime(2026, 1, 1, tzinfo=UTC),
+                completed_at=datetime(2026, 1, 1, tzinfo=UTC),
+            ),
+            input_ref=InputRef.of(
+                system_name="Test system",
+                sources=[Source(kind="description", label="brief", text="text")],
+            ),
+            nodes=[NodeRun(node="extract", duration_ms=1)],
+            pipeline=pipeline,
+        )
+
+    def test_every_shared_field_is_carried(self, pipeline):
+        """A field on both sides that ``into_report`` forgets fails here.
+
+        Mechanical rather than enumerated, because an enumerated list is the
+        second field list this method exists to remove. Any name an
+        ``Analysis`` and a ``StrideReport`` both carry must arrive unchanged,
+        and the marks count as the ``Analysis``'s own: it holds them on one
+        field, and the report spreads them across five.
+        """
+        analysis = self.analysis()
+        report = self.report(pipeline)
+        held = {field.name for field in fields(analysis)} | set(
+            AnalysisMarks.model_fields
+        )
+        shared = held & set(StrideReport.model_fields)
+
+        assert shared, "Analysis and StrideReport share no field names"
+        for name in sorted(shared):
+            holder = analysis if hasattr(analysis, name) else analysis.marks
+            assert getattr(report, name) == getattr(holder, name), name
+
+    def test_the_driver_supplies_only_what_the_graph_cannot_know(self, pipeline):
+        report = self.report(pipeline)
+
+        assert report.job.id == "job-01"
+        assert report.input.system_name == "Test system"
+        assert [node.node for node in report.nodes] == ["extract"]
+        assert set(report.sampling) == set(pipeline.tier_sampling)
+
+    def test_the_context_joins_the_built_graph_s_digest(self, pipeline):
+        report = self.report(pipeline)
+
+        assert report.analysis_context is not None
+        assert report.analysis_context.instruction_sha256 == pipeline.instruction_sha256
+        assert report.analysis_context.domain_packs == ["http-api"]
 
 
 class TestTheInstructionDigest:

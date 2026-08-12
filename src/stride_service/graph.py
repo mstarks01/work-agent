@@ -82,8 +82,9 @@ from __future__ import annotations
 import hashlib
 import json
 import logging
-from collections.abc import Callable, Sequence
+from collections.abc import Callable, Mapping, Sequence
 from dataclasses import dataclass
+from types import MappingProxyType
 from typing import TYPE_CHECKING, Any, Literal
 
 from google.adk.agents import LlmAgent
@@ -124,20 +125,21 @@ from stride_service.prompts import (
 from stride_service.report import (
     STRIDE_CATEGORIES,
     AnalysisContext,
+    AnalysisMarks,
     CategoryCoverage,
     DraftThreat,
-    MissingMitigation,
+    InputRef,
+    Job,
+    NodeRun,
     SharedElementName,
     StrideCategory,
+    StrideReport,
     Summary,
     Threat,
     ThreatProposal,
     ThreatProposals,
     ThreatRuling,
     ThreatRulings,
-    UnresolvedEvidence,
-    UnresolvedMention,
-    UnverifiedGround,
     build_summary,
 )
 from stride_service.resilience import ResilienceConfig
@@ -185,14 +187,102 @@ CRITIC_FAILED_NODE = "critic_failed"
 ASSEMBLE_NODE = "assemble"
 
 
-def analyze_node_name(category: StrideCategory) -> str:
-    """This category agent's graph node name (an identifier, unlike the ID)."""
-    return f"analyze_{category.replace('-', '_')}"
-
-
-ANALYZE_GRAPH_NODES: tuple[str, ...] = tuple(
-    analyze_node_name(category) for category in STRIDE_CATEGORIES
+# The per-lane artifacts, as ``{placeholder}`` in ``analyze.md`` against the
+# state-key prefix it resolves to. **The only place that correspondence
+# lives**: :meth:`Lane.prompt_bindings` reads it to substitute, and
+# :meth:`Lane.state` reads it to write, so the key an agent's instruction reads
+# and the key ``prepare`` wrote cannot be different keys.
+#
+# Six keys per artifact rather than one, for the reason ``{category}`` is
+# substituted at build time: the six agents run in parallel against a single
+# session state, which cannot hold six values for one key. Handing every agent
+# all six lanes' material would also spend five sixths of the block on other
+# people's leads, and the material genuinely differs per lane — the candidate
+# rules that selected the corpus documents fired per lane, and the rule counts
+# behind the scope differ per category.
+LANE_ARTIFACTS: Mapping[str, str] = MappingProxyType(
+    {
+        "candidates": "candidates",
+        "scope": "scope",
+        "reference_notes": "notes",
+        "prior_cases": "cases",
+    }
 )
+
+
+@dataclass(frozen=True)
+class Lane:
+    """One category agent's lane: its graph node, its keys, its prompt bindings.
+
+    The graph runs six of these in parallel, one per STRIDE category, and every
+    per-lane name is derived here. That is the point: the write and the
+    substitution used to be spelled in three places — a key function, the
+    ``prepare`` write, the instruction's replace chain — held together by a
+    lint. A lane now hands out both from one declaration.
+    """
+
+    category: StrideCategory
+
+    @property
+    def slug(self) -> str:
+        """The category as an identifier, which a graph node name must be."""
+        return self.category.replace("-", "_")
+
+    @property
+    def node_name(self) -> str:
+        """This category agent's graph node name (an identifier, unlike the ID)."""
+        return f"analyze_{self.slug}"
+
+    @property
+    def drafts_key(self) -> str:
+        """Where this category agent parks its proposals for the merge node."""
+        return f"drafts_{self.slug}"
+
+    def key(self, artifact: str) -> str:
+        """Where ``prepare`` parks one of this lane's inputs."""
+        return f"{LANE_ARTIFACTS[artifact]}_{self.slug}"
+
+    @property
+    def prompt_bindings(self) -> dict[str, str]:
+        """What each ``{placeholder}`` in ``analyze.md`` becomes for this lane.
+
+        ``{category}`` becomes the category itself. Every other placeholder
+        becomes *the name of this lane's state key*, so what ADK templates at
+        run time is ``{candidates_spoofing}`` — one prompt file, six bindings,
+        no lane reading another's leads.
+        """
+        return {
+            "category": self.category,
+            **{name: f"{{{self.key(name)}}}" for name in LANE_ARTIFACTS},
+        }
+
+    def state(self, artifacts: Mapping[str, str]) -> dict[str, str]:
+        """This lane's state entries, given one rendered value per artifact.
+
+        Keyed by placeholder on the way in and by state key on the way out,
+        which is the whole translation. Fails closed on a partial set: a
+        missing artifact would leave the placeholder ADK templates pointing at
+        a key nothing wrote, and that raises at the first LLM call rather than
+        here.
+        """
+        if set(artifacts) != set(LANE_ARTIFACTS):
+            missing = sorted(set(LANE_ARTIFACTS) - set(artifacts))
+            extra = sorted(set(artifacts) - set(LANE_ARTIFACTS))
+            raise ValueError(
+                f"lane {self.category!r} state: missing {missing}, unknown {extra}"
+            )
+        return {self.key(name): value for name, value in artifacts.items()}
+
+
+LANES: tuple[Lane, ...] = tuple(Lane(category) for category in STRIDE_CATEGORIES)
+
+
+def analyze_node_name(category: StrideCategory) -> str:
+    """This category agent's graph node name, for a caller holding a category."""
+    return Lane(category).node_name
+
+
+ANALYZE_GRAPH_NODES: tuple[str, ...] = tuple(lane.node_name for lane in LANES)
 
 # Graph node name -> the canonical LLM node name the tier config keys on.
 TIER_NODE_BY_GRAPH_NODE: dict[str, str] = {
@@ -200,10 +290,7 @@ TIER_NODE_BY_GRAPH_NODE: dict[str, str] = {
     REPAIR_NODE: "repair",
     CRITIC_NODE: "critic",
     RECRITIC_NODE: "recritic",
-    **{
-        analyze_node_name(category): f"analyze/{category}"
-        for category in STRIDE_CATEGORIES
-    },
+    **{lane.node_name: f"analyze/{lane.category}" for lane in LANES},
 }
 
 # --- Routes -----------------------------------------------------------------
@@ -246,9 +333,9 @@ def _routed(route: str, output: dict[str, Any]) -> Event:
 
 # --- State keys -------------------------------------------------------------
 #
-# The six keys the prompt files template against carry *rendered* text, since
-# ADK substitutes ``str(value)`` into an instruction. The structured values
-# the FunctionNodes pass between themselves live under their own keys.
+# The keys the prompt files template against carry *rendered* text, since ADK
+# substitutes ``str(value)`` into an instruction. The structured values the
+# FunctionNodes pass between themselves live under their own keys.
 #
 # Two key families, and the invariant that keeps them honest:
 # *structured* keys are the code's view (Pydantic round-trips), *rendered*
@@ -257,8 +344,10 @@ def _routed(route: str, output: dict[str, Any]) -> Event:
 # what makes a failed job debuggable — so the rule that stops them drifting
 # is: **a rendered key is written once by the FunctionNode that derives it,
 # and never read by Python.** No node mutates an artifact after rendering it.
-# A future node that re-renders or edits one of these in place breaks the
-# report's traceability without failing any test.
+#
+# :class:`SessionState` is what holds that rule. Each key is declared into one
+# family below, and a node writes through the method for its family; there is
+# deliberately no way to read a rendered key back.
 
 STATE_INPUT_TEXT = "input_text"
 # The job's sources as ``label -> text``, for the two checks that take data
@@ -290,10 +379,11 @@ STATE_EXTRACTED_MODEL = "extracted_model"
 STATE_VALID_MODEL = "valid_model"
 STATE_MERGED_DRAFTS = "merged_drafts"
 STATE_COVERAGE = "coverage"
-STATE_UNVERIFIED_GROUNDS = "unverified_grounds"
-STATE_UNRESOLVED_MENTIONS = "unresolved_mentions"
-STATE_UNRESOLVED_EVIDENCE = "unresolved_evidence"
-STATE_MISSING_MITIGATIONS = "missing_mitigations"
+# Every service-owned mark the fan-in produced, as one
+# :class:`~stride_service.report.AnalysisMarks`. One key rather than one per
+# mark kind: they share an owner, a standing and a policy, so a sixth kind is a
+# field on that model and nothing here.
+STATE_MARKS = "marks"
 STATE_REVIEWED_THREATS = "reviewed_threats"
 # What ``prepare`` put in front of the agents, for the report to record: the
 # packs this model earned and the rules that fired. Written where the selection
@@ -304,46 +394,102 @@ STATE_ANALYSIS_CONTEXT = "analysis_context"
 STATE_ANALYSIS = "analysis"
 STATE_REJECTION = "rejection"
 
+# The keys above are the graph's. The six *per-lane* keys are a lane's, and are
+# derived rather than spelled: see :class:`Lane` and :data:`LANE_ARTIFACTS`.
 
-def analyze_state_key(category: StrideCategory) -> str:
-    """Where one category agent parks its drafts for the merge node."""
-    return f"drafts_{category.replace('-', '_')}"
+#: Keys holding bytes a model reads and Python does not. Written once by the
+#: node that derives them, then templated into an instruction by ADK.
+RENDERED_KEYS: frozenset[str] = frozenset(
+    {
+        STATE_INPUT_TEXT,
+        STATE_SYSTEM_MODEL,
+        STATE_BOUNDARY_CROSSINGS,
+        STATE_EVIDENCE_CATALOG,
+        STATE_DOMAIN_SKILLS,
+        STATE_DRAFT_THREATS,
+        STATE_PREVIOUS_MODEL,
+        STATE_VALIDATION_ISSUES,
+        STATE_PREVIOUS_REVIEW,
+        STATE_CRITIC_ISSUES,
+        STATE_DRAFT_ROSTER,
+        STATE_UNRECONCILED_DRAFTS,
+        *(lane.key(artifact) for lane in LANES for artifact in LANE_ARTIFACTS),
+    }
+)
+
+#: Keys holding values a later node or a driver reads back. Every one of them
+#: round-trips through a Pydantic model or a plain mapping.
+STRUCTURED_KEYS: frozenset[str] = frozenset(
+    {
+        STATE_SOURCE_TEXTS,
+        STATE_EXTRACTED_MODEL,
+        STATE_VALID_MODEL,
+        STATE_MERGED_DRAFTS,
+        STATE_COVERAGE,
+        STATE_MARKS,
+        STATE_REVIEWED_THREATS,
+        STATE_ANALYSIS_CONTEXT,
+        STATE_ANALYSIS,
+        STATE_REJECTION,
+        *(lane.drafts_key for lane in LANES),
+    }
+)
 
 
-def notes_state_key(category: StrideCategory) -> str:
-    """Where ``prepare`` parks one lane's retrieved reference notes.
+class UndeclaredStateKey(KeyError):
+    """A node wrote or read a key no family declares.
 
-    Per lane for the reason the candidates key is: six agents run in parallel
-    against one session state, which cannot hold six values for one key — and
-    the material differs per lane because the rules that selected it did.
+    Undeclared keys are how a rendered artifact and its structured counterpart
+    come to disagree, and how a typo becomes a ``KeyError`` at the first LLM
+    call instead of at the node that made it.
     """
-    return f"notes_{category.replace('-', '_')}"
 
 
-def cases_state_key(category: StrideCategory) -> str:
-    """Where ``prepare`` parks one lane's retrieved worked cases."""
-    return f"cases_{category.replace('-', '_')}"
+class SessionState:
+    """The one way a node touches the session, with the two families kept apart.
 
+    ADK hands a FunctionNode a context whose ``state`` is a plain dict, and
+    binds the next node's parameters out of it by name. That leaves the two
+    key families indistinguishable at every call site, and the rule that keeps
+    a rendered artifact and its structured counterpart from drifting — *a
+    rendered key is written once and never read by Python* — was a comment.
 
-def scope_state_key(category: StrideCategory) -> str:
-    """Where ``prepare`` parks one lane's denominators.
+    Here it is the interface. :meth:`prompt` writes a rendered key and
+    :meth:`put` writes a structured one; each rejects a key from the other
+    family, and there is **no method that reads a rendered key at all**. The
+    rule holds because the operation does not exist, not because a reviewer
+    remembered it.
 
-    Per lane like the candidates key, and for the same reason: six agents share
-    one session state, and the rule counts differ per category anyway.
+    Both methods also reject a key neither family declares, so a mistyped key
+    fails at the node that wrote it rather than at the model call that would
+    have templated it.
     """
-    return f"scope_{category.replace('-', '_')}"
 
+    def __init__(self, ctx) -> None:
+        self._state = ctx.state
 
-def candidates_state_key(category: StrideCategory) -> str:
-    """Where ``prepare`` parks one lane's deterministic candidates.
+    def prompt(self, key: str, text: str) -> None:
+        """Write a rendered key: bytes for a model, never read back here."""
+        if key not in RENDERED_KEYS:
+            raise UndeclaredStateKey(f"{key!r} is not a rendered state key")
+        self._state[key] = text
 
-    Six keys rather than one, for the reason ``{category}`` is substituted at
-    build time: the six agents run in parallel against a single session state,
-    which cannot hold six values for one key, and handing every agent all six
-    lanes' candidates would spend five sixths of the block on other people's
-    leads.
-    """
-    return f"candidates_{category.replace('-', '_')}"
+    def put(self, key: str, value: Any) -> None:
+        """Write a structured key: a value a later node or a driver reads."""
+        if key not in STRUCTURED_KEYS:
+            raise UndeclaredStateKey(f"{key!r} is not a structured state key")
+        self._state[key] = value
+
+    def get(self, key: str) -> Any:
+        """Read a structured key, or ``None`` where the node that writes it did not.
+
+        ``None`` is load-bearing rather than a convenience: an LLM node that
+        emits no text writes no key, and telling that absence from a written
+        empty value is what :class:`SilentNodeError` is for.
+        """
+        if key not in STRUCTURED_KEYS:
+            raise UndeclaredStateKey(f"{key!r} is not a structured state key")
+        return self._state.get(key)
 
 
 class SilentNodeError(RuntimeError):
@@ -397,25 +543,28 @@ class Analysis:
     """What the graph produces: a report minus the facts only the runner has.
 
     Job identity and per-node timings belong to whoever ran the graph, so the
-    assemble node stops here and :mod:`stride_service.pipeline` stamps the
-    rest onto a :class:`~stride_service.report.StrideReport`.
+    assemble node stops here and a driver completes the rest through
+    :meth:`into_report`.
+
+    **This class owns the report's shape.** The graph has two drivers — the
+    service over a job, the eval harness over a corpus case — and each used to
+    copy every field across itself. The copies had to agree and nothing checked
+    that they did, so a field added here and missed in one driver produced a
+    report with a block silently absent. :meth:`into_report` is the one place
+    that mapping lives; a driver hands over the four things the graph cannot
+    know and reads nothing out of this object itself.
     """
 
     system_model: SystemModel
     boundary_crossings: list[BoundaryCrossing]
     threats: list[Threat]
     rejected_threats: list[Threat]
-    # Service-owned, computed at the fan-in, and covering both arrays above —
-    # a rejected threat keeps its grounds, so it keeps their marks too.
-    unverified_grounds: list[UnverifiedGround]
-    unresolved_mentions: list[UnresolvedMention]
-    unresolved_evidence: list[UnresolvedEvidence]
-    missing_mitigations: list[MissingMitigation]
+    # Every service-owned mark, as one value. They cover both threat arrays
+    # above — a rejected threat keeps its grounds, so it keeps their marks too
+    # — plus the one mark that is about the model rather than about a threat.
+    marks: AnalysisMarks
     # Per-lane coverage accounting, computed at the fan-in over the drafts.
     coverage: list[CategoryCoverage]
-    # The one mark about the model rather than the threats, so it is derived
-    # from the valid model rather than collected from the drafts.
-    shared_element_names: list[SharedElementName]
     # What ``prepare`` put in front of the agents. Two halves of one record,
     # carried loose rather than as an :class:`~stride_service.report.AnalysisContext`
     # because its third field — the instruction digest — is a fact about the
@@ -441,6 +590,53 @@ class Analysis:
             knowledge_docs=list(self.knowledge_docs),
         )
 
+    def into_report(
+        self,
+        *,
+        job: Job,
+        input_ref: InputRef,
+        nodes: Sequence[NodeRun],
+        pipeline: Pipeline,
+    ) -> StrideReport:
+        """This analysis as a report, given what only a driver observed.
+
+        The four arguments are exactly the facts the graph does not hold. A
+        ``job`` identity and an ``input_ref`` belong to whoever asked for the
+        run; ``nodes`` is what the drive itself observed
+        (:class:`~stride_service.execution.GraphRun`); ``pipeline`` is the
+        built graph, which carries the per-tier sampling the report records in
+        the clear and the instruction digest the context block needs.
+
+        Every other field comes from ``self``, and no driver names one. That is
+        the whole point: the service and the eval harness produce the same
+        report shape by construction rather than by two field lists agreeing.
+        """
+        return StrideReport(
+            job=job,
+            input=input_ref,
+            nodes=list(nodes),
+            sampling={
+                tier: params.model_dump()
+                for tier, params in pipeline.tier_sampling.items()
+            },
+            system_model=self.system_model,
+            boundary_crossings=self.boundary_crossings,
+            threats=self.threats,
+            rejected_threats=self.rejected_threats,
+            # The report keeps its five top-level arrays; this is the one place
+            # the marks become them. Written out rather than unpacked, so the
+            # type checker sees each field, and held to the whole set by
+            # ``test_every_shared_field_is_carried``.
+            unverified_grounds=self.marks.unverified_grounds,
+            unresolved_mentions=self.marks.unresolved_mentions,
+            unresolved_evidence=self.marks.unresolved_evidence,
+            missing_mitigations=self.marks.missing_mitigations,
+            shared_element_names=self.marks.shared_element_names,
+            coverage=self.coverage,
+            analysis_context=self.context(pipeline.instruction_sha256),
+            summary=self.summary,
+        )
+
     def to_state(self) -> dict[str, Any]:
         """The JSON-safe form parked in session state."""
         return {
@@ -452,22 +648,8 @@ class Analysis:
             "rejected_threats": [
                 threat.model_dump(mode="json") for threat in self.rejected_threats
             ],
-            "unverified_grounds": [
-                mark.model_dump(mode="json") for mark in self.unverified_grounds
-            ],
-            "unresolved_mentions": [
-                mark.model_dump(mode="json") for mark in self.unresolved_mentions
-            ],
-            "unresolved_evidence": [
-                mark.model_dump(mode="json") for mark in self.unresolved_evidence
-            ],
-            "missing_mitigations": [
-                mark.model_dump(mode="json") for mark in self.missing_mitigations
-            ],
+            "marks": self.marks.model_dump(mode="json"),
             "coverage": [row.model_dump(mode="json") for row in self.coverage],
-            "shared_element_names": [
-                mark.model_dump(mode="json") for mark in self.shared_element_names
-            ],
             "domain_packs": list(self.domain_packs),
             "fired_rules": list(self.fired_rules),
             "knowledge_docs": list(self.knowledge_docs),
@@ -494,28 +676,9 @@ class Analysis:
             rejected_threats=[
                 Threat.model_validate(threat) for threat in data["rejected_threats"]
             ],
-            unverified_grounds=[
-                UnverifiedGround.model_validate(mark)
-                for mark in data["unverified_grounds"]
-            ],
-            unresolved_mentions=[
-                UnresolvedMention.model_validate(mark)
-                for mark in data["unresolved_mentions"]
-            ],
-            unresolved_evidence=[
-                UnresolvedEvidence.model_validate(mark)
-                for mark in data["unresolved_evidence"]
-            ],
-            missing_mitigations=[
-                MissingMitigation.model_validate(mark)
-                for mark in data["missing_mitigations"]
-            ],
+            marks=AnalysisMarks.model_validate(data["marks"]),
             coverage=[
                 CategoryCoverage.model_validate(row) for row in data.get("coverage", [])
-            ],
-            shared_element_names=[
-                SharedElementName.model_validate(mark)
-                for mark in data.get("shared_element_names", [])
             ],
             domain_packs=list(data["domain_packs"]),
             fired_rules=list(data["fired_rules"]),
@@ -588,17 +751,19 @@ def validate_extraction(
     model, issues = parse_and_validate(
         extracted_model, normalize_ids=True, sources=source_texts or {}
     )
+    state = SessionState(ctx)
     if issues or model is None:
         parked = extracted_model if model is None else model.model_dump(mode="json")
         # Fenced for the same reason as the agents' copy: this is the model
         # built from caller words, handed straight back to a model.
-        ctx.state[STATE_PREVIOUS_MODEL] = render_fenced(parked)
-        ctx.state[STATE_VALIDATION_ISSUES] = render(
-            [issue.model_dump(mode="json") for issue in issues]
+        state.prompt(STATE_PREVIOUS_MODEL, render_fenced(parked))
+        state.prompt(
+            STATE_VALIDATION_ISSUES,
+            render([issue.model_dump(mode="json") for issue in issues]),
         )
         return _routed(ROUTE_INVALID, {"issue_count": len(issues)})
 
-    ctx.state[STATE_VALID_MODEL] = model.model_dump(mode="json")
+    state.put(STATE_VALID_MODEL, model.model_dump(mode="json"))
     return _routed(ROUTE_VALID, {"issue_count": 0})
 
 
@@ -608,7 +773,7 @@ def reject_model(validation_issues: str, ctx) -> dict[str, Any]:
     Nothing is auto-repaired and nothing is analyzed on a model that never
     passed the gate — the user gets the validator's issues instead.
     """
-    ctx.state[STATE_REJECTION] = validation_issues
+    SessionState(ctx).put(STATE_REJECTION, validation_issues)
     return {"rejected": True}
 
 
@@ -748,33 +913,39 @@ def prepare_analysis(
     candidates = generate_candidates(model)
     packs = select_domain_packs(model)
 
-    ctx.state[STATE_SYSTEM_MODEL] = render_fenced(_without_source_fields(valid_model))
-    ctx.state[STATE_BOUNDARY_CROSSINGS] = render(
-        [crossing.model_dump(mode="json") for crossing in crossings]
+    state = SessionState(ctx)
+    state.prompt(STATE_SYSTEM_MODEL, render_fenced(_without_source_fields(valid_model)))
+    state.prompt(
+        STATE_BOUNDARY_CROSSINGS,
+        render([crossing.model_dump(mode="json") for crossing in crossings]),
     )
-    ctx.state[STATE_EVIDENCE_CATALOG] = render_catalog(catalog)
-    ctx.state[STATE_DOMAIN_SKILLS] = compose_domain_skills(skill_loader, packs)
+    state.prompt(STATE_EVIDENCE_CATALOG, render_catalog(catalog))
+    state.prompt(STATE_DOMAIN_SKILLS, compose_domain_skills(skill_loader, packs))
     retrieved: list[str] = []
     for category, candidate_set in candidates.items():
-        ctx.state[candidates_state_key(category)] = render_fenced(
-            candidate_set.model_dump(mode="json")
-        )
-        ctx.state[scope_state_key(category)] = lane_scope(
-            category, model, candidate_set
-        )
         # Retrieval is by *fired* rule, so a lane that triggered nothing gets
         # nothing: the material follows the leads rather than the category.
         fired = {candidate.rule_id for candidate in candidate_set.candidates}
         notes, cases = select_notes(fired), select_cases(fired)
-        ctx.state[notes_state_key(category)] = compose_notes(knowledge_loader, notes)
-        ctx.state[cases_state_key(category)] = compose_cases(knowledge_loader, cases)
+        # Keyed by the placeholder each fills, which is the vocabulary the
+        # prompt file uses; the lane turns that into its own four state keys.
+        lane_state = Lane(category).state(
+            {
+                "candidates": render_fenced(candidate_set.model_dump(mode="json")),
+                "scope": lane_scope(category, model, candidate_set),
+                "reference_notes": compose_notes(knowledge_loader, notes),
+                "prior_cases": compose_cases(knowledge_loader, cases),
+            }
+        )
+        for key, text in lane_state.items():
+            state.prompt(key, text)
         retrieved += [f"notes/{name}" for name in notes]
         retrieved += [f"cases/{name}" for name in cases]
     # The record of what the agents were given, written here because here is
     # where they are given it. Sorted and deduplicated: it is a set of rules
     # that matched, and firing order across six independent lanes is not a fact
     # about anything.
-    ctx.state[STATE_ANALYSIS_CONTEXT] = {
+    context = {
         "domain_packs": list(packs),
         "knowledge_docs": sorted(set(retrieved)),
         "fired_rules": sorted(
@@ -785,6 +956,7 @@ def prepare_analysis(
             }
         ),
     }
+    state.put(STATE_ANALYSIS_CONTEXT, context)
     return {
         "element_count": len(model.elements()),
         "crossing_count": len(crossings),
@@ -835,6 +1007,24 @@ def _threats_of(payload: object) -> list[Any]:
     return threats if isinstance(threats, list) else []
 
 
+def _model_marks(model: SystemModel) -> AnalysisMarks:
+    """The marks that are about the model rather than about a threat.
+
+    One so far. Elements of different types whose names normalize to one slug
+    are a suspicion the validity gate cannot carry — its one severity is fatal,
+    and a system may legitimately run a process and keep a store of the same
+    name. Derived in :func:`assemble_report` rather than bound as a parameter:
+    it is a fact about the model that node already holds, so no upstream node
+    has to carry it, and deriving it in both places would double every entry.
+    """
+    return AnalysisMarks(
+        shared_element_names=[
+            SharedElementName(name_slug=slug, element_ids=ids)
+            for slug, ids in model.shared_names().items()
+        ]
+    )
+
+
 def merge_drafts(
     valid_model: dict, ctx, source_texts: dict | None = None
 ) -> dict[str, Any]:
@@ -856,8 +1046,11 @@ def merge_drafts(
     and whether a verbatim quote actually supports what it was filed under.
 
     It also returns what it could *not* verify: quote grounds absent from the
-    source they name are marked rather than dropped, and the marks are parked
-    for :func:`assemble_report` to carry into the report. ``source_texts``
+    source they name are marked rather than dropped. Those marks join the ones
+    the evidence resolution produced and the one the model itself does
+    (:func:`_model_marks`) as a single
+    :class:`~stride_service.report.AnalysisMarks`, which is what
+    :func:`assemble_report` carries into the report. ``source_texts``
     defaults to ``None`` so the in-process engine, which drives a hand-authored
     model with no job behind it, is not failed on a citation that is not wrong.
 
@@ -879,54 +1072,43 @@ def merge_drafts(
     to build the report. ``STATE_DRAFT_THREATS`` is the *prompt* view, narrowed
     by :func:`_ruling_view` to the fields a verdict is actually reached from.
     """
-    silent = [
-        category
-        for category in STRIDE_CATEGORIES
-        if ctx.state.get(analyze_state_key(category)) is None
-    ]
+    state = SessionState(ctx)
+    silent = [lane for lane in LANES if state.get(lane.drafts_key) is None]
     if silent:
-        keys = ", ".join(repr(analyze_state_key(c)) for c in silent)
+        keys = ", ".join(repr(lane.drafts_key) for lane in silent)
         raise SilentNodeError(
-            f"{len(silent)} of {len(STRIDE_CATEGORIES)} category agents wrote"
+            f"{len(silent)} of {len(LANES)} category agents wrote"
             f" nothing ({keys}), so those STRIDE categories were never"
             f" analyzed. {_TRUNCATION_HINT}"
         )
     model = SystemModel.model_validate(valid_model)
     catalog = evidence_catalog(model)
     resolutions = {
-        category: resolve_proposals(
+        lane.category: resolve_proposals(
             (
                 ThreatProposal.model_validate(proposal)
-                for proposal in _threats_of(ctx.state.get(analyze_state_key(category)))
+                for proposal in _threats_of(state.get(lane.drafts_key))
             ),
             catalog,
-            category,
+            lane.category,
         )
-        for category in STRIDE_CATEGORIES
+        for lane in LANES
     }
     drafts_by_category = {
         category: resolution.drafts for category, resolution in resolutions.items()
     }
-    # Every reference that named nothing, across all six lanes. Recorded rather
-    # than fatal: a threat standing on two real facts and one composed one is
-    # still justified by the two (#138).
-    ctx.state[STATE_UNRESOLVED_EVIDENCE] = [
-        mark.model_dump(mode="json")
-        for resolution in resolutions.values()
-        for mark in resolution.unresolved
-    ]
     joined = join_drafts(drafts_by_category, model, source_texts or {})
     merged = joined.drafts
-    ctx.state[STATE_MERGED_DRAFTS] = [draft.model_dump(mode="json") for draft in merged]
-    ctx.state[STATE_UNVERIFIED_GROUNDS] = [
-        mark.model_dump(mode="json") for mark in joined.unverified
-    ]
-    ctx.state[STATE_UNRESOLVED_MENTIONS] = [
-        mark.model_dump(mode="json") for mark in joined.mentions
-    ]
-    ctx.state[STATE_MISSING_MITIGATIONS] = [
-        mark.model_dump(mode="json") for mark in joined.unmitigated
-    ]
+    state.put(STATE_MERGED_DRAFTS, [draft.model_dump(mode="json") for draft in merged])
+    # Every mark the fan-in produced, from both of its producers: the join
+    # across all six lanes, and each lane's own evidence resolution. Merged
+    # rather than parked separately — they share an owner, a standing and a
+    # policy, so one key carries them and ``assemble`` reads one parameter.
+    # The mark about the *model* is not here; see :func:`_model_marks`.
+    marks = joined.marks
+    for resolution in resolutions.values():
+        marks = marks.merged_with(resolution.marks)
+    state.put(STATE_MARKS, marks.model_dump(mode="json"))
     # Logged rather than reported: a lane that numbered its drafts 01, 02, 05
     # broke nothing a reader could act on, and the agents are who it is about.
     for gap in numbering_gaps(merged):
@@ -938,13 +1120,13 @@ def merge_drafts(
     # validated model, so the two derivations cannot disagree, and the fan-in
     # stays free of a dependency on a key ``prepare`` wrote for the prompt.
     coverage = build_coverage(drafts_by_category, generate_candidates(model), model)
-    ctx.state[STATE_COVERAGE] = [row.model_dump(mode="json") for row in coverage]
-    ctx.state[STATE_DRAFT_THREATS] = render(_ruling_view(merged))
+    state.put(STATE_COVERAGE, [row.model_dump(mode="json") for row in coverage])
+    state.prompt(STATE_DRAFT_THREATS, render(_ruling_view(merged)))
     return {
         "draft_count": len(merged),
-        "unverified_count": len(joined.unverified),
-        "unresolved_mention_count": len(joined.mentions),
-        "missing_mitigation_count": len(joined.unmitigated),
+        "unverified_count": len(marks.unverified_grounds),
+        "unresolved_mention_count": len(marks.unresolved_mentions),
+        "missing_mitigation_count": len(marks.missing_mitigations),
     }
 
 
@@ -994,14 +1176,20 @@ def route_review(
     rulings = [ThreatRuling.model_validate(ruling) for ruling in ruled]
     problems = review_issues(drafts, rulings, model)
     if problems:
-        ctx.state[STATE_PREVIOUS_REVIEW] = render(ruled)
-        ctx.state[STATE_CRITIC_ISSUES] = render(problems.messages)
+        state = SessionState(ctx)
+        state.prompt(STATE_PREVIOUS_REVIEW, render(ruled))
+        state.prompt(STATE_CRITIC_ISSUES, render(problems.messages))
         # The roster is the covering set the re-ask must reproduce, and an ID is
         # the whole of that claim — the re-ask reproduces rulings, not drafts.
         # Only the drafts it cannot fix without reading travel in full.
-        ctx.state[STATE_DRAFT_ROSTER] = render([draft.id for draft in drafts])
-        ctx.state[STATE_UNRECONCILED_DRAFTS] = render(
-            _ruling_view([draft for draft in drafts if draft.id in problems.implicated])
+        state.prompt(STATE_DRAFT_ROSTER, render([draft.id for draft in drafts]))
+        state.prompt(
+            STATE_UNRECONCILED_DRAFTS,
+            render(
+                _ruling_view(
+                    [draft for draft in drafts if draft.id in problems.implicated]
+                )
+            ),
         )
         return _routed(ROUTE_REVISE, {"issue_count": len(problems.messages)})
     return _routed(ROUTE_ACCEPT, {"reviewed_count": len(rulings)})
@@ -1039,10 +1227,7 @@ def assemble_report(
     merged_drafts: list,
     ctx,
     reviewed_threats: dict | None = None,
-    unverified_grounds: list | None = None,
-    unresolved_mentions: list | None = None,
-    unresolved_evidence: list | None = None,
-    missing_mitigations: list | None = None,
+    marks: dict | None = None,
     coverage: list | None = None,
     analysis_context: dict | None = None,
 ) -> dict[str, Any]:
@@ -1059,20 +1244,22 @@ def assemble_report(
     every draft, and dropped drafts are ``revise`` — so the default is
     unreachable rather than a fallback this node relies on.
 
-    ``unverified_grounds`` defaults because ``merge`` writes an empty list when
-    nothing failed and when the job carried no sources to check against, and an
-    empty list is indistinguishable from the absent key ADK would bind here.
-    Both mean the same thing: no quote was found wanting.
-    ``unresolved_mentions`` and ``missing_mitigations`` default for exactly
-    the same reason: an empty list means every element ID the descriptions
-    cite resolves, and every threat either carries a countermeasure or has
-    the unknown that excuses carrying none. ``coverage`` defaults so a graph
-    driven from a seeded state that never ran ``merge`` still assembles — an
-    absent account is recorded as absent rather than fabricated at zero.
-    ``analysis_context`` defaults for the same reason and records the same way:
-    a graph entered past ``prepare`` was given no packs and no candidates, and
-    an empty record says so rather than implying an analysis that ran without
-    them.
+    ``marks`` defaults because ``merge`` writes an all-empty
+    :class:`~stride_service.report.AnalysisMarks` when nothing was found
+    wanting, and that is indistinguishable from the absent key ADK would bind
+    here. Both mean the same thing: every quote verified, every mention
+    resolved, every reference named a fact, and every threat either carried a
+    countermeasure or had the unknown that excuses carrying none. ``coverage``
+    defaults so a graph driven from a seeded state that never ran ``merge``
+    still assembles — an absent account is recorded as absent rather than
+    fabricated at zero. ``analysis_context`` defaults for the same reason and
+    records the same way: a graph entered past ``prepare`` was given no packs
+    and no candidates, and an empty record says so rather than implying an
+    analysis that ran without them.
+
+    The one mark this node adds is :func:`_model_marks`, which is about the
+    System Model rather than about any threat and so is derived here rather
+    than carried from the fan-in.
     """
     model = SystemModel.model_validate(valid_model)
     drafts = [DraftThreat.model_validate(draft) for draft in merged_drafts]
@@ -1086,32 +1273,16 @@ def assemble_report(
         boundary_crossings=model.boundary_crossings(),
         threats=threats,
         rejected_threats=rejected,
-        unverified_grounds=[
-            UnverifiedGround.model_validate(mark) for mark in unverified_grounds or []
-        ],
-        unresolved_evidence=[
-            UnresolvedEvidence.model_validate(mark)
-            for mark in unresolved_evidence or []
-        ],
-        unresolved_mentions=[
-            UnresolvedMention.model_validate(mark) for mark in unresolved_mentions or []
-        ],
-        missing_mitigations=[
-            MissingMitigation.model_validate(mark) for mark in missing_mitigations or []
-        ],
+        marks=AnalysisMarks.model_validate(marks or {}).merged_with(
+            _model_marks(model)
+        ),
         coverage=[CategoryCoverage.model_validate(row) for row in coverage or []],
-        # Derived here rather than bound as a parameter: it is a fact about the
-        # model this node already holds, so no upstream node has to carry it.
-        shared_element_names=[
-            SharedElementName(name_slug=slug, element_ids=ids)
-            for slug, ids in model.shared_names().items()
-        ],
         domain_packs=list(context.get("domain_packs", [])),
         fired_rules=list(context.get("fired_rules", [])),
         knowledge_docs=list(context.get("knowledge_docs", [])),
         summary=build_summary(threats, rejected, model),
     )
-    ctx.state[STATE_ANALYSIS] = analysis.to_state()
+    SessionState(ctx).put(STATE_ANALYSIS, analysis.to_state())
     return {"threat_count": len(threats), "rejected_count": len(rejected)}
 
 
@@ -1234,31 +1405,22 @@ def analyze_instruction(
 ) -> str:
     """One category agent's full instruction, with the per-lane names resolved.
 
-    Two substitutions happen here rather than in ADK, for one reason: the six
+    These substitutions happen here rather than in ADK, for one reason: the six
     category agents run in parallel against a single session state, which
-    cannot hold six different values for one key.
+    cannot hold six different values for one key. So ``{candidates}`` becomes
+    *the name of this lane's state key* and what ADK templates at run time is
+    ``{candidates_spoofing}`` — one prompt file, six bindings, no lane reading
+    another's leads.
 
-    * ``{category}`` becomes this agent's category.
-    * ``{candidates}`` becomes *the name of this lane's state key*
-      (:func:`candidates_state_key`), so what ADK templates at run time is
-      ``{candidates_spoofing}`` — one prompt file, six bindings, no lane
-      reading another's leads.
-    * ``{reference_notes}`` and ``{prior_cases}`` become this lane's retrieved
-      corpus keys, on the same argument: the documents differ per lane because
-      the rules that selected them did.
-
-    The job-varying placeholders stay for ADK to template.
+    Which placeholder becomes which key is :attr:`Lane.prompt_bindings`, read
+    from the same :data:`LANE_ARTIFACTS` that :meth:`Lane.state` writes by. The
+    job-varying placeholders stay for ADK to template.
     """
     skills = compose_analyze_skills(skill_loader, category)
     prompt = compose_analyze_prompt(prompt_loader, category)
-    resolved = (
-        prompt.replace("{category}", category)
-        .replace("{candidates}", f"{{{candidates_state_key(category)}}}")
-        .replace("{scope}", f"{{{scope_state_key(category)}}}")
-        .replace("{reference_notes}", f"{{{notes_state_key(category)}}}")
-        .replace("{prior_cases}", f"{{{cases_state_key(category)}}}")
-    )
-    return _instruction(skills, resolved)
+    for placeholder, binding in Lane(category).prompt_bindings.items():
+        prompt = prompt.replace(f"{{{placeholder}}}", binding)
+    return _instruction(skills, prompt)
 
 
 def recritic_instruction(
@@ -1343,15 +1505,15 @@ def build_pipeline(
     )
     agents = [
         _llm_node(
-            name=analyze_node_name(category),
-            instruction=analyze_instruction(skill_loader, prompt_loader, category),
+            name=lane.node_name,
+            instruction=analyze_instruction(skill_loader, prompt_loader, lane.category),
             output_schema=ThreatProposals,
-            output_key=analyze_state_key(category),
+            output_key=lane.drafts_key,
             resolve_model=resolve_model,
             resolve_sampling=resolve_sampling,
             resilience=resilience,
         )
-        for category in STRIDE_CATEGORIES
+        for lane in LANES
     ]
 
     prepare = prepare_node(skill_loader, knowledge_loader)
@@ -1469,3 +1631,45 @@ def _node_sampling(
 def rejection_issues(rendered: str) -> list[ValidationIssue]:
     """Parse the rejection the graph parked in state back into issues."""
     return [ValidationIssue.model_validate(issue) for issue in json.loads(rendered)]
+
+
+@dataclass(frozen=True)
+class Rejected:
+    """The graph refused the input: no model ever passed the validity gate.
+
+    Rejected, not *failed*. The input never became a valid System Model, which
+    is the submitter's to fix, and the issues say what was wrong with it.
+    """
+
+    issues: list[ValidationIssue]
+
+
+class GraphProducedNothing(RuntimeError):
+    """The graph reached neither of its two terminal shapes.
+
+    Ours to own: every path through the topology ends at ``assemble`` or at
+    ``reject``, so a final state carrying neither is a defect in the graph
+    rather than anything about the job. Each driver catches this and names the
+    run it was driving.
+    """
+
+
+GraphResult = Analysis | Rejected
+
+
+def result_of(final_state: Mapping[str, Any]) -> GraphResult:
+    """What a finished drive left behind, as one of the graph's two outcomes.
+
+    The graph has two drivers — the service over a job, the eval harness over a
+    corpus case — and each used to read the terminal keys itself: the same two
+    membership tests and the same two parses, spelled twice. What differs
+    between them is only what they *do* with a rejection, so that is what they
+    keep; how a final state is read is here.
+    """
+    rejection = final_state.get(STATE_REJECTION)
+    if rejection is not None:
+        return Rejected(issues=rejection_issues(rejection))
+    analysis = final_state.get(STATE_ANALYSIS)
+    if analysis is None:
+        raise GraphProducedNothing("graph produced neither an analysis nor a rejection")
+    return Analysis.from_state(analysis)
