@@ -128,9 +128,11 @@ class TestEvidenceCatalog:
 class TestRenderCatalog:
     """The shape agents select from — a fix for #138, not a presentation choice.
 
-    Agents composed well-formed references to facts the catalog did not hold,
-    which fails the whole job. A JSON array of IDs reads as a specimen of the
-    format; these pin the properties that make the rendering a menu instead.
+    Agents composed well-formed references to facts the catalog did not hold.
+    A JSON array of IDs reads as a specimen of the format; these pin the
+    properties that make the rendering a menu instead. The shape is the half of
+    the fix that stops the reference being composed — dropping it costs its
+    entry rather than the job (:class:`UnresolvedEvidence`) once it has been.
     """
 
     def test_every_entry_appears_as_its_own_row(self):

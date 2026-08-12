@@ -62,7 +62,7 @@ from stride_service.graph import (
     RECRITIC_NODE,
     TIER_NODE_BY_GRAPH_NODE,
 )
-from stride_service.jobs import PipelineCompleted, PipelineRejected
+from stride_service.jobs import PipelineRejected
 from stride_service.model_tiers import TierName
 from stride_service.report import NodeRun, SamplingValue, StrideReport
 from stride_service.sampling import TierSampling, sampling_fingerprint
@@ -587,7 +587,8 @@ async def run_smoke(deployment: Deployment | None = None) -> SmokeResult:
         )
         return SmokeResult(tiers=tiers, checks=checks)
 
-    assert isinstance(outcome, PipelineCompleted)
+    # `PipelineOutcome` is exactly the two branches, and the other one returned
+    # above, so this is the completed case by elimination rather than by check.
     report = outcome.report
     return SmokeResult(
         tiers=tiers,

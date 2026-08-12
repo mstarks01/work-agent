@@ -55,6 +55,7 @@ from typing import NamedTuple
 from stride_service.critic import DraftJoinError
 from stride_service.report import (
     CATEGORY_LETTERS,
+    REFERENCE_MAX_CHARS,
     DraftThreat,
     Ground,
     StrideCategory,
@@ -205,7 +206,7 @@ class Resolution(NamedTuple):
 
 
 def _grounds_of(
-    proposal: ThreatProposal, threat_id: str, catalog: Mapping[str, Ground]
+    proposal: ThreatProposal, catalog: Mapping[str, Ground]
 ) -> tuple[list[Ground], list[str]]:
     """One proposal's grounds, and every reference of its that named nothing.
 
@@ -281,9 +282,9 @@ def resolve_proposals(
     groundless: list[str] = []
     for proposal in proposals:
         threat_id = f"{CATEGORY_LETTERS[category]}-{proposal.sequence:02d}"
-        grounds, unresolved = _grounds_of(proposal, threat_id, catalog)
+        grounds, unresolved = _grounds_of(proposal, catalog)
         marks += [
-            UnresolvedEvidence(threat_id=threat_id, reference=ref[:300])
+            UnresolvedEvidence(threat_id=threat_id, reference=ref[:REFERENCE_MAX_CHARS])
             for ref in unresolved
         ]
         if not grounds:

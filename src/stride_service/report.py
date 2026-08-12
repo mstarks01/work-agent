@@ -959,6 +959,14 @@ class UnresolvedMention(BaseModel):
     mention: str = Field(min_length=1, max_length=300)
 
 
+# How much of an agent-supplied evidence reference a mark carries. Exported
+# because the producer must truncate to it: `evidence_refs` is a free string
+# the model fills, so an over-long one would fail validation here and cost the
+# job the very report this mark exists to preserve. One name, so the bound the
+# producer cuts at and the bound this field accepts cannot drift apart.
+REFERENCE_MAX_CHARS = 300
+
+
 class UnresolvedEvidence(BaseModel):
     """An evidence reference a threat cited that its job's catalog does not hold.
 
@@ -967,7 +975,9 @@ class UnresolvedEvidence(BaseModel):
     :class:`UnverifiedGround`. An unverified quote is a real ground whose text
     the service could not find; this is a ground that never existed. There is
     nothing to render, so the entry is dropped and the mark records what was
-    asked for.
+    asked for — verbatim up to ``REFERENCE_MAX_CHARS``, past which a reference
+    is long enough that it is evidence of a malfunctioning agent rather than of
+    a fact anyone meant to cite.
 
     **Marked per reference, failed closed per threat**, exactly as an
     unverified quote is. A threat citing three facts, one of them composed, is
@@ -990,7 +1000,7 @@ class UnresolvedEvidence(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
     threat_id: str = Field(pattern=r"^[STRIDE]-\d{2}$")
-    reference: str = Field(min_length=1, max_length=300)
+    reference: str = Field(min_length=1, max_length=REFERENCE_MAX_CHARS)
 
 
 class MissingMitigation(BaseModel):
