@@ -27,6 +27,7 @@ from stride_service.jobs import (
     StubPipelineRunner,
 )
 from stride_service.sources import SourceLimits
+from tests.factories import DEFAULT_FRAMEWORKS
 from tests.test_api import FakeVerifier, auth, submit
 
 FP_A = "a" * 64
@@ -68,6 +69,7 @@ def make_client(result: CertifyResult, gate_policy: CertificationGate) -> TestCl
         limits=TEST_LIMITS,
         job_deadline_seconds=30,
         max_active_jobs=10,
+        frameworks=DEFAULT_FRAMEWORKS,
     )
     app.state.certification = gate_policy
     return TestClient(app)
@@ -95,7 +97,7 @@ class TestAnnotateByDefault:
             make_client(CertifyResult(certified=False), gate(require_certified=False))
         )
         assert response.status_code == 200
-        assert "threats" in response.json()
+        assert "analyses" in response.json()
 
     def test_a_certified_report_is_served(self):
         response = fetch_report(
@@ -174,6 +176,7 @@ class TestNothingReachesTheClientView:
             limits=TEST_LIMITS,
             job_deadline_seconds=30,
             max_active_jobs=10,
+            frameworks=DEFAULT_FRAMEWORKS,
         )
         app.state.certification = None
         assert fetch_report(TestClient(app)).status_code == 200
