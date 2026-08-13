@@ -40,6 +40,16 @@ from tests.factories import (
     valid_model,
 )
 
+# This install's one package's own nodes: every per-framework role carries its
+# framework, since two packages may declare a lane of the same name.
+_STRIDE_NODES = graph.FrameworkNodes("stride")
+CRITIC = _STRIDE_NODES.node(graph.CRITIC_ROLE)
+RECRITIC = _STRIDE_NODES.node(graph.RECRITIC_ROLE)
+ROUTER = _STRIDE_NODES.node(graph.ROUTER_ROLE)
+#: This graph's node -> tier map, built for the selection above.
+TIER_NODES = graph.tier_node_by_graph_node(("stride",))
+
+
 DESCRIPTION = DESCRIPTION_TEXT
 
 
@@ -48,10 +58,10 @@ def happy_replies() -> dict[str, str]:
     return {
         "extract": valid_model().model_dump_json(),
         # A category agent proposes — the critic's two rulings are not its to make.
-        graph.analyze_node_name("spoofing"): claims_json(
+        graph.analyze_node_name("stride", "spoofing"): claims_json(
             sample_proposal("S-01", "spoofing")
         ),
-        "critic": claims_json(sample_ruling("S-01")),
+        CRITIC: claims_json(sample_ruling("S-01")),
     }
 
 
@@ -103,8 +113,8 @@ def test_node_runs_record_the_served_and_the_requested_model(graph_run):
     nodes = by_node(graph_run)
     assert nodes[graph.EXTRACT_NODE].model == served_build(BASE_MODEL)
     assert nodes[graph.EXTRACT_NODE].requested_model == BASE_MODEL
-    assert nodes[graph.CRITIC_NODE].model == served_build(STRONG_MODEL)
-    assert nodes[graph.CRITIC_NODE].requested_model == STRONG_MODEL
+    assert nodes[CRITIC].model == served_build(STRONG_MODEL)
+    assert nodes[CRITIC].requested_model == STRONG_MODEL
 
 
 def test_a_deterministic_node_carries_no_model_and_no_fingerprint(graph_run):
@@ -132,7 +142,7 @@ def test_node_runs_record_what_the_provider_says_each_call_cost(graph_run):
     transposed pair in the mapping fails here rather than being averaged away
     in a roll-up later.
     """
-    critic = by_node(graph_run)[graph.CRITIC_NODE]
+    critic = by_node(graph_run)[CRITIC]
 
     assert critic.usage is not None
     assert critic.usage.prompt_tokens == 1100
@@ -170,28 +180,28 @@ def test_a_provider_that_meters_nothing_yields_no_usage_at_all():
 
 def test_usage_by_node_sums_a_nodes_executions(graph_run):
     """A sweep runs one node once per case; the question is what it all cost."""
-    critic = by_node(graph_run)[graph.CRITIC_NODE]
+    critic = by_node(graph_run)[CRITIC]
     twice = [critic, critic.model_copy()]
 
     totals = usage_by_node(twice)
 
-    assert totals[graph.CRITIC_NODE].reasoning_tokens == 18000
-    assert totals[graph.CRITIC_NODE].total_tokens == 20800
+    assert totals[CRITIC].reasoning_tokens == 18000
+    assert totals[CRITIC].total_tokens == 20800
 
 
 def test_usage_by_node_omits_what_was_never_measured(graph_run):
     """Absent, not zeroed — a node with no usage is not a node that cost nothing."""
     assert graph.ASSEMBLE_NODE not in usage_by_node(graph_run.node_runs)
-    assert graph.CRITIC_NODE in usage_by_node(graph_run.node_runs)
+    assert CRITIC in usage_by_node(graph_run.node_runs)
 
 
 def test_latency_by_node_sums_and_keeps_the_slowest(graph_run):
     """The mean is not the number a timeout is set from, so both are kept."""
-    critic = by_node(graph_run)[graph.CRITIC_NODE]
+    critic = by_node(graph_run)[CRITIC]
     faster = critic.model_copy(update={"duration_ms": 10})
     slower = critic.model_copy(update={"duration_ms": 90})
 
-    folded = latency_by_node([faster, slower])[graph.CRITIC_NODE]
+    folded = latency_by_node([faster, slower])[CRITIC]
 
     assert folded.executions == 2
     assert folded.total_ms == 100
@@ -222,7 +232,7 @@ def test_every_llm_node_fingerprint_recomputes_from_its_tier_sampling(graph_run)
     tiers = repo_tiers()
 
     for node_run in graph_run.node_runs:
-        canonical = graph.TIER_NODE_BY_GRAPH_NODE.get(node_run.node)
+        canonical = TIER_NODES.get(node_run.node)
         if canonical is None:  # deterministic FunctionNode
             assert node_run.sampling_fingerprint is None
             continue
@@ -236,7 +246,7 @@ def test_base_and_strong_nodes_get_different_identities(graph_run):
     """Different served build and tier sampling → distinct generation identities."""
     nodes = by_node(graph_run)
     extract_fp = nodes[graph.EXTRACT_NODE].sampling_fingerprint
-    critic_fp = nodes[graph.CRITIC_NODE].sampling_fingerprint
+    critic_fp = nodes[CRITIC].sampling_fingerprint
 
     assert extract_fp and critic_fp and extract_fp != critic_fp
 
@@ -302,13 +312,19 @@ def test_an_llm_nodes_latency_is_charged_to_that_node():
     # The LLM nodes waited; the deterministic nodes that follow them did not.
     assert nodes[graph.EXTRACT_NODE].duration_ms >= 40
     assert nodes[graph.VALIDATE_NODE].duration_ms < 40
-    assert nodes[graph.CRITIC_NODE].duration_ms >= 40
-    assert nodes[graph.ROUTER_NODE].duration_ms < 40
+    assert nodes[CRITIC].duration_ms >= 40
+    assert nodes[ROUTER].duration_ms < 40
 
 
 def test_extract_only_entry_stamps_just_the_one_node():
     """Mode 1's graph: one LLM node, and an identity for it all the same."""
-    pipeline, _ = scripted_pipeline(happy_replies(), entry=graph.ENTRY_EXTRACT_ONLY)
+    # Only the one node this graph has. The extract-only entry leaves out every
+    # framework's subgraph, so scripting a lane agent here would be scripting a
+    # node that does not exist — which the fixture refuses rather than ignores.
+    pipeline, _ = scripted_pipeline(
+        {graph.EXTRACT_NODE: happy_replies()[graph.EXTRACT_NODE]},
+        entry=graph.ENTRY_EXTRACT_ONLY,
+    )
     run = drive(pipeline)
 
     assert [node_run.node for node_run in run.node_runs] == [graph.EXTRACT_NODE]
@@ -341,7 +357,7 @@ class TestSourceRendering:
         )
         replies = happy_replies() | {
             "extract": valid_model("Doc").model_dump_json(),
-            graph.analyze_node_name("spoofing"): claims_json(proposal),
+            graph.analyze_node_name("stride", "spoofing"): claims_json(proposal),
         }
         pipeline, models = scripted_pipeline(replies)
 
