@@ -268,7 +268,8 @@ def analyze_orders(engine: StrideEngine) -> None:
         return
 
     assert isinstance(outcome, PipelineCompleted)
-    print(f"{outcome.report.summary.threat_count} threats")
+    for block in outcome.report.analyses:
+        print(f"{block.framework}: {block.summary.claim_count} claims")
 ```
 <!-- /docs-include -->
 

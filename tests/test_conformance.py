@@ -61,7 +61,12 @@ from stride_service.vendors import (
     openai_reasoning_model,
     vendor_for,
 )
-from tests.factories import EMPTY_CLAIMS, ScriptedLlm
+from tests.factories import (
+    DEFAULT_FRAMEWORKS,
+    EMPTY_CLAIMS,
+    ScriptedLlm,
+    repo_package_loaders,
+)
 
 PROJECT_ROOT = Path(__file__).resolve().parents[1]
 CONFIG = PROJECT_ROOT / "config"
@@ -125,10 +130,11 @@ def _pipeline_for(vendor: str) -> Pipeline:
         return ScriptedLlm(model=selection.route, reply=EMPTY_CLAIMS, seen=[])
 
     return build_pipeline(
-        skill_loader=MarkdownLoader(PROJECT_ROOT / "skills"),
         prompt_loader=MarkdownLoader(PROJECT_ROOT / "prompts"),
-        knowledge_loader=MarkdownLoader(PROJECT_ROOT / "knowledge"),
+        domain_loader=MarkdownLoader(PROJECT_ROOT / "domains"),
+        package_loaders=repo_package_loaders(),
         binding=NodeBinding.from_configs(tiers, sampling, resolve),
+        frameworks=DEFAULT_FRAMEWORKS,
     )
 
 
