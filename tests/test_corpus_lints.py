@@ -11,6 +11,7 @@ import pytest
 
 from evals import verify_corpus
 from stride_service.report import InputRef, SourceRef
+from stride_service.validation import parse_and_validate
 
 
 @pytest.mark.parametrize(
@@ -25,10 +26,15 @@ def test_severity_bands_are_derivable_everywhere():
 
 
 def test_calibration_fixtures_pass_their_checks():
+    # STRIDE's reference file, because the judge is STRIDE's: a framework that
+    # matches by requirement ID reaches no claim-equivalence judgement and so
+    # contributes no pair here.
     claims_by_case = {
         case_dir.name: {
-            threat["claim"]
-            for threat in verify_corpus._load_json_array(case_dir / "threats.json")
+            record["claim"]
+            for record in verify_corpus._load_json_array(
+                verify_corpus.claims_file(case_dir, "stride")
+            )
         }
         for case_dir in verify_corpus.case_dirs()
     }
@@ -36,6 +42,56 @@ def test_calibration_fixtures_pass_their_checks():
     problems = verify_corpus.check_calibration(set(claims_by_case), claims_by_case)
 
     assert problems == []
+
+
+def test_every_lane_of_every_carried_package_is_measured():
+    """The merge bar's corpus-wide half, over the corpus this repo ships.
+
+    A lane is one **Model Tier** call, so a lane with no ``must-find`` record
+    anywhere is a run nobody ever measured — and the deployment cannot check
+    that for itself, because it cannot read ``evals/``.
+    """
+    must_find_lanes: dict[str, set[object]] = {}
+    for case_dir in verify_corpus.case_dirs():
+        for name in verify_corpus.PACKAGES:
+            path = verify_corpus.claims_file(case_dir, name)
+            if not path.is_file():
+                continue
+            must_find_lanes.setdefault(name, set()).update(
+                verify_corpus.RECORD_LANE[name](record)
+                for record in verify_corpus._load_json_array(path)
+                if record.get("tier") == "must-find"
+            )
+
+    assert list(verify_corpus.lane_coverage_issues(must_find_lanes)) == []
+
+
+def test_an_unmeasured_lane_fails_the_merge_bar():
+    """The bar bites: drop one lane's must-find records and it says so."""
+    problems = list(verify_corpus.lane_coverage_issues({"stride": {"spoofing"}}))
+
+    assert len(problems) == len(verify_corpus.PACKAGES["stride"].lanes) - 1
+    assert all(
+        "carries no must-find record anywhere" in problem for problem in problems
+    )
+    assert not any("spoofing" in problem for problem in problems)
+
+
+def test_a_case_that_declares_no_framework_it_does_not_refuse_is_caught():
+    """The declaration is checked against the precondition, not trusted.
+
+    STRIDE's precondition is total, so every case satisfies it and every case
+    must declare it. A case that declared nothing would carry no reference set
+    and score nothing, which no recall denominator can show.
+    """
+    case_dir = verify_corpus.case_dirs()[0]
+    model, _ = parse_and_validate(verify_corpus._load_json(case_dir / "model.json"))
+    assert model is not None
+
+    problems = list(verify_corpus.framework_issues(case_dir, {"frameworks": []}, model))
+
+    assert len(problems) == 1
+    assert "does not declare 'stride'" in problems[0]
 
 
 def test_each_declared_source_digests_to_what_it_claims():
