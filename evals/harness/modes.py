@@ -39,21 +39,21 @@ from stride_service.graph import (
     ENTRY_EXTRACT_ONLY,
     ENTRY_PREPARE,
     STATE_EXTRACTED_MODEL,
-    STATE_MERGED_DRAFTS,
     STATE_VALID_MODEL,
     Entry,
+    FrameworkNodes,
     GraphProducedNothing,
     ModelResolver,
     Pipeline,
     Rejected,
     result_of,
 )
+from stride_service.frameworks.stride.record import DraftThreat
 from stride_service.report import (
-    DraftThreat,
     InputRef,
     Job,
     NodeRun,
-    StrideReport,
+    Report,
 )
 from stride_service.sampling import (
     SamplingConfig,
@@ -99,7 +99,7 @@ class AnalysisRun:
     exactly as :func:`~stride_service.graph.assemble_report` does.
     """
 
-    report: StrideReport
+    report: Report
     merged_drafts: tuple[DraftThreat, ...]
 
 
@@ -268,7 +268,7 @@ def _run_from_graph(
     The report is built by :meth:`~stride_service.graph.Analysis.into_report`,
     the same method :class:`~stride_service.pipeline.AdkPipelineRunner` calls,
     so a sweep's reports carry every block a job's do. The Tier 1 gates check a
-    whole ``StrideReport`` — including the self-containment invariants — and a
+    whole ``Report`` — including the self-containment invariants — and a
     stripped-down payload would test a shape production never emits.
 
     What the eval supplies is what only this driver knows: a case-derived job
@@ -285,7 +285,11 @@ def _run_from_graph(
     if isinstance(result, Rejected):
         detail = "; ".join(f"{issue.code}: {issue.message}" for issue in result.issues)
         raise EvalRunError(f"{case.id}: the graph rejected the model: {detail}")
-    if STATE_MERGED_DRAFTS not in state:
+    # STRIDE's own drafts key. Critic yield is graded per framework (#167), and
+    # this driver scores the open-claim-set half of that contract; a second
+    # framework's drafts are read by its own scorer against its own reference.
+    drafts_key = FrameworkNodes("stride").key("drafts")
+    if drafts_key not in state:
         raise EvalRunError(f"{case.id}: graph produced an analysis with no drafts")
 
     now = datetime.now(UTC)
@@ -296,7 +300,7 @@ def _run_from_graph(
         pipeline=pipeline,
     )
     drafts = tuple(
-        DraftThreat.model_validate(draft) for draft in state[STATE_MERGED_DRAFTS]
+        DraftThreat.model_validate(draft) for draft in state[drafts_key]
     )
     return AnalysisRun(report=report, merged_drafts=drafts)
 

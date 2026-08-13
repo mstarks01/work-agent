@@ -32,10 +32,17 @@ from stride_service.deployment import (
     BLESSED_FINGERPRINTS_VAR,
     SAMPLING_VAR,
 )
-from stride_service.graph import TIER_NODE_BY_GRAPH_NODE
+from stride_service.graph import tier_node_by_graph_node
 from stride_service.report import NodeRun
 from stride_service.sampling import load_sampling, sampling_fingerprint
-from tests.factories import TEST_TIER_ENV, repo_tiers, served_build
+from tests.factories import (
+    DEFAULT_FRAMEWORKS,
+    TEST_TIER_ENV,
+    repo_tiers,
+    served_build,
+)
+
+TIER_NODE_BY_GRAPH_NODE = tier_node_by_graph_node(DEFAULT_FRAMEWORKS)
 from tests.test_evals_run_grounds import CASE_DIR
 from tests.test_evals_run_grounds import sweep as drive_sweep
 
