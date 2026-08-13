@@ -313,17 +313,18 @@ def score_case(
     """
     rulings: list[PairRuling] = []
     in_lane = _judge_in_lane(case, produced, judge, rulings)
-    assignment = _assign(in_lane, case.references)
+    references = case.claims_for("stride")
+    assignment = _assign(in_lane, references)
 
     matched = tuple(
-        _matched_pair(reference_index, case.references[reference_index], produced[pos])
+        _matched_pair(reference_index, references[reference_index], produced[pos])
         for reference_index, pos in sorted(assignment.items())
     )
     matched_threat_positions = set(assignment.values())
     matched_reference_indices = set(assignment)
     missed = tuple(
         index
-        for index in range(len(case.references))
+        for index in range(len(references))
         if index not in matched_reference_indices
     )
     unmatched_positions = [
@@ -342,11 +343,11 @@ def score_case(
 
     return CaseScore(
         case_id=case.id,
-        exemplar_proximity=case.meta.exemplar_proximity,
+        exemplar_proximity=case.declaration("stride").exemplar_proximity,
         produced_ids=tuple(threat.id for threat in produced),
         produced_count=len(produced),
-        reference_count=len(case.references),
-        must_find_total=len(case.must_find),
+        reference_count=len(references),
+        must_find_total=len(case.must_find_for("stride")),
         matched=matched,
         missed=missed,
         lane_errors=lane_errors,
@@ -369,7 +370,7 @@ def _judge_in_lane(
     equivalent, which is the bipartite graph step 3 assigns over.
     """
     candidates: dict[int, list[int]] = {}
-    for reference_index, reference in enumerate(case.references):
+    for reference_index, reference in enumerate(case.claims_for("stride")):
         matches = []
         for position, threat in enumerate(produced):
             if threat.category != reference.category:
@@ -477,7 +478,7 @@ def _find_lane_errors(
     for position in unmatched_positions:
         threat = produced[position]
         for reference_index in missed:
-            reference = case.references[reference_index]
+            reference = case.claims_for("stride")[reference_index]
             already_used = reference_index in claimed_references
             if reference.category == threat.category or already_used:
                 continue

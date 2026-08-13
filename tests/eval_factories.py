@@ -18,6 +18,7 @@ from evals.harness.judge import (
 )
 from evals.harness.reference import ReferenceThreat
 from stride_service.frameworks.stride.record import (
+    STRIDE_VERSION,
     DraftThreat,
     StrideCategory,
     Threat,
@@ -124,6 +125,8 @@ def draft_threat(
     """
     return DraftThreat(
         id=f"{CATEGORY_LETTERS[category]}-{sequence:02d}",
+        framework="stride",
+        framework_version=STRIDE_VERSION,
         category=category,
         title=title,
         description=f"{title} Details for the scorer's adjudication step.",
