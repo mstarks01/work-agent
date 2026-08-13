@@ -50,7 +50,7 @@ reported as itself, because the alternative — inferring which fact an agent
 from __future__ import annotations
 
 from collections.abc import Iterable, Mapping
-from typing import NamedTuple
+from typing import Any, NamedTuple
 
 from stride_service.critic import DraftJoinError
 from stride_service.frameworks import FrameworkPackage, schemas_for
@@ -322,14 +322,21 @@ def resolve_proposals(
                 " so nothing is left to justify it"
             )
             continue
+        # The agent's own fields plus the lane the graph stamped, as one mapping:
+        # what a package's record declares beyond :class:`Claim` is the package's
+        # business, so this is deliberately untyped here and validated by the
+        # record's own model.
+        agent_fields: dict[str, Any] = {
+            **package.lane_fields(lane),
+            **proposal.model_dump(exclude=set(carried)),
+        }
         drafts.append(
             package.record(
                 id=claim_id,
                 framework=package.name,
                 framework_version=package.version,
                 grounds=grounds,
-                **package.lane_fields(lane),
-                **proposal.model_dump(exclude=carried),
+                **agent_fields,
             )
         )
     if groundless:

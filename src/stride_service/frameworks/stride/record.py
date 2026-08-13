@@ -273,7 +273,11 @@ class ThreatProposals(ProposalBatch):
 
     model_config = ConfigDict(extra="forbid")
 
-    claims: list[ThreatProposal]
+    # A narrowing, which is the point of the wrapper, and which mypy reports as
+    # an incompatible override because `list` is invariant. Sound here: these
+    # models are built by validation and read, never handed to base-class code
+    # that would append a wider element to them.
+    claims: list[ThreatProposal]  # type: ignore[assignment]
 
 
 class ThreatRuling(Ruling):
@@ -304,7 +308,7 @@ class ThreatRulings(RulingBatch):
 
     model_config = ConfigDict(extra="forbid")
 
-    claims: list[ThreatRuling]
+    claims: list[ThreatRuling]  # type: ignore[assignment]  # narrowed; see ThreatProposals
 
 
 class StrideSummary(BlockSummary):
@@ -352,8 +356,10 @@ class StrideAnalysis(FrameworkAnalysis):
     base.
     """
 
-    claims: list[Threat] = Field(default_factory=list)
-    rejected_claims: list[Threat] = Field(default_factory=list)
+    claims: list[Threat] = Field(default_factory=list)  # type: ignore[assignment]
+    rejected_claims: list[Threat] = Field(  # type: ignore[assignment]
+        default_factory=list
+    )
     summary: StrideSummary
     missing_mitigations: list[MissingMitigation] = Field(default_factory=list)
 

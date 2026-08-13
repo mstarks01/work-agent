@@ -339,15 +339,20 @@ SCHEMAS: Mapping[FrameworkName, FrameworkSchemas] = MappingProxyType(
 )
 
 
-def block_type_for(name: str) -> type | None:
+def block_type_for(name: object) -> type[FrameworkAnalysis] | None:
     """The analysis block type this framework's output validates as.
 
     ``None`` for a name no registered package carries, which is what lets the
     envelope fall back to the neutral base rather than raise on a payload
-    written by a build that carried a framework this one does not.
+    written by a build that carried a framework this one does not. The parameter
+    is ``object`` rather than :data:`FrameworkName` for the same reason: the
+    callers are the two validators, which are reading a name off an unvalidated
+    payload and asking exactly this question about it.
     """
-    schemas = SCHEMAS.get(name)  # type: ignore[arg-type]
-    return schemas.block if schemas else None
+    for registered, schemas in SCHEMAS.items():
+        if registered == name:
+            return schemas.block
+    return None
 
 
 def schemas_for(name: FrameworkName) -> FrameworkSchemas:
@@ -455,7 +460,7 @@ def _declaration_issues(package: FrameworkPackage) -> list[str]:
     return issues
 
 
-def _batch_element(batch: type) -> type | None:
+def _batch_element(batch: type[BaseModel]) -> type[BaseModel] | None:
     """The element type inside a proposal or ruling wrapper, or ``None``.
 
     The wrapper's single ``claims`` field is declared ``list[<element>]``, so the
@@ -466,7 +471,9 @@ def _batch_element(batch: type) -> type | None:
     if field is None:
         return None
     args = get_args(field.annotation)
-    return args[0] if len(args) == 1 and isinstance(args[0], type) else None
+    if len(args) != 1 or not isinstance(args[0], type):
+        return None
+    return args[0] if issubclass(args[0], BaseModel) else None
 
 
 def _schema_issues(package: FrameworkPackage) -> list[str]:

@@ -10,11 +10,17 @@ hand.
 The engine carries none of the HTTP contract's ceremony: no bearer token, no
 job store, no polling. It builds the pipeline once — the expensive
 shared-prefix composition is amortised across jobs — and runs each submission
-to a terminal state. Success returns a
-:class:`~stride_service.report.StrideReport`, an input the validity gate
-rejects returns its :class:`~stride_service.validation.ValidationIssue`s, and
-an internal failure raises. That trichotomy is the job lifecycle's ``completed
-| rejected | failed`` with the transport removed.
+to a terminal state. Success returns a :class:`~stride_service.report.Report`,
+an input the validity gate rejects returns its
+:class:`~stride_service.validation.ValidationIssue`s, and an internal failure
+raises. That trichotomy is the job lifecycle's ``completed | rejected | failed``
+with the transport removed.
+
+**An engine is built for one framework selection**, because a graph is. The
+selection is stated once, at construction, rather than per call: building it
+per call would compose a graph per call and throw away the whole reason this
+class exists. An embedder that runs two selections holds two engines, which is
+the in-process spelling of what the HTTP path does per submission.
 
 The submitted sources are untrusted text (OWASP LLM01): the engine bounds them
 and hands them to the pipeline, which places them in session state as fenced
@@ -43,6 +49,7 @@ from stride_service.jobs import (
     PipelineOutcome,
     PipelineRunner,
 )
+from stride_service.report import FrameworkName, FrameworkSelection
 from stride_service.sources import Source, SourceLimits
 
 logger = logging.getLogger(__name__)
@@ -69,9 +76,9 @@ class EngineDeadlineError(TimeoutError):
     "this deployment stopped it" apart from "something else timed out" can.
 
     A partial run is never a partial report: nothing is returned on this path,
-    for the reason :func:`~stride_service.jobs.execute_job` gives — six category
-    lanes are what makes the output a STRIDE model, and one that stopped halfway
-    is a different method rather than a shorter answer.
+    for the reason :func:`~stride_service.jobs.execute_job` gives — every lane of
+    every selected framework is what makes the output that method's answer, and
+    one that stopped halfway is a different method rather than a shorter answer.
     """
 
 
@@ -82,11 +89,11 @@ async def _ignore_node(node: str) -> None:
 class StrideEngine:
     """Runs one submission through the analysis pipeline, in process.
 
-    Build once with :meth:`from_config` and reuse: the pipeline composes its
-    cacheable shared prefix at construction, so a fresh engine per call would
-    pay that cost every time. Each :meth:`analyze` call is independent and
-    holds no cross-call state, so one engine is safe to share across
-    concurrent tasks.
+    Build once with :meth:`from_config`, naming the frameworks to analyse under,
+    and reuse: the pipeline composes its cacheable shared prefix at
+    construction, so a fresh engine per call would pay that cost every time.
+    Each :meth:`analyze` call is independent and holds no cross-call state, so
+    one engine is safe to share across concurrent tasks.
     """
 
     def __init__(
@@ -95,34 +102,59 @@ class StrideEngine:
         *,
         limits: SourceLimits,
         deadline_seconds: float,
+        frameworks: Sequence[FrameworkSelection],
     ) -> None:
+        if not frameworks:
+            raise EngineInputError("an engine must be built for at least one framework")
         self._runner = runner
         self._limits = limits
         self._deadline_seconds = deadline_seconds
+        self._frameworks = list(frameworks)
 
     @classmethod
-    def from_config(cls, env: Mapping[str, str] | None = None) -> Self:
+    def from_config(
+        cls,
+        frameworks: Sequence[FrameworkName | FrameworkSelection],
+        env: Mapping[str, str] | None = None,
+    ) -> Self:
         """The production engine: this deployment's Markdown, config and models.
 
         Fails closed on missing or invalid config, exactly as the HTTP app
         does, rather than running nodes on whatever model or sampling happened
-        to be default.
+        to be default — and on a framework this install does not carry, before
+        any adapter binds.
         """
-        return cls.from_deployment(Deployment.from_env(env))
+        return cls.from_deployment(Deployment.from_env(env), frameworks)
 
     @classmethod
-    def from_deployment(cls, deployment: Deployment) -> Self:
-        """An engine on an already-resolved deployment.
+    def from_deployment(
+        cls,
+        deployment: Deployment,
+        frameworks: Sequence[FrameworkName | FrameworkSelection],
+    ) -> Self:
+        """An engine on an already-resolved deployment, for one selection.
 
         For callers that need the configuration *and* the engine — the
         first-run app reports which vendor a tier selected when the credential
         check fails, and re-reading the config to find that out is how the two
         could disagree.
+
+        ``frameworks`` takes bare names or full
+        :class:`~stride_service.report.FrameworkSelection`\\ s. A bare name is
+        the selection with no options, spelled the short way; it is not a
+        default, because there is still no way to leave the argument out.
         """
+        selections = [
+            entry
+            if isinstance(entry, FrameworkSelection)
+            else FrameworkSelection(name=entry)
+            for entry in frameworks
+        ]
         return cls(
-            deployment.runner(),
+            deployment.runner([selection.name for selection in selections]),
             limits=deployment.resilience.source_limits(),
             deadline_seconds=deployment.resilience.deadline_seconds(),
+            frameworks=selections,
         )
 
     async def analyze(
@@ -141,7 +173,7 @@ class StrideEngine:
         later one.
 
         Returns a :class:`~stride_service.jobs.PipelineCompleted` carrying the
-        :class:`~stride_service.report.StrideReport` when analysis succeeds, or
+        :class:`~stride_service.report.Report` when analysis succeeds, or
         a :class:`~stride_service.jobs.PipelineRejected` carrying the validity
         gate's issues when the input cannot be modelled. An internal failure
         raises — the engine never returns a partial or best-effort report.
@@ -162,6 +194,7 @@ class StrideEngine:
 
         Usage::
 
+            engine = StrideEngine.from_config(["stride"])
             outcome = await engine.analyze(
                 [Source.description(text)], system_name="Checkout"
             )
@@ -240,6 +273,7 @@ class StrideEngine:
         return JobRecord.create(
             owner_subject=caller,
             sources=sources,
+            frameworks=self._frameworks,
             system_name=_clean_system_name(system_name),
         )
 

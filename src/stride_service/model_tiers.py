@@ -65,7 +65,8 @@ TIER_NAMES: tuple[TierName, ...] = ("base", "strong")
 # reading the report, so it is not a node name here or anywhere else. These are
 # the *tier config* keys; the graph's own node names are a separate namespace
 # (they must be Python identifiers, and they carry the lane as well as the
-# framework), mapped in :data:`stride_service.graph.TIER_NODE_BY_GRAPH_NODE`.
+# framework), mapped by :func:`stride_service.graph.tier_node_by_graph_node`,
+# which is built per selection because which nodes exist is a function of it.
 #
 # **The keys are the service's, and there is one set per framework rather than
 # one per lane.** A framework's lanes all run the same judgement on the same

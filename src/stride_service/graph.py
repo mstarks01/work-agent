@@ -125,9 +125,9 @@ from stride_service.evidence import (
 )
 from stride_service.frameworks import (
     DISCLAIMER_DOC,
-    SCHEMAS,
     FrameworkPackage,
     FrameworkSchemas,
+    block_type_for,
     package_for,
     schemas_for,
 )
@@ -850,8 +850,7 @@ def _block_of(payload: dict[str, Any]) -> FrameworkAnalysis:
     framework this build does not carry reads as a base claim rather than
     raising, which is the honest outcome.
     """
-    schemas = SCHEMAS.get(payload.get("framework"))
-    block_type = schemas.block if schemas else FrameworkAnalysis
+    block_type = block_type_for(payload.get("framework")) or FrameworkAnalysis
     return block_type.model_validate(payload)
 
 
