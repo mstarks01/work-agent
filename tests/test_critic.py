@@ -9,11 +9,13 @@ from stride_service.critic import (
     assemble_claims,
     join_drafts,
     mentioned_ids,
-    numbering_gaps,
     review_issues,
     snap_drafts,
     snap_rulings,
 )
+from stride_service.frameworks import schemas_for
+from stride_service.frameworks.stride import STRIDE
+from stride_service.frameworks.stride.record import DraftThreat
 from stride_service.report import (
     Ground,
     Mitigation,
@@ -24,6 +26,10 @@ from stride_service.report import (
 )
 from stride_service.sources import DEFAULT_DESCRIPTION_LABEL
 from tests.factories import sample_draft, sample_ruling, valid_model
+
+#: The five model-facing shapes STRIDE's own nodes speak in. ``assemble_claims``
+#: needs the ruled record to build; the package itself carries the draft.
+SCHEMAS = schemas_for("stride")
 
 LABEL = DEFAULT_DESCRIPTION_LABEL
 # The job's one source, as the executor hands it to the fan-in.
@@ -55,23 +61,24 @@ class TestJoinDrafts:
                 "spoofing": [sample_draft("S-01")],
                 "repudiation": [sample_draft("R-01", "repudiation")],
             },
+            STRIDE,
             model,
         )
         assert [draft.id for draft in merged.drafts] == ["S-01", "T-01", "R-01"]
 
     def test_absent_categories_contribute_nothing(self, model):
-        joined = join_drafts({"spoofing": [sample_draft()]}, model)
+        joined = join_drafts({"spoofing": [sample_draft()]}, STRIDE, model)
         assert joined.drafts == [sample_draft()]
 
     def test_empty_analysis_is_legal(self, model):
-        assert join_drafts({}, model).drafts == []
+        assert join_drafts({}, STRIDE, model).drafts == []
 
     def test_unresolvable_element_reference_fails_closed(self, model):
         drafts = {
             "spoofing": [sample_draft(affected_element_ids=["process:does-not-exist"])]
         }
         with pytest.raises(DraftJoinError, match="not in the system model"):
-            join_drafts(drafts, model)
+            join_drafts(drafts, STRIDE, model)
 
     def test_every_bad_reference_is_reported_at_once(self, model):
         drafts = {
@@ -81,20 +88,20 @@ class TestJoinDrafts:
             ],
         }
         with pytest.raises(DraftJoinError) as excinfo:
-            join_drafts(drafts, model)
+            join_drafts(drafts, STRIDE, model)
         assert "process:ghost" in str(excinfo.value)
         assert "store:ghost" in str(excinfo.value)
 
     def test_a_respelled_element_reference_resolves_and_is_canonicalized(self, model):
         """The fold runs before the check, and the report carries the job's ID."""
         drafts = {"spoofing": [sample_draft(affected_element_ids=["Process:Web-App"])]}
-        [joined] = join_drafts(drafts, model).drafts
+        [joined] = join_drafts(drafts, STRIDE, model).drafts
         assert joined.affected_element_ids == ["process:web-app"]
 
     def test_duplicate_threat_ids_fail_closed(self, model):
         drafts = {"spoofing": [sample_draft("S-01"), sample_draft("S-01")]}
         with pytest.raises(DraftJoinError, match="used by 2 drafts"):
-            join_drafts(drafts, model)
+            join_drafts(drafts, STRIDE, model)
 
     def test_a_lane_and_its_drafts_cannot_disagree_about_the_category(self, model):
         """There is nothing left here to check, and that is the point.
@@ -107,7 +114,7 @@ class TestJoinDrafts:
         """
         drafts = {"spoofing": [sample_draft("T-01", "tampering")]}
 
-        assert join_drafts(drafts, model).drafts[0].category == "tampering"
+        assert join_drafts(drafts, STRIDE, model).drafts[0].category == "tampering"
 
 
 class TestGroundReferences:
@@ -127,7 +134,7 @@ class TestGroundReferences:
             Ground(kind="quote", text="anything", source_label="Never submitted")
         )
         with pytest.raises(DraftJoinError, match="not one of this job's sources"):
-            join_drafts(drafts, model, SOURCES)
+            join_drafts(drafts, STRIDE, model, SOURCES)
 
     def test_an_unknown_attribute_on_an_element_that_does_not_exist(self, model):
         drafts = self.grounded(
@@ -138,7 +145,7 @@ class TestGroundReferences:
             )
         )
         with pytest.raises(DraftJoinError, match="not in the system model"):
-            join_drafts(drafts, model, SOURCES)
+            join_drafts(drafts, STRIDE, model, SOURCES)
 
     def test_an_attribute_the_element_type_does_not_have(self, model):
         """An ExternalEntity has no ``encryption_at_rest``; naming one is a guess."""
@@ -150,7 +157,7 @@ class TestGroundReferences:
             )
         )
         with pytest.raises(DraftJoinError, match="does not have"):
-            join_drafts(drafts, model, SOURCES)
+            join_drafts(drafts, STRIDE, model, SOURCES)
 
     def test_a_pointer_spelled_attribute_resolves(self, model):
         """A field name arriving as ``/exposure`` is the field ``exposure``.
@@ -166,7 +173,7 @@ class TestGroundReferences:
                 attribute="/exposure",
             )
         )
-        assert join_drafts(drafts, model, SOURCES).drafts
+        assert join_drafts(drafts, STRIDE, model, SOURCES).drafts
 
     def test_a_pointer_spelled_attribute_the_element_lacks_still_fails(self, model):
         drafts = self.grounded(
@@ -177,14 +184,14 @@ class TestGroundReferences:
             )
         )
         with pytest.raises(DraftJoinError, match="does not have"):
-            join_drafts(drafts, model, SOURCES)
+            join_drafts(drafts, STRIDE, model, SOURCES)
 
     def test_a_derived_fact_naming_a_flow_that_does_not_cross(self, model):
         drafts = self.grounded(
             Ground(kind="derived-fact", flow_id="flow:not-a:crossing")
         )
         with pytest.raises(DraftJoinError, match="not a derived boundary crossing"):
-            join_drafts(drafts, model, SOURCES)
+            join_drafts(drafts, STRIDE, model, SOURCES)
 
     def test_a_respelled_source_label_resolves_to_the_jobs_label(self, model):
         """A quote whose label differs only in case cites the caller's bytes."""
@@ -195,7 +202,7 @@ class TestGroundReferences:
                 source_label=LABEL.upper(),
             )
         )
-        joined = join_drafts(drafts, model, SOURCES)
+        joined = join_drafts(drafts, STRIDE, model, SOURCES)
         assert joined.drafts[0].grounds[0].source_label == LABEL
         assert joined.marks.unverified_grounds == []
 
@@ -204,7 +211,7 @@ class TestGroundReferences:
         drafts = self.grounded(
             Ground(kind="quote", text="anything", source_label="Never submitted")
         )
-        assert join_drafts(drafts, model).drafts
+        assert join_drafts(drafts, STRIDE, model).drafts
 
 
 class TestMentionedIds:
@@ -260,12 +267,14 @@ class TestUnresolvedMentions:
 
     def test_an_id_the_model_contains_is_not_marked(self, model):
         joined = join_drafts(
-            self.drafted("An attacker reaches process:web-app."), model
+            self.drafted("An attacker reaches process:web-app."), STRIDE, model
         )
         assert joined.marks.unresolved_mentions == []
 
     def test_an_id_the_model_lacks_is_marked_and_the_job_survives(self, model):
-        joined = join_drafts(self.drafted("It pivots into process:ghost."), model)
+        joined = join_drafts(
+            self.drafted("It pivots into process:ghost."), STRIDE, model
+        )
 
         assert [(m.claim_id, m.mention) for m in joined.marks.unresolved_mentions] == [
             ("S-01", "process:ghost")
@@ -278,6 +287,7 @@ class TestUnresolvedMentions:
             self.drafted(
                 "The attacker posts to process:web-api and reaches store:accounts-db."
             ),
+            STRIDE,
             model,
         )
         assert [m.mention for m in joined.marks.unresolved_mentions] == [
@@ -286,12 +296,14 @@ class TestUnresolvedMentions:
         ]
 
     def test_a_respelled_id_resolves_rather_than_being_marked(self, model):
-        joined = join_drafts(self.drafted("Reaches Process:Web-App first."), model)
+        joined = join_drafts(
+            self.drafted("Reaches Process:Web-App first."), STRIDE, model
+        )
         assert joined.marks.unresolved_mentions == []
 
     def test_marks_are_per_mention_not_per_threat(self, model):
         joined = join_drafts(
-            self.drafted("From process:ghost through store:phantom."), model
+            self.drafted("From process:ghost through store:phantom."), STRIDE, model
         )
         assert [m.mention for m in joined.marks.unresolved_mentions] == [
             "process:ghost",
@@ -309,11 +321,11 @@ class TestMissingMitigations:
         return {"spoofing": [sample_draft("S-01", **fields)]}
 
     def test_a_threat_carrying_a_countermeasure_is_not_marked(self, model):
-        joined = join_drafts(self.drafted(mitigations=[mitigation()]), model)
+        joined = join_drafts(self.drafted(mitigations=[mitigation()]), STRIDE, model)
         assert joined.marks.missing_mitigations == []
 
     def test_empty_with_no_unknown_behind_it_is_marked(self, model):
-        joined = join_drafts(self.drafted(mitigations=[]), model)
+        joined = join_drafts(self.drafted(mitigations=[]), STRIDE, model)
         assert [m.claim_id for m in joined.marks.missing_mitigations] == ["S-01"]
 
     def test_empty_on_a_threat_conditional_on_an_unknown_is_licensed(self, model):
@@ -329,12 +341,13 @@ class TestMissingMitigations:
                     )
                 ],
             ),
+            STRIDE,
             model,
         )
         assert joined.marks.missing_mitigations == []
 
     def test_the_mark_never_costs_the_finding(self, model):
-        joined = join_drafts(self.drafted(mitigations=[]), model)
+        joined = join_drafts(self.drafted(mitigations=[]), STRIDE, model)
         assert [draft.id for draft in joined.drafts] == ["S-01"]
 
 
@@ -342,10 +355,13 @@ class TestNumberingGaps:
     """A lane's own drafts should run 01..N; a gap is reported, never repaired."""
 
     def test_a_contiguous_lane_reports_nothing(self):
-        assert numbering_gaps([sample_draft("S-01"), sample_draft("S-02")]) == []
+        assert (
+            DraftThreat.lane_diagnostics([sample_draft("S-01"), sample_draft("S-02")])
+            == []
+        )
 
     def test_a_gap_is_named_with_the_ids_that_produced_it(self):
-        [gap] = numbering_gaps(
+        [gap] = DraftThreat.lane_diagnostics(
             [sample_draft("S-01"), sample_draft("S-02"), sample_draft("S-05")]
         )
         assert "spoofing" in gap
@@ -353,12 +369,14 @@ class TestNumberingGaps:
         assert "01..03" in gap
 
     def test_a_lane_not_starting_at_01_is_a_gap(self):
-        assert numbering_gaps([sample_draft("S-02"), sample_draft("S-03")])
+        assert DraftThreat.lane_diagnostics(
+            [sample_draft("S-02"), sample_draft("S-03")]
+        )
 
     def test_lanes_are_numbered_independently(self):
         """Each agent numbers within its own category, so each is judged alone."""
         assert (
-            numbering_gaps(
+            DraftThreat.lane_diagnostics(
                 [
                     sample_draft("S-01"),
                     sample_draft("T-01", "tampering"),
@@ -369,7 +387,7 @@ class TestNumberingGaps:
         )
 
     def test_only_the_offending_lane_is_named(self):
-        gaps = numbering_gaps(
+        gaps = DraftThreat.lane_diagnostics(
             [
                 sample_draft("S-01"),
                 sample_draft("T-01", "tampering"),
@@ -382,7 +400,10 @@ class TestNumberingGaps:
     def test_the_ids_are_left_exactly_as_the_agent_wrote_them(self, model):
         """Reported, never renumbered: an ID must not move between two runs."""
         drafts = {"spoofing": [sample_draft("S-01"), sample_draft("S-05")]}
-        assert [d.id for d in join_drafts(drafts, model).drafts] == ["S-01", "S-05"]
+        assert [d.id for d in join_drafts(drafts, STRIDE, model).drafts] == [
+            "S-01",
+            "S-05",
+        ]
 
 
 class TestQuoteVerification:
@@ -393,7 +414,9 @@ class TestQuoteVerification:
         return {"spoofing": [sample_draft(threat_id, grounds=grounds)]}
 
     def test_a_verifying_quote_is_not_marked(self, model):
-        joined = join_drafts(self.quoting("log in to the web app"), model, SOURCES)
+        joined = join_drafts(
+            self.quoting("log in to the web app"), STRIDE, model, SOURCES
+        )
         assert joined.marks.unverified_grounds == []
 
     def test_an_unfindable_quote_beside_a_good_ground_is_marked_not_fatal(self, model):
@@ -402,7 +425,7 @@ class TestQuoteVerification:
             "a sentence the submitter never wrote",
             extra=[Ground(kind="derived-fact", flow_id=CROSSING)],
         )
-        joined = join_drafts(drafts, model, SOURCES)
+        joined = join_drafts(drafts, STRIDE, model, SOURCES)
 
         assert len(joined.drafts) == 1
         assert [(m.claim_id, m.index) for m in joined.marks.unverified_grounds] == [
@@ -413,7 +436,7 @@ class TestQuoteVerification:
     def test_a_threat_whose_every_ground_fails_kills_the_job(self, model):
         drafts = self.quoting("a sentence the submitter never wrote")
         with pytest.raises(DraftJoinError, match="no ground that verifies"):
-            join_drafts(drafts, model, SOURCES)
+            join_drafts(drafts, STRIDE, model, SOURCES)
 
     def test_the_fail_closed_error_carries_both_halves_of_the_rate(self, model):
         """The raise site is the only moment the numerator and denominator
@@ -422,9 +445,9 @@ class TestQuoteVerification:
         drafts["tampering"] = [sample_draft("T-01", "tampering")]
 
         with pytest.raises(GroundsUnverifiedError) as excinfo:
-            join_drafts(drafts, model, SOURCES)
+            join_drafts(drafts, STRIDE, model, SOURCES)
 
-        assert excinfo.value.threat_ids == ("S-01",)
+        assert excinfo.value.claim_ids == ("S-01",)
         assert excinfo.value.draft_count == 2
 
     def test_an_unresolvable_label_is_not_a_fail_closed_error(self, model):
@@ -435,12 +458,12 @@ class TestQuoteVerification:
         drafts["spoofing"][0].grounds[0].source_label = "no-such-source"
 
         with pytest.raises(DraftJoinError) as excinfo:
-            join_drafts(drafts, model, SOURCES)
+            join_drafts(drafts, STRIDE, model, SOURCES)
 
         assert not isinstance(excinfo.value, GroundsUnverifiedError)
 
     def test_the_text_check_does_not_run_without_sources(self, model):
-        joined = join_drafts(self.quoting("never written anywhere"), model)
+        joined = join_drafts(self.quoting("never written anywhere"), STRIDE, model)
         assert joined.marks.unverified_grounds == []
 
 
@@ -462,7 +485,7 @@ class TestAssembleThreats:
                 ),
             ),
         ]
-        threats, rejected = assemble_claims(drafts, rulings, model)
+        threats, rejected = assemble_claims(drafts, rulings, model, SCHEMAS)
         assert [t.id for t in threats] == ["S-01", "S-02"]
         assert rejected == []
 
@@ -475,7 +498,7 @@ class TestAssembleThreats:
                 verdict=Verdict(status="rejected", reason="duplicate of S-01"),
             ),
         ]
-        threats, rejected = assemble_claims(drafts, rulings, model)
+        threats, rejected = assemble_claims(drafts, rulings, model, SCHEMAS)
         assert [t.id for t in threats] == ["S-01"]
         assert [t.id for t in rejected] == ["S-02"]
 
@@ -486,29 +509,31 @@ class TestAssembleThreats:
             sample_draft("S-03", severity=severity("medium", "high")),
         ]
         rulings = [sample_ruling(f"S-0{n}") for n in (1, 2, 3)]
-        threats, _ = assemble_claims(drafts, rulings, model)
+        threats, _ = assemble_claims(drafts, rulings, model, SCHEMAS)
         assert [t.id for t in threats] == ["S-02", "S-03", "S-01"]
 
     def test_ties_break_on_threat_id(self, model):
         drafts = [sample_draft("S-02"), sample_draft("S-01")]
         rulings = [sample_ruling("S-02"), sample_ruling("S-01")]
-        threats, _ = assemble_claims(drafts, rulings, model)
+        threats, _ = assemble_claims(drafts, rulings, model, SCHEMAS)
         assert [t.id for t in threats] == ["S-01", "S-02"]
 
     def test_a_dropped_draft_fails_closed(self, model):
         drafts = [sample_draft("S-01"), sample_draft("S-02")]
         with pytest.raises(CriticOutputError, match="dropped draft 'S-02'"):
-            assemble_claims(drafts, [sample_ruling("S-01")], model)
+            assemble_claims(drafts, [sample_ruling("S-01")], model, SCHEMAS)
 
     def test_an_invented_threat_fails_closed(self, model):
-        with pytest.raises(CriticOutputError, match="no category agent drafted"):
-            assemble_claims([sample_draft("S-01")], [sample_ruling("S-02")], model)
+        with pytest.raises(CriticOutputError, match="no lane agent drafted"):
+            assemble_claims(
+                [sample_draft("S-01")], [sample_ruling("S-02")], model, SCHEMAS
+            )
 
     def test_a_duplicated_ruling_fails_closed(self, model):
         drafts = [sample_draft("S-01")]
         rulings = [sample_ruling("S-01"), sample_ruling("S-01")]
         with pytest.raises(CriticOutputError, match="used by 2 drafts"):
-            assemble_claims(drafts, rulings, model)
+            assemble_claims(drafts, rulings, model, SCHEMAS)
 
     def test_needs_info_unknowns_must_resolve(self, model):
         drafts = [sample_draft("S-01")]
@@ -525,7 +550,7 @@ class TestAssembleThreats:
             )
         ]
         with pytest.raises(CriticOutputError, match="hangs its needs-info verdict"):
-            assemble_claims(drafts, rulings, model)
+            assemble_claims(drafts, rulings, model, SCHEMAS)
 
     def test_a_needs_info_attribute_the_element_lacks_is_a_fault(self, model):
         """Checked to the same depth as the grounds surface, and no deeper.
@@ -549,10 +574,10 @@ class TestAssembleThreats:
             )
         ]
         with pytest.raises(CriticOutputError, match="does not have"):
-            assemble_claims(drafts, rulings, model)
+            assemble_claims(drafts, rulings, model, SCHEMAS)
 
     def test_empty_analysis_assembles_to_empty_arrays(self, model):
-        assert assemble_claims([], [], model) == ([], [])
+        assert assemble_claims([], [], model, SCHEMAS) == ([], [])
 
 
 class TestVerdictShapeIsReAskableRatherThanFatal:
@@ -640,7 +665,7 @@ class TestVerdictShapeIsReAskableRatherThanFatal:
         problems = review_issues([sample_draft("S-01")], [ruling], model)
 
         assert "dropped draft 'S-01'" in "; ".join(problems.messages)
-        assert "'S-1', which no category agent drafted" in "; ".join(problems.messages)
+        assert "'S-1', which no lane agent drafted" in "; ".join(problems.messages)
         assert problems.implicated == frozenset({"S-01"})
 
     def test_assembly_still_fails_closed_on_one(self, model):
@@ -648,14 +673,17 @@ class TestVerdictShapeIsReAskableRatherThanFatal:
         the seam refused."""
         with pytest.raises(CriticOutputError, match="states no reason"):
             assemble_claims(
-                [sample_draft("S-01")], self._rulings(status="rejected"), model
+                [sample_draft("S-01")],
+                self._rulings(status="rejected"),
+                model,
+                SCHEMAS,
             )
 
     def test_a_passing_ruling_is_promoted_to_the_reports_own_verdict(self, model):
         """``ProposedVerdict`` in, ``Verdict`` out — so a threat on the report
         carries the shape the report defines, whatever the critic emitted."""
         threats, _ = assemble_claims(
-            [sample_draft("S-01")], self._rulings(status="confirmed"), model
+            [sample_draft("S-01")], self._rulings(status="confirmed"), model, SCHEMAS
         )
 
         assert type(threats[0].verdict) is Verdict
@@ -671,7 +699,7 @@ class TestRulingsMergeOntoDrafts:
             description="Stolen cookies let an attacker impersonate the customer.",
             affected_element_ids=["flow:customer-to-web-app:login"],
         )
-        (threat,), _ = assemble_claims([draft], [sample_ruling("S-01")], model)
+        (threat,), _ = assemble_claims([draft], [sample_ruling("S-01")], model, SCHEMAS)
         assert threat.title == draft.title
         assert threat.description == draft.description
         assert threat.affected_element_ids == draft.affected_element_ids
@@ -679,7 +707,7 @@ class TestRulingsMergeOntoDrafts:
 
     def test_a_ruling_without_severity_keeps_the_agents_rating(self, model):
         draft = sample_draft("S-01", severity=severity("low", "medium"))
-        (threat,), _ = assemble_claims([draft], [sample_ruling("S-01")], model)
+        (threat,), _ = assemble_claims([draft], [sample_ruling("S-01")], model, SCHEMAS)
         assert threat.severity == draft.severity
         assert threat.severity.level == "low"
 
@@ -693,14 +721,14 @@ class TestRulingsMergeOntoDrafts:
             justification="The model states the flow is unauthenticated.",
         )
         rulings = [sample_ruling("S-01", severity=corrected)]
-        (threat,), _ = assemble_claims([draft], rulings, model)
+        (threat,), _ = assemble_claims([draft], rulings, model, SCHEMAS)
         assert threat.severity.likelihood == "high"
         assert threat.severity.justification == corrected.justification
         assert threat.severity.level == "critical"
 
     def test_the_critics_judgements_reach_the_threat(self, model):
         rulings = [sample_ruling("S-01", confidence="medium")]
-        (threat,), _ = assemble_claims([sample_draft("S-01")], rulings, model)
+        (threat,), _ = assemble_claims([sample_draft("S-01")], rulings, model, SCHEMAS)
         assert threat.confidence == "medium"
         assert threat.verdict.status == "confirmed"
 
@@ -710,7 +738,7 @@ class TestRulingsMergeOntoDrafts:
             sample_ruling("S-02", verdict=Verdict(status="rejected", reason="dup")),
             sample_ruling("S-01", verdict=Verdict(status="rejected", reason="dup")),
         ]
-        _, rejected = assemble_claims(drafts, rulings, model)
+        _, rejected = assemble_claims(drafts, rulings, model, SCHEMAS)
         assert [t.id for t in rejected] == ["S-01", "S-02"]
 
 
