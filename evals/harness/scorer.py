@@ -52,13 +52,12 @@ from evals.harness.judge import (
     UnmatchedThreat,
 )
 from evals.harness.reference import GoldenCase, ReferenceThreat
-from stride_service.report import (
+from stride_service.frameworks.stride.record import (
     DraftThreat,
-    SeverityLevel,
     StrideCategory,
     Threat,
-    derive_severity_level,
 )
+from stride_service.report import SeverityLevel, derive_severity_level
 
 
 def candidate_claim(threat: DraftThreat) -> str:

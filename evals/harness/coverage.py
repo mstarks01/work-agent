@@ -1,7 +1,8 @@
 """What the category agents were offered across a sweep, and what they cited.
 
-:class:`~stride_service.report.CategoryCoverage` is computed per job and rides
-on the report, one row per STRIDE category. One job's rows are close to
+:class:`~stride_service.report.LaneCoverage` is computed per job and rides on
+the report, one row per lane — which for STRIDE is one per category. One job's
+rows are close to
 unreadable — an agent that examined a flow and correctly found nothing cites
 nothing, and no observable separates it from one that never looked. The
 aggregate is where the field was always meant to be read: a lane citing two of
@@ -26,7 +27,8 @@ from dataclasses import dataclass
 from typing import Any
 
 from evals.harness.scorer import ratio
-from stride_service.report import STRIDE_CATEGORIES, CategoryCoverage, StrideCategory
+from stride_service.frameworks.stride.record import STRIDE_CATEGORIES, StrideCategory
+from stride_service.report import LaneCoverage as ReportLaneCoverage
 
 # The offered/cited pairs, in the order they read on a row. Named once because
 # the fold, the rates and the printed table would otherwise each carry their
@@ -82,18 +84,22 @@ class LaneCoverage:
         }
 
 
-def aggregate_coverage(rows: Iterable[CategoryCoverage]) -> list[LaneCoverage]:
+def aggregate_coverage(rows: Iterable[ReportLaneCoverage]) -> list[LaneCoverage]:
     """Pool per-case coverage rows into one row per category.
 
     Always all six lanes, in the report's own category order, including any the
     sweep never produced a row for: a lane missing from the table would read as
     a lane with nothing to cite, and the two are opposite findings.
+
+    STRIDE's lane slugs *are* its category names, so a report row's ``lane``
+    keys this table directly. That identity is this package's and not a fact
+    about the report, which is why the fold names the framework it is folding.
     """
-    by_category: dict[StrideCategory, list[CategoryCoverage]] = {
+    by_category: dict[StrideCategory, list[ReportLaneCoverage]] = {
         category: [] for category in STRIDE_CATEGORIES
     }
     for row in rows:
-        by_category[row.category].append(row)
+        by_category[row.lane].append(row)
     return [
         LaneCoverage(
             category=category,

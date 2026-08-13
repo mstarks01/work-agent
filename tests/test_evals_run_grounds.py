@@ -30,12 +30,14 @@ from stride_service.evidence import evidence_catalog
 from stride_service.frameworks.stride.record import STRIDE_CATEGORIES
 from stride_service.graph import (
     ENTRY_PREPARE,
-    TIER_NODE_BY_GRAPH_NODE,
     analyze_node_name,
+    tier_node_by_graph_node,
 )
 from stride_service.sampling import load_sampling
-from tests.factories import TEST_TIER_ENV, ScriptedLlm
+from tests.factories import DEFAULT_FRAMEWORKS, TEST_TIER_ENV, ScriptedLlm
 from tests.test_evals_modes import scripted_ruling
+
+TIER_NODE_BY_GRAPH_NODE = tier_node_by_graph_node(DEFAULT_FRAMEWORKS)
 
 REPO_ROOT = Path(__file__).resolve().parents[1]
 CASE_DIR = REPO_ROOT / "evals" / "corpus" / "01-payments-checkout"

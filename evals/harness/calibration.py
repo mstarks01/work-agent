@@ -28,7 +28,7 @@ from pathlib import Path
 from typing import Any, Literal
 
 from evals.harness.judge import ClaimPair, Judge
-from stride_service.report import STRIDE_CATEGORIES, StrideCategory
+from stride_service.frameworks.stride.record import STRIDE_CATEGORIES, StrideCategory
 
 EVALS_ROOT = Path(__file__).resolve().parents[1]
 DEFAULT_PAIRS_PATH = EVALS_ROOT / "judge_calibration" / "pairs.json"

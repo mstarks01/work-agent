@@ -21,10 +21,12 @@ from stride_service.certification import (
     load_manifest,
 )
 from stride_service.deployment import SAMPLING_VAR, Deployment
-from stride_service.graph import ENTRY_EXTRACT, TIER_NODE_BY_GRAPH_NODE
+from stride_service.graph import ENTRY_EXTRACT, tier_node_by_graph_node
 from stride_service.model_tiers import TierName
 from stride_service.sampling import load_sampling, sampling_fingerprint
-from tests.factories import TEST_TIER_ENV, repo_tiers
+from tests.factories import DEFAULT_FRAMEWORKS, TEST_TIER_ENV, repo_tiers
+
+TIER_NODE_BY_GRAPH_NODE = tier_node_by_graph_node(DEFAULT_FRAMEWORKS)
 
 REPO_ROOT = Path(__file__).resolve().parents[1]
 SAMPLING_PATH = REPO_ROOT / "config" / "sampling.toml"
