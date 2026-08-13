@@ -19,4 +19,3 @@ The System Model carries a Trust Boundary of `kind: tenant`, or names tenants, c
 
 - This pack is **analysis knowledge, not evidence.** A finding still rests on the submitter's words, an `unknown` attribute, or a derived crossing.
 - Do not assume isolation exists or does not. Where the model is silent about how tenant scoping is enforced, the attribute is `unknown` — write the threat conditionally and name what has to be learned.
-- Lane discipline: reaching another tenant's data by an unscoped read is elevation of privilege or information disclosure depending on what the attacker achieves; replaying one tenant's valid credential in another's scope is spoofing.

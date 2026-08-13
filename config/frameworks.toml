@@ -1,0 +1,34 @@
+# Framework configuration — the set of security frameworks this install carries.
+#
+# The fifth config file, located by STRIDE_FRAMEWORKS_FILE like the other four,
+# and failing closed on a wrong version like the other four.
+#
+# WHAT THIS FILE DECIDES, AND WHAT IT DOES NOT. It fixes what this install
+# *carries*. A job picks from that set and must name its choice explicitly:
+# `frameworks` is required and non-empty on a submission, and an absent field
+# rejects. This file holds no default, deliberately — a default set would make
+# one submission mean different things on two installs, and the caller would
+# read no sign of it. That is worse than the byte-vs-token case this repo
+# already ruled on, because it changes what the answer *is* rather than whether
+# the request is accepted.
+#
+# IMPLICIT ENABLEMENT LOSES. Carrying every package present in the build was the
+# alternative, and it leaves an operator no way to disable one.
+#
+# A NAME HERE MUST BE ONE THIS BUILD CARRIES. Three sets have to agree: the
+# closed `FrameworkName` literal names what the code can spell,
+# `stride_service.frameworks.PACKAGES` names what this build carries, and this
+# list names what this install runs. The first two agree at import; this one
+# agrees at `Deployment.from_env`, which also checks that every carried package
+# is well-formed and present on disk before an adapter binds or an instruction
+# composes.
+#
+# ADDING A FRAMEWORK is a code change, not a config one: a package writes into a
+# `strong`-tier prompt, so there is no path here and no import by name. Register
+# the package in the table, spell its name in the literal, add its three
+# `model_tiers.toml` node keys, then add the name below.
+
+version = 1
+
+# The frameworks this install runs, by name.
+carried = ["stride"]
