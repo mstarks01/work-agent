@@ -8,6 +8,7 @@ from pydantic import ValidationError
 
 from stride_service.frameworks.stride.record import (
     ThreatRulings,
+    build_stride_summary,
 )
 from stride_service.report import (
     AnalysisMarks,
@@ -22,11 +23,14 @@ from stride_service.report import (
     UnresolvedEvidence,
     UnresolvedMention,
     Verdict,
-    build_summary,
     derive_severity_level,
 )
 from stride_service.sampling import TierSampling, sampling_fingerprint
-from tests.factories import sample_report, sample_threat, valid_model
+from tests.factories import (
+    sample_report,
+    sample_threat,
+    valid_model,
+)
 
 
 class TestSeverityMatrix:
@@ -152,10 +156,10 @@ class TestProposedVerdictCarriesNoRuleBetweenFields:
         into state, so anything raising here is a dead job rather than a
         re-ask."""
         rulings = ThreatRulings.model_validate(
-            {"threats": [{"id": "S-01", "confidence": "high", "verdict": verdict}]}
+            {"claims": [{"id": "S-01", "confidence": "high", "verdict": verdict}]}
         )
 
-        assert rulings.threats[0].verdict.status == verdict["status"]
+        assert rulings.claims[0].verdict.status == verdict["status"]
 
     def test_a_malformed_threat_id_survives_the_node_too(self):
         """The critic copies IDs off a roster; a mistyped one is not a shape
@@ -168,7 +172,7 @@ class TestProposedVerdictCarriesNoRuleBetweenFields:
         """
         rulings = ThreatRulings.model_validate(
             {
-                "threats": [
+                "claims": [
                     {
                         "id": "S-1",
                         "confidence": "high",
@@ -178,7 +182,7 @@ class TestProposedVerdictCarriesNoRuleBetweenFields:
             }
         )
 
-        assert rulings.threats[0].id == "S-1"
+        assert rulings.claims[0].id == "S-1"
 
     def test_the_field_level_constraints_are_untouched(self):
         """Only the rules *between* fields moved. A closed vocabulary is
@@ -270,13 +274,19 @@ class TestThreat:
         with pytest.raises(ValidationError):
             sample_threat(grounds=[])
 
-    def test_id_must_carry_the_category_letter(self):
-        with pytest.raises(ValidationError, match="category letter"):
-            sample_threat(threat_id="S-01", category="tampering")
+    def test_the_record_no_longer_re_validates_an_id_it_did_not_compose(self):
+        """``^[STRIDE]-\\d{2}$`` and the category-letter check are gone.
 
-    def test_id_pattern_is_enforced(self):
-        with pytest.raises(ValidationError):
-            sample_threat(threat_id="SPOOF-1", category="spoofing")
+        Both asked a record to re-check a string the *service* built: the ID is
+        composed by the package's own ``IdRule`` from the lane the resolver was
+        called for, and the lane is stamped from the same call — so the letter
+        and the category could not disagree unless the composition itself were
+        wrong, which is a defect a schema pattern would hide rather than catch.
+        The shape is a fact about STRIDE's ``id_format`` and nothing a second
+        framework's requirement numbering would satisfy.
+        """
+        assert sample_threat(threat_id="S-01", category="tampering").id == "S-01"
+        assert sample_threat(threat_id="SPOOF-1").id == "SPOOF-1"
 
     def test_at_least_one_affected_element_is_required(self):
         with pytest.raises(ValidationError):
@@ -286,7 +296,9 @@ class TestThreat:
 class TestReportInvariants:
     def test_sample_report_is_valid(self):
         report = sample_report()
-        assert report.summary.threat_count == len(report.threats)
+        (block,) = report.analyses
+        assert block.summary.claim_count == len(block.claims)
+        assert report.elements_analyzed == len(report.system_model.elements())
 
     def test_rejected_verdict_may_not_sit_in_threats(self):
         rejected = sample_threat(
@@ -294,12 +306,12 @@ class TestReportInvariants:
             category="tampering",
             verdict=Verdict(status="rejected", reason="ungrounded"),
         )
-        with pytest.raises(ValidationError, match="belongs in rejected_threats"):
+        with pytest.raises(ValidationError, match="belongs in rejected_claims"):
             sample_report(threats=[rejected])
 
     def test_rejected_threats_must_hold_rejected_verdicts(self):
         confirmed = sample_threat(threat_id="T-01", category="tampering")
-        with pytest.raises(ValidationError, match="sits in rejected_threats"):
+        with pytest.raises(ValidationError, match="sits in rejected_claims"):
             sample_report(rejected_threats=[confirmed])
 
     def test_dangling_element_reference_is_rejected(self):
@@ -333,10 +345,11 @@ class TestReportInvariants:
             Report.model_validate(payload)
 
     def test_mismatched_summary_is_rejected(self):
+        """Recounted per block, since a report carries one summary per framework."""
         report = sample_report()
         payload = report.model_dump()
-        payload["summary"]["threat_count"] += 1
-        with pytest.raises(ValidationError, match="summary does not match"):
+        payload["analyses"][0]["summary"]["claim_count"] += 1
+        with pytest.raises(ValidationError, match="does not match the stride analysis"):
             Report.model_validate(payload)
 
 
@@ -354,25 +367,25 @@ class TestEveryClaimMarkPointsAtAThreat:
         [
             (
                 "unresolved_mentions",
-                UnresolvedMention(threat_id="S-09", mention="process:ghost"),
+                UnresolvedMention(claim_id="S-09", mention="process:ghost"),
                 "unresolved mention",
             ),
             (
                 "unresolved_evidence",
                 UnresolvedEvidence(
-                    threat_id="S-09", reference="unknown:process:ghost:exposure"
+                    claim_id="S-09", reference="unknown:process:ghost:exposure"
                 ),
                 "unresolved evidence",
             ),
             (
                 "missing_mitigations",
-                MissingMitigation(threat_id="S-09"),
+                MissingMitigation(claim_id="S-09"),
                 "missing mitigation",
             ),
         ],
     )
     def test_a_mark_on_an_absent_threat_is_rejected(self, field, mark, what):
-        with pytest.raises(ValidationError, match=f"{what} names threat 'S-09'"):
+        with pytest.raises(ValidationError, match=f"{what} names claim 'S-09'"):
             sample_report(**{field: [mark]})
 
     def test_every_mark_type_is_covered_by_the_check(self):
@@ -396,14 +409,14 @@ class TestAnalysisMarks:
     def test_merging_concatenates_every_list_in_order(self):
         first = AnalysisMarks(
             unresolved_mentions=[
-                UnresolvedMention(threat_id="S-01", mention="process:ghost")
+                UnresolvedMention(claim_id="S-01", mention="process:ghost")
             ]
         )
         second = AnalysisMarks(
             unresolved_mentions=[
-                UnresolvedMention(threat_id="T-02", mention="store:ghost")
+                UnresolvedMention(claim_id="T-02", mention="store:ghost")
             ],
-            missing_mitigations=[MissingMitigation(threat_id="R-03")],
+            missing_mitigations=[MissingMitigation(claim_id="R-03")],
         )
 
         merged = first.merged_with(second)
@@ -434,7 +447,7 @@ class TestCoverageRatios:
             ValidationError, match="elements_cited=3 exceeds elements=2"
         ):
             LaneCoverage(
-                category="spoofing",
+                lane="spoofing",
                 drafts=1,
                 rules=2,
                 rules_fired=1,
@@ -476,12 +489,16 @@ class TestSummary:
                 verdict=Verdict(status="rejected", reason="ungrounded"),
             )
         ]
-        summary = build_summary(threats, rejected, model)
-        assert summary.threat_count == 2
+        summary = build_stride_summary(threats, rejected)
+        assert summary.claim_count == 2
         assert summary.by_category == {"spoofing": 1, "information-disclosure": 1}
         assert summary.needs_info_count == 1
         assert summary.rejected_count == 1
-        assert summary.elements_analyzed == len(model.elements())
+        # ``elements_analyzed`` is a fact about the shared model, so it left the
+        # summary for the envelope: N blocks would be N chances to disagree
+        # about one number.
+        assert "elements_analyzed" not in summary.model_fields
+        assert sample_report().elements_analyzed == len(model.elements())
 
 
 class TestTheSamplingClearBlock:
