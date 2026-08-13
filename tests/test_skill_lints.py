@@ -11,15 +11,17 @@ from pathlib import Path
 import pytest
 
 from stride_service.domains import DETECTORS
+from stride_service.frameworks.stride.record import (
+    STRIDE_CATEGORIES,
+)
 from stride_service.markdown_loader import MarkdownLoader
 from stride_service.skills import (
-    CATEGORY_SKILL_TOKEN_CAP,
     DOMAIN_PACK_TOKEN_CAP,
+    LANE_SECTION_HEADINGS,
+    LANE_SKILL_TOKEN_CAP,
     SEVERITY_RUBRIC_TOKEN_CAP,
-    SKILL_SECTION_HEADINGS,
-    STRIDE_CATEGORIES,
-    category_boundary_digest,
     estimate_tokens,
+    lane_boundary_digest,
     split_sections,
 )
 
@@ -42,7 +44,7 @@ def test_category_files_match_stride_categories_exactly():
 @pytest.mark.parametrize("category", STRIDE_CATEGORIES)
 def test_category_file_has_exact_fixed_headings_in_order(category):
     sections = split_sections(loader.load(f"stride/{category}"))
-    assert list(sections) == list(SKILL_SECTION_HEADINGS)
+    assert list(sections) == list(LANE_SECTION_HEADINGS)
 
 
 @pytest.mark.parametrize("category", STRIDE_CATEGORIES)
@@ -55,7 +57,7 @@ def test_category_file_sections_are_nonempty(category):
 @pytest.mark.parametrize("category", STRIDE_CATEGORIES)
 def test_category_file_within_token_cap(category):
     tokens = estimate_tokens(loader.load(f"stride/{category}"))
-    assert tokens <= CATEGORY_SKILL_TOKEN_CAP
+    assert tokens <= LANE_SKILL_TOKEN_CAP
 
 
 def test_severity_rubric_within_token_cap():
@@ -104,7 +106,7 @@ DIGEST_TOKEN_BUDGET = 2000
 
 
 def test_boundary_digest_assembles_within_budget():
-    digest = category_boundary_digest(loader)
+    digest = lane_boundary_digest(loader)
     assert estimate_tokens(digest) <= DIGEST_TOKEN_BUDGET
 
 

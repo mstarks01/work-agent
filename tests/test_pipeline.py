@@ -16,6 +16,7 @@ import pytest
 
 from stride_service import graph
 from stride_service.api import create_app
+from stride_service.frameworks.stride.record import STRIDE_CATEGORIES
 from stride_service.jobs import (
     InMemoryJobStore,
     JobRecord,
@@ -24,18 +25,18 @@ from stride_service.jobs import (
     StubPipelineRunner,
 )
 from stride_service.pipeline import AdkPipelineRunner, PipelineError
-from stride_service.report import STRIDE_CATEGORIES, InputRef
+from stride_service.report import InputRef
 from stride_service.sampling import TierSampling, load_sampling, sampling_fingerprint
 from stride_service.sources import DEFAULT_DESCRIPTION_LABEL, Source
 from tests.factories import (
     BASE_MODEL,
     DESCRIPTION_TEXT,
     PROJECT_ROOT,
+    claims_json,
     repo_tiers,
     sample_proposal,
     sample_ruling,
     served_build,
-    threats_json,
     valid_model,
 )
 from tests.factories import scripted_pipeline as build
@@ -52,7 +53,7 @@ VERTEX_ENV = {
 
 def proposal_json(threat_id: str, category: str) -> str:
     """One category agent's whole emission: the shape its node's schema names."""
-    return threats_json(sample_proposal(threat_id, category))
+    return claims_json(sample_proposal(threat_id, category))
 
 
 def job(text: str = DESCRIPTION_TEXT) -> JobRecord:
@@ -83,7 +84,7 @@ def happy_replies() -> dict[str, str]:
     return {
         "extract": valid_model().model_dump_json(),
         graph.analyze_node_name("spoofing"): proposal_json("S-01", "spoofing"),
-        "critic": threats_json(sample_ruling("S-01")),
+        "critic": claims_json(sample_ruling("S-01")),
     }
 
 
@@ -97,7 +98,7 @@ def test_a_clean_run_produces_a_report():
     assert report.summary.threat_count == 1
     assert report.input.system_name == "Order Service"
     assert report.system_model.get("process:web-app") is not None
-    # Self-containment is re-checked by StrideReport itself on construction.
+    # Self-containment is re-checked by Report itself on construction.
     assert report.boundary_crossings == report.system_model.boundary_crossings()
 
     assert visited[0] == graph.EXTRACT_NODE
@@ -127,7 +128,7 @@ def test_an_unfindable_quote_is_marked_on_the_report_and_still_renders():
         evidence_refs=["crossing:flow:customer-to-web-app:login"],
     )
     replies = happy_replies() | {
-        graph.analyze_node_name("spoofing"): threats_json(proposal)
+        graph.analyze_node_name("spoofing"): claims_json(proposal)
     }
     pipeline, _ = build(replies)
 
@@ -155,7 +156,7 @@ def test_a_description_citing_a_missing_element_is_marked_on_the_report():
         " process:web-api, which this model does not contain.",
     )
     replies = happy_replies() | {
-        graph.analyze_node_name("spoofing"): threats_json(proposal)
+        graph.analyze_node_name("spoofing"): claims_json(proposal)
     }
     pipeline, _ = build(replies)
 
@@ -186,7 +187,7 @@ def test_a_composed_evidence_reference_is_marked_rather_than_fatal():
         ],
     )
     replies = happy_replies() | {
-        graph.analyze_node_name("spoofing"): threats_json(proposal)
+        graph.analyze_node_name("spoofing"): claims_json(proposal)
     }
     pipeline, _ = build(replies)
 
@@ -205,7 +206,7 @@ def test_a_threat_with_no_countermeasure_is_marked_on_the_report():
     """A completeness signal, carried to the reader rather than costing the run."""
     proposal = sample_proposal("S-01", "spoofing", mitigations=[])
     replies = happy_replies() | {
-        graph.analyze_node_name("spoofing"): threats_json(proposal)
+        graph.analyze_node_name("spoofing"): claims_json(proposal)
     }
     pipeline, _ = build(replies)
 
@@ -254,10 +255,10 @@ def test_a_lane_that_skips_a_number_is_logged_and_not_renumbered(caplog):
     import logging
 
     replies = happy_replies() | {
-        graph.analyze_node_name("spoofing"): threats_json(
+        graph.analyze_node_name("spoofing"): claims_json(
             sample_proposal("S-01"), sample_proposal("S-05")
         ),
-        "critic": threats_json(sample_ruling("S-01"), sample_ruling("S-05")),
+        "critic": claims_json(sample_ruling("S-01"), sample_ruling("S-05")),
     }
     pipeline, _ = build(replies)
 
@@ -283,7 +284,7 @@ def test_a_threat_no_ground_supports_fails_the_job():
         evidence_refs=[],
     )
     replies = happy_replies() | {
-        graph.analyze_node_name("spoofing"): threats_json(proposal)
+        graph.analyze_node_name("spoofing"): claims_json(proposal)
     }
     pipeline, _ = build(replies)
 
@@ -383,7 +384,7 @@ def test_each_agent_gets_its_own_category_and_the_shared_model():
 def test_the_critic_sees_each_category_agents_drafts_once():
     replies = happy_replies()
     replies[graph.analyze_node_name("tampering")] = proposal_json("T-01", "tampering")
-    replies["critic"] = threats_json(sample_ruling("S-01"), sample_ruling("T-01"))
+    replies["critic"] = claims_json(sample_ruling("S-01"), sample_ruling("T-01"))
     pipeline, models = build(replies)
     outcome, _ = run(pipeline, job())
 
@@ -435,7 +436,7 @@ def test_a_model_that_fails_twice_is_rejected_with_its_issues():
 def test_a_hallucinated_element_reference_fails_the_job_loudly():
     """The merge seam refuses drafts the System Model cannot account for."""
     replies = happy_replies()
-    replies[graph.analyze_node_name("spoofing")] = threats_json(
+    replies[graph.analyze_node_name("spoofing")] = claims_json(
         sample_proposal("S-01", affected_element_ids=["process:invented"])
     )
     pipeline, _ = build(replies)
@@ -448,9 +449,9 @@ def test_a_malformed_critic_output_is_re_asked_once_and_then_assembled():
     """The critic drops a draft; the bounded re-ask returns the full set."""
     replies = happy_replies()
     replies[graph.analyze_node_name("tampering")] = proposal_json("T-01", "tampering")
-    both = threats_json(sample_ruling("S-01"), sample_ruling("T-01"))
+    both = claims_json(sample_ruling("S-01"), sample_ruling("T-01"))
     # The critic drops T-01; the re-ask returns both drafts, reconciled.
-    replies["critic"] = threats_json(sample_ruling("S-01"))
+    replies["critic"] = claims_json(sample_ruling("S-01"))
     replies["recritic"] = both
 
     pipeline, models = build(replies)
@@ -491,7 +492,7 @@ def test_a_mis_shaped_verdict_is_re_asked_rather_than_killing_the_job():
             ]
         }
     )
-    replies["recritic"] = threats_json(sample_ruling("S-01"))
+    replies["recritic"] = claims_json(sample_ruling("S-01"))
     pipeline, models = build(replies)
 
     outcome, visited = run(pipeline, job())
@@ -523,7 +524,7 @@ def test_a_mistyped_ruling_id_is_re_asked_rather_than_killing_the_job():
             ]
         }
     )
-    replies["recritic"] = threats_json(sample_ruling("S-01"))
+    replies["recritic"] = claims_json(sample_ruling("S-01"))
     pipeline, models = build(replies)
 
     outcome, visited = run(pipeline, job())
@@ -563,7 +564,7 @@ def test_a_verdict_still_mis_shaped_after_the_re_ask_fails_as_critic_output():
 
 def test_a_critic_that_will_not_reconcile_after_the_re_ask_fails_the_job_loudly():
     replies = happy_replies()
-    invented = threats_json(sample_ruling("S-01"), sample_ruling("T-02"))
+    invented = claims_json(sample_ruling("S-01"), sample_ruling("T-02"))
     # Both the critic and its re-ask return a threat no category agent drafted.
     replies["critic"] = invented
     replies["recritic"] = invented
@@ -602,7 +603,7 @@ def test_a_failed_job_logs_the_input_digest(caplog):
     import logging
 
     replies = happy_replies()
-    invented = threats_json(sample_ruling("S-01"), sample_ruling("T-02"))
+    invented = claims_json(sample_ruling("S-01"), sample_ruling("T-02"))
     replies["critic"] = invented
     replies["recritic"] = invented
     pipeline, _ = build(replies)

@@ -19,7 +19,7 @@ from stride_service.certification import (
     report_fingerprints,
 )
 from stride_service.model_tiers import TierName
-from stride_service.report import NodeRun, StrideReport
+from stride_service.report import NodeRun, Report
 from tests.factories import sample_report
 
 FP_A = "a" * 64
@@ -136,7 +136,7 @@ class TestTheThirdState:
 
 
 class TestReportFingerprints:
-    def _report(self, nodes: list[NodeRun]) -> StrideReport:
+    def _report(self, nodes: list[NodeRun]) -> Report:
         return sample_report().model_copy(update={"nodes": nodes})
 
     def test_covers_llm_nodes_only(self):

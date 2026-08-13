@@ -3,7 +3,8 @@
 import pytest
 
 from evals.harness.coverage import aggregate_coverage, coverage_totals
-from stride_service.report import STRIDE_CATEGORIES, CategoryCoverage
+from stride_service.frameworks.stride.record import STRIDE_CATEGORIES
+from stride_service.report import LaneCoverage
 
 
 def row(category, **overrides):
@@ -21,7 +22,7 @@ def row(category, **overrides):
         "unknown_controls": 5,
         "unknown_controls_cited": 0,
     }
-    return CategoryCoverage(**{**fields, **overrides})
+    return LaneCoverage(**{**fields, **overrides})
 
 
 def lane_for(category, lanes):
@@ -53,7 +54,7 @@ def test_pooling_sums_the_counts_rather_than_averaging_the_rates(two_cases):
 
 def test_a_lane_offered_nothing_rates_zero_rather_than_dividing_by_it():
     # Cited moves with offered: a lane handed no candidates cannot have cited
-    # one, and CategoryCoverage refuses the pair that says otherwise.
+    # one, and LaneCoverage refuses the pair that says otherwise.
     lane = lane_for(
         "spoofing",
         aggregate_coverage([row("spoofing", candidates=0, candidates_cited=0)]),

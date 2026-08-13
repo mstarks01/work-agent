@@ -324,10 +324,10 @@ def test_the_viewer_reads_every_service_mark_the_report_carries():
     """
     from typing import get_args, get_origin
 
-    from stride_service.report import StrideReport
+    from stride_service.report import Report
 
     marks = []
-    for name, field in StrideReport.model_fields.items():
+    for name, field in Report.model_fields.items():
         annotation = field.annotation
         if get_origin(annotation) is not list:
             continue
@@ -335,7 +335,7 @@ def test_the_viewer_reads_every_service_mark_the_report_carries():
         if hasattr(item, "model_fields") and "threat_id" in item.model_fields:
             marks.append(name)
 
-    assert marks, "no service marks found on StrideReport — has the shape changed?"
+    assert marks, "no service marks found on Report — has the shape changed?"
     javascript = viewer_javascript()
     unread = [name for name in marks if f"R.{name}" not in javascript]
     assert not unread, (

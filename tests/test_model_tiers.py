@@ -7,7 +7,7 @@ import pytest
 from pydantic import ValidationError
 
 from stride_service.model_tiers import (
-    CATEGORY_NODES,
+    FRAMEWORK_NODES,
     LLM_NODES,
     SUPPORTED_VERSION,
     TIER_NAMES,
@@ -60,12 +60,18 @@ def config_path(tmp_path):
 
 
 class TestNodeInventory:
-    def test_llm_nodes_are_bookends_plus_category_agents_plus_critic(self):
+    def test_llm_nodes_are_the_bookends_plus_three_keys_per_framework(self):
+        """The two shared extraction nodes, then each package's own three.
+
+        Six ``analyze/<category>`` keys collapsed to one ``analyze/<framework>``
+        in v5: a lane is a framework's internal fact, and every lane runs the
+        same judgement on the same tier. What is per framework is the triple,
+        because an operator may point one package's critic at a different vendor
+        from another's.
+        """
         assert LLM_NODES[:2] == ("extract", "repair")
-        # The critic and its bounded re-ask close the list.
-        assert LLM_NODES[-2:] == ("critic", "recritic")
-        assert len(CATEGORY_NODES) == 6
-        assert all(node.startswith("analyze/") for node in CATEGORY_NODES)
+        assert FRAMEWORK_NODES == ("analyze/stride", "critic/stride", "recritic/stride")
+        assert LLM_NODES[2:] == FRAMEWORK_NODES
 
     def test_exactly_two_tiers_named_on_a_capability_axis(self):
         # Not flash/pro: those were one vendor's product names and would be an
@@ -118,8 +124,8 @@ class TestRepoConfig:
         config = load_model_tiers(REPO_CONFIG, env=self.SELECTED)
         assert config.nodes["extract"] == "base"
         assert config.nodes["repair"] == "base"
-        assert config.nodes["critic"] == "strong"
-        for node in CATEGORY_NODES:
+        assert config.nodes["critic/stride"] == "strong"
+        for node in FRAMEWORK_NODES:
             assert config.nodes[node] == "strong"
 
 
@@ -129,7 +135,7 @@ class TestResolution:
         assert config.resolve_model("extract") == TierSelection(
             vendor=VENDOR, model=BASE
         )
-        assert config.resolve_model("critic").model == STRONG
+        assert config.resolve_model("critic/stride").model == STRONG
 
     def test_the_route_joins_the_vendor_prefix_to_the_model(self, config_path):
         config = load_model_tiers(config_path(config_toml()), env={})
@@ -139,7 +145,7 @@ class TestResolution:
         text = config_toml(strong_vendor="anthropic", strong="claude-opus-5")
         config = load_model_tiers(config_path(text), env={})
         assert config.resolve_model("extract").vendor == "vertex"
-        assert config.resolve_model("critic").vendor == "anthropic"
+        assert config.resolve_model("critic/stride").vendor == "anthropic"
 
     def test_resolve_model_unknown_node_raises(self, config_path):
         config = load_model_tiers(config_path(config_toml()), env={})
@@ -154,7 +160,7 @@ class TestEnvOverrides:
         config = load_model_tiers(
             config_path(config_toml()), env={model_var: "gemini-3.0-pro"}
         )
-        assert config.resolve_model("critic").model == "gemini-3.0-pro"
+        assert config.resolve_model("critic/stride").model == "gemini-3.0-pro"
         assert config.resolve_model("extract").model == BASE
 
     def test_vendor_and_model_together_switch_vendor(self, config_path):
@@ -302,7 +308,7 @@ class TestFileValidation:
             load_model_tiers(config_path(config_toml(nodes=nodes)), env={})
 
     def test_missing_node_rejected(self, config_path):
-        nodes = {node: "strong" for node in LLM_NODES if node != "critic"}
+        nodes = {node: "strong" for node in LLM_NODES if node != "critic/stride"}
         with pytest.raises(ModelConfigError, match="missing entries"):
             load_model_tiers(config_path(config_toml(nodes=nodes)), env={})
 
@@ -352,7 +358,7 @@ class TestFileValidation:
     def test_os_environ_is_default_env(self, config_path, monkeypatch):
         monkeypatch.setenv("STRIDE_MODEL_STRONG_MODEL", "gemini-3.0-pro")
         config = load_model_tiers(config_path(config_toml()))
-        assert config.resolve_model("critic").model == "gemini-3.0-pro"
+        assert config.resolve_model("critic/stride").model == "gemini-3.0-pro"
 
 
 def test_direct_construction_validates_completeness():

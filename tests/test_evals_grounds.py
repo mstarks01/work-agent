@@ -19,7 +19,8 @@ from evals.harness.grounds import (
 )
 from stride_service.critic import DraftJoinError, GroundsUnverifiedError
 from stride_service.evidence import EvidenceResolutionError
-from stride_service.report import DraftThreat, Ground, UnverifiedGround
+from stride_service.frameworks.stride.record import DraftThreat
+from stride_service.report import Ground, UnverifiedGround
 from tests.eval_factories import draft_threat
 
 LABEL = "design-doc"

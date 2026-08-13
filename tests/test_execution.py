@@ -31,12 +31,12 @@ from tests.factories import (
     SilentLlm,
     SlowLlm,
     UnmeteredLlm,
+    claims_json,
     repo_tiers,
     sample_proposal,
     sample_ruling,
     scripted_pipeline,
     served_build,
-    threats_json,
     valid_model,
 )
 
@@ -48,10 +48,10 @@ def happy_replies() -> dict[str, str]:
     return {
         "extract": valid_model().model_dump_json(),
         # A category agent proposes — the critic's two rulings are not its to make.
-        graph.analyze_node_name("spoofing"): threats_json(
+        graph.analyze_node_name("spoofing"): claims_json(
             sample_proposal("S-01", "spoofing")
         ),
-        "critic": threats_json(sample_ruling("S-01")),
+        "critic": claims_json(sample_ruling("S-01")),
     }
 
 
@@ -341,7 +341,7 @@ class TestSourceRendering:
         )
         replies = happy_replies() | {
             "extract": valid_model("Doc").model_dump_json(),
-            graph.analyze_node_name("spoofing"): threats_json(proposal),
+            graph.analyze_node_name("spoofing"): claims_json(proposal),
         }
         pipeline, models = scripted_pipeline(replies)
 

@@ -21,17 +21,19 @@ from google.adk.workflow import FunctionNode, JoinNode
 from stride_service import graph
 from stride_service.binding import NodeBinding
 from stride_service.critic import CriticOutputError, DraftJoinError
+from stride_service.frameworks.stride.record import (
+    STRIDE_CATEGORIES,
+    ThreatProposals,
+    ThreatRulings,
+)
 from stride_service.markdown_loader import MarkdownLoader
 from stride_service.model_tiers import LLM_NODES
 from stride_service.report import (
-    STRIDE_CATEGORIES,
     AnalysisMarks,
     InputRef,
     Job,
     NodeRun,
-    StrideReport,
-    ThreatProposals,
-    ThreatRulings,
+    Report,
     UnknownRef,
     Verdict,
 )
@@ -1413,7 +1415,7 @@ class TestIntoReport:
 
         Mechanical rather than enumerated, because an enumerated list is the
         second field list this method exists to remove. Any name an
-        ``Analysis`` and a ``StrideReport`` both carry must arrive unchanged,
+        ``Analysis`` and a ``Report`` both carry must arrive unchanged,
         and the marks count as the ``Analysis``'s own: it holds them on one
         field, and the report spreads them across five.
         """
@@ -1422,9 +1424,9 @@ class TestIntoReport:
         held = {field.name for field in fields(analysis)} | set(
             AnalysisMarks.model_fields
         )
-        shared = held & set(StrideReport.model_fields)
+        shared = held & set(Report.model_fields)
 
-        assert shared, "Analysis and StrideReport share no field names"
+        assert shared, "Analysis and Report share no field names"
         for name in sorted(shared):
             holder = analysis if hasattr(analysis, name) else analysis.marks
             assert getattr(report, name) == getattr(holder, name), name

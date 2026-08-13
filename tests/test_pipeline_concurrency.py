@@ -32,14 +32,14 @@ from stride_service.sources import Source
 from tests.factories import (
     BASE_MODEL,
     DESCRIPTION_TEXT,
-    EMPTY_THREATS,
+    EMPTY_CLAIMS,
     PROJECT_ROOT,
     STRONG_MODEL,
     ScriptedLlm,
+    claims_json,
     repo_tiers,
     sample_ruling,
     served_build,
-    threats_json,
     valid_model,
 )
 from tests.test_pipeline import proposal_json
@@ -85,7 +85,7 @@ def _build_shared_pipeline() -> graph.Pipeline:
     }
     replies = {
         graph.analyze_node_name("spoofing"): proposal_json("S-01", "spoofing"),
-        graph.CRITIC_NODE: threats_json(sample_ruling("S-01")),
+        graph.CRITIC_NODE: claims_json(sample_ruling("S-01")),
     }
 
     def resolve(tier_node: str) -> BaseLlm:
@@ -94,7 +94,7 @@ def _build_shared_pipeline() -> graph.Pipeline:
             return MarkerExtractLlm(model=BASE_MODEL)
         model_name = BASE_MODEL if node == graph.REPAIR_NODE else STRONG_MODEL
         return ScriptedLlm(
-            model=model_name, reply=replies.get(node, EMPTY_THREATS), seen=[]
+            model=model_name, reply=replies.get(node, EMPTY_CLAIMS), seen=[]
         )
 
     tiers = repo_tiers()

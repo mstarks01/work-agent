@@ -22,6 +22,10 @@ from evals.harness.reference import load_case
 from evals.harness.structural import report_issues
 from stride_service.certification import fingerprints_of
 from stride_service.evidence import evidence_catalog
+from stride_service.frameworks.stride.record import (
+    CATEGORY_LETTERS,
+    STRIDE_CATEGORIES,
+)
 from stride_service.graph import (
     ENTRY_EXTRACT,
     ENTRY_EXTRACT_ONLY,
@@ -32,13 +36,11 @@ from stride_service.graph import (
     analyze_node_name,
 )
 from stride_service.report import (
-    CATEGORY_LETTERS,
-    STRIDE_CATEGORIES,
     AnalysisMarks,
     Mitigation,
+    Report,
     Severity,
     SharedElementName,
-    StrideReport,
     Verdict,
 )
 from stride_service.sampling import load_sampling
@@ -160,7 +162,7 @@ def test_an_eval_report_carries_every_field_production_stamps(case):
 
     The pinned set is the guard, and it is pinned rather than derived on
     purpose: every field an :class:`~stride_service.graph.Analysis` and a
-    :class:`~stride_service.report.StrideReport` share is one the eval seam has
+    :class:`~stride_service.report.Report` share is one the eval seam has
     to be *asked* to carry, and a field added to both without a decision here
     is exactly how ``coverage`` came to be computed at the fan-in for a sweep
     that then read an empty list for it.
@@ -176,7 +178,7 @@ def test_an_eval_report_carries_every_field_production_stamps(case):
     analysis_fields = {field.name for field in fields(Analysis)} | set(
         AnalysisMarks.model_fields
     )
-    shared = analysis_fields & StrideReport.model_fields.keys()
+    shared = analysis_fields & Report.model_fields.keys()
     assert shared == {
         "system_model",
         "boundary_crossings",

@@ -6,7 +6,7 @@ from stride_service.critic import (
     CriticOutputError,
     DraftJoinError,
     GroundsUnverifiedError,
-    assemble_threats,
+    assemble_claims,
     join_drafts,
     mentioned_ids,
     numbering_gaps,
@@ -462,7 +462,7 @@ class TestAssembleThreats:
                 ),
             ),
         ]
-        threats, rejected = assemble_threats(drafts, rulings, model)
+        threats, rejected = assemble_claims(drafts, rulings, model)
         assert [t.id for t in threats] == ["S-01", "S-02"]
         assert rejected == []
 
@@ -475,7 +475,7 @@ class TestAssembleThreats:
                 verdict=Verdict(status="rejected", reason="duplicate of S-01"),
             ),
         ]
-        threats, rejected = assemble_threats(drafts, rulings, model)
+        threats, rejected = assemble_claims(drafts, rulings, model)
         assert [t.id for t in threats] == ["S-01"]
         assert [t.id for t in rejected] == ["S-02"]
 
@@ -486,29 +486,29 @@ class TestAssembleThreats:
             sample_draft("S-03", severity=severity("medium", "high")),
         ]
         rulings = [sample_ruling(f"S-0{n}") for n in (1, 2, 3)]
-        threats, _ = assemble_threats(drafts, rulings, model)
+        threats, _ = assemble_claims(drafts, rulings, model)
         assert [t.id for t in threats] == ["S-02", "S-03", "S-01"]
 
     def test_ties_break_on_threat_id(self, model):
         drafts = [sample_draft("S-02"), sample_draft("S-01")]
         rulings = [sample_ruling("S-02"), sample_ruling("S-01")]
-        threats, _ = assemble_threats(drafts, rulings, model)
+        threats, _ = assemble_claims(drafts, rulings, model)
         assert [t.id for t in threats] == ["S-01", "S-02"]
 
     def test_a_dropped_draft_fails_closed(self, model):
         drafts = [sample_draft("S-01"), sample_draft("S-02")]
         with pytest.raises(CriticOutputError, match="dropped draft 'S-02'"):
-            assemble_threats(drafts, [sample_ruling("S-01")], model)
+            assemble_claims(drafts, [sample_ruling("S-01")], model)
 
     def test_an_invented_threat_fails_closed(self, model):
         with pytest.raises(CriticOutputError, match="no category agent drafted"):
-            assemble_threats([sample_draft("S-01")], [sample_ruling("S-02")], model)
+            assemble_claims([sample_draft("S-01")], [sample_ruling("S-02")], model)
 
     def test_a_duplicated_ruling_fails_closed(self, model):
         drafts = [sample_draft("S-01")]
         rulings = [sample_ruling("S-01"), sample_ruling("S-01")]
         with pytest.raises(CriticOutputError, match="used by 2 drafts"):
-            assemble_threats(drafts, rulings, model)
+            assemble_claims(drafts, rulings, model)
 
     def test_needs_info_unknowns_must_resolve(self, model):
         drafts = [sample_draft("S-01")]
@@ -525,7 +525,7 @@ class TestAssembleThreats:
             )
         ]
         with pytest.raises(CriticOutputError, match="hangs its needs-info verdict"):
-            assemble_threats(drafts, rulings, model)
+            assemble_claims(drafts, rulings, model)
 
     def test_a_needs_info_attribute_the_element_lacks_is_a_fault(self, model):
         """Checked to the same depth as the grounds surface, and no deeper.
@@ -549,10 +549,10 @@ class TestAssembleThreats:
             )
         ]
         with pytest.raises(CriticOutputError, match="does not have"):
-            assemble_threats(drafts, rulings, model)
+            assemble_claims(drafts, rulings, model)
 
     def test_empty_analysis_assembles_to_empty_arrays(self, model):
-        assert assemble_threats([], [], model) == ([], [])
+        assert assemble_claims([], [], model) == ([], [])
 
 
 class TestVerdictShapeIsReAskableRatherThanFatal:
@@ -647,14 +647,14 @@ class TestVerdictShapeIsReAskableRatherThanFatal:
         """Re-askable is not ignorable: nothing reaches the report on rulings
         the seam refused."""
         with pytest.raises(CriticOutputError, match="states no reason"):
-            assemble_threats(
+            assemble_claims(
                 [sample_draft("S-01")], self._rulings(status="rejected"), model
             )
 
     def test_a_passing_ruling_is_promoted_to_the_reports_own_verdict(self, model):
         """``ProposedVerdict`` in, ``Verdict`` out — so a threat on the report
         carries the shape the report defines, whatever the critic emitted."""
-        threats, _ = assemble_threats(
+        threats, _ = assemble_claims(
             [sample_draft("S-01")], self._rulings(status="confirmed"), model
         )
 
@@ -671,7 +671,7 @@ class TestRulingsMergeOntoDrafts:
             description="Stolen cookies let an attacker impersonate the customer.",
             affected_element_ids=["flow:customer-to-web-app:login"],
         )
-        (threat,), _ = assemble_threats([draft], [sample_ruling("S-01")], model)
+        (threat,), _ = assemble_claims([draft], [sample_ruling("S-01")], model)
         assert threat.title == draft.title
         assert threat.description == draft.description
         assert threat.affected_element_ids == draft.affected_element_ids
@@ -679,7 +679,7 @@ class TestRulingsMergeOntoDrafts:
 
     def test_a_ruling_without_severity_keeps_the_agents_rating(self, model):
         draft = sample_draft("S-01", severity=severity("low", "medium"))
-        (threat,), _ = assemble_threats([draft], [sample_ruling("S-01")], model)
+        (threat,), _ = assemble_claims([draft], [sample_ruling("S-01")], model)
         assert threat.severity == draft.severity
         assert threat.severity.level == "low"
 
@@ -693,14 +693,14 @@ class TestRulingsMergeOntoDrafts:
             justification="The model states the flow is unauthenticated.",
         )
         rulings = [sample_ruling("S-01", severity=corrected)]
-        (threat,), _ = assemble_threats([draft], rulings, model)
+        (threat,), _ = assemble_claims([draft], rulings, model)
         assert threat.severity.likelihood == "high"
         assert threat.severity.justification == corrected.justification
         assert threat.severity.level == "critical"
 
     def test_the_critics_judgements_reach_the_threat(self, model):
         rulings = [sample_ruling("S-01", confidence="medium")]
-        (threat,), _ = assemble_threats([sample_draft("S-01")], rulings, model)
+        (threat,), _ = assemble_claims([sample_draft("S-01")], rulings, model)
         assert threat.confidence == "medium"
         assert threat.verdict.status == "confirmed"
 
@@ -710,7 +710,7 @@ class TestRulingsMergeOntoDrafts:
             sample_ruling("S-02", verdict=Verdict(status="rejected", reason="dup")),
             sample_ruling("S-01", verdict=Verdict(status="rejected", reason="dup")),
         ]
-        _, rejected = assemble_threats(drafts, rulings, model)
+        _, rejected = assemble_claims(drafts, rulings, model)
         assert [t.id for t in rejected] == ["S-01", "S-02"]
 
 
