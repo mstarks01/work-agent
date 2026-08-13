@@ -74,8 +74,13 @@ from stride_service.report import Ground
 from stride_service.skills import estimate_tokens
 
 PROMPTS_DIR = Path(__file__).resolve().parents[1] / "prompts"
+# The exemplars moved with the package that owns them: a worked draft is written
+# in one framework's record shape, so it lives under that framework's root while
+# the body that frames it stays shared (ADR 0011).
+PACKAGE_DIR = Path(__file__).resolve().parents[1] / "frameworks" / "stride"
 
 loader = MarkdownLoader(PROMPTS_DIR)
+package_loader = MarkdownLoader(PACKAGE_DIR)
 
 BODY_TOKEN_CAPS = {
     ANALYZE_PROMPT_NAME: ANALYZE_PROMPT_TOKEN_CAP,
@@ -109,8 +114,8 @@ def json_blocks(text):
     return JSON_BLOCK_RE.findall(text)
 
 
-def exemplar_sections(category):
-    return split_sections(loader.load(lane_exemplars_doc(category)))
+def exemplar_sections(lane):
+    return split_sections(package_loader.load(lane_exemplars_doc(lane)))
 
 
 def exemplar_systems():
@@ -261,8 +266,10 @@ def test_prompt_body_within_token_cap(name):
 
 
 def test_exemplar_files_match_stride_categories_exactly():
-    stems = sorted(path.stem for path in (PROMPTS_DIR / "exemplars").glob("*.md"))
-    assert stems == sorted(STRIDE_CATEGORIES)
+    lanes = sorted(path.name for path in (PACKAGE_DIR / "lanes").iterdir())
+    assert lanes == sorted(STRIDE_CATEGORIES)
+    for lane in lanes:
+        assert (PACKAGE_DIR / "lanes" / lane / "exemplars.md").is_file()
 
 
 @pytest.mark.parametrize("category", STRIDE_CATEGORIES)
@@ -474,13 +481,19 @@ def test_every_exemplar_system_is_worked_by_some_category():
 
 @pytest.mark.parametrize("category", STRIDE_CATEGORIES)
 def test_exemplar_file_within_token_cap(category):
-    tokens = estimate_tokens(loader.load(lane_exemplars_doc(category)))
+    tokens = estimate_tokens(package_loader.load(lane_exemplars_doc(category)))
     assert tokens <= EXEMPLAR_TOKEN_CAP
 
 
 def test_no_stray_prompt_files():
-    known = {*PROMPT_BODY_NAMES, *(lane_exemplars_doc(c) for c in STRIDE_CATEGORIES)}
-    assert set(loader.names()) == known
+    """The shared root is the five bodies and nothing else.
+
+    Tighter than before the cutover, not looser: the exemplars used to sit here
+    too, and every one of them was STRIDE's. What is left is the text that
+    genuinely serves every registered framework, which is what makes the shared
+    root shared rather than merely first.
+    """
+    assert set(loader.names()) == set(PROMPT_BODY_NAMES)
 
 
 def test_no_non_markdown_files_under_prompts():
@@ -522,5 +535,5 @@ COMPOSED_ANALYZE_TOKEN_BUDGET = 5300
 
 @pytest.mark.parametrize("category", STRIDE_CATEGORIES)
 def test_composed_analyze_prompt_within_budget(category):
-    composed = compose_analyze_prompt(loader, category)
+    composed = compose_analyze_prompt(loader, package_loader, category)
     assert estimate_tokens(composed) <= COMPOSED_ANALYZE_TOKEN_BUDGET
