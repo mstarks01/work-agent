@@ -47,10 +47,9 @@ from pydantic import ValidationError
 
 from stride_service.critic import DraftJoinError, GroundsUnverifiedError
 from stride_service.evidence import EvidenceResolutionError
+from stride_service.frameworks.stride.record import DraftThreat, StrideCategory
 from stride_service.report import (
-    DraftThreat,
     GroundKind,
-    StrideCategory,
     UnverifiedGround,
 )
 

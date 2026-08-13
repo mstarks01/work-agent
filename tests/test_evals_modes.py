@@ -31,9 +31,9 @@ from stride_service.graph import (
     ENTRY_EXTRACT_ONLY,
     ENTRY_PREPARE,
     EXTRACT_NODE,
-    TIER_NODE_BY_GRAPH_NODE,
     Analysis,
     analyze_node_name,
+    tier_node_by_graph_node,
 )
 from stride_service.report import (
     AnalysisMarks,
@@ -44,10 +44,12 @@ from stride_service.report import (
     Verdict,
 )
 from stride_service.sampling import load_sampling
-from tests.factories import ScriptedLlm
+from tests.factories import DEFAULT_FRAMEWORKS, ScriptedLlm
 
 REPO_ROOT = Path(__file__).resolve().parents[1]
 CASE_DIR = REPO_ROOT / "evals" / "corpus" / "01-payments-checkout"
+
+TIER_NODE_BY_GRAPH_NODE = tier_node_by_graph_node(DEFAULT_FRAMEWORKS)
 
 
 @pytest.fixture(scope="module")
