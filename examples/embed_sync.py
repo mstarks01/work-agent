@@ -58,7 +58,8 @@ def analyze_orders(engine: StrideEngine) -> None:
         return
 
     assert isinstance(outcome, PipelineCompleted)
-    print(f"{outcome.report.summary.threat_count} threats")
+    for block in outcome.report.analyses:
+        print(f"{block.framework}: {block.summary.claim_count} claims")
 
 
 # docs-region-end: embed_sync
@@ -78,4 +79,4 @@ async def main(engine: StrideEngine) -> None:
 
 
 if __name__ == "__main__":
-    analyze_orders(StrideEngine.from_config())
+    analyze_orders(StrideEngine.from_config(["stride"]))
