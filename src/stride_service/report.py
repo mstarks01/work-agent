@@ -37,6 +37,7 @@ from pydantic import (
     BeforeValidator,
     ConfigDict,
     Field,
+    SerializeAsAny,
     field_validator,
     model_validator,
 )
@@ -1541,8 +1542,14 @@ class FrameworkAnalysis(BaseModel):
     framework: FrameworkName
     framework_version: str = Field(min_length=1, max_length=100)
     disclaimer: str = Field(min_length=1, max_length=2000)
-    claims: list[RuledClaim] = Field(default_factory=list)
-    rejected_claims: list[RuledClaim] = Field(default_factory=list)
+    # ``SerializeAsAny`` on the three fields a package may narrow. Pydantic
+    # serializes by the *declared* type, so without it a block that narrowed
+    # ``claims`` to its own record would serialize back out as the neutral base
+    # — dropping exactly the fields the narrowing exists for, silently, on the
+    # one path that matters. See :class:`Report.analyses` for the whole of this
+    # rule; it is stated in both places because either one alone would lose it.
+    claims: list[SerializeAsAny[RuledClaim]] = Field(default_factory=list)
+    rejected_claims: list[SerializeAsAny[RuledClaim]] = Field(default_factory=list)
     scope: list[ScopeEntry] = Field(default_factory=list)
     coverage: list[LaneCoverage] = Field(default_factory=list)
     unverified_grounds: list[UnverifiedGround] = Field(default_factory=list)
@@ -1550,7 +1557,7 @@ class FrameworkAnalysis(BaseModel):
     unresolved_evidence: list[UnresolvedEvidence] = Field(default_factory=list)
     fired_rules: list[str] = Field(default_factory=list)
     knowledge_docs: list[str] = Field(default_factory=list)
-    summary: BlockSummary
+    summary: SerializeAsAny[BlockSummary]
 
     def all_claims(self) -> tuple[RuledClaim, ...]:
         """Both arrays, for the checks that do not care which one a claim is in."""
@@ -1793,7 +1800,20 @@ class Report(BaseModel):
     # without it (the stub runner's), which is the same absence an empty
     # ``coverage`` records rather than a claim that nothing informed the run.
     analysis_context: AnalysisContext | None = None
-    analyses: list[FrameworkAnalysis] = Field(default_factory=list)
+    # **Declared as the base and serialized as itself.** The declaration is what
+    # lets this module carry an envelope a framework it has never heard of fits
+    # into; ``SerializeAsAny`` is what stops that generality from *costing* the
+    # narrowing on the way out. Pydantic serializes a field by its declared
+    # type, so without this a ``StrideAnalysis`` in this list would come back
+    # out as a ``FrameworkAnalysis``: every severity, every category and both
+    # summary breakdowns dropped, with nothing raised and nothing logged — on
+    # the report route, which is the only path a caller ever sees.
+    #
+    # It is the exact mirror of :meth:`_dispatch_blocks`. That validator makes
+    # the narrowing survive the way in; this makes it survive the way out. A
+    # round trip through JSON is the property both exist for, and it is a
+    # property only the pair has.
+    analyses: list[SerializeAsAny[FrameworkAnalysis]] = Field(default_factory=list)
 
     @field_validator("analyses", mode="before")
     @classmethod

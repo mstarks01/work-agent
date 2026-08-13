@@ -101,9 +101,9 @@ from stride_service import (
     EngineDeadlineError,
     EngineInputError,
     PipelineCompleted,
+    Report,
     Source,
     StrideEngine,
-    StrideReport,
 )
 from stride_service.deployment import Deployment
 from stride_service.model_tiers import ModelTierConfig
@@ -203,7 +203,7 @@ class Run:
 
     id: str
     events: asyncio.Queue[tuple[str, str]] = field(default_factory=asyncio.Queue)
-    report: StrideReport | None = None
+    report: Report | None = None
     task: asyncio.Task | None = None
 
 
@@ -273,7 +273,11 @@ def build_startup(env: Mapping[str, str] | None = None) -> Startup:
     deployment = None
     try:
         deployment = Deployment.from_env(env)
-        engine = StrideEngine.from_deployment(deployment)
+        # Every framework this install carries. The first-run app has no
+        # selection UI and no business inventing a default the service itself
+        # refuses to have: what it offers is "run what this install is
+        # configured for", which is exactly the carried set.
+        engine = StrideEngine.from_deployment(deployment, deployment.frameworks)
     except ConfigError as exc:
         logger.error("config error at startup: %s", exc)
         tiers = deployment.tiers if deployment is not None else None
@@ -296,7 +300,7 @@ class RenderedPage:
     csp: str
 
 
-def render_report(report: StrideReport) -> RenderedPage:
+def render_report(report: Report) -> RenderedPage:
     """``report_view.html``, carrying this run's report.
 
     The template is a self-contained renderer for the report schema — no build
