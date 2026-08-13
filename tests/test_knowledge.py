@@ -125,14 +125,31 @@ class TestTheCorpusCannotBecomeEvidence:
         builds the closed set of citable facts, and not ``critic.py``, which
         resolves what a finding rests on. There is no code path by which a
         retrieved document could become a Ground.
+
+        Recursive, and keyed by path rather than bare filename: a package
+        under a subpackage (``frameworks/<name>/``) must stay covered by this
+        allowlist rather than escaping a flat, non-recursive glob.
         """
         package = PROJECT_ROOT / "src" / "stride_service"
         importers = {
-            path.name
-            for path in package.glob("*.py")
+            path.relative_to(package).as_posix()
+            for path in package.rglob("*.py")
             if "from stride_service.knowledge import" in path.read_text()
         }
         assert importers == {"graph.py"}
+
+    def test_evidence_and_critic_never_import_knowledge(self):
+        """The two modules the docstring above names, checked directly.
+
+        A narrower, harder-to-fool companion to the allowlist test: it names
+        the two modules that must never import ``knowledge`` and reads them
+        by path, so it keeps failing loud even if the allowlist test above is
+        ever weakened or deleted.
+        """
+        package = PROJECT_ROOT / "src" / "stride_service"
+        for module in ("evidence.py", "critic.py"):
+            source = (package / module).read_text()
+            assert "from stride_service.knowledge import" not in source
 
     def test_a_document_id_is_never_an_evidence_reference(self):
         """The two ID spaces cannot collide.
