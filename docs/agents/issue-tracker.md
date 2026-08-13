@@ -55,12 +55,85 @@ gh api --method POST repos/mstarks01/work-agent/issues/<child>/dependencies/bloc
 
 ### The live map
 
-**None.** [#76](https://github.com/mstarks01/work-agent/issues/76) completed 2026-08-04 and has
+**None.** [#158](https://github.com/mstarks01/work-agent/issues/158) completed 2026-08-13 and has
 moved to Completed efforts below. Chart a new one only against the bar at the end of this file.
 
 ### Completed efforts
 
 Completed on GitHub Issues (canonical):
+
+- [#158 — Map: one validated system representation, many security frameworks](https://github.com/mstarks01/work-agent/issues/158)
+  — 11 tickets, charted 2026-08-12 from [#139](https://github.com/mstarks01/work-agent/issues/139) and
+  completed 2026-08-13. A **planning** map: it settled the spec for a framework-neutral analysis layer —
+  one extraction and one **Valid System Model** feeding N in-repo framework packages — and stopped at the
+  spec. **Not yet implemented.** The cutover plan is
+  [#172](https://github.com/mstarks01/work-agent/issues/172), filed rather than left as a line in this map.
+  Read #172 first for the order of operations, then the eleven resolution comments in map order.
+  [#139](https://github.com/mstarks01/work-agent/issues/139) stays open as the source idea.
+
+  **STRIDE becomes the first package rather than the architecture.** The coupling is narrower than the map
+  charted and sits in six files ([#159](https://github.com/mstarks01/work-agent/issues/159)); four things the
+  ticket listed carry no STRIDE at all, and `analysis.py` was already the neutral query layer.
+  **ASVS asks a system representation for almost nothing**
+  ([#160](https://github.com/mstarks01/work-agent/issues/160)): 67% of L1 is a property of code rather than a
+  position in a graph, 5.0 deleted its architecture chapter, all 16 applicability predicates are presence
+  tests, and this service can rule a requirement applicable or unknown but **never passed**. A late correction
+  added a **tier-0 precondition** — ASVS scopes itself to web applications and never tests that, and two of
+  this repo's 12 corpus cases fail it.
+
+  The route in one pass. **The job selects its frameworks from a set the deployment carries**
+  ([#161](https://github.com/mstarks01/work-agent/issues/161)): `frameworks` is required and non-empty, the
+  contract carries **no default**, a fifth config file `config/frameworks.toml` holds the carried set, and an
+  unknown name rejects on the input ladder. **The taxonomy holds**
+  ([#162](https://github.com/mstarks01/work-agent/issues/162)) — five element types, controls stay string
+  attributes, identities do not become nodes — so **one extraction pass serves every framework**, measured on
+  188 of 251 control attributes already `unknown`. A thin **`Claim` supertype** carries the seven fields the
+  service constructs and nothing a framework judges
+  ([#163](https://github.com/mstarks01/work-agent/issues/163)), with `(framework, version)` one required pair.
+  **A package is a declaration object beside a text root**, registered in a table like `VENDORS` and checked by
+  a ten-check gate inside `Deployment.from_env`
+  ([#164](https://github.com/mstarks01/work-agent/issues/164)); the ID rule becomes data, which deletes
+  `^[STRIDE]-\d{2}$` outright. **The evidence catalog stays the service's and a package selects from it**
+  ([#165](https://github.com/mstarks01/work-agent/issues/165)) — no package may add an entry, a derivation or a
+  **Ground** kind, and grounds justify applicability, never undeterminedness. **Each package carries its own
+  critic**, blind to every other framework ([#166](https://github.com/mstarks01/work-agent/issues/166)), which
+  closes the cross-framework node #161 parked; a shared critic saves about 1,100 uncached tokens per extra
+  framework per job and nothing else. **One corpus splits by framework inside each case**
+  ([#167](https://github.com/mstarks01/work-agent/issues/167)): the grading contract is per framework, STRIDE's
+  claim set is open and ASVS's is closed, and a CI merge bar replaces a load-time gate because a deployment
+  cannot read `evals/`. **The report becomes one envelope named `Report` at `schema_version` 3.0**
+  ([#168](https://github.com/mstarks01/work-agent/issues/168)): nine top-level fields stay, eight move into a
+  per-framework block, `analyses` is an ordered list rather than a map, and ten checks split three on the
+  envelope and seven written once over the neutral base. And **the retrieval key decides where knowledge
+  lives** ([#169](https://github.com/mstarks01/work-agent/issues/169)): a **Reference Note** and a **Worked
+  Case** move into the package because their key is a package rule, a **Domain Pack** stays one shared root
+  because its key reads the neutral model, and a shared pack may never name a lane, a category, a requirement
+  ID or a verdict state.
+
+  Three findings outlived their tickets. **#165 found a live catalog bug** — `evidence_catalog` tests exact
+  equality with `unknown` while `control_state` reads a leading token, so a control the input says is *not*
+  there has no **Evidence Reference** — filed off-map as
+  [#171](https://github.com/mstarks01/work-agent/issues/171); 18 of 300 corpus candidates fire on one.
+  **#169 found a test that will pass while covering nothing**:
+  `test_no_document_is_reachable_from_the_evidence_seam` globs `src/stride_service/*.py` flat, so a package's
+  tables under `frameworks/<name>/` escape it. It is correct today and is not filed; #169 rules the fix.
+  And **#166 corrected #163** — the service constructs a **Verdict** for every framework's claim, so the
+  report's record is `RuledClaim(Claim)`, not `verdict` on `Claim` itself.
+
+  Corrections worth knowing: **#160 corrected itself after closing** with the tier-0 web-application
+  precondition, which became a run-time gate in #164 rather than an input-ladder check. **#162 corrected its
+  own price** — the Evidence Reference scheme survives untouched — and found the repo carries **two definitions
+  of "a control"**. **#168 corrected #163** on where `verdict` sits.
+
+  **Certified but unmeasured** is the gap this map names rather than papers over: one `strong` fingerprint
+  covers both frameworks, so a run of a framework nobody measured can be certified today. Nothing on this
+  route is measured at all, because **no live eval sweep ever ran in this repository**. Every cost figure the
+  eleven tickets carry is a count from the tree or a token estimate, never an observation of a run.
+
+  **Out of scope and not graduating**: the content of the ASVS requirements, external plugin loading, semantic
+  claim identity (#139 folds it in and it deserves its own issue), graph databases and RDF, and the ADK
+  workflow engine. Two things stay unspecified: which deterministic rules a second package carries, and the
+  cost and concurrency of one job running two frameworks — the lane budget #164 declined to set.
 
 - [#76 — Map: tie every finding back to the input text that justifies it](https://github.com/mstarks01/work-agent/issues/76)
   — 9 tickets, charted 2026-08-03 and completed 2026-08-04. A **planning** map: it settled the
