@@ -56,7 +56,7 @@ gh api --method POST repos/mstarks01/work-agent/issues/<child>/dependencies/bloc
 ### The live map
 
 [#158 — Map: one validated system representation, many security frameworks](https://github.com/mstarks01/work-agent/issues/158)
-— charted 2026-08-12 from [#139](https://github.com/mstarks01/work-agent/issues/139), 11 tickets, 8 resolved.
+— charted 2026-08-12 from [#139](https://github.com/mstarks01/work-agent/issues/139), 11 tickets, 10 resolved.
 A **planning** map: it settles the spec for a framework-neutral analysis layer, where one extraction and one
 **Valid System Model** feed N in-repo framework packages, and it stops at the spec. STRIDE becomes the first
 package rather than the architecture; ASVS proves the second.
@@ -71,16 +71,19 @@ declaration object beside a text root, checked before the first model call
 ([#164](https://github.com/mstarks01/work-agent/issues/164)). The evidence catalog stays the service's and a
 package selects from it ([#165](https://github.com/mstarks01/work-agent/issues/165)), and each package carries
 its own critic, blind to every other framework
-([#166](https://github.com/mstarks01/work-agent/issues/166)).
+([#166](https://github.com/mstarks01/work-agent/issues/166)). One corpus splits by framework inside each case,
+the grading contract is per framework, and a CI merge bar replaces a load-time gate
+([#167](https://github.com/mstarks01/work-agent/issues/167)). The report becomes one envelope named `Report`
+at `schema_version` 3.0: nine top-level fields stay on it, eight move into a per-framework block, and the
+neutral checks are written once and run per block
+([#168](https://github.com/mstarks01/work-agent/issues/168)).
 
-The frontier is [#167](https://github.com/mstarks01/work-agent/issues/167) (how a second framework is measured)
-and [#169](https://github.com/mstarks01/work-agent/issues/169) (where the notes, cases and domain packs sit).
-[#168](https://github.com/mstarks01/work-agent/issues/168), the report envelope, waits on
-[#167](https://github.com/mstarks01/work-agent/issues/167) and closes the map.
+The frontier is [#169](https://github.com/mstarks01/work-agent/issues/169) alone — where the reference notes,
+worked cases and domain packs sit — and it closes the map.
 
 Two constraints ride the whole effort. A framework package is **in-repo only** — no third-party code loads.
-And the no-shim rule removes "decide later" from the report envelope, so
-[#168](https://github.com/mstarks01/work-agent/issues/168) cuts over once or declares no change.
+And the no-shim rule removed "decide later" from the report envelope, which is why
+[#168](https://github.com/mstarks01/work-agent/issues/168) cut over rather than deferred.
 
 ### Completed efforts
 
