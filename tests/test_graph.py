@@ -49,6 +49,7 @@ from tests.factories import (
     sample_draft,
     sample_proposal,
     sample_ruling,
+    sample_selection,
     valid_model,
 )
 
@@ -94,23 +95,27 @@ class FakeContext:
 
 
 def analyze_state(**proposals_by_category: list) -> dict[str, object]:
-    """State as six category agents that all ran leave it.
+    """State as STRIDE's six lane agents, all of which ran, leave it.
 
-    Proposals, not drafts: a category agent's node emits
-    :class:`~stride_service.report.ThreatProposals`, and ``merge_drafts``
-    resolves each proposal's references into the grounds a draft carries. A
-    test seeding drafts here would be asserting against a shape no agent can
-    produce.
+    Proposals, not drafts: a lane agent's node emits this package's own
+    :class:`~stride_service.frameworks.stride.record.ThreatProposals`, and
+    ``merge_drafts`` resolves each proposal's references into the grounds a
+    draft carries. A test seeding drafts here would be asserting against a shape
+    no agent can produce.
 
-    Every lane gets a key, because ``merge_drafts`` distinguishes a category agent
-    that found nothing (``{"threats": []}``, its key written) from one that
+    ``claims`` rather than ``threats`` is the batch's field name: one prompt body
+    serves every framework's agents, so the word it spells has to be one a second
+    framework can answer in.
+
+    Every lane gets a key, because ``merge_drafts`` distinguishes a lane agent
+    that found nothing (``{"claims": []}``, its key written) from one that
     emitted nothing (no key at all, a truncated completion). A test seeding only
     the lanes it cares about would be asserting against the second, which is a
     failed job.
     """
     return {
         graph.Lane("stride", category).drafts_key: {
-            "threats": [
+            "claims": [
                 proposal.model_dump(mode="json")
                 for proposal in proposals_by_category.get(
                     category.replace("-", "_"), []
@@ -185,20 +190,40 @@ def pipeline(
 DISCLAIMERS = {"stride": "AI-generated STRIDE threat model."}
 
 
-def _park(ctx, drafts=None, reviewed_threats=None, marks=None):
+def _park(
+    ctx, drafts=None, reviewed_threats=None, marks=None, coverage=None, retrieved=None
+):
     """Park one framework's artifacts where its own nodes read them."""
-    if drafts is not None:
-        ctx.state[NODES.key("drafts")] = drafts
-    if reviewed_threats is not None:
-        ctx.state[NODES.key("reviewed")] = reviewed_threats
-    if marks is not None:
-        ctx.state[NODES.key("marks")] = marks
+    for artifact, value in (
+        ("drafts", drafts),
+        ("reviewed", reviewed_threats),
+        ("marks", marks),
+        ("coverage", coverage),
+        ("retrieved", retrieved),
+    ):
+        if value is not None:
+            ctx.state[NODES.key(artifact)] = value
     return ctx
 
 
-def assemble(model, drafts, ctx, reviewed_threats=None, marks=None, domain_packs=None):
-    """``assemble_report`` over one framework's parked artifacts."""
-    _park(ctx, drafts, reviewed_threats, marks)
+def assemble(
+    model,
+    drafts,
+    ctx,
+    reviewed_threats=None,
+    marks=None,
+    coverage=None,
+    retrieved=None,
+    domain_packs=None,
+):
+    """``assemble_report`` over one framework's parked artifacts.
+
+    ``domain_packs`` stays a parameter because it is the *job's* — one selection
+    of shared reference material serves every framework — while ``retrieved``,
+    which carries the fired rules and the documents they pulled, is the
+    package's and so is parked under the framework's own key.
+    """
+    _park(ctx, drafts, reviewed_threats, marks, coverage, retrieved)
     return graph.assemble_report(
         model, ctx, KEYS, FRAMEWORKS, DISCLAIMERS, domain_packs=domain_packs
     )
@@ -661,7 +686,10 @@ class TestReadingAFinishedRun:
         result = graph.result_of(self.analysis_state())
 
         assert isinstance(result, graph.Analysis)
-        assert [threat.id for threat in result.threats] == ["S-01"]
+        # One block per selected framework, and the claims are the block's:
+        # a claim belongs to the framework that ruled it, not to the run.
+        assert [block.framework for block in result.analyses] == list(FRAMEWORKS)
+        assert [claim.id for claim in result.analyses[0].claims] == ["S-01"]
 
     def test_a_rejected_run_reads_as_its_issues(self):
         ctx = FakeContext()
@@ -847,11 +875,13 @@ def test_merge_joins_drafts_in_canonical_order():
     )
     output = graph.merge_drafts(valid_model().model_dump(mode="json"), ctx, KEYS, NODES)
 
+    # The fan-in names its own framework: a run carries one of these per
+    # selection, and a trace that did not say which would read as one merge.
     assert output == {
+        "framework": "stride",
         "draft_count": 2,
         "unverified_count": 0,
         "unresolved_mention_count": 0,
-        "missing_mitigation_count": 0,
     }
     assert [d["id"] for d in ctx.state[NODES.key("drafts")]] == ["S-01", "T-01"]
     assert "S-01" in ctx.state[NODES.key("draft_view")]
@@ -863,13 +893,18 @@ def test_merge_parks_every_mark_kind_under_one_key():
     The marks have one owner, one standing and one policy, so they travel as
     one :class:`~stride_service.report.AnalysisMarks`. A sixth kind is a field
     on that model and no new key here.
+
+    The key is the *framework's*, because the fan-in that produced them is: two
+    frameworks rule different drafts against different questions, so a mark
+    about one framework's claim has no standing in the other's block.
     """
     ctx = FakeContext(**analyze_state(spoofing=[sample_proposal("S-01", "spoofing")]))
 
     graph.merge_drafts(valid_model().model_dump(mode="json"), ctx, KEYS, NODES)
 
-    marks = AnalysisMarks.model_validate(ctx.state[graph.STATE_MARKS])
-    assert set(ctx.state[graph.STATE_MARKS]) == set(AnalysisMarks.model_fields)
+    parked = ctx.state[NODES.key("marks")]
+    marks = AnalysisMarks.model_validate(parked)
+    assert set(parked) == set(AnalysisMarks.model_fields)
     assert marks.unverified_grounds == []
     assert marks.unresolved_mentions == []
     assert marks.unresolved_evidence == []
@@ -877,7 +912,14 @@ def test_merge_parks_every_mark_kind_under_one_key():
 
 
 def test_the_marks_reach_the_report_through_assemble():
-    """What ``merge`` parked, plus the one mark ``assemble`` derives itself."""
+    """What ``merge`` parked lands on the block; the envelope keeps its own.
+
+    A mark goes where the thing it is about goes. ``missing_mitigations`` is
+    about one framework's claim, and only STRIDE's block declares the field, so
+    the fan-in's marks are filtered by what the block type carries.
+    ``shared_element_names`` is about the *shared* model, so it stays on the
+    analysis and is derived here rather than carried from any fan-in.
+    """
     ctx = FakeContext()
     assemble(
         valid_model().model_dump(mode="json"),
@@ -885,13 +927,14 @@ def test_the_marks_reach_the_report_through_assemble():
         ctx,
         reviewed_threats={"claims": [sample_ruling("S-01").model_dump(mode="json")]},
         marks={
-            "missing_mitigations": [{"threat_id": "S-01"}],
+            "missing_mitigations": [{"claim_id": "S-01"}],
         },
     )
 
     analysis = graph.Analysis.from_state(ctx.state[graph.STATE_ANALYSIS])
+    (block,) = analysis.analyses
 
-    assert [m.claim_id for m in analysis.marks.missing_mitigations] == ["S-01"]
+    assert [m.claim_id for m in block.missing_mitigations] == ["S-01"]
     # Derived from the model this node holds, never carried from the fan-in,
     # so it is present on an analysis assembled from marks that omit it.
     assert analysis.marks.shared_element_names == []
@@ -951,10 +994,10 @@ def test_merge_accepts_a_lane_that_ran_and_found_nothing():
     output = graph.merge_drafts(valid_model().model_dump(mode="json"), ctx, KEYS, NODES)
 
     assert output == {
+        "framework": "stride",
         "draft_count": 1,
         "unverified_count": 0,
         "unresolved_mention_count": 0,
-        "missing_mitigation_count": 0,
     }
 
 
@@ -963,19 +1006,23 @@ def test_merge_fails_closed_when_a_category_agent_emitted_nothing():
 
     A truncated agent writes no output key. Defaulting that to an empty list
     deletes a sixth of the method and finishes green: the critic rules what it
-    is handed, and ``build_summary`` omits a category with no threats rather
-    than carrying a zero, so nothing downstream can see the hole.
+    is handed, and the block summary omits a lane with no claims rather than
+    carrying a zero, so nothing downstream can see the hole.
+
+    The message names the framework as well as the count, because a run carries
+    one fan-in per selected framework and "1 of 6 lane agents" would not say
+    whose.
     """
     state = analyze_state(spoofing=[sample_proposal("S-01", "spoofing")])
-    del state[graph.Lane("denial-of-service").drafts_key]
+    del state[graph.Lane("stride", "denial-of-service").drafts_key]
     ctx = FakeContext(**state)
 
     with pytest.raises(graph.SilentNodeError) as excinfo:
         graph.merge_drafts(valid_model().model_dump(mode="json"), ctx, KEYS, NODES)
 
     message = str(excinfo.value)
-    assert "1 of 6 category agents wrote nothing" in message
-    assert "drafts_denial_of_service" in message
+    assert "1 of 6 stride lane agents wrote nothing" in message
+    assert "drafts_stride_denial_of_service" in message
     # The message has to name the knob, like every other wall in this service.
     assert "max_output_tokens" in message
 
@@ -1179,12 +1226,15 @@ def test_assemble_splits_rulings_and_builds_the_summary():
         },
     )
 
-    assert output == {"threat_count": 1, "rejected_count": 1}
+    # The node's own output counts across every block it fanned in, because one
+    # of it serves the whole selection; the arrays and the summary are per block.
+    assert output == {"claim_count": 1, "rejected_count": 1, "framework_count": 1}
     analysis = graph.Analysis.from_state(ctx.state[graph.STATE_ANALYSIS])
-    assert [t.id for t in analysis.threats] == ["S-01"]
-    assert [t.id for t in analysis.rejected_threats] == ["T-01"]
-    assert analysis.summary.threat_count == 1
-    assert analysis.summary.rejected_count == 1
+    (block,) = analysis.analyses
+    assert [claim.id for claim in block.claims] == ["S-01"]
+    assert [claim.id for claim in block.rejected_claims] == ["T-01"]
+    assert block.summary.claim_count == 1
+    assert block.summary.rejected_count == 1
 
 
 # --- Deterministic candidates, domain packs, coverage -----------------------
@@ -1206,9 +1256,9 @@ def test_prepare_parks_each_lanes_candidates_under_its_own_key(
 
     for category in STRIDE_CATEGORIES:
         parked = ctx.state[graph.Lane("stride", category).key("candidates")]
-        assert f'"category": "{category}"' in parked
+        assert f'"lane": "{category}"' in parked
         others = set(STRIDE_CATEGORIES) - {category}
-        assert not any(f'"category": "{other}"' in parked for other in others)
+        assert not any(f'"lane": "{other}"' in parked for other in others)
 
 
 def test_prepare_gives_each_lane_its_own_denominators(domain_loader, package_loaders):
@@ -1246,7 +1296,7 @@ def test_prepare_fences_candidate_facts(domain_loader, package_loaders):
         package_loaders,
     )
 
-    parked = ctx.state[graph.Lane("information-disclosure").key("candidates")]
+    parked = ctx.state[graph.Lane("stride", "information-disclosure").key("candidates")]
     assert parked.startswith("```")
 
 
@@ -1347,9 +1397,9 @@ def test_merge_accounts_for_coverage_over_the_drafts():
 
     graph.merge_drafts(valid_model().model_dump(mode="json"), ctx, KEYS, NODES)
 
-    rows = ctx.state[graph.STATE_COVERAGE]
-    assert [row["category"] for row in rows] == list(STRIDE_CATEGORIES)
-    spoofing = next(row for row in rows if row["category"] == "spoofing")
+    rows = ctx.state[NODES.key("coverage")]
+    assert [row["lane"] for row in rows] == list(STRIDE_CATEGORIES)
+    spoofing = next(row for row in rows if row["lane"] == "spoofing")
     assert spoofing["drafts"] == 1
     assert spoofing["elements"] == 7
 
@@ -1380,8 +1430,9 @@ def test_coverage_reaches_the_report_through_assemble():
     )
 
     analysis = graph.Analysis.from_state(ctx.state[graph.STATE_ANALYSIS])
-    assert [row.category for row in analysis.coverage] == ["spoofing"]
-    assert analysis.coverage[0].boundary_crossings_cited == 1
+    (block,) = analysis.analyses
+    assert [row.lane for row in block.coverage] == ["spoofing"]
+    assert block.coverage[0].boundary_crossings_cited == 1
 
 
 def test_assemble_fails_closed_when_the_critic_drops_a_draft():
@@ -1404,12 +1455,17 @@ def test_assemble_fails_closed_when_the_critic_drops_a_draft():
 def test_prepare_records_the_packs_and_rules_the_agents_were_given(
     domain_loader, package_loaders
 ):
-    """The record is written where the selection happens.
+    """The record is written where the selection happens, and split by owner.
 
     Both halves are already computed here to build the prompt; recomputing them
     at the fan-in would be a second derivation that could disagree with what
     the agents actually read, which is the failure the evidence catalog is
     derived-once-and-resolved-against-itself to avoid.
+
+    The packs are the *job's* — one selection of shared reference material
+    serves every framework — so they land on one key. The fired rules and the
+    documents they pulled are the *package's*, so they land under the
+    framework's own key and reach that framework's block.
     """
     ctx = FakeContext()
     graph.prepare_analysis(
@@ -1421,30 +1477,34 @@ def test_prepare_records_the_packs_and_rules_the_agents_were_given(
         package_loaders,
     )
 
-    recorded = ctx.state[graph.STATE_ANALYSIS_CONTEXT]
+    assert ctx.state[graph.STATE_DOMAIN_PACKS] == ["http-api", "databases"]
 
-    assert recorded["domain_packs"] == ["http-api", "databases"]
-    assert recorded["fired_rules"] == sorted(set(recorded["fired_rules"]))
-    assert "information-disclosure-store-at-rest-unverified" in recorded["fired_rules"]
+    retrieved = ctx.state[NODES.key("retrieved")]
+    assert retrieved["fired_rules"] == sorted(set(retrieved["fired_rules"]))
+    assert "information-disclosure-store-at-rest-unverified" in retrieved["fired_rules"]
 
 
 def test_the_context_reaches_the_report_through_assemble():
+    """Each half arrives on the side that owns it, from the key that owns it."""
     ctx = FakeContext()
     assemble(
         valid_model().model_dump(mode="json"),
         [sample_draft("S-01").model_dump(mode="json")],
         ctx,
         reviewed_threats={"claims": [sample_ruling("S-01").model_dump(mode="json")]},
-        domain_packs={
-            "domain_packs": ["http-api"],
+        domain_packs=["http-api"],
+        retrieved={
             "fired_rules": ["spoofing-unverified-boundary-auth"],
+            "knowledge_docs": ["notes/spoofing.md"],
         },
     )
 
     analysis = graph.Analysis.from_state(ctx.state[graph.STATE_ANALYSIS])
+    (block,) = analysis.analyses
 
     assert analysis.domain_packs == ["http-api"]
-    assert analysis.fired_rules == ["spoofing-unverified-boundary-auth"]
+    assert block.fired_rules == ["spoofing-unverified-boundary-auth"]
+    assert block.knowledge_docs == ["notes/spoofing.md"]
 
 
 def test_a_graph_entered_past_prepare_records_an_empty_context():
@@ -1465,9 +1525,11 @@ def test_a_graph_entered_past_prepare_records_an_empty_context():
 
     analysis = graph.Analysis.from_state(ctx.state[graph.STATE_ANALYSIS])
     context = analysis.context("0" * 64)
+    (block,) = analysis.analyses
 
     assert context.domain_packs == []
-    assert context.fired_rules == []
+    assert block.fired_rules == []
+    assert block.knowledge_docs == []
 
 
 class TestIntoReport:
@@ -1487,7 +1549,8 @@ class TestIntoReport:
             reviewed_threats={
                 "claims": [sample_ruling("S-01").model_dump(mode="json")]
             },
-            domain_packs={"domain_packs": ["http-api"], "fired_rules": ["r-01"]},
+            domain_packs=["http-api"],
+            retrieved={"fired_rules": ["r-01"], "knowledge_docs": []},
         )
         return graph.Analysis.from_state(ctx.state[graph.STATE_ANALYSIS])
 
@@ -1498,6 +1561,10 @@ class TestIntoReport:
                 id="job-01",
                 created_at=datetime(2026, 1, 1, tzinfo=UTC),
                 completed_at=datetime(2026, 1, 1, tzinfo=UTC),
+                # The envelope checks the blocks answer this list, in order, so
+                # the job a report is built for has to name the selection the
+                # graph was built for.
+                frameworks=sample_selection(FRAMEWORKS),
             ),
             input_ref=InputRef.of(
                 system_name="Test system",
