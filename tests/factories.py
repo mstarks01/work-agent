@@ -1,8 +1,16 @@
-"""Shared factories: a small, fully valid System Model, plus threats and a
-complete STRIDE report built against it.
+"""Shared factories: a small, fully valid System Model, plus claims and a
+complete report built against it.
 
 Topology: customer (internet zone) -> web app -> orders db (both internal),
 one cross-boundary flow and one intra-zone flow, one recorded assumption.
+
+The claim-shaped factories here are **STRIDE's**, because STRIDE is the package
+this repository carries and a fixture has to build something concrete. What they
+are built *into* is neutral: :func:`sample_analysis` fills one
+:class:`~stride_service.frameworks.stride.record.StrideAnalysis` block and
+:func:`sample_report` wraps it in the envelope beside the job's own selection,
+so a test that means to talk about the envelope can hold a second block without
+going through here.
 
 Also home to :class:`ScriptedLlm`, the offline stand-in every graph-driving
 test binds its nodes to. It lives here rather than in one test module because
@@ -13,22 +21,29 @@ provenance defect stay invisible to the eval lane.
 
 import asyncio
 import json
-from collections.abc import AsyncGenerator
+from collections.abc import AsyncGenerator, Sequence
 from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any
 
+from google.adk.agents.llm_agent import LlmAgent
 from google.adk.models.base_llm import BaseLlm
 from google.adk.models.llm_response import LlmResponse
 from google.genai import types
 from pydantic import BaseModel, Field
 
 from stride_service.binding import NodeBinding
+from stride_service.frameworks import FrameworkName
+from stride_service.frameworks.stride.record import (
+    STRIDE_VERSION,
+    DraftThreat,
+    StrideAnalysis,
+    Threat,
+    ThreatProposal,
+    ThreatRuling,
+)
 from stride_service.graph import (
     ENTRY_EXTRACT,
-    EXTRACT_NODE,
-    REPAIR_NODE,
-    TIER_NODE_BY_GRAPH_NODE,
     Entry,
     Pipeline,
     build_pipeline,
@@ -36,19 +51,15 @@ from stride_service.graph import (
 from stride_service.markdown_loader import MarkdownLoader
 from stride_service.model_tiers import ModelTierConfig, load_model_tiers
 from stride_service.report import (
-    DraftThreat,
+    FrameworkSelection,
     Ground,
     InputRef,
     Job,
     Mitigation,
     NodeRun,
+    Report,
     Severity,
-    StrideReport,
-    Threat,
-    ThreatProposal,
-    ThreatRuling,
     Verdict,
-    build_summary,
 )
 from stride_service.sampling import SamplingConfig, load_sampling
 from stride_service.sources import DEFAULT_DESCRIPTION_LABEL, Source
@@ -63,6 +74,11 @@ from stride_service.system_model import (
 )
 
 PROJECT_ROOT = Path(__file__).resolve().parents[1]
+
+#: The one framework this repository carries, as a one-name selection. Spelled
+#: here rather than inline so a test that means "the default selection" and a
+#: test that means "the ``stride`` package specifically" are distinguishable.
+DEFAULT_FRAMEWORKS: tuple[FrameworkName, ...] = ("stride",)
 
 BASE_MODEL = "fake-base-001"
 STRONG_MODEL = "fake-strong-001"
@@ -103,6 +119,21 @@ def repo_tiers() -> ModelTierConfig:
     return load_model_tiers(
         PROJECT_ROOT / "config" / "model_tiers.toml", env=TEST_TIER_ENV
     )
+
+
+def repo_package_loaders(
+    frameworks: Sequence[FrameworkName] = DEFAULT_FRAMEWORKS,
+) -> dict[FrameworkName, MarkdownLoader]:
+    """One loader per selected package, rooted where this repo ships its text.
+
+    The third of :func:`~stride_service.graph.build_pipeline`'s three roots, and
+    the only one that is per framework. Built here so a test naming a selection
+    does not also have to know that a package's text lives at
+    ``frameworks/<name>/``.
+    """
+    return {
+        name: MarkdownLoader(PROJECT_ROOT / "frameworks" / name) for name in frameworks
+    }
 
 
 DESCRIPTION_TEXT = (
@@ -222,7 +253,7 @@ def sample_draft(
     category: str = "spoofing",
     **overrides: Any,
 ) -> DraftThreat:
-    """One category agent's draft against valid_model(), before the critic rules."""
+    """One lane agent's draft against valid_model(), before the critic rules."""
     threat = sample_threat(threat_id, category, **overrides)
     return DraftThreat.model_validate(
         threat.model_dump(exclude={"confidence", "verdict"})
@@ -234,17 +265,32 @@ def sample_proposal(
     category: str = "spoofing",
     **overrides: Any,
 ) -> ThreatProposal:
-    """What a category agent emits for sample_draft(), before resolution.
+    """What a lane agent emits for sample_draft(), before resolution.
 
     The same two facts the draft is grounded on, *named* rather than
     serialized: the quote as a candidate, the crossing as a catalog ID. So
     resolving this against ``valid_model()``'s catalog, in the lane the second
     argument names, reproduces ``sample_draft()`` exactly — the property the
     two fixtures exist together to let a test assert.
+
+    ``framework`` and ``framework_version`` are excluded alongside ``id``: all
+    three are the *service's* to stamp, composed by
+    :func:`~stride_service.evidence.resolve_proposals` from the package it is
+    resolving for, so a proposal carrying them would be an agent asserting its
+    own provenance.
     """
     threat = sample_threat(threat_id, category)
     fields: dict[str, Any] = threat.model_dump(
-        mode="json", exclude={"confidence", "verdict", "grounds", "id", "category"}
+        mode="json",
+        exclude={
+            "confidence",
+            "verdict",
+            "grounds",
+            "id",
+            "category",
+            "framework",
+            "framework_version",
+        },
     )
     # Called with the threat ID the resolved draft will carry, because that is
     # what a test is talking about — the proposal itself names only the number,
@@ -284,6 +330,8 @@ def sample_threat(
     """One valid confirmed threat against valid_model(), overridable per test."""
     fields: dict[str, Any] = {
         "id": threat_id,
+        "framework": "stride",
+        "framework_version": STRIDE_VERSION,
         "category": category,
         "title": "Session cookie theft enables account takeover",
         "description": "Stolen session cookies let an attacker impersonate"
@@ -314,27 +362,76 @@ def sample_threat(
     return Threat(**fields)
 
 
-def sample_report(
+def sample_analysis(
     threats: list[Threat] | None = None,
     rejected_threats: list[Threat] | None = None,
     **marks: Any,
-) -> StrideReport:
-    """A complete, internally consistent report over valid_model().
+) -> StrideAnalysis:
+    """One STRIDE analysis block over valid_model(), summary already computed.
 
-    ``marks`` passes the service-owned mark lists straight through, so a test
-    about mark placement states only the mark it is about.
+    ``marks`` passes this block's own mark lists straight through, so a test
+    about mark placement states only the mark it is about. The summary is not
+    among them: the block recounts its own contents, so a fixture that let a
+    caller pass one would let a test assert against a number the schema is about
+    to reject.
     """
-    model = valid_model()
     if threats is None:
         threats = [sample_threat()]
     if rejected_threats is None:
         rejected_threats = []
+    return StrideAnalysis(
+        framework="stride",
+        framework_version=STRIDE_VERSION,
+        disclaimer=STRIDE_DISCLAIMER,
+        claims=threats,
+        rejected_claims=rejected_threats,
+        summary=StrideAnalysis.summarize(threats, rejected_threats),
+        **marks,
+    )
+
+
+def sample_report(
+    threats: list[Threat] | None = None,
+    rejected_threats: list[Threat] | None = None,
+    *,
+    analyses: list[Any] | None = None,
+    **marks: Any,
+) -> Report:
+    """A complete, internally consistent report over valid_model().
+
+    One STRIDE block by default, built from ``threats`` and ``rejected_threats``.
+    ``analyses`` replaces that block outright, for the tests that are about the
+    envelope rather than about STRIDE — a second framework's block, or two, or
+    none. The job's own ``frameworks`` list follows whatever the blocks are,
+    since the envelope checks the two agree and a fixture that let them drift
+    would fail every test for one reason.
+
+    ``marks`` are routed by **which model declares the field**: the envelope
+    carries exactly one mark list (``shared_element_names``, which annotates the
+    shared model) and every other mark belongs to a block. So a test still names
+    a mark once, and the schema decides where it lands. Passing block marks
+    alongside an explicit ``analyses`` is refused rather than silently dropped.
+    """
+    model = valid_model()
+    block_marks = {key: value for key, value in marks.items() if key not in _ENVELOPE}
+    envelope_marks = {key: value for key, value in marks.items() if key in _ENVELOPE}
+    if analyses is None:
+        analyses = [sample_analysis(threats, rejected_threats, **block_marks)]
+    elif block_marks or threats is not None or rejected_threats is not None:
+        raise TypeError(
+            "sample_report(analyses=...) builds the blocks itself;"
+            f" pass {sorted({*block_marks, 'threats', 'rejected_threats'})} to"
+            " sample_analysis() instead"
+        )
     created = datetime(2026, 7, 18, 14, 3, 21, tzinfo=UTC)
-    return StrideReport(
+    return Report(
         job=Job(
             id="job-8f3a2c91",
             created_at=created,
             completed_at=datetime(2026, 7, 18, 14, 4, 9, tzinfo=UTC),
+            frameworks=[
+                FrameworkSelection(name=block.framework) for block in analyses
+            ],
         ),
         input=InputRef.of(
             system_name="Order Service",
@@ -342,29 +439,45 @@ def sample_report(
         ),
         nodes=[
             NodeRun(node="extract", model="gemini-2.5-flash", duration_ms=3200),
-            NodeRun(node="critic", model="gemini-2.5-pro", duration_ms=14500),
+            NodeRun(node="critic_stride", model="gemini-2.5-pro", duration_ms=14500),
             NodeRun(node="assemble", duration_ms=20),
         ],
         system_model=model,
         boundary_crossings=model.boundary_crossings(),
-        threats=threats,
-        rejected_threats=rejected_threats,
-        summary=build_summary(threats, rejected_threats, model),
-        **marks,
+        elements_analyzed=len(model.elements()),
+        analyses=analyses,
+        **envelope_marks,
     )
 
 
-EMPTY_THREATS = '{"threats": []}'
+#: The mark lists the *envelope* declares. Everything else a caller names is a
+#: block's, which is what :func:`sample_report` routes on. Derived from the
+#: schema rather than listed, so a mark that moves between the two moves here
+#: with it.
+_ENVELOPE = frozenset(Report.model_fields)
+
+#: What ``frameworks/stride/disclaimer.md`` says, read once. The block's
+#: ``disclaimer`` is the package's own text, so a fixture spelling its own would
+#: be asserting against a sentence the service never serves.
+STRIDE_DISCLAIMER = (
+    MarkdownLoader(PROJECT_ROOT / "frameworks" / "stride").load("disclaimer").strip()
+)
+
+EMPTY_CLAIMS = '{"claims": []}'
 
 
-def threats_json(*threats: BaseModel) -> str:
-    """A review or category-agent node's emission: the list inside its ``threats`` key.
+def claims_json(*claims: BaseModel) -> str:
+    """A lane-agent or critic node's emission: the list inside its ``claims`` key.
 
     The wrapper is the node's output-schema shape, not the domain's, so tests
     build it here rather than each spelling it out — a bare array is what these
     nodes emitted before the schema had to be convertible, and is now invalid.
+
+    The key is ``claims`` rather than ``threats`` because one shared
+    ``prompts/analyze.md`` serves every registered framework's lane agents; see
+    :class:`~stride_service.report.ProposalBatch`.
     """
-    return json.dumps({"threats": [t.model_dump(mode="json") for t in threats]})
+    return json.dumps({"claims": [claim.model_dump(mode="json") for claim in claims]})
 
 
 def served_build(requested: str) -> str:
@@ -480,54 +593,91 @@ class UnmeteredLlm(ScriptedLlm):
         )
 
 
+#: The tier keys the *base* tier serves. Spelled as tier node names rather than
+#: graph node names because that is what the resolver is handed, and because the
+#: two are no longer the same thing: six lane agents share one ``analyze/<F>``.
+_BASE_TIER_NODES = frozenset({"extract", "repair"})
+
+
 def scripted_pipeline(
     replies: dict[str, str],
     *,
     llm_class: type[ScriptedLlm] = ScriptedLlm,
     entry: Entry = ENTRY_EXTRACT,
     sampling: SamplingConfig | None = None,
+    frameworks: Sequence[FrameworkName] = DEFAULT_FRAMEWORKS,
 ) -> tuple[Pipeline, dict[str, ScriptedLlm]]:
-    """The real graph, with every LLM node bound to its scripted stand-in.
+    """The real graph, with every LLM node bound to its own scripted stand-in.
 
-    Repo skills, repo prompts, repo tier and sampling config — only the model's
-    text is faked, so the topology, the per-tier binding and the provenance
-    stamping under test are the shipped ones. The tier adapters are
+    Repo package text, repo prompts, repo tier and sampling config — only the
+    model's text is faked, so the topology, the per-tier binding and the
+    provenance stamping under test are the shipped ones. The tier adapters are
     short-circuited by passing ``resolve_model`` directly: building them would
     run the credential check, which an offline test has no credentials to pass.
+
+    ``replies`` and the returned map are both keyed by **graph node name** —
+    ``analyze_stride_spoofing``, ``critic_stride`` — which is what a test talks
+    about. A node with no scripted reply emits an empty claim list.
+
+    ``frameworks`` is the selection the graph is built for, since a graph is now
+    built for one (:func:`~stride_service.graph.build_pipeline`). The returned
+    map covers whatever LLM nodes that selection produced.
 
     ``sampling`` substitutes another *legal* deployment's decoding params for
     the shipped ones. The shipped file leaves several offered params unset, so
     without this the only values any test ever stamps are the ones this
     repository happens to ship — and a param no test sets is a param whose
     journey to the report nothing checks.
+
+    **The stand-ins are named by walking the built graph, not by inverting the
+    tier map.** That map stopped being invertible when the lanes moved onto one
+    ``analyze/<framework>`` key: six nodes now resolve on it, so a tier name no
+    longer identifies a node. The resolver therefore mints a fresh stand-in per
+    call — one per node, where production shares one adapter per tier — and the
+    walk afterwards is what learns which node got which. Per-node rather than
+    per-tier is also what keeps ``seen`` a record of one node's prompts.
     """
-    models: dict[str, ScriptedLlm] = {}
-    graph_node_of = {
-        tier_node: graph_node
-        for graph_node, tier_node in TIER_NODE_BY_GRAPH_NODE.items()
-    }
+    minted: list[ScriptedLlm] = []
 
     def resolve(tier_node: str) -> BaseLlm:
-        # ``build_pipeline`` resolves by canonical tier name; the scripts are
-        # keyed by graph node name, which is what the tests talk about.
-        node = graph_node_of[tier_node]
-        base = node in (EXTRACT_NODE, REPAIR_NODE)
-        models[node] = llm_class(
-            model=BASE_MODEL if base else STRONG_MODEL,
-            reply=replies.get(node, EMPTY_THREATS),
+        model = llm_class(
+            model=BASE_MODEL if tier_node in _BASE_TIER_NODES else STRONG_MODEL,
+            reply=EMPTY_CLAIMS,
             seen=[],
         )
-        return models[node]
+        minted.append(model)
+        return model
 
     tiers = repo_tiers()
     sampling = sampling or load_sampling(
         PROJECT_ROOT / "config" / "sampling.toml", env={}
     )
     pipeline = build_pipeline(
-        skill_loader=MarkdownLoader(PROJECT_ROOT / "skills"),
         prompt_loader=MarkdownLoader(PROJECT_ROOT / "prompts"),
-        knowledge_loader=MarkdownLoader(PROJECT_ROOT / "knowledge"),
+        domain_loader=MarkdownLoader(PROJECT_ROOT / "domains"),
+        package_loaders=repo_package_loaders(frameworks),
         binding=NodeBinding.from_configs(tiers, sampling, resolve),
+        frameworks=frameworks,
         entry=entry,
     )
+
+    graph = pipeline.workflow.graph
+    models = {
+        node.name: node.model
+        for node in (graph.nodes if graph else ())
+        if isinstance(node, LlmAgent) and isinstance(node.model, ScriptedLlm)
+    }
+    if len(models) != len(minted):
+        raise AssertionError(
+            f"scripted {len(minted)} stand-ins but found {len(models)} on the"
+            " built graph: a node was bound to something else"
+        )
+    unknown = sorted(set(replies) - set(models))
+    if unknown:
+        raise AssertionError(
+            f"scripted replies for {unknown}, which the graph built for"
+            f" {list(frameworks)} has no LLM node called. It has {sorted(models)}"
+        )
+    for name, model in models.items():
+        model.reply = replies.get(name, EMPTY_CLAIMS)
     return pipeline, models
