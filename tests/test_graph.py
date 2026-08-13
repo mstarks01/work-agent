@@ -21,6 +21,7 @@ from google.adk.workflow import FunctionNode, JoinNode
 from stride_service import graph
 from stride_service.binding import NodeBinding
 from stride_service.critic import CriticOutputError, DraftJoinError
+from stride_service.frameworks.stride import STRIDE
 from stride_service.frameworks.stride.record import (
     STRIDE_CATEGORIES,
     ThreatProposals,
@@ -42,6 +43,8 @@ from stride_service.sampling import load_sampling
 from stride_service.sources import Source
 from stride_service.system_model import SystemModel
 from tests.factories import (
+    DEFAULT_FRAMEWORKS,
+    repo_package_loaders,
     repo_tiers,
     sample_draft,
     sample_proposal,
@@ -51,35 +54,31 @@ from tests.factories import (
 
 PROJECT_ROOT = __import__("pathlib").Path(__file__).resolve().parents[1]
 
+#: The selection every test here builds a graph for. A graph is built for one
+#: selection now, so a test asserting about "the nodes" has to say which.
+FRAMEWORKS = DEFAULT_FRAMEWORKS
+NODES = graph.FrameworkNodes("stride")
+LANES = NODES.lanes
+KEYS = graph.GraphKeys.of(FRAMEWORKS)
+
+CRITIC_NODE = NODES.node(graph.CRITIC_ROLE)
+RECRITIC_NODE = NODES.node(graph.RECRITIC_ROLE)
+ROUTER_NODE = NODES.node(graph.ROUTER_ROLE)
+REREVIEW_NODE = NODES.node(graph.REREVIEW_ROLE)
+MERGE_NODE = NODES.node(graph.MERGE_ROLE)
+JOIN_NODE = NODES.node(graph.JOIN_ROLE)
+CRITIC_FAILED_NODE = NODES.node(graph.CRITIC_FAILED_ROLE)
+ANALYZE_NODES = tuple(lane.node_name for lane in LANES)
+TIER_NODES = graph.tier_node_by_graph_node(FRAMEWORKS)
+
 # Placeholders ADK templates from session state at run time. Anything else
 # left in a composed instruction would raise at the first LLM call.
-RUNTIME_PLACEHOLDERS = frozenset(
-    {
-        graph.STATE_SYSTEM_MODEL,
-        graph.STATE_BOUNDARY_CROSSINGS,
-        graph.STATE_EVIDENCE_CATALOG,
-        graph.STATE_DRAFT_THREATS,
-        graph.STATE_INPUT_TEXT,
-        graph.STATE_PREVIOUS_MODEL,
-        graph.STATE_VALIDATION_ISSUES,
-        graph.STATE_PREVIOUS_REVIEW,
-        graph.STATE_CRITIC_ISSUES,
-        graph.STATE_DRAFT_ROSTER,
-        graph.STATE_UNRECONCILED_DRAFTS,
-        graph.STATE_DOMAIN_SKILLS,
-        # Six per artifact: ``{candidates}`` in the prompt file is resolved to
-        # this agent's own key at build time, and the retrieved corpus and the
-        # scope resolve the same way and for the same reason — six lanes, one
-        # session state, and material selected per lane by the rules that fired
-        # there. Derived from the lanes rather than listed, so a seventh
-        # artifact does not need adding here as well.
-        *(
-            lane.key(artifact)
-            for lane in graph.LANES
-            for artifact in graph.LANE_ARTIFACTS
-        ),
-    }
-)
+#
+# Derived from this graph's own key families rather than listed: which keys
+# exist is a function of the selection, so a second framework's per-lane and
+# per-framework keys arrive here by the graph carrying them rather than by
+# somebody remembering to add twelve more names.
+RUNTIME_PLACEHOLDERS = KEYS.rendered
 
 
 class FakeContext:
@@ -110,7 +109,7 @@ def analyze_state(**proposals_by_category: list) -> dict[str, object]:
     failed job.
     """
     return {
-        graph.Lane(category).drafts_key: {
+        graph.Lane("stride", category).drafts_key: {
             "threats": [
                 proposal.model_dump(mode="json")
                 for proposal in proposals_by_category.get(
@@ -123,8 +122,15 @@ def analyze_state(**proposals_by_category: list) -> dict[str, object]:
 
 
 @pytest.fixture
-def skill_loader() -> MarkdownLoader:
-    return MarkdownLoader(PROJECT_ROOT / "skills")
+def package_loaders() -> dict:
+    """One loader per selected package, rooted at ``frameworks/<name>/``."""
+    return repo_package_loaders(FRAMEWORKS)
+
+
+@pytest.fixture
+def package_loader(package_loaders) -> MarkdownLoader:
+    """This install's one package's loader, for the tests about one lane."""
+    return package_loaders["stride"]
 
 
 @pytest.fixture
@@ -133,8 +139,8 @@ def prompt_loader() -> MarkdownLoader:
 
 
 @pytest.fixture
-def knowledge_loader() -> MarkdownLoader:
-    return MarkdownLoader(PROJECT_ROOT / "knowledge")
+def domain_loader() -> MarkdownLoader:
+    return MarkdownLoader(PROJECT_ROOT / "domains")
 
 
 def _route_resolver(tiers):
@@ -149,18 +155,65 @@ def _route_resolver(tiers):
 
 @pytest.fixture
 def pipeline(
-    skill_loader: MarkdownLoader,
     prompt_loader: MarkdownLoader,
-    knowledge_loader: MarkdownLoader,
+    domain_loader: MarkdownLoader,
+    package_loaders: dict,
 ):
     tiers = repo_tiers()
     sampling = load_sampling(PROJECT_ROOT / "config" / "sampling.toml", env={})
     return graph.build_pipeline(
-        skill_loader=skill_loader,
         prompt_loader=prompt_loader,
-        knowledge_loader=knowledge_loader,
+        domain_loader=domain_loader,
+        package_loaders=package_loaders,
+        frameworks=FRAMEWORKS,
         binding=NodeBinding.from_configs(tiers, sampling, _route_resolver(tiers)),
     )
+
+
+# --- Driving the per-framework nodes ----------------------------------------
+#
+# The three nodes below read their framework's artifacts off that framework's
+# own state keys rather than taking them as parameters. That is not a style
+# choice: ADK binds a FunctionNode's parameters by name, and a name derived per
+# framework — ``drafts_stride``, ``reviewed_stride`` — cannot be spelled in a
+# signature. So a test that used to pass drafts and rulings parks them first.
+#
+# One helper per node rather than seeding inline, so each test below still
+# states only the artifacts it is about, and so "what this node reads" is
+# written once.
+
+DISCLAIMERS = {"stride": "AI-generated STRIDE threat model."}
+
+
+def _park(ctx, drafts=None, reviewed_threats=None, marks=None):
+    """Park one framework's artifacts where its own nodes read them."""
+    if drafts is not None:
+        ctx.state[NODES.key("drafts")] = drafts
+    if reviewed_threats is not None:
+        ctx.state[NODES.key("reviewed")] = reviewed_threats
+    if marks is not None:
+        ctx.state[NODES.key("marks")] = marks
+    return ctx
+
+
+def assemble(model, drafts, ctx, reviewed_threats=None, marks=None, domain_packs=None):
+    """``assemble_report`` over one framework's parked artifacts."""
+    _park(ctx, drafts, reviewed_threats, marks)
+    return graph.assemble_report(
+        model, ctx, KEYS, FRAMEWORKS, DISCLAIMERS, domain_packs=domain_packs
+    )
+
+
+def route(model, drafts, ctx, reviewed_threats=None):
+    """``route_review`` over one framework's parked artifacts."""
+    _park(ctx, drafts, reviewed_threats)
+    return graph.route_review(model, ctx, KEYS, NODES)
+
+
+def fail(model, drafts, ctx=None, reviewed_threats=None):
+    """``fail_review`` over one framework's parked artifacts."""
+    ctx = _park(ctx if ctx is not None else FakeContext(), drafts, reviewed_threats)
+    return graph.fail_review(model, ctx, KEYS, NODES)
 
 
 def nodes_by_name(pipeline) -> dict:
@@ -180,8 +233,8 @@ def routed_targets(pipeline, source: str) -> dict:
 
 def test_every_canonical_llm_node_is_a_graph_node(pipeline):
     """The tier config's node names and the graph's LLM nodes are one set."""
-    assert set(graph.TIER_NODE_BY_GRAPH_NODE.values()) == set(LLM_NODES)
-    assert set(graph.TIER_NODE_BY_GRAPH_NODE) <= set(nodes_by_name(pipeline))
+    assert set(TIER_NODES.values()) == set(LLM_NODES)
+    assert set(TIER_NODES) <= set(nodes_by_name(pipeline))
 
 
 def test_llm_nodes_bind_their_resolved_model(pipeline):
@@ -189,7 +242,7 @@ def test_llm_nodes_bind_their_resolved_model(pipeline):
     for name, node in nodes_by_name(pipeline).items():
         if not isinstance(node, LlmAgent):
             continue
-        selection = tiers.resolve_model(graph.TIER_NODE_BY_GRAPH_NODE[name])
+        selection = tiers.resolve_model(TIER_NODES[name])
         assert node.model == selection.route
         assert pipeline.node_models[name] == node.model
 
@@ -201,13 +254,13 @@ def test_the_recorded_model_carries_its_vendor(pipeline):
     # also pin that each node records *its own* tier's vendor: against the old
     # Vertex-on-both default, one global prefix would have passed identically.
     tiers = repo_tiers()
-    for node in (graph.EXTRACT_NODE, graph.CRITIC_NODE):
-        selection = tiers.resolve_model(graph.TIER_NODE_BY_GRAPH_NODE[node])
+    for node in (graph.EXTRACT_NODE, CRITIC_NODE):
+        selection = tiers.resolve_model(TIER_NODES[node])
         assert pipeline.node_models[node].startswith(selection.vendor_entry.prefix)
 
     base, strong = (
         pipeline.node_models[node].partition("/")[0]
-        for node in (graph.EXTRACT_NODE, graph.CRITIC_NODE)
+        for node in (graph.EXTRACT_NODE, CRITIC_NODE)
     )
     assert base != strong
 
@@ -232,14 +285,15 @@ thinking = "high"
 
 
 def _pipeline_with_sampling(
-    skill_loader, prompt_loader, knowledge_loader, sampling_path, resilience
+    prompt_loader, domain_loader, package_loaders, sampling_path, resilience
 ):
     tiers = repo_tiers()
     sampling = load_sampling(sampling_path, env={})
     return graph.build_pipeline(
-        skill_loader=skill_loader,
         prompt_loader=prompt_loader,
-        knowledge_loader=knowledge_loader,
+        domain_loader=domain_loader,
+        package_loaders=package_loaders,
+        frameworks=FRAMEWORKS,
         binding=NodeBinding.from_configs(
             tiers, sampling, _route_resolver(tiers), resilience
         ),
@@ -247,7 +301,7 @@ def _pipeline_with_sampling(
 
 
 def test_each_llm_node_binds_its_own_tier_sampling(
-    skill_loader, prompt_loader, knowledge_loader, tmp_path
+    prompt_loader, domain_loader, package_loaders, tmp_path
 ):
     """Sampling is resolved per node, not shared graph-wide.
 
@@ -260,15 +314,15 @@ def test_each_llm_node_binds_its_own_tier_sampling(
     resilience = load_resilience(PROJECT_ROOT / "config" / "resilience.toml", env={})
     nodes = nodes_by_name(
         _pipeline_with_sampling(
-            skill_loader, prompt_loader, knowledge_loader, sampling_path, resilience
+            prompt_loader, domain_loader, package_loaders, sampling_path, resilience
         )
     )
 
     base_nodes = (graph.EXTRACT_NODE, graph.REPAIR_NODE)
     strong_nodes = (
-        graph.CRITIC_NODE,
-        graph.RECRITIC_NODE,
-        *graph.ANALYZE_GRAPH_NODES,
+        CRITIC_NODE,
+        RECRITIC_NODE,
+        *ANALYZE_NODES,
     )
     for name in base_nodes:
         config = nodes[name].generate_content_config
@@ -283,7 +337,7 @@ def test_each_llm_node_binds_its_own_tier_sampling(
 
 
 def test_seed_and_reasoning_stay_off_the_node_config(
-    skill_loader, prompt_loader, knowledge_loader, tmp_path
+    prompt_loader, domain_loader, package_loaders, tmp_path
 ):
     """They ride the tier's adapter constructor instead.
 
@@ -295,7 +349,7 @@ def test_seed_and_reasoning_stay_off_the_node_config(
     sampling_path.write_text(_DIVERGENT_SAMPLING, encoding="utf-8")
     nodes = nodes_by_name(
         _pipeline_with_sampling(
-            skill_loader, prompt_loader, knowledge_loader, sampling_path, None
+            prompt_loader, domain_loader, package_loaders, sampling_path, None
         )
     )
     config = nodes[graph.EXTRACT_NODE].generate_content_config
@@ -304,7 +358,7 @@ def test_seed_and_reasoning_stay_off_the_node_config(
 
 
 def test_per_node_sampling_composes_with_the_resilience_timeout(
-    skill_loader, prompt_loader, knowledge_loader, tmp_path
+    prompt_loader, domain_loader, package_loaders, tmp_path
 ):
     """The node's tier sampling and the resilience timeout ride the one config.
 
@@ -316,7 +370,7 @@ def test_per_node_sampling_composes_with_the_resilience_timeout(
     resilience = load_resilience(PROJECT_ROOT / "config" / "resilience.toml", env={})
     nodes = nodes_by_name(
         _pipeline_with_sampling(
-            skill_loader, prompt_loader, knowledge_loader, sampling_path, resilience
+            prompt_loader, domain_loader, package_loaders, sampling_path, resilience
         )
     )
 
@@ -326,17 +380,17 @@ def test_per_node_sampling_composes_with_the_resilience_timeout(
 
 
 def test_llm_nodes_carry_no_http_options_without_resilience(
-    skill_loader, prompt_loader, knowledge_loader, tmp_path
+    prompt_loader, domain_loader, package_loaders, tmp_path
 ):
     """Resilience is optional (offline stand-ins); its absence leaves no timeout."""
     sampling_path = tmp_path / "sampling.toml"
     sampling_path.write_text(_DIVERGENT_SAMPLING, encoding="utf-8")
     nodes = nodes_by_name(
         _pipeline_with_sampling(
-            skill_loader, prompt_loader, knowledge_loader, sampling_path, None
+            prompt_loader, domain_loader, package_loaders, sampling_path, None
         )
     )
-    assert nodes[graph.CRITIC_NODE].generate_content_config.http_options is None
+    assert nodes[CRITIC_NODE].generate_content_config.http_options is None
 
 
 def test_deterministic_bookends_carry_no_model(pipeline):
@@ -344,14 +398,14 @@ def test_deterministic_bookends_carry_no_model(pipeline):
         graph.VALIDATE_NODE,
         graph.REVALIDATE_NODE,
         graph.PREPARE_NODE,
-        graph.MERGE_NODE,
-        graph.ROUTER_NODE,
+        MERGE_NODE,
+        ROUTER_NODE,
         graph.ASSEMBLE_NODE,
         graph.REJECT_NODE,
     ):
         assert isinstance(nodes_by_name(pipeline)[name], FunctionNode)
         assert name not in pipeline.node_models
-    assert isinstance(nodes_by_name(pipeline)[graph.JOIN_NODE], JoinNode)
+    assert isinstance(nodes_by_name(pipeline)[JOIN_NODE], JoinNode)
 
 
 def test_six_category_agents_fan_out_from_prepare_and_join(pipeline):
@@ -359,11 +413,9 @@ def test_six_category_agents_fan_out_from_prepare_and_join(pipeline):
     fanned = {
         edge.to_node.name for edge in edges if edge.from_node.name == graph.PREPARE_NODE
     }
-    joined = {
-        edge.from_node.name for edge in edges if edge.to_node.name == graph.JOIN_NODE
-    }
-    assert fanned == set(graph.ANALYZE_GRAPH_NODES) == joined
-    assert len(graph.ANALYZE_GRAPH_NODES) == len(STRIDE_CATEGORIES) == 6
+    joined = {edge.from_node.name for edge in edges if edge.to_node.name == JOIN_NODE}
+    assert fanned == set(ANALYZE_NODES) == joined
+    assert len(ANALYZE_NODES) == len(STRIDE_CATEGORIES) == 6
 
 
 def test_one_repair_pass_then_rejection(pipeline):
@@ -381,26 +433,26 @@ def test_one_repair_pass_then_rejection(pipeline):
 
 def test_critic_re_ask_mirrors_the_one_repair_pass(pipeline):
     """router/recritic/rereview is the critic's validate/repair/revalidate."""
-    assert routed_targets(pipeline, graph.ROUTER_NODE) == {
+    assert routed_targets(pipeline, ROUTER_NODE) == {
         graph.ROUTE_ACCEPT: graph.ASSEMBLE_NODE,
-        graph.ROUTE_REVISE: graph.RECRITIC_NODE,
+        graph.ROUTE_REVISE: RECRITIC_NODE,
     }
-    assert routed_targets(pipeline, graph.RECRITIC_NODE) == {None: graph.REREVIEW_NODE}
-    assert routed_targets(pipeline, graph.REREVIEW_NODE) == {
+    assert routed_targets(pipeline, RECRITIC_NODE) == {None: REREVIEW_NODE}
+    assert routed_targets(pipeline, REREVIEW_NODE) == {
         graph.ROUTE_ACCEPT: graph.ASSEMBLE_NODE,
-        graph.ROUTE_REVISE: graph.CRITIC_FAILED_NODE,
+        graph.ROUTE_REVISE: CRITIC_FAILED_NODE,
     }
     # critic_failed is terminal: it raises rather than routing anywhere.
-    assert not routed_targets(pipeline, graph.CRITIC_FAILED_NODE)
+    assert not routed_targets(pipeline, CRITIC_FAILED_NODE)
 
 
 def test_recritic_runs_on_the_critic_tier_and_emits_the_review_schema(pipeline):
     by_name = nodes_by_name(pipeline)
-    recritic = by_name[graph.RECRITIC_NODE]
+    recritic = by_name[RECRITIC_NODE]
     assert isinstance(recritic, LlmAgent)
     assert recritic.output_schema is ThreatRulings
-    assert recritic.output_key == graph.STATE_REVIEWED_THREATS
-    assert recritic.model == by_name[graph.CRITIC_NODE].model
+    assert recritic.output_key == NODES.key("reviewed")
+    assert recritic.model == by_name[CRITIC_NODE].model
 
 
 def test_llm_nodes_see_no_history(pipeline):
@@ -413,8 +465,8 @@ def test_llm_nodes_emit_their_schema(pipeline):
     by_name = nodes_by_name(pipeline)
     assert by_name[graph.EXTRACT_NODE].output_schema is SystemModel
     assert by_name[graph.REPAIR_NODE].output_schema is SystemModel
-    assert by_name[graph.CRITIC_NODE].output_schema is ThreatRulings
-    for name in graph.ANALYZE_GRAPH_NODES:
+    assert by_name[CRITIC_NODE].output_schema is ThreatRulings
+    for name in ANALYZE_NODES:
         assert by_name[name].output_schema is ThreatProposals
 
 
@@ -481,19 +533,23 @@ def test_extract_and_repair_share_one_output_key(pipeline):
 
 
 def test_analyze_instruction_carries_skill_then_prompt_then_exemplars(
-    skill_loader, prompt_loader
+    prompt_loader, package_loader
 ):
-    instruction = graph.analyze_instruction(skill_loader, prompt_loader, "spoofing")
+    instruction = graph.analyze_instruction(
+        package_loader, prompt_loader, STRIDE, graph.Lane("stride", "spoofing")
+    )
     scope = instruction.index("# Spoofing")
     role = instruction.index("# STRIDE Category Agent")
     exemplars = instruction.index("Exemplars")
     assert scope < role < exemplars
 
 
-def test_category_placeholder_is_filled_at_build_time(skill_loader, prompt_loader):
+def test_category_placeholder_is_filled_at_build_time(prompt_loader, package_loader):
     """Six category agents share one session state, which cannot hold six categories."""
     for category in STRIDE_CATEGORIES:
-        instruction = graph.analyze_instruction(skill_loader, prompt_loader, category)
+        instruction = graph.analyze_instruction(
+            package_loader, prompt_loader, STRIDE, graph.Lane("stride", category)
+        )
         assert "{category}" not in instruction
         assert f"**{category}** agent" in instruction
 
@@ -520,17 +576,17 @@ class TestSessionState:
 
     def state(self) -> tuple[FakeContext, graph.SessionState]:
         ctx = FakeContext()
-        return ctx, graph.SessionState(ctx)
+        return ctx, KEYS.state(ctx)
 
     def test_the_two_families_are_disjoint_and_cover_every_key(self):
-        assert not graph.RENDERED_KEYS & graph.STRUCTURED_KEYS
+        assert not KEYS.rendered & KEYS.structured
 
         declared = {
             value
             for name, value in vars(graph).items()
             if name.startswith("STATE_") and isinstance(value, str)
         }
-        assert declared <= graph.RENDERED_KEYS | graph.STRUCTURED_KEYS
+        assert declared <= KEYS.rendered | KEYS.structured
 
     def test_a_rendered_key_is_written_and_never_read(self):
         ctx, state = self.state()
@@ -591,12 +647,12 @@ class TestReadingAFinishedRun:
 
     def analysis_state(self) -> dict:
         ctx = FakeContext()
-        graph.assemble_report(
+        assemble(
             valid_model().model_dump(mode="json"),
             [sample_draft("S-01").model_dump(mode="json")],
             ctx,
             reviewed_threats={
-                "threats": [sample_ruling("S-01").model_dump(mode="json")]
+                "claims": [sample_ruling("S-01").model_dump(mode="json")]
             },
         )
         return ctx.state
@@ -609,7 +665,7 @@ class TestReadingAFinishedRun:
 
     def test_a_rejected_run_reads_as_its_issues(self):
         ctx = FakeContext()
-        graph.reject_model('[{"code": "schema", "message": "bad"}]', ctx)
+        graph.reject_model('[{"code": "schema", "message": "bad"}]', ctx, KEYS)
 
         result = graph.result_of(ctx.state)
 
@@ -627,7 +683,7 @@ class TestReadingAFinishedRun:
 
 def test_validate_routes_valid_and_publishes_the_model():
     ctx = FakeContext()
-    event = graph.validate_extraction(ctx, valid_model().model_dump(mode="json"))
+    event = graph.validate_extraction(ctx, KEYS, valid_model().model_dump(mode="json"))
     assert event.actions.route == graph.ROUTE_VALID
     assert ctx.state[graph.STATE_VALID_MODEL]["processes"][0]["id"] == "process:web-app"
 
@@ -636,7 +692,7 @@ def test_validate_routes_invalid_and_feeds_the_repair_prompt():
     broken = valid_model().model_dump(mode="json")
     broken["data_flows"][0]["destination"] = "process:does-not-exist"
     ctx = FakeContext()
-    event = graph.validate_extraction(ctx, broken)
+    event = graph.validate_extraction(ctx, KEYS, broken)
 
     assert event.actions.route == graph.ROUTE_INVALID
     assert "process:does-not-exist" in ctx.state[graph.STATE_PREVIOUS_MODEL]
@@ -649,7 +705,7 @@ def test_validate_derives_ids_rather_than_spending_the_repair_pass():
     abbreviated = valid_model().model_dump(mode="json")
     abbreviated["processes"][0]["name"] = "Web App Frontend Service"
     ctx = FakeContext()
-    event = graph.validate_extraction(ctx, abbreviated)
+    event = graph.validate_extraction(ctx, KEYS, abbreviated)
 
     assert event.actions.route == graph.ROUTE_VALID
     published = ctx.state[graph.STATE_VALID_MODEL]
@@ -665,7 +721,7 @@ def test_validate_parks_the_normalized_model_the_issues_cite():
     broken["processes"][0]["name"] = "Web App Frontend Service"
     broken["data_flows"][0]["source"] = "entity:does-not-exist"
     ctx = FakeContext()
-    event = graph.validate_extraction(ctx, broken)
+    event = graph.validate_extraction(ctx, KEYS, broken)
 
     assert event.actions.route == graph.ROUTE_INVALID
     assert "process:web-app-frontend-service" in ctx.state[graph.STATE_PREVIOUS_MODEL]
@@ -674,14 +730,14 @@ def test_validate_parks_the_normalized_model_the_issues_cite():
 
 def test_validate_routes_invalid_on_unparseable_output():
     ctx = FakeContext()
-    event = graph.validate_extraction(ctx, {"processes": "not a list"})
+    event = graph.validate_extraction(ctx, KEYS, {"processes": "not a list"})
     assert event.actions.route == graph.ROUTE_INVALID
     assert graph.STATE_VALID_MODEL not in ctx.state
 
 
 def test_reject_parks_the_issues_for_the_runner():
     ctx = FakeContext()
-    graph.reject_model('[{"code": "schema", "message": "bad"}]', ctx)
+    graph.reject_model('[{"code": "schema", "message": "bad"}]', ctx, KEYS)
     issues = graph.rejection_issues(ctx.state[graph.STATE_REJECTION])
     assert [issue.code for issue in issues] == ["schema"]
 
@@ -697,7 +753,7 @@ def test_validate_names_a_silent_extraction_rather_than_binding_against_it():
     ctx = FakeContext()
 
     with pytest.raises(graph.SilentNodeError) as excinfo:
-        graph.validate_extraction(ctx)
+        graph.validate_extraction(ctx, KEYS)
 
     message = str(excinfo.value)
     assert graph.STATE_EXTRACTED_MODEL in message
@@ -706,11 +762,16 @@ def test_validate_names_a_silent_extraction_rather_than_binding_against_it():
 
 
 def test_prepare_derives_crossings_rather_than_trusting_them(
-    skill_loader, knowledge_loader
+    domain_loader, package_loaders
 ):
     ctx = FakeContext()
     output = graph.prepare_analysis(
-        valid_model().model_dump(mode="json"), ctx, skill_loader, knowledge_loader
+        valid_model().model_dump(mode="json"),
+        ctx,
+        KEYS,
+        FRAMEWORKS,
+        domain_loader,
+        package_loaders,
     )
 
     assert output["element_count"] == 7
@@ -721,7 +782,7 @@ def test_prepare_derives_crossings_rather_than_trusting_them(
 
 
 def test_prepare_shows_the_agents_the_evidence_catalog_as_references(
-    skill_loader, knowledge_loader
+    domain_loader, package_loaders
 ):
     """The closed set an agent picks from, and no more than that.
 
@@ -734,7 +795,12 @@ def test_prepare_shows_the_agents_the_evidence_catalog_as_references(
     """
     ctx = FakeContext()
     graph.prepare_analysis(
-        valid_model().model_dump(mode="json"), ctx, skill_loader, knowledge_loader
+        valid_model().model_dump(mode="json"),
+        ctx,
+        KEYS,
+        FRAMEWORKS,
+        domain_loader,
+        package_loaders,
     )
 
     rendered = ctx.state[graph.STATE_EVIDENCE_CATALOG]
@@ -745,7 +811,7 @@ def test_prepare_shows_the_agents_the_evidence_catalog_as_references(
 
 
 def test_prepare_strips_the_source_fields_from_the_rendered_model(
-    skill_loader, knowledge_loader
+    domain_loader, package_loaders
 ):
     """The agents and the critic read the model; only ``{input_text}`` has quotes.
 
@@ -759,7 +825,7 @@ def test_prepare_strips_the_source_fields_from_the_rendered_model(
     assert excerpt, "the fixture must carry an excerpt for this to prove anything"
     ctx = FakeContext()
 
-    graph.prepare_analysis(valid, ctx, skill_loader, knowledge_loader)
+    graph.prepare_analysis(valid, ctx, KEYS, FRAMEWORKS, domain_loader, package_loaders)
 
     rendered = ctx.state[graph.STATE_SYSTEM_MODEL]
     assert excerpt not in rendered
@@ -779,7 +845,7 @@ def test_merge_joins_drafts_in_canonical_order():
             tampering=[sample_proposal("T-01", "tampering")],
         )
     )
-    output = graph.merge_drafts(valid_model().model_dump(mode="json"), ctx)
+    output = graph.merge_drafts(valid_model().model_dump(mode="json"), ctx, KEYS, NODES)
 
     assert output == {
         "draft_count": 2,
@@ -787,8 +853,8 @@ def test_merge_joins_drafts_in_canonical_order():
         "unresolved_mention_count": 0,
         "missing_mitigation_count": 0,
     }
-    assert [d["id"] for d in ctx.state[graph.STATE_MERGED_DRAFTS]] == ["S-01", "T-01"]
-    assert "S-01" in ctx.state[graph.STATE_DRAFT_THREATS]
+    assert [d["id"] for d in ctx.state[NODES.key("drafts")]] == ["S-01", "T-01"]
+    assert "S-01" in ctx.state[NODES.key("draft_view")]
 
 
 def test_merge_parks_every_mark_kind_under_one_key():
@@ -800,7 +866,7 @@ def test_merge_parks_every_mark_kind_under_one_key():
     """
     ctx = FakeContext(**analyze_state(spoofing=[sample_proposal("S-01", "spoofing")]))
 
-    graph.merge_drafts(valid_model().model_dump(mode="json"), ctx)
+    graph.merge_drafts(valid_model().model_dump(mode="json"), ctx, KEYS, NODES)
 
     marks = AnalysisMarks.model_validate(ctx.state[graph.STATE_MARKS])
     assert set(ctx.state[graph.STATE_MARKS]) == set(AnalysisMarks.model_fields)
@@ -813,11 +879,11 @@ def test_merge_parks_every_mark_kind_under_one_key():
 def test_the_marks_reach_the_report_through_assemble():
     """What ``merge`` parked, plus the one mark ``assemble`` derives itself."""
     ctx = FakeContext()
-    graph.assemble_report(
+    assemble(
         valid_model().model_dump(mode="json"),
         [sample_draft("S-01").model_dump(mode="json")],
         ctx,
-        reviewed_threats={"threats": [sample_ruling("S-01").model_dump(mode="json")]},
+        reviewed_threats={"claims": [sample_ruling("S-01").model_dump(mode="json")]},
         marks={
             "missing_mitigations": [{"threat_id": "S-01"}],
         },
@@ -870,10 +936,10 @@ def test_merge_keeps_mitigations_out_of_the_prompt_but_in_the_report():
     """The drafts the report is built from are not the drafts the critic reads."""
     ctx = FakeContext(**analyze_state(spoofing=[sample_proposal("S-01", "spoofing")]))
 
-    graph.merge_drafts(valid_model().model_dump(mode="json"), ctx)
+    graph.merge_drafts(valid_model().model_dump(mode="json"), ctx, KEYS, NODES)
 
-    assert "Set HttpOnly" not in ctx.state[graph.STATE_DRAFT_THREATS]
-    assert ctx.state[graph.STATE_MERGED_DRAFTS][0]["mitigations"] == [
+    assert "Set HttpOnly" not in ctx.state[NODES.key("draft_view")]
+    assert ctx.state[NODES.key("drafts")][0]["mitigations"] == [
         {"summary": "Set HttpOnly and Secure on cookies", "detail": ""}
     ]
 
@@ -882,7 +948,7 @@ def test_merge_accepts_a_lane_that_ran_and_found_nothing():
     """Empty is a finding; absent is a failure. The check is on the key."""
     ctx = FakeContext(**analyze_state(spoofing=[sample_proposal("S-01", "spoofing")]))
 
-    output = graph.merge_drafts(valid_model().model_dump(mode="json"), ctx)
+    output = graph.merge_drafts(valid_model().model_dump(mode="json"), ctx, KEYS, NODES)
 
     assert output == {
         "draft_count": 1,
@@ -905,7 +971,7 @@ def test_merge_fails_closed_when_a_category_agent_emitted_nothing():
     ctx = FakeContext(**state)
 
     with pytest.raises(graph.SilentNodeError) as excinfo:
-        graph.merge_drafts(valid_model().model_dump(mode="json"), ctx)
+        graph.merge_drafts(valid_model().model_dump(mode="json"), ctx, KEYS, NODES)
 
     message = str(excinfo.value)
     assert "1 of 6 category agents wrote nothing" in message
@@ -918,23 +984,23 @@ def test_merge_fails_closed_on_a_hallucinated_element():
     proposal = sample_proposal("S-01", affected_element_ids=["process:invented"])
     ctx = FakeContext(**analyze_state(spoofing=[proposal]))
     with pytest.raises(DraftJoinError, match="process:invented"):
-        graph.merge_drafts(valid_model().model_dump(mode="json"), ctx)
+        graph.merge_drafts(valid_model().model_dump(mode="json"), ctx, KEYS, NODES)
 
 
 def test_router_accepts_well_formed_critic_output():
     drafts = [sample_draft("S-01")]
     rulings = [sample_ruling("S-01")]
     ctx = FakeContext()
-    event = graph.route_review(
+    event = route(
         valid_model().model_dump(mode="json"),
         [draft.model_dump(mode="json") for draft in drafts],
         ctx,
         reviewed_threats={
-            "threats": [ruling.model_dump(mode="json") for ruling in rulings]
+            "claims": [ruling.model_dump(mode="json") for ruling in rulings]
         },
     )
     assert event.actions.route == graph.ROUTE_ACCEPT
-    assert graph.STATE_CRITIC_ISSUES not in ctx.state
+    assert NODES.key("critic_issues") not in ctx.state
 
 
 def test_router_revises_and_feeds_the_re_ask_prompt():
@@ -942,28 +1008,28 @@ def test_router_revises_and_feeds_the_re_ask_prompt():
     drafts = [sample_draft("S-01"), sample_draft("T-01", category="tampering")]
     rulings = [sample_ruling("S-01")]  # T-01 dropped
     ctx = FakeContext()
-    event = graph.route_review(
+    event = route(
         valid_model().model_dump(mode="json"),
         [draft.model_dump(mode="json") for draft in drafts],
         ctx,
         reviewed_threats={
-            "threats": [ruling.model_dump(mode="json") for ruling in rulings]
+            "claims": [ruling.model_dump(mode="json") for ruling in rulings]
         },
     )
     assert event.actions.route == graph.ROUTE_REVISE
-    assert "T-01" in ctx.state[graph.STATE_CRITIC_ISSUES]
-    assert "S-01" in ctx.state[graph.STATE_PREVIOUS_REVIEW]
+    assert "T-01" in ctx.state[NODES.key("critic_issues")]
+    assert "S-01" in ctx.state[NODES.key("previous_review")]
 
 
 def _revise(drafts, rulings):
     """Drive the router to its ``revise`` edge and hand back the parked state."""
     ctx = FakeContext()
-    event = graph.route_review(
+    event = route(
         valid_model().model_dump(mode="json"),
         [draft.model_dump(mode="json") for draft in drafts],
         ctx,
         reviewed_threats={
-            "threats": [ruling.model_dump(mode="json") for ruling in rulings]
+            "claims": [ruling.model_dump(mode="json") for ruling in rulings]
         },
     )
     assert event.actions.route == graph.ROUTE_REVISE
@@ -976,7 +1042,7 @@ def test_the_re_ask_roster_names_every_drafted_id():
 
     state = _revise(drafts, [sample_ruling("S-01")])
 
-    assert json.loads(state[graph.STATE_DRAFT_ROSTER]) == ["S-01", "T-01"]
+    assert json.loads(state[NODES.key("draft_roster")]) == ["S-01", "T-01"]
 
 
 def test_the_re_ask_reads_only_the_drafts_it_cannot_fix_blind():
@@ -993,13 +1059,13 @@ def test_the_re_ask_reads_only_the_drafts_it_cannot_fix_blind():
 
     state = _revise(drafts, [sample_ruling("S-01")])  # T-01 dropped
 
-    unreconciled = json.loads(state[graph.STATE_UNRECONCILED_DRAFTS])
+    unreconciled = json.loads(state[NODES.key("unreconciled_drafts")])
     assert [draft["id"] for draft in unreconciled] == ["T-01"]
-    assert "THE DROPPED ONE" in state[graph.STATE_UNRECONCILED_DRAFTS]
+    assert "THE DROPPED ONE" in state[NODES.key("unreconciled_drafts")]
     # S-01 was ruled correctly, so its prose is not re-sent — the roster is the
     # whole of what the re-ask is told about it.
-    assert "RULED CORRECTLY" not in state[graph.STATE_UNRECONCILED_DRAFTS]
-    assert "S-01" in state[graph.STATE_DRAFT_ROSTER]
+    assert "RULED CORRECTLY" not in state[NODES.key("unreconciled_drafts")]
+    assert "S-01" in state[NODES.key("draft_roster")]
 
 
 def test_an_unresolved_unknown_sends_the_draft_it_hangs_on():
@@ -1016,7 +1082,7 @@ def test_an_unresolved_unknown_sends_the_draft_it_hangs_on():
 
     state = _revise(drafts, [ruling])
 
-    unreconciled = json.loads(state[graph.STATE_UNRECONCILED_DRAFTS])
+    unreconciled = json.loads(state[NODES.key("unreconciled_drafts")])
     assert [draft["id"] for draft in unreconciled] == ["S-01"]
 
 
@@ -1026,8 +1092,8 @@ def test_a_duplicate_ruling_sends_no_draft_at_all():
 
     state = _revise(drafts, [sample_ruling("S-01"), sample_ruling("S-01")])
 
-    assert json.loads(state[graph.STATE_UNRECONCILED_DRAFTS]) == []
-    assert json.loads(state[graph.STATE_DRAFT_ROSTER]) == ["S-01"]
+    assert json.loads(state[NODES.key("unreconciled_drafts")]) == []
+    assert json.loads(state[NODES.key("draft_roster")]) == ["S-01"]
 
 
 def test_the_re_ask_never_sees_a_field_the_critic_could_not_rule_on():
@@ -1036,7 +1102,7 @@ def test_the_re_ask_never_sees_a_field_the_critic_could_not_rule_on():
 
     state = _revise(drafts, [sample_ruling("S-01")])
 
-    (dropped,) = json.loads(state[graph.STATE_UNRECONCILED_DRAFTS])
+    (dropped,) = json.loads(state[NODES.key("unreconciled_drafts")])
     assert "mitigations" not in dropped
 
 
@@ -1052,15 +1118,15 @@ def test_a_critic_that_emitted_nothing_routes_to_the_re_ask():
     drafts = [sample_draft("S-01"), sample_draft("T-01", category="tampering")]
     ctx = FakeContext()
 
-    event = graph.route_review(
+    event = route(
         valid_model().model_dump(mode="json"),
         [draft.model_dump(mode="json") for draft in drafts],
         ctx,
     )
 
     assert event.actions.route == graph.ROUTE_REVISE
-    assert "S-01" in ctx.state[graph.STATE_CRITIC_ISSUES]
-    assert "T-01" in ctx.state[graph.STATE_CRITIC_ISSUES]
+    assert "S-01" in ctx.state[NODES.key("critic_issues")]
+    assert "T-01" in ctx.state[NODES.key("critic_issues")]
 
 
 def test_a_silent_re_ask_fails_naming_the_drafts_it_never_ruled():
@@ -1073,7 +1139,7 @@ def test_a_silent_re_ask_fails_naming_the_drafts_it_never_ruled():
     drafts = [sample_draft("S-01")]
 
     with pytest.raises(CriticOutputError, match="dropped draft 'S-01'"):
-        graph.fail_review(
+        fail(
             valid_model().model_dump(mode="json"),
             [draft.model_dump(mode="json") for draft in drafts],
         )
@@ -1084,11 +1150,11 @@ def test_fail_review_raises_the_still_unreconciled_issues():
     drafts = [sample_draft("S-01"), sample_draft("T-01", category="tampering")]
     rulings = [sample_ruling("S-01")]  # T-01 still dropped after the re-ask
     with pytest.raises(CriticOutputError, match="dropped draft 'T-01'"):
-        graph.fail_review(
+        fail(
             valid_model().model_dump(mode="json"),
             [draft.model_dump(mode="json") for draft in drafts],
             reviewed_threats={
-                "threats": [ruling.model_dump(mode="json") for ruling in rulings]
+                "claims": [ruling.model_dump(mode="json") for ruling in rulings]
             },
         )
 
@@ -1104,12 +1170,12 @@ def test_assemble_splits_rulings_and_builds_the_summary():
         sample_draft("T-01", category="tampering"),
     ]
     ctx = FakeContext()
-    output = graph.assemble_report(
+    output = assemble(
         valid_model().model_dump(mode="json"),
         [draft.model_dump(mode="json") for draft in drafts],
         ctx,
         reviewed_threats={
-            "threats": [r.model_dump(mode="json") for r in (confirmed, rejected)]
+            "claims": [r.model_dump(mode="json") for r in (confirmed, rejected)]
         },
     )
 
@@ -1125,22 +1191,27 @@ def test_assemble_splits_rulings_and_builds_the_summary():
 
 
 def test_prepare_parks_each_lanes_candidates_under_its_own_key(
-    skill_loader, knowledge_loader
+    domain_loader, package_loaders
 ):
     """Six agents, one session state: a lane cannot read another's leads."""
     ctx = FakeContext()
     graph.prepare_analysis(
-        valid_model().model_dump(mode="json"), ctx, skill_loader, knowledge_loader
+        valid_model().model_dump(mode="json"),
+        ctx,
+        KEYS,
+        FRAMEWORKS,
+        domain_loader,
+        package_loaders,
     )
 
     for category in STRIDE_CATEGORIES:
-        parked = ctx.state[graph.Lane(category).key("candidates")]
+        parked = ctx.state[graph.Lane("stride", category).key("candidates")]
         assert f'"category": "{category}"' in parked
         others = set(STRIDE_CATEGORIES) - {category}
         assert not any(f'"category": "{other}"' in parked for other in others)
 
 
-def test_prepare_gives_each_lane_its_own_denominators(skill_loader, knowledge_loader):
+def test_prepare_gives_each_lane_its_own_denominators(domain_loader, package_loaders):
     """The scope line is per lane because the rule counts are.
 
     Elements and crossings are properties of the model and identical across the
@@ -1149,30 +1220,45 @@ def test_prepare_gives_each_lane_its_own_denominators(skill_loader, knowledge_lo
     """
     ctx = FakeContext()
     graph.prepare_analysis(
-        valid_model().model_dump(mode="json"), ctx, skill_loader, knowledge_loader
+        valid_model().model_dump(mode="json"),
+        ctx,
+        KEYS,
+        FRAMEWORKS,
+        domain_loader,
+        package_loaders,
     )
 
     for category in STRIDE_CATEGORIES:
-        parked = ctx.state[graph.Lane(category).key("scope")]
+        parked = ctx.state[graph.Lane("stride", category).key("scope")]
         assert f"{category} rules ran" in parked
         assert "7 elements" in parked
 
 
-def test_prepare_fences_candidate_facts(skill_loader, knowledge_loader):
+def test_prepare_fences_candidate_facts(domain_loader, package_loaders):
     """Facts carry caller words, so they get the model's own fencing."""
     ctx = FakeContext()
     graph.prepare_analysis(
-        valid_model().model_dump(mode="json"), ctx, skill_loader, knowledge_loader
+        valid_model().model_dump(mode="json"),
+        ctx,
+        KEYS,
+        FRAMEWORKS,
+        domain_loader,
+        package_loaders,
     )
 
     parked = ctx.state[graph.Lane("information-disclosure").key("candidates")]
     assert parked.startswith("```")
 
 
-def test_prepare_selects_domain_packs_from_the_model(skill_loader, knowledge_loader):
+def test_prepare_selects_domain_packs_from_the_model(domain_loader, package_loaders):
     ctx = FakeContext()
     output = graph.prepare_analysis(
-        valid_model().model_dump(mode="json"), ctx, skill_loader, knowledge_loader
+        valid_model().model_dump(mode="json"),
+        ctx,
+        KEYS,
+        FRAMEWORKS,
+        domain_loader,
+        package_loaders,
     )
 
     # The fixture runs FastAPI over HTTPS against Cloud SQL Postgres.
@@ -1181,7 +1267,7 @@ def test_prepare_selects_domain_packs_from_the_model(skill_loader, knowledge_loa
 
 
 def test_prepare_renders_no_pack_block_when_none_is_earned(
-    skill_loader, knowledge_loader
+    domain_loader, package_loaders
 ):
     model = valid_model()
     model.processes[0].technology = "a shell script"
@@ -1192,16 +1278,24 @@ def test_prepare_renders_no_pack_block_when_none_is_earned(
     ctx = FakeContext()
 
     graph.prepare_analysis(
-        model.model_dump(mode="json"), ctx, skill_loader, knowledge_loader
+        model.model_dump(mode="json"),
+        ctx,
+        KEYS,
+        FRAMEWORKS,
+        domain_loader,
+        package_loaders,
     )
 
     assert ctx.state[graph.STATE_DOMAIN_SKILLS] == ""
 
 
-def test_each_agent_is_bound_to_its_own_candidate_key(skill_loader, prompt_loader):
+def test_each_agent_is_bound_to_its_own_candidate_key(prompt_loader, package_loader):
     for category in STRIDE_CATEGORIES:
-        instruction = graph.analyze_instruction(skill_loader, prompt_loader, category)
-        assert f"{{{graph.Lane(category).key('candidates')}}}" in instruction
+        instruction = graph.analyze_instruction(
+            package_loader, prompt_loader, STRIDE, graph.Lane("stride", category)
+        )
+        key = graph.Lane("stride", category).key("candidates")
+        assert f"{{{key}}}" in instruction
         assert "{candidates}" not in instruction
 
 
@@ -1214,20 +1308,18 @@ class TestALane:
     """
 
     def test_what_a_lane_writes_is_what_its_prompt_reads(self):
-        for lane in graph.LANES:
+        for lane in LANES:
             written = set(lane.state(dict.fromkeys(graph.LANE_ARTIFACTS, "text")))
             read = {
                 binding.strip("{}")
                 for placeholder, binding in lane.prompt_bindings.items()
-                if placeholder != "category"
+                if placeholder != "lane"
             }
-            assert read == written, lane.category
+            assert read == written, lane.lane
 
     def test_no_two_lanes_share_a_key(self):
         keys = [
-            lane.key(artifact)
-            for lane in graph.LANES
-            for artifact in graph.LANE_ARTIFACTS
+            lane.key(artifact) for lane in LANES for artifact in graph.LANE_ARTIFACTS
         ]
 
         assert len(set(keys)) == len(keys)
@@ -1235,17 +1327,17 @@ class TestALane:
     def test_a_partial_set_of_artifacts_fails_closed(self):
         """A key nothing wrote would raise at the first LLM call, not here."""
         with pytest.raises(ValueError, match="missing"):
-            graph.Lane("spoofing").state({"candidates": "text"})
+            graph.Lane("stride", "spoofing").state({"candidates": "text"})
 
     def test_an_unknown_artifact_fails_closed(self):
         with pytest.raises(ValueError, match="unknown"):
-            graph.Lane("spoofing").state(
+            graph.Lane("stride", "spoofing").state(
                 {**dict.fromkeys(graph.LANE_ARTIFACTS, "text"), "invented": "text"}
             )
 
     def test_the_node_name_is_an_identifier(self):
         """Unlike a category, which carries a hyphen ADK cannot take."""
-        for lane in graph.LANES:
+        for lane in LANES:
             assert lane.node_name.isidentifier()
             assert lane.drafts_key.isidentifier()
 
@@ -1253,7 +1345,7 @@ class TestALane:
 def test_merge_accounts_for_coverage_over_the_drafts():
     ctx = FakeContext(**analyze_state(spoofing=[sample_proposal("S-01", "spoofing")]))
 
-    graph.merge_drafts(valid_model().model_dump(mode="json"), ctx)
+    graph.merge_drafts(valid_model().model_dump(mode="json"), ctx, KEYS, NODES)
 
     rows = ctx.state[graph.STATE_COVERAGE]
     assert [row["category"] for row in rows] == list(STRIDE_CATEGORIES)
@@ -1264,14 +1356,14 @@ def test_merge_accounts_for_coverage_over_the_drafts():
 
 def test_coverage_reaches_the_report_through_assemble():
     ctx = FakeContext()
-    graph.assemble_report(
+    assemble(
         valid_model().model_dump(mode="json"),
         [sample_draft("S-01").model_dump(mode="json")],
         ctx,
-        reviewed_threats={"threats": [sample_ruling("S-01").model_dump(mode="json")]},
+        reviewed_threats={"claims": [sample_ruling("S-01").model_dump(mode="json")]},
         coverage=[
             {
-                "category": "spoofing",
+                "lane": "spoofing",
                 "drafts": 1,
                 "rules": 2,
                 "rules_fired": 0,
@@ -1296,12 +1388,12 @@ def test_assemble_fails_closed_when_the_critic_drops_a_draft():
     drafts = [sample_draft("S-01"), sample_draft("T-01", category="tampering")]
     ctx = FakeContext()
     with pytest.raises(CriticOutputError, match="dropped draft 'T-01'"):
-        graph.assemble_report(
+        assemble(
             valid_model().model_dump(mode="json"),
             [draft.model_dump(mode="json") for draft in drafts],
             ctx,
             reviewed_threats={
-                "threats": [sample_ruling("S-01").model_dump(mode="json")]
+                "claims": [sample_ruling("S-01").model_dump(mode="json")]
             },
         )
 
@@ -1310,7 +1402,7 @@ def test_assemble_fails_closed_when_the_critic_drops_a_draft():
 
 
 def test_prepare_records_the_packs_and_rules_the_agents_were_given(
-    skill_loader, knowledge_loader
+    domain_loader, package_loaders
 ):
     """The record is written where the selection happens.
 
@@ -1321,7 +1413,12 @@ def test_prepare_records_the_packs_and_rules_the_agents_were_given(
     """
     ctx = FakeContext()
     graph.prepare_analysis(
-        valid_model().model_dump(mode="json"), ctx, skill_loader, knowledge_loader
+        valid_model().model_dump(mode="json"),
+        ctx,
+        KEYS,
+        FRAMEWORKS,
+        domain_loader,
+        package_loaders,
     )
 
     recorded = ctx.state[graph.STATE_ANALYSIS_CONTEXT]
@@ -1333,12 +1430,12 @@ def test_prepare_records_the_packs_and_rules_the_agents_were_given(
 
 def test_the_context_reaches_the_report_through_assemble():
     ctx = FakeContext()
-    graph.assemble_report(
+    assemble(
         valid_model().model_dump(mode="json"),
         [sample_draft("S-01").model_dump(mode="json")],
         ctx,
-        reviewed_threats={"threats": [sample_ruling("S-01").model_dump(mode="json")]},
-        analysis_context={
+        reviewed_threats={"claims": [sample_ruling("S-01").model_dump(mode="json")]},
+        domain_packs={
             "domain_packs": ["http-api"],
             "fired_rules": ["spoofing-unverified-boundary-auth"],
         },
@@ -1359,11 +1456,11 @@ def test_a_graph_entered_past_prepare_records_an_empty_context():
     leave a reader guessing whether the run had them.
     """
     ctx = FakeContext()
-    graph.assemble_report(
+    assemble(
         valid_model().model_dump(mode="json"),
         [sample_draft("S-01").model_dump(mode="json")],
         ctx,
-        reviewed_threats={"threats": [sample_ruling("S-01").model_dump(mode="json")]},
+        reviewed_threats={"claims": [sample_ruling("S-01").model_dump(mode="json")]},
     )
 
     analysis = graph.Analysis.from_state(ctx.state[graph.STATE_ANALYSIS])
@@ -1383,14 +1480,14 @@ class TestIntoReport:
 
     def analysis(self) -> graph.Analysis:
         ctx = FakeContext()
-        graph.assemble_report(
+        assemble(
             valid_model().model_dump(mode="json"),
             [sample_draft("S-01").model_dump(mode="json")],
             ctx,
             reviewed_threats={
-                "threats": [sample_ruling("S-01").model_dump(mode="json")]
+                "claims": [sample_ruling("S-01").model_dump(mode="json")]
             },
-            analysis_context={"domain_packs": ["http-api"], "fired_rules": ["r-01"]},
+            domain_packs={"domain_packs": ["http-api"], "fired_rules": ["r-01"]},
         )
         return graph.Analysis.from_state(ctx.state[graph.STATE_ANALYSIS])
 
@@ -1487,7 +1584,7 @@ class TestTheInstructionDigest:
         assert re.fullmatch(r"[0-9a-f]{64}", pipeline.instruction_sha256)
 
     def test_two_builds_of_the_same_configuration_agree(
-        self, pipeline, skill_loader, prompt_loader, knowledge_loader
+        self, pipeline, prompt_loader, domain_loader, package_loaders
     ):
         """The property a comparison across runs depends on.
 
@@ -1497,9 +1594,10 @@ class TestTheInstructionDigest:
         """
         tiers = repo_tiers()
         rebuilt = graph.build_pipeline(
-            skill_loader=skill_loader,
             prompt_loader=prompt_loader,
-            knowledge_loader=knowledge_loader,
+            domain_loader=domain_loader,
+            package_loaders=package_loaders,
+            frameworks=FRAMEWORKS,
             binding=NodeBinding.from_configs(
                 tiers,
                 load_sampling(PROJECT_ROOT / "config" / "sampling.toml", env={}),
