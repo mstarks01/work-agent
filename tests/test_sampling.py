@@ -340,7 +340,7 @@ class TestResolveSampling:
         )
         resolve = make_resolve_sampling(config, tiers.resolve_tier)
         assert resolve("extract") is config.for_tier("base")
-        assert resolve("critic") is config.for_tier("strong")
+        assert resolve("critic/stride") is config.for_tier("strong")
 
     def test_unknown_node_propagates(self):
         config = load_sampling(SAMPLING_PATH, env={})
