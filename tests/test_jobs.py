@@ -22,12 +22,14 @@ from stride_service.jobs import (
 from stride_service.report import InputRef
 from stride_service.sources import Source
 from stride_service.validation import ValidationIssue
+from tests.factories import sample_selection
 
 
 def make_record() -> JobRecord:
     return JobRecord.create(
         owner_subject="alice",
         sources=[Source.description("a web app storing orders")],
+        frameworks=sample_selection(),
     )
 
 
@@ -196,7 +198,9 @@ class TestActiveFor:
             for owner in ("alice", "alice", "bob"):
                 await store.create(
                     JobRecord.create(
-                        owner_subject=owner, sources=[Source.description("an app")]
+                        owner_subject=owner,
+                        sources=[Source.description("an app")],
+                        frameworks=sample_selection(),
                     )
                 )
             return await store.active_for("alice"), await store.active_for("bob")

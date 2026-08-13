@@ -39,6 +39,7 @@ from tests.factories import (
     claims_json,
     repo_tiers,
     sample_ruling,
+    sample_selection,
     served_build,
     valid_model,
 )
@@ -118,6 +119,7 @@ def _marker_job(index: int) -> tuple[str, JobRecord]:
         owner_subject="idp|shared-caller",
         sources=[Source.description(f"{DESCRIPTION_TEXT} Job token {marker}.")],
         system_name=f"System-{index:04x}",
+        frameworks=sample_selection(),
     )
     record.transition("running")
     return marker, record

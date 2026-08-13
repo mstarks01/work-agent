@@ -121,6 +121,24 @@ def repo_tiers() -> ModelTierConfig:
     )
 
 
+def sample_selection(
+    frameworks: Sequence[FrameworkName] = DEFAULT_FRAMEWORKS,
+) -> list[FrameworkSelection]:
+    """One job's framework selection, with each package's options left empty.
+
+    ``frameworks`` is required and non-empty everywhere a job exists — on the
+    submission, on the record and on the engine — with no default on any path,
+    which is what stops a caller's omission meaning two different things on two
+    installs. So a test that is about something else still has to state one, and
+    states it here.
+
+    STRIDE's options model is empty, so ``{}`` is a *complete* selection for it
+    rather than a stub. A package with required options needs its own values
+    here.
+    """
+    return [FrameworkSelection(name=name) for name in frameworks]
+
+
 def repo_package_loaders(
     frameworks: Sequence[FrameworkName] = DEFAULT_FRAMEWORKS,
 ) -> dict[FrameworkName, MarkdownLoader]:
