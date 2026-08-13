@@ -267,7 +267,7 @@ class TestUnresolvedMentions:
     def test_an_id_the_model_lacks_is_marked_and_the_job_survives(self, model):
         joined = join_drafts(self.drafted("It pivots into process:ghost."), model)
 
-        assert [(m.threat_id, m.mention) for m in joined.marks.unresolved_mentions] == [
+        assert [(m.claim_id, m.mention) for m in joined.marks.unresolved_mentions] == [
             ("S-01", "process:ghost")
         ]
         assert len(joined.drafts) == 1
@@ -314,7 +314,7 @@ class TestMissingMitigations:
 
     def test_empty_with_no_unknown_behind_it_is_marked(self, model):
         joined = join_drafts(self.drafted(mitigations=[]), model)
-        assert [m.threat_id for m in joined.marks.missing_mitigations] == ["S-01"]
+        assert [m.claim_id for m in joined.marks.missing_mitigations] == ["S-01"]
 
     def test_empty_on_a_threat_conditional_on_an_unknown_is_licensed(self, model):
         """The one case the prompt allows, recognized by the branch its trigger picks."""
@@ -405,7 +405,7 @@ class TestQuoteVerification:
         joined = join_drafts(drafts, model, SOURCES)
 
         assert len(joined.drafts) == 1
-        assert [(m.threat_id, m.index) for m in joined.marks.unverified_grounds] == [
+        assert [(m.claim_id, m.index) for m in joined.marks.unverified_grounds] == [
             ("S-01", 0)
         ]
         assert LABEL in joined.marks.unverified_grounds[0].reason

@@ -408,11 +408,11 @@ class TestAnalysisMarks:
 
         merged = first.merged_with(second)
 
-        assert [mark.threat_id for mark in merged.unresolved_mentions] == [
+        assert [mark.claim_id for mark in merged.unresolved_mentions] == [
             "S-01",
             "T-02",
         ]
-        assert [mark.threat_id for mark in merged.missing_mitigations] == ["R-03"]
+        assert [mark.claim_id for mark in merged.missing_mitigations] == ["R-03"]
         assert merged.unverified_grounds == []
 
     def test_merging_covers_every_declared_mark(self):

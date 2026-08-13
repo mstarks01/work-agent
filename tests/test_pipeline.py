@@ -139,7 +139,7 @@ def test_an_unfindable_quote_is_marked_on_the_report_and_still_renders():
     report = outcome.report
     assert [threat.id for threat in report.threats] == ["S-01"]
     assert len(report.threats[0].grounds) == 2
-    assert [(m.threat_id, m.index) for m in report.unverified_grounds] == [("S-01", 0)]
+    assert [(m.claim_id, m.index) for m in report.unverified_grounds] == [("S-01", 0)]
 
 
 def test_a_description_citing_a_missing_element_is_marked_on_the_report():
@@ -166,7 +166,7 @@ def test_a_description_citing_a_missing_element_is_marked_on_the_report():
 
     report = outcome.report
     assert [threat.id for threat in report.threats] == ["S-01"]
-    assert [(m.threat_id, m.mention) for m in report.unresolved_mentions] == [
+    assert [(m.claim_id, m.mention) for m in report.unresolved_mentions] == [
         ("S-01", "process:web-api")
     ]
 
@@ -197,7 +197,7 @@ def test_a_composed_evidence_reference_is_marked_rather_than_fatal():
 
     report = outcome.report
     assert [threat.id for threat in report.threats] == ["S-01"]
-    assert [(m.threat_id, m.reference) for m in report.unresolved_evidence] == [
+    assert [(m.claim_id, m.reference) for m in report.unresolved_evidence] == [
         ("S-01", "crossing:flow:ghost")
     ]
     # The surviving reference still grounds the finding it was cited for.
@@ -216,7 +216,7 @@ def test_a_threat_with_no_countermeasure_is_marked_on_the_report():
 
     report = outcome.report
     assert [threat.id for threat in report.threats] == ["S-01"]
-    assert [m.threat_id for m in report.missing_mitigations] == ["S-01"]
+    assert [m.claim_id for m in report.missing_mitigations] == ["S-01"]
 
 
 def test_one_name_on_two_types_is_marked_and_does_not_fail_the_run():
