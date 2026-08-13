@@ -825,7 +825,7 @@ def test_the_marks_reach_the_report_through_assemble():
 
     analysis = graph.Analysis.from_state(ctx.state[graph.STATE_ANALYSIS])
 
-    assert [m.threat_id for m in analysis.marks.missing_mitigations] == ["S-01"]
+    assert [m.claim_id for m in analysis.marks.missing_mitigations] == ["S-01"]
     # Derived from the model this node holds, never carried from the fan-in,
     # so it is present on an analysis assembled from marks that omit it.
     assert analysis.marks.shared_element_names == []
