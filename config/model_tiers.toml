@@ -1,6 +1,17 @@
 # Model-tier configuration — source of truth for tier -> (vendor, model) and
 # LLM node -> tier.
 #
+# Version 5 is a hard cutover from version 4, for the framework packages: the
+# six `analyze/<category>` keys collapse to one `analyze/<framework>`, and
+# `critic` and `recritic` become `critic/<framework>` and
+# `recritic/<framework>`. There is no v4 shim, for the reason v4 had no v3 one.
+#
+# WHY THE FRAMEWORK AND NOT THE LANE: a lane is a framework's internal fact, and
+# every lane of one framework runs the same judgement on the same tier. Six keys
+# that always held one value had no reader. What an operator genuinely chooses
+# between is running one framework's analysis on a cheaper tier than another's,
+# and that is a knob per framework.
+#
 # Version 4 (#77 / #85) is a hard cutover from version 3, not a migration: the
 # six `analyst/<category>` node keys became `analyze/<category>`. There is no v3
 # shim — a version-3 file fails the loader's version check, which is the point:
@@ -61,7 +72,7 @@
 # picked. The three vendors are reached through one adapter and differ only in
 # the credential mode each implies; none is cheaper to select than the others.
 
-version = 4
+version = 5
 
 # CHOOSE A VENDOR AND MODEL FOR EACH TIER. Fill in the template below, or set
 # STRIDE_MODEL_{BASE,STRONG}_VENDOR together with the matching _MODEL — the two
@@ -103,14 +114,14 @@ version = 4
 [nodes]
 extract = "base"
 repair = "base"
-"analyze/spoofing" = "strong"
-"analyze/tampering" = "strong"
-"analyze/repudiation" = "strong"
-"analyze/information-disclosure" = "strong"
-"analyze/denial-of-service" = "strong"
-"analyze/elevation-of-privilege" = "strong"
-critic = "strong"
+# Three keys per framework. Every lane of one framework runs the same judgement
+# on the same tier, so this is one knob per framework rather than one per lane —
+# an operator choosing to run one framework cheaper than another is the choice
+# that has a purpose, and six keys that always held one value had no reader.
+"analyze/stride" = "strong"
+"critic/stride" = "strong"
 # The bounded critic re-ask (ticket 038): same judgement as the critic, so
-# always the same tier — a separate line here only so it is pinned, never so it
-# can drift onto a cheaper model than the pass it corrects.
-recritic = "strong"
+# always the same tier. The loader now *checks* the pairing rather than trusting
+# this comment — at two keys a comment holds, at 2N keys it drifts, and a re-ask
+# on a cheaper model than the pass it corrects is what the comment warned about.
+"recritic/stride" = "strong"
