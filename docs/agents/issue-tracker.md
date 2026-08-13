@@ -56,16 +56,26 @@ gh api --method POST repos/mstarks01/work-agent/issues/<child>/dependencies/bloc
 ### The live map
 
 [#158 — Map: one validated system representation, many security frameworks](https://github.com/mstarks01/work-agent/issues/158)
-— charted 2026-08-12 from [#139](https://github.com/mstarks01/work-agent/issues/139), 11 tickets, 0 resolved.
+— charted 2026-08-12 from [#139](https://github.com/mstarks01/work-agent/issues/139), 11 tickets, 6 resolved.
 A **planning** map: it settles the spec for a framework-neutral analysis layer, where one extraction and one
 **Valid System Model** feed N in-repo framework packages, and it stops at the spec. STRIDE becomes the first
 package rather than the architecture; ASVS proves the second.
 
-The frontier is [#159](https://github.com/mstarks01/work-agent/issues/159) (inventory the STRIDE coupling
-surface), [#160](https://github.com/mstarks01/work-agent/issues/160) (what ASVS 5.0 needs a system
-representation to say) and [#161](https://github.com/mstarks01/work-agent/issues/161) (does a job select its
-frameworks). Everything else waits on [#162](https://github.com/mstarks01/work-agent/issues/162), the
-taxonomy ruling, which is the cost driver of the map.
+The spine is settled. The coupling surface is verified ([#159](https://github.com/mstarks01/work-agent/issues/159)),
+ASVS asks a system representation for almost nothing ([#160](https://github.com/mstarks01/work-agent/issues/160)),
+the job selects its frameworks from a set the deployment carries
+([#161](https://github.com/mstarks01/work-agent/issues/161)), the taxonomy holds and one extraction serves
+every framework ([#162](https://github.com/mstarks01/work-agent/issues/162)), a thin `Claim` supertype carries
+what the service constructs ([#163](https://github.com/mstarks01/work-agent/issues/163)), and a package is a
+declaration object beside a text root, checked before the first model call
+([#164](https://github.com/mstarks01/work-agent/issues/164)).
+
+The frontier is [#165](https://github.com/mstarks01/work-agent/issues/165) (may a framework extend the
+evidence catalog), [#166](https://github.com/mstarks01/work-agent/issues/166) (one critic, or one per
+framework), [#167](https://github.com/mstarks01/work-agent/issues/167) (how a second framework is measured)
+and [#169](https://github.com/mstarks01/work-agent/issues/169) (where the notes, cases and domain packs sit).
+[#168](https://github.com/mstarks01/work-agent/issues/168), the report envelope, waits on
+[#167](https://github.com/mstarks01/work-agent/issues/167) and closes the map.
 
 Two constraints ride the whole effort. A framework package is **in-repo only** — no third-party code loads.
 And the no-shim rule removes "decide later" from the report envelope, so
