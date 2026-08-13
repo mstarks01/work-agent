@@ -50,6 +50,7 @@ from stride_service.graph import (
 )
 from stride_service.frameworks.stride.record import DraftThreat
 from stride_service.report import (
+    FrameworkName,
     InputRef,
     Job,
     NodeRun,
@@ -141,12 +142,19 @@ class ExtractionScore:
         }
 
 
+#: The frameworks a sweep's graph is built for. One today, and named here
+#: rather than defaulted inside the harness: a sweep grades a framework's own
+#: claim set (#167), so which frameworks ran is a property of the sweep.
+EVAL_FRAMEWORKS: tuple[FrameworkName, ...] = ("stride",)
+
+
 def build_eval_pipeline(
     entry: Entry,
     *,
     deployment: Deployment | None = None,
     resolve_model: ModelResolver | None = None,
     sampling: SamplingConfig | None = None,
+    frameworks: Sequence[FrameworkName] = EVAL_FRAMEWORKS,
 ) -> Pipeline:
     """The shipped graph, entered where the mode needs it.
 
@@ -166,7 +174,9 @@ def build_eval_pipeline(
     deployment = deployment or Deployment.from_env()
     if sampling is not None:
         deployment = replace(deployment, sampling=sampling, _built={})
-    return deployment.pipeline(entry=entry, resolve_model=resolve_model)
+    return deployment.pipeline(
+        frameworks, entry=entry, resolve_model=resolve_model
+    )
 
 
 async def run_graph(
