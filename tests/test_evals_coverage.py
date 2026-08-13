@@ -9,7 +9,9 @@ from stride_service.report import LaneCoverage
 
 def row(category, **overrides):
     fields = {
-        "category": category,
+        # STRIDE's lane slugs are its category names; the report row is keyed by
+        # lane, and the pooled row this feeds is still keyed by category.
+        "lane": category,
         "drafts": 1,
         "rules": 2,
         "rules_fired": 1,
