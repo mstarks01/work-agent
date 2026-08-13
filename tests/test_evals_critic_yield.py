@@ -290,12 +290,12 @@ def _report_with(case, threats):
         InputRef,
         Job,
         NodeRun,
-        StrideReport,
+        Report,
         build_summary,
     )
 
     now = datetime.now(UTC)
-    return StrideReport(
+    return Report(
         job=Job(id=f"eval-{case.id}", created_at=now, completed_at=now),
         input=InputRef.of(system_name=case.meta.title, sources=case.sources),
         nodes=[NodeRun(node="eval", model=None, duration_ms=0)],

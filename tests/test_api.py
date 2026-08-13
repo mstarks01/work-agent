@@ -19,7 +19,7 @@ from stride_service.jobs import (
     PipelineRejected,
     StubPipelineRunner,
 )
-from stride_service.report import StrideReport
+from stride_service.report import Report
 from stride_service.sources import Source, SourceLimits
 from stride_service.validation import ValidationIssue
 
@@ -482,7 +482,7 @@ class TestReport:
         job_id = submit(client)
         response = client.get(f"/v1/jobs/{job_id}/report", headers=auth())
         assert response.status_code == 200
-        report = StrideReport.model_validate(response.json())
+        report = Report.model_validate(response.json())
         assert report.job.id == job_id
         assert "owner" not in response.text
         assert "alice" not in response.text

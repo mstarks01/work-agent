@@ -17,13 +17,15 @@ from evals.harness.judge import (
     UnmatchedThreat,
 )
 from evals.harness.reference import ReferenceThreat
-from stride_service.report import (
+from stride_service.frameworks.stride.record import (
     DraftThreat,
+    StrideCategory,
+    Threat,
+)
+from stride_service.report import (
     Ground,
     Rating,
     Severity,
-    StrideCategory,
-    Threat,
     UnknownRef,
     Verdict,
 )

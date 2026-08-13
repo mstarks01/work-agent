@@ -27,12 +27,12 @@ from evals.harness.reference import load_case
 from evals.harness.run import _run_mode
 from stride_service.deployment import Deployment
 from stride_service.evidence import evidence_catalog
+from stride_service.frameworks.stride.record import STRIDE_CATEGORIES
 from stride_service.graph import (
     ENTRY_PREPARE,
     TIER_NODE_BY_GRAPH_NODE,
     analyze_node_name,
 )
-from stride_service.report import STRIDE_CATEGORIES
 from stride_service.sampling import load_sampling
 from tests.factories import TEST_TIER_ENV, ScriptedLlm
 from tests.test_evals_modes import scripted_ruling

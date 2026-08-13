@@ -429,9 +429,7 @@ def sample_report(
             id="job-8f3a2c91",
             created_at=created,
             completed_at=datetime(2026, 7, 18, 14, 4, 9, tzinfo=UTC),
-            frameworks=[
-                FrameworkSelection(name=block.framework) for block in analyses
-            ],
+            frameworks=[FrameworkSelection(name=block.framework) for block in analyses],
         ),
         input=InputRef.of(
             system_name="Order Service",

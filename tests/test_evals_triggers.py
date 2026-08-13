@@ -10,7 +10,7 @@ import pytest
 
 from evals.harness.reference import load_corpus
 from evals.harness.triggers import case_trigger_recall, corpus_recall, summarize
-from stride_service.report import STRIDE_CATEGORIES
+from stride_service.frameworks.stride.record import STRIDE_CATEGORIES
 
 CORPUS = Path(__file__).resolve().parents[1] / "evals" / "corpus"
 

@@ -2,6 +2,7 @@
 
 import pytest
 
+from stride_service.frameworks.stride.record import STRIDE_CATEGORIES
 from stride_service.markdown_loader import (
     MarkdownLoader,
     MarkdownNotFoundError,
@@ -13,9 +14,8 @@ from stride_service.prompts import (
     compose_critic_prompt,
     compose_extract_prompt,
     compose_repair_prompt,
-    exemplar_name,
+    lane_exemplars_doc,
 )
-from stride_service.report import STRIDE_CATEGORIES
 
 
 def prompt_text(title, body="Body."):
@@ -103,5 +103,5 @@ class TestComposePeerPrompts:
 
 
 def test_exemplar_name_is_root_relative(loader):
-    assert exemplar_name("denial-of-service") == "exemplars/denial-of-service"
-    assert loader.load(exemplar_name("denial-of-service"))
+    assert lane_exemplars_doc("denial-of-service") == "exemplars/denial-of-service"
+    assert loader.load(lane_exemplars_doc("denial-of-service"))

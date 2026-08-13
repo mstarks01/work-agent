@@ -4,7 +4,7 @@ import pytest
 
 from stride_service.candidates import generate_candidates
 from stride_service.coverage import build_coverage, cited_element_ids, lane_scope
-from stride_service.report import STRIDE_CATEGORIES
+from stride_service.frameworks.stride.record import STRIDE_CATEGORIES
 from tests.factories import sample_draft, valid_model
 
 

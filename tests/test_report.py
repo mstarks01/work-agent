@@ -6,16 +6,18 @@ from typing import get_args
 import pytest
 from pydantic import ValidationError
 
+from stride_service.frameworks.stride.record import (
+    ThreatRulings,
+)
 from stride_service.report import (
     AnalysisMarks,
-    CategoryCoverage,
+    ClaimMark,
     Ground,
+    LaneCoverage,
     MissingMitigation,
     ProposedVerdict,
+    Report,
     Severity,
-    StrideReport,
-    ThreatMark,
-    ThreatRulings,
     UnknownRef,
     UnresolvedEvidence,
     UnresolvedMention,
@@ -328,22 +330,22 @@ class TestReportInvariants:
         payload = report.model_dump()
         payload["boundary_crossings"] = []
         with pytest.raises(ValidationError, match="boundary_crossings"):
-            StrideReport.model_validate(payload)
+            Report.model_validate(payload)
 
     def test_mismatched_summary_is_rejected(self):
         report = sample_report()
         payload = report.model_dump()
         payload["summary"]["threat_count"] += 1
         with pytest.raises(ValidationError, match="summary does not match"):
-            StrideReport.model_validate(payload)
+            Report.model_validate(payload)
 
 
-class TestEveryThreatMarkPointsAtAThreat:
+class TestEveryClaimMarkPointsAtAThreat:
     """One rule over every mark, so a new mark type cannot arrive uncovered.
 
     A mark naming a threat this report does not carry annotates nothing, while
     the threat that really earned it renders as though it had checked out.
-    Parametrized over the whole of ``ThreatMark`` rather than written once per
+    Parametrized over the whole of ``ClaimMark`` rather than written once per
     type: the point is that the set is closed.
     """
 
@@ -374,9 +376,9 @@ class TestEveryThreatMarkPointsAtAThreat:
             sample_report(**{field: [mark]})
 
     def test_every_mark_type_is_covered_by_the_check(self):
-        """The parametrization above is the whole of ``ThreatMark``."""
+        """The parametrization above is the whole of ``ClaimMark``."""
         covered = {UnresolvedMention, UnresolvedEvidence, MissingMitigation}
-        assert set(get_args(ThreatMark)) == covered
+        assert set(get_args(ClaimMark)) == covered
 
 
 class TestAnalysisMarks:
@@ -431,7 +433,7 @@ class TestCoverageRatios:
         with pytest.raises(
             ValidationError, match="elements_cited=3 exceeds elements=2"
         ):
-            CategoryCoverage(
+            LaneCoverage(
                 category="spoofing",
                 drafts=1,
                 rules=2,
@@ -517,7 +519,7 @@ class TestTheSamplingClearBlock:
         resolved = self.fully_set()
         report = sample_report().model_copy(update={"sampling": {"base": {}}})
 
-        stored = StrideReport.model_validate(
+        stored = Report.model_validate(
             {**report.model_dump(), "sampling": {"base": resolved.model_dump()}}
         ).sampling["base"]
 
@@ -532,7 +534,7 @@ class TestTheSamplingClearBlock:
         in the report unverifiable by the reader it was recorded for.
         """
         resolved = self.fully_set()
-        stored = StrideReport.model_validate(
+        stored = Report.model_validate(
             {
                 **sample_report().model_dump(),
                 "sampling": {"base": resolved.model_dump()},
@@ -548,10 +550,10 @@ class TestTheSamplingClearBlock:
 class TestSerialization:
     def test_report_roundtrips_through_json(self):
         report = sample_report()
-        assert StrideReport.model_validate_json(report.model_dump_json()) == report
+        assert Report.model_validate_json(report.model_dump_json()) == report
 
     def test_extra_fields_are_rejected(self):
         payload = sample_report().model_dump()
         payload["extra"] = True
         with pytest.raises(ValidationError):
-            StrideReport.model_validate(payload)
+            Report.model_validate(payload)
