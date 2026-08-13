@@ -32,22 +32,32 @@ from collections.abc import Callable, Mapping, Sequence
 from dataclasses import dataclass
 from pathlib import Path
 from types import MappingProxyType
-from typing import Literal
+from typing import Literal, get_args
 
 from pydantic import BaseModel
 
 from stride_service.candidates import Rule
 from stride_service.errors import ConfigError
-from stride_service.report import Claim, FrameworkName
+from stride_service.report import (
+    Claim,
+    FrameworkAnalysis,
+    FrameworkName,
+    ProposalBatch,
+    RuledClaim,
+    RulingBatch,
+)
 from stride_service.system_model import SystemModel
 
 __all__ = [
     "PACKAGES",
+    "SCHEMAS",
     "FrameworkPackage",
     "FrameworkPackageError",
+    "FrameworkSchemas",
     "KnowledgeTables",
     "PreconditionResult",
     "package_for",
+    "schemas_for",
     "validate_package",
 ]
 
@@ -242,6 +252,53 @@ class FrameworkPackage:
         return "severity" in self.record.model_fields
 
 
+@dataclass(frozen=True)
+class FrameworkSchemas:
+    """The five shapes one framework's *model calls* speak in.
+
+    Beside :class:`FrameworkPackage` rather than inside it, and the split is the
+    nine-member contract's own: a package member says what this framework judges
+    and what selects its text, which is what the deployment gate can check and
+    what a maintainer edits. These five are the wire between the graph and a
+    provider — the types an ``output_schema`` compiles to and the types a node's
+    emission validates as — and none of them is a declaration about the
+    framework's method.
+
+    Registering a package fills both tables in one edit, exactly as the vendor
+    registry is one table edit and an import.
+
+    ``proposals`` / ``rulings``
+        The wrappers a lane agent and a critic emit, narrowing
+        :class:`~stride_service.report.ProposalBatch` and
+        :class:`~stride_service.report.RulingBatch` to this framework's own
+        element types. The graph never names the field inside; it unwraps
+        ``claims``, which is neutral because the prompt that asks for it is
+        shared.
+    ``ruled_record``
+        What a draft becomes once its ruling is merged on: the package's own
+        :class:`~stride_service.report.RuledClaim`. The draft side is the
+        package's ``record`` member, because that is what the gate checks and
+        what the resolver builds; this is the shape the report carries.
+    ``block``
+        The :class:`~stride_service.report.FrameworkAnalysis` subclass this
+        framework's output validates as, narrowing the claim arrays and the
+        summary. The envelope dispatches on ``framework`` to read the right one
+        back.
+    ``key_field``
+        The one field of ``proposals``' element type that is the agent's **ID
+        key** — STRIDE's ``sequence``, and a requirement-shaped framework's
+        requirement. Named rather than derived because ``id`` has no shared
+        grammar: the neutral resolver reads this field, hands it to the
+        package's own :class:`IdRule`, and composes an ID no agent spelled.
+    """
+
+    proposals: type[ProposalBatch]
+    rulings: type[RulingBatch]
+    ruled_record: type[RuledClaim]
+    block: type[FrameworkAnalysis]
+    key_field: str
+
+
 def _stride_package() -> FrameworkPackage:
     # Imported inside the function so this module can be imported for the
     # contract alone -- the STRIDE package pulls in its rules, which pull in the
@@ -251,10 +308,21 @@ def _stride_package() -> FrameworkPackage:
     return STRIDE
 
 
-def _stride_block() -> type:
-    from stride_service.frameworks.stride.record import StrideAnalysis
+def _stride_schemas() -> FrameworkSchemas:
+    from stride_service.frameworks.stride.record import (
+        StrideAnalysis,
+        Threat,
+        ThreatProposals,
+        ThreatRulings,
+    )
 
-    return StrideAnalysis
+    return FrameworkSchemas(
+        proposals=ThreatProposals,
+        rulings=ThreatRulings,
+        ruled_record=Threat,
+        block=StrideAnalysis,
+        key_field="sequence",
+    )
 
 
 #: What this repo carries, keyed by the name it is spelled with. A table, and a
@@ -263,13 +331,11 @@ PACKAGES: Mapping[FrameworkName, FrameworkPackage] = MappingProxyType(
     {"stride": _stride_package()}
 )
 
-#: How each package's analysis block is shaped in the report. Beside
-#: :data:`PACKAGES` and filled in the same edit, because it is the same
-#: registration: a package narrows ``claims`` to its own record type and its
-#: summary to whatever its record can be counted by, and the envelope dispatches
-#: on ``framework`` to read the right one back.
-BLOCK_TYPES: Mapping[FrameworkName, type] = MappingProxyType(
-    {"stride": _stride_block()}
+#: The model-facing shapes, keyed the same way and filled in the same edit. See
+#: :class:`FrameworkSchemas` for why these sit beside the package rather than on
+#: it.
+SCHEMAS: Mapping[FrameworkName, FrameworkSchemas] = MappingProxyType(
+    {"stride": _stride_schemas()}
 )
 
 
@@ -280,7 +346,18 @@ def block_type_for(name: str) -> type | None:
     envelope fall back to the neutral base rather than raise on a payload
     written by a build that carried a framework this one does not.
     """
-    return BLOCK_TYPES.get(name)
+    schemas = SCHEMAS.get(name)  # type: ignore[arg-type]
+    return schemas.block if schemas else None
+
+
+def schemas_for(name: FrameworkName) -> FrameworkSchemas:
+    """The model-facing shapes registered under this name.
+
+    A ``KeyError`` here is a defect for the reason :func:`package_for` gives:
+    both tables are filled in one edit, and every name that reaches the graph
+    has already passed :func:`validate_packages`.
+    """
+    return SCHEMAS[name]
 
 
 def package_for(name: FrameworkName) -> FrameworkPackage:
@@ -297,10 +374,12 @@ def package_for(name: FrameworkName) -> FrameworkPackage:
 def validate_package(package: FrameworkPackage, root: Path) -> None:
     """Refuse an ill-formed package, before any model call.
 
-    Twelve checks in three families, run for every name a **Deployment**
-    carries. Family A is the declaration, family B is what must exist on disk,
-    and family C is whether this deployment can actually run it — that last one
-    needs the tier config and so is checked by the caller, which holds it.
+    Three families of checks, run for every name a **Deployment** carries.
+    Family A is the declaration — including that this package's entry in
+    :data:`SCHEMAS` describes the record it declares — family B is what must
+    exist on disk, and family C is whether this deployment can actually run it —
+    that last one needs the tier config and so is checked by the caller, which
+    holds it.
 
     **Why this is not only a CI lint.** A deployment redirects
     ``STRIDE_FRAMEWORKS_DIR``, so a lint over this repo's tree says nothing
@@ -372,6 +451,84 @@ def _declaration_issues(package: FrameworkPackage) -> list[str]:
 
     issues += _id_format_issues(package)
     issues += _knowledge_issues(package)
+    issues += _schema_issues(package)
+    return issues
+
+
+def _batch_element(batch: type) -> type | None:
+    """The element type inside a proposal or ruling wrapper, or ``None``.
+
+    The wrapper's single ``claims`` field is declared ``list[<element>]``, so the
+    element is the annotation's one argument. ``None`` where it is not shaped
+    that way at all, which is a finding rather than something to guess through.
+    """
+    field = batch.model_fields.get("claims")
+    if field is None:
+        return None
+    args = get_args(field.annotation)
+    return args[0] if len(args) == 1 and isinstance(args[0], type) else None
+
+
+def _schema_issues(package: FrameworkPackage) -> list[str]:
+    """The registration's two halves agree with each other.
+
+    :data:`PACKAGES` and :data:`SCHEMAS` are filled in one edit, and this is what
+    holds that true: a package registered without its shapes, or with shapes
+    describing a different record, would fail at the first model call with a
+    ``KeyError`` naming nothing a maintainer could act on.
+
+    The ``key_field`` rules are the interesting pair, and they are the resolver's
+    own contract read back. It must be a field the *agent* fills, so it is on the
+    proposal; it must not be a field the *claim* carries, because the service
+    composes the ID from it and a record spelling the key too would give an agent
+    a second place to put a value the service already holds.
+    """
+    schemas = SCHEMAS.get(package.name)
+    if schemas is None:
+        return [
+            (
+                "no schemas are registered for this package; PACKAGES and"
+                " SCHEMAS are filled in one edit"
+            )
+        ]
+
+    issues: list[str] = []
+    proposal = _batch_element(schemas.proposals)
+    if proposal is None:
+        issues.append(
+            f"{schemas.proposals.__name__} does not declare claims as a list of"
+            " one proposal type"
+        )
+    elif schemas.key_field not in proposal.model_fields:
+        issues.append(
+            f"key_field {schemas.key_field!r} is not a field of"
+            f" {proposal.__name__}, so no agent supplies it"
+        )
+    if schemas.key_field in package.record.model_fields:
+        issues.append(
+            f"key_field {schemas.key_field!r} is also a field of"
+            f" {package.record.__name__}; the service composes the ID from the"
+            " key, so a claim carrying it would restate what it was built from"
+        )
+    if _batch_element(schemas.rulings) is None:
+        issues.append(
+            f"{schemas.rulings.__name__} does not declare claims as a list of"
+            " one ruling type"
+        )
+    if not issubclass(schemas.ruled_record, package.record):
+        issues.append(
+            f"ruled_record {schemas.ruled_record.__name__} does not subclass this"
+            f" package's own record {package.record.__name__}"
+        )
+    if not issubclass(schemas.ruled_record, RuledClaim):
+        issues.append(
+            f"ruled_record {schemas.ruled_record.__name__} does not subclass"
+            " RuledClaim, so it carries no verdict"
+        )
+    if not issubclass(schemas.block, FrameworkAnalysis):
+        issues.append(
+            f"block {schemas.block.__name__} does not subclass FrameworkAnalysis"
+        )
     return issues
 
 

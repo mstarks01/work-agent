@@ -524,6 +524,46 @@ class Claim(BaseModel):
     affected_element_ids: list[str] = Field(default_factory=list)
     grounds: list[Ground] = Field(min_length=1)
 
+    @classmethod
+    def claim_marks(cls, drafts: Sequence[Claim]) -> AnalysisMarks:
+        """The marks this framework's *own* judgement fields earn. None, here.
+
+        The neutral marks are the service's and are produced at the seam that
+        can see them: a quote absent from the source it named, a prose citation
+        naming no element, a reference resolving to nothing. This hook is for the
+        rest — a mark about a field only one framework declares.
+
+        STRIDE's is the only one today: a threat offering no countermeasure and
+        no reason for offering none. ``mitigations`` is
+        :class:`~stride_service.frameworks.stride.record.DraftThreat`'s, and a
+        framework that recommends nothing has no such mark to carry — which is
+        also why ``missing_mitigations`` sits on STRIDE's block rather than on
+        :class:`FrameworkAnalysis`.
+
+        Same standing as every other mark: recorded beside the findings, never
+        fatal, and never something an agent asserts about its own accuracy.
+        """
+        del drafts
+        return AnalysisMarks()
+
+    @classmethod
+    def lane_diagnostics(cls, drafts: Sequence[Claim]) -> list[str]:
+        """What this framework wants *logged* about one job's drafts. Nothing, here.
+
+        The one hook a package has into the fan-in, and it is deliberately
+        write-only: the fan-in logs whatever comes back and nothing else reads
+        it, so a package cannot reach a report or a verdict through this.
+
+        It exists because the observations worth making about an agent's output
+        are framework-specific in a way the neutral layer cannot reach. STRIDE's
+        is that a lane numbered its drafts ``01, 02, 05`` — a statement about its
+        own ``id_format``, which :class:`Claim` has none of, since ``id`` has no
+        shared grammar. A framework with nothing to say about its own IDs
+        inherits this and says nothing.
+        """
+        del drafts
+        return []
+
 
 class RuledClaim(Claim):
     """A :class:`Claim` a critic has ruled on: what a report carries.
@@ -652,6 +692,34 @@ class Proposal(BaseModel):
         return self
 
 
+class ProposalBatch(BaseModel):
+    """What a lane agent node emits: an object wrapping its list of proposals.
+
+    The wrapper exists for the *schema*, not for the domain. A node's
+    ``output_schema`` is what the graph asks the provider to constrain generation
+    to, and a bare ``list[Proposal]`` cannot be asked for: ADK cannot convert a
+    generic alias into a response format, so it sends none and the node generates
+    unconstrained — silently, with only a log line. Wrapping the list in a model
+    gives the conversion something it can carry, and an object root at that, which
+    is what OpenAI's structured outputs require and a bare array would not
+    satisfy.
+
+    **The field is ``claims`` and the name is neutral because the prompt is.**
+    ``prompts/analyze.md`` is one shared body serving every registered framework's
+    lane agents — a package brings its lane skill, its exemplars and its critic
+    text, not a copy of the output contract — so the word the prompt spells and
+    the word the graph unwraps has to be one a second framework can read without
+    lying. A package narrows the element type; nobody renames the field.
+
+    Nothing downstream sees the wrapper: the graph unwraps at the node boundary,
+    so the domain keeps working in lists.
+    """
+
+    model_config = ConfigDict(extra="forbid")
+
+    claims: list[Proposal]
+
+
 class Ruling(BaseModel):
     """The critic's ruling on one draft: the fields the critic owns, and no more.
 
@@ -711,6 +779,19 @@ class Ruling(BaseModel):
     # problem for the review seam to report and the re-ask to fix, not a reason
     # to fail the node. assemble_claims builds the canonical Verdict.
     verdict: ProposedVerdict
+
+
+class RulingBatch(BaseModel):
+    """What a critic node and its re-ask emit: one ruling per draft, wrapped.
+
+    Separate from :class:`ProposalBatch` because the element type differs; see
+    that class for why the wrapper exists at all and why its field is spelled
+    ``claims`` on both.
+    """
+
+    model_config = ConfigDict(extra="forbid")
+
+    claims: list[Ruling]
 
 
 class TokenUsage(BaseModel):
@@ -815,9 +896,8 @@ class AnalysisContext(BaseModel):
     The report already records the two ends of a run: the served build and
     sampling each node ran on (:class:`NodeRun`), and the facts each finding
     rests on (``grounds``). Between them sits everything the service *put in
-    front of* the category agents — the instruction text they were given, the
-    reference packs this model earned, the deterministic rules that fired — and
-    none of it was recorded anywhere. Two runs of the same model on the same
+    front of* the lane agents — the instruction text they were given and the
+    reference packs this model earned — and none of it was recorded anywhere. Two runs of the same model on the same
     input could differ because a pack selection flipped or a skill was edited,
     and the report showed nothing.
 
@@ -830,8 +910,9 @@ class AnalysisContext(BaseModel):
 
     ``instruction_sha256`` digests the *composed instruction* of every LLM node
     in the built graph, with the job-varying placeholders still unexpanded. So
-    it identifies the repo-authored text — prompts, category skills, the shared
-    rubric — and carries no submitter bytes at all, which is what makes it
+    it identifies the repo-authored text — the shared prompts and every carried
+    package's lane skills, exemplars, critic text and rubric — and carries no
+    submitter bytes at all, which is what makes it
     publishable beside a report. The generation-identity fingerprint attests to
     the model and the decoding params; it says nothing about the instructions,
     so two runs with identical fingerprints and completely different prompts
@@ -842,24 +923,19 @@ class AnalysisContext(BaseModel):
     same service gives two submissions different reference material, and the
     names are the only record of which.
 
-    ``fired_rules`` names the deterministic triggers that matched, where
-    ``coverage`` counts them. The count says how much attention was directed;
-    the IDs say where — which is what an eval measuring candidate usefulness
-    needs, and what a reader asking "why did the agent look there" reads.
-
-    ``knowledge_docs`` names what was retrieved from the local corpus for those
-    rules — ``notes/<id>`` for reference material and ``cases/<id>`` for a
-    worked judgement, unioned across the six lanes. Retrieval is deterministic
-    and local, so the pair (this list, this checkout) reproduces exactly the
-    text the agents were shown.
+    **``fired_rules`` and ``knowledge_docs`` are not here**, and the rule that
+    moved them is the one that sorted every field of the flat schema this
+    replaced: a field sits where the thing it describes sits. A candidate rule
+    belongs to the package that declared it and a retrieved document to the
+    package that selected it, so both name *one framework's* material and both
+    sit on :class:`FrameworkAnalysis`. The two that stayed describe the built
+    graph and the shared model, of which a report has one each.
     """
 
     model_config = ConfigDict(extra="forbid", frozen=True)
 
     instruction_sha256: str = Field(pattern=r"^[0-9a-f]{64}$")
     domain_packs: list[str] = Field(default_factory=list)
-    fired_rules: list[str] = Field(default_factory=list)
-    knowledge_docs: list[str] = Field(default_factory=list)
 
 
 class FrameworkSelection(BaseModel):
@@ -1479,6 +1555,20 @@ class FrameworkAnalysis(BaseModel):
     def all_claims(self) -> tuple[RuledClaim, ...]:
         """Both arrays, for the checks that do not care which one a claim is in."""
         return (*self.claims, *self.rejected_claims)
+
+    @classmethod
+    def summarize(
+        cls, claims: Sequence[RuledClaim], rejected_claims: Sequence[RuledClaim]
+    ) -> BlockSummary:
+        """This block's summary, computed from the claims that will fill it.
+
+        On the block type rather than in a registry, because the summary a
+        package builds and the summary its block *declares* are one decision: a
+        package that narrows :class:`BlockSummary` overrides this beside the
+        field it narrowed, so the fan-in that fills a block reaches the right
+        builder by holding the block type and nothing else.
+        """
+        return build_block_summary(claims, rejected_claims)
 
     def block_issues(self, known_element_ids: Collection[str]) -> list[str]:
         """Everything wrong with this block, given the envelope's element IDs.
