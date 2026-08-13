@@ -21,6 +21,7 @@ from stride_service.evidence import (
     resolve_proposals,
     unknown_evidence_ref,
 )
+from stride_service.frameworks.stride import STRIDE
 from stride_service.frameworks.stride.record import ThreatProposal, ThreatProposals
 from stride_service.report import Ground
 from stride_service.system_model import UNKNOWN, DataStore, SystemModel
@@ -217,7 +218,7 @@ class TestABadReferenceCostsItsEntryNotTheJob:
             quotes=[],
         )
 
-        resolution = resolve_proposals([proposal], catalog, "spoofing")
+        resolution = resolve_proposals([proposal], catalog, STRIDE, "spoofing")
 
         (draft,) = resolution.drafts
         assert draft.grounds == [catalog[ENCRYPTION_REF]]
@@ -236,10 +237,10 @@ class TestABadReferenceCostsItsEntryNotTheJob:
         )
 
         (mark,) = resolve_proposals(
-            [proposal], catalog, "spoofing"
+            [proposal], catalog, STRIDE, "spoofing"
         ).marks.unresolved_evidence
 
-        assert mark.threat_id == "S-01"
+        assert mark.claim_id == "S-01"
         assert mark.reference == "crossing:flow:ghost"
 
     def test_a_quote_is_enough_to_keep_a_threat_whose_references_all_fail(self):
@@ -251,7 +252,7 @@ class TestABadReferenceCostsItsEntryNotTheJob:
             quotes=[{"text": "Customers log in", "source_label": "Description"}],
         )
 
-        resolution = resolve_proposals([proposal], catalog, "spoofing")
+        resolution = resolve_proposals([proposal], catalog, STRIDE, "spoofing")
 
         assert len(resolution.drafts) == 1
         assert len(resolution.marks.unresolved_evidence) == 1
@@ -270,7 +271,7 @@ class TestABadReferenceCostsItsEntryNotTheJob:
         )
 
         with pytest.raises(EvidenceResolutionError, match="nothing is left"):
-            resolve_proposals([proposal], catalog, "spoofing")
+            resolve_proposals([proposal], catalog, STRIDE, "spoofing")
 
     def test_one_groundless_threat_does_not_take_its_lane_down_with_it(self):
         """Only the threat that cannot stand fails, and it fails the job.
@@ -285,7 +286,7 @@ class TestABadReferenceCostsItsEntryNotTheJob:
         ]
 
         with pytest.raises(EvidenceResolutionError) as excinfo:
-            resolve_proposals(proposals, catalog, "spoofing")
+            resolve_proposals(proposals, catalog, STRIDE, "spoofing")
 
         assert "'S-02'" in str(excinfo.value)
         assert "'S-01'" not in str(excinfo.value)
@@ -293,7 +294,7 @@ class TestABadReferenceCostsItsEntryNotTheJob:
     def test_a_clean_lane_records_no_marks(self):
         catalog = evidence_catalog(valid_model())
 
-        resolution = resolve_proposals([sample_proposal()], catalog, "spoofing")
+        resolution = resolve_proposals([sample_proposal()], catalog, STRIDE, "spoofing")
 
         assert resolution.marks.unresolved_evidence == []
 
@@ -303,7 +304,7 @@ class TestResolveProposals:
         catalog = evidence_catalog(valid_model())
         proposal = sample_proposal("S-01", evidence_refs=[ENCRYPTION_REF], quotes=[])
 
-        (draft,) = resolve_proposals([proposal], catalog, "spoofing").drafts
+        (draft,) = resolve_proposals([proposal], catalog, STRIDE, "spoofing").drafts
 
         assert draft.grounds == [catalog[ENCRYPTION_REF]]
 
@@ -315,7 +316,7 @@ class TestResolveProposals:
             quotes=[{"text": "Customers log in", "source_label": "Description"}],
         )
 
-        (draft,) = resolve_proposals([proposal], catalog, "spoofing").drafts
+        (draft,) = resolve_proposals([proposal], catalog, STRIDE, "spoofing").drafts
 
         assert draft.grounds == [
             Ground(kind="quote", text="Customers log in", source_label="Description")
@@ -332,7 +333,7 @@ class TestResolveProposals:
             quotes=[{"text": "Customers log in", "source_label": "Description"}],
         )
 
-        (draft,) = resolve_proposals([proposal], catalog, "spoofing").drafts
+        (draft,) = resolve_proposals([proposal], catalog, STRIDE, "spoofing").drafts
 
         assert [ground.kind for ground in draft.grounds] == [
             "quote",
@@ -344,7 +345,9 @@ class TestResolveProposals:
         """The agent's other seven fields reach the report as written."""
         catalog = evidence_catalog(valid_model())
 
-        (draft,) = resolve_proposals([sample_proposal()], catalog, "spoofing").drafts
+        (draft,) = resolve_proposals(
+            [sample_proposal()], catalog, STRIDE, "spoofing"
+        ).drafts
 
         assert draft == sample_draft()
 
@@ -352,9 +355,9 @@ class TestResolveProposals:
         catalog = evidence_catalog(valid_model())
         proposals = [sample_proposal("S-01"), sample_proposal("S-02")]
 
-        assert resolve_proposals(proposals, catalog, "spoofing") == resolve_proposals(
-            proposals, catalog, "spoofing"
-        )
+        assert resolve_proposals(
+            proposals, catalog, STRIDE, "spoofing"
+        ) == resolve_proposals(proposals, catalog, STRIDE, "spoofing")
 
     def test_a_reference_naming_nothing_fails_deterministically(self):
         """Reported as itself. There is no near match and no repair: inferring
@@ -365,7 +368,7 @@ class TestResolveProposals:
         )
 
         with pytest.raises(EvidenceResolutionError, match="crossing:flow:not-real"):
-            resolve_proposals([proposal], catalog, "spoofing")
+            resolve_proposals([proposal], catalog, STRIDE, "spoofing")
 
     def test_every_bad_reference_in_the_batch_is_reported_at_once(self):
         """The fan-in has no re-ask path, so it gets one chance to say what was
@@ -377,7 +380,7 @@ class TestResolveProposals:
         ]
 
         with pytest.raises(EvidenceResolutionError) as excinfo:
-            resolve_proposals(proposals, catalog, "spoofing")
+            resolve_proposals(proposals, catalog, STRIDE, "spoofing")
 
         assert "crossing:flow:ghost" in str(excinfo.value)
         assert "unknown:store:ghost:x" in str(excinfo.value)
@@ -390,7 +393,7 @@ class TestResolveProposals:
             "S-01", evidence_refs=[f"  {ENCRYPTION_REF} "], quotes=[]
         )
 
-        (draft,) = resolve_proposals([proposal], catalog, "spoofing").drafts
+        (draft,) = resolve_proposals([proposal], catalog, STRIDE, "spoofing").drafts
 
         assert draft.grounds == [catalog[ENCRYPTION_REF]]
 
@@ -440,7 +443,7 @@ class TestTheMisShapeIsUnreachable:
             "S-01", evidence_refs=[LOGIN_CROSSING_REF], quotes=[]
         )
 
-        (draft,) = resolve_proposals([proposal], catalog, "spoofing").drafts
+        (draft,) = resolve_proposals([proposal], catalog, STRIDE, "spoofing").drafts
 
         assert draft.grounds[0].kind == "derived-fact"
         assert draft.grounds[0].flow_id == "flow:customer-to-web-app:login"
@@ -465,7 +468,7 @@ class TestTheMisShapeIsUnreachable:
         catalog = evidence_catalog(valid_model())
         proposal = sample_proposal("S-07", evidence_refs=[ENCRYPTION_REF], quotes=[])
 
-        (draft,) = resolve_proposals([proposal], catalog, "tampering").drafts
+        (draft,) = resolve_proposals([proposal], catalog, STRIDE, "tampering").drafts
 
         assert draft.id == "T-07"
         assert draft.category == "tampering"

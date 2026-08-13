@@ -4,6 +4,7 @@ import pytest
 
 from stride_service.candidates import generate_candidates
 from stride_service.coverage import build_coverage, cited_element_ids, lane_scope
+from stride_service.frameworks.stride import STRIDE
 from stride_service.frameworks.stride.record import STRIDE_CATEGORIES
 from tests.factories import sample_draft, valid_model
 
@@ -15,22 +16,22 @@ def model():
 
 @pytest.fixture
 def candidates(model):
-    return generate_candidates(model)
+    return generate_candidates(model, STRIDE.lanes, STRIDE.rules)
 
 
 def coverage_for(category, rows):
-    return next(row for row in rows if row.category == category)
+    return next(row for row in rows if row.lane == category)
 
 
 def test_every_lane_gets_a_row_even_with_no_drafts(model, candidates):
-    rows = build_coverage({}, candidates, model)
-    assert [row.category for row in rows] == list(STRIDE_CATEGORIES)
+    rows = build_coverage({}, candidates, model, STRIDE)
+    assert [row.lane for row in rows] == list(STRIDE_CATEGORIES)
     assert all(row.drafts == 0 for row in rows)
     assert all(row.elements == len(model.elements()) for row in rows)
 
 
 def test_rules_counts_the_lane_not_the_firings(model, candidates):
-    rows = build_coverage({}, candidates, model)
+    rows = build_coverage({}, candidates, model, STRIDE)
     for row in rows:
         assert row.rules >= row.rules_fired
         assert row.rules_fired <= row.candidates
@@ -38,7 +39,7 @@ def test_rules_counts_the_lane_not_the_firings(model, candidates):
 
 def test_a_draft_citing_nothing_relevant_scores_zero_candidates(model, candidates):
     draft = sample_draft(category="spoofing", affected_element_ids=["entity:customer"])
-    rows = build_coverage({"spoofing": [draft]}, candidates, model)
+    rows = build_coverage({"spoofing": [draft]}, candidates, model, STRIDE)
     row = coverage_for("spoofing", rows)
     assert row.drafts == 1
     assert row.candidates_cited == 0
@@ -58,9 +59,11 @@ def test_a_candidate_counts_as_cited_only_when_every_element_is(model, candidate
         "I-01", category=lane, affected_element_ids=list(lead.element_ids)
     )
     partial_row = coverage_for(
-        lane, build_coverage({lane: [partial]}, candidates, model)
+        lane, build_coverage({lane: [partial]}, candidates, model, STRIDE)
     )
-    whole_row = coverage_for(lane, build_coverage({lane: [whole]}, candidates, model))
+    whole_row = coverage_for(
+        lane, build_coverage({lane: [whole]}, candidates, model, STRIDE)
+    )
     assert partial_row.candidates_cited == 0
     assert whole_row.candidates_cited > 0
 
@@ -104,7 +107,7 @@ def test_elements_cited_never_exceeds_the_model(model, candidates):
         description="`process:web-api` and `store:ghost` are also implicated",
     )
     row = coverage_for(
-        "tampering", build_coverage({"tampering": [draft]}, candidates, model)
+        "tampering", build_coverage({"tampering": [draft]}, candidates, model, STRIDE)
     )
     assert row.elements == len(model.elements())
     assert row.elements_cited <= row.elements
@@ -119,7 +122,7 @@ def test_crossings_and_unknown_controls_are_counted_against_citations(
         affected_element_ids=["flow:customer-to-web-app:login", "store:orders-db"],
     )
     row = coverage_for(
-        "tampering", build_coverage({"tampering": [draft]}, candidates, model)
+        "tampering", build_coverage({"tampering": [draft]}, candidates, model, STRIDE)
     )
     assert row.boundary_crossings == 1
     assert row.boundary_crossings_cited == 1
@@ -128,8 +131,8 @@ def test_crossings_and_unknown_controls_are_counted_against_citations(
 
 def test_coverage_is_stable_across_calls(model, candidates):
     draft = sample_draft(category="spoofing")
-    first = build_coverage({"spoofing": [draft]}, candidates, model)
-    second = build_coverage({"spoofing": [draft]}, candidates, model)
+    first = build_coverage({"spoofing": [draft]}, candidates, model, STRIDE)
+    second = build_coverage({"spoofing": [draft]}, candidates, model, STRIDE)
     assert [row.model_dump() for row in first] == [row.model_dump() for row in second]
 
 
@@ -143,7 +146,7 @@ class TestLaneScope:
     """
 
     def test_it_reports_the_models_denominators(self, model, candidates):
-        scope = lane_scope("spoofing", model, candidates["spoofing"])
+        scope = lane_scope("spoofing", STRIDE, model, candidates["spoofing"])
 
         assert f"{len(model.elements())} elements" in scope
         assert f"{len(model.boundary_crossings())} boundary crossings" in scope
@@ -156,8 +159,8 @@ class TestLaneScope:
         Two computations of "how many elements" would be two claims rather than
         one fact, and the one the agent read is the one nobody could check.
         """
-        scope = lane_scope("spoofing", model, candidates["spoofing"])
-        row = coverage_for("spoofing", build_coverage({}, candidates, model))
+        scope = lane_scope("spoofing", STRIDE, model, candidates["spoofing"])
+        row = coverage_for("spoofing", build_coverage({}, candidates, model, STRIDE))
 
         assert f"{row.elements} elements" in scope
         assert f"{row.boundary_crossings} boundary crossings" in scope
@@ -173,19 +176,19 @@ class TestLaneScope:
         because it never looked, so it is the last lane that should be told
         nothing about the system's size.
         """
-        scope = lane_scope("repudiation", model, None)
+        scope = lane_scope("repudiation", STRIDE, model, None)
 
         assert f"{len(model.elements())} elements" in scope
         assert "0 fired" in scope
 
     def test_it_names_the_lanes_own_category(self, model, candidates):
         assert "denial-of-service rules" in lane_scope(
-            "denial-of-service", model, candidates["denial-of-service"]
+            "denial-of-service", STRIDE, model, candidates["denial-of-service"]
         )
 
     def test_it_is_stable_across_calls(self, model, candidates):
         """Two runs over one model must send byte-identical instructions."""
-        first = lane_scope("tampering", model, candidates["tampering"])
-        second = lane_scope("tampering", model, candidates["tampering"])
+        first = lane_scope("tampering", STRIDE, model, candidates["tampering"])
+        second = lane_scope("tampering", STRIDE, model, candidates["tampering"])
 
         assert first == second
