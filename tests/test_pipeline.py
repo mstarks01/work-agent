@@ -36,6 +36,7 @@ from tests.factories import (
     repo_tiers,
     sample_proposal,
     sample_ruling,
+    sample_selection,
     served_build,
     valid_model,
 )
@@ -61,6 +62,7 @@ def job(text: str = DESCRIPTION_TEXT) -> JobRecord:
         owner_subject="idp|user-1",
         sources=[Source.description(text)],
         system_name="Order Service",
+        frameworks=sample_selection(),
     )
     record.transition("running")
     return record
