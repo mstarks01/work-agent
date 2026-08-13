@@ -46,7 +46,7 @@ from stride_service.jobs import (
     PipelineOutcome,
     PipelineRejected,
 )
-from stride_service.report import InputRef, Job, StrideReport
+from stride_service.report import InputRef, Job, Report
 
 logger = logging.getLogger(__name__)
 
@@ -95,6 +95,16 @@ class AdkPipelineRunner:
         wedges jobs is identifiable across runs without the service ever
         storing the untrusted text.
         """
+        # Before the graph rather than after it. A runner holds a graph built for
+        # one selection, and the envelope already refuses a report whose blocks
+        # are not the job's frameworks in order — but that refusal arrives after
+        # every node has been paid for, and it reads as a report defect rather
+        # than as the routing mistake it is.
+        if job.selection() != self._pipeline.frameworks:
+            raise PipelineError(
+                f"job {job.id} selected {list(job.selection())}, but this runner's"
+                f" graph was built for {list(self._pipeline.frameworks)}"
+            )
         input_ref = InputRef.of(
             system_name=job.system_name or DEFAULT_SYSTEM_NAME, sources=job.sources
         )
@@ -126,6 +136,11 @@ class AdkPipelineRunner:
                 id=job.id,
                 created_at=job.created_at,
                 completed_at=datetime.now(UTC),
+                # The selection as *submitted*, options and all, rather than the
+                # graph's name list: the envelope checks the blocks against this
+                # field, so recording what the job asked for is what makes that
+                # check mean anything.
+                frameworks=list(job.frameworks),
             ),
             input_ref=input_ref,
             nodes=graph_run.node_runs,
@@ -135,7 +150,7 @@ class AdkPipelineRunner:
             report=report, certification=self._certify(job, report)
         )
 
-    def _certify(self, job: JobRecord, report: StrideReport) -> CertifyResult | None:
+    def _certify(self, job: JobRecord, report: Report) -> CertifyResult | None:
         """Certify the finished report against this deployment's manifest.
 
         Runs **once, after the report is built**: a fingerprint exists only per

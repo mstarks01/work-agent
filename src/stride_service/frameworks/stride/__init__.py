@@ -133,7 +133,12 @@ STRIDE = FrameworkPackage(
     record=DraftThreat,
     id_rule=IdRule(
         template=ID_FORMAT,
-        prefix=MappingProxyType(dict(CATEGORY_LETTERS)),
+        # Widened from ``StrideCategory`` to ``str``, because ``IdRule`` keys by
+        # lane and a lane is a plain slug on the contract: the package gate is
+        # what checks this table covers every declared lane.
+        prefix=MappingProxyType(
+            {str(lane): letter for lane, letter in CATEGORY_LETTERS.items()}
+        ),
         lane_field="category",
     ),
     options=StrideOptions,
