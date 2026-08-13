@@ -35,11 +35,12 @@ from pydantic import BaseModel, ConfigDict, Field, model_validator
 
 from stride_service.certification import CertifyResult
 from stride_service.report import (
+    FrameworkAnalysis,
+    FrameworkSelection,
     InputRef,
     Job,
     NodeRun,
-    StrideReport,
-    build_summary,
+    Report,
 )
 from stride_service.sources import Source
 from stride_service.system_model import Process, SystemModel, TrustBoundary
@@ -114,6 +115,14 @@ class JobRecord(BaseModel):
     id: str
     owner_subject: str
     sources: list[Source] = Field(min_length=1)
+    # What this job asked to be analysed under, in the order its report's blocks
+    # will carry. Required and non-empty here as well as on the wire: the record
+    # is what the runner is selected by and what the report's own ``job.frameworks``
+    # is stamped from, so a record with no selection would name a graph that
+    # cannot be built. No default, for the reason ``config/frameworks.toml``
+    # carries none — a defaulted selection makes one submission mean different
+    # things on two installs.
+    frameworks: list[FrameworkSelection] = Field(min_length=1)
     system_name: str | None = None
     status: JobStatus = "queued"
     created_at: datetime
@@ -121,7 +130,7 @@ class JobRecord(BaseModel):
     events: list[JobEvent] = Field(default_factory=list)
     validation_issues: list[ValidationIssue] = Field(default_factory=list)
     error: str | None = None
-    report: StrideReport | None = None
+    report: Report | None = None
     # The certification verdict for this run, or None if the job produced no
     # report. It lives on the record rather than on the report because every
     # derived report field recomputes *from the report* and this one cannot —
@@ -135,6 +144,7 @@ class JobRecord(BaseModel):
         *,
         owner_subject: str,
         sources: Sequence[Source],
+        frameworks: Sequence[FrameworkSelection],
         system_name: str | None = None,
     ) -> Self:
         """A fresh queued job with its initial status event recorded."""
@@ -143,12 +153,23 @@ class JobRecord(BaseModel):
             id=f"job-{uuid4().hex}",
             owner_subject=owner_subject,
             sources=list(sources),
+            frameworks=list(frameworks),
             system_name=system_name,
             created_at=now,
             updated_at=now,
         )
         record._append_event(kind="status", status="queued")
         return record
+
+    def selection(self) -> tuple[str, ...]:
+        """This job's frameworks by name, in selection order.
+
+        What a runner is looked up by. The options ride on the record and on the
+        report's ``job`` block; they are job data rather than graph shape, so
+        two jobs selecting the same frameworks with different options share one
+        built graph.
+        """
+        return tuple(selection.name for selection in self.frameworks)
 
     def transition(self, new_status: JobStatus) -> None:
         """Move to ``new_status``, refusing edges outside the lifecycle."""
@@ -288,7 +309,7 @@ class PipelineCompleted:
     offline stand-ins, which have no manifest to certify against.
     """
 
-    report: StrideReport
+    report: Report
     certification: CertifyResult | None = None
 
 
@@ -312,16 +333,28 @@ class PipelineRunner(Protocol):
 
 
 class StubPipelineRunner:
-    """Stand-in runner: walks a few named nodes, returns an empty valid report."""
+    """Stand-in runner: walks a few named nodes, returns an empty valid report.
 
-    nodes: tuple[str, ...] = ("extract", "validate", "prepare", "critic", "assemble")
+    It answers the job's selection with one empty block per framework, because
+    the envelope refuses a report whose blocks are not the job's frameworks in
+    order — and that check is exactly the contract this stand-in exists to
+    exercise. The blocks are the neutral :class:`~stride_service.report.
+    FrameworkAnalysis` rather than each package's own narrowed shape: nothing
+    here judges anything, so claiming a package's block type would assert a
+    method that never ran.
+
+    The node names are the shared half of the topology only. A stub that spelled
+    per-framework node names would be inventing graph structure it never built.
+    """
+
+    nodes: tuple[str, ...] = ("extract", "validate", "prepare", "assemble")
 
     async def run(self, job: JobRecord, on_node: NodeCallback) -> PipelineOutcome:
         for node in self.nodes:
             await on_node(node)
         return PipelineCompleted(report=self._stub_report(job))
 
-    def _stub_report(self, job: JobRecord) -> StrideReport:
+    def _stub_report(self, job: JobRecord) -> Report:
         model = SystemModel(
             processes=[
                 Process(
@@ -336,11 +369,12 @@ class StubPipelineRunner:
                 TrustBoundary(id="boundary:system", name="System", kind="other")
             ],
         )
-        return StrideReport(
+        return Report(
             job=Job(
                 id=job.id,
                 created_at=job.created_at,
                 completed_at=datetime.now(UTC),
+                frameworks=list(job.frameworks),
             ),
             # Built through the same constructor the real runner uses: two
             # independent digest computations is how a fixture comes to carry
@@ -351,8 +385,25 @@ class StubPipelineRunner:
             nodes=[NodeRun(node=node, duration_ms=0) for node in self.nodes],
             system_model=model,
             boundary_crossings=model.boundary_crossings(),
-            threats=[],
-            summary=build_summary([], [], model),
+            elements_analyzed=len(model.elements()),
+            analyses=[self._stub_block(selection) for selection in job.frameworks],
+        )
+
+    def _stub_block(self, selection: FrameworkSelection) -> FrameworkAnalysis:
+        # The version comes from the registered package rather than from a
+        # literal: this stand-in runs in the build it is stubbing, and a report
+        # carrying a version no package here declares is a fixture nothing could
+        # be checked against.
+        from stride_service.frameworks import package_for
+
+        return FrameworkAnalysis(
+            framework=selection.name,
+            framework_version=package_for(selection.name).version,
+            disclaimer=(
+                f"Stub run: no {selection.name} analysis was performed and this"
+                " block asserts nothing about the system."
+            ),
+            summary=FrameworkAnalysis.summarize([], []),
         )
 
 
@@ -384,9 +435,11 @@ async def execute_job(
     operator's alert cannot.
 
     A partial run is never a partial report. The deadline path stores no
-    ``report`` at all — six category lanes are what makes the output a STRIDE
-    model, and one that stopped halfway is a different method, not a shorter
-    answer.
+    ``report`` at all — every lane of every framework the job selected is what
+    makes the output that method's answer, and one that stopped halfway is a
+    different method rather than a shorter answer. The envelope enforces the
+    same rule from the other side: a block missing from ``analyses`` is refused
+    rather than served as a report the caller has to notice is short.
     """
     record = await store.get(job_id)
     if record is None:
