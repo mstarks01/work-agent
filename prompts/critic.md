@@ -21,7 +21,7 @@ Then follow the validated System Model, its derived boundary crossings, and the 
 ```
 
 ```
-{draft_threats}
+{drafts}
 ```
 
 ## Procedure
@@ -40,7 +40,7 @@ Run these five steps on each draft, in this order. Steps 1–3 gate: a draft tha
 
 ## Output
 
-Return an object with a single field, `threats`, holding one ruling per draft you were given — `{"threats": [ ... ]}`, nothing outside it, and none disappear. A ruling is not the draft: it carries the draft's `id`, so we know which one you ruled on, and the two judgements that are yours — a `verdict` and a `confidence` rating.
+Return an object with a single field, `claims`, holding one ruling per draft you were given — `{"claims": [ ... ]}`, nothing outside it, and none disappear. A ruling is not the draft: it carries the draft's `id`, so we know which one you ruled on, and the two judgements that are yours — a `verdict` and a `confidence` rating.
 
 Do not repeat the draft's own fields. Its title, description, affected elements and mitigations are held beside your ruling and are copied into the report exactly as the agent wrote them. Re-transcribing them wins nothing, and every re-transcription is a chance to alter wording you were not asked to touch.
 

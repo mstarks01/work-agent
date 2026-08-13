@@ -1,4 +1,4 @@
-"""Every fact a category agent may cite, enumerated from the validated model.
+"""Every fact a lane agent may cite, enumerated from the validated model.
 
 A finding's justification is a :class:`~stride_service.report.Ground`, and the
 two non-quote branches of one are pure functions of the System Model: an
@@ -53,14 +53,13 @@ from collections.abc import Iterable, Mapping
 from typing import NamedTuple
 
 from stride_service.critic import DraftJoinError
+from stride_service.frameworks import FrameworkPackage, schemas_for
 from stride_service.report import (
-    CATEGORY_LETTERS,
     REFERENCE_MAX_CHARS,
     AnalysisMarks,
-    DraftThreat,
+    Claim,
     Ground,
-    StrideCategory,
-    ThreatProposal,
+    Proposal,
     UnresolvedEvidence,
 )
 from stride_service.system_model import UNKNOWN, SystemModel, attribute_names
@@ -81,9 +80,9 @@ class EvidenceResolutionError(DraftJoinError):
 
     Narrower than it was. A *single* reference the catalog does not contain is
     dropped and marked (:class:`~stride_service.report.UnresolvedEvidence`), so
-    this no longer fires for a threat that cited one composed fact beside real
+    this no longer fires for a claim that cited one composed fact beside real
     ones — that cost 2 of 12 jobs on a live sweep for citation errors (#138).
-    What still raises is a threat with **no grounds left**, which the schema
+    What still raises is a claim with **no grounds left**, which the schema
     cannot represent and no critic could rule on.
 
     A :class:`~stride_service.critic.DraftJoinError` because it is one: a draft
@@ -183,7 +182,7 @@ def _gloss(ground: Ground) -> str:
     """What one catalogued fact asserts.
 
     Deliberately short, and it does not repeat the element ID: that is the left
-    column already, and this text is paid for on all six agents' instructions
+    column already, and this text is paid for on every lane agent's instruction
     through the two exemplar catalogs. What it has to carry is the *kind* of
     fact — an unstated attribute reads very differently from a derived crossing,
     and an agent that conflates them cites the wrong one.
@@ -201,17 +200,21 @@ class Resolution(NamedTuple):
     halves. Shaped like :class:`~stride_service.critic.JoinedDrafts` — marks
     beside drafts — and carrying the same
     :class:`~stride_service.report.AnalysisMarks`, so the fan-in merges what
-    six lanes and the join produced without knowing which mark came from where.
+    every lane and the join produced without knowing which mark came from where.
     Only ``unresolved_evidence`` is ever populated here; the other four lists
     have no producer this early.
+
+    The drafts are the package's own record type; they are typed as the neutral
+    :class:`~stride_service.report.Claim` here because this module builds them
+    from a contract rather than from a framework it knows.
     """
 
-    drafts: list[DraftThreat]
+    drafts: list[Claim]
     marks: AnalysisMarks
 
 
 def _grounds_of(
-    proposal: ThreatProposal, catalog: Mapping[str, Ground]
+    proposal: Proposal, catalog: Mapping[str, Ground]
 ) -> tuple[list[Ground], list[str]]:
     """One proposal's grounds, and every reference of its that named nothing.
 
@@ -244,71 +247,89 @@ def _grounds_of(
     return grounds, unresolved
 
 
+#: What every proposal carries for this module rather than for the claim: the
+#: two evidence lists, which resolve into ``grounds`` and do not survive as
+#: fields. Everything else an agent wrote is carried across untouched.
+_RESOLVED_AWAY = frozenset({"evidence_refs", "quotes"})
+
+
 def resolve_proposals(
-    proposals: Iterable[ThreatProposal],
+    proposals: Iterable[Proposal],
     catalog: Mapping[str, Ground],
-    category: StrideCategory,
+    package: FrameworkPackage,
+    lane: str,
 ) -> Resolution:
     """Turn one lane's proposals into drafts: resolve the evidence, stamp the lane.
 
+    **One resolver for every framework**, which is what keeps *the agent selects
+    and the service constructs* a construction rather than a convention each
+    package could break. Three things are the service's here and none of them is
+    a judgement: the grounds, the claim ID, and the lane.
+
     The catalog is the sole source of truth for evidence: a resolved ground is
     the entry itself, so it carries the branch and the fields that branch
-    requires, and the :class:`~stride_service.report.DraftThreat` this returns
-    cannot be mis-shaped whatever an agent emitted.
+    requires, and the claim this returns cannot be mis-shaped whatever an agent
+    emitted.
 
-    ``category`` is the lane being resolved, and it arrives as an argument
-    because that is where the fact lives — the graph builds one node per STRIDE
-    category and knows which is which before any model runs. The threat ID is
-    composed from it and the agent's ``sequence``, so a draft's category, its
-    ID's letter and the node that produced it agree by construction rather than
-    by an agent keeping three spellings in line. Everything else passes through
-    untouched.
+    ``lane`` is the lane being resolved, and it arrives as an argument because
+    that is where the fact lives — the graph builds one node per
+    ``(framework, lane)`` and knows which is which before any model runs. The ID
+    is composed by the package's own :class:`~stride_service.frameworks.IdRule`
+    from that lane and the agent's key, and the lane is stamped into whatever
+    field that rule names, so a draft's lane, its ID's prefix and the node that
+    produced it agree by construction rather than by an agent keeping three
+    spellings in line.
+
+    Everything else the agent wrote passes through untouched — the title, the
+    description, the element refs, and whatever this framework judges. The key
+    itself does not: it is what the ID was composed *from*, and the gate has
+    already refused a record that declares it.
 
     **A reference that names nothing costs its entry, not the job.** Agents
     compose well-formed references to facts the catalog does not hold — correct
     grammar, plausible element IDs — and failing the whole analysis over one
-    discards six lanes of work to punish a citation error (#138). So an
-    unresolvable reference is dropped and marked, and the threat stands on
+    discards every lane's work to punish a citation error (#138). So an
+    unresolvable reference is dropped and marked, and the claim stands on
     whatever else it cited.
 
-    The line is *no grounds at all*. A threat whose every ground evaporates has
+    The line is *no grounds at all*. A claim whose every ground evaporates has
     nothing supporting it, and a finding with empty ``grounds`` is the one
     thing this schema refuses to represent — so that, and only that, still
     raises. It is the same rule :func:`~stride_service.critic.join_drafts`
-    applies to unverified quotes: marked per entry, failed closed per threat.
+    applies to unverified quotes: marked per entry, failed closed per claim.
 
-    Every such threat across the whole batch is reported together, rather than
+    Every such claim across the whole batch is reported together, rather than
     the first one aborting the pass. An agent that misread the catalog usually
     misread it more than once, and a fan-in with no re-ask path gets one chance
     to say what was wrong.
     """
-    drafts = []
+    key_field = schemas_for(package.name).key_field
+    carried = _RESOLVED_AWAY | {key_field}
+    drafts: list[Claim] = []
     unresolved_evidence: list[UnresolvedEvidence] = []
     groundless: list[str] = []
     for proposal in proposals:
-        threat_id = f"{CATEGORY_LETTERS[category]}-{proposal.sequence:02d}"
+        claim_id = package.compose_id(lane, getattr(proposal, key_field))
         grounds, unresolved = _grounds_of(proposal, catalog)
         unresolved_evidence += [
-            UnresolvedEvidence(threat_id=threat_id, reference=ref[:REFERENCE_MAX_CHARS])
+            UnresolvedEvidence(claim_id=claim_id, reference=ref[:REFERENCE_MAX_CHARS])
             for ref in unresolved
         ]
         if not grounds:
             groundless.append(
-                f"threat {threat_id!r} cites only evidence this job's catalog"
+                f"claim {claim_id!r} cites only evidence this job's catalog"
                 f" does not contain ({', '.join(repr(ref) for ref in unresolved)}),"
                 " so nothing is left to justify it"
             )
             continue
         drafts.append(
-            DraftThreat(
-                id=threat_id,
-                category=category,
-                title=proposal.title,
-                description=proposal.description,
-                affected_element_ids=proposal.affected_element_ids,
+            package.record(
+                id=claim_id,
+                framework=package.name,
+                framework_version=package.version,
                 grounds=grounds,
-                severity=proposal.severity,
-                mitigations=proposal.mitigations,
+                **package.lane_fields(lane),
+                **proposal.model_dump(exclude=carried),
             )
         )
     if groundless:
