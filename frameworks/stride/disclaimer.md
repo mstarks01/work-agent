@@ -1,0 +1,1 @@
+AI-generated STRIDE threat model. Each claim asserts that an attacker action against the named elements is credible against what the submitted text stated — never that a control is absent, and never that anything not listed here is safe. Not reviewed by a human security analyst.
