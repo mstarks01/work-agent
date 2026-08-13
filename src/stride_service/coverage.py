@@ -1,18 +1,23 @@
 """Coverage accounting: what each lane was offered, and what its drafts cite.
 
-A threat count says how much an agent found. It cannot say whether a lane that
+A claim count says how much an agent found. It cannot say whether a lane that
 found nothing had examined the system and cleared it, or had never looked at
 half of it — and those two are the difference between a report and a
 misleading one. This module computes the second number.
 
 Everything here is derived in code from three artifacts that already exist: the
-validated System Model, the deterministic candidates
-(:mod:`stride_service.candidates`), and the drafts the six agents actually
-filed. Nothing is asserted by a model, and nothing here can change a finding —
-coverage is recorded beside the analysis, never fed back into it.
+validated System Model, the deterministic candidates one package's rules raised
+(:mod:`stride_service.candidates`), and the drafts that package's lane agents
+actually filed. Nothing is asserted by a model, and nothing here can change a
+finding — coverage is recorded beside the analysis, never fed back into it.
+
+**Per framework, and it sits inside that framework's block for the same
+reason.** A lane belongs to the package that declared it, the denominators are
+counted from that package's own rules, and a coverage table pooled across
+frameworks would divide one framework's citations by another's leads.
 
 **The honest limit, stated once here and again on
-:class:`~stride_service.report.CategoryCoverage`.** What is measured is
+:class:`~stride_service.report.LaneCoverage`.** What is measured is
 *citation*, not attention: an agent that read a flow and rightly concluded it
 was harmless cites nothing, and looks from here exactly like one that skipped
 it. There is no observable that separates them — a model's own claim to have
@@ -20,7 +25,7 @@ examined something is precisely the assertion this design refuses to trust. So
 the fields are named for citation, and the number that means something is the
 aggregate across a corpus rather than any one lane on any one case.
 
-Computed at the fan-in, over the drafts rather than the ruled threats: coverage
+Computed at the fan-in, over the drafts rather than the ruled claims: coverage
 is a fact about what the agents did with the system, and a draft the critic
 later rejects was still a part of the system being examined.
 """
@@ -30,22 +35,21 @@ from __future__ import annotations
 from collections.abc import Collection, Iterable, Mapping
 
 from stride_service.analysis import unknown_controls
-from stride_service.candidates import CandidateSet, rules_for
+from stride_service.candidates import CandidateSet
 from stride_service.critic import mentioned_ids
+from stride_service.frameworks import FrameworkPackage
 from stride_service.references import canonical
-from stride_service.report import (
-    STRIDE_CATEGORIES,
-    CategoryCoverage,
-    DraftThreat,
-    StrideCategory,
-)
+from stride_service.report import Claim, LaneCoverage
 from stride_service.system_model import SystemModel
 
 __all__ = ["build_coverage", "cited_element_ids", "lane_scope"]
 
 
 def lane_scope(
-    category: StrideCategory, model: SystemModel, candidate_set: CandidateSet | None
+    lane: str,
+    package: FrameworkPackage,
+    model: SystemModel,
+    candidate_set: CandidateSet | None,
 ) -> str:
     """One lane's denominators, as a line the agent reads before it starts.
 
@@ -61,7 +65,7 @@ def lane_scope(
     **What this is for**, and it is not a quota: a lane that files nothing
     should be able to mean *examined and cleared* rather than *never looked*,
     and an agent cannot say that about a system whose size it was never told.
-    An agent that files a threat per element to make a number go up has
+    An agent that files a claim per element to make a number go up has
     misread it, which is why the prompt spends a sentence saying so.
     """
     offered = candidate_set.candidates if candidate_set else ()
@@ -70,13 +74,13 @@ def lane_scope(
         f"Scope for your lane: {len(model.elements())} elements, "
         f"{len(model.boundary_crossings())} boundary crossings, "
         f"{len(unknown_controls(model))} unstated controls. "
-        f"{len(rules_for(category))} {category} rules ran; {fired} fired, "
+        f"{len(package.rules_for(lane))} {lane} rules ran; {fired} fired, "
         f"raising {len(offered)} candidates.\n"
     )
 
 
 def cited_element_ids(
-    drafts: Iterable[DraftThreat], element_ids: Collection[str]
+    drafts: Iterable[Claim], element_ids: Collection[str]
 ) -> frozenset[str]:
     """Every element ID these drafts point at, from both places one appears.
 
@@ -113,46 +117,51 @@ def cited_element_ids(
 
 
 def build_coverage(
-    drafts_by_category: Mapping[StrideCategory, list[DraftThreat]],
-    candidates: Mapping[StrideCategory, CandidateSet],
+    drafts_by_lane: Mapping[str, list[Claim]],
+    candidates: Mapping[str, CandidateSet],
     model: SystemModel,
-) -> list[CategoryCoverage]:
-    """One :class:`CategoryCoverage` per STRIDE category, in canonical order.
+    package: FrameworkPackage,
+) -> list[LaneCoverage]:
+    """One :class:`LaneCoverage` per lane, in the package's declared order.
 
-    Every category gets a row, including a lane that filed nothing — a missing
-    row would be the exact ambiguity this accounting exists to remove.
+    Every lane gets a row, including one that filed nothing — a missing row
+    would be the exact ambiguity this accounting exists to remove. The lane set
+    is the package's own, so a framework's block accounts for its own lanes and
+    for nothing else.
     """
     elements = [element.id for element in model.elements()]
     crossings = model.boundary_crossings()
     controls = unknown_controls(model)
     return [
         _row(
-            category,
-            drafts_by_category.get(category, []),
-            candidates.get(category),
+            lane,
+            package,
+            drafts_by_lane.get(lane, []),
+            candidates.get(lane),
             element_ids=elements,
             crossing_flow_ids=[crossing.flow_id for crossing in crossings],
             control_element_ids=[control.element_id for control in controls],
         )
-        for category in STRIDE_CATEGORIES
+        for lane in package.lanes
     ]
 
 
 def _row(
-    category: StrideCategory,
-    drafts: list[DraftThreat],
+    lane: str,
+    package: FrameworkPackage,
+    drafts: list[Claim],
     candidate_set: CandidateSet | None,
     *,
     element_ids: Collection[str],
     crossing_flow_ids: list[str],
     control_element_ids: list[str],
-) -> CategoryCoverage:
+) -> LaneCoverage:
     cited = cited_element_ids(drafts, element_ids)
     offered = candidate_set.candidates if candidate_set else ()
-    return CategoryCoverage(
-        category=category,
+    return LaneCoverage(
+        lane=lane,
         drafts=len(drafts),
-        rules=len(rules_for(category)),
+        rules=len(package.rules_for(lane)),
         rules_fired=len({candidate.rule_id for candidate in offered}),
         candidates=len(offered),
         # A candidate counts as cited when *every* element it names is cited:

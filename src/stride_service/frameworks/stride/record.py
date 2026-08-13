@@ -18,18 +18,21 @@ from __future__ import annotations
 from collections.abc import Sequence
 from typing import Literal, get_args
 
-from pydantic import BaseModel, ConfigDict, Field
+from pydantic import ConfigDict, Field
 
 from stride_service.report import (
+    AnalysisMarks,
     BlockSummary,
     Claim,
     FrameworkAnalysis,
     MissingMitigation,
     Mitigation,
     Proposal,
+    ProposalBatch,
     Rating,
     RuledClaim,
     Ruling,
+    RulingBatch,
     Severity,
     SeverityLevel,
     build_block_summary,
@@ -103,6 +106,19 @@ ID_FORMAT = "{prefix}-{key:02d}"
 MAX_SEQUENCE = 99
 
 
+def _threat_id(lane: StrideCategory, sequence: int) -> str:
+    """One threat ID, composed the way the package's own ``IdRule`` composes it.
+
+    Only :meth:`DraftThreat.lane_diagnostics` needs this: everything on the
+    analysis path composes IDs through
+    :meth:`~stride_service.frameworks.FrameworkPackage.compose_id`, and the
+    diagnostic runs over drafts whose IDs already exist. Spelled from the same
+    two constants, so a message cannot describe an ID shape the resolver does not
+    produce.
+    """
+    return ID_FORMAT.format(prefix=CATEGORY_LETTERS[lane], key=sequence)
+
+
 class DraftThreat(Claim):
     """One draft STRIDE finding: a claim plus what this framework judges.
 
@@ -131,6 +147,75 @@ class DraftThreat(Claim):
     affected_element_ids: list[str] = Field(min_length=1)
     severity: Severity
     mitigations: list[Mitigation] = Field(default_factory=list)
+
+    @classmethod
+    def claim_marks(cls, drafts: Sequence[Claim]) -> AnalysisMarks:
+        """Marks for threats offering no countermeasure and no reason for none.
+
+        The prompt licenses an empty ``mitigations`` for exactly one case — the
+        threat is conditional on an ``unknown`` and no countermeasure can be
+        named without first learning that fact — and the branch rule makes that
+        case recognizable: a threat triggered by an unknown carries an
+        ``unknown-attribute`` ground, because the trigger dictates the branch. So
+        the licensed empty and the unlicensed one are told apart by the draft's
+        own grounds, with no judgement asked of anybody.
+        """
+        return AnalysisMarks(
+            missing_mitigations=[
+                MissingMitigation(claim_id=draft.id)
+                for draft in drafts
+                if isinstance(draft, DraftThreat)
+                and not draft.mitigations
+                and not any(
+                    ground.kind == "unknown-attribute" for ground in draft.grounds
+                )
+            ]
+        )
+
+    @classmethod
+    def lane_diagnostics(cls, drafts: Sequence[Claim]) -> list[str]:
+        """Every lane whose drafts are not numbered ``01..N``, as messages.
+
+        The prompt asks each agent for "a sequence starting at 1, numbered within
+        your lane only". A lane that emits ``S-01, S-02, S-05`` has not followed
+        it.
+
+        **Logged rather than raised, and deliberately not on the report.** A gap
+        breaks nothing: IDs are opaque handles, they are unique, their letters
+        match, and every downstream check passes. Renumbering would make them
+        comply, and is refused — rewriting a finding's identity to satisfy a
+        cosmetic rule is a bigger liberty than the rule is worth, and it would
+        move a threat's ID between two runs of the same input.
+
+        So this is a signal about the *agents*, not about the report, and it goes
+        where the other operational facts about a run go rather than to a reader
+        who can do nothing with it. Worth having because it is free and because
+        nothing else in the graph would ever mention it: an agent quietly
+        drifting from its output contract is the kind of thing that is obvious in
+        hindsight and invisible in advance.
+
+        **STRIDE's, not the service's**, which is why it is here. "Numbered
+        ``01..N``" is a statement about :data:`ID_FORMAT` and a two-digit integer
+        key, and :class:`~stride_service.report.Claim` has neither — ``id`` has no
+        shared grammar, so a framework keyed by requirement number has no gaps to
+        have. The neutral hook it overrides says nothing at all.
+        """
+        numbers_by_lane: dict[StrideCategory, list[int]] = {}
+        for draft in drafts:
+            # Not every Claim is one of ours: the hook's signature is the
+            # neutral one, and a caller holding a mixed list is a defect
+            # elsewhere rather than something to report from here.
+            if isinstance(draft, DraftThreat):
+                numbers_by_lane.setdefault(draft.category, []).append(
+                    int(draft.id.split("-", 1)[1])
+                )
+        return [
+            f"the {lane} lane numbered its {len(numbers)} drafts"
+            f" {', '.join(sorted(_threat_id(lane, n) for n in numbers))},"
+            f" not 01..{len(numbers):02d}"
+            for lane, numbers in numbers_by_lane.items()
+            if sorted(numbers) != list(range(1, len(numbers) + 1))
+        ]
 
 
 class Threat(DraftThreat, RuledClaim):
@@ -171,28 +256,24 @@ class ThreatProposal(Proposal):
     mitigations: list[Mitigation] = Field(default_factory=list)
 
 
-class ThreatProposals(BaseModel):
-    """What a category agent node emits: an object wrapping its list of proposals.
+class ThreatProposals(ProposalBatch):
+    """What a category agent node emits, narrowed to STRIDE's own proposal.
 
-    The wrapper exists for the *schema*, not for the domain. A node's
-    ``output_schema`` is what the graph asks the provider to constrain
-    generation to, and a bare ``list[ThreatProposal]`` cannot be asked for: ADK
-    cannot convert a generic alias into a response format, so it sends none and
-    the node generates unconstrained — silently, with only a log line. Wrapping
-    the list in a model gives the conversion something it can carry, and an
-    object root at that, which is what OpenAI's structured outputs require and
-    a bare array would not satisfy.
+    The wrapper and its ``claims`` field are
+    :class:`~stride_service.report.ProposalBatch`'s, for the schema-compiler
+    reasons that class documents. All this adds is the element type.
 
-    Nothing downstream sees it: the graph unwraps at the node boundary, so the
-    domain keeps working in lists.
-
-    ``threats`` rather than ``proposals`` because the field name is the agent's
-    output contract and the prompt has always spelled it that way.
+    **The field used to be spelled ``threats``**, because the prompt spelled it
+    that way and the prompt was STRIDE's. It is not any more: one shared
+    ``analyze.md`` asks every registered framework's lane agents for the same
+    object, and a second framework filing "threats" would be answering in a word
+    its own claims are not. The rename costs one line in that prompt and is
+    inside the ``schema_version`` 3.0 break either way.
     """
 
     model_config = ConfigDict(extra="forbid")
 
-    threats: list[ThreatProposal]
+    claims: list[ThreatProposal]
 
 
 class ThreatRuling(Ruling):
@@ -213,18 +294,17 @@ class ThreatRuling(Ruling):
     severity: Severity | None = None
 
 
-class ThreatRulings(BaseModel):
-    """What the critic and its re-ask emit: the wrapper over one ruling per draft.
+class ThreatRulings(RulingBatch):
+    """What the critic and its re-ask emit, narrowed to STRIDE's own ruling.
 
     Separate from :class:`ThreatProposals` because the element type differs. See
-    that class for why the wrapper exists at all, and why its field is still
-    spelled ``threats`` on both: it is the shape the provider constrains
-    generation to, not the domain's word for what is inside.
+    :class:`~stride_service.report.ProposalBatch` for why the wrapper exists at
+    all and why its field is spelled ``claims`` on both.
     """
 
     model_config = ConfigDict(extra="forbid")
 
-    threats: list[ThreatRuling]
+    claims: list[ThreatRuling]
 
 
 class StrideSummary(BlockSummary):
@@ -276,6 +356,11 @@ class StrideAnalysis(FrameworkAnalysis):
     rejected_claims: list[Threat] = Field(default_factory=list)
     summary: StrideSummary
     missing_mitigations: list[MissingMitigation] = Field(default_factory=list)
+
+    @classmethod
+    def summarize(cls, claims, rejected_claims) -> StrideSummary:
+        """STRIDE's own summary, beside the field that narrowed it."""
+        return build_stride_summary(claims, rejected_claims)
 
     def block_issues(self, known_element_ids):
         """The neutral checks, plus STRIDE's own mark placement."""
