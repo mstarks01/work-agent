@@ -21,7 +21,8 @@ from stride_service.evidence import (
     resolve_proposals,
     unknown_evidence_ref,
 )
-from stride_service.report import Ground, ThreatProposal, ThreatProposals
+from stride_service.frameworks.stride.record import ThreatProposal, ThreatProposals
+from stride_service.report import Ground
 from stride_service.system_model import UNKNOWN, DataStore, SystemModel
 from tests.factories import sample_draft, sample_proposal, valid_model
 

@@ -16,21 +16,30 @@ from __future__ import annotations
 
 from pathlib import Path
 
-from stride_service.candidates import RULES
+from stride_service.frameworks.stride import CASES, NOTES, STRIDE
 from stride_service.knowledge import (
-    CASES,
     MAX_CASES,
     MAX_NOTES,
-    NOTES,
     compose_cases,
     compose_notes,
-    select_cases,
-    select_notes,
+    select_documents,
 )
 from stride_service.markdown_loader import MarkdownLoader
 
 PROJECT_ROOT = Path(__file__).resolve().parents[1]
-loader = MarkdownLoader(PROJECT_ROOT / "knowledge")
+# The package's own text root: a document's home follows its retrieval key,
+# and these are selected by STRIDE's own fired rules (ADR 0011).
+loader = MarkdownLoader(PROJECT_ROOT / "frameworks" / "stride")
+
+
+def select_notes(fired) -> tuple[str, ...]:
+    """STRIDE's reference notes for one lane's fired rules."""
+    return select_documents(NOTES, fired, MAX_NOTES)
+
+
+def select_cases(fired) -> tuple[str, ...]:
+    """STRIDE's worked cases for one lane's fired rules."""
+    return select_documents(CASES, fired, MAX_CASES)
 
 
 class TestSelection:
@@ -55,7 +64,7 @@ class TestSelection:
 
     def test_selection_is_capped_per_lane(self):
         """Every rule at once is not a realistic lane; the cap is why it is safe."""
-        every_rule = {rule.rule_id for rule in RULES}
+        every_rule = {rule.rule_id for rule in STRIDE.rules}
         assert len(select_notes(every_rule)) == MAX_NOTES
         assert len(select_cases(every_rule)) == MAX_CASES
 
@@ -80,7 +89,7 @@ class TestSelection:
         otherwise identical jobs — the same property
         ``select_domain_packs`` needs.
         """
-        fired = {rule.rule_id for rule in RULES[:5]}
+        fired = {rule.rule_id for rule in STRIDE.rules[:5]}
         assert select_notes(fired) == select_notes(fired)
         assert select_cases(fired) == select_cases(fired)
 

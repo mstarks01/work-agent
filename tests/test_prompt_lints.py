@@ -50,6 +50,7 @@ from pydantic import ValidationError
 
 from stride_service.critic import mentioned_ids
 from stride_service.evidence import CROSSING_PREFIX, UNKNOWN_PREFIX, render_catalog
+from stride_service.frameworks.stride.record import STRIDE_CATEGORIES, ThreatProposal
 from stride_service.grounding import verify_quote
 from stride_service.markdown_loader import MarkdownLoader, split_sections
 from stride_service.prompts import (
@@ -67,9 +68,9 @@ from stride_service.prompts import (
     REPAIR_PROMPT_NAME,
     REPAIR_PROMPT_TOKEN_CAP,
     compose_analyze_prompt,
-    exemplar_name,
+    lane_exemplars_doc,
 )
-from stride_service.report import STRIDE_CATEGORIES, Ground, ThreatProposal
+from stride_service.report import Ground
 from stride_service.skills import estimate_tokens
 
 PROMPTS_DIR = Path(__file__).resolve().parents[1] / "prompts"
@@ -109,7 +110,7 @@ def json_blocks(text):
 
 
 def exemplar_sections(category):
-    return split_sections(loader.load(exemplar_name(category)))
+    return split_sections(loader.load(lane_exemplars_doc(category)))
 
 
 def exemplar_systems():
@@ -473,12 +474,12 @@ def test_every_exemplar_system_is_worked_by_some_category():
 
 @pytest.mark.parametrize("category", STRIDE_CATEGORIES)
 def test_exemplar_file_within_token_cap(category):
-    tokens = estimate_tokens(loader.load(exemplar_name(category)))
+    tokens = estimate_tokens(loader.load(lane_exemplars_doc(category)))
     assert tokens <= EXEMPLAR_TOKEN_CAP
 
 
 def test_no_stray_prompt_files():
-    known = {*PROMPT_BODY_NAMES, *(exemplar_name(c) for c in STRIDE_CATEGORIES)}
+    known = {*PROMPT_BODY_NAMES, *(lane_exemplars_doc(c) for c in STRIDE_CATEGORIES)}
     assert set(loader.names()) == known
 
 

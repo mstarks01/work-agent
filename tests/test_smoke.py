@@ -36,7 +36,7 @@ from stride_service.jobs import (
     PipelineOutcome,
     PipelineRejected,
 )
-from stride_service.report import NodeRun, StrideReport
+from stride_service.report import NodeRun, Report
 from stride_service.sampling import sampling_fingerprint
 from stride_service.smoke import (
     ANALYST,
@@ -73,7 +73,7 @@ DEPLOYMENT = Deployment.from_env(env=TEST_TIER_ENV)
 LLM_NODES = (EXTRACT_NODE, *ANALYZE_GRAPH_NODES, CRITIC_NODE)
 
 
-def smoke_report(**overrides: object) -> StrideReport:
+def smoke_report(**overrides: object) -> Report:
     """A completed report shaped like one the smoke fixture would produce.
 
     Built from the shared report factory with a full LLM execution record laid
@@ -93,7 +93,7 @@ def smoke_report(**overrides: object) -> StrideReport:
         "sampling": sampling,
         **overrides,
     }
-    return StrideReport.model_validate(fields)
+    return Report.model_validate(fields)
 
 
 def node_run(node: str, **overrides: object) -> dict[str, object]:
@@ -126,7 +126,7 @@ class StubRunner:
         return self._outcome
 
 
-def result_for(report: StrideReport) -> dict[str, Check]:
+def result_for(report: Report) -> dict[str, Check]:
     """Every check against one report, keyed by name for a targeted assertion."""
     return {check.name: check for check in checks_for(report, DEPLOYMENT)}
 

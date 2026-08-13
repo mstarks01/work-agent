@@ -2,7 +2,7 @@
 
 Each check is exercised against a report deliberately broken in one way. The
 gates are re-asserted in :mod:`evals.harness.structural` rather than delegated
-to :class:`StrideReport`'s own validator, so these tests build the broken
+to :class:`Report`'s own validator, so these tests build the broken
 payloads as raw JSON where the model would refuse to construct them.
 """
 
@@ -20,7 +20,7 @@ def test_a_sound_report_has_no_issues():
 def test_unparseable_payload_fails_the_gate():
     issues = structural_issues({"job": {"id": "x"}})
 
-    assert issues and all("does not parse as StrideReport" in i for i in issues)
+    assert issues and all("does not parse as Report" in i for i in issues)
 
 
 def test_dangling_element_reference_fails_the_gate():

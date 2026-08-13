@@ -18,7 +18,8 @@ from evals.harness.reference import (
     load_case,
     load_corpus,
 )
-from stride_service.report import STRIDE_CATEGORIES, derive_severity_level
+from stride_service.frameworks.stride.record import STRIDE_CATEGORIES
+from stride_service.report import derive_severity_level
 
 CORPUS_DIR = Path(__file__).resolve().parents[1] / "evals" / "corpus"
 
