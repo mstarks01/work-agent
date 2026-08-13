@@ -3,6 +3,16 @@
 Everything here is deterministic and credential-free by construction;
 ``tests/test_corpus_lints.py`` runs the same checks in CI.
 
+**This module is also the merge bar.** A deployment cannot read ``evals/`` —
+``pyproject.toml`` packages ``src/stride_service`` alone — so no load-time gate
+can check that a framework was ever measured, and a package that *asserted* it
+had been would be the shape Promotion already rejects. The floor sits here
+instead, and it draws the same line the package gate does: the gate checks what
+the code reads, CI checks what the budget allows. Three checks
+(:func:`framework_issues`, :func:`lane_coverage_issues`) say a framework is
+**gradeable**; none of them says it grades *well*, and no number stands behind
+either claim until a live sweep runs.
+
 Run ``python evals/verify_corpus.py`` to check, ``--write-sha`` to stamp each
 case's ``source_sha256`` from its ``source.md``.
 """
@@ -13,21 +23,24 @@ import argparse
 import hashlib
 import json
 import sys
-from collections.abc import Iterator
+from collections.abc import Callable, Iterator, Mapping
 from pathlib import Path
 from typing import Any, get_args
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "src"))
 
+from stride_service.frameworks import PACKAGES
+from stride_service.frameworks.stride.record import STRIDE_CATEGORIES
 from stride_service.grounding import verify_quote
 from stride_service.report import (
-    STRIDE_CATEGORIES,
+    FrameworkName,
     InputRef,
     Rating,
     SourceRef,
     derive_severity_level,
 )
 from stride_service.sources import SourceKind
+from stride_service.system_model import SystemModel
 from stride_service.validation import parse_and_validate
 
 SOURCE_KINDS = frozenset(get_args(SourceKind))
@@ -53,20 +66,71 @@ CASE_FIELDS = frozenset(
         "id",
         "title",
         "domain",
-        "exemplar_proximity",
         "provenance",
         "bootstrap",
         "sources",
         "source_sha256",
+        "frameworks",
         "notes",
     )
 )
-THREAT_FIELDS = frozenset(
-    ("category", "affected_element_ids", "claim", "tier", "severity", "notes")
-)
+CASE_FRAMEWORK_FIELDS = frozenset(("name", "options", "exemplar_proximity"))
+#: What every framework's reference record carries, whatever it grades with.
+CLAIM_FIELDS = frozenset(("claim", "tier", "affected_element_ids", "notes"))
 PAIR_FIELDS = frozenset(
     ("case", "category", "reference_claim", "candidate_claim", "label", "note")
 )
+
+#: Where one framework's reference records live inside a case, relative to it.
+#: Spelled here as well as in :mod:`evals.harness.reference` because this module
+#: reads the corpus as raw JSON on purpose — a lint that went through the
+#: harness's loader would be checking the loader.
+CLAIMS_DIR = "claims"
+
+
+def claims_file(case_dir: Path, framework: FrameworkName) -> Path:
+    return case_dir / CLAIMS_DIR / f"{framework}.json"
+
+
+def _stride_record_issues(where: str, record: dict) -> Iterator[str]:
+    """What STRIDE's reference record carries beyond the neutral fields.
+
+    A category, a graded severity, and at least one element: STRIDE-per-element
+    is what the framework *means*, so a reference threat naming nothing in the
+    graph is unscoreable rather than a legal record.
+    """
+    if record["category"] not in STRIDE_CATEGORIES:
+        yield f"{where} category {record['category']!r} is not a STRIDE category"
+
+    if not record["affected_element_ids"]:
+        yield f"{where} cites no elements"
+
+    severity = record["severity"]
+    if severity.keys() != {"likelihood", "impact"}:
+        yield f"{where} severity must carry likelihood and impact only"
+        return
+    for field, rating in severity.items():
+        if rating not in RATINGS:
+            yield f"{where} severity {field} {rating!r} is not a legal rating"
+
+
+#: The extra fields each framework's reference record carries, and the checks
+#: over them. Harness data keyed off the closed ``FrameworkName``, beside
+#: :data:`evals.harness.reference.REFERENCE_TYPES` and for the same reason: what
+#: a reference set looks like is the eval's business, not a package member.
+RECORD_FIELDS: Mapping[FrameworkName, frozenset[str]] = {
+    "stride": CLAIM_FIELDS | {"category", "severity"},
+}
+RECORD_CHECKS: Mapping[FrameworkName, Callable[[str, dict], Iterator[str]]] = {
+    "stride": _stride_record_issues,
+}
+#: Which lane a reference record belongs to, or ``None`` for a framework whose
+#: records carry no lane. Read by :func:`lane_coverage_issues`, which is the
+#: check that an unmeasured lane — one ``strong`` call per lane, which is the
+#: granularity that spends money — cannot reach a deployment.
+RECORD_LANE: Mapping[FrameworkName, Callable[[dict], object]] = {
+    "stride": lambda record: record.get("category"),
+}
 
 
 def case_dirs() -> list[Path]:
@@ -242,69 +306,178 @@ def _check_case_metadata(case_dir: Path, meta: dict) -> Iterator[str]:
         yield f"case.json has unexpected fields: {sorted(unexpected)}"
     if meta.get("id") != case_dir.name:
         yield f"case.json id {meta.get('id')!r} does not match directory name"
-    if meta.get("exemplar_proximity") not in EXEMPLAR_PROXIMITY:
-        yield f"exemplar_proximity {meta.get('exemplar_proximity')!r} is not near/far"
+    yield from _check_declared_frameworks(meta)
     yield from _check_sources(case_dir, meta)
 
 
-def _check_threats(threats: object, element_ids: set[str]) -> Iterator[str]:
-    if not isinstance(threats, list) or not threats:
-        yield "threats.json must be a non-empty list"
+def _check_declared_frameworks(meta: dict) -> Iterator[str]:
+    """The ``frameworks`` block is well-formed and names each package once."""
+    declared = meta.get("frameworks")
+    if not isinstance(declared, list) or not declared:
+        yield "case.json frameworks must be a non-empty list"
         return
 
-    seen_categories = set()
-    for index, threat in enumerate(threats):
-        where = f"threats[{index}]"
-        missing = THREAT_FIELDS - threat.keys()
-        unexpected = threat.keys() - THREAT_FIELDS
+    seen: set[str] = set()
+    for index, entry in enumerate(declared):
+        where = f"frameworks[{index}]"
+        if not isinstance(entry, dict):
+            yield f"{where} is not an object"
+            continue
+        missing = CASE_FRAMEWORK_FIELDS - entry.keys()
+        unexpected = entry.keys() - CASE_FRAMEWORK_FIELDS
+        if missing or unexpected:
+            yield (
+                f"{where} fields wrong: missing {sorted(missing)},"
+                f" extra {sorted(unexpected)}"
+            )
+            continue
+        if entry["name"] not in PACKAGES:
+            yield f"{where} names {entry['name']!r}, which this build does not carry"
+        elif entry["name"] in seen:
+            yield f"{where} declares {entry['name']!r} twice"
+        seen.add(entry["name"])
+        if not isinstance(entry["options"], dict):
+            yield f"{where} options must be an object"
+        if entry["exemplar_proximity"] not in EXEMPLAR_PROXIMITY:
+            yield (
+                f"{where} exemplar_proximity"
+                f" {entry['exemplar_proximity']!r} is not near/far"
+            )
+
+
+def _check_claims(
+    framework: FrameworkName, records: object, element_ids: set[str]
+) -> Iterator[str]:
+    """One framework's reference file, on the neutral rules plus its own.
+
+    The neutral half is every framework's: a legal tier, a one-sentence claim,
+    and cited elements that exist in the blessed model. The rest comes from
+    :data:`RECORD_CHECKS`, so a second framework's record shape is a table entry
+    rather than a branch here.
+    """
+    where_file = f"{CLAIMS_DIR}/{framework}.json"
+    if not isinstance(records, list) or not records:
+        yield f"{where_file} must be a non-empty list"
+        return
+
+    fields = RECORD_FIELDS[framework]
+    for index, record in enumerate(records):
+        where = f"{framework}[{index}]"
+        if not isinstance(record, dict):
+            yield f"{where} is not an object"
+            continue
+        missing = fields - record.keys()
+        unexpected = record.keys() - fields
         if missing:
             yield f"{where} is missing fields: {sorted(missing)}"
             continue
         if unexpected:
             yield f"{where} has unexpected fields: {sorted(unexpected)}"
 
-        category = threat["category"]
-        if category not in STRIDE_CATEGORIES:
-            yield f"{where} category {category!r} is not a STRIDE category"
-        else:
-            seen_categories.add(category)
+        if record["tier"] not in TIERS:
+            yield f"{where} tier {record['tier']!r} is not must-find/expected"
 
-        if threat["tier"] not in TIERS:
-            yield f"{where} tier {threat['tier']!r} is not must-find/expected"
-
-        # Mirrors the exemplar lint: a reference threat that cites an element
-        # the blessed model does not have is unscoreable.
-        for element_id in threat["affected_element_ids"]:
+        # Mirrors the exemplar lint: a reference record that cites an element
+        # the blessed model does not have is unscoreable. Citing *none* is legal
+        # here and refused by the frameworks whose records are about elements;
+        # that split is :data:`RECORD_CHECKS`'.
+        for element_id in record["affected_element_ids"]:
             if element_id not in element_ids:
                 yield f"{where} cites {element_id!r}, absent from model.json"
-        if not threat["affected_element_ids"]:
-            yield f"{where} cites no elements"
 
-        claim = threat["claim"].strip()
+        claim = record["claim"].strip()
         if not claim.endswith("."):
             yield f"{where} claim is not a single terminated sentence"
         if claim.count(".") != 1:
             yield f"{where} claim is not one sentence: {claim!r}"
 
-        severity = threat["severity"]
-        if severity.keys() != {"likelihood", "impact"}:
-            yield f"{where} severity must carry likelihood and impact only"
-            continue
-        for field, rating in severity.items():
-            if rating not in RATINGS:
-                yield f"{where} severity {field} {rating!r} is not a legal rating"
+        yield from RECORD_CHECKS[framework](where, record)
 
-    for category in STRIDE_CATEGORIES:
-        if category not in seen_categories:
-            yield f"no reference threat in the {category} lane"
-    if not any(threat.get("tier") == "must-find" for threat in threats):
-        yield "no must-find threat: tier 2 recall would be vacuous for this case"
+    # Every lane represented in every case, which is stricter than the merge bar
+    # below and is what this corpus has always held. The bar asks that a lane be
+    # measured *somewhere*; this asks that no case quietly grades five of six.
+    lane_of = RECORD_LANE[framework]
+    seen_lanes = {lane_of(record) for record in records if isinstance(record, dict)}
+    for lane in PACKAGES[framework].lanes:
+        if lane not in seen_lanes:
+            yield f"{where_file} carries no reference record in the {lane} lane"
+
+    if not any(record.get("tier") == "must-find" for record in records):
+        yield (
+            f"{where_file} carries no must-find record: tier 2 recall would be"
+            " vacuous for this case"
+        )
+
+
+def declared_names(meta: dict) -> list[str]:
+    """The frameworks ``case.json`` declares, however malformed the block is."""
+    declared = meta.get("frameworks")
+    if not isinstance(declared, list):
+        return []
+    return [
+        entry["name"]
+        for entry in declared
+        if isinstance(entry, dict) and isinstance(entry.get("name"), str)
+    ]
+
+
+def framework_issues(case_dir: Path, meta: dict, model: SystemModel) -> Iterator[str]:
+    """The per-case half of the merge bar: two of #167's three checks.
+
+    Every registered framework carries a reference file for every case its own
+    **Precondition** does not refuse, and the ``frameworks`` declaration agrees
+    with that precondition run over the blessed ``model.json``.
+
+    The precondition is a pure function of the **Valid System Model**, so both
+    are credential-free and run on every PR. A refused case and a missing file
+    are different facts — the first scores nothing and is reported *unexercised*,
+    the second is an unmeasured framework — and only the declaration can tell
+    them apart, which is why the declaration is checked against the predicate
+    rather than trusted.
+    """
+    declared = set(declared_names(meta))
+    for name, package in PACKAGES.items():
+        result = package.precondition(model)
+        if result == "refuted":
+            if name in declared:
+                yield (
+                    f"case.json declares {name!r}, but its precondition refutes"
+                    " this case; a refused framework carries no reference set"
+                )
+            continue
+        if name not in declared:
+            yield (
+                f"case.json does not declare {name!r}, whose precondition"
+                f" {result} this case; every framework a case does not refuse"
+                " must carry a reference set"
+            )
+            continue
+        if not claims_file(case_dir, name).is_file():
+            yield f"case.json declares {name!r}, but {CLAIMS_DIR}/{name}.json is absent"
+
+
+def lane_coverage_issues(must_find_lanes: Mapping[str, set[object]]) -> Iterator[str]:
+    """The corpus-wide half of the merge bar: #167's second check.
+
+    Every lane a package declares carries at least one ``must-find`` record
+    somewhere in the corpus. A lane is one **Model Tier** call, so an unmeasured
+    lane is the granularity that spends money — which is why the bar sits at the
+    lane rather than at the framework.
+    """
+    for name, package in PACKAGES.items():
+        seen = must_find_lanes.get(name, set())
+        for lane in package.lanes:
+            if lane not in seen:
+                yield (
+                    f"{name}: the {lane} lane carries no must-find record anywhere"
+                    " in the corpus, so a run of it is unmeasured"
+                )
 
 
 def check_case(case_dir: Path) -> list[str]:
     """Every mechanical failure in one case, empty if the case is sound."""
     problems: list[str] = []
-    for name in ("source.md", "model.json", "threats.json", "case.json"):
+    for name in ("source.md", "model.json", "case.json"):
         if not (case_dir / name).exists():
             problems.append(f"missing {name}")
     if problems:
@@ -332,8 +505,17 @@ def check_case(case_dir: Path) -> list[str]:
     if not model.boundary_crossings():
         problems.append("model.json derives no boundary crossing")
 
+    problems.extend(framework_issues(case_dir, meta, model))
+
+    # Only the packages this build carries: a declaration naming something else
+    # has no record shape to check against, and :func:`framework_issues` has
+    # already reported it.
     element_ids = {element.id for element in model.elements()}
-    problems.extend(_check_threats(_load_json(case_dir / "threats.json"), element_ids))
+    declared = set(declared_names(meta))
+    for name in PACKAGES:
+        path = claims_file(case_dir, name)
+        if name in declared and path.is_file():
+            problems.extend(_check_claims(name, _load_json(path), element_ids))
     return problems
 
 
@@ -375,9 +557,16 @@ def check_calibration(
 
 
 def _severity_bands() -> Iterator[str]:
-    """Guard the one arithmetic the corpus shares with production."""
+    """Guard the one arithmetic the corpus shares with production.
+
+    STRIDE's alone, because the matrix is: a framework that grades no harm
+    carries no ``severity`` on its records and has nothing to derive.
+    """
     for case_dir in case_dirs():
-        for threat in _load_json_array(case_dir / "threats.json"):
+        path = claims_file(case_dir, "stride")
+        if not path.is_file():
+            continue
+        for threat in _load_json_array(path):
             severity = threat.get("severity", {})
             likelihood: Rating = severity.get("likelihood")
             impact: Rating = severity.get("impact")
@@ -423,16 +612,36 @@ def main() -> int:
 
     failures = 0
     claims_by_case: dict[str, set[str]] = {}
+    # Lane -> whether any case anywhere carries a must-find record for it. The
+    # merge bar's second check is over the whole corpus, so it is accumulated
+    # here rather than answered per case.
+    must_find_lanes: dict[str, set[object]] = {}
     for case_dir in case_dirs():
         problems = check_case(case_dir)
-        threats_path = case_dir / "threats.json"
-        if threats_path.exists():
-            claims_by_case[case_dir.name] = {
-                threat["claim"] for threat in _load_json_array(threats_path)
-            }
+        for name in PACKAGES:
+            path = claims_file(case_dir, name)
+            if not path.is_file():
+                continue
+            records = _load_json_array(path)
+            must_find_lanes.setdefault(name, set()).update(
+                RECORD_LANE[name](record)
+                for record in records
+                if isinstance(record, dict) and record.get("tier") == "must-find"
+            )
+            # The judge's fixtures cite STRIDE claim strings, because the judge
+            # is STRIDE's alone: a framework matching by requirement ID needs no
+            # claim-equivalence judgement and must not inherit its cost.
+            if name == "stride":
+                claims_by_case[case_dir.name] = {
+                    record["claim"] for record in records if isinstance(record, dict)
+                }
         for problem in problems:
             print(f"{case_dir.name}: {problem}")
         failures += len(problems)
+
+    for problem in lane_coverage_issues(must_find_lanes):
+        print(f"merge bar: {problem}")
+        failures += 1
 
     for problem in _severity_bands():
         print(problem)

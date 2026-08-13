@@ -2,7 +2,6 @@
   "id": "05-cookbook-queue-webapp",
   "title": "Web application with queue-decoupled background worker",
   "domain": "web-application",
-  "exemplar_proximity": "far",
   "provenance": "OWASP Threat Model Cookbook, \"Demo Threat Model\" (Flow Diagram/webapp-threat-dragon/webapp-threat-dragon.json), https://github.com/OWASP/threat-model-cookbook — textual and graphical representations CC-BY 4.0. Converted to submitted-text form for this corpus; the original OWASP Threat Dragon model carries its own threat annotations, which were deliberately NOT copied into threats.json (see notes).",
   "bootstrap": "agent-stand-in",
   "sources": [
@@ -14,5 +13,12 @@
     }
   ],
   "source_sha256": "37f17dbdad7ff7968531482d9dde87a6d94cb0034cea6bf9495793720435d171",
+  "frameworks": [
+    {
+      "name": "stride",
+      "options": {},
+      "exemplar_proximity": "far"
+    }
+  ],
   "notes": "Cookbook conversion 1 of 2. Faithful to the source diagram's elements, flows and boundaries; the source.md is a prose rendering of the diagram, since the service's input is submitted text, not a DFD file. The original model's own threat annotations were used only as a sanity check that the blessed reference set does not miss what a human modeller found — not as the reference set itself, which is written against our schema, our tiers and our severity model. Structurally far from the payments exemplar in one specific way that earns its place: the trust hand-off is an asynchronous queue rather than a synchronous call, so both the poisoned-message threat and the loss of request attribution have no exemplar analogue. Attribute-poor by nature, so it also exercises how analysts behave when most attributes are unknown."
 }
