@@ -31,7 +31,7 @@ from stride_service.jobs import (
 from stride_service.pipeline import AdkPipelineRunner
 from stride_service.resilience import load_resilience
 from stride_service.sources import Source, SourceLimits
-from tests.factories import DESCRIPTION_TEXT
+from tests.factories import DEFAULT_FRAMEWORKS, DESCRIPTION_TEXT, sample_selection
 from tests.test_pipeline import build, happy_replies
 
 
@@ -62,8 +62,19 @@ TEST_LIMITS = SourceLimits(max_total_bytes=512, max_sources=3)
 TEST_DEADLINE = 30.0
 
 
-def engine_for(runner) -> StrideEngine:
-    return StrideEngine(runner, limits=TEST_LIMITS, deadline_seconds=TEST_DEADLINE)
+def engine_for(runner, frameworks=None) -> StrideEngine:
+    """An engine over an injected runner, with a selection it must be given.
+
+    ``frameworks`` is required and non-empty on the engine as it is on every
+    other path a job exists on, so a test about the deadline or the source
+    ladder still states one.
+    """
+    return StrideEngine(
+        runner,
+        limits=TEST_LIMITS,
+        deadline_seconds=TEST_DEADLINE,
+        frameworks=frameworks or sample_selection(),
+    )
 
 
 def analyze(engine: StrideEngine, text: str, **kwargs) -> PipelineOutcome:
@@ -255,6 +266,7 @@ def test_from_config_builds_an_adk_runner():
     # Nothing is selected by default, so the vendor is named here too. Vertex's
     # credential mode is ADC, and the check is a build-time gate.
     engine = StrideEngine.from_config(
+        DEFAULT_FRAMEWORKS,
         env={
             "STRIDE_MODEL_BASE_VENDOR": "vertex",
             "STRIDE_MODEL_BASE_MODEL": "gemini-2.5-flash",
@@ -263,7 +275,7 @@ def test_from_config_builds_an_adk_runner():
             "STRIDE_VERTEX_PROJECT": "test-project",
             "STRIDE_VERTEX_LOCATION": "us-central1",
             "GOOGLE_APPLICATION_CREDENTIALS": "/nonexistent/adc.json",
-        }
+        },
     )
 
     assert isinstance(engine._runner, AdkPipelineRunner)
@@ -271,14 +283,12 @@ def test_from_config_builds_an_adk_runner():
 
 def test_engine_drives_the_real_graph_to_a_report():
     pipeline, _ = build(happy_replies())
-    engine = StrideEngine(
-        AdkPipelineRunner(pipeline), limits=TEST_LIMITS, deadline_seconds=TEST_DEADLINE
-    )
+    engine = engine_for(AdkPipelineRunner(pipeline))
 
     outcome = analyze(engine, DESCRIPTION_TEXT)
 
     assert isinstance(outcome, PipelineCompleted)
-    assert any(threat.id == "S-01" for threat in outcome.report.threats)
+    assert any(threat.id == "S-01" for threat in outcome.report.analyses[0].claims)
 
 
 class StallingRunner:
@@ -293,7 +303,12 @@ def test_a_wedged_run_is_stopped_by_the_deployments_deadline():
     # The bound the in-process path did not used to have: ``execute_job`` wraps
     # the job route in ``asyncio.timeout`` while ``analyze`` handed straight to
     # the runner, so the first-run app and every library embedder ran unbounded.
-    engine = StrideEngine(StallingRunner(), limits=TEST_LIMITS, deadline_seconds=0.05)
+    engine = StrideEngine(
+        StallingRunner(),
+        limits=TEST_LIMITS,
+        deadline_seconds=0.05,
+        frameworks=sample_selection(),
+    )
 
     with pytest.raises(EngineDeadlineError, match="time budget"):
         analyze(engine, DESCRIPTION_TEXT)
@@ -312,6 +327,7 @@ def test_a_timeout_from_inside_the_graph_keeps_its_own_identity():
 
 def test_the_deadline_comes_from_the_deployments_resilience_config():
     engine = StrideEngine.from_config(
+        DEFAULT_FRAMEWORKS,
         env={
             "STRIDE_MODEL_BASE_VENDOR": "vertex",
             "STRIDE_MODEL_BASE_MODEL": "gemini-2.5-flash",
@@ -320,7 +336,7 @@ def test_the_deadline_comes_from_the_deployments_resilience_config():
             "STRIDE_VERTEX_PROJECT": "test-project",
             "STRIDE_VERTEX_LOCATION": "us-central1",
             "GOOGLE_APPLICATION_CREDENTIALS": "/nonexistent/adc.json",
-        }
+        },
     )
 
     # The shipped number, not one this test picked: an engine that invented its
