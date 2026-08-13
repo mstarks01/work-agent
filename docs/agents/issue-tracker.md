@@ -56,7 +56,7 @@ gh api --method POST repos/mstarks01/work-agent/issues/<child>/dependencies/bloc
 ### The live map
 
 [#158 — Map: one validated system representation, many security frameworks](https://github.com/mstarks01/work-agent/issues/158)
-— charted 2026-08-12 from [#139](https://github.com/mstarks01/work-agent/issues/139), 11 tickets, 6 resolved.
+— charted 2026-08-12 from [#139](https://github.com/mstarks01/work-agent/issues/139), 11 tickets, 8 resolved.
 A **planning** map: it settles the spec for a framework-neutral analysis layer, where one extraction and one
 **Valid System Model** feed N in-repo framework packages, and it stops at the spec. STRIDE becomes the first
 package rather than the architecture; ASVS proves the second.
@@ -68,11 +68,12 @@ the job selects its frameworks from a set the deployment carries
 every framework ([#162](https://github.com/mstarks01/work-agent/issues/162)), a thin `Claim` supertype carries
 what the service constructs ([#163](https://github.com/mstarks01/work-agent/issues/163)), and a package is a
 declaration object beside a text root, checked before the first model call
-([#164](https://github.com/mstarks01/work-agent/issues/164)).
+([#164](https://github.com/mstarks01/work-agent/issues/164)). The evidence catalog stays the service's and a
+package selects from it ([#165](https://github.com/mstarks01/work-agent/issues/165)), and each package carries
+its own critic, blind to every other framework
+([#166](https://github.com/mstarks01/work-agent/issues/166)).
 
-The frontier is [#165](https://github.com/mstarks01/work-agent/issues/165) (may a framework extend the
-evidence catalog), [#166](https://github.com/mstarks01/work-agent/issues/166) (one critic, or one per
-framework), [#167](https://github.com/mstarks01/work-agent/issues/167) (how a second framework is measured)
+The frontier is [#167](https://github.com/mstarks01/work-agent/issues/167) (how a second framework is measured)
 and [#169](https://github.com/mstarks01/work-agent/issues/169) (where the notes, cases and domain packs sit).
 [#168](https://github.com/mstarks01/work-agent/issues/168), the report envelope, waits on
 [#167](https://github.com/mstarks01/work-agent/issues/167) and closes the map.
