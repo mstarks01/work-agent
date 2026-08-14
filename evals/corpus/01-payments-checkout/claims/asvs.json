@@ -1,0 +1,188 @@
+[
+  {
+    "chapter": "encoding-and-sanitization",
+    "requirement": "V1.2.4",
+    "affected_element_ids": [
+      "process:order-service",
+      "store:orders-db",
+      "flow:order-service-to-orders-db:read-write-orders"
+    ],
+    "claim": "The order service reaches a PostgreSQL store and the input never says how its queries are built.",
+    "tier": "must-find",
+    "notes": "tech:database fires on store:orders-db. The requirement applies and no fact settles it."
+  },
+  {
+    "chapter": "validation-and-business-logic",
+    "requirement": "V2.1.1",
+    "affected_element_ids": [
+      "process:storefront-api"
+    ],
+    "claim": "No documented input validation rules exist for the order payload the storefront API accepts.",
+    "tier": "expected",
+    "notes": "A documentation requirement: the subject is outside the running system, so needs-info by construction."
+  },
+  {
+    "chapter": "validation-and-business-logic",
+    "requirement": "V2.2.2",
+    "affected_element_ids": [
+      "entity:shopper",
+      "process:storefront-api",
+      "flow:shopper-to-storefront-api:place-order"
+    ],
+    "claim": "Nothing says which side enforces validation of the order the shopper submits.",
+    "tier": "must-find",
+    "notes": "The crossing from the public zone is the fact that makes the requirement apply."
+  },
+  {
+    "chapter": "web-frontend-security",
+    "requirement": "V3.3.1",
+    "affected_element_ids": [
+      "entity:shopper",
+      "process:storefront-api",
+      "flow:shopper-to-storefront-api:place-order"
+    ],
+    "claim": "The shopper session cookie is named and none of its attributes is stated.",
+    "tier": "must-find",
+    "notes": "A browser-delivered credential puts this system in the chapter; the attributes are the requirement."
+  },
+  {
+    "chapter": "api-and-web-service",
+    "requirement": "V4.1.1",
+    "affected_element_ids": [
+      "process:storefront-api"
+    ],
+    "claim": "The storefront API's response content types are never described.",
+    "tier": "expected",
+    "notes": "An HTTP surface exists on two flows; the header policy is unstated."
+  },
+  {
+    "chapter": "authentication",
+    "requirement": "V6.2.1",
+    "affected_element_ids": [
+      "entity:shopper",
+      "process:storefront-api"
+    ],
+    "claim": "No password length policy is stated for shopper accounts.",
+    "tier": "must-find",
+    "notes": "feature:password-auth fires. The mechanism is named and no parameter of it is."
+  },
+  {
+    "chapter": "authentication",
+    "requirement": "V6.3.1",
+    "affected_element_ids": [
+      "entity:shopper",
+      "flow:shopper-to-storefront-api:place-order"
+    ],
+    "claim": "The shopper login carries no second factor and no stated anti-automation control.",
+    "tier": "must-find",
+    "notes": "The submitter states there is no MFA, so this half is settled rather than open."
+  },
+  {
+    "chapter": "session-management",
+    "requirement": "V7.4.1",
+    "affected_element_ids": [
+      "process:storefront-api",
+      "flow:shopper-to-storefront-api:place-order"
+    ],
+    "claim": "Nothing states whether a terminated shopper session stops being accepted.",
+    "tier": "must-find",
+    "notes": "A session cookie exists, so the chapter applies; termination is unstated."
+  },
+  {
+    "chapter": "session-management",
+    "requirement": "V7.2.3",
+    "affected_element_ids": [
+      "process:storefront-api"
+    ],
+    "claim": "The session token's generation and entropy are never described.",
+    "tier": "expected",
+    "notes": "A framework default is not evidence about the token."
+  },
+  {
+    "chapter": "authorization",
+    "requirement": "V8.2.2",
+    "affected_element_ids": [
+      "process:order-service",
+      "store:orders-db",
+      "flow:order-service-to-orders-db:read-write-orders"
+    ],
+    "claim": "One shared account holds full read and write on every order record.",
+    "tier": "must-find",
+    "notes": "Stated outright, so the ruling is plain rather than conditional."
+  },
+  {
+    "chapter": "cryptography",
+    "requirement": "V11.3.2",
+    "affected_element_ids": [
+      "store:orders-db"
+    ],
+    "claim": "No cipher is stated for the order database at rest.",
+    "tier": "must-find",
+    "notes": "encryption_at_rest is unknown: an open question, not a missing control."
+  },
+  {
+    "chapter": "secure-communication",
+    "requirement": "V12.3.3",
+    "affected_element_ids": [
+      "process:storefront-api",
+      "process:order-service",
+      "flow:storefront-api-to-order-service:submit-order"
+    ],
+    "claim": "The gRPC link between the storefront API and the order service states no transport protection.",
+    "tier": "must-find",
+    "notes": "A derived crossing with encryption_in_transit unknown; the internal scope is not an exemption."
+  },
+  {
+    "chapter": "configuration",
+    "requirement": "V13.3.1",
+    "affected_element_ids": [
+      "process:order-service",
+      "flow:order-service-to-orders-db:read-write-orders"
+    ],
+    "claim": "The database password is held in an environment variable rather than a secret store.",
+    "tier": "must-find",
+    "notes": "Stated outright by the submitter."
+  },
+  {
+    "chapter": "data-protection",
+    "requirement": "V14.1.1",
+    "affected_element_ids": [
+      "store:orders-db"
+    ],
+    "claim": "No protection requirement follows from the order database's confidential classification.",
+    "tier": "expected",
+    "notes": "The model answers the classification half and nothing answers the controls half."
+  },
+  {
+    "chapter": "secure-coding-and-architecture",
+    "requirement": "V15.2.1",
+    "affected_element_ids": [
+      "process:storefront-api",
+      "process:order-service"
+    ],
+    "claim": "Nothing states whether the Node and Python components are within their update windows.",
+    "tier": "expected",
+    "notes": "A code-practice requirement: the input carries prose rather than a dependency inventory."
+  },
+  {
+    "chapter": "security-logging-and-error-handling",
+    "requirement": "V16.2.1",
+    "affected_element_ids": [
+      "store:receipt-archive",
+      "flow:order-service-to-receipt-archive:append-receipt"
+    ],
+    "claim": "Receipt archive entries name the order service rather than the acting shopper.",
+    "tier": "must-find",
+    "notes": "The submitter states the record's content, so the ruling is plain."
+  },
+  {
+    "chapter": "security-logging-and-error-handling",
+    "requirement": "V16.5.1",
+    "affected_element_ids": [
+      "process:storefront-api"
+    ],
+    "claim": "Nothing describes what the storefront API returns to a caller when an order fails.",
+    "tier": "expected",
+    "notes": "Applies to every internet-facing surface and is unstated here."
+  }
+]
