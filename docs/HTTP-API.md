@@ -177,7 +177,8 @@ and checking it second would make the ceiling probe-able through requests that
 were never going to run.
 
 A submission past the ceiling is **refused, not queued**. Each accepted job fans
-six category agents out in parallel on the strongest model tier, so a queued job
+every selected framework's lane agents out in parallel on the strongest model
+tier, so a queued job
 holds your place in the deployment's provider quota just as a running one does;
 only a refusal sheds the load. No `Retry-After` is sent, because what clears the
 ceiling is a job of yours reaching a terminal state rather than the passage of
