@@ -256,6 +256,25 @@ class GoldenCase:
         """One framework's ``must-find`` records."""
         return tuple(ref for ref in self.references[framework] if ref.must_find)
 
+    def stride_claims(self) -> tuple[ReferenceThreat, ...]:
+        """This case's STRIDE reference set, at the record type it validates as.
+
+        :meth:`claims_for` is typed at the neutral base because it serves every
+        framework, while STRIDE's scorers grade ``category`` and ``severity`` —
+        fields only the narrowed record carries. :func:`load_case` already
+        validates each framework's file against its own type from
+        :data:`REFERENCE_TYPES`, so this re-states that fact where a caller
+        needs it rather than casting it away, and fails loudly if it ever stops
+        being true.
+        """
+        claims = self.references["stride"]
+        narrowed = tuple(ref for ref in claims if isinstance(ref, ReferenceThreat))
+        if len(narrowed) != len(claims):
+            raise CorpusError(
+                f"{self.id}: stride references did not load as ReferenceThreat"
+            )
+        return narrowed
+
     @property
     def source_text(self) -> str:
         """Every source's text, for the scorers that read the input as prose."""

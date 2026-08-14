@@ -84,6 +84,21 @@ class LaneCoverage:
         }
 
 
+def _as_category(lane: str) -> StrideCategory:
+    """A report row's lane slug as the STRIDE category it names.
+
+    A report row is keyed by a plain string, because a lane belongs to whichever
+    package declares it. This fold is STRIDE's, where the six lane slugs *are*
+    the category names — so the narrowing is a real lookup against that package's
+    own list rather than a cast, and a lane no STRIDE category matches is a
+    caller feeding this fold another framework's rows.
+    """
+    for category in STRIDE_CATEGORIES:
+        if category == lane:
+            return category
+    raise ValueError(f"{lane!r} is not a STRIDE lane; these rows are not STRIDE's")
+
+
 def aggregate_coverage(rows: Iterable[ReportLaneCoverage]) -> list[LaneCoverage]:
     """Pool per-case coverage rows into one row per category.
 
@@ -99,7 +114,7 @@ def aggregate_coverage(rows: Iterable[ReportLaneCoverage]) -> list[LaneCoverage]
         category: [] for category in STRIDE_CATEGORIES
     }
     for row in rows:
-        by_category[row.lane].append(row)
+        by_category[_as_category(row.lane)].append(row)
     return [
         LaneCoverage(
             category=category,

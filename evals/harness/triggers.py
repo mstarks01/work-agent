@@ -79,9 +79,7 @@ def case_trigger_recall(case: GoldenCase) -> CaseTriggerRecall:
     """Score one golden case's reference threats against the fired rules."""
     return CaseTriggerRecall(
         case_id=case.id,
-        hits=tuple(
-            _hit(reference, case.model) for reference in case.claims_for("stride")
-        ),
+        hits=tuple(_hit(reference, case.model) for reference in case.stride_claims()),
     )
 
 
