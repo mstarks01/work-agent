@@ -14,6 +14,6 @@ A flow crosses from one trust zone into another and its `authentication` is `unk
 
 ## Guardrails
 
-- Analysis knowledge, not evidence. Nothing here is a fact about the system under review; ground a finding in what the submitter wrote, an `unknown` attribute, or a derived crossing.
-- `unknown` is not `none`. An unstated control may exist and go undescribed — write the threat conditionally so the critic can rule it needs-info — while a stated absence is a fact you may rely on.
+- Analysis knowledge, not evidence. Nothing here is a fact about the system under review; ground a finding in what the submitter wrote, an attribute's catalogued state, or a derived crossing.
+- `unknown` is not `none`. An unstated control may exist and go undescribed — write the threat conditionally so the critic can rule it needs-info — while a stated absence is a fact you may rely on, and each has its own catalog row.
 - Being accepted as another identity is spoofing. Holding an identity legitimately and reaching past what it is entitled to is elevation of privilege.

@@ -65,7 +65,12 @@ from stride_service.report import (
 # :class:`GroundMisShape`.
 FailureKind = Literal["fail-closed", "unresolved-evidence", "other"]
 
-_KINDS: tuple[GroundKind, ...] = ("quote", "unknown-attribute", "derived-fact")
+_KINDS: tuple[GroundKind, ...] = (
+    "quote",
+    "unknown-attribute",
+    "absent-attribute",
+    "derived-fact",
+)
 
 
 @dataclass(frozen=True)

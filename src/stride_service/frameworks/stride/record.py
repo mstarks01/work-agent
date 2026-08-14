@@ -159,6 +159,12 @@ class DraftThreat(Claim):
         ``unknown-attribute`` ground, because the trigger dictates the branch. So
         the licensed empty and the unlicensed one are told apart by the draft's
         own grounds, with no judgement asked of anybody.
+
+        ``absent-attribute`` is deliberately not read here, though it names the
+        same two fields. A control the submitter said is *not there* is a fact
+        already in hand, and "put the control in" is a countermeasure the agent
+        can always name — so a threat resting on one and offering nothing is the
+        unlicensed empty, which is exactly what this mark is for.
         """
         return AnalysisMarks(
             missing_mitigations=[

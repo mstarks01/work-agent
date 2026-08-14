@@ -142,7 +142,23 @@ PROMPT_BODY_NAMES: tuple[str, ...] = (
 # the part that had to be written — an agent handed "17 elements" with no
 # framing has been given a target, and inflating a lane's draft count is a worse
 # failure than the undercounting the line exists to fix.
-ANALYZE_PROMPT_TOKEN_CAP = 3900
+#
+# 3900 -> 4100 IS THE CATALOG LEARNING TO SAY "STATED ABSENT" (#171). Roughly
+# 160 tokens, and about 60 of them are the two rows exemplar system A now
+# carries for a flow the input says is unauthenticated and unencrypted — rows
+# the catalog previously could not offer at all, so the exemplar grounded that
+# flow on a quote instead. The rest is the distinction those rows make citable:
+# the sub-step separating an attribute the input left open from one it ruled
+# out, and the sentence saying to cite the row rather than re-quote the
+# sentence behind it.
+#
+# It buys back more runtime tokens than it spends in static ones: a quote is a
+# span of submitter prose in every draft that carries it, while a row is an ID,
+# and the workaround this replaces put the quote on every finding resting on a
+# stated absence. What it fixes is not a token count, though — 18 of 300 corpus
+# candidates fire on a control the input states is absent, and none of them had
+# a citable fact before this.
+ANALYZE_PROMPT_TOKEN_CAP = 4100
 EXEMPLAR_TOKEN_CAP = 1500
 CRITIC_PROMPT_TOKEN_CAP = 1500
 # The re-ask has to be able to name and fix every fault `review_issues` can
