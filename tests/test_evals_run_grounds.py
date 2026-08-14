@@ -70,7 +70,7 @@ class QueuedLlm(ScriptedLlm):
 
 
 def proposal(case, category, evidence: dict[str, Any], sequence: int = 1) -> dict:
-    reference = next(ref for ref in case.references if ref.category == category)
+    reference = next(ref for ref in case.claims_for("stride") if ref.category == category)
     return {
         "sequence": sequence,
         "title": reference.claim,
@@ -149,23 +149,23 @@ def sweep(monkeypatch, case, spoofing_first: dict[str, Any] | None) -> Any:
 
 
 def _reply_for(case, graph_node: str) -> str:
-    if graph_node == "critic":
+    if graph_node == "critic_stride":
         return json.dumps(
-            {"threats": [scripted_ruling(category) for category in STRIDE_CATEGORIES]}
+            {"claims": [scripted_ruling(category) for category in STRIDE_CATEGORIES]}
         )
     for category in STRIDE_CATEGORIES:
-        if graph_node == analyze_node_name(category):
+        if graph_node == analyze_node_name("stride", category):
             return json.dumps(
-                {"threats": [proposal(case, category, sound_evidence(case))]}
+                {"claims": [proposal(case, category, sound_evidence(case))]}
             )
-    return '{"threats": []}'
+    return '{"claims": []}'
 
 
 def _replies_for(case, graph_node: str, first: dict[str, Any] | None) -> list[str]:
     """The spoofing agent's first emission, when the test wants it broken."""
-    if first is None or graph_node != analyze_node_name("spoofing"):
+    if first is None or graph_node != analyze_node_name("stride", "spoofing"):
         return []
-    return [json.dumps({"threats": [proposal(case, "spoofing", first)]})]
+    return [json.dumps({"claims": [proposal(case, "spoofing", first)]})]
 
 
 def test_a_clean_sweep_measures_every_case(monkeypatch, case):

@@ -51,6 +51,7 @@ from stride_service.graph import (
 from stride_service.frameworks.stride.record import DraftThreat
 from stride_service.report import (
     FrameworkName,
+    FrameworkSelection,
     InputRef,
     Job,
     NodeRun,
@@ -304,7 +305,17 @@ def _run_from_graph(
 
     now = datetime.now(UTC)
     report = result.into_report(
-        job=Job(id=f"eval-{case.id}", created_at=now, completed_at=now),
+        job=Job(
+            id=f"eval-{case.id}",
+            created_at=now,
+            completed_at=now,
+            # Read off the built graph rather than restated: the envelope checks
+            # that the blocks answer the job's own selection, so a driver that
+            # named its own list could disagree with the graph that ran.
+            frameworks=[
+                FrameworkSelection(name=name) for name in pipeline.frameworks
+            ],
+        ),
         input_ref=InputRef.of(system_name=case.meta.title, sources=case.sources),
         nodes=graph_run.node_runs,
         pipeline=pipeline,
