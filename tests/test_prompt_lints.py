@@ -553,7 +553,19 @@ def test_no_non_markdown_files_under_prompts():
 # entry. It is job-varying so it does not land in this number, but it is not
 # free: a large model pays it per lane, which is the trade for jobs that no
 # longer die on a composed reference.
-COMPOSED_ANALYZE_TOKEN_BUDGET = 5500
+# RAISED BY 200 FOR THE SECOND PACKAGE'S OUTPUT CONTRACT, and the paragraph
+# above asked for a deletion to come with a raise. One did: the eight-field list
+# and the two rating steps left ``analyze.md`` for ``frameworks/<name>/
+# output.md``, so the shared body no longer names ``severity``, ``sequence`` or
+# ``mitigations`` at all. That is what a framework grading nothing needed —
+# reading a field list for fields its record does not declare is worse than
+# reading a longer prompt.
+#
+# The net on a STRIDE lane is +124 on the worst of the six, because the moved
+# text came back with a heading and a sentence fixing what one claim is. The
+# worst lane now sits at ~5.6K of the 5.7K and the worst case at ~7.3K against
+# the 6-8K envelope. The rule stands unchanged for the next raise.
+COMPOSED_ANALYZE_TOKEN_BUDGET = 5700
 
 
 @pytest.mark.parametrize("category", STRIDE_CATEGORIES)

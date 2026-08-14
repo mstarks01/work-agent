@@ -18,6 +18,7 @@ from stride_service.model_tiers import (
     load_model_tiers,
     validate_model_string,
 )
+from stride_service.report import FRAMEWORK_NAMES
 from stride_service.vendors import VENDOR_NAMES
 
 REPO_CONFIG = Path(__file__).parents[1] / "config" / "model_tiers.toml"
@@ -70,8 +71,29 @@ class TestNodeInventory:
         from another's.
         """
         assert LLM_NODES[:2] == ("extract", "repair")
-        assert FRAMEWORK_NODES == ("analyze/stride", "critic/stride", "recritic/stride")
+        assert FRAMEWORK_NODES == (
+            "analyze/asvs",
+            "critic/asvs",
+            "recritic/asvs",
+            "analyze/stride",
+            "critic/stride",
+            "recritic/stride",
+        )
         assert LLM_NODES[2:] == FRAMEWORK_NODES
+
+    def test_every_carried_framework_needs_its_three_keys_of_every_install(self):
+        """The triple is required in every file, whatever that install carries.
+
+        ``LLM_NODES`` derives from ``FrameworkName``, which names what this build
+        can spell rather than what an install runs. So a deployment carrying
+        STRIDE alone still has to name ASVS's three keys, and a file that omits
+        them fails the completeness check by name. That message is the fix, and
+        it is the stated cost of adding a framework without moving the schema
+        version.
+        """
+        assert {name.split("/", 1)[1] for name in FRAMEWORK_NODES} == set(
+            FRAMEWORK_NAMES
+        )
 
     def test_exactly_two_tiers_named_on_a_capability_axis(self):
         # Not flash/pro: those were one vendor's product names and would be an

@@ -386,8 +386,12 @@
     const head = el("div","card-head");
     head.append(el("h3", null, t.title), el("span","tid", t.id));
     card.append(head);
-    // The lane, where the framework stamps one. STRIDE's is its category.
-    if (t.category) card.append(el("div","cat", t.category));
+    // The lane, where the framework stamps one. Each package names the field
+    // itself — STRIDE's is its category, ASVS's is its chapter — so this reads
+    // the ones it knows and a framework it does not know renders without a lane
+    // chip rather than not rendering.
+    const lane = t.category || t.chapter;
+    if (lane) card.append(el("div","cat", lane));
 
     const badges = el("div","badges");
     if (t.severity) {
@@ -500,6 +504,19 @@
       tiles.append(t);
     });
     section.append(tiles);
+
+    // What this framework considered and raised nothing about, as a count. The
+    // entries themselves are not rendered: a framework answering in its own
+    // units lists every one of them — ASVS lists 70 requirements at level 1 and
+    // 345 at level 3 — and a page that printed all of them would bury the
+    // findings under the things that were fine. The count is what a reader needs
+    // to know the list is in the payload.
+    if (block.scope.length) {
+      const ruledOut = block.scope.filter(e => e.state === "not-applicable").length;
+      const tail = ruledOut ? ` (${ruledOut} ruled out)` : "";
+      section.append(el("div", "meta",
+        `${block.scope.length} units considered with no claim raised${tail}`));
+    }
 
     // The severity mix, only for a framework that grades harm. One that does
     // not declares no `by_severity`, and an empty bar would read as "nothing

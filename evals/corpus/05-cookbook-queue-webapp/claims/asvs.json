@@ -1,0 +1,78 @@
+[
+  {
+    "chapter": "web-frontend-security",
+    "requirement": "V3.4.1",
+    "affected_element_ids": [
+      "entity:browser",
+      "process:web-application",
+      "flow:browser-to-web-application:page-request"
+    ],
+    "claim": "No security response header is described for the one encrypted browser-facing link.",
+    "tier": "must-find",
+    "notes": "tech:browser-frontend fires; the chapter applies and every header is unstated."
+  },
+  {
+    "chapter": "web-frontend-security",
+    "requirement": "V3.3.1",
+    "affected_element_ids": [
+      "process:web-application",
+      "flow:browser-to-web-application:page-request"
+    ],
+    "claim": "Nothing states whether the web application sets any cookie or with which attributes.",
+    "tier": "expected",
+    "notes": "A browser client is stated; the cookie question is open rather than answered."
+  },
+  {
+    "chapter": "configuration",
+    "requirement": "V13.3.1",
+    "affected_element_ids": [
+      "store:web-application-config",
+      "store:worker-config"
+    ],
+    "claim": "Two configuration stores are named and nothing says whether either holds a secret or how.",
+    "tier": "must-find",
+    "notes": "Both stores carry unknown technology and classification."
+  },
+  {
+    "chapter": "secure-coding-and-architecture",
+    "requirement": "V15.2.2",
+    "affected_element_ids": [
+      "process:background-worker",
+      "store:message-queue",
+      "flow:background-worker-to-message-queue:consume-job"
+    ],
+    "claim": "Nothing states what bounds the work a queued job can consume.",
+    "tier": "must-find",
+    "notes": "A queue with an internal worker raises the availability requirement; the input never reaches it."
+  },
+  {
+    "chapter": "webrtc",
+    "requirement": "V17.2.1",
+    "affected_element_ids": [],
+    "claim": "No WebRTC media path exists in this system, so this chapter does not apply.",
+    "tier": "must-find",
+    "notes": "The exclusion the standard invites by name. The flows state HTTP/S and unknown, and no element is a media server."
+  },
+  {
+    "chapter": "secure-communication",
+    "requirement": "V12.3.3",
+    "affected_element_ids": [
+      "process:web-application",
+      "store:message-queue",
+      "flow:web-application-to-message-queue:enqueue-job"
+    ],
+    "claim": "Every link except the browser one states no transport protection at all.",
+    "tier": "expected",
+    "notes": "The submitter marks one link as the only encrypted one, which settles the others."
+  },
+  {
+    "chapter": "authentication",
+    "requirement": "V6.1.1",
+    "affected_element_ids": [
+      "process:web-application"
+    ],
+    "claim": "Nothing states how the web application authenticates anybody.",
+    "tier": "expected",
+    "notes": "authentication is unknown on the browser flow; the chapter applies and stays open."
+  }
+]

@@ -143,9 +143,16 @@ class ExtractionScore:
         }
 
 
-#: The frameworks a sweep's graph is built for. One today, and named here
-#: rather than defaulted inside the harness: a sweep grades a framework's own
-#: claim set (#167), so which frameworks ran is a property of the sweep.
+#: The frameworks a sweep's graph is built for, named here rather than defaulted
+#: inside the harness: a sweep grades a framework's own claim set (#167), so
+#: which frameworks ran is a property of the sweep.
+#:
+#: **STRIDE alone, although this build carries two.** The corpus now holds ASVS
+#: reference sets for the cases whose precondition allows one, and
+#: :mod:`evals.harness.scorer` grades STRIDE's records: it reads a category and
+#: two rated severity axes, and an ASVS record carries neither. So an ASVS sweep
+#: would run 17 ``strong``-tier lanes per case and score nothing. Adding ASVS
+#: here is a scorer change, not a list edit.
 EVAL_FRAMEWORKS: tuple[FrameworkName, ...] = ("stride",)
 
 

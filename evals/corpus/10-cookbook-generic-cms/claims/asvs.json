@@ -1,0 +1,96 @@
+[
+  {
+    "chapter": "web-frontend-security",
+    "requirement": "V3.3.1",
+    "affected_element_ids": [
+      "entity:reader",
+      "process:web-server",
+      "flow:reader-to-web-server:page-requests"
+    ],
+    "claim": "Sign-in exists for some readers and no cookie attribute is stated for the session it creates.",
+    "tier": "must-find",
+    "notes": "The submitter says the mechanism and session handling are not stated, which is the requirement."
+  },
+  {
+    "chapter": "web-frontend-security",
+    "requirement": "V3.4.1",
+    "affected_element_ids": [
+      "process:web-server",
+      "entity:cdn",
+      "flow:reader-to-cdn:asset-fetch"
+    ],
+    "claim": "Assets are fetched over plain HTTP, so no transport security header protects them.",
+    "tier": "must-find",
+    "notes": "encryption_in_transit is stated absent on the CDN fetch."
+  },
+  {
+    "chapter": "session-management",
+    "requirement": "V7.2.2",
+    "affected_element_ids": [
+      "entity:reader",
+      "process:web-server",
+      "flow:reader-to-web-server:page-requests"
+    ],
+    "claim": "Nothing states how a reader session is represented or generated.",
+    "tier": "must-find",
+    "notes": "Sign-in is stated to exist and its session handling is stated not to be described."
+  },
+  {
+    "chapter": "encoding-and-sanitization",
+    "requirement": "V1.2.4",
+    "affected_element_ids": [
+      "process:web-server",
+      "store:mysql-database",
+      "flow:web-server-to-mysql-database:cms-data"
+    ],
+    "claim": "The web server builds MySQL queries for CMS content and nothing says how.",
+    "tier": "must-find",
+    "notes": "tech:database fires on a MySQL store reached from an internet-facing process."
+  },
+  {
+    "chapter": "secure-communication",
+    "requirement": "V12.2.1",
+    "affected_element_ids": [
+      "entity:admin",
+      "store:mysql-database",
+      "flow:admin-to-mysql-database:direct-administration"
+    ],
+    "claim": "An administrator reaches MySQL directly over a connection stated to carry no TLS.",
+    "tier": "must-find",
+    "notes": "encryption_in_transit is stated absent on a human-to-store flow."
+  },
+  {
+    "chapter": "validation-and-business-logic",
+    "requirement": "V2.2.2",
+    "affected_element_ids": [
+      "process:web-server",
+      "entity:admin"
+    ],
+    "claim": "Nothing states which layer validates the content an administrator publishes.",
+    "tier": "expected",
+    "notes": "Two human entities with different powers and no stated enforcement point."
+  },
+  {
+    "chapter": "authentication",
+    "requirement": "V6.2.1",
+    "affected_element_ids": [
+      "entity:reader",
+      "process:web-server"
+    ],
+    "claim": "No password rule is stated for the reader sign-in the input mentions.",
+    "tier": "expected",
+    "notes": "The submitter says the mechanism and its strength are not stated."
+  },
+  {
+    "chapter": "authorization",
+    "requirement": "V8.2.1",
+    "affected_element_ids": [
+      "entity:admin",
+      "entity:reader",
+      "process:web-server"
+    ],
+    "claim": "Nothing states what separates reader access from administrator access.",
+    "tier": "expected",
+    "notes": "Two human entities reach the same web server and no rule is named."
+  }
+]

@@ -118,6 +118,19 @@ repair = "base"
 # on the same tier, so this is one knob per framework rather than one per lane —
 # an operator choosing to run one framework cheaper than another is the choice
 # that has a purpose, and six keys that always held one value had no reader.
+#
+# THE KEYS ARE REQUIRED IN EVERY INSTALL, including one whose `carried` list
+# names a single framework. `LLM_NODES` derives from `FrameworkName`, which names
+# what this build can spell rather than what this install runs, so a file missing
+# a framework's three keys fails `_check_complete` and the message names them.
+# That message is the fix. The version does not move for a key added under the
+# same schema: adding a framework is a data edit here.
+#
+# ASVS runs 17 lanes against STRIDE's 6, so this is the knob that decides what
+# the extra lanes cost. The two frameworks select independently.
+"analyze/asvs" = "strong"
+"critic/asvs" = "strong"
+"recritic/asvs" = "strong"
 "analyze/stride" = "strong"
 "critic/stride" = "strong"
 # The bounded critic re-ask (ticket 038): same judgement as the critic, so
