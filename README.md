@@ -9,9 +9,9 @@ privileged default.
 ```mermaid
 flowchart LR
     src(["sources<br/>(text)"]) --> extract["extract<br/>(base)"]
-    extract --> analyze["6 category agents<br/>in parallel<br/>(strong)"]
-    analyze --> critic["critic<br/>(strong)"]
-    critic --> report(["StrideReport<br/>(JSON)"])
+    extract --> analyze["lane agents<br/>in parallel<br/>(strong)"]
+    analyze --> critic["critic<br/>(per framework, strong)"]
+    critic --> report(["Report<br/>(JSON)"])
 
     classDef io fill:#f1f5f9,stroke:#64748b,stroke-width:1.5px,color:#0f172a
     classDef llm fill:#ede9fe,stroke:#7c3aed,stroke-width:1.5px,color:#2e1065
@@ -19,10 +19,13 @@ flowchart LR
     class extract,analyze,critic llm
 ```
 
-An extraction pass builds the canonical **System Model** (a DFD); six category
-agents draft threats against it in parallel, one per STRIDE category, each
-citing the grounds for every threat it raises; a grounding critic reviews the
-merged union in one pass — confirming, deduping, calibrating severity, and
+**One extraction, many frameworks.** A single pass builds the canonical **System
+Model** (a DFD), and every framework the job selected analyses that one model.
+A framework ships as an in-repo **package** — its lanes, its deterministic
+rules, its record type and its text — with STRIDE as the first one rather than
+as the architecture. Its six lane agents draft threats in parallel, each citing
+the grounds for every threat it raises, and each package's own critic reviews
+its merged union in one pass — confirming, deduping, calibrating severity, and
 rejecting what the model does not support. See [`CONTEXT.md`](CONTEXT.md) for
 the domain glossary.
 
@@ -35,7 +38,8 @@ the domain glossary.
   a bearer token from any OIDC identity provider, for a decoupled front end.
 
 Both surfaces drive the same pipeline and return the same
-[`StrideReport`](docs/Report-Schema.md).
+[`Report`](docs/Report-Schema.md): one envelope carrying the shared system
+model, with one block per framework the job named.
 
 **New here? [docs/First-Run.md](docs/First-Run.md)** takes you from a clone to a
 real report to the engine embedded in your own code, in five steps.

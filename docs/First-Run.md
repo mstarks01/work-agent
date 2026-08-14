@@ -294,7 +294,7 @@ async def main(engine: StrideEngine) -> None:
 
 That is [`examples/embed.py`](../examples/embed.py), included here from the file
 itself — run it with `uv run python examples/embed.py`. Build the engine once
-with `StrideEngine.from_config()` and reuse it; construction composes a cacheable
+with `StrideEngine.from_config(["stride"])` and reuse it; construction composes a cacheable
 shared prefix that a fresh engine per call would pay for every time.
 
 Handle all three outcomes. `analyze` returns a report, returns a rejection
