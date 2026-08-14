@@ -16,6 +16,7 @@ import pytest
 
 from stride_service import graph
 from stride_service.execution import GraphExecutor, _NodeFinish
+from stride_service.frameworks.stride.record import STRIDE_CATEGORIES
 from stride_service.report import latency_by_node, usage_by_node
 from stride_service.sampling import (
     TierSampling,
@@ -31,7 +32,9 @@ from tests.factories import (
     SilentLlm,
     SlowLlm,
     UnmeteredLlm,
+    carrying,
     claims_json,
+    package_answering,
     repo_tiers,
     sample_proposal,
     sample_ruling,
@@ -314,6 +317,61 @@ def test_an_llm_nodes_latency_is_charged_to_that_node():
     assert nodes[graph.VALIDATE_NODE].duration_ms < 40
     assert nodes[CRITIC].duration_ms >= 40
     assert nodes[ROUTER].duration_ms < 40
+
+
+class TestARefusedFramework:
+    """The run-time precondition gate, driven through the graph.
+
+    **Tested here rather than as a function.** Driving ``prepare`` alone proves
+    the predicate; only a drive proves the *topology*, which is the part that can
+    drop a block or spend a lane agent the gate meant to stop. Every test swaps
+    STRIDE's total precondition for one that refuses, because a gate whose only
+    exerciser always answers ``satisfied`` proves nothing.
+    """
+
+    def run(self, monkeypatch, result):
+        carrying(monkeypatch, package_answering(result))
+        pipeline, models = scripted_pipeline(happy_replies())
+        visited: list[str] = []
+        return drive(pipeline, visited=visited), visited, models
+
+    def test_no_lane_agent_and_no_critic_runs(self, monkeypatch):
+        """The whole point: a framework that will not run costs no model call."""
+        _, visited, models = self.run(monkeypatch, "refuted")
+
+        assert graph.PREPARE_NODE in visited
+        assert graph.ASSEMBLE_NODE in visited
+        assert not [node for node in visited if node.startswith("analyze_")]
+        assert CRITIC not in visited
+        assert models[CRITIC].seen == []
+
+    def test_the_refusal_is_not_a_job_failure(self, monkeypatch):
+        """A refusal is an answer about the system, not a defect in the run."""
+        run, _, _ = self.run(monkeypatch, "refuted")
+
+        assert graph.STATE_ANALYSIS in run.final_state
+        assert graph.STATE_REJECTION not in run.final_state
+
+    @pytest.mark.parametrize("result", ["refuted", "undecidable"])
+    def test_the_block_survives_with_its_reason(self, monkeypatch, result):
+        """The envelope's own check needs the block; the reader needs the reason."""
+        run, _, _ = self.run(monkeypatch, result)
+        block = graph.result_of(run.final_state).analyses[0]
+
+        assert block.framework == "stride"
+        assert block.claims == []
+        assert block.summary.claim_count == 0
+        assert [entry.unit for entry in block.scope] == list(STRIDE_CATEGORIES)
+        assert all(entry.reason for entry in block.scope)
+
+    def test_a_satisfied_precondition_still_runs_the_whole_subgraph(self, monkeypatch):
+        """The control: the swap itself changes nothing when the answer is yes."""
+        run, visited, _ = self.run(monkeypatch, "satisfied")
+        block = graph.result_of(run.final_state).analyses[0]
+
+        assert CRITIC in visited
+        assert [claim.id for claim in block.claims] == ["S-01"]
+        assert block.scope == []
 
 
 def test_extract_only_entry_stamps_just_the_one_node():
