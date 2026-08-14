@@ -280,7 +280,7 @@ async def _run_mode(
         issues = report_issues(run.report)
         failures += [f"{case.id}: {issue}" for issue in issues]
         measurement = measure_grounds(
-            case.id, run.merged_drafts, run.report.unverified_grounds
+            case.id, run.merged_drafts, stride_block(run.report).unverified_grounds
         )
         grounds.append(measurement)
         # The measurement rides in the artifact rather than being recomputed

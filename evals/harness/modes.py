@@ -34,6 +34,7 @@ from typing import Any
 from evals.harness.reference import GoldenCase
 from stride_service.deployment import Deployment
 from stride_service.execution import GraphExecutor, GraphRun
+from stride_service.frameworks.stride.record import DraftThreat
 from stride_service.graph import (
     ENTRY_EXTRACT,
     ENTRY_EXTRACT_ONLY,
@@ -48,7 +49,6 @@ from stride_service.graph import (
     Rejected,
     result_of,
 )
-from stride_service.frameworks.stride.record import DraftThreat
 from stride_service.report import (
     FrameworkName,
     FrameworkSelection,
@@ -175,9 +175,7 @@ def build_eval_pipeline(
     deployment = deployment or Deployment.from_env()
     if sampling is not None:
         deployment = replace(deployment, sampling=sampling, _built={})
-    return deployment.pipeline(
-        frameworks, entry=entry, resolve_model=resolve_model
-    )
+    return deployment.pipeline(frameworks, entry=entry, resolve_model=resolve_model)
 
 
 async def run_graph(
@@ -312,17 +310,13 @@ def _run_from_graph(
             # Read off the built graph rather than restated: the envelope checks
             # that the blocks answer the job's own selection, so a driver that
             # named its own list could disagree with the graph that ran.
-            frameworks=[
-                FrameworkSelection(name=name) for name in pipeline.frameworks
-            ],
+            frameworks=[FrameworkSelection(name=name) for name in pipeline.frameworks],
         ),
         input_ref=InputRef.of(system_name=case.meta.title, sources=case.sources),
         nodes=graph_run.node_runs,
         pipeline=pipeline,
     )
-    drafts = tuple(
-        DraftThreat.model_validate(draft) for draft in state[drafts_key]
-    )
+    drafts = tuple(DraftThreat.model_validate(draft) for draft in state[drafts_key])
     return AnalysisRun(report=report, merged_drafts=drafts)
 
 
