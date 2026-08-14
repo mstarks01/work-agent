@@ -50,13 +50,16 @@ from stride_service.system_model import SystemModel
 
 __all__ = [
     "PACKAGES",
+    "PRECONDITION_RESULTS",
     "SCHEMAS",
     "FrameworkPackage",
     "FrameworkPackageError",
     "FrameworkSchemas",
     "KnowledgeTables",
+    "PreconditionError",
     "PreconditionResult",
     "package_for",
+    "run_precondition",
     "schemas_for",
     "validate_package",
 ]
@@ -72,6 +75,9 @@ __all__ = [
 #:
 #: Fails closed — only ``satisfied`` runs the framework.
 PreconditionResult = Literal["satisfied", "refuted", "undecidable"]
+
+#: The three states, as a value the run-time gate can check a return against.
+PRECONDITION_RESULTS: tuple[PreconditionResult, ...] = get_args(PreconditionResult)
 
 Precondition = Callable[[SystemModel], PreconditionResult]
 
@@ -107,6 +113,25 @@ class FrameworkPackageError(ConfigError):
     **Deployment**'s construction: a package that declares a lane with no prompt
     must not reach a model call, and the only way to guarantee that is to refuse
     to start.
+    """
+
+
+class PreconditionError(FrameworkPackageError):
+    """A package's precondition raised, or answered outside the three states.
+
+    **A defect in the build, not a fact about the input.** The member is typed
+    and mypy covers its construction, so reaching this means package code that
+    the type checker did not see — and the only safe reading of an answer the
+    contract does not define is no reading at all.
+
+    Never read as ``refuted``, which is the whole reason this is an error rather
+    than a fallback: refusing a framework on a defect drops a whole analysis the
+    caller asked for, and the caller reads no sign of it.
+
+    A :class:`FrameworkPackageError` because the subject is the same — a package
+    this deployment carries is ill-formed — even though this one fires at a call
+    site rather than at construction. :func:`run_precondition` says why it cannot
+    fire earlier.
     """
 
 
@@ -213,6 +238,10 @@ class FrameworkPackage:
         What this framework asks of a **Valid System Model** before any of its
         lanes runs. STRIDE's is total — every valid model satisfies it — and it
         is a declared predicate rather than an absence, so no package is exempt.
+        The graph runs it once per selected framework, after ``extract`` and
+        before the fan-out, through :func:`run_precondition`. Only ``satisfied``
+        runs the lanes; a refused framework still produces a block that states
+        the reason.
     ``knowledge``
         This package's **Reference Note** and **Worked Case** tables. They live
         here because their retrieval key does: selection is a set intersection
@@ -376,6 +405,44 @@ def package_for(name: FrameworkName) -> FrameworkPackage:
     return PACKAGES[name]
 
 
+def run_precondition(
+    package: FrameworkPackage, model: SystemModel
+) -> PreconditionResult:
+    """One package's precondition over one **Valid System Model**, checked.
+
+    **The check cannot run at declaration time.** A precondition reads a model,
+    so nothing knows what it returns until a model exists;
+    :func:`validate_package` checks only that the member is callable. Probing it
+    at construction with a synthetic model would run package code at startup and
+    prove nothing about a real input.
+
+    So this validates what it receives, and fails closed both ways. An
+    unrecognised return names the package and the value it gave. An exception out
+    of package code is wrapped, because an unwrapped one says nothing about whose
+    code it came from.
+
+    The honest cost: this runs after extraction, so a defective package costs one
+    extraction. That is the right side to be wrong on — the check exists for a
+    build defect that should never reach a deployment, and the alternative loses
+    a framework's whole output quietly.
+
+    Every caller runs it through here: the graph's run-time gate, and the eval
+    corpus verifier that checks a case's declaration against the predicate.
+    """
+    try:
+        result = package.precondition(model)
+    except Exception as exc:
+        raise PreconditionError(
+            f"framework package {package.name!r} precondition raised {exc!r}"
+        ) from exc
+    if result not in PRECONDITION_RESULTS:
+        raise PreconditionError(
+            f"framework package {package.name!r} precondition returned {result!r},"
+            f" which is not one of {list(PRECONDITION_RESULTS)}"
+        )
+    return result
+
+
 def validate_package(package: FrameworkPackage, root: Path) -> None:
     """Refuse an ill-formed package, before any model call.
 
@@ -436,6 +503,18 @@ def _declaration_issues(package: FrameworkPackage) -> list[str]:
 
     if not issubclass(package.record, Claim):
         issues.append(f"record {package.record.__name__} does not subclass Claim")
+    # The narrow half of the precondition's two checks, and the value is stated
+    # rather than oversold: the member is typed and mypy covers the
+    # construction. It earns its place on the gate's own terms — the gate
+    # re-checks ``record`` with ``issubclass`` under the same reasoning, because
+    # its job is to refuse an ill-formed package before any model call rather
+    # than to trust the type checker. What the member *returns* cannot be
+    # checked here at all; :func:`run_precondition` says why.
+    if not callable(package.precondition):
+        issues.append(
+            f"precondition is {package.precondition!r}, which is not callable,"
+            " so nothing can ask this framework whether it applies"
+        )
     lane_field = package.id_rule.lane_field
     if lane_field and lane_field not in package.record.model_fields:
         issues.append(
