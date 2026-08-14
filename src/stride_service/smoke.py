@@ -64,7 +64,7 @@ from typing import Any
 from stride_service.deployment import Deployment
 from stride_service.engine import StrideEngine
 from stride_service.errors import ConfigError
-from stride_service.frameworks import package_for
+from stride_service.frameworks import selectable_without_options
 from stride_service.graph import (
     CRITIC_ROLE,
     EXTRACT_NODE,
@@ -248,25 +248,15 @@ def required_nodes(frameworks: Sequence[FrameworkName]) -> tuple[str, ...]:
 def _smoke_selection(deployment: Deployment) -> tuple[FrameworkName, ...]:
     """The carried frameworks a smoke run can ask its question of.
 
-    **A framework whose options carry a required field is left out**, and this is
-    the honest limit rather than a workaround. A smoke run asks whether the
-    *application* works here; it has no submitter to ask what ASVS level this
-    install should be measured at, and inventing one would make the smoke run
-    assert a choice the operator never made. #161's rule holds here as anywhere:
-    no default selection, on any axis.
+    A framework whose options carry a required field is left out, for the reason
+    :func:`~stride_service.frameworks.selectable_without_options` gives: a smoke
+    run has nobody to ask what ASVS level this install should be measured at.
 
     The cost is stated by :func:`unexercised_frameworks` rather than hidden: a
     framework left out is three tier keys nothing exercised, and an operator who
     wants them exercised runs a job.
     """
-    return tuple(
-        name
-        for name in deployment.frameworks
-        if not any(
-            field.is_required()
-            for field in package_for(name).options.model_fields.values()
-        )
-    )
+    return selectable_without_options(deployment.frameworks)
 
 
 def unexercised_frameworks(deployment: Deployment) -> tuple[FrameworkName, ...]:

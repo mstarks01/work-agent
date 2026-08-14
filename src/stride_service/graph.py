@@ -390,14 +390,20 @@ class FrameworkNodes:
     def skip_route(self) -> str:
         """The route ``prepare`` emits when this framework's precondition refuses.
 
-        One route per framework rather than one shared ``skip``, for the reason
-        every other name here carries the framework: a job selecting two
-        frameworks decides each of them separately, and ADK matches an edge
-        against *any* value in the emitted route list. So one node emits a list
-        of N routes and exactly N edges fire, which is what makes a partial
-        refusal expressible without a route per subset of the selection.
+        **One shared route, unlike every other name on this class.** A ``run``
+        route reaches this framework's own lane agents, so it has to carry the
+        framework; every ``skip`` reaches ``assemble``, so a route per framework
+        would declare N copies of one ``prepare -> assemble`` edge — which ADK's
+        graph validation refuses outright, and which a build carrying two
+        frameworks is the first thing to hit.
+
+        Nothing is lost by sharing it. The route decides topology and nothing
+        else: *which* framework was refused is parked under that framework's own
+        ``precondition`` key, and ``assemble`` reads it there. A job refusing one
+        of two emits ``["skip", "run_<other>"]``, and ADK fires every edge
+        matching any value in that list, so exactly the two intended edges fire.
         """
-        return f"skip_{_identifier(self.name)}"
+        return SKIP_ROUTE
 
     @property
     def tier_nodes(self) -> dict[str, str]:
@@ -458,6 +464,13 @@ be that many kinds of noise on one number."""
 
 ROUTE_VALID = "valid"
 ROUTE_INVALID = "invalid"
+SKIP_ROUTE = "skip"
+"""The run-time precondition gate's refusal route, shared by every framework.
+
+One route rather than one per framework, because every ``skip`` edge has the
+same target: ``assemble``. See
+:attr:`FrameworkNodes.skip_route`, which reads it, for the whole of the
+argument."""
 ROUTE_ACCEPT = "accept"
 ROUTE_REVISE = "revise"
 """The critic re-ask route. ``route_review`` takes it when the critic's output
@@ -1243,7 +1256,10 @@ def prepare_analysis(
         knowledge_count += len(set(retrieved))
 
     return _routed(
-        routes,
+        # Deduplicated, because the refusal route is shared: two refused
+        # frameworks emit one ``skip`` between them, and ADK fires the one edge
+        # it names once.
+        list(dict.fromkeys(routes)),
         {
             "element_count": len(model.elements()),
             "crossing_count": len(crossings),
@@ -1598,6 +1614,20 @@ def assemble_report(
     shared System Model rather than about any framework's claim. It is derived
     here because one model serves N blocks: deriving it per framework would put
     the same finding in the report N times.
+
+    **This node runs once per incoming trigger, so a two-framework job runs it
+    twice.** ADK schedules a ``FunctionNode`` on each trigger rather than on all
+    of its predecessors, and the earlier run builds the block of whichever
+    framework has not finished from keys nothing wrote. The final state is right
+    by construction — the last run is the one that follows the last subgraph, so
+    it sees every framework's artifacts — and it overwrites what the earlier run
+    left.
+
+    **A join node is the wrong fix here**, and the run-time gate is why. ADK's
+    ``JoinNode`` waits for *all* predecessors to complete, and a refused
+    framework's subgraph never runs, so its terminal node never completes and the
+    join would never fire. The wasted run is the price of a topology where a
+    framework may legitimately not run at all.
     """
     model = SystemModel.model_validate(valid_model)
     state = keys.state(ctx)

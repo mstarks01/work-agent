@@ -21,7 +21,7 @@ from google.adk.workflow import FunctionNode, JoinNode
 from stride_service import graph
 from stride_service.binding import NodeBinding
 from stride_service.critic import CriticOutputError, DraftJoinError
-from stride_service.frameworks import PreconditionError
+from stride_service.frameworks import PreconditionError, package_for
 from stride_service.frameworks.stride import STRIDE
 from stride_service.frameworks.stride.record import (
     STRIDE_CATEGORIES,
@@ -32,6 +32,7 @@ from stride_service.markdown_loader import MarkdownLoader
 from stride_service.model_tiers import LLM_NODES
 from stride_service.report import (
     AnalysisMarks,
+    FrameworkName,
     InputRef,
     Job,
     NodeRun,
@@ -1640,6 +1641,197 @@ def test_the_two_refusing_states_state_different_reasons(monkeypatch):
 
     assert reasons["refuted"] != reasons["undecidable"]
     assert "never says" in reasons["undecidable"]
+
+
+# --- Two frameworks, one of them refused -------------------------------------
+#
+# The tests above swap STRIDE's precondition for one that can refuse, because
+# until ASVS landed there was no shipped package that could. These run the real
+# pair: ASVS refuses a system whose flows carry no web protocol, STRIDE's is
+# total, and one job asks for both.
+
+BOTH: tuple[FrameworkName, ...] = ("asvs", "stride")
+BOTH_KEYS = graph.GraphKeys.of(BOTH)
+BOTH_DISCLAIMERS = {
+    "asvs": "AI-generated ASVS applicability analysis.",
+    "stride": "AI-generated STRIDE threat model.",
+}
+ASVS_OPTIONS = {graph.STATE_FRAMEWORK_OPTIONS: {"asvs": {"level": 1}}}
+
+
+def non_web_model():
+    """The shared model with every flow speaking something other than the web.
+
+    Both protocols are *stated*, which is what makes ASVS answer ``refuted``
+    rather than ``undecidable``: the input said, and what it said was not a web
+    application.
+    """
+    model = valid_model()
+    return model.model_copy(
+        update={
+            "data_flows": [
+                flow.model_copy(update={"protocol": "AMQP"})
+                for flow in model.data_flows
+            ]
+        }
+    )
+
+
+def test_a_two_framework_graph_builds(prompt_loader, domain_loader):
+    """The topology holds for two, and the refusal route is what made it not.
+
+    Every framework's ``skip`` reaches ``assemble``, so a route per framework
+    declared N copies of one ``prepare -> assemble`` edge — which ADK refuses
+    outright. A build carrying one framework could never hit it, which is why the
+    second framework is what found it.
+    """
+    tiers = repo_tiers()
+    sampling = load_sampling(PROJECT_ROOT / "config" / "sampling.toml", env={})
+    pipeline = graph.build_pipeline(
+        prompt_loader=prompt_loader,
+        domain_loader=domain_loader,
+        package_loaders=repo_package_loaders(BOTH),
+        frameworks=BOTH,
+        binding=NodeBinding.from_configs(tiers, sampling, _route_resolver(tiers)),
+    )
+
+    names = set(nodes_by_name(pipeline))
+    assert {"analyze_asvs_webrtc", "analyze_stride_spoofing"} <= names
+    assert {"critic_asvs", "critic_stride"} <= names
+    fanned = routed_fan_out(pipeline, graph.PREPARE_NODE)
+    assert fanned[graph.SKIP_ROUTE] == {graph.ASSEMBLE_NODE}
+    assert len(fanned["run_asvs"]) == len(package_for("asvs").lanes)
+
+
+def test_one_framework_s_refusal_routes_only_its_own_half_past_the_lanes(
+    domain_loader,
+):
+    """A partial refusal is expressible: one route per framework, N edges fire."""
+    ctx = FakeContext(**ASVS_OPTIONS)
+
+    event = graph.prepare_analysis(
+        non_web_model().model_dump(mode="json"),
+        ctx,
+        BOTH_KEYS,
+        BOTH,
+        domain_loader,
+        repo_package_loaders(BOTH),
+    )
+
+    assert set(event.actions.route) == {
+        graph.FrameworkNodes("asvs").skip_route,
+        graph.FrameworkNodes("stride").run_route,
+    }
+    assert ctx.state[graph.FrameworkNodes("asvs").key("precondition")] == "refuted"
+    assert not [key for key in ctx.state if key.startswith("candidates_asvs_")]
+    assert LANES[0].key("candidates") in ctx.state
+
+
+def test_a_refusal_does_not_cost_the_other_framework_its_answer(domain_loader):
+    """One framework's precondition does not spend another framework's judgement.
+
+    The whole point of the gate sitting before the fan-out rather than inside
+    it: a job naming both against a non-web system still gets its STRIDE
+    analysis, and the ASVS block says why it has none.
+    """
+    model = non_web_model().model_dump(mode="json")
+    ctx = FakeContext(**ASVS_OPTIONS)
+    graph.prepare_analysis(
+        model, ctx, BOTH_KEYS, BOTH, domain_loader, repo_package_loaders(BOTH)
+    )
+    _park(ctx, [sample_draft("S-01").model_dump(mode="json")], None)
+    ctx.state[NODES.key("reviewed")] = {
+        "claims": [sample_ruling("S-01").model_dump(mode="json")]
+    }
+    graph.assemble_report(model, ctx, BOTH_KEYS, BOTH, BOTH_DISCLAIMERS)
+
+    analysis = graph.Analysis.from_state(ctx.state[graph.STATE_ANALYSIS])
+    asvs_block, stride_block = analysis.analyses
+
+    assert [block.framework for block in analysis.analyses] == list(BOTH)
+    assert [claim.id for claim in stride_block.claims] == ["S-01"]
+    assert asvs_block.claims == []
+    assert len(asvs_block.scope) == 70
+    assert asvs_block.scope[0].unit == "V1.2.1"
+    assert "does not apply" in asvs_block.scope[0].reason
+
+
+def test_the_refused_block_records_the_level_the_job_asked_for(domain_loader):
+    """The option reaches the block, so a reader can tell which set was ruled on.
+
+    It is job data rather than graph shape — two jobs with different levels share
+    one built graph — so it arrives in state and the block declares a field for
+    it.
+    """
+    model = non_web_model().model_dump(mode="json")
+    ctx = FakeContext(**{graph.STATE_FRAMEWORK_OPTIONS: {"asvs": {"level": 2}}})
+    graph.prepare_analysis(
+        model, ctx, BOTH_KEYS, BOTH, domain_loader, repo_package_loaders(BOTH)
+    )
+    graph.assemble_report(model, ctx, BOTH_KEYS, BOTH, BOTH_DISCLAIMERS)
+
+    analysis = graph.Analysis.from_state(ctx.state[graph.STATE_ANALYSIS])
+
+    assert analysis.analyses[0].level == 2
+    assert len(analysis.analyses[0].scope) == 253
+
+
+def test_assemble_runs_once_per_framework_and_the_last_run_is_the_whole_report(
+    domain_loader,
+):
+    """The topology's own cost, pinned rather than assumed.
+
+    ADK schedules a ``FunctionNode`` on each incoming trigger, so two frameworks
+    trigger ``assemble`` twice: the earlier run builds the unfinished
+    framework's block from keys nothing wrote. What matters is that the later run
+    overwrites it, and that is what this holds. A join node is the wrong fix —
+    it waits for every predecessor, and a refused framework's subgraph never
+    completes.
+    """
+    model = valid_model().model_dump(mode="json")
+    ctx = FakeContext(**ASVS_OPTIONS)
+    graph.prepare_analysis(
+        model, ctx, BOTH_KEYS, BOTH, domain_loader, repo_package_loaders(BOTH)
+    )
+
+    # The first trigger: ASVS's half has landed, STRIDE's has not.
+    graph.assemble_report(model, ctx, BOTH_KEYS, BOTH, BOTH_DISCLAIMERS)
+    early = graph.Analysis.from_state(ctx.state[graph.STATE_ANALYSIS])
+    assert early.analyses[1].claims == []
+
+    # The second: every framework's artifacts are parked, so this is the report.
+    _park(ctx, [sample_draft("S-01").model_dump(mode="json")], None)
+    ctx.state[NODES.key("reviewed")] = {
+        "claims": [sample_ruling("S-01").model_dump(mode="json")]
+    }
+    graph.assemble_report(model, ctx, BOTH_KEYS, BOTH, BOTH_DISCLAIMERS)
+    final = graph.Analysis.from_state(ctx.state[graph.STATE_ANALYSIS])
+
+    assert [block.framework for block in final.analyses] == list(BOTH)
+    assert [claim.id for claim in final.analyses[1].claims] == ["S-01"]
+
+
+def test_a_lane_agent_is_told_which_level_its_job_asked_for(domain_loader):
+    """A framework whose options select what applies has to tell its agents.
+
+    Rendered neutrally, from the package's own field names: this seam knows no
+    package, and a framework with no options renders nothing extra.
+    """
+    ctx = FakeContext(**ASVS_OPTIONS)
+    graph.prepare_analysis(
+        valid_model().model_dump(mode="json"),
+        ctx,
+        BOTH_KEYS,
+        BOTH,
+        domain_loader,
+        repo_package_loaders(BOTH),
+    )
+
+    asvs_scope = ctx.state[graph.Lane("asvs", "cryptography").key("scope")]
+    stride_scope = ctx.state[LANES[0].key("scope")]
+
+    assert "asvs with level 1" in asvs_scope
+    assert "asked for" not in stride_scope
 
 
 def test_a_graph_entered_past_the_gate_reports_nothing_out_of_scope():

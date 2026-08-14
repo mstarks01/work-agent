@@ -62,6 +62,7 @@ __all__ = [
     "package_for",
     "run_precondition",
     "schemas_for",
+    "selectable_without_options",
     "validate_package",
 ]
 
@@ -437,6 +438,32 @@ def package_for(name: FrameworkName) -> FrameworkPackage:
     refused by :func:`validate_package` before anything binds.
     """
     return PACKAGES[name]
+
+
+def selectable_without_options(
+    names: Sequence[FrameworkName],
+) -> tuple[FrameworkName, ...]:
+    """Those of ``names`` a caller with nobody to ask can select, in order.
+
+    **A package whose options carry a required field is left out.** No package
+    field carries a default, so there is no value to fall back on and no honest
+    way to invent one: an ASVS level is a choice an organization makes, and a
+    caller that supplied one on the operator's behalf would put a decision in the
+    report that nobody made.
+
+    Two callers ask exactly this, and both are unattended by construction: the
+    **Provider Smoke** run, which asks whether the application works here, and
+    the first-run app, which offers "run what this install is configured for"
+    and has no selection UI. Each states what it left out rather than hiding it.
+    """
+    return tuple(
+        name
+        for name in names
+        if not any(
+            field.is_required()
+            for field in PACKAGES[name].options.model_fields.values()
+        )
+    )
 
 
 def run_precondition(

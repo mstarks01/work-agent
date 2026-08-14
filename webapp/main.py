@@ -106,6 +106,10 @@ from stride_service import (
     StrideEngine,
 )
 from stride_service.deployment import Deployment
+from stride_service.frameworks import (
+    FrameworkPackageError,
+    selectable_without_options,
+)
 from stride_service.model_tiers import ModelTierConfig
 from stride_service.vendors import vendor_for
 
@@ -273,11 +277,21 @@ def build_startup(env: Mapping[str, str] | None = None) -> Startup:
     deployment = None
     try:
         deployment = Deployment.from_env(env)
-        # Every framework this install carries. The first-run app has no
-        # selection UI and no business inventing a default the service itself
-        # refuses to have: what it offers is "run what this install is
-        # configured for", which is exactly the carried set.
-        engine = StrideEngine.from_deployment(deployment, deployment.frameworks)
+        # The frameworks this install carries that a caller with nobody to ask
+        # can select. The first-run app has no selection UI and no business
+        # inventing a default the service itself refuses to have: what it offers
+        # is "run what this install is configured for", minus any framework
+        # whose options carry a required field. ASVS is the first such
+        # framework — its level is a choice an organization makes, and this app
+        # cannot make it on their behalf.
+        selection = selectable_without_options(deployment.frameworks)
+        if not selection:
+            raise FrameworkPackageError(
+                "every framework this install carries needs a job option this app"
+                f" cannot supply: {list(deployment.frameworks)}; submit a job"
+                " through the /v1 API instead"
+            )
+        engine = StrideEngine.from_deployment(deployment, selection)
     except ConfigError as exc:
         logger.error("config error at startup: %s", exc)
         tiers = deployment.tiers if deployment is not None else None
