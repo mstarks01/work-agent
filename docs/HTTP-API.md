@@ -102,9 +102,23 @@ Content-Type: application/json
     {"kind": "transcript", "label": "Kickoff call, 14 May",
      "text": "Ana: the orders DB is Postgres. Bob: I think it's 13."}
   ],
+  "frameworks": [{"name": "stride"}],
   "system_name": "Orders"
 }
 ```
+
+`frameworks` is **required and non-empty**, and names which security frameworks
+this job is analysed under. There is no default: a contract that picked one for
+you would mean two different things on two deployments, and a job that silently
+analysed fewer frameworks than it asked for is worse than one that refused. Each
+entry is `{name, options}`, where `options` defaults to `{}` on the envelope and
+the named package's own model decides what it needs — so a framework requiring a
+job-level value rejects a submission that omits it, naming the field. Which
+names a deployment carries is its `config/frameworks.toml`; an unknown one is
+refused on the input ladder, before a job record exists and before anything is
+billed.
+
+The report answers exactly this set, one block per framework, in this order.
 
 Each source is `{kind, label, text}`. `kind` is `description` or `transcript`
 and selects the guidance extraction reads the text under. `label` is yours: it
@@ -138,6 +152,8 @@ when a deployment changes vendor. Shape is checked before size:
 | `422` | A source is malformed: unknown `kind`, missing or over-long `label`, empty `text`, an unknown field. |
 | `422` | A `label` carries a control, bidi or zero-width character. A label is a citation key rendered as chrome beside the text it names, so a character that renders as something other than what it is can misrepresent the report. Rejected rather than stripped: a label is bounded but never rewritten, so repairing one would cite something you did not submit. Line breaks are refused for the same reason. |
 | `400` | `sources` is present but empty. |
+| `422` | `frameworks` is missing or empty. There is no default, so an omitted selection is a malformed submission rather than an implied one. |
+| `422` | `frameworks` names a framework this deployment does not carry, or names one twice. The message names it; order carries nothing, so a repeat is a mistake rather than a preference. |
 | `422` | Two sources share a `label`. Refused at any size — a label is a citation key, so a repeated one leaves every excerpt naming it ambiguous. The message names the repeated labels. |
 | `413` | More sources than the deployment allows. The message names the count and the limit. |
 | `413` | The sources total more bytes than allowed. There is no per-source cap, so the message names **no** culprit — it carries a per-label byte breakdown instead, because the overspend belongs to the sum. |

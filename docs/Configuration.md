@@ -4,7 +4,7 @@ The service reads its behaviour from versioned files in `config/` and from a set
 of environment variables. Loaders **fail closed**: a missing or invalid file
 stops startup rather than silently falling back to a default model or sampling.
 
-Both [`StrideEngine.from_config(env=...)`](Integration-Guide.md) and the
+Both [`StrideEngine.from_config(frameworks, env=...)`](Integration-Guide.md) and the
 [HTTP app](HTTP-API.md) take the same environment; the tables below apply to both.
 
 ## Config files

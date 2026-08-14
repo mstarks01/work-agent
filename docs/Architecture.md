@@ -2,7 +2,7 @@
 
 Both entry points — the in-process [engine](Integration-Guide.md) and the
 [`/v1` API](HTTP-API.md) — drive one Google ADK Workflow graph and shape its
-outcome into a [`StrideReport`](Report-Schema.md). This page is the map of what
+outcome into a [`Report`](Report-Schema.md). This page is the map of what
 runs between text in and report out.
 
 ## The pipeline
@@ -20,17 +20,17 @@ flowchart TD
     revalidate -- valid --> prepare
     revalidate -- invalid --> reject([rejected])
 
-    prepare --> analyze["6 category agents,<br/>one per STRIDE category, in parallel<br/>(strong)"]
-    analyze --> merge[merge]
-    merge --> critic["critic<br/>(strong)"]
+    prepare --> analyze["lane agents, in parallel<br/>one per lane of each framework<br/>(strong)"]
+    analyze --> merge["merge<br/>(per framework)"]
+    merge --> critic["critic<br/>(per framework, strong)"]
     critic --> router{{route_review}}
 
     router -- accept --> assemble[assemble]
-    router -- revise --> recritic["recritic<br/>(strong)"]
+    router -- revise --> recritic["recritic<br/>(per framework, strong)"]
     recritic --> rereview{{rereview}}
     rereview -- accept --> assemble
     rereview -- revise --> failed([failed])
-    assemble --> report([StrideReport])
+    assemble --> report([Report])
 
     classDef llm fill:#ede9fe,stroke:#7c3aed,stroke-width:1.5px,color:#2e1065
     classDef code fill:#e0f2fe,stroke:#0284c7,stroke-width:1.5px,color:#082f49
@@ -63,20 +63,26 @@ run's three outcomes.
   agents will see it — with `source_excerpt`, `source_label` and
   `source_speaker` stripped, so the only submitter words downstream of here are
   the ones a finding chose to quote.
-- **six category agents** (`analyze_<category>`) run in parallel, one per STRIDE
-  category, each drafting threats in its lane. Each threat cites at least one
+- **lane agents** (`analyze_<framework>_<lane>`) run in parallel — one per lane
+  of each framework the job selected, which for STRIDE is its six categories.
+  Each drafts claims in its own lane, and each claim cites at least one
   **ground**: a quote from the submitted text, an `unknown` attribute, or a
   boundary crossing. A **candidate is never one of those** — it is a structural
   lead code found, which an agent may investigate and reject, and which nothing
   downstream of the prompt reads.
-- **merge** joins the drafts and runs the mechanical half of the fan-in: every
-  reference resolves, no two lanes reused a threat ID, and every quote ground is
-  matched against the bytes of the source it names. An unverifiable quote is
-  marked and still renders; a threat where *nothing* verifies fails the job. It
-  also computes the per-lane [`coverage`](Report-Schema.md#coverage--what-each-lane-was-offered)
-  account over the drafts.
-  Then the **critic** rules on all of them in one pass — verdicts, dedupe,
-  severity calibration — spending judgement only on what code cannot check.
+- **merge** joins one framework's drafts and runs the mechanical half of the
+  fan-in: every reference resolves, no two lanes reused a claim ID, and every
+  quote ground is matched against the bytes of the source it names. An
+  unverifiable quote is marked and still renders; a claim where *nothing*
+  verifies fails the job. It also computes the per-lane
+  [`coverage`](Report-Schema.md#coverage--what-each-lane-was-offered) account
+  over the drafts.
+  Then that framework's **critic** rules on all of them in one pass — verdicts,
+  dedupe, severity calibration — spending judgement only on what code cannot
+  check. **Each package carries its own critic, blind to every other
+  framework**: two frameworks' subgraphs never touch between `prepare` and
+  `assemble`, because a critic rules its own framework's claims against its own
+  framework's question.
 - **route_review** runs the mechanical checks the assembler depends on. If the
   critic's output fails them, one bounded **recritic** re-ask runs; a second
   failure is a `failed` job, not a rejection.
@@ -92,7 +98,7 @@ Every LLM node runs on one of two **model tiers** — named for the job they do,
 not for any vendor's product line:
 
 - **`base`** — the workhorse: `extract` and `repair`.
-- **`strong`** — judgement: the six category agents, the `critic`, and the
+- **`strong`** — judgement: every framework's lane agents, its `critic`, and the
   `recritic`.
 
 [`config/model_tiers.toml`](Configuration.md) maps nodes to tiers and each tier
@@ -187,7 +193,7 @@ Nothing about certification appears in the job status view — it is operator-on
 The graph reaches one of three states, surfaced identically by both entry
 points:
 
-- **completed** — a `StrideReport`.
+- **completed** — a `Report`.
 - **rejected** — the input failed the validity gate; carries the
   `ValidationIssue`s.
 - **failed** (raises) — an internal error. No partial report is ever produced:
@@ -224,7 +230,7 @@ across every call.
 - **Isolation is per session, not per caller.** Two analyses submitted at the
   same time by the same caller still get separate sessions, so they can never
   read or overwrite each other's state.
-- **Within a single analysis**, the six category agents run in parallel but each writes
+- **Within a single analysis**, the lane agents run in parallel but each writes
   to its own category-keyed slot in the session, so the parallel branches don't
   clobber one another before the merge.
 - **Untrusted input stays contained.** Because a job's text lives only in its own
@@ -274,7 +280,8 @@ and the selection seam are in place for all of them.
 | `stride_service.candidates` | The rule table. Structural conditions an agent should investigate — leads, never findings, never evidence. |
 | `stride_service.domains` | Which `skills/domains/` packs a model earns, decided from its own technology fields. |
 | `stride_service.coverage` | Per-lane accounting: what each agent was offered, and what its drafts cite. |
-| `stride_service.report` | `StrideReport` and the severity model. |
+| `stride_service.report` | The `Report` envelope, the neutral `Claim` and the severity model. |
+| `stride_service.frameworks` | The framework-package contract, its registry and its deployment gate. |
 | `stride_service.validation` | The mechanical validity gate. |
 | `stride_service.critic` | The mechanical checks around the critic step — the ones no model should be asked to perform. |
 | `stride_service.skills` / `.prompts` / `.markdown_loader` | Skill/prompt loading and composition. |
