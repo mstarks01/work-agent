@@ -1,3 +1,5 @@
+** This repo is under early active development and breaking changes should be expected. ** 
+
 # stride-service
 
 An agentic **STRIDE threat-modeling engine**: semi-structured text describing a
