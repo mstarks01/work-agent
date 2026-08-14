@@ -260,7 +260,7 @@ def measure_grounds(
     """
     marked: dict[str, set[int]] = {}
     for mark in unverified:
-        marked.setdefault(mark.threat_id, set()).add(mark.index)
+        marked.setdefault(mark.claim_id, set()).add(mark.index)
     return CaseGrounds(
         case_id=case_id,
         threats=tuple(
@@ -313,7 +313,7 @@ def classify_failure(case_id: str, error: Exception) -> GroundsFailure:
             case_id=case_id,
             kind="fail-closed",
             detail=str(error),
-            threat_ids=error.threat_ids,
+            threat_ids=error.claim_ids,
             draft_count=error.draft_count,
         )
     if isinstance(error, EvidenceResolutionError):
