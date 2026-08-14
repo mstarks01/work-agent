@@ -1,22 +1,46 @@
-"""STRIDE report: the structured JSON payload the front-end retrieves for a job.
+"""The report: the structured JSON payload the front-end retrieves for a job.
+
+**One envelope, many frameworks.** A :class:`Report` carries the facts about one
+job — its identity, its inputs, the nodes that ran, and the single **Valid
+System Model** every framework analysed — plus one :class:`FrameworkAnalysis`
+block per framework the job selected. A field sits where the thing it describes
+sits: nine fields describe the job or the shared model and stay on the
+envelope, and everything one framework produced rides in that framework's own
+block.
+
+The neutral shape every block's checks read is :class:`Claim` — an ID, the
+``(framework, version)`` pair naming what the conclusion is *of*, a title and
+description, the elements it affects, and the **Grounds** that justify it. It
+carries no judgement: a severity, a mitigation and a ruling all belong to the
+framework that makes them, and STRIDE's live on :class:`~stride_service.
+frameworks.stride.record.Threat`.
 
 Severity is qualitative likelihood x impact with the band **derived by a fixed
 matrix, never asserted** by a model — the critic calibrates two narrow
-judgments and evals check the arithmetic. Rejected threats ride in their own
-``rejected_threats`` array as an audit trail. The report embeds the full
-validated System Model plus derived boundary crossings, so it is
-self-contained: every element reference resolves inside one payload.
+judgments and evals check the arithmetic. Rejected claims ride in their own
+``rejected_claims`` array as an audit trail. The report embeds the full
+validated System Model plus derived boundary crossings once, so it is
+self-contained: every element reference in every block resolves inside one
+payload.
 """
 
 from __future__ import annotations
 
 import hashlib
 from collections import Counter
-from collections.abc import Iterable, Sequence
+from collections.abc import Collection, Iterable, Sequence
 from datetime import datetime
-from typing import Annotated, ClassVar, Literal, Self, get_args
+from typing import Annotated, Any, ClassVar, Literal, Self, get_args
 
-from pydantic import BaseModel, BeforeValidator, ConfigDict, Field, model_validator
+from pydantic import (
+    BaseModel,
+    BeforeValidator,
+    ConfigDict,
+    Field,
+    SerializeAsAny,
+    field_validator,
+    model_validator,
+)
 from pydantic.json_schema import SkipJsonSchema
 
 from stride_service.sources import Source
@@ -109,25 +133,56 @@ from stride_service.system_model import BoundaryCrossing, SystemModel
 # number finally means what the field always said it did. A consumer that
 # computed a citation rate off an affected row read a rate over 1.0 and will now
 # read a smaller, correct one.
-SCHEMA_VERSION = "2.10"
+#
+# 3.0 is the framework cutover, and it is major on every count the rule names:
+# fields move, a field changes its spelling, and one changes what it carries.
+# ``threats`` and seven other top-level fields become ``analyses[].claims`` and
+# their per-framework siblings; the four mark classes rename ``threat_id`` to
+# ``claim_id``; ``coverage[].category`` becomes ``coverage[].lane``; and every
+# claim gains the required ``(framework, framework_version)`` pair.
+#
+# **There is no version gate and none is needed.** ``Report`` keeps
+# ``extra="forbid"``, so a 2.10 payload carrying ``threats`` at the top level is
+# refused by this model, and a 3.0 payload carrying ``analyses`` is refused by
+# the old one. The no-shim behaviour falls out of the shapes rather than out of
+# anything reading ``schema_version``.
+#
+# 3.0 also carries a fourth ``GroundKind``, ``absent-attribute`` (#171), which
+# would have earned a major bump of its own had it arrived separately: a
+# consumer switching over the three kinds it knew now meets a fourth. It rides
+# this one instead because 3.0 has never shipped, and two hard cutovers for one
+# release is a cost paid twice for nothing.
+SCHEMA_VERSION = "3.0"
 
+# The envelope's disclaimer, which is about the *service* rather than about any
+# one framework. It no longer says "threat model": that is false of a report
+# whose blocks include a framework that rules on requirement applicability
+# rather than on attacks, and a sentence that is false of half a payload is
+# worse than a general one. Each package carries its own, from
+# ``frameworks/<name>/disclaimer.md``, saying what its own claims assert.
 DEFAULT_DISCLAIMER = (
-    "AI-generated threat model. Not reviewed by a human security analyst."
+    "AI-generated security analysis. Not reviewed by a human security analyst."
 )
 
-StrideCategory = Literal[
-    "spoofing",
-    "tampering",
-    "repudiation",
-    "information-disclosure",
-    "denial-of-service",
-    "elevation-of-privilege",
-]
+# What this repo can spell. Three sets must agree: this ``Literal`` names what
+# the code can name, :data:`~stride_service.frameworks.PACKAGES` names what this
+# repo carries, and ``config/frameworks.toml`` names what this install runs. The
+# first two agree at import; the third agrees at the gate.
+#
+# One member today. ASVS is specified across #160-#169 and carried by none of
+# it: the map put the content of its requirements out of scope, so adding the
+# name here without a package in the table would break the first agreement on
+# purpose. A second framework is a table edit and an entry here, together.
+FrameworkName = Literal["stride"]
 
-# The six categories in canonical STRIDE order, derived from the type itself
-# so the two can never drift.
-STRIDE_CATEGORIES: tuple[StrideCategory, ...] = get_args(StrideCategory)
+FRAMEWORK_NAMES: tuple[FrameworkName, ...] = get_args(FrameworkName)
 
+# Severity vocabulary. **Shared value types, whose placement is a package's
+# choice.** #163 kept the severity *field* off :class:`Claim` because a
+# framework that grades nothing has no use for it; the types themselves are the
+# service's, so two packages that do grade harm spell a band the same way and
+# the matrix arithmetic is written once. A package declares the field, and the
+# gate then requires the ``severity_rubric.md`` that explains how it is read.
 Rating = Literal["low", "medium", "high"]
 SeverityLevel = Literal["low", "medium", "high", "critical"]
 VerdictStatus = Literal["confirmed", "needs-info", "rejected"]
@@ -152,18 +207,21 @@ SamplingValue = bool | int | float | str | None
 # (``unknown`` / ``derived``) because a bare ``unknown`` collides: it is already
 # a legal *attribute value* across the System Model, so ``kind="unknown"`` would
 # read as "the kind is unknown" rather than "the ground is an unknown
-# attribute".
-GroundKind = Literal["quote", "unknown-attribute", "derived-fact"]
+# attribute". ``absent-attribute`` follows that spelling for the same reason and
+# for one more: the two attribute branches carry identical fields, so the kind
+# is the only place their difference can live.
+GroundKind = Literal["quote", "unknown-attribute", "absent-attribute", "derived-fact"]
 
-# Threat IDs are <category letter>-<per-category sequence>, e.g. "S-01".
-CATEGORY_LETTERS: dict[StrideCategory, str] = {
-    "spoofing": "S",
-    "tampering": "T",
-    "repudiation": "R",
-    "information-disclosure": "I",
-    "denial-of-service": "D",
-    "elevation-of-privilege": "E",
-}
+# How long a claim ID may be. **Not a grammar**: #163 ruled that ``id`` has no
+# shared one, because each package composes its own from its own ``id_format``
+# and per-lane prefix. STRIDE's ``S-01`` and an ASVS requirement ID are both
+# legal here and neither is spelled by this module.
+#
+# What survives is the bound, for the reason every ID field here carries one: a
+# string a package composed from a model's own value is still worth capping
+# (OWASP LLM10). Uniqueness within a block is the real check, and it lives on
+# :class:`FrameworkAnalysis`.
+CLAIM_ID_MAX_CHARS = 300
 
 SEVERITY_MATRIX: dict[tuple[Rating, Rating], SeverityLevel] = {
     ("high", "high"): "critical",
@@ -263,7 +321,7 @@ class UnknownRef(BaseModel):
 
 
 class Ground(BaseModel):
-    """What justifies one finding: a quote, a named unknown, or a derived fact.
+    """What justifies one finding: a quote, an attribute's state, or a derived fact.
 
     Chosen by a category agent, constructed by the service. An agent names the
     fact it relied on — a catalog entry, or a span and the source it came from
@@ -274,7 +332,7 @@ class Ground(BaseModel):
     raised.
 
     NO MODEL EVER GENERATES ONE, which is what makes a flat object safe here.
-    The three branches carry different required fields, and that relationship
+    The four branches carry different required fields, and that relationship
     is not expressible in a JSON schema a provider will reliably compile —
     ``oneOf`` has the thinnest, least uniform support across the vendors a
     category agent may be routed to, and ``config/sampling.toml`` records what
@@ -304,6 +362,17 @@ class Ground(BaseModel):
       *forward-looking* — the unknown the critic says must be answered before
       the threat can be ruled on. Different author, different moment, different
       job; when they coincide that is signal, not redundancy.
+    * ``absent-attribute`` — the same two fields, for the attribute whose value
+      *states its own absence*: ``authentication: "none; accepted by network
+      position"`` is a control the submitter said is not there. **The fields are
+      identical and the fact is not**, which is the whole reason this is a kind
+      rather than a flag on the one above. An unknown is a question — it makes a
+      threat conditional and routes it to needs-info — while a stated absence is
+      an answer, and a threat resting on one is confirmed rather than pending.
+      A consumer that folded the two would report a control the input described
+      as missing as a gap in the *description*. Both branches say only what the
+      model carries; neither says the control is inadequate, which stays the
+      agent's argument and the critic's to rule on.
     * ``derived-fact`` — ``flow_id`` alone, a **reference and never a copy**.
       The crossing's zones are recomputed from the system model the report
       already embeds, so a renderer holding only the report resolves them; a
@@ -319,17 +388,22 @@ class Ground(BaseModel):
     kind: GroundKind
     text: str = Field(default="", max_length=1000)  # quote
     source_label: str = Field(default="", max_length=200)  # quote
-    element_id: str = Field(default="", max_length=300)  # unknown-attribute
-    attribute: AttributeName = Field(default="", max_length=100)  # unknown-attribute
+    element_id: str = Field(default="", max_length=300)  # both attribute branches
+    attribute: AttributeName = Field(
+        default="", max_length=100
+    )  # both attribute branches
     flow_id: str = Field(default="", max_length=300)  # derived-fact
 
     # Which fields each branch requires. Everything not listed for a branch is
     # forbidden on it — a quote carrying an element_id is a shape error, not a
     # tolerated extra, because the two readings of such a record differ and
-    # nothing downstream could choose between them.
+    # nothing downstream could choose between them. The two attribute branches
+    # share a row's worth of fields, so neither forbids the other's: what
+    # separates them is the kind, and there is nothing else to check.
     _REQUIRED: ClassVar[dict[GroundKind, tuple[str, ...]]] = {
         "quote": ("text", "source_label"),
         "unknown-attribute": ("element_id", "attribute"),
+        "absent-attribute": ("element_id", "attribute"),
         "derived-fact": ("flow_id",),
     }
 
@@ -420,68 +494,122 @@ class Verdict(ProposedVerdict):
         return self
 
 
-def _check_category_letter(threat_id: str, category: StrideCategory) -> None:
-    """Raise unless a threat ID carries its category's letter.
+class Claim(BaseModel):
+    """One framework's conclusion about the **Valid System Model**.
 
-    Shared by the shape a category agent emits and the shape the service
-    resolves it into, so the rule is stated once. A proposal that fails it is
-    rejected at the node boundary, which is the earliest point either shape
-    exists.
-    """
-    letter = CATEGORY_LETTERS[category]
-    if not threat_id.startswith(f"{letter}-"):
-        raise ValueError(
-            f"threat ID {threat_id!r} does not carry the {category}"
-            f" category letter {letter!r}"
-        )
+    THE ONLY SHAPE THE REPORT'S NEUTRAL CHECKS READ. Seven fields, and the test
+    that produced exactly these seven: three rules on the report read nothing
+    framework-specific — element IDs must resolve in the embedded model, claim
+    IDs must be unique within their block, and every mark must name a claim its
+    block carries. Those checks have to run over a second framework's output, so
+    what they read is what the base holds. A field they do not read has no claim
+    on the shared shape.
 
+    **Chosen by an agent, constructed by the service.** One resolver builds
+    every claim of every framework from an agent's selections
+    (:func:`~stride_service.evidence.resolve_proposals`), which is what keeps
+    "code and not an agent builds a :class:`Ground`" a construction rather than
+    a convention each package could break.
 
-class DraftThreat(BaseModel):
-    """One draft finding: the eight fields a category agent's answer becomes.
+    It carries **no judgement**. A severity, a mitigation and a ruling all
+    belong to the framework that makes them: STRIDE's live on
+    :class:`~stride_service.frameworks.stride.record.DraftThreat`, and a
+    framework that grades nothing declares none of them.
 
-    Everything a category agent's proposal establishes and nothing it may rule
-    on — ``verdict`` and ``confidence`` are the critic's, and appear only once a
-    draft is promoted to a :class:`Threat`. This is the shape the prompt
-    exemplars are lint-parsed against.
+    ``(framework, framework_version)`` is one pair and both halves are required.
+    A framework identifier with no version is uninterpretable one release later
+    — ASVS 5.0.0 kept 11 of 4.0.3's 286 requirements and renumbered every
+    survivor, and its own citation format is ``v5.0.0-1.2.5`` for exactly that
+    reason. An optional field was rejected because an empty version cannot be
+    told apart from "not versioned", which is the failure the pair exists to
+    prevent. STRIDE is not a published standard, so its version names **this
+    repo's own ruleset** rather than anyone else's release.
 
-    **Built by the service, never emitted by an agent.** An agent answers in
-    :class:`ThreatProposal`, which names its evidence rather than serializing
-    it, and :func:`~stride_service.evidence.resolve_proposals` constructs this
-    from that answer. So a ``grounds`` list here is code's own output: every
-    entry either came out of the evidence catalog whole or is a quote assembled
-    from the two fields an agent supplied, and neither route can express a
-    mis-shaped :class:`Ground`.
+    ``affected_element_ids`` **may be empty here**, where STRIDE narrows it to
+    ``min_length=1`` in its own record. A framework whose requirements address a
+    coding practice rather than anything in the graph has nothing legal to put
+    there, and the alternative — a whole-application pseudo-element — buys a
+    legal value by putting a lie in the model. The referential check still runs
+    over whatever IDs are present.
 
-    ``grounds`` is ``min_length=1`` with **no maximum**, exactly like
-    ``affected_element_ids``: this model caps no list, and runaway output stays
-    governed where it already is, at the tier's ``max_output_tokens``.
+    ``grounds`` is ``min_length=1`` and **no framework opts out**: a framework
+    exempt from finding-level attribution would gut ADR 0002. It has no maximum,
+    exactly like ``affected_element_ids``: this model caps no list, and runaway
+    output stays governed where it already is, at the tier's
+    ``max_output_tokens``.
     """
 
     model_config = ConfigDict(extra="forbid")
 
-    id: str = Field(pattern=r"^[STRIDE]-\d{2}$")
-    category: StrideCategory
+    id: str = Field(min_length=1, max_length=CLAIM_ID_MAX_CHARS)
+    framework: FrameworkName
+    framework_version: str = Field(min_length=1, max_length=100)
     title: str = Field(min_length=1, max_length=200)
     description: str = Field(min_length=1, max_length=4000)
-    affected_element_ids: list[str] = Field(min_length=1)
+    affected_element_ids: list[str] = Field(default_factory=list)
     grounds: list[Ground] = Field(min_length=1)
-    severity: Severity
-    mitigations: list[Mitigation] = Field(default_factory=list)
 
-    @model_validator(mode="after")
-    def _check_id_matches_category(self) -> Self:
-        _check_category_letter(self.id, self.category)
-        return self
+    @classmethod
+    def claim_marks(cls, drafts: Sequence[Claim]) -> AnalysisMarks:
+        """The marks this framework's *own* judgement fields earn. None, here.
+
+        The neutral marks are the service's and are produced at the seam that
+        can see them: a quote absent from the source it named, a prose citation
+        naming no element, a reference resolving to nothing. This hook is for the
+        rest — a mark about a field only one framework declares.
+
+        STRIDE's is the only one today: a threat offering no countermeasure and
+        no reason for offering none. ``mitigations`` is
+        :class:`~stride_service.frameworks.stride.record.DraftThreat`'s, and a
+        framework that recommends nothing has no such mark to carry — which is
+        also why ``missing_mitigations`` sits on STRIDE's block rather than on
+        :class:`FrameworkAnalysis`.
+
+        Same standing as every other mark: recorded beside the findings, never
+        fatal, and never something an agent asserts about its own accuracy.
+        """
+        del drafts
+        return AnalysisMarks()
+
+    @classmethod
+    def lane_diagnostics(cls, drafts: Sequence[Claim]) -> list[str]:
+        """What this framework wants *logged* about one job's drafts. Nothing, here.
+
+        The one hook a package has into the fan-in, and it is deliberately
+        write-only: the fan-in logs whatever comes back and nothing else reads
+        it, so a package cannot reach a report or a verdict through this.
+
+        It exists because the observations worth making about an agent's output
+        are framework-specific in a way the neutral layer cannot reach. STRIDE's
+        is that a lane numbered its drafts ``01, 02, 05`` — a statement about its
+        own ``id_format``, which :class:`Claim` has none of, since ``id`` has no
+        shared grammar. A framework with nothing to say about its own IDs
+        inherits this and says nothing.
+        """
+        del drafts
+        return []
 
 
-class Threat(DraftThreat):
-    """One STRIDE finding, traceable to the elements it affects.
+class RuledClaim(Claim):
+    """A :class:`Claim` a critic has ruled on: what a report carries.
 
-    A draft plus the critic's two judgments; the category-letter rule is
-    inherited, so a draft and the threat it becomes are checked identically.
+    The layer exists because ``verdict`` cannot sit on :class:`Claim` itself. A
+    draft *is* a claim — the resolver builds one before any critic sees it — and
+    a draft has no verdict. So the neutral side carries two classes rather than
+    one, mirroring the two pairs this module already has
+    (:class:`ProposedVerdict` → :class:`Verdict`, and a package's own draft →
+    ruled pair).
+
+    The **service** constructs a :class:`Verdict` for every claim of every
+    framework: each package brings its own critic, but the three states, the
+    rules binding the fields to the status, and the review seam that checks them
+    all stay here. So the shape is neutral and the *question* is the framework's
+    — a STRIDE ``confirmed`` says an attack is credible, and another
+    framework's says its requirement applies — which is why the package's own
+    critic text says what its states assert and this class says nothing about
+    it.
     """
 
-    confidence: Rating  # critic-calibrated grounding in model facts
     verdict: Verdict
 
 
@@ -506,8 +634,20 @@ class QuoteCandidate(BaseModel):
     source_label: str = Field(min_length=1, max_length=200)
 
 
-class ThreatProposal(BaseModel):
-    """What a category agent actually emits: a finding that *names* its evidence.
+class Proposal(BaseModel):
+    """What a lane agent actually emits: a finding that *names* its evidence.
+
+    The neutral base, shared by every framework. It carries exactly what
+    :func:`~stride_service.evidence.resolve_proposals` reads — the element refs,
+    the two evidence lists, the title and the description — and each framework
+    adds its own judgement fields and its own ID key on top. The reason this
+    shape exists at all, that a provider's schema compiler cannot express a
+    :class:`Ground`'s branch relationship, is identical for any framework.
+
+    **The ID key is not shared.** STRIDE names an integer ``sequence``, and a
+    requirement-shaped framework names a requirement. That follows from ``id``
+    having no shared grammar: a package supplies the ``id_format`` and the
+    per-lane prefix, and the resolver composes the ID from its own key.
 
     THE FIELD A MODEL NO LONGER SERIALIZES. A :class:`Ground` is a flat object
     whose legal field combination depends on its own ``kind``, and that
@@ -540,23 +680,12 @@ class ThreatProposal(BaseModel):
 
     model_config = ConfigDict(extra="forbid")
 
-    # A number, not an ID, and no category beside it. There is one node per
-    # STRIDE category and ``analyze_instruction`` fills ``{category}`` at build
-    # time, so the lane is the graph's fact: an agent restating it is an agent
-    # given a constant to contradict, and the ID's letter is a pure function of
-    # what it would be restating. :func:`~stride_service.evidence.resolve_proposals`
-    # composes both from the lane it is resolving.
-    #
-    # An integer rather than a two-digit string, because a string reintroduces
-    # what this removes: ``"1"`` against a ``^\d{2}$`` pattern is a spelling
-    # error that fails the node, and a sequence has no spelling.
-    sequence: int = Field(ge=1, le=99)
     # THE LENGTH AND CARDINALITY CAPS BELOW ARE FATAL, AND THAT IS ACCEPTED
     # RATHER THAN OVERLOOKED. Unlike the rules this class exists to remove, they
     # *are* expressible in a JSON schema — but providers enforce ``maxLength``
     # and ``minItems`` no more reliably than ``pattern``, so an agent can still
     # exceed one, and the raise lands at the node boundary where it costs the
-    # lane and its five siblings.
+    # lane and its siblings.
     #
     # Neither remedy that worked elsewhere applies. There is no "select rather
     # than construct" form of an over-long description, so it cannot be made
@@ -571,56 +700,67 @@ class ThreatProposal(BaseModel):
     # is a filed decision rather than an accident of where a constraint sits.
     title: str = Field(min_length=1, max_length=200)
     description: str = Field(min_length=1, max_length=4000)
-    affected_element_ids: list[str] = Field(min_length=1)
+    # Unconstrained here and narrowed by the packages that need it, exactly as
+    # :class:`Claim`'s own is: a proposal that validates must be resolvable into
+    # a claim that validates, so the two sides of that pair move together.
+    affected_element_ids: list[str] = Field(default_factory=list)
     evidence_refs: list[str] = Field(default_factory=list)
     quotes: list[QuoteCandidate] = Field(default_factory=list)
-    severity: Severity
-    mitigations: list[Mitigation] = Field(default_factory=list)
 
     @model_validator(mode="after")
     def _check_shape(self) -> Self:
         if not self.evidence_refs and not self.quotes:
             raise ValueError(
-                f"the draft numbered {self.sequence} justifies itself with"
+                f"the draft titled {self.title!r} justifies itself with"
                 " nothing: name at least one evidence reference or quote"
             )
         return self
 
 
-class ThreatProposals(BaseModel):
-    """What a category agent node emits: an object wrapping its list of proposals.
+class ProposalBatch(BaseModel):
+    """What a lane agent node emits: an object wrapping its list of proposals.
 
     The wrapper exists for the *schema*, not for the domain. A node's
-    ``output_schema`` is what the graph asks the provider to constrain
-    generation to, and a bare ``list[ThreatProposal]`` cannot be asked for: ADK
-    cannot convert a generic alias into a response format, so it sends none and
-    the node generates unconstrained — silently, with only a log line. Wrapping
-    the list in a model gives the conversion something it can carry, and an
-    object root at that, which is what OpenAI's structured outputs require and
-    a bare array would not satisfy.
+    ``output_schema`` is what the graph asks the provider to constrain generation
+    to, and a bare ``list[Proposal]`` cannot be asked for: ADK cannot convert a
+    generic alias into a response format, so it sends none and the node generates
+    unconstrained — silently, with only a log line. Wrapping the list in a model
+    gives the conversion something it can carry, and an object root at that, which
+    is what OpenAI's structured outputs require and a bare array would not
+    satisfy.
 
-    Nothing downstream sees it: the graph unwraps at the node boundary, so the
-    domain keeps working in lists.
+    **The field is ``claims`` and the name is neutral because the prompt is.**
+    ``prompts/analyze.md`` is one shared body serving every registered framework's
+    lane agents — a package brings its lane skill, its exemplars and its critic
+    text, not a copy of the output contract — so the word the prompt spells and
+    the word the graph unwraps has to be one a second framework can read without
+    lying. A package narrows the element type; nobody renames the field.
 
-    ``threats`` rather than ``proposals`` because the field name is the agent's
-    output contract and the prompt has always spelled it that way. What changed
-    is the shape of an entry, not what an agent is being asked for.
+    Nothing downstream sees the wrapper: the graph unwraps at the node boundary,
+    so the domain keeps working in lists.
     """
 
     model_config = ConfigDict(extra="forbid")
 
-    threats: list[ThreatProposal]
+    claims: list[Proposal]
 
 
-class ThreatRuling(BaseModel):
+class Ruling(BaseModel):
     """The critic's ruling on one draft: the fields the critic owns, and no more.
 
-    A ruling is **not** a threat. It names the draft it rules on by ``id`` and
-    carries the two judgements that are the critic's — ``verdict`` and
-    ``confidence`` — leaving the agent's eight fields where they already are.
-    :func:`~stride_service.critic.assemble_threats` merges a ruling onto the
-    draft it names to build the :class:`Threat` the report carries, so the
+    A ruling is **not** a claim. It names the draft it rules on by ``id`` and
+    carries the judgement that is the critic's — the ``verdict`` — leaving the
+    agent's own fields where they already are.
+    :func:`~stride_service.critic.assemble_claims` merges a ruling onto the
+    draft it names to build the :class:`RuledClaim` the report carries, so the
     report's shape is unchanged.
+
+    **Neutral, because every package has a critic and the seam is shared.** Each
+    framework brings its own critic text and its own question, but the three
+    verdict states, the rules binding the fields to the status, and the review
+    seam that checks them are the service's. A package adds its own judgement
+    fields on top — STRIDE's ``confidence`` and its severity override are on
+    :class:`~stride_service.frameworks.stride.record.ThreatRuling`.
 
     WHY THE CRITIC NO LONGER RE-EMITS THE DRAFT. Its output was every draft
     transcribed whole plus a verdict, which made the single longest call in the
@@ -634,13 +774,8 @@ class ThreatRuling(BaseModel):
     review seam used to run is gone — a ruling carries no element references
     to break.
 
-    ``severity`` is the one draft field a ruling may replace, and only where
-    the critic's severity-calibration step changed a rating. ``None`` — the
-    common case — keeps the agent's rating and justification as written.
-    Present, it replaces both together, which is what stops a corrected rating
-    from sitting beside a justification that argues for the old one. It is a
-    whole :class:`Severity` rather than loose scalars so a partial override
-    cannot be expressed.
+    A package's own subclass may add one more thing: a draft field the ruling
+    is allowed to *replace*. STRIDE's severity override is the only one today.
     """
 
     model_config = ConfigDict(extra="forbid")
@@ -650,40 +785,38 @@ class ThreatRuling(BaseModel):
     # handed — and :func:`~stride_service.critic.review_issues` already requires
     # the ruled set to equal the drafted set exactly. That is a *stronger*
     # constraint than any pattern: an ID matching a drafted one is well-formed
-    # by construction, because the draft's own ``id`` carries the pattern.
+    # by construction, because the draft's own ``id`` was composed by the
+    # service from its package's own ``id_format``.
     #
     # So a pattern here could only ever fire on an ID the reconciliation was
     # about to reject anyway — and it fired earlier and fatally, at the node
     # boundary, where a raise kills the critic's single pass over every draft
     # and the bounded re-ask never runs. Without it, ``"S-1"`` arrives as two
-    # precise re-askable problems: one draft dropped, one threat returned that
+    # precise re-askable problems: one draft dropped, one claim returned that
     # nobody drafted.
     #
     # The length bound stays because an unbounded string from a model is worth
-    # capping on principle (OWASP LLM10), and 300 is the same number every other
+    # capping on principle (OWASP LLM10), and it is the same number every other
     # ID field here carries. It is not the well-formedness check and cannot be
-    # read as one — a real ID is four characters.
-    id: str = Field(max_length=300)
-    confidence: Rating
+    # read as one.
+    id: str = Field(max_length=CLAIM_ID_MAX_CHARS)
     # The unruled shape: a verdict whose fields disagree with each other is a
     # problem for the review seam to report and the re-ask to fix, not a reason
-    # to fail the node. assemble_threats builds the canonical Verdict.
+    # to fail the node. assemble_claims builds the canonical Verdict.
     verdict: ProposedVerdict
-    severity: Severity | None = None
 
 
-class ThreatRulings(BaseModel):
-    """What the critic and its re-ask emit: the wrapper over one ruling per draft.
+class RulingBatch(BaseModel):
+    """What a critic node and its re-ask emit: one ruling per draft, wrapped.
 
-    Separate from :class:`DraftThreats` because the element type differs. See
-    that class for why the wrapper exists at all, and why its field is still
-    spelled ``threats`` on both: it is the shape the provider constrains
-    generation to, not the domain's word for what is inside.
+    Separate from :class:`ProposalBatch` because the element type differs; see
+    that class for why the wrapper exists at all and why its field is spelled
+    ``claims`` on both.
     """
 
     model_config = ConfigDict(extra="forbid")
 
-    threats: list[ThreatRuling]
+    claims: list[Ruling]
 
 
 class TokenUsage(BaseModel):
@@ -788,9 +921,8 @@ class AnalysisContext(BaseModel):
     The report already records the two ends of a run: the served build and
     sampling each node ran on (:class:`NodeRun`), and the facts each finding
     rests on (``grounds``). Between them sits everything the service *put in
-    front of* the category agents — the instruction text they were given, the
-    reference packs this model earned, the deterministic rules that fired — and
-    none of it was recorded anywhere. Two runs of the same model on the same
+    front of* the lane agents — the instruction text they were given and the
+    reference packs this model earned — and none of it was recorded anywhere. Two runs of the same model on the same
     input could differ because a pack selection flipped or a skill was edited,
     and the report showed nothing.
 
@@ -803,8 +935,9 @@ class AnalysisContext(BaseModel):
 
     ``instruction_sha256`` digests the *composed instruction* of every LLM node
     in the built graph, with the job-varying placeholders still unexpanded. So
-    it identifies the repo-authored text — prompts, category skills, the shared
-    rubric — and carries no submitter bytes at all, which is what makes it
+    it identifies the repo-authored text — the shared prompts and every carried
+    package's lane skills, exemplars, critic text and rubric — and carries no
+    submitter bytes at all, which is what makes it
     publishable beside a report. The generation-identity fingerprint attests to
     the model and the decoding params; it says nothing about the instructions,
     so two runs with identical fingerprints and completely different prompts
@@ -815,24 +948,39 @@ class AnalysisContext(BaseModel):
     same service gives two submissions different reference material, and the
     names are the only record of which.
 
-    ``fired_rules`` names the deterministic triggers that matched, where
-    ``coverage`` counts them. The count says how much attention was directed;
-    the IDs say where — which is what an eval measuring candidate usefulness
-    needs, and what a reader asking "why did the agent look there" reads.
-
-    ``knowledge_docs`` names what was retrieved from the local corpus for those
-    rules — ``notes/<id>`` for reference material and ``cases/<id>`` for a
-    worked judgement, unioned across the six lanes. Retrieval is deterministic
-    and local, so the pair (this list, this checkout) reproduces exactly the
-    text the agents were shown.
+    **``fired_rules`` and ``knowledge_docs`` are not here**, and the rule that
+    moved them is the one that sorted every field of the flat schema this
+    replaced: a field sits where the thing it describes sits. A candidate rule
+    belongs to the package that declared it and a retrieved document to the
+    package that selected it, so both name *one framework's* material and both
+    sit on :class:`FrameworkAnalysis`. The two that stayed describe the built
+    graph and the shared model, of which a report has one each.
     """
 
     model_config = ConfigDict(extra="forbid", frozen=True)
 
     instruction_sha256: str = Field(pattern=r"^[0-9a-f]{64}$")
     domain_packs: list[str] = Field(default_factory=list)
-    fired_rules: list[str] = Field(default_factory=list)
-    knowledge_docs: list[str] = Field(default_factory=list)
+
+
+class FrameworkSelection(BaseModel):
+    """One framework a job asked for, and the options it asked for it with.
+
+    ``options`` defaults to ``{}`` **on the envelope only**. The package's own
+    options model then rejects a submission that left out a value it needs, and
+    names the field it wants. No package field carries a default, so no
+    submission means two different things on two installs.
+
+    Recorded on the :class:`Job` exactly as the input ladder resolved it,
+    because a report that omits the options does not say what was analysed — a
+    framework whose options select which requirements apply produces a different
+    answer under different ones.
+    """
+
+    model_config = ConfigDict(extra="forbid")
+
+    name: FrameworkName
+    options: dict[str, Any] = Field(default_factory=dict)
 
 
 class Job(BaseModel):
@@ -840,6 +988,10 @@ class Job(BaseModel):
 
     A report only exists for a completed job, so ``status`` admits exactly the
     ``completed`` state from the job-lifecycle contract.
+
+    ``frameworks`` is what was *asked for*, in submission order. The envelope's
+    own check reads it: the analysis blocks must answer exactly this list, in
+    this order, so a framework that produced nothing cannot be dropped quietly.
     """
 
     model_config = ConfigDict(extra="forbid")
@@ -849,6 +1001,7 @@ class Job(BaseModel):
     created_at: datetime
     completed_at: datetime
     revise_rounds: int = Field(default=0, ge=0)
+    frameworks: list[FrameworkSelection] = Field(default_factory=list)
 
     @model_validator(mode="after")
     def _check_timeline(self) -> Self:
@@ -936,7 +1089,7 @@ class UnverifiedGround(BaseModel):
 
     model_config = ConfigDict(extra="forbid")
 
-    threat_id: str = Field(pattern=r"^[STRIDE]-\d{2}$")
+    claim_id: str = Field(min_length=1, max_length=CLAIM_ID_MAX_CHARS)
     index: int = Field(ge=0)
     reason: str = Field(min_length=1, max_length=500)
 
@@ -970,7 +1123,7 @@ class UnresolvedMention(BaseModel):
 
     model_config = ConfigDict(extra="forbid")
 
-    threat_id: str = Field(pattern=r"^[STRIDE]-\d{2}$")
+    claim_id: str = Field(min_length=1, max_length=CLAIM_ID_MAX_CHARS)
     mention: str = Field(min_length=1, max_length=300)
 
 
@@ -1014,7 +1167,7 @@ class UnresolvedEvidence(BaseModel):
 
     model_config = ConfigDict(extra="forbid")
 
-    threat_id: str = Field(pattern=r"^[STRIDE]-\d{2}$")
+    claim_id: str = Field(min_length=1, max_length=CLAIM_ID_MAX_CHARS)
     reference: str = Field(min_length=1, max_length=REFERENCE_MAX_CHARS)
 
 
@@ -1028,6 +1181,9 @@ class MissingMitigation(BaseModel):
     ``unknown-attribute`` ground, because that is the branch its trigger
     dictates. So "empty for the legitimate reason" and "empty with no reason"
     are mechanically distinguishable, and only the second is recorded here.
+    ``absent-attribute`` deliberately does not license the empty list: a control
+    the submitter said is *not there* is a fact already learned, and the
+    countermeasure is to put the control in.
 
     A completeness signal rather than a correctness one, which is why it is a
     mark and not a failure: a finding with no recommended action is still a
@@ -1039,16 +1195,17 @@ class MissingMitigation(BaseModel):
 
     model_config = ConfigDict(extra="forbid")
 
-    threat_id: str = Field(pattern=r"^[STRIDE]-\d{2}$")
+    claim_id: str = Field(min_length=1, max_length=CLAIM_ID_MAX_CHARS)
 
 
-# The marks whose whole placement claim is the threat they name, so one check
-# covers them all (:meth:`StrideReport._threat_mark_issues`).
+# The marks whose whole placement claim is the claim they name, so one check
+# covers them all (:meth:`FrameworkAnalysis._claim_mark_issues`).
 # :class:`UnverifiedGround` is deliberately absent: it also names an *index*
-# into that threat's grounds, so it needs the stricter check of its own.
+# into that claim's grounds, so it needs the stricter check of its own.
 # :class:`SharedElementName` is absent because it annotates the model rather
-# than a threat.
-ThreatMark = UnresolvedMention | UnresolvedEvidence | MissingMitigation
+# than a claim — which is also why it is the one mark that stays on the
+# envelope while these ride in the block whose claims they annotate.
+ClaimMark = UnresolvedMention | UnresolvedEvidence | MissingMitigation
 
 
 class SharedElementName(BaseModel):
@@ -1139,44 +1296,96 @@ class AnalysisMarks(BaseModel):
         )
 
 
-class Summary(BaseModel):
-    """Counts the front-end can render without walking the threat list."""
+class BlockSummary(BaseModel):
+    """Counts a front-end can render without walking one block's claim list.
+
+    Neutral, and per block rather than per report: a report carrying two
+    frameworks has two of these, because a claim count that summed across
+    frameworks would add a credible attack to an unanswered requirement and call
+    the total findings.
+
+    ``elements_analyzed`` is deliberately **not** here. It is a fact about the
+    shared model, so N copies would be N chances to disagree; it sits on the
+    envelope as a scalar instead.
+
+    A package narrows this with whatever its own record can be counted by —
+    STRIDE adds ``by_category`` and ``by_severity``, and a framework that grades
+    nothing adds neither.
+    """
 
     model_config = ConfigDict(extra="forbid")
 
-    threat_count: int = Field(ge=0)
-    by_category: dict[StrideCategory, int] = Field(default_factory=dict)
-    by_severity: dict[SeverityLevel, int] = Field(default_factory=dict)
+    claim_count: int = Field(ge=0)
     needs_info_count: int = Field(ge=0)
     rejected_count: int = Field(ge=0)
-    elements_analyzed: int = Field(ge=0)
 
 
-class CategoryCoverage(BaseModel):
-    """What one category agent was offered, and how much of it its drafts cite.
+class ScopeEntry(BaseModel):
+    """One unit a framework considered and raised no claim about.
 
-    The question this answers is the one a bare threat count cannot: whether
-    "no threat here" means *examined and cleared* or *never looked at*. Every
+    The positive half of an answer. A framework whose **Precondition** or whose
+    own presence tests rule a unit out has to *say so*: dropping it leaves a
+    reader unable to tell a requirement that does not apply from one nobody
+    looked at, which is the same distinction **Coverage** exists to make about
+    lanes.
+
+    **Every unit appears, and the complement is not derived.** An eval scorer
+    can list the exceptions and derive the rest, because it holds the package's
+    own catalog; a report's reader does not. Self-containment is the property
+    this payload enforces everywhere else.
+
+    A ``not-applicable`` entry must state a reason, which is the rule
+    :class:`Verdict` already applies to its two non-confirmed states.
+
+    **STRIDE's list is empty**, and that is not an omission: STRIDE has no
+    precondition that refuses a lane, so nothing it can analyse is out of scope.
+    """
+
+    model_config = ConfigDict(extra="forbid")
+
+    unit: str = Field(min_length=1, max_length=300)
+    state: Literal["applicable", "not-applicable"]
+    reason: str = Field(default="", max_length=1000)
+
+    @model_validator(mode="after")
+    def _check_shape(self) -> Self:
+        if self.state == "not-applicable" and not self.reason:
+            raise ValueError(
+                f"scope entry {self.unit!r} is not-applicable and must state a reason"
+            )
+        return self
+
+
+class LaneCoverage(BaseModel):
+    """What one lane agent was offered, and how much of it its drafts cite.
+
+    The question this answers is the one a bare claim count cannot: whether "no
+    finding here" means *examined and cleared* or *never looked at*. Every
     number is computed in code from the System Model, the deterministic
     candidate triggers and the agent's own drafts — none of it is asserted by
     a model, which is the whole reason it is worth recording.
 
+    **Per lane, not per category.** A lane is a **Framework Package**'s own
+    unit, and the six STRIDE categories are one package's lane list rather than
+    a fact about the report. The row is keyed by the lane slug the package
+    declares.
+
     **Read ``*_cited`` as cited, not as considered.** An agent that examined a
-    flow and correctly concluded there was no threat cites nothing, and is
-    indistinguishable here from one that never read it. The fields are named
+    flow and correctly concluded there was nothing to raise cites nothing, and
+    is indistinguishable here from one that never read it. The fields are named
     for what they measure rather than for what a reader would like them to
-    mean; the honest use is the aggregate — a category citing two of forty
+    mean; the honest use is the aggregate — a lane citing two of forty
     structural leads across a corpus is a coverage signal, one agent's zero on
     one case is not.
 
-    ``elements`` is the whole model rather than the subset a category's
+    ``elements`` is the whole model rather than the subset a lane's
     ``## Applicability`` scopes: applicability lives in the skill text, and a
     second copy of it in code would be a second definition to drift.
     """
 
     model_config = ConfigDict(extra="forbid")
 
-    category: StrideCategory
+    lane: str = Field(min_length=1, max_length=100)
     drafts: int = Field(ge=0)
     rules: int = Field(ge=0)  # rules in this lane
     rules_fired: int = Field(ge=0)  # of those, how many produced a candidate
@@ -1213,31 +1422,27 @@ class CategoryCoverage(BaseModel):
         ]
         if over:
             raise ValueError(
-                f"{self.category} coverage counts more cited than offered:"
+                f"lane {self.lane!r} coverage counts more cited than offered:"
                 f" {'; '.join(over)}"
             )
         return self
 
 
-def build_summary(
-    threats: list[Threat],
-    rejected_threats: list[Threat],
-    system_model: SystemModel,
-) -> Summary:
-    """Compute the summary block mechanically from the report's own contents."""
-    by_category = Counter(threat.category for threat in threats)
-    by_severity = Counter(
-        derive_severity_level(threat.severity.likelihood, threat.severity.impact)
-        for threat in threats
-    )
-    needs_info = sum(1 for t in threats if t.verdict.status == "needs-info")
-    return Summary(
-        threat_count=len(threats),
-        by_category=dict(by_category),
-        by_severity=dict(by_severity),
-        needs_info_count=needs_info,
-        rejected_count=len(rejected_threats),
-        elements_analyzed=len(system_model.elements()),
+def build_block_summary(
+    claims: Sequence[RuledClaim], rejected_claims: Sequence[RuledClaim]
+) -> BlockSummary:
+    """The neutral counts, mechanically from one block's own contents.
+
+    A package that narrows :class:`BlockSummary` narrows this too, and the
+    block's own check is what holds the two together: a summary that disagrees
+    with the claims beside it fails validation rather than being served.
+    """
+    return BlockSummary(
+        claim_count=len(claims),
+        needs_info_count=sum(
+            1 for claim in claims if claim.verdict.status == "needs-info"
+        ),
+        rejected_count=len(rejected_claims),
     )
 
 
@@ -1329,14 +1534,260 @@ def latency_by_node(nodes: Iterable[NodeRun]) -> dict[str, NodeLatency]:
     return totals
 
 
-class StrideReport(BaseModel):
-    """The complete report payload the front-end retrieves for a finished job.
+class FrameworkAnalysis(BaseModel):
+    """What one framework produced, against the envelope's shared model.
 
-    Self-containment is enforced, not assumed: every element reference in
-    threats and verdicts must resolve inside the embedded System Model, the
-    boundary crossings must be exactly the derived ones, threat IDs must be
-    unique, actionable and rejected threats must sit in the right array, and
-    the summary must match the counts it summarizes.
+    **A field sits where the thing it describes sits**, and that one rule sorted
+    every field of the flat schema this replaced. Nine described the job or the
+    shared model and stayed on the envelope; the eight here describe one
+    framework's output and moved. ``analysis_context`` split on the same rule —
+    the instruction digest describes the built graph and the domain packs
+    describe the model, so both stayed, while ``fired_rules`` names *this*
+    package's **Candidate** rules and ``knowledge_docs`` names what those rules
+    retrieved, so both are here.
+
+    **Self-contained against the shared model, never against a second copy of
+    it.** Every element ID a claim here references resolves in the envelope's
+    one ``system_model``. That is why the alternative — one whole report per
+    framework — was refused: it duplicates nine fields including the largest
+    block after the findings, and nothing could check that two embedded copies
+    of one model agreed.
+
+    ``disclaimer`` is the **package's**, not the service's. The envelope's says
+    what the service is; this one says what this framework's claims assert, and
+    the two are different sentences the moment a report carries a framework that
+    rules on requirement applicability rather than on attacks. It comes from
+    ``frameworks/<name>/disclaimer.md``.
+
+    A consumer that does not know a framework reads the base claim — an ID, the
+    pair, a title, a description, the elements and the grounds. That is the
+    honest outcome, and it is what the viewer's fallback card renders.
+    """
+
+    model_config = ConfigDict(extra="forbid")
+
+    framework: FrameworkName
+    framework_version: str = Field(min_length=1, max_length=100)
+    disclaimer: str = Field(min_length=1, max_length=2000)
+    # ``SerializeAsAny`` on the three fields a package may narrow. Pydantic
+    # serializes by the *declared* type, so without it a block that narrowed
+    # ``claims`` to its own record would serialize back out as the neutral base
+    # — dropping exactly the fields the narrowing exists for, silently, on the
+    # one path that matters. See :class:`Report.analyses` for the whole of this
+    # rule; it is stated in both places because either one alone would lose it.
+    claims: list[SerializeAsAny[RuledClaim]] = Field(default_factory=list)
+    rejected_claims: list[SerializeAsAny[RuledClaim]] = Field(default_factory=list)
+    scope: list[ScopeEntry] = Field(default_factory=list)
+    coverage: list[LaneCoverage] = Field(default_factory=list)
+    unverified_grounds: list[UnverifiedGround] = Field(default_factory=list)
+    unresolved_mentions: list[UnresolvedMention] = Field(default_factory=list)
+    unresolved_evidence: list[UnresolvedEvidence] = Field(default_factory=list)
+    fired_rules: list[str] = Field(default_factory=list)
+    knowledge_docs: list[str] = Field(default_factory=list)
+    summary: SerializeAsAny[BlockSummary]
+
+    def all_claims(self) -> tuple[RuledClaim, ...]:
+        """Both arrays, for the checks that do not care which one a claim is in."""
+        return (*self.claims, *self.rejected_claims)
+
+    @classmethod
+    def summarize(
+        cls, claims: Sequence[RuledClaim], rejected_claims: Sequence[RuledClaim]
+    ) -> BlockSummary:
+        """This block's summary, computed from the claims that will fill it.
+
+        On the block type rather than in a registry, because the summary a
+        package builds and the summary its block *declares* are one decision: a
+        package that narrows :class:`BlockSummary` overrides this beside the
+        field it narrowed, so the fan-in that fills a block reaches the right
+        builder by holding the block type and nothing else.
+        """
+        return build_block_summary(claims, rejected_claims)
+
+    def block_issues(self, known_element_ids: Collection[str]) -> list[str]:
+        """Everything wrong with this block, given the envelope's element IDs.
+
+        **Written once over the neutral base and run per block.** These are the
+        checks a second framework's output has to satisfy too, so they read
+        :class:`Claim` and :class:`Verdict` and nothing a package declares. A
+        package that narrows ``claims`` narrows what these run over; it does not
+        get to opt out of them, and it cannot forget to run them, because the
+        envelope calls this for every block it carries.
+
+        The model itself is not passed in — one model serves N blocks, so the
+        envelope resolves it once and hands down the ID set.
+        """
+        return [
+            *self._verdict_placement_issues(),
+            *self._reference_issues(known_element_ids),
+            *self._identity_issues(),
+            *self._unverified_mark_issues(),
+            *self._claim_mark_issues(self.unresolved_mentions, "unresolved mention"),
+            *self._claim_mark_issues(self.unresolved_evidence, "unresolved evidence"),
+            *self._summary_issues(),
+            *self._scope_issues(),
+        ]
+
+    def _verdict_placement_issues(self) -> list[str]:
+        issues = [
+            f"claim {claim.id!r} has a rejected verdict but sits in claims;"
+            " it belongs in rejected_claims"
+            for claim in self.claims
+            if claim.verdict.status == "rejected"
+        ]
+        issues += [
+            f"claim {claim.id!r} sits in rejected_claims but its verdict is"
+            f" {claim.verdict.status!r}"
+            for claim in self.rejected_claims
+            if claim.verdict.status != "rejected"
+        ]
+        return issues
+
+    def _reference_issues(self, known_element_ids: Collection[str]) -> list[str]:
+        """Every element ID this block names resolves in the shared model."""
+        known = set(known_element_ids)
+        issues = []
+        for claim in self.all_claims():
+            refs = [
+                *claim.affected_element_ids,
+                *(ref.element_id for ref in claim.verdict.related_unknowns),
+            ]
+            issues += [
+                f"claim {claim.id!r} references element {ref!r}, which is"
+                " not in the embedded system model"
+                for ref in refs
+                if ref not in known
+            ]
+        return issues
+
+    def _identity_issues(self) -> list[str]:
+        """IDs unique **within the block**, and every claim of this framework.
+
+        Uniqueness stops at the block on purpose. #163 ruled that ``id`` has no
+        shared grammar, so two packages composing ``1.2.5`` and ``1.2.5`` for
+        unrelated things is legal — and every mark that points at a claim now
+        lives in the same block as the claim it points at, so nothing resolves
+        an ID across a boundary.
+
+        The ``(framework, version)`` check is the block refusing to disagree with
+        itself, and it is the per-framework equivalent of the crossings rule on
+        the envelope: a claim stamped with another framework's pair reached the
+        wrong block, and the pair is exactly what a reader uses to interpret the
+        ID beside it.
+        """
+        issues = [
+            f"claim ID {claim_id!r} appears more than once in the"
+            f" {self.framework} analysis"
+            for claim_id, count in Counter(
+                claim.id for claim in self.all_claims()
+            ).items()
+            if count > 1
+        ]
+        issues += [
+            f"claim {claim.id!r} carries"
+            f" ({claim.framework!r}, {claim.framework_version!r}) in the"
+            f" ({self.framework!r}, {self.framework_version!r}) analysis"
+            for claim in self.all_claims()
+            if (claim.framework, claim.framework_version)
+            != (self.framework, self.framework_version)
+        ]
+        return issues
+
+    def _unverified_mark_issues(self) -> list[str]:
+        """Every unverified mark points at a grounds entry this block carries.
+
+        A mark naming a claim or an index that is not here is worse than no
+        mark: the viewer drops the quotation marks off nothing, and the entry
+        the service actually failed to verify renders as though it had passed.
+        """
+        grounds_count = {claim.id: len(claim.grounds) for claim in self.all_claims()}
+        issues = []
+        for mark in self.unverified_grounds:
+            count = grounds_count.get(mark.claim_id)
+            if count is None:
+                issues.append(
+                    f"unverified ground names claim {mark.claim_id!r}, which"
+                    f" is not in the {self.framework} analysis"
+                )
+            elif mark.index >= count:
+                issues.append(
+                    f"unverified ground names index {mark.index} on claim"
+                    f" {mark.claim_id!r}, which carries {count} grounds"
+                )
+        return issues
+
+    def _claim_mark_issues(self, marks: Iterable[ClaimMark], what: str) -> list[str]:
+        """Every claim-level mark points at a claim this block carries.
+
+        Same rule as the unverified marks, and same reason: a mark on a claim
+        that is not here annotates nothing, while the claim that really earned
+        it renders as though it had checked out. Shared across every mark type
+        because the rule is the mark's *shape* — it names one claim and the rest
+        of its fields say nothing about placement — rather than anything about
+        what each one records. A mark type added to a block joins
+        :data:`ClaimMark` and this call list together, or it carries a claim
+        about a claim that nothing checks.
+        """
+        claim_ids = {claim.id for claim in self.all_claims()}
+        return [
+            f"{what} names claim {mark.claim_id!r}, which is not in the"
+            f" {self.framework} analysis"
+            for mark in marks
+            if mark.claim_id not in claim_ids
+        ]
+
+    def _summary_issues(self) -> list[str]:
+        """The summary is the block's own contents, recounted.
+
+        Compared field by field against the neutral recount rather than by
+        equality of the whole object, so a package's narrowed summary is held to
+        the three counts every summary carries and keeps its own extra fields to
+        check for itself.
+        """
+        recount = build_block_summary(self.claims, self.rejected_claims)
+        return [
+            f"summary.{field}={getattr(self.summary, field)} does not match the"
+            f" {self.framework} analysis's own contents ({getattr(recount, field)})"
+            for field in BlockSummary.model_fields
+            if getattr(self.summary, field) != getattr(recount, field)
+        ]
+
+    def _scope_issues(self) -> list[str]:
+        """No claim names a unit this block's own scope list ruled out.
+
+        A framework that reported a requirement non-applicable and then raised a
+        claim about it has contradicted itself inside one payload, and a reader
+        has no way to choose which half to believe.
+        """
+        excluded = {
+            entry.unit for entry in self.scope if entry.state == "not-applicable"
+        }
+        return [
+            f"claim {claim.id!r} is about a unit the {self.framework} scope list"
+            " rules non-applicable"
+            for claim in self.all_claims()
+            if claim.id in excluded
+        ]
+
+
+class Report(BaseModel):
+    """The complete payload the front-end retrieves for a finished job.
+
+    One job's facts, one **Valid System Model**, and one
+    :class:`FrameworkAnalysis` per framework the job selected.
+
+    Self-containment is enforced, not assumed. On the envelope: the boundary
+    crossings are exactly the ones derived from the embedded model,
+    ``elements_analyzed`` is that model's own element count, and the blocks are
+    the frameworks the job asked for — in order, with none dropped and none
+    repeated. Inside each block, :meth:`FrameworkAnalysis.block_issues` runs the
+    neutral claim checks against the shared model.
+
+    **A list, not a map.** ``analyses`` is ordered by the job's own selection
+    order. A map keyed by name gives uniqueness free, but then the key and the
+    block's own ``framework`` field can disagree, and a dropped framework is
+    invisible. A list plus one check catches both, and silently dropping a
+    framework the caller paid for is the failure this rules out.
     """
 
     model_config = ConfigDict(extra="forbid")
@@ -1359,136 +1810,127 @@ class StrideReport(BaseModel):
     sampling: dict[str, dict[str, SamplingValue]] = Field(default_factory=dict)
     system_model: SystemModel
     boundary_crossings: list[BoundaryCrossing]
-    threats: list[Threat]  # confirmed + needs-info, severity-ordered
-    rejected_threats: list[Threat] = Field(default_factory=list)
-    # Which quote grounds did not verify against the source they name. Empty on
-    # the common run, and empty too on a job whose sources were never supplied
-    # to the checker — see :func:`~stride_service.critic.join_drafts`.
-    unverified_grounds: list[UnverifiedGround] = Field(default_factory=list)
-    unresolved_mentions: list[UnresolvedMention] = Field(default_factory=list)
-    unresolved_evidence: list[UnresolvedEvidence] = Field(default_factory=list)
-    missing_mitigations: list[MissingMitigation] = Field(default_factory=list)
     # Elements of different types sharing one name slug — a suspicion about the
     # model rather than a fault in it, which is why it rides here and not in
-    # the validity gate. Recomputable from ``system_model`` by design.
+    # the validity gate. The one mark that stays on the envelope: it annotates
+    # the shared model rather than any framework's claims. Recomputable from
+    # ``system_model`` by design.
     shared_element_names: list[SharedElementName] = Field(default_factory=list)
-    # Per-category coverage accounting, computed at the fan-in over the drafts
-    # the critic was handed — before any verdict, because coverage is a fact
-    # about what the six agents did with the system, not about what survived
-    # review. Empty on a report built without it (the stub runner's).
-    coverage: list[CategoryCoverage] = Field(default_factory=list)
-    # What was in front of the agents: the instruction text, the reference
-    # packs this model earned, the rules that fired. Context, not evidence —
-    # see :class:`AnalysisContext`. ``None`` on a report built without it (the
-    # stub runner's), which is the same absence an empty ``coverage`` records
-    # rather than a claim that nothing informed the run.
+    # A fact about the shared model, so it is a scalar here rather than a field
+    # each block copies: N copies would be N chances to disagree about one
+    # number. It left ``Summary`` in this cutover for exactly that reason.
+    elements_analyzed: int = Field(default=0, ge=0)
+    # What was in front of the agents that is *not* one framework's: the
+    # instruction digest of the built graph, and the domain packs this job's
+    # model earned. Context, not evidence — see :class:`AnalysisContext`. The
+    # per-framework halves live in each block. ``None`` on a report built
+    # without it (the stub runner's), which is the same absence an empty
+    # ``coverage`` records rather than a claim that nothing informed the run.
     analysis_context: AnalysisContext | None = None
-    summary: Summary
+    # **Declared as the base and serialized as itself.** The declaration is what
+    # lets this module carry an envelope a framework it has never heard of fits
+    # into; ``SerializeAsAny`` is what stops that generality from *costing* the
+    # narrowing on the way out. Pydantic serializes a field by its declared
+    # type, so without this a ``StrideAnalysis`` in this list would come back
+    # out as a ``FrameworkAnalysis``: every severity, every category and both
+    # summary breakdowns dropped, with nothing raised and nothing logged — on
+    # the report route, which is the only path a caller ever sees.
+    #
+    # It is the exact mirror of :meth:`_dispatch_blocks`. That validator makes
+    # the narrowing survive the way in; this makes it survive the way out. A
+    # round trip through JSON is the property both exist for, and it is a
+    # property only the pair has.
+    analyses: list[SerializeAsAny[FrameworkAnalysis]] = Field(default_factory=list)
+
+    @field_validator("analyses", mode="before")
+    @classmethod
+    def _dispatch_blocks(cls, value: Any) -> Any:
+        """Validate each block as the type its own framework registered.
+
+        The field is declared as the neutral base, because the envelope is what
+        a second framework has to fit into without this module knowing its
+        name. What makes the *narrowing* survive a round trip is this: a block
+        naming ``stride`` is validated as STRIDE's own block type, so its
+        severities, its categories and its two breakdowns come back typed rather
+        than being refused as extra fields on the base.
+
+        The registry import is function-local on purpose. ``frameworks`` imports
+        this module for :class:`Claim`, so a module-level import would cycle;
+        by the time a report is validated both modules are fully imported, and a
+        build with no packages registered simply reads every block as the base.
+
+        A block naming a framework this build does not carry also reads as the
+        base, which is the honest outcome rather than a refusal: the neutral
+        fields are exactly what such a reader can still be held to.
+        """
+        if not isinstance(value, list):
+            return value
+        from stride_service.frameworks import block_type_for
+
+        dispatched = []
+        for item in value:
+            if isinstance(item, FrameworkAnalysis) or not isinstance(item, dict):
+                dispatched.append(item)
+                continue
+            block_type = block_type_for(item.get("framework", ""))
+            dispatched.append(block_type.model_validate(item) if block_type else item)
+        return dispatched
 
     @model_validator(mode="after")
     def _check_self_contained(self) -> Self:
-        issues = self._verdict_placement_issues()
-        issues += self._reference_issues()
+        issues = self._envelope_issues()
+        known_ids = [element.id for element in self.system_model.elements()]
+        for block in self.analyses:
+            issues += block.block_issues(known_ids)
+        if issues:
+            raise ValueError("; ".join(issues))
+        return self
 
-        threat_ids = [t.id for t in (*self.threats, *self.rejected_threats)]
-        issues += [
-            f"threat ID {threat_id!r} appears more than once"
-            for threat_id, count in Counter(threat_ids).items()
-            if count > 1
-        ]
-
+    def _envelope_issues(self) -> list[str]:
+        issues = []
         if self.boundary_crossings != self.system_model.boundary_crossings():
             issues.append(
                 "boundary_crossings do not match the crossings derived from"
                 " the embedded system model"
             )
-        if self.summary != build_summary(
-            self.threats, self.rejected_threats, self.system_model
-        ):
-            issues.append("summary does not match the report's own contents")
+        element_count = len(self.system_model.elements())
+        if self.elements_analyzed != element_count:
+            issues.append(
+                f"elements_analyzed={self.elements_analyzed} does not match the"
+                f" embedded system model's {element_count} elements"
+            )
+        return issues + self._selection_issues()
 
-        if issues:
-            raise ValueError("; ".join(issues))
-        return self
+    def _selection_issues(self) -> list[str]:
+        """The blocks are the job's frameworks, in order, once each.
 
-    def _verdict_placement_issues(self) -> list[str]:
-        issues = [
-            f"threat {threat.id!r} has a rejected verdict but sits in threats;"
-            " it belongs in rejected_threats"
-            for threat in self.threats
-            if threat.verdict.status == "rejected"
-        ]
-        issues += [
-            f"threat {threat.id!r} sits in rejected_threats but its verdict is"
-            f" {threat.verdict.status!r}"
-            for threat in self.rejected_threats
-            if threat.verdict.status != "rejected"
-        ]
-        return issues
-
-    def _reference_issues(self) -> list[str]:
-        known_ids = {element.id for element in self.system_model.elements()}
-        issues = []
-        for threat in (*self.threats, *self.rejected_threats):
-            refs = [
-                *threat.affected_element_ids,
-                *(ref.element_id for ref in threat.verdict.related_unknowns),
-            ]
-            issues += [
-                f"threat {threat.id!r} references element {ref!r}, which is"
-                " not in the embedded system model"
-                for ref in refs
-                if ref not in known_ids
-            ]
-        return (
-            issues
-            + self._unverified_mark_issues()
-            + self._threat_mark_issues(self.unresolved_mentions, "unresolved mention")
-            + self._threat_mark_issues(self.unresolved_evidence, "unresolved evidence")
-            + self._threat_mark_issues(self.missing_mitigations, "missing mitigation")
-        )
-
-    def _unverified_mark_issues(self) -> list[str]:
-        """Every unverified mark points at a grounds entry this report carries.
-
-        A mark naming a threat or an index that is not here is worse than no
-        mark: the viewer drops the quotation marks off nothing, and the entry
-        the service actually failed to verify renders as though it had passed.
+        This is the envelope's version of "no partial report": a framework that
+        produced nothing cannot be dropped quietly, because a caller who named
+        two and reads one has no field that says which half is missing. Order is
+        checked as well as membership, since ``analyses`` is a list precisely so
+        that a dropped entry is visible.
         """
-        grounds_count = {
-            threat.id: len(threat.grounds)
-            for threat in (*self.threats, *self.rejected_threats)
-        }
-        issues = []
-        for mark in self.unverified_grounds:
-            count = grounds_count.get(mark.threat_id)
-            if count is None:
-                issues.append(
-                    f"unverified ground names threat {mark.threat_id!r}, which"
-                    " is not in this report"
-                )
-            elif mark.index >= count:
-                issues.append(
-                    f"unverified ground names index {mark.index} on threat"
-                    f" {mark.threat_id!r}, which carries {count} grounds"
-                )
-        return issues
+        asked = [selection.name for selection in self.job.frameworks]
+        answered = [block.framework for block in self.analyses]
+        if answered == asked:
+            return []
+        return [f"analyses answer {answered!r}, but the job selected {asked!r}"]
 
-    def _threat_mark_issues(self, marks: Iterable[ThreatMark], what: str) -> list[str]:
-        """Every threat-level mark points at a threat this report carries.
+    def claims_by_element(self) -> dict[str, dict[FrameworkName, list[str]]]:
+        """Which claims name each element, grouped by framework.
 
-        Same rule as the unverified marks, and same reason: a mark on a threat
-        that is not here annotates nothing, while the threat that really earned
-        it renders as though it had checked out. Shared across every mark type
-        because the rule is the mark's *shape* — it names one threat and the
-        rest of its fields say nothing about placement — rather than anything
-        about what each one records. A mark type added to :class:`StrideReport`
-        joins :data:`ThreatMark` and this call list together, or it carries a
-        claim about a threat that nothing checks.
+        The cross-framework view, and the whole of it. The relation an analyst
+        wants between two frameworks' output is *these findings touch one
+        element*, and the **Element ID** is the join key both analyses already
+        cite. Code does that with no model pass, which is what
+        *deterministic code, models for judgement* asks for — and it is why no
+        cross-framework critic node exists to merge them instead.
         """
-        threat_ids = {threat.id for threat in (*self.threats, *self.rejected_threats)}
-        return [
-            f"{what} names threat {mark.threat_id!r}, which is not in this report"
-            for mark in marks
-            if mark.threat_id not in threat_ids
-        ]
+        grouped: dict[str, dict[FrameworkName, list[str]]] = {}
+        for block in self.analyses:
+            for claim in block.all_claims():
+                for element_id in claim.affected_element_ids:
+                    grouped.setdefault(element_id, {}).setdefault(
+                        block.framework, []
+                    ).append(claim.id)
+        return grouped

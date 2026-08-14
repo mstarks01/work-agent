@@ -17,15 +17,15 @@ from pathlib import Path
 
 import pytest
 
-from stride_service.candidates import RULES
-from stride_service.knowledge import CASES, MAX_CASES, MAX_NOTES, NOTES
+from stride_service.frameworks.stride import CASES, NOTES, STRIDE
+from stride_service.knowledge import MAX_CASES, MAX_NOTES
 from stride_service.markdown_loader import (
     MarkdownLoader,
     estimate_tokens,
     split_sections,
 )
 
-KNOWLEDGE_DIR = Path(__file__).resolve().parents[1] / "knowledge"
+KNOWLEDGE_DIR = Path(__file__).resolve().parents[1] / "frameworks" / "stride"
 
 # A note's three fixed H2 sections, in order — the same three a domain pack
 # carries, because a note is the same kind of thing selected a different way:
@@ -44,7 +44,7 @@ CASE_SECTION_HEADINGS = ("Pattern", "Considered", "Ruling", "Why", "What decided
 NOTE_TOKEN_CAP = 700
 CASE_TOKEN_CAP = 700
 
-RULE_IDS = {rule.rule_id for rule in RULES}
+RULE_IDS = {rule.rule_id for rule in STRIDE.rules}
 
 loader = MarkdownLoader(KNOWLEDGE_DIR)
 note_files = sorted(path.stem for path in (KNOWLEDGE_DIR / "notes").glob("*.md"))

@@ -19,4 +19,3 @@ The System Model carries a Data Store whose `technology` names a database, objec
 
 - This pack is **analysis knowledge, not evidence.** Ground the finding in the submitter's words, an `unknown` attribute, or a derived crossing — never in a pattern named here.
 - Do not invent stores, replicas or backups the model does not contain. Name the gap against the store that is there.
-- Lane discipline: reading records is information disclosure; writing or deleting them is tampering; exhausting the pool is denial of service; the over-broad account that makes all three worse is elevation of privilege.

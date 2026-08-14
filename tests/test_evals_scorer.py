@@ -38,7 +38,9 @@ def labelled_pairs():
 
 
 def test_candidate_claim_is_the_title(case):
-    threat = threat_for(case.references[0], 1, "An attacker replays a session.")
+    threat = threat_for(
+        case.claims_for("stride")[0], 1, "An attacker replays a session."
+    )
     assert candidate_claim(threat) == "An attacker replays a session."
 
 
@@ -52,10 +54,12 @@ def test_matches_reference_via_recorded_labels(case, labelled_pairs):
     )
     reference_index = next(
         index
-        for index, reference in enumerate(case.references)
+        for index, reference in enumerate(case.claims_for("stride"))
         if reference.claim == pair.reference_claim
     )
-    produced = [threat_for(case.references[reference_index], 1, pair.candidate_claim)]
+    produced = [
+        threat_for(case.claims_for("stride")[reference_index], 1, pair.candidate_claim)
+    ]
     judge = ScriptedJudge([(pair.reference_claim, pair.candidate_claim)])
 
     score = score_case(case, produced, judge)
@@ -77,7 +81,7 @@ def test_lane_prefilter_never_judges_across_lanes(case):
 def _is_cross_lane(pair, case) -> bool:
     reference = next(
         reference
-        for reference in case.references
+        for reference in case.claims_for("stride")
         if reference.claim == pair.reference_claim
     )
     return reference.category != "denial-of-service"
@@ -87,7 +91,7 @@ def test_assignment_is_one_to_one(case):
     # Two produced threats the judge calls equivalent to the *same* reference
     # must consume one reference between them; without this recall inflates and
     # stops meaning anything.
-    reference = case.references[0]
+    reference = case.claims_for("stride")[0]
     produced = [
         threat_for(reference, 1, "Claim one."),
         threat_for(reference, 2, "Claim two."),
@@ -104,10 +108,10 @@ def test_assignment_is_one_to_one(case):
 
 
 def test_must_find_references_win_assignment_ties(case):
-    must_find = next(ref for ref in case.references if ref.must_find)
+    must_find = next(ref for ref in case.claims_for("stride") if ref.must_find)
     expected = next(
         ref
-        for ref in case.references
+        for ref in case.claims_for("stride")
         if not ref.must_find and ref.category == must_find.category
     )
     produced = [threat_for(must_find, 1, "Ambiguous claim.")]
@@ -170,7 +174,7 @@ def test_element_disagreement_is_scored_not_filtered(case):
     # A correct threat may cite the process where the SME cited the flow at its
     # endpoint. That must still match, and show up as an element-accuracy miss
     # rather than a recall miss.
-    reference = case.references[0]
+    reference = case.claims_for("stride")[0]
     produced = [
         produced_threat(
             1,
@@ -192,7 +196,9 @@ def test_element_disagreement_is_scored_not_filtered(case):
 def test_misfiled_threat_is_a_lane_error_and_not_a_recall_hit(case):
     # Misfiled threats are rejected rather than recategorized, so the reference
     # stays missed while lane accuracy records the mistake.
-    reference = next(ref for ref in case.references if ref.category == "tampering")
+    reference = next(
+        ref for ref in case.claims_for("stride") if ref.category == "tampering"
+    )
     produced = [produced_threat(1, "spoofing", "Filed in the wrong lane.")]
     judge = ScriptedJudge([(reference.claim, "Filed in the wrong lane.")])
 
@@ -209,7 +215,7 @@ def test_misfiled_threat_is_a_lane_error_and_not_a_recall_hit(case):
 def test_severity_calibration_is_arithmetic(case):
     reference = next(
         ref
-        for ref in case.references
+        for ref in case.claims_for("stride")
         if ref.severity.likelihood == "high" and ref.severity.impact == "high"
     )
     produced = [
@@ -238,7 +244,9 @@ def test_recall_and_artifact_over_the_whole_labelled_set(case, labelled_pairs):
         for pair in labelled_pairs
         if pair.case == case.id and pair.label == "match"
     ]
-    claims_by_reference = {reference.claim: reference for reference in case.references}
+    claims_by_reference = {
+        reference.claim: reference for reference in case.claims_for("stride")
+    }
     produced = [
         threat_for(
             claims_by_reference[pair.reference_claim], index + 1, pair.candidate_claim
@@ -256,7 +264,7 @@ def test_recall_and_artifact_over_the_whole_labelled_set(case, labelled_pairs):
     # label — two candidates against one reference still consume one.
     covered = {pair.reference_claim for pair in matches}
     assert len(score.matched) == len(covered)
-    assert score.recall == pytest.approx(len(covered) / len(case.references))
+    assert score.recall == pytest.approx(len(covered) / len(case.claims_for("stride")))
     assert score.must_find_recall > 0.0
     artifact = score.to_json()
     assert artifact["counts"]["produced"] == len(produced)
@@ -282,4 +290,4 @@ def test_empty_production_scores_zero_without_crashing(case):
     assert score.must_find_recall == 0.0
     assert score.element_accuracy == 0.0
     assert score.lane_accuracy == 0.0
-    assert len(score.missed) == len(case.references)
+    assert len(score.missed) == len(case.claims_for("stride"))

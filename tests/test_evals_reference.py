@@ -18,7 +18,8 @@ from evals.harness.reference import (
     load_case,
     load_corpus,
 )
-from stride_service.report import STRIDE_CATEGORIES, derive_severity_level
+from stride_service.frameworks.stride.record import STRIDE_CATEGORIES
+from stride_service.report import derive_severity_level
 
 CORPUS_DIR = Path(__file__).resolve().parents[1] / "evals" / "corpus"
 
@@ -45,7 +46,11 @@ NEAR_EXEMPLAR_CONTROLS = ["01-payments-checkout", "02-iot-fleet-telemetry"]
 def test_one_near_exemplar_control_per_exemplar_system(corpus):
     # Without a control there is nothing to subtract from, and the
     # exemplar-domain-bias delta is unmeasurable.
-    near = [case.id for case in corpus if case.meta.exemplar_proximity == "near"]
+    near = [
+        case.id
+        for case in corpus
+        if case.declaration("stride").exemplar_proximity == "near"
+    ]
     assert near == NEAR_EXEMPLAR_CONTROLS
 
 
@@ -57,25 +62,28 @@ def test_the_near_controls_are_outnumbered_by_far_cases(corpus):
     population costs it a case. At two of twelve that is comfortable; the check
     exists so a third exemplar system cannot quietly make it not.
     """
-    near = sum(1 for case in corpus if case.meta.exemplar_proximity == "near")
+    near = sum(
+        1 for case in corpus if case.declaration("stride").exemplar_proximity == "near"
+    )
     assert near * 2 < len(corpus) - near
 
 
 def test_every_case_carries_must_find_references(corpus):
     for case in corpus:
-        assert case.must_find, f"{case.id} would make tier 2 recall vacuous"
-        assert len(case.references) >= len(case.must_find)
+        must_find = case.must_find_for("stride")
+        assert must_find, f"{case.id} would make tier 2 recall vacuous"
+        assert len(case.claims_for("stride")) >= len(must_find)
 
 
 def test_references_span_every_lane(corpus):
     for case in corpus:
-        lanes = {reference.category for reference in case.references}
+        lanes = {reference.category for reference in case.claims_for("stride")}
         assert lanes == set(STRIDE_CATEGORIES), f"{case.id} misses lanes"
 
 
 def test_reference_severity_band_uses_shipped_arithmetic(corpus):
     for case in corpus:
-        for reference in case.references:
+        for reference in case.claims_for("stride"):
             assert reference.severity.level == derive_severity_level(
                 reference.severity.likelihood, reference.severity.impact
             )
@@ -118,8 +126,12 @@ def test_reference_threat_rejects_unknown_tier():
 def _copy_case(source: Path, destination: Path) -> Path:
     case_dir = destination / source.name
     case_dir.mkdir(parents=True)
-    for name in ("source.md", "model.json", "threats.json", "case.json"):
+    for name in ("source.md", "model.json", "case.json"):
         (case_dir / name).write_bytes((source / name).read_bytes())
+    claims = case_dir / "claims"
+    claims.mkdir()
+    for path in (source / "claims").glob("*.json"):
+        (claims / path.name).write_bytes(path.read_bytes())
     return case_dir
 
 
@@ -128,9 +140,10 @@ def test_dangling_element_reference_fails_closed(tmp_path):
     # model lacks is unscoreable, and dropping it silently would lower the
     # recall denominator without anyone noticing.
     case_dir = _copy_case(CORPUS_DIR / "01-payments-checkout", tmp_path)
-    threats = json.loads((case_dir / "threats.json").read_text())
+    claims_file = case_dir / "claims" / "stride.json"
+    threats = json.loads(claims_file.read_text())
     threats[0]["affected_element_ids"] = ["process:does-not-exist"]
-    (case_dir / "threats.json").write_text(json.dumps(threats))
+    claims_file.write_text(json.dumps(threats))
 
     with pytest.raises(CorpusError, match="absent from model.json"):
         load_case(case_dir)
@@ -148,9 +161,9 @@ def test_invalid_blessed_model_fails_closed(tmp_path):
 
 def test_missing_file_fails_closed(tmp_path):
     case_dir = _copy_case(CORPUS_DIR / "03-batch-data-pipeline", tmp_path)
-    (case_dir / "threats.json").unlink()
+    (case_dir / "claims" / "stride.json").unlink()
 
-    with pytest.raises(CorpusError, match="missing threats.json"):
+    with pytest.raises(CorpusError, match="claims/stride.json does not exist"):
         load_case(case_dir)
 
 

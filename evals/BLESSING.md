@@ -230,6 +230,7 @@ threat on the maintenance path for it. Do not carry what you do not grade.
 
 The grounds are still worth *reading* before you promote. A threat whose only
 ground is an `unknown-attribute` is telling you the case leaves that attribute
-unstated, which is a fact about your `model.json`, and a `quote` ground points
-at the sentence in `source.md` that a real reference entry should have been
-written from.
+unstated, which is a fact about your `model.json`; an `absent-attribute` says
+the case states the control is missing, which is a different fact about the
+same file; and a `quote` ground points at the sentence in `source.md` that a
+real reference entry should have been written from.

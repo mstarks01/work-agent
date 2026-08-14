@@ -50,11 +50,11 @@ def _identity_judge(drafts, buckets=None):
 
 
 def _must_find(case):
-    return next(ref for ref in case.references if ref.must_find)
+    return next(ref for ref in case.claims_for("stride") if ref.must_find)
 
 
 def _expected(case):
-    return next(ref for ref in case.references if not ref.must_find)
+    return next(ref for ref in case.claims_for("stride") if not ref.must_find)
 
 
 def test_scorer_takes_drafts_without_promoting_them(case):
@@ -286,24 +286,42 @@ def _report_with(case, threats):
     """A minimal report carrying the given threats, as the modes build one."""
     from datetime import UTC, datetime
 
+    from stride_service.frameworks.stride.record import (
+        STRIDE_VERSION,
+        StrideAnalysis,
+    )
     from stride_service.report import (
+        FrameworkSelection,
         InputRef,
         Job,
         NodeRun,
-        StrideReport,
-        build_summary,
+        Report,
     )
 
     now = datetime.now(UTC)
-    return StrideReport(
-        job=Job(id=f"eval-{case.id}", created_at=now, completed_at=now),
+    claims = list(threats)
+    return Report(
+        job=Job(
+            id=f"eval-{case.id}",
+            created_at=now,
+            completed_at=now,
+            frameworks=[FrameworkSelection(name="stride")],
+        ),
         input=InputRef.of(system_name=case.meta.title, sources=case.sources),
         nodes=[NodeRun(node="eval", model=None, duration_ms=0)],
         system_model=case.model,
         boundary_crossings=case.model.boundary_crossings(),
-        threats=list(threats),
-        rejected_threats=[],
-        summary=build_summary(list(threats), [], case.model),
+        elements_analyzed=len(case.model.elements()),
+        analyses=[
+            StrideAnalysis(
+                framework="stride",
+                framework_version=STRIDE_VERSION,
+                disclaimer="Scripted for the critic-yield CLI test.",
+                claims=claims,
+                rejected_claims=[],
+                summary=StrideAnalysis.summarize(claims, []),
+            )
+        ],
     )
 
 

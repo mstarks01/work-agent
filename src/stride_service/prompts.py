@@ -1,25 +1,37 @@
-"""Prompt composition for the four LLM node kinds.
+"""Prompt composition for the five LLM node kinds.
 
 Prompt content lives in ``prompts/`` as Markdown and loads through the same
 :class:`~stride_service.markdown_loader.MarkdownLoader` the skills use — a
 skill is *what to know*, a prompt is *what to do with this job's input*.
-Composition here is concatenation only: the ``{category}``, ``{system_model}``,
+Composition here is concatenation only: the ``{lane}``, ``{system_model}``,
 ``{boundary_crossings}``, ``{evidence_catalog}``, ``{candidates}``,
-``{domain_skills}``, ``{draft_threats}``, ``{input_text}``,
-``{previous_model}`` and ``{validation_issues}`` placeholders stay untouched
-for ADK state templating to fill at run time.
+``{domain_skills}``, ``{drafts}``, ``{input_text}``, ``{previous_model}`` and
+``{validation_issues}`` placeholders stay untouched for ADK state templating to
+fill at run time.
 
-Order is stable-first, mirroring
-:func:`~stride_service.skills.compose_analyze_skills`: the one shared
-``analyze.md`` body precedes the per-category exemplar file, so the six
-category agents share the longest possible cacheable prefix. The token caps
-here are enforced by ``tests/test_prompt_lints.py``.
+**The five bodies are the service's and are framework-neutral.** A prompt says
+what to do with this job's input, and every registered framework's lane agent
+does the same thing with it: read the model, work the leads, cite from the
+catalog, emit an object holding ``claims``. What differs is *what to look for*,
+and that is a skill — the lane skill, the exemplars, the critic text — which is
+package text under ``frameworks/<name>/`` and is composed by
+:mod:`stride_service.skills`. Two frameworks reading two copies of ``analyze.md``
+would be two places for the output contract to drift.
+
+The one exception is the **exemplars**, which are worked drafts in one
+framework's own record shape and so live under its package root
+(``lanes/<lane>/exemplars.md``). :func:`compose_analyze_prompt` takes the
+package's loader for exactly that block.
+
+Order is stable-first: the one shared ``analyze.md`` body precedes the per-lane
+exemplar file, so a framework's lane agents share the longest possible cacheable
+prefix. The token caps here are enforced by ``tests/test_prompt_lints.py``.
 """
 
 from __future__ import annotations
 
 from stride_service.markdown_loader import MarkdownLoader
-from stride_service.report import StrideCategory
+from stride_service.skills import lane_exemplars_doc
 
 # The four fixed H2 sections of an agent prompt, in order. The lints enforce
 # these exact strings.
@@ -38,8 +50,6 @@ PROMPT_BODY_NAMES: tuple[str, ...] = (
     CRITIC_PROMPT_NAME,
     RECRITIC_PROMPT_NAME,
 )
-
-EXEMPLARS_PREFIX = "exemplars/"
 
 # Token caps per prompt file, checked in CI by the lint tests.
 #
@@ -66,7 +76,7 @@ EXEMPLARS_PREFIX = "exemplars/"
 # THE SECOND EXEMPLAR SYSTEM IS WHAT THE LAST RAISE BOUGHT: ~500 tokens for a
 # fleet-telemetry platform beside the payments one, event-driven and
 # multi-tenant where the first is synchronous request/response, worked by six
-# of the eighteen exemplars. The cost is real and lands on all six agents on
+# of the eighteen exemplars. The cost is real and lands on every lane agent on
 # every job. What it buys is that the exemplars stop teaching one architecture
 # alongside the method — an agent shown only payments has no way to tell which
 # parts of the reasoning were the domain, and the far-domain corpus cases are
@@ -76,7 +86,7 @@ EXEMPLARS_PREFIX = "exemplars/"
 # systems and the diversity it buys is not: the first contrasting system breaks
 # a monoculture, the fifth mostly restates it, and per-technology depth has a
 # carrier that costs nothing on jobs that do not earn it — the domain packs in
-# ``skills/domains/``, selected per job. System B is deliberately smaller than
+# ``domains/``, selected per job. System B is deliberately smaller than
 # system A (four elements and three flows against six and five), because it
 # exists to contrast rather than to be a second full-fidelity model.
 #
@@ -97,7 +107,7 @@ EXEMPLARS_PREFIX = "exemplars/"
 # what an agent can actually hold in mind, not against this number.
 #
 # THE FOURTH AND FIFTH BLOCKS ARE THE RETRIEVED CORPUS, and here is the
-# argument the line above asks for. ``knowledge/notes/`` and ``knowledge/cases/``
+# argument the line above asks for. A package's ``notes/`` and ``cases/``
 # are selected per lane by the rules that actually fired
 # (:mod:`stride_service.knowledge`), so they cost ~57 tokens of *static* text
 # here — one clause in the Input section and two sentences fixing their
@@ -132,7 +142,23 @@ EXEMPLARS_PREFIX = "exemplars/"
 # the part that had to be written — an agent handed "17 elements" with no
 # framing has been given a target, and inflating a lane's draft count is a worse
 # failure than the undercounting the line exists to fix.
-ANALYZE_PROMPT_TOKEN_CAP = 3900
+#
+# 3900 -> 4100 IS THE CATALOG LEARNING TO SAY "STATED ABSENT" (#171). Roughly
+# 160 tokens, and about 60 of them are the two rows exemplar system A now
+# carries for a flow the input says is unauthenticated and unencrypted — rows
+# the catalog previously could not offer at all, so the exemplar grounded that
+# flow on a quote instead. The rest is the distinction those rows make citable:
+# the sub-step separating an attribute the input left open from one it ruled
+# out, and the sentence saying to cite the row rather than re-quote the
+# sentence behind it.
+#
+# It buys back more runtime tokens than it spends in static ones: a quote is a
+# span of submitter prose in every draft that carries it, while a row is an ID,
+# and the workaround this replaces put the quote on every finding resting on a
+# stated absence. What it fixes is not a token count, though — 18 of 300 corpus
+# candidates fire on a control the input states is absent, and none of them had
+# a citable fact before this.
+ANALYZE_PROMPT_TOKEN_CAP = 4100
 EXEMPLAR_TOKEN_CAP = 1500
 CRITIC_PROMPT_TOKEN_CAP = 1500
 # The re-ask has to be able to name and fix every fault `review_issues` can
@@ -150,27 +176,37 @@ EXTRACT_PROMPT_TOKEN_CAP = 2200
 REPAIR_PROMPT_TOKEN_CAP = 800
 
 
-def exemplar_name(category: StrideCategory) -> str:
-    """The loader name of one category's exemplar file."""
-    return f"{EXEMPLARS_PREFIX}{category}"
+def compose_analyze_prompt(
+    prompt_loader: MarkdownLoader, package_loader: MarkdownLoader, lane: str
+) -> str:
+    """One lane agent's prompt: the shared body, then that lane's own exemplars.
 
+    Two loaders because the two halves have two owners. ``analyze.md`` is the
+    service's, rooted at ``prompts/``, and one templated body serves every lane
+    of every registered framework rather than N near-identical copies.
+    ``lanes/<lane>/exemplars.md`` is the *package's*, rooted at
+    ``frameworks/<name>/``, because a worked draft is written in that framework's
+    own record shape and would be a lie in another's.
 
-def compose_analyze_prompt(loader: MarkdownLoader, category: StrideCategory) -> str:
-    """One category agent's prompt: the shared body, then that category's exemplars.
-
-    ``{category}`` is left in place — one templated body serves all six agents
-    rather than six near-identical copies.
+    ``{lane}`` is left in place for ADK to template.
     """
-    parts = [loader.load(ANALYZE_PROMPT_NAME), loader.load(exemplar_name(category))]
+    parts = [
+        prompt_loader.load(ANALYZE_PROMPT_NAME),
+        package_loader.load(lane_exemplars_doc(lane)),
+    ]
     return "\n\n".join(part.strip() for part in parts) + "\n"
 
 
 def compose_critic_prompt(loader: MarkdownLoader) -> str:
-    """The critic's prompt: the five judgement steps over all six agents' drafts.
+    """The critic's prompt: the judgement steps over one framework's drafts.
 
     No exemplars — the critic rules on drafts it is given rather than
     producing new ones, and the mechanical checks it must not re-perform run
     in :mod:`stride_service.critic`.
+
+    What this framework's verdicts *assert* is not here: that is the package's
+    own ``critic.md``, composed into the node's skills by
+    :func:`~stride_service.skills.compose_critic_skills`.
     """
     return loader.load(CRITIC_PROMPT_NAME).strip() + "\n"
 

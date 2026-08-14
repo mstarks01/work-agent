@@ -1,11 +1,12 @@
-"""Every fact a category agent may cite, enumerated from the validated model.
+"""Every fact a lane agent may cite, enumerated from the validated model.
 
 A finding's justification is a :class:`~stride_service.report.Ground`, and the
-two non-quote branches of one are pure functions of the System Model: an
-attribute whose value is the ``unknown`` sentinel, and a Data Flow whose
-endpoints sit in different trust zones. Neither requires judgement to
-construct, and neither is anything an agent knows that the service does not.
-So the service constructs them, once, and hands the agent a list of IDs.
+three non-quote branches of one are pure functions of the System Model: an
+attribute the input never settled, a control attribute the input says is not
+there, and a Data Flow whose endpoints sit in different trust zones. None
+requires judgement to construct, and none is anything an agent knows that the
+service does not. So the service constructs them, once, and hands the agent a
+list of IDs.
 
 **The LLM decides which evidence supports a finding; this module decides how
 that evidence is represented.** An agent answers with
@@ -33,11 +34,12 @@ not do is *check* it; presence in the named source stays
 ladder in :mod:`stride_service.grounding` against the job's actual bytes, which
 this module does not hold.
 
-IDs ARE STABLE AND MEAN SOMETHING. ``unknown:<element-id>:<attribute>`` and
-``crossing:<flow-id>``, both built from IDs the model already carries, so the
-same System Model yields the same catalog on every run and a ref in a log or a
-diff is readable without a lookup. Opaque IDs would cost that for nothing:
-there is no secret here, only facts the agent is being shown anyway.
+IDs ARE STABLE AND MEAN SOMETHING. ``unknown:<element-id>:<attribute>``,
+``absent:<element-id>:<attribute>`` and ``crossing:<flow-id>``, all built from
+IDs the model already carries, so the same System Model yields the same catalog
+on every run and a ref in a log or a diff is readable without a lookup. Opaque
+IDs would cost that for nothing: there is no secret here, only facts the agent
+is being shown anyway.
 
 Model output is untrusted input (OWASP LLM05). A ref is used as a dictionary
 key and never parsed, interpolated, or matched by a pattern compiled from it,
@@ -50,20 +52,20 @@ reported as itself, because the alternative — inferring which fact an agent
 from __future__ import annotations
 
 from collections.abc import Iterable, Mapping
-from typing import NamedTuple
+from typing import Any, NamedTuple
 
+from stride_service.analysis import CONTROL_ATTRIBUTES, control_state
 from stride_service.critic import DraftJoinError
+from stride_service.frameworks import FrameworkPackage, schemas_for
 from stride_service.report import (
-    CATEGORY_LETTERS,
     REFERENCE_MAX_CHARS,
     AnalysisMarks,
-    DraftThreat,
+    Claim,
     Ground,
-    StrideCategory,
-    ThreatProposal,
+    Proposal,
     UnresolvedEvidence,
 )
-from stride_service.system_model import UNKNOWN, SystemModel, attribute_names
+from stride_service.system_model import Element, SystemModel, attribute_names
 
 #: An evidence catalog: each reference, in a stable order, against the ground
 #: it resolves to. A plain mapping on purpose — ``list(catalog)`` is what the
@@ -73,6 +75,7 @@ from stride_service.system_model import UNKNOWN, SystemModel, attribute_names
 EvidenceCatalog = dict[str, Ground]
 
 UNKNOWN_PREFIX = "unknown"
+ABSENT_PREFIX = "absent"
 CROSSING_PREFIX = "crossing"
 
 
@@ -81,9 +84,9 @@ class EvidenceResolutionError(DraftJoinError):
 
     Narrower than it was. A *single* reference the catalog does not contain is
     dropped and marked (:class:`~stride_service.report.UnresolvedEvidence`), so
-    this no longer fires for a threat that cited one composed fact beside real
+    this no longer fires for a claim that cited one composed fact beside real
     ones — that cost 2 of 12 jobs on a live sweep for citation errors (#138).
-    What still raises is a threat with **no grounds left**, which the schema
+    What still raises is a claim with **no grounds left**, which the schema
     cannot represent and no critic could rule on.
 
     A :class:`~stride_service.critic.DraftJoinError` because it is one: a draft
@@ -99,6 +102,11 @@ def unknown_evidence_ref(element_id: str, attribute: str) -> str:
     return f"{UNKNOWN_PREFIX}:{element_id}:{attribute}"
 
 
+def absent_evidence_ref(element_id: str, attribute: str) -> str:
+    """The catalog ID for one control the input states is not there."""
+    return f"{ABSENT_PREFIX}:{element_id}:{attribute}"
+
+
 def crossing_evidence_ref(flow_id: str) -> str:
     """The catalog ID for one flow's derived boundary crossing."""
     return f"{CROSSING_PREFIX}:{flow_id}"
@@ -107,8 +115,8 @@ def crossing_evidence_ref(flow_id: str) -> str:
 def evidence_catalog(model: SystemModel) -> EvidenceCatalog:
     """Every mechanically derivable fact in one validated System Model.
 
-    Two enumerations, in this order: each element's attributes whose value is
-    the ``unknown`` sentinel, walked in the model's own element order and each
+    Two enumerations, in this order: each element's attributes the input left
+    unsettled or stated absent, walked in the model's own element order and each
     element's own field-declaration order; then the derived boundary crossings,
     in the order :meth:`~stride_service.system_model.SystemModel.boundary_crossings`
     yields them. Both orders are properties of the model rather than of this
@@ -120,24 +128,23 @@ def evidence_catalog(model: SystemModel) -> EvidenceCatalog:
     the word "unknown" is a sentence, not an unstated control, and a catalog
     that could not tell those apart would invite a finding grounded on prose.
 
-    Two refs cannot collide. An element ID is unique across a validated model
-    and an attribute appears once on an element, so the ``unknown`` half is
-    injective; a flow ID is an element ID, so the ``crossing`` half is; and the
-    two halves are separated by their prefixes.
+    Refs cannot collide. An element ID is unique across a validated model and an
+    attribute appears once on an element, so each attribute half is injective
+    and the two cannot overlap because one attribute has one state; a flow ID is
+    an element ID, so the ``crossing`` half is injective; and the three halves
+    are separated by their prefixes.
 
     Requires a valid model, and fails closed on an invalid one exactly as
     ``boundary_crossings`` does — a catalog derived from a model with a
     dangling flow endpoint would offer agents evidence about a system nobody
     described.
     """
-    catalog: EvidenceCatalog = {
-        unknown_evidence_ref(element.id, attribute): Ground(
-            kind="unknown-attribute", element_id=element.id, attribute=attribute
-        )
+    catalog: EvidenceCatalog = dict(
+        entry
         for element in model.elements()
         for attribute in attribute_names(element)
-        if getattr(element, attribute) == UNKNOWN
-    }
+        if (entry := _attribute_entry(element, attribute)) is not None
+    )
     catalog.update(
         {
             crossing_evidence_ref(crossing.flow_id): Ground(
@@ -147,6 +154,45 @@ def evidence_catalog(model: SystemModel) -> EvidenceCatalog:
         }
     )
     return catalog
+
+
+def _attribute_entry(element: Element, attribute: str) -> tuple[str, Ground] | None:
+    """One attribute's catalog entry, or ``None`` where it states a control.
+
+    The classifier is :func:`~stride_service.analysis.control_state`, the same
+    one the candidate rules read, which is the whole of this function's point:
+    the catalog used to test exact equality with the ``unknown`` sentinel while
+    the analysis layer read the leading token, so a control the input *hedged*
+    (``"unknown; possibly a shared group account"``) and a control the input
+    said is *not there* (``"none; accepted by network position"``) were both
+    facts a rule could fire on and no agent could cite (#171).
+
+    **The two halves cover different attribute sets, and the asymmetry is the
+    honest reading rather than an oversight.** ``unknown`` is the extraction
+    sentinel: it means "the input never settled this" on every type-specific
+    field, decorated with a hedge or not, so the unverified half runs over all
+    of them. ``none`` is not a sentinel — it carries a determinate meaning only
+    where the attribute names a control, and "the submitter said this is not
+    there" is not a fact about a ``protocol`` or a ``data_description``. So the
+    absent half is confined to :data:`~stride_service.analysis.CONTROL_ATTRIBUTES`,
+    and a ``technology`` reading ``none`` stays what the input wrote rather than
+    becoming a fact an agent may rest a finding on.
+
+    Both entries carry the element and the attribute and nothing else. Which
+    *state* the attribute is in is the branch, never a field — a ground whose
+    kind and payload could disagree is the shape this whole module exists to
+    make unreachable.
+    """
+    state = control_state(getattr(element, attribute))
+    if state == "unverified":
+        return unknown_evidence_ref(element.id, attribute), Ground(
+            kind="unknown-attribute", element_id=element.id, attribute=attribute
+        )
+    if state == "absent" and attribute in CONTROL_ATTRIBUTES:
+        return absent_evidence_ref(element.id, attribute), Ground(
+            kind="absent-attribute", element_id=element.id, attribute=attribute
+        )
+    return None
 
 
 def render_catalog(catalog: Mapping[str, Ground]) -> str:
@@ -183,13 +229,18 @@ def _gloss(ground: Ground) -> str:
     """What one catalogued fact asserts.
 
     Deliberately short, and it does not repeat the element ID: that is the left
-    column already, and this text is paid for on all six agents' instructions
+    column already, and this text is paid for on every lane agent's instruction
     through the two exemplar catalogs. What it has to carry is the *kind* of
     fact — an unstated attribute reads very differently from a derived crossing,
-    and an agent that conflates them cites the wrong one.
+    and an agent that conflates them cites the wrong one. *Never stated* against
+    *stated absent* is the sharpest of those distinctions and the cheapest to
+    render: it is the difference between a question and an answer, and the
+    prompt spends a whole procedure step on it.
     """
     if ground.kind == "derived-fact":
         return "crosses a trust boundary"
+    if ground.kind == "absent-attribute":
+        return f"`{ground.attribute}` stated absent"
     return f"`{ground.attribute}` never stated"
 
 
@@ -201,17 +252,21 @@ class Resolution(NamedTuple):
     halves. Shaped like :class:`~stride_service.critic.JoinedDrafts` — marks
     beside drafts — and carrying the same
     :class:`~stride_service.report.AnalysisMarks`, so the fan-in merges what
-    six lanes and the join produced without knowing which mark came from where.
+    every lane and the join produced without knowing which mark came from where.
     Only ``unresolved_evidence`` is ever populated here; the other four lists
     have no producer this early.
+
+    The drafts are the package's own record type; they are typed as the neutral
+    :class:`~stride_service.report.Claim` here because this module builds them
+    from a contract rather than from a framework it knows.
     """
 
-    drafts: list[DraftThreat]
+    drafts: list[Claim]
     marks: AnalysisMarks
 
 
 def _grounds_of(
-    proposal: ThreatProposal, catalog: Mapping[str, Ground]
+    proposal: Proposal, catalog: Mapping[str, Ground]
 ) -> tuple[list[Ground], list[str]]:
     """One proposal's grounds, and every reference of its that named nothing.
 
@@ -244,71 +299,96 @@ def _grounds_of(
     return grounds, unresolved
 
 
+#: What every proposal carries for this module rather than for the claim: the
+#: two evidence lists, which resolve into ``grounds`` and do not survive as
+#: fields. Everything else an agent wrote is carried across untouched.
+_RESOLVED_AWAY = frozenset({"evidence_refs", "quotes"})
+
+
 def resolve_proposals(
-    proposals: Iterable[ThreatProposal],
+    proposals: Iterable[Proposal],
     catalog: Mapping[str, Ground],
-    category: StrideCategory,
+    package: FrameworkPackage,
+    lane: str,
 ) -> Resolution:
     """Turn one lane's proposals into drafts: resolve the evidence, stamp the lane.
 
+    **One resolver for every framework**, which is what keeps *the agent selects
+    and the service constructs* a construction rather than a convention each
+    package could break. Three things are the service's here and none of them is
+    a judgement: the grounds, the claim ID, and the lane.
+
     The catalog is the sole source of truth for evidence: a resolved ground is
     the entry itself, so it carries the branch and the fields that branch
-    requires, and the :class:`~stride_service.report.DraftThreat` this returns
-    cannot be mis-shaped whatever an agent emitted.
+    requires, and the claim this returns cannot be mis-shaped whatever an agent
+    emitted.
 
-    ``category`` is the lane being resolved, and it arrives as an argument
-    because that is where the fact lives — the graph builds one node per STRIDE
-    category and knows which is which before any model runs. The threat ID is
-    composed from it and the agent's ``sequence``, so a draft's category, its
-    ID's letter and the node that produced it agree by construction rather than
-    by an agent keeping three spellings in line. Everything else passes through
-    untouched.
+    ``lane`` is the lane being resolved, and it arrives as an argument because
+    that is where the fact lives — the graph builds one node per
+    ``(framework, lane)`` and knows which is which before any model runs. The ID
+    is composed by the package's own :class:`~stride_service.frameworks.IdRule`
+    from that lane and the agent's key, and the lane is stamped into whatever
+    field that rule names, so a draft's lane, its ID's prefix and the node that
+    produced it agree by construction rather than by an agent keeping three
+    spellings in line.
+
+    Everything else the agent wrote passes through untouched — the title, the
+    description, the element refs, and whatever this framework judges. The key
+    itself does not: it is what the ID was composed *from*, and the gate has
+    already refused a record that declares it.
 
     **A reference that names nothing costs its entry, not the job.** Agents
     compose well-formed references to facts the catalog does not hold — correct
     grammar, plausible element IDs — and failing the whole analysis over one
-    discards six lanes of work to punish a citation error (#138). So an
-    unresolvable reference is dropped and marked, and the threat stands on
+    discards every lane's work to punish a citation error (#138). So an
+    unresolvable reference is dropped and marked, and the claim stands on
     whatever else it cited.
 
-    The line is *no grounds at all*. A threat whose every ground evaporates has
+    The line is *no grounds at all*. A claim whose every ground evaporates has
     nothing supporting it, and a finding with empty ``grounds`` is the one
     thing this schema refuses to represent — so that, and only that, still
     raises. It is the same rule :func:`~stride_service.critic.join_drafts`
-    applies to unverified quotes: marked per entry, failed closed per threat.
+    applies to unverified quotes: marked per entry, failed closed per claim.
 
-    Every such threat across the whole batch is reported together, rather than
+    Every such claim across the whole batch is reported together, rather than
     the first one aborting the pass. An agent that misread the catalog usually
     misread it more than once, and a fan-in with no re-ask path gets one chance
     to say what was wrong.
     """
-    drafts = []
+    key_field = schemas_for(package.name).key_field
+    carried = _RESOLVED_AWAY | {key_field}
+    drafts: list[Claim] = []
     unresolved_evidence: list[UnresolvedEvidence] = []
     groundless: list[str] = []
     for proposal in proposals:
-        threat_id = f"{CATEGORY_LETTERS[category]}-{proposal.sequence:02d}"
+        claim_id = package.compose_id(lane, getattr(proposal, key_field))
         grounds, unresolved = _grounds_of(proposal, catalog)
         unresolved_evidence += [
-            UnresolvedEvidence(threat_id=threat_id, reference=ref[:REFERENCE_MAX_CHARS])
+            UnresolvedEvidence(claim_id=claim_id, reference=ref[:REFERENCE_MAX_CHARS])
             for ref in unresolved
         ]
         if not grounds:
             groundless.append(
-                f"threat {threat_id!r} cites only evidence this job's catalog"
+                f"claim {claim_id!r} cites only evidence this job's catalog"
                 f" does not contain ({', '.join(repr(ref) for ref in unresolved)}),"
                 " so nothing is left to justify it"
             )
             continue
+        # The agent's own fields plus the lane the graph stamped, as one mapping:
+        # what a package's record declares beyond :class:`Claim` is the package's
+        # business, so this is deliberately untyped here and validated by the
+        # record's own model.
+        agent_fields: dict[str, Any] = {
+            **package.lane_fields(lane),
+            **proposal.model_dump(exclude=set(carried)),
+        }
         drafts.append(
-            DraftThreat(
-                id=threat_id,
-                category=category,
-                title=proposal.title,
-                description=proposal.description,
-                affected_element_ids=proposal.affected_element_ids,
+            package.record(
+                id=claim_id,
+                framework=package.name,
+                framework_version=package.version,
                 grounds=grounds,
-                severity=proposal.severity,
-                mitigations=proposal.mitigations,
+                **agent_fields,
             )
         )
     if groundless:

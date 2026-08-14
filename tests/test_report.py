@@ -6,25 +6,31 @@ from typing import get_args
 import pytest
 from pydantic import ValidationError
 
+from stride_service.frameworks.stride.record import (
+    ThreatRulings,
+    build_stride_summary,
+)
 from stride_service.report import (
     AnalysisMarks,
-    CategoryCoverage,
+    ClaimMark,
     Ground,
+    LaneCoverage,
     MissingMitigation,
     ProposedVerdict,
+    Report,
     Severity,
-    StrideReport,
-    ThreatMark,
-    ThreatRulings,
     UnknownRef,
     UnresolvedEvidence,
     UnresolvedMention,
     Verdict,
-    build_summary,
     derive_severity_level,
 )
 from stride_service.sampling import TierSampling, sampling_fingerprint
-from tests.factories import sample_report, sample_threat, valid_model
+from tests.factories import (
+    sample_report,
+    sample_threat,
+    valid_model,
+)
 
 
 class TestSeverityMatrix:
@@ -150,10 +156,10 @@ class TestProposedVerdictCarriesNoRuleBetweenFields:
         into state, so anything raising here is a dead job rather than a
         re-ask."""
         rulings = ThreatRulings.model_validate(
-            {"threats": [{"id": "S-01", "confidence": "high", "verdict": verdict}]}
+            {"claims": [{"id": "S-01", "confidence": "high", "verdict": verdict}]}
         )
 
-        assert rulings.threats[0].verdict.status == verdict["status"]
+        assert rulings.claims[0].verdict.status == verdict["status"]
 
     def test_a_malformed_threat_id_survives_the_node_too(self):
         """The critic copies IDs off a roster; a mistyped one is not a shape
@@ -166,7 +172,7 @@ class TestProposedVerdictCarriesNoRuleBetweenFields:
         """
         rulings = ThreatRulings.model_validate(
             {
-                "threats": [
+                "claims": [
                     {
                         "id": "S-1",
                         "confidence": "high",
@@ -176,7 +182,7 @@ class TestProposedVerdictCarriesNoRuleBetweenFields:
             }
         )
 
-        assert rulings.threats[0].id == "S-1"
+        assert rulings.claims[0].id == "S-1"
 
     def test_the_field_level_constraints_are_untouched(self):
         """Only the rules *between* fields moved. A closed vocabulary is
@@ -203,6 +209,11 @@ class TestGround:
                 "element_id": "store:orders-db",
                 "attribute": "encryption_at_rest",
             },
+            {
+                "kind": "absent-attribute",
+                "element_id": "flow:a-to-b:x",
+                "attribute": "authentication",
+            },
             {"kind": "derived-fact", "flow_id": "flow:a-to-b:x"},
         ],
     )
@@ -216,6 +227,8 @@ class TestGround:
             {"kind": "quote", "source_label": "Doc"},  # no text
             {"kind": "unknown-attribute", "element_id": "store:orders-db"},
             {"kind": "unknown-attribute", "attribute": "exposure"},
+            {"kind": "absent-attribute", "element_id": "flow:a-to-b:x"},
+            {"kind": "absent-attribute", "attribute": "authentication"},
             {"kind": "derived-fact"},
         ],
     )
@@ -232,6 +245,21 @@ class TestGround:
                 source_label="Doc",
                 element_id="store:orders-db",
             )
+
+    def test_the_two_attribute_branches_are_told_apart_by_kind_alone(self):
+        """They require the same two fields and forbid the same others, so the
+        shape check cannot separate them and is not asked to: what an attribute
+        *states* is the branch, and a record where the two disagreed would be
+        the thing this validator exists to make unreachable."""
+        fields = {"element_id": "flow:a-to-b:x", "attribute": "authentication"}
+
+        unknown = Ground(kind="unknown-attribute", **fields)
+        absent = Ground(kind="absent-attribute", **fields)
+
+        assert unknown != absent
+        assert unknown.model_dump(exclude={"kind"}) == absent.model_dump(
+            exclude={"kind"}
+        )
 
     def test_unknown_fields_are_forbidden(self):
         with pytest.raises(ValidationError):
@@ -268,13 +296,19 @@ class TestThreat:
         with pytest.raises(ValidationError):
             sample_threat(grounds=[])
 
-    def test_id_must_carry_the_category_letter(self):
-        with pytest.raises(ValidationError, match="category letter"):
-            sample_threat(threat_id="S-01", category="tampering")
+    def test_the_record_no_longer_re_validates_an_id_it_did_not_compose(self):
+        """``^[STRIDE]-\\d{2}$`` and the category-letter check are gone.
 
-    def test_id_pattern_is_enforced(self):
-        with pytest.raises(ValidationError):
-            sample_threat(threat_id="SPOOF-1", category="spoofing")
+        Both asked a record to re-check a string the *service* built: the ID is
+        composed by the package's own ``IdRule`` from the lane the resolver was
+        called for, and the lane is stamped from the same call — so the letter
+        and the category could not disagree unless the composition itself were
+        wrong, which is a defect a schema pattern would hide rather than catch.
+        The shape is a fact about STRIDE's ``id_format`` and nothing a second
+        framework's requirement numbering would satisfy.
+        """
+        assert sample_threat(threat_id="S-01", category="tampering").id == "S-01"
+        assert sample_threat(threat_id="SPOOF-1").id == "SPOOF-1"
 
     def test_at_least_one_affected_element_is_required(self):
         with pytest.raises(ValidationError):
@@ -284,7 +318,9 @@ class TestThreat:
 class TestReportInvariants:
     def test_sample_report_is_valid(self):
         report = sample_report()
-        assert report.summary.threat_count == len(report.threats)
+        (block,) = report.analyses
+        assert block.summary.claim_count == len(block.claims)
+        assert report.elements_analyzed == len(report.system_model.elements())
 
     def test_rejected_verdict_may_not_sit_in_threats(self):
         rejected = sample_threat(
@@ -292,12 +328,12 @@ class TestReportInvariants:
             category="tampering",
             verdict=Verdict(status="rejected", reason="ungrounded"),
         )
-        with pytest.raises(ValidationError, match="belongs in rejected_threats"):
+        with pytest.raises(ValidationError, match="belongs in rejected_claims"):
             sample_report(threats=[rejected])
 
     def test_rejected_threats_must_hold_rejected_verdicts(self):
         confirmed = sample_threat(threat_id="T-01", category="tampering")
-        with pytest.raises(ValidationError, match="sits in rejected_threats"):
+        with pytest.raises(ValidationError, match="sits in rejected_claims"):
             sample_report(rejected_threats=[confirmed])
 
     def test_dangling_element_reference_is_rejected(self):
@@ -328,22 +364,23 @@ class TestReportInvariants:
         payload = report.model_dump()
         payload["boundary_crossings"] = []
         with pytest.raises(ValidationError, match="boundary_crossings"):
-            StrideReport.model_validate(payload)
+            Report.model_validate(payload)
 
     def test_mismatched_summary_is_rejected(self):
+        """Recounted per block, since a report carries one summary per framework."""
         report = sample_report()
         payload = report.model_dump()
-        payload["summary"]["threat_count"] += 1
-        with pytest.raises(ValidationError, match="summary does not match"):
-            StrideReport.model_validate(payload)
+        payload["analyses"][0]["summary"]["claim_count"] += 1
+        with pytest.raises(ValidationError, match="does not match the stride analysis"):
+            Report.model_validate(payload)
 
 
-class TestEveryThreatMarkPointsAtAThreat:
+class TestEveryClaimMarkPointsAtAThreat:
     """One rule over every mark, so a new mark type cannot arrive uncovered.
 
     A mark naming a threat this report does not carry annotates nothing, while
     the threat that really earned it renders as though it had checked out.
-    Parametrized over the whole of ``ThreatMark`` rather than written once per
+    Parametrized over the whole of ``ClaimMark`` rather than written once per
     type: the point is that the set is closed.
     """
 
@@ -352,31 +389,31 @@ class TestEveryThreatMarkPointsAtAThreat:
         [
             (
                 "unresolved_mentions",
-                UnresolvedMention(threat_id="S-09", mention="process:ghost"),
+                UnresolvedMention(claim_id="S-09", mention="process:ghost"),
                 "unresolved mention",
             ),
             (
                 "unresolved_evidence",
                 UnresolvedEvidence(
-                    threat_id="S-09", reference="unknown:process:ghost:exposure"
+                    claim_id="S-09", reference="unknown:process:ghost:exposure"
                 ),
                 "unresolved evidence",
             ),
             (
                 "missing_mitigations",
-                MissingMitigation(threat_id="S-09"),
+                MissingMitigation(claim_id="S-09"),
                 "missing mitigation",
             ),
         ],
     )
     def test_a_mark_on_an_absent_threat_is_rejected(self, field, mark, what):
-        with pytest.raises(ValidationError, match=f"{what} names threat 'S-09'"):
+        with pytest.raises(ValidationError, match=f"{what} names claim 'S-09'"):
             sample_report(**{field: [mark]})
 
     def test_every_mark_type_is_covered_by_the_check(self):
-        """The parametrization above is the whole of ``ThreatMark``."""
+        """The parametrization above is the whole of ``ClaimMark``."""
         covered = {UnresolvedMention, UnresolvedEvidence, MissingMitigation}
-        assert set(get_args(ThreatMark)) == covered
+        assert set(get_args(ClaimMark)) == covered
 
 
 class TestAnalysisMarks:
@@ -394,23 +431,23 @@ class TestAnalysisMarks:
     def test_merging_concatenates_every_list_in_order(self):
         first = AnalysisMarks(
             unresolved_mentions=[
-                UnresolvedMention(threat_id="S-01", mention="process:ghost")
+                UnresolvedMention(claim_id="S-01", mention="process:ghost")
             ]
         )
         second = AnalysisMarks(
             unresolved_mentions=[
-                UnresolvedMention(threat_id="T-02", mention="store:ghost")
+                UnresolvedMention(claim_id="T-02", mention="store:ghost")
             ],
-            missing_mitigations=[MissingMitigation(threat_id="R-03")],
+            missing_mitigations=[MissingMitigation(claim_id="R-03")],
         )
 
         merged = first.merged_with(second)
 
-        assert [mark.threat_id for mark in merged.unresolved_mentions] == [
+        assert [mark.claim_id for mark in merged.unresolved_mentions] == [
             "S-01",
             "T-02",
         ]
-        assert [mark.threat_id for mark in merged.missing_mitigations] == ["R-03"]
+        assert [mark.claim_id for mark in merged.missing_mitigations] == ["R-03"]
         assert merged.unverified_grounds == []
 
     def test_merging_covers_every_declared_mark(self):
@@ -431,8 +468,8 @@ class TestCoverageRatios:
         with pytest.raises(
             ValidationError, match="elements_cited=3 exceeds elements=2"
         ):
-            CategoryCoverage(
-                category="spoofing",
+            LaneCoverage(
+                lane="spoofing",
                 drafts=1,
                 rules=2,
                 rules_fired=1,
@@ -474,12 +511,16 @@ class TestSummary:
                 verdict=Verdict(status="rejected", reason="ungrounded"),
             )
         ]
-        summary = build_summary(threats, rejected, model)
-        assert summary.threat_count == 2
+        summary = build_stride_summary(threats, rejected)
+        assert summary.claim_count == 2
         assert summary.by_category == {"spoofing": 1, "information-disclosure": 1}
         assert summary.needs_info_count == 1
         assert summary.rejected_count == 1
-        assert summary.elements_analyzed == len(model.elements())
+        # ``elements_analyzed`` is a fact about the shared model, so it left the
+        # summary for the envelope: N blocks would be N chances to disagree
+        # about one number.
+        assert "elements_analyzed" not in summary.model_fields
+        assert sample_report().elements_analyzed == len(model.elements())
 
 
 class TestTheSamplingClearBlock:
@@ -517,7 +558,7 @@ class TestTheSamplingClearBlock:
         resolved = self.fully_set()
         report = sample_report().model_copy(update={"sampling": {"base": {}}})
 
-        stored = StrideReport.model_validate(
+        stored = Report.model_validate(
             {**report.model_dump(), "sampling": {"base": resolved.model_dump()}}
         ).sampling["base"]
 
@@ -532,7 +573,7 @@ class TestTheSamplingClearBlock:
         in the report unverifiable by the reader it was recorded for.
         """
         resolved = self.fully_set()
-        stored = StrideReport.model_validate(
+        stored = Report.model_validate(
             {
                 **sample_report().model_dump(),
                 "sampling": {"base": resolved.model_dump()},
@@ -548,10 +589,10 @@ class TestTheSamplingClearBlock:
 class TestSerialization:
     def test_report_roundtrips_through_json(self):
         report = sample_report()
-        assert StrideReport.model_validate_json(report.model_dump_json()) == report
+        assert Report.model_validate_json(report.model_dump_json()) == report
 
     def test_extra_fields_are_rejected(self):
         payload = sample_report().model_dump()
         payload["extra"] = True
         with pytest.raises(ValidationError):
-            StrideReport.model_validate(payload)
+            Report.model_validate(payload)

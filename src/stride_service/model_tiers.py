@@ -37,15 +37,23 @@ from typing import Literal, Self
 from pydantic import BaseModel, ConfigDict, Field, ValidationError, model_validator
 
 from stride_service.errors import ConfigError
-from stride_service.skills import STRIDE_CATEGORIES
+from stride_service.report import FRAMEWORK_NAMES
 from stride_service.vendors import VENDOR_NAMES, Vendor, VendorName, vendor_for
 
 # The only schema version this loader accepts. A file on any other version
 # fails its own check rather than being migrated in place.
-SUPPORTED_VERSION = 4
+#
+# Version 5 is the framework cutover. Six ``analyze/<category>`` keys that all
+# held one value became one ``analyze/<framework>`` key, and ``critic`` and
+# ``recritic`` became ``critic/<framework>`` and ``recritic/<framework>``. The
+# framework is the unit a **Deployment** tunes — an operator can run one
+# framework on ``base`` and another on ``strong``, which is the choice that has
+# a purpose, where a knob per lane is the same knob on a second axis.
+SUPPORTED_VERSION = 5
 
 TierName = Literal["base", "strong"]
 TIER_NAMES: tuple[TierName, ...] = ("base", "strong")
+
 
 # The graph's LLM nodes. Deterministic FunctionNodes (validate, prepare, join,
 # router, assemble) carry no model and never appear in the config. ``recritic``
@@ -53,21 +61,50 @@ TIER_NAMES: tuple[TierName, ...] = ("base", "strong")
 # right, running the same judgement as the critic and so always on the same
 # tier.
 #
-# One agent per STRIDE category, named for what it does. ``Analyst`` names the
-# human reading the report, so it is not a node name here or anywhere else.
-# These are the *tier config* keys; the graph's own node names are a separate
-# namespace (they must be Python identifiers), mapped in
-# :data:`stride_service.graph.TIER_NODE_BY_GRAPH_NODE`.
-CATEGORY_NODES: tuple[str, ...] = tuple(
-    f"analyze/{category}" for category in STRIDE_CATEGORIES
-)
-LLM_NODES: tuple[str, ...] = (
-    "extract",
-    "repair",
-    *CATEGORY_NODES,
-    "critic",
-    "recritic",
-)
+# Three keys per framework, named for what they do. ``Analyst`` names the human
+# reading the report, so it is not a node name here or anywhere else. These are
+# the *tier config* keys; the graph's own node names are a separate namespace
+# (they must be Python identifiers, and they carry the lane as well as the
+# framework), mapped by :func:`stride_service.graph.tier_node_by_graph_node`,
+# which is built per selection because which nodes exist is a function of it.
+#
+# **The keys are the service's, and there is one set per framework rather than
+# one per lane.** A framework's lanes all run the same judgement on the same
+# tier, so six keys holding one value had no reader; what an operator actually
+# chooses between is running one framework's analysis cheaper than another's.
+#
+# ``recritic/<name>`` is the bounded critic re-ask: a distinct node so it is
+# pinned in its own right, and the loader requires it to resolve to the same
+# tier as its own ``critic/<name>``. That pairing used to be a comment in the
+# config file; at two keys a comment holds, and at 2N keys it drifts, so it is a
+# check. A re-ask on a cheaper model than the pass it corrects is the failure
+# the comment warned about.
+def _framework_nodes() -> tuple[str, ...]:
+    return tuple(
+        f"{role}/{name}"
+        for name in FRAMEWORK_NAMES
+        for role in ("analyze", "critic", "recritic")
+    )
+
+
+FRAMEWORK_NODES: tuple[str, ...] = _framework_nodes()
+LLM_NODES: tuple[str, ...] = ("extract", "repair", *FRAMEWORK_NODES)
+
+
+def critic_pairing_issues(resolve_tier) -> list[str]:
+    """Every framework's ``recritic`` sits on the same tier as its ``critic``.
+
+    Takes the resolver rather than a config object so the rule can be stated
+    once and checked wherever a node -> tier map exists.
+    """
+    return [
+        f"recritic/{name} resolves to {resolve_tier(f'recritic/{name}')!r} but"
+        f" critic/{name} resolves to {resolve_tier(f'critic/{name}')!r};"
+        " a re-ask must not run on a cheaper model than the pass it corrects"
+        for name in FRAMEWORK_NAMES
+        if resolve_tier(f"recritic/{name}") != resolve_tier(f"critic/{name}")
+    ]
+
 
 _ENV_PREFIX = "STRIDE_MODEL_"
 _VENDOR_FIELD = "VENDOR"

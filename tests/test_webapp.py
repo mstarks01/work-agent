@@ -22,7 +22,7 @@ from fastapi.testclient import TestClient
 from stride_service import Source, SourceLimits, StrideEngine, StubPipelineRunner
 from stride_service.deployment import Deployment
 from stride_service.vendors import ProviderAuthError
-from tests.factories import TEST_TIER_ENV
+from tests.factories import TEST_TIER_ENV, sample_selection
 from webapp.main import Analyses, Startup, create_app, render_report
 
 SAME_ORIGIN = {"Sec-Fetch-Site": "same-origin"}
@@ -43,7 +43,10 @@ def client(tiers):
     """The app wired to a stub runner — no models, no credentials, no cost."""
     startup = Startup(
         engine=StrideEngine(
-            StubPipelineRunner(), limits=WEBAPP_LIMITS, deadline_seconds=TEST_DEADLINE
+            StubPipelineRunner(),
+            limits=WEBAPP_LIMITS,
+            deadline_seconds=TEST_DEADLINE,
+            frameworks=sample_selection(),
         ),
         tiers=tiers,
         error=None,
@@ -164,7 +167,10 @@ def test_a_second_submission_is_refused_while_one_is_running(tiers):
     analyses = Analyses()
     startup = Startup(
         engine=StrideEngine(
-            StubPipelineRunner(), limits=WEBAPP_LIMITS, deadline_seconds=TEST_DEADLINE
+            StubPipelineRunner(),
+            limits=WEBAPP_LIMITS,
+            deadline_seconds=TEST_DEADLINE,
+            frameworks=sample_selection(),
         ),
         tiers=tiers,
         error=None,
@@ -212,7 +218,10 @@ def test_the_injection_point_escapes_every_angle_bracket():
     from webapp.main import VIEWER
 
     engine = StrideEngine(
-        StubPipelineRunner(), limits=WEBAPP_LIMITS, deadline_seconds=TEST_DEADLINE
+        StubPipelineRunner(),
+        limits=WEBAPP_LIMITS,
+        deadline_seconds=TEST_DEADLINE,
+        frameworks=sample_selection(),
     )
     outcome = asyncio.run(
         engine.analyze([Source.description("A web app.")], system_name=BREAKOUT)
@@ -318,26 +327,36 @@ def test_the_viewer_reads_every_service_mark_the_report_carries():
     had done the work and the reader was never told.
 
     The field list is *derived* rather than written down, so the next mark is
-    caught by existing: a service mark is a top-level list whose element type
-    carries a ``threat_id``, which is what makes it a note about a finding
-    rather than part of one.
+    caught by existing: a service mark is a list on an analysis block whose
+    element type carries a ``claim_id``, which is what makes it a note about a
+    finding rather than part of one.
+
+    **Derived from the block, and from each package's own block type.** The
+    marks moved off the envelope in the cutover — a mark annotates one
+    framework's claims — and a package may add its own beside the neutral three,
+    as STRIDE does with ``missing_mitigations``. Walking every registered
+    block type is what keeps a second framework's mark covered by this test
+    existing rather than by somebody remembering to extend it.
     """
     from typing import get_args, get_origin
 
-    from stride_service.report import StrideReport
+    from stride_service.frameworks import SCHEMAS
+    from stride_service.report import FrameworkAnalysis
 
-    marks = []
-    for name, field in StrideReport.model_fields.items():
-        annotation = field.annotation
-        if get_origin(annotation) is not list:
-            continue
-        (item,) = get_args(annotation)
-        if hasattr(item, "model_fields") and "threat_id" in item.model_fields:
-            marks.append(name)
+    block_types = {FrameworkAnalysis, *(schemas.block for schemas in SCHEMAS.values())}
+    marks = set()
+    for block_type in block_types:
+        for name, field in block_type.model_fields.items():
+            annotation = field.annotation
+            if get_origin(annotation) is not list:
+                continue
+            (item,) = get_args(annotation)
+            if hasattr(item, "model_fields") and "claim_id" in item.model_fields:
+                marks.add(name)
 
-    assert marks, "no service marks found on StrideReport — has the shape changed?"
+    assert marks, "no service marks found on the analysis block — shape changed?"
     javascript = viewer_javascript()
-    unread = [name for name in marks if f"R.{name}" not in javascript]
+    unread = sorted(name for name in marks if f"block.{name}" not in javascript)
     assert not unread, (
         f"the report carries {unread} and the viewer never reads them. A mark"
         " the service computes and nothing shows is a check that stops one step"
@@ -447,8 +466,11 @@ def test_no_free_text_field_reaches_the_page_as_markup():
         re.DOTALL,
     )
     decoded = json.loads(payload.group(1))
-    assert decoded["rejected_threats"][0]["title"] == MARKUP_PAYLOAD
-    assert decoded["rejected_threats"][0]["grounds"][0]["text"] == MARKUP_PAYLOAD
+    assert decoded["analyses"][0]["rejected_claims"][0]["title"] == MARKUP_PAYLOAD
+    assert (
+        decoded["analyses"][0]["rejected_claims"][0]["grounds"][0]["text"]
+        == MARKUP_PAYLOAD
+    )
     assert decoded["system_model"]["processes"][0]["technology"] == MARKUP_PAYLOAD
 
 
@@ -503,7 +525,10 @@ def test_a_submitted_nonce_placeholder_is_not_substituted():
         rendered.html,
         re.DOTALL,
     )
-    assert json.loads(payload.group(1))["threats"][0]["title"] == "__CSP_NONCE__"
+    assert (
+        json.loads(payload.group(1))["analyses"][0]["claims"][0]["title"]
+        == "__CSP_NONCE__"
+    )
     assert nonce not in payload.group(1)
 
 

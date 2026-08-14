@@ -47,10 +47,9 @@ from pydantic import ValidationError
 
 from stride_service.critic import DraftJoinError, GroundsUnverifiedError
 from stride_service.evidence import EvidenceResolutionError
+from stride_service.frameworks.stride.record import DraftThreat, StrideCategory
 from stride_service.report import (
-    DraftThreat,
     GroundKind,
-    StrideCategory,
     UnverifiedGround,
 )
 
@@ -66,7 +65,12 @@ from stride_service.report import (
 # :class:`GroundMisShape`.
 FailureKind = Literal["fail-closed", "unresolved-evidence", "other"]
 
-_KINDS: tuple[GroundKind, ...] = ("quote", "unknown-attribute", "derived-fact")
+_KINDS: tuple[GroundKind, ...] = (
+    "quote",
+    "unknown-attribute",
+    "absent-attribute",
+    "derived-fact",
+)
 
 
 @dataclass(frozen=True)
@@ -261,7 +265,7 @@ def measure_grounds(
     """
     marked: dict[str, set[int]] = {}
     for mark in unverified:
-        marked.setdefault(mark.threat_id, set()).add(mark.index)
+        marked.setdefault(mark.claim_id, set()).add(mark.index)
     return CaseGrounds(
         case_id=case_id,
         threats=tuple(
@@ -314,7 +318,7 @@ def classify_failure(case_id: str, error: Exception) -> GroundsFailure:
             case_id=case_id,
             kind="fail-closed",
             detail=str(error),
-            threat_ids=error.threat_ids,
+            threat_ids=error.claim_ids,
             draft_count=error.draft_count,
         )
     if isinstance(error, EvidenceResolutionError):

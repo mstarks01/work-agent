@@ -32,12 +32,19 @@ from stride_service.deployment import (
     BLESSED_FINGERPRINTS_VAR,
     SAMPLING_VAR,
 )
-from stride_service.graph import TIER_NODE_BY_GRAPH_NODE
+from stride_service.graph import tier_node_by_graph_node
 from stride_service.report import NodeRun
 from stride_service.sampling import load_sampling, sampling_fingerprint
-from tests.factories import TEST_TIER_ENV, repo_tiers, served_build
+from tests.factories import (
+    DEFAULT_FRAMEWORKS,
+    TEST_TIER_ENV,
+    repo_tiers,
+    served_build,
+)
 from tests.test_evals_run_grounds import CASE_DIR
 from tests.test_evals_run_grounds import sweep as drive_sweep
+
+TIER_NODE_BY_GRAPH_NODE = tier_node_by_graph_node(DEFAULT_FRAMEWORKS)
 
 REPO_ROOT = Path(__file__).resolve().parents[1]
 SAMPLING_PATH = REPO_ROOT / "config" / "sampling.toml"
@@ -73,12 +80,17 @@ def node_run(node: str, requested: str, served: str, sampling) -> NodeRun:
     )
 
 
+#: The strong-tier node this sweep drives. Per framework since schema 3.0, so
+#: it is spelled once here rather than at each site that names a node.
+CRITIC_NODE = "critic_stride"
+
+
 def sweep(sampling, **served: str) -> list[NodeRun]:
-    """A two-tier sweep's executions: ``extract`` on base, ``critic`` on strong."""
+    """A two-tier sweep's executions: ``extract`` on base, the critic on strong."""
     return [
         node_run("extract", BASE_REQUESTED, served.get("base", BASE_SERVED), sampling),
         node_run(
-            "critic", STRONG_REQUESTED, served.get("strong", STRONG_SERVED), sampling
+            CRITIC_NODE, STRONG_REQUESTED, served.get("strong", STRONG_SERVED), sampling
         ),
     ]
 
@@ -178,7 +190,7 @@ class TestArtifactSerialization:
 
         observations = record.observations()
 
-        assert set(observations) == {"extract", "critic"}
+        assert set(observations) == {"extract", CRITIC_NODE}
         assert observations["extract"] == frozenset(
             {sampling_fingerprint(BASE_SERVED, sampling.for_tier("base"))}
         )

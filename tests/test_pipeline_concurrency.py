@@ -18,6 +18,7 @@ from __future__ import annotations
 import asyncio
 import re
 
+from google.adk.agents.llm_agent import LlmAgent
 from google.adk.models.base_llm import BaseLlm
 from google.adk.models.llm_response import LlmResponse
 from google.genai import types
@@ -31,18 +32,21 @@ from stride_service.sampling import load_sampling
 from stride_service.sources import Source
 from tests.factories import (
     BASE_MODEL,
+    DEFAULT_FRAMEWORKS,
     DESCRIPTION_TEXT,
-    EMPTY_THREATS,
+    EMPTY_CLAIMS,
     PROJECT_ROOT,
     STRONG_MODEL,
     ScriptedLlm,
+    claims_json,
+    repo_package_loaders,
     repo_tiers,
     sample_ruling,
+    sample_selection,
     served_build,
-    threats_json,
     valid_model,
 )
-from tests.test_pipeline import proposal_json
+from tests.test_pipeline import CRITIC, block, proposal_json
 
 MARKER = re.compile(r"MARK-[0-9a-f]{4}")
 
@@ -78,33 +82,50 @@ class MarkerExtractLlm(BaseLlm):
 
 
 def _build_shared_pipeline() -> graph.Pipeline:
-    """The real graph: a marker-aware ``extract``, fixed drafts downstream."""
-    graph_node_of = {
-        tier_node: graph_node
-        for graph_node, tier_node in graph.TIER_NODE_BY_GRAPH_NODE.items()
-    }
+    """The real graph: a marker-aware ``extract``, fixed drafts downstream.
+
+    The stand-ins are named by walking the built graph rather than by inverting
+    the tier map, for the reason :func:`tests.factories.scripted_pipeline`
+    documents: six lane agents share one ``analyze/<framework>`` key, so a tier
+    name no longer identifies a node. What the *tier* still decides is the
+    class — ``extract`` is the only node that has to read the job's marker —
+    and that is a question the resolver can answer.
+    """
     replies = {
-        graph.analyze_node_name("spoofing"): proposal_json("S-01", "spoofing"),
-        graph.CRITIC_NODE: threats_json(sample_ruling("S-01")),
+        graph.analyze_node_name("stride", "spoofing"): proposal_json(
+            "S-01", "spoofing"
+        ),
+        CRITIC: claims_json(sample_ruling("S-01")),
     }
 
     def resolve(tier_node: str) -> BaseLlm:
-        node = graph_node_of[tier_node]
-        if node == graph.EXTRACT_NODE:
+        if tier_node == "extract":
             return MarkerExtractLlm(model=BASE_MODEL)
-        model_name = BASE_MODEL if node == graph.REPAIR_NODE else STRONG_MODEL
-        return ScriptedLlm(
-            model=model_name, reply=replies.get(node, EMPTY_THREATS), seen=[]
-        )
+        model_name = BASE_MODEL if tier_node == "repair" else STRONG_MODEL
+        return ScriptedLlm(model=model_name, reply=EMPTY_CLAIMS, seen=[])
 
     tiers = repo_tiers()
     sampling = load_sampling(PROJECT_ROOT / "config" / "sampling.toml", env={})
-    return graph.build_pipeline(
-        skill_loader=MarkdownLoader(PROJECT_ROOT / "skills"),
+    pipeline = graph.build_pipeline(
         prompt_loader=MarkdownLoader(PROJECT_ROOT / "prompts"),
-        knowledge_loader=MarkdownLoader(PROJECT_ROOT / "knowledge"),
+        domain_loader=MarkdownLoader(PROJECT_ROOT / "domains"),
+        package_loaders=repo_package_loaders(),
         binding=NodeBinding.from_configs(tiers, sampling, resolve),
+        frameworks=DEFAULT_FRAMEWORKS,
     )
+    # Scripted per node rather than per tier: six lanes share one
+    # ``analyze/stride`` tier key, so the resolver above cannot tell them apart
+    # and the reply has to be set on the built node. Both narrowings are real
+    # checks — a workflow with no graph, or an agent bound to a model name
+    # rather than an adapter, means this helper built something other than the
+    # graph it is scripting.
+    assert pipeline.workflow.graph is not None
+    for node in pipeline.workflow.graph.nodes:
+        if isinstance(node, LlmAgent) and node.name in replies:
+            model = node.model
+            assert isinstance(model, ScriptedLlm)
+            model.reply = replies[node.name]
+    return pipeline
 
 
 def _marker_job(index: int) -> tuple[str, JobRecord]:
@@ -118,6 +139,7 @@ def _marker_job(index: int) -> tuple[str, JobRecord]:
         owner_subject="idp|shared-caller",
         sources=[Source.description(f"{DESCRIPTION_TEXT} Job token {marker}.")],
         system_name=f"System-{index:04x}",
+        frameworks=sample_selection(),
     )
     record.transition("running")
     return marker, record
@@ -186,7 +208,7 @@ def test_each_concurrent_job_gets_its_own_threats_and_fingerprints():
         # The scripted critic confirms exactly S-01 for every job; each report
         # holds its own single copy, never a doubled-up or missing set from a
         # neighbour's drafts bleeding across.
-        assert [threat.id for threat in report.threats] == ["S-01"]
+        assert [claim.id for claim in block(report).claims] == ["S-01"]
         # Sampling provenance is present and well-formed on every concurrent run.
         assert report.sampling
         extract_run = next(n for n in report.nodes if n.node == graph.EXTRACT_NODE)

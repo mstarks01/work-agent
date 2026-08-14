@@ -7,13 +7,10 @@ candidate is a lead, and nothing downstream can turn one into a finding.
 
 import pytest
 
-from stride_service.candidates import (
-    RULES,
-    Candidate,
-    generate_candidates,
-    rules_for,
-)
-from stride_service.report import STRIDE_CATEGORIES, Ground
+from stride_service.candidates import Candidate, generate_candidates
+from stride_service.frameworks.stride import STRIDE
+from stride_service.frameworks.stride.record import STRIDE_CATEGORIES
+from stride_service.report import Ground
 from stride_service.system_model import (
     DataFlow,
     DataStore,
@@ -22,6 +19,21 @@ from stride_service.system_model import (
     SystemModel,
     TrustBoundary,
 )
+
+#: STRIDE's own rule table. The neutral engine takes the lanes and the rules as
+#: arguments now, so a test about *these* rules has to name the package they
+#: belong to rather than reaching for a module-level constant.
+RULES = STRIDE.rules
+
+
+def candidates(model) -> dict:
+    """Every STRIDE lane's candidate set for one model.
+
+    The one place this suite binds the neutral engine to STRIDE's own lanes and
+    rules, so a test below reads the way it did before the engine stopped
+    knowing which framework it was firing for.
+    """
+    return generate_candidates(model, STRIDE.lanes, RULES)
 
 
 def flow(source, destination, label, **overrides):
@@ -125,7 +137,7 @@ def model():
 def fired(model, rule_id):
     return [
         candidate
-        for candidate_set in generate_candidates(model).values()
+        for candidate_set in candidates(model).values()
         for candidate in candidate_set.candidates
         if candidate.rule_id == rule_id
     ]
@@ -134,7 +146,7 @@ def fired(model, rule_id):
 class TestRuleTable:
     def test_every_category_has_at_least_one_rule(self):
         for category in STRIDE_CATEGORIES:
-            assert rules_for(category), category
+            assert STRIDE.rules_for(category), category
 
     def test_rule_ids_are_unique(self):
         ids = [rule.rule_id for rule in RULES]
@@ -143,12 +155,12 @@ class TestRuleTable:
     def test_every_rule_id_opens_with_its_category(self):
         """The lane is readable off the ID alone, in the report and in a log."""
         for rule in RULES:
-            assert rule.rule_id.startswith(f"{rule.category}-")
+            assert rule.rule_id.startswith(f"{rule.lane}-")
 
     def test_a_rule_cannot_file_outside_its_own_lane(self, model):
-        for category, candidate_set in generate_candidates(model).items():
-            assert all(c.category == category for c in candidate_set.candidates)
-            assert candidate_set.category == category
+        for category, candidate_set in candidates(model).items():
+            assert all(c.lane == category for c in candidate_set.candidates)
+            assert candidate_set.lane == category
 
 
 class TestFiring:
@@ -270,24 +282,23 @@ class TestFiring:
             trust_boundaries=[TrustBoundary(id="boundary:z", name="Z", kind="network")],
         )
         assert all(
-            not candidate_set.candidates
-            for candidate_set in generate_candidates(model).values()
+            not candidate_set.candidates for candidate_set in candidates(model).values()
         )
 
 
 class TestShape:
     def test_every_lane_gets_an_entry_even_when_empty(self, model):
-        assert set(generate_candidates(model)) == set(STRIDE_CATEGORIES)
+        assert set(candidates(model)) == set(STRIDE_CATEGORIES)
 
     def test_questions_cover_exactly_the_rules_that_fired(self, model):
-        for candidate_set in generate_candidates(model).values():
+        for candidate_set in candidates(model).values():
             assert set(candidate_set.questions) == {
                 candidate.rule_id for candidate in candidate_set.candidates
             }
 
     def test_generation_is_stable_across_calls(self, model):
-        first = generate_candidates(model)
-        second = generate_candidates(model)
+        first = candidates(model)
+        second = candidates(model)
         assert {k: v.model_dump() for k, v in first.items()} == {
             k: v.model_dump() for k, v in second.items()
         }
@@ -311,7 +322,7 @@ class TestCandidatesAreNotFindings:
         """It states a condition. It says nothing about whether it is bad."""
         assert set(Candidate.model_fields) == {
             "rule_id",
-            "category",
+            "lane",
             "element_ids",
             "facts",
         }

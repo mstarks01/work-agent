@@ -139,5 +139,7 @@ class TestSelection:
 def test_every_detector_names_a_pack_that_exists(pack):
     from pathlib import Path
 
-    skills = Path(__file__).resolve().parents[1] / "skills" / "domains"
-    assert (skills / f"{pack}.md").is_file()
+    # The shared root: a pack describes a technology rather than a framework,
+    # so every carried framework's lanes may earn it (ADR 0011).
+    domains = Path(__file__).resolve().parents[1] / "domains"
+    assert (domains / f"{pack}.md").is_file()
