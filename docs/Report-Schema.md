@@ -69,7 +69,7 @@ copies of one model agreed.
 
 ```python
 class FrameworkAnalysis:
-    framework: str  # "stride" — the name the job selected
+    framework: str  # "asvs" | "stride" — the name the job selected
     framework_version: str  # the ruleset version that produced these claims
     disclaimer: str  # the PACKAGE's: what this framework's claims assert
     claims: list[RuledClaim]  # the actionable findings
@@ -156,6 +156,44 @@ bad composition rather than catch it.
 `StrideAnalysis` adds `missing_mitigations` to the block, and its `summary` adds
 `by_category` and `by_severity` to the neutral three counts.
 
+### ASVS's own record
+
+```python
+class RequirementRuling(RuledClaim):
+    chapter: AsvsChapter  # encoding-and-sanitization | authentication | ...
+```
+
+One field, and nothing else. **ASVS grades nothing**: no severity, no confidence
+and no mitigation, so the package carries no `severity_rubric.md` and the block's
+`summary` adds `by_chapter` alone. A claim's `id` is the standard's own
+version-safe reference — `v5.0.0-1.2.5` — composed by the service from the lane's
+chapter number and the `<section>.<requirement>` key the agent supplied, so the
+chapter in the ID, in the lane and in the record cannot disagree.
+
+`affected_element_ids` is **empty on most ASVS claims**, and that is correct
+rather than a gap: the majority of the standard's requirements address a coding
+practice with no position in the graph, which is why the neutral `Claim` allows
+an empty list where STRIDE narrows it.
+
+**An ASVS claim never reports a pass.** `confirmed` means the requirement applies
+and the input does not show it satisfied; `needs-info` means the input does not
+settle it; `rejected` means the requirement does not apply. Verification needs
+source code, configuration and the people who built the system, and a job here
+carries prose. See
+[ADR 0013](adr/0013-asvs-rules-applicability-and-never-a-pass.md).
+
+`AsvsAnalysis` adds one more field to the block:
+
+```python
+    level: 1 | 2 | 3  # the requirement set this run was ruled against
+```
+
+It arrives from the job's own options, which the report also carries on `job`,
+and it makes the block self-contained: a reader holding one block can tell which
+requirement set produced the answer, and the block's own checks verify that every
+requirement in that set appears exactly once. **A level-filtered run is a fork of
+ASVS rather than ASVS**, and no output of one is a compliance result.
+
 ### `scope` — what a framework considered and raised nothing about
 
 ```python
@@ -171,8 +209,15 @@ looked". A `not-applicable` entry must state a reason, which is the rule
 `Verdict` already applies to its two non-confirmed states. The complement is not
 derived — every unit appears.
 
+**The unit is the framework's own.** The neutral answer is the lane, because a
+lane is the only unit the service knows without reading a catalog it does not
+own. A package that holds one answers in its own units instead: an ASVS block
+lists requirement identifiers, which at level 1 is 70 entries and at level 3 is
+345. Every requirement in the selected level is either a claim in the block or an
+entry here.
+
 A framework whose **Precondition** refuses the system fills this list and nothing
-else. Its block carries no claims and no coverage, and every lane appears here as
+else. Its block carries no claims and no coverage, and every unit appears here as
 `not-applicable` with the reason: either the framework does not apply to a system
 of this shape, or the input never said. The two reasons stay apart because the
 remedy differs. A refusal is not a job failure — a job naming two frameworks, one
