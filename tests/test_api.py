@@ -3,6 +3,7 @@
 import asyncio
 import json
 import logging
+from collections.abc import Sequence
 
 import pytest
 from fastapi.testclient import TestClient
@@ -19,7 +20,7 @@ from stride_service.jobs import (
     PipelineRejected,
     StubPipelineRunner,
 )
-from stride_service.report import Report
+from stride_service.report import FrameworkName, Report
 from stride_service.sources import Source, SourceLimits
 from stride_service.validation import ValidationIssue
 from tests.factories import DEFAULT_FRAMEWORKS, sample_selection
@@ -73,7 +74,7 @@ def make_client(
     store=None,
     limits: SourceLimits = TEST_LIMITS,
     max_active_jobs: int = TEST_MAX_ACTIVE_JOBS,
-    frameworks: tuple[str, ...] = DEFAULT_FRAMEWORKS,
+    frameworks: Sequence[FrameworkName] = DEFAULT_FRAMEWORKS,
 ) -> tuple[TestClient, InMemoryJobStore]:
     store = store if store is not None else InMemoryJobStore()
     app = create_app(

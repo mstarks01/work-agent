@@ -117,7 +117,18 @@ def _block_issues(block: FrameworkAnalysis, known_ids: set[str]) -> list[str]:
     # the field this check reads cannot disagree.
     if package_for(block.framework).carries_severity():
         for claim in claims:
-            severity = claim.severity
+            # The guard above is what puts the field here: a block's claims
+            # validate as its own package's record, and that record declares
+            # `severity` exactly when carries_severity() is true. The read is
+            # dynamic because the annotation is the neutral base, which by
+            # design carries no field a framework judges with.
+            severity = getattr(claim, "severity", None)
+            if severity is None:
+                issues.append(
+                    f"{where}: claim {claim.id!r} carries no severity, but this"
+                    " package's record grades harm"
+                )
+                continue
             derived = derive_severity_level(severity.likelihood, severity.impact)
             if severity.level != derived:
                 issues.append(

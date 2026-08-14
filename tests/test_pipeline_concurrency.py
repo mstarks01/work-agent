@@ -113,9 +113,18 @@ def _build_shared_pipeline() -> graph.Pipeline:
         binding=NodeBinding.from_configs(tiers, sampling, resolve),
         frameworks=DEFAULT_FRAMEWORKS,
     )
+    # Scripted per node rather than per tier: six lanes share one
+    # ``analyze/stride`` tier key, so the resolver above cannot tell them apart
+    # and the reply has to be set on the built node. Both narrowings are real
+    # checks — a workflow with no graph, or an agent bound to a model name
+    # rather than an adapter, means this helper built something other than the
+    # graph it is scripting.
+    assert pipeline.workflow.graph is not None
     for node in pipeline.workflow.graph.nodes:
         if isinstance(node, LlmAgent) and node.name in replies:
-            node.model.reply = replies[node.name]
+            model = node.model
+            assert isinstance(model, ScriptedLlm)
+            model.reply = replies[node.name]
     return pipeline
 
 
