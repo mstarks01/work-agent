@@ -8,6 +8,8 @@ a redirected path is honoured everywhere rather than only on the service side.
 
 from __future__ import annotations
 
+import tomllib
+
 import pytest
 
 from stride_service import graph
@@ -108,14 +110,14 @@ def test_a_path_variable_picks_the_file_and_never_layers_a_second(tmp_path):
 
 
 def test_default_dir_prefers_the_bundled_copy_when_present(tmp_path, monkeypatch):
-    """A wheel install bundles skills/prompts under stride_service/_bundled/."""
+    """A wheel install bundles the text roots under stride_service/_bundled/."""
     from stride_service import deployment as module
 
-    bundled_skills = tmp_path / "skills"
-    bundled_skills.mkdir()
+    bundled_domains = tmp_path / "domains"
+    bundled_domains.mkdir()
     monkeypatch.setattr(module, "_BUNDLED_DIR", tmp_path)
 
-    assert module._default_dir("skills") == bundled_skills
+    assert module._default_dir("domains") == bundled_domains
 
 
 def test_default_dir_falls_back_to_the_repo_copy_when_unbundled(tmp_path, monkeypatch):
@@ -124,7 +126,58 @@ def test_default_dir_falls_back_to_the_repo_copy_when_unbundled(tmp_path, monkey
 
     monkeypatch.setattr(module, "_BUNDLED_DIR", tmp_path / "does-not-exist")
 
-    assert module._default_dir("skills") == module._REPO_ROOT / "skills"
+    assert module._default_dir("domains") == module._REPO_ROOT / "domains"
+
+
+def test_every_bundled_root_the_wheel_force_includes_exists():
+    """The write side of ``_default_dir``, which nothing offline could catch.
+
+    ``force-include`` copies a top-level directory into ``_bundled/``, and
+    hatchling raises ``FileNotFoundError`` on one that is not there — but only
+    when a *wheel* is built. Every test here, and every `uv run` in this repo,
+    uses an editable install, which links back to the checkout and force-includes
+    nothing. So a root renamed on the read side while `pyproject.toml` kept the
+    old name stays green locally and fails in CI at the build step, which is
+    exactly what the frameworks cutover did to `skills/` and `knowledge/`.
+
+    Asserted against the file rather than a copied list: a fifth root added to
+    the wheel is covered by this test existing.
+    """
+    manifest = tomllib.loads(
+        (PROJECT_ROOT / "pyproject.toml").read_text(encoding="utf-8")
+    )
+    included = manifest["tool"]["hatch"]["build"]["targets"]["wheel"]["force-include"]
+
+    missing = [root for root in included if not (PROJECT_ROOT / root).is_dir()]
+
+    assert not missing, (
+        f"pyproject.toml force-includes roots that do not exist: {missing}"
+    )
+
+
+def test_every_bundled_root_is_one_the_service_reads():
+    """The other direction: a root bundled into every wheel and read by nothing
+    is dead weight in the distribution, and the pair of these two tests is what
+    keeps ``force-include`` and ``_default_dir`` describing one layout."""
+    from stride_service import deployment as module
+
+    manifest = tomllib.loads(
+        (PROJECT_ROOT / "pyproject.toml").read_text(encoding="utf-8")
+    )
+    included = {
+        target.removeprefix("stride_service/_bundled/")
+        for target in manifest["tool"]["hatch"]["build"]["targets"]["wheel"][
+            "force-include"
+        ].values()
+    }
+    read = {
+        module.DEFAULT_PROMPTS_DIR.name,
+        module.DEFAULT_DOMAINS_DIR.name,
+        module.DEFAULT_FRAMEWORKS_DIR.name,
+        module.DEFAULT_SAMPLING_PATH.parent.name,
+    }
+
+    assert included == read
 
 
 def test_default_config_path_prefers_the_bundled_copy_when_present(
