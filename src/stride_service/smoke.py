@@ -64,6 +64,7 @@ from typing import Any
 from stride_service.deployment import Deployment
 from stride_service.engine import StrideEngine
 from stride_service.errors import ConfigError
+from stride_service.frameworks import selectable_without_options
 from stride_service.graph import (
     CRITIC_ROLE,
     EXTRACT_NODE,
@@ -244,6 +245,54 @@ def required_nodes(frameworks: Sequence[FrameworkName]) -> tuple[str, ...]:
     return (EXTRACT_NODE, *analyze_nodes(frameworks), *critic_nodes(frameworks))
 
 
+def _smoke_selection(deployment: Deployment) -> tuple[FrameworkName, ...]:
+    """The carried frameworks a smoke run can ask its question of.
+
+    A framework whose options carry a required field is left out, for the reason
+    :func:`~stride_service.frameworks.selectable_without_options` gives: a smoke
+    run has nobody to ask what ASVS level this install should be measured at.
+
+    The cost is stated by :func:`unexercised_frameworks` rather than hidden: a
+    framework left out is three tier keys nothing exercised, and an operator who
+    wants them exercised runs a job.
+    """
+    return selectable_without_options(deployment.frameworks)
+
+
+def unexercised_frameworks(deployment: Deployment) -> tuple[FrameworkName, ...]:
+    """The carried frameworks this smoke run could not select, in carried order."""
+    selected = set(_smoke_selection(deployment))
+    return tuple(name for name in deployment.frameworks if name not in selected)
+
+
+def selected_frameworks(report: Report) -> tuple[FrameworkName, ...]:
+    """The frameworks the job behind this report actually asked for.
+
+    Read from the report rather than from the deployment's carried list, and the
+    two are different questions: the carried list fixes what an install *may*
+    run, and a job names a subset of it. Every check below asks whether this run
+    did what this job asked, so every one of them reads this.
+    """
+    return tuple(selection.name for selection in report.job.frameworks)
+
+
+def _ran_frameworks(report: Report) -> tuple[FrameworkName, ...]:
+    """The selected frameworks whose lanes were allowed to run.
+
+    A framework whose **Precondition** refuses still produces a block, and that
+    block carries no coverage and a ``scope`` saying why nothing ran. Its lanes
+    are then correctly absent from the node record, so a check demanding them
+    would fail the service behaving exactly as designed.
+    """
+    refused = {
+        block.framework
+        for block in report.analyses
+        if any(entry.state == "not-applicable" for entry in block.scope)
+        and not block.coverage
+    }
+    return tuple(name for name in selected_frameworks(report) if name not in refused)
+
+
 def _llm_runs(report: Report, deployment: Deployment) -> list[NodeRun]:
     """Every node execution that went to a model.
 
@@ -327,7 +376,8 @@ def _check_analyst(report: Report, deployment: Deployment) -> Check:
     examined the system and rightly found nothing is not a defect. Claim counts
     are model quality and belong to ``evals/``.
     """
-    expected = analyze_nodes(deployment.frameworks)
+    frameworks = _ran_frameworks(report)
+    expected = analyze_nodes(frameworks)
     ran = {run.node for run in report.nodes}
     missing = [node for node in expected if node not in ran]
     if missing:
@@ -336,7 +386,7 @@ def _check_analyst(report: Report, deployment: Deployment) -> Check:
     return Check(
         ANALYST,
         CheckResult.PASSED,
-        f"all {len(expected)} lanes across {len(deployment.frameworks)} framework(s)"
+        f"all {len(expected)} lanes across {len(frameworks)} framework(s)"
         f" ran; drafts merged: {drafts}",
     )
 
@@ -355,13 +405,12 @@ def _check_critic(report: Report, deployment: Deployment) -> Check:
     of is ``critic_failed``, and that path never produces a report to inspect.
     """
     ran = {run.node for run in report.nodes}
-    missing = [node for node in critic_nodes(deployment.frameworks) if node not in ran]
+    frameworks = _ran_frameworks(report)
+    missing = [node for node in critic_nodes(frameworks) if node not in ran]
     if missing:
         return Check(CRITIC, CheckResult.FAILED, f"critics that did not run: {missing}")
     re_asked = sorted(
-        name
-        for name in deployment.frameworks
-        if FrameworkNodes(name).node(RECRITIC_ROLE) in ran
+        name for name in frameworks if FrameworkNodes(name).node(RECRITIC_ROLE) in ran
     )
     suffix = f" (after a re-ask on: {', '.join(re_asked)})" if re_asked else ""
     rendered = ", ".join(
@@ -477,7 +526,7 @@ def _check_provenance(report: Report, deployment: Deployment) -> Check:
     """
     ran = {run.node for run in report.nodes}
     missing = [
-        node for node in required_nodes(deployment.frameworks) if node not in ran
+        node for node in required_nodes(_ran_frameworks(report)) if node not in ran
     ]
     if missing:
         return Check(
@@ -593,12 +642,7 @@ async def run_smoke(deployment: Deployment | None = None) -> SmokeResult:
     deployment = deployment or Deployment.from_env()
     tiers = _tier_summary(deployment)
     try:
-        # Every carried framework, with no options: this asks whether the
-        # *application* works here, and a framework left out of the selection is
-        # a tier key nothing exercised. A package whose options have required
-        # fields would fail construction here, which is the right place for a
-        # smoke run to learn that it cannot ask its question.
-        engine = StrideEngine.from_deployment(deployment, deployment.frameworks)
+        engine = StrideEngine.from_deployment(deployment, _smoke_selection(deployment))
     except ConfigError as exc:
         # The build-time gates: a missing credential or a param this pair will
         # not take. Both name the variable or the tier and never a value.
@@ -643,11 +687,18 @@ async def run_smoke(deployment: Deployment | None = None) -> SmokeResult:
     return SmokeResult(
         tiers=tiers,
         checks=checks_for(report, deployment),
-        notes=tuple(
-            f"{block.framework}: {block.summary.claim_count} claims over"
-            f" {report.elements_analyzed} elements"
-            " — a count, not a quality judgement"
-            for block in report.analyses
+        notes=(
+            *(
+                f"{block.framework}: {block.summary.claim_count} claims over"
+                f" {report.elements_analyzed} elements"
+                " — a count, not a quality judgement"
+                for block in report.analyses
+            ),
+            *(
+                f"{name}: not exercised — its options carry a required field and a"
+                " smoke run has nobody to ask; its three tier keys stay untested"
+                for name in unexercised_frameworks(deployment)
+            ),
         ),
     )
 

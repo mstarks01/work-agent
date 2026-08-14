@@ -42,7 +42,10 @@ import time
 from collections.abc import Mapping, Sequence
 from typing import Self
 
+from pydantic import ValidationError
+
 from stride_service.deployment import Deployment
+from stride_service.frameworks import package_for
 from stride_service.jobs import (
     JobRecord,
     NodeCallback,
@@ -106,6 +109,17 @@ class StrideEngine:
     ) -> None:
         if not frameworks:
             raise EngineInputError("an engine must be built for at least one framework")
+        # The same rung the HTTP route applies, applied to every other caller.
+        # A package's options model declares no default, so a selection missing a
+        # value it needs is refused here rather than reaching a block that cannot
+        # be built — which would fail after every node had been paid for.
+        for selection in frameworks:
+            try:
+                package_for(selection.name).options.model_validate(selection.options)
+            except ValidationError as exc:
+                raise EngineInputError(
+                    f"options for framework {selection.name!r} are invalid: {exc}"
+                ) from exc
         self._runner = runner
         self._limits = limits
         self._deadline_seconds = deadline_seconds

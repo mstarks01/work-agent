@@ -34,6 +34,7 @@ from google.adk.sessions import BaseSessionService
 from stride_service.certification import CertificationGate, CertifyResult
 from stride_service.execution import GraphExecutor
 from stride_service.graph import (
+    STATE_FRAMEWORK_OPTIONS,
     GraphProducedNothing,
     Pipeline,
     Rejected,
@@ -122,7 +123,20 @@ class AdkPipelineRunner:
         self, job: JobRecord, on_node: NodeCallback, input_ref: InputRef
     ) -> PipelineOutcome:
         graph_run = await self._executor.run(
-            job.sources, user_id=job.owner_subject, on_node=on_node
+            job.sources,
+            user_id=job.owner_subject,
+            # The options ride into the run rather than into the graph. A runner
+            # holds one built graph per selection and two jobs may select the
+            # same frameworks with different options, so what varies per job is
+            # seeded per job. Its readers are the lane agents, which are told
+            # what was asked for, and the block, which records it.
+            extra_state={
+                STATE_FRAMEWORK_OPTIONS: {
+                    selection.name: dict(selection.options)
+                    for selection in job.frameworks
+                }
+            },
+            on_node=on_node,
         )
         try:
             result = result_of(graph_run.final_state)

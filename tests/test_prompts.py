@@ -42,8 +42,10 @@ def prompts_root(tmp_path):
 
 @pytest.fixture
 def package_root(tmp_path):
-    """One package's root, carrying its own lanes' exemplars."""
+    """One package's root: its output contract, and its own lanes' exemplars."""
     root = tmp_path / "stride"
+    root.mkdir(parents=True)
+    (root / "output.md").write_text("# Output Contract\n\nFields.\n")
     for lane in STRIDE_CATEGORIES:
         lane_dir = root / "lanes" / lane
         lane_dir.mkdir(parents=True)
@@ -89,9 +91,18 @@ class TestSharedLoader:
 
 
 class TestComposeAnalyzePrompt:
-    def test_body_precedes_the_lanes_exemplars(self, loader, package_loader):
+    def test_body_precedes_the_contract_which_precedes_the_exemplars(
+        self, loader, package_loader
+    ):
+        """Stable-first: shared body, then the package's, then the lane's.
+
+        The order is the cacheable prefix, so it is a property rather than a
+        preference — a lane's own text ahead of the contract every lane of that
+        framework shares would cut the prefix at the first lane boundary.
+        """
         composed = compose_analyze_prompt(loader, package_loader, "tampering")
-        assert composed.index("## Role") < composed.index("Exemplars.")
+        assert composed.index("## Role") < composed.index("Fields.")
+        assert composed.index("Fields.") < composed.index("Exemplars.")
 
     def test_only_the_requested_lane_is_included(self, loader, package_loader):
         composed = compose_analyze_prompt(loader, package_loader, "tampering")

@@ -49,6 +49,7 @@ from stride_service.report import (
 from stride_service.system_model import SystemModel
 
 __all__ = [
+    "OUTPUT_DOC",
     "PACKAGES",
     "PRECONDITION_RESULTS",
     "SCHEMAS",
@@ -61,6 +62,7 @@ __all__ = [
     "package_for",
     "run_precondition",
     "schemas_for",
+    "selectable_without_options",
     "validate_package",
 ]
 
@@ -99,10 +101,17 @@ LANE_SECTION_HEADINGS: tuple[str, ...] = (
 #: fewer members to get wrong.
 #:
 #: Per lane: ``lanes/<lane>/skill.md`` and ``lanes/<lane>/exemplars.md``.
-#: Per package: ``critic.md``, ``disclaimer.md``, and ``severity_rubric.md``
-#: exactly when the record carries a ``severity`` field.
+#: Per package: ``critic.md``, ``disclaimer.md``, ``output.md``, and
+#: ``severity_rubric.md`` exactly when the record carries a ``severity`` field.
+#:
+#: ``output.md`` is what makes the shared ``analyze.md`` genuinely neutral. That
+#: prompt says what to do with a job's input, which every framework's lane agent
+#: does alike; what one *claim* is and which fields carry it are the package's,
+#: and a second framework whose record grades nothing cannot read a field list
+#: naming ``severity``. So the field list travels with the record it describes.
 CRITIC_DOC = "critic"
 DISCLAIMER_DOC = "disclaimer"
+OUTPUT_DOC = "output"
 SEVERITY_RUBRIC_DOC = "severity_rubric"
 
 
@@ -328,6 +337,32 @@ class FrameworkSchemas:
     key_field: str
 
 
+def _asvs_package() -> FrameworkPackage:
+    # Imported inside the function for the reason the STRIDE one is: this module
+    # is the contract, and the packages that implement it pull in rules, records
+    # and — for ASVS — a 345-requirement catalog.
+    from stride_service.frameworks.asvs import ASVS
+
+    return ASVS
+
+
+def _asvs_schemas() -> FrameworkSchemas:
+    from stride_service.frameworks.asvs.record import (
+        AsvsAnalysis,
+        RequirementProposals,
+        RequirementRuling,
+        RequirementRulings,
+    )
+
+    return FrameworkSchemas(
+        proposals=RequirementProposals,
+        rulings=RequirementRulings,
+        ruled_record=RequirementRuling,
+        block=AsvsAnalysis,
+        key_field="requirement",
+    )
+
+
 def _stride_package() -> FrameworkPackage:
     # Imported inside the function so this module can be imported for the
     # contract alone -- the STRIDE package pulls in its rules, which pull in the
@@ -357,14 +392,14 @@ def _stride_schemas() -> FrameworkSchemas:
 #: What this repo carries, keyed by the name it is spelled with. A table, and a
 #: table alone: registering a package is an import and an entry here.
 PACKAGES: Mapping[FrameworkName, FrameworkPackage] = MappingProxyType(
-    {"stride": _stride_package()}
+    {"asvs": _asvs_package(), "stride": _stride_package()}
 )
 
 #: The model-facing shapes, keyed the same way and filled in the same edit. See
 #: :class:`FrameworkSchemas` for why these sit beside the package rather than on
 #: it.
 SCHEMAS: Mapping[FrameworkName, FrameworkSchemas] = MappingProxyType(
-    {"stride": _stride_schemas()}
+    {"asvs": _asvs_schemas(), "stride": _stride_schemas()}
 )
 
 
@@ -403,6 +438,32 @@ def package_for(name: FrameworkName) -> FrameworkPackage:
     refused by :func:`validate_package` before anything binds.
     """
     return PACKAGES[name]
+
+
+def selectable_without_options(
+    names: Sequence[FrameworkName],
+) -> tuple[FrameworkName, ...]:
+    """Those of ``names`` a caller with nobody to ask can select, in order.
+
+    **A package whose options carry a required field is left out.** No package
+    field carries a default, so there is no value to fall back on and no honest
+    way to invent one: an ASVS level is a choice an organization makes, and a
+    caller that supplied one on the operator's behalf would put a decision in the
+    report that nobody made.
+
+    Two callers ask exactly this, and both are unattended by construction: the
+    **Provider Smoke** run, which asks whether the application works here, and
+    the first-run app, which offers "run what this install is configured for"
+    and has no selection UI. Each states what it left out rather than hiding it.
+    """
+    return tuple(
+        name
+        for name in names
+        if not any(
+            field.is_required()
+            for field in PACKAGES[name].options.model_fields.values()
+        )
+    )
 
 
 def run_precondition(
@@ -665,7 +726,7 @@ def _disk_issues(package: FrameworkPackage, root: Path) -> list[str]:
             elif doc == "skill":
                 issues += _heading_issues(lane, path)
 
-    for doc in (CRITIC_DOC, DISCLAIMER_DOC):
+    for doc in (CRITIC_DOC, DISCLAIMER_DOC, OUTPUT_DOC):
         path = root / f"{doc}.md"
         expected.add(path)
         if not path.is_file():

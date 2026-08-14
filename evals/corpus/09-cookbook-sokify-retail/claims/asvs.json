@@ -1,0 +1,84 @@
+[
+  {
+    "chapter": "secure-communication",
+    "requirement": "V12.2.1",
+    "affected_element_ids": [
+      "process:mobile-app",
+      "process:web-api",
+      "flow:mobile-app-to-web-api:api-traffic"
+    ],
+    "claim": "The mobile app reaches the web API over HTTP rather than HTTPS.",
+    "tier": "must-find",
+    "notes": "encryption_in_transit is stated absent, so the ruling is plain rather than conditional."
+  },
+  {
+    "chapter": "data-protection",
+    "requirement": "V14.2.1",
+    "affected_element_ids": [
+      "store:user-database",
+      "process:web-api",
+      "flow:web-api-to-user-database:customer-records"
+    ],
+    "claim": "Customer names, addresses and card details are held with no stated protection.",
+    "tier": "must-find",
+    "notes": "The classification is stated and nothing that follows from it is."
+  },
+  {
+    "chapter": "encoding-and-sanitization",
+    "requirement": "V1.2.4",
+    "affected_element_ids": [
+      "process:catalogue-spreadsheet",
+      "process:web-api",
+      "flow:catalogue-spreadsheet-to-web-api:sql-statements"
+    ],
+    "claim": "A macro-bearing spreadsheet sends SQL statements to the web API over an unstated transport.",
+    "tier": "must-find",
+    "notes": "The strongest injection trigger in the corpus: raw SQL from a client the model names."
+  },
+  {
+    "chapter": "secure-coding-and-architecture",
+    "requirement": "V15.3.1",
+    "affected_element_ids": [
+      "process:sims",
+      "store:delivery-address-flat-file",
+      "flow:sims-to-delivery-address-flat-file:address-write"
+    ],
+    "claim": "Nothing states what subset of a customer record reaches the delivery address file.",
+    "tier": "must-find",
+    "notes": "A flat file holding addresses only, written from a store holding more."
+  },
+  {
+    "chapter": "authentication",
+    "requirement": "V6.1.1",
+    "affected_element_ids": [
+      "entity:customer",
+      "process:mobile-app",
+      "flow:customer-to-mobile-app:browse-and-order"
+    ],
+    "claim": "Nothing states how a customer is authenticated to the mobile app.",
+    "tier": "must-find",
+    "notes": "authentication is unknown on the one human-facing flow."
+  },
+  {
+    "chapter": "authorization",
+    "requirement": "V8.2.2",
+    "affected_element_ids": [
+      "process:web-api",
+      "store:user-database"
+    ],
+    "claim": "Nothing restricts what the web API may read from the customer record store.",
+    "tier": "expected",
+    "notes": "The store holds payment card data and the flow's authentication is unknown."
+  },
+  {
+    "chapter": "web-frontend-security",
+    "requirement": "V3.5.3",
+    "affected_element_ids": [
+      "process:web-api",
+      "flow:mobile-app-to-web-api:api-traffic"
+    ],
+    "claim": "Nothing states which HTTP methods the web API accepts for order submission.",
+    "tier": "expected",
+    "notes": "An HTTP surface is stated; the method policy is not."
+  }
+]

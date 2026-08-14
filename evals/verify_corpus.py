@@ -30,6 +30,7 @@ from typing import Any, get_args
 sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "src"))
 
 from stride_service.frameworks import PACKAGES, run_precondition
+from stride_service.frameworks.asvs.catalog import ASVS_LEVELS, requirements_for
 from stride_service.frameworks.stride.record import STRIDE_CATEGORIES
 from stride_service.grounding import verify_quote
 from stride_service.report import (
@@ -92,13 +93,16 @@ def claims_file(case_dir: Path, framework: FrameworkName) -> Path:
     return case_dir / CLAIMS_DIR / f"{framework}.json"
 
 
-def _stride_record_issues(where: str, record: dict) -> Iterator[str]:
+def _stride_record_issues(
+    where: str, record: dict, options: Mapping[str, Any]
+) -> Iterator[str]:
     """What STRIDE's reference record carries beyond the neutral fields.
 
     A category, a graded severity, and at least one element: STRIDE-per-element
     is what the framework *means*, so a reference threat naming nothing in the
     graph is unscoreable rather than a legal record.
     """
+    del options  # STRIDE declares none
     if record["category"] not in STRIDE_CATEGORIES:
         yield f"{where} category {record['category']!r} is not a STRIDE category"
 
@@ -114,14 +118,65 @@ def _stride_record_issues(where: str, record: dict) -> Iterator[str]:
             yield f"{where} severity {field} {rating!r} is not a legal rating"
 
 
+def _asvs_record_issues(
+    where: str, record: dict, options: Mapping[str, Any]
+) -> Iterator[str]:
+    """What ASVS's reference record carries beyond the neutral fields.
+
+    A chapter this package declares, and a requirement the published catalog
+    holds in that chapter **at the level this case declares**. All three are
+    checked against the catalog rather than against a pattern: a reference record
+    naming a requirement outside the case's own level grades a run against a
+    ruling no lane was asked to make.
+
+    No severity and no element check. This package grades nothing, and most of
+    its requirements address a coding practice with no position in the graph.
+    """
+    chapter = record["chapter"]
+    if chapter not in PACKAGES["asvs"].lanes:
+        yield f"{where} chapter {chapter!r} is not an ASVS chapter"
+        return
+    level = options.get("level")
+    if level not in ASVS_LEVELS:
+        yield f"{where} sits in a case whose asvs options declare no legal level"
+        return
+    known = {req.id for req in requirements_for(level, chapter)}
+    if record["requirement"] not in known:
+        yield (
+            f"{where} requirement {record['requirement']!r} is not in the"
+            f" {chapter} chapter of ASVS {PACKAGES['asvs'].version} at level"
+            f" {level}"
+        )
+
+
+#: Whether every lane a package declares must appear in *every* case's reference
+#: set. True where a package's lanes are unconditional — all six STRIDE
+#: categories apply to any system that can be drawn as a graph, so a case
+#: grading five of them is a case quietly missing one.
+#:
+#: False for ASVS, and that is the standard's own position rather than a
+#: concession: it tells an operator to filter out the chapters that do not apply,
+#: naming OAuth and WebRTC by name. A corpus case with no OAuth has no OAuth
+#: requirement to expect, and demanding a record there would make the merge bar
+#: reward a fabricated expectation. What still holds for every package is
+#: :func:`lane_coverage_issues` — every lane must be measured *somewhere*.
+LANES_REQUIRED_PER_CASE: Mapping[FrameworkName, bool] = {
+    "asvs": False,
+    "stride": True,
+}
+
 #: The extra fields each framework's reference record carries, and the checks
 #: over them. Harness data keyed off the closed ``FrameworkName``, beside
 #: :data:`evals.harness.reference.REFERENCE_TYPES` and for the same reason: what
 #: a reference set looks like is the eval's business, not a package member.
 RECORD_FIELDS: Mapping[FrameworkName, frozenset[str]] = {
+    "asvs": CLAIM_FIELDS | {"chapter", "requirement"},
     "stride": CLAIM_FIELDS | {"category", "severity"},
 }
-RECORD_CHECKS: Mapping[FrameworkName, Callable[[str, dict], Iterator[str]]] = {
+RECORD_CHECKS: Mapping[
+    FrameworkName, Callable[[str, dict, Mapping[str, Any]], Iterator[str]]
+] = {
+    "asvs": _asvs_record_issues,
     "stride": _stride_record_issues,
 }
 #: Which lane a reference record belongs to, or ``None`` for a framework whose
@@ -129,6 +184,7 @@ RECORD_CHECKS: Mapping[FrameworkName, Callable[[str, dict], Iterator[str]]] = {
 #: check that an unmeasured lane — one ``strong`` call per lane, which is the
 #: granularity that spends money — cannot reach a deployment.
 RECORD_LANE: Mapping[FrameworkName, Callable[[dict], object]] = {
+    "asvs": lambda record: record.get("chapter"),
     "stride": lambda record: record.get("category"),
 }
 
@@ -346,7 +402,10 @@ def _check_declared_frameworks(meta: dict) -> Iterator[str]:
 
 
 def _check_claims(
-    framework: FrameworkName, records: object, element_ids: set[str]
+    framework: FrameworkName,
+    records: object,
+    element_ids: set[str],
+    options: Mapping[str, Any],
 ) -> Iterator[str]:
     """One framework's reference file, on the neutral rules plus its own.
 
@@ -391,16 +450,21 @@ def _check_claims(
         if claim.count(".") != 1:
             yield f"{where} claim is not one sentence: {claim!r}"
 
-        yield from RECORD_CHECKS[framework](where, record)
+        yield from RECORD_CHECKS[framework](where, record, options)
 
     # Every lane represented in every case, which is stricter than the merge bar
-    # below and is what this corpus has always held. The bar asks that a lane be
-    # measured *somewhere*; this asks that no case quietly grades five of six.
+    # below and is what this corpus has always held for STRIDE. The bar asks that
+    # a lane be measured *somewhere*; this asks that no case quietly grades five
+    # of six. :data:`LANES_REQUIRED_PER_CASE` says why ASVS is exempt.
     lane_of = RECORD_LANE[framework]
     seen_lanes = {lane_of(record) for record in records if isinstance(record, dict)}
-    for lane in PACKAGES[framework].lanes:
-        if lane not in seen_lanes:
-            yield f"{where_file} carries no reference record in the {lane} lane"
+    stray = sorted(str(lane) for lane in seen_lanes - set(PACKAGES[framework].lanes))
+    if stray:
+        yield f"{where_file} names lanes {framework} does not declare: {stray}"
+    if LANES_REQUIRED_PER_CASE[framework]:
+        for lane in PACKAGES[framework].lanes:
+            if lane not in seen_lanes:
+                yield f"{where_file} carries no reference record in the {lane} lane"
 
     if not any(record.get("tier") == "must-find" for record in records):
         yield (
@@ -421,6 +485,23 @@ def declared_names(meta: dict) -> list[str]:
     ]
 
 
+def declared_options(meta: dict) -> dict[str, Mapping[str, Any]]:
+    """Each framework ``case.json`` declares, against the options it declares it with.
+
+    The options are what a job would submit, so a reference set is checked
+    against them: an ASVS level decides which requirements a run rules on, and a
+    record outside it is unmeetable.
+    """
+    declared = meta.get("frameworks")
+    if not isinstance(declared, list):
+        return {}
+    return {
+        entry["name"]: entry.get("options") or {}
+        for entry in declared
+        if isinstance(entry, dict) and isinstance(entry.get("name"), str)
+    }
+
+
 def framework_issues(case_dir: Path, meta: dict, model: SystemModel) -> Iterator[str]:
     """The per-case half of the merge bar: two of #167's three checks.
 
@@ -434,22 +515,30 @@ def framework_issues(case_dir: Path, meta: dict, model: SystemModel) -> Iterator
     the second is an unmeasured framework — and only the declaration can tell
     them apart, which is why the declaration is checked against the predicate
     rather than trusted.
+
+    **Only ``satisfied`` earns a reference set.** The run-time gate runs a
+    framework's lanes on that answer alone, so a case whose model leaves the
+    question open produces no claims to grade — and an expectation nothing can
+    meet is worse than no expectation. ``refuted`` and ``undecidable`` are still
+    kept apart everywhere their remedy differs; here their consequence is the
+    same and the check treats them alike.
     """
     declared = set(declared_names(meta))
     for name, package in PACKAGES.items():
         result = run_precondition(package, model)
-        if result == "refuted":
+        if result != "satisfied":
             if name in declared:
                 yield (
-                    f"case.json declares {name!r}, but its precondition refutes"
-                    " this case; a refused framework carries no reference set"
+                    f"case.json declares {name!r}, but its precondition answers"
+                    f" {result} for this case; only a satisfied framework runs its"
+                    " lanes, so only one carries a reference set"
                 )
             continue
         if name not in declared:
             yield (
                 f"case.json does not declare {name!r}, whose precondition"
-                f" {result} this case; every framework a case does not refuse"
-                " must carry a reference set"
+                " satisfies this case; every framework a case runs must carry a"
+                " reference set"
             )
             continue
         if not claims_file(case_dir, name).is_file():
@@ -511,11 +600,13 @@ def check_case(case_dir: Path) -> list[str]:
     # has no record shape to check against, and :func:`framework_issues` has
     # already reported it.
     element_ids = {element.id for element in model.elements()}
-    declared = set(declared_names(meta))
+    options = declared_options(meta)
     for name in PACKAGES:
         path = claims_file(case_dir, name)
-        if name in declared and path.is_file():
-            problems.extend(_check_claims(name, _load_json(path), element_ids))
+        if name in options and path.is_file():
+            problems.extend(
+                _check_claims(name, _load_json(path), element_ids, options[name])
+            )
     return problems
 
 

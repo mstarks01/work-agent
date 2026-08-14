@@ -117,10 +117,21 @@ the two neutral ones:
 [nodes]
 extract = "base"
 repair = "base"
+"analyze/asvs" = "strong"
+"critic/asvs" = "strong"
+"recritic/asvs" = "strong"
 "analyze/stride" = "strong"
 "critic/stride" = "strong"
 "recritic/stride" = "strong"
 ```
+
+**Every framework this build can spell needs its three keys, whatever this
+install carries.** The node list derives from the closed framework vocabulary
+rather than from `frameworks.toml`, so a deployment running STRIDE alone still
+names ASVS's three. A file that omits them fails the loader's completeness check,
+and the message names the three missing keys — that message is the fix. Adding a
+framework does not move `model_tiers.toml`'s version, because adding a node key
+is a data edit under the same schema.
 
 One knob per framework rather than one per lane. Every lane of one framework
 runs the same judgement on the same tier, so six `analyze/<category>` keys that
@@ -129,6 +140,11 @@ cheaper than another is the choice that has a purpose. The loader **checks that
 a framework's `recritic` key resolves to the same tier as its `critic`** — a
 re-ask on a cheaper model than the pass it corrects is the failure a comment
 used to warn about, and at 2N keys a comment drifts.
+
+**What the extra keys cost.** ASVS runs one lane per chapter of its standard, so
+an ASVS job makes 17 `strong`-tier lane calls against STRIDE's 6, and a job
+naming both makes 23. That is the knob these keys exist for: an operator who
+wants ASVS cheaper than STRIDE points `analyze/asvs` at `base`.
 
 `config/frameworks.toml` names which packages this install runs. Three sets have
 to agree: what the code can spell, what this build carries, and what this
@@ -525,9 +541,12 @@ inheriting a default for a contract its callers can see.
 | `STRIDE_FRAMEWORKS_FILE` | `config/frameworks.toml` |
 
 **Three text roots, not four.** `frameworks/<name>/` holds one framework
-package's text — its lanes' skills and exemplars, its critic, its disclaimer,
-its severity rubric where its record grades harm, and the reference notes and
-worked cases its own rules retrieve. `domains/` holds the shared domain packs,
+package's text — its lanes' skills and exemplars, its critic, its disclaimer, its
+output contract, its severity rubric where its record grades harm, and the
+reference notes and worked cases its own rules retrieve. The output contract says
+what one claim is and which fields carry it, which is why it is the package's and
+not the shared `analyze.md`'s: a record that grades nothing cannot read a field
+list naming `severity`. `domains/` holds the shared domain packs,
 which stay the service's because their retrieval key reads the neutral system
 model rather than any package's rules. `STRIDE_KNOWLEDGE_DIR` is **gone**: the
 corpus it pointed at moved into the package whose rules select it. See
