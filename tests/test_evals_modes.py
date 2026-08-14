@@ -16,6 +16,7 @@ from pathlib import Path
 
 import pytest
 from google.adk.models.base_llm import BaseLlm
+from pydantic import Field
 
 from evals.harness import modes
 from evals.harness.reference import load_case
@@ -77,7 +78,7 @@ def scripted_proposal(case, category) -> dict:
     fan-in's ladder, and these tests are about the modes rather than about
     grounding.
     """
-    reference = next(ref for ref in case.references if ref.category == category)
+    reference = next(ref for ref in case.claims_for("stride") if ref.category == category)
     return {
         "sequence": 1,
         "title": reference.claim,
@@ -106,13 +107,53 @@ def scripted_ruling(category) -> dict:
     }
 
 
+class LaneAwareLlm(ScriptedLlm):
+    """One adapter serving every lane, replying by the lane it was asked about.
+
+    All six STRIDE lanes run on one ``analyze/stride`` tier key since
+    ``model_tiers.toml`` v5, so a tier node no longer identifies a lane and a
+    resolver keyed on one cannot script six different emissions. The lane is
+    recoverable from the instruction the lane agent was actually built with,
+    which is the only place it still distinguishes itself.
+    """
+
+    replies: dict[str, str] = Field(default_factory=dict)
+
+    async def generate_content_async(self, llm_request, stream: bool = False):
+        instruction = llm_request.config.system_instruction or ""
+        default = self.reply
+        self.reply = self._reply_for_instruction(instruction, default)
+        try:
+            async for response in super().generate_content_async(llm_request, stream):
+                yield response
+        finally:
+            self.reply = default
+
+    def _reply_for_instruction(self, instruction: str, default: str) -> str:
+        """The lane whose skill text this instruction opens with.
+
+        Matched on the skill's own ``# <Lane>`` H1 rather than on the lane name
+        anywhere in the text: every lane skill names all six categories in its
+        boundaries section, so a bare substring test binds whichever lane is
+        mentioned first and silently scripts the wrong emission.
+        """
+        for lane, reply in self.replies.items():
+            heading = f"# {lane.replace('-', ' ').title()}"
+            if heading.lower() in instruction.lower():
+                return reply
+        return default
+
+
 def build(case, entry, models: dict[str, ScriptedLlm]) -> object:
     def resolve(tier_node: str) -> BaseLlm:
         graph_node = next(
             node for node, tier in TIER_NODE_BY_GRAPH_NODE.items() if tier == tier_node
         )
-        models[graph_node] = ScriptedLlm(
-            model="fake-pro-001", reply=_reply_for(case, graph_node), seen=[]
+        models[graph_node] = LaneAwareLlm(
+            model="fake-pro-001",
+            reply=_reply_for(case, graph_node),
+            seen=[],
+            replies=_lane_replies(case, graph_node),
         )
         return models[graph_node]
 
@@ -123,17 +164,29 @@ def build(case, entry, models: dict[str, ScriptedLlm]) -> object:
     )
 
 
+def _lane_replies(case, graph_node: str) -> dict[str, str]:
+    """Per-lane emissions, for the one adapter every lane agent shares."""
+    if graph_node not in {
+        analyze_node_name("stride", category) for category in STRIDE_CATEGORIES
+    }:
+        return {}
+    return {
+        category: json.dumps({"claims": [scripted_proposal(case, category)]})
+        for category in STRIDE_CATEGORIES
+    }
+
+
 def _reply_for(case, graph_node: str) -> str:
     if graph_node == "extract":
         return json.dumps(case.model.model_dump(mode="json"))
-    if graph_node == "critic":
+    if graph_node == "critic_stride":
         return json.dumps(
-            {"threats": [scripted_ruling(category) for category in STRIDE_CATEGORIES]}
+            {"claims": [scripted_ruling(category) for category in STRIDE_CATEGORIES]}
         )
     for category in STRIDE_CATEGORIES:
-        if graph_node == analyze_node_name(category):
-            return json.dumps({"threats": [scripted_proposal(case, category)]})
-    return '{"threats": []}'
+        if graph_node == analyze_node_name("stride", category):
+            return json.dumps({"claims": [scripted_proposal(case, category)]})
+    return '{"claims": []}'
 
 
 def test_analysis_mode_injects_the_blessed_model_at_prepare(case):
@@ -146,7 +199,7 @@ def test_analysis_mode_injects_the_blessed_model_at_prepare(case):
     # whole point of the mode.
     assert "extract" not in models
     assert report.system_model == case.model
-    spoofing = models[analyze_node_name("spoofing")].seen[0]
+    spoofing = models[analyze_node_name("stride", "spoofing")].seen[0]
     assert "flow:shopper-to-storefront-api:place-order" in spoofing
 
 
@@ -156,7 +209,7 @@ def test_analysis_mode_output_passes_the_tier_1_gates(case):
     report = asyncio.run(modes.run_analysis(case, pipeline)).report
 
     assert report_issues(report) == []
-    assert len(report.threats) == len(STRIDE_CATEGORIES)
+    assert len(report.analyses[0].claims) == len(STRIDE_CATEGORIES)
 
 
 def test_an_eval_report_carries_every_field_production_stamps(case):
@@ -181,20 +234,17 @@ def test_an_eval_report_carries_every_field_production_stamps(case):
         AnalysisMarks.model_fields
     )
     shared = analysis_fields & Report.model_fields.keys()
+    # Only what the envelope itself carries. The eight per-framework fields
+    # moved onto the block at schema 3.0, so a field this set still named would
+    # be one the envelope no longer has.
     assert shared == {
         "system_model",
         "boundary_crossings",
-        "threats",
-        "rejected_threats",
-        "unverified_grounds",
-        "unresolved_mentions",
-        "unresolved_evidence",
-        "missing_mitigations",
+        "analyses",
         "shared_element_names",
-        "coverage",
-        "summary",
     }
-    assert len(run.report.coverage) == len(STRIDE_CATEGORIES)
+    block = run.report.analyses[0]
+    assert len(block.coverage) == len(STRIDE_CATEGORIES)
     assert run.report.shared_element_names == [
         SharedElementName(name_slug=slug, element_ids=ids)
         for slug, ids in run.report.system_model.shared_names().items()
@@ -209,9 +259,10 @@ def test_analysis_mode_scores_against_the_reference_set(case):
     report = asyncio.run(modes.run_analysis(case, pipeline)).report
     # The scripted threats are titled with reference claims verbatim, so a
     # judge that matches identical strings is the honest stand-in here.
-    judge = ScriptedJudge((threat.title, threat.title) for threat in report.threats)
+    claims = report.analyses[0].claims
+    judge = ScriptedJudge((claim.title, claim.title) for claim in claims)
 
-    score = score_case(case, report.threats, judge)
+    score = score_case(case, claims, judge)
 
     assert len(score.matched) == len(STRIDE_CATEGORIES)
     assert score.element_accuracy == 1.0
@@ -227,7 +278,7 @@ def test_analysis_mode_surfaces_the_pre_critic_drafts(case):
 
     assert len(run.merged_drafts) == len(STRIDE_CATEGORIES)
     assert {draft.id for draft in run.merged_drafts} == {
-        threat.id for threat in run.report.threats
+        claim.id for claim in run.report.analyses[0].claims
     }
     # Drafts, not threats: the critic's two rulings are absent by construction.
     assert not any(hasattr(draft, "verdict") for draft in run.merged_drafts)
@@ -303,7 +354,7 @@ def test_an_eval_report_stamps_the_nodes_that_actually_ran(case):
 
     stamped = {node_run.node for node_run in report.nodes}
     assert EXTRACT_NODE in stamped
-    assert "critic" in stamped
+    assert "critic_stride" in stamped
     assert stamped <= {node.name for node in pipeline.workflow.graph.nodes}
     # The placeholder this replaced.
     assert "eval" not in stamped
@@ -343,9 +394,12 @@ def test_an_eval_report_records_the_same_analysis_context_a_job_does(case):
 
     report = asyncio.run(modes.run_end_to_end(case, pipeline)).report
     context = report.analysis_context
+    fired_rules = report.analyses[0].fired_rules
 
     assert context.instruction_sha256 == pipeline.instruction_sha256
-    assert context.fired_rules == sorted(set(context.fired_rules))
+    # fired_rules names this package's own Candidate rules, so it sits on the
+    # block rather than on the envelope's shared context.
+    assert fired_rules == sorted(set(fired_rules))
 
 
 def test_extraction_mode_observes_its_one_node(case):
