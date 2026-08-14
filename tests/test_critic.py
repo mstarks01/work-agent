@@ -186,6 +186,33 @@ class TestGroundReferences:
         with pytest.raises(DraftJoinError, match="does not have"):
             join_drafts(drafts, STRIDE, model, SOURCES)
 
+    def test_an_absent_attribute_on_an_element_that_does_not_exist(self, model):
+        """The absent branch resolves through the same check as the unknown one
+        — it names the same two fields — and says which branch failed."""
+        drafts = self.grounded(
+            Ground(
+                kind="absent-attribute",
+                element_id="store:ghost",
+                attribute="encryption_at_rest",
+            )
+        )
+        with pytest.raises(DraftJoinError, match="an absent attribute"):
+            join_drafts(drafts, STRIDE, model, SOURCES)
+
+    def test_an_absent_attribute_is_never_checked_against_its_value(self, model):
+        """Set membership only, matched to the depth ``related_unknowns`` is
+        checked at: requiring the attribute to actually read ``none`` would
+        encode a judgement as a mechanical rule, and the catalog is what
+        decided the branch in the first place."""
+        drafts = self.grounded(
+            Ground(
+                kind="absent-attribute",
+                element_id="process:web-app",
+                attribute="exposure",
+            )
+        )
+        assert join_drafts(drafts, STRIDE, model, SOURCES).drafts
+
     def test_a_derived_fact_naming_a_flow_that_does_not_cross(self, model):
         drafts = self.grounded(
             Ground(kind="derived-fact", flow_id="flow:not-a:crossing")
@@ -765,6 +792,15 @@ class TestSnapDrafts:
             (
                 Ground(
                     kind="unknown-attribute",
+                    element_id="Process:Web-App",
+                    attribute="exposure",
+                ),
+                "element_id",
+                "process:web-app",
+            ),
+            (
+                Ground(
+                    kind="absent-attribute",
                     element_id="Process:Web-App",
                     attribute="exposure",
                 ),

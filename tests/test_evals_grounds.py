@@ -49,6 +49,12 @@ def unknown(attribute: str = "authentication") -> Ground:
     )
 
 
+def absent(attribute: str = "encryption_in_transit") -> Ground:
+    return Ground(
+        kind="absent-attribute", element_id="entity:shopper", attribute=attribute
+    )
+
+
 def derived(flow_id: str = "flow:a-to-b:login") -> Ground:
     return Ground(kind="derived-fact", flow_id=flow_id)
 
@@ -72,16 +78,17 @@ class TestMeasureGrounds:
     def test_counts_grounds_per_threat_and_the_branch_mix(self):
         measurement = measure_grounds(
             "case-a",
-            [grounded(1, quote(), unknown()), grounded(2, derived())],
+            [grounded(1, quote(), unknown()), grounded(2, absent(), derived())],
             [],
         )
 
         assert measurement.threat_count == 2
-        assert measurement.ground_count == 3
-        assert measurement.grounds_per_threat == 1.5
+        assert measurement.ground_count == 4
+        assert measurement.grounds_per_threat == 2.0
         assert measurement.kind_counts == {
             "quote": 1,
             "unknown-attribute": 1,
+            "absent-attribute": 1,
             "derived-fact": 1,
         }
 

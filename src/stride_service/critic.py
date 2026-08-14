@@ -181,6 +181,13 @@ def _unresolved_mentions(
     ]
 
 
+# The two branches whose reference is an element and an attribute of it. They
+# differ in what they say about that attribute — never stated against stated
+# absent — and in nothing this module does: both snap the same field and both
+# resolve against the same model, so every check here reads the pair.
+_ATTRIBUTE_KINDS = frozenset({"unknown-attribute", "absent-attribute"})
+
+
 def _snapped_ground(
     ground: Ground, element_ids: Collection[str], labels: Collection[str]
 ) -> Ground:
@@ -193,7 +200,7 @@ def _snapped_ground(
         return ground.model_copy(
             update={"source_label": snap(ground.source_label, labels)}
         )
-    if ground.kind == "unknown-attribute":
+    if ground.kind in _ATTRIBUTE_KINDS:
         return ground.model_copy(
             update={"element_id": snap(ground.element_id, element_ids)}
         )
@@ -441,14 +448,14 @@ def _ground_reference_issues(
     """Every grounds entry whose reference does not resolve.
 
     Set membership, one branch at a time: a quote's ``source_label`` against
-    the job's labels, an unknown-attribute's ``element_id`` and ``attribute``
-    against the model, a derived-fact's ``flow_id`` against the crossings
-    derived from that same model. The gate's own stated principle is what puts
-    it here — *set membership is mechanical, so it belongs in code rather than
-    in a prompt* — and it inherits that rule's escape: where a job supplies no
-    labels, the label half does not run, so a hand-authored model driven
-    through the in-process engine is not failed on a citation that is not
-    wrong.
+    the job's labels, either attribute branch's ``element_id`` and
+    ``attribute`` against the model, a derived-fact's ``flow_id`` against the
+    crossings derived from that same model. The gate's own stated principle is
+    what puts it here — *set membership is mechanical, so it belongs in code
+    rather than in a prompt* — and it inherits that rule's escape: where a job
+    supplies no labels, the label half does not run, so a hand-authored model
+    driven through the in-process engine is not failed on a citation that is
+    not wrong.
     """
     by_id = {element.id: element for element in system_model.elements()}
     crossing_ids = {crossing.flow_id for crossing in system_model.boundary_crossings()}
@@ -485,15 +492,24 @@ def _one_ground_issues(
                 f" {ground.flow_id!r}, which is not a derived boundary crossing"
             )
     else:
+        # An unknown attribute and an absent one resolve identically: the check
+        # is that the element carries the attribute, never what its value says,
+        # for the reason ``related_unknowns`` gives above — a mechanical rule
+        # over a value is a judgement in disguise.
+        named = (
+            "an unknown attribute"
+            if ground.kind == "unknown-attribute"
+            else "an absent attribute"
+        )
         element = by_id.get(ground.element_id)
         if element is None:
             issue = (
-                f"claim {claim_id!r} grounds an unknown attribute on element"
+                f"claim {claim_id!r} grounds {named} on element"
                 f" {ground.element_id!r}, which is not in the system model"
             )
         elif ground.attribute not in _attribute_names(element):
             issue = (
-                f"claim {claim_id!r} grounds an unknown attribute"
+                f"claim {claim_id!r} grounds {named}"
                 f" {ground.attribute!r}, which element {ground.element_id!r}"
                 " does not have"
             )
@@ -515,10 +531,10 @@ def _verify_quotes(
     **Per claim**, if *no* ground verifies at all, the caller fails closed. A
     claim with one bad quote beside good ones is still justified; a claim
     where nothing holds is a finding with no machine-checkable justification.
-    That total loss is rarer than it sounds — unknown-attribute and
-    derived-fact grounds verify by set membership, which is deterministic and
-    always available, so a claim can only lose every ground if every one of
-    them is a quote and every quote is bad.
+    That total loss is rarer than it sounds — every catalogued ground verifies
+    by set membership, which is deterministic and always available, so a claim
+    can only lose every ground if every one of them is a quote and every quote
+    is bad.
 
     Nothing is filtered: this marks and it fails, and it removes neither an
     entry nor a claim from anything.

@@ -146,6 +146,12 @@ from stride_service.system_model import BoundaryCrossing, SystemModel
 # refused by this model, and a 3.0 payload carrying ``analyses`` is refused by
 # the old one. The no-shim behaviour falls out of the shapes rather than out of
 # anything reading ``schema_version``.
+#
+# 3.0 also carries a fourth ``GroundKind``, ``absent-attribute`` (#171), which
+# would have earned a major bump of its own had it arrived separately: a
+# consumer switching over the three kinds it knew now meets a fourth. It rides
+# this one instead because 3.0 has never shipped, and two hard cutovers for one
+# release is a cost paid twice for nothing.
 SCHEMA_VERSION = "3.0"
 
 # The envelope's disclaimer, which is about the *service* rather than about any
@@ -201,8 +207,10 @@ SamplingValue = bool | int | float | str | None
 # (``unknown`` / ``derived``) because a bare ``unknown`` collides: it is already
 # a legal *attribute value* across the System Model, so ``kind="unknown"`` would
 # read as "the kind is unknown" rather than "the ground is an unknown
-# attribute".
-GroundKind = Literal["quote", "unknown-attribute", "derived-fact"]
+# attribute". ``absent-attribute`` follows that spelling for the same reason and
+# for one more: the two attribute branches carry identical fields, so the kind
+# is the only place their difference can live.
+GroundKind = Literal["quote", "unknown-attribute", "absent-attribute", "derived-fact"]
 
 # How long a claim ID may be. **Not a grammar**: #163 ruled that ``id`` has no
 # shared one, because each package composes its own from its own ``id_format``
@@ -313,7 +321,7 @@ class UnknownRef(BaseModel):
 
 
 class Ground(BaseModel):
-    """What justifies one finding: a quote, a named unknown, or a derived fact.
+    """What justifies one finding: a quote, an attribute's state, or a derived fact.
 
     Chosen by a category agent, constructed by the service. An agent names the
     fact it relied on — a catalog entry, or a span and the source it came from
@@ -324,7 +332,7 @@ class Ground(BaseModel):
     raised.
 
     NO MODEL EVER GENERATES ONE, which is what makes a flat object safe here.
-    The three branches carry different required fields, and that relationship
+    The four branches carry different required fields, and that relationship
     is not expressible in a JSON schema a provider will reliably compile —
     ``oneOf`` has the thinnest, least uniform support across the vendors a
     category agent may be routed to, and ``config/sampling.toml`` records what
@@ -354,6 +362,17 @@ class Ground(BaseModel):
       *forward-looking* — the unknown the critic says must be answered before
       the threat can be ruled on. Different author, different moment, different
       job; when they coincide that is signal, not redundancy.
+    * ``absent-attribute`` — the same two fields, for the attribute whose value
+      *states its own absence*: ``authentication: "none; accepted by network
+      position"`` is a control the submitter said is not there. **The fields are
+      identical and the fact is not**, which is the whole reason this is a kind
+      rather than a flag on the one above. An unknown is a question — it makes a
+      threat conditional and routes it to needs-info — while a stated absence is
+      an answer, and a threat resting on one is confirmed rather than pending.
+      A consumer that folded the two would report a control the input described
+      as missing as a gap in the *description*. Both branches say only what the
+      model carries; neither says the control is inadequate, which stays the
+      agent's argument and the critic's to rule on.
     * ``derived-fact`` — ``flow_id`` alone, a **reference and never a copy**.
       The crossing's zones are recomputed from the system model the report
       already embeds, so a renderer holding only the report resolves them; a
@@ -369,17 +388,22 @@ class Ground(BaseModel):
     kind: GroundKind
     text: str = Field(default="", max_length=1000)  # quote
     source_label: str = Field(default="", max_length=200)  # quote
-    element_id: str = Field(default="", max_length=300)  # unknown-attribute
-    attribute: AttributeName = Field(default="", max_length=100)  # unknown-attribute
+    element_id: str = Field(default="", max_length=300)  # both attribute branches
+    attribute: AttributeName = Field(
+        default="", max_length=100
+    )  # both attribute branches
     flow_id: str = Field(default="", max_length=300)  # derived-fact
 
     # Which fields each branch requires. Everything not listed for a branch is
     # forbidden on it — a quote carrying an element_id is a shape error, not a
     # tolerated extra, because the two readings of such a record differ and
-    # nothing downstream could choose between them.
+    # nothing downstream could choose between them. The two attribute branches
+    # share a row's worth of fields, so neither forbids the other's: what
+    # separates them is the kind, and there is nothing else to check.
     _REQUIRED: ClassVar[dict[GroundKind, tuple[str, ...]]] = {
         "quote": ("text", "source_label"),
         "unknown-attribute": ("element_id", "attribute"),
+        "absent-attribute": ("element_id", "attribute"),
         "derived-fact": ("flow_id",),
     }
 
@@ -1157,6 +1181,9 @@ class MissingMitigation(BaseModel):
     ``unknown-attribute`` ground, because that is the branch its trigger
     dictates. So "empty for the legitimate reason" and "empty with no reason"
     are mechanically distinguishable, and only the second is recorded here.
+    ``absent-attribute`` deliberately does not license the empty list: a control
+    the submitter said is *not there* is a fact already learned, and the
+    countermeasure is to put the control in.
 
     A completeness signal rather than a correctness one, which is why it is a
     mark and not a failure: a finding with no recommended action is still a

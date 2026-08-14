@@ -49,7 +49,12 @@ import pytest
 from pydantic import ValidationError
 
 from stride_service.critic import mentioned_ids
-from stride_service.evidence import CROSSING_PREFIX, UNKNOWN_PREFIX, render_catalog
+from stride_service.evidence import (
+    ABSENT_PREFIX,
+    CROSSING_PREFIX,
+    UNKNOWN_PREFIX,
+    render_catalog,
+)
 from stride_service.frameworks.stride.record import STRIDE_CATEGORIES, ThreatProposal
 from stride_service.grounding import verify_quote
 from stride_service.markdown_loader import MarkdownLoader, split_sections
@@ -176,7 +181,9 @@ def catalog(system):
     refs = [
         ref
         for ref in re.findall(r"^\| `([^`]+)` \| ", system, re.MULTILINE)
-        if ref.startswith((f"{UNKNOWN_PREFIX}:", f"{CROSSING_PREFIX}:"))
+        if ref.startswith(
+            (f"{UNKNOWN_PREFIX}:", f"{ABSENT_PREFIX}:", f"{CROSSING_PREFIX}:")
+        )
     ]
     if not refs:
         raise AssertionError("an exemplar system carries no evidence catalog block")
@@ -424,7 +431,7 @@ def test_the_exemplar_catalog_names_only_elements_the_system_defines(name):
     for ref in catalog(system):
         if ref.startswith(f"{CROSSING_PREFIX}:"):
             element = ref.split(":", 1)[1]
-        elif ref.startswith(f"{UNKNOWN_PREFIX}:"):
+        elif ref.startswith((f"{UNKNOWN_PREFIX}:", f"{ABSENT_PREFIX}:")):
             element = ref.split(":", 1)[1].rsplit(":", 1)[0]
         else:
             dangling.append(ref)
@@ -447,8 +454,12 @@ def test_the_exemplar_catalog_is_rendered_the_way_a_real_one_is(name):
     change and nothing here would notice.
 
     Rebuilding the grounds from the refs is exact rather than approximate — a
-    ref is *built* from a ground, and the two branches are separated by their
-    prefixes — so these are the objects a real catalog would hold.
+    ref is *built* from a ground, and the three branches are separated by their
+    prefixes — so these are the objects a real catalog would hold. The two
+    attribute branches are what makes the prefix load-bearing here: they carry
+    identical fields and different glosses, so a row written under the wrong
+    prefix renders "never stated" where the system states an absence, and this
+    is the check that says so.
     """
     system = exemplar_systems()[name]
     entries = {}
@@ -456,10 +467,13 @@ def test_the_exemplar_catalog_is_rendered_the_way_a_real_one_is(name):
         if ref.startswith(f"{CROSSING_PREFIX}:"):
             entries[ref] = Ground(kind="derived-fact", flow_id=ref.split(":", 1)[1])
         else:
-            element, attribute = ref.split(":", 1)[1].rsplit(":", 1)
-            entries[ref] = Ground(
-                kind="unknown-attribute", element_id=element, attribute=attribute
+            kind = (
+                "absent-attribute"
+                if ref.startswith(f"{ABSENT_PREFIX}:")
+                else "unknown-attribute"
             )
+            element, attribute = ref.split(":", 1)[1].rsplit(":", 1)
+            entries[ref] = Ground(kind=kind, element_id=element, attribute=attribute)
     assert render_catalog(entries).strip() in system
 
 
@@ -523,14 +537,23 @@ def test_no_non_markdown_files_under_prompts():
 # capped where they are produced; this budget governs the static instruction
 # only, and it moves with the body cap it has to accommodate — by 100 for the
 # retrieved corpus, then by 300 for the evidence catalog becoming a table
-# (#138), which is argued at ``ANALYZE_PROMPT_TOKEN_CAP`` rather than restated
+# (#138), and now by 200 for that catalog learning to say "stated absent"
+# (#171), each argued at ``ANALYZE_PROMPT_TOKEN_CAP`` rather than restated
 # here.
+#
+# The worst lane sits at ~5.4K of the 5.5K, and the worst case is now ~7.2K
+# against the 6-8K envelope. The paragraph above already said the next thing
+# wanting static room should be weighed against deleting something; #171 was
+# weighed that way and one deletion came with it — the canonical tampering
+# draft dropped the quote it used as a workaround for the rows this ticket
+# adds. That is the shape the next raise needs, and there is no longer room
+# for one that does not have it.
 #
 # The catalog's *runtime* rendering grew too, by roughly one short clause per
 # entry. It is job-varying so it does not land in this number, but it is not
 # free: a large model pays it per lane, which is the trade for jobs that no
 # longer die on a composed reference.
-COMPOSED_ANALYZE_TOKEN_BUDGET = 5300
+COMPOSED_ANALYZE_TOKEN_BUDGET = 5500
 
 
 @pytest.mark.parametrize("category", STRIDE_CATEGORIES)

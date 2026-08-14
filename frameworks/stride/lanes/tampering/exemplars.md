@@ -6,6 +6,8 @@ Three drafts against the exemplar system, showing the shape and the reasoning. F
 
 `flow:web-api-to-ledger-service:post-transfer` carries `encryption_in_transit: none` and `authentication: none`, and appears in the derived crossings (dmz → core). Its `data_description` says what an alteration is worth: transfer instructions with customer IDs.
 
+All three facts are catalogued — two `absent:` rows and the crossing — so this draft quotes nothing. The submitter's own sentence says the same thing, and citing it as well would be one fact filed twice.
+
 Keep the lane straight. Speaking *as* the web API is spoofing; altering the message an honest caller sent is yours. Both can be true of one path — write only the modification here, and score it on the integrity loss.
 
 ```json
@@ -19,14 +21,11 @@ Keep the lane straight. Speaking *as* the web API is spoofing; altering the mess
     "store:accounts-db"
   ],
   "evidence_refs": [
-    "crossing:flow:web-api-to-ledger-service:post-transfer"
+    "crossing:flow:web-api-to-ledger-service:post-transfer",
+    "absent:flow:web-api-to-ledger-service:post-transfer:authentication",
+    "absent:flow:web-api-to-ledger-service:post-transfer:encryption_in_transit"
   ],
-  "quotes": [
-    {
-      "text": "not authenticated and not encrypted",
-      "source_label": "Payments platform notes"
-    }
-  ],
+  "quotes": [],
   "severity": {
     "likelihood": "medium",
     "impact": "high",
