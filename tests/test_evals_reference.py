@@ -46,7 +46,11 @@ NEAR_EXEMPLAR_CONTROLS = ["01-payments-checkout", "02-iot-fleet-telemetry"]
 def test_one_near_exemplar_control_per_exemplar_system(corpus):
     # Without a control there is nothing to subtract from, and the
     # exemplar-domain-bias delta is unmeasurable.
-    near = [case.id for case in corpus if case.declaration("stride").exemplar_proximity == "near"]
+    near = [
+        case.id
+        for case in corpus
+        if case.declaration("stride").exemplar_proximity == "near"
+    ]
     assert near == NEAR_EXEMPLAR_CONTROLS
 
 
@@ -58,7 +62,9 @@ def test_the_near_controls_are_outnumbered_by_far_cases(corpus):
     population costs it a case. At two of twelve that is comfortable; the check
     exists so a third exemplar system cannot quietly make it not.
     """
-    near = sum(1 for case in corpus if case.declaration("stride").exemplar_proximity == "near")
+    near = sum(
+        1 for case in corpus if case.declaration("stride").exemplar_proximity == "near"
+    )
     assert near * 2 < len(corpus) - near
 
 

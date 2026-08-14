@@ -104,7 +104,7 @@ def test_reference_claims_stay_attached_to_the_corpus(pairs):
 
     corpus_dir = Path(__file__).resolve().parents[1] / "evals" / "corpus"
     claims_by_case = {
-        case.id: {reference.claim for reference in case.references}
+        case.id: {reference.claim for reference in case.claims_for("stride")}
         for case in load_corpus(corpus_dir)
     }
     for pair in pairs:

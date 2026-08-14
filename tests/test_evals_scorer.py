@@ -38,7 +38,9 @@ def labelled_pairs():
 
 
 def test_candidate_claim_is_the_title(case):
-    threat = threat_for(case.claims_for("stride")[0], 1, "An attacker replays a session.")
+    threat = threat_for(
+        case.claims_for("stride")[0], 1, "An attacker replays a session."
+    )
     assert candidate_claim(threat) == "An attacker replays a session."
 
 
@@ -55,7 +57,9 @@ def test_matches_reference_via_recorded_labels(case, labelled_pairs):
         for index, reference in enumerate(case.claims_for("stride"))
         if reference.claim == pair.reference_claim
     )
-    produced = [threat_for(case.claims_for("stride")[reference_index], 1, pair.candidate_claim)]
+    produced = [
+        threat_for(case.claims_for("stride")[reference_index], 1, pair.candidate_claim)
+    ]
     judge = ScriptedJudge([(pair.reference_claim, pair.candidate_claim)])
 
     score = score_case(case, produced, judge)
@@ -192,7 +196,9 @@ def test_element_disagreement_is_scored_not_filtered(case):
 def test_misfiled_threat_is_a_lane_error_and_not_a_recall_hit(case):
     # Misfiled threats are rejected rather than recategorized, so the reference
     # stays missed while lane accuracy records the mistake.
-    reference = next(ref for ref in case.claims_for("stride") if ref.category == "tampering")
+    reference = next(
+        ref for ref in case.claims_for("stride") if ref.category == "tampering"
+    )
     produced = [produced_threat(1, "spoofing", "Filed in the wrong lane.")]
     judge = ScriptedJudge([(reference.claim, "Filed in the wrong lane.")])
 
@@ -238,7 +244,9 @@ def test_recall_and_artifact_over_the_whole_labelled_set(case, labelled_pairs):
         for pair in labelled_pairs
         if pair.case == case.id and pair.label == "match"
     ]
-    claims_by_reference = {reference.claim: reference for reference in case.claims_for("stride")}
+    claims_by_reference = {
+        reference.claim: reference for reference in case.claims_for("stride")
+    }
     produced = [
         threat_for(
             claims_by_reference[pair.reference_claim], index + 1, pair.candidate_claim
