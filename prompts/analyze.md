@@ -61,13 +61,15 @@ Trust zones: `boundary:public-internet` (network), `boundary:dmz` (network), `bo
 
 Its evidence catalog, rendered as yours will be:
 
-7 facts, and this table is all of them.
+9 facts, and this table is all of them.
 
 | cite this exactly | what it says |
 | --- | --- |
 | `unknown:process:ledger-service:exposure` | `exposure` never stated |
 | `unknown:store:accounts-db:encryption_at_rest` | `encryption_at_rest` never stated |
 | `unknown:flow:payments-provider-to-web-api:settlement-webhook:authentication` | `authentication` never stated |
+| `absent:flow:web-api-to-ledger-service:post-transfer:authentication` | `authentication` stated absent |
+| `absent:flow:web-api-to-ledger-service:post-transfer:encryption_in_transit` | `encryption_in_transit` stated absent |
 | `unknown:flow:ledger-service-to-accounts-db:read-write-balances:encryption_in_transit` | `encryption_in_transit` never stated |
 | `crossing:flow:customer-to-web-api:submit-payment` | crosses a trust boundary |
 | `crossing:flow:payments-provider-to-web-api:settlement-webhook` | crosses a trust boundary |
@@ -121,7 +123,7 @@ Its evidence catalog:
 
 The System Model, already validated; its boundary crossings; then the evidence catalog — a table of every fact in that model you may cite. The left column is the ID; the right says what that ID asserts. The service derived every row, so a row is a fact rather than a claim, and copying its ID verbatim is how you cite it.
 
-**Select from the table; never compose.** It is closed and complete: an ID you did not copy out of it names nothing, however well-formed it looks, and it is dropped — the threat stands on what else it cited, and one citing nothing at all fails. If a fact you want to rest on has no row, that is the table telling you the input *stated* that attribute, so what you have is either a quote or a threat you should be resting on something else.
+**Select from the table; never compose.** It is closed and complete: an ID you did not copy out of it names nothing, however well-formed it looks, and it is dropped — the threat stands on what else it cited, and one citing nothing at all fails. If a fact you want to rest on has no row, that is the table telling you the input described a control that is *there*, so what you have is either a quote or a threat you should be resting on something else.
 
 Then this lane's candidates, any domain reference material, any notes and cases retrieved for them, and the sources — the standing of each is set above.
 
@@ -159,9 +161,13 @@ Work in this order, over the whole model before you write anything:
 4. **Work the candidates.** Answer each candidate's `question` against the model. Where the answer is an attacker action with a real consequence, it is a threat you were going to find anyway and the candidate saved you the search; where it is not — the condition holds but nothing follows from it, or the threat is already covered by one you wrote in step 3 — drop it silently. Do not file a threat whose whole argument is that a rule fired.
 5. **Walk second-order reach.** For each threat, follow the outbound flows from the compromised element: what does the attacker reach next? A low-value element compromised as a foothold is a real threat, and its impact is scored on everything reachable from it. Say the reach in the description.
 6. **Handle unknowns.** When the trigger is an attribute whose value is `unknown`, the control is unverified — never absent. Write the threat conditionally, name the element and attribute in the description, and let the critic mark it needs-info. Where the element's `notes` records what someone said about that gap — a hedge, an admitted unknown, two sources disagreeing — use it to make the needs-info question specific, and to aim the mitigation at what is actually unresolved. It is context for the question, never evidence for the threat: per the rubric, it cannot move a rating.
-7. **Ground.** Name the facts your threat rests on. Each is either an entry in the evidence catalog — copy its ID verbatim into `evidence_refs` — or words the submitter wrote, which go in `quotes`. A crossing from step 2 and an `unknown` attribute from step 6 are both catalogued; **you never state which kind of ground a fact is, because the catalog already carries that.** A candidate is never one of them: cite the crossing or the attribute the rule read, never the rule. A threat resting only on catalogued facts quotes nothing, and that is correct, not a gap. One entry per load-bearing fact — a threat commonly rests on two — and no padding: evidence supporting nothing in your description is noise.
 
-    An ID that is not in the catalog above does not exist. There is no near match and no repair: one invented ID fails every draft in your lane. If the fact you want is absent, it is neither a derived crossing nor an unstated attribute — quote it, or drop the claim.
+    An attribute reading `none` is the opposite case: the submitter answered the question and the control is not there. Write that threat plainly rather than conditionally and name a countermeasure, because nothing has to be learned first. The catalog's right column tells the two apart — `never stated` against `stated absent`.
+7. **Ground.** Name the facts your threat rests on. Each is either an entry in the evidence catalog — copy its ID verbatim into `evidence_refs` — or words the submitter wrote, which go in `quotes`. A crossing from step 2 and either state of an attribute from step 6 are all catalogued; **you never state which kind of ground a fact is, because the catalog already carries that.** A candidate is never one of them: cite the crossing or the attribute the rule read, never the rule. A threat resting only on catalogued facts quotes nothing, and that is correct, not a gap. One entry per load-bearing fact — a threat commonly rests on two — and no padding: evidence supporting nothing in your description is noise.
+
+    An ID that is not in the catalog above does not exist. There is no near match and no repair: one invented ID fails every draft in your lane. If the fact you want has no row, it is neither a derived crossing nor an attribute the input left open or ruled out — quote it, or drop the claim.
+
+    Where a row carries the fact, cite the row rather than quoting the sentence it came from: a quote saying a link is unencrypted and an `absent:` row for `encryption_in_transit` are one fact, and the row is the half that resolves against the model.
 
     Within `quotes`: **states it, not mentions it.** A quote must state the fact your threat turns on, not merely mention the element it acts on. "we run Postgres for the accounts DB" mentions the store; it grounds nothing about encryption. "honestly no idea if that bucket's encrypted" states the gap. If no span states it, the submitter's words were not your trigger — cite the catalogued fact instead.
 

@@ -26,6 +26,7 @@
        red-to-green means severity must not read these as a fourth band. */
     --g-quote:      #3c6ecb;
     --g-unknown:    #7a52c4;
+    --g-absent:     #a63f95;
     --g-derived:    #1f8a86;
     --tint:         color-mix(in srgb, var(--surface) 88%, transparent);
   }
@@ -42,6 +43,7 @@
       --hairline: #2c2c2a;
       --g-quote:  #7ea6ee;
       --g-unknown:#ac8ce8;
+      --g-absent: #d47fc6;
       --g-derived:#49b6b1;
     }
   }
@@ -49,7 +51,7 @@
     color-scheme: dark;
     --plane:#0d0d0d; --surface:#1a1a19; --surface-2:#242422;
     --ink:#ffffff; --ink-2:#c3c2b7; --muted:#898781; --border:rgba(255,255,255,0.10); --hairline:#2c2c2a;
-    --g-quote:#7ea6ee; --g-unknown:#ac8ce8; --g-derived:#49b6b1;
+    --g-quote:#7ea6ee; --g-unknown:#ac8ce8; --g-absent:#d47fc6; --g-derived:#49b6b1;
   }
 
   * { box-sizing: border-box; }
@@ -133,6 +135,7 @@
   .ground { border-left: 3px solid var(--muted); padding-left: 11px; margin-top: 10px; }
   .ground.quote { border-left-color: var(--g-quote); }
   .ground.unknown-attribute { border-left-color: var(--g-unknown); }
+  .ground.absent-attribute { border-left-color: var(--g-absent); }
   .ground.derived-fact { border-left-color: var(--g-derived); }
   .ground .kind { color: var(--muted); text-transform: uppercase; letter-spacing: 0.05em; font-size: 0.68rem; }
   .ground .body { font-size: 0.88rem; color: var(--ink-2); margin-top: 3px; }
@@ -248,11 +251,14 @@
   const lbl = (text) => el("span", "lbl", text);
   const cell = (...kids) => { const n = el("td"); n.append(...kids); return n; };
 
-  // Each branch named in its own words, so the three read as different *kinds*
-  // of justification rather than three formattings of one.
+  // Each branch named in its own words, so the four read as different *kinds*
+  // of justification rather than four formattings of one. The two attribute
+  // branches carry identical fields, so this line is the only place a reader
+  // can tell "nobody said" from "somebody said no".
   const GROUND_KIND = {
     "quote": "Quoted from the submission",
     "unknown-attribute": "Unstated in the submission",
+    "absent-attribute": "Stated absent in the submission",
     "derived-fact": "Derived from the model",
   };
   // Past this, a quote is clamped to three lines behind a toggle. Short quotes
@@ -348,7 +354,7 @@
       row.append(cite);
       return row;
     }
-    if (ground.kind === "unknown-attribute") {
+    if (ground.kind === "unknown-attribute" || ground.kind === "absent-attribute") {
       body.append(code(ground.element_id), " \u2192 ", code(ground.attribute));
     } else {
       body.append(code(ground.flow_id));

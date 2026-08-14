@@ -223,11 +223,11 @@ compiler. See [ADR 0004](adr/0004-evidence-references.md).
 
 ```python
 class Ground:
-    kind: "quote" | "unknown-attribute" | "derived-fact"
+    kind: "quote" | "unknown-attribute" | "absent-attribute" | "derived-fact"
     text: str                    # quote: the verbatim span, ≤1000 chars
     source_label: str            # quote: names one of input.sources
-    element_id: str              # unknown-attribute: resolves in system_model
-    attribute: str               # unknown-attribute: the attribute that is `unknown`
+    element_id: str              # either attribute kind: resolves in system_model
+    attribute: str               # either attribute kind: the attribute relied on
     flow_id: str                 # derived-fact: a data flow in system_model
 ```
 
@@ -235,14 +235,24 @@ class Ground:
 | --- | --- | --- |
 | `quote` | `text` + `source_label` | the submitter's own words said this |
 | `unknown-attribute` | `element_id` + `attribute` | this fact was never stated, so the threat stands unrefuted |
+| `absent-attribute` | `element_id` + `attribute` | the input states this control is not there |
 | `derived-fact` | `flow_id` | this flow's boundary crossing is the fact relied on |
 
-**One flat model, not a discriminated union.** Fields belonging to the other two
+**One flat model, not a discriminated union.** Fields belonging to the other
 kinds are empty strings, and a record carrying a field its own kind does not
 claim is rejected on construction rather than tolerated — so a consumer may read
 the fields its `kind` names and ignore the rest. Why the shape is flat rather
 than a tagged union, which it should be, is
 [ADR 0002](adr/0002-finding-level-attribution.md).
+
+**The two attribute kinds carry identical fields and different facts**, so a
+consumer must switch on `kind` rather than on which fields are populated.
+`unknown-attribute` is a question the submission left open — the threat resting
+on it is conditional and typically routes to `needs-info`. `absent-attribute`
+is the submission answering that question with *no*: `authentication: "none;
+accepted by network position"`. Folding the two would report a control the
+input described as missing as a gap in the description
+([ADR 0012](adr/0012-the-catalog-carries-a-stated-absence.md)).
 
 A `derived-fact` names the flow and **never copies the zones it crosses**: they
 recompute from `boundary_crossings`, which the report already carries, so a
@@ -348,7 +358,9 @@ class MissingMitigation:
 That case is mechanically recognizable, so the report distinguishes it. A
 threat triggered by an `unknown` carries an `unknown-attribute` ground —
 the trigger dictates the branch — so an empty `mitigations` list *with* such a
-ground is the licensed case and is not marked. An empty list *without* one is.
+ground is the licensed case and is not marked. An empty list *without* one is,
+and an `absent-attribute` ground does not license one: the fact is already in
+hand, so a countermeasure can always be named.
 
 This is a **completeness** signal, not a correctness one, which is why it is a
 mark rather than a failure: a finding with no recommended action is still a

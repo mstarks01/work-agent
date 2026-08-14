@@ -209,6 +209,11 @@ class TestGround:
                 "element_id": "store:orders-db",
                 "attribute": "encryption_at_rest",
             },
+            {
+                "kind": "absent-attribute",
+                "element_id": "flow:a-to-b:x",
+                "attribute": "authentication",
+            },
             {"kind": "derived-fact", "flow_id": "flow:a-to-b:x"},
         ],
     )
@@ -222,6 +227,8 @@ class TestGround:
             {"kind": "quote", "source_label": "Doc"},  # no text
             {"kind": "unknown-attribute", "element_id": "store:orders-db"},
             {"kind": "unknown-attribute", "attribute": "exposure"},
+            {"kind": "absent-attribute", "element_id": "flow:a-to-b:x"},
+            {"kind": "absent-attribute", "attribute": "authentication"},
             {"kind": "derived-fact"},
         ],
     )
@@ -238,6 +245,21 @@ class TestGround:
                 source_label="Doc",
                 element_id="store:orders-db",
             )
+
+    def test_the_two_attribute_branches_are_told_apart_by_kind_alone(self):
+        """They require the same two fields and forbid the same others, so the
+        shape check cannot separate them and is not asked to: what an attribute
+        *states* is the branch, and a record where the two disagreed would be
+        the thing this validator exists to make unreachable."""
+        fields = {"element_id": "flow:a-to-b:x", "attribute": "authentication"}
+
+        unknown = Ground(kind="unknown-attribute", **fields)
+        absent = Ground(kind="absent-attribute", **fields)
+
+        assert unknown != absent
+        assert unknown.model_dump(exclude={"kind"}) == absent.model_dump(
+            exclude={"kind"}
+        )
 
     def test_unknown_fields_are_forbidden(self):
         with pytest.raises(ValidationError):

@@ -15,6 +15,7 @@ from pydantic import ValidationError
 
 from stride_service.evidence import (
     EvidenceResolutionError,
+    absent_evidence_ref,
     crossing_evidence_ref,
     evidence_catalog,
     render_catalog,
@@ -59,12 +60,81 @@ class TestEvidenceCatalog:
 
         assert unknown_evidence_ref("store:orders-db", "technology") not in catalog
 
-    def test_only_the_two_derived_kinds_are_ever_catalogued(self):
-        """No quote, and no room for a conclusion: every entry is one of two
-        shapes, both computed by rule from the model."""
-        kinds = {ground.kind for ground in evidence_catalog(valid_model()).values()}
+    def test_only_the_derived_kinds_are_ever_catalogued(self):
+        """No quote, and no room for a conclusion: every entry is one of three
+        shapes, all computed by rule from the model."""
+        model = valid_model()
+        model.data_flows[0].authentication = "none"
 
-        assert kinds == {"unknown-attribute", "derived-fact"}
+        kinds = {ground.kind for ground in evidence_catalog(model).values()}
+
+        assert kinds == {"unknown-attribute", "absent-attribute", "derived-fact"}
+
+    def test_a_control_the_input_states_is_absent_is_enumerated(self):
+        """The gap #171 was filed for.
+
+        The catalog used to test exact equality with the ``unknown`` sentinel,
+        so a control the submitter said is *not there* — which 11 of the 12
+        candidate rules fire on, through ``is_unverified`` — was a fact no
+        agent could cite. It has its own entry and its own kind, because
+        "nobody said" and "somebody said no" carry different threats.
+        """
+        model = valid_model()
+        model.data_flows[0].authentication = "none; accepted by network position"
+
+        catalog = evidence_catalog(model)
+
+        ref = absent_evidence_ref("flow:customer-to-web-app:login", "authentication")
+        assert catalog[ref] == Ground(
+            kind="absent-attribute",
+            element_id="flow:customer-to-web-app:login",
+            attribute="authentication",
+        )
+        assert (
+            unknown_evidence_ref("flow:customer-to-web-app:login", "authentication")
+            not in catalog
+        )
+
+    def test_a_hedged_unknown_is_still_an_unknown(self):
+        """``CONTEXT.md`` defines Unknown to include a voiced hedge, and
+        ``control_state`` reads the leading token — so the sentinel decorated
+        with the speaker's own doubt is the same fact as the bare one, and the
+        catalog no longer misses it for the decoration."""
+        model = valid_model()
+        model.data_flows[0].authentication = "unknown; possibly a shared group account"
+
+        catalog = evidence_catalog(model)
+
+        ref = unknown_evidence_ref("flow:customer-to-web-app:login", "authentication")
+        assert catalog[ref].kind == "unknown-attribute"
+
+    def test_a_stated_control_reading_no_is_not_an_absence(self):
+        """Only the leading token is read, which is what keeps this from
+        becoming a classifier with a security opinion: ``no MFA on the password
+        login`` describes a mechanism that exists."""
+        model = valid_model()
+        model.data_flows[0].authentication = "no MFA on the password login"
+
+        catalog = evidence_catalog(model)
+
+        flow_id = "flow:customer-to-web-app:login"
+        assert absent_evidence_ref(flow_id, "authentication") not in catalog
+        assert unknown_evidence_ref(flow_id, "authentication") not in catalog
+
+    def test_only_a_control_attribute_can_be_stated_absent(self):
+        """``unknown`` is the extraction sentinel on every field; ``none`` means
+        something determinate only where the attribute names a control. A
+        ``protocol`` reading ``none`` is what the input wrote, not a fact an
+        agent may rest a finding on."""
+        model = valid_model()
+        model.data_flows[0].protocol = "none"
+
+        catalog = evidence_catalog(model)
+
+        assert (
+            absent_evidence_ref("flow:customer-to-web-app:login", "protocol")
+            not in catalog
+        )
 
     def test_identity_and_provenance_fields_are_not_attributes(self):
         """``notes`` holding the word is a sentence, not an unstated control."""
@@ -156,11 +226,14 @@ class TestRenderCatalog:
 
         assert f"{len(catalog)} facts" in render_catalog(catalog)
 
-    def test_the_two_kinds_of_fact_read_differently(self):
-        """An unstated attribute and a derived crossing are not interchangeable.
+    def test_the_kinds_of_fact_read_differently(self):
+        """An unstated attribute, a stated absence and a derived crossing are
+        not interchangeable.
 
         An agent that conflates them cites the wrong one, so the gloss carries
-        the distinction the ID prefix alone makes easy to skim past.
+        the distinction the ID prefix alone makes easy to skim past. It carries
+        the whole of it for the two attribute branches: they name identical
+        fields, so the right column is the only place their difference shows.
         """
         rendered = render_catalog(
             {
@@ -169,6 +242,11 @@ class TestRenderCatalog:
                     element_id="store:accounts-db",
                     attribute="encryption_at_rest",
                 ),
+                "absent:flow:a-to-b:call:authentication": Ground(
+                    kind="absent-attribute",
+                    element_id="flow:a-to-b:call",
+                    attribute="authentication",
+                ),
                 "crossing:flow:a-to-b:call": Ground(
                     kind="derived-fact", flow_id="flow:a-to-b:call"
                 ),
@@ -176,6 +254,7 @@ class TestRenderCatalog:
         )
 
         assert "`encryption_at_rest` never stated" in rendered
+        assert "`authentication` stated absent" in rendered
         assert "crosses a trust boundary" in rendered
 
     def test_an_empty_catalog_renders_no_rows(self):

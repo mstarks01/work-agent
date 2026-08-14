@@ -1,11 +1,12 @@
 """Every fact a lane agent may cite, enumerated from the validated model.
 
 A finding's justification is a :class:`~stride_service.report.Ground`, and the
-two non-quote branches of one are pure functions of the System Model: an
-attribute whose value is the ``unknown`` sentinel, and a Data Flow whose
-endpoints sit in different trust zones. Neither requires judgement to
-construct, and neither is anything an agent knows that the service does not.
-So the service constructs them, once, and hands the agent a list of IDs.
+three non-quote branches of one are pure functions of the System Model: an
+attribute the input never settled, a control attribute the input says is not
+there, and a Data Flow whose endpoints sit in different trust zones. None
+requires judgement to construct, and none is anything an agent knows that the
+service does not. So the service constructs them, once, and hands the agent a
+list of IDs.
 
 **The LLM decides which evidence supports a finding; this module decides how
 that evidence is represented.** An agent answers with
@@ -33,11 +34,12 @@ not do is *check* it; presence in the named source stays
 ladder in :mod:`stride_service.grounding` against the job's actual bytes, which
 this module does not hold.
 
-IDs ARE STABLE AND MEAN SOMETHING. ``unknown:<element-id>:<attribute>`` and
-``crossing:<flow-id>``, both built from IDs the model already carries, so the
-same System Model yields the same catalog on every run and a ref in a log or a
-diff is readable without a lookup. Opaque IDs would cost that for nothing:
-there is no secret here, only facts the agent is being shown anyway.
+IDs ARE STABLE AND MEAN SOMETHING. ``unknown:<element-id>:<attribute>``,
+``absent:<element-id>:<attribute>`` and ``crossing:<flow-id>``, all built from
+IDs the model already carries, so the same System Model yields the same catalog
+on every run and a ref in a log or a diff is readable without a lookup. Opaque
+IDs would cost that for nothing: there is no secret here, only facts the agent
+is being shown anyway.
 
 Model output is untrusted input (OWASP LLM05). A ref is used as a dictionary
 key and never parsed, interpolated, or matched by a pattern compiled from it,
@@ -52,6 +54,7 @@ from __future__ import annotations
 from collections.abc import Iterable, Mapping
 from typing import Any, NamedTuple
 
+from stride_service.analysis import CONTROL_ATTRIBUTES, control_state
 from stride_service.critic import DraftJoinError
 from stride_service.frameworks import FrameworkPackage, schemas_for
 from stride_service.report import (
@@ -62,7 +65,7 @@ from stride_service.report import (
     Proposal,
     UnresolvedEvidence,
 )
-from stride_service.system_model import UNKNOWN, SystemModel, attribute_names
+from stride_service.system_model import Element, SystemModel, attribute_names
 
 #: An evidence catalog: each reference, in a stable order, against the ground
 #: it resolves to. A plain mapping on purpose — ``list(catalog)`` is what the
@@ -72,6 +75,7 @@ from stride_service.system_model import UNKNOWN, SystemModel, attribute_names
 EvidenceCatalog = dict[str, Ground]
 
 UNKNOWN_PREFIX = "unknown"
+ABSENT_PREFIX = "absent"
 CROSSING_PREFIX = "crossing"
 
 
@@ -98,6 +102,11 @@ def unknown_evidence_ref(element_id: str, attribute: str) -> str:
     return f"{UNKNOWN_PREFIX}:{element_id}:{attribute}"
 
 
+def absent_evidence_ref(element_id: str, attribute: str) -> str:
+    """The catalog ID for one control the input states is not there."""
+    return f"{ABSENT_PREFIX}:{element_id}:{attribute}"
+
+
 def crossing_evidence_ref(flow_id: str) -> str:
     """The catalog ID for one flow's derived boundary crossing."""
     return f"{CROSSING_PREFIX}:{flow_id}"
@@ -106,8 +115,8 @@ def crossing_evidence_ref(flow_id: str) -> str:
 def evidence_catalog(model: SystemModel) -> EvidenceCatalog:
     """Every mechanically derivable fact in one validated System Model.
 
-    Two enumerations, in this order: each element's attributes whose value is
-    the ``unknown`` sentinel, walked in the model's own element order and each
+    Two enumerations, in this order: each element's attributes the input left
+    unsettled or stated absent, walked in the model's own element order and each
     element's own field-declaration order; then the derived boundary crossings,
     in the order :meth:`~stride_service.system_model.SystemModel.boundary_crossings`
     yields them. Both orders are properties of the model rather than of this
@@ -119,24 +128,23 @@ def evidence_catalog(model: SystemModel) -> EvidenceCatalog:
     the word "unknown" is a sentence, not an unstated control, and a catalog
     that could not tell those apart would invite a finding grounded on prose.
 
-    Two refs cannot collide. An element ID is unique across a validated model
-    and an attribute appears once on an element, so the ``unknown`` half is
-    injective; a flow ID is an element ID, so the ``crossing`` half is; and the
-    two halves are separated by their prefixes.
+    Refs cannot collide. An element ID is unique across a validated model and an
+    attribute appears once on an element, so each attribute half is injective
+    and the two cannot overlap because one attribute has one state; a flow ID is
+    an element ID, so the ``crossing`` half is injective; and the three halves
+    are separated by their prefixes.
 
     Requires a valid model, and fails closed on an invalid one exactly as
     ``boundary_crossings`` does — a catalog derived from a model with a
     dangling flow endpoint would offer agents evidence about a system nobody
     described.
     """
-    catalog: EvidenceCatalog = {
-        unknown_evidence_ref(element.id, attribute): Ground(
-            kind="unknown-attribute", element_id=element.id, attribute=attribute
-        )
+    catalog: EvidenceCatalog = dict(
+        entry
         for element in model.elements()
         for attribute in attribute_names(element)
-        if getattr(element, attribute) == UNKNOWN
-    }
+        if (entry := _attribute_entry(element, attribute)) is not None
+    )
     catalog.update(
         {
             crossing_evidence_ref(crossing.flow_id): Ground(
@@ -146,6 +154,45 @@ def evidence_catalog(model: SystemModel) -> EvidenceCatalog:
         }
     )
     return catalog
+
+
+def _attribute_entry(element: Element, attribute: str) -> tuple[str, Ground] | None:
+    """One attribute's catalog entry, or ``None`` where it states a control.
+
+    The classifier is :func:`~stride_service.analysis.control_state`, the same
+    one the candidate rules read, which is the whole of this function's point:
+    the catalog used to test exact equality with the ``unknown`` sentinel while
+    the analysis layer read the leading token, so a control the input *hedged*
+    (``"unknown; possibly a shared group account"``) and a control the input
+    said is *not there* (``"none; accepted by network position"``) were both
+    facts a rule could fire on and no agent could cite (#171).
+
+    **The two halves cover different attribute sets, and the asymmetry is the
+    honest reading rather than an oversight.** ``unknown`` is the extraction
+    sentinel: it means "the input never settled this" on every type-specific
+    field, decorated with a hedge or not, so the unverified half runs over all
+    of them. ``none`` is not a sentinel — it carries a determinate meaning only
+    where the attribute names a control, and "the submitter said this is not
+    there" is not a fact about a ``protocol`` or a ``data_description``. So the
+    absent half is confined to :data:`~stride_service.analysis.CONTROL_ATTRIBUTES`,
+    and a ``technology`` reading ``none`` stays what the input wrote rather than
+    becoming a fact an agent may rest a finding on.
+
+    Both entries carry the element and the attribute and nothing else. Which
+    *state* the attribute is in is the branch, never a field — a ground whose
+    kind and payload could disagree is the shape this whole module exists to
+    make unreachable.
+    """
+    state = control_state(getattr(element, attribute))
+    if state == "unverified":
+        return unknown_evidence_ref(element.id, attribute), Ground(
+            kind="unknown-attribute", element_id=element.id, attribute=attribute
+        )
+    if state == "absent" and attribute in CONTROL_ATTRIBUTES:
+        return absent_evidence_ref(element.id, attribute), Ground(
+            kind="absent-attribute", element_id=element.id, attribute=attribute
+        )
+    return None
 
 
 def render_catalog(catalog: Mapping[str, Ground]) -> str:
@@ -185,10 +232,15 @@ def _gloss(ground: Ground) -> str:
     column already, and this text is paid for on every lane agent's instruction
     through the two exemplar catalogs. What it has to carry is the *kind* of
     fact — an unstated attribute reads very differently from a derived crossing,
-    and an agent that conflates them cites the wrong one.
+    and an agent that conflates them cites the wrong one. *Never stated* against
+    *stated absent* is the sharpest of those distinctions and the cheapest to
+    render: it is the difference between a question and an answer, and the
+    prompt spends a whole procedure step on it.
     """
     if ground.kind == "derived-fact":
         return "crosses a trust boundary"
+    if ground.kind == "absent-attribute":
+        return f"`{ground.attribute}` stated absent"
     return f"`{ground.attribute}` never stated"
 
 

@@ -442,8 +442,8 @@ def _print_grounds(
         print(
             f"{entry.case_id:<26} grounds {entry.ground_count}"
             f" on {entry.threat_count} threats ({entry.grounds_per_threat:.2f} ea)"
-            f"  q/u/d {counts['quote']}/{counts['unknown-attribute']}"
-            f"/{counts['derived-fact']}"
+            f"  q/u/a/d {counts['quote']}/{counts['unknown-attribute']}"
+            f"/{counts['absent-attribute']}/{counts['derived-fact']}"
             f"  quoteless {entry.quoteless_rate:.0%}"
             f"  unverified {entry.unverified_count}/{entry.quote_count}"
         )
