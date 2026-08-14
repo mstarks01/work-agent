@@ -9,11 +9,19 @@ certification-bar verification import
 
 **The manifest keys by tier, not by node.** A fingerprint's payload contains no
 node name — it is ``(vendor-prefixed served build, tier sampling)`` — and the
-tier map puts ``critic`` and ``recritic`` both on ``strong``, ``extract`` and
-``repair`` both on ``base``. So ``recritic`` presents a *byte-identical* hash
-to ``critic``, and per-node keying would call that same hash blessed under one
-key and unblessed under the other, reporting the production revise path
-uncertified on a technicality.
+tier map puts ``critic/<framework>`` and ``recritic/<framework>`` both on
+``strong`` (the tier loader *requires* that pairing), ``extract`` and ``repair``
+both on ``base``, and every one of a framework's lane agents on its single
+``analyze/<framework>`` key. So a framework's recritic presents a
+*byte-identical* hash to its critic, and its six lane agents present one hash
+between them; per-node keying would call the same hash blessed under one key and
+unblessed under another, reporting the production revise path uncertified on a
+technicality.
+
+**Keying by tier is also what makes the map survive N frameworks.** Graph node
+names carry their framework, so they multiply with the selection while the tiers
+do not — a manifest keyed by node would need a new blessing for every framework
+added, over generation identities that had not changed.
 
 **Three states, and the third is a separate field.** ``certified`` keeps its
 narrow meaning — every observed fingerprint is blessed — because callers consume
@@ -41,7 +49,7 @@ from typing import Annotated
 from pydantic import BaseModel, ConfigDict, Field, ValidationError
 
 from stride_service.model_tiers import TIER_NAMES, TierName
-from stride_service.report import NodeRun, StrideReport
+from stride_service.report import NodeRun, Report
 
 # The manifest schema version. Keyed by tier, with no compatibility shim for
 # older files.
@@ -184,7 +192,7 @@ def fingerprints_of(nodes: Iterable[NodeRun]) -> dict[str, frozenset[str]]:
     Takes the node runs rather than a report because the two callers hold
     different things: the service certifies a finished report, while a sweep
     certifies runs that may produce no report at all — the extraction mode
-    scores an emission, not a :class:`StrideReport`, and its ``extract``
+    scores an emission, not a :class:`Report`, and its ``extract``
     execution is no less an observed generation identity for that.
     """
     observations: dict[str, set[str]] = {}
@@ -195,7 +203,7 @@ def fingerprints_of(nodes: Iterable[NodeRun]) -> dict[str, frozenset[str]]:
     return {node: frozenset(prints) for node, prints in observations.items()}
 
 
-def report_fingerprints(report: StrideReport) -> dict[str, frozenset[str]]:
+def report_fingerprints(report: Report) -> dict[str, frozenset[str]]:
     """The node -> fingerprint sets a finished report presents, ready to certify."""
     return fingerprints_of(report.nodes)
 
@@ -258,9 +266,7 @@ class CertificationGate:
     tier_of: TierResolver
     require_certified: bool = False
 
-    def check(
-        self, report: StrideReport, expected_nodes: Iterable[str]
-    ) -> CertifyResult:
+    def check(self, report: Report, expected_nodes: Iterable[str]) -> CertifyResult:
         """Certify a finished report. Runs once, after every node has run."""
         return certify(
             report_fingerprints(report),

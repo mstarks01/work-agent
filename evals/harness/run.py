@@ -92,17 +92,53 @@ from evals.harness.stability import (
 from evals.harness.structural import report_issues
 from stride_service.certification import CertificationError, CertifyResult, certify
 from stride_service.deployment import Deployment
+from stride_service.frameworks.stride.record import Threat
 from stride_service.report import (
-    CategoryCoverage,
+    FrameworkAnalysis,
     NodeLatency,
     NodeRun,
+    Report,
     TokenUsage,
     latency_by_node,
     usage_by_node,
 )
+from stride_service.report import LaneCoverage as ReportLaneCoverage
 
 EVALS_ROOT = Path(__file__).resolve().parents[1]
 DEFAULT_CORPUS_DIR = EVALS_ROOT / "corpus"
+
+
+def stride_block(report: Report) -> FrameworkAnalysis:
+    """This sweep's own framework block, off a report that may carry several.
+
+    The grading contract is per framework (#167) and this harness grades
+    STRIDE's open claim set, so the block is named here once rather than
+    re-derived at each of the four sites that read one. A report with no STRIDE
+    block is a driver defect rather than a sweep result: every mode in
+    :mod:`evals.harness.modes` builds its graph for this framework.
+    """
+    for block in report.analyses:
+        if block.framework == "stride":
+            return block
+    raise modes.EvalRunError("the report carries no stride analysis block")
+
+
+def stride_threats(report: Report) -> list[Threat]:
+    """This report's STRIDE claims, at the record type they validate as.
+
+    ``claims`` is annotated at the neutral :class:`RuledClaim` because a block
+    holds whatever its own package produced; the scorers grade ``category`` and
+    ``severity``, which only STRIDE's record carries. The envelope already
+    validated this block as its package's own shape, so this re-states that
+    where a caller needs it and fails loudly if it ever stops being true.
+    """
+    claims = stride_block(report).claims
+    narrowed = [claim for claim in claims if isinstance(claim, Threat)]
+    if len(narrowed) != len(claims):
+        raise modes.EvalRunError(
+            "the stride block's claims did not load as Threat records"
+        )
+    return narrowed
 
 
 def _live_judge(
@@ -189,7 +225,7 @@ class ModeRun:
     latency: dict[str, NodeLatency]
     grounds: list[CaseGrounds]
     grounds_failures: list[GroundsFailure]
-    coverage: list[CategoryCoverage]
+    coverage: list[ReportLaneCoverage]
 
     @property
     def observations(self) -> dict[str, frozenset[str]]:
@@ -229,7 +265,7 @@ async def _run_mode(
     executions: list[NodeRun] = []
     grounds: list[CaseGrounds] = []
     grounds_failures: list[GroundsFailure] = []
-    coverage: list[CategoryCoverage] = []
+    coverage: list[ReportLaneCoverage] = []
 
     for case in cases:
         if mode == "extraction":
@@ -259,11 +295,11 @@ async def _run_mode(
 
         runs[case.id] = run
         executions += run.report.nodes
-        coverage += run.report.coverage
+        coverage += stride_block(run.report).coverage
         issues = report_issues(run.report)
         failures += [f"{case.id}: {issue}" for issue in issues]
         measurement = measure_grounds(
-            case.id, run.merged_drafts, run.report.unverified_grounds
+            case.id, run.merged_drafts, stride_block(run.report).unverified_grounds
         )
         grounds.append(measurement)
         # The measurement rides in the artifact rather than being recomputed
@@ -312,7 +348,10 @@ def _score_runs(
     """
     scored = [
         score_case_with_yield(
-            case, runs[case.id].merged_drafts, runs[case.id].report.threats, judge
+            case,
+            runs[case.id].merged_drafts,
+            stride_threats(runs[case.id].report),
+            judge,
         )
         for case in cases
         if case.id in runs
@@ -422,8 +461,8 @@ def _print_grounds(
         print(
             f"{entry.case_id:<26} grounds {entry.ground_count}"
             f" on {entry.threat_count} threats ({entry.grounds_per_threat:.2f} ea)"
-            f"  q/u/d {counts['quote']}/{counts['unknown-attribute']}"
-            f"/{counts['derived-fact']}"
+            f"  q/u/a/d {counts['quote']}/{counts['unknown-attribute']}"
+            f"/{counts['absent-attribute']}/{counts['derived-fact']}"
             f"  quoteless {entry.quoteless_rate:.0%}"
             f"  unverified {entry.unverified_count}/{entry.quote_count}"
         )

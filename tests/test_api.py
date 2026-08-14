@@ -3,6 +3,7 @@
 import asyncio
 import json
 import logging
+from collections.abc import Sequence
 
 import pytest
 from fastapi.testclient import TestClient
@@ -19,9 +20,10 @@ from stride_service.jobs import (
     PipelineRejected,
     StubPipelineRunner,
 )
-from stride_service.report import StrideReport
+from stride_service.report import FrameworkName, Report
 from stride_service.sources import Source, SourceLimits
 from stride_service.validation import ValidationIssue
+from tests.factories import DEFAULT_FRAMEWORKS, sample_selection
 
 TOKENS = {"alice-token": "alice", "bob-token": "bob"}
 
@@ -72,6 +74,7 @@ def make_client(
     store=None,
     limits: SourceLimits = TEST_LIMITS,
     max_active_jobs: int = TEST_MAX_ACTIVE_JOBS,
+    frameworks: Sequence[FrameworkName] = DEFAULT_FRAMEWORKS,
 ) -> tuple[TestClient, InMemoryJobStore]:
     store = store if store is not None else InMemoryJobStore()
     app = create_app(
@@ -81,6 +84,7 @@ def make_client(
         limits=limits,
         job_deadline_seconds=TEST_DEADLINE_SECONDS,
         max_active_jobs=max_active_jobs,
+        frameworks=frameworks,
     )
     return TestClient(app), store
 
@@ -89,10 +93,25 @@ def one_source(text: str = "a web app storing orders", **kwargs) -> list[dict]:
     return [{"kind": "description", "label": "Doc", "text": text} | kwargs]
 
 
+def one_framework(name: str = "stride", **options) -> list[dict]:
+    """The ``frameworks`` half of a submission body.
+
+    Required and non-empty on every submission, with no default on the route,
+    so a test about sources still has to say which frameworks it wants — see
+    :func:`tests.factories.sample_selection` for why there is no default.
+    """
+    return [{"name": name, "options": options}]
+
+
+def submission(**overrides) -> dict:
+    """A complete, minimal submission body."""
+    return {"sources": one_source(), "frameworks": one_framework()} | overrides
+
+
 def submit(client: TestClient, token: str = "alice-token") -> str:
     response = client.post(
         "/v1/jobs",
-        json={"sources": one_source()},
+        json=submission(),
         headers=auth(token),
     )
     assert response.status_code == 201
@@ -126,6 +145,7 @@ class TestInjectedBoundsMustBeStated:
                 runner=StubPipelineRunner(),
                 verifier=FakeVerifier(),
                 limits=TEST_LIMITS,
+                frameworks=DEFAULT_FRAMEWORKS,
             )
 
     def test_a_runner_without_limits_is_refused(self):
@@ -136,6 +156,7 @@ class TestInjectedBoundsMustBeStated:
                 verifier=FakeVerifier(),
                 job_deadline_seconds=TEST_DEADLINE_SECONDS,
                 max_active_jobs=TEST_MAX_ACTIVE_JOBS,
+                frameworks=DEFAULT_FRAMEWORKS,
             )
 
     def test_a_runner_without_a_concurrency_ceiling_is_refused(self):
@@ -146,6 +167,7 @@ class TestInjectedBoundsMustBeStated:
                 verifier=FakeVerifier(),
                 limits=TEST_LIMITS,
                 job_deadline_seconds=TEST_DEADLINE_SECONDS,
+                frameworks=DEFAULT_FRAMEWORKS,
             )
 
 
@@ -183,7 +205,7 @@ class TestSubmit:
         client, _ = make_client()
         response = client.post(
             "/v1/jobs",
-            json={"sources": one_source(), "system_name": "Orders"},
+            json=submission(system_name="Orders"),
             headers=auth(),
         )
         assert response.status_code == 201
@@ -195,8 +217,8 @@ class TestSubmit:
         client, _ = make_client()
         response = client.post(
             "/v1/jobs",
-            json={
-                "sources": [
+            json=submission(
+                sources=[
                     {"kind": "description", "label": "Doc", "text": "a web app"},
                     {
                         "kind": "transcript",
@@ -204,7 +226,7 @@ class TestSubmit:
                         "text": "Ana: it writes to Postgres.",
                     },
                 ]
-            },
+            ),
             headers=auth(),
         )
         assert response.status_code == 201
@@ -231,7 +253,7 @@ class TestSubmit:
         client, _ = make_client()
         response = client.post(
             "/v1/jobs",
-            json={"sources": one_source(), "model_tier": "pro"},
+            json=submission(model_tier="pro"),
             headers=auth(),
         )
         assert response.status_code == 422
@@ -254,7 +276,7 @@ class TestInputLadder:
     def test_rung_one_a_malformed_source_is_422(self, bad_source):
         client, _ = make_client()
         response = client.post(
-            "/v1/jobs", json={"sources": [bad_source]}, headers=auth()
+            "/v1/jobs", json=submission(sources=[bad_source]), headers=auth()
         )
         assert response.status_code == 422
 
@@ -262,7 +284,7 @@ class TestInputLadder:
         # Not 413: a job with no input is the wrong shape, and quoting a byte
         # count of zero against a cap would explain nothing.
         client, _ = make_client()
-        response = client.post("/v1/jobs", json={"sources": []}, headers=auth())
+        response = client.post("/v1/jobs", json=submission(sources=[]), headers=auth())
         assert response.status_code == 400
         assert response.headers["content-type"] == "application/problem+json"
         assert "at least one source" in response.json()["detail"]
@@ -274,12 +296,12 @@ class TestInputLadder:
         client, _ = make_client()
         response = client.post(
             "/v1/jobs",
-            json={
-                "sources": [
+            json=submission(
+                sources=[
                     {"kind": "description", "label": "Notes", "text": "one"},
                     {"kind": "transcript", "label": "Notes", "text": "two"},
                 ]
-            },
+            ),
             headers=auth(),
         )
         assert response.status_code == 422
@@ -310,12 +332,12 @@ class TestInputLadder:
         client, _ = make_client()
         response = client.post(
             "/v1/jobs",
-            json={
-                "sources": [
+            json=submission(
+                sources=[
                     {"kind": "description", "label": "Doc", "text": "a"},
                     {"kind": "transcript", "label": "Call", "text": "b"},
                 ]
-            },
+            ),
             headers=auth(),
         )
         assert response.status_code == 201
@@ -326,7 +348,9 @@ class TestInputLadder:
             {"kind": "description", "label": f"Doc {n}", "text": "x"}
             for n in range(TEST_LIMITS.max_sources + 1)
         ]
-        response = client.post("/v1/jobs", json={"sources": sources}, headers=auth())
+        response = client.post(
+            "/v1/jobs", json=submission(sources=sources), headers=auth()
+        )
         assert response.status_code == 413
         detail = response.json()["detail"]
         assert str(TEST_LIMITS.max_sources) in detail
@@ -340,13 +364,13 @@ class TestInputLadder:
         half = TEST_LIMITS.max_total_bytes // 2
         response = client.post(
             "/v1/jobs",
-            json={
-                "sources": [
+            json=submission(
+                sources=[
                     {"kind": "description", "label": "Doc", "text": "a" * half},
                     {"kind": "transcript", "label": "Call", "text": "b" * half},
                     {"kind": "transcript", "label": "Standup", "text": "c" * half},
                 ]
-            },
+            ),
             headers=auth(),
         )
         assert response.status_code == 413
@@ -364,7 +388,9 @@ class TestInputLadder:
             {"kind": "voicemail", "label": f"S{n}", "text": "x"}
             for n in range(TEST_LIMITS.max_sources + 1)
         ]
-        response = client.post("/v1/jobs", json={"sources": sources}, headers=auth())
+        response = client.post(
+            "/v1/jobs", json=submission(sources=sources), headers=auth()
+        )
         assert response.status_code == 422
 
     def test_an_absurd_body_is_refused_before_it_is_parsed(self):
@@ -410,7 +436,9 @@ class TestInputLadder:
         # route that answers, not the guard.
         client, _ = make_client()
         body = json.dumps(
-            {"sources": [{"kind": "description", "label": "Doc", "text": "a system"}]}
+            submission(
+                sources=[{"kind": "description", "label": "Doc", "text": "a system"}]
+            )
         ).encode()
 
         response = client.post(
@@ -482,7 +510,7 @@ class TestReport:
         job_id = submit(client)
         response = client.get(f"/v1/jobs/{job_id}/report", headers=auth())
         assert response.status_code == 200
-        report = StrideReport.model_validate(response.json())
+        report = Report.model_validate(response.json())
         assert report.job.id == job_id
         assert "owner" not in response.text
         assert "alice" not in response.text
@@ -490,7 +518,9 @@ class TestReport:
     def test_queued_job_report_is_409(self):
         store = InMemoryJobStore()
         record = JobRecord.create(
-            owner_subject="alice", sources=[Source.description("an app")]
+            owner_subject="alice",
+            sources=[Source.description("an app")],
+            frameworks=sample_selection(),
         )
         asyncio.run(store.create(record))
         client, _ = make_client(store=store)
@@ -514,7 +544,9 @@ def seed(store: InMemoryJobStore, subject: str, status: JobStatus) -> JobRecord:
     job is already terminal by the time the next one is sent.
     """
     record = JobRecord.create(
-        owner_subject=subject, sources=[Source.description("an app")]
+        owner_subject=subject,
+        sources=[Source.description("an app")],
+        frameworks=sample_selection(),
     )
     if status != "queued":
         record.transition("running")
@@ -540,9 +572,7 @@ class TestConcurrencyCeiling:
         for _ in range(2):
             seed(store, "alice", status)
         client, _ = make_client(store=store, max_active_jobs=2)
-        response = client.post(
-            "/v1/jobs", json={"sources": one_source()}, headers=auth()
-        )
+        response = client.post("/v1/jobs", json=submission(), headers=auth())
         assert response.status_code == 429
         assert response.headers["content-type"] == "application/problem+json"
         assert "2" in response.json()["detail"]
@@ -553,16 +583,14 @@ class TestConcurrencyCeiling:
         store = InMemoryJobStore()
         seed(store, "alice", "running")
         client, _ = make_client(store=store, max_active_jobs=1)
-        client.post("/v1/jobs", json={"sources": one_source()}, headers=auth())
+        client.post("/v1/jobs", json=submission(), headers=auth())
         assert asyncio.run(store.active_for("alice")) == 1
 
     def test_below_the_ceiling_a_submission_is_accepted(self):
         store = InMemoryJobStore()
         seed(store, "alice", "running")
         client, _ = make_client(store=store, max_active_jobs=2)
-        response = client.post(
-            "/v1/jobs", json={"sources": one_source()}, headers=auth()
-        )
+        response = client.post("/v1/jobs", json=submission(), headers=auth())
         assert response.status_code == 201
 
     def test_terminal_jobs_do_not_hold_a_slot(self):
@@ -572,9 +600,7 @@ class TestConcurrencyCeiling:
         for _ in range(5):
             seed(store, "alice", "completed")
         client, _ = make_client(store=store, max_active_jobs=1)
-        response = client.post(
-            "/v1/jobs", json={"sources": one_source()}, headers=auth()
-        )
+        response = client.post("/v1/jobs", json=submission(), headers=auth())
         assert response.status_code == 201
 
     def test_the_ceiling_is_per_subject_not_per_service(self):
@@ -583,9 +609,7 @@ class TestConcurrencyCeiling:
         store = InMemoryJobStore()
         seed(store, "alice", "running")
         client, _ = make_client(store=store, max_active_jobs=1)
-        response = client.post(
-            "/v1/jobs", json={"sources": one_source()}, headers=auth("bob-token")
-        )
+        response = client.post("/v1/jobs", json=submission(), headers=auth("bob-token"))
         assert response.status_code == 201
 
     def test_the_ceiling_outranks_the_input_ladder(self):
@@ -596,7 +620,7 @@ class TestConcurrencyCeiling:
         store = InMemoryJobStore()
         seed(store, "alice", "running")
         client, _ = make_client(store=store, max_active_jobs=1)
-        response = client.post("/v1/jobs", json={"sources": []}, headers=auth())
+        response = client.post("/v1/jobs", json=submission(sources=[]), headers=auth())
         assert response.status_code == 429
 
     def test_a_refusal_is_logged(self, caplog):
@@ -607,7 +631,7 @@ class TestConcurrencyCeiling:
         seed(store, "alice", "running")
         client, _ = make_client(store=store, max_active_jobs=1)
         with caplog.at_level(logging.WARNING, logger="stride_service.api"):
-            client.post("/v1/jobs", json={"sources": one_source()}, headers=auth())
+            client.post("/v1/jobs", json=submission(), headers=auth())
         assert "alice" in caplog.text
         assert "concurrency ceiling" in caplog.text
 
@@ -617,7 +641,7 @@ class TestConcurrencyCeiling:
         store = InMemoryJobStore()
         seed(store, "alice", "running")
         client, _ = make_client(store=store, max_active_jobs=1)
-        response = client.post("/v1/jobs", json={"sources": one_source()})
+        response = client.post("/v1/jobs", json=submission())
         assert response.status_code == 401
 
 

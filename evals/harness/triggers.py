@@ -26,6 +26,7 @@ from dataclasses import dataclass
 
 from evals.harness.reference import GoldenCase, ReferenceThreat
 from stride_service.candidates import generate_candidates
+from stride_service.frameworks import package_for
 from stride_service.system_model import SystemModel
 
 __all__ = ["CaseTriggerRecall", "TriggerHit", "case_trigger_recall", "corpus_recall"]
@@ -78,7 +79,7 @@ def case_trigger_recall(case: GoldenCase) -> CaseTriggerRecall:
     """Score one golden case's reference threats against the fired rules."""
     return CaseTriggerRecall(
         case_id=case.id,
-        hits=tuple(_hit(reference, case.model) for reference in case.references),
+        hits=tuple(_hit(reference, case.model) for reference in case.stride_claims()),
     )
 
 
@@ -95,7 +96,13 @@ def _hit(reference: ReferenceThreat, model: SystemModel) -> TriggerHit:
     threat's own element list is wider, and a stricter subset rule would score
     the reference set's editorial choices rather than the rules' reach.
     """
-    fired = generate_candidates(model).get(reference.category)
+    # STRIDE's own rules: trigger recall measures this package's deterministic
+    # reach against this package's reference set, and a lane name is only
+    # meaningful inside the package that declares it.
+    stride = package_for("stride")
+    fired = generate_candidates(model, stride.lanes, stride.rules).get(
+        reference.category
+    )
     targets = set(reference.affected_element_ids)
     rule_ids: tuple[str, ...] = ()
     if fired is not None:

@@ -19,4 +19,3 @@ The System Model names OAuth, OIDC, OpenID, an identity provider or broker, sing
 
 - This pack is **analysis knowledge, not evidence.** Naming a protocol failure mode here does not make it a fact about this system; ground the finding in what the submitter said, an `unknown` attribute, or a derived crossing.
 - The model rarely states which OAuth grant is in use. Where it does not, that is `unknown` — write the threat conditionally and let the critic mark it needs-info rather than assuming implicit flow or assuming PKCE.
-- Stay in the lane. Being accepted as another identity is spoofing; holding a token whose scope exceeds the caller's legitimate authority is elevation of privilege.

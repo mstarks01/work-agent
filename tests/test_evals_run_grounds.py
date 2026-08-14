@@ -27,15 +27,17 @@ from evals.harness.reference import load_case
 from evals.harness.run import _run_mode
 from stride_service.deployment import Deployment
 from stride_service.evidence import evidence_catalog
+from stride_service.frameworks.stride.record import STRIDE_CATEGORIES
 from stride_service.graph import (
     ENTRY_PREPARE,
-    TIER_NODE_BY_GRAPH_NODE,
     analyze_node_name,
+    tier_node_by_graph_node,
 )
-from stride_service.report import STRIDE_CATEGORIES
 from stride_service.sampling import load_sampling
-from tests.factories import TEST_TIER_ENV, ScriptedLlm
-from tests.test_evals_modes import scripted_ruling
+from tests.factories import DEFAULT_FRAMEWORKS, TEST_TIER_ENV, ScriptedLlm
+from tests.test_evals_modes import lane_of, scripted_ruling
+
+TIER_NODE_BY_GRAPH_NODE = tier_node_by_graph_node(DEFAULT_FRAMEWORKS)
 
 REPO_ROOT = Path(__file__).resolve().parents[1]
 CASE_DIR = REPO_ROOT / "evals" / "corpus" / "01-payments-checkout"
@@ -47,28 +49,47 @@ def case():
 
 
 class QueuedLlm(ScriptedLlm):
-    """Replays a different emission per call, so one pipeline serves two cases.
+    """One adapter for every lane, replying by lane and by how often it was asked.
 
     ``_run_mode`` builds the pipeline once for the whole sweep, which is what
     makes "the next case still runs" a property worth testing — and what means
     a per-case difference has to come from the model rather than the build.
+
+    Two things have to be told apart through one adapter since every lane
+    shares an ``analyze/stride`` tier key: *which* lane is asking, recovered
+    from its instruction, and *which case* is asking, counted per lane. The
+    broken emission is queued against one lane and consumed on that lane's
+    first call, so the second case runs clean without the queue being drained
+    by whichever lane happened to run first.
     """
 
-    replies: list[str] = Field(default_factory=list)
+    lane_replies: dict[str, str] = Field(default_factory=dict)
+    queued: dict[str, list[str]] = Field(default_factory=dict)
 
     async def generate_content_async(self, llm_request, stream: bool = False):
-        queued = self.replies.pop(0) if self.replies else None
+        instruction = llm_request.config.system_instruction or ""
         default = self.reply
-        self.reply = queued or default
+        self.reply = self._next_reply(instruction, default)
         try:
             async for response in super().generate_content_async(llm_request, stream):
                 yield response
         finally:
             self.reply = default
 
+    def _next_reply(self, instruction: str, default: str) -> str:
+        lane = lane_of(instruction, self.lane_replies or self.queued)
+        if lane is None:
+            return default
+        pending = self.queued.get(lane)
+        if pending:
+            return pending.pop(0)
+        return self.lane_replies.get(lane, default)
+
 
 def proposal(case, category, evidence: dict[str, Any], sequence: int = 1) -> dict:
-    reference = next(ref for ref in case.references if ref.category == category)
+    reference = next(
+        ref for ref in case.claims_for("stride") if ref.category == category
+    )
     return {
         "sequence": sequence,
         "title": reference.claim,
@@ -129,7 +150,8 @@ def sweep(monkeypatch, case, spoofing_first: dict[str, Any] | None) -> Any:
         return QueuedLlm(
             model="fake-pro-001",
             reply=_reply_for(case, graph_node),
-            replies=_replies_for(case, graph_node, first),
+            lane_replies=_lane_replies(case, graph_node),
+            queued=_queued_for(case, graph_node, first),
         )
 
     pipeline = modes.build_eval_pipeline(
@@ -147,23 +169,41 @@ def sweep(monkeypatch, case, spoofing_first: dict[str, Any] | None) -> Any:
 
 
 def _reply_for(case, graph_node: str) -> str:
-    if graph_node == "critic":
+    if graph_node == "critic_stride":
         return json.dumps(
-            {"threats": [scripted_ruling(category) for category in STRIDE_CATEGORIES]}
+            {"claims": [scripted_ruling(category) for category in STRIDE_CATEGORIES]}
         )
     for category in STRIDE_CATEGORIES:
-        if graph_node == analyze_node_name(category):
+        if graph_node == analyze_node_name("stride", category):
             return json.dumps(
-                {"threats": [proposal(case, category, sound_evidence(case))]}
+                {"claims": [proposal(case, category, sound_evidence(case))]}
             )
-    return '{"threats": []}'
+    return '{"claims": []}'
 
 
-def _replies_for(case, graph_node: str, first: dict[str, Any] | None) -> list[str]:
+def _lane_replies(case, graph_node: str) -> dict[str, str]:
+    """The clean per-lane emissions, for the adapter every lane agent shares."""
+    if graph_node not in {
+        analyze_node_name("stride", category) for category in STRIDE_CATEGORIES
+    }:
+        return {}
+    return {
+        category: json.dumps(
+            {"claims": [proposal(case, category, sound_evidence(case))]}
+        )
+        for category in STRIDE_CATEGORIES
+    }
+
+
+def _queued_for(
+    case, graph_node: str, first: dict[str, Any] | None
+) -> dict[str, list[str]]:
     """The spoofing agent's first emission, when the test wants it broken."""
-    if first is None or graph_node != analyze_node_name("spoofing"):
-        return []
-    return [json.dumps({"threats": [proposal(case, "spoofing", first)]})]
+    if first is None or graph_node not in {
+        analyze_node_name("stride", category) for category in STRIDE_CATEGORIES
+    }:
+        return {}
+    return {"spoofing": [json.dumps({"claims": [proposal(case, "spoofing", first)]})]}
 
 
 def test_a_clean_sweep_measures_every_case(monkeypatch, case):
@@ -244,7 +284,7 @@ def test_the_sweep_folds_latency_over_every_node_it_ran(monkeypatch, case):
     """``duration_ms`` is per execution and read back by nothing else."""
     run = sweep(monkeypatch, case, None)
 
-    critic = run.latency["critic"]
+    critic = run.latency["critic_stride"]
     assert critic.executions == 2
     assert critic.slowest_ms <= critic.total_ms
     # The deterministic derivations are absent from the token totals and

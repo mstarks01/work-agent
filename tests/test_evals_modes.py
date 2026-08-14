@@ -16,36 +16,41 @@ from pathlib import Path
 
 import pytest
 from google.adk.models.base_llm import BaseLlm
+from pydantic import Field
 
 from evals.harness import modes
 from evals.harness.reference import load_case
 from evals.harness.structural import report_issues
 from stride_service.certification import fingerprints_of
 from stride_service.evidence import evidence_catalog
+from stride_service.frameworks.stride.record import (
+    CATEGORY_LETTERS,
+    STRIDE_CATEGORIES,
+)
 from stride_service.graph import (
     ENTRY_EXTRACT,
     ENTRY_EXTRACT_ONLY,
     ENTRY_PREPARE,
     EXTRACT_NODE,
-    TIER_NODE_BY_GRAPH_NODE,
     Analysis,
     analyze_node_name,
+    tier_node_by_graph_node,
 )
 from stride_service.report import (
-    CATEGORY_LETTERS,
-    STRIDE_CATEGORIES,
     AnalysisMarks,
     Mitigation,
+    Report,
     Severity,
     SharedElementName,
-    StrideReport,
     Verdict,
 )
 from stride_service.sampling import load_sampling
-from tests.factories import ScriptedLlm
+from tests.factories import DEFAULT_FRAMEWORKS, ScriptedLlm
 
 REPO_ROOT = Path(__file__).resolve().parents[1]
 CASE_DIR = REPO_ROOT / "evals" / "corpus" / "01-payments-checkout"
+
+TIER_NODE_BY_GRAPH_NODE = tier_node_by_graph_node(DEFAULT_FRAMEWORKS)
 
 
 @pytest.fixture(scope="module")
@@ -73,7 +78,9 @@ def scripted_proposal(case, category) -> dict:
     fan-in's ladder, and these tests are about the modes rather than about
     grounding.
     """
-    reference = next(ref for ref in case.references if ref.category == category)
+    reference = next(
+        ref for ref in case.claims_for("stride") if ref.category == category
+    )
     return {
         "sequence": 1,
         "title": reference.claim,
@@ -102,13 +109,62 @@ def scripted_ruling(category) -> dict:
     }
 
 
+def lane_of(instruction: str, lanes) -> str | None:
+    """Which lane's agent this instruction belongs to, or ``None``.
+
+    Matched on the lane skill's own ``# <Lane>`` H1 rather than on the lane
+    name appearing anywhere: every lane skill names all six categories in its
+    boundaries section, so a bare substring test binds whichever lane is
+    mentioned first and silently scripts the wrong emission.
+
+    Shared with :mod:`tests.test_evals_run_grounds`, which needs the same
+    discrimination for the same reason — one ``analyze/stride`` tier key now
+    serves every lane, so a tier node no longer identifies one.
+    """
+    for lane in lanes:
+        heading = f"# {lane.replace('-', ' ').title()}"
+        if heading.lower() in instruction.lower():
+            return lane
+    return None
+
+
+class LaneAwareLlm(ScriptedLlm):
+    """One adapter serving every lane, replying by the lane it was asked about.
+
+    All six STRIDE lanes run on one ``analyze/stride`` tier key since
+    ``model_tiers.toml`` v5, so a tier node no longer identifies a lane and a
+    resolver keyed on one cannot script six different emissions. The lane is
+    recoverable from the instruction the lane agent was actually built with,
+    which is the only place it still distinguishes itself.
+    """
+
+    replies: dict[str, str] = Field(default_factory=dict)
+
+    async def generate_content_async(self, llm_request, stream: bool = False):
+        instruction = llm_request.config.system_instruction or ""
+        default = self.reply
+        self.reply = self._reply_for_instruction(instruction, default)
+        try:
+            async for response in super().generate_content_async(llm_request, stream):
+                yield response
+        finally:
+            self.reply = default
+
+    def _reply_for_instruction(self, instruction: str, default: str) -> str:
+        lane = lane_of(instruction, self.replies)
+        return self.replies[lane] if lane else default
+
+
 def build(case, entry, models: dict[str, ScriptedLlm]) -> object:
     def resolve(tier_node: str) -> BaseLlm:
         graph_node = next(
             node for node, tier in TIER_NODE_BY_GRAPH_NODE.items() if tier == tier_node
         )
-        models[graph_node] = ScriptedLlm(
-            model="fake-pro-001", reply=_reply_for(case, graph_node), seen=[]
+        models[graph_node] = LaneAwareLlm(
+            model="fake-pro-001",
+            reply=_reply_for(case, graph_node),
+            seen=[],
+            replies=_lane_replies(case, graph_node),
         )
         return models[graph_node]
 
@@ -119,17 +175,29 @@ def build(case, entry, models: dict[str, ScriptedLlm]) -> object:
     )
 
 
+def _lane_replies(case, graph_node: str) -> dict[str, str]:
+    """Per-lane emissions, for the one adapter every lane agent shares."""
+    if graph_node not in {
+        analyze_node_name("stride", category) for category in STRIDE_CATEGORIES
+    }:
+        return {}
+    return {
+        category: json.dumps({"claims": [scripted_proposal(case, category)]})
+        for category in STRIDE_CATEGORIES
+    }
+
+
 def _reply_for(case, graph_node: str) -> str:
     if graph_node == "extract":
         return json.dumps(case.model.model_dump(mode="json"))
-    if graph_node == "critic":
+    if graph_node == "critic_stride":
         return json.dumps(
-            {"threats": [scripted_ruling(category) for category in STRIDE_CATEGORIES]}
+            {"claims": [scripted_ruling(category) for category in STRIDE_CATEGORIES]}
         )
     for category in STRIDE_CATEGORIES:
-        if graph_node == analyze_node_name(category):
-            return json.dumps({"threats": [scripted_proposal(case, category)]})
-    return '{"threats": []}'
+        if graph_node == analyze_node_name("stride", category):
+            return json.dumps({"claims": [scripted_proposal(case, category)]})
+    return '{"claims": []}'
 
 
 def test_analysis_mode_injects_the_blessed_model_at_prepare(case):
@@ -142,7 +210,7 @@ def test_analysis_mode_injects_the_blessed_model_at_prepare(case):
     # whole point of the mode.
     assert "extract" not in models
     assert report.system_model == case.model
-    spoofing = models[analyze_node_name("spoofing")].seen[0]
+    spoofing = models[analyze_node_name("stride", "spoofing")].seen[0]
     assert "flow:shopper-to-storefront-api:place-order" in spoofing
 
 
@@ -152,7 +220,7 @@ def test_analysis_mode_output_passes_the_tier_1_gates(case):
     report = asyncio.run(modes.run_analysis(case, pipeline)).report
 
     assert report_issues(report) == []
-    assert len(report.threats) == len(STRIDE_CATEGORIES)
+    assert len(report.analyses[0].claims) == len(STRIDE_CATEGORIES)
 
 
 def test_an_eval_report_carries_every_field_production_stamps(case):
@@ -160,7 +228,7 @@ def test_an_eval_report_carries_every_field_production_stamps(case):
 
     The pinned set is the guard, and it is pinned rather than derived on
     purpose: every field an :class:`~stride_service.graph.Analysis` and a
-    :class:`~stride_service.report.StrideReport` share is one the eval seam has
+    :class:`~stride_service.report.Report` share is one the eval seam has
     to be *asked* to carry, and a field added to both without a decision here
     is exactly how ``coverage`` came to be computed at the fan-in for a sweep
     that then read an empty list for it.
@@ -176,21 +244,18 @@ def test_an_eval_report_carries_every_field_production_stamps(case):
     analysis_fields = {field.name for field in fields(Analysis)} | set(
         AnalysisMarks.model_fields
     )
-    shared = analysis_fields & StrideReport.model_fields.keys()
+    shared = analysis_fields & Report.model_fields.keys()
+    # Only what the envelope itself carries. The eight per-framework fields
+    # moved onto the block at schema 3.0, so a field this set still named would
+    # be one the envelope no longer has.
     assert shared == {
         "system_model",
         "boundary_crossings",
-        "threats",
-        "rejected_threats",
-        "unverified_grounds",
-        "unresolved_mentions",
-        "unresolved_evidence",
-        "missing_mitigations",
+        "analyses",
         "shared_element_names",
-        "coverage",
-        "summary",
     }
-    assert len(run.report.coverage) == len(STRIDE_CATEGORIES)
+    block = run.report.analyses[0]
+    assert len(block.coverage) == len(STRIDE_CATEGORIES)
     assert run.report.shared_element_names == [
         SharedElementName(name_slug=slug, element_ids=ids)
         for slug, ids in run.report.system_model.shared_names().items()
@@ -205,9 +270,10 @@ def test_analysis_mode_scores_against_the_reference_set(case):
     report = asyncio.run(modes.run_analysis(case, pipeline)).report
     # The scripted threats are titled with reference claims verbatim, so a
     # judge that matches identical strings is the honest stand-in here.
-    judge = ScriptedJudge((threat.title, threat.title) for threat in report.threats)
+    claims = report.analyses[0].claims
+    judge = ScriptedJudge((claim.title, claim.title) for claim in claims)
 
-    score = score_case(case, report.threats, judge)
+    score = score_case(case, claims, judge)
 
     assert len(score.matched) == len(STRIDE_CATEGORIES)
     assert score.element_accuracy == 1.0
@@ -223,7 +289,7 @@ def test_analysis_mode_surfaces_the_pre_critic_drafts(case):
 
     assert len(run.merged_drafts) == len(STRIDE_CATEGORIES)
     assert {draft.id for draft in run.merged_drafts} == {
-        threat.id for threat in run.report.threats
+        claim.id for claim in run.report.analyses[0].claims
     }
     # Drafts, not threats: the critic's two rulings are absent by construction.
     assert not any(hasattr(draft, "verdict") for draft in run.merged_drafts)
@@ -299,7 +365,7 @@ def test_an_eval_report_stamps_the_nodes_that_actually_ran(case):
 
     stamped = {node_run.node for node_run in report.nodes}
     assert EXTRACT_NODE in stamped
-    assert "critic" in stamped
+    assert "critic_stride" in stamped
     assert stamped <= {node.name for node in pipeline.workflow.graph.nodes}
     # The placeholder this replaced.
     assert "eval" not in stamped
@@ -339,9 +405,12 @@ def test_an_eval_report_records_the_same_analysis_context_a_job_does(case):
 
     report = asyncio.run(modes.run_end_to_end(case, pipeline)).report
     context = report.analysis_context
+    fired_rules = report.analyses[0].fired_rules
 
     assert context.instruction_sha256 == pipeline.instruction_sha256
-    assert context.fired_rules == sorted(set(context.fired_rules))
+    # fired_rules names this package's own Candidate rules, so it sits on the
+    # block rather than on the envelope's shared context.
+    assert fired_rules == sorted(set(fired_rules))
 
 
 def test_extraction_mode_observes_its_one_node(case):
