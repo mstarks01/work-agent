@@ -33,6 +33,7 @@ later rejects was still a part of the system being examined.
 from __future__ import annotations
 
 from collections.abc import Collection, Iterable, Mapping
+from types import MappingProxyType
 
 from stride_service.analysis import unknown_controls
 from stride_service.candidates import CandidateSet
@@ -50,8 +51,9 @@ def lane_scope(
     package: FrameworkPackage,
     model: SystemModel,
     candidate_set: CandidateSet | None,
+    options: Mapping[str, object] = MappingProxyType({}),
 ) -> str:
-    """One lane's denominators, as a line the agent reads before it starts.
+    """One lane's denominators and its job's options, as a line the agent reads.
 
     The same numbers :func:`build_coverage` records afterwards, and derived
     from the same three calls — which is the whole reason this lives here
@@ -67,15 +69,27 @@ def lane_scope(
     and an agent cannot say that about a system whose size it was never told.
     An agent that files a claim per element to make a number go up has
     misread it, which is why the prompt spends a sentence saying so.
+
+    **The job's options ride here** because this is the one per-lane block the
+    graph writes per job. A framework whose options select which requirements
+    apply produces a different answer under different ones, so its lane agents
+    have to be told what was asked for. They are rendered neutrally, as the
+    package's own field names against the values the input ladder validated:
+    this module knows no package, and a framework with no options renders
+    nothing extra.
     """
     offered = candidate_set.candidates if candidate_set else ()
     fired = len({candidate.rule_id for candidate in offered})
+    selected = "".join(
+        f" This job asked for {package.name} with {name} {value}."
+        for name, value in sorted(options.items())
+    )
     return (
         f"Scope for your lane: {len(model.elements())} elements, "
         f"{len(model.boundary_crossings())} boundary crossings, "
         f"{len(unknown_controls(model))} unstated controls. "
         f"{len(package.rules_for(lane))} {lane} rules ran; {fired} fired, "
-        f"raising {len(offered)} candidates.\n"
+        f"raising {len(offered)} candidates.{selected}\n"
     )
 
 

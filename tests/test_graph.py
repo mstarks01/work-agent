@@ -292,8 +292,16 @@ def routed_fan_out(pipeline, source: str) -> dict[Any, set[str]]:
 
 
 def test_every_canonical_llm_node_is_a_graph_node(pipeline):
-    """The tier config's node names and the graph's LLM nodes are one set."""
-    assert set(TIER_NODES.values()) == set(LLM_NODES)
+    """This graph's LLM node names are tier keys, and they are all in the graph.
+
+    A subset rather than an equality, and the reason is what ``LLM_NODES`` is:
+    it names every key the tier config must carry, which is three per framework
+    this build can spell. This pipeline is built for one selection, so it
+    exercises that selection's keys and no others — an install running STRIDE
+    alone still configures ASVS's three, and no graph of its will ever bind
+    them.
+    """
+    assert set(TIER_NODES.values()) <= set(LLM_NODES)
     assert set(TIER_NODES) <= set(nodes_by_name(pipeline))
 
 
@@ -595,16 +603,17 @@ def test_extract_and_repair_share_one_output_key(pipeline):
 # --- Instructions -----------------------------------------------------------
 
 
-def test_analyze_instruction_carries_skill_then_prompt_then_exemplars(
+def test_analyze_instruction_carries_skill_then_prompt_then_contract_then_exemplars(
     prompt_loader, package_loader
 ):
     instruction = graph.analyze_instruction(
         package_loader, prompt_loader, STRIDE, graph.Lane("stride", "spoofing")
     )
     scope = instruction.index("# Spoofing")
-    role = instruction.index("# STRIDE Category Agent")
+    role = instruction.index("# Lane Agent")
+    contract = instruction.index("# STRIDE Output Contract")
     exemplars = instruction.index("Exemplars")
-    assert scope < role < exemplars
+    assert scope < role < contract < exemplars
 
 
 def test_category_placeholder_is_filled_at_build_time(prompt_loader, package_loader):

@@ -170,7 +170,6 @@ from stride_service.report import (
     NodeRun,
     Report,
     Ruling,
-    ScopeEntry,
     SharedElementName,
 )
 from stride_service.resilience import ResilienceConfig
@@ -532,6 +531,15 @@ STATE_VALID_MODEL = "valid_model"
 STATE_DOMAIN_PACKS = "domain_packs"
 STATE_ANALYSIS = "analysis"
 STATE_REJECTION = "rejection"
+# What each selected framework was asked for, as ``name -> options``, exactly as
+# the input ladder validated it against that package's own ``options`` model.
+#
+# **Job data, not graph shape.** Two jobs selecting the same frameworks with
+# different options share one built graph, so the values arrive per run and the
+# driver seeds them. A framework whose options select which requirements apply
+# produces a different answer under different ones, which is why they reach the
+# lane agents and the block rather than only the report's ``job`` field.
+STATE_FRAMEWORK_OPTIONS = "framework_options"
 
 # The per-framework keys, as artifact names. Each is spelled
 # ``<artifact>_<framework>`` by :meth:`FrameworkNodes.key`, so two frameworks'
@@ -588,6 +596,7 @@ SHARED_STRUCTURED_KEYS: frozenset[str] = frozenset(
         STATE_DOMAIN_PACKS,
         STATE_ANALYSIS,
         STATE_REJECTION,
+        STATE_FRAMEWORK_OPTIONS,
     }
 )
 
@@ -1158,6 +1167,7 @@ def prepare_analysis(
     packs = select_domain_packs(model)
 
     state = keys.state(ctx)
+    options = state.get(STATE_FRAMEWORK_OPTIONS) or {}
     state.prompt(STATE_SYSTEM_MODEL, render_fenced(_without_source_fields(valid_model)))
     state.prompt(
         STATE_BOUNDARY_CROSSINGS,
@@ -1196,7 +1206,13 @@ def prepare_analysis(
             lane_state = lane.state(
                 {
                     "candidates": render_fenced(candidate_set.model_dump(mode="json")),
-                    "scope": lane_scope(lane.lane, package, model, candidate_set),
+                    "scope": lane_scope(
+                        lane.lane,
+                        package,
+                        model,
+                        candidate_set,
+                        options.get(name) or {},
+                    ),
                     "reference_notes": compose_notes(loader, notes),
                     "prior_cases": compose_cases(loader, cases),
                 }
@@ -1585,8 +1601,15 @@ def assemble_report(
     """
     model = SystemModel.model_validate(valid_model)
     state = keys.state(ctx)
+    options = state.get(STATE_FRAMEWORK_OPTIONS) or {}
     blocks = [
-        _framework_block(FrameworkNodes(name), state, model, disclaimers[name])
+        _framework_block(
+            FrameworkNodes(name),
+            state,
+            model,
+            disclaimers[name],
+            options.get(name) or {},
+        )
         for name in frameworks
     ]
     analysis = Analysis(
@@ -1609,6 +1632,7 @@ def _framework_block(
     state: SessionState,
     model: SystemModel,
     disclaimer: str,
+    options: Mapping[str, Any],
 ) -> FrameworkAnalysis:
     """One framework's finished analysis block, from its own parked artifacts.
 
@@ -1629,10 +1653,16 @@ def _framework_block(
     **A refused framework reaches here too**, on its ``skip`` route out of
     ``prepare`` rather than through its own critic. Every key its subgraph would
     have written is absent, so its claims, coverage and marks read as absent
-    already; the one thing it adds is :func:`_refusal_scope`, which states why
-    each of its lanes did not run. That is what keeps the envelope's own check
+    already; the one thing it adds is its block's own ``scope``, which states why
+    the framework did not run. That is what keeps the envelope's own check
     answerable — the analyses must answer the job's frameworks in order, with
     none dropped — while the framework's judgement stays unspent.
+
+    **An option a block declares as a field is stamped from the job's own
+    selection.** ASVS records the level it ruled at, so a reader holding the
+    block alone can tell which requirement set produced the answer. The rule is
+    one line and neutral: a field named after an option gets that option's value.
+    A package whose block declares no such field is handed nothing.
     """
     schemas = nodes.schemas
     package = nodes.package
@@ -1647,7 +1677,14 @@ def _framework_block(
         disclaimer=disclaimer,
         claims=claims,
         rejected_claims=rejected,
-        scope=_refusal_scope(package, state.get(nodes.key("precondition"))),
+        scope=schemas.block.scope_entries(
+            lanes=package.lanes,
+            claims=(*claims, *rejected),
+            options=options,
+            refusal_reason=_refusal_reason(
+                package, state.get(nodes.key("precondition"))
+            ),
+        ),
         coverage=[
             LaneCoverage.model_validate(row)
             for row in state.get(nodes.key("coverage")) or []
@@ -1658,6 +1695,11 @@ def _framework_block(
         **{
             field: value
             for field, value in marks.model_dump(mode="json").items()
+            if field in schemas.block.model_fields
+        },
+        **{
+            field: value
+            for field, value in options.items()
             if field in schemas.block.model_fields
         },
     )
@@ -1682,30 +1724,20 @@ _REFUSAL_REASONS: Mapping[str, str] = MappingProxyType(
 )
 
 
-def _refusal_scope(package: FrameworkPackage, result: object) -> list[ScopeEntry]:
-    """Every lane this framework did not run, and why, or nothing if it ran.
+def _refusal_reason(package: FrameworkPackage, result: object) -> str:
+    """Why this framework did not run, or ``""`` when it did.
 
-    **The unit is the lane**, because a lane is what the gate stopped and the
-    only unit of a framework this service knows without reading a catalog it
-    does not own. A package whose own units are finer — a requirement set — says
-    so in its own block rather than here.
+    What the reason is *used for* is the block's own — the neutral base answers
+    in lanes, and a package holding a requirement catalog answers in
+    requirements. What the reason *says* is the graph's, because the gate is the
+    graph's.
 
     ``result`` is read as ``satisfied`` when the key is absent, which is a graph
     entered past ``prepare``: the eval harness's analysis mode seeds a blessed
-    model and runs no gate, and reporting every lane out of scope there would
-    describe a refusal that never happened.
+    model and runs no gate, and reporting a refusal there would describe one that
+    never happened.
     """
-    reason = _REFUSAL_REASONS.get(str(result), "")
-    if not reason:
-        return []
-    return [
-        ScopeEntry(
-            unit=lane,
-            state="not-applicable",
-            reason=reason.format(framework=package.name),
-        )
-        for lane in package.lanes
-    ]
+    return _REFUSAL_REASONS.get(str(result), "").format(framework=package.name)
 
 
 # --- Assembly ---------------------------------------------------------------

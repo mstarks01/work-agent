@@ -14,7 +14,9 @@ prefix at construction, so a fresh engine per call pays that cost every time.
 ```python
 from stride_service import StrideEngine
 
-engine = StrideEngine.from_config(["stride"])   # bundled prompts, bundled config, pinned models
+engine = StrideEngine.from_config(
+    ["stride"]
+)  # bundled prompts, bundled config, pinned models
 ```
 
 **`frameworks` is required and has no default.** It names which security
@@ -61,12 +63,12 @@ once — and builds the engine from it. Resolve it yourself when you need both:
 ```python
 from stride_service import Deployment, StrideEngine
 
-deployment = Deployment.from_env()          # reads config; no credentials touched
+deployment = Deployment.from_env()  # reads config; no credentials touched
 engine = StrideEngine.from_deployment(deployment, deployment.frameworks)
 
-deployment.frameworks                        # what config/frameworks.toml carries
+deployment.frameworks  # what config/frameworks.toml carries
 
-deployment.tiers.tiers["strong"].model       # what the strong tier selected
+deployment.tiers.tiers["strong"].model  # what the strong tier selected
 ```
 
 The two stages fail differently on purpose. `from_env()` raises for a missing or

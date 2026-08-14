@@ -28,18 +28,24 @@ framework's own findings sit in its own block under `analyses`.
 
 ```python
 class Report:
-    schema_version: str          # "3.0"
-    disclaimer: str              # the SERVICE's: AI-generated, not human-reviewed
-    job: Job                     # id, status="completed", timestamps, revise_rounds, frameworks
-    input: InputRef              # system_name + one ref per submitted source
-    nodes: list[NodeRun]         # per-node model, sampling fingerprint, duration_ms, token usage
-    sampling: dict[str, dict]    # per-tier resolved decoding params (provenance)
-    system_model: SystemModel    # the ONE canonical model every framework ran on
+    schema_version: str  # "3.0"
+    disclaimer: str  # the SERVICE's: AI-generated, not human-reviewed
+    job: Job  # id, status="completed", timestamps, revise_rounds, frameworks
+    input: InputRef  # system_name + one ref per submitted source
+    nodes: list[
+        NodeRun
+    ]  # per-node model, sampling fingerprint, duration_ms, token usage
+    sampling: dict[str, dict]  # per-tier resolved decoding params (provenance)
+    system_model: SystemModel  # the ONE canonical model every framework ran on
     boundary_crossings: list[BoundaryCrossing]
-    shared_element_names: list[SharedElementName]  # different-typed elements sharing one name slug
+    shared_element_names: list[
+        SharedElementName
+    ]  # different-typed elements sharing one name slug
     elements_analyzed: int
-    analysis_context: AnalysisContext | None       # what informed the analysis (never what proves it)
-    analyses: list[FrameworkAnalysis]              # one block per framework, in the job's own order
+    analysis_context: (
+        AnalysisContext | None
+    )  # what informed the analysis (never what proves it)
+    analyses: list[FrameworkAnalysis]  # one block per framework, in the job's own order
 ```
 
 **A field sits where the thing it describes sits.** Nine fields describe the job
@@ -63,18 +69,18 @@ copies of one model agreed.
 
 ```python
 class FrameworkAnalysis:
-    framework: str                # "stride" — the name the job selected
-    framework_version: str        # the ruleset version that produced these claims
-    disclaimer: str               # the PACKAGE's: what this framework's claims assert
-    claims: list[RuledClaim]      # the actionable findings
-    rejected_claims: list[RuledClaim]   # the audit trail of drafts the critic ruled out
-    scope: list[ScopeEntry]       # units this framework considered and raised nothing about
+    framework: str  # "stride" — the name the job selected
+    framework_version: str  # the ruleset version that produced these claims
+    disclaimer: str  # the PACKAGE's: what this framework's claims assert
+    claims: list[RuledClaim]  # the actionable findings
+    rejected_claims: list[RuledClaim]  # the audit trail of drafts the critic ruled out
+    scope: list[ScopeEntry]  # units this framework considered and raised nothing about
     coverage: list[LaneCoverage]  # per-lane account of what each agent was offered
     unverified_grounds: list[UnverifiedGround]
     unresolved_mentions: list[UnresolvedMention]
     unresolved_evidence: list[UnresolvedEvidence]
-    fired_rules: list[str]        # this package's deterministic rules that matched
-    knowledge_docs: list[str]     # local-corpus documents those rules retrieved
+    fired_rules: list[str]  # this package's deterministic rules that matched
+    knowledge_docs: list[str]  # local-corpus documents those rules retrieved
     summary: BlockSummary
 ```
 
@@ -102,16 +108,17 @@ framework's own record.
 
 ```python
 class Claim:
-    id: str                          # unique within its own block
-    framework: str                   # which framework this is a conclusion of
-    framework_version: str           # required, non-empty
+    id: str  # unique within its own block
+    framework: str  # which framework this is a conclusion of
+    framework_version: str  # required, non-empty
     title: str
     description: str
     affected_element_ids: list[str]  # element IDs in system_model — always resolve
-    grounds: list[Ground]            # why it was raised — at least one, never empty
+    grounds: list[Ground]  # why it was raised — at least one, never empty
+
 
 class RuledClaim(Claim):
-    verdict: Verdict                 # the critic's ruling
+    verdict: Verdict  # the critic's ruling
 ```
 
 **`(framework, framework_version)` is one pair and both halves are required.** A
@@ -132,10 +139,10 @@ require at least one.
 
 ```python
 class Threat(RuledClaim):
-    category: StrideCategory         # spoofing | tampering | repudiation | ...
+    category: StrideCategory  # spoofing | tampering | repudiation | ...
     severity: Severity
-    mitigations: list[Mitigation]    # {summary, detail}
-    confidence: Rating               # low | medium | high (critic-calibrated)
+    mitigations: list[Mitigation]  # {summary, detail}
+    confidence: Rating  # low | medium | high (critic-calibrated)
 ```
 
 Category letters: `S` spoofing, `T` tampering, `R` repudiation,
@@ -153,9 +160,9 @@ bad composition rather than catch it.
 
 ```python
 class ScopeEntry:
-    unit: str                        # the requirement, lane or unit considered
+    unit: str  # the requirement, lane or unit considered
     state: "applicable" | "not-applicable"
-    reason: str                      # required when not-applicable
+    reason: str  # required when not-applicable
 ```
 
 A framework whose own presence tests rule a unit out has to **say so**: dropping
@@ -192,14 +199,15 @@ however many changes it carries.
 
 ```python
 class SourceRef:
-    kind: str                    # description | transcript
-    label: str                   # the citation key an element's source_label names
-    sha256: str                  # digest of that one source's text
+    kind: str  # description | transcript
+    label: str  # the citation key an element's source_label names
+    sha256: str  # digest of that one source's text
+
 
 class InputRef:
     system_name: str
-    sources: list[SourceRef]     # one per submitted source, in submitted order
-    source_sha256: str           # aggregate, taken over the refs above
+    sources: list[SourceRef]  # one per submitted source, in submitted order
+    source_sha256: str  # aggregate, taken over the refs above
 ```
 
 The aggregate is computed **over the refs**, not over the concatenated text, so
@@ -231,11 +239,11 @@ compiler. See [ADR 0004](adr/0004-evidence-references.md).
 ```python
 class Ground:
     kind: "quote" | "unknown-attribute" | "absent-attribute" | "derived-fact"
-    text: str                    # quote: the verbatim span, ≤1000 chars
-    source_label: str            # quote: names one of input.sources
-    element_id: str              # either attribute kind: resolves in system_model
-    attribute: str               # either attribute kind: the attribute relied on
-    flow_id: str                 # derived-fact: a data flow in system_model
+    text: str  # quote: the verbatim span, ≤1000 chars
+    source_label: str  # quote: names one of input.sources
+    element_id: str  # either attribute kind: resolves in system_model
+    attribute: str  # either attribute kind: the attribute relied on
+    flow_id: str  # derived-fact: a data flow in system_model
 ```
 
 | `kind` | Carries | Reads as |
@@ -276,8 +284,8 @@ supports the finding — that judgement stays the critic's.
 
 ```python
 class UnverifiedGround:
-    claim_id: str                # the claim carrying it, unique within this block
-    index: int                   # position in that claim's `grounds` list
+    claim_id: str  # the claim carrying it, unique within this block
+    index: int  # position in that claim's `grounds` list
     reason: str
 ```
 
@@ -294,8 +302,8 @@ run.
 
 ```python
 class UnresolvedEvidence:
-    claim_id: str                # the claim that cited it
-    reference: str               # the reference as written, e.g. "unknown:flow:ghost:authentication"
+    claim_id: str  # the claim that cited it
+    reference: str  # the reference as written, e.g. "unknown:flow:ghost:authentication"
 ```
 
 The [evidence catalog](#grounds--why-the-finding-was-raised) is closed and
@@ -329,8 +337,8 @@ checked differently on purpose.
 
 ```python
 class UnresolvedMention:
-    claim_id: str                # the claim whose description cites it
-    mention: str                 # the ID as written, e.g. "process:web-api"
+    claim_id: str  # the claim whose description cites it
+    mention: str  # the ID as written, e.g. "process:web-api"
 ```
 
 A structural reference that does not resolve **fails the job** — it is the
@@ -359,7 +367,7 @@ without first learning that fact.
 
 ```python
 class MissingMitigation:
-    claim_id: str                # the threat offering no countermeasure
+    claim_id: str  # the threat offering no countermeasure
 ```
 
 That case is mechanically recognizable, so the report distinguishes it. A
@@ -385,8 +393,8 @@ what that rule is about.
 
 ```python
 class SharedElementName:
-    name_slug: str               # the slug both elements normalize to
-    element_ids: list[str]       # the two or more IDs that share it
+    name_slug: str  # the slug both elements normalize to
+    element_ids: list[str]  # the two or more IDs that share it
 ```
 
 **Why a mark and not a gate failure.** The gate has exactly one severity —
@@ -423,17 +431,17 @@ fact about the report.
 
 ```python
 class LaneCoverage:
-    lane: str                    # the lane slug the package declares
-    drafts: int                  # claims this lane filed, before the critic ruled
-    rules: int                   # deterministic triggers defined in this lane
-    rules_fired: int             # of those, how many produced a candidate here
-    candidates: int              # structural leads handed to this agent
-    candidates_cited: int        # leads whose every element the drafts cite
-    elements: int                # elements in the system model
+    lane: str  # the lane slug the package declares
+    drafts: int  # claims this lane filed, before the critic ruled
+    rules: int  # deterministic triggers defined in this lane
+    rules_fired: int  # of those, how many produced a candidate here
+    candidates: int  # structural leads handed to this agent
+    candidates_cited: int  # leads whose every element the drafts cite
+    elements: int  # elements in the system model
     elements_cited: int
     boundary_crossings: int
     boundary_crossings_cited: int
-    unknown_controls: int        # attributes stating no verified control
+    unknown_controls: int  # attributes stating no verified control
     unknown_controls_cited: int
 ```
 
@@ -457,17 +465,17 @@ still part of the system being examined.
 ## `analysis_context` — what informed the run
 
 ```python
-class AnalysisContext:        # on the ENVELOPE
-    instruction_sha256: str   # digest of every LLM node's composed instruction
-    domain_packs: list[str]   # the reference packs this model earned, in selection order
+class AnalysisContext:  # on the ENVELOPE
+    instruction_sha256: str  # digest of every LLM node's composed instruction
+    domain_packs: list[str]  # the reference packs this model earned, in selection order
 ```
 
 Two more fields answer the same question **per framework**, and sit on the block
 for the reason the split gives above — they name one package's own rules:
 
 ```python
-    fired_rules: list[str]    # this package's deterministic rules that matched, sorted
-    knowledge_docs: list[str] # local-corpus documents those rules retrieved
+fired_rules: list[str]  # this package's deterministic rules that matched, sorted
+knowledge_docs: list[str]  # local-corpus documents those rules retrieved
 ```
 
 The report records what each node *ran on* (`nodes`, `sampling`) and what each
@@ -533,8 +541,8 @@ cannot inflate it. `justification` explains the two inputs.
 ```python
 from stride_service import derive_severity_level
 
-derive_severity_level("high", "high")     # "critical"
-derive_severity_level("medium", "low")    # "low"
+derive_severity_level("high", "high")  # "critical"
+derive_severity_level("medium", "low")  # "low"
 ```
 
 ### Verdict
@@ -544,8 +552,8 @@ The critic's ruling on the threat:
 ```python
 class Verdict:
     status: "confirmed" | "needs-info" | "rejected"
-    reason: str                          # required unless confirmed
-    related_unknowns: list[UnknownRef]   # required iff needs-info
+    reason: str  # required unless confirmed
+    related_unknowns: list[UnknownRef]  # required iff needs-info
 ```
 
 - `confirmed` — grounded in the model's facts.
@@ -572,12 +580,13 @@ See [ADR 0005](adr/0005-verdict-shape-is-re-askable.md).
 Counts a UI can render without walking a block's claim list:
 
 ```python
-class BlockSummary:                       # on every framework block
+class BlockSummary:  # on every framework block
     claim_count: int
     needs_info_count: int
     rejected_count: int
 
-class StrideSummary(BlockSummary):        # what STRIDE's block carries
+
+class StrideSummary(BlockSummary):  # what STRIDE's block carries
     by_category: dict[StrideCategory, int]
     by_severity: dict[SeverityLevel, int]
 ```
@@ -596,18 +605,23 @@ a result stands on its own without trusting any outside record.
 
 ```python
 class NodeRun:
-    node: str                        # graph node name: "extract", "analyze_stride_spoofing", "critic_stride", …
-    model: str | None                # the SERVED build, vendor-prefixed; None for code-only nodes
-    requested_model: str | None      # the CONFIGURED route this node asked for
-    sampling_fingerprint: str | None # 64-hex identity hash of (served route, decoding params)
+    node: (
+        str  # graph node name: "extract", "analyze_stride_spoofing", "critic_stride", …
+    )
+    model: str | None  # the SERVED build, vendor-prefixed; None for code-only nodes
+    requested_model: str | None  # the CONFIGURED route this node asked for
+    sampling_fingerprint: (
+        str | None
+    )  # 64-hex identity hash of (served route, decoding params)
     duration_ms: int
-    usage: TokenUsage | None         # what the provider says the call cost; None if unmetered
+    usage: TokenUsage | None  # what the provider says the call cost; None if unmetered
+
 
 class TokenUsage:
     prompt_tokens: int
-    cached_prompt_tokens: int        # the part of prompt_tokens served from cache
+    cached_prompt_tokens: int  # the part of prompt_tokens served from cache
     completion_tokens: int
-    reasoning_tokens: int            # spent against max_output_tokens, absent from the output
+    reasoning_tokens: int  # spent against max_output_tokens, absent from the output
     total_tokens: int
 ```
 
@@ -741,8 +755,8 @@ fixtures) simply has an empty `sampling` and no fingerprints.
 front end consumes):
 
 ```python
-report.model_dump_json()          # str
-report.model_dump(mode="json")    # dict
+report.model_dump_json()  # str
+report.model_dump(mode="json")  # dict
 ```
 
 ## Rendering this report
