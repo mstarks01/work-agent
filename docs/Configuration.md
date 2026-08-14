@@ -471,7 +471,7 @@ node. It did not used to be, and that gap was the 429 storm. On the OpenAI/Azure
 path LiteLLM sets the provider SDK's own `max_retries` from the retry count it
 is given, so the first attempt retried at the SDK level too and the worst case
 per node was `2 * attempts - 1` requests — five at the shipped `3`, and up to
-thirty in the seconds the six category agents run in parallel. Passing `max_retries` on
+thirty in the seconds a framework's lane agents run in parallel. Passing `max_retries` on
 the adapter did not close it, because the retry count LiteLLM is given overwrites
 it.
 
