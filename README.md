@@ -1,4 +1,4 @@
-** This repo is under early active development and breaking changes should be expected. ** 
+**This repo is under early active development and breaking changes should be expected.** 
 
 # stride-service
 
