@@ -21,6 +21,7 @@ from google.adk.workflow import FunctionNode, JoinNode
 from stride_service import graph
 from stride_service.binding import NodeBinding
 from stride_service.critic import CriticOutputError, DraftJoinError
+from stride_service.frameworks import PreconditionError
 from stride_service.frameworks.stride import STRIDE
 from stride_service.frameworks.stride.record import (
     STRIDE_CATEGORIES,
@@ -44,6 +45,8 @@ from stride_service.sources import Source
 from stride_service.system_model import SystemModel
 from tests.factories import (
     DEFAULT_FRAMEWORKS,
+    carrying,
+    package_answering,
     repo_package_loaders,
     repo_tiers,
     sample_draft,
@@ -253,6 +256,38 @@ def routed_targets(pipeline, source: str) -> dict:
     }
 
 
+def prepare(ctx, model, domain_loader, package_loaders) -> Any:
+    """Drive ``prepare`` over one model and hand back what it reported.
+
+    The node routes as well as prepares — it is the run-time precondition gate —
+    so it returns an ``Event`` carrying the report rather than the report itself.
+    A test about the artifacts reads that report through here; a test about the
+    gate needs ``actions.route`` and calls ``graph.prepare_analysis`` directly.
+    """
+    return graph.prepare_analysis(
+        model.model_dump(mode="json"),
+        ctx,
+        KEYS,
+        FRAMEWORKS,
+        domain_loader,
+        package_loaders,
+    ).output
+
+
+def routed_fan_out(pipeline, source: str) -> dict[Any, set[str]]:
+    """Every route out of one node against *all* the nodes it reaches.
+
+    :func:`routed_targets` keeps one target per route, which is enough for the
+    routers. ``prepare`` fans one route out to a whole framework's lane agents,
+    so a test about it needs the set.
+    """
+    fanned: dict[Any, set[str]] = {}
+    for edge in pipeline.workflow.graph.edges:
+        if edge.from_node.name == source:
+            fanned.setdefault(edge.route, set()).add(edge.to_node.name)
+    return fanned
+
+
 # --- Wiring -----------------------------------------------------------------
 
 
@@ -434,12 +469,15 @@ def test_deterministic_bookends_carry_no_model(pipeline):
 
 
 def test_six_category_agents_fan_out_from_prepare_and_join(pipeline):
-    edges = pipeline.workflow.graph.edges
-    fanned = {
-        edge.to_node.name for edge in edges if edge.from_node.name == graph.PREPARE_NODE
+    """The fan-out is the ``run`` route's; the ``skip`` route bypasses the lanes."""
+    fanned = routed_fan_out(pipeline, graph.PREPARE_NODE)
+    joined = {
+        edge.from_node.name
+        for edge in pipeline.workflow.graph.edges
+        if edge.to_node.name == JOIN_NODE
     }
-    joined = {edge.from_node.name for edge in edges if edge.to_node.name == JOIN_NODE}
-    assert fanned == set(ANALYZE_NODES) == joined
+    assert fanned[NODES.run_route] == set(ANALYZE_NODES) == joined
+    assert fanned[NODES.skip_route] == {graph.ASSEMBLE_NODE}
     assert len(ANALYZE_NODES) == len(STRIDE_CATEGORIES) == 6
 
 
@@ -793,14 +831,7 @@ def test_prepare_derives_crossings_rather_than_trusting_them(
     domain_loader, package_loaders
 ):
     ctx = FakeContext()
-    output = graph.prepare_analysis(
-        valid_model().model_dump(mode="json"),
-        ctx,
-        KEYS,
-        FRAMEWORKS,
-        domain_loader,
-        package_loaders,
-    )
+    output = prepare(ctx, valid_model(), domain_loader, package_loaders)
 
     assert output["element_count"] == 7
     assert output["crossing_count"] == 1
@@ -1302,14 +1333,7 @@ def test_prepare_fences_candidate_facts(domain_loader, package_loaders):
 
 def test_prepare_selects_domain_packs_from_the_model(domain_loader, package_loaders):
     ctx = FakeContext()
-    output = graph.prepare_analysis(
-        valid_model().model_dump(mode="json"),
-        ctx,
-        KEYS,
-        FRAMEWORKS,
-        domain_loader,
-        package_loaders,
-    )
+    output = prepare(ctx, valid_model(), domain_loader, package_loaders)
 
     # The fixture runs FastAPI over HTTPS against Cloud SQL Postgres.
     assert output["domain_packs"] == ["http-api", "databases"]
@@ -1482,6 +1506,147 @@ def test_prepare_records_the_packs_and_rules_the_agents_were_given(
     retrieved = ctx.state[NODES.key("retrieved")]
     assert retrieved["fired_rules"] == sorted(set(retrieved["fired_rules"]))
     assert "information-disclosure-store-at-rest-unverified" in retrieved["fired_rules"]
+
+
+# --- The run-time precondition gate -----------------------------------------
+#
+# ``prepare`` is the gate: it runs each selected framework's precondition over
+# the one **Valid System Model** and routes on the answer. Every test here swaps
+# STRIDE's total precondition for one that can refuse
+# (:func:`tests.factories.package_answering`), because a gate whose only
+# exerciser always answers ``satisfied`` proves nothing — that is the shape of
+# the gap this seam was written to close.
+
+
+def _prepare_over(monkeypatch, result, domain_loader, package_loaders):
+    """Drive ``prepare`` with the one carried package answering ``result``."""
+    carrying(monkeypatch, package_answering(result))
+    ctx = FakeContext()
+    event = graph.prepare_analysis(
+        valid_model().model_dump(mode="json"),
+        ctx,
+        KEYS,
+        FRAMEWORKS,
+        domain_loader,
+        package_loaders,
+    )
+    return ctx, event
+
+
+def test_a_satisfied_precondition_routes_to_the_lane_agents(
+    monkeypatch, domain_loader, package_loaders
+):
+    ctx, event = _prepare_over(monkeypatch, "satisfied", domain_loader, package_loaders)
+
+    assert event.actions.route == [NODES.run_route]
+    assert ctx.state[NODES.key("precondition")] == "satisfied"
+    assert LANES[0].key("candidates") in ctx.state
+
+
+@pytest.mark.parametrize("result", ["refuted", "undecidable"])
+def test_a_refused_precondition_routes_past_the_lane_agents(
+    monkeypatch, domain_loader, package_loaders, result
+):
+    """Both refusing states stop the lanes, and nothing is derived for them.
+
+    A framework that will not run needs no candidates, no retrieval and no lane
+    prompts, so the gate sits where it does: before the work, not beside it.
+    """
+    ctx, event = _prepare_over(monkeypatch, result, domain_loader, package_loaders)
+
+    assert event.actions.route == [NODES.skip_route]
+    assert ctx.state[NODES.key("precondition")] == result
+    assert not [key for key in ctx.state if key.startswith("candidates_")]
+    assert NODES.key("retrieved") not in ctx.state
+
+
+def test_the_shared_view_is_still_derived_for_a_refused_framework(
+    monkeypatch, domain_loader, package_loaders
+):
+    """The model, its crossings and the packs are the job's, not a framework's.
+
+    They serve every framework a job selects, so a refusal of one cannot be
+    allowed to withhold them from another.
+    """
+    ctx, _ = _prepare_over(monkeypatch, "refuted", domain_loader, package_loaders)
+
+    assert "process:web-app" in ctx.state[graph.STATE_SYSTEM_MODEL]
+    assert ctx.state[graph.STATE_DOMAIN_PACKS] == ["http-api", "databases"]
+
+
+def test_a_precondition_the_contract_cannot_read_fails_the_run(
+    monkeypatch, domain_loader, package_loaders
+):
+    """A build defect, and it must not be read as a refusal.
+
+    Refusing the framework here would drop the whole analysis the caller asked
+    for and leave them no sign of it, so the gate raises instead — after one
+    extraction, which is the honest cost of a check that cannot run earlier.
+    """
+    with pytest.raises(PreconditionError) as caught:
+        _prepare_over(monkeypatch, "maybe", domain_loader, package_loaders)
+
+    assert "'maybe'" in str(caught.value)
+
+
+def test_a_refused_framework_still_produces_a_block_that_states_the_reason(
+    monkeypatch,
+):
+    """The envelope needs the block; the reader needs to know why it is empty.
+
+    ``analyses`` must answer the job's frameworks in order with none dropped, so
+    a refused framework cannot vanish. What it carries instead of claims is a
+    ``scope`` list naming every lane that did not run.
+    """
+    carrying(monkeypatch, package_answering("refuted"))
+    ctx = FakeContext(**{NODES.key("precondition"): "refuted"})
+
+    graph.assemble_report(
+        valid_model().model_dump(mode="json"), ctx, KEYS, FRAMEWORKS, DISCLAIMERS
+    )
+    block = graph.Analysis.from_state(ctx.state[graph.STATE_ANALYSIS]).analyses[0]
+
+    assert block.framework == "stride"
+    assert block.claims == []
+    assert [entry.unit for entry in block.scope] == list(STRIDE.lanes)
+    assert all(entry.state == "not-applicable" for entry in block.scope)
+    assert "does not apply" in block.scope[0].reason
+
+
+def test_the_two_refusing_states_state_different_reasons(monkeypatch):
+    """Never collapsed, because the remedy differs.
+
+    ``refuted`` says do not name this framework for this system. ``undecidable``
+    says the input never said, which the submitter answers by submitting more.
+    """
+    reasons = {}
+    for result in ("refuted", "undecidable"):
+        carrying(monkeypatch, package_answering(result))
+        ctx = FakeContext(**{NODES.key("precondition"): result})
+        graph.assemble_report(
+            valid_model().model_dump(mode="json"), ctx, KEYS, FRAMEWORKS, DISCLAIMERS
+        )
+        analysis = graph.Analysis.from_state(ctx.state[graph.STATE_ANALYSIS])
+        reasons[result] = analysis.analyses[0].scope[0].reason
+
+    assert reasons["refuted"] != reasons["undecidable"]
+    assert "never says" in reasons["undecidable"]
+
+
+def test_a_graph_entered_past_the_gate_reports_nothing_out_of_scope():
+    """The analysis eval mode seeds a blessed model and runs no gate.
+
+    An absent answer is not a refusal, and filling ``scope`` there would describe
+    one that never happened.
+    """
+    ctx = FakeContext()
+
+    graph.assemble_report(
+        valid_model().model_dump(mode="json"), ctx, KEYS, FRAMEWORKS, DISCLAIMERS
+    )
+    analysis = graph.Analysis.from_state(ctx.state[graph.STATE_ANALYSIS])
+
+    assert analysis.analyses[0].scope == []
 
 
 def test_the_context_reaches_the_report_through_assemble():
