@@ -29,7 +29,7 @@ from typing import Any, get_args
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "src"))
 
-from stride_service.frameworks import PACKAGES
+from stride_service.frameworks import PACKAGES, run_precondition
 from stride_service.frameworks.stride.record import STRIDE_CATEGORIES
 from stride_service.grounding import verify_quote
 from stride_service.report import (
@@ -437,7 +437,7 @@ def framework_issues(case_dir: Path, meta: dict, model: SystemModel) -> Iterator
     """
     declared = set(declared_names(meta))
     for name, package in PACKAGES.items():
-        result = package.precondition(model)
+        result = run_precondition(package, model)
         if result == "refuted":
             if name in declared:
                 yield (

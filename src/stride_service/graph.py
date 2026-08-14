@@ -2,14 +2,23 @@
 
 The topology, for a job selecting frameworks F1..Fn::
 
-    START -> extract -> validate -+-valid--> prepare --+--> F1 subgraph --+
-                                  |             ^      |                  |
-                                  +-invalid-> repair   +--> ... ----------+
-                                                 |     |                  |
-                                          revalidate   +--> Fn subgraph --+
-                                              |                           |
-                                    invalid-> reject                      v
-                                                                       assemble
+    START -> extract -> validate -+-valid--> prepare --+-run_F1-> F1 subgraph -+
+                                  |             ^      |                       |
+                                  +-invalid-> repair   +-run_Fn-> Fn subgraph -+
+                                                 |     |                       |
+                                          revalidate   +-skip_Fx---------------+
+                                              |                                |
+                                    invalid-> reject                           v
+                                                                            assemble
+
+``prepare`` is also the **run-time precondition gate**. It runs each selected
+framework's precondition over the one **Valid System Model** and emits one route
+per framework: ``run_<F>`` reaches that framework's lane agents, ``skip_<F>``
+reaches ``assemble`` directly. A refused framework still produces a block — it
+carries no claims and its ``scope`` states why each lane did not run — because
+the envelope checks that the analyses answer the job's frameworks in order with
+none dropped. A refusal is therefore not a job failure: a job naming two
+frameworks, one of them refused, still serves the other's analysis.
 
 and one subgraph per framework, all of them converging on the one ``assemble``::
 
@@ -127,8 +136,10 @@ from stride_service.frameworks import (
     DISCLAIMER_DOC,
     FrameworkPackage,
     FrameworkSchemas,
+    PreconditionResult,
     block_type_for,
     package_for,
+    run_precondition,
     schemas_for,
 )
 from stride_service.knowledge import (
@@ -159,6 +170,7 @@ from stride_service.report import (
     NodeRun,
     Report,
     Ruling,
+    ScopeEntry,
     SharedElementName,
 )
 from stride_service.resilience import ResilienceConfig
@@ -371,6 +383,24 @@ class FrameworkNodes:
         return f"{artifact}_{_identifier(self.name)}"
 
     @property
+    def run_route(self) -> str:
+        """The route ``prepare`` emits when this framework's precondition holds."""
+        return f"run_{_identifier(self.name)}"
+
+    @property
+    def skip_route(self) -> str:
+        """The route ``prepare`` emits when this framework's precondition refuses.
+
+        One route per framework rather than one shared ``skip``, for the reason
+        every other name here carries the framework: a job selecting two
+        frameworks decides each of them separately, and ADK matches an edge
+        against *any* value in the emitted route list. So one node emits a list
+        of N routes and exactly N edges fire, which is what makes a partial
+        refusal expressible without a route per subset of the selection.
+        """
+        return f"skip_{_identifier(self.name)}"
+
+    @property
     def tier_nodes(self) -> dict[str, str]:
         """This framework's graph node names against the tier keys they run on.
 
@@ -438,12 +468,16 @@ re-ask, and from ``rereview`` — the second look after that re-ask — it reach
 be rejected for."""
 
 
-def _routed(route: str, output: dict[str, Any]) -> Event:
+def _routed(route: str | list[str], output: dict[str, Any]) -> Event:
     """An ADK ``Event`` carrying the route the graph's edges match on.
 
     ``route=`` is a convenience kwarg ADK's before-validator lifts onto
     ``actions.route``; it is not a declared field, so the type checker cannot
     see it. Routing through one constructor keeps that a single suppression.
+
+    A **list** of routes fires every edge that matches any of them, which is how
+    ``prepare`` decides N frameworks in one node: it emits one route per selected
+    framework rather than one route naming a subset of the selection.
     """
     return Event(route=route, output=output)  # type: ignore[call-arg]
 
@@ -516,10 +550,16 @@ FRAMEWORK_RENDERED_ARTIFACTS: tuple[str, ...] = (
     "draft_roster",
     "unreconciled_drafts",
 )
+# ``precondition`` holds what this framework's own gate answered about the
+# shared model, as one of the three :data:`~stride_service.frameworks.
+# PreconditionResult` states. Written by ``prepare`` for every selected
+# framework and read by ``assemble``, so the block a refused framework produces
+# states the reason its lanes did not run.
 FRAMEWORK_STRUCTURED_ARTIFACTS: tuple[str, ...] = (
     "drafts",
     "coverage",
     "marks",
+    "precondition",
     "retrieved",
     "reviewed",
 )
@@ -1055,8 +1095,8 @@ def prepare_analysis(
     frameworks: Sequence[FrameworkName],
     domain_loader: MarkdownLoader,
     package_loaders: Mapping[FrameworkName, MarkdownLoader],
-) -> dict[str, Any]:
-    """Derive the whole deterministic view every lane agent reasons from.
+) -> Event:
+    """Run each framework's precondition, then derive what its lane agents read.
 
     Crossings are computed here rather than extracted, so no agent can be handed
     a crossing that contradicts the zones in the model it is reading. The same
@@ -1099,6 +1139,18 @@ def prepare_analysis(
     with :func:`render_fenced` exactly as the model is — the bytes are a subset
     of what already rides in ``{system_model}`` and they get the same
     treatment. The pack text is repo-authored and needs none.
+
+    **This node is also the run-time precondition gate**, and it is here because
+    here is where the topology is still one decision: the **Valid System Model**
+    exists, and the fan-out has not happened yet. Each selected framework's
+    precondition runs once over that one model, through
+    :func:`~stride_service.frameworks.run_precondition`, and the answer is parked
+    under that framework's own key for ``assemble`` to read. Only ``satisfied``
+    earns the framework's artifacts and its ``run`` route; ``refuted`` and
+    ``undecidable`` both take its ``skip`` route straight to ``assemble``, where
+    the framework still produces a block. Nothing is derived for a refused
+    framework, so its candidates, its retrieval and its lane prompts cost
+    nothing.
     """
     model = SystemModel.model_validate(valid_model)
     crossings = model.boundary_crossings()
@@ -1117,9 +1169,18 @@ def prepare_analysis(
 
     candidate_count = 0
     knowledge_count = 0
+    routes: list[str] = []
+    preconditions: dict[FrameworkName, PreconditionResult] = {}
     for name in frameworks:
         nodes = FrameworkNodes(name)
         package = nodes.package
+        result = run_precondition(package, model)
+        state.put(nodes.key("precondition"), result)
+        preconditions[name] = result
+        if result != "satisfied":
+            routes.append(nodes.skip_route)
+            continue
+        routes.append(nodes.run_route)
         loader = package_loaders[name]
         candidates = generate_candidates(model, package.lanes, package.rules)
         retrieved: list[str] = []
@@ -1165,14 +1226,18 @@ def prepare_analysis(
         candidate_count += sum(len(each.candidates) for each in candidates.values())
         knowledge_count += len(set(retrieved))
 
-    return {
-        "element_count": len(model.elements()),
-        "crossing_count": len(crossings),
-        "evidence_count": len(catalog),
-        "candidate_count": candidate_count,
-        "domain_packs": list(packs),
-        "knowledge_doc_count": knowledge_count,
-    }
+    return _routed(
+        routes,
+        {
+            "element_count": len(model.elements()),
+            "crossing_count": len(crossings),
+            "evidence_count": len(catalog),
+            "candidate_count": candidate_count,
+            "domain_packs": list(packs),
+            "knowledge_doc_count": knowledge_count,
+            "preconditions": preconditions,
+        },
+    )
 
 
 def prepare_node(
@@ -1189,7 +1254,7 @@ def prepare_node(
     from session state.
     """
 
-    def prepare_analysis_node(valid_model: dict, ctx) -> dict[str, Any]:
+    def prepare_analysis_node(valid_model: dict, ctx) -> Event:
         return prepare_analysis(
             valid_model, ctx, keys, frameworks, domain_loader, package_loaders
         )
@@ -1560,6 +1625,14 @@ def _framework_block(
     STRIDE's ``missing_mitigations`` reaches a STRIDE block while a framework
     that recommends nothing carries no such field and is handed nothing —
     without either side naming the other.
+
+    **A refused framework reaches here too**, on its ``skip`` route out of
+    ``prepare`` rather than through its own critic. Every key its subgraph would
+    have written is absent, so its claims, coverage and marks read as absent
+    already; the one thing it adds is :func:`_refusal_scope`, which states why
+    each of its lanes did not run. That is what keeps the envelope's own check
+    answerable — the analyses must answer the job's frameworks in order, with
+    none dropped — while the framework's judgement stays unspent.
     """
     schemas = nodes.schemas
     package = nodes.package
@@ -1574,6 +1647,7 @@ def _framework_block(
         disclaimer=disclaimer,
         claims=claims,
         rejected_claims=rejected,
+        scope=_refusal_scope(package, state.get(nodes.key("precondition"))),
         coverage=[
             LaneCoverage.model_validate(row)
             for row in state.get(nodes.key("coverage")) or []
@@ -1587,6 +1661,51 @@ def _framework_block(
             if field in schemas.block.model_fields
         },
     )
+
+
+# What a refused framework's block says about each lane that did not run, by
+# the state its own precondition answered. **The two are never collapsed**,
+# because the remedy differs: ``refuted`` says do not name this framework for
+# this system, and ``undecidable`` says the input never said, which the
+# submitter answers by submitting more.
+_REFUSAL_REASONS: Mapping[str, str] = MappingProxyType(
+    {
+        "refuted": (
+            "the {framework} precondition refutes this system, so no {framework}"
+            " lane ran; this framework does not apply to a system of this shape"
+        ),
+        "undecidable": (
+            "the input never says whether {framework} applies to this system, so"
+            " no {framework} lane ran; submitting more about the system settles it"
+        ),
+    }
+)
+
+
+def _refusal_scope(package: FrameworkPackage, result: object) -> list[ScopeEntry]:
+    """Every lane this framework did not run, and why, or nothing if it ran.
+
+    **The unit is the lane**, because a lane is what the gate stopped and the
+    only unit of a framework this service knows without reading a catalog it
+    does not own. A package whose own units are finer — a requirement set — says
+    so in its own block rather than here.
+
+    ``result`` is read as ``satisfied`` when the key is absent, which is a graph
+    entered past ``prepare``: the eval harness's analysis mode seeds a blessed
+    model and runs no gate, and reporting every lane out of scope there would
+    describe a refusal that never happened.
+    """
+    reason = _REFUSAL_REASONS.get(str(result), "")
+    if not reason:
+        return []
+    return [
+        ScopeEntry(
+            unit=lane,
+            state="not-applicable",
+            reason=reason.format(framework=package.name),
+        )
+        for lane in package.lanes
+    ]
 
 
 # --- Assembly ---------------------------------------------------------------
@@ -1998,11 +2117,21 @@ def build_pipeline(
     else:
         head_edges = [(START, prepare)]
 
+    # The fan-out is routed rather than unconditional, which is the whole of the
+    # run-time precondition gate's topology: ``prepare`` emits one route per
+    # selected framework, and ADK fires every edge matching any of them. A
+    # framework that satisfies its precondition takes ``run`` to its own lane
+    # agents; one that does not takes ``skip`` to ``assemble``, so its block is
+    # built and no lane of it ever runs.
+    fan_out: dict[Any, Any] = {}
+    for sub in subgraphs:
+        fan_out[sub.nodes.run_route] = sub.agents
+        fan_out[sub.nodes.skip_route] = assemble
     workflow = Workflow(
         name=name,
         edges=[
             *head_edges,
-            (prepare, tuple(agent for sub in subgraphs for agent in sub.agents)),
+            (prepare, fan_out),
             *(edge for sub in subgraphs for edge in sub.edges(assemble)),
         ],
     )

@@ -22,8 +22,10 @@ provenance defect stay invisible to the eval lane.
 import asyncio
 import json
 from collections.abc import AsyncGenerator, Sequence
+from dataclasses import replace
 from datetime import UTC, datetime
 from pathlib import Path
+from types import MappingProxyType
 from typing import Any
 
 from google.adk.agents.llm_agent import LlmAgent
@@ -32,8 +34,9 @@ from google.adk.models.llm_response import LlmResponse
 from google.genai import types
 from pydantic import BaseModel, Field
 
+from stride_service import frameworks as framework_registry
 from stride_service.binding import NodeBinding
-from stride_service.frameworks import FrameworkName
+from stride_service.frameworks import PACKAGES, FrameworkName, FrameworkPackage
 from stride_service.frameworks.stride.record import (
     STRIDE_VERSION,
     DraftThreat,
@@ -137,6 +140,53 @@ def sample_selection(
     here.
     """
     return [FrameworkSelection(name=name) for name in frameworks]
+
+
+def package_whose_precondition(
+    precondition: Any, name: FrameworkName = "stride"
+) -> FrameworkPackage:
+    """This install's package, with its precondition member replaced.
+
+    **The one thing this repository cannot otherwise test.** STRIDE's
+    precondition is total, so a gate that never runs and a gate that always
+    passes look identical from every seam — which is how the member came to be
+    declared, checked on the corpus side and never called in ``src/``. A package
+    that can refuse is what tells the two apart, and until a second framework
+    lands there is no such package to select.
+
+    Everything else is the shipped package: the same lanes, the same rules and
+    the same text on disk. So a graph built over this is the shipped topology,
+    and what the precondition answers is the only difference.
+
+    The parameter is ``Any`` because the defect cases are the point. A caller
+    hands this a member that is not callable at all, or one that raises, and the
+    gate has to refuse both.
+    """
+    return replace(PACKAGES[name], precondition=precondition)
+
+
+def package_answering(result: Any, name: FrameworkName = "stride") -> FrameworkPackage:
+    """The same, for a precondition that answers ``result`` about any model.
+
+    ``result`` is ``Any`` rather than a ``PreconditionResult``: one caller hands
+    it a value outside the three states, because refusing that is the run-time
+    gate's own fail-closed rule.
+    """
+    return package_whose_precondition(lambda model: result, name)
+
+
+def carrying(monkeypatch: Any, package: FrameworkPackage) -> None:
+    """Register one package under its own name for the length of a test.
+
+    Patches the registry rather than the name it is read through:
+    :func:`~stride_service.frameworks.package_for` reads the module global, and
+    the graph holds no package of its own.
+    """
+    monkeypatch.setattr(
+        framework_registry,
+        "PACKAGES",
+        MappingProxyType({**PACKAGES, package.name: package}),
+    )
 
 
 def repo_package_loaders(

@@ -164,6 +164,13 @@ looked". A `not-applicable` entry must state a reason, which is the rule
 `Verdict` already applies to its two non-confirmed states. The complement is not
 derived — every unit appears.
 
+A framework whose **Precondition** refuses the system fills this list and nothing
+else. Its block carries no claims and no coverage, and every lane appears here as
+`not-applicable` with the reason: either the framework does not apply to a system
+of this shape, or the input never said. The two reasons stay apart because the
+remedy differs. A refusal is not a job failure — a job naming two frameworks, one
+of them refused, still carries the other's analysis.
+
 **How `schema_version` moves.** Adding a field is a **minor** bump: a consumer
 reading the fields it already knows is unaffected. Changing the *meaning* or the
 *spelling* of something that already exists — renaming a field, renaming a value
