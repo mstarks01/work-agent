@@ -39,6 +39,7 @@ from typing import Any, Literal, Protocol, TypeVar
 
 from pydantic import BaseModel, ConfigDict, Field, ValidationError
 
+from stride_service.frameworks.stride.record import StrideCategory
 from stride_service.markdown_loader import MarkdownLoader
 from stride_service.model_gate import (
     check_supported,
@@ -46,7 +47,6 @@ from stride_service.model_gate import (
     emulates_structured_output,
     supports_structured_output,
 )
-from stride_service.frameworks.stride.record import StrideCategory
 from stride_service.model_tiers import validate_model_string
 from stride_service.resilience import ResilienceConfig
 from stride_service.system_model import SystemModel

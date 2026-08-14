@@ -78,7 +78,9 @@ def scripted_proposal(case, category) -> dict:
     fan-in's ladder, and these tests are about the modes rather than about
     grounding.
     """
-    reference = next(ref for ref in case.claims_for("stride") if ref.category == category)
+    reference = next(
+        ref for ref in case.claims_for("stride") if ref.category == category
+    )
     return {
         "sequence": 1,
         "title": reference.claim,
@@ -107,6 +109,25 @@ def scripted_ruling(category) -> dict:
     }
 
 
+def lane_of(instruction: str, lanes) -> str | None:
+    """Which lane's agent this instruction belongs to, or ``None``.
+
+    Matched on the lane skill's own ``# <Lane>`` H1 rather than on the lane
+    name appearing anywhere: every lane skill names all six categories in its
+    boundaries section, so a bare substring test binds whichever lane is
+    mentioned first and silently scripts the wrong emission.
+
+    Shared with :mod:`tests.test_evals_run_grounds`, which needs the same
+    discrimination for the same reason — one ``analyze/stride`` tier key now
+    serves every lane, so a tier node no longer identifies one.
+    """
+    for lane in lanes:
+        heading = f"# {lane.replace('-', ' ').title()}"
+        if heading.lower() in instruction.lower():
+            return lane
+    return None
+
+
 class LaneAwareLlm(ScriptedLlm):
     """One adapter serving every lane, replying by the lane it was asked about.
 
@@ -130,18 +151,8 @@ class LaneAwareLlm(ScriptedLlm):
             self.reply = default
 
     def _reply_for_instruction(self, instruction: str, default: str) -> str:
-        """The lane whose skill text this instruction opens with.
-
-        Matched on the skill's own ``# <Lane>`` H1 rather than on the lane name
-        anywhere in the text: every lane skill names all six categories in its
-        boundaries section, so a bare substring test binds whichever lane is
-        mentioned first and silently scripts the wrong emission.
-        """
-        for lane, reply in self.replies.items():
-            heading = f"# {lane.replace('-', ' ').title()}"
-            if heading.lower() in instruction.lower():
-                return reply
-        return default
+        lane = lane_of(instruction, self.replies)
+        return self.replies[lane] if lane else default
 
 
 def build(case, entry, models: dict[str, ScriptedLlm]) -> object:

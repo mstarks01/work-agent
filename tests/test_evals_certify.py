@@ -88,8 +88,8 @@ def test_a_pro_override_reprints_only_pro_nodes():
 
     # Base nodes are untouched; every strong node's generation identity moved.
     assert base["extract"] == swept["extract"]
-    assert base["critic"] != swept["critic"]
-    assert base["analyze_spoofing"] != swept["analyze_spoofing"]
+    assert base["critic_stride"] != swept["critic_stride"]
+    assert base["analyze_stride_spoofing"] != swept["analyze_stride_spoofing"]
 
 
 def test_certify_flags_an_override_drifted_run():
@@ -102,15 +102,17 @@ def test_certify_flags_an_override_drifted_run():
     assert certify(_build_fingerprints(default), manifest, tier_of, ALL_NODES).certified
     drifted = certify(_build_fingerprints(overridden), manifest, tier_of, ALL_NODES)
     assert not drifted.certified
+    # Every strong node, which is now per framework: one critic, one re-ask
+    # and one lane agent per lane, all named for the package they belong to.
     assert {n.node for n in drifted.uncertified} == {
-        "critic",
-        "recritic",
-        "analyze_spoofing",
-        "analyze_tampering",
-        "analyze_repudiation",
-        "analyze_information_disclosure",
-        "analyze_denial_of_service",
-        "analyze_elevation_of_privilege",
+        "critic_stride",
+        "recritic_stride",
+        "analyze_stride_spoofing",
+        "analyze_stride_tampering",
+        "analyze_stride_repudiation",
+        "analyze_stride_information_disclosure",
+        "analyze_stride_denial_of_service",
+        "analyze_stride_elevation_of_privilege",
     }
 
 
