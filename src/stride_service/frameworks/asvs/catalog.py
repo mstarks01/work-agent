@@ -1,0 +1,211 @@
+"""The ASVS 5.0.0 requirement catalog, as this package's own private data.
+
+**A package is a catalog it does not own plus a profile it does.** ASVS
+publishes a machine-readable requirement set, so this package carries it. No
+contract member names it, no service module reads it, and no other package sees
+it. That is the rule :mod:`stride_service.frameworks` states, and it is why the
+catalog is a module here rather than a tenth member on
+:class:`~stride_service.frameworks.FrameworkPackage`.
+
+The data sits beside this module in ``catalog.json``, copied from the flat JSON
+the ASVS project publishes at tag ``v5.0.0``. Five fields per requirement, which
+is every field the standard publishes: chapter, section, identifier, description
+and level. There is no applies-when field, no tag and no technology list, so the
+applicability rules in :mod:`stride_service.frameworks.asvs.rules` are this
+repo's own.
+
+**The catalog checks itself at import.** A truncated file or a chapter with no
+requirements would otherwise reach a ``strong``-tier prompt, and the package gate
+cannot see a catalog no contract member names. So the check runs where the data
+is read, and it raises the same error a malformed package raises.
+"""
+
+from __future__ import annotations
+
+import json
+from collections import Counter
+from collections.abc import Mapping
+from dataclasses import dataclass
+from pathlib import Path
+from types import MappingProxyType
+from typing import Literal, get_args
+
+from stride_service.frameworks import FrameworkPackageError
+
+__all__ = [
+    "ASVS_LEVELS",
+    "ASVS_VERSION",
+    "CHAPTERS",
+    "CHAPTER_NUMBERS",
+    "LANES",
+    "REQUIREMENTS",
+    "AsvsLevel",
+    "Chapter",
+    "Requirement",
+    "requirement_id",
+    "requirements_for",
+]
+
+#: The release of the standard this catalog carries. It names **the standard's
+#: own version**, unlike STRIDE's, which names this repo's ruleset: ASVS is a
+#: published standard and STRIDE is a method. Every ASVS claim carries it, and
+#: the version-safe reference format the standard publishes carries it too.
+ASVS_VERSION = "5.0.0"
+
+#: The three levels an organization chooses between. A requirement belongs to
+#: exactly one. The levels are cumulative in use: a run at level 2 rules on the
+#: level 1 and level 2 sets together.
+#:
+#: ASVS 5.0 broke the tie between application risk and level, and tells the
+#: organization to choose. So nothing in a **Valid System Model** picks one, and
+#: this is a job option rather than a derived fact.
+AsvsLevel = Literal[1, 2, 3]
+
+#: The levels, as a value the catalog's own checks can test a requirement against.
+ASVS_LEVELS: tuple[AsvsLevel, ...] = get_args(AsvsLevel)
+
+_CATALOG_PATH = Path(__file__).with_name("catalog.json")
+
+
+@dataclass(frozen=True)
+class Chapter:
+    """One chapter of the standard, and the lane that runs it.
+
+    ``id`` is the standard's own ``V1``..``V17``. ``lane`` is the slug this
+    package declares, taken from the chapter name. The standard's own
+    applicability guidance operates on a chapter, so one lane is one chapter.
+    """
+
+    id: str
+    name: str
+    lane: str
+
+    @property
+    def number(self) -> str:
+        """The chapter number alone, which is an ASVS identifier's first part."""
+        return self.id[1:]
+
+
+@dataclass(frozen=True)
+class Requirement:
+    """One ASVS requirement, with the lane that rules on it.
+
+    ``key`` is the ``<section>.<requirement>`` pair a lane agent supplies. The
+    service composes the whole identifier from it and the lane's chapter number,
+    so an agent never spells a chapter it was told to work in.
+    """
+
+    id: str
+    lane: str
+    section: str
+    section_name: str
+    key: str
+    level: AsvsLevel
+    text: str
+
+
+def _load(path: Path) -> tuple[tuple[Chapter, ...], tuple[Requirement, ...]]:
+    """Read the published catalog off disk."""
+    payload = json.loads(path.read_text(encoding="utf-8"))
+    chapters = tuple(Chapter(**entry) for entry in payload["chapters"])
+    requirements = tuple(Requirement(**entry) for entry in payload["requirements"])
+    return chapters, requirements
+
+
+CHAPTERS, REQUIREMENTS = _load(_CATALOG_PATH)
+
+#: This package's lanes, in chapter order. The chapter order is the standard's,
+#: and it is not alphabetical: V1 through V17 is how the standard numbers its
+#: own chapters, and a reader who infers a ranking from it reads the standard's.
+LANES: tuple[str, ...] = tuple(chapter.lane for chapter in CHAPTERS)
+
+#: One lane against the chapter number its identifiers carry, which is the
+#: package's ``id_rule`` prefix table.
+CHAPTER_NUMBERS: Mapping[str, str] = MappingProxyType(
+    {chapter.lane: chapter.number for chapter in CHAPTERS}
+)
+
+_BY_CHAPTER: Mapping[str, Chapter] = MappingProxyType(
+    {chapter.lane: chapter for chapter in CHAPTERS}
+)
+
+
+def chapter_for(lane: str) -> Chapter:
+    """The chapter one lane runs."""
+    return _BY_CHAPTER[lane]
+
+
+def requirements_for(level: int, lane: str | None = None) -> tuple[Requirement, ...]:
+    """Every requirement a run at ``level`` rules on, in catalog order.
+
+    The levels are cumulative, so a run at level 2 gets the level 1 and level 2
+    sets together. ``lane`` narrows the answer to one chapter.
+
+    ``level`` is a plain ``int`` rather than :data:`AsvsLevel`, because this is a
+    comparison rather than a lookup: a level outside the three simply selects
+    everything at or below it. What refuses a level nobody defined is
+    ``AsvsOptions``, on the input ladder, where a caller can be told.
+    """
+    return tuple(
+        requirement
+        for requirement in REQUIREMENTS
+        if requirement.level <= level and (lane is None or requirement.lane == lane)
+    )
+
+
+def requirement_id(lane: str, key: object) -> str:
+    """The standard's own identifier for one requirement, as ``V1.2.5``.
+
+    The inverse of what an agent supplies: the lane gives the chapter and the
+    agent gives the rest. :func:`~stride_service.frameworks.asvs.record.
+    requirement_of` reads the same pair back off a composed claim ID.
+    """
+    return f"V{CHAPTER_NUMBERS[lane]}.{key}"
+
+
+def _catalog_issues() -> list[str]:
+    """Everything wrong with the catalog on disk, as messages."""
+    issues: list[str] = []
+    if not CHAPTERS:
+        issues.append("the catalog declares no chapters")
+    if not REQUIREMENTS:
+        issues.append("the catalog declares no requirements")
+
+    duplicate_lanes = sorted(
+        {lane for lane in LANES if LANES.count(lane) > 1},
+    )
+    if duplicate_lanes:
+        issues.append(f"two chapters share a lane slug: {', '.join(duplicate_lanes)}")
+
+    stray = sorted({req.lane for req in REQUIREMENTS} - set(LANES))
+    if stray:
+        issues.append(f"requirements name chapters the catalog omits: {stray}")
+
+    empty = sorted(lane for lane in LANES if not requirements_for(3, lane))
+    if empty:
+        issues.append(f"chapters carry no requirement at any level: {empty}")
+
+    counts = Counter(req.id for req in REQUIREMENTS)
+    duplicate_ids = sorted(req_id for req_id, count in counts.items() if count > 1)
+    if duplicate_ids:
+        issues.append(f"two requirements share an identifier: {duplicate_ids}")
+
+    malformed = sorted(
+        req.id
+        for req in REQUIREMENTS
+        if req.id != requirement_id(req.lane, req.key) or req.level not in ASVS_LEVELS
+    )
+    if malformed:
+        issues.append(f"requirements are ill-formed: {malformed}")
+
+    textless = sorted(req.id for req in REQUIREMENTS if not req.text.strip())
+    if textless:
+        issues.append(f"requirements carry no description: {textless}")
+    return issues
+
+
+_ISSUES = _catalog_issues()
+if _ISSUES:
+    raise FrameworkPackageError(
+        "the asvs requirement catalog is not well-formed: " + "; ".join(_ISSUES)
+    )

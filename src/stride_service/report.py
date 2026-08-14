@@ -28,7 +28,7 @@ from __future__ import annotations
 
 import hashlib
 from collections import Counter
-from collections.abc import Collection, Iterable, Sequence
+from collections.abc import Collection, Iterable, Mapping, Sequence
 from datetime import datetime
 from typing import Annotated, Any, ClassVar, Literal, Self, get_args
 
@@ -169,11 +169,10 @@ DEFAULT_DISCLAIMER = (
 # repo carries, and ``config/frameworks.toml`` names what this install runs. The
 # first two agree at import; the third agrees at the gate.
 #
-# One member today. ASVS is specified across #160-#169 and carried by none of
-# it: the map put the content of its requirements out of scope, so adding the
-# name here without a package in the table would break the first agreement on
-# purpose. A second framework is a table edit and an entry here, together.
-FrameworkName = Literal["stride"]
+# Two members. The names are alphabetical, which is the rule the vendor registry
+# already follows wherever a reader could infer a ranking: this repo carries no
+# default framework and no primary one.
+FrameworkName = Literal["asvs", "stride"]
 
 FRAMEWORK_NAMES: tuple[FrameworkName, ...] = get_args(FrameworkName)
 
@@ -1603,6 +1602,40 @@ class FrameworkAnalysis(BaseModel):
         builder by holding the block type and nothing else.
         """
         return build_block_summary(claims, rejected_claims)
+
+    @classmethod
+    def scope_entries(
+        cls,
+        *,
+        lanes: Sequence[str],
+        claims: Sequence[RuledClaim],
+        options: Mapping[str, Any],
+        refusal_reason: str,
+    ) -> list[ScopeEntry]:
+        """What this framework considered and raised no claim about.
+
+        Beside :meth:`summarize` and for the same reason: a package that answers
+        in its own units overrides this next to the field it fills, and the
+        fan-in that fills a block reaches the right builder by holding the block
+        type and nothing else.
+
+        **The neutral unit is the lane**, because a lane is the only unit of a
+        framework this service knows without reading a catalog it does not own.
+        So the base answers nothing while the framework runs, and answers one
+        entry per lane when its **Precondition** refuses. A package whose own
+        units are finer — a requirement set — answers in those instead.
+
+        ``refusal_reason`` is empty when the precondition let the lanes run.
+        ``options`` is the job's own selection for this framework, as the input
+        ladder validated it.
+        """
+        del claims, options
+        if not refusal_reason:
+            return []
+        return [
+            ScopeEntry(unit=lane, state="not-applicable", reason=refusal_reason)
+            for lane in lanes
+        ]
 
     def block_issues(self, known_element_ids: Collection[str]) -> list[str]:
         """Everything wrong with this block, given the envelope's element IDs.

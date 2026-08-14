@@ -67,8 +67,17 @@ def test_every_lane_of_every_carried_package_is_measured():
 
 
 def test_an_unmeasured_lane_fails_the_merge_bar():
-    """The bar bites: drop one lane's must-find records and it says so."""
-    problems = list(verify_corpus.lane_coverage_issues({"stride": {"spoofing"}}))
+    """The bar bites: drop one lane's must-find records and it says so.
+
+    Per package, because the bar runs over every carried one: a corpus that
+    measured every STRIDE category and no ASVS chapter would be a corpus paying
+    for 17 ``strong``-tier calls it never graded.
+    """
+    measured = {
+        name: set(package.lanes) for name, package in verify_corpus.PACKAGES.items()
+    }
+    measured["stride"] = {"spoofing"}
+    problems = list(verify_corpus.lane_coverage_issues(measured))
 
     assert len(problems) == len(verify_corpus.PACKAGES["stride"].lanes) - 1
     assert all(
@@ -77,12 +86,13 @@ def test_an_unmeasured_lane_fails_the_merge_bar():
     assert not any("spoofing" in problem for problem in problems)
 
 
-def test_a_case_that_declares_no_framework_it_does_not_refuse_is_caught():
+def test_a_case_that_declares_no_framework_it_runs_is_caught():
     """The declaration is checked against the precondition, not trusted.
 
-    STRIDE's precondition is total, so every case satisfies it and every case
-    must declare it. A case that declared nothing would carry no reference set
-    and score nothing, which no recall denominator can show.
+    A case that declared nothing would carry no reference set and score nothing,
+    which no recall denominator can show. The first case satisfies both
+    preconditions — STRIDE's because it is total, ASVS's because the case is a
+    web system — so dropping the declaration is caught once per framework.
     """
     case_dir = verify_corpus.case_dirs()[0]
     model, _ = parse_and_validate(verify_corpus._load_json(case_dir / "model.json"))
@@ -90,8 +100,33 @@ def test_a_case_that_declares_no_framework_it_does_not_refuse_is_caught():
 
     problems = list(verify_corpus.framework_issues(case_dir, {"frameworks": []}, model))
 
-    assert len(problems) == 1
-    assert "does not declare 'stride'" in problems[0]
+    assert sorted(problems) == sorted(
+        f"case.json does not declare {name!r}, whose precondition satisfies this"
+        " case; every framework a case runs must carry a reference set"
+        for name in verify_corpus.PACKAGES
+    )
+
+
+def test_a_case_declaring_a_framework_its_model_does_not_satisfy_is_caught():
+    """The other direction, and ASVS is the first framework that can fire it.
+
+    STRIDE's precondition is total, so no case can over-declare it. A case whose
+    flows never say they carry the web answers ``undecidable`` for ASVS, and a
+    reference set there would grade a run whose lanes never ran.
+    """
+    case_dir = next(
+        path for path in verify_corpus.case_dirs() if path.name.endswith("pipeline")
+    )
+    model, _ = parse_and_validate(verify_corpus._load_json(case_dir / "model.json"))
+    assert model is not None
+
+    meta = {"frameworks": [{"name": "asvs", "options": {"level": 1}}]}
+    problems = list(verify_corpus.framework_issues(case_dir, meta, model))
+
+    assert any(
+        "declares 'asvs', but its precondition answers undecidable" in problem
+        for problem in problems
+    )
 
 
 def test_each_declared_source_digests_to_what_it_claims():

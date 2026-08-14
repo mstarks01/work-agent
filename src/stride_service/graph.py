@@ -170,7 +170,6 @@ from stride_service.report import (
     NodeRun,
     Report,
     Ruling,
-    ScopeEntry,
     SharedElementName,
 )
 from stride_service.resilience import ResilienceConfig
@@ -391,14 +390,20 @@ class FrameworkNodes:
     def skip_route(self) -> str:
         """The route ``prepare`` emits when this framework's precondition refuses.
 
-        One route per framework rather than one shared ``skip``, for the reason
-        every other name here carries the framework: a job selecting two
-        frameworks decides each of them separately, and ADK matches an edge
-        against *any* value in the emitted route list. So one node emits a list
-        of N routes and exactly N edges fire, which is what makes a partial
-        refusal expressible without a route per subset of the selection.
+        **One shared route, unlike every other name on this class.** A ``run``
+        route reaches this framework's own lane agents, so it has to carry the
+        framework; every ``skip`` reaches ``assemble``, so a route per framework
+        would declare N copies of one ``prepare -> assemble`` edge — which ADK's
+        graph validation refuses outright, and which a build carrying two
+        frameworks is the first thing to hit.
+
+        Nothing is lost by sharing it. The route decides topology and nothing
+        else: *which* framework was refused is parked under that framework's own
+        ``precondition`` key, and ``assemble`` reads it there. A job refusing one
+        of two emits ``["skip", "run_<other>"]``, and ADK fires every edge
+        matching any value in that list, so exactly the two intended edges fire.
         """
-        return f"skip_{_identifier(self.name)}"
+        return SKIP_ROUTE
 
     @property
     def tier_nodes(self) -> dict[str, str]:
@@ -459,6 +464,13 @@ be that many kinds of noise on one number."""
 
 ROUTE_VALID = "valid"
 ROUTE_INVALID = "invalid"
+SKIP_ROUTE = "skip"
+"""The run-time precondition gate's refusal route, shared by every framework.
+
+One route rather than one per framework, because every ``skip`` edge has the
+same target: ``assemble``. See
+:attr:`FrameworkNodes.skip_route`, which reads it, for the whole of the
+argument."""
 ROUTE_ACCEPT = "accept"
 ROUTE_REVISE = "revise"
 """The critic re-ask route. ``route_review`` takes it when the critic's output
@@ -532,6 +544,15 @@ STATE_VALID_MODEL = "valid_model"
 STATE_DOMAIN_PACKS = "domain_packs"
 STATE_ANALYSIS = "analysis"
 STATE_REJECTION = "rejection"
+# What each selected framework was asked for, as ``name -> options``, exactly as
+# the input ladder validated it against that package's own ``options`` model.
+#
+# **Job data, not graph shape.** Two jobs selecting the same frameworks with
+# different options share one built graph, so the values arrive per run and the
+# driver seeds them. A framework whose options select which requirements apply
+# produces a different answer under different ones, which is why they reach the
+# lane agents and the block rather than only the report's ``job`` field.
+STATE_FRAMEWORK_OPTIONS = "framework_options"
 
 # The per-framework keys, as artifact names. Each is spelled
 # ``<artifact>_<framework>`` by :meth:`FrameworkNodes.key`, so two frameworks'
@@ -588,6 +609,7 @@ SHARED_STRUCTURED_KEYS: frozenset[str] = frozenset(
         STATE_DOMAIN_PACKS,
         STATE_ANALYSIS,
         STATE_REJECTION,
+        STATE_FRAMEWORK_OPTIONS,
     }
 )
 
@@ -1158,6 +1180,7 @@ def prepare_analysis(
     packs = select_domain_packs(model)
 
     state = keys.state(ctx)
+    options = state.get(STATE_FRAMEWORK_OPTIONS) or {}
     state.prompt(STATE_SYSTEM_MODEL, render_fenced(_without_source_fields(valid_model)))
     state.prompt(
         STATE_BOUNDARY_CROSSINGS,
@@ -1196,7 +1219,13 @@ def prepare_analysis(
             lane_state = lane.state(
                 {
                     "candidates": render_fenced(candidate_set.model_dump(mode="json")),
-                    "scope": lane_scope(lane.lane, package, model, candidate_set),
+                    "scope": lane_scope(
+                        lane.lane,
+                        package,
+                        model,
+                        candidate_set,
+                        options.get(name) or {},
+                    ),
                     "reference_notes": compose_notes(loader, notes),
                     "prior_cases": compose_cases(loader, cases),
                 }
@@ -1227,7 +1256,10 @@ def prepare_analysis(
         knowledge_count += len(set(retrieved))
 
     return _routed(
-        routes,
+        # Deduplicated, because the refusal route is shared: two refused
+        # frameworks emit one ``skip`` between them, and ADK fires the one edge
+        # it names once.
+        list(dict.fromkeys(routes)),
         {
             "element_count": len(model.elements()),
             "crossing_count": len(crossings),
@@ -1582,11 +1614,32 @@ def assemble_report(
     shared System Model rather than about any framework's claim. It is derived
     here because one model serves N blocks: deriving it per framework would put
     the same finding in the report N times.
+
+    **This node runs once per incoming trigger, so a two-framework job runs it
+    twice.** ADK schedules a ``FunctionNode`` on each trigger rather than on all
+    of its predecessors, and the earlier run builds the block of whichever
+    framework has not finished from keys nothing wrote. The final state is right
+    by construction — the last run is the one that follows the last subgraph, so
+    it sees every framework's artifacts — and it overwrites what the earlier run
+    left.
+
+    **A join node is the wrong fix here**, and the run-time gate is why. ADK's
+    ``JoinNode`` waits for *all* predecessors to complete, and a refused
+    framework's subgraph never runs, so its terminal node never completes and the
+    join would never fire. The wasted run is the price of a topology where a
+    framework may legitimately not run at all.
     """
     model = SystemModel.model_validate(valid_model)
     state = keys.state(ctx)
+    options = state.get(STATE_FRAMEWORK_OPTIONS) or {}
     blocks = [
-        _framework_block(FrameworkNodes(name), state, model, disclaimers[name])
+        _framework_block(
+            FrameworkNodes(name),
+            state,
+            model,
+            disclaimers[name],
+            options.get(name) or {},
+        )
         for name in frameworks
     ]
     analysis = Analysis(
@@ -1609,6 +1662,7 @@ def _framework_block(
     state: SessionState,
     model: SystemModel,
     disclaimer: str,
+    options: Mapping[str, Any],
 ) -> FrameworkAnalysis:
     """One framework's finished analysis block, from its own parked artifacts.
 
@@ -1629,10 +1683,16 @@ def _framework_block(
     **A refused framework reaches here too**, on its ``skip`` route out of
     ``prepare`` rather than through its own critic. Every key its subgraph would
     have written is absent, so its claims, coverage and marks read as absent
-    already; the one thing it adds is :func:`_refusal_scope`, which states why
-    each of its lanes did not run. That is what keeps the envelope's own check
+    already; the one thing it adds is its block's own ``scope``, which states why
+    the framework did not run. That is what keeps the envelope's own check
     answerable — the analyses must answer the job's frameworks in order, with
     none dropped — while the framework's judgement stays unspent.
+
+    **An option a block declares as a field is stamped from the job's own
+    selection.** ASVS records the level it ruled at, so a reader holding the
+    block alone can tell which requirement set produced the answer. The rule is
+    one line and neutral: a field named after an option gets that option's value.
+    A package whose block declares no such field is handed nothing.
     """
     schemas = nodes.schemas
     package = nodes.package
@@ -1647,7 +1707,14 @@ def _framework_block(
         disclaimer=disclaimer,
         claims=claims,
         rejected_claims=rejected,
-        scope=_refusal_scope(package, state.get(nodes.key("precondition"))),
+        scope=schemas.block.scope_entries(
+            lanes=package.lanes,
+            claims=(*claims, *rejected),
+            options=options,
+            refusal_reason=_refusal_reason(
+                package, state.get(nodes.key("precondition"))
+            ),
+        ),
         coverage=[
             LaneCoverage.model_validate(row)
             for row in state.get(nodes.key("coverage")) or []
@@ -1658,6 +1725,11 @@ def _framework_block(
         **{
             field: value
             for field, value in marks.model_dump(mode="json").items()
+            if field in schemas.block.model_fields
+        },
+        **{
+            field: value
+            for field, value in options.items()
             if field in schemas.block.model_fields
         },
     )
@@ -1682,30 +1754,20 @@ _REFUSAL_REASONS: Mapping[str, str] = MappingProxyType(
 )
 
 
-def _refusal_scope(package: FrameworkPackage, result: object) -> list[ScopeEntry]:
-    """Every lane this framework did not run, and why, or nothing if it ran.
+def _refusal_reason(package: FrameworkPackage, result: object) -> str:
+    """Why this framework did not run, or ``""`` when it did.
 
-    **The unit is the lane**, because a lane is what the gate stopped and the
-    only unit of a framework this service knows without reading a catalog it
-    does not own. A package whose own units are finer — a requirement set — says
-    so in its own block rather than here.
+    What the reason is *used for* is the block's own — the neutral base answers
+    in lanes, and a package holding a requirement catalog answers in
+    requirements. What the reason *says* is the graph's, because the gate is the
+    graph's.
 
     ``result`` is read as ``satisfied`` when the key is absent, which is a graph
     entered past ``prepare``: the eval harness's analysis mode seeds a blessed
-    model and runs no gate, and reporting every lane out of scope there would
-    describe a refusal that never happened.
+    model and runs no gate, and reporting a refusal there would describe one that
+    never happened.
     """
-    reason = _REFUSAL_REASONS.get(str(result), "")
-    if not reason:
-        return []
-    return [
-        ScopeEntry(
-            unit=lane,
-            state="not-applicable",
-            reason=reason.format(framework=package.name),
-        )
-        for lane in package.lanes
-    ]
+    return _REFUSAL_REASONS.get(str(result), "").format(framework=package.name)
 
 
 # --- Assembly ---------------------------------------------------------------

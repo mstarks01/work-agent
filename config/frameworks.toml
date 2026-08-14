@@ -30,5 +30,7 @@
 
 version = 1
 
-# The frameworks this install runs, by name.
-carried = ["stride"]
+# The frameworks this install runs, by name. Alphabetical, because nothing here
+# ranks one framework above another: a job names what it wants and this list only
+# fixes what it may name.
+carried = ["asvs", "stride"]

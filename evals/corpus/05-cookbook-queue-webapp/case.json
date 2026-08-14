@@ -15,6 +15,13 @@
   "source_sha256": "37f17dbdad7ff7968531482d9dde87a6d94cb0034cea6bf9495793720435d171",
   "frameworks": [
     {
+      "name": "asvs",
+      "options": {
+        "level": 2
+      },
+      "exemplar_proximity": "far"
+    },
+    {
       "name": "stride",
       "options": {},
       "exemplar_proximity": "far"

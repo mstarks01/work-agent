@@ -1,0 +1,95 @@
+[
+  {
+    "chapter": "authentication",
+    "requirement": "V6.3.2",
+    "affected_element_ids": [
+      "entity:sensor-node",
+      "process:device-gateway",
+      "flow:sensor-node-to-device-gateway:publish-readings"
+    ],
+    "claim": "Every sensor node authenticates with one fleet-wide pre-shared key that is never rotated.",
+    "tier": "must-find",
+    "notes": "A shared machine credential is stated outright, so the ruling is plain."
+  },
+  {
+    "chapter": "authorization",
+    "requirement": "V8.2.1",
+    "affected_element_ids": [
+      "process:device-gateway",
+      "store:device-registry",
+      "flow:device-gateway-to-device-registry:look-up-device"
+    ],
+    "claim": "Nothing states what restricts the device gateway's access to the device registry.",
+    "tier": "must-find",
+    "notes": "authentication on the flow is unknown; the requirement applies and stays open."
+  },
+  {
+    "chapter": "authorization",
+    "requirement": "V8.3.1",
+    "affected_element_ids": [
+      "process:telemetry-normalizer",
+      "store:telemetry-lake"
+    ],
+    "claim": "Nothing states which layer enforces a tenant boundary on telemetry writes.",
+    "tier": "expected",
+    "notes": "The normalizer writes every fleet's readings and no enforcing layer is named."
+  },
+  {
+    "chapter": "oauth-and-oidc",
+    "requirement": "V10.4.4",
+    "affected_element_ids": [
+      "entity:fleet-operator",
+      "store:telemetry-lake",
+      "flow:fleet-operator-to-telemetry-lake:query-dashboards"
+    ],
+    "claim": "Company SSO is named for operator dashboards and nothing says which grant it uses.",
+    "tier": "must-find",
+    "notes": "tech:oauth fires on the SSO mention. The chapter may apply and the input never settles it."
+  },
+  {
+    "chapter": "cryptography",
+    "requirement": "V11.3.2",
+    "affected_element_ids": [
+      "store:device-registry",
+      "store:telemetry-lake"
+    ],
+    "claim": "No cipher is stated for either the device registry or the telemetry lake at rest.",
+    "tier": "must-find",
+    "notes": "Both carry encryption_at_rest unknown against confidential and customer data."
+  },
+  {
+    "chapter": "secure-communication",
+    "requirement": "V12.2.1",
+    "affected_element_ids": [
+      "entity:sensor-node",
+      "process:device-gateway",
+      "flow:sensor-node-to-device-gateway:publish-readings"
+    ],
+    "claim": "The MQTT publish path from the field to an internet-facing broker states no transport protection.",
+    "tier": "must-find",
+    "notes": "encryption_in_transit is unknown on a crossing into an internet-facing element."
+  },
+  {
+    "chapter": "encoding-and-sanitization",
+    "requirement": "V1.2.4",
+    "affected_element_ids": [
+      "process:telemetry-normalizer",
+      "store:telemetry-lake"
+    ],
+    "claim": "Nothing says how the normalizer builds the queries that load readings into BigQuery.",
+    "tier": "expected",
+    "notes": "tech:database fires on the BigQuery store."
+  },
+  {
+    "chapter": "data-protection",
+    "requirement": "V14.2.1",
+    "affected_element_ids": [
+      "entity:sensor-node",
+      "store:firmware-bucket",
+      "flow:sensor-node-to-firmware-bucket:poll-firmware"
+    ],
+    "claim": "Firmware is fetched from a publicly readable bucket with no stated integrity or access control.",
+    "tier": "expected",
+    "notes": "The bucket is stated public read, so the access half is settled."
+  }
+]

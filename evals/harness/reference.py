@@ -46,6 +46,7 @@ from typing import Literal
 
 from pydantic import BaseModel, ConfigDict, Field, ValidationError
 
+from stride_service.frameworks.asvs.record import AsvsChapter
 from stride_service.frameworks.stride.record import StrideCategory
 from stride_service.report import (
     FrameworkName,
@@ -133,13 +134,35 @@ class ReferenceThreat(ReferenceClaim):
     severity: ReferenceSeverity
 
 
+class ReferenceRequirement(ReferenceClaim):
+    """ASVS's reference record: the chapter and the requirement it expects.
+
+    ``requirement`` is the standard's own identifier, ``V1.2.4``. It is what
+    makes this reference set **closed** where STRIDE's is open: the catalog is
+    finite, so a case names the requirements it expects a ruling on and a scorer
+    can derive the rest.
+
+    ``affected_element_ids`` keeps the neutral empty default. Most ASVS
+    requirements address a coding practice with no position in the graph, so a
+    reference record naming no element is the ordinary case here.
+
+    No severity and no verdict. This package grades nothing, and what a ruling
+    should conclude belongs in ``claim`` as the sentence a scorer matches on —
+    adding a verdict field would put a second, unscored copy of it beside the
+    first.
+    """
+
+    chapter: AsvsChapter
+    requirement: str = Field(pattern=r"^V\d{1,2}\.\d{1,2}\.\d{1,2}$")
+
+
 #: The reference record each framework's corpus file validates as. Harness data
 #: keyed off the closed :data:`~stride_service.report.FrameworkName`, not a
 #: tenth package member: what a reference set looks like is the *eval's*
 #: business, and a package that shipped its own would be asserting how well it
 #: must be measured.
 REFERENCE_TYPES: Mapping[FrameworkName, type[ReferenceClaim]] = MappingProxyType(
-    {"stride": ReferenceThreat}
+    {"asvs": ReferenceRequirement, "stride": ReferenceThreat}
 )
 
 

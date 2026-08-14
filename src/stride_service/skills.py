@@ -69,7 +69,18 @@ __all__ = [
 ]
 
 # Token caps per skill kind, checked in CI by the lint tests.
-LANE_SKILL_TOKEN_CAP = 3000
+#
+# Raised from 3000 for the second framework package, and the reason is what a
+# lane skill *is* under each. A STRIDE lane states a method — six of them sit
+# near 1000 tokens and the old cap never bound them. An ASVS lane states a
+# chapter of a published standard, and the requirements of that chapter are its
+# subject rather than an illustration of it: the authentication chapter carries
+# 47 of them and reaches ~3200. Holding the old number would mean cutting
+# published requirement text out of the one place an agent can read it.
+#
+# Still a budget rather than an entitlement: 3500 leaves the largest chapter
+# ~250 tokens of room, which is an ordinary edit and not a fourth exemplar.
+LANE_SKILL_TOKEN_CAP = 3500
 SEVERITY_RUBRIC_TOKEN_CAP = 1000
 DOMAIN_PACK_TOKEN_CAP = 2000
 

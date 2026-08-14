@@ -1,0 +1,116 @@
+[
+  {
+    "chapter": "api-and-web-service",
+    "requirement": "V4.1.1",
+    "affected_element_ids": [
+      "process:inference-gateway"
+    ],
+    "claim": "The inference gateway's response content types and method policy are never described.",
+    "tier": "must-find",
+    "notes": "An internet-facing HTTPS surface exists and its contract is unstated."
+  },
+  {
+    "chapter": "file-handling",
+    "requirement": "V5.2.1",
+    "affected_element_ids": [
+      "entity:ml-engineer",
+      "store:model-registry",
+      "flow:ml-engineer-to-model-registry:publish-artifact"
+    ],
+    "claim": "Nothing limits the size or type of a model artifact published into the registry.",
+    "tier": "must-find",
+    "notes": "An artifact upload path exists; feature:file-upload has a subject here."
+  },
+  {
+    "chapter": "file-handling",
+    "requirement": "V5.2.2",
+    "affected_element_ids": [
+      "store:model-registry",
+      "flow:ml-engineer-to-model-registry:publish-artifact"
+    ],
+    "claim": "Nothing states what validates a published artifact before the model server loads it.",
+    "tier": "expected",
+    "notes": "The registry is read by an internal server, so an unvalidated artifact is executed content."
+  },
+  {
+    "chapter": "self-contained-tokens",
+    "requirement": "V9.1.1",
+    "affected_element_ids": [
+      "entity:calling-service",
+      "process:inference-gateway",
+      "flow:calling-service-to-inference-gateway:submit-inference-request"
+    ],
+    "claim": "The per-team API key carries no claims, so this chapter does not apply to the gateway.",
+    "tier": "must-find",
+    "notes": "The stated credential is an opaque key rather than a self-contained token; the exclusion is the answer."
+  },
+  {
+    "chapter": "authentication",
+    "requirement": "V6.2.10",
+    "affected_element_ids": [
+      "entity:calling-service",
+      "flow:calling-service-to-inference-gateway:submit-inference-request"
+    ],
+    "claim": "The per-team API key is never expired or rotated.",
+    "tier": "must-find",
+    "notes": "Stated outright, so the ruling is plain."
+  },
+  {
+    "chapter": "authorization",
+    "requirement": "V8.2.1",
+    "affected_element_ids": [
+      "process:inference-gateway",
+      "process:model-server",
+      "flow:inference-gateway-to-model-server:forward-request"
+    ],
+    "claim": "The model server accepts forwarded requests on network position with no stated permission check.",
+    "tier": "expected",
+    "notes": "authentication is stated as none, so the ruling is plain."
+  },
+  {
+    "chapter": "cryptography",
+    "requirement": "V11.3.2",
+    "affected_element_ids": [
+      "store:feature-store",
+      "store:inference-log"
+    ],
+    "claim": "No cipher is stated for the feature store or the inference log at rest.",
+    "tier": "expected",
+    "notes": "Both are confidential with encryption_at_rest unknown."
+  },
+  {
+    "chapter": "secure-communication",
+    "requirement": "V12.3.3",
+    "affected_element_ids": [
+      "process:inference-gateway",
+      "process:model-server",
+      "flow:inference-gateway-to-model-server:forward-request"
+    ],
+    "claim": "The gateway to model server link states neither a protocol nor transport protection.",
+    "tier": "must-find",
+    "notes": "protocol and encryption_in_transit are both unknown on an internal crossing."
+  },
+  {
+    "chapter": "security-logging-and-error-handling",
+    "requirement": "V16.2.5",
+    "affected_element_ids": [
+      "process:inference-gateway",
+      "store:inference-log",
+      "flow:inference-gateway-to-inference-log:write-request-log"
+    ],
+    "claim": "Nothing states what of an inference request is written to the confidential request log.",
+    "tier": "must-find",
+    "notes": "The log is confidential and its content is never described."
+  },
+  {
+    "chapter": "configuration",
+    "requirement": "V13.3.2",
+    "affected_element_ids": [
+      "process:model-server",
+      "store:model-registry"
+    ],
+    "claim": "Nothing states what limits the model server's registry service account.",
+    "tier": "expected",
+    "notes": "A service account is named and its scope is not."
+  }
+]

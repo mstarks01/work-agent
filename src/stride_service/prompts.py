@@ -18,18 +18,21 @@ package text under ``frameworks/<name>/`` and is composed by
 :mod:`stride_service.skills`. Two frameworks reading two copies of ``analyze.md``
 would be two places for the output contract to drift.
 
-The one exception is the **exemplars**, which are worked drafts in one
-framework's own record shape and so live under its package root
-(``lanes/<lane>/exemplars.md``). :func:`compose_analyze_prompt` takes the
-package's loader for exactly that block.
+Two blocks are the exception, and both are package text. The **output contract**
+(``output.md``) says what one claim is and which fields carry it, which a record
+that grades nothing cannot share with one that does. The **exemplars**
+(``lanes/<lane>/exemplars.md``) are worked drafts in that record's own shape.
+:func:`compose_analyze_prompt` takes the package's loader for exactly those two.
 
-Order is stable-first: the one shared ``analyze.md`` body precedes the per-lane
-exemplar file, so a framework's lane agents share the longest possible cacheable
-prefix. The token caps here are enforced by ``tests/test_prompt_lints.py``.
+Order is stable-first: the one shared ``analyze.md`` body, then the package's
+output contract, then the per-lane exemplar file, so a framework's lane agents
+share the longest possible cacheable prefix. The token caps here are enforced by
+``tests/test_prompt_lints.py``.
 """
 
 from __future__ import annotations
 
+from stride_service.frameworks import OUTPUT_DOC
 from stride_service.markdown_loader import MarkdownLoader
 from stride_service.skills import lane_exemplars_doc
 
@@ -179,19 +182,26 @@ REPAIR_PROMPT_TOKEN_CAP = 800
 def compose_analyze_prompt(
     prompt_loader: MarkdownLoader, package_loader: MarkdownLoader, lane: str
 ) -> str:
-    """One lane agent's prompt: the shared body, then that lane's own exemplars.
+    """One lane agent's prompt: the shared body, the package's output contract,
+    then that lane's own exemplars.
 
-    Two loaders because the two halves have two owners. ``analyze.md`` is the
+    Two loaders because the parts have two owners. ``analyze.md`` is the
     service's, rooted at ``prompts/``, and one templated body serves every lane
-    of every registered framework rather than N near-identical copies.
-    ``lanes/<lane>/exemplars.md`` is the *package's*, rooted at
-    ``frameworks/<name>/``, because a worked draft is written in that framework's
-    own record shape and would be a lie in another's.
+    of every registered framework rather than N near-identical copies. The other
+    two are the *package's*, rooted at ``frameworks/<name>/``: ``output.md``
+    says what one claim is and which fields carry it, and
+    ``lanes/<lane>/exemplars.md`` works drafts in that framework's own record
+    shape. Both would be a lie in another framework's prompt.
+
+    **Stable-first, so the cacheable prefix is as long as it can be.** The shared
+    body is identical across every framework, the output contract across every
+    lane of one framework, and only the exemplars are per lane.
 
     ``{lane}`` is left in place for ADK to template.
     """
     parts = [
         prompt_loader.load(ANALYZE_PROMPT_NAME),
+        package_loader.load(OUTPUT_DOC),
         package_loader.load(lane_exemplars_doc(lane)),
     ]
     return "\n\n".join(part.strip() for part in parts) + "\n"
