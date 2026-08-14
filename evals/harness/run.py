@@ -92,6 +92,7 @@ from evals.harness.stability import (
 from evals.harness.structural import report_issues
 from stride_service.certification import CertificationError, CertifyResult, certify
 from stride_service.deployment import Deployment
+from stride_service.frameworks.stride.record import Threat
 from stride_service.report import (
     FrameworkAnalysis,
     NodeLatency,
@@ -120,6 +121,24 @@ def stride_block(report: Report) -> FrameworkAnalysis:
         if block.framework == "stride":
             return block
     raise modes.EvalRunError("the report carries no stride analysis block")
+
+
+def stride_threats(report: Report) -> list[Threat]:
+    """This report's STRIDE claims, at the record type they validate as.
+
+    ``claims`` is annotated at the neutral :class:`RuledClaim` because a block
+    holds whatever its own package produced; the scorers grade ``category`` and
+    ``severity``, which only STRIDE's record carries. The envelope already
+    validated this block as its package's own shape, so this re-states that
+    where a caller needs it and fails loudly if it ever stops being true.
+    """
+    claims = stride_block(report).claims
+    narrowed = [claim for claim in claims if isinstance(claim, Threat)]
+    if len(narrowed) != len(claims):
+        raise modes.EvalRunError(
+            "the stride block's claims did not load as Threat records"
+        )
+    return narrowed
 
 
 def _live_judge(
@@ -331,7 +350,7 @@ def _score_runs(
         score_case_with_yield(
             case,
             runs[case.id].merged_drafts,
-            stride_block(runs[case.id].report).claims,
+            stride_threats(runs[case.id].report),
             judge,
         )
         for case in cases

@@ -313,7 +313,7 @@ def score_case(
     """
     rulings: list[PairRuling] = []
     in_lane = _judge_in_lane(case, produced, judge, rulings)
-    references = case.claims_for("stride")
+    references = case.stride_claims()
     assignment = _assign(in_lane, references)
 
     matched = tuple(
@@ -370,7 +370,7 @@ def _judge_in_lane(
     equivalent, which is the bipartite graph step 3 assigns over.
     """
     candidates: dict[int, list[int]] = {}
-    for reference_index, reference in enumerate(case.claims_for("stride")):
+    for reference_index, reference in enumerate(case.stride_claims()):
         matches = []
         for position, threat in enumerate(produced):
             if threat.category != reference.category:
@@ -478,7 +478,7 @@ def _find_lane_errors(
     for position in unmatched_positions:
         threat = produced[position]
         for reference_index in missed:
-            reference = case.claims_for("stride")[reference_index]
+            reference = case.stride_claims()[reference_index]
             already_used = reference_index in claimed_references
             if reference.category == threat.category or already_used:
                 continue
