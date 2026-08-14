@@ -19,7 +19,7 @@ from evals.harness.grounds import (
 )
 from stride_service.critic import DraftJoinError, GroundsUnverifiedError
 from stride_service.evidence import EvidenceResolutionError
-from stride_service.frameworks.stride.record import DraftThreat
+from stride_service.frameworks.stride.record import STRIDE_VERSION, DraftThreat
 from stride_service.report import Ground, UnverifiedGround
 from tests.eval_factories import draft_threat
 
@@ -57,6 +57,8 @@ def draft_payload(*, grounds: list[dict]) -> dict:
     """One agent's draft as JSON, the way ``merge_drafts`` receives it."""
     return {
         "id": "S-01",
+        "framework": "stride",
+        "framework_version": STRIDE_VERSION,
         "category": "spoofing",
         "title": "A title.",
         "description": "A description.",
@@ -99,7 +101,7 @@ class TestMeasureGrounds:
         measurement = measure_grounds(
             "case-a",
             [grounded(1, quote("bad"), unknown()), grounded(2, quote())],
-            [UnverifiedGround(threat_id="S-01", index=0, reason="not found")],
+            [UnverifiedGround(claim_id="S-01", index=0, reason="not found")],
         )
 
         assert measurement.quote_count == 2
@@ -111,8 +113,8 @@ class TestMeasureGrounds:
             "case-a",
             [grounded(1, quote("bad"), quote("worse")), grounded(2, quote())],
             [
-                UnverifiedGround(threat_id="S-01", index=0, reason="not found"),
-                UnverifiedGround(threat_id="S-01", index=1, reason="not found"),
+                UnverifiedGround(claim_id="S-01", index=0, reason="not found"),
+                UnverifiedGround(claim_id="S-01", index=1, reason="not found"),
             ],
         )
 
@@ -132,7 +134,7 @@ class TestClassifyFailure:
     def test_a_threat_that_lost_every_ground_is_fail_closed(self):
         error = GroundsUnverifiedError(
             "threat 'S-01' has no ground that verifies",
-            threat_ids=["S-01"],
+            claim_ids=["S-01"],
             draft_count=4,
         )
 
@@ -247,7 +249,7 @@ class TestAggregate:
         marked = measure_grounds(
             "small",
             [grounded(1, quote("bad"))],
-            [UnverifiedGround(threat_id="S-01", index=0, reason="not found")],
+            [UnverifiedGround(claim_id="S-01", index=0, reason="not found")],
         )
 
         totals = aggregate_grounds([marked, large], [])
@@ -263,7 +265,7 @@ class TestAggregate:
         failures = [
             classify_failure(
                 "case-a",
-                GroundsUnverifiedError("x", threat_ids=["S-01", "T-02"], draft_count=9),
+                GroundsUnverifiedError("x", claim_ids=["S-01", "T-02"], draft_count=9),
             ),
             classify_failure("case-b", DraftJoinError("unrelated")),
         ]
