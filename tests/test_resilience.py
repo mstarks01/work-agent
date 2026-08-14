@@ -13,7 +13,7 @@ from pathlib import Path
 
 import pytest
 
-from stride_service.report import STRIDE_CATEGORIES
+from stride_service.frameworks.stride.record import STRIDE_CATEGORIES
 from stride_service.resilience import (
     ATTEMPTS_VAR,
     JOB_DEADLINE_MS_VAR,

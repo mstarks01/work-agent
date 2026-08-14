@@ -1,7 +1,7 @@
 # Report Schema
 
-A successful analysis returns a `StrideReport` (from `stride_service.report`).
-It is **self-contained**: every element a threat references resolves inside the
+A successful analysis returns a `Report` (from `stride_service.report`). It is
+**self-contained**: every element a claim references resolves inside the one
 embedded system model, so a consumer needs nothing but the one payload. The
 model validators enforce that on construction — a report that does not hold
 together cannot be built.
@@ -12,40 +12,157 @@ Get one from either [the engine](Integration-Guide.md) (`outcome.report`) or the
 ## Seeing one rendered
 
 Run the [web app](Web-App.md) — [First-Run](First-Run.md) step 3. It renders a
-real report of your own: threat cards, a severity summary, the extracted DFD,
+real report of your own: finding cards, a severity summary, the extracted DFD,
 and the per-node provenance panel.
 
 There is no checked-in sample report in this repository. One would be a second
 description of this schema, drifting from the schema itself every time it moved,
 and the fields below are the authoritative account.
 
-## Top-level shape
+## One envelope, N framework blocks
+
+A job names the security frameworks it wants (`frameworks`, required and
+non-empty — see [HTTP-API](HTTP-API.md)), and the report answers **exactly that
+set**. The envelope carries what the job and the shared system model are; each
+framework's own findings sit in its own block under `analyses`.
 
 ```python
-class StrideReport:
-    schema_version: str          # "2.10"
-    disclaimer: str              # AI-generated, not human-reviewed
-    job: Job                     # id, status="completed", timestamps, revise_rounds
+class Report:
+    schema_version: str          # "3.0"
+    disclaimer: str              # the SERVICE's: AI-generated, not human-reviewed
+    job: Job                     # id, status="completed", timestamps, revise_rounds, frameworks
     input: InputRef              # system_name + one ref per submitted source
     nodes: list[NodeRun]         # per-node model, sampling fingerprint, duration_ms, token usage
     sampling: dict[str, dict]    # per-tier resolved decoding params (provenance)
-    system_model: SystemModel    # the canonical model the analysis ran on
+    system_model: SystemModel    # the ONE canonical model every framework ran on
     boundary_crossings: list[BoundaryCrossing]
-    threats: list[Threat]        # confirmed + needs-info, severity-ordered
-    rejected_threats: list[Threat]
-    unverified_grounds: list[UnverifiedGround]  # quote grounds not found in their source
-    unresolved_mentions: list[UnresolvedMention]  # element IDs a description cites that do not exist
-    unresolved_evidence: list[UnresolvedEvidence]  # evidence refs cited that the catalog does not hold
-    missing_mitigations: list[MissingMitigation]  # threats offering no countermeasure, unexcused
     shared_element_names: list[SharedElementName]  # different-typed elements sharing one name slug
-    coverage: list[CategoryCoverage]             # per-lane account of what each agent was offered
-    analysis_context: AnalysisContext | None     # what informed the analysis (never what proves it)
-    summary: Summary
+    elements_analyzed: int
+    analysis_context: AnalysisContext | None       # what informed the analysis (never what proves it)
+    analyses: list[FrameworkAnalysis]              # one block per framework, in the job's own order
 ```
 
-`threats` holds the actionable findings; `rejected_threats` is the audit trail
-of drafts the critic ruled out. Both are the same `Threat` type — placement is
-decided by the verdict.
+**A field sits where the thing it describes sits.** Nine fields describe the job
+or the shared model and stayed on the envelope. Eight describe one framework's
+output and moved onto the block. `analysis_context` split on the same rule: the
+instruction digest describes the built graph and the domain packs describe the
+model, so both stayed, while `fired_rules` and `knowledge_docs` name *one
+package's* rules and what they retrieved, so both moved.
+
+**`analyses` is an ordered list, not a map.** It is ordered by the job's own
+selection, and the envelope re-checks that the blocks answer exactly the
+frameworks the job named — a report that answered half a selection would make
+every consumer check which half it holds.
+
+**One shared model, never a second copy of it.** The alternative — one whole
+report per framework — was refused because it duplicates nine fields including
+the largest block after the findings, and nothing could check that two embedded
+copies of one model agreed.
+
+### A framework block
+
+```python
+class FrameworkAnalysis:
+    framework: str                # "stride" — the name the job selected
+    framework_version: str        # the ruleset version that produced these claims
+    disclaimer: str               # the PACKAGE's: what this framework's claims assert
+    claims: list[RuledClaim]      # the actionable findings
+    rejected_claims: list[RuledClaim]   # the audit trail of drafts the critic ruled out
+    scope: list[ScopeEntry]       # units this framework considered and raised nothing about
+    coverage: list[LaneCoverage]  # per-lane account of what each agent was offered
+    unverified_grounds: list[UnverifiedGround]
+    unresolved_mentions: list[UnresolvedMention]
+    unresolved_evidence: list[UnresolvedEvidence]
+    fired_rules: list[str]        # this package's deterministic rules that matched
+    knowledge_docs: list[str]     # local-corpus documents those rules retrieved
+    summary: BlockSummary
+```
+
+`claims` holds the actionable findings; `rejected_claims` is the audit trail.
+Both are the same type — placement is decided by the verdict.
+
+**Two disclaimers, and they say different things.** The envelope's is about the
+*service*; a block's is about *that framework* — what its claims assert. The two
+stop being one sentence the moment a report carries a framework that rules on
+requirement applicability rather than on attacks.
+
+**A block may narrow its arrays.** STRIDE's block is a `StrideAnalysis`, whose
+`claims` are `Threat`s and whose `summary` carries `by_category` and
+`by_severity`. A consumer that does not know a framework reads the base shape —
+an ID, the `(framework, version)` pair, a title, a description, the elements and
+the grounds — which is the honest outcome and what the viewer's fallback card
+renders.
+
+### A claim
+
+`Claim` is the neutral supertype: **exactly what the service constructs on an
+agent's behalf, plus what says which framework the conclusion is of.** Anything
+a framework *judges* — a category, a severity, a mitigation — belongs to that
+framework's own record.
+
+```python
+class Claim:
+    id: str                          # unique within its own block
+    framework: str                   # which framework this is a conclusion of
+    framework_version: str           # required, non-empty
+    title: str
+    description: str
+    affected_element_ids: list[str]  # element IDs in system_model — always resolve
+    grounds: list[Ground]            # why it was raised — at least one, never empty
+
+class RuledClaim(Claim):
+    verdict: Verdict                 # the critic's ruling
+```
+
+**`(framework, framework_version)` is one pair and both halves are required.** A
+framework identifier with no version is uninterpretable one release later — the
+standard a claim cites may renumber every requirement between major releases, and
+nothing recovers the intent from an old report.
+
+**`id` has no shared grammar.** Each package composes its own from its own ID
+rule, so it is unique within its block and says nothing across blocks: two
+packages composing `S-01` are naming two different claims, not colliding.
+
+**`affected_element_ids` may be empty on the base**, because a framework can
+raise a claim about a property of code rather than a position in the graph. The
+referential check still runs over whatever IDs are there. STRIDE narrows it to
+require at least one.
+
+### STRIDE's own record
+
+```python
+class Threat(RuledClaim):
+    category: StrideCategory         # spoofing | tampering | repudiation | ...
+    severity: Severity
+    mitigations: list[Mitigation]    # {summary, detail}
+    confidence: Rating               # low | medium | high (critic-calibrated)
+```
+
+Category letters: `S` spoofing, `T` tampering, `R` repudiation,
+`I` information-disclosure, `D` denial-of-service, `E` elevation-of-privilege.
+A threat's `id` carries its category letter — **composed by the service** from
+the package's own ID rule, and stamped with the lane in the same call, so the
+letter and the lane cannot disagree. Nothing re-validates the composed string:
+there is no longer a pattern to check it against, because a check would hide a
+bad composition rather than catch it.
+
+`StrideAnalysis` adds `missing_mitigations` to the block, and its `summary` adds
+`by_category` and `by_severity` to the neutral three counts.
+
+### `scope` — what a framework considered and raised nothing about
+
+```python
+class ScopeEntry:
+    unit: str                        # the requirement, lane or unit considered
+    state: "applicable" | "not-applicable"
+    reason: str                      # required when not-applicable
+```
+
+A framework whose own presence tests rule a unit out has to **say so**: dropping
+it silently leaves a reader unable to tell "considered and cleared" from "never
+looked". A `not-applicable` entry must state a reason, which is the rule
+`Verdict` already applies to its two non-confirmed states. The complement is not
+derived — every unit appears.
 
 **How `schema_version` moves.** Adding a field is a **minor** bump: a consumer
 reading the fields it already knows is unaffected. Changing the *meaning* or the
@@ -62,7 +179,7 @@ however many changes it carries.
 > `analyst_<category>`. A consumer keying on `analyst_spoofing` does not error;
 > it matches nothing, silently.
 
-## A threat
+## What ties a report to its submission
 
 `InputRef` ties the report to what was submitted without carrying the text:
 
@@ -89,25 +206,7 @@ attributes it). `source_speaker` is a separate field precisely so a name can be
 stripped; a name inside a verbatim excerpt cannot be. An element's `notes` may
 also quote submitted words — a speaker's hedge, or two sources disagreeing —
 so both fields ship raw caller text in the report JSON, as does every `quote`
-ground on a threat.
-
-```python
-class Threat:
-    id: str                          # "<letter>-<NN>", e.g. "S-01" (see letters below)
-    category: StrideCategory         # spoofing | tampering | repudiation | ...
-    title: str
-    description: str
-    affected_element_ids: list[str]  # element IDs in system_model — always resolve
-    grounds: list[Ground]            # why it was raised — at least one, never empty
-    severity: Severity
-    mitigations: list[Mitigation]    # {summary, detail}
-    confidence: Rating               # low | medium | high (critic-calibrated)
-    verdict: Verdict
-```
-
-Category letters: `S` spoofing, `T` tampering, `R` repudiation,
-`I` information-disclosure, `D` denial-of-service, `E` elevation-of-privilege.
-A threat's `id` must carry its category letter.
+ground on a claim.
 
 ### Grounds — why the finding was raised
 
@@ -124,11 +223,11 @@ compiler. See [ADR 0004](adr/0004-evidence-references.md).
 
 ```python
 class Ground:
-    kind: "quote" | "unknown-attribute" | "derived-fact"
+    kind: "quote" | "unknown-attribute" | "absent-attribute" | "derived-fact"
     text: str                    # quote: the verbatim span, ≤1000 chars
     source_label: str            # quote: names one of input.sources
-    element_id: str              # unknown-attribute: resolves in system_model
-    attribute: str               # unknown-attribute: the attribute that is `unknown`
+    element_id: str              # either attribute kind: resolves in system_model
+    attribute: str               # either attribute kind: the attribute relied on
     flow_id: str                 # derived-fact: a data flow in system_model
 ```
 
@@ -136,14 +235,24 @@ class Ground:
 | --- | --- | --- |
 | `quote` | `text` + `source_label` | the submitter's own words said this |
 | `unknown-attribute` | `element_id` + `attribute` | this fact was never stated, so the threat stands unrefuted |
+| `absent-attribute` | `element_id` + `attribute` | the input states this control is not there |
 | `derived-fact` | `flow_id` | this flow's boundary crossing is the fact relied on |
 
-**One flat model, not a discriminated union.** Fields belonging to the other two
+**One flat model, not a discriminated union.** Fields belonging to the other
 kinds are empty strings, and a record carrying a field its own kind does not
 claim is rejected on construction rather than tolerated — so a consumer may read
 the fields its `kind` names and ignore the rest. Why the shape is flat rather
 than a tagged union, which it should be, is
 [ADR 0002](adr/0002-finding-level-attribution.md).
+
+**The two attribute kinds carry identical fields and different facts**, so a
+consumer must switch on `kind` rather than on which fields are populated.
+`unknown-attribute` is a question the submission left open — the threat resting
+on it is conditional and typically routes to `needs-info`. `absent-attribute`
+is the submission answering that question with *no*: `authentication: "none;
+accepted by network position"`. Folding the two would report a control the
+input described as missing as a gap in the description
+([ADR 0012](adr/0012-the-catalog-carries-a-stated-absence.md)).
 
 A `derived-fact` names the flow and **never copies the zones it crosses**: they
 recompute from `boundary_crossings`, which the report already carries, so a
@@ -160,13 +269,13 @@ supports the finding — that judgement stays the critic's.
 
 ```python
 class UnverifiedGround:
-    threat_id: str               # the threat carrying it
-    index: int                   # position in that threat's `grounds` list
+    claim_id: str                # the claim carrying it, unique within this block
+    index: int                   # position in that claim's `grounds` list
     reason: str
 ```
 
 A quote that could not be found is **marked, not removed**: the entry still
-renders, and `unverified_grounds` points at it by threat and index. A threat
+renders, and `unverified_grounds` points at it by claim and index. A claim
 where *nothing* verified never reaches the report at all — the job fails
 instead. So an entry in this list means "one citation on an otherwise justified
 finding did not match", which is worth showing a reader and is not grounds for
@@ -178,7 +287,7 @@ run.
 
 ```python
 class UnresolvedEvidence:
-    threat_id: str               # the threat that cited it
+    claim_id: str                # the claim that cited it
     reference: str               # the reference as written, e.g. "unknown:flow:ghost:authentication"
 ```
 
@@ -213,7 +322,7 @@ checked differently on purpose.
 
 ```python
 class UnresolvedMention:
-    threat_id: str               # the threat whose description cites it
+    claim_id: str                # the claim whose description cites it
     mention: str                 # the ID as written, e.g. "process:web-api"
 ```
 
@@ -243,13 +352,15 @@ without first learning that fact.
 
 ```python
 class MissingMitigation:
-    threat_id: str               # the threat offering no countermeasure
+    claim_id: str                # the threat offering no countermeasure
 ```
 
 That case is mechanically recognizable, so the report distinguishes it. A
 threat triggered by an `unknown` carries an `unknown-attribute` ground —
 the trigger dictates the branch — so an empty `mitigations` list *with* such a
-ground is the licensed case and is not marked. An empty list *without* one is.
+ground is the licensed case and is not marked. An empty list *without* one is,
+and an `absent-attribute` ground does not license one: the fact is already in
+hand, so a countermeasure can always be named.
 
 This is a **completeness** signal, not a correctness one, which is why it is a
 mark rather than a failure: a finding with no recommended action is still a
@@ -288,20 +399,25 @@ pair. Same-type collisions never appear here: two elements of one type sharing
 a name hold the same ID, which is `duplicate-id`'s to report.
 
 This is the first mark about the **model** rather than about the threats, which
-is why it carries element IDs and no `threat_id`. It is recomputable from the
+is why it carries element IDs and no `claim_id` — and why it sits on the
+envelope beside the model it describes rather than on any block. It is
+recomputable from the
 report's own embedded `system_model`, by design.
 
 ## `coverage` — what each lane was offered
 
-A threat count says how much a category agent found. It cannot say whether a
-lane that found nothing had examined the system and cleared it, or had never
-looked at half of it. `coverage` carries one row per STRIDE category — always
-all six, including a lane that filed nothing.
+A claim count says how much a lane agent found. It cannot say whether a lane
+that found nothing had examined the system and cleared it, or had never looked
+at half of it. `coverage` carries one row **per lane** — every lane the package
+declares, including one that filed nothing. A lane is a package's own unit, so
+for STRIDE that is the six categories; the row is keyed by the lane slug rather
+than by a category, because the six are one package's lane list rather than a
+fact about the report.
 
 ```python
-class CategoryCoverage:
-    category: StrideCategory
-    drafts: int                  # threats this lane filed, before the critic ruled
+class LaneCoverage:
+    lane: str                    # the lane slug the package declares
+    drafts: int                  # claims this lane filed, before the critic ruled
     rules: int                   # deterministic triggers defined in this lane
     rules_fired: int             # of those, how many produced a candidate here
     candidates: int              # structural leads handed to this agent
@@ -327,17 +443,23 @@ measure. The honest use is the aggregate: a category citing two of forty
 structural leads across a corpus is a signal, one agent's zero on one case is
 not.
 
-Counted over the **drafts**, not the ruled threats: coverage is a fact about
-what the six agents did with the system, and a draft the critic later rejects
-was still part of the system being examined.
+Counted over the **drafts**, not the ruled claims: coverage is a fact about what
+the lane agents did with the system, and a draft the critic later rejects was
+still part of the system being examined.
 
 ## `analysis_context` — what informed the run
 
 ```python
-class AnalysisContext:
+class AnalysisContext:        # on the ENVELOPE
     instruction_sha256: str   # digest of every LLM node's composed instruction
     domain_packs: list[str]   # the reference packs this model earned, in selection order
-    fired_rules: list[str]    # the deterministic rules that matched, sorted
+```
+
+Two more fields answer the same question **per framework**, and sit on the block
+for the reason the split gives above — they name one package's own rules:
+
+```python
+    fired_rules: list[str]    # this package's deterministic rules that matched, sorted
     knowledge_docs: list[str] # local-corpus documents those rules retrieved
 ```
 
@@ -358,9 +480,12 @@ front of the agents.
   `coverage` counts them.
 - **`knowledge_docs`** names what those rules retrieved from the local corpus —
   `notes/<id>` for reference material, `cases/<id>` for a worked judgement,
-  unioned across the six lanes. Retrieval is local and deterministic, so this
-  list plus the checkout reproduces exactly the text the agents were shown. See
-  [ADR 0008](adr/0008-retrieval-by-fired-rule.md).
+  unioned across that framework's lanes. A note and a case live **inside the
+  package** whose rules select them, while a domain pack stays shared, because
+  the retrieval key decides the home. Retrieval is local and deterministic, so
+  this list plus the checkout reproduces exactly the text the agents were shown.
+  See [ADR 0008](adr/0008-retrieval-by-fired-rule.md) and
+  [ADR 0011](adr/0011-package-text-follows-its-retrieval-key.md).
 
 **None of it is evidence, and the separation is the point.** A pack named here
 did not ground anything and a rule named here did not find anything; what
@@ -419,8 +544,16 @@ class Verdict:
 - `confirmed` — grounded in the model's facts.
 - `needs-info` — plausible but hinges on an `unknown` attribute; each such
   attribute is named in `related_unknowns` (`{element_id, attribute}`). Stays in
-  `threats`.
-- `rejected` — not grounded. Moves to `rejected_threats`.
+  its block's `claims`.
+- `rejected` — not grounded. Moves to `rejected_claims`.
+
+**The service owns the shape; each package owns the question.** The three states
+and the rules binding their fields are the service's, and every framework's
+claims are ruled by its own critic — but what a state *asserts* is the
+framework's. For STRIDE, `confirmed` means the threat holds. A framework that
+rules on requirement applicability rather than on attacks uses the same three
+words to answer a different question, which is why one shared rubric cannot
+serve both.
 
 Those three conditional rules hold on every verdict in a report, but they are
 **not enforced on the critic's output** — that shape is checked at the review
@@ -429,20 +562,25 @@ See [ADR 0005](adr/0005-verdict-shape-is-re-askable.md).
 
 ## Summary
 
-Counts a UI can render without walking the threat list:
+Counts a UI can render without walking a block's claim list:
 
 ```python
-class Summary:
-    threat_count: int
-    by_category: dict[StrideCategory, int]
-    by_severity: dict[SeverityLevel, int]
+class BlockSummary:                       # on every framework block
+    claim_count: int
     needs_info_count: int
     rejected_count: int
-    elements_analyzed: int
+
+class StrideSummary(BlockSummary):        # what STRIDE's block carries
+    by_category: dict[StrideCategory, int]
+    by_severity: dict[SeverityLevel, int]
 ```
 
-`summary` is computed from the report's own contents and must match them, so it
-is safe to trust without recounting.
+`summary` is computed from its own block's contents and must match them, so it
+is safe to trust without recounting — a mismatched summary does not validate.
+
+`elements_analyzed` is **on the envelope**, not here: it counts the one shared
+model every framework ran against, so a per-block copy would be N copies of one
+number.
 
 ## Provenance
 
@@ -451,7 +589,7 @@ a result stands on its own without trusting any outside record.
 
 ```python
 class NodeRun:
-    node: str                        # graph node name: "extract", "analyze_spoofing", "critic", …
+    node: str                        # graph node name: "extract", "analyze_stride_spoofing", "critic_stride", …
     model: str | None                # the SERVED build, vendor-prefixed; None for code-only nodes
     requested_model: str | None      # the CONFIGURED route this node asked for
     sampling_fingerprint: str | None # 64-hex identity hash of (served route, decoding params)
@@ -538,6 +676,28 @@ class TokenUsage:
 > service-owned like the rest of it, and under the same rule — a document
 > informed the analysis and grounds nothing.
 
+> **`schema_version` 3.0** is the framework cutover, and it is major on every
+> count the rule names: fields move, a field changes its spelling, and one
+> changes what it carries.
+>
+> - `threats` and seven other top-level fields became `analyses[].claims` and
+>   their per-framework siblings. A consumer reading `report.threats` reads
+>   nothing.
+> - The four mark classes renamed `threat_id` to `claim_id`.
+> - `coverage[].category` became `coverage[].lane`, and `CategoryCoverage`
+>   became `LaneCoverage`.
+> - Every claim gained the required `(framework, framework_version)` pair, and
+>   `Summary` split into a neutral `BlockSummary` per block with
+>   `elements_analyzed` left on the envelope.
+> - The `StrideReport` type is now `Report`, and `analyses` is an ordered list
+>   rather than a map.
+>
+> **There is no version gate and none is needed.** `Report` forbids unknown
+> fields, so a 2.10 payload carrying `threats` at the top level is refused by
+> this model, and a 3.0 payload carrying `analyses` is refused by the old one.
+> The no-shim behaviour falls out of the shapes rather than out of anything
+> reading `schema_version`.
+
 > **`schema_version` 2.10** corrected what `coverage[].elements_cited` counts,
 > and holds every `*_cited` half to the total beside it. The definition above is
 > unchanged; the computation counted prose citations raw, so an ID a description
@@ -570,7 +730,7 @@ fixtures) simply has an empty `sampling` and no fingerprints.
 
 ## Serialising
 
-`StrideReport` is a Pydantic model. For JSON (dates as ISO strings, the shape a
+`Report` is a Pydantic model. For JSON (dates as ISO strings, the shape a
 front end consumes):
 
 ```python

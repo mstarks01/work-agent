@@ -1,26 +1,35 @@
-"""Mechanical checks at the join and assemble seams around the critic.
+"""Mechanical checks at the join and assemble seams around a framework's critic.
 
 The deterministic half of the critic step: mechanical checks belong in code,
 prompts carry only judgement. Everything here is a check no model should be
-asked to perform — that the six category agents' drafts cite elements the System
-Model actually contains, that threat IDs are unique, that every grounds entry
-resolves and every quote ground is really in the source it names, and that the
-critic ruled on exactly the drafts it was given, each ruling carrying a
-well-formed verdict. The critic prompt names these as already done so its
-judgement is spent on evidence, lanes, duplicates, severity and confidence
-instead — and, for grounds, on the one question code cannot answer: whether a
-quote that is verbatim actually *supports* the finding it was filed under.
+asked to perform — that a framework's lane agents' drafts cite elements the
+System Model actually contains, that claim IDs are unique, that every grounds
+entry resolves and every quote ground is really in the source it names, and that
+the critic ruled on exactly the drafts it was given, each ruling carrying a
+well-formed verdict. A package's critic prompt names these as already done so its
+judgement is spent on evidence, lanes, duplicates and whatever else that
+framework grades — and, for grounds, on the one question code cannot answer:
+whether a quote that is verbatim actually *supports* the finding it was filed
+under.
 
-The assemble seam is also where a ruling becomes a threat. The critic emits
+**Neutral, and one seam per framework rather than one across frameworks.** Every
+check here reads :class:`~stride_service.report.Claim`,
+:class:`~stride_service.report.Ruling` and the package contract, so a second
+framework's output goes through the same code. What it never does is merge two
+frameworks' drafts: the join runs per package, in that package's own declared
+lane order, because two frameworks' claims are not comparable and a duplicate
+across them is not a duplicate.
+
+The assemble seam is also where a ruling becomes a claim. A critic emits
 judgements keyed by draft ID rather than the drafts themselves
-(:class:`~stride_service.report.ThreatRuling`), so the agent's own fields
-reach the report from the copy this service already holds — not round-tripped
-through a model that was never asked to change them.
+(:class:`~stride_service.report.Ruling`), so the agent's own fields reach the
+report from the copy this service already holds — not round-tripped through a
+model that was never asked to change them.
 
 Model output is untrusted input (OWASP LLM05): it is validated here, before
 anything reaches the report. Both seams fail closed with every issue listed
 at once — an agent that hallucinates an element ID or a critic that drops
-threats is a defect to surface loudly, never to paper over by discarding the
+claims is a defect to surface loudly, never to paper over by discarding the
 offending entries.
 """
 
@@ -32,35 +41,35 @@ from collections.abc import Collection, Iterable, Mapping, Sequence
 from types import MappingProxyType
 from typing import NamedTuple, get_args
 
+from stride_service.frameworks import FrameworkPackage, FrameworkSchemas
 from stride_service.grounding import normalize, verify_normalized
 from stride_service.references import canonical, snap
 from stride_service.report import (
-    CATEGORY_LETTERS,
-    STRIDE_CATEGORIES,
     AnalysisMarks,
-    DraftThreat,
+    Claim,
     Ground,
-    MissingMitigation,
+    RuledClaim,
+    Ruling,
     SeverityLevel,
-    StrideCategory,
-    Threat,
-    ThreatRuling,
     UnresolvedMention,
     UnverifiedGround,
     Verdict,
 )
 from stride_service.system_model import DataFlow, Element, SystemModel
 
-# Most severe first — the order the report's ``threats`` array carries.
+# Most severe first — the order a graded framework's ``claims`` array carries.
+# The service holds the order because it holds
+# :data:`~stride_service.report.SeverityLevel`; whether a framework grades at all
+# is its record's business, and one that does not is ordered by ID alone.
 SEVERITY_ORDER: tuple[SeverityLevel, ...] = ("critical", "high", "medium", "low")
 
 
 class DraftJoinError(ValueError):
-    """The merged category agents' drafts fail a mechanical check."""
+    """One framework's merged lane agents' drafts fail a mechanical check."""
 
 
 class GroundsUnverifiedError(DraftJoinError):
-    """Threats on which *no* ground verified — the fail-closed half of the
+    """Claims on which *no* ground verified — the fail-closed half of the
     grounding policy.
 
     A subclass rather than a distinctive message, because the faults it has to
@@ -72,16 +81,16 @@ class GroundsUnverifiedError(DraftJoinError):
     them apart is guessing rather than measuring.
 
     Both halves of that rate ride on the exception, because the raise is the
-    only moment they coexist: ``threat_ids`` are the threats that lost every
+    only moment they coexist: ``claim_ids`` are the claims that lost every
     ground, and ``draft_count`` is the population they came from. Nothing
     downstream of here sees either — the job is over.
     """
 
     def __init__(
-        self, message: str, *, threat_ids: Sequence[str], draft_count: int
+        self, message: str, *, claim_ids: Sequence[str], draft_count: int
     ) -> None:
         super().__init__(message)
-        self.threat_ids = tuple(threat_ids)
+        self.claim_ids = tuple(claim_ids)
         self.draft_count = draft_count
 
 
@@ -89,11 +98,11 @@ class CriticOutputError(ValueError):
     """The critic's output does not account for exactly the drafts it saw."""
 
 
-class AssembledThreats(NamedTuple):
-    """The critic's ruled threats, split into the report's two arrays."""
+class AssembledClaims(NamedTuple):
+    """One critic's ruled claims, split into that block's two arrays."""
 
-    threats: list[Threat]
-    rejected_threats: list[Threat]
+    claims: list[RuledClaim]
+    rejected_claims: list[RuledClaim]
 
 
 class JoinedDrafts(NamedTuple):
@@ -103,9 +112,10 @@ class JoinedDrafts(NamedTuple):
     are the agents'; the :class:`~stride_service.report.AnalysisMarks` are the
     *service's* record of what each draft failed to make good on — a quote that
     is not in the source it named, an element ID a description cited that does
-    not exist, a threat offering no countermeasure and no reason for offering
-    none. They ride beside the drafts rather than on them, because a field an
-    agent could set about its own accuracy is not evidence of it.
+    not exist, and whatever the package's own record adds
+    (:meth:`~stride_service.report.Claim.claim_marks`). They ride beside the
+    drafts rather than on them, because a field an agent could set about its own
+    accuracy is not evidence of it.
 
     None of the marks is fatal, and that is the whole policy of this seam:
     checks that decide whether a finding *means* anything fail closed, and
@@ -113,7 +123,7 @@ class JoinedDrafts(NamedTuple):
     fan-in has no re-ask path, so the second kind must never cost a report.
     """
 
-    drafts: list[DraftThreat]
+    drafts: list[Claim]
     marks: AnalysisMarks
 
 
@@ -145,8 +155,8 @@ def mentioned_ids(description: str) -> list[str]:
     narrowness is a miss rather than a false alarm, which is the right way
     round for a check whose output annotates a finding a human will read.
 
-    Measured over the 18 hand-authored descriptions in ``prompts/exemplars/``,
-    the closest thing the repo holds to real agent prose: **24 distinct IDs
+    Measured over the 18 hand-authored descriptions in STRIDE's own lane
+    exemplars, the closest thing the repo holds to real agent prose: **24 distinct IDs
     extracted, 0 of them spurious** — every token found is one of the two
     exemplar systems' 24 real element IDs, and all 24 are found. Small, and the
     only corpus of threat descriptions that exists; enough to say the pattern
@@ -160,71 +170,22 @@ def mentioned_ids(description: str) -> list[str]:
 
 
 def _unresolved_mentions(
-    threats: Iterable[DraftThreat], element_ids: Collection[str]
+    claims: Iterable[Claim], element_ids: Collection[str]
 ) -> list[UnresolvedMention]:
     """Marks for every ID a description cites that the model does not contain."""
     return [
-        UnresolvedMention(threat_id=threat.id, mention=mention)
-        for threat in threats
-        for mention in mentioned_ids(threat.description)
+        UnresolvedMention(claim_id=claim.id, mention=mention)
+        for claim in claims
+        for mention in mentioned_ids(claim.description)
         if not canonical(mention, element_ids)
     ]
 
 
-def _missing_mitigations(
-    threats: Iterable[DraftThreat],
-) -> list[MissingMitigation]:
-    """Marks for threats offering no countermeasure and no reason for none.
-
-    The prompt licenses an empty ``mitigations`` for exactly one case — the
-    threat is conditional on an ``unknown`` and no countermeasure can be named
-    without first learning that fact — and step 6's branch rule makes that case
-    recognizable: a threat triggered by an unknown carries an
-    ``unknown-attribute`` ground, because the trigger dictates the branch. So
-    the licensed empty and the unlicensed one are told apart by the draft's own
-    grounds, with no judgement asked of anybody.
-    """
-    return [
-        MissingMitigation(threat_id=threat.id)
-        for threat in threats
-        if not threat.mitigations
-        and not any(ground.kind == "unknown-attribute" for ground in threat.grounds)
-    ]
-
-
-def numbering_gaps(threats: Iterable[DraftThreat]) -> list[str]:
-    """Every lane whose drafts are not numbered ``01..N``, as messages.
-
-    The prompt asks each agent for "a two-digit sequence starting at ``01``,
-    numbered within your category only". A lane that emits ``S-01, S-02, S-05``
-    has not followed it.
-
-    **Returned rather than raised, and deliberately not on the report.** A gap
-    breaks nothing: IDs are opaque handles, they are unique, their letters
-    match, and every downstream check passes. Renumbering would make them
-    comply, and is refused — rewriting a finding's identity to satisfy a
-    cosmetic rule is a bigger liberty than the rule is worth, and it would move
-    a threat's ID between two runs of the same input.
-
-    So this is a signal about the *agents*, not about the report, and it is
-    logged where the other operational facts about a run are rather than shown
-    to a reader who can do nothing with it. Worth having because it is free and
-    because nothing else in the graph would ever mention it: an agent quietly
-    drifting from its output contract is the kind of thing that is obvious in
-    hindsight and invisible in advance.
-    """
-    numbers_by_category: dict[StrideCategory, list[int]] = {}
-    for threat in threats:
-        numbers_by_category.setdefault(threat.category, []).append(
-            int(threat.id.split("-", 1)[1])
-        )
-    return [
-        f"the {category} lane numbered its {len(numbers)} drafts"
-        f" {', '.join(sorted(f'{CATEGORY_LETTERS[category]}-{n:02d}' for n in numbers))},"
-        f" not 01..{len(numbers):02d}"
-        for category, numbers in numbers_by_category.items()
-        if sorted(numbers) != list(range(1, len(numbers) + 1))
-    ]
+# The two branches whose reference is an element and an attribute of it. They
+# differ in what they say about that attribute — never stated against stated
+# absent — and in nothing this module does: both snap the same field and both
+# resolve against the same model, so every check here reads the pair.
+_ATTRIBUTE_KINDS = frozenset({"unknown-attribute", "absent-attribute"})
 
 
 def _snapped_ground(
@@ -239,7 +200,7 @@ def _snapped_ground(
         return ground.model_copy(
             update={"source_label": snap(ground.source_label, labels)}
         )
-    if ground.kind == "unknown-attribute":
+    if ground.kind in _ATTRIBUTE_KINDS:
         return ground.model_copy(
             update={"element_id": snap(ground.element_id, element_ids)}
         )
@@ -247,16 +208,17 @@ def _snapped_ground(
 
 
 def snap_drafts(
-    drafts: Iterable[DraftThreat],
+    drafts: Iterable[Claim],
     element_ids: Collection[str],
     source_labels: Collection[str] = (),
-) -> list[DraftThreat]:
+) -> list[Claim]:
     """Every reference a draft carries, in the spelling the job holds.
 
     Run at the fan-in before the checks, so what those checks compare — and what
     the report goes on to carry — is the canonical spelling rather than whatever
-    each of six independently-vendored agents happened to type. The drafts reach
-    the report unaltered otherwise: this rewrites references and nothing else.
+    each of a framework's independently-vendored lane agents happened to type.
+    The drafts reach the report unaltered otherwise: this rewrites references and
+    nothing else.
 
     ``element_ids`` covers flow references too, because a flow *is* an element
     and its ID is in the same set. Whether that flow is a derived boundary
@@ -279,8 +241,8 @@ def snap_drafts(
 
 
 def snap_rulings(
-    rulings: Iterable[ThreatRuling], element_ids: Collection[str]
-) -> list[ThreatRuling]:
+    rulings: Iterable[Ruling], element_ids: Collection[str]
+) -> list[Ruling]:
     """The same fold over the one reference a ruling carries.
 
     A ruling names no element of its own — that was given up deliberately when
@@ -310,14 +272,14 @@ def snap_rulings(
 
 
 def _unresolved_reference_issues(
-    threats: Iterable[DraftThreat], system_model: SystemModel
+    claims: Iterable[Claim], system_model: SystemModel
 ) -> list[str]:
     known_ids = {element.id for element in system_model.elements()}
     return [
-        f"threat {threat.id!r} references element {ref!r}, which is not in the"
+        f"claim {claim.id!r} references element {ref!r}, which is not in the"
         " system model"
-        for threat in threats
-        for ref in threat.affected_element_ids
+        for claim in claims
+        for ref in claim.affected_element_ids
         if ref not in known_ids
     ]
 
@@ -334,7 +296,7 @@ def _attribute_names(element: Element) -> frozenset[str]:
 
 
 class CriticIssue(NamedTuple):
-    """One unresolved-unknown problem, and the threat whose ruling carries it.
+    """One unresolved-unknown problem, and the claim whose ruling carries it.
 
     The ID rides beside the message because two callers need different halves.
     The re-ask prompt reads the *message*; the seam that builds that prompt
@@ -343,7 +305,7 @@ class CriticIssue(NamedTuple):
     wording of an error string load-bearing for what the graph sends a model.
     """
 
-    threat_id: str
+    claim_id: str
     message: str
 
 
@@ -368,7 +330,7 @@ class ReviewProblems(NamedTuple):
         return bool(self.messages)
 
 
-def _verdict_shape_issues(rulings: Iterable[ThreatRuling]) -> list[CriticIssue]:
+def _verdict_shape_issues(rulings: Iterable[Ruling]) -> list[CriticIssue]:
     """Every ruling whose verdict's fields disagree with its own ``status``.
 
     The three rules :class:`~stride_service.report.Verdict` states, asked here
@@ -379,11 +341,11 @@ def _verdict_shape_issues(rulings: Iterable[ThreatRuling]) -> list[CriticIssue]:
     for exactly this class of problem still unreached.
 
     So they are returned, like every other problem this module finds, and the
-    router sends them to ``recritic``. Each names its threat, because the fix
+    router sends them to ``recritic``. Each names its claim, because the fix
     is per-ruling: a reason to write, an unknown to name, or a list to drop.
 
     Deliberately three separate messages rather than one per ruling. A critic
-    that rejected a threat without a reason *and* attached unknowns to it has
+    that rejected a claim without a reason *and* attached unknowns to it has
     two independent things to fix, and a merged message would leave the second
     to be discovered on the pass that no longer exists.
     """
@@ -394,7 +356,7 @@ def _verdict_shape_issues(rulings: Iterable[ThreatRuling]) -> list[CriticIssue]:
             issues.append(
                 CriticIssue(
                     ruling.id,
-                    f"threat {ruling.id!r} is ruled needs-info but names no"
+                    f"claim {ruling.id!r} is ruled needs-info but names no"
                     " unknown attribute in related_unknowns, so nothing says"
                     " what has to be answered",
                 )
@@ -403,7 +365,7 @@ def _verdict_shape_issues(rulings: Iterable[ThreatRuling]) -> list[CriticIssue]:
             issues.append(
                 CriticIssue(
                     ruling.id,
-                    f"threat {ruling.id!r} is ruled {verdict.status} but carries"
+                    f"claim {ruling.id!r} is ruled {verdict.status} but carries"
                     " related_unknowns, which is only meaningful on a"
                     " needs-info verdict",
                 )
@@ -412,7 +374,7 @@ def _verdict_shape_issues(rulings: Iterable[ThreatRuling]) -> list[CriticIssue]:
             issues.append(
                 CriticIssue(
                     ruling.id,
-                    f"threat {ruling.id!r} is ruled {verdict.status} and states"
+                    f"claim {ruling.id!r} is ruled {verdict.status} and states"
                     " no reason",
                 )
             )
@@ -420,7 +382,7 @@ def _verdict_shape_issues(rulings: Iterable[ThreatRuling]) -> list[CriticIssue]:
 
 
 def _unresolved_unknown_ref_issues(
-    rulings: Iterable[ThreatRuling], system_model: SystemModel
+    rulings: Iterable[Ruling], system_model: SystemModel
 ) -> list[CriticIssue]:
     """Every ``related_unknowns`` entry naming an element or attribute not there.
 
@@ -452,7 +414,7 @@ def _unresolved_unknown_ref_issues(
                 issues.append(
                     CriticIssue(
                         ruling.id,
-                        f"threat {ruling.id!r} hangs its needs-info verdict on"
+                        f"claim {ruling.id!r} hangs its needs-info verdict on"
                         f" element {ref.element_id!r}, which is not in the system"
                         " model",
                     )
@@ -461,7 +423,7 @@ def _unresolved_unknown_ref_issues(
                 issues.append(
                     CriticIssue(
                         ruling.id,
-                        f"threat {ruling.id!r} hangs its needs-info verdict on"
+                        f"claim {ruling.id!r} hangs its needs-info verdict on"
                         f" attribute {ref.attribute!r}, which element"
                         f" {ref.element_id!r} does not have",
                     )
@@ -469,46 +431,46 @@ def _unresolved_unknown_ref_issues(
     return issues
 
 
-def _duplicate_id_issues(entries: Iterable[DraftThreat | ThreatRuling]) -> list[str]:
+def _duplicate_id_issues(entries: Iterable[Claim | Ruling]) -> list[str]:
     counts = Counter(entry.id for entry in entries)
     return [
-        f"threat ID {threat_id!r} is used by {count} drafts"
-        for threat_id, count in counts.items()
+        f"claim ID {claim_id!r} is used by {count} drafts"
+        for claim_id, count in counts.items()
         if count > 1
     ]
 
 
 def _ground_reference_issues(
-    threats: Iterable[DraftThreat],
+    claims: Iterable[Claim],
     system_model: SystemModel,
     source_labels: Collection[str],
 ) -> list[str]:
     """Every grounds entry whose reference does not resolve.
 
     Set membership, one branch at a time: a quote's ``source_label`` against
-    the job's labels, an unknown-attribute's ``element_id`` and ``attribute``
-    against the model, a derived-fact's ``flow_id`` against the crossings
-    derived from that same model. The gate's own stated principle is what puts
-    it here — *set membership is mechanical, so it belongs in code rather than
-    in a prompt* — and it inherits that rule's escape: where a job supplies no
-    labels, the label half does not run, so a hand-authored model driven
-    through the in-process engine is not failed on a citation that is not
-    wrong.
+    the job's labels, either attribute branch's ``element_id`` and
+    ``attribute`` against the model, a derived-fact's ``flow_id`` against the
+    crossings derived from that same model. The gate's own stated principle is
+    what puts it here — *set membership is mechanical, so it belongs in code
+    rather than in a prompt* — and it inherits that rule's escape: where a job
+    supplies no labels, the label half does not run, so a hand-authored model
+    driven through the in-process engine is not failed on a citation that is
+    not wrong.
     """
     by_id = {element.id: element for element in system_model.elements()}
     crossing_ids = {crossing.flow_id for crossing in system_model.boundary_crossings()}
     legal_labels = frozenset(source_labels)
     issues = []
-    for threat in threats:
-        for ground in threat.grounds:
+    for claim in claims:
+        for ground in claim.grounds:
             issues += _one_ground_issues(
-                threat.id, ground, by_id, crossing_ids, legal_labels
+                claim.id, ground, by_id, crossing_ids, legal_labels
             )
     return issues
 
 
 def _one_ground_issues(
-    threat_id: str,
+    claim_id: str,
     ground: Ground,
     by_id: Mapping[str, Element],
     crossing_ids: Collection[str],
@@ -519,26 +481,35 @@ def _one_ground_issues(
     if ground.kind == "quote":
         if legal_labels and ground.source_label not in legal_labels:
             issue = (
-                f"threat {threat_id!r} grounds a quote in source"
+                f"claim {claim_id!r} grounds a quote in source"
                 f" {ground.source_label!r}, which is not one of this job's"
                 f" sources {sorted(legal_labels)}"
             )
     elif ground.kind == "derived-fact":
         if ground.flow_id not in crossing_ids:
             issue = (
-                f"threat {threat_id!r} grounds a derived fact in flow"
+                f"claim {claim_id!r} grounds a derived fact in flow"
                 f" {ground.flow_id!r}, which is not a derived boundary crossing"
             )
     else:
+        # An unknown attribute and an absent one resolve identically: the check
+        # is that the element carries the attribute, never what its value says,
+        # for the reason ``related_unknowns`` gives above — a mechanical rule
+        # over a value is a judgement in disguise.
+        named = (
+            "an unknown attribute"
+            if ground.kind == "unknown-attribute"
+            else "an absent attribute"
+        )
         element = by_id.get(ground.element_id)
         if element is None:
             issue = (
-                f"threat {threat_id!r} grounds an unknown attribute on element"
+                f"claim {claim_id!r} grounds {named} on element"
                 f" {ground.element_id!r}, which is not in the system model"
             )
         elif ground.attribute not in _attribute_names(element):
             issue = (
-                f"threat {threat_id!r} grounds an unknown attribute"
+                f"claim {claim_id!r} grounds {named}"
                 f" {ground.attribute!r}, which element {ground.element_id!r}"
                 " does not have"
             )
@@ -546,7 +517,7 @@ def _one_ground_issues(
 
 
 def _verify_quotes(
-    threats: Sequence[DraftThreat], sources: Mapping[str, str]
+    claims: Sequence[Claim], sources: Mapping[str, str]
 ) -> list[UnverifiedGround]:
     """Check every quote ground against the source it names.
 
@@ -554,110 +525,116 @@ def _verify_quotes(
     **Per entry**, an unverifiable quote is *marked* and still renders: 0
     failures in 206 measured excerpts is not evidence of zero, and the Rule of
     Three puts the 95% bound at 1.46% per quote — which at the corpus mean of
-    18.7 threats per job is a 24% chance that some job dies on a single
+    18.7 claims per job is a 24% chance that some job dies on a single
     cosmetic mismatch. That is not enough evidence to license killing a job.
 
-    **Per threat**, if *no* ground verifies at all, the caller fails closed. A
-    threat with one bad quote beside good ones is still justified; a threat
+    **Per claim**, if *no* ground verifies at all, the caller fails closed. A
+    claim with one bad quote beside good ones is still justified; a claim
     where nothing holds is a finding with no machine-checkable justification.
-    That total loss is rarer than it sounds — unknown-attribute and
-    derived-fact grounds verify by set membership, which is deterministic and
-    always available, so a threat can only lose every ground if every one of
-    them is a quote and every quote is bad.
+    That total loss is rarer than it sounds — every catalogued ground verifies
+    by set membership, which is deterministic and always available, so a claim
+    can only lose every ground if every one of them is a quote and every quote
+    is bad.
 
     Nothing is filtered: this marks and it fails, and it removes neither an
-    entry nor a threat from anything.
+    entry nor a claim from anything.
     """
     # Each source folded once rather than once per quote. The ladder normalizes
-    # every character of the haystack, and a job runs ~19 threats against the
-    # same few submissions, so the per-quote form would re-fold whole documents
-    # to reach the same answer.
+    # every character of the haystack, and a job runs ~19 claims per framework
+    # against the same few submissions, so the per-quote form would re-fold whole
+    # documents to reach the same answer.
     folded = {label: normalize(text) for label, text in sources.items()}
     marks: list[UnverifiedGround] = []
     issues: list[str] = []
     failed: list[str] = []
-    for threat in threats:
+    for claim in claims:
         unverified = [
             index
-            for index, ground in enumerate(threat.grounds)
+            for index, ground in enumerate(claim.grounds)
             if ground.kind == "quote"
             and not verify_normalized(ground.text, folded.get(ground.source_label, ""))
         ]
-        if len(unverified) == len(threat.grounds):
-            failed.append(threat.id)
+        if len(unverified) == len(claim.grounds):
+            failed.append(claim.id)
             issues.append(
-                f"threat {threat.id!r} has no ground that verifies: all"
+                f"claim {claim.id!r} has no ground that verifies: all"
                 f" {len(unverified)} of its quotes are absent from the sources"
                 " they name"
             )
             continue
         marks += [
             UnverifiedGround(
-                threat_id=threat.id,
+                claim_id=claim.id,
                 index=index,
-                reason=f"not found in {threat.grounds[index].source_label!r}",
+                reason=f"not found in {claim.grounds[index].source_label!r}",
             )
             for index in unverified
         ]
     if issues:
         raise GroundsUnverifiedError(
-            "; ".join(issues), threat_ids=failed, draft_count=len(threats)
+            "; ".join(issues), claim_ids=failed, draft_count=len(claims)
         )
     return marks
 
 
 def join_drafts(
-    drafts_by_category: Mapping[StrideCategory, Sequence[DraftThreat]],
+    drafts_by_lane: Mapping[str, Sequence[Claim]],
+    package: FrameworkPackage,
     system_model: SystemModel,
     sources: Mapping[str, str] = MappingProxyType({}),
 ) -> JoinedDrafts:
-    """Merge the six category agents' drafts into the single list the critic sees.
+    """Merge one framework's lane agents' drafts into the list its critic sees.
 
-    Canonical STRIDE order, so the critic reads the lanes in the same order
-    every run. Category letters and each ``Ground``'s own shape are enforced by
-    :class:`DraftThreat` itself; what this seam adds is the checks that need the
-    whole set — element references resolving against the System Model, IDs
-    unique across it, and every grounds entry resolving and, for a quote,
-    actually appearing in the source it names.
+    **One package per call.** Two frameworks' drafts never meet here: they are
+    ruled by different critics against different questions, and merging them
+    would put a duplicate check across claims that cannot duplicate each other.
+    The graph runs this once per selected framework.
+
+    The package's own declared lane order, so a critic reads the lanes in the
+    same order every run. ID prefixes and each ``Ground``'s own shape are
+    enforced by construction — :func:`~stride_service.evidence.resolve_proposals`
+    composes both — and what this seam adds is the checks that need the whole
+    set: element references resolving against the System Model, IDs unique
+    across it, and every grounds entry resolving and, for a quote, actually
+    appearing in the source it names.
 
     **Whether a draft sits in the right lane is not among them, and cannot be.**
-    A draft's category is stamped from the lane by
+    A draft's lane is stamped from the node by
     :func:`~stride_service.evidence.resolve_proposals` rather than written by
     the agent, so comparing the two would compare a value against the value it
-    was copied from. The question that survives is whether the threat *belongs*
+    was copied from. The question that survives is whether the claim *belongs*
     in the lane it was found in, which is about the finding's content rather
-    than its serialization, and is the critic's second judgement step.
+    than its serialization, and is a critic's judgement step.
 
     Two things it *marks* rather than fails on, because the fan-in has no
     re-ask path and a whole report is too much to trade for either: a quote
     absent from the source it names, and an element ID a description cites in
     prose that the model does not contain
-    (:class:`~stride_service.report.UnresolvedMention`).
+    (:class:`~stride_service.report.UnresolvedMention`). A package's record adds
+    whatever else its own judgement fields earn
+    (:meth:`~stride_service.report.Claim.claim_marks`).
 
     References are snapped to their canonical spelling first
-    (:func:`~stride_service.references.snap_drafts`), so the checks below —
-    and the report, which carries these drafts' own fields through unaltered —
-    see the spelling the job holds rather than each agent's. That is
-    recognition and never resolution: a reference naming nothing is left
-    exactly as written, for the check to report in the agent's own words.
+    (:func:`snap_drafts`), so the checks below — and the report, which carries
+    these drafts' own fields through unaltered — see the spelling the job holds
+    rather than each agent's. That is recognition and never resolution: a
+    reference naming nothing is left exactly as written, for the check to report
+    in the agent's own words.
 
     The fan-in is where this belongs because it is the first point at which all
-    six lanes' drafts, the System Model and the job's sources exist together.
+    of this framework's lanes' drafts, the System Model and the job's sources
+    exist together.
 
     ``sources`` maps each source's label to its text. It defaults to empty for
     the same reason the validity gate's citation rule takes its label set as a
     parameter: a hand-authored model driven through the in-process engine has
     no sources to check against, and inventing a set would fail it on a
     citation that is not wrong. Empty means the text check does not run — no
-    quote is marked and no threat fails on one.
+    quote is marked and no claim fails on one.
     """
     known_ids = {element.id for element in system_model.elements()}
     merged = snap_drafts(
-        [
-            draft
-            for category in STRIDE_CATEGORIES
-            for draft in drafts_by_category.get(category, ())
-        ],
+        [draft for lane in package.lanes for draft in drafts_by_lane.get(lane, ())],
         known_ids,
         sources.keys(),
     )
@@ -677,14 +654,13 @@ def join_drafts(
         marks=AnalysisMarks(
             unverified_grounds=unverified,
             unresolved_mentions=_unresolved_mentions(merged, known_ids),
-            missing_mitigations=_missing_mitigations(merged),
-        ),
+        ).merged_with(package.record.claim_marks(merged)),
     )
 
 
 def review_issues(
-    drafts: Sequence[DraftThreat],
-    rulings: Sequence[ThreatRuling],
+    drafts: Sequence[Claim],
+    rulings: Sequence[Ruling],
     system_model: SystemModel,
 ) -> ReviewProblems:
     """Every way the critic's rulings fail to account for the drafts it saw.
@@ -692,7 +668,7 @@ def review_issues(
     The mechanical check, returned rather than raised, so the graph can *route*
     on it: a falsy result means the rulings are assemblable, a truthy one is
     what the bounded re-ask is asked to fix. The critic must rule on exactly the
-    drafted set — no threat invented, none dropped — with unique IDs, with each
+    drafted set — no claim invented, none dropped — with unique IDs, with each
     verdict carrying the fields its own ``status`` calls for, and each
     ``needs-info`` naming only unknowns the model actually contains.
 
@@ -705,14 +681,15 @@ def review_issues(
     re-ask; a missing reason is not a worse fault than a dropped draft, and
     there is no reason for it to be the fatal one.
 
-    **A malformed threat ID is checked here too, and by accident rather than by
-    design.** Nothing below looks at an ID's spelling: the set comparison at the
-    top requires the ruled IDs to equal the drafted ones, which an ill-formed ID
-    fails on both sides at once — the draft it meant to name reads as dropped,
+    **A malformed claim ID is checked here too, and by accident rather than by
+    design.** Nothing below looks at an ID's spelling — which is what lets this
+    run over a framework whose IDs are requirement numbers: the set comparison at
+    the top requires the ruled IDs to equal the drafted ones, which an ill-formed
+    ID fails on both sides at once — the draft it meant to name reads as dropped,
     and the ID it actually wrote reads as invented. That is a stronger
     constraint than a pattern and it produces better messages, so
-    :class:`~stride_service.report.ThreatRuling` carries no pattern to fire
-    first and fatally.
+    :class:`~stride_service.report.Ruling` carries no pattern to fire first and
+    fatally.
 
     Element references are deliberately **not** checked: a ruling carries none.
     They are the join seam's business (:func:`join_drafts` fails closed on a
@@ -727,10 +704,10 @@ def review_issues(
     per_ruling = _verdict_shape_issues(rulings) + _unresolved_unknown_ref_issues(
         rulings, system_model
     )
-    messages = [f"critic dropped draft {threat_id!r}" for threat_id in dropped]
+    messages = [f"critic dropped draft {claim_id!r}" for claim_id in dropped]
     messages += [
-        f"critic returned threat {threat_id!r}, which no category agent drafted"
-        for threat_id in sorted(ruled_ids - drafted_ids)
+        f"critic returned claim {claim_id!r}, which no lane agent drafted"
+        for claim_id in sorted(ruled_ids - drafted_ids)
     ]
     messages += _duplicate_id_issues(rulings)
     messages += [issue.message for issue in per_ruling]
@@ -740,22 +717,30 @@ def review_issues(
     #
     # Every per-ruling problem does implicate one. Naming the unknown a
     # needs-info hangs on, or writing the reason a rejection owes a reader,
-    # cannot be done from an ID — both are claims about a specific threat, and
-    # a re-ask that cannot read it would have to invent one.
+    # cannot be done from an ID — both are assertions about a specific claim,
+    # and a re-ask that cannot read it would have to invent one.
     implicated = set(dropped) | {
-        issue.threat_id for issue in per_ruling if issue.threat_id in drafted_ids
+        issue.claim_id for issue in per_ruling if issue.claim_id in drafted_ids
     }
     return ReviewProblems(messages=messages, implicated=frozenset(implicated))
 
 
-def _ruled(draft: DraftThreat, ruling: ThreatRuling) -> Threat:
-    """One draft plus the critic's ruling on it, as the report's :class:`Threat`.
+def _ruled(draft: Claim, ruling: Ruling, ruled_record: type[RuledClaim]) -> RuledClaim:
+    """One draft plus the critic's ruling on it, as the package's ruled record.
 
     The draft's own fields are carried across from the copy the service already
     held rather than from anything the critic emitted, so a review cannot alter
-    a description or an element reference. ``severity`` is the single exception
-    and the single overridable field: the calibration step is allowed to replace
-    a rating, and does so together with the justification that argues for it.
+    a description or an element reference.
+
+    **What a ruling may replace is stated by the ruling's own shape, not by a
+    list here.** Every field a package's :class:`~stride_service.report.Ruling`
+    subclass declares beyond ``id`` and ``verdict`` is merged onto the draft, and
+    a field holding ``None`` leaves the draft's alone. That one rule covers both
+    of the things a package actually does with those fields: STRIDE's
+    ``confidence`` is a judgement the draft never had and is required, so it
+    always lands; STRIDE's ``severity`` is a draft field the calibration step may
+    replace, and its ``None`` — the common case — keeps the agent's rating and the
+    justification that argues for it together.
 
     The verdict is **rebuilt** rather than carried across, promoting the
     critic's unruled :class:`~stride_service.report.ProposedVerdict` to the
@@ -765,29 +750,33 @@ def _ruled(draft: DraftThreat, ruling: ThreatRuling) -> Threat:
     raise here would mean the two had drifted, which is why the promotion is
     left able to raise rather than coerced.
     """
-    return Threat(
-        **draft.model_dump(exclude={"severity"}),
-        severity=ruling.severity or draft.severity,
-        confidence=ruling.confidence,
+    overrides = {
+        field: value
+        for field, value in ruling.model_dump(exclude={"id", "verdict"}).items()
+        if value is not None
+    }
+    return ruled_record(
+        **{**draft.model_dump(), **overrides},
         verdict=Verdict.model_validate(ruling.verdict.model_dump()),
     )
 
 
-def assemble_threats(
-    drafts: Sequence[DraftThreat],
-    rulings: Sequence[ThreatRuling],
+def assemble_claims(
+    drafts: Sequence[Claim],
+    rulings: Sequence[Ruling],
     system_model: SystemModel,
-) -> AssembledThreats:
-    """Merge the critic's rulings onto the drafts, split into the report's arrays.
+    schemas: FrameworkSchemas,
+) -> AssembledClaims:
+    """Merge one critic's rulings onto its drafts, split into the block's arrays.
 
     :func:`review_issues` is the gate — one definition of what "well-formed
     critic output" means, shared with the router that decides whether to
     re-ask. Assembly runs only after that gate has passed, but re-checks here
     and fails closed regardless: nothing reaches the report on output that did
-    not survive the check. Rejected threats ride in their own audit array; the
-    rest are sorted most-severe-first, as the report expects.
+    not survive the check. Rejected claims ride in their own audit array; the
+    rest are ordered by :func:`_claim_order`.
 
-    Threats are built in ``drafts`` order — canonical STRIDE order, as
+    Claims are built in ``drafts`` order — the package's own lane order, as
     :func:`join_drafts` left them — so the audit array does not inherit
     whatever order the critic happened to emit its rulings in.
     """
@@ -797,11 +786,23 @@ def assemble_threats(
 
     rulings = snap_rulings(rulings, {element.id for element in system_model.elements()})
     ruling_by_id = {ruling.id: ruling for ruling in rulings}
-    reviewed = [_ruled(draft, ruling_by_id[draft.id]) for draft in drafts]
-    actionable = [t for t in reviewed if t.verdict.status != "rejected"]
-    rejected = [t for t in reviewed if t.verdict.status == "rejected"]
-    return AssembledThreats(sorted(actionable, key=_severity_key), rejected)
+    reviewed = [
+        _ruled(draft, ruling_by_id[draft.id], schemas.ruled_record) for draft in drafts
+    ]
+    actionable = [claim for claim in reviewed if claim.verdict.status != "rejected"]
+    rejected = [claim for claim in reviewed if claim.verdict.status == "rejected"]
+    return AssembledClaims(sorted(actionable, key=_claim_order), rejected)
 
 
-def _severity_key(threat: Threat) -> tuple[int, str]:
-    return SEVERITY_ORDER.index(threat.severity.level), threat.id
+def _claim_order(claim: RuledClaim) -> tuple[int, str]:
+    """Most severe first where the framework grades harm, then by ID.
+
+    ``severity`` is read off the record rather than declared, the same way
+    :meth:`~stride_service.frameworks.FrameworkPackage.carries_severity` reads
+    it: a framework that grades nothing has every claim on one rank and falls
+    through to the ID, which is a stable order rather than the critic's emission
+    order.
+    """
+    severity = getattr(claim, "severity", None)
+    rank = SEVERITY_ORDER.index(severity.level) if severity is not None else 0
+    return rank, claim.id

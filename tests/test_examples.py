@@ -27,6 +27,7 @@ from stride_service import (
     StubPipelineRunner,
 )
 from stride_service.validation import ValidationIssue
+from tests.factories import sample_selection
 
 EXAMPLES = Path(__file__).resolve().parents[1] / "examples"
 
@@ -86,7 +87,10 @@ TEST_DEADLINE = 30.0
 
 def test_the_example_reports_a_completed_run(example, capsys):
     engine = StrideEngine(
-        StubPipelineRunner(), limits=EXAMPLE_LIMITS, deadline_seconds=TEST_DEADLINE
+        StubPipelineRunner(),
+        limits=EXAMPLE_LIMITS,
+        deadline_seconds=TEST_DEADLINE,
+        frameworks=sample_selection(),
     )
     asyncio.run(example.main(engine))
     assert capsys.readouterr().out, "a completed run must print something"
@@ -95,7 +99,10 @@ def test_the_example_reports_a_completed_run(example, capsys):
 def test_the_example_handles_a_rejection_without_raising(example, capsys):
     """The bug this whole mechanism exists to catch: silence on rejection."""
     engine = StrideEngine(
-        RejectingRunner(), limits=EXAMPLE_LIMITS, deadline_seconds=TEST_DEADLINE
+        RejectingRunner(),
+        limits=EXAMPLE_LIMITS,
+        deadline_seconds=TEST_DEADLINE,
+        frameworks=sample_selection(),
     )
     asyncio.run(example.main(engine))
 
@@ -110,7 +117,10 @@ def test_the_example_handles_a_rejection_without_raising(example, capsys):
 def test_the_example_lets_an_internal_failure_propagate(example):
     """Fail closed: nothing partial is invented on the way out."""
     engine = StrideEngine(
-        ExplodingRunner(), limits=EXAMPLE_LIMITS, deadline_seconds=TEST_DEADLINE
+        ExplodingRunner(),
+        limits=EXAMPLE_LIMITS,
+        deadline_seconds=TEST_DEADLINE,
+        frameworks=sample_selection(),
     )
     with pytest.raises(RuntimeError):
         asyncio.run(example.main(engine))

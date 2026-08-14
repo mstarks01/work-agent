@@ -49,7 +49,7 @@ from typing import Any, Literal
 from evals.harness.judge import Judge, MemoJudge
 from evals.harness.reference import GoldenCase
 from evals.harness.scorer import CaseScore, candidate_claim, ratio, score_case
-from stride_service.report import DraftThreat, StrideCategory
+from stride_service.frameworks.stride.record import DraftThreat, StrideCategory
 
 # What one produced threat turned out to be, in the pass that scored it. The
 # first two are hits against ground truth, the last four are the ways of

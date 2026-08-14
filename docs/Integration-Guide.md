@@ -1,7 +1,7 @@
 # Integration Guide
 
 `StrideEngine` is the in-process entry point: hand it the text describing a
-system and it returns a [`StrideReport`](Report-Schema.md). It owns none of the
+system and it returns a [`Report`](Report-Schema.md). It owns none of the
 [HTTP contract's](HTTP-API.md) ceremony — no auth token, no job store, no polling
 — so it is the right surface for swapping this pipeline in behind an
 application's own analysis interface.
@@ -14,7 +14,20 @@ prefix at construction, so a fresh engine per call pays that cost every time.
 ```python
 from stride_service import StrideEngine
 
-engine = StrideEngine.from_config()   # bundled prompts, bundled config, pinned models
+engine = StrideEngine.from_config(["stride"])   # bundled prompts, bundled config, pinned models
+```
+
+**`frameworks` is required and has no default.** It names which security
+frameworks this engine analyses with, in the order its reports' blocks will
+carry, and a name this build does not carry raises rather than being dropped —
+a job that silently analysed fewer frameworks than it asked for is the failure
+that rule exists to prevent. Pass a `FrameworkSelection` instead of a bare name
+where a framework takes job-level options:
+
+```python
+from stride_service import FrameworkSelection
+
+engine = StrideEngine.from_config([FrameworkSelection(name="stride")])
 ```
 
 If [config](Configuration.md) is missing or invalid, `from_config()` raises
@@ -24,10 +37,11 @@ reads paths and overrides from the environment; pass `env=` to override that
 
 ```python
 engine = StrideEngine.from_config(
+    ["stride"],
     env={
         "STRIDE_MODEL_STRONG_VENDOR": "vertex",
         "STRIDE_MODEL_STRONG_MODEL": "gemini-2.5-pro",
-    }
+    },
 )
 ```
 
@@ -48,7 +62,9 @@ once — and builds the engine from it. Resolve it yourself when you need both:
 from stride_service import Deployment, StrideEngine
 
 deployment = Deployment.from_env()          # reads config; no credentials touched
-engine = StrideEngine.from_deployment(deployment)   # resolves credentials, builds the graph
+engine = StrideEngine.from_deployment(deployment, deployment.frameworks)
+
+deployment.frameworks                        # what config/frameworks.toml carries
 
 deployment.tiers.tiers["strong"].model       # what the strong tier selected
 ```
@@ -268,7 +284,8 @@ def analyze_orders(engine: StrideEngine) -> None:
         return
 
     assert isinstance(outcome, PipelineCompleted)
-    print(f"{outcome.report.summary.threat_count} threats")
+    for block in outcome.report.analyses:
+        print(f"{block.framework}: {block.summary.claim_count} claims")
 ```
 <!-- /docs-include -->
 

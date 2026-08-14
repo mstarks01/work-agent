@@ -34,14 +34,15 @@ from typing import Any
 from evals.harness.reference import GoldenCase
 from stride_service.deployment import Deployment
 from stride_service.execution import GraphExecutor, GraphRun
+from stride_service.frameworks.stride.record import DraftThreat
 from stride_service.graph import (
     ENTRY_EXTRACT,
     ENTRY_EXTRACT_ONLY,
     ENTRY_PREPARE,
     STATE_EXTRACTED_MODEL,
-    STATE_MERGED_DRAFTS,
     STATE_VALID_MODEL,
     Entry,
+    FrameworkNodes,
     GraphProducedNothing,
     ModelResolver,
     Pipeline,
@@ -49,11 +50,12 @@ from stride_service.graph import (
     result_of,
 )
 from stride_service.report import (
-    DraftThreat,
+    FrameworkName,
+    FrameworkSelection,
     InputRef,
     Job,
     NodeRun,
-    StrideReport,
+    Report,
 )
 from stride_service.sampling import (
     SamplingConfig,
@@ -99,7 +101,7 @@ class AnalysisRun:
     exactly as :func:`~stride_service.graph.assemble_report` does.
     """
 
-    report: StrideReport
+    report: Report
     merged_drafts: tuple[DraftThreat, ...]
 
 
@@ -141,12 +143,19 @@ class ExtractionScore:
         }
 
 
+#: The frameworks a sweep's graph is built for. One today, and named here
+#: rather than defaulted inside the harness: a sweep grades a framework's own
+#: claim set (#167), so which frameworks ran is a property of the sweep.
+EVAL_FRAMEWORKS: tuple[FrameworkName, ...] = ("stride",)
+
+
 def build_eval_pipeline(
     entry: Entry,
     *,
     deployment: Deployment | None = None,
     resolve_model: ModelResolver | None = None,
     sampling: SamplingConfig | None = None,
+    frameworks: Sequence[FrameworkName] = EVAL_FRAMEWORKS,
 ) -> Pipeline:
     """The shipped graph, entered where the mode needs it.
 
@@ -166,7 +175,7 @@ def build_eval_pipeline(
     deployment = deployment or Deployment.from_env()
     if sampling is not None:
         deployment = replace(deployment, sampling=sampling, _built={})
-    return deployment.pipeline(entry=entry, resolve_model=resolve_model)
+    return deployment.pipeline(frameworks, entry=entry, resolve_model=resolve_model)
 
 
 async def run_graph(
@@ -268,7 +277,7 @@ def _run_from_graph(
     The report is built by :meth:`~stride_service.graph.Analysis.into_report`,
     the same method :class:`~stride_service.pipeline.AdkPipelineRunner` calls,
     so a sweep's reports carry every block a job's do. The Tier 1 gates check a
-    whole ``StrideReport`` — including the self-containment invariants — and a
+    whole ``Report`` — including the self-containment invariants — and a
     stripped-down payload would test a shape production never emits.
 
     What the eval supplies is what only this driver knows: a case-derived job
@@ -285,19 +294,29 @@ def _run_from_graph(
     if isinstance(result, Rejected):
         detail = "; ".join(f"{issue.code}: {issue.message}" for issue in result.issues)
         raise EvalRunError(f"{case.id}: the graph rejected the model: {detail}")
-    if STATE_MERGED_DRAFTS not in state:
+    # STRIDE's own drafts key. Critic yield is graded per framework (#167), and
+    # this driver scores the open-claim-set half of that contract; a second
+    # framework's drafts are read by its own scorer against its own reference.
+    drafts_key = FrameworkNodes("stride").key("drafts")
+    if drafts_key not in state:
         raise EvalRunError(f"{case.id}: graph produced an analysis with no drafts")
 
     now = datetime.now(UTC)
     report = result.into_report(
-        job=Job(id=f"eval-{case.id}", created_at=now, completed_at=now),
+        job=Job(
+            id=f"eval-{case.id}",
+            created_at=now,
+            completed_at=now,
+            # Read off the built graph rather than restated: the envelope checks
+            # that the blocks answer the job's own selection, so a driver that
+            # named its own list could disagree with the graph that ran.
+            frameworks=[FrameworkSelection(name=name) for name in pipeline.frameworks],
+        ),
         input_ref=InputRef.of(system_name=case.meta.title, sources=case.sources),
         nodes=graph_run.node_runs,
         pipeline=pipeline,
     )
-    drafts = tuple(
-        DraftThreat.model_validate(draft) for draft in state[STATE_MERGED_DRAFTS]
-    )
+    drafts = tuple(DraftThreat.model_validate(draft) for draft in state[drafts_key])
     return AnalysisRun(report=report, merged_drafts=drafts)
 
 

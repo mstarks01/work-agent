@@ -54,7 +54,8 @@ model = "<model>"
 ```
 
 The two tiers select independently: `base` is the workhorse (extraction,
-repair), `strong` is judgement (the six category agents, the critic, the re-ask). A
+repair), `strong` is judgement (every framework's lane agents, its critic and
+its re-ask). A
 mixed pair — a cheap model from one vendor, judgement from another — is
 ordinary rather than a special case.
 
@@ -188,7 +189,7 @@ uv run python -m stride_service.smoke
 
 It runs one small system through the shipped graph on your selection — about
 eight model calls, cents rather than dollars — and reports whether each node
-bound, whether extraction, the six category agents and the critic returned
+bound, whether extraction, the lane agents and the critic returned
 output the service could parse, whether the provider took your sampling
 parameters, and what build actually answered. Run it before the first real job:
 a credential or a model pin that is wrong shows up here in a minute rather than
@@ -294,7 +295,7 @@ async def main(engine: StrideEngine) -> None:
 
 That is [`examples/embed.py`](../examples/embed.py), included here from the file
 itself — run it with `uv run python examples/embed.py`. Build the engine once
-with `StrideEngine.from_config()` and reuse it; construction composes a cacheable
+with `StrideEngine.from_config(["stride"])` and reuse it; construction composes a cacheable
 shared prefix that a fresh engine per call would pay for every time.
 
 Handle all three outcomes. `analyze` returns a report, returns a rejection

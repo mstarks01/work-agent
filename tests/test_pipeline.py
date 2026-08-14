@@ -16,6 +16,7 @@ import pytest
 
 from stride_service import graph
 from stride_service.api import create_app
+from stride_service.frameworks.stride.record import STRIDE_CATEGORIES
 from stride_service.jobs import (
     InMemoryJobStore,
     JobRecord,
@@ -24,18 +25,20 @@ from stride_service.jobs import (
     StubPipelineRunner,
 )
 from stride_service.pipeline import AdkPipelineRunner, PipelineError
-from stride_service.report import STRIDE_CATEGORIES, InputRef
+from stride_service.report import InputRef
 from stride_service.sampling import TierSampling, load_sampling, sampling_fingerprint
 from stride_service.sources import DEFAULT_DESCRIPTION_LABEL, Source
 from tests.factories import (
     BASE_MODEL,
+    DEFAULT_FRAMEWORKS,
     DESCRIPTION_TEXT,
     PROJECT_ROOT,
+    claims_json,
     repo_tiers,
     sample_proposal,
     sample_ruling,
+    sample_selection,
     served_build,
-    threats_json,
     valid_model,
 )
 from tests.factories import scripted_pipeline as build
@@ -43,6 +46,19 @@ from tests.factories import scripted_pipeline as build
 # The shipped config selects Vertex on both tiers, and Vertex's credential mode
 # is ADC — so building the real pipeline needs these three present. They are
 # names of variables, never credentials: nothing here is a secret.
+# This install's one package's own nodes. Every per-framework role carries its
+# framework in the node name, since two packages may declare a lane of the same
+# name and would otherwise fight over one state key.
+STRIDE_NODES = graph.FrameworkNodes("stride")
+CRITIC = STRIDE_NODES.node(graph.CRITIC_ROLE)
+RECRITIC = STRIDE_NODES.node(graph.RECRITIC_ROLE)
+ROUTER = STRIDE_NODES.node(graph.ROUTER_ROLE)
+REREVIEW = STRIDE_NODES.node(graph.REREVIEW_ROLE)
+CRITIC_FAILED = STRIDE_NODES.node(graph.CRITIC_FAILED_ROLE)
+ANALYZE_NODES = tuple(lane.node_name for lane in STRIDE_NODES.lanes)
+#: This graph's node -> tier map, built for the selection above.
+TIER_NODES = graph.tier_node_by_graph_node(("stride",))
+
 VERTEX_ENV = {
     "STRIDE_VERTEX_PROJECT": "test-project",
     "STRIDE_VERTEX_LOCATION": "us-central1",
@@ -52,7 +68,7 @@ VERTEX_ENV = {
 
 def proposal_json(threat_id: str, category: str) -> str:
     """One category agent's whole emission: the shape its node's schema names."""
-    return threats_json(sample_proposal(threat_id, category))
+    return claims_json(sample_proposal(threat_id, category))
 
 
 def job(text: str = DESCRIPTION_TEXT) -> JobRecord:
@@ -60,6 +76,7 @@ def job(text: str = DESCRIPTION_TEXT) -> JobRecord:
         owner_subject="idp|user-1",
         sources=[Source.description(text)],
         system_name="Order Service",
+        frameworks=sample_selection(),
     )
     record.transition("running")
     return record
@@ -78,12 +95,26 @@ def run(pipeline: graph.Pipeline, record: JobRecord) -> tuple[object, list[str]]
     return asyncio.run(scenario()), visited
 
 
+def block(report):
+    """This report's one analysis block.
+
+    Every finding-shaped field moved off the envelope and onto the block a
+    framework fills, since a claim count that summed across frameworks would add
+    a credible attack to an unanswered requirement and call the total findings.
+    These runs select one framework, so there is exactly one.
+    """
+    (only,) = report.analyses
+    return only
+
+
 def happy_replies() -> dict[str, str]:
     """Extraction succeeds; spoofing drafts one threat; the critic confirms it."""
     return {
         "extract": valid_model().model_dump_json(),
-        graph.analyze_node_name("spoofing"): proposal_json("S-01", "spoofing"),
-        "critic": threats_json(sample_ruling("S-01")),
+        graph.analyze_node_name("stride", "spoofing"): proposal_json(
+            "S-01", "spoofing"
+        ),
+        CRITIC: claims_json(sample_ruling("S-01")),
     }
 
 
@@ -93,16 +124,16 @@ def test_a_clean_run_produces_a_report():
 
     assert isinstance(outcome, PipelineCompleted)
     report = outcome.report
-    assert [threat.id for threat in report.threats] == ["S-01"]
-    assert report.summary.threat_count == 1
+    assert [threat.id for threat in block(report).claims] == ["S-01"]
+    assert block(report).summary.claim_count == 1
     assert report.input.system_name == "Order Service"
     assert report.system_model.get("process:web-app") is not None
-    # Self-containment is re-checked by StrideReport itself on construction.
+    # Self-containment is re-checked by Report itself on construction.
     assert report.boundary_crossings == report.system_model.boundary_crossings()
 
     assert visited[0] == graph.EXTRACT_NODE
     assert visited[-1] == graph.ASSEMBLE_NODE
-    assert set(graph.ANALYZE_GRAPH_NODES) <= set(visited)
+    assert set(ANALYZE_NODES) <= set(visited)
     assert graph.REPAIR_NODE not in visited
     assert graph.REJECT_NODE not in visited
 
@@ -127,16 +158,18 @@ def test_an_unfindable_quote_is_marked_on_the_report_and_still_renders():
         evidence_refs=["crossing:flow:customer-to-web-app:login"],
     )
     replies = happy_replies() | {
-        graph.analyze_node_name("spoofing"): threats_json(proposal)
+        graph.analyze_node_name("stride", "spoofing"): claims_json(proposal)
     }
     pipeline, _ = build(replies)
 
     outcome, _ = run(pipeline, job())
 
     report = outcome.report
-    assert [threat.id for threat in report.threats] == ["S-01"]
-    assert len(report.threats[0].grounds) == 2
-    assert [(m.threat_id, m.index) for m in report.unverified_grounds] == [("S-01", 0)]
+    assert [threat.id for threat in block(report).claims] == ["S-01"]
+    assert len(block(report).claims[0].grounds) == 2
+    assert [(m.claim_id, m.index) for m in block(report).unverified_grounds] == [
+        ("S-01", 0)
+    ]
 
 
 def test_a_description_citing_a_missing_element_is_marked_on_the_report():
@@ -155,15 +188,15 @@ def test_a_description_citing_a_missing_element_is_marked_on_the_report():
         " process:web-api, which this model does not contain.",
     )
     replies = happy_replies() | {
-        graph.analyze_node_name("spoofing"): threats_json(proposal)
+        graph.analyze_node_name("stride", "spoofing"): claims_json(proposal)
     }
     pipeline, _ = build(replies)
 
     outcome, _ = run(pipeline, job())
 
     report = outcome.report
-    assert [threat.id for threat in report.threats] == ["S-01"]
-    assert [(m.threat_id, m.mention) for m in report.unresolved_mentions] == [
+    assert [threat.id for threat in block(report).claims] == ["S-01"]
+    assert [(m.claim_id, m.mention) for m in block(report).unresolved_mentions] == [
         ("S-01", "process:web-api")
     ]
 
@@ -186,34 +219,36 @@ def test_a_composed_evidence_reference_is_marked_rather_than_fatal():
         ],
     )
     replies = happy_replies() | {
-        graph.analyze_node_name("spoofing"): threats_json(proposal)
+        graph.analyze_node_name("stride", "spoofing"): claims_json(proposal)
     }
     pipeline, _ = build(replies)
 
     outcome, _ = run(pipeline, job())
 
     report = outcome.report
-    assert [threat.id for threat in report.threats] == ["S-01"]
-    assert [(m.threat_id, m.reference) for m in report.unresolved_evidence] == [
+    assert [threat.id for threat in block(report).claims] == ["S-01"]
+    assert [(m.claim_id, m.reference) for m in block(report).unresolved_evidence] == [
         ("S-01", "crossing:flow:ghost")
     ]
     # The surviving reference still grounds the finding it was cited for.
-    assert any(ground.kind == "derived-fact" for ground in report.threats[0].grounds)
+    assert any(
+        ground.kind == "derived-fact" for ground in block(report).claims[0].grounds
+    )
 
 
 def test_a_threat_with_no_countermeasure_is_marked_on_the_report():
     """A completeness signal, carried to the reader rather than costing the run."""
     proposal = sample_proposal("S-01", "spoofing", mitigations=[])
     replies = happy_replies() | {
-        graph.analyze_node_name("spoofing"): threats_json(proposal)
+        graph.analyze_node_name("stride", "spoofing"): claims_json(proposal)
     }
     pipeline, _ = build(replies)
 
     outcome, _ = run(pipeline, job())
 
     report = outcome.report
-    assert [threat.id for threat in report.threats] == ["S-01"]
-    assert [m.threat_id for m in report.missing_mitigations] == ["S-01"]
+    assert [threat.id for threat in block(report).claims] == ["S-01"]
+    assert [m.claim_id for m in block(report).missing_mitigations] == ["S-01"]
 
 
 def test_one_name_on_two_types_is_marked_and_does_not_fail_the_run():
@@ -254,17 +289,17 @@ def test_a_lane_that_skips_a_number_is_logged_and_not_renumbered(caplog):
     import logging
 
     replies = happy_replies() | {
-        graph.analyze_node_name("spoofing"): threats_json(
+        graph.analyze_node_name("stride", "spoofing"): claims_json(
             sample_proposal("S-01"), sample_proposal("S-05")
         ),
-        "critic": threats_json(sample_ruling("S-01"), sample_ruling("S-05")),
+        CRITIC: claims_json(sample_ruling("S-01"), sample_ruling("S-05")),
     }
     pipeline, _ = build(replies)
 
     with caplog.at_level(logging.WARNING, logger="stride_service.graph"):
         outcome, _ = run(pipeline, job())
 
-    assert [threat.id for threat in outcome.report.threats] == ["S-01", "S-05"]
+    assert [threat.id for threat in block(outcome.report).claims] == ["S-01", "S-05"]
     assert any("S-01, S-05" in message for message in caplog.messages)
     assert any("not 01..02" in message for message in caplog.messages)
 
@@ -283,7 +318,7 @@ def test_a_threat_no_ground_supports_fails_the_job():
         evidence_refs=[],
     )
     replies = happy_replies() | {
-        graph.analyze_node_name("spoofing"): threats_json(proposal)
+        graph.analyze_node_name("stride", "spoofing"): claims_json(proposal)
     }
     pipeline, _ = build(replies)
 
@@ -303,7 +338,7 @@ def test_the_report_carries_the_graph_runs_node_stamps():
     assert [node_run.node for node_run in outcome.report.nodes] == visited
     by_node = {run_.node: run_ for run_ in outcome.report.nodes}
     assert by_node[graph.EXTRACT_NODE].model == served_build(BASE_MODEL)
-    assert by_node[graph.CRITIC_NODE].sampling_fingerprint is not None
+    assert by_node[CRITIC].sampling_fingerprint is not None
     assert by_node[graph.ASSEMBLE_NODE].sampling_fingerprint is None
 
 
@@ -359,7 +394,7 @@ def test_each_llm_node_fingerprint_recomputes_from_the_artifact():
     clear = outcome.report.sampling
 
     for node_run in outcome.report.nodes:
-        canonical = graph.TIER_NODE_BY_GRAPH_NODE.get(node_run.node)
+        canonical = TIER_NODES.get(node_run.node)
         if canonical is None:  # deterministic FunctionNode
             assert node_run.model is None
             assert node_run.sampling_fingerprint is None
@@ -374,7 +409,7 @@ def test_each_agent_gets_its_own_category_and_the_shared_model():
     run(pipeline, job())
 
     for category in STRIDE_CATEGORIES:
-        instruction = models[graph.analyze_node_name(category)].seen[0]
+        instruction = models[graph.analyze_node_name("stride", category)].seen[0]
         assert f"**{category}** agent" in instruction
         assert "process:web-app" in instruction  # {system_model} templated in
         assert "{" not in instruction.split("## Procedure")[0].split("```")[-1]
@@ -382,15 +417,17 @@ def test_each_agent_gets_its_own_category_and_the_shared_model():
 
 def test_the_critic_sees_each_category_agents_drafts_once():
     replies = happy_replies()
-    replies[graph.analyze_node_name("tampering")] = proposal_json("T-01", "tampering")
-    replies["critic"] = threats_json(sample_ruling("S-01"), sample_ruling("T-01"))
+    replies[graph.analyze_node_name("stride", "tampering")] = proposal_json(
+        "T-01", "tampering"
+    )
+    replies[CRITIC] = claims_json(sample_ruling("S-01"), sample_ruling("T-01"))
     pipeline, models = build(replies)
     outcome, _ = run(pipeline, job())
 
-    critic_instruction = models["critic"].seen[0]
+    critic_instruction = models[CRITIC].seen[0]
     assert critic_instruction.count('"id": "S-01"') == 1
     assert critic_instruction.count('"id": "T-01"') == 1
-    assert {threat.id for threat in outcome.report.threats} == {"S-01", "T-01"}
+    assert {threat.id for threat in block(outcome.report).claims} == {"S-01", "T-01"}
 
 
 def test_an_invalid_extraction_is_repaired_once_and_then_analyzed():
@@ -429,13 +466,13 @@ def test_a_model_that_fails_twice_is_rejected_with_its_issues():
     assert any("process:does-not-exist" in issue.message for issue in outcome.issues)
     assert visited[-1] == graph.REJECT_NODE
     assert graph.PREPARE_NODE not in visited
-    assert not set(graph.ANALYZE_GRAPH_NODES) & set(visited)
+    assert not set(ANALYZE_NODES) & set(visited)
 
 
 def test_a_hallucinated_element_reference_fails_the_job_loudly():
     """The merge seam refuses drafts the System Model cannot account for."""
     replies = happy_replies()
-    replies[graph.analyze_node_name("spoofing")] = threats_json(
+    replies[graph.analyze_node_name("stride", "spoofing")] = claims_json(
         sample_proposal("S-01", affected_element_ids=["process:invented"])
     )
     pipeline, _ = build(replies)
@@ -447,26 +484,28 @@ def test_a_hallucinated_element_reference_fails_the_job_loudly():
 def test_a_malformed_critic_output_is_re_asked_once_and_then_assembled():
     """The critic drops a draft; the bounded re-ask returns the full set."""
     replies = happy_replies()
-    replies[graph.analyze_node_name("tampering")] = proposal_json("T-01", "tampering")
-    both = threats_json(sample_ruling("S-01"), sample_ruling("T-01"))
+    replies[graph.analyze_node_name("stride", "tampering")] = proposal_json(
+        "T-01", "tampering"
+    )
+    both = claims_json(sample_ruling("S-01"), sample_ruling("T-01"))
     # The critic drops T-01; the re-ask returns both drafts, reconciled.
-    replies["critic"] = threats_json(sample_ruling("S-01"))
-    replies["recritic"] = both
+    replies[CRITIC] = claims_json(sample_ruling("S-01"))
+    replies[RECRITIC] = both
 
     pipeline, models = build(replies)
     outcome, visited = run(pipeline, job())
 
     assert isinstance(outcome, PipelineCompleted)
-    assert {threat.id for threat in outcome.report.threats} == {"S-01", "T-01"}
+    assert {threat.id for threat in block(outcome.report).claims} == {"S-01", "T-01"}
     assert visited[-4:] == [
-        graph.ROUTER_NODE,
-        graph.RECRITIC_NODE,
-        graph.REREVIEW_NODE,
+        ROUTER,
+        RECRITIC,
+        REREVIEW,
         graph.ASSEMBLE_NODE,
     ]
-    assert graph.CRITIC_FAILED_NODE not in visited
+    assert CRITIC_FAILED not in visited
     # The re-ask saw the failing ruling and the problem it must fix.
-    re_ask_instruction = models["recritic"].seen[0]
+    re_ask_instruction = models[RECRITIC].seen[0]
     assert "T-01" in re_ask_instruction  # named in {critic_issues}
 
 
@@ -480,9 +519,9 @@ def test_a_mis_shaped_verdict_is_re_asked_rather_than_killing_the_job():
     — with it. The re-ask that exists for exactly this never got to run.
     """
     replies = happy_replies()
-    replies["critic"] = json.dumps(
+    replies[CRITIC] = json.dumps(
         {
-            "threats": [
+            "claims": [
                 {
                     "id": "S-01",
                     "confidence": "high",
@@ -491,18 +530,18 @@ def test_a_mis_shaped_verdict_is_re_asked_rather_than_killing_the_job():
             ]
         }
     )
-    replies["recritic"] = threats_json(sample_ruling("S-01"))
+    replies[RECRITIC] = claims_json(sample_ruling("S-01"))
     pipeline, models = build(replies)
 
     outcome, visited = run(pipeline, job())
 
     assert isinstance(outcome, PipelineCompleted)
-    assert [threat.id for threat in outcome.report.threats] == ["S-01"]
-    assert graph.RECRITIC_NODE in visited
-    assert graph.CRITIC_FAILED_NODE not in visited
+    assert [threat.id for threat in block(outcome.report).claims] == ["S-01"]
+    assert RECRITIC in visited
+    assert CRITIC_FAILED not in visited
     # The re-ask was told which ruling, and what about it — and was shown the
     # draft, because naming the unknown cannot be done from an ID alone.
-    re_ask = models["recritic"].seen[0]
+    re_ask = models[RECRITIC].seen[0]
     assert "names no unknown attribute" in re_ask
     assert "S-01" in re_ask
 
@@ -516,25 +555,25 @@ def test_a_mistyped_ruling_id_is_re_asked_rather_than_killing_the_job():
     prompt change needed for the new fault.
     """
     replies = happy_replies()
-    replies["critic"] = json.dumps(
+    replies[CRITIC] = json.dumps(
         {
-            "threats": [
+            "claims": [
                 {"id": "S-1", "confidence": "high", "verdict": {"status": "confirmed"}}
             ]
         }
     )
-    replies["recritic"] = threats_json(sample_ruling("S-01"))
+    replies[RECRITIC] = claims_json(sample_ruling("S-01"))
     pipeline, models = build(replies)
 
     outcome, visited = run(pipeline, job())
 
     assert isinstance(outcome, PipelineCompleted)
-    assert [threat.id for threat in outcome.report.threats] == ["S-01"]
-    assert graph.RECRITIC_NODE in visited
-    assert graph.CRITIC_FAILED_NODE not in visited
-    re_ask = models["recritic"].seen[0]
+    assert [threat.id for threat in block(outcome.report).claims] == ["S-01"]
+    assert RECRITIC in visited
+    assert CRITIC_FAILED not in visited
+    re_ask = models[RECRITIC].seen[0]
     assert "dropped draft 'S-01'" in re_ask
-    assert "'S-1', which no category agent drafted" in re_ask
+    assert "'S-1', which no lane agent drafted" in re_ask
 
 
 def test_a_verdict_still_mis_shaped_after_the_re_ask_fails_as_critic_output():
@@ -544,7 +583,7 @@ def test_a_verdict_still_mis_shaped_after_the_re_ask_fails_as_critic_output():
     replies = happy_replies()
     unreasoned = json.dumps(
         {
-            "threats": [
+            "claims": [
                 {
                     "id": "S-01",
                     "confidence": "high",
@@ -553,8 +592,8 @@ def test_a_verdict_still_mis_shaped_after_the_re_ask_fails_as_critic_output():
             ]
         }
     )
-    replies["critic"] = unreasoned
-    replies["recritic"] = unreasoned
+    replies[CRITIC] = unreasoned
+    replies[RECRITIC] = unreasoned
     pipeline, _ = build(replies)
 
     with pytest.raises(Exception, match="states no reason"):
@@ -563,10 +602,10 @@ def test_a_verdict_still_mis_shaped_after_the_re_ask_fails_as_critic_output():
 
 def test_a_critic_that_will_not_reconcile_after_the_re_ask_fails_the_job_loudly():
     replies = happy_replies()
-    invented = threats_json(sample_ruling("S-01"), sample_ruling("T-02"))
+    invented = claims_json(sample_ruling("S-01"), sample_ruling("T-02"))
     # Both the critic and its re-ask return a threat no category agent drafted.
-    replies["critic"] = invented
-    replies["recritic"] = invented
+    replies[CRITIC] = invented
+    replies[RECRITIC] = invented
     pipeline, _ = build(replies)
 
     with pytest.raises(Exception, match="T-02"):
@@ -602,9 +641,9 @@ def test_a_failed_job_logs_the_input_digest(caplog):
     import logging
 
     replies = happy_replies()
-    invented = threats_json(sample_ruling("S-01"), sample_ruling("T-02"))
-    replies["critic"] = invented
-    replies["recritic"] = invented
+    invented = claims_json(sample_ruling("S-01"), sample_ruling("T-02"))
+    replies[CRITIC] = invented
+    replies[RECRITIC] = invented
     pipeline, _ = build(replies)
     # Distinct from the shared text so the digest is this job's, but still
     # carrying the spans the scripted model's excerpts quote.
@@ -634,7 +673,10 @@ def test_the_api_runs_jobs_through_the_real_graph_by_default(monkeypatch):
             raise AssertionError("not reached")
 
     app = create_app(store=InMemoryJobStore(), verifier=NoVerifier())
-    assert isinstance(app.state.runner, AdkPipelineRunner)
+    # A runner is built per selection, so the app holds a function from one to
+    # its runner rather than a single runner built up front.
+    runner = app.state.runner_for(DEFAULT_FRAMEWORKS)
+    assert isinstance(runner, AdkPipelineRunner)
 
 
 def test_pipeline_error_names_the_job_when_the_graph_produces_nothing():
@@ -658,7 +700,9 @@ def test_the_report_records_what_informed_the_analysis():
     assert context.instruction_sha256 == pipeline.instruction_sha256
     # The fixture runs FastAPI over HTTPS against Cloud SQL Postgres.
     assert context.domain_packs == ["http-api", "databases"]
-    assert all(rule.split("-")[0] for rule in context.fired_rules)
+    # ``fired_rules`` names *one package's* candidate rules, so it sits on that
+    # package's block rather than on the envelope's shared context.
+    assert all(rule.split("-")[0] for rule in block(outcome.report).fired_rules)
 
 
 def test_two_jobs_on_one_deployment_share_an_instruction_digest():

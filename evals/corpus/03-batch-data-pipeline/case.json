@@ -2,7 +2,6 @@
   "id": "03-batch-data-pipeline",
   "title": "Nightly partner claims ingest pipeline",
   "domain": "data-pipeline",
-  "exemplar_proximity": "far",
   "provenance": "internal-system (synthetic, sanitized)",
   "bootstrap": "agent-stand-in",
   "sources": [
@@ -14,5 +13,12 @@
     }
   ],
   "source_sha256": "d2475a4d4d74674de1f87071603b3e9adfb174920656df1ba4454f26ebe0d40b",
+  "frameworks": [
+    {
+      "name": "stride",
+      "options": {},
+      "exemplar_proximity": "far"
+    }
+  ],
   "notes": "Far-domain case (ticket 009 decision 6). Batch rather than request/response: there is no user session anywhere, the trust decision is about a file's provenance rather than a caller's identity, availability failures are silent staleness inside a nightly window rather than visible downtime, and the sensitive data is health-related. Carries the one element type the payments exemplar has no analogue for — a scheduler's own metadata store acting as a control plane."
 }

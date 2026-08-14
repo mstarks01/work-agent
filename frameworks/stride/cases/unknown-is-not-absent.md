@@ -22,4 +22,4 @@ Compare a flow whose `authentication` reads `none; the queue is only reachable i
 
 ## What decided it
 
-The `unknown:` evidence reference for the attribute itself — the fact that the input never stated it, which is a fact about the material rather than about the system.
+The `unknown:` evidence reference for the attribute itself — the fact that the input never stated it, which is a fact about the material rather than about the system. The stated absence in the comparison above carries an `absent:` reference instead, and the catalog's two glosses — `never stated` against `stated absent` — are where the difference is visible.

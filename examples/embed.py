@@ -26,9 +26,9 @@ from stride_service import (
     EngineInputError,
     PipelineCompleted,
     PipelineRejected,
+    Report,
     Source,
     StrideEngine,
-    StrideReport,
 )
 
 SAMPLE = Path(__file__).resolve().parent / "orders.md"
@@ -73,15 +73,25 @@ async def main(engine: StrideEngine) -> None:
 # docs-region-end: embed
 
 
-def summarise(report: StrideReport) -> None:
+def summarise(report: Report) -> None:
     """Print the headline numbers. Your application does something useful here."""
-    summary = report.summary
     print(f"system:   {report.input.system_name}")
-    print(f"elements: {summary.elements_analyzed}")
-    print(f"threats:  {summary.threat_count} ({summary.needs_info_count} need info)")
-    for level, count in sorted(summary.by_severity.items()):
-        print(f"  {level}: {count}")
+    print(f"elements: {report.elements_analyzed}")
+    # One block per framework the job selected, in that order. A consumer that
+    # knows only the neutral shape reads exactly these fields; a package's own
+    # block carries more, and `getattr` is how you ask without assuming.
+    for block in report.analyses:
+        summary = block.summary
+        print(
+            f"{block.framework}: {summary.claim_count} claims"
+            f" ({summary.needs_info_count} need info,"
+            f" {summary.rejected_count} rejected)"
+        )
+        for level, count in sorted(getattr(summary, "by_severity", {}).items()):
+            print(f"  {level}: {count}")
 
 
 if __name__ == "__main__":
-    asyncio.run(main(StrideEngine.from_config()))
+    # A selection is required: this service ships no default set, so an
+    # embedder names the frameworks it wants analysed under.
+    asyncio.run(main(StrideEngine.from_config(["stride"])))

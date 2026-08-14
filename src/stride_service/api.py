@@ -1,7 +1,9 @@
 """The `/v1` job API: the only production surface the front-end calls.
 
 * ``POST /v1/jobs`` — submit an ordered list of sources, bounded in UTF-8 bytes
-  and in count by this deployment's config; returns a job handle. A subject may
+  and in count by this deployment's config, together with the frameworks to
+  analyse them under — required, non-empty, and drawn from what this install
+  carries, with no default on any path; returns a job handle. A subject may
   hold only ``max_active_jobs`` jobs in flight at once; a submission past that
   is refused with 429 rather than queued, because a queued job still holds the
   caller's place in the provider quota and a refusal is the only answer that
@@ -22,17 +24,17 @@ from __future__ import annotations
 
 import asyncio
 import logging
-from collections.abc import Mapping
+from collections.abc import Mapping, Sequence
 from datetime import datetime
 from http import HTTPStatus
-from typing import Annotated, Any
+from typing import Annotated, Any, cast
 from uuid import uuid4
 
 from fastapi import BackgroundTasks, Depends, FastAPI, HTTPException, Request
 from fastapi.exceptions import RequestValidationError
 from fastapi.responses import JSONResponse, StreamingResponse
 from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
-from pydantic import BaseModel, ConfigDict, Field
+from pydantic import BaseModel, ConfigDict, Field, ValidationError
 from starlette.exceptions import HTTPException as StarletteHTTPException
 
 from stride_service.auth import (
@@ -42,6 +44,7 @@ from stride_service.auth import (
 )
 from stride_service.deployment import Deployment
 from stride_service.errors import ConfigError
+from stride_service.frameworks import package_for
 from stride_service.jobs import (
     TERMINAL_STATUSES,
     JobRecord,
@@ -51,6 +54,7 @@ from stride_service.jobs import (
     build_store,
     execute_job,
 )
+from stride_service.report import FrameworkName, FrameworkSelection
 from stride_service.sources import Source, SourceLimits
 from stride_service.validation import ValidationIssue
 
@@ -176,18 +180,48 @@ def _replay(body: bytes, disconnected: bool, receive):
     return replayed
 
 
+class FrameworkRequest(BaseModel):
+    """One framework a submission asks for, and the options it carries.
+
+    ``options`` is declared as a free-form object here and validated against the
+    named package's own ``options`` model one rung later, in the route. Two
+    reasons it is not typed at this layer: the shape depends on the name in the
+    same object, which Pydantic would need a discriminated union of every
+    registered package to express; and *which* packages exist is a property of
+    the deployment rather than of the wire schema, so a build that carries one
+    framework would otherwise publish a body schema that a build carrying two
+    does not.
+    """
+
+    model_config = ConfigDict(extra="forbid")
+
+    name: str = Field(min_length=1, max_length=100)
+    options: dict[str, Any] = Field(default_factory=dict)
+
+
 class JobSubmission(BaseModel):
-    """Body of ``POST /v1/jobs``; no client-controlled knobs in v1.
+    """Body of ``POST /v1/jobs``.
 
     ``sources`` is typed but not bounded here. Pydantic answers the first rung
     of the ladder — is each source well-formed? — and the route answers the
     rest, because the count and byte budgets are this deployment's config
     rather than a property of the schema.
+
+    ``frameworks`` is **required and non-empty**, with no default anywhere on
+    the path. A submission that names none is refused rather than analysed under
+    whatever this install happens to carry: a default set would make one body
+    mean different things on two installs, and the caller would read no sign of
+    it. Which names are acceptable is again the deployment's, so an unknown or
+    uncarried name is refused by the route rather than by this schema.
+
+    The list is ordered, and the order is kept: it is the order the report's
+    analysis blocks carry.
     """
 
     model_config = ConfigDict(extra="forbid")
 
     sources: list[Source]
+    frameworks: list[FrameworkRequest] = Field(min_length=1)
     system_name: str | None = Field(default=None, min_length=1, max_length=200)
 
 
@@ -212,6 +246,60 @@ class JobStatusView(BaseModel):
     progress: list[NodeCompletion]
     validation_issues: list[ValidationIssue] | None = None
     error: str | None = None
+
+
+def _resolve_selection(
+    carried: Sequence[FrameworkName], requested: Sequence[FrameworkRequest]
+) -> list[FrameworkSelection]:
+    """The submission's framework selection, or the 422 that refuses it.
+
+    Three rungs, all of them shape rather than budget, and all refused before a
+    job record exists — which is the point: a name this install does not carry
+    can never reach the registry, so every later lookup is a defect rather than
+    a caller's mistake.
+
+    A repeat is refused rather than collapsed. ``analyses`` is a list in the
+    report so a dropped block is visible, and silently de-duplicating here would
+    hand back one block for two the caller asked for — the same invisible loss,
+    moved one layer earlier.
+    """
+    names = [entry.name for entry in requested]
+    repeated = sorted({name for name in names if names.count(name) > 1})
+    if repeated:
+        raise HTTPException(
+            status_code=422,
+            detail=f"frameworks repeats {', '.join(repeated)};"
+            " name each framework at most once",
+        )
+    unknown = [name for name in names if name not in carried]
+    if unknown:
+        raise HTTPException(
+            status_code=422,
+            detail=f"this service does not carry {', '.join(unknown)};"
+            f" it carries {', '.join(carried)}",
+        )
+
+    selections = []
+    for entry in requested:
+        # The check above is the narrowing: a name that reaches here is one this
+        # deployment carries, and a carried name is a FrameworkName by
+        # construction. The cast is what says so to the type checker, which
+        # cannot read a membership test over a Literal.
+        name = cast(FrameworkName, entry.name)
+        # Validated against the package's own options model, which declares no
+        # defaulted field — so an option this framework requires and the caller
+        # omitted is refused here rather than filled in with a value the caller
+        # never chose.
+        try:
+            package_for(name).options.model_validate(entry.options)
+        except ValidationError as exc:
+            raise HTTPException(
+                status_code=422,
+                detail=f"options for framework {entry.name!r} are invalid:"
+                f" {exc.error_count()} problem(s)",
+            ) from None
+        selections.append(FrameworkSelection(name=name, options=dict(entry.options)))
+    return selections
 
 
 def _withheld_report(request: Request, record: JobRecord) -> JSONResponse | None:
@@ -326,6 +414,7 @@ def create_app(
     limits: SourceLimits | None = None,
     job_deadline_seconds: float | None = None,
     max_active_jobs: int | None = None,
+    frameworks: Sequence[FrameworkName] | None = None,
 ) -> FastAPI:
     """Build the service app; production defaults, injectable seams for tests.
 
@@ -336,22 +425,39 @@ def create_app(
     gate — a report it produced was never certified, so there is nothing for
     the route to withhold on.
 
+    **The runner is resolved per submission, not held as one object.** A graph is
+    built for one framework selection, so the app holds a *function* from a
+    selection to its runner and the deployment memoizes behind it: two jobs
+    naming the same frameworks share one composed graph, and a selection nobody
+    has asked for yet costs nothing. An injected runner serves every selection,
+    because a stand-in that answers one is answering the seam rather than the
+    graph.
+
     ``limits`` bounds what one job may carry, ``job_deadline_seconds`` bounds
-    how long one may run, and ``max_active_jobs`` bounds how many one caller may
-    have in flight. All three come from the deployment wherever there is one; a
-    caller who injects a runner instead must state them, because reading a
-    second configuration behind their back is how an app comes to enforce bounds
-    its deployment never chose.
+    how long one may run, ``max_active_jobs`` bounds how many one caller may
+    have in flight, and ``frameworks`` is what a submission may select from. All
+    four come from the deployment wherever there is one; a caller who injects a
+    runner instead must state them, because reading a second configuration
+    behind their back is how an app comes to enforce bounds its deployment never
+    chose.
     """
     app = FastAPI(title="STRIDE Threat-Modeling Service")
     app.state.store = store if store is not None else build_store()
     if runner is not None:
-        app.state.runner = runner
+        app.state.runner_for = lambda selection: runner
         app.state.certification = None
     else:
         deployment = deployment if deployment is not None else Deployment.from_env()
-        app.state.runner = deployment.runner()
+        app.state.runner_for = deployment.runner
         app.state.certification = deployment.gate()
+    if frameworks is None:
+        if deployment is None:
+            raise ConfigError(
+                "create_app needs frameworks= when it is given a runner instead "
+                "of a deployment"
+            )
+        frameworks = deployment.frameworks
+    app.state.frameworks = tuple(frameworks)
     if limits is None:
         if deployment is None:
             raise ConfigError(
@@ -438,6 +544,12 @@ def create_app(
                 detail=f"this token already has {active} jobs in flight; the"
                 f" limit is {ceiling}. Wait for one to reach a terminal state.",
             )
+        # Shape before budget: a framework this service does not carry is the
+        # wrong request at any size, and answering it with a byte count would
+        # quote a cap the caller never came near.
+        selection = _resolve_selection(
+            request.app.state.frameworks, submission.frameworks
+        )
         breach = request.app.state.limits.breach(submission.sources)
         if breach is not None:
             raise HTTPException(
@@ -446,13 +558,14 @@ def create_app(
         record = JobRecord.create(
             owner_subject=subject,
             sources=submission.sources,
+            frameworks=selection,
             system_name=submission.system_name,
         )
         await store.create(record)
         background_tasks.add_task(
             execute_job,
             store,
-            request.app.state.runner,
+            request.app.state.runner_for(record.selection()),
             record.id,
             deadline_seconds=request.app.state.job_deadline_seconds,
         )

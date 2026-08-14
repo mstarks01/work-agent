@@ -23,11 +23,9 @@ from stride_service import smoke
 from stride_service.deployment import Deployment
 from stride_service.engine import StrideEngine
 from stride_service.graph import (
-    ANALYZE_GRAPH_NODES,
     ASSEMBLE_NODE,
-    CRITIC_NODE,
     EXTRACT_NODE,
-    TIER_NODE_BY_GRAPH_NODE,
+    tier_node_by_graph_node,
 )
 from stride_service.jobs import (
     JobRecord,
@@ -36,7 +34,7 @@ from stride_service.jobs import (
     PipelineOutcome,
     PipelineRejected,
 )
-from stride_service.report import NodeRun, StrideReport
+from stride_service.report import NodeRun, Report
 from stride_service.sampling import sampling_fingerprint
 from stride_service.smoke import (
     ANALYST,
@@ -53,13 +51,23 @@ from stride_service.smoke import (
     CheckResult,
     SmokeResult,
     _redacted,
+    analyze_nodes,
     checks_for,
+    critic_nodes,
     render_markdown,
+    required_nodes,
     run_smoke,
 )
 from stride_service.validation import ValidationIssue
 from stride_service.vendors import join_served
-from tests.factories import TEST_TIER_ENV, sample_report, served_build
+from tests.factories import (
+    DEFAULT_FRAMEWORKS,
+    TEST_TIER_ENV,
+    sample_analysis,
+    sample_report,
+    sample_selection,
+    served_build,
+)
 
 PROJECT_ROOT = Path(__file__).resolve().parents[1]
 
@@ -70,10 +78,18 @@ PROJECT_ROOT = Path(__file__).resolve().parents[1]
 # name the wrong one here.
 DEPLOYMENT = Deployment.from_env(env=TEST_TIER_ENV)
 
-LLM_NODES = (EXTRACT_NODE, *ANALYZE_GRAPH_NODES, CRITIC_NODE)
+# What a complete run of this install's selection must have executed. A
+# function of the selection rather than a constant: every framework brings its
+# own lanes and its own critic, and the smoke fixture runs every carried one
+# because each brings tier keys an operator may point at a different vendor.
+LLM_NODES = required_nodes(DEFAULT_FRAMEWORKS)
+ANALYZE_NODES = analyze_nodes(DEFAULT_FRAMEWORKS)
+(STRIDE_CRITIC_NODE,) = critic_nodes(DEFAULT_FRAMEWORKS)
+#: This graph's node -> tier map, built for the selection above.
+TIER_NODES = tier_node_by_graph_node(DEFAULT_FRAMEWORKS)
 
 
-def smoke_report(**overrides: object) -> StrideReport:
+def smoke_report(**overrides: object) -> Report:
     """A completed report shaped like one the smoke fixture would produce.
 
     Built from the shared report factory with a full LLM execution record laid
@@ -93,12 +109,12 @@ def smoke_report(**overrides: object) -> StrideReport:
         "sampling": sampling,
         **overrides,
     }
-    return StrideReport.model_validate(fields)
+    return Report.model_validate(fields)
 
 
 def node_run(node: str, **overrides: object) -> dict[str, object]:
     """One LLM node's execution record, consistent by construction."""
-    requested = DEPLOYMENT.tiers.resolve_model(TIER_NODE_BY_GRAPH_NODE[node]).route
+    requested = DEPLOYMENT.tiers.resolve_model(TIER_NODES[node]).route
     served = join_served(requested, served_build(requested))
     tier = DEPLOYMENT.tier_of(node)
     run = {
@@ -126,7 +142,7 @@ class StubRunner:
         return self._outcome
 
 
-def result_for(report: StrideReport) -> dict[str, Check]:
+def result_for(report: Report) -> dict[str, Check]:
     """Every check against one report, keyed by name for a targeted assertion."""
     return {check.name: check for check in checks_for(report, DEPLOYMENT)}
 
@@ -184,16 +200,8 @@ class TestTheApplicationsFailures:
         report = smoke_report(
             system_model={},
             boundary_crossings=[],
-            threats=[],
-            rejected_threats=[],
-            summary={
-                "threat_count": 0,
-                "by_category": {},
-                "by_severity": {},
-                "needs_info_count": 0,
-                "rejected_count": 0,
-                "elements_analyzed": 0,
-            },
+            elements_analyzed=0,
+            analyses=[sample_analysis(threats=[], rejected_threats=[])],
         )
         assert result_for(report)[EXTRACTION].result is CheckResult.FAILED
 
@@ -204,15 +212,15 @@ class TestTheApplicationsFailures:
         legitimately find nothing — so absence of the execution is the only
         thing that separates "examined and clear" from "never looked".
         """
-        without_one = [node for node in LLM_NODES if node != ANALYZE_GRAPH_NODES[0]]
+        without_one = [node for node in LLM_NODES if node != ANALYZE_NODES[0]]
         report = smoke_report(nodes=[node_run(node) for node in without_one])
         checks = result_for(report)
         assert checks[ANALYST].result is CheckResult.FAILED
-        assert ANALYZE_GRAPH_NODES[0] in checks[ANALYST].detail
+        assert ANALYZE_NODES[0] in checks[ANALYST].detail
 
     def test_a_run_with_no_critic_fails_the_critic_check(self):
         report = smoke_report(
-            nodes=[node_run(node) for node in LLM_NODES if node != CRITIC_NODE]
+            nodes=[node_run(node) for node in LLM_NODES if node != STRIDE_CRITIC_NODE]
         )
         assert result_for(report)[CRITIC].result is CheckResult.FAILED
 
@@ -352,9 +360,14 @@ class TestDrivingTheEngine:
             StubRunner(outcome),
             limits=DEPLOYMENT.resilience.source_limits(),
             deadline_seconds=DEPLOYMENT.resilience.deadline_seconds(),
+            frameworks=sample_selection(),
         )
         monkeypatch.setattr(
-            smoke.StrideEngine, "from_deployment", classmethod(lambda cls, _: engine)
+            smoke.StrideEngine,
+            "from_deployment",
+            # The smoke run names the selection now — every carried framework —
+            # so the stand-in takes it and ignores it.
+            classmethod(lambda cls, _deployment, _frameworks: engine),
         )
         return asyncio.run(run_smoke(DEPLOYMENT))
 

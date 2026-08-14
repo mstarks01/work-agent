@@ -1,7 +1,8 @@
 """What the category agents were offered across a sweep, and what they cited.
 
-:class:`~stride_service.report.CategoryCoverage` is computed per job and rides
-on the report, one row per STRIDE category. One job's rows are close to
+:class:`~stride_service.report.LaneCoverage` is computed per job and rides on
+the report, one row per lane — which for STRIDE is one per category. One job's
+rows are close to
 unreadable — an agent that examined a flow and correctly found nothing cites
 nothing, and no observable separates it from one that never looked. The
 aggregate is where the field was always meant to be read: a lane citing two of
@@ -26,7 +27,8 @@ from dataclasses import dataclass
 from typing import Any
 
 from evals.harness.scorer import ratio
-from stride_service.report import STRIDE_CATEGORIES, CategoryCoverage, StrideCategory
+from stride_service.frameworks.stride.record import STRIDE_CATEGORIES, StrideCategory
+from stride_service.report import LaneCoverage as ReportLaneCoverage
 
 # The offered/cited pairs, in the order they read on a row. Named once because
 # the fold, the rates and the printed table would otherwise each carry their
@@ -82,18 +84,37 @@ class LaneCoverage:
         }
 
 
-def aggregate_coverage(rows: Iterable[CategoryCoverage]) -> list[LaneCoverage]:
+def _as_category(lane: str) -> StrideCategory:
+    """A report row's lane slug as the STRIDE category it names.
+
+    A report row is keyed by a plain string, because a lane belongs to whichever
+    package declares it. This fold is STRIDE's, where the six lane slugs *are*
+    the category names — so the narrowing is a real lookup against that package's
+    own list rather than a cast, and a lane no STRIDE category matches is a
+    caller feeding this fold another framework's rows.
+    """
+    for category in STRIDE_CATEGORIES:
+        if category == lane:
+            return category
+    raise ValueError(f"{lane!r} is not a STRIDE lane; these rows are not STRIDE's")
+
+
+def aggregate_coverage(rows: Iterable[ReportLaneCoverage]) -> list[LaneCoverage]:
     """Pool per-case coverage rows into one row per category.
 
     Always all six lanes, in the report's own category order, including any the
     sweep never produced a row for: a lane missing from the table would read as
     a lane with nothing to cite, and the two are opposite findings.
+
+    STRIDE's lane slugs *are* its category names, so a report row's ``lane``
+    keys this table directly. That identity is this package's and not a fact
+    about the report, which is why the fold names the framework it is folding.
     """
-    by_category: dict[StrideCategory, list[CategoryCoverage]] = {
+    by_category: dict[StrideCategory, list[ReportLaneCoverage]] = {
         category: [] for category in STRIDE_CATEGORIES
     }
     for row in rows:
-        by_category[row.category].append(row)
+        by_category[_as_category(row.lane)].append(row)
     return [
         LaneCoverage(
             category=category,

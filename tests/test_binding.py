@@ -14,12 +14,16 @@ import dataclasses
 import pytest
 
 from stride_service.binding import NodeBinding, build_tier_adapters
-from stride_service.graph import TIER_NODE_BY_GRAPH_NODE
+from stride_service.graph import tier_node_by_graph_node
 from stride_service.model_gate import ModelGateError
 from stride_service.model_tiers import ModelConfigError, load_model_tiers
 from stride_service.resilience import load_resilience
 from stride_service.sampling import load_sampling
-from tests.factories import PROJECT_ROOT, repo_tiers
+from tests.factories import DEFAULT_FRAMEWORKS, PROJECT_ROOT, repo_tiers
+
+#: This install's whole selection. The node -> tier map is built per selection
+#: now, so a test walking "every node" has to say which graph's nodes it means.
+CARRIED_FRAMEWORKS = DEFAULT_FRAMEWORKS
 
 DIVERGENT = """\
 version = 4
@@ -60,7 +64,7 @@ def test_both_sampling_views_come_from_one_config(tiers, tmp_path):
 
     binding = NodeBinding.from_configs(tiers, divergent, _resolver)
 
-    for graph_node, tier_node in TIER_NODE_BY_GRAPH_NODE.items():
+    for graph_node, tier_node in tier_node_by_graph_node(CARRIED_FRAMEWORKS).items():
         resolved = binding.resolve_sampling(tier_node)
         tier = tiers.resolve_tier(tier_node)
         assert resolved == binding.tier_sampling[tier], graph_node
@@ -71,9 +75,11 @@ def test_the_tier_map_is_not_re_derived(tiers, sampling):
     binding = NodeBinding.from_configs(tiers, sampling, _resolver)
 
     assert binding.resolve_sampling("extract") == sampling.for_tier("base")
-    assert binding.resolve_sampling("critic") == sampling.for_tier("strong")
+    assert binding.resolve_sampling("critic/stride") == sampling.for_tier("strong")
     # recritic shares the critic's tier, so it shares the params by construction.
-    assert binding.resolve_sampling("recritic") == binding.resolve_sampling("critic")
+    assert binding.resolve_sampling("recritic/stride") == binding.resolve_sampling(
+        "critic/stride"
+    )
 
 
 def test_an_unknown_node_fails_closed(tiers, sampling):

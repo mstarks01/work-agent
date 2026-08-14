@@ -26,6 +26,7 @@
        red-to-green means severity must not read these as a fourth band. */
     --g-quote:      #3c6ecb;
     --g-unknown:    #7a52c4;
+    --g-absent:     #a63f95;
     --g-derived:    #1f8a86;
     --tint:         color-mix(in srgb, var(--surface) 88%, transparent);
   }
@@ -42,6 +43,7 @@
       --hairline: #2c2c2a;
       --g-quote:  #7ea6ee;
       --g-unknown:#ac8ce8;
+      --g-absent: #d47fc6;
       --g-derived:#49b6b1;
     }
   }
@@ -49,7 +51,7 @@
     color-scheme: dark;
     --plane:#0d0d0d; --surface:#1a1a19; --surface-2:#242422;
     --ink:#ffffff; --ink-2:#c3c2b7; --muted:#898781; --border:rgba(255,255,255,0.10); --hairline:#2c2c2a;
-    --g-quote:#7ea6ee; --g-unknown:#ac8ce8; --g-derived:#49b6b1;
+    --g-quote:#7ea6ee; --g-unknown:#ac8ce8; --g-absent:#d47fc6; --g-derived:#49b6b1;
   }
 
   * { box-sizing: border-box; }
@@ -65,6 +67,16 @@
   h1 { font-size: 1.5rem; margin: 0 0 4px; letter-spacing: -0.01em; }
   h2 { font-size: 0.8rem; text-transform: uppercase; letter-spacing: 0.08em;
        color: var(--muted); margin: 40px 0 14px; font-weight: 600; }
+  /* Inside an analysis section: one step down from the framework's own heading,
+     so "Claims" reads as belonging to the framework named above it rather than
+     as a peer of it. With one framework selected the nesting is invisible;
+     with two it is the whole navigation. */
+  /* Direct children only: a claim card carries its own `h3` for the claim
+     title, and a descendant selector here would repaint every one of them in
+     the section-heading style. */
+  .analysis > h3 { font-size: 0.78rem; text-transform: uppercase; letter-spacing: 0.08em;
+       color: var(--muted); margin: 28px 0 12px; font-weight: 600; }
+  .analysis { border-top: 1px solid var(--border); margin-top: 8px; }
   .meta { color: var(--ink-2); font-size: 0.85rem; }
   .meta code { font-family: ui-monospace, SFMono-Regular, Menlo, monospace; }
 
@@ -76,6 +88,11 @@
     background: var(--tint); border: 1px solid var(--border); color: var(--ink-2); font-size: 0.85rem;
     display: flex; gap: 8px; align-items: center; }
   .disclaimer .dot { width: 8px; height: 8px; border-radius: 50%; background: var(--sev-medium); flex: none; }
+  /* The package's own disclaimer. Quieter than the envelope's, and without the
+     dot: the envelope's says what the service is and is read once, while this
+     says what one framework's claims assert and is read per section. */
+  .disclaimer-block { color: var(--ink-2); font-size: 0.82rem; margin: 0 0 16px;
+    padding-left: 12px; border-left: 2px solid var(--border); }
 
   /* stat tiles */
   .tiles { display: grid; grid-template-columns: repeat(4, 1fr); gap: 12px; }
@@ -118,6 +135,7 @@
   .ground { border-left: 3px solid var(--muted); padding-left: 11px; margin-top: 10px; }
   .ground.quote { border-left-color: var(--g-quote); }
   .ground.unknown-attribute { border-left-color: var(--g-unknown); }
+  .ground.absent-attribute { border-left-color: var(--g-absent); }
   .ground.derived-fact { border-left-color: var(--g-derived); }
   .ground .kind { color: var(--muted); text-transform: uppercase; letter-spacing: 0.05em; font-size: 0.68rem; }
   .ground .body { font-size: 0.88rem; color: var(--ink-2); margin-top: 3px; }
@@ -183,18 +201,15 @@
     </div>
     <div class="disclaimer"><span class="dot"></span><span id="disclaimer"></span></div>
 
-    <h2>Summary</h2>
-    <div class="tiles" id="tiles"></div>
-    <div class="mixwrap">
-      <div class="mix" id="mix"></div>
-      <div class="mixlegend" id="mixlegend"></div>
-    </div>
+    <!-- A fact about the shared model rather than about any analysis, so it is
+         stated once here instead of being copied into each block: N copies
+         would be N chances to disagree about one number. -->
+    <div class="meta" id="scope"></div>
 
-    <h2>Threats</h2>
-    <div id="threats"></div>
-
-    <h2>Rejected — considered and dismissed</h2>
-    <div id="rejected"></div>
+    <!-- One section per framework the job selected, built in JS: the count and
+         the names are the report's, not this file's. Everything outside it
+         describes the one shared System Model, which every framework analysed. -->
+    <div id="analyses"></div>
 
     <h2>System model (extracted DFD)</h2>
     <table id="elements"><thead><tr>
@@ -236,43 +251,55 @@
   const lbl = (text) => el("span", "lbl", text);
   const cell = (...kids) => { const n = el("td"); n.append(...kids); return n; };
 
-  // Each branch named in its own words, so the three read as different *kinds*
-  // of justification rather than three formattings of one.
+  // Each branch named in its own words, so the four read as different *kinds*
+  // of justification rather than four formattings of one. The two attribute
+  // branches carry identical fields, so this line is the only place a reader
+  // can tell "nobody said" from "somebody said no".
   const GROUND_KIND = {
     "quote": "Quoted from the submission",
     "unknown-attribute": "Unstated in the submission",
+    "absent-attribute": "Stated absent in the submission",
     "derived-fact": "Derived from the model",
   };
   // Past this, a quote is clamped to three lines behind a toggle. Short quotes
   // are the common case and get no affordance.
   const CLAMP_OVER = 220;
-  // "<threat id>#<grounds index>" for every quote the service looked for in its
-  // named source and could not find.
-  const UNVERIFIED = new Map(
-    (R.unverified_grounds || []).map(u => [`${u.threat_id}#${u.index}`, u])
-  );
-  // Every element ID a description cites that the embedded model does not
-  // contain, gathered under the threat that cites it. Defaulted like the map
-  // above: a report from before these marks existed simply has none.
-  const MENTIONS = new Map();
-  (R.unresolved_mentions || []).forEach(m => {
-    if (!MENTIONS.has(m.threat_id)) MENTIONS.set(m.threat_id, []);
-    MENTIONS.get(m.threat_id).push(m.mention);
-  });
-  // Every evidence reference a threat cited that its job's catalog did not
-  // hold, gathered under the threat that cited it. Unlike an unverified quote
-  // there is nothing to render in the grounds list — no ground was ever built
-  // from these — so the note is the only trace a reader gets that the agent
-  // reached for a fact that does not exist.
-  const UNRESOLVED_EVIDENCE = new Map();
-  (R.unresolved_evidence || []).forEach(m => {
-    if (!UNRESOLVED_EVIDENCE.has(m.threat_id)) UNRESOLVED_EVIDENCE.set(m.threat_id, []);
-    UNRESOLVED_EVIDENCE.get(m.threat_id).push(m.reference);
-  });
-  // Threats offering no countermeasure and carrying no unknown that would
-  // excuse offering none. The excused ones are not in this set and get no
-  // note — their unknown-attribute ground already says why the list is empty.
-  const UNMITIGATED = new Set((R.missing_mitigations || []).map(m => m.threat_id));
+
+  // Every mark now sits in the block whose claims it points at, so these are
+  // built per block rather than once for the page. Claim IDs are unique only
+  // *within* a block — two frameworks may legitimately compose the same string
+  // for unrelated things — so a page-wide map would collide the moment a report
+  // carries two frameworks.
+  function marksOf(block) {
+    // "<claim id>#<grounds index>" for every quote the service looked for in
+    // its named source and could not find.
+    const unverified = new Map(
+      (block.unverified_grounds || []).map(u => [`${u.claim_id}#${u.index}`, u])
+    );
+    // Every element ID a description cites that the embedded model does not
+    // contain, gathered under the claim that cites it.
+    const mentions = new Map();
+    (block.unresolved_mentions || []).forEach(m => {
+      if (!mentions.has(m.claim_id)) mentions.set(m.claim_id, []);
+      mentions.get(m.claim_id).push(m.mention);
+    });
+    // Every evidence reference a claim cited that its job's catalog did not
+    // hold. Unlike an unverified quote there is nothing to render in the
+    // grounds list — no ground was ever built from these — so the note is the
+    // only trace a reader gets that the agent reached for a fact that does not
+    // exist.
+    const composed = new Map();
+    (block.unresolved_evidence || []).forEach(m => {
+      if (!composed.has(m.claim_id)) composed.set(m.claim_id, []);
+      composed.get(m.claim_id).push(m.reference);
+    });
+    // Claims offering no countermeasure and carrying no unknown that would
+    // excuse offering none. A framework that recommends nothing declares no
+    // such mark, so this is empty for it rather than absent — the same shape
+    // either way.
+    const unmitigated = new Set((block.missing_mitigations || []).map(m => m.claim_id));
+    return { unverified, mentions, composed, unmitigated };
+  }
 
   const SEV = { critical: ["Critical","--sev-critical"], high: ["High","--sev-high"], medium: ["Medium","--sev-medium"], low: ["Low","--sev-low"] };
   const SEV_ORDER = ["critical","high","medium","low"];
@@ -285,40 +312,31 @@
   $("jobmeta").append(
     "Job ", code(R.job.id), ` · ${R.job.status} · ${fmt(R.job.completed_at)} · schema ${R.schema_version}`
   );
+  // The envelope's disclaimer says what the *service* is. Each block carries
+  // its own, saying what that framework's claims assert — a different sentence
+  // the moment a report carries a framework that rules on requirement
+  // applicability rather than on attacks.
   $("disclaimer").textContent = R.disclaimer;
 
-  // stat tiles
-  const tiles = [
-    [R.summary.threat_count, "Actionable threats"],
-    [R.summary.needs_info_count, "Needs info"],
-    [R.summary.rejected_count, "Rejected"],
-    [R.summary.elements_analyzed, "Elements analysed"],
-  ];
-  tiles.forEach(([n, k]) => { const t = el("div","tile"); t.append(el("div","n",String(n)), el("div","k",k)); $("tiles").append(t); });
-
-  // severity mix bar (only levels present, in severity order) with direct-labelled legend
-  const present = SEV_ORDER.filter(l => R.summary.by_severity[l]);
-  const total = present.reduce((a,l) => a + R.summary.by_severity[l], 0) || 1;
-  present.forEach(l => { const s = el("span"); s.style.flex = R.summary.by_severity[l]; s.style.background = svar(l); $("mix").append(s); });
-  present.forEach(l => {
-    const item = el("div");
-    const swatch = el("span", "swatch");
-    swatch.style.background = svar(l);
-    item.append(swatch, `${SEV[l][0]} · ${R.summary.by_severity[l]}`);
-    $("mixlegend").append(item);
-  });
+  const frameworks = R.analyses.map(b => b.framework).join(", ");
+  $("scope").textContent =
+    `${R.elements_analyzed} elements analysed under ${frameworks}`;
 
   // One grounds entry. Every string here is model-authored or lifted verbatim
   // out of the submitter's own prose, so it goes in as text and never as markup.
-  function groundEntry(threatId, ground, index) {
+  //
+  // Grounds are the neutral half of a claim: the three branches are properties
+  // of the shared System Model and of the submission, not of any framework's
+  // method, so this renders identically in every block.
+  function groundEntry(marks, claimId, ground, index) {
     const row = el("div", "ground " + ground.kind);
     row.append(el("div", "kind", GROUND_KIND[ground.kind] || ground.kind));
     const body = el("div", "body");
     if (ground.kind === "quote") {
-      const unverified = UNVERIFIED.get(`${threatId}#${index}`);
+      const unverified = marks.unverified.get(`${claimId}#${index}`);
       // The quotation marks assert a verbatim span the service found. When it
       // did not, they come off — the claim they make is the one that failed.
-      body.textContent = unverified ? ground.text : `“${ground.text}”`;
+      body.textContent = unverified ? ground.text : `\u201c${ground.text}\u201d`;
       row.append(body);
       if (ground.text.length > CLAMP_OVER) {
         body.classList.add("clamped");
@@ -331,13 +349,13 @@
         row.append(more);
       }
       const cite = el("div", "cite" + (unverified ? " unverified" : ""));
-      cite.append(unverified ? `⚠ not found in ${ground.source_label}`
-                             : `— ${ground.source_label}`);
+      cite.append(unverified ? `\u26a0 not found in ${ground.source_label}`
+                             : `\u2014 ${ground.source_label}`);
       row.append(cite);
       return row;
     }
-    if (ground.kind === "unknown-attribute") {
-      body.append(code(ground.element_id), " → ", code(ground.attribute));
+    if (ground.kind === "unknown-attribute" || ground.kind === "absent-attribute") {
+      body.append(code(ground.element_id), " \u2192 ", code(ground.attribute));
     } else {
       body.append(code(ground.flow_id));
     }
@@ -345,33 +363,49 @@
     return row;
   }
 
-  function groundsBlock(t) {
+  function groundsBlock(marks, t) {
     const block = el("div", "grounds");
-    block.append(lbl("Grounds — why this was raised"));
-    t.grounds.forEach((g, i) => block.append(groundEntry(t.id, g, i)));
+    block.append(lbl("Grounds \u2014 why this was raised"));
+    t.grounds.forEach((g, i) => block.append(groundEntry(marks, t.id, g, i)));
     return block;
   }
 
-  function threatCard(t, rejected) {
+  // One claim card, built from the neutral shape and *widened* by whatever the
+  // framework's own record carries.
+  //
+  // This is the fallback the report's design promises: a consumer that does not
+  // know a framework reads an ID, the (framework, version) pair, a title, a
+  // description, the elements and the grounds — and this page is that consumer
+  // for every framework but the ones whose extras it happens to recognise. So
+  // each extra is rendered behind a presence test rather than assumed: a claim
+  // with no severity gets no severity chip and no coloured border, not a card
+  // that throws reading `undefined.level`. Adding a framework needs no edit
+  // here; its claims render, correctly, in the neutral shape.
+  function claimCard(marks, t, rejected) {
     const card = el("div", "card" + (rejected ? " rejected" : ""));
-    card.style.borderLeftColor = svar(t.severity.level);
     const head = el("div","card-head");
     head.append(el("h3", null, t.title), el("span","tid", t.id));
     card.append(head);
-    card.append(el("div","cat", t.category));
+    // The lane, where the framework stamps one. STRIDE's is its category.
+    if (t.category) card.append(el("div","cat", t.category));
 
     const badges = el("div","badges");
-    const sev = el("span","chip");
-    const sevSwatch = el("span","swatch");
-    sevSwatch.style.background = svar(t.severity.level);
-    sev.append(sevSwatch, SEV[t.severity.level][0]);
-    // A property assignment, not an attribute: there is no markup context to
-    // escape out of, which is why no quote handling is needed anywhere here.
-    sev.title = `likelihood ${t.severity.likelihood} × impact ${t.severity.impact} → ${t.severity.level}`;
+    if (t.severity) {
+      card.style.borderLeftColor = svar(t.severity.level);
+      const sev = el("span","chip");
+      const sevSwatch = el("span","swatch");
+      sevSwatch.style.background = svar(t.severity.level);
+      sev.append(sevSwatch, SEV[t.severity.level][0]);
+      // A property assignment, not an attribute: there is no markup context to
+      // escape out of, which is why no quote handling is needed anywhere here.
+      sev.title = `likelihood ${t.severity.likelihood} \u00d7 impact ${t.severity.impact} \u2192 ${t.severity.level}`;
+      badges.append(sev);
+    }
     const [vlabel, vglyph] = VERDICT[t.verdict.status];
-    const vd = el("span","chip verdict", `${vglyph} ${vlabel}`);
-    const conf = el("span","chip confidence", `confidence: ${t.confidence}`);
-    badges.append(sev, vd, conf);
+    badges.append(el("span","chip verdict", `${vglyph} ${vlabel}`));
+    if (t.confidence) {
+      badges.append(el("span","chip confidence", `confidence: ${t.confidence}`));
+    }
     card.append(badges);
 
     card.append(el("div","desc", t.description));
@@ -379,28 +413,30 @@
     // Directly under the argument it qualifies. The prose above cites an
     // element this report does not describe, which a reader following the ID
     // into the model table below would otherwise discover by finding nothing.
-    const mentions = MENTIONS.get(t.id);
+    const mentions = marks.mentions.get(t.id);
     if (mentions && mentions.length) {
       const note = el("div", "caveat");
-      note.append("⚠ Cited above but not in the system model: ");
+      note.append("\u26a0 Cited above but not in the system model: ");
       mentions.forEach((m, i) => { if (i) note.append(", "); note.append(code(m)); });
       card.append(note);
     }
 
     // Beside it, and deliberately worded as a citation failure rather than a
     // doubt about the finding: the grounds shown below are the ones that did
-    // resolve, and they are why this threat is still here.
-    const composed = UNRESOLVED_EVIDENCE.get(t.id);
+    // resolve, and they are why this claim is still here.
+    const composed = marks.composed.get(t.id);
     if (composed && composed.length) {
       const note = el("div", "caveat");
-      note.append("⚠ Cited evidence not in this job's catalog, and dropped: ");
+      note.append("\u26a0 Cited evidence not in this job's catalog, and dropped: ");
       composed.forEach((r, i) => { if (i) note.append(", "); note.append(code(r)); });
       card.append(note);
     }
 
-    const rationale = el("div","field");
-    rationale.append(lbl("Severity rationale"), el("br"), t.severity.justification);
-    card.append(rationale);
+    if (t.severity) {
+      const rationale = el("div","field");
+      rationale.append(lbl("Severity rationale"), el("br"), t.severity.justification);
+      card.append(rationale);
+    }
 
     const refs = el("div","field refs");
     refs.append(lbl("Affected elements"), el("br"));
@@ -410,19 +446,19 @@
     // After the analysis, not before it: the card's job on first read is
     // triage, and attribution is what you turn to once a finding has your
     // attention.
-    card.append(groundsBlock(t));
+    card.append(groundsBlock(marks, t));
 
     // A needs-info banner may repeat an element/attribute pair that also
     // appears as an unknown-attribute ground above. Both stay: the ground is
-    // the category agent's *trigger*, the banner is the critic's citation for
-    // its *verdict*. Different authors, and this block's whole value is that it
+    // the lane agent's *trigger*, the banner is the critic's citation for its
+    // *verdict*. Different authors, and this block's whole value is that it
     // says who justified what.
     if (t.verdict.status === "needs-info" && t.verdict.related_unknowns.length) {
       const u = el("div","unknown");
       u.append(el("b", null, "Needs info."), ` ${t.verdict.reason} Unknown: `);
       t.verdict.related_unknowns.forEach((r, i) => {
         if (i) u.append(", ");
-        u.append(code(r.element_id), " → ", code(r.attribute));
+        u.append(code(r.element_id), " \u2192 ", code(r.attribute));
       });
       card.append(u);
     }
@@ -434,18 +470,93 @@
     if (t.mitigations && t.mitigations.length) {
       const list = el("ul","mits"); t.mitigations.forEach(m => list.append(el("li", null, m.summary)));
       const wrap = el("div","field"); wrap.append(el("div","lbl","Mitigations"), list); card.append(wrap);
-    } else if (UNMITIGATED.has(t.id)) {
+    } else if (marks.unmitigated.has(t.id)) {
       // Where the Mitigations block would have been, so its absence is stated
       // rather than left as a gap the reader has to notice.
       card.append(el("div", "caveat",
-        "⚠ No mitigation proposed, and this finding does not rest on an unknown that would explain why."));
+        "\u26a0 No mitigation proposed, and this finding does not rest on an unknown that would explain why."));
     }
     return card;
   }
 
-  const ordered = [...R.threats].sort((a,b) => SEV_ORDER.indexOf(a.severity.level) - SEV_ORDER.indexOf(b.severity.level));
-  ordered.forEach(t => $("threats").append(threatCard(t, false)));
-  R.rejected_threats.forEach(t => $("rejected").append(threatCard(t, true)));
+  // One framework's whole section: its heading, its disclaimer, its own counts,
+  // and its two claim arrays. Nothing here reaches back into the envelope
+  // except for the element count, which is a fact about the one shared model
+  // and so is stated once at the top rather than N times.
+  function renderBlock(block) {
+    const marks = marksOf(block);
+    const section = el("section", "analysis");
+    section.append(el("h2", null, `${block.framework} \u00b7 v${block.framework_version}`));
+    section.append(el("div", "disclaimer-block", block.disclaimer));
+
+    const tiles = el("div", "tiles");
+    [
+      [block.summary.claim_count, "Actionable claims"],
+      [block.summary.needs_info_count, "Needs info"],
+      [block.summary.rejected_count, "Rejected"],
+    ].forEach(([n, k]) => {
+      const t = el("div","tile");
+      t.append(el("div","n",String(n)), el("div","k",k));
+      tiles.append(t);
+    });
+    section.append(tiles);
+
+    // The severity mix, only for a framework that grades harm. One that does
+    // not declares no `by_severity`, and an empty bar would read as "nothing
+    // was severe" rather than "severity is not this method's question".
+    const by = block.summary.by_severity;
+    if (by) {
+      const present = SEV_ORDER.filter(l => by[l]);
+      if (present.length) {
+        const wrap = el("div", "mixwrap");
+        const mix = el("div", "mix");
+        const legend = el("div", "mixlegend");
+        present.forEach(l => {
+          const s = el("span");
+          s.style.flex = by[l];
+          s.style.background = svar(l);
+          mix.append(s);
+        });
+        present.forEach(l => {
+          const item = el("div");
+          const swatch = el("span", "swatch");
+          swatch.style.background = svar(l);
+          item.append(swatch, `${SEV[l][0]} \u00b7 ${by[l]}`);
+          legend.append(item);
+        });
+        wrap.append(mix, legend);
+        section.append(wrap);
+      }
+    }
+
+    // Severity order where the framework grades, and the block's own order
+    // otherwise — which is the package's declared lane order, and is the only
+    // ranking a framework that grades nothing has.
+    const claims = [...block.claims];
+    if (claims.every(c => c.severity)) {
+      claims.sort((a,b) => SEV_ORDER.indexOf(a.severity.level) - SEV_ORDER.indexOf(b.severity.level));
+    }
+    section.append(el("h3", null, "Claims"));
+    if (claims.length) {
+      claims.forEach(t => section.append(claimCard(marks, t, false)));
+    } else {
+      // Said rather than left blank. A framework that examined the system and
+      // raised nothing is a result; an empty heading reads as a rendering fault.
+      section.append(el("div", "meta", "No claims were raised under this framework."));
+    }
+    // Only where there are any. Every block carries this heading otherwise, and
+    // on a report with two frameworks that is two empty sections a reader has
+    // to scroll past to reach the model.
+    if (block.rejected_claims.length) {
+      section.append(el("h3", null, "Rejected \u2014 considered and dismissed"));
+      block.rejected_claims.forEach(t => section.append(claimCard(marks, t, true)));
+    }
+    $("analyses").append(section);
+  }
+
+  // In the job's own selection order, which the envelope has already checked
+  // against `job.frameworks`.
+  R.analyses.forEach(renderBlock);
 
   // system model table. Each entry returns the cell's children rather than a
   // string of markup — `technology`, `protocol`, `authentication` and

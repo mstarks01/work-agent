@@ -46,11 +46,11 @@ from stride_service.conformance import (
     reference_matrix,
     render_markdown,
 )
+from stride_service.frameworks.stride.record import ThreatProposals, ThreatRulings
 from stride_service.graph import Pipeline, build_pipeline
 from stride_service.markdown_loader import MarkdownLoader
 from stride_service.model_gate import ModelGateError
 from stride_service.model_tiers import ModelTierConfig, load_model_tiers
-from stride_service.report import ThreatProposals, ThreatRulings
 from stride_service.resilience import load_resilience
 from stride_service.sampling import load_sampling, sampling_fingerprint
 from stride_service.system_model import SystemModel
@@ -61,7 +61,12 @@ from stride_service.vendors import (
     openai_reasoning_model,
     vendor_for,
 )
-from tests.factories import EMPTY_THREATS, ScriptedLlm
+from tests.factories import (
+    DEFAULT_FRAMEWORKS,
+    EMPTY_CLAIMS,
+    ScriptedLlm,
+    repo_package_loaders,
+)
 
 PROJECT_ROOT = Path(__file__).resolve().parents[1]
 CONFIG = PROJECT_ROOT / "config"
@@ -122,13 +127,14 @@ def _pipeline_for(vendor: str) -> Pipeline:
 
     def resolve(tier_node: str) -> BaseLlm:
         selection = tiers.resolve_model(tier_node)
-        return ScriptedLlm(model=selection.route, reply=EMPTY_THREATS, seen=[])
+        return ScriptedLlm(model=selection.route, reply=EMPTY_CLAIMS, seen=[])
 
     return build_pipeline(
-        skill_loader=MarkdownLoader(PROJECT_ROOT / "skills"),
         prompt_loader=MarkdownLoader(PROJECT_ROOT / "prompts"),
-        knowledge_loader=MarkdownLoader(PROJECT_ROOT / "knowledge"),
+        domain_loader=MarkdownLoader(PROJECT_ROOT / "domains"),
+        package_loaders=repo_package_loaders(),
         binding=NodeBinding.from_configs(tiers, sampling, resolve),
+        frameworks=DEFAULT_FRAMEWORKS,
     )
 
 

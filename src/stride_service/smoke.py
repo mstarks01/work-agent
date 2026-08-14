@@ -14,12 +14,21 @@ a provider must satisfy before its coverage counts as exercised:
 
     model binding                    the routes each node asked for
     structured extraction            a schema-valid model came back
-    analyst structured output        all six category lanes parsed
-    critic structured output         the ruling parsed
+    analyst structured output        every lane of every framework parsed
+    critic structured output         each framework's ruling parsed
     sampling parameter validation    the provider took this tier's params
     served-model capture             what actually answered
     execution fingerprint            the generation identity that implies
     provenance                       the record, recomputable from itself
+
+**Every framework this deployment carries, not one of them.** A framework's lane
+agents and its critic run on their own ``analyze/<name>``, ``critic/<name>`` and
+``recritic/<name>`` tier keys, which an operator may point at different tiers and
+so at different vendors. Smoking one framework and reporting green would leave
+another's binding unexercised while reading exactly like a lane that had checked
+it — the failure this module exists to rule out. Running all of them is still one
+small system through one graph, which is the cheapest thing that answers the
+question *for this install*.
 
 **Not an eval.** Nothing here scores threat-model quality, and nothing here
 fails because one model writes weaker threats than another — that split is the
@@ -56,15 +65,14 @@ from stride_service.deployment import Deployment
 from stride_service.engine import StrideEngine
 from stride_service.errors import ConfigError
 from stride_service.graph import (
-    ANALYZE_GRAPH_NODES,
-    CRITIC_NODE,
+    CRITIC_ROLE,
     EXTRACT_NODE,
-    RECRITIC_NODE,
-    TIER_NODE_BY_GRAPH_NODE,
+    RECRITIC_ROLE,
+    FrameworkNodes,
 )
 from stride_service.jobs import PipelineRejected
 from stride_service.model_tiers import TierName
-from stride_service.report import NodeRun, SamplingValue, StrideReport
+from stride_service.report import FrameworkName, NodeRun, Report, SamplingValue
 from stride_service.sampling import TierSampling, sampling_fingerprint
 from stride_service.sources import Source
 
@@ -104,12 +112,6 @@ SMOKE_SOURCE = Source.description(SMOKE_SOURCE_TEXT, label="smoke-notes-service"
 # than borrowed from the engine's default so a provider-side log shows which of
 # this service's callers spent the tokens.
 SMOKE_CALLER = "provider-smoke"
-
-# The LLM nodes a complete run must have executed. ``repair`` and ``recritic``
-# are absent deliberately: both are re-asks the graph takes only when a first
-# answer failed its mechanical check, so requiring them would fail the runs that
-# went right, and forbidding them would fail the application behaving correctly.
-REQUIRED_NODES: tuple[str, ...] = (EXTRACT_NODE, *ANALYZE_GRAPH_NODES, CRITIC_NODE)
 
 # How much of a provider's error text reaches the summary. Long enough to name
 # the failure, short enough that a provider echoing the request body does not
@@ -217,25 +219,53 @@ class SmokeResult:
         }
 
 
-def _llm_runs(report: StrideReport) -> list[NodeRun]:
+def analyze_nodes(frameworks: Sequence[FrameworkName]) -> tuple[str, ...]:
+    """Every lane agent one selection runs, across every framework in it."""
+    return tuple(
+        lane.node_name for name in frameworks for lane in FrameworkNodes(name).lanes
+    )
+
+
+def critic_nodes(frameworks: Sequence[FrameworkName]) -> tuple[str, ...]:
+    """Each selected framework's own critic node."""
+    return tuple(FrameworkNodes(name).node(CRITIC_ROLE) for name in frameworks)
+
+
+def required_nodes(frameworks: Sequence[FrameworkName]) -> tuple[str, ...]:
+    """The LLM nodes a complete run of this selection must have executed.
+
+    A function of the selection rather than a constant, because which nodes exist
+    is one: every framework brings its own lanes and its own critic. ``repair``
+    and every ``recritic`` are absent deliberately — all of them are re-asks the
+    graph takes only when a first answer failed its mechanical check, so
+    requiring them would fail the runs that went right, and forbidding them would
+    fail the application behaving correctly.
+    """
+    return (EXTRACT_NODE, *analyze_nodes(frameworks), *critic_nodes(frameworks))
+
+
+def _llm_runs(report: Report, deployment: Deployment) -> list[NodeRun]:
     """Every node execution that went to a model.
 
-    Keyed on the graph's own node -> tier table rather than on "has a requested
-    model", so a node that reached a provider without recording what it asked
-    for is a finding here instead of a row this walk skips.
+    Keyed on the deployment's own node -> tier table rather than on "has a
+    requested model", so a node that reached a provider without recording what it
+    asked for is a finding here instead of a row this walk skips. That table is
+    built over every framework this install carries, which is exactly the set
+    this run selects.
     """
-    return [run for run in report.nodes if run.node in TIER_NODE_BY_GRAPH_NODE]
+    tier_nodes = deployment.tier_nodes()
+    return [run for run in report.nodes if run.node in tier_nodes]
 
 
 def _selected_routes(deployment: Deployment) -> dict[str, str]:
     """Each LLM graph node -> the route this deployment's config selects for it."""
     return {
         node: deployment.tiers.resolve_model(tier_node).route
-        for node, tier_node in TIER_NODE_BY_GRAPH_NODE.items()
+        for node, tier_node in deployment.tier_nodes().items()
     }
 
 
-def _check_binding(report: StrideReport, deployment: Deployment) -> Check:
+def _check_binding(report: Report, deployment: Deployment) -> Check:
     """Every node asked for the route its tier selects, and both tiers ran.
 
     The live counterpart of the offline binding assertions: those prove the
@@ -243,7 +273,7 @@ def _check_binding(report: StrideReport, deployment: Deployment) -> Check:
     a provider through.
     """
     expected = _selected_routes(deployment)
-    runs = _llm_runs(report)
+    runs = _llm_runs(report, deployment)
     wrong = [
         f"{run.node} asked for {run.requested_model!r},"
         f" config selects {expected[run.node]!r}"
@@ -266,7 +296,7 @@ def _check_binding(report: StrideReport, deployment: Deployment) -> Check:
     )
 
 
-def _check_extraction(report: StrideReport, deployment: Deployment) -> Check:
+def _check_extraction(report: Report, deployment: Deployment) -> Check:
     """``extract`` returned a model the shipped validity gate accepted.
 
     Reached at all only on a completed run, since a model the gate rejects comes
@@ -289,47 +319,60 @@ def _check_extraction(report: StrideReport, deployment: Deployment) -> Check:
     )
 
 
-def _check_analyst(report: StrideReport, deployment: Deployment) -> Check:
-    """All six category lanes produced output the service could parse.
+def _check_analyst(report: Report, deployment: Deployment) -> Check:
+    """Every lane of every selected framework produced output the service could parse.
 
-    Presence of the six executions is the assertion, not the number of threats:
-    a lane whose emission fails its schema never lands a node run at all, and a
-    lane that examined the system and rightly found nothing is not a defect.
-    Threat counts are model quality and belong to ``evals/``.
+    Presence of the executions is the assertion, not the number of claims: a lane
+    whose emission fails its schema never lands a node run at all, and a lane that
+    examined the system and rightly found nothing is not a defect. Claim counts
+    are model quality and belong to ``evals/``.
     """
+    expected = analyze_nodes(deployment.frameworks)
     ran = {run.node for run in report.nodes}
-    missing = [node for node in ANALYZE_GRAPH_NODES if node not in ran]
+    missing = [node for node in expected if node not in ran]
     if missing:
         return Check(ANALYST, CheckResult.FAILED, f"lanes that did not run: {missing}")
-    drafts = sum(entry.drafts for entry in report.coverage)
+    drafts = sum(entry.drafts for block in report.analyses for entry in block.coverage)
     return Check(
         ANALYST,
         CheckResult.PASSED,
-        f"all {len(ANALYZE_GRAPH_NODES)} category lanes ran; drafts merged: {drafts}",
+        f"all {len(expected)} lanes across {len(deployment.frameworks)} framework(s)"
+        f" ran; drafts merged: {drafts}",
     )
 
 
-def _check_critic(report: StrideReport, deployment: Deployment) -> Check:
-    """The critic ruled, and its ruling reached the report.
+def _check_critic(report: Report, deployment: Deployment) -> Check:
+    """Each framework's critic ruled, and its rulings reached that framework's block.
 
-    A re-ask is recorded rather than penalised. ``recritic`` runs when the
+    Per framework rather than once, because a critic rules its own framework's
+    drafts against its own framework's question: one that never ran leaves a
+    block whose claims nothing reviewed, and a single ``critic did not run`` row
+    would not say whose.
+
+    A re-ask is recorded rather than penalised. A ``recritic`` runs when that
     critic's first answer failed the mechanical check, which is the application
     handling a provider difference correctly — the failure it would be evidence
     of is ``critic_failed``, and that path never produces a report to inspect.
     """
-    if not any(run.node == CRITIC_NODE for run in report.nodes):
-        return Check(CRITIC, CheckResult.FAILED, "critic did not run")
-    ruled = len(report.threats) + len(report.rejected_threats)
-    re_asked = any(run.node == RECRITIC_NODE for run in report.nodes)
-    suffix = " (after one re-ask)" if re_asked else ""
-    return Check(
-        CRITIC,
-        CheckResult.PASSED,
-        f"threats ruled: {ruled}, rejected: {len(report.rejected_threats)}{suffix}",
+    ran = {run.node for run in report.nodes}
+    missing = [node for node in critic_nodes(deployment.frameworks) if node not in ran]
+    if missing:
+        return Check(CRITIC, CheckResult.FAILED, f"critics that did not run: {missing}")
+    re_asked = sorted(
+        name
+        for name in deployment.frameworks
+        if FrameworkNodes(name).node(RECRITIC_ROLE) in ran
     )
+    suffix = f" (after a re-ask on: {', '.join(re_asked)})" if re_asked else ""
+    rendered = ", ".join(
+        f"{block.framework}: {len(block.all_claims())} ruled,"
+        f" {len(block.rejected_claims)} rejected"
+        for block in report.analyses
+    )
+    return Check(CRITIC, CheckResult.PASSED, f"{rendered}{suffix}")
 
 
-def _check_sampling(report: StrideReport, deployment: Deployment) -> Check:
+def _check_sampling(report: Report, deployment: Deployment) -> Check:
     """The provider accepted this deployment's resolved params, and they are recorded.
 
     The build-time gate asked whether the provider *would* take them; this is
@@ -338,7 +381,7 @@ def _check_sampling(report: StrideReport, deployment: Deployment) -> Check:
     assert is that the values are in the report in the clear, because a
     fingerprint nobody can recompute is an assertion rather than evidence.
     """
-    tiers_run = {deployment.tier_of(run.node) for run in _llm_runs(report)}
+    tiers_run = {deployment.tier_of(run.node) for run in _llm_runs(report, deployment)}
     missing = sorted(tier for tier in tiers_run if tier not in report.sampling)
     if missing:
         return Check(
@@ -359,7 +402,7 @@ def _render_params(params: Mapping[str, SamplingValue]) -> str:
     )
 
 
-def _check_served(report: StrideReport, deployment: Deployment) -> Check:
+def _check_served(report: Report, deployment: Deployment) -> Check:
     """What actually answered, per execution — where the provider said.
 
     ``UNKNOWN`` rather than a failure when it did not. A provider that reports
@@ -368,7 +411,7 @@ def _check_served(report: StrideReport, deployment: Deployment) -> Check:
     served model and derives no fingerprint from one, rather than attesting to
     the string that was requested.
     """
-    runs = _llm_runs(report)
+    runs = _llm_runs(report, deployment)
     served = [run for run in runs if run.model]
     if not served:
         return Check(
@@ -390,7 +433,7 @@ def _check_served(report: StrideReport, deployment: Deployment) -> Check:
     )
 
 
-def _check_fingerprint(report: StrideReport, deployment: Deployment) -> Check:
+def _check_fingerprint(report: Report, deployment: Deployment) -> Check:
     """Every execution with a served build carries its generation identity.
 
     ``UNKNOWN`` when none did: with nothing to hash there is no fingerprint to
@@ -399,7 +442,7 @@ def _check_fingerprint(report: StrideReport, deployment: Deployment) -> Check:
     served build *without* a fingerprint is the failure — that pair is the
     identity certification is computed over.
     """
-    served = [run for run in _llm_runs(report) if run.model]
+    served = [run for run in _llm_runs(report, deployment) if run.model]
     if not served:
         return Check(
             FINGERPRINT,
@@ -421,7 +464,7 @@ def _check_fingerprint(report: StrideReport, deployment: Deployment) -> Check:
     )
 
 
-def _check_provenance(report: StrideReport, deployment: Deployment) -> Check:
+def _check_provenance(report: Report, deployment: Deployment) -> Check:
     """The record is complete, and it follows from itself.
 
     Two things, because either alone is weak. Complete: every node the graph had
@@ -433,7 +476,9 @@ def _check_provenance(report: StrideReport, deployment: Deployment) -> Check:
     recomputation a promotion runs before anything reaches the blessed manifest.
     """
     ran = {run.node for run in report.nodes}
-    missing = [node for node in REQUIRED_NODES if node not in ran]
+    missing = [
+        node for node in required_nodes(deployment.frameworks) if node not in ran
+    ]
     if missing:
         return Check(
             PROVENANCE, CheckResult.FAILED, f"no execution recorded for: {missing}"
@@ -444,15 +489,15 @@ def _check_provenance(report: StrideReport, deployment: Deployment) -> Check:
     return Check(
         PROVENANCE,
         CheckResult.PASSED,
-        f"{len(_llm_runs(report))} executions recorded;"
+        f"{len(_llm_runs(report, deployment))} executions recorded;"
         " every fingerprint recomputes from the report's own sampling block",
     )
 
 
-def _fingerprint_mismatches(report: StrideReport, deployment: Deployment) -> list[str]:
+def _fingerprint_mismatches(report: Report, deployment: Deployment) -> list[str]:
     """Recorded fingerprints that do not follow from the report's own numbers."""
     mismatches = []
-    for run in _llm_runs(report):
+    for run in _llm_runs(report, deployment):
         if run.model is None or run.sampling_fingerprint is None:
             continue
         tier = deployment.tier_of(run.node)
@@ -483,7 +528,7 @@ _CHECKERS = (
 )
 
 
-def checks_for(report: StrideReport, deployment: Deployment) -> tuple[Check, ...]:
+def checks_for(report: Report, deployment: Deployment) -> tuple[Check, ...]:
     """Every check, against one completed report. No provider, no network.
 
     Separated from :func:`run_smoke` so the checks themselves are testable
@@ -548,7 +593,12 @@ async def run_smoke(deployment: Deployment | None = None) -> SmokeResult:
     deployment = deployment or Deployment.from_env()
     tiers = _tier_summary(deployment)
     try:
-        engine = StrideEngine.from_deployment(deployment)
+        # Every carried framework, with no options: this asks whether the
+        # *application* works here, and a framework left out of the selection is
+        # a tier key nothing exercised. A package whose options have required
+        # fields would fail construction here, which is the right place for a
+        # smoke run to learn that it cannot ask its question.
+        engine = StrideEngine.from_deployment(deployment, deployment.frameworks)
     except ConfigError as exc:
         # The build-time gates: a missing credential or a param this pair will
         # not take. Both name the variable or the tier and never a value.
@@ -593,12 +643,11 @@ async def run_smoke(deployment: Deployment | None = None) -> SmokeResult:
     return SmokeResult(
         tiers=tiers,
         checks=checks_for(report, deployment),
-        notes=(
-            (
-                f"{report.summary.threat_count} threats over"
-                f" {report.summary.elements_analyzed} elements"
-                " — a count, not a quality judgement"
-            ),
+        notes=tuple(
+            f"{block.framework}: {block.summary.claim_count} claims over"
+            f" {report.elements_analyzed} elements"
+            " — a count, not a quality judgement"
+            for block in report.analyses
         ),
     )
 

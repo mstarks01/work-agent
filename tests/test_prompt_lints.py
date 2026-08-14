@@ -49,7 +49,13 @@ import pytest
 from pydantic import ValidationError
 
 from stride_service.critic import mentioned_ids
-from stride_service.evidence import CROSSING_PREFIX, UNKNOWN_PREFIX, render_catalog
+from stride_service.evidence import (
+    ABSENT_PREFIX,
+    CROSSING_PREFIX,
+    UNKNOWN_PREFIX,
+    render_catalog,
+)
+from stride_service.frameworks.stride.record import STRIDE_CATEGORIES, ThreatProposal
 from stride_service.grounding import verify_quote
 from stride_service.markdown_loader import MarkdownLoader, split_sections
 from stride_service.prompts import (
@@ -67,14 +73,19 @@ from stride_service.prompts import (
     REPAIR_PROMPT_NAME,
     REPAIR_PROMPT_TOKEN_CAP,
     compose_analyze_prompt,
-    exemplar_name,
+    lane_exemplars_doc,
 )
-from stride_service.report import STRIDE_CATEGORIES, Ground, ThreatProposal
+from stride_service.report import Ground
 from stride_service.skills import estimate_tokens
 
 PROMPTS_DIR = Path(__file__).resolve().parents[1] / "prompts"
+# The exemplars moved with the package that owns them: a worked draft is written
+# in one framework's record shape, so it lives under that framework's root while
+# the body that frames it stays shared (ADR 0011).
+PACKAGE_DIR = Path(__file__).resolve().parents[1] / "frameworks" / "stride"
 
 loader = MarkdownLoader(PROMPTS_DIR)
+package_loader = MarkdownLoader(PACKAGE_DIR)
 
 BODY_TOKEN_CAPS = {
     ANALYZE_PROMPT_NAME: ANALYZE_PROMPT_TOKEN_CAP,
@@ -108,8 +119,8 @@ def json_blocks(text):
     return JSON_BLOCK_RE.findall(text)
 
 
-def exemplar_sections(category):
-    return split_sections(loader.load(exemplar_name(category)))
+def exemplar_sections(lane):
+    return split_sections(package_loader.load(lane_exemplars_doc(lane)))
 
 
 def exemplar_systems():
@@ -170,7 +181,9 @@ def catalog(system):
     refs = [
         ref
         for ref in re.findall(r"^\| `([^`]+)` \| ", system, re.MULTILINE)
-        if ref.startswith((f"{UNKNOWN_PREFIX}:", f"{CROSSING_PREFIX}:"))
+        if ref.startswith(
+            (f"{UNKNOWN_PREFIX}:", f"{ABSENT_PREFIX}:", f"{CROSSING_PREFIX}:")
+        )
     ]
     if not refs:
         raise AssertionError("an exemplar system carries no evidence catalog block")
@@ -260,8 +273,10 @@ def test_prompt_body_within_token_cap(name):
 
 
 def test_exemplar_files_match_stride_categories_exactly():
-    stems = sorted(path.stem for path in (PROMPTS_DIR / "exemplars").glob("*.md"))
-    assert stems == sorted(STRIDE_CATEGORIES)
+    lanes = sorted(path.name for path in (PACKAGE_DIR / "lanes").iterdir())
+    assert lanes == sorted(STRIDE_CATEGORIES)
+    for lane in lanes:
+        assert (PACKAGE_DIR / "lanes" / lane / "exemplars.md").is_file()
 
 
 @pytest.mark.parametrize("category", STRIDE_CATEGORIES)
@@ -416,7 +431,7 @@ def test_the_exemplar_catalog_names_only_elements_the_system_defines(name):
     for ref in catalog(system):
         if ref.startswith(f"{CROSSING_PREFIX}:"):
             element = ref.split(":", 1)[1]
-        elif ref.startswith(f"{UNKNOWN_PREFIX}:"):
+        elif ref.startswith((f"{UNKNOWN_PREFIX}:", f"{ABSENT_PREFIX}:")):
             element = ref.split(":", 1)[1].rsplit(":", 1)[0]
         else:
             dangling.append(ref)
@@ -439,8 +454,12 @@ def test_the_exemplar_catalog_is_rendered_the_way_a_real_one_is(name):
     change and nothing here would notice.
 
     Rebuilding the grounds from the refs is exact rather than approximate — a
-    ref is *built* from a ground, and the two branches are separated by their
-    prefixes — so these are the objects a real catalog would hold.
+    ref is *built* from a ground, and the three branches are separated by their
+    prefixes — so these are the objects a real catalog would hold. The two
+    attribute branches are what makes the prefix load-bearing here: they carry
+    identical fields and different glosses, so a row written under the wrong
+    prefix renders "never stated" where the system states an absence, and this
+    is the check that says so.
     """
     system = exemplar_systems()[name]
     entries = {}
@@ -448,10 +467,13 @@ def test_the_exemplar_catalog_is_rendered_the_way_a_real_one_is(name):
         if ref.startswith(f"{CROSSING_PREFIX}:"):
             entries[ref] = Ground(kind="derived-fact", flow_id=ref.split(":", 1)[1])
         else:
-            element, attribute = ref.split(":", 1)[1].rsplit(":", 1)
-            entries[ref] = Ground(
-                kind="unknown-attribute", element_id=element, attribute=attribute
+            kind = (
+                "absent-attribute"
+                if ref.startswith(f"{ABSENT_PREFIX}:")
+                else "unknown-attribute"
             )
+            element, attribute = ref.split(":", 1)[1].rsplit(":", 1)
+            entries[ref] = Ground(kind=kind, element_id=element, attribute=attribute)
     assert render_catalog(entries).strip() in system
 
 
@@ -473,13 +495,19 @@ def test_every_exemplar_system_is_worked_by_some_category():
 
 @pytest.mark.parametrize("category", STRIDE_CATEGORIES)
 def test_exemplar_file_within_token_cap(category):
-    tokens = estimate_tokens(loader.load(exemplar_name(category)))
+    tokens = estimate_tokens(package_loader.load(lane_exemplars_doc(category)))
     assert tokens <= EXEMPLAR_TOKEN_CAP
 
 
 def test_no_stray_prompt_files():
-    known = {*PROMPT_BODY_NAMES, *(exemplar_name(c) for c in STRIDE_CATEGORIES)}
-    assert set(loader.names()) == known
+    """The shared root is the five bodies and nothing else.
+
+    Tighter than before the cutover, not looser: the exemplars used to sit here
+    too, and every one of them was STRIDE's. What is left is the text that
+    genuinely serves every registered framework, which is what makes the shared
+    root shared rather than merely first.
+    """
+    assert set(loader.names()) == set(PROMPT_BODY_NAMES)
 
 
 def test_no_non_markdown_files_under_prompts():
@@ -509,17 +537,26 @@ def test_no_non_markdown_files_under_prompts():
 # capped where they are produced; this budget governs the static instruction
 # only, and it moves with the body cap it has to accommodate — by 100 for the
 # retrieved corpus, then by 300 for the evidence catalog becoming a table
-# (#138), which is argued at ``ANALYZE_PROMPT_TOKEN_CAP`` rather than restated
+# (#138), and now by 200 for that catalog learning to say "stated absent"
+# (#171), each argued at ``ANALYZE_PROMPT_TOKEN_CAP`` rather than restated
 # here.
+#
+# The worst lane sits at ~5.4K of the 5.5K, and the worst case is now ~7.2K
+# against the 6-8K envelope. The paragraph above already said the next thing
+# wanting static room should be weighed against deleting something; #171 was
+# weighed that way and one deletion came with it — the canonical tampering
+# draft dropped the quote it used as a workaround for the rows this ticket
+# adds. That is the shape the next raise needs, and there is no longer room
+# for one that does not have it.
 #
 # The catalog's *runtime* rendering grew too, by roughly one short clause per
 # entry. It is job-varying so it does not land in this number, but it is not
 # free: a large model pays it per lane, which is the trade for jobs that no
 # longer die on a composed reference.
-COMPOSED_ANALYZE_TOKEN_BUDGET = 5300
+COMPOSED_ANALYZE_TOKEN_BUDGET = 5500
 
 
 @pytest.mark.parametrize("category", STRIDE_CATEGORIES)
 def test_composed_analyze_prompt_within_budget(category):
-    composed = compose_analyze_prompt(loader, category)
+    composed = compose_analyze_prompt(loader, package_loader, category)
     assert estimate_tokens(composed) <= COMPOSED_ANALYZE_TOKEN_BUDGET

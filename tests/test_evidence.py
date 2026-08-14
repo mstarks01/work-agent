@@ -15,13 +15,16 @@ from pydantic import ValidationError
 
 from stride_service.evidence import (
     EvidenceResolutionError,
+    absent_evidence_ref,
     crossing_evidence_ref,
     evidence_catalog,
     render_catalog,
     resolve_proposals,
     unknown_evidence_ref,
 )
-from stride_service.report import Ground, ThreatProposal, ThreatProposals
+from stride_service.frameworks.stride import STRIDE
+from stride_service.frameworks.stride.record import ThreatProposal, ThreatProposals
+from stride_service.report import Ground
 from stride_service.system_model import UNKNOWN, DataStore, SystemModel
 from tests.factories import sample_draft, sample_proposal, valid_model
 
@@ -57,12 +60,81 @@ class TestEvidenceCatalog:
 
         assert unknown_evidence_ref("store:orders-db", "technology") not in catalog
 
-    def test_only_the_two_derived_kinds_are_ever_catalogued(self):
-        """No quote, and no room for a conclusion: every entry is one of two
-        shapes, both computed by rule from the model."""
-        kinds = {ground.kind for ground in evidence_catalog(valid_model()).values()}
+    def test_only_the_derived_kinds_are_ever_catalogued(self):
+        """No quote, and no room for a conclusion: every entry is one of three
+        shapes, all computed by rule from the model."""
+        model = valid_model()
+        model.data_flows[0].authentication = "none"
 
-        assert kinds == {"unknown-attribute", "derived-fact"}
+        kinds = {ground.kind for ground in evidence_catalog(model).values()}
+
+        assert kinds == {"unknown-attribute", "absent-attribute", "derived-fact"}
+
+    def test_a_control_the_input_states_is_absent_is_enumerated(self):
+        """The gap #171 was filed for.
+
+        The catalog used to test exact equality with the ``unknown`` sentinel,
+        so a control the submitter said is *not there* — which 11 of the 12
+        candidate rules fire on, through ``is_unverified`` — was a fact no
+        agent could cite. It has its own entry and its own kind, because
+        "nobody said" and "somebody said no" carry different threats.
+        """
+        model = valid_model()
+        model.data_flows[0].authentication = "none; accepted by network position"
+
+        catalog = evidence_catalog(model)
+
+        ref = absent_evidence_ref("flow:customer-to-web-app:login", "authentication")
+        assert catalog[ref] == Ground(
+            kind="absent-attribute",
+            element_id="flow:customer-to-web-app:login",
+            attribute="authentication",
+        )
+        assert (
+            unknown_evidence_ref("flow:customer-to-web-app:login", "authentication")
+            not in catalog
+        )
+
+    def test_a_hedged_unknown_is_still_an_unknown(self):
+        """``CONTEXT.md`` defines Unknown to include a voiced hedge, and
+        ``control_state`` reads the leading token — so the sentinel decorated
+        with the speaker's own doubt is the same fact as the bare one, and the
+        catalog no longer misses it for the decoration."""
+        model = valid_model()
+        model.data_flows[0].authentication = "unknown; possibly a shared group account"
+
+        catalog = evidence_catalog(model)
+
+        ref = unknown_evidence_ref("flow:customer-to-web-app:login", "authentication")
+        assert catalog[ref].kind == "unknown-attribute"
+
+    def test_a_stated_control_reading_no_is_not_an_absence(self):
+        """Only the leading token is read, which is what keeps this from
+        becoming a classifier with a security opinion: ``no MFA on the password
+        login`` describes a mechanism that exists."""
+        model = valid_model()
+        model.data_flows[0].authentication = "no MFA on the password login"
+
+        catalog = evidence_catalog(model)
+
+        flow_id = "flow:customer-to-web-app:login"
+        assert absent_evidence_ref(flow_id, "authentication") not in catalog
+        assert unknown_evidence_ref(flow_id, "authentication") not in catalog
+
+    def test_only_a_control_attribute_can_be_stated_absent(self):
+        """``unknown`` is the extraction sentinel on every field; ``none`` means
+        something determinate only where the attribute names a control. A
+        ``protocol`` reading ``none`` is what the input wrote, not a fact an
+        agent may rest a finding on."""
+        model = valid_model()
+        model.data_flows[0].protocol = "none"
+
+        catalog = evidence_catalog(model)
+
+        assert (
+            absent_evidence_ref("flow:customer-to-web-app:login", "protocol")
+            not in catalog
+        )
 
     def test_identity_and_provenance_fields_are_not_attributes(self):
         """``notes`` holding the word is a sentence, not an unstated control."""
@@ -154,11 +226,14 @@ class TestRenderCatalog:
 
         assert f"{len(catalog)} facts" in render_catalog(catalog)
 
-    def test_the_two_kinds_of_fact_read_differently(self):
-        """An unstated attribute and a derived crossing are not interchangeable.
+    def test_the_kinds_of_fact_read_differently(self):
+        """An unstated attribute, a stated absence and a derived crossing are
+        not interchangeable.
 
         An agent that conflates them cites the wrong one, so the gloss carries
-        the distinction the ID prefix alone makes easy to skim past.
+        the distinction the ID prefix alone makes easy to skim past. It carries
+        the whole of it for the two attribute branches: they name identical
+        fields, so the right column is the only place their difference shows.
         """
         rendered = render_catalog(
             {
@@ -167,6 +242,11 @@ class TestRenderCatalog:
                     element_id="store:accounts-db",
                     attribute="encryption_at_rest",
                 ),
+                "absent:flow:a-to-b:call:authentication": Ground(
+                    kind="absent-attribute",
+                    element_id="flow:a-to-b:call",
+                    attribute="authentication",
+                ),
                 "crossing:flow:a-to-b:call": Ground(
                     kind="derived-fact", flow_id="flow:a-to-b:call"
                 ),
@@ -174,6 +254,7 @@ class TestRenderCatalog:
         )
 
         assert "`encryption_at_rest` never stated" in rendered
+        assert "`authentication` stated absent" in rendered
         assert "crosses a trust boundary" in rendered
 
     def test_an_empty_catalog_renders_no_rows(self):
@@ -216,7 +297,7 @@ class TestABadReferenceCostsItsEntryNotTheJob:
             quotes=[],
         )
 
-        resolution = resolve_proposals([proposal], catalog, "spoofing")
+        resolution = resolve_proposals([proposal], catalog, STRIDE, "spoofing")
 
         (draft,) = resolution.drafts
         assert draft.grounds == [catalog[ENCRYPTION_REF]]
@@ -235,10 +316,10 @@ class TestABadReferenceCostsItsEntryNotTheJob:
         )
 
         (mark,) = resolve_proposals(
-            [proposal], catalog, "spoofing"
+            [proposal], catalog, STRIDE, "spoofing"
         ).marks.unresolved_evidence
 
-        assert mark.threat_id == "S-01"
+        assert mark.claim_id == "S-01"
         assert mark.reference == "crossing:flow:ghost"
 
     def test_a_quote_is_enough_to_keep_a_threat_whose_references_all_fail(self):
@@ -250,7 +331,7 @@ class TestABadReferenceCostsItsEntryNotTheJob:
             quotes=[{"text": "Customers log in", "source_label": "Description"}],
         )
 
-        resolution = resolve_proposals([proposal], catalog, "spoofing")
+        resolution = resolve_proposals([proposal], catalog, STRIDE, "spoofing")
 
         assert len(resolution.drafts) == 1
         assert len(resolution.marks.unresolved_evidence) == 1
@@ -269,7 +350,7 @@ class TestABadReferenceCostsItsEntryNotTheJob:
         )
 
         with pytest.raises(EvidenceResolutionError, match="nothing is left"):
-            resolve_proposals([proposal], catalog, "spoofing")
+            resolve_proposals([proposal], catalog, STRIDE, "spoofing")
 
     def test_one_groundless_threat_does_not_take_its_lane_down_with_it(self):
         """Only the threat that cannot stand fails, and it fails the job.
@@ -284,7 +365,7 @@ class TestABadReferenceCostsItsEntryNotTheJob:
         ]
 
         with pytest.raises(EvidenceResolutionError) as excinfo:
-            resolve_proposals(proposals, catalog, "spoofing")
+            resolve_proposals(proposals, catalog, STRIDE, "spoofing")
 
         assert "'S-02'" in str(excinfo.value)
         assert "'S-01'" not in str(excinfo.value)
@@ -292,7 +373,7 @@ class TestABadReferenceCostsItsEntryNotTheJob:
     def test_a_clean_lane_records_no_marks(self):
         catalog = evidence_catalog(valid_model())
 
-        resolution = resolve_proposals([sample_proposal()], catalog, "spoofing")
+        resolution = resolve_proposals([sample_proposal()], catalog, STRIDE, "spoofing")
 
         assert resolution.marks.unresolved_evidence == []
 
@@ -302,7 +383,7 @@ class TestResolveProposals:
         catalog = evidence_catalog(valid_model())
         proposal = sample_proposal("S-01", evidence_refs=[ENCRYPTION_REF], quotes=[])
 
-        (draft,) = resolve_proposals([proposal], catalog, "spoofing").drafts
+        (draft,) = resolve_proposals([proposal], catalog, STRIDE, "spoofing").drafts
 
         assert draft.grounds == [catalog[ENCRYPTION_REF]]
 
@@ -314,7 +395,7 @@ class TestResolveProposals:
             quotes=[{"text": "Customers log in", "source_label": "Description"}],
         )
 
-        (draft,) = resolve_proposals([proposal], catalog, "spoofing").drafts
+        (draft,) = resolve_proposals([proposal], catalog, STRIDE, "spoofing").drafts
 
         assert draft.grounds == [
             Ground(kind="quote", text="Customers log in", source_label="Description")
@@ -331,7 +412,7 @@ class TestResolveProposals:
             quotes=[{"text": "Customers log in", "source_label": "Description"}],
         )
 
-        (draft,) = resolve_proposals([proposal], catalog, "spoofing").drafts
+        (draft,) = resolve_proposals([proposal], catalog, STRIDE, "spoofing").drafts
 
         assert [ground.kind for ground in draft.grounds] == [
             "quote",
@@ -343,7 +424,9 @@ class TestResolveProposals:
         """The agent's other seven fields reach the report as written."""
         catalog = evidence_catalog(valid_model())
 
-        (draft,) = resolve_proposals([sample_proposal()], catalog, "spoofing").drafts
+        (draft,) = resolve_proposals(
+            [sample_proposal()], catalog, STRIDE, "spoofing"
+        ).drafts
 
         assert draft == sample_draft()
 
@@ -351,9 +434,9 @@ class TestResolveProposals:
         catalog = evidence_catalog(valid_model())
         proposals = [sample_proposal("S-01"), sample_proposal("S-02")]
 
-        assert resolve_proposals(proposals, catalog, "spoofing") == resolve_proposals(
-            proposals, catalog, "spoofing"
-        )
+        assert resolve_proposals(
+            proposals, catalog, STRIDE, "spoofing"
+        ) == resolve_proposals(proposals, catalog, STRIDE, "spoofing")
 
     def test_a_reference_naming_nothing_fails_deterministically(self):
         """Reported as itself. There is no near match and no repair: inferring
@@ -364,7 +447,7 @@ class TestResolveProposals:
         )
 
         with pytest.raises(EvidenceResolutionError, match="crossing:flow:not-real"):
-            resolve_proposals([proposal], catalog, "spoofing")
+            resolve_proposals([proposal], catalog, STRIDE, "spoofing")
 
     def test_every_bad_reference_in_the_batch_is_reported_at_once(self):
         """The fan-in has no re-ask path, so it gets one chance to say what was
@@ -376,7 +459,7 @@ class TestResolveProposals:
         ]
 
         with pytest.raises(EvidenceResolutionError) as excinfo:
-            resolve_proposals(proposals, catalog, "spoofing")
+            resolve_proposals(proposals, catalog, STRIDE, "spoofing")
 
         assert "crossing:flow:ghost" in str(excinfo.value)
         assert "unknown:store:ghost:x" in str(excinfo.value)
@@ -389,7 +472,7 @@ class TestResolveProposals:
             "S-01", evidence_refs=[f"  {ENCRYPTION_REF} "], quotes=[]
         )
 
-        (draft,) = resolve_proposals([proposal], catalog, "spoofing").drafts
+        (draft,) = resolve_proposals([proposal], catalog, STRIDE, "spoofing").drafts
 
         assert draft.grounds == [catalog[ENCRYPTION_REF]]
 
@@ -439,7 +522,7 @@ class TestTheMisShapeIsUnreachable:
             "S-01", evidence_refs=[LOGIN_CROSSING_REF], quotes=[]
         )
 
-        (draft,) = resolve_proposals([proposal], catalog, "spoofing").drafts
+        (draft,) = resolve_proposals([proposal], catalog, STRIDE, "spoofing").drafts
 
         assert draft.grounds[0].kind == "derived-fact"
         assert draft.grounds[0].flow_id == "flow:customer-to-web-app:login"
@@ -464,7 +547,7 @@ class TestTheMisShapeIsUnreachable:
         catalog = evidence_catalog(valid_model())
         proposal = sample_proposal("S-07", evidence_refs=[ENCRYPTION_REF], quotes=[])
 
-        (draft,) = resolve_proposals([proposal], catalog, "tampering").drafts
+        (draft,) = resolve_proposals([proposal], catalog, STRIDE, "tampering").drafts
 
         assert draft.id == "T-07"
         assert draft.category == "tampering"
