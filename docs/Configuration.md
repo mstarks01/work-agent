@@ -15,8 +15,10 @@ Both [`StrideEngine.from_config(env=...)`](Integration-Guide.md) and the
 | `config/sampling.toml` | Decoding parameters, shared by production and evals. |
 | `config/resilience.toml` | Retry attempts and budget, per-request timeout, input bounds, and the job deadline. |
 | `config/blessed-fingerprints.toml` | The generation identities this deployment has blessed. |
-| `skills/` | The per-category STRIDE skill Markdown baked into the image. |
-| `prompts/` | The agent prompt and exemplar Markdown. |
+| `config/frameworks.toml` | Which framework packages this deployment carries. |
+| `frameworks/` | One directory per framework package: its lanes, critic, disclaimer, rubric and local corpus. |
+| `domains/` | The shared domain packs, selected from the system model rather than by any framework's rules. |
+| `prompts/` | The framework-neutral prompt Markdown (`extract`, `repair`, `analyze`, `critic`, `recritic`). |
 
 ### Models and vendors
 
@@ -27,12 +29,12 @@ stops at startup with an error naming the vendors and the two places a selection
 can be made. There is no vendor you reach by doing nothing.
 
 Two tiers named on a capability axis — `base` (extraction, repair) and `strong`
-(the six category agents, the critic, the re-ask) — each select a
+(every framework's lane agents, critics and re-asks) — each select a
 `(vendor, model)` pair **independently**, so the two tiers may run different
 vendors at once.
 
 ```toml
-version = 4
+version = 5
 
 [tiers.base]
 vendor = "vertex"
@@ -105,6 +107,35 @@ tomorrow already satisfies it. The name check is only a proxy either way. The
 real guarantee is the **served build read back from every response** and
 recorded for each node execution, described under
 [Architecture → Provenance and certification](Architecture.md#provenance-and-certification).
+
+### Node keys, and the frameworks this deployment carries
+
+`model_tiers.toml`'s `[nodes]` table carries **three keys per framework** beside
+the two neutral ones:
+
+```toml
+[nodes]
+extract = "base"
+repair = "base"
+"analyze/stride" = "strong"
+"critic/stride" = "strong"
+"recritic/stride" = "strong"
+```
+
+One knob per framework rather than one per lane. Every lane of one framework
+runs the same judgement on the same tier, so six `analyze/<category>` keys that
+always held one value had no reader; an operator choosing to run one framework
+cheaper than another is the choice that has a purpose. The loader **checks that
+a framework's `recritic` key resolves to the same tier as its `critic`** — a
+re-ask on a cheaper model than the pass it corrects is the failure a comment
+used to warn about, and at 2N keys a comment drifts.
+
+`config/frameworks.toml` names which packages this install runs. Three sets have
+to agree: what the code can spell, what this build carries, and what this
+install selects. The first two agree at import; the third is checked when a
+`Deployment` is constructed, and a name this build does not carry stops startup
+rather than failing on the first job. A deployment missing an
+`analyze/<name>` key for a framework it carries fails the same way.
 
 ### Sampling
 
@@ -484,13 +515,23 @@ inheriting a default for a contract its callers can see.
 
 | Variable | Overrides |
 | --- | --- |
-| `STRIDE_SKILLS_DIR` | `skills/` |
+| `STRIDE_DOMAINS_DIR` | `domains/` |
 | `STRIDE_PROMPTS_DIR` | `prompts/` |
-| `STRIDE_KNOWLEDGE_DIR` | `knowledge/` |
+| `STRIDE_FRAMEWORKS_DIR` | `frameworks/` |
 | `STRIDE_TIERS_FILE` | `config/model_tiers.toml` |
 | `STRIDE_SAMPLING` | `config/sampling.toml` |
 | `STRIDE_RESILIENCE` | `config/resilience.toml` |
 | `STRIDE_BLESSED_FINGERPRINTS` | `config/blessed-fingerprints.toml` |
+| `STRIDE_FRAMEWORKS_FILE` | `config/frameworks.toml` |
+
+**Three text roots, not four.** `frameworks/<name>/` holds one framework
+package's text — its lanes' skills and exemplars, its critic, its disclaimer,
+its severity rubric where its record grades harm, and the reference notes and
+worked cases its own rules retrieve. `domains/` holds the shared domain packs,
+which stay the service's because their retrieval key reads the neutral system
+model rather than any package's rules. `STRIDE_KNOWLEDGE_DIR` is **gone**: the
+corpus it pointed at moved into the package whose rules select it. See
+[ADR 0011](adr/0011-package-text-follows-its-retrieval-key.md).
 
 A variable **picks which file is read**; it never layers a second file over the
 first. A set-but-empty value is a deploy mistake and raises rather than
