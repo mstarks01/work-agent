@@ -137,7 +137,28 @@ class DataFlow(_Element):
 
 
 class TrustBoundary(_Element):
-    """A named flat trust zone: network zones, auth boundaries, privilege levels."""
+    """A named flat trust zone: network zones, auth boundaries, privilege levels.
+
+    ``kind`` says *what separates* this zone from the rest, and the four values
+    are ordered by how much a reader learns from them. Two questions decide it,
+    in this order: **who controls the zone**, then **what authority the zone
+    holds**.
+
+    ``tenant``
+        A different party controls it — another company, a franchise, a vendor's
+        hosting, a customer's own hardware, another team's environment. The
+        boundary is *whose* rather than *where*.
+    ``privilege``
+        The same party controls both sides, and this side holds authority the
+        other does not: an administrative zone, a control plane, a production
+        estate reached from a corporate one.
+    ``network``
+        The same party, the same authority, a different network location. A
+        DMZ, an internal tier, a segment.
+    ``other``
+        None of the three fit. This is the last resort, not the default: a
+        zone typed ``other`` tells a downstream rule nothing at all.
+    """
 
     id_prefix: ClassVar[str] = "boundary"
 

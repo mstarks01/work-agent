@@ -22,4 +22,4 @@ The identity weakness underneath belongs to the spoofing lane, and filing it her
 
 ## What decided it
 
-The model showing one credential on flows from several distinct sources, and the graded asset on the element they act upon.
+The credential's own words on the flow — "the same API key", "shared by every operator" — and the graded asset on the element it acts upon. The sharing is usually stated once, on one flow, rather than shown by two flows repeating a value: a submitter writes "they all use the same key" and never lists the users. Read the attribute, not the repetition.
