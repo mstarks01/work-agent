@@ -190,7 +190,7 @@
       "description": "Run by another team; the source says nothing else about it.",
       "source_excerpt": "The payroll system, which is run by another team",
       "source_label": "System description",
-      "kind": "other"
+      "kind": "tenant"
     }
   ],
   "assumptions": [

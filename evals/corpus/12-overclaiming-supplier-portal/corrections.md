@@ -12,6 +12,7 @@ Applying these in reverse to `model.json` reconstructs the bootstrap artifact.
 | 5 | `store:audit-log` and `flow:supplier-portal-to-audit-log:write-audit-records` | present | removed | The candidate invented an element and a flow out of the word "audited". This is the most damaging shape of over-claim: a fabricated element gives every analyst something to cite, so a repudiation finding gets closed against a store that does not exist. |
 | 6 | `store:supplier-database.data_classification`, `store:landing-bucket.data_classification` | `confidential` | `unknown` | Derived from "fully compliant". A compliance adjective is not a classification, and the source classifies nothing. |
 | 7 | `entity:portal-vendor` | absent | present | The vendor was modelled only as a boundary, with the nightly push sourced from `process:supplier-portal`. The source states the vendor pushes, and the vendor is an actor outside our control that initiates into our cloud account — dropping it removes the case's sharpest external entity. |
+| 8 | `boundary:vendor-platform.kind` | `network` | `tenant` | "The vendor hosts it and we do not run any part of it" states a controlling party, and the zone's whole point is that the party differs rather than the network. This is the one boundary in the case that suppliers and category managers both cross into, so its kind is what tells the elevation-of-privilege lane that the crossing leaves our control. |
 
 ## Signal
 

@@ -170,12 +170,13 @@ CRITIC_PROMPT_TOKEN_CAP = 1500
 # step. 1100 leaves ~100 tokens; a fault class costs roughly a third of that,
 # which is the right amount of friction for adding one.
 RECRITIC_PROMPT_TOKEN_CAP = 1100
-# Raised from 1500 with the sources cutover (#53, #56). The original was sized
-# against the *category agent's* 6-8K envelope, but extract loads no skills, so this
-# file is the whole instruction — around 5% of a full-budget call. Buying room
-# for the seven reading rules and their worked examples is cheaper than
-# deleting the only worked examples the prompt has.
-EXTRACT_PROMPT_TOKEN_CAP = 2200
+# Extract loads no skills, so this file is the whole instruction — around 5% of
+# a full-budget call, which is why the cap is wide against the *category
+# agent's* 6-8K envelope. It buys room for the seven reading rules, their worked
+# examples, and the trust boundary `kind` rule: an attribute the prompt does not
+# tell the transcriber how to fill is an attribute whose legal values never
+# reach the model, and a downstream rule keyed on one of them fires nowhere.
+EXTRACT_PROMPT_TOKEN_CAP = 2300
 REPAIR_PROMPT_TOKEN_CAP = 800
 
 

@@ -232,7 +232,7 @@
       "description": "The franchise stores and the identity provider they run; a separate party rather than a network location.",
       "source_excerpt": "We also let the franchise stores in. Franchise colleagues do not have staff accounts with us; their own identity provider vouches for them",
       "source_label": "System description",
-      "kind": "other"
+      "kind": "tenant"
     }
   ],
   "assumptions": [

@@ -76,9 +76,9 @@ class TestTheIndexAndTheFilesAgree:
         """A lead with no reference material behind it is a gap in the corpus.
 
         Not a hard requirement of the design — retrieval is allowed to return
-        nothing — but the corpus was written against the twelve rules, so a
-        rule with neither a note nor a case means one was added and its
-        material was not.
+        nothing — but the corpus was written against the rule table as it
+        stands, so a rule with neither a note nor a case means one was added
+        and its material was not.
         """
         covered = {
             rule_id

@@ -7,7 +7,7 @@ it fire.
 
 **Neutral by design, and empty of rules.** The rules themselves belong to a
 **Framework Package** — a rule decides which lane sees a lead, and a lane is a
-framework's own unit — so STRIDE's twelve live in
+framework's own unit — so STRIDE's eleven live in
 :mod:`stride_service.frameworks.stride.rules`. What is here is the shape a rule
 takes, the shape a hit takes, and the fold that evaluates a package's whole
 table against one model.

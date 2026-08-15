@@ -206,7 +206,7 @@
       "description": "The vendor's hosting, holding the portal and the documents; we run no part of it and can verify nothing inside it.",
       "source_excerpt": "The vendor hosts it and we do not run any part of it.",
       "source_label": "System description",
-      "kind": "other"
+      "kind": "tenant"
     },
     {
       "id": "boundary:cloud-account",

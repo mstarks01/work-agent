@@ -1,4 +1,4 @@
-"""STRIDE's twelve deterministic candidate rules.
+"""STRIDE's eleven deterministic candidate rules.
 
 A **Candidate** is not a finding. It is a mechanically-evaluated condition over
 the validated System Model — "this flow crosses a trust boundary and its
@@ -25,7 +25,7 @@ The representation is deliberately small: a tuple of
 belongs to, the question it puts to that agent, and a plain function from model
 to matches. There is no rule DSL, no condition tree and no engine, because the
 thing a maintainer needs to do most often is read one rule and decide whether it
-is right — and a table of twelve functions is the representation that makes that
+is right — and a table of eleven functions is the representation that makes that
 cheapest. Adding a rule is writing a function and appending to :data:`RULES`.
 
 Rules fire on **structure**, never on prose. The attribute predicates come from
@@ -150,34 +150,6 @@ def _unverified_write_to_store(model: SystemModel) -> Iterator[Match]:
 
 
 # --- Repudiation ------------------------------------------------------------
-
-
-def _shared_authentication(model: SystemModel) -> Iterator[Match]:
-    """Flows from distinct sources presenting the identical stated credential.
-
-    String equality, not similarity: two flows whose ``authentication`` reads
-    the same are describing one mechanism, and one mechanism shared by several
-    callers is an attribution question by construction. Unverified values are
-    excluded — six flows reading ``unknown`` share nothing but silence.
-    """
-    by_value: dict[str, list[str]] = {}
-    sources: dict[str, set[str]] = {}
-    for flow in model.data_flows:
-        if is_unverified(flow.authentication):
-            continue
-        by_value.setdefault(flow.authentication, []).append(flow.id)
-        sources.setdefault(flow.authentication, set()).add(flow.source)
-    for value, flow_ids in by_value.items():
-        if len(sources[value]) < SHARED_DEPENDENCY_MIN:
-            continue
-        yield (
-            tuple(flow_ids),
-            {
-                "authentication": _clip(value),
-                "flow_count": len(flow_ids),
-                "distinct_sources": len(sources[value]),
-            },
-        )
 
 
 def _unattributable_action(model: SystemModel) -> Iterator[Match]:
@@ -371,15 +343,6 @@ RULES: tuple[Rule, ...] = (
             " what it finds there?"
         ),
         find=_unverified_write_to_store,
-    ),
-    Rule(
-        rule_id="repudiation-shared-authentication",
-        lane="repudiation",
-        question=(
-            "Several flows from different sources present the same credential."
-            " If one of them acts, can the logs say which? Who could deny it?"
-        ),
-        find=_shared_authentication,
     ),
     Rule(
         rule_id="repudiation-unattributable-action",
