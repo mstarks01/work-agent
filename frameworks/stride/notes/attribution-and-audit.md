@@ -2,7 +2,7 @@
 
 ## When this applies
 
-Several flows present the same credential, or an unverified caller acts on an element holding a graded asset, and what the record would say about the actor is unstated.
+An unverified caller acts on an element holding a graded asset, or a flow's stated credential is one a population shares, and what the record would say about the actor is unstated.
 
 ## What to look for
 
