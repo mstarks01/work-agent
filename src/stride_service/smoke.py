@@ -21,14 +21,19 @@ a provider must satisfy before its coverage counts as exercised:
     execution fingerprint            the generation identity that implies
     provenance                       the record, recomputable from itself
 
-**Every framework this deployment carries, not one of them.** A framework's lane
-agents and its critic run on their own ``analyze/<name>``, ``critic/<name>`` and
-``recritic/<name>`` tier keys, which an operator may point at different tiers and
-so at different vendors. Smoking one framework and reporting green would leave
-another's binding unexercised while reading exactly like a lane that had checked
-it — the failure this module exists to rule out. Running all of them is still one
-small system through one graph, which is the cheapest thing that answers the
-question *for this install*.
+**Every framework this deployment carries that a smoke run can select.** A
+framework's lane agents and its critic run on their own ``analyze/<name>``,
+``critic/<name>`` and ``recritic/<name>`` tier keys, which an operator may point
+at different tiers and so at different vendors. Smoking one framework and
+reporting green would leave another's binding unexercised while reading exactly
+like a lane that had checked it — the failure this module exists to rule out.
+
+**One framework can still be left out, and the run says so rather than hiding
+it.** A package whose options carry a required field cannot be selected here:
+ASVS needs a level, that level is a choice an organization makes, and a smoke run
+has nobody to ask. Every result names what it could not exercise, and an install
+carrying nothing else reports eight ``unknown`` checks with the reason attached —
+never a traceback.
 
 **Not an eval.** Nothing here scores threat-model quality, and nothing here
 fails because one model writes weaker threats than another — that split is the
@@ -263,6 +268,20 @@ def unexercised_frameworks(deployment: Deployment) -> tuple[FrameworkName, ...]:
     """The carried frameworks this smoke run could not select, in carried order."""
     selected = set(_smoke_selection(deployment))
     return tuple(name for name in deployment.frameworks if name not in selected)
+
+
+def _unexercised_notes(deployment: Deployment) -> tuple[str, ...]:
+    """One note per carried framework this run could not ask its question of.
+
+    Stated on every path that produces a result, including the one where nothing
+    could be selected at all: a run that reports eight ``unknown`` checks and
+    says nothing about why has told the operator less than nothing.
+    """
+    return tuple(
+        f"{name}: not exercised — its options carry a required field and a"
+        " smoke run has nobody to ask; its three tier keys stay untested"
+        for name in unexercised_frameworks(deployment)
+    )
 
 
 def selected_frameworks(report: Report) -> tuple[FrameworkName, ...]:
@@ -641,8 +660,27 @@ async def run_smoke(deployment: Deployment | None = None) -> SmokeResult:
     """
     deployment = deployment or Deployment.from_env()
     tiers = _tier_summary(deployment)
+    selection = _smoke_selection(deployment)
+    if not selection:
+        # Every carried framework needs a job option, so there is nothing this
+        # run can select. A result rather than a traceback, for the reason the
+        # whole module gives: an operator asking "does my provider work here"
+        # gets an answer, and this one is "nobody can ask on your behalf".
+        return SmokeResult(
+            tiers=tiers,
+            checks=_unreached("no framework could be selected, so nothing ran"),
+            # A ``failure`` rather than a quiet result, so ``exercised`` is False
+            # and the lane's exit status is non-zero. No provider served this
+            # run, and a green smoke on an install where nothing ran is the one
+            # outcome this module exists to rule out.
+            failure=(
+                "every framework this install carries needs a job option a smoke"
+                f" run cannot supply: {list(deployment.frameworks)}"
+            ),
+            notes=_unexercised_notes(deployment),
+        )
     try:
-        engine = StrideEngine.from_deployment(deployment, _smoke_selection(deployment))
+        engine = StrideEngine.from_deployment(deployment, selection)
     except ConfigError as exc:
         # The build-time gates: a missing credential or a param this pair will
         # not take. Both name the variable or the tier and never a value.
@@ -694,11 +732,7 @@ async def run_smoke(deployment: Deployment | None = None) -> SmokeResult:
                 " — a count, not a quality judgement"
                 for block in report.analyses
             ),
-            *(
-                f"{name}: not exercised — its options carry a required field and a"
-                " smoke run has nobody to ask; its three tier keys stay untested"
-                for name in unexercised_frameworks(deployment)
-            ),
+            *_unexercised_notes(deployment),
         ),
     )
 
