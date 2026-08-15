@@ -332,3 +332,9 @@ MODE_ENTRIES: dict[str, Entry] = {
     "analysis": ENTRY_PREPARE,
     "end-to-end": ENTRY_EXTRACT,
 }
+
+#: The modes whose graph ends in a :class:`Report`. ``extraction`` stops at the
+#: validity gate and returns an :class:`ExtractionResult`, so a sweep of it has
+#: no report to persist and says so rather than writing an empty file
+#: ([#180](https://github.com/mstarks01/work-agent/issues/180)).
+REPORTING_MODES: frozenset[str] = frozenset({"analysis", "end-to-end"})

@@ -319,10 +319,18 @@ class AsvsAnalysis(FrameworkAnalysis):
     def block_issues(self, known_element_ids):
         """The neutral checks, plus this block's own two.
 
-        The completeness check is what makes story *every requirement appears*
-        mechanical rather than editorial: the union of what the claims rule on
-        and what ``scope`` lists must be exactly the selected level's requirement
-        set. It runs on the block alone, because ``level`` is on the block.
+        The completeness check is what makes *every requirement appears*
+        mechanical rather than editorial: every requirement in the selected level
+        is either ruled on by a claim or listed in ``scope``. It runs on the
+        block alone, because ``level`` is on the block.
+
+        **Every issue here is fatal, so every issue here must be the service's
+        own.** An issue on this list raises out of the report validator and costs
+        the whole job — after every node has been paid for — so a check that an
+        *agent* can trip does not belong on it. That is the line ADR 0009 drew
+        for a bad evidence reference and the one STRIDE's lane numbering already
+        sits behind: an agent's slip costs its entry, never the run. See
+        :meth:`_level_coverage_issues` for the one this rules out.
         """
         return [
             *super().block_issues(known_element_ids),
@@ -338,7 +346,23 @@ class AsvsAnalysis(FrameworkAnalysis):
         return ["summary.by_chapter does not match the asvs analysis's own contents"]
 
     def _level_coverage_issues(self) -> list[str]:
-        """Every requirement in the level appears exactly once, and nothing else."""
+        """Every requirement in the level appears once, and ``scope`` holds no other.
+
+        **Only what the service builds is checked.** ``scope`` is composed by
+        :meth:`scope_entries` from the catalog and the claims, so each finding
+        below can only mean this code got it wrong — which is what makes them
+        safe to raise on.
+
+        **A claim naming a requirement outside the level is deliberately not an
+        issue.** It is the one thing on this block a lane agent can get wrong on
+        its own: the prompt asks it to rule on its chapter at the level the scope
+        line names, and an agent that reaches one requirement further has filed a
+        real ruling about a real requirement. Failing the report would throw away
+        that finding and the other 22 lanes' work with it, to enforce a boundary
+        the reader can already see — ``level`` is on the block and the selection
+        is on the job. So the claim rides, and the level still says what was
+        asked for.
+        """
         expected = {req.id for req in requirements_for(self.level)}
         ruled = {
             requirement_of(claim.id) for claim in (*self.claims, *self.rejected_claims)
@@ -354,9 +378,9 @@ class AsvsAnalysis(FrameworkAnalysis):
         both = sorted(ruled & listed)
         if both:
             issues.append(f"requirements appear in both the claims and scope: {both}")
-        stray = sorted((ruled | listed) - expected)
+        stray = sorted(listed - expected)
         if stray:
             issues.append(
-                f"the block names requirements outside level {self.level}: {stray}"
+                f"scope names requirements outside level {self.level}: {stray}"
             )
         return issues

@@ -371,6 +371,41 @@ class TestDrivingTheEngine:
         )
         return asyncio.run(run_smoke(DEPLOYMENT))
 
+    def test_an_install_it_cannot_ask_reports_rather_than_raising(self, monkeypatch):
+        """Nothing selectable is a result, not a traceback.
+
+        A framework whose options carry a required field cannot be selected here:
+        a smoke run has nobody to ask what ASVS level an install wants. An
+        install carrying nothing else leaves the selection empty, and the module
+        contract says only a broken deployment raises — so this reports eight
+        ``unknown`` checks with the reason attached. The lane still fails: no
+        provider served, and a green smoke where nothing ran is the one outcome
+        this module exists to rule out.
+        """
+        monkeypatch.setattr(smoke, "_smoke_selection", lambda _deployment: ())
+        monkeypatch.setattr(
+            smoke, "unexercised_frameworks", lambda _deployment: ("asvs",)
+        )
+
+        result = asyncio.run(run_smoke(DEPLOYMENT))
+
+        assert not result.exercised
+        assert all(check.result is CheckResult.UNKNOWN for check in result.checks)
+        assert "needs a job option a smoke run cannot supply" in result.failure
+        assert any("asvs: not exercised" in note for note in result.notes)
+
+    def test_a_framework_it_could_not_select_is_named_on_a_completed_run(
+        self, monkeypatch
+    ):
+        """The cost is stated rather than hidden: three tier keys stay untested."""
+        monkeypatch.setattr(
+            smoke, "unexercised_frameworks", lambda _deployment: ("asvs",)
+        )
+
+        result = self.smoke_with(monkeypatch, PipelineCompleted(report=smoke_report()))
+
+        assert any("asvs: not exercised" in note for note in result.notes)
+
     def test_a_completed_run_passes_every_check_and_names_both_tiers(self, monkeypatch):
         result = self.smoke_with(monkeypatch, PipelineCompleted(report=smoke_report()))
 

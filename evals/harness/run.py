@@ -7,11 +7,16 @@ printed and written to the artifact, and deliberately **does not block** until
 baseline sweeps have established its normal range: a gate that fires before
 anyone knows that range trains people to bypass it.
 
-Everything the run learned lands in one JSON artifact: every judge ruling with
+Everything the run measured lands in one JSON artifact: every judge ruling with
 its rationale, every bucket decision, the severity confusion, the near/far
 exemplar delta, and the ``valid-unlisted`` threats queued for the SME's next
 blessing pass. The metrics are judge-relative — track movement with them, never
 quote them as absolutes.
+
+Everything the run *produced* lands beside it, one whole report per case, in the
+directory :func:`reports_dir` names. The artifact answers the questions the
+metric set anticipated; the reports answer the rest, offline and for free
+([#180](https://github.com/mstarks01/work-agent/issues/180)).
 
 ``run`` and ``calibrate`` need live provider credentials, so neither runs on a
 PR. The credential-free lane is ``evals/verify_corpus.py``, which is what CI
@@ -32,7 +37,7 @@ import argparse
 import asyncio
 import json
 import sys
-from collections.abc import Sequence
+from collections.abc import Mapping, Sequence
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
@@ -182,6 +187,52 @@ def _select(cases: Sequence[GoldenCase], wanted: Sequence[str]) -> list[GoldenCa
     return [by_id[case_id] for case_id in wanted]
 
 
+#: The extension a sweep's report directory takes, replacing the artifact's.
+REPORTS_SUFFIX = ".reports"
+
+
+def reports_dir(out: str | Path) -> Path:
+    """Where a sweep's per-case reports land, given its artifact path.
+
+    Derived from ``--out`` rather than selected by a second flag: the reports
+    and the artifact describe one sweep, and two independent paths let an
+    operator point them at two different ones.
+    """
+    return Path(out).with_suffix(REPORTS_SUFFIX)
+
+
+def _write_reports(out: str, mode: str, runs: Mapping[str, modes.AnalysisRun]) -> None:
+    """Persist every finished case's whole report beside the artifact.
+
+    A sweep is paid work and the report is the only record of what the agents
+    said: what each threat cited, what the critic rejected and on what
+    reasoning, and what the ``scope`` list carried. The artifact holds the
+    measurements somebody thought of in advance, so without this file every
+    other question about a finished sweep costs a second sweep
+    ([#180](https://github.com/mstarks01/work-agent/issues/180)).
+
+    Beside the artifact rather than inside it. A report embeds the whole
+    **Valid System Model** and every claim's grounds, so folding a corpus of
+    them into the artifact would bury the aggregates a reader opens it for.
+
+    **These reports are publishable.** They carry corpus source text, which is
+    in this repository, so writing them raises no disclosure question. That is
+    stated rather than assumed, because the same code path carries a
+    submitter's own text the moment it runs outside the corpus.
+    """
+    if mode not in modes.REPORTING_MODES:
+        print(f"no reports written: {mode} mode produces none")
+        return
+    directory = reports_dir(out)
+    directory.mkdir(parents=True, exist_ok=True)
+    total_bytes = 0
+    for case_id, run in sorted(runs.items()):
+        path = directory / f"{case_id}.report.json"
+        path.write_text(run.report.model_dump_json(indent=2) + "\n", "utf-8")
+        total_bytes += path.stat().st_size
+    print(f"{len(runs)} report(s) written to {directory} ({total_bytes / 1024:.0f} KB)")
+
+
 @dataclass(frozen=True)
 class ModeRun:
     """Everything one sweep of one mode produced.
@@ -302,10 +353,10 @@ async def _run_mode(
             case.id, run.merged_drafts, stride_block(run.report).unverified_grounds
         )
         grounds.append(measurement)
-        # The measurement rides in the artifact rather than being recomputed
-        # from it later: the report stays in memory and never reaches
-        # ``mode_output``, so a number not written here is a number nobody can
-        # recover from a finished sweep.
+        # The measurement rides in the artifact rather than in the report, so a
+        # reader gets the number without opening a second file. The report is
+        # kept too, in the directory beside the artifact, and that is what a
+        # question this payload did not anticipate is answered from.
         payloads.append(
             {
                 "case": case.id,
@@ -574,6 +625,7 @@ def command_run(args: argparse.Namespace) -> int:
     if args.out:
         Path(args.out).write_text(json.dumps(artifact, indent=2) + "\n", "utf-8")
         print(f"artifact written to {args.out}")
+        _write_reports(args.out, args.mode, mode_run.runs)
 
     for failure in failures:
         print(f"TIER 1 FAILURE: {failure}", file=sys.stderr)
@@ -1020,7 +1072,13 @@ def main(argv: Sequence[str] | None = None) -> int:
     run_parser.add_argument("--mode", choices=sorted(modes.MODE_ENTRIES), required=True)
     run_parser.add_argument("--case", action="append", default=[])
     run_parser.add_argument("--corpus", default=DEFAULT_CORPUS_DIR)
-    run_parser.add_argument("--out", help="where to write the run artifact")
+    run_parser.add_argument(
+        "--out",
+        help=(
+            "where to write the run artifact. Each finished case's whole report"
+            " is written beside it, as <out>.reports/<case>.report.json"
+        ),
+    )
     run_parser.add_argument(
         "--no-scoring",
         action="store_true",

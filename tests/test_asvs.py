@@ -14,6 +14,7 @@ a maintainer would notice.
 from __future__ import annotations
 
 import json
+from collections.abc import Sequence
 from pathlib import Path
 
 import pytest
@@ -38,16 +39,24 @@ from stride_service.frameworks.asvs.catalog import (
 )
 from stride_service.frameworks.asvs.record import (
     AsvsAnalysis,
+    AsvsChapter,
     AsvsOptions,
     RequirementProposal,
+    RequirementRuling,
     requirement_of,
 )
 from stride_service.markdown_loader import MarkdownLoader, split_sections
-from stride_service.report import FrameworkSelection, Report
+from stride_service.report import (
+    FrameworkSelection,
+    Ground,
+    Report,
+    ScopeEntry,
+    Verdict,
+)
 from stride_service.skills import lane_skill_doc
 from stride_service.sources import SourceLimits
 from stride_service.system_model import SystemModel
-from tests.factories import PROJECT_ROOT
+from tests.factories import PROJECT_ROOT, valid_model
 
 ASVS = PACKAGES["asvs"]
 ASVS_ROOT = PROJECT_ROOT / "frameworks" / "asvs"
@@ -209,6 +218,52 @@ def test_the_precondition_answers_the_corpus_as_measured(case_id, expected):
     assert run_precondition(ASVS, corpus_model(case_id)) == expected
 
 
+@pytest.mark.parametrize(
+    ("protocols", "expected"),
+    [
+        (("", ""), "undecidable"),
+        (("", "AMQP"), "undecidable"),
+        (("unknown", "AMQP"), "undecidable"),
+        (("unknown; the team never said", "AMQP"), "undecidable"),
+        (("none", "AMQP"), "undecidable"),
+        (("unknownish binary framing", "AMQP"), "refuted"),
+        (("AMQP", "SFTP"), "refuted"),
+        (("HTTPS", "SFTP"), "satisfied"),
+    ],
+)
+def test_one_flow_that_never_said_holds_the_answer_open(protocols, expected):
+    """Silence is ``undecidable``, and a stated non-web protocol is ``refuted``.
+
+    The two are never collapsed, because the remedy differs: one says do not name
+    this framework for this system, the other says the input did not say. A blank
+    protocol reaches a **Valid System Model** — the gate sets no minimum length —
+    and reading it as a stated non-web protocol would tell an operator to drop
+    ASVS when what they need is to submit more.
+
+    ``unknownish binary framing`` is a stated protocol on purpose: the leading
+    token is read as a *word*, which is the rule every other reader of an
+    attribute in this repo already applies.
+    """
+    model = valid_model()
+    flows = [
+        flow.model_copy(update={"protocol": protocol})
+        for flow, protocol in zip(model.data_flows, protocols, strict=True)
+    ]
+
+    answer = run_precondition(ASVS, model.model_copy(update={"data_flows": flows}))
+
+    assert answer == expected
+
+
+def test_a_model_with_no_flows_at_all_is_undecidable():
+    """Nothing said, rather than nothing there."""
+    model = valid_model()
+
+    assert run_precondition(ASVS, model.model_copy(update={"data_flows": []})) == (
+        "undecidable"
+    )
+
+
 def test_a_system_whose_protocols_are_all_stated_and_none_web_is_refuted():
     """The third state, and the one the corpus has no case for.
 
@@ -230,22 +285,47 @@ def test_a_system_whose_protocols_are_all_stated_and_none_web_is_refuted():
 # --- The block ---------------------------------------------------------------
 
 
-def _block(level: AsvsLevel, **overrides) -> AsvsAnalysis:
-    """One ASVS block with no claims, built the way ``assemble`` builds it."""
-    scope = AsvsAnalysis.scope_entries(
-        lanes=ASVS.lanes,
-        claims=(),
-        options={"level": level},
-        refusal_reason=overrides.pop("refusal_reason", ""),
+def sample_asvs_claim(
+    claim_id: str = "v5.0.0-6.2.1", chapter: AsvsChapter = "authentication"
+) -> RequirementRuling:
+    """One ruled ASVS claim against valid_model(), in the shape the graph builds."""
+    return RequirementRuling(
+        id=claim_id,
+        framework="asvs",
+        framework_version=ASVS.version,
+        chapter=chapter,
+        title="No password length policy is stated",
+        description="The requirement applies and the input does not settle it.",
+        affected_element_ids=[],
+        grounds=[Ground(kind="derived-fact", flow_id="flow:customer-to-web-app:login")],
+        verdict=Verdict(status="confirmed"),
     )
+
+
+def _block(
+    level: AsvsLevel,
+    claims: Sequence[RequirementRuling] = (),
+    refusal_reason: str = "",
+) -> AsvsAnalysis:
+    """One ASVS block, built the way ``assemble`` builds it.
+
+    ``scope`` and ``summary`` come from the block type's own hooks rather than
+    from a literal, so a test cannot assert against a shape the graph would not
+    produce.
+    """
     return AsvsAnalysis(
         framework="asvs",
         framework_version=ASVS.version,
         disclaimer=(ASVS_ROOT / "disclaimer.md").read_text(encoding="utf-8").strip(),
         level=level,
-        scope=scope,
-        summary=AsvsAnalysis.summarize([], []),
-        **overrides,
+        claims=list(claims),
+        scope=AsvsAnalysis.scope_entries(
+            lanes=ASVS.lanes,
+            claims=claims,
+            options={"level": level},
+            refusal_reason=refusal_reason,
+        ),
+        summary=AsvsAnalysis.summarize(claims, []),
     )
 
 
@@ -274,6 +354,43 @@ def test_a_refused_framework_lists_the_level_as_not_applicable_with_the_reason()
 def test_a_level_that_moves_moves_the_scope_list_with_it():
     """The level the operator asked for is what the block rules against."""
     assert [len(_block(level).scope) for level in (1, 2, 3)] == [70, 253, 345]
+
+
+def test_a_claim_outside_the_level_does_not_fail_the_report():
+    """An agent's slip costs its entry, never the run.
+
+    A block issue raises out of the report validator and costs the whole job,
+    after 23 `strong`-tier calls have been paid for. So the only checks on that
+    list are ones the *service* can fail — and a claim naming a requirement one
+    level further out is the one thing on this block a lane agent can get wrong
+    on its own. The finding rides; `level` still says what was asked for.
+    """
+    out_of_level = sample_asvs_claim("v5.0.0-6.2.9")  # V6.2.9 is level 2
+    block = _block(1, claims=[out_of_level])
+
+    assert block.block_issues(known_element_ids=()) == []
+    assert len(block.scope) == 70
+
+
+def test_a_scope_entry_outside_the_level_still_fails_the_report():
+    """The other half of the same rule: `scope` is the service's own to build.
+
+    Nothing an agent emits reaches this list, so an entry outside the level can
+    only mean `scope_entries` got it wrong — which is exactly what a fatal check
+    is for.
+    """
+    block = _block(1)
+    tampered = block.model_copy(
+        update={
+            "scope": [
+                *block.scope,
+                ScopeEntry(unit="V6.2.9", state="applicable", reason=""),
+            ]
+        }
+    )
+
+    (issue,) = tampered.block_issues(known_element_ids=())
+    assert "scope names requirements outside level 1" in issue
 
 
 def test_a_block_missing_a_requirement_of_its_level_says_so():

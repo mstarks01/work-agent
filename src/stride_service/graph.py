@@ -118,6 +118,7 @@ from google.adk.events.event import Event
 from google.adk.models.base_llm import BaseLlm
 from google.adk.workflow import START, FunctionNode, JoinNode, Workflow
 from google.genai import types
+from pydantic import ValidationError
 
 from stride_service.candidates import generate_candidates
 from stride_service.coverage import build_coverage, lane_scope
@@ -1181,6 +1182,12 @@ def prepare_analysis(
 
     state = keys.state(ctx)
     options = state.get(STATE_FRAMEWORK_OPTIONS) or {}
+    # Before the fan-out, which is the earliest node that holds the selection and
+    # its options together. ``assemble`` checks the same thing, because a graph
+    # entered past here never runs this node — but by then 23 ``strong``-tier
+    # calls have been paid for, and a lane agent has been told to rule at a level
+    # nobody supplied.
+    _check_options(frameworks, options)
     state.prompt(STATE_SYSTEM_MODEL, render_fenced(_without_source_fields(valid_model)))
     state.prompt(
         STATE_BOUNDARY_CROSSINGS,
@@ -1632,6 +1639,7 @@ def assemble_report(
     model = SystemModel.model_validate(valid_model)
     state = keys.state(ctx)
     options = state.get(STATE_FRAMEWORK_OPTIONS) or {}
+    _check_options(frameworks, options)
     blocks = [
         _framework_block(
             FrameworkNodes(name),
@@ -1655,6 +1663,49 @@ def assemble_report(
         "rejected_count": sum(len(block.rejected_claims) for block in blocks),
         "framework_count": len(blocks),
     }
+
+
+class MissingFrameworkOptions(ValueError):
+    """A driver ran a framework without seeding the options that framework needs.
+
+    **A driver contract, checked where it is first readable.** Options are job
+    data rather than graph shape, so the driver seeds them per run
+    (:data:`STATE_FRAMEWORK_OPTIONS`); a package that declares a required option
+    cannot have its block built without one, because no package field carries a
+    default and inventing one is the thing this whole path refuses to do.
+
+    Named and raised early rather than left to fail inside a block's own
+    construction. Without this, a driver that forgot the key got a raw Pydantic
+    error out of a scope helper, naming a model rather than the framework, the
+    option or the key to seed — and it arrived after every node had been paid
+    for either way.
+    """
+
+
+def _check_options(
+    frameworks: Sequence[FrameworkName], options: Mapping[str, Any]
+) -> None:
+    """Every selected framework's options are present and well-formed, or raise.
+
+    Checked over the whole selection at once so a driver missing two is told
+    about two. The values themselves go through each package's own options model,
+    which is the one declaration of what that framework needs.
+    """
+    problems = []
+    for name in frameworks:
+        try:
+            package_for(name).options.model_validate(options.get(name) or {})
+        except ValidationError as exc:
+            fields = sorted(
+                ".".join(str(part) for part in error["loc"]) for error in exc.errors()
+            )
+            problems.append(f"{name}: {', '.join(fields)}")
+    if problems:
+        raise MissingFrameworkOptions(
+            f"the job's options do not satisfy every selected framework"
+            f" ({'; '.join(problems)}); a driver seeds them under"
+            f" {STATE_FRAMEWORK_OPTIONS!r}, and no package field carries a default"
+        )
 
 
 def _framework_block(
