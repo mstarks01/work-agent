@@ -54,6 +54,27 @@ def flow(source, destination, label, **overrides):
     )
 
 
+def zoned_pair(source_kind, destination_kind):
+    """Two processes in two zones, one flow from the first to the second."""
+    return SystemModel(
+        processes=[
+            Process(
+                id=f"process:{name}",
+                name=name,
+                technology="x",
+                trust_zone=f"boundary:{name}",
+                exposure="internal",
+            )
+            for name in ("theirs", "ours")
+        ],
+        data_flows=[flow("process:theirs", "process:ours", "call")],
+        trust_boundaries=[
+            TrustBoundary(id="boundary:theirs", name="theirs", kind=source_kind),
+            TrustBoundary(id="boundary:ours", name="ours", kind=destination_kind),
+        ],
+    )
+
+
 @pytest.fixture
 def model():
     """A model shaped to fire at least one rule in every lane."""
@@ -233,6 +254,37 @@ class TestFiring:
             "boundary:privileged",
         )
         assert hits[0].facts["destination_zone_kind"] == "privilege"
+        assert hits[0].facts["direction"] == "into"
+
+    def test_leaving_a_privilege_zone_is_not_a_transition(self, model):
+        """The authority is on the inside, so only entering it crosses one."""
+        model.data_flows.append(
+            flow("process:admin", "process:api", "report", authentication="unknown")
+        )
+        hits = fired(model, "elevation-of-privilege-privilege-zone-crossing")
+        assert [hit.facts["direction"] for hit in hits] == ["into"]
+
+    def test_leaving_a_tenant_zone_is_a_transition(self):
+        """A party we do not control reaching a zone we do."""
+        hits = fired(
+            zoned_pair("tenant", "network"),
+            "elevation-of-privilege-privilege-zone-crossing",
+        )
+        assert len(hits) == 1
+        assert hits[0].element_ids == ("flow:theirs-to-ours:call", "boundary:theirs")
+        assert hits[0].facts["direction"] == "out-of"
+        assert hits[0].facts["zone_kind"] == "tenant"
+
+    def test_a_crossing_between_two_tenant_zones_fires_once(self):
+        """Both ends qualify; the destination decides, and the facts carry both."""
+        hits = fired(
+            zoned_pair("tenant", "tenant"),
+            "elevation-of-privilege-privilege-zone-crossing",
+        )
+        assert len(hits) == 1
+        assert hits[0].facts["direction"] == "into"
+        assert hits[0].facts["source_zone_kind"] == "tenant"
+        assert hits[0].facts["destination_zone_kind"] == "tenant"
 
     def test_exposed_process_authority_needs_a_crossing(self, model):
         hits = fired(model, "elevation-of-privilege-inbound-from-exposed-process")
