@@ -228,7 +228,7 @@
       "description": "Hardware owned by the player; outside the operator's control.",
       "source_excerpt": "Players run our game client on their own machines. We do not control those machines.",
       "source_label": "System description",
-      "kind": "other"
+      "kind": "tenant"
     },
     {
       "id": "boundary:corp-network",

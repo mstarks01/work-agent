@@ -64,12 +64,16 @@ would have quietly removed two references' worth of grounding.
 - **Path:** `entity:franchise-identity-provider.trust_zone`
 - **Bootstrap:** `boundary:outside-corporate-network`, shared with colleagues at
   home and with the HR system
-- **Blessed:** a new `boundary:franchise-partner` of kind `other`
+- **Blessed:** a new `boundary:franchise-partner` of kind `tenant`
 - **Source reason:** "We also let the franchise stores in" introduces a distinct
   party admitted on distinct terms, and collapsing it into one outside-zone
   makes the franchise crossing indistinguishable from a colleague signing in
   from home. In a case whose whole subject is trust granted to parties rather
   than to network positions, that is the one distinction the zones have to keep.
+  The kind follows from the same sentence: a franchise runs its own identity
+  provider, so a different party controls the zone, which is what `tenant`
+  means. `other` would say the zone resists all three characterizations, and
+  this one states its own in the source's own words.
 
 ### 5. Two invented asset tags
 

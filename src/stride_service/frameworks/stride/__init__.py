@@ -79,10 +79,7 @@ NOTES: dict[str, tuple[str, ...]] = {
         "information-disclosure-unprotected-sensitive-transit",
     ),
     "write-path-integrity": ("tampering-unverified-write-to-store",),
-    "attribution-and-audit": (
-        "repudiation-shared-authentication",
-        "repudiation-unattributable-action",
-    ),
+    "attribution-and-audit": ("repudiation-unattributable-action",),
     "protection-at-rest": ("information-disclosure-store-at-rest-unverified",),
     "cost-of-an-unauthenticated-request": (
         "denial-of-service-internet-exposed-process",
@@ -118,10 +115,7 @@ CASES: dict[str, tuple[str, ...]] = {
         "elevation-of-privilege-inbound-from-exposed-process",
         "denial-of-service-shared-dependency",
     ),
-    "shared-credential-attribution": (
-        "repudiation-shared-authentication",
-        "repudiation-unattributable-action",
-    ),
+    "shared-credential-attribution": ("repudiation-unattributable-action",),
 }
 
 

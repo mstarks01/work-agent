@@ -200,36 +200,6 @@ class TestFiring:
         hits = fired(model, "tampering-unverified-write-to-store")
         assert hits[0].facts["data_classification"] == "confidential"
 
-    def test_shared_authentication_needs_two_distinct_sources(self, model):
-        hits = fired(model, "repudiation-shared-authentication")
-        assert len(hits) == 1
-        assert hits[0].facts["distinct_sources"] == 2
-        assert set(hits[0].element_ids) == {
-            "flow:api-to-ledger:write",
-            "flow:admin-to-ledger:audit",
-        }
-
-    def test_shared_authentication_ignores_shared_silence(self):
-        """Six flows reading ``unknown`` share nothing but silence."""
-        model = SystemModel(
-            processes=[
-                Process(
-                    id=f"process:{name}",
-                    name=name,
-                    technology="x",
-                    trust_zone="boundary:z",
-                    exposure="internal",
-                )
-                for name in ("a", "b", "c")
-            ],
-            data_flows=[
-                flow("process:a", "process:c", "one", authentication="unknown"),
-                flow("process:b", "process:c", "two", authentication="unknown"),
-            ],
-            trust_boundaries=[TrustBoundary(id="boundary:z", name="Z", kind="network")],
-        )
-        assert fired(model, "repudiation-shared-authentication") == []
-
     def test_unattributable_action_needs_a_graded_asset(self, model):
         hits = fired(model, "repudiation-unattributable-action")
         assert [hit.element_ids for hit in hits] == []

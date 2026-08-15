@@ -24,7 +24,7 @@ and a query built from it is a lever on which repo-authored text enters the
 agent's context (OWASP LLM01).
 
 The repository already had the selector this needed and had not noticed.
-`candidates.py` fires twelve structural rules against the validated System
+`candidates.py` fires a table of structural rules against the validated System
 Model, and a rule firing is a precise statement about what a lane is looking at
 — far more precise than a bag of words from the submission, and computed
 entirely from validated state.
