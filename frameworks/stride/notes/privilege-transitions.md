@@ -2,7 +2,7 @@
 
 ## When this applies
 
-A flow crosses into a zone whose boundary is a privilege or tenant separation rather than a network one, and what enforces the transition is unstated.
+A flow crosses a boundary that separates privilege levels or parties rather than network locations, and what enforces the transition is unstated. A privilege boundary counts on the way in; a tenant boundary counts both ways, because leaving one is a party we do not control reaching a zone we do.
 
 ## What to look for
 

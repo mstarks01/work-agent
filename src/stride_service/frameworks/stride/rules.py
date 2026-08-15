@@ -56,7 +56,12 @@ from stride_service.analysis import (
 from stride_service.candidates import Match, Rule, clip_fact
 from stride_service.system_model import SystemModel
 
-__all__ = ["PRIVILEGE_ZONE_KINDS", "RULES", "SHARED_DEPENDENCY_MIN"]
+__all__ = [
+    "ENTERED_ZONE_KINDS",
+    "LEFT_ZONE_KINDS",
+    "RULES",
+    "SHARED_DEPENDENCY_MIN",
+]
 
 # A shared dependency is an element two or more distinct elements flow into.
 # Two rather than three: on the small models this service sees, the second
@@ -64,11 +69,20 @@ __all__ = ["PRIVILEGE_ZONE_KINDS", "RULES", "SHARED_DEPENDENCY_MIN"]
 # chokepoint, and the agent decides whether it matters.
 SHARED_DEPENDENCY_MIN = 2
 
-# The zone kinds whose crossing is a privilege transition rather than a network
-# hop. ``network`` and ``other`` are excluded: every boundary crossing is
-# already surfaced to every agent, and a rule that fires on all of them adds no
-# attention anywhere.
-PRIVILEGE_ZONE_KINDS = frozenset({"privilege", "tenant"})
+# The zone kinds a crossing *enters* to be a privilege transition rather than a
+# network hop. ``network`` and ``other`` are excluded: every boundary crossing
+# is already surfaced to every agent, and a rule that fires on all of them adds
+# no attention anywhere.
+ENTERED_ZONE_KINDS = frozenset({"privilege", "tenant"})
+
+# The zone kind a crossing *leaves* to be one as well, and the asymmetry is the
+# point. Entering a ``privilege`` zone is the transition and leaving it is not:
+# the authority is on the inside. A ``tenant`` zone separates parties rather
+# than authority levels, so both directions cross something — inward hands
+# authority to a party we do not control, and outward is a party we do not
+# control reaching a zone we do. That second direction is the multi-tenancy
+# escape, and reading only the destination makes it invisible.
+LEFT_ZONE_KINDS = frozenset({"tenant"})
 
 _clip = clip_fact
 
@@ -252,6 +266,13 @@ def _shared_dependency(model: SystemModel) -> Iterator[Match]:
 
 
 def _privilege_zone_crossing(model: SystemModel) -> Iterator[Match]:
+    """Crossings that change authority, and which way the flow runs.
+
+    One candidate per crossing at most. A flow leaving one tenant zone for
+    another qualifies twice over, and the destination is the end that decides
+    it — the facts carry both zones' kinds either way, so the agent loses
+    nothing that a second candidate would have told it.
+    """
     kinds = zone_kinds(model)
     # A crossing's flow ID names a Data Flow in the model it was derived from,
     # so this lookup resolves. Indexed by type rather than reached for with a
@@ -261,19 +282,28 @@ def _privilege_zone_crossing(model: SystemModel) -> Iterator[Match]:
     # do. A flow that somehow does not resolve yields no candidate instead.
     flows = {flow.id: flow for flow in model.data_flows}
     for crossing in model.boundary_crossings():
-        kind = kinds.get(crossing.destination_zone, "")
-        if kind not in PRIVILEGE_ZONE_KINDS:
+        source_kind = kinds.get(crossing.source_zone, "")
+        destination_kind = kinds.get(crossing.destination_zone, "")
+        if destination_kind in ENTERED_ZONE_KINDS:
+            zone, direction = crossing.destination_zone, "into"
+        elif source_kind in LEFT_ZONE_KINDS:
+            zone, direction = crossing.source_zone, "out-of"
+        else:
             continue
         flow = flows.get(crossing.flow_id)
         if flow is None:
             continue
         authentication = flow.authentication
         yield (
-            (crossing.flow_id, crossing.destination_zone),
+            (crossing.flow_id, zone),
             {
+                "direction": direction,
+                "zone": zone,
+                "zone_kind": kinds[zone],
                 "source_zone": crossing.source_zone,
+                "source_zone_kind": source_kind,
                 "destination_zone": crossing.destination_zone,
-                "destination_zone_kind": kind,
+                "destination_zone_kind": destination_kind,
                 "authentication": _clip(authentication),
                 "authentication_state": control_state(authentication),
             },
@@ -395,9 +425,11 @@ RULES: tuple[Rule, ...] = (
         rule_id="elevation-of-privilege-privilege-zone-crossing",
         lane="elevation-of-privilege",
         question=(
-            "This flow crosses into a privilege or tenant boundary. What"
-            " enforces the transition, and what would the caller command if"
-            " nothing did?"
+            "This flow crosses a privilege or tenant boundary; `direction`"
+            " says whether it runs into the named zone or out of it. Going"
+            " in, what enforces the transition and what would the caller"
+            " command if nothing did? Coming out of a tenant zone, what does"
+            " a party we do not control reach on our side?"
         ),
         find=_privilege_zone_crossing,
     ),
