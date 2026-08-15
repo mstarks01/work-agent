@@ -100,6 +100,14 @@ python -m evals.harness.run calibrate \
   --out judge-comparison.json
 ```
 
+A `run --out artifact.json` also writes `artifact.reports/<case>.report.json` —
+one whole report for each case that finished. The artifact holds the aggregates
+this harness computes; the report holds what the agents said, so a question the
+metric set did not anticipate is answered offline instead of costing a second
+sweep. `extraction` mode stops at the validity gate, produces no report, and
+says so. Expect roughly 30–80 KB per report. These files are publishable: they
+carry corpus source text, which is in this repository.
+
 `--judge-config` is offered on `calibrate` only. A scored `run` is always
 measured by the judge in `evals/config/judge.toml`: pointing a sweep at some
 other judge produces numbers that look like the tracked series and are not

@@ -33,6 +33,7 @@ from __future__ import annotations
 from collections.abc import Iterator
 from dataclasses import dataclass
 
+from stride_service.analysis import control_state
 from stride_service.candidates import Match, Rule, clip_fact
 from stride_service.frameworks import PreconditionResult
 from stride_service.system_model import SystemModel
@@ -371,11 +372,23 @@ WEB_PROTOCOL_TERMS: tuple[str, ...] = (
     "wss://",
 )
 
-#: The leading token a **Valid System Model** carries where an attribute states
-#: nothing. Read from the protocol here for the reason
-#: :func:`~stride_service.analysis.control_state` reads it from a control: a
-#: flow that never said is a different fact from a flow that said MQTT.
-_UNKNOWN_TOKEN = "unknown"
+
+def _states_a_protocol(protocol: str) -> bool:
+    """Whether this flow's ``protocol`` says anything at all about what it speaks.
+
+    **Read through the service's own leading-token rule**, not a bare prefix
+    test. :func:`~stride_service.analysis.control_state` is what every other
+    reader of an attribute in this repo uses: it matches ``unknown`` or ``none``
+    as a *word*, so ``"unknownish binary framing"`` is a stated protocol and
+    ``"unknown; the team never said"`` is not. A prefix test read the first as
+    silence.
+
+    The empty string is silence too, and it has to be said separately because
+    ``control_state`` calls it ``stated`` — correctly, since for a *control* an
+    empty value is not evidence of anything. A protocol nobody filled in is the
+    same fact as one nobody knew, and both are what ``undecidable`` is for.
+    """
+    return bool(protocol.strip()) and control_state(protocol) == "stated"
 
 
 def asvs_precondition(model: SystemModel) -> PreconditionResult:
@@ -397,12 +410,18 @@ def asvs_precondition(model: SystemModel) -> PreconditionResult:
 
     A model with no flows at all is ``undecidable`` on the same terms: nothing
     said, rather than nothing there.
+
+    **One flow that never said is enough to hold the answer open**, and that is
+    the whole point of carrying three states rather than two. Reading silence as
+    a non-web protocol would tell an operator "do not name ASVS for this system"
+    when the truth is "your input did not say" — and those two have different
+    remedies, which is the distinction this repo refuses to collapse anywhere
+    else.
     """
-    stated = 0
+    silent = False
     for flow in model.data_flows:
         protocol = flow.protocol.lower()
         if any(term in protocol for term in WEB_PROTOCOL_TERMS):
             return "satisfied"
-        if not protocol.lstrip().startswith(_UNKNOWN_TOKEN):
-            stated += 1
-    return "refuted" if stated == len(model.data_flows) and stated else "undecidable"
+        silent = silent or not _states_a_protocol(flow.protocol)
+    return "undecidable" if silent or not model.data_flows else "refuted"

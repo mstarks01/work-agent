@@ -343,6 +343,7 @@ jobs:
           name: eval-run-${{ github.run_id }}
           path: |
             eval-artifact.json
+            eval-artifact.reports/
             judge-agreement.json
           if-no-files-found: warn
           retention-days: 30

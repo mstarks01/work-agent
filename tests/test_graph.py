@@ -1811,6 +1811,60 @@ def test_assemble_runs_once_per_framework_and_the_last_run_is_the_whole_report(
     assert [claim.id for claim in final.analyses[1].claims] == ["S-01"]
 
 
+def test_prepare_refuses_a_selection_whose_options_are_missing(domain_loader):
+    """Refused before the lane agents run, not after.
+
+    ``prepare`` is the earliest node holding the selection and its options
+    together. Letting the run continue would tell 17 ASVS lane agents to rule at
+    a level nobody supplied and then fail at assembly, with every call paid for.
+    """
+    with pytest.raises(graph.MissingFrameworkOptions) as caught:
+        graph.prepare_analysis(
+            valid_model().model_dump(mode="json"),
+            FakeContext(),
+            BOTH_KEYS,
+            BOTH,
+            domain_loader,
+            repo_package_loaders(BOTH),
+        )
+
+    assert "asvs: level" in str(caught.value)
+
+
+def test_a_driver_that_seeds_no_options_is_told_which_framework_needs_what():
+    """A driver contract, and it must not surface as a Pydantic error.
+
+    Options are job data, so a driver seeds them per run. A framework whose
+    package declares a required option cannot have its block built without one,
+    because no package field carries a default. Without this check the failure
+    arrived from inside a scope helper naming a model rather than the framework,
+    the option or the key to seed.
+    """
+    with pytest.raises(graph.MissingFrameworkOptions) as caught:
+        graph.assemble_report(
+            valid_model().model_dump(mode="json"),
+            FakeContext(),
+            BOTH_KEYS,
+            BOTH,
+            BOTH_DISCLAIMERS,
+        )
+
+    message = str(caught.value)
+    assert "asvs: level" in message
+    assert graph.STATE_FRAMEWORK_OPTIONS in message
+
+
+def test_a_framework_needing_no_options_needs_nothing_seeded():
+    """The STRIDE-only path is unchanged: an empty options model validates."""
+    ctx = FakeContext()
+
+    graph.assemble_report(
+        valid_model().model_dump(mode="json"), ctx, KEYS, FRAMEWORKS, DISCLAIMERS
+    )
+
+    assert graph.STATE_ANALYSIS in ctx.state
+
+
 def test_a_lane_agent_is_told_which_level_its_job_asked_for(domain_loader):
     """A framework whose options select what applies has to tell its agents.
 
