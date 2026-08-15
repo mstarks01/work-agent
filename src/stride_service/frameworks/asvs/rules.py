@@ -302,7 +302,26 @@ PRESENCE_TESTS: tuple[PresenceTest, ...] = (
             "This system carries a self-contained token. Which algorithms and"
             " claims does the verifier accept?"
         ),
-        terms=("jwt", "json web token", "jws", "jwe", "bearer token", "id token"),
+        # The last four name self-containment rather than a format, because a
+        # submitter states the property long before they state the standard: a
+        # SAML assertion is self-contained by construction, and "signed token"
+        # says the verifier trusts the bytes. The bare word ``token`` is
+        # deliberately absent — an opaque session or build token is looked up
+        # server-side and is what this lane is not about. ``claims`` is absent
+        # for the same reason from the other direction: in this corpus it
+        # matches insurance claim data.
+        terms=(
+            "jwt",
+            "json web token",
+            "jws",
+            "jwe",
+            "bearer token",
+            "id token",
+            "assertion",
+            "signed token",
+            "stateless token",
+            "self-contained",
+        ),
     ),
     PresenceTest(
         predicate="oauth",
@@ -311,6 +330,13 @@ PRESENCE_TESTS: tuple[PresenceTest, ...] = (
             "This system uses OAuth or OIDC. Which grant, which redirect URIs"
             " and which client authentication?"
         ),
+        # The federation terms carry the weight here. A submitter writes "company
+        # SSO" and "identity provider"; the protocol acronyms and product names
+        # appear only when someone already knows which standard they run. "SSO"
+        # can mean SAML, which is not this chapter — accepted, because a
+        # candidate is a lead the lane agent judges, ASVS declares no federation
+        # lane closer to it, and the alternative is that a system whose whole
+        # subject is federated sign-in gets no lead at all.
         terms=(
             "oauth",
             "oidc",
@@ -319,6 +345,13 @@ PRESENCE_TESTS: tuple[PresenceTest, ...] = (
             "keycloak",
             "auth0",
             "okta",
+            "sso",
+            "single sign-on",
+            "single sign on",
+            "identity provider",
+            "identity broker",
+            "federated",
+            "federation",
         ),
     ),
     PresenceTest(
