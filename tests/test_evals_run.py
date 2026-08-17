@@ -13,7 +13,8 @@ import json
 
 import pytest
 
-from evals.harness.run import _models_record, _print_certification
+from evals.harness.modes import AttributeCheck, ExtractionScore
+from evals.harness.run import _models_record, _print_certification, _print_extraction
 from stride_service.certification import CertifyResult, UncertifiedNode
 from stride_service.deployment import Deployment
 from tests.factories import TEST_CREDENTIAL_ENV, TEST_TIER_ENV
@@ -67,6 +68,53 @@ def test_an_incomplete_and_uncertified_run_reports_both(capsys):
     out = capsys.readouterr().out
     assert "INCOMPLETE" in out
     assert "UNCERTIFIED" in out
+
+
+class TestWhatAnExtractionSweepPrints:
+    """The attribute numbers are printed, and printed as an instrument.
+
+    An extraction sweep used to print nothing about what it extracted, so the
+    only reader of its numbers was whoever opened the JSON. These pin the two
+    properties that make the measurement useful at the terminal: the split by
+    attribute is there, and nothing on the line reads as a gate
+    ([#195](https://github.com/mstarks01/work-agent/issues/195)).
+    """
+
+    def score(self, *, agreeing: bool) -> ExtractionScore:
+        blessed = "network" if agreeing else "tenant"
+        return ExtractionScore(
+            case_id="01-payments-checkout",
+            matched=("boundary:core-services",),
+            missing=(),
+            extra=(),
+            crossings_match=True,
+            attributes=(
+                AttributeCheck(
+                    element_id="boundary:core-services",
+                    attribute="kind",
+                    blessed=blessed,
+                    extracted="network",
+                ),
+            ),
+        )
+
+    def test_a_disagreeing_attribute_is_named_without_a_verdict(self, capsys):
+        _print_extraction([self.score(agreeing=False)])
+
+        out = capsys.readouterr().out
+        assert "attributes 0/1" in out
+        assert "kind" in out
+        assert "instrument, non-gating" in out
+        assert "FAIL" not in out
+
+    def test_the_element_numbers_are_printed_beside_the_attribute_ones(self, capsys):
+        _print_extraction([self.score(agreeing=True)])
+
+        out = capsys.readouterr().out
+        assert "recall 1.00" in out
+        assert "precision 1.00" in out
+        assert "crossings match" in out
+        assert "1/1 agree (100%)" in out
 
 
 class TestTheArtifactCanActuallyBeWritten:

@@ -265,6 +265,11 @@ class ModeRun:
     case's row is not a readable number — see
     :mod:`evals.harness.coverage` — so what rides here is the input to the
     aggregate rather than the aggregate itself.
+
+    ``extractions`` is what the extraction mode produced and every other mode
+    leaves empty. It is kept beside its own payloads because the sweep prints
+    an aggregate over it, and folding a printed number out of JSON already
+    written is how the printed line and the artifact come to disagree.
     """
 
     payloads: list[dict[str, Any]]
@@ -277,6 +282,7 @@ class ModeRun:
     grounds: list[CaseGrounds]
     grounds_failures: list[GroundsFailure]
     coverage: list[ReportLaneCoverage]
+    extractions: list[modes.ExtractionScore]
 
     @property
     def observations(self) -> dict[str, frozenset[str]]:
@@ -317,12 +323,14 @@ async def _run_mode(
     grounds: list[CaseGrounds] = []
     grounds_failures: list[GroundsFailure] = []
     coverage: list[ReportLaneCoverage] = []
+    extractions: list[modes.ExtractionScore] = []
 
     for case in cases:
         if mode == "extraction":
             result = await modes.run_extraction(case, pipeline)
             executions += result.node_runs
             score = modes.score_extraction(case, result)
+            extractions.append(score)
             payloads.append(score.to_json())
             failures += [
                 f"{case.id}: extraction is not a valid system model:"
@@ -381,6 +389,7 @@ async def _run_mode(
         grounds=grounds,
         grounds_failures=grounds_failures,
         coverage=coverage,
+        extractions=extractions,
     )
 
 
@@ -497,6 +506,41 @@ def _print_yields(yields: Sequence[CriticYield]) -> None:
         )
 
 
+def _print_extraction(scores: Sequence[modes.ExtractionScore]) -> None:
+    """What an extraction sweep found, per case and then per attribute.
+
+    The per-attribute split is the line this instrument exists for. An element
+    recall of 1.00 says the extraction named the right things; it says nothing
+    about whether it typed them, and a rule reads the type. So a sweep whose
+    ``boundary.kind`` row reads 40% has found a real regression behind two
+    perfect element numbers.
+
+    Every number here is **non-gating**. A low agreement is a question to take
+    to the source text, not a defect on its own
+    ([#179](https://github.com/mstarks01/work-agent/issues/179)).
+    """
+    for score in scores:
+        agreed = len(score.attributes) - len(score.differing)
+        print(
+            f"{score.case_id:<26} extraction recall {score.recall:.2f}"
+            f"  precision {score.precision:.2f}"
+            f"  crossings {'match' if score.crossings_match else 'DIFFER'}"
+            f"  attributes {agreed}/{len(score.attributes)}"
+        )
+    if not scores:
+        return
+    totals = modes.aggregate_attributes(scores)
+    print(
+        f"attributes: {totals['agreed']}/{totals['compared']} agree"
+        f" ({totals['agreement']:.0%}) (instrument, non-gating)"
+    )
+    for name, split in totals["by_attribute"].items():
+        print(
+            f"  {name:28} {split['agreed']:5,}/{split['compared']:<7,}"
+            f" {split['agreement']:.0%}"
+        )
+
+
 def _print_grounds(
     measurements: Sequence[CaseGrounds], failures: Sequence[GroundsFailure]
 ) -> None:
@@ -562,8 +606,9 @@ def command_run(args: argparse.Namespace) -> int:
     # vacuously true of a sweep that observed no fingerprint at all.
     trusted = certification.certified and certification.complete
 
-    # Before the judge, and unconditional: the grounds and coverage
+    # Before the judge, and unconditional: the extraction, grounds and coverage
     # measurements cost no provider call, so ``--no-scoring`` still emits them.
+    _print_extraction(mode_run.extractions)
     _print_grounds(mode_run.grounds, mode_run.grounds_failures)
     lanes = aggregate_coverage(mode_run.coverage)
     _print_coverage(lanes, offered=bool(mode_run.coverage))
@@ -599,6 +644,16 @@ def command_run(args: argparse.Namespace) -> int:
         },
         "structural_failures": failures,
         "mode_output": mode_run.payloads,
+        # The per-case attribute numbers ride in ``mode_output`` beside the
+        # element ones; this is the sweep-wide fold, which is where a value the
+        # pipeline stopped producing shows up as a column rather than as one
+        # line per case (#195). ``None`` outside the extraction mode, so an
+        # unmeasured attribute set never reads as a fully agreeing one.
+        "attribute_aggregate": (
+            modes.aggregate_attributes(mode_run.extractions)
+            if mode_run.extractions
+            else None
+        ),
         # Aggregates carry the verdict so nothing downstream folds an
         # uncertified run into a trusted number unaware.
         "scores": [score.to_json() for score in scores],

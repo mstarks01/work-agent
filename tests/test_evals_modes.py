@@ -340,6 +340,162 @@ def test_extraction_scoring_reports_missing_and_extra_elements(case):
     assert score.precision == 1.0  # nothing invented, only dropped
 
 
+def score_of(case, model) -> modes.ExtractionScore:
+    """Score a hand-mutated model against the blessed one, without a graph run."""
+    return modes.score_extraction(case, modes.ExtractionResult(case.id, model, ()))
+
+
+def edited(model, collection: str, index: int, **update):
+    """A copy of one element in one of the model's collections, changed."""
+    elements = list(getattr(model, collection))
+    elements[index] = elements[index].model_copy(update=update)
+    return model.model_copy(update={collection: elements})
+
+
+def test_a_faithful_extraction_agrees_on_every_scored_attribute(case):
+    pipeline = build(case, ENTRY_EXTRACT_ONLY, {})
+    result = asyncio.run(modes.run_extraction(case, pipeline))
+
+    score = modes.score_extraction(case, result)
+
+    assert score.attributes  # the case carries scored attributes at all
+    assert score.differing == ()
+    assert score.attribute_agreement == 1.0
+
+
+def test_a_mistyped_trust_boundary_moves_no_element_number(case):
+    """The failure #195 exists for: every element right, one value wrong.
+
+    A ``kind`` an ``elevation-of-privilege`` rule reads can stop arriving
+    without recall, precision or the crossings moving at all — the ID derives
+    from the name, and the crossings derive from ``trust_zone``.
+    """
+    mistyped = edited(case.model, "trust_boundaries", 2, kind="tenant")
+
+    score = score_of(case, mistyped)
+
+    assert score.recall == 1.0
+    assert score.precision == 1.0
+    assert score.crossings_match is True
+    assert [
+        (check.element_id, check.blessed, check.extracted) for check in score.differing
+    ] == [("boundary:core-services", "network", "tenant")]
+    assert score.attribute_agreement < 1.0
+
+
+def test_an_invented_control_is_caught_where_the_blessed_model_says_unknown(case):
+    """`evals/BLESSING.md`'s most repeated extraction failure, as a number."""
+    invented = edited(
+        case.model,
+        "data_flows",
+        1,
+        authentication="OAuth 2.0 client credentials, rotated quarterly",
+    )
+
+    score = score_of(case, invented)
+
+    assert [check.to_json() for check in score.differing] == [
+        {
+            "element": "flow:card-processor-to-storefront-api:settlement-webhook",
+            "attribute": "authentication",
+            "blessed": "unverified",
+            "extracted": "stated",
+        }
+    ]
+
+
+def test_rewording_a_stated_control_is_not_a_disagreement(case):
+    """The state is scored, never the wording — which is what keeps the judge out."""
+    reworded = edited(
+        case.model,
+        "data_stores",
+        1,
+        encryption_at_rest="a KMS key the customer manages",
+    )
+
+    assert score_of(case, reworded).differing == ()
+
+
+def test_a_dropped_asset_tag_is_a_disagreement(case):
+    stripped = edited(case.model, "data_stores", 0, assets=["pii"])
+
+    score = score_of(case, stripped)
+
+    assert [
+        (check.attribute, check.blessed, check.extracted) for check in score.differing
+    ] == [("assets", "financial, pii", "pii")]
+
+
+def test_a_missing_element_is_not_charged_twice(case):
+    """A dropped element is a miss, and its attributes are not read again."""
+    dropped = case.model.model_copy(update={"data_stores": case.model.data_stores[:1]})
+
+    score = score_of(case, dropped)
+
+    assert score.missing == ("store:receipt-archive",)
+    assert not [
+        check
+        for check in score.attributes
+        if check.element_id == "store:receipt-archive"
+    ]
+
+
+def test_the_case_payload_carries_the_disagreements_and_the_count(case):
+    payload = score_of(
+        case, edited(case.model, "processes", 0, exposure="internal")
+    ).to_json()
+
+    assert payload["attributes_compared"] > 1
+    assert payload["attribute_agreement"] < 1.0
+    assert payload["attributes_differing"] == [
+        {
+            "element": "process:storefront-api",
+            "attribute": "exposure",
+            "blessed": "internet-facing",
+            "extracted": "internal",
+        }
+    ]
+
+
+def test_the_sweep_aggregate_splits_by_element_type_and_attribute(case):
+    """``kind`` names two vocabularies, so the split has to name the type too."""
+    clean = score_of(case, case.model)
+    mistyped = score_of(case, edited(case.model, "trust_boundaries", 0, kind="other"))
+
+    totals = modes.aggregate_attributes([clean, mistyped])
+
+    assert totals["compared"] == 2 * len(clean.attributes)
+    assert totals["agreed"] == totals["compared"] - 1
+    # The mistyped boundary lands here and nowhere near the entity kinds.
+    assert totals["by_attribute"]["boundary.kind"]["agreed"] == 5
+    assert totals["by_attribute"]["boundary.kind"]["compared"] == 6
+    assert totals["by_attribute"]["entity.kind"]["agreement"] == 1.0
+    # Attribute declaration order, so two sweeps' printed splits line up row by
+    # row, with the types sharing one attribute name grouped together.
+    assert list(totals["by_attribute"]) == [
+        "boundary.kind",
+        "entity.kind",
+        "process.exposure",
+        "boundary.assets",
+        "entity.assets",
+        "flow.assets",
+        "process.assets",
+        "store.assets",
+        "flow.authentication",
+        "flow.encryption_in_transit",
+        "store.encryption_at_rest",
+        "store.data_classification",
+    ]
+
+
+def test_an_extraction_that_produced_nothing_compares_no_attributes(case):
+    score = score_of(case, None)
+
+    assert score.attributes == ()
+    assert score.attribute_agreement == 0.0
+    assert score.crossings_match is False
+
+
 def test_end_to_end_mode_runs_the_production_entry(case):
     models: dict[str, ScriptedLlm] = {}
     pipeline = build(case, ENTRY_EXTRACT, models)

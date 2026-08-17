@@ -26,12 +26,14 @@ take plain data.
 
 from __future__ import annotations
 
-from collections.abc import Mapping, Sequence
+from collections import Counter
+from collections.abc import Callable, Mapping, Sequence
 from dataclasses import dataclass, replace
 from datetime import UTC, datetime
 from typing import Any
 
 from evals.harness.reference import GoldenCase
+from stride_service.analysis import control_state
 from stride_service.deployment import Deployment
 from stride_service.execution import GraphExecutor, GraphRun
 from stride_service.frameworks.stride.record import DraftThreat
@@ -105,15 +107,100 @@ class AnalysisRun:
     merged_drafts: tuple[DraftThreat, ...]
 
 
+def _tags(value: list[str]) -> str:
+    """One element's asset tags as a comparable string, order removed."""
+    return ", ".join(sorted(value))
+
+
+#: The attributes an extraction is measured on, each with the function that
+#: reduces it to a comparable value. Declaration order, because the per-sweep
+#: aggregate prints in it.
+#:
+#: **Two kinds of attribute, and nothing else.** A closed vocabulary — ``kind``,
+#: ``exposure``, the asset tags — is set arithmetic against the blessed model,
+#: exact and judge-free. A free-text control is not, but
+#: :func:`~stride_service.analysis.control_state` reduces it to ``unverified`` /
+#: ``absent`` / ``stated`` by its leading token, and *that* is comparable. So
+#: this measures the state rather than the wording, which keeps the judge out
+#: and still catches the corpus's most repeated extraction failure: a control
+#: invented where the blessed model says ``unknown``.
+#:
+#: What is deliberately absent is every other free-text attribute —
+#: ``technology``, ``protocol``, ``data_description``. Two correct readings of
+#: one sentence word them differently, so an exact test on them reports
+#: disagreement that is not there. ``trust_zone`` is absent for the opposite
+#: reason: :attr:`ExtractionScore.crossings_match` already reads it, derived
+#: rather than compared string by string.
+_SCORED_ATTRIBUTES: Mapping[str, Callable[[Any], str]] = {
+    "kind": str,
+    "exposure": str,
+    "assets": _tags,
+    "authentication": control_state,
+    "encryption_in_transit": control_state,
+    "encryption_at_rest": control_state,
+    "data_classification": control_state,
+}
+
+
+@dataclass(frozen=True)
+class AttributeCheck:
+    """One attribute of one element, as each model states it.
+
+    ``blessed`` and ``extracted`` hold the *reduced* values that
+    :data:`_SCORED_ATTRIBUTES` compared, never the raw text: a report saying
+    ``unverified -> stated`` names the failure, where the two sentences behind
+    it would only name the wording.
+    """
+
+    element_id: str
+    attribute: str
+    blessed: str
+    extracted: str
+
+    @property
+    def agrees(self) -> bool:
+        return self.blessed == self.extracted
+
+    @property
+    def key(self) -> str:
+        """What this check is about, as ``<element type>.<attribute>``.
+
+        The type is carried because ``kind`` names two different closed
+        vocabularies — an entity's ``human``/``external-system`` and a
+        boundary's four — and a sweep-wide split that pooled them would report
+        a drift without saying which one drifted. The type is read off the ID's
+        prefix, which is where an element ID always carries it.
+        """
+        return f"{self.element_id.split(':', 1)[0]}.{self.attribute}"
+
+    def to_json(self) -> dict[str, str]:
+        return {
+            "element": self.element_id,
+            "attribute": self.attribute,
+            "blessed": self.blessed,
+            "extracted": self.extracted,
+        }
+
+
 @dataclass(frozen=True)
 class ExtractionScore:
-    """Element-level agreement between an extraction and the blessed model.
+    """Agreement between an extraction and the blessed model.
 
     Purely mechanical — element IDs are typed slugs, so set arithmetic answers
     this without a judge. Element *naming* drift shows up as a miss plus a
     spurious element, which is the honest reading: a threat filed against
     ``process:auth-svc`` does not resolve for a reader holding
     ``process:auth-service``.
+
+    ``attributes`` carries the second half, on the elements both models hold:
+    the values a Candidate rule reads. Without it an extraction that types
+    every Trust Boundary ``network`` scores exactly like one that picks
+    ``privilege`` and ``tenant`` correctly, and a value the live pipeline
+    stopped producing leaves every number here flat
+    ([#195](https://github.com/mstarks01/work-agent/issues/195)). It is
+    **reported, never gated**: it carries no threshold, because a low number is
+    not a defect on its own, and adding a scored metric would move every
+    baseline this repo tracks.
     """
 
     case_id: str
@@ -121,6 +208,7 @@ class ExtractionScore:
     missing: tuple[str, ...]
     extra: tuple[str, ...]
     crossings_match: bool
+    attributes: tuple[AttributeCheck, ...]
 
     @property
     def recall(self) -> float:
@@ -132,6 +220,16 @@ class ExtractionScore:
         total = len(self.matched) + len(self.extra)
         return len(self.matched) / total if total else 0.0
 
+    @property
+    def differing(self) -> tuple[AttributeCheck, ...]:
+        """The checks the two models answered differently, in model order."""
+        return tuple(check for check in self.attributes if not check.agrees)
+
+    @property
+    def attribute_agreement(self) -> float:
+        agreed = len(self.attributes) - len(self.differing)
+        return agreed / len(self.attributes) if self.attributes else 0.0
+
     def to_json(self) -> dict[str, Any]:
         return {
             "case": self.case_id,
@@ -140,7 +238,41 @@ class ExtractionScore:
             "crossings_match": self.crossings_match,
             "missing": list(self.missing),
             "extra": list(self.extra),
+            "attribute_agreement": round(self.attribute_agreement, 3),
+            "attributes_compared": len(self.attributes),
+            # The disagreements alone. An agreeing check is a number, and the
+            # count above carries it; writing all of them out would bury the
+            # few lines a reader opens this file for.
+            "attributes_differing": [check.to_json() for check in self.differing],
         }
+
+
+def aggregate_attributes(scores: Sequence[ExtractionScore]) -> dict[str, Any]:
+    """The whole sweep's attribute agreement, and the same split per attribute.
+
+    Both, because they answer different questions. The total says whether
+    anything drifted; the split says *which value stopped arriving*, which is
+    the question [#184](https://github.com/mstarks01/work-agent/issues/184)
+    needed a hand-run count of candidates by lane to answer.
+    """
+    checks = [check for score in scores for check in score.attributes]
+    compared = Counter(check.key for check in checks)
+    agreed = Counter(check.key for check in checks if check.agrees)
+    order = list(_SCORED_ATTRIBUTES)
+    keys = sorted(compared, key=lambda key: (order.index(key.split(".", 1)[1]), key))
+    return {
+        "compared": len(checks),
+        "agreed": sum(agreed.values()),
+        "agreement": round(sum(agreed.values()) / len(checks), 3) if checks else 0.0,
+        "by_attribute": {
+            key: {
+                "compared": compared[key],
+                "agreed": agreed[key],
+                "agreement": round(agreed[key] / compared[key], 3),
+            }
+            for key in keys
+        },
+    }
 
 
 #: The frameworks a sweep's graph is built for, named here rather than defaulted
@@ -237,7 +369,43 @@ def score_extraction(case: GoldenCase, result: ExtractionResult) -> ExtractionSc
         missing=tuple(sorted(blessed_ids - extracted_ids)),
         extra=tuple(sorted(extracted_ids - blessed_ids)),
         crossings_match=crossings_match,
+        attributes=_check_attributes(case.model, result.extracted),
     )
+
+
+def _check_attributes(
+    blessed: SystemModel, extracted: SystemModel | None
+) -> tuple[AttributeCheck, ...]:
+    """Compare every scored attribute of the elements both models carry.
+
+    Matched elements only. An attribute of a missing element is already
+    counted, as the miss, and reading it a second time here would charge one
+    dropped element twice.
+
+    A matched ID implies a matched type — an element ID leads with its type
+    prefix — so the attributes one side declares are the attributes the other
+    declares, and the walk needs no per-type branch.
+    """
+    if extracted is None:
+        return ()
+    counterparts = {element.id: element for element in extracted.elements()}
+    checks = []
+    for element in blessed.elements():
+        counterpart = counterparts.get(element.id)
+        if counterpart is None:
+            continue
+        for attribute, reduce_value in _SCORED_ATTRIBUTES.items():
+            if attribute not in type(element).model_fields:
+                continue
+            checks.append(
+                AttributeCheck(
+                    element_id=element.id,
+                    attribute=attribute,
+                    blessed=reduce_value(getattr(element, attribute)),
+                    extracted=reduce_value(getattr(counterpart, attribute)),
+                )
+            )
+    return tuple(checks)
 
 
 def _crossings_match(blessed: SystemModel, extracted: SystemModel | None) -> bool:
