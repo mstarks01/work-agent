@@ -48,7 +48,7 @@ evals/
 | `harness/calibration.py` | Judge-vs-human agreement over the labelled fixtures. |
 | `harness/provenance.py` | What each node execution actually ran on — tier, requested route, served build, fingerprint — written into the artifact and read back by a promotion. |
 | `harness/certify.py` | Promoting a winning configuration: rewrites `config/sampling.toml` and records its fingerprints as blessed. The certification check itself lives in the service (`stride_service.certification`), which this imports. |
-| `harness/modes.py` | The three run modes over the shipped graph. |
+| `harness/modes.py` | The three run modes over the shipped graph, and the extraction score: element agreement, the derived crossings, and the attributes a Candidate rule reads. Judge-free. |
 | `harness/run.py` | The command-line entry point. |
 
 Sampling parameters are **not** here: the harness reads `config/sampling.toml`
@@ -107,6 +107,14 @@ metric set did not anticipate is answered offline instead of costing a second
 sweep. `extraction` mode stops at the validity gate, produces no report, and
 says so. Expect roughly 30–80 KB per report. These files are publishable: they
 carry corpus source text, which is in this repository.
+
+An `extraction` run prints element recall and precision per case, then the
+attribute agreement split by attribute. Read the split first when the element
+numbers look clean: an extraction that names every element and types none of
+them correctly scores 1.00 on both, and a `kind` or an `exposure` the live
+pipeline stopped producing appears only in that column. Every number in it is
+an instrument. It carries no threshold and fails no run — a low agreement is a
+question to take back to the source text.
 
 `--judge-config` is offered on `calibrate` only. A scored `run` is always
 measured by the judge in `evals/config/judge.toml`: pointing a sweep at some
