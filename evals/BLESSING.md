@@ -69,13 +69,17 @@ fabrication, not visible garbling), and merged turns run around 220 characters.
 Write it **cleaned, not raw** — the byte budget forces cleaning, and cue timings
 are stripped by it.
 
-**Grading a conversational rule needs care.** `score_extraction` is
-attribute-blind — it sees element IDs and boundary crossings — so "a hedge
-became `unknown`" is invisible to it. The only path from an extraction rule to a
-number is the reference threat set in end-to-end mode: a needs-info must-find
-threat that a wrongly-confident attribute would suppress, dropping recall. Write
-each assertion so it fires through that or through `ExtractionScore` directly,
-or it will not be measured at all.
+**Grading a conversational rule needs care.** `score_extraction` reads element
+IDs, boundary crossings, and the attributes in `_SCORED_ATTRIBUTES` — the closed
+vocabularies exactly, and each free-text control through `control_state`. So "a
+hedge became `unknown`" *is* measured, on any element both models carry. What is
+still invisible is the wording: `technology`, `protocol` and `data_description`
+are compared by nothing, because two correct readings of one sentence word them
+differently. An assertion about those reaches a number only through the
+reference threat set in end-to-end mode — a needs-info must-find threat that a
+wrongly-confident attribute would suppress, dropping recall. Write each
+assertion so it fires through that or through `ExtractionScore`, or it will not
+be measured at all.
 
 Size the system so the finished model lands at **8–20 elements**. That's not a
 style preference: the reference threat set has to be exhaustively enumerable by a
