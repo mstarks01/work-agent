@@ -32,10 +32,7 @@ yielding a partial record that promotion would bless.
 
 from __future__ import annotations
 
-import json
 from collections.abc import Iterable
-from dataclasses import dataclass
-from pathlib import Path
 from typing import Any, Self
 
 from pydantic import (
@@ -54,14 +51,6 @@ from stride_service.certification import (
 from stride_service.model_tiers import TIER_NAMES, TierName
 from stride_service.report import NodeRun
 from stride_service.sampling import SamplingConfig, TierSampling, sampling_fingerprint
-
-# The eval artifact's schema version. Version 1 is the first artifact that
-# records served identities at all, and so the first one promotable: every
-# earlier artifact is unversioned, and there is no shim that would let one be
-# read as this shape. Bump it for any change to the ``provenance`` block, and
-# promotion will reject the older files by name rather than half-understanding
-# them.
-ARTIFACT_VERSION = 1
 
 # How an unset param reads in the operator-facing display. A param this
 # deployment leaves unset is not the same claim as one pinned to zero, and the
@@ -344,100 +333,4 @@ def provenance_of(
         tiers_config_version=tiers_config_version,
         sampling=dict(sampling.tiers),
         node_runs={node: tuple(runs) for node, runs in node_runs.items()},
-    )
-
-
-@dataclass(frozen=True)
-class EvalArtifact:
-    """A loaded sweep artifact: its provenance, plus the run that produced it.
-
-    The context fields are not promotion inputs — nothing here changes which
-    fingerprints get blessed — but an operator approving a promotion should see
-    that the sweep they are certifying reported structural failures or read as
-    untrusted. Refusing on them would be the wrong call: whether to bless a
-    sweep with one failed case is a judgement, and the tool's job is to make
-    sure it is a *made* one.
-
-    ``raw`` is the parsed document, kept whole. Promotion needs none of it, but
-    the artifact is the only record a finished sweep leaves, and an offline
-    instrument reading some other block of it —
-    :mod:`evals.harness.stability` reads ``scores`` — should go through the
-    loader that decides an artifact is admissible rather than opening the file
-    a second time under its own rules.
-    """
-
-    path: Path
-    mode: str
-    cases: tuple[str, ...]
-    trusted: bool
-    structural_failures: tuple[str, ...]
-    provenance: RunProvenance
-    raw: dict[str, Any]
-
-
-def load_artifact(path: Path | str) -> EvalArtifact:
-    """Read a sweep artifact's provenance, or refuse it.
-
-    The version is checked before the shape, as
-    :func:`~stride_service.certification.load_manifest` does: an artifact from
-    another schema should be named as such, not reported as a heap of stray
-    keys. There is no best-effort read of an unversioned artifact — those
-    predate served identities entirely, so anything recovered from one would be
-    a guess at what answered.
-    """
-    path = Path(path)
-    try:
-        raw = json.loads(path.read_text(encoding="utf-8"))
-    except json.JSONDecodeError as exc:
-        raise ProvenanceError(f"{path}: invalid JSON: {exc}") from exc
-    except OSError as exc:
-        raise ProvenanceError(f"{path}: cannot be read: {exc}") from exc
-
-    if not isinstance(raw, dict):
-        raise ProvenanceError(f"{path}: not an eval artifact (expected a JSON object)")
-
-    version = raw.get("artifact_version")
-    if version != ARTIFACT_VERSION:
-        raise ProvenanceError(
-            f"{path}: unsupported artifact_version {version!r}; expected"
-            f" {ARTIFACT_VERSION}. An artifact without one predates recorded"
-            " served identities and cannot be promoted — re-run the sweep"
-        )
-
-    block = raw.get("provenance")
-    if not isinstance(block, dict):
-        raise ProvenanceError(
-            f"{path}: no provenance block, so nothing records what actually"
-            " served this run"
-        )
-
-    stored = block.get("generation_identities")
-    record = {
-        key: value for key, value in block.items() if key != "generation_identities"
-    }
-    try:
-        provenance = RunProvenance(**record)
-    except ValidationError as exc:
-        raise ProvenanceError(f"{path}: malformed provenance: {exc}") from exc
-
-    derived = {
-        tier: identity.to_json()
-        for tier, identity in provenance.tier_identities().items()
-    }
-    if stored != derived:
-        raise ProvenanceError(
-            f"{path}: generation_identities disagrees with the node_runs it is"
-            " derived from; the artifact has been edited and will not be promoted"
-        )
-    provenance.verify()
-    return EvalArtifact(
-        path=path,
-        mode=str(raw.get("mode", "")),
-        cases=tuple(str(case) for case in raw.get("cases", ())),
-        trusted=bool(raw.get("trusted", False)),
-        structural_failures=tuple(
-            str(failure) for failure in raw.get("structural_failures", ())
-        ),
-        provenance=provenance,
-        raw=raw,
     )

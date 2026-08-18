@@ -26,6 +26,8 @@ that produced it.
 
 from __future__ import annotations
 
+from pathlib import Path
+
 import pytest
 
 from evals.harness.instruments import (
@@ -224,3 +226,82 @@ class _NeverAskedJudge:
 
     def rule(self, *args, **kwargs):
         raise AssertionError("the judge was asked about a framework it does not grade")
+
+
+class TestTheDeclaredKeysAreTheWrittenKeys:
+    """``Instrument.keys`` against what ``Instrument.artifact`` actually writes.
+
+    The declaration is what :mod:`evals.harness.artifact` builds ``DECLARED_KEYS``
+    from, and a declaration that drifted from its writer would let the loader
+    demand a key nothing produces — or, worse, stay quiet about one that went
+    missing.
+    """
+
+    @pytest.mark.parametrize("name", sorted(INSTRUMENTS))
+    def test_each_instrument_writes_the_keys_it_declares(self, name):
+        instrument = INSTRUMENTS[name]
+        written = instrument.artifact(Sweep(run=empty_run(tuple(PACKAGES))))
+        assert set(written) == set(instrument.keys)
+
+    def test_the_declared_set_is_the_envelope_plus_every_instrument(self):
+        from evals.harness.artifact import DECLARED_KEYS, ENVELOPE_KEYS
+
+        owned = {key for i in INSTRUMENTS.values() for key in i.keys}
+        assert DECLARED_KEYS == set(ENVELOPE_KEYS) | owned
+
+    def test_a_sweep_writes_exactly_the_declared_set(self, tmp_path):
+        """``build`` produces the keys the loader is told to expect."""
+        from evals.harness.artifact import DECLARED_KEYS, build
+        from stride_service.certification import CertifyResult
+
+        run = empty_run(tuple(PACKAGES))
+        artifact = build(
+            mode="analysis",
+            cases=[],
+            models={},
+            certification=CertifyResult(certified=True),
+            provenance=run.provenance,
+            usage={},
+            latency={},
+            structural_failures=[],
+            payloads=[],
+            trusted=True,
+            sweep=Sweep(run=run),
+        )
+        assert set(artifact) == DECLARED_KEYS
+
+
+class TestReadingABlockFailsClosed:
+    """``EvalArtifact.block`` over an artifact that lost one."""
+
+    def loaded(self, raw):
+        from evals.harness.artifact import EvalArtifact
+
+        return EvalArtifact(
+            path=Path("sweep.json"),
+            mode="analysis",
+            cases=(),
+            trusted=True,
+            structural_failures=(),
+            provenance=empty_run(()).provenance,
+            raw=raw,
+        )
+
+    def test_a_missing_block_raises_rather_than_reading_as_empty(self):
+        """The defect: ``raw.get("scores") or ()`` reported a sweep that scored
+        nothing, which is the number a sweep that scored and found nothing
+        prints too."""
+        from evals.harness.provenance import ProvenanceError
+
+        with pytest.raises(ProvenanceError, match="carries no 'scores' block"):
+            self.loaded({"applicability": []}).block("scores")
+
+    def test_a_present_but_empty_block_is_returned(self):
+        """An instrument that measured nothing is not a missing instrument."""
+        assert self.loaded({"scores": []}).block("scores") == []
+
+    def test_an_undeclared_key_is_refused_as_a_caller_error(self):
+        from evals.harness.provenance import ProvenanceError
+
+        with pytest.raises(ProvenanceError, match="not a key an artifact declares"):
+            self.loaded({"nope": 1}).block("nope")

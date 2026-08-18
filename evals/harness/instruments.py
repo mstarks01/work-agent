@@ -174,10 +174,18 @@ class Instrument:
     ``render`` and ``artifact`` both take the whole :class:`Sweep` so the table
     can hold them uniformly. Each instrument module keeps its own function
     signature in its own terms; the entry below is the one line that unpacks.
+
+    ``keys`` names the artifact keys this instrument owns. It is declared rather
+    than discovered so that a reader can be told what an artifact of this
+    version must carry without running a sweep to find out — which is what
+    :func:`~evals.harness.artifact.load_artifact` checks, and what stopped a
+    dropped block from reading as a sweep that measured nothing.
+    ``test_each_instrument_writes_the_keys_it_declares`` holds the two together.
     """
 
     render: Callable[[Sweep], None]
     artifact: Callable[[Sweep], dict[str, Any]]
+    keys: tuple[str, ...]
     #: The packages whose record this instrument reads. Empty means neutral.
     frameworks: tuple[FrameworkName, ...] = ()
     #: Whether the reading needs the judge.
@@ -195,6 +203,7 @@ INSTRUMENTS: dict[str, Instrument] = {
     "extraction": Instrument(
         render=lambda sweep: modes.render_extraction(sweep.run.extractions),
         artifact=lambda sweep: modes.artifact_extraction(sweep.run.extractions),
+        keys=("attribute_aggregate",),
     ),
     "grounds": Instrument(
         render=lambda sweep: grounds.render(
@@ -203,17 +212,25 @@ INSTRUMENTS: dict[str, Instrument] = {
         artifact=lambda sweep: grounds.artifact(
             sweep.run.grounds, sweep.run.grounds_failures
         ),
+        keys=("grounds", "grounds_failures", "grounds_aggregate"),
     ),
     "coverage": Instrument(
         render=lambda sweep: coverage.render(
             sweep.lanes, offered=bool(sweep.run.coverage)
         ),
         artifact=lambda sweep: coverage.artifact(sweep.lanes),
+        keys=("coverage", "coverage_totals"),
     ),
     "applicability": Instrument(
         render=lambda sweep: applicability.render(sweep.rows("applicability")),
         artifact=lambda sweep: applicability.artifact(sweep.rows("applicability")),
         frameworks=("asvs",),
+        keys=(
+            "applicability",
+            "applicability_aggregate",
+            "applicability_exemplar_delta",
+            "over_applied_for_promotion",
+        ),
     ),
     "applicability_yield": Instrument(
         render=lambda sweep: applicability.render_yield(
@@ -223,18 +240,21 @@ INSTRUMENTS: dict[str, Instrument] = {
             sweep.rows("applicability_yield")
         ),
         frameworks=("asvs",),
+        keys=("applicability_yield", "applicability_yield_aggregate"),
     ),
     "scores": Instrument(
         render=lambda sweep: scorer.render(sweep.scores),
         artifact=lambda sweep: scorer.artifact(sweep.scores),
         frameworks=("stride",),
         judged=True,
+        keys=("scores", "exemplar_delta", "unlisted_for_promotion"),
     ),
     "critic_yield": Instrument(
         render=lambda sweep: critic_yield.render(sweep.yields),
         artifact=lambda sweep: critic_yield.artifact(sweep.yields),
         frameworks=("stride",),
         judged=True,
+        keys=("critic_yield", "critic_yield_aggregate"),
     ),
 }
 

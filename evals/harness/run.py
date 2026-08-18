@@ -43,6 +43,8 @@ from pathlib import Path
 from typing import Any
 
 from evals.harness import modes
+from evals.harness.artifact import EvalArtifact, load_artifact
+from evals.harness.artifact import build as build_artifact
 from evals.harness.calibration import (
     AGREEMENT_BAR,
     LabelledPair,
@@ -60,21 +62,12 @@ from evals.harness.grounds import (
     classify_failure,
     measure_grounds,
 )
-from evals.harness.instruments import (
-    ModeRun,
-    Sweep,
-    artifact_blocks,
-    render_all,
-    score_blocks,
-)
+from evals.harness.instruments import ModeRun, Sweep, render_all, score_blocks
 from evals.harness.judge import Judge, PinnedJudge, load_judge_config
 from evals.harness.provenance import (
-    ARTIFACT_VERSION,
     UNSET,
-    EvalArtifact,
     ProvenanceError,
     RunProvenance,
-    load_artifact,
     provenance_of,
 )
 from evals.harness.reference import GoldenCase, load_corpus
@@ -506,36 +499,19 @@ def command_run(args: argparse.Namespace) -> int:
     sweep = replace(sweep, scores=scores, yields=yields)
     render_all(sweep, judged=True)
 
-    artifact = {
-        "artifact_version": ARTIFACT_VERSION,
-        "mode": args.mode,
-        "cases": [case.id for case in cases],
-        "models": _models_record(deployment, judge),
-        "gating": "tier-1-structural-only",
-        "certification": certification.to_json(),
-        # What actually generated, per node execution — the record `promote`
-        # reads back. It replaces the `node_fingerprints` map, which carried
-        # the hashes without the served builds they were computed from, so a
-        # promotion could not be driven from a finished sweep at all
-        # ([#117](https://github.com/mstarks01/work-agent/issues/117)).
-        "provenance": mode_run.provenance.to_json(),
-        "node_usage": {
-            node: usage.model_dump() for node, usage in mode_run.usage.items()
-        },
-        "node_latency": {
-            node: {**latency.model_dump(), "mean_ms": round(latency.mean_ms)}
-            for node, latency in mode_run.latency.items()
-        },
-        "structural_failures": failures,
-        "mode_output": mode_run.payloads,
-        # Aggregates carry the verdict so nothing downstream folds an
-        # uncertified run into a trusted number unaware.
-        "trusted": trusted,
-        # Every instrument's own keys, from the table that also printed them.
-        # One source for the printed line and the written number is what stops
-        # the two disagreeing.
-        **artifact_blocks(sweep),
-    }
+    artifact = build_artifact(
+        mode=args.mode,
+        cases=[case.id for case in cases],
+        models=_models_record(deployment, judge),
+        certification=certification,
+        provenance=mode_run.provenance,
+        usage=mode_run.usage,
+        latency=mode_run.latency,
+        structural_failures=failures,
+        payloads=mode_run.payloads,
+        trusted=trusted,
+        sweep=sweep,
+    )
     if args.out:
         Path(args.out).write_text(json.dumps(artifact, indent=2) + "\n", "utf-8")
         print(f"artifact written to {args.out}")
