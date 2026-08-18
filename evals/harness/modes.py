@@ -275,17 +275,51 @@ def aggregate_attributes(scores: Sequence[ExtractionScore]) -> dict[str, Any]:
     }
 
 
-#: The frameworks a sweep's graph is built for, named here rather than defaulted
-#: inside the harness: a sweep grades a framework's own claim set (#167), so
-#: which frameworks ran is a property of the sweep.
-#:
-#: **STRIDE alone, although this build carries two.** The corpus now holds ASVS
-#: reference sets for the cases whose precondition allows one, and
-#: :mod:`evals.harness.scorer` grades STRIDE's records: it reads a category and
-#: two rated severity axes, and an ASVS record carries neither. So an ASVS sweep
-#: would run 17 ``strong``-tier lanes per case and score nothing. Adding ASVS
-#: here is a scorer change, not a list edit.
+#: The frameworks a sweep runs for a case that declares none, and the fallback
+#: for a caller that names no case. A sweep grades a framework's own claim set
+#: (#167), so which frameworks ran is a property of the *case* rather than of the
+#: harness — see :func:`case_frameworks`, which is what the sweep actually reads.
 EVAL_FRAMEWORKS: tuple[FrameworkName, ...] = ("stride",)
+
+
+def case_frameworks(case: GoldenCase) -> tuple[FrameworkName, ...]:
+    """The frameworks to build this case's graph for: the ones it declares.
+
+    Read off ``case.json`` rather than fixed for the sweep. A case declares a
+    framework when that framework's **Precondition** allows one and it carries a
+    reference set, so running the declaration is what makes "every record the
+    corpus holds is graded" true — and what stops a sweep paying for ASVS's 17
+    ``strong``-tier lanes on a case that has nothing to score them against.
+
+    A case declaring nothing falls back to :data:`EVAL_FRAMEWORKS`, which keeps
+    a hand-built fixture case runnable without a frameworks array.
+    """
+    declared = tuple(declaration.name for declaration in case.meta.frameworks)
+    return declared or EVAL_FRAMEWORKS
+
+
+def case_selections(case: GoldenCase, pipeline: Pipeline) -> list[FrameworkSelection]:
+    """The job selection, taken from the built graph and dressed in the case's options.
+
+    **The names come from the pipeline, never from the case.** The envelope
+    checks that a report's blocks answer the job's own selection, so a driver
+    that named the case's declaration while the graph ran something else would
+    fail that check rather than record what happened — which is exactly what a
+    test binding a STRIDE-only pipeline to a case declaring two frameworks does.
+
+    The *options* come from the case, because they are load-bearing and the
+    graph does not carry them: an **ASVS Level** decides which requirements a run
+    rules on, so a job that omitted it is rejected on the input ladder and one
+    that guessed it grades against the wrong slice of the catalog.
+    """
+    options = {
+        declaration.name: dict(declaration.options)
+        for declaration in case.meta.frameworks
+    }
+    return [
+        FrameworkSelection(name=name, options=options.get(name, {}))
+        for name in pipeline.frameworks
+    ]
 
 
 def build_eval_pipeline(
@@ -482,10 +516,10 @@ def _run_from_graph(
             id=f"eval-{case.id}",
             created_at=now,
             completed_at=now,
-            # Read off the built graph rather than restated: the envelope checks
-            # that the blocks answer the job's own selection, so a driver that
-            # named its own list could disagree with the graph that ran.
-            frameworks=[FrameworkSelection(name=name) for name in pipeline.frameworks],
+            # Read off the built graph rather than restated, so the blocks
+            # answer the job's own selection exactly as the envelope requires;
+            # the case supplies only the options the graph does not carry.
+            frameworks=case_selections(case, pipeline),
         ),
         input_ref=InputRef.of(system_name=case.meta.title, sources=case.sources),
         nodes=graph_run.node_runs,
