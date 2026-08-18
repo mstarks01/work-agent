@@ -16,6 +16,11 @@ accuracy**: it measures how closely one model reproduces what an earlier agent
 wrote down. That includes the 90% bar. A judge at 95% agrees with an agent's
 opinions 95% of the time, and nothing here says those opinions are right.
 
+Why it drifted, and the rule taken from it, are in
+[docs/agents/provenance.md](../docs/agents/provenance.md): `bootstrap` on
+`case.json` recorded the agent stand-in honestly for a year because it was a
+required field, while the reviewer claim beside it was prose and did not.
+
 The numbers are still worth having. They track movement, they compare
 configurations, and they fail loudly when a change breaks something. They are
 not evidence that this tool finds real threats, and they must never be quoted
