@@ -306,7 +306,8 @@ def test_stability_reads_the_applicability_block_too():
     model call, so a credential-free sweep still carries a comparable half where
     STRIDE's is absent.
     """
-    from evals.harness.provenance import EvalArtifact, RunProvenance
+    from evals.harness.artifact import DECLARED_KEYS, EvalArtifact
+    from evals.harness.provenance import RunProvenance
     from evals.harness.stability import read_run
 
     artifact = EvalArtifact(
@@ -322,6 +323,10 @@ def test_stability_reads_the_applicability_block_too():
             node_runs={},
         ),
         raw={
+            # Every declared key, as a sweep writes them. An instrument that
+            # measured nothing writes an empty block rather than dropping one.
+            **dict.fromkeys(DECLARED_KEYS),
+            "models": {},
             # Empty, as a --no-scoring sweep leaves it.
             "scores": [],
             "applicability": [

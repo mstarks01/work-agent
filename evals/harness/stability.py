@@ -32,7 +32,8 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
 
-from evals.harness.provenance import EvalArtifact, ProvenanceError, load_artifact
+from evals.harness.artifact import EvalArtifact, load_artifact
+from evals.harness.provenance import ProvenanceError
 from evals.harness.scorer import ratio
 from stride_service.report import FrameworkName
 
@@ -133,14 +134,14 @@ def read_run(artifact: EvalArtifact) -> ScoredRun:
     # the wrong shape is a file to re-produce, and a KeyError out of a
     # comparison reads as a defect in the comparison.
     try:
-        for score in artifact.raw.get("scores") or ():
+        for score in artifact.block("scores"):
             scope: Scope = ("stride", str(score["case"]))
             matched[scope] = frozenset(
                 str(pair["reference_index"]) for pair in score["matched"]
             )
             references[scope] = int(score["counts"]["references"])
             recall[scope] = float(score["metrics"]["recall"])
-        for entry in artifact.raw.get("applicability") or ():
+        for entry in artifact.block("applicability"):
             scope = ("asvs", str(entry["case"]))
             matched[scope] = frozenset(str(item) for item in entry["matched"])
             references[scope] = int(entry["expected"])
@@ -157,7 +158,7 @@ def read_run(artifact: EvalArtifact) -> ScoredRun:
     return ScoredRun(
         label=artifact.path.name,
         mode=artifact.mode,
-        models=dict(artifact.raw.get("models", {})),
+        models=dict(artifact.block("models")),
         matched=matched,
         references=references,
         recall=recall,
@@ -246,7 +247,7 @@ def comparability_warnings(runs: Sequence[ScoredRun]) -> list[str]:
     """What makes these runs not a clean repeat of each other.
 
     Reported rather than refused, on the same principle
-    :class:`~evals.harness.provenance.EvalArtifact` applies to a sweep with
+    :class:`~evals.harness.artifact.EvalArtifact` applies to a sweep with
     failures: comparing two modes or two judges is sometimes exactly the
     question being asked, and the tool's job is to make sure it is a chosen
     comparison rather than an accidental one. Anything here means the spread
