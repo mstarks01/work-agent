@@ -43,7 +43,12 @@ from pathlib import Path
 from typing import Any
 
 from evals.harness import modes
-from evals.harness.applicability import ApplicabilityScore, score_applicability
+from evals.harness.applicability import (
+    ApplicabilityScore,
+    over_applied_for_promotion,
+    score_applicability,
+)
+from evals.harness.applicability import exemplar_delta as applicability_exemplar_delta
 from evals.harness.applicability import pooled as pooled_applicability
 from evals.harness.calibration import (
     AGREEMENT_BAR,
@@ -781,6 +786,21 @@ def command_run(args: argparse.Namespace) -> int:
             if mode_run.applicability
             else None
         ),
+        # Its own key beside STRIDE's for the reason the scores are: one column
+        # pooling a judge-relative recall with a set comparison would be an
+        # average of two things nobody asked for.
+        "applicability_exemplar_delta": (
+            applicability_exemplar_delta(mode_run.applicability)
+            if mode_run.applicability
+            else None
+        ),
+        # The corpus feedback loop's ASVS half: requirements a run ruled
+        # applicable that the case did not expect, for the next reading session
+        # to settle. No judge, because the set arithmetic already separated the
+        # package-bug case into ``off_catalog``.
+        "over_applied_for_promotion": over_applied_for_promotion(
+            mode_run.applicability
+        ),
         "trusted": trusted,
         "exemplar_delta": exemplar_delta(scores) if scores else None,
         "critic_yield": [entry.to_json() for entry in yields],
@@ -1046,13 +1066,14 @@ def _print_stability(
     for warning in comparability_warnings(runs):
         print(f"WARNING: {warning}")
     print(f"stability over {len(runs)} runs: {', '.join(run.label for run in runs)}")
-    print(f"  {'case':26} {'recalls':>22} {'spread':>8} {'always':>16} {'jaccard':>9}")
+    header = f"  {'framework':10} {'case':26} {'recalls':>22}"
+    print(f"{header} {'spread':>8} {'always':>16} {'jaccard':>9}")
     for entry in stability:
         recalls = " ".join(f"{recall:.2f}" for recall in entry.recalls)
         always = f"{entry.always}/{entry.references} (±{entry.sometimes})"
         print(
-            f"  {entry.case_id:26} {recalls:>22} {entry.recall_spread:8.2f}"
-            f" {always:>16} {entry.mean_jaccard:9.2f}"
+            f"  {entry.framework:10} {entry.case_id:26} {recalls:>22}"
+            f" {entry.recall_spread:8.2f} {always:>16} {entry.mean_jaccard:9.2f}"
         )
     totals = aggregate_stability(stability)
     print(
