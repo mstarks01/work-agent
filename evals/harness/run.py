@@ -60,9 +60,8 @@ from evals.harness.grounds import (
     CaseGrounds,
     GroundsFailure,
     classify_failure,
-    measure_grounds,
 )
-from evals.harness.instruments import ModeRun, Sweep, render_all, score_blocks
+from evals.harness.instruments import ModeRun, Sweep, measure_case, render_all
 from evals.harness.judge import Judge, PinnedJudge, load_judge_config
 from evals.harness.provenance import (
     UNSET,
@@ -316,39 +315,12 @@ async def _run_mode(
         executions += run.report.nodes
         issues = report_issues(run.report)
         failures += [f"{case.id}: {issue}" for issue in issues]
-        # Every block the job selected, not STRIDE's alone. Coverage and grounds
-        # are folds over what a lane agent was offered and what its drafts cite,
-        # and no package is exempt from either — ADR 0002 exempts none from
-        # finding-level attribution, and Coverage is reported per lane of every
-        # framework a job runs.
-        measurements = []
-        for block in run.report.analyses:
-            coverage += [(block.framework, row) for row in block.coverage]
-            measurements.append(
-                measure_grounds(
-                    case.id,
-                    block.framework,
-                    run.drafts.get(block.framework, ()),
-                    block.unverified_grounds,
-                )
-            )
-        grounds += measurements
-        # The measurement rides in the artifact rather than in the report, so a
-        # reader gets the number without opening a second file. The report is
-        # kept too, in the directory beside the artifact, and that is what a
-        # question this payload did not anticipate is answered from.
-        payload: dict[str, Any] = {
-            "case": case.id,
-            "structural_issues": issues,
-            "grounds": [entry.to_json() for entry in measurements],
-        }
-        # Each block's own per-case rows, looked up by framework rather than
-        # branched on by name. A package this build carries and no table entry
-        # names raises here rather than scoring nothing.
-        for name, row in score_blocks(case, run.report, run.drafts).items():
+        measured = measure_case(case, run, issues)
+        grounds += measured.grounds
+        coverage += measured.coverage
+        for name, row in measured.rows.items():
             rows.setdefault(name, []).append(row)
-            payload[name] = row.to_json()
-        payloads.append(payload)
+        payloads.append(measured.payload)
 
     return ModeRun(
         payloads=payloads,

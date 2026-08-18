@@ -330,3 +330,65 @@ def score_blocks(
             continue
         scored |= scorer(case, block, drafts.get(block.framework, ()))
     return scored
+
+
+@dataclass(frozen=True)
+class CaseMeasurement:
+    """Every reading one finished case offers, before any of it is pooled.
+
+    One value rather than four appends into four accumulators. The sweep loop
+    used to hold the whole of this inline, which meant an instrument that
+    measures a case grew the loop; now it grows this function and the table,
+    and the loop stays "run the case, measure it, keep the result".
+
+    ``rows`` is keyed by instrument name, the way :func:`score_blocks` returns
+    it, so a package that earns a per-case scorer needs nothing here either.
+    """
+
+    payload: dict[str, Any]
+    grounds: list[Any]
+    coverage: list[TaggedRow]
+    rows: Mapping[str, Any]
+
+
+def measure_case(
+    case: GoldenCase, run: Any, structural_issues: Sequence[str]
+) -> CaseMeasurement:
+    """Read one finished case, over every block it produced.
+
+    **Every block the job selected, not one package's alone.** Coverage and
+    grounds are folds over what a lane agent was offered and what its drafts
+    cite, and no package is exempt from either — ADR 0002 exempts none from
+    finding-level attribution, and Coverage is reported per lane of every
+    framework a job runs.
+
+    The measurement rides in the artifact rather than in the report, so a reader
+    gets the number without opening a second file. The report is kept too, in
+    the directory beside the artifact, and that is what a question this payload
+    did not anticipate is answered from.
+    """
+    measurements = []
+    rows_by_lane: list[TaggedRow] = []
+    for block in run.report.analyses:
+        rows_by_lane += [(block.framework, row) for row in block.coverage]
+        measurements.append(
+            grounds.measure_grounds(
+                case.id,
+                block.framework,
+                run.drafts.get(block.framework, ()),
+                block.unverified_grounds,
+            )
+        )
+    scored = score_blocks(case, run.report, run.drafts)
+    payload: dict[str, Any] = {
+        "case": case.id,
+        "structural_issues": list(structural_issues),
+        "grounds": [entry.to_json() for entry in measurements],
+        **{name: row.to_json() for name, row in scored.items()},
+    }
+    return CaseMeasurement(
+        payload=payload,
+        grounds=measurements,
+        coverage=rows_by_lane,
+        rows=scored,
+    )
