@@ -14,19 +14,16 @@ would make mechanical identity unusable: a deduplicator that drops a real
 threat is worse than one that reports a paraphrase twice.
 
 The other direction — one claim spelled two ways landing on two keys — is the
-one #201's title names, and **nothing in this repo can measure it**. The
-judge-calibration set is the only hand-labelled claim-identity data here, and
-its candidate side is a bare string: ``evals/judge_calibration/pairs.json``
-carries ``case``, ``category``, the two claim texts, the label and a note, and
-no element IDs at all. Measuring false splits needs a candidate set whose claims
-carry the elements they are about, which means either a paid sweep or a second
-hand-labelling pass.
+one #201's title names, and it is measured next door in
+``tests/test_evals_identity.py`` over the judge-calibration labels. Read the two
+together: this file prices a false merge, that one prices a false split, and
+neither number means anything alone. Equality collides 1 pair here and splits 91
+of 201 there; relaxing to a shared element collides 34 here and splits 5 there.
 
-So this says nothing about whether ``mechanism`` is needed, and it is not a step
-towards retiring the judge. What it does is keep a running count of the claims
-the corpus holds that the existing fields cannot tell apart — which is the
-evidence that decides ``mechanism``, accumulated one corpus case at a time
-instead of guessed at once.
+So this says nothing on its own about whether ``mechanism`` is needed. What it
+does is keep a running count of the claims the corpus holds that the existing
+fields cannot tell apart, accumulated one corpus case at a time instead of
+guessed at once.
 
 Deterministic over the blessed reference sets and free of provider calls, which
 is why it gates on every PR rather than waiting for a sweep.
