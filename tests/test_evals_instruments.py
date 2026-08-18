@@ -38,10 +38,13 @@ from evals.harness.instruments import (
     render_all,
 )
 from evals.harness.provenance import RunProvenance
+from evals.harness.reference import load_case
 from stride_service.frameworks import PACKAGES
 from stride_service.report import FrameworkName
 from tests.factories import sample_report
 from tests.test_asvs import _block as asvs_block
+
+CORPUS = Path(__file__).resolve().parents[1] / "evals" / "corpus"
 
 
 def empty_run(frameworks: tuple[FrameworkName, ...]) -> ModeRun:
@@ -216,9 +219,10 @@ class _CaseStub:
 class _AnalysisRunStub:
     """Only the two attributes ``_score_runs`` reads off a run."""
 
-    def __init__(self, report):
+    def __init__(self, report, drafts=None):
         self.report = report
         self.merged_drafts = ()
+        self.drafts = drafts or {}
 
 
 class _NeverAskedJudge:
@@ -305,3 +309,49 @@ class TestReadingABlockFailsClosed:
 
         with pytest.raises(ProvenanceError, match="not a key an artifact declares"):
             self.loaded({"nope": 1}).block("nope")
+
+
+class TestOneCaseMeasuredAlone:
+    """``measure_case`` over one finished run, with no sweep around it.
+
+    The seam this pins: what a case contributes is separable from the loop that
+    produced it, so a reading can be checked without building a graph.
+    """
+
+    def measured(self, analyses, drafts=None):
+        """One corpus case, one hand-built report, no graph anywhere.
+
+        A real case rather than a stub, because ASVS's scorer reads the
+        reference set the case declares — which is the thing being measured.
+        """
+        from evals.harness.instruments import measure_case
+
+        case = load_case(CORPUS / "01-payments-checkout")
+        report = sample_report(analyses=analyses)
+        return measure_case(case, _AnalysisRunStub(report, drafts or {}), ["an issue"])
+
+    def test_the_payload_names_the_case_and_its_structural_issues(self):
+        measured = self.measured([asvs_block(1)])
+
+        assert measured.payload["case"] == "01-payments-checkout"
+        assert measured.payload["structural_issues"] == ["an issue"]
+
+    def test_a_block_contributes_its_own_grounds_row(self):
+        """One grounds row per block, whichever package produced it."""
+        measured = self.measured([asvs_block(1)])
+
+        assert [entry.framework for entry in measured.grounds] == ["asvs"]
+
+    def test_a_package_with_a_per_case_scorer_contributes_its_rows(self):
+        """ASVS declares one, so both its rows arrive keyed by instrument."""
+        measured = self.measured([asvs_block(1)])
+
+        assert set(measured.rows) == {"applicability", "applicability_yield"}
+        assert set(measured.payload) >= {"applicability", "applicability_yield"}
+
+    def test_a_package_whose_scorer_is_none_contributes_no_rows(self):
+        """STRIDE's entry is ``None``; the neutral instruments still read it."""
+        measured = self.measured(None)
+
+        assert measured.rows == {}
+        assert [entry.framework for entry in measured.grounds] == ["stride"]
