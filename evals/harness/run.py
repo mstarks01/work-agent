@@ -45,9 +45,12 @@ from typing import Any
 from evals.harness import modes
 from evals.harness.applicability import (
     ApplicabilityScore,
+    ApplicabilityYield,
     over_applied_for_promotion,
     score_applicability,
+    score_yield,
 )
+from evals.harness.applicability import aggregate_yield as aggregate_applicability_yield
 from evals.harness.applicability import exemplar_delta as applicability_exemplar_delta
 from evals.harness.applicability import pooled as pooled_applicability
 from evals.harness.calibration import (
@@ -318,6 +321,7 @@ class ModeRun:
     frameworks: tuple[FrameworkName, ...]
     extractions: list[modes.ExtractionScore]
     applicability: list[ApplicabilityScore]
+    applicability_yields: list[ApplicabilityYield]
 
     @property
     def observations(self) -> dict[str, frozenset[str]]:
@@ -374,6 +378,7 @@ async def _run_mode(
     coverage: list[TaggedRow] = []
     extractions: list[modes.ExtractionScore] = []
     applicability: list[ApplicabilityScore] = []
+    applicability_yields: list[ApplicabilityYield] = []
 
     for case in cases:
         pipeline = pipeline_for(case)
@@ -442,6 +447,12 @@ async def _run_mode(
             applies = score_applicability(case, asvs)
             applicability.append(applies)
             payload["applicability"] = applies.to_json()
+            # Both sides of this framework's critic, from the block the run
+            # already produced: no judge and no second scoring pass, because
+            # both sides are requirement identifiers.
+            critic = score_yield(case, asvs, run.drafts.get("asvs", ()))
+            applicability_yields.append(critic)
+            payload["applicability_yield"] = critic.to_json()
         payloads.append(payload)
 
     return ModeRun(
@@ -475,6 +486,7 @@ async def _run_mode(
         ),
         extractions=extractions,
         applicability=applicability,
+        applicability_yields=applicability_yields,
     )
 
 
@@ -698,6 +710,37 @@ def _print_applicability(scores: Sequence[ApplicabilityScore]) -> None:
     )
 
 
+def _print_applicability_yield(yields: Sequence[ApplicabilityYield]) -> None:
+    """This framework's critic, both sides, never one.
+
+    ``destroyed`` is the number that can veto the pattern here — the critic
+    ruling inapplicable a requirement the case says applies — and it is printed
+    beside ``earned`` for the reason
+    :mod:`evals.harness.critic_yield` prints its pair: a rejection count alone
+    reads as the critic working or as the critic breaking things.
+    """
+    if not yields:
+        return
+    print("\nASVS critic yield (mechanical, no judge)")
+    print(
+        f"{'case':<26} {'drafts':>7} {'confirmed':>10} {'rejected':>9} {'earned':>7} {'destroyed':>10}"
+    )
+    for entry in yields:
+        print(
+            f"{entry.case:<26} {entry.drafts:>7} {len(entry.confirmed):>10}"
+            f" {len(entry.rejected):>9} {len(entry.earned):>7}"
+            f" {len(entry.destroyed):>10}"
+        )
+    totals = aggregate_applicability_yield(yields)
+    print(
+        f"pooled: rejected {totals['rejected']}/{totals['drafts']}"
+        f" ({totals['rejection_rate']:.0%}),"
+        f" earned {totals['earned']}, destroyed {totals['destroyed']}"
+        f" ({totals['destroyed_rate']:.0%} of rejections)"
+        " (instrument, non-gating)"
+    )
+
+
 def command_run(args: argparse.Namespace) -> int:
     cases = _select(load_corpus(args.corpus), args.case)
     # One deployment for the whole sweep: the graph it runs, the manifest it is
@@ -732,6 +775,7 @@ def command_run(args: argparse.Namespace) -> int:
     # Costs no provider call either: ASVS matches by requirement ID, so its
     # whole scorer is a set comparison and ``--no-scoring`` still emits it.
     _print_applicability(mode_run.applicability)
+    _print_applicability_yield(mode_run.applicability_yields)
 
     scores: list[CaseScore] = []
     yields: list[CriticYield] = []
@@ -800,6 +844,17 @@ def command_run(args: argparse.Namespace) -> int:
         # package-bug case into ``off_catalog``.
         "over_applied_for_promotion": over_applied_for_promotion(
             mode_run.applicability
+        ),
+        # This framework's critic, both sides. Its own keys rather than rows in
+        # ``critic_yield``: STRIDE's kill count is judge-relative and this one is
+        # set arithmetic, so a shared table would invite a rate across both.
+        "applicability_yield": [
+            entry.to_json() for entry in mode_run.applicability_yields
+        ],
+        "applicability_yield_aggregate": (
+            aggregate_applicability_yield(mode_run.applicability_yields)
+            if mode_run.applicability_yields
+            else None
         ),
         "trusted": trusted,
         "exemplar_delta": exemplar_delta(scores) if scores else None,
