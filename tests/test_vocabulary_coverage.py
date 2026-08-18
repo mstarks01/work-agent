@@ -11,9 +11,9 @@ nowhere and an unproduced vocabulary value are one failure at two depths: the
 dead rule is the symptom, and a value no **System Model** ever holds is the
 cause.
 
-What it proves is that the *corpus* carries a value. A blessed ``model.json``
-is hand-corrected under ``evals/BLESSING.md`` step 3, so a green run here says
-the reviewer produced the value and says nothing about what the live extraction
+What it proves is that the *corpus* carries a value. A ``model.json`` under
+``evals/corpus/`` is agent-authored and unreviewed, so a green run here says
+the corpus carries the value and says nothing about what the live extraction
 agent produces.
 
 Deterministic over the blessed ``model.json`` and free of provider calls, which

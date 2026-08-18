@@ -31,7 +31,7 @@ def pairs():
 @pytest.fixture(scope="module")
 def labels(pairs):
     return {
-        (pair.reference_claim, pair.candidate_claim): pair.human_match for pair in pairs
+        (pair.reference_claim, pair.candidate_claim): pair.label_match for pair in pairs
     }
 
 
@@ -39,7 +39,7 @@ def test_fixture_set_is_large_and_balanced(pairs):
     # Agreement measured on a lopsided fixture set is not informative, and the
     # bar was sized against ~100 pairs.
     assert len(pairs) >= 100
-    matches = sum(1 for pair in pairs if pair.human_match)
+    matches = sum(1 for pair in pairs if pair.label_match)
     assert 0.3 <= matches / len(pairs) <= 0.7
 
 
@@ -73,7 +73,7 @@ def test_disagreements_are_split_by_direction(pairs, labels):
 
     result = measure_agreement(judge, pairs)
 
-    if first.human_match:
+    if first.label_match:
         assert len(result.false_non_matches) == 1
         assert result.false_matches == ()
     else:
@@ -91,7 +91,7 @@ def test_result_serializes_every_disagreement(pairs, labels):
     assert payload["bar"] == AGREEMENT_BAR
     disagreements = payload["false_matches"] + payload["false_non_matches"]
     assert len(disagreements) == 1
-    assert disagreements[0]["human_note"]
+    assert disagreements[0]["label_note"]
     assert disagreements[0]["judge_rationale"]
 
 
@@ -259,7 +259,7 @@ class TestJudgeComparison:
         assert len(divergences) == 1
         entry = divergences[0]
         assert entry["reference_claim"] == first.reference_claim
-        assert entry["human"] == first.label
+        assert entry["label"] == first.label
         assert set(entry["judges"]) == {"agrees", "differs"}
         assert entry["judges"]["agrees"] != entry["judges"]["differs"]
 

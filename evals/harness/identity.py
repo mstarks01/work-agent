@@ -4,7 +4,7 @@
 **Claim** to the parts that decide its identity, so two spellings of one threat
 compare equal without the judge. This is that rule, built to the ``Judge``
 protocol so that :func:`~evals.harness.calibration.measure_agreement` scores it
-against the same hand labels, on the same 90% bar, as the pinned judge. One
+against the same recorded labels, on the same 90% bar, as the pinned judge. One
 scoreboard, two answers to one question.
 
 **What it reads, and what it does not.** #201 names four parts. Three are on the
@@ -21,7 +21,7 @@ no rule reads, so the comparison sorts. Relaxing equality to a shared element is
 the obvious way to buy back a paraphrase that named the flow where the reference
 named the process, and ``tests/test_claim_identity.py`` records what it costs on
 the blessed corpus: an order of magnitude more claims merge, every one of them a
-pair a reviewer ruled distinct.
+pair the corpus records as a distinct claim.
 
 **A Trust Boundary is dropped before the comparison.** It is an Element with an
 Element ID like any other, and the reference sets cite one in 431 citations —
@@ -65,7 +65,7 @@ def comparable_elements(element_ids: Iterable[str]) -> frozenset[str]:
 def endpoint_form(element_ids: Iterable[str], flows: FlowMap) -> frozenset[str]:
     """Every cited **Data Flow** replaced by the two **Element**s it runs between.
 
-    One place in the graph, spelled one way. The hand labels record the same
+    One place in the graph, spelled one way. The recorded labels carry the same
     finding cited as a flow by one writer and as the process at the end of that
     flow by another — ``evals/BLESSING.md`` step 5 calls that an element-agreement
     difference and labels the pair a match — and this is what makes those two
