@@ -27,7 +27,11 @@ from STRIDE.
 
 **Prefer a table keyed by framework over a constant or a branch.** Every gap ASVS exposed
 was a name or an `if`; every table was already correct, because a missing key raises.
-`tests/test_framework_neutrality.py` holds the decidable half. See
+The rule generalises past frameworks: the eval sweep grew one entry per *measurement* and
+paid the same tax until `evals/harness/instruments.py` made that a table too. When
+machinery grows an entry per anything, key it — then check the table against its registry,
+because a table nobody compares to `PACKAGES` fails as quietly as the branch it replaced.
+`tests/test_framework_neutrality.py` holds the decidable half of both. See
 `docs/agents/framework-parity.md` for the post-mortem this is derived from.
 
 ### Provenance
