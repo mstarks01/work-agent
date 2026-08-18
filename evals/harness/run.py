@@ -9,7 +9,7 @@ anyone knows that range trains people to bypass it.
 
 Everything the run measured lands in one JSON artifact: every judge ruling with
 its rationale, every bucket decision, the severity confusion, the near/far
-exemplar delta, and the ``valid-unlisted`` threats queued for the SME's next
+exemplar delta, and the ``valid-unlisted`` threats queued for the corpus's next
 blessing pass. The metrics are judge-relative — track movement with them, never
 quote them as absolutes.
 
@@ -1004,7 +1004,7 @@ def _print_promotion(
 
 
 def command_calibrate(args: argparse.Namespace) -> int:
-    """The >= 90% judge-human bar; failing it blocks a judge change.
+    """The >= 90% judge-label bar; failing it blocks a judge change.
 
     One ``--judge-config`` (or none) measures a single judge and gates on it.
     Several put the candidates side by side over the identical pairs, which is
@@ -1028,7 +1028,7 @@ def _calibrate_one(
     judge = _live_judge(deployment, config_path)
     result = measure_agreement(judge, pairs)
     print(
-        f"judge-human agreement {result.agreement:.1%} over {result.total} pairs"
+        f"judge-label agreement {result.agreement:.1%} over {result.total} pairs"
         f" (bar {AGREEMENT_BAR:.0%})"
     )
     print(
@@ -1066,7 +1066,7 @@ def _calibrate_many(
     comparison = compare_judges(judges, pairs)
 
     width = max(len(label) for label in judges)
-    print(f"judge-human agreement over {len(pairs)} pairs (bar {AGREEMENT_BAR:.0%})")
+    print(f"judge-label agreement over {len(pairs)} pairs (bar {AGREEMENT_BAR:.0%})")
     for candidate in comparison.candidates:
         mark = "ok " if candidate.result.meets_bar else "BAR"
         print(
@@ -1078,7 +1078,7 @@ def _calibrate_many(
     # The half a per-judge accuracy cannot show: two judges at the same
     # agreement can still disagree with each other on every pair they each got
     # wrong, and that is what decides whether a conclusion is judge-dependent.
-    print("\njudge-vs-judge agreement (the human labels aside)")
+    print("\njudge-vs-judge agreement (the recorded labels aside)")
     labels = [candidate.label for candidate in comparison.candidates]
     for index, first in enumerate(labels):
         for second in labels[index + 1 :]:
@@ -1147,7 +1147,7 @@ def main(argv: Sequence[str] | None = None) -> int:
     run_parser.set_defaults(func=command_run)
 
     calibrate_parser = subparsers.add_parser(
-        "calibrate", help="measure judge-human agreement over the fixtures"
+        "calibrate", help="measure judge-label agreement over the fixtures"
     )
     calibrate_parser.add_argument("--out", help="where to write the agreement report")
     calibrate_parser.add_argument(

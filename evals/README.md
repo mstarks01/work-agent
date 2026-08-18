@@ -1,8 +1,26 @@
 # Evals
 
-How we measure the analysis quality: a corpus of hand-blessed "golden" cases, a
-scorer that compares the service's output against them, and an LLM judge that
-decides when two threats describe the same thing.
+How we measure the analysis quality: a corpus of "golden" cases, a scorer that
+compares the service's output against them, and an LLM judge that decides when
+two threats describe the same thing.
+
+## Read this before you quote a number
+
+**No human has reviewed anything in this directory.** Every golden case, every
+reference claim and every one of the judge-calibration labels was written by an
+agent. `BLESSING.md` describes a human reading session that has never taken
+place, and no `corrections.md` records a correction a person made.
+
+So every agreement figure the suite produces is **self-consistency, not
+accuracy**: it measures how closely one model reproduces what an earlier agent
+wrote down. That includes the 90% bar. A judge at 95% agrees with an agent's
+opinions 95% of the time, and nothing here says those opinions are right.
+
+The numbers are still worth having. They track movement, they compare
+configurations, and they fail loudly when a change breaks something. They are
+not evidence that this tool finds real threats, and they must never be quoted
+against another tool's published figures. Where this file and the ones beside it
+say "the labels" or "the reference set", read *what an agent recorded*.
 
 Nothing in this directory ships in the production image — the corpus, the judge,
 and the scorer are test-side only, and the package build takes just
@@ -26,7 +44,7 @@ evals/
     corrections.md              notes on how the model was corrected, and why
     case.json                   metadata, provenance, and the declared sources
   judge_calibration/
-    build_pairs.py              the hand-labelled judge fixtures (edit this)
+    build_pairs.py              the judge fixtures and their labels (edit this)
     pairs.json                  generated from build_pairs.py (never hand-edit)
   config/judge.toml             the judge's own pinned model and settings
   prompts/                      the judge's prompts (NOT the shipped prompts/)
@@ -92,7 +110,7 @@ python -m evals.harness.run run --mode extraction --case 01-payments-checkout
 python -m evals.harness.run calibrate --out agreement.json
 
 # Several candidate judges over the same pairs, side by side. Reports agreement
-# with the human labels per candidate AND agreement between candidates, which is
+# with the recorded labels per candidate AND agreement between candidates, which is
 # what says whether a conclusion depends on the judge's vendor. See TUNING.md.
 python -m evals.harness.run calibrate \
   --judge-config evals/config/judge.toml \
@@ -145,8 +163,10 @@ matrix, or a summary that disagrees with its own contents. Every quality metric
 below is computed, printed, and written to the artifact, but does **not** fail
 the run: a gate that fires before anyone knows the normal range just trains
 people to bypass it. `calibrate` is the exception — it fails below the 90%
-judge–human agreement bar, because a judge that disagrees with humans makes
-every other number meaningless.
+judge–label agreement bar, because a judge that disagrees with the recorded
+labels makes every other number meaningless. Read that bar as the top of this
+file describes it: the labels are agent-authored and unreviewed, so the bar
+measures agreement with them and not correctness.
 
 ## What the metrics mean
 
