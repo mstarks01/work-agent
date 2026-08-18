@@ -1,0 +1,207 @@
+[
+  {
+    "category": "spoofing",
+    "affected_element_ids": [
+      "flow:schedule-importer-to-dispatch-api:post-work-orders",
+      "process:schedule-importer",
+      "process:dispatch-api"
+    ],
+    "claim": "An attacker who holds the importer's never-rotated API token posts work orders to the dispatch API as the importer.",
+    "tier": "must-find",
+    "severity": {"likelihood": "medium", "impact": "high"},
+    "notes": "The token is the case's one fully stated credential: issued once at build time and never rotated. It is also the only stated authentication on any crossing into the control plane, so a lane that misses it is reading nothing the source gave it."
+  },
+  {
+    "category": "spoofing",
+    "affected_element_ids": [
+      "flow:dispatch-console-to-dispatch-api:live-job-status",
+      "process:dispatch-api"
+    ],
+    "claim": "An attacker opens a WebSocket to the dispatch API in a duty engineer's name, because nothing states what the handshake checks.",
+    "tier": "must-find",
+    "severity": {"likelihood": "medium", "impact": "medium"},
+    "notes": "The source states the handshake's authentication was never written down, which is an unknown somebody registered rather than a topic nobody raised."
+  },
+  {
+    "category": "spoofing",
+    "affected_element_ids": [
+      "flow:schedule-importer-to-scheduling-partner:pull-schedule-feed",
+      "entity:scheduling-partner",
+      "process:schedule-importer"
+    ],
+    "claim": "An attacker answers the hourly pull as the scheduling partner, because nothing states how the importer identifies the partner.",
+    "tier": "expected",
+    "severity": {"likelihood": "low", "impact": "high"},
+    "notes": "Kept apart from the tampering entry on the same flow: standing in for the partner is the action here, and what the returned document then carries is the other."
+  },
+  {
+    "category": "spoofing",
+    "affected_element_ids": [
+      "flow:duty-engineer-to-dispatch-console:open-console",
+      "process:dispatch-console"
+    ],
+    "claim": "An attacker signs in to the dispatch console as a duty engineer, because nothing states what the sign-in checks.",
+    "tier": "expected",
+    "severity": {"likelihood": "medium", "impact": "high"},
+    "notes": "The console is the near end of every crossing into the control plane, so the weakest gate on it is the authority over the estate."
+  },
+  {
+    "category": "tampering",
+    "affected_element_ids": [
+      "flow:schedule-importer-to-scheduling-partner:pull-schedule-feed",
+      "process:schedule-importer",
+      "process:dispatch-api"
+    ],
+    "claim": "An attacker returns an XML document to the hourly pull that plants work orders the partner never sent.",
+    "tier": "must-find",
+    "severity": {"likelihood": "medium", "impact": "high"},
+    "notes": "The path the case is built on: a document from outside becomes work the control plane hands to a depot, and nothing between the two checks it."
+  },
+  {
+    "category": "tampering",
+    "affected_element_ids": [
+      "flow:dispatch-console-to-dispatch-api:dispatch-requests",
+      "process:dispatch-api"
+    ],
+    "claim": "An attacker on the corporate network alters a dispatch request on its way into the control plane, because nothing states the call is encrypted.",
+    "tier": "must-find",
+    "severity": {"likelihood": "medium", "impact": "high"},
+    "notes": "encryption_in_transit is unknown on the one flow that carries crew moves, and the crossing it makes is into the privilege zone."
+  },
+  {
+    "category": "tampering",
+    "affected_element_ids": [
+      "store:dispatch-database",
+      "flow:dispatch-api-to-dispatch-database:read-write-job-orders"
+    ],
+    "claim": "An attacker inside the control plane writes job orders straight into the dispatch database, because nothing states what the connection checks.",
+    "tier": "expected",
+    "severity": {"likelihood": "low", "impact": "high"},
+    "notes": "Distinct from the transit entry: writing at the store is a different action from altering a request in flight."
+  },
+  {
+    "category": "tampering",
+    "affected_element_ids": [
+      "store:schedule-archive",
+      "flow:schedule-importer-to-schedule-archive:store-schedule-documents"
+    ],
+    "claim": "An attacker rewrites a document in the schedule archive so the kept copy no longer matches what the partner sent.",
+    "tier": "expected",
+    "severity": {"likelihood": "low", "impact": "medium"},
+    "notes": "The archive is written after the parse, so this alters the record of the day rather than the work itself."
+  },
+  {
+    "category": "repudiation",
+    "affected_element_ids": ["store:dispatch-database", "process:dispatch-api"],
+    "claim": "A duty engineer denies moving a crew, and the job order names only the token or session that wrote it.",
+    "tier": "must-find",
+    "severity": {"likelihood": "medium", "impact": "medium"},
+    "notes": "Stated in the source rather than unknown: every job order carries the token or session and nothing about the person behind it."
+  },
+  {
+    "category": "repudiation",
+    "affected_element_ids": [
+      "process:schedule-importer",
+      "flow:schedule-importer-to-dispatch-api:post-work-orders",
+      "store:schedule-archive"
+    ],
+    "claim": "The scheduling partner denies sending a work order, and nothing ties the posted order to the archived document it was parsed from.",
+    "tier": "expected",
+    "severity": {"likelihood": "low", "impact": "medium"},
+    "notes": "The archive holds the documents and the database holds the orders, and the source states no link between them."
+  },
+  {
+    "category": "information-disclosure",
+    "affected_element_ids": ["flow:dispatch-console-to-dispatch-api:live-job-status"],
+    "claim": "An attacker on the corporate network reads the live job status stream, because nothing states the WebSocket runs over TLS.",
+    "tier": "must-find",
+    "severity": {"likelihood": "medium", "impact": "medium"},
+    "notes": "The transport of the long-lived channel is the attribute the source explicitly leaves unwritten."
+  },
+  {
+    "category": "information-disclosure",
+    "affected_element_ids": ["store:dispatch-database"],
+    "claim": "An attacker who obtains a copy of the dispatch database reads the crew names and mobile numbers in it.",
+    "tier": "must-find",
+    "severity": {"likelihood": "low", "impact": "high"},
+    "notes": "The contents are stated and the at-rest protection is stated to be unwritten, so pii comes from the content while data_classification stays unknown."
+  },
+  {
+    "category": "information-disclosure",
+    "affected_element_ids": [
+      "process:schedule-importer",
+      "flow:schedule-importer-to-scheduling-partner:pull-schedule-feed"
+    ],
+    "claim": "An attacker returns an XML document whose external entity makes the importer read a file off the corporate network and hand it back.",
+    "tier": "expected",
+    "severity": {"likelihood": "low", "impact": "high"},
+    "notes": "The parser's configuration is unstated, which is exactly what the ASVS encoding-and-sanitization record rules on for the same element."
+  },
+  {
+    "category": "information-disclosure",
+    "affected_element_ids": [
+      "store:schedule-archive",
+      "flow:schedule-importer-to-schedule-archive:store-schedule-documents"
+    ],
+    "claim": "An attacker who reaches the corporate file store reads the partner's schedule documents out of the archive.",
+    "tier": "expected",
+    "severity": {"likelihood": "low", "impact": "medium"},
+    "notes": "The archive sits in the corporate zone, so it is the one copy of the day's work an attacker reaches without crossing into the control plane."
+  },
+  {
+    "category": "denial-of-service",
+    "affected_element_ids": [
+      "process:dispatch-api",
+      "flow:dispatch-console-to-dispatch-api:live-job-status"
+    ],
+    "claim": "An attacker holds open enough WebSockets to the dispatch API that duty engineers lose live job status.",
+    "tier": "must-find",
+    "severity": {"likelihood": "medium", "impact": "medium"},
+    "notes": "A long-lived channel is the availability shape a request-response API does not have, and the API serves both the console and the importer."
+  },
+  {
+    "category": "denial-of-service",
+    "affected_element_ids": [
+      "process:schedule-importer",
+      "flow:schedule-importer-to-scheduling-partner:pull-schedule-feed"
+    ],
+    "claim": "An attacker returns an XML document large enough that the hourly import never finishes and tomorrow's work never reaches the control plane.",
+    "tier": "expected",
+    "severity": {"likelihood": "low", "impact": "medium"},
+    "notes": "The failure is silent staleness rather than an outage: the API keeps answering and the work it holds is yesterday's."
+  },
+  {
+    "category": "elevation-of-privilege",
+    "affected_element_ids": [
+      "flow:schedule-importer-to-dispatch-api:post-work-orders",
+      "process:dispatch-api",
+      "boundary:production-control-plane"
+    ],
+    "claim": "An attacker on the corporate network uses the importer's token to act in the control plane, where a corporate laptop holds no rights at all.",
+    "tier": "must-find",
+    "severity": {"likelihood": "medium", "impact": "high"},
+    "notes": "The case's central claim, and the one the privilege boundary exists to put in front of a lane: same company on both sides, and the authority is on the far side."
+  },
+  {
+    "category": "elevation-of-privilege",
+    "affected_element_ids": [
+      "flow:dispatch-console-to-dispatch-api:dispatch-requests",
+      "process:dispatch-api"
+    ],
+    "claim": "An attacker gets a duty engineer's browser to dispatch a crew from a page the attacker controls, because the API's allowed origins and its credential rule are unrecorded.",
+    "tier": "must-find",
+    "severity": {"likelihood": "medium", "impact": "high"},
+    "notes": "The browser holds the authority and the origin rule is what decides who may spend it, which is why an unrecorded CORS policy is an elevation rather than a header hygiene point."
+  },
+  {
+    "category": "elevation-of-privilege",
+    "affected_element_ids": [
+      "process:dispatch-console",
+      "flow:dispatch-console-to-dispatch-api:dispatch-requests"
+    ],
+    "claim": "An attacker who can publish on the corporate web host serves script from the console's own origin and dispatches crews with it.",
+    "tier": "expected",
+    "severity": {"likelihood": "low", "impact": "high"},
+    "notes": "Distinct from the cross-origin entry: this attacker takes the origin the API trusts rather than working around what it allows."
+  }
+]

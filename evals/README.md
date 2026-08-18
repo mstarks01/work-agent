@@ -22,7 +22,7 @@ evals/
   corpus/<NN>-<slug>/
     source.md                   the submitted text
     model.json                  the blessed System Model (passes the shipped validator)
-    threats.json                the reference threat set, keyed to model.json's IDs
+    claims/<framework>.json     that framework's reference set, keyed to model.json's IDs
     corrections.md              notes on how the model was corrected, and why
     case.json                   metadata, provenance, and the declared sources
   judge_calibration/
@@ -215,7 +215,7 @@ any comparison of two other numbers has to clear before it means anything.
 
 ## The corpus
 
-Twelve cases, each sized so a human can enumerate its threats exhaustively
+Thirteen cases, each sized so a human can enumerate its threats exhaustively
 (roughly 8–20 elements). Case `01` is the **control** and is not optional: every
 worked example in the shipped prompts is drawn from one payments system, and
 that can bias the tool toward payments-shaped threats. You can't see that bias as
@@ -237,6 +237,7 @@ to compare against. That gap is tracked and watched, but never fails a build.
 | `10-cookbook-generic-cms` | content management | far | OWASP Threat Model Cookbook |
 | `11-sparse-shift-scheduling` | workforce scheduling | far | synthetic (sparse input) |
 | `12-overclaiming-supplier-portal` | supplier management | far | synthetic (over-claiming input) |
+| `13-dispatch-control-plane` | field service dispatch | far | synthetic |
 
 The Cookbook cases come from the [OWASP Threat Model
 Cookbook](https://github.com/OWASP/threat-model-cookbook) (CC-BY 4.0), converted
