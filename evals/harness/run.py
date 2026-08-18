@@ -43,6 +43,8 @@ from pathlib import Path
 from typing import Any
 
 from evals.harness import modes
+from evals.harness.applicability import ApplicabilityScore, score_applicability
+from evals.harness.applicability import pooled as pooled_applicability
 from evals.harness.calibration import (
     AGREEMENT_BAR,
     LabelledPair,
@@ -98,8 +100,10 @@ from evals.harness.structural import report_issues
 from stride_service.certification import CertificationError, CertifyResult, certify
 from stride_service.deployment import Deployment
 from stride_service.frameworks.stride.record import Threat
+from stride_service.graph import Pipeline
 from stride_service.report import (
     FrameworkAnalysis,
+    FrameworkName,
     NodeLatency,
     NodeRun,
     Report,
@@ -113,19 +117,33 @@ EVALS_ROOT = Path(__file__).resolve().parents[1]
 DEFAULT_CORPUS_DIR = EVALS_ROOT / "corpus"
 
 
-def stride_block(report: Report) -> FrameworkAnalysis:
-    """This sweep's own framework block, off a report that may carry several.
+def framework_block(report: Report, framework: FrameworkName) -> FrameworkAnalysis:
+    """One framework's block off a report that carries one per selection.
 
-    The grading contract is per framework (#167) and this harness grades
-    STRIDE's open claim set, so the block is named here once rather than
-    re-derived at each of the four sites that read one. A report with no STRIDE
-    block is a driver defect rather than a sweep result: every mode in
-    :mod:`evals.harness.modes` builds its graph for this framework.
+    The grading contract is per framework (#167), so every scorer names the
+    block it grades rather than assuming the report holds one. A report missing
+    a block the job selected is a driver defect rather than a sweep result: the
+    envelope's own check requires the blocks to answer the job's frameworks with
+    none dropped.
     """
     for block in report.analyses:
-        if block.framework == "stride":
+        if block.framework == framework:
             return block
-    raise modes.EvalRunError("the report carries no stride analysis block")
+    raise modes.EvalRunError(f"the report carries no {framework} analysis block")
+
+
+def optional_block(
+    report: Report, framework: FrameworkName
+) -> FrameworkAnalysis | None:
+    """The same, for a framework a case may not have declared."""
+    return next(
+        (block for block in report.analyses if block.framework == framework), None
+    )
+
+
+def stride_block(report: Report) -> FrameworkAnalysis:
+    """STRIDE's block, which every case declares and every mode builds for."""
+    return framework_block(report, "stride")
 
 
 def stride_threats(report: Report) -> list[Threat]:
@@ -266,6 +284,13 @@ class ModeRun:
     :mod:`evals.harness.coverage` — so what rides here is the input to the
     aggregate rather than the aggregate itself.
 
+    ``applicability`` is the ASVS half, one row per case that declares the
+    framework. It is a separate list rather than a column on ``payloads``
+    because it is a different instrument: STRIDE's scorer grades an open claim
+    set through a judge, and this one is a confusion matrix over a finite
+    catalog with no model call anywhere (#167). Pooling them would put two
+    numbers that are not comparable under one heading.
+
     ``extractions`` is what the extraction mode produced and every other mode
     leaves empty. It is kept beside its own payloads because the sweep prints
     an aggregate over it, and folding a printed number out of JSON already
@@ -283,6 +308,7 @@ class ModeRun:
     grounds_failures: list[GroundsFailure]
     coverage: list[ReportLaneCoverage]
     extractions: list[modes.ExtractionScore]
+    applicability: list[ApplicabilityScore]
 
     @property
     def observations(self) -> dict[str, frozenset[str]]:
@@ -310,9 +336,23 @@ async def _run_mode(
     neither is a :class:`~evals.harness.grounds.GroundMisShape`, which is this
     service assembling its own record wrongly rather than anything a model did.
     """
-    pipeline = modes.build_eval_pipeline(
-        modes.MODE_ENTRIES[mode], deployment=deployment
-    )
+    # One graph per distinct framework set rather than one for the sweep. A case
+    # declares the frameworks whose **Precondition** allows it and whose records
+    # it carries, so building the declaration is what makes every record the
+    # corpus holds reachable — and what stops a case with no ASVS reference set
+    # paying for 17 ``strong``-tier lanes it has nothing to score. Two sets
+    # today, so this is two builds, and building one runs the credential and
+    # supported-param gates that a per-case build would re-run 13 times.
+    pipelines: dict[tuple[FrameworkName, ...], Pipeline] = {}
+
+    def pipeline_for(case: GoldenCase) -> Pipeline:
+        frameworks = modes.case_frameworks(case)
+        if frameworks not in pipelines:
+            pipelines[frameworks] = modes.build_eval_pipeline(
+                modes.MODE_ENTRIES[mode], deployment=deployment, frameworks=frameworks
+            )
+        return pipelines[frameworks]
+
     failures: list[str] = []
     payloads: list[dict[str, Any]] = []
     runs: dict[str, modes.AnalysisRun] = {}
@@ -324,8 +364,10 @@ async def _run_mode(
     grounds_failures: list[GroundsFailure] = []
     coverage: list[ReportLaneCoverage] = []
     extractions: list[modes.ExtractionScore] = []
+    applicability: list[ApplicabilityScore] = []
 
     for case in cases:
+        pipeline = pipeline_for(case)
         if mode == "extraction":
             result = await modes.run_extraction(case, pipeline)
             executions += result.node_runs
@@ -365,13 +407,21 @@ async def _run_mode(
         # reader gets the number without opening a second file. The report is
         # kept too, in the directory beside the artifact, and that is what a
         # question this payload did not anticipate is answered from.
-        payloads.append(
-            {
-                "case": case.id,
-                "structural_issues": issues,
-                "grounds": measurement.to_json(),
-            }
-        )
+        payload: dict[str, Any] = {
+            "case": case.id,
+            "structural_issues": issues,
+            "grounds": measurement.to_json(),
+        }
+        # Only where the case declared the framework. A case ASVS's
+        # **Precondition** refuses carries no reference set, and scoring the
+        # empty block it would still produce reports zero recall for a framework
+        # that correctly did nothing.
+        asvs = optional_block(run.report, "asvs")
+        if asvs is not None:
+            applies = score_applicability(case, asvs)
+            applicability.append(applies)
+            payload["applicability"] = applies.to_json()
+        payloads.append(payload)
 
     return ModeRun(
         payloads=payloads,
@@ -383,13 +433,20 @@ async def _run_mode(
             sampling=deployment.sampling,
             tiers_config_version=deployment.tiers.version,
         ),
-        expected_nodes=list(pipeline.node_sampling),
+        # The union across the graphs the sweep built. Certification reports a
+        # tier that presented no fingerprint as *unexercised*, so a node that
+        # only one framework set carries has to be in the expectation or a sweep
+        # that ran it would look like one that did not.
+        expected_nodes=sorted(
+            {node for built in pipelines.values() for node in built.node_sampling}
+        ),
         usage=usage_by_node(executions),
         latency=latency_by_node(executions),
         grounds=grounds,
         grounds_failures=grounds_failures,
         coverage=coverage,
         extractions=extractions,
+        applicability=applicability,
     )
 
 
@@ -581,6 +638,38 @@ def _print_grounds(
         )
 
 
+def _print_applicability(scores: Sequence[ApplicabilityScore]) -> None:
+    """ASVS's rows, then the pooled figures. Never folded into STRIDE's table.
+
+    The two scorers answer different questions over different sets — an open
+    claim set through a judge, and a finite catalog by string compare — so one
+    combined recall column would be an average of two things nobody asked for.
+    """
+    if not scores:
+        return
+    print("\nASVS applicability (mechanical, no judge)")
+    print(
+        f"{'case':<26} {'lvl':>3} {'rec':>6} {'must':>6} {'prec':>6}"
+        f" {'miss':>5} {'over':>5} {'rej':>5} {'off':>4}"
+    )
+    for score in scores:
+        print(
+            f"{score.case:<26} {score.level:>3} {score.recall:>6.0%}"
+            f" {score.must_find_recall:>6.0%} {score.precision:>6.0%}"
+            f" {len(score.missed):>5} {len(score.over_applied):>5}"
+            f" {len(score.rejected):>5} {len(score.off_catalog):>4}"
+        )
+    totals = pooled_applicability(scores)
+    print(
+        f"pooled over {totals['cases']} cases: recall {totals['recall']:.0%}"
+        f" ({totals['matched']}/{totals['expected']}),"
+        f" must-find {totals['must_find_recall']:.0%},"
+        f" precision {totals['precision']:.0%},"
+        f" off-catalog {totals['off_catalog']}"
+        " (instrument, non-gating)"
+    )
+
+
 def command_run(args: argparse.Namespace) -> int:
     cases = _select(load_corpus(args.corpus), args.case)
     # One deployment for the whole sweep: the graph it runs, the manifest it is
@@ -612,6 +701,9 @@ def command_run(args: argparse.Namespace) -> int:
     _print_grounds(mode_run.grounds, mode_run.grounds_failures)
     lanes = aggregate_coverage(mode_run.coverage)
     _print_coverage(lanes, offered=bool(mode_run.coverage))
+    # Costs no provider call either: ASVS matches by requirement ID, so its
+    # whole scorer is a set comparison and ``--no-scoring`` still emits it.
+    _print_applicability(mode_run.applicability)
 
     scores: list[CaseScore] = []
     yields: list[CriticYield] = []
@@ -657,6 +749,15 @@ def command_run(args: argparse.Namespace) -> int:
         # Aggregates carry the verdict so nothing downstream folds an
         # uncertified run into a trusted number unaware.
         "scores": [score.to_json() for score in scores],
+        # ASVS's own key rather than a row in ``scores``: a confusion matrix
+        # over a finite catalog and a judge-relative recall figure are not the
+        # same measurement, and one list would invite a reader to average them.
+        "applicability": [score.to_json() for score in mode_run.applicability],
+        "applicability_aggregate": (
+            pooled_applicability(mode_run.applicability)
+            if mode_run.applicability
+            else None
+        ),
         "trusted": trusted,
         "exemplar_delta": exemplar_delta(scores) if scores else None,
         "critic_yield": [entry.to_json() for entry in yields],
