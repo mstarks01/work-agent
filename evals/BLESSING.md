@@ -234,6 +234,34 @@ One reading session, one pull request, one approval. The reviewer signs off on
 **together** — they're one artifact, and reviewing them separately loses the
 property that the threat set is exhaustive *against that model*.
 
+**This step is now enforced.** Record the session in `case.json`:
+
+```json
+  "review": {
+    "reviewer": "<name or handle>",
+    "date": "<YYYY-MM-DD>",
+    "read": ["source.md", "model.json", "claims/stride.json"],
+    "notes": "<counts, and anything you changed>"
+  },
+```
+
+`tests/test_case_review.py` fails on a new case that arrives without that block,
+and names every case still waiting in its `UNREVIEWED` list. The 13 cases that
+shipped before this was enforced are on that list; it is debt, not an exemption,
+and it is meant to shrink to nothing.
+
+**Why it cannot be replaced by a lint.** Review sitting 01 found a reference claim
+asserting the model emits training data in a case with no training pipeline. A
+mechanical version of that check — flag a claim using a word absent from the case's
+source and model — fires on 231 of 243 claims, because a claim is *supposed* to
+describe an attack in words the system description never uses. Narrowing to the
+asset vocabulary fails too. This step is the only instrument for that class of
+defect.
+
+`REVIEW-02.md` in case 01 is the first run, and the template for the rest: read the
+source and write your own threat list *before* opening the recorded one, or the
+sitting measures nothing.
+
 Merge checklist:
 
 - [ ] `python evals/verify_corpus.py` is green

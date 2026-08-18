@@ -222,6 +222,30 @@ class CaseSource(BaseModel):
     sha256: str = Field(pattern=r"^[0-9a-f]{64}$")
 
 
+class CaseReview(BaseModel):
+    """Who read this case, when, and what they read.
+
+    ``evals/BLESSING.md`` step 6 is one reading session over ``source.md``, the
+    model and every reference set together. Until this block exists on a case,
+    nobody has done it — and the corpus shipped 13 cases in that state, which is
+    how a reference claim asserting a fact its own model does not hold survived
+    to review sitting 01. ``tests/test_case_review.py`` names every case still
+    waiting and fails on a new one that arrives without a block.
+
+    ``read`` is the artefacts the session covered, because a session that read
+    only the model says nothing about the reference set and the two are
+    reviewable apart even though step 6 asks for them together.
+    """
+
+    model_config = ConfigDict(extra="forbid", frozen=True)
+
+    reviewer: str = Field(min_length=1)
+    #: ISO date. A review is a dated event; the reference set moves under it.
+    date: str = Field(pattern=r"^\d{4}-\d{2}-\d{2}$")
+    read: list[str] = Field(min_length=1)
+    notes: str = ""
+
+
 class CaseMetadata(BaseModel):
     """``case.json``: what the case is, where it came from, and who grades it."""
 
@@ -238,6 +262,10 @@ class CaseMetadata(BaseModel):
     # Non-empty: a case no framework grades is a case that scores nothing, and
     # a corpus quietly carrying one lowers no denominator visibly.
     frameworks: list[CaseFramework] = Field(min_length=1)
+    #: Absent until a person reads the case. Optional on the model rather than
+    #: required, because the 13 cases that shipped without one are real and a
+    #: required field would make them unloadable rather than visibly unreviewed.
+    review: CaseReview | None = None
     notes: str = ""
 
 
