@@ -41,6 +41,8 @@ PAIR = ClaimPair(
     category="spoofing",
     reference_claim="An attacker replays a stolen session cookie.",
     candidate_claim="An attacker reuses a stolen cookie to order as the shopper.",
+    reference_element_ids=("flow:shopper-to-storefront-api:place-order",),
+    candidate_element_ids=("flow:shopper-to-storefront-api:place-order",),
 )
 
 
