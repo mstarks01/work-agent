@@ -157,12 +157,27 @@ def load_judge_config(path: Path | str = DEFAULT_JUDGE_CONFIG_PATH) -> JudgeConf
 
 @dataclass(frozen=True)
 class ClaimPair:
-    """One candidate pair for the equivalence judge, always within a lane."""
+    """One candidate pair for the equivalence judge, always within a lane.
+
+    The two element-ID fields are **not shown to the judge**. They are here for
+    the mechanical identity rule in :mod:`evals.harness.identity`, which reads
+    the same pair and answers the same question without a model call, so that
+    the two can be measured against one set of hand labels. Feeding them to the
+    judge would re-baseline every calibration number this repo holds, so
+    :func:`claim_payload` builds its payload from the category and the two claim
+    strings and nothing else — pinned by a test rather than left to care.
+
+    ``candidate_element_ids`` is ``None`` where nobody has assigned them yet,
+    which is a different fact from an empty tuple and is why the rule refuses
+    those pairs instead of scoring them as a miss.
+    """
 
     case: str
     category: StrideCategory
     reference_claim: str
     candidate_claim: str
+    reference_element_ids: tuple[str, ...]
+    candidate_element_ids: tuple[str, ...] | None
 
 
 class ClaimRuling(BaseModel):

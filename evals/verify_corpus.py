@@ -79,7 +79,16 @@ CASE_FRAMEWORK_FIELDS = frozenset(("name", "options", "exemplar_proximity"))
 #: What every framework's reference record carries, whatever it grades with.
 CLAIM_FIELDS = frozenset(("claim", "tier", "affected_element_ids", "notes"))
 PAIR_FIELDS = frozenset(
-    ("case", "category", "reference_claim", "candidate_claim", "label", "note")
+    (
+        "case",
+        "category",
+        "reference_claim",
+        "reference_element_ids",
+        "candidate_claim",
+        "candidate_element_ids",
+        "label",
+        "note",
+    )
 )
 
 #: Where one framework's reference records live inside a case, relative to it.
@@ -610,10 +619,79 @@ def check_case(case_dir: Path) -> list[str]:
     return problems
 
 
-def check_calibration(
-    case_ids: set[str], claims_by_case: dict[str, set[str]]
+def calibration_inputs() -> tuple[dict[str, set[str]], dict[str, dict[str, list[str]]]]:
+    """What :func:`check_calibration` compares fixtures against, per case.
+
+    The blessed model's element IDs, and each STRIDE reference claim mapped to
+    its own sorted element IDs. STRIDE's reference file only, because the judge
+    is STRIDE's: a framework that matches by requirement ID reaches no
+    claim-equivalence judgement and contributes no pair.
+    """
+    elements: dict[str, set[str]] = {}
+    claims: dict[str, dict[str, list[str]]] = {}
+    for case_dir in case_dirs():
+        records = _load_json_array(claims_file(case_dir, "stride"))
+        claims[case_dir.name] = {
+            record["claim"]: sorted(record["affected_element_ids"])
+            for record in records
+            if isinstance(record, dict)
+        }
+        model, _ = parse_and_validate(_load_json(case_dir / "model.json"))
+        elements[case_dir.name] = (
+            {element.id for element in model.elements()} if model else set()
+        )
+    return elements, claims
+
+
+def _check_pair_elements(
+    where: str,
+    pair: dict[str, Any],
+    element_ids: set[str],
+    reference_elements: list[str],
 ) -> list[str]:
-    """Every mechanical failure in the judge-calibration fixtures."""
+    """One pair's two element-ID fields, against the corpus they came from."""
+    problems = []
+    if sorted(pair["reference_element_ids"]) != reference_elements:
+        problems.append(
+            f"{where} reference_element_ids {pair['reference_element_ids']} are"
+            f" not the claim's own {reference_elements}; re-run build_pairs.py"
+        )
+    candidate = pair["candidate_element_ids"]
+    if candidate is None:
+        # Only ``match`` pairs are assigned so far, and the ones that are not
+        # are excluded by the identity measurement rather than scored as a miss.
+        if pair["label"] == "match":
+            problems.append(
+                f"{where} is labelled match and carries no candidate_element_ids;"
+                " every match pair is assigned, so this one was missed"
+            )
+        return problems
+    dangling = sorted(set(candidate) - element_ids)
+    if dangling:
+        problems.append(
+            f"{where} candidate_element_ids name elements absent from"
+            f" {pair['case']}'s model: {dangling}"
+        )
+    if sorted(candidate) != list(candidate):
+        problems.append(f"{where} candidate_element_ids are not sorted: {candidate}")
+    return problems
+
+
+def check_calibration(
+    elements_by_case: dict[str, set[str]],
+    claims_by_case: dict[str, dict[str, list[str]]],
+) -> list[str]:
+    """Every mechanical failure in the judge-calibration fixtures.
+
+    The two element-ID fields are checked the way the claim strings are, and for
+    the same reason. ``reference_element_ids`` is copied out of the corpus by
+    ``build_pairs.py``, so a reference whose elements are re-cut and a fixture
+    file nobody regenerated show up here rather than as a silent drop in the
+    mechanical-identity number. ``candidate_element_ids`` is a hand assignment,
+    so what is checkable is that every ID resolves in that case's blessed model
+    — a candidate citing an element the model does not hold is unscoreable in
+    exactly the way a dangling reference claim is.
+    """
     pairs = _load_json_array(CALIBRATION_PATH)
     problems: list[str] = []
     if len(pairs) < MIN_CALIBRATION_PAIRS:
@@ -628,10 +706,19 @@ def check_calibration(
         if missing:
             problems.append(f"{where} is missing fields: {sorted(missing)}")
             continue
-        if pair["case"] not in case_ids:
+        if pair["case"] not in claims_by_case:
             problems.append(f"{where} names unknown case {pair['case']!r}")
         elif pair["reference_claim"] not in claims_by_case[pair["case"]]:
             problems.append(f"{where} reference_claim is not a claim in {pair['case']}")
+        else:
+            problems.extend(
+                _check_pair_elements(
+                    where,
+                    pair,
+                    elements_by_case[pair["case"]],
+                    claims_by_case[pair["case"]][pair["reference_claim"]],
+                )
+            )
         if pair["category"] not in STRIDE_CATEGORIES:
             problems.append(f"{where} category {pair['category']!r} is not a lane")
         if pair["label"] not in ("match", "no-match"):
@@ -702,7 +789,6 @@ def main() -> int:
         return 0
 
     failures = 0
-    claims_by_case: dict[str, set[str]] = {}
     # Lane -> whether any case anywhere carries a must-find record for it. The
     # merge bar's second check is over the whole corpus, so it is accumulated
     # here rather than answered per case.
@@ -719,13 +805,6 @@ def main() -> int:
                 for record in records
                 if isinstance(record, dict) and record.get("tier") == "must-find"
             )
-            # The judge's fixtures cite STRIDE claim strings, because the judge
-            # is STRIDE's alone: a framework matching by requirement ID needs no
-            # claim-equivalence judgement and must not inherit its cost.
-            if name == "stride":
-                claims_by_case[case_dir.name] = {
-                    record["claim"] for record in records if isinstance(record, dict)
-                }
         for problem in problems:
             print(f"{case_dir.name}: {problem}")
         failures += len(problems)
@@ -739,7 +818,7 @@ def main() -> int:
         failures += 1
 
     if CALIBRATION_PATH.exists():
-        for problem in check_calibration(set(claims_by_case), claims_by_case):
+        for problem in check_calibration(*calibration_inputs()):
             print(f"judge_calibration: {problem}")
             failures += 1
     else:

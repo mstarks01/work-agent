@@ -187,12 +187,22 @@ bar**, and they're what lets the scorer be tested with no live calls at all.
   too readily inflates recall silently — the expensive direction to be wrong.
 - **Include pairs that differ only in which element they cite.** Those are
   matches: matching is decided on the claim, and element agreement is scored
-  separately.
+  separately. This rule is why element agreement alone cannot decide claim
+  identity — it labels the two apart on purpose — and
+  `tests/test_evals_identity.py` measures the size of the gap.
 - **Include candidates that assert facts the model doesn't support.** Those are
   no-match — and downstream they're the "unsupported" bucket that counts against
   the tool.
 - **Keep the set balanced;** `verify_corpus.py` fails if either label drops below
   30%.
+- **Assign the candidate's affected element IDs on every `match` pair.** The
+  sixth field of the tuple, and `verify_corpus.py` fails on a `match` pair
+  without one. Answer it from the candidate sentence's own words against
+  `model.json`, **before** reading the reference's element list: copying that
+  list makes every pair agree by construction and the measurement in
+  `tests/test_evals_identity.py` worthless. Follow the reference sets' own
+  conventions — a flow, process, store or entity, one or two of them, never a
+  boundary. `no-match` candidates carry `None`; nobody has assigned them yet.
 
 ### 6. Bless and merge
 
@@ -212,6 +222,7 @@ Merge checklist:
 - [ ] every `source_excerpt` is a verbatim span of the source it cites, with `…` marking any cut
 - [ ] digests and the aggregate stamped (`--write-sha`)
 - [ ] tier assignment reviewed: some must-find, not all
+- [ ] every `match` pair's candidate element IDs read against the candidate's own words
 
 ## Growing a case from real runs
 

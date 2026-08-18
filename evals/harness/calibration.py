@@ -50,6 +50,8 @@ class LabelledPair:
     category: StrideCategory
     reference_claim: str
     candidate_claim: str
+    reference_element_ids: tuple[str, ...]
+    candidate_element_ids: tuple[str, ...] | None
     label: Label
     note: str
 
@@ -63,6 +65,8 @@ class LabelledPair:
             category=self.category,
             reference_claim=self.reference_claim,
             candidate_claim=self.candidate_claim,
+            reference_element_ids=self.reference_element_ids,
+            candidate_element_ids=self.candidate_element_ids,
         )
 
 
@@ -283,6 +287,12 @@ def load_pairs(path: Path | str = DEFAULT_PAIRS_PATH) -> tuple[LabelledPair, ...
                 category=entry["category"],
                 reference_claim=entry["reference_claim"],
                 candidate_claim=entry["candidate_claim"],
+                reference_element_ids=tuple(entry["reference_element_ids"]),
+                candidate_element_ids=(
+                    None
+                    if entry["candidate_element_ids"] is None
+                    else tuple(entry["candidate_element_ids"])
+                ),
                 label=entry["label"],
                 note=entry.get("note", ""),
             )
