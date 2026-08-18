@@ -37,7 +37,7 @@ consistently the "official" one.
 
 **B.** A caller holding a valid key floods the gateway with inference requests and exhausts the shared GPU capacity behind it.
 
-> answer:
+> answer: same
 
 
 ### 2. 06-cookbook-online-game · tampering
@@ -46,7 +46,7 @@ consistently the "official" one.
 
 **B.** An attacker modifies the game client to report fabricated match results.
 
-> answer:
+> answer: different 
 
 
 ### 3. 02-iot-fleet-telemetry · repudiation
@@ -55,7 +55,7 @@ consistently the "official" one.
 
 **B.** There is no way to tell which physical device produced a disputed reading, because every node presents the same credential.
 
-> answer:
+> answer: unclear
 
 
 ### 4. 03-batch-data-pipeline · spoofing
@@ -64,7 +64,7 @@ consistently the "official" one.
 
 **B.** An attacker deposits a file into another partner's folder and the scheduler processes it as that partner's extract, because it never checks the depositor.
 
-> answer:
+> answer: same
 
 
 ### 5. 03-batch-data-pipeline · denial-of-service
@@ -73,7 +73,7 @@ consistently the "official" one.
 
 **B.** An attacker uploads a file large enough that the nightly job never finishes and genuine extracts go unprocessed.
 
-> answer:
+> answer: same
 
 
 ### 6. 03-batch-data-pipeline · elevation-of-privilege
@@ -82,7 +82,7 @@ consistently the "official" one.
 
 **B.** An attacker who can plant a file in the landing bucket gains execution in the warehouse network through the job it triggers.
 
-> answer:
+> answer: same 
 
 
 ### 7. 05-cookbook-queue-webapp · spoofing
@@ -91,7 +91,7 @@ consistently the "official" one.
 
 **B.** An attacker who can reach the message queue writes job messages that the worker treats as coming from the web application.
 
-> answer:
+> answer: same
 
 
 ### 8. 06-cookbook-online-game · repudiation
@@ -100,7 +100,7 @@ consistently the "official" one.
 
 **B.** A support agent's action on a player account cannot be attributed to them, because nothing records who performed a moderation change.
 
-> answer:
+> answer: same
 
 
 ### 9. 06-cookbook-online-game · elevation-of-privilege
@@ -109,7 +109,7 @@ consistently the "official" one.
 
 **B.** An attacker who gets into the moderation website gains control over every player account it can act on.
 
-> answer:
+> answer: same
 
 
 ### 10. 08-sso-identity-broker · elevation-of-privilege
@@ -118,7 +118,7 @@ consistently the "official" one.
 
 **B.** A leaver keeps their access until the nightly pull runs, and a token issued before it goes on working for twelve hours after that.
 
-> answer:
+> answer: unclear
 
 
 ### 11. 08-sso-identity-broker · elevation-of-privilege
@@ -127,7 +127,7 @@ consistently the "official" one.
 
 **B.** An attacker who takes over the franchise provider signs in to our internal applications.
 
-> answer:
+> answer: same
 
 
 ### 12. 09-cookbook-sokify-retail · tampering
@@ -136,7 +136,7 @@ consistently the "official" one.
 
 **B.** An attacker edits the fax number held against an order so the confirmation reaches a machine they control.
 
-> answer:
+> answer: same
 
 
 ### 13. 11-sparse-shift-scheduling · repudiation
@@ -145,7 +145,7 @@ consistently the "official" one.
 
 **B.** A store manager denies having made a rota change that disadvantaged a colleague, and nothing in the model records who changed what.
 
-> answer:
+> answer: same
 
 
 ### 14. 12-overclaiming-supplier-portal · denial-of-service
@@ -154,7 +154,7 @@ consistently the "official" one.
 
 **B.** The vendor platform becomes unavailable and suppliers cannot file compliance paperwork while it is down.
 
-> answer:
+> answer: same
 
 
 ### 15. 12-overclaiming-supplier-portal · elevation-of-privilege
@@ -163,7 +163,7 @@ consistently the "official" one.
 
 **B.** A signed-in supplier reaches another supplier's compliance documents through the portal, because no separation between supplier tenants is stated.
 
-> answer:
+> answer: same
 
 
 ### 16. 04-ml-inference-service · information-disclosure
@@ -172,7 +172,7 @@ consistently the "official" one.
 
 **B.** A caller crafts a request that makes the model emit customer features or training data belonging to a different tenant.
 
-> answer:
+> answer: unclear
 
 
 ### 17. 01-payments-checkout · spoofing
@@ -181,7 +181,7 @@ consistently the "official" one.
 
 **B.** A compromised workload in the internal network calls the order service's gRPC endpoint, which accepts it without authentication.
 
-> answer:
+> answer: unclear 
 
 
 ### 18. 01-payments-checkout · tampering
@@ -190,7 +190,7 @@ consistently the "official" one.
 
 **B.** An attacker with database access rewrites order prices directly in orders-db.
 
-> answer:
+> answer: same
 
 
 ### 19. 01-payments-checkout · elevation-of-privilege
@@ -199,7 +199,7 @@ consistently the "official" one.
 
 **B.** An attacker compromises the storefront API and moves into the core network.
 
-> answer:
+> answer: same
 
 
 ### 20. 02-iot-fleet-telemetry · tampering
@@ -208,7 +208,7 @@ consistently the "official" one.
 
 **B.** An attacker uploads a malicious firmware image to the bucket and every node that polls installs it.
 
-> answer:
+> answer: same
 
 
 ### 21. 02-iot-fleet-telemetry · denial-of-service
@@ -217,7 +217,7 @@ consistently the "official" one.
 
 **B.** An attacker opens huge numbers of MQTT connections to the gateway so real devices cannot connect.
 
-> answer:
+> answer: same 
 
 
 ### 22. 02-iot-fleet-telemetry · elevation-of-privilege
@@ -226,7 +226,7 @@ consistently the "official" one.
 
 **B.** An attacker who compromises one physically accessible node uses its fleet-wide credential to act as the whole fleet against the ingest edge.
 
-> answer:
+> answer: same
 
 
 ### 23. 03-batch-data-pipeline · tampering
@@ -235,8 +235,7 @@ consistently the "official" one.
 
 **B.** An attacker edits claim records sitting in the landing bucket before the 02:00 run picks them up.
 
-> answer:
-
+> answer: same
 
 ### 24. 03-batch-data-pipeline · tampering
 
@@ -244,7 +243,7 @@ consistently the "official" one.
 
 **B.** An attacker changes an Airflow connection string so the pipeline reads from or writes to a system they control.
 
-> answer:
+> answer: same
 
 
 ### 25. 03-batch-data-pipeline · denial-of-service
@@ -253,7 +252,7 @@ consistently the "official" one.
 
 **B.** An attacker crafts input that makes the transform job fail repeatedly, leaving the warehouse stale without any request-level error surfacing.
 
-> answer:
+> answer: same
 
 
 ### 26. 03-batch-data-pipeline · elevation-of-privilege
@@ -262,7 +261,7 @@ consistently the "official" one.
 
 **B.** An attacker with a foothold in the landing network reads the metadata database and escalates to every credential the pipeline holds.
 
-> answer:
+> answer: same
 
 
 ### 27. 04-ml-inference-service · spoofing
@@ -271,7 +270,7 @@ consistently the "official" one.
 
 **B.** Anything already inside the model network can send requests straight to the model server, which authenticates nothing.
 
-> answer:
+> answer: same
 
 
 ### 28. 04-ml-inference-service · tampering
@@ -280,7 +279,7 @@ consistently the "official" one.
 
 **B.** An attacker with model-network access writes to the unauthenticated Redis feature store and changes the features a decision is made on.
 
-> answer:
+> answer: same
 
 
 ### 29. 04-ml-inference-service · denial-of-service
@@ -289,7 +288,7 @@ consistently the "official" one.
 
 **B.** An attacker with model-network access flushes or fills the unauthenticated Redis store, stalling every request that needs features.
 
-> answer:
+> answer: same
 
 
 ### 30. 05-cookbook-queue-webapp · tampering
@@ -298,7 +297,7 @@ consistently the "official" one.
 
 **B.** An attacker who can write to the web application config changes the queue endpoint or credentials and redirects the application's work.
 
-> answer:
+> answer: same
 
 ---
 
