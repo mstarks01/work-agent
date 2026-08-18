@@ -201,6 +201,18 @@ reproduces them and says nothing about whether they are right.
   separately. This rule is why element agreement alone cannot decide claim
   identity — it labels the two apart on purpose — and
   `tests/test_evals_identity.py` measures the size of the gap.
+- **A better-explained write-up of one attack is still a match.** One side
+  naming the credential, the cause, a figure, or the control the other leaves
+  implicit does not make a second claim. **The test: does the extra text change
+  what the attacker does, or only how well it is explained?** Review sitting 01
+  showed this is the rule a reader cannot apply from the bullet above it — every
+  `unclear` answer in that sitting was a pair where one side carried specificity
+  the other lacked.
+- **But a different route is a different claim.** Same fabricated data landing in
+  the same store is *not* one finding when one write-up comes through a server's
+  write path and the other through what a client reports: the remedies differ,
+  and the route is the finding. Review sitting 01 relabelled a pair for exactly
+  this, so the two bullets above have a floor under them.
 - **Include candidates that assert facts the model doesn't support.** Those are
   no-match — and downstream they're the "unsupported" bucket that counts against
   the tool.
