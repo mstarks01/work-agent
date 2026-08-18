@@ -430,3 +430,63 @@ def aggregate_grounds(
             if failure.kind == "fail-closed"
         ),
     }
+
+
+def render(
+    measurements: Sequence[CaseGrounds], failures: Sequence[GroundsFailure]
+) -> None:
+    """The three measurements, printed with the branch mix beside the rates.
+
+    ``quoteless`` is on the same line as the rates and is not a fault:
+    ``analyze.md``'s branch rule predicts a real share of findings whose
+    trigger was an unknown or a crossing rather than the submitter's words.
+    Read low with suspicion, not high.
+    """
+    for entry in measurements:
+        counts = entry.kind_counts
+        print(
+            f"{entry.case_id:<26} grounds {entry.ground_count}"
+            f" on {entry.threat_count} threats ({entry.grounds_per_threat:.2f} ea)"
+            f"  q/u/a/d {counts['quote']}/{counts['unknown-attribute']}"
+            f"/{counts['absent-attribute']}/{counts['derived-fact']}"
+            f"  quoteless {entry.quoteless_rate:.0%}"
+            f"  unverified {entry.unverified_count}/{entry.quote_count}"
+        )
+    for failure in failures:
+        scope = (
+            f": {len(failure.threat_ids)}/{failure.draft_count} threats"
+            if failure.kind == "fail-closed"
+            else ""
+        )
+        print(f"{failure.case_id:<26} grounds FAILED ({failure.kind}{scope})")
+    if measurements or failures:
+        totals = aggregate_grounds(measurements, failures)
+        print(
+            f"grounds: {totals['grounds_per_threat']:.2f} per threat,"
+            f" quoteless {totals['quoteless_rate']:.0%},"
+            f" unverified {totals['unverified_rate']:.1%},"
+            f" failed cases {totals['failed_cases']}"
+            f" (fail-closed {totals['fail_closed_cases']},"
+            f" other {totals['other_failed_cases']})"
+            " (instrument, non-gating)"
+        )
+
+
+def artifact(
+    measurements: Sequence[CaseGrounds], failures: Sequence[GroundsFailure]
+) -> dict[str, Any]:
+    """This instrument's artifact keys.
+
+    The aggregate is ``None`` rather than a fold over nothing: a sweep that
+    measured no case and a sweep whose every rate came out zero are different
+    findings, and one shape for both would hide the first.
+    """
+    return {
+        "grounds": [entry.to_json() for entry in measurements],
+        "grounds_failures": [failure.to_json() for failure in failures],
+        "grounds_aggregate": (
+            aggregate_grounds(measurements, failures)
+            if measurements or failures
+            else None
+        ),
+    }

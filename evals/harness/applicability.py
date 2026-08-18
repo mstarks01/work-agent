@@ -412,3 +412,99 @@ def aggregate_yield(yields: Sequence[ApplicabilityYield]) -> Mapping[str, Any]:
 def _mean(values: Iterable[float]) -> float:
     collected = list(values)
     return sum(collected) / len(collected) if collected else 0.0
+
+
+def render(scores: Sequence[ApplicabilityScore]) -> None:
+    """ASVS's rows, then the pooled figures. Never folded into STRIDE's table.
+
+    The two scorers answer different questions over different sets — an open
+    claim set through a judge, and a finite catalog by string compare — so one
+    combined recall column would be an average of two things nobody asked for.
+    """
+    if not scores:
+        return
+    print("\nASVS applicability (mechanical, no judge)")
+    print(
+        f"{'case':<26} {'lvl':>3} {'rec':>6} {'must':>6} {'prec':>6}"
+        f" {'miss':>5} {'over':>5} {'rej':>5} {'off':>4}"
+    )
+    for score in scores:
+        print(
+            f"{score.case:<26} {score.level:>3} {score.recall:>6.0%}"
+            f" {score.must_find_recall:>6.0%} {score.precision:>6.0%}"
+            f" {len(score.missed):>5} {len(score.over_applied):>5}"
+            f" {len(score.rejected):>5} {len(score.off_catalog):>4}"
+        )
+    totals = pooled(scores)
+    print(
+        f"pooled over {totals['cases']} cases: recall {totals['recall']:.0%}"
+        f" ({totals['matched']}/{totals['expected']}),"
+        f" must-find {totals['must_find_recall']:.0%},"
+        f" precision {totals['precision']:.0%},"
+        f" off-catalog {totals['off_catalog']}"
+        " (instrument, non-gating)"
+    )
+
+
+def artifact(scores: Sequence[ApplicabilityScore]) -> dict[str, Any]:
+    """This instrument's artifact keys.
+
+    Its own keys rather than rows in ``scores``: a confusion matrix over a
+    finite catalog and a judge-relative recall figure are not the same
+    measurement, and one list would invite a reader to average them.
+
+    ``over_applied_for_promotion`` is the corpus feedback loop's half of this
+    instrument — requirements a run ruled applicable that the case did not
+    expect, for the next reading session to settle. No judge, because the set
+    arithmetic already separated the package-bug case into ``off_catalog``.
+    """
+    return {
+        "applicability": [score.to_json() for score in scores],
+        "applicability_aggregate": pooled(scores) if scores else None,
+        "applicability_exemplar_delta": exemplar_delta(scores) if scores else None,
+        "over_applied_for_promotion": over_applied_for_promotion(scores),
+    }
+
+
+def render_yield(yields: Sequence[ApplicabilityYield]) -> None:
+    """This framework's critic, both sides, never one.
+
+    ``destroyed`` is the number that can veto the pattern here — the critic
+    ruling inapplicable a requirement the case says applies — and it is printed
+    beside ``earned`` for the reason :mod:`evals.harness.critic_yield` prints
+    its pair: a rejection count alone reads as the critic working or as the
+    critic breaking things.
+    """
+    if not yields:
+        return
+    print("\nASVS critic yield (mechanical, no judge)")
+    print(
+        f"{'case':<26} {'drafts':>7} {'confirmed':>10} {'rejected':>9} {'earned':>7} {'destroyed':>10}"
+    )
+    for entry in yields:
+        print(
+            f"{entry.case:<26} {entry.drafts:>7} {len(entry.confirmed):>10}"
+            f" {len(entry.rejected):>9} {len(entry.earned):>7}"
+            f" {len(entry.destroyed):>10}"
+        )
+    totals = aggregate_yield(yields)
+    print(
+        f"pooled: rejected {totals['rejected']}/{totals['drafts']}"
+        f" ({totals['rejection_rate']:.0%}),"
+        f" earned {totals['earned']}, destroyed {totals['destroyed']}"
+        f" ({totals['destroyed_rate']:.0%} of rejections)"
+        " (instrument, non-gating)"
+    )
+
+
+def artifact_yield(yields: Sequence[ApplicabilityYield]) -> dict[str, Any]:
+    """This instrument's artifact keys.
+
+    Its own keys beside STRIDE's for the reason the scores are: one column
+    pooling a judge-relative kill count with set arithmetic would be a rate
+    across both.
+    """
+    return {
+        "applicability_yield": [entry.to_json() for entry in yields],
+        "applicability_yield_aggregate": aggregate_yield(yields) if yields else None,
+    }

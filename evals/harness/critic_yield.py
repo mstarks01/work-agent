@@ -312,3 +312,36 @@ def aggregate_yield(yields: Sequence[CriticYield]) -> dict[str, Any]:
         "matched_kill_rate": round(ratio(matched_killed, matched_before), 3),
         "kill_precision": round(ratio(unsupported_killed, killed), 3),
     }
+
+
+def render(yields: Sequence[CriticYield]) -> None:
+    """Both sides of the critic, always printed together.
+
+    ``killed-real`` is deliberately on the same line as ``killed-unsupported``:
+    a kill count read on its own says nothing about whether the critic is
+    filtering noise or destroying findings.
+    """
+    for entry in yields:
+        print(
+            f"{entry.case_id:<26} critic {entry.drafts_in}->{entry.threats_out}"
+            f"  killed-unsupported {entry.unsupported_killed}/{entry.unsupported_before}"
+            f"  killed-real {entry.matched_killed}/{entry.matched_before}"
+            f"  (must-find {entry.must_find_killed})"
+        )
+    if yields:
+        totals = aggregate_yield(yields)
+        print(
+            f"critic yield: killed {totals['killed']}/{totals['drafts_in']}"
+            f" ({totals['kill_rate']:.0%}),"
+            f" unsupported caught {totals['unsupported_kill_rate']:.0%},"
+            f" real destroyed {totals['matched_kill_rate']:.0%}"
+            " (instrument, non-gating)"
+        )
+
+
+def artifact(yields: Sequence[CriticYield]) -> dict[str, Any]:
+    """This instrument's artifact keys."""
+    return {
+        "critic_yield": [entry.to_json() for entry in yields],
+        "critic_yield_aggregate": aggregate_yield(yields) if yields else None,
+    }
