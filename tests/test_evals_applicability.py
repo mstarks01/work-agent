@@ -340,3 +340,99 @@ def test_stability_reads_the_applicability_block_too():
     assert run.cases == {("asvs", "01-payments-checkout")}
     assert run.matched[("asvs", "01-payments-checkout")] == {"V1.2.4", "V6.2.1"}
     assert run.recall[("asvs", "01-payments-checkout")] == 0.5
+
+
+class RuledBlock:
+    """A block with both sides of a critic decision, as the graph builds one."""
+
+    def __init__(self, claims, rejected_claims=()):
+        self.claims = list(claims)
+        self.rejected_claims = list(rejected_claims)
+
+
+def test_the_critic_pair_reads_both_sides(case):
+    """A rejection count alone reads as the critic working or breaking things.
+
+    So the instrument reports `earned` and `destroyed` together, the way
+    `critic_yield` reports `unsupported_killed` beside `matched_killed`.
+    """
+    from evals.harness.applicability import score_yield
+
+    expected = [reference.requirement for reference in case.references["asvs"]]
+    universe = {entry.id for entry in requirements_for(declared_level(case))}
+    unexpected = min(universe - set(expected))
+
+    critic = score_yield(
+        case,
+        RuledBlock(
+            claims=[ruling(expected[0])],
+            # One the corpus expects — destroyed — and one it does not — earned.
+            rejected_claims=[
+                ruling(expected[1], "rejected"),
+                ruling(unexpected, "rejected"),
+            ],
+        ),
+        drafts=[object(), object(), object()],
+    )
+
+    assert critic.destroyed == (expected[1],)
+    assert critic.earned == (unexpected,)
+    assert critic.confirmed == (expected[0],)
+    assert critic.rejection_rate == pytest.approx(2 / 3)
+    assert critic.destroyed_rate == 0.5
+
+
+def test_the_split_comes_from_the_list_a_claim_sits_in(case):
+    """Not from its verdict, which would be a second definition of one split.
+
+    The two lists *are* the critic's decision. Re-deriving it from the verdict
+    would let a block whose lists and verdicts disagree read as consistent.
+    """
+    from evals.harness.applicability import score_yield
+
+    expected = [reference.requirement for reference in case.references["asvs"]]
+    critic = score_yield(
+        case,
+        # A confirmed verdict sitting in the rejected list: malformed, and the
+        # block's own checks are what report that. This instrument follows the
+        # list, so the claim counts as rejected.
+        RuledBlock(claims=[], rejected_claims=[ruling(expected[0], "confirmed")]),
+        drafts=[object()],
+    )
+
+    assert critic.rejected == (expected[0],)
+    assert critic.confirmed == ()
+
+
+def test_a_critic_that_rejected_nothing_reports_zero_rather_than_dividing(case):
+    from evals.harness.applicability import aggregate_yield, score_yield
+
+    expected = [reference.requirement for reference in case.references["asvs"]]
+    critic = score_yield(
+        case, RuledBlock(claims=[ruling(r) for r in expected]), drafts=[object()]
+    )
+
+    assert critic.rejected == ()
+    assert critic.destroyed_rate == 0.0
+    assert aggregate_yield([critic])["destroyed_rate"] == 0.0
+
+
+def test_pooling_the_yield_weights_by_draft_and_not_by_case(case):
+    """A case drafting three must not outweigh one drafting seventeen."""
+    from evals.harness.applicability import aggregate_yield, score_yield
+
+    expected = [reference.requirement for reference in case.references["asvs"]]
+    small = score_yield(
+        case,
+        RuledBlock(claims=[], rejected_claims=[ruling(expected[0], "rejected")]),
+        drafts=[object()],
+    )
+    large = score_yield(
+        case, RuledBlock(claims=[ruling(r) for r in expected]), drafts=[object()] * 9
+    )
+
+    totals = aggregate_yield([small, large])
+
+    assert totals["drafts"] == 10
+    assert totals["rejected"] == 1
+    assert totals["rejection_rate"] == 0.1
