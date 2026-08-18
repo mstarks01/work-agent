@@ -16,6 +16,63 @@ below is written that way on purpose: a note that said "the other framework"
 would be wrong the day a third one lands, and would have to be rewritten by
 whoever was least likely to notice.
 
+## How the asymmetry happened, once, in detail
+
+Worth reading before the rules, because the rules are derived from it rather than
+from principle.
+
+**The cutover stopped at the service boundary.**
+[#172](https://github.com/mstarks01/work-agent/issues/172) made the service
+framework-neutral: one extraction, one **Valid System Model**, N packages. It
+worked — `src/` is clean today, and every `stride` in it is a module path.
+Everything that *grades* the service was outside that scope and kept its
+one-package shape. ASVS landed four days later
+([#176](https://github.com/mstarks01/work-agent/issues/176)) and **nothing
+failed**.
+
+**A one-package assumption is vacuously correct when written and silently wrong
+afterwards.** It does not raise; it reports a smaller, plausible number.
+`EVAL_FRAMEWORKS = ("stride",)` was right when there was one package.
+`aggregate_coverage` keyed by lane name was right while no two packages shared a
+slug. `summarize()` pooling every framework was right with one — and once ASVS
+records reached it, it returned 70%, which cleared STRIDE's floor while hiding
+that ASVS sat at 32%. None of these broke on the day the second package arrived.
+They kept answering about half the system, which is why an audit found them and a
+test suite did not.
+
+**Eight PRs to find them one at a time:**
+[#214](https://github.com/mstarks01/work-agent/pull/214) (nothing scored 63 ASVS
+records), [#215](https://github.com/mstarks01/work-agent/pull/215) (coverage,
+grounds), [#221](https://github.com/mstarks01/work-agent/pull/221) (the knowledge
+lint read one directory), [#222](https://github.com/mstarks01/work-agent/pull/222)
+(stability, exemplar delta, promotion feed),
+[#223](https://github.com/mstarks01/work-agent/pull/223) (trigger recall),
+[#224](https://github.com/mstarks01/work-agent/pull/224) (the tuning guide),
+[#225](https://github.com/mstarks01/work-agent/pull/225) (critic yield), and
+[#210](https://github.com/mstarks01/work-agent/pull/210), which fixed a review
+check *I had shipped an hour earlier* that let a sign-off naming one package's
+reference set clear a case holding another's unread. The rule does not exempt
+whoever is applying it.
+
+### The one usable rule this gives
+
+Sorting those fixes by what they touched separates two shapes cleanly:
+
+| shape | what happened when ASVS landed |
+|---|---|
+| **a table keyed by framework** — `PACKAGES`, `SCHEMAS`, `REFERENCE_TYPES`, the five maps in `verify_corpus.py` | **already correct, no change needed.** A missing key raises `KeyError` at the first call, so the edit is forced. |
+| **a constant or a branch naming one framework** — the eval framework list, `stride_block` call sites, the grounds fold, stability, the exemplar delta, trigger recall, the knowledge lint | **every one of them was a gap.** |
+
+**So: prefer a table keyed by framework over a constant or a branch.** The table
+is self-completing; the branch needs somebody to remember, and this document
+exists because somebody did not.
+
+`tests/test_framework_neutrality.py` enforces the decidable half: every framework
+literal outside a package root is declared with the reason it is allowed, and a
+new one fails until it is. Its `DECLARED` map is also the checklist to re-read
+when a package lands — every entry reading *"this code is that framework's"* is a
+dispatch a third package may need adding to.
+
 ## Why this rule exists
 
 The repo name, the service name, the package root and most of the history all
@@ -118,11 +175,17 @@ for free" is a claim to check, never one to assume.
 
 ## Where this is enforced
 
-`tests/test_case_review.py` is the one mechanical instance, and it is written
-N-ary: a step 6 sign-off is checked against every framework the case declares, so
-a review that read one package's reference set leaves the case in debt. The merge
-bar in `verify_corpus.py` is the other, for a narrower question — every lane of
-every carried package has a `must-find` record somewhere.
+Three mechanical instances, each for a narrow question:
+
+- **`tests/test_framework_neutrality.py`** — every framework literal outside a
+  package root is declared with a reason, so a new one fails until somebody says
+  why it is not a table. This is the check derived from the root cause above.
+- **`tests/test_case_review.py`** — a step 6 sign-off is checked against every
+  framework the case declares, so a review that read one package's reference set
+  leaves the case in debt.
+- **The merge bar in `verify_corpus.py`** — every lane of every carried package
+  has a `must-find` record somewhere in the corpus.
 
 Everything else in this document is a rule for the PR body, because the general
-form is not mechanically checkable.
+form is not mechanically checkable: no test can tell that a *number* was computed
+over one framework when the code reading it was already neutral.
