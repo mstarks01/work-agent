@@ -34,7 +34,12 @@ from typing import Any
 from evals.harness.reference import CaseFramework, GoldenCase, ReferenceRequirement
 from stride_service.frameworks.asvs.catalog import requirements_for
 from stride_service.frameworks.asvs.record import requirement_of
-from stride_service.report import FrameworkAnalysis, FrameworkName, RuledClaim
+from stride_service.report import (
+    Claim,
+    FrameworkAnalysis,
+    FrameworkName,
+    RuledClaim,
+)
 
 #: The verdicts that assert a requirement applies to this system. ``rejected``
 #: is the critic ruling it does not, which is the negative answer rather than a
@@ -288,6 +293,120 @@ def over_applied_for_promotion(
         for score in scores
         for requirement in score.over_applied
     ]
+
+
+@dataclass(frozen=True)
+class ApplicabilityYield:
+    """What one case's ASVS critic pass cost and bought.
+
+    The same two-sided instrument :mod:`evals.harness.critic_yield` is for, over
+    the only destructive move this package's **Critic** has. STRIDE's critic
+    kills drafts; ASVS's *rules applicability*, and its `rejected` verdict is
+    the ruling that a requirement does not apply to a system of this shape. So
+    "what did the critic destroy, and how much of it was real" reads:
+
+    * ``earned`` — requirements it rejected that the case did not expect. The
+      critic doing its job, and the direct counterpart of ``unsupported_killed``.
+    * ``destroyed`` — requirements it rejected that the case *did* expect. **The
+      number that can veto the pattern here**, exactly as ``matched_killed``
+      does for STRIDE.
+
+    Only the pair means anything. A rejection count alone reads as either.
+
+    **No judge and no second scoring pass.** STRIDE's yield works by scoring one
+    case twice through the judge, sharing a memo so the subset is close to free.
+    Here both sides are requirement identifiers, so the whole instrument is set
+    arithmetic over the block the run already produced.
+    """
+
+    case: str
+    drafts: int
+    confirmed: tuple[str, ...]
+    rejected: tuple[str, ...]
+    destroyed: tuple[str, ...]
+    earned: tuple[str, ...]
+
+    @property
+    def rejection_rate(self) -> float:
+        """Of what the critic was handed, the share it ruled inapplicable."""
+        return len(self.rejected) / self.drafts if self.drafts else 0.0
+
+    @property
+    def destroyed_rate(self) -> float:
+        """Of what it rejected, the share the case expected a ruling on."""
+        return len(self.destroyed) / len(self.rejected) if self.rejected else 0.0
+
+    def to_json(self) -> dict[str, Any]:
+        return {
+            "case": self.case,
+            "framework": FRAMEWORK,
+            "drafts": self.drafts,
+            "confirmed": len(self.confirmed),
+            "rejected": len(self.rejected),
+            "destroyed": list(self.destroyed),
+            "earned": list(self.earned),
+            "rejection_rate": round(self.rejection_rate, 3),
+            "destroyed_rate": round(self.destroyed_rate, 3),
+        }
+
+
+def score_yield(
+    case: GoldenCase, block: FrameworkAnalysis, drafts: Sequence[Claim]
+) -> ApplicabilityYield:
+    """One case's ASVS critic pass, against what the case expected.
+
+    ``drafts`` is the pre-critic union the critic was handed, which is the
+    denominator: the block's own ``claims`` and ``rejected_claims`` are what
+    came back, and a draft the fan-in never delivered was never the critic's to
+    rule on.
+    """
+    expected = {
+        reference.requirement
+        for reference in case.references.get(FRAMEWORK) or ()
+        if isinstance(reference, ReferenceRequirement)
+    }
+    # Read from the list a claim sits in, not from its verdict: the two lists
+    # *are* the critic's decision, and re-deriving it from the verdict would be
+    # a second definition of the same split.
+    confirmed = _requirements(block.claims)
+    rejected = _requirements(block.rejected_claims)
+    return ApplicabilityYield(
+        case=case.id,
+        drafts=len(drafts),
+        confirmed=tuple(sorted(confirmed)),
+        rejected=tuple(sorted(rejected)),
+        destroyed=tuple(sorted(rejected & expected)),
+        earned=tuple(sorted(rejected - expected)),
+    )
+
+
+def _requirements(claims: Sequence[RuledClaim]) -> set[str]:
+    """Every standard identifier in a claim list, parseable ones only."""
+    return {
+        requirement for claim in claims if (requirement := requirement_of(claim.id))
+    }
+
+
+def aggregate_yield(yields: Sequence[ApplicabilityYield]) -> Mapping[str, Any]:
+    """The corpus-wide view, pooled rather than averaged over cases.
+
+    Pooled for the reason :func:`~evals.harness.critic_yield.aggregate_yield`
+    gives: these are small per-case counts, and a mean of per-case rates lets a
+    case carrying six records outweigh one carrying seventeen.
+    """
+    drafts = sum(entry.drafts for entry in yields)
+    rejected = sum(len(entry.rejected) for entry in yields)
+    destroyed = sum(len(entry.destroyed) for entry in yields)
+    return {
+        "cases": len(yields),
+        "drafts": drafts,
+        "confirmed": sum(len(entry.confirmed) for entry in yields),
+        "rejected": rejected,
+        "destroyed": destroyed,
+        "earned": sum(len(entry.earned) for entry in yields),
+        "rejection_rate": round(rejected / drafts, 3) if drafts else 0.0,
+        "destroyed_rate": round(destroyed / rejected, 3) if rejected else 0.0,
+    }
 
 
 def _mean(values: Iterable[float]) -> float:
