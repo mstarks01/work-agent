@@ -381,6 +381,8 @@ def _judge_in_lane(
                     category=reference.category,
                     reference_claim=reference.claim,
                     candidate_claim=candidate_claim(threat),
+                    reference_element_ids=tuple(reference.affected_element_ids),
+                    candidate_element_ids=tuple(threat.affected_element_ids),
                 )
             )
             rulings.append(
@@ -488,6 +490,8 @@ def _find_lane_errors(
                     category=reference.category,
                     reference_claim=reference.claim,
                     candidate_claim=candidate_claim(threat),
+                    reference_element_ids=tuple(reference.affected_element_ids),
+                    candidate_element_ids=tuple(threat.affected_element_ids),
                 )
             )
             rulings.append(

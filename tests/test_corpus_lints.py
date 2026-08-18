@@ -26,20 +26,7 @@ def test_severity_bands_are_derivable_everywhere():
 
 
 def test_calibration_fixtures_pass_their_checks():
-    # STRIDE's reference file, because the judge is STRIDE's: a framework that
-    # matches by requirement ID reaches no claim-equivalence judgement and so
-    # contributes no pair here.
-    claims_by_case = {
-        case_dir.name: {
-            record["claim"]
-            for record in verify_corpus._load_json_array(
-                verify_corpus.claims_file(case_dir, "stride")
-            )
-        }
-        for case_dir in verify_corpus.case_dirs()
-    }
-
-    problems = verify_corpus.check_calibration(set(claims_by_case), claims_by_case)
+    problems = verify_corpus.check_calibration(*verify_corpus.calibration_inputs())
 
     assert problems == []
 

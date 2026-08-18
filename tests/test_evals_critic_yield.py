@@ -219,6 +219,8 @@ def test_memo_replays_one_answer_for_one_question():
         category="spoofing",
         reference_claim="a",
         candidate_claim="b",
+        reference_element_ids=("process:storefront-api",),
+        candidate_element_ids=("process:storefront-api",),
     )
 
     first = memo.equivalent(pair)
