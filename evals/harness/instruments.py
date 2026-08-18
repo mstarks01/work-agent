@@ -37,18 +37,29 @@ the numbers that cost no provider call.
 
 from __future__ import annotations
 
-from collections.abc import Callable, Sequence
+from collections.abc import Callable, Mapping, Sequence
 from dataclasses import dataclass
 from typing import Any
 
 from evals.harness import applicability, coverage, critic_yield, grounds, modes, scorer
-from evals.harness.applicability import ApplicabilityScore, ApplicabilityYield
 from evals.harness.coverage import LaneCoverage, TaggedRow
 from evals.harness.critic_yield import CriticYield
 from evals.harness.grounds import CaseGrounds, GroundsFailure
 from evals.harness.provenance import RunProvenance
+from evals.harness.reference import GoldenCase
 from evals.harness.scorer import CaseScore
-from stride_service.report import FrameworkName, NodeLatency, TokenUsage
+from stride_service.report import (
+    FrameworkAnalysis,
+    FrameworkName,
+    NodeLatency,
+    Report,
+    TokenUsage,
+)
+
+#: What a package's per-case scorer is handed, and what it gives back: the
+#: case, that package's own block off the report, and the pre-critic drafts
+#: it produced. The return is keyed by instrument name.
+CaseScorer = Callable[[GoldenCase, FrameworkAnalysis, Sequence[Any]], Mapping[str, Any]]
 
 
 @dataclass(frozen=True)
@@ -85,10 +96,11 @@ class ModeRun:
     aggregate rather than the aggregate itself, and the framework rides beside
     it because a lane slug belongs to whichever package declared it.
 
-    ``applicability`` is the ASVS half, one row per case that declares the
-    framework. It is a separate list rather than a column on ``payloads``
-    because it is a different instrument: STRIDE's scorer grades an open claim
-    set through a judge, and this one is a confusion matrix over a finite
+    ``rows`` holds what each package's own per-case scorer produced, keyed by
+    the instrument that reads it — ASVS's applicability rows arrive here, one
+    per case that declares the framework. They are separate from ``payloads``
+    because they are different instruments: STRIDE's scorer grades an open
+    claim set through a judge, and ASVS's is a confusion matrix over a finite
     catalog with no model call anywhere (#167). Pooling them would put two
     numbers that are not comparable under one heading.
 
@@ -112,8 +124,12 @@ class ModeRun:
     #: can report a package whose every lane went silent rather than drop it.
     frameworks: tuple[FrameworkName, ...]
     extractions: list[modes.ExtractionScore]
-    applicability: list[ApplicabilityScore]
-    applicability_yields: list[ApplicabilityYield]
+    #: Per-case rows from the package scorers, keyed by the instrument that
+    #: reads each one. The neutral instruments above keep their own fields
+    #: because they read every block and need no per-package declaration; these
+    #: are what one package's own record earned, so they arrive under a key
+    #: rather than as a field somebody has to add.
+    rows: Mapping[str, tuple[Any, ...]]
 
     @property
     def observations(self) -> dict[str, frozenset[str]]:
@@ -135,6 +151,15 @@ class Sweep:
     run: ModeRun
     scores: tuple[CaseScore, ...] = ()
     yields: tuple[CriticYield, ...] = ()
+
+    def rows(self, instrument: str) -> tuple[Any, ...]:
+        """The per-case rows this instrument's scorers produced, if any.
+
+        Empty for an instrument no package in this sweep declared a scorer for,
+        which is the same shape as one whose scorer ran and found nothing. The
+        difference is carried by ``run.frameworks``, which says what ran.
+        """
+        return self.run.rows.get(instrument, ())
 
     @property
     def lanes(self) -> list[LaneCoverage]:
@@ -186,14 +211,16 @@ INSTRUMENTS: dict[str, Instrument] = {
         artifact=lambda sweep: coverage.artifact(sweep.lanes),
     ),
     "applicability": Instrument(
-        render=lambda sweep: applicability.render(sweep.run.applicability),
-        artifact=lambda sweep: applicability.artifact(sweep.run.applicability),
+        render=lambda sweep: applicability.render(sweep.rows("applicability")),
+        artifact=lambda sweep: applicability.artifact(sweep.rows("applicability")),
         frameworks=("asvs",),
     ),
     "applicability_yield": Instrument(
-        render=lambda sweep: applicability.render_yield(sweep.run.applicability_yields),
+        render=lambda sweep: applicability.render_yield(
+            sweep.rows("applicability_yield")
+        ),
         artifact=lambda sweep: applicability.artifact_yield(
-            sweep.run.applicability_yields
+            sweep.rows("applicability_yield")
         ),
         frameworks=("asvs",),
     ),
@@ -245,3 +272,41 @@ def artifact_blocks(sweep: Sweep) -> dict[str, Any]:
             )
         blocks |= keys
     return blocks
+
+
+#: The per-case scorer each package's own record earns, beyond the
+#: framework-neutral instruments every block already gets.
+#:
+#: **Keyed, never branched.** A package added to
+#: :data:`~stride_service.frameworks.PACKAGES` and missing here raises at the
+#: first case that carries its block, which is the whole reason this is a table:
+#: the ``if`` it replaced dispatched to one package by name and would have gone
+#: on scoring nothing for a third, quietly.
+#:
+#: ``None`` is a declaration, not a hole. It says grounds and coverage are the
+#: whole of what this package's record can be measured with mechanically —
+#: which is true of a package whose claims are graded through a judge, because
+#: a judged reading is not a per-case fold. ``test_every_package_declares_a_scorer``
+#: is what keeps it a decision.
+PACKAGE_SCORERS: dict[FrameworkName, CaseScorer | None] = {
+    "stride": None,
+    "asvs": applicability.score_case,
+}
+
+
+def score_blocks(
+    case: GoldenCase, report: Report, drafts: Mapping[FrameworkName, Sequence[Any]]
+) -> dict[str, Any]:
+    """Every block's own per-case rows, keyed by the instrument that reads each.
+
+    Walks the report's blocks rather than asking for a package by name, so a
+    sweep measures what it ran. A package whose scorer is ``None`` contributes
+    nothing here and is still measured by every neutral instrument.
+    """
+    scored: dict[str, Any] = {}
+    for block in report.analyses:
+        scorer = PACKAGE_SCORERS[block.framework]
+        if scorer is None:
+            continue
+        scored |= scorer(case, block, drafts.get(block.framework, ()))
+    return scored
