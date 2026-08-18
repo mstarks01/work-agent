@@ -891,7 +891,7 @@
   {
     "case": "04-ml-inference-service",
     "category": "information-disclosure",
-    "reference_claim": "A caller crafts a request that makes the model emit customer features or training data belonging to a different tenant.",
+    "reference_claim": "A caller crafts a request that makes the model emit customer features belonging to a different tenant.",
     "reference_element_ids": [
       "flow:calling-service-to-inference-gateway:submit-inference-request",
       "process:model-server"
@@ -906,7 +906,7 @@
   {
     "case": "04-ml-inference-service",
     "category": "information-disclosure",
-    "reference_claim": "A caller crafts a request that makes the model emit customer features or training data belonging to a different tenant.",
+    "reference_claim": "A caller crafts a request that makes the model emit customer features belonging to a different tenant.",
     "reference_element_ids": [
       "flow:calling-service-to-inference-gateway:submit-inference-request",
       "process:model-server"
@@ -1814,12 +1814,9 @@
       "store:player-database"
     ],
     "candidate_claim": "An attacker modifies the game client to report fabricated match results.",
-    "candidate_element_ids": [
-      "process:game-client",
-      "store:stats-database"
-    ],
-    "label": "match",
-    "note": "Same action and target as the reference's fabricated progression, reached through the client the model already marks untrusted."
+    "candidate_element_ids": null,
+    "label": "no-match",
+    "note": "Relabelled by review sitting 01. The reference is a game server writing fabricated progression to the player database; this is a client reporting fabricated results. Different component, different point of entry, and different remedies \u2014 harden the server's write path against validate what the client sends. The original note treated the route as incidental to 'fabricated data ends up recorded', and in threat modelling the route is the finding."
   },
   {
     "case": "06-cookbook-online-game",

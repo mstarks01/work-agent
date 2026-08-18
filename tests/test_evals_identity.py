@@ -38,17 +38,19 @@ from evals.harness.reference import ReferenceThreat, load_corpus
 from tests.factories import valid_model
 
 #: What element agreement alone is worth on the recorded labels, measured
-#: 2026-08-18 over the 201 ``match`` pairs that carry candidate element IDs.
+#: 2026-08-18 over the 200 ``match`` pairs that carry candidate element IDs.
+#: Review sitting 01 relabelled one pair out of the set, which is why the count
+#: is 200 and not the 201 #204 reported.
 #: Every number here is quoted in #201, so moving one means updating the issue.
 MEASURED = {
-    "assigned_pairs": 201,
+    "assigned_pairs": 200,
     # The rule the record can express today: the two element sets are equal,
     # with zones dropped.
     "equality_agreements": 111,
     # It never merges two claims a human called different, and splits nearly
     # half of the ones a human called the same.
     "false_matches": 0,
-    "false_non_matches": 90,
+    "false_non_matches": 89,
 }
 
 #: The frontier, both errors at once. ``splits`` counts the ``match`` pairs a
@@ -56,18 +58,18 @@ MEASURED = {
 #: the same, over the 287 within-lane pairs the corpus holds — and every one of
 #: those is a pair the corpus records as a distinct claim, so every merge is an error.
 #:
-#: Read down the table: no rule here is usable. The tightest loses 90 of 201
+#: Read down the table: no rule here is usable. The tightest loses 89 of 200
 #: paraphrases; the loosest destroys 126 findings. **The interesting row is
 #: endpoint subset**, which clears the 90% bar on splits and is the only row
 #: whose merges are few enough to enumerate and design against — which is what
 #: #201's ``mechanism`` has to separate.
 FRONTIER = {
-    "equality": {"splits": 90, "merges": 1},
-    "endpoint equality": {"splits": 61, "merges": 6},
-    "subset": {"splits": 42, "merges": 7},
-    "endpoint subset": {"splits": 15, "merges": 23},
-    "overlap": {"splits": 5, "merges": 34},
-    "endpoint overlap": {"splits": 2, "merges": 126},
+    "equality": {"splits": 89, "merges": 1},
+    "endpoint equality": {"splits": 60, "merges": 6},
+    "subset": {"splits": 41, "merges": 7},
+    "endpoint subset": {"splits": 14, "merges": 23},
+    "overlap": {"splits": 4, "merges": 34},
+    "endpoint overlap": {"splits": 1, "merges": 126},
 }
 
 
@@ -126,7 +128,7 @@ def assigned():
 def test_every_assigned_pair_is_a_match_label(assigned):
     """The assignment pass covered the ``match`` half and only that half.
 
-    The false-split question lives entirely in the pairs a human called equal,
+    The false-split question lives entirely in the pairs the labels call equal,
     so those were assigned first. A ``no-match`` pair that acquired element IDs
     without the figures below moving would mean the two sets stopped describing
     the same population.

@@ -1,5 +1,36 @@
 # Review sitting 01 — are these the same threat?
 
+> ## Result, recorded 2026-08-18
+>
+> **25 `same`, 1 `different`, 4 `unclear`.** Five of thirty, under the six-of-thirty
+> line this document set, so the labels hold at their weakest point and the
+> duplicate-threat work stands on the evidence it has. The floor is soft, not
+> firm: 17% at the hard end.
+>
+> Two defects came out of it, and both are fixed:
+>
+> - **Pair 16 exposed an unsupported reference claim.** Case 04's
+>   information-disclosure claim asserted the model emits "customer features **or
+>   training data**". No training pipeline exists in that case, and the label set
+>   already rules training-time attacks out of scope for it — so the corpus graded
+>   the tool against a fact its own model does not hold. The claim is corrected.
+> - **Pair 2 was a wrong label.** A game server writing fabricated progression and
+>   a client reporting fabricated results were labelled one claim. Different
+>   component, different entry point, different remedy. Relabelled `no-match`,
+>   which is why the match set is 200 and not 201.
+>
+> **All four `unclear` answers share one cause:** one side carried specificity the
+> other lacked. That is what step 5 of `BLESSING.md` rules on, and the sitting
+> shows the rule was not readable. Step 5 now states the test explicitly.
+>
+> **A mechanical check for the pair-16 defect was tried and abandoned.** Flagging
+> a claim that uses a word absent from its case's source and model fires on 231
+> of 243 claims: a claim is *supposed* to describe an attack in words the system
+> description never uses. Narrowing to the asset vocabulary fails too — training
+> data falls under `business-critical-data`, which that case already carries. So
+> this class of defect is not mechanically detectable, and a reading session is
+> the only thing that finds it. That is the argument for step 6.
+
 **Nobody has ever reviewed anything under `evals/`.** The 339 pairs the eval
 suite scores against were written by an agent, and the judge model has been
 graded against them since July. This is the first check on whether any of it is
