@@ -30,6 +30,14 @@ was a name or an `if`; every table was already correct, because a missing key ra
 `tests/test_framework_neutrality.py` holds the decidable half. See
 `docs/agents/framework-parity.md` for the post-mortem this is derived from.
 
+### Provenance
+
+A fact about how an artifact was made belongs in a **field the code reads**, never a
+sentence in a guide: `bootstrap` on `case.json` stayed true for a year, while the same
+file's prose about a reviewer drifted the moment nobody was one. When a design names a
+role, ship the field and its debt list before the artifact. Write guides in the
+imperative, never the past tense. See `docs/agents/provenance.md`.
+
 ### Domain docs
 
 Single-context: one `CONTEXT.md` glossary at the repo root, ADRs in `docs/adr/`.
