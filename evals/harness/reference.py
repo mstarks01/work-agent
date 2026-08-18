@@ -122,6 +122,18 @@ class ReferenceClaim(BaseModel):
     def must_find(self) -> bool:
         return self.tier == "must-find"
 
+    @property
+    def lane(self) -> str:
+        """Which of its framework's lanes this claim belongs to.
+
+        Declared on the base and answered by each record, so a scorer reading a
+        lane never spells ``category`` or ``chapter`` — the same separation
+        :attr:`~stride_service.frameworks.IdRule.lane_field` makes on the
+        service side. A framework whose records carry no lane answers the empty
+        string, which is legal rather than a defect.
+        """
+        return ""
+
 
 class ReferenceThreat(ReferenceClaim):
     """STRIDE's reference record: a category and a graded severity.
@@ -134,6 +146,11 @@ class ReferenceThreat(ReferenceClaim):
 
     category: StrideCategory
     affected_element_ids: tuple[str, ...] = Field(min_length=1)
+
+    @property
+    def lane(self) -> str:
+        return self.category
+
     severity: ReferenceSeverity
 
 
@@ -157,6 +174,10 @@ class ReferenceRequirement(ReferenceClaim):
 
     chapter: AsvsChapter
     requirement: str = Field(pattern=r"^V\d{1,2}\.\d{1,2}\.\d{1,2}$")
+
+    @property
+    def lane(self) -> str:
+        return self.chapter
 
 
 #: The reference record each framework's corpus file validates as. Harness data
