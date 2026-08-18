@@ -1,7 +1,7 @@
-"""What the category agents were offered across a sweep, and what they cited.
+"""What the lane agents were offered across a sweep, and what they cited.
 
 :class:`~stride_service.report.LaneCoverage` is computed per job and rides on
-the report, one row per lane — which for STRIDE is one per category. One job's
+each **Framework Analysis**, one row per lane. One job's
 rows are close to
 unreadable — an agent that examined a flow and correctly found nothing cites
 nothing, and no observable separates it from one that never looked. The
@@ -13,6 +13,14 @@ Pooled rather than averaged over cases, for the reason
 :func:`~evals.harness.critic_yield.aggregate_yield` gives: these are small
 per-case counts, and a mean of per-case rates lets a three-element case
 outweigh a forty-element one.
+
+**Keyed by ``(framework, lane)``, never by lane alone.** A lane is a
+**Framework Package**'s own vocabulary rather than a shared one, and two
+packages may legitimately declare a lane of the same name — so a table keyed by
+the slug would pool two unrelated agents' numbers the day that happens. STRIDE's
+six categories and ASVS's 17 chapters do not collide today, and relying on that
+is the one-package assumption ``docs/agents/framework-parity.md`` exists to
+catch.
 
 Credential-free — it folds numbers the service already computed in code — so
 it costs a sweep nothing and is **non-gating**. A citation rate is not a
@@ -27,7 +35,8 @@ from dataclasses import dataclass
 from typing import Any
 
 from evals.harness.scorer import ratio
-from stride_service.frameworks.stride.record import STRIDE_CATEGORIES, StrideCategory
+from stride_service.frameworks import PACKAGES
+from stride_service.report import FrameworkName
 from stride_service.report import LaneCoverage as ReportLaneCoverage
 
 # The offered/cited pairs, in the order they read on a row. Named once because
@@ -41,11 +50,18 @@ CITED_PAIRS: tuple[tuple[str, str], ...] = (
 )
 
 
+#: One report row, tagged with the block it was read off. The report's own row
+#: carries no framework — it does not need one, since it sits inside that
+#: framework's block — so the sweep pairs them as it collects.
+TaggedRow = tuple[FrameworkName, ReportLaneCoverage]
+
+
 @dataclass(frozen=True)
 class LaneCoverage:
-    """One category's coverage pooled over every case in the sweep."""
+    """One lane's coverage pooled over every case in the sweep."""
 
-    category: StrideCategory
+    framework: FrameworkName
+    lane: str
     cases: int
     drafts: int
     rules: int
@@ -70,7 +86,8 @@ class LaneCoverage:
 
     def to_json(self) -> dict[str, Any]:
         return {
-            "category": self.category,
+            "framework": self.framework,
+            "lane": self.lane,
             "cases": self.cases,
             "drafts": self.drafts,
             "rules": self.rules,
@@ -84,51 +101,52 @@ class LaneCoverage:
         }
 
 
-def _as_category(lane: str) -> StrideCategory:
-    """A report row's lane slug as the STRIDE category it names.
+def aggregate_coverage(
+    rows: Iterable[TaggedRow], frameworks: Iterable[FrameworkName]
+) -> list[LaneCoverage]:
+    """Pool per-case coverage rows into one row per ``(framework, lane)``.
 
-    A report row is keyed by a plain string, because a lane belongs to whichever
-    package declares it. This fold is STRIDE's, where the six lane slugs *are*
-    the category names — so the narrowing is a real lookup against that package's
-    own list rather than a cast, and a lane no STRIDE category matches is a
-    caller feeding this fold another framework's rows.
+    **Every lane of every framework the sweep ran**, in each package's own
+    declared order, including lanes the sweep saw no row for: a lane missing
+    from the table would read as a lane with nothing to cite, and the two are
+    opposite findings.
+
+    ``frameworks`` is what the sweep *built*, not what the rows happen to
+    mention, and that is what makes the guarantee hold in both directions. A
+    package whose every lane went silent would vanish from the table if the list
+    came off the rows — which is the exact finding the table exists to show. And
+    a sweep that ran STRIDE alone prints six rows rather than twenty-three,
+    because a framework nobody ran has no silent lanes to report.
+
+    The lane list itself comes from
+    :data:`~stride_service.frameworks.PACKAGES`, so a package that gains a lane
+    gains a row here with no edit.
     """
-    for category in STRIDE_CATEGORIES:
-        if category == lane:
-            return category
-    raise ValueError(f"{lane!r} is not a STRIDE lane; these rows are not STRIDE's")
-
-
-def aggregate_coverage(rows: Iterable[ReportLaneCoverage]) -> list[LaneCoverage]:
-    """Pool per-case coverage rows into one row per category.
-
-    Always all six lanes, in the report's own category order, including any the
-    sweep never produced a row for: a lane missing from the table would read as
-    a lane with nothing to cite, and the two are opposite findings.
-
-    STRIDE's lane slugs *are* its category names, so a report row's ``lane``
-    keys this table directly. That identity is this package's and not a fact
-    about the report, which is why the fold names the framework it is folding.
-    """
-    by_category: dict[StrideCategory, list[ReportLaneCoverage]] = {
-        category: [] for category in STRIDE_CATEGORIES
-    }
-    for row in rows:
-        by_category[_as_category(row.lane)].append(row)
+    collected: dict[tuple[FrameworkName, str], list[ReportLaneCoverage]] = {}
+    for framework, row in rows:
+        collected.setdefault((framework, row.lane), []).append(row)
+    ran = set(frameworks)
     return [
         LaneCoverage(
-            category=category,
-            cases=len(lane),
-            drafts=sum(row.drafts for row in lane),
-            rules=sum(row.rules for row in lane),
-            rules_fired=sum(row.rules_fired for row in lane),
+            framework=framework,
+            lane=lane,
+            cases=len(collected.get((framework, lane), [])),
+            drafts=sum(row.drafts for row in collected.get((framework, lane), [])),
+            rules=sum(row.rules for row in collected.get((framework, lane), [])),
+            rules_fired=sum(
+                row.rules_fired for row in collected.get((framework, lane), [])
+            ),
             totals={
-                field: sum(getattr(row, field) for row in lane)
+                field: sum(
+                    getattr(row, field) for row in collected.get((framework, lane), [])
+                )
                 for pair in CITED_PAIRS
                 for field in pair
             },
         )
-        for category, lane in by_category.items()
+        for framework in PACKAGES
+        if framework in ran
+        for lane in PACKAGES[framework].lanes
     ]
 
 

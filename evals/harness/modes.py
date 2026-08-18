@@ -36,6 +36,7 @@ from evals.harness.reference import GoldenCase
 from stride_service.analysis import control_state
 from stride_service.deployment import Deployment
 from stride_service.execution import GraphExecutor, GraphRun
+from stride_service.frameworks import PACKAGES
 from stride_service.frameworks.stride.record import DraftThreat
 from stride_service.graph import (
     ENTRY_EXTRACT,
@@ -52,6 +53,7 @@ from stride_service.graph import (
     result_of,
 )
 from stride_service.report import (
+    Claim,
     FrameworkName,
     FrameworkSelection,
     InputRef,
@@ -92,19 +94,36 @@ class ExtractionResult:
 
 @dataclass(frozen=True)
 class AnalysisRun:
-    """A graph run's report, plus the draft union the critic was handed.
+    """A graph run's report, plus the draft union each critic was handed.
 
-    The drafts are read straight off ``merged_drafts`` in the final session
-    state, which is where :func:`~stride_service.graph.merge_drafts` parks them
-    on the way into the critic — so critic yield costs one extra state key here
-    and no change to the production seam. Reading them back as
-    :class:`DraftThreat` rather than passing the raw dicts on keeps the scorer
-    typed against the shipped model, and revalidates on the way out of state
-    exactly as :func:`~stride_service.graph.assemble_report` does.
+    The drafts are read straight off each framework's ``merged_drafts`` in the
+    final session state, which is where
+    :func:`~stride_service.graph.merge_drafts` parks them on the way into that
+    framework's critic — so this costs one extra state key per framework here and
+    no change to the production seam. Reading them back through **the package's
+    own record** rather than passing the raw dicts on keeps every scorer typed
+    against the shipped model, and revalidates on the way out of state exactly as
+    :func:`~stride_service.graph.assemble_report` does.
+
+    ``drafts`` is keyed by framework because the drafts are: two frameworks'
+    subgraphs never touch, each has its own fan-in and its own critic, and a
+    pooled draft list would ask one scorer to read another package's record.
+    ``merged_drafts`` stays as STRIDE's, because the scorer and the critic-yield
+    instrument both read a :class:`DraftThreat`'s ``category`` and ``severity``,
+    which only that record carries.
     """
 
     report: Report
-    merged_drafts: tuple[DraftThreat, ...]
+    drafts: Mapping[FrameworkName, tuple[Claim, ...]]
+
+    @property
+    def merged_drafts(self) -> tuple[DraftThreat, ...]:
+        """STRIDE's half, at the record its own scorers are typed against."""
+        return tuple(
+            draft
+            for draft in self.drafts.get("stride", ())
+            if isinstance(draft, DraftThreat)
+        )
 
 
 def _tags(value: list[str]) -> str:
@@ -503,12 +522,18 @@ def _run_from_graph(
     if isinstance(result, Rejected):
         detail = "; ".join(f"{issue.code}: {issue.message}" for issue in result.issues)
         raise EvalRunError(f"{case.id}: the graph rejected the model: {detail}")
-    # STRIDE's own drafts key. Critic yield is graded per framework (#167), and
-    # this driver scores the open-claim-set half of that contract; a second
-    # framework's drafts are read by its own scorer against its own reference.
-    drafts_key = FrameworkNodes("stride").key("drafts")
-    if drafts_key not in state:
-        raise EvalRunError(f"{case.id}: graph produced an analysis with no drafts")
+    # Every framework the graph ran, each through its own state key. Grading is
+    # per framework (#167), so a scorer reads its own package's drafts against
+    # its own reference set and two packages' records never meet.
+    drafts: dict[FrameworkName, tuple[Claim, ...]] = {}
+    for name in pipeline.frameworks:
+        key = FrameworkNodes(name).key("drafts")
+        if key not in state:
+            raise EvalRunError(
+                f"{case.id}: graph produced a {name} analysis with no drafts"
+            )
+        record = PACKAGES[name].record
+        drafts[name] = tuple(record.model_validate(draft) for draft in state[key])
 
     now = datetime.now(UTC)
     report = result.into_report(
@@ -525,8 +550,7 @@ def _run_from_graph(
         nodes=graph_run.node_runs,
         pipeline=pipeline,
     )
-    drafts = tuple(DraftThreat.model_validate(draft) for draft in state[drafts_key])
-    return AnalysisRun(report=report, merged_drafts=drafts)
+    return AnalysisRun(report=report, drafts=drafts)
 
 
 MODE_ENTRIES: dict[str, Entry] = {

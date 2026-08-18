@@ -7,11 +7,15 @@ from stride_service.frameworks.stride.record import STRIDE_CATEGORIES
 from stride_service.report import LaneCoverage
 
 
-def row(category, **overrides):
+def row(lane_name, framework="stride", **overrides):
+    """One report row, tagged with the block it was read off.
+
+    The report's own row carries no framework — it sits inside that framework's
+    block — so the sweep pairs them as it collects and the pooled row is keyed
+    by ``(framework, lane)``.
+    """
     fields = {
-        # STRIDE's lane slugs are its category names; the report row is keyed by
-        # lane, and the pooled row this feeds is still keyed by category.
-        "lane": category,
+        "lane": lane_name,
         "drafts": 1,
         "rules": 2,
         "rules_fired": 1,
@@ -24,11 +28,13 @@ def row(category, **overrides):
         "unknown_controls": 5,
         "unknown_controls_cited": 0,
     }
-    return LaneCoverage(**{**fields, **overrides})
+    return (framework, LaneCoverage(**{**fields, **overrides}))
 
 
-def lane_for(category, lanes):
-    return next(lane for lane in lanes if lane.category == category)
+def lane_for(lane_name, lanes, framework="stride"):
+    return next(
+        lane for lane in lanes if lane.lane == lane_name and lane.framework == framework
+    )
 
 
 @pytest.fixture
@@ -37,15 +43,15 @@ def two_cases():
 
 
 def test_a_lane_the_sweep_never_reported_still_gets_a_row(two_cases):
-    lanes = aggregate_coverage(two_cases)
+    lanes = aggregate_coverage(two_cases, ["stride"])
 
-    assert [lane.category for lane in lanes] == list(STRIDE_CATEGORIES)
+    assert [lane.lane for lane in lanes] == list(STRIDE_CATEGORIES)
     assert lane_for("tampering", lanes).cases == 0
 
 
 def test_pooling_sums_the_counts_rather_than_averaging_the_rates(two_cases):
     """A three-element case must not outweigh a forty-element one."""
-    lane = lane_for("spoofing", aggregate_coverage(two_cases))
+    lane = lane_for("spoofing", aggregate_coverage(two_cases, ["stride"]))
 
     assert lane.cases == 2
     assert lane.drafts == 3
@@ -59,7 +65,9 @@ def test_a_lane_offered_nothing_rates_zero_rather_than_dividing_by_it():
     # one, and LaneCoverage refuses the pair that says otherwise.
     lane = lane_for(
         "spoofing",
-        aggregate_coverage([row("spoofing", candidates=0, candidates_cited=0)]),
+        aggregate_coverage(
+            [row("spoofing", candidates=0, candidates_cited=0)], ["stride"]
+        ),
     )
 
     assert lane.cited_rate("candidates", "candidates_cited") == 0.0
@@ -67,14 +75,18 @@ def test_a_lane_offered_nothing_rates_zero_rather_than_dividing_by_it():
 
 def test_rules_fired_is_the_unambiguous_number(two_cases):
     """Unlike a citation rate, a rule firing nowhere means the rule reads nothing."""
-    lanes = aggregate_coverage(two_cases + [row("tampering", rules_fired=0, rules=2)])
+    lanes = aggregate_coverage(
+        two_cases + [row("tampering", rules_fired=0, rules=2)], ["stride"]
+    )
 
     assert lane_for("tampering", lanes).rules_fired_rate == 0.0
     assert lane_for("spoofing", lanes).rules_fired_rate == 0.5
 
 
 def test_totals_fold_every_lane_into_one_line(two_cases):
-    totals = coverage_totals(aggregate_coverage(two_cases + [row("repudiation")]))
+    totals = coverage_totals(
+        aggregate_coverage(two_cases + [row("repudiation")], ["stride"])
+    )
 
     assert totals["cases"] == 2  # the busiest lane, not the sum over lanes
     assert totals["candidates"] == 12
@@ -82,7 +94,46 @@ def test_totals_fold_every_lane_into_one_line(two_cases):
 
 
 def test_an_empty_sweep_reports_six_empty_lanes_not_an_empty_table():
-    lanes = aggregate_coverage([])
+    """A silent lane is a finding; the table must not be able to hide one.
+
+    The framework list is what the sweep *built*, so this holds even when no row
+    came back at all — which is exactly the run where a reader most needs to see
+    that six lanes produced nothing.
+    """
+    lanes = aggregate_coverage([], ["stride"])
 
     assert len(lanes) == len(STRIDE_CATEGORIES)
     assert coverage_totals(lanes)["candidates"] == 0
+
+
+def test_a_framework_the_sweep_never_ran_contributes_no_rows():
+    """A STRIDE-only sweep prints six rows, not twenty-three.
+
+    A lane belongs to whichever package declares it, so a package nobody ran has
+    no silent lanes to report — and padding the table with them would read as a
+    framework that produced nothing when it was never asked to.
+    """
+    stride_only = aggregate_coverage([row("spoofing")], ["stride"])
+    both = aggregate_coverage([row("spoofing")], ["stride", "asvs"])
+
+    assert {lane.framework for lane in stride_only} == {"stride"}
+    assert {lane.framework for lane in both} == {"stride", "asvs"}
+    assert len(both) > len(stride_only)
+
+
+def test_two_packages_declaring_one_lane_name_stay_apart():
+    """The key is ``(framework, lane)``, never the slug alone.
+
+    ``CONTEXT.md`` is explicit that two packages may declare a lane of the same
+    name. STRIDE's categories and ASVS's chapters do not collide today, and
+    relying on that is the one-package assumption
+    ``docs/agents/framework-parity.md`` exists to catch — so the separation is
+    asserted rather than left to the vocabularies happening not to overlap.
+    """
+    lanes = aggregate_coverage(
+        [row("spoofing", drafts=7), row("authentication", "asvs", drafts=3)],
+        ["stride", "asvs"],
+    )
+
+    assert lane_for("spoofing", lanes).drafts == 7
+    assert lane_for("authentication", lanes, "asvs").drafts == 3

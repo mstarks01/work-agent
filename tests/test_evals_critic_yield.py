@@ -270,7 +270,7 @@ def test_the_cli_reports_both_sides_per_case_and_pooled(case, capsys):
     )
     analysis = modes.AnalysisRun(
         report=_report_with(case, [promote(kept)]),
-        merged_drafts=(kept, junk),
+        drafts={"stride": (kept, junk)},
     )
     judge = _identity_judge([kept], buckets={junk.id: "unsupported"})
 
