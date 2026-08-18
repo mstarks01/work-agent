@@ -10,7 +10,8 @@ from pathlib import Path
 
 import pytest
 
-from evals.harness.provenance import ARTIFACT_VERSION, ProvenanceError
+from evals.harness.artifact import ARTIFACT_VERSION, DECLARED_KEYS
+from evals.harness.provenance import ProvenanceError
 from evals.harness.stability import (
     aggregate_stability,
     comparability_warnings,
@@ -33,7 +34,15 @@ def score(case: str, references: int, matched: list[int]) -> dict:
 
 
 def write_run(tmp_path, name, record, scores, **overrides) -> Path:
+    """A complete artifact, the way a sweep writes one.
+
+    Every declared key is present, because every sweep writes every declared
+    key — an instrument that measured nothing writes an empty block rather than
+    dropping one. A fixture carrying only the keys its own assertions read would
+    be a shape no sweep produces, and the loader is strict about that on purpose.
+    """
     payload = {
+        **dict.fromkeys(DECLARED_KEYS),
         "artifact_version": ARTIFACT_VERSION,
         "mode": "analysis",
         "cases": sorted({entry["case"] for entry in scores}),
@@ -42,6 +51,7 @@ def write_run(tmp_path, name, record, scores, **overrides) -> Path:
         "provenance": record.to_json(),
         "models": {"judge": "openai/gpt-4.1", "tiers_config_version": "3"},
         "scores": scores,
+        "applicability": [],
     } | overrides
     path = tmp_path / name
     path.write_text(json.dumps(payload, indent=2), encoding="utf-8")

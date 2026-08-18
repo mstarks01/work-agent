@@ -18,11 +18,10 @@ from pathlib import Path
 
 import pytest
 
+from evals.harness.artifact import ARTIFACT_VERSION, load_artifact
 from evals.harness.certify import plan_promotion
 from evals.harness.provenance import (
-    ARTIFACT_VERSION,
     ProvenanceError,
-    load_artifact,
     provenance_of,
 )
 from evals.harness.reference import load_case
