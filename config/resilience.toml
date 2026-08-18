@@ -157,11 +157,14 @@ max_sources = 10
 # instance's share, or register a shared store and get a shared ceiling with no
 # change here.
 #
-# 3 IS SIZED AGAINST THE FAN-OUT, NOT AGAINST DEMAND. Three concurrent jobs is
-# eighteen concurrent `strong`-tier requests at the category barrier, which is
-# the burst a per-minute request quota actually sees. Turn it UP only with a
-# quota that has been checked against 6x the new number; turn it DOWN to shed
-# load mid-incident. 1 is legal and makes the service strictly serial per
-# caller, matching the first-run web app's gate; 0 is not, because a deployment
+# 3 IS SIZED AGAINST THE FAN-OUT, NOT AGAINST DEMAND. One job's burst is one
+# `strong`-tier request per lane of every framework it runs, all fired together
+# at the barrier, and a package's lane count is its own: STRIDE declares 6, ASVS
+# declares 17, so a job naming both is 23 and three of them are 69 concurrent
+# `strong`-tier requests. That is the burst a per-minute request quota actually
+# sees. Turn it UP only with a quota that has been checked against the new
+# number times the widest framework selection this deployment offers; turn it
+# DOWN to shed load mid-incident. 1 is legal and makes the service strictly
+# serial per caller, matching the first-run web app's gate; 0 is not, because a deployment
 # that accepts no jobs should not be running.
 max_active_jobs = 3
