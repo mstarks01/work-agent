@@ -26,8 +26,11 @@ Nothing in this directory ships in the production image — the corpus, the judg
 and the scorer are test-side only, and the package build takes just
 `src/stride_service`. Two companion guides:
 
-- **[BLESSING.md](BLESSING.md)** — how to author a new golden case.
-- **[TUNING.md](TUNING.md)** — how to use these evals to improve the models.
+- **[BLESSING.md](BLESSING.md)** — how to author a new golden case, including a
+  reference set per framework it declares.
+- **[TUNING.md](TUNING.md)** — how to use these evals to improve the models. Read
+  it per instrument: step 1 gates the judged numbers only, and the mechanically
+  matched half is tunable without credentials.
 
 ## Layout
 

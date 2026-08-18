@@ -160,7 +160,13 @@ corrected value, and the reason from the source text. Close with a short summary
 of the pattern you saw — that record is what later informs how extraction errors
 are weighted.
 
-### 4. Write the reference threat set
+### 4. Write the reference sets
+
+One per framework the case declares, at `claims/<framework>.json`. Step 4a is
+STRIDE's and 4b is ASVS's; they are different jobs because the two packages
+assert different things.
+
+#### 4a. STRIDE — the reference threat set
 
 Write one entry per threat, against the corrected model's element IDs:
 `category`, `affected_element_ids`, `claim`, `tier`, `severity`, `notes`.
@@ -183,7 +189,45 @@ Write one entry per threat, against the corrected model's element IDs:
 - **`notes` is your rationale.** Never scored, always worth writing — it's what
   lets a later reviewer disagree with you specifically.
 
+#### 4b. ASVS — the reference requirement set
+
+Skip this if the case does not declare ASVS. Its **Precondition** answers
+`undecidable` when nothing in the model says what a flow carries, and six cases
+sit there today for a reason that may be a thin model rather than a system out
+of scope — see
+[#219](https://github.com/mstarks01/work-agent/issues/219).
+
+Write one entry per requirement you expect a ruling on: `chapter`,
+`requirement`, `affected_element_ids`, `claim`, `tier`, `notes`. No severity —
+the package grades nothing.
+
+- **Name the requirement the standard's way**, `V6.2.1`. It is what the scorer
+  matches on, by string, with **no judge anywhere**. So the claim sentence is not
+  the thing being compared here, and a paraphrase costs nothing.
+- **The set is closed, and that is what makes this different from 4a.** A run at
+  the declared **ASVS Level** rules on a known list, so every requirement you
+  *omit* is an assertion too: it says a correct run should not raise it. That is
+  the `over_applied` cell in the score. STRIDE's set has no such complement.
+- **Declare the level in `case.json`, and write against that level only.** A
+  record outside it is unmeetable, and `verify_corpus.py` fails it.
+- **Do not write a pass.** An ASVS claim says the requirement *applies and the
+  input does not show it satisfied*. If the text settles the requirement, the
+  entry does not belong in the set at all.
+- **Tier honestly**, the same way 4a says.
+- **Cover the chapters the model can reach.** The merge bar checks that every
+  lane of every carried package has a `must-find` record *somewhere in the
+  corpus*, not in every case.
+- **`affected_element_ids` may be empty.** Most requirements address a coding
+  practice with no position in the graph. One record in 63 uses this today; it is
+  legal, and it drops out of candidate-trigger recall by name rather than
+  counting as a miss.
+
 ### 5. Label the judge-calibration pairs
+
+**STRIDE only.** The judge exists because STRIDE's claim set is open and its
+claims are prose. ASVS matches by requirement ID, so it reaches no
+claim-equivalence judgement and contributes no pair — that is settled design
+([#167](https://github.com/mstarks01/work-agent/issues/167)), not an omission.
 
 In the same sitting, label candidate threat pairs as match / no-match in
 `build_pairs.py`. These are what the **≥90% judge–label agreement bar** scores
@@ -273,6 +317,8 @@ Merge checklist:
 - [ ] every `source_excerpt` is a verbatim span of the source it cites, with `…` marking any cut
 - [ ] digests and the aggregate stamped (`--write-sha`)
 - [ ] tier assignment reviewed: some must-find, not all
+- [ ] a reference set written for **every** framework the case declares, per step 4
+- [ ] no ASVS entry asserts a requirement is satisfied — the package never reports a pass
 - [ ] every `match` pair's candidate element IDs read against the candidate's own words
 
 ## Growing a case from real runs
@@ -286,7 +332,7 @@ Promoting a threat is always a reviewed change with a human explaining why; it's
 never automatic.
 
 **A promoted threat arrives carrying `grounds`, and loses them.** A reference
-threat keeps its six fields, so write step 4's entry as you would any other and
+threat keeps its six fields, so write step 4a's entry as you would any other and
 drop the grounds on the way in. That is deliberate, not an oversight: a
 hand-authored ground would be graded by nothing. Grounds are produced by a
 category agent and checked against the case's real `source.md` at merge time, so
