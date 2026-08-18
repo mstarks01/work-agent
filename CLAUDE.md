@@ -23,7 +23,12 @@ in the PR body for **every other package in `PACKAGES`** — "nothing changes, b
 framework whose claims carry a catalog identifier needs no equivalence judgement" is a
 fine answer; silence is not. State the reason as a property of the framework, never as its
 name, so it answers for packages nobody has written yet. It runs every way, not outward
-from STRIDE. See `docs/agents/framework-parity.md`.
+from STRIDE.
+
+**Prefer a table keyed by framework over a constant or a branch.** Every gap ASVS exposed
+was a name or an `if`; every table was already correct, because a missing key raises.
+`tests/test_framework_neutrality.py` holds the decidable half. See
+`docs/agents/framework-parity.md` for the post-mortem this is derived from.
 
 ### Domain docs
 
