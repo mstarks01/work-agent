@@ -26,6 +26,7 @@ from evals.harness.applicability import (
 )
 from evals.harness.modes import case_frameworks
 from evals.harness.reference import load_corpus
+from stride_service.frameworks import PACKAGES
 from stride_service.frameworks.asvs.catalog import requirements_for
 from stride_service.frameworks.asvs.record import RequirementRuling
 from stride_service.report import Ground, UnknownRef, Verdict, VerdictStatus
@@ -216,3 +217,37 @@ def test_a_case_s_graph_is_built_for_the_frameworks_it_declares(corpus):
     with_asvs = [case_id for case_id, names in built.items() if "asvs" in names]
     assert len(with_asvs) == 7
     assert all("stride" in names for names in built.values())
+
+
+def test_grounds_reads_a_lane_without_naming_any_framework_s_field():
+    """The lane comes from the package's declaration, not from a field name.
+
+    STRIDE stamps its lane into ``category`` and ASVS into ``chapter``. A fold
+    that spelled either would be a second definition to drift, so
+    :func:`~evals.harness.grounds.lane_of` reads ``IdRule.lane_field`` — which is
+    the same declaration the neutral resolver stamps through.
+    """
+    from evals.harness.grounds import lane_of
+
+    claim = ruling("V6.2.1")
+
+    assert lane_of("asvs", claim) == "authentication"
+    assert PACKAGES["asvs"].id_rule.lane_field == "chapter"
+    assert PACKAGES["stride"].id_rule.lane_field == "category"
+
+
+def test_coverage_reports_every_lane_of_every_framework_that_ran():
+    """The row count a two-framework sweep owes, against a one-framework sweep.
+
+    Before #213 the sweep collected ``stride_block(report).coverage`` and ASVS's
+    17 lanes were computed, carried on the report and dropped. The framework list
+    is what was *built*, so a package whose every lane went silent still gets its
+    rows — which is the finding the table exists to show.
+    """
+    from evals.harness.coverage import aggregate_coverage
+
+    both = aggregate_coverage([], ["stride", "asvs"])
+
+    assert len(both) == len(PACKAGES["stride"].lanes) + len(PACKAGES["asvs"].lanes)
+    assert len([lane for lane in both if lane.framework == "asvs"]) == 17
+    assert all(lane.cases == 0 for lane in both)

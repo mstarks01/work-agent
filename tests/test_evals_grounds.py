@@ -78,6 +78,7 @@ class TestMeasureGrounds:
     def test_counts_grounds_per_threat_and_the_branch_mix(self):
         measurement = measure_grounds(
             "case-a",
+            "stride",
             [grounded(1, quote(), unknown()), grounded(2, absent(), derived())],
             [],
         )
@@ -96,7 +97,7 @@ class TestMeasureGrounds:
         """The branch rule predicts these: an unknown or a crossing was the
         trigger, so there was never a span to quote."""
         measurement = measure_grounds(
-            "case-a", [grounded(1, unknown()), grounded(2, quote())], []
+            "case-a", "stride", [grounded(1, unknown()), grounded(2, quote())], []
         )
 
         assert measurement.quoteless_count == 1
@@ -107,6 +108,7 @@ class TestMeasureGrounds:
         unknowns would be measuring the branch mix, not the discipline."""
         measurement = measure_grounds(
             "case-a",
+            "stride",
             [grounded(1, quote("bad"), unknown()), grounded(2, quote())],
             [UnverifiedGround(claim_id="S-01", index=0, reason="not found")],
         )
@@ -118,6 +120,7 @@ class TestMeasureGrounds:
     def test_marks_are_attributed_to_the_threat_that_carries_them(self):
         measurement = measure_grounds(
             "case-a",
+            "stride",
             [grounded(1, quote("bad"), quote("worse")), grounded(2, quote())],
             [
                 UnverifiedGround(claim_id="S-01", index=0, reason="not found"),
@@ -130,7 +133,7 @@ class TestMeasureGrounds:
         assert by_id["S-02"].unverified == ()
 
     def test_an_empty_case_reports_zeros_rather_than_dividing_by_none(self):
-        measurement = measure_grounds("case-a", [], [])
+        measurement = measure_grounds("case-a", "stride", [], [])
 
         assert measurement.grounds_per_threat == 0.0
         assert measurement.unverified_rate == 0.0
@@ -247,14 +250,16 @@ class TestAggregate:
     def test_pools_rather_than_averaging_over_cases(self):
         """A case that drafted one threat must not outweigh one that drafted
         three, which is what a mean of per-case rates would do."""
-        small = measure_grounds("small", [grounded(1, quote("bad"))], [])
+        small = measure_grounds("small", "stride", [grounded(1, quote("bad"))], [])
         large = measure_grounds(
             "large",
+            "stride",
             [grounded(1, quote()), grounded(2, quote()), grounded(3, quote())],
             [],
         )
         marked = measure_grounds(
             "small",
+            "stride",
             [grounded(1, quote("bad"))],
             [UnverifiedGround(claim_id="S-01", index=0, reason="not found")],
         )

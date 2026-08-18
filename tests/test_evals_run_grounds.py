@@ -221,8 +221,13 @@ def test_the_measurement_rides_in_the_case_payload(monkeypatch, case):
 
     payload = run.payloads[0]
     assert payload["case"] == case.id
-    assert payload["grounds"]["counts"]["unknown-attribute"] == len(STRIDE_CATEGORIES)
-    assert payload["grounds"]["metrics"]["grounds_per_threat"] == 1.0
+    # One entry per block the job selected: grounds is per framework, because
+    # ADR 0002 exempts none of them from finding-level attribution.
+    measured = {entry["framework"]: entry for entry in payload["grounds"]}
+    assert set(measured) == {"stride"}
+    stride = measured["stride"]
+    assert stride["counts"]["unknown-attribute"] == len(STRIDE_CATEGORIES)
+    assert stride["metrics"]["grounds_per_threat"] == 1.0
 
 
 def test_a_fail_closed_case_is_counted_and_the_sweep_continues(monkeypatch, case):
@@ -268,7 +273,8 @@ def test_the_sweep_collects_every_case_s_coverage_rows(monkeypatch, case):
     run = sweep(monkeypatch, case, None)
 
     assert len(run.coverage) == 2 * len(STRIDE_CATEGORIES)
-    lanes = aggregate_coverage(run.coverage)
+    assert {framework for framework, _ in run.coverage} == {"stride"}
+    lanes = aggregate_coverage(run.coverage, run.frameworks)
     assert all(lane.cases == 2 for lane in lanes)
     assert coverage_totals(lanes)["drafts"] == 2 * len(STRIDE_CATEGORIES)
 
