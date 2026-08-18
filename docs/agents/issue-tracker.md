@@ -66,10 +66,16 @@ Completed on GitHub Issues (canonical):
   — 11 tickets, charted 2026-08-12 from [#139](https://github.com/mstarks01/work-agent/issues/139) and
   completed 2026-08-13. A **planning** map: it settled the spec for a framework-neutral analysis layer —
   one extraction and one **Valid System Model** feeding N in-repo framework packages — and stopped at the
-  spec. **Not yet implemented.** The cutover plan is
-  [#172](https://github.com/mstarks01/work-agent/issues/172), filed rather than left as a line in this map.
+  spec. The cutover plan is
+  [#172](https://github.com/mstarks01/work-agent/issues/172), filed rather than left as a line in this map;
+  it landed on 2026-08-14, and the ASVS package
+  [#176](https://github.com/mstarks01/work-agent/issues/176) landed the same day.
   Read #172 first for the order of operations, then the eleven resolution comments in map order.
-  [#139](https://github.com/mstarks01/work-agent/issues/139) stays open as the source idea.
+  [#139](https://github.com/mstarks01/work-agent/issues/139), the source idea, closed on 2026-08-18 with
+  fourteen of its sixteen acceptance criteria met by merged code. Two issues carry the rest:
+  [#200](https://github.com/mstarks01/work-agent/issues/200) — the eval sweep grades STRIDE only, so 63 ASVS
+  references sit unread — and [#201](https://github.com/mstarks01/work-agent/issues/201) — semantic claim
+  identity.
 
   **STRIDE becomes the first package rather than the architecture.** The coupling is narrower than the map
   charted and sits in six files ([#159](https://github.com/mstarks01/work-agent/issues/159)); four things the
@@ -131,7 +137,8 @@ Completed on GitHub Issues (canonical):
   eleven tickets carry is a count from the tree or a token estimate, never an observation of a run.
 
   **Out of scope and not graduating**: the content of the ASVS requirements, external plugin loading, semantic
-  claim identity (#139 folds it in and it deserves its own issue), graph databases and RDF, and the ADK
+  claim identity (#139 folded it in and it deserved its own issue, now
+  [#201](https://github.com/mstarks01/work-agent/issues/201)), graph databases and RDF, and the ADK
   workflow engine. Two things stay unspecified: which deterministic rules a second package carries, and the
   cost and concurrency of one job running two frameworks — the lane budget #164 declined to set.
 
