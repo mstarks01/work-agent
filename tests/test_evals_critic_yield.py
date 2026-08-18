@@ -14,6 +14,7 @@ from pathlib import Path
 
 import pytest
 
+from evals.harness import critic_yield
 from evals.harness.critic_yield import aggregate_yield, score_case_with_yield
 from evals.harness.judge import MemoJudge
 from evals.harness.reference import load_case
@@ -275,7 +276,7 @@ def test_the_cli_reports_both_sides_per_case_and_pooled(case, capsys):
     judge = _identity_judge([kept], buckets={junk.id: "unsupported"})
 
     scores, yields = run._score_runs([case], {case.id: analysis}, judge)
-    run._print_yields(yields)
+    critic_yield.render(yields)
 
     assert [score.case_id for score in scores] == [case.id]
     assert yields[0].unsupported_killed == 1

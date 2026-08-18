@@ -564,3 +564,50 @@ MODE_ENTRIES: dict[str, Entry] = {
 #: no report to persist and says so rather than writing an empty file
 #: ([#180](https://github.com/mstarks01/work-agent/issues/180)).
 REPORTING_MODES: frozenset[str] = frozenset({"analysis", "end-to-end"})
+
+
+def render_extraction(scores: Sequence[ExtractionScore]) -> None:
+    """What an extraction sweep found, per case and then per attribute.
+
+    The per-attribute split is the line this instrument exists for. An element
+    recall of 1.00 says the extraction named the right things; it says nothing
+    about whether it typed them, and a rule reads the type. So a sweep whose
+    ``boundary.kind`` row reads 40% has found a real regression behind two
+    perfect element numbers.
+
+    Every number here is **non-gating**. A low agreement is a question to take
+    to the source text, not a defect on its own
+    ([#179](https://github.com/mstarks01/work-agent/issues/179)).
+    """
+    for score in scores:
+        agreed = len(score.attributes) - len(score.differing)
+        print(
+            f"{score.case_id:<26} extraction recall {score.recall:.2f}"
+            f"  precision {score.precision:.2f}"
+            f"  crossings {'match' if score.crossings_match else 'DIFFER'}"
+            f"  attributes {agreed}/{len(score.attributes)}"
+        )
+    if not scores:
+        return
+    totals = aggregate_attributes(scores)
+    print(
+        f"attributes: {totals['agreed']}/{totals['compared']} agree"
+        f" ({totals['agreement']:.0%}) (instrument, non-gating)"
+    )
+    for name, split in totals["by_attribute"].items():
+        print(
+            f"  {name:28} {split['agreed']:5,}/{split['compared']:<7,}"
+            f" {split['agreement']:.0%}"
+        )
+
+
+def artifact_extraction(scores: Sequence[ExtractionScore]) -> dict[str, Any]:
+    """This instrument's artifact key.
+
+    The per-case attribute numbers ride in ``mode_output`` beside the element
+    ones; this is the sweep-wide fold, which is where a value the pipeline
+    stopped producing shows up as a column rather than as one line per case
+    (#195). ``None`` outside the extraction mode, so an unmeasured attribute set
+    never reads as a fully agreeing one.
+    """
+    return {"attribute_aggregate": aggregate_attributes(scores) if scores else None}

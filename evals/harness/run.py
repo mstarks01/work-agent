@@ -38,7 +38,7 @@ import asyncio
 import json
 import sys
 from collections.abc import Mapping, Sequence
-from dataclasses import dataclass
+from dataclasses import replace
 from pathlib import Path
 from typing import Any
 
@@ -46,13 +46,9 @@ from evals.harness import modes
 from evals.harness.applicability import (
     ApplicabilityScore,
     ApplicabilityYield,
-    over_applied_for_promotion,
     score_applicability,
     score_yield,
 )
-from evals.harness.applicability import aggregate_yield as aggregate_applicability_yield
-from evals.harness.applicability import exemplar_delta as applicability_exemplar_delta
-from evals.harness.applicability import pooled as pooled_applicability
 from evals.harness.calibration import (
     AGREEMENT_BAR,
     LabelledPair,
@@ -61,25 +57,20 @@ from evals.harness.calibration import (
     measure_agreement,
 )
 from evals.harness.certify import PromotionPlan, plan_promotion, promote
-from evals.harness.coverage import (
-    CITED_PAIRS,
-    LaneCoverage,
-    TaggedRow,
-    aggregate_coverage,
-    coverage_totals,
-)
-from evals.harness.critic_yield import (
-    CriticYield,
-    aggregate_yield,
-    score_case_with_yield,
-)
+from evals.harness.coverage import TaggedRow
+from evals.harness.critic_yield import CriticYield, score_case_with_yield
 from evals.harness.grounds import (
     CAUGHT,
     CaseGrounds,
     GroundsFailure,
-    aggregate_grounds,
     classify_failure,
     measure_grounds,
+)
+from evals.harness.instruments import (
+    ModeRun,
+    Sweep,
+    artifact_blocks,
+    render_all,
 )
 from evals.harness.judge import Judge, PinnedJudge, load_judge_config
 from evals.harness.provenance import (
@@ -92,11 +83,7 @@ from evals.harness.provenance import (
     provenance_of,
 )
 from evals.harness.reference import GoldenCase, load_corpus
-from evals.harness.scorer import (
-    CaseScore,
-    exemplar_delta,
-    unlisted_for_promotion,
-)
+from evals.harness.scorer import CaseScore
 from evals.harness.stability import (
     CaseStability,
     ScoredRun,
@@ -257,76 +244,6 @@ def _write_reports(out: str, mode: str, runs: Mapping[str, modes.AnalysisRun]) -
         path.write_text(run.report.model_dump_json(indent=2) + "\n", "utf-8")
         total_bytes += path.stat().st_size
     print(f"{len(runs)} report(s) written to {directory} ({total_bytes / 1024:.0f} KB)")
-
-
-@dataclass(frozen=True)
-class ModeRun:
-    """Everything one sweep of one mode produced.
-
-    ``provenance`` is the sweep's generation identities — per node execution,
-    what was requested, what answered, and the hash that pair produced. Both
-    the certification verdict and the artifact are derived from it, so the
-    thing a promotion reads back is the same record the verdict was computed
-    from rather than a parallel one written alongside. ``expected_nodes`` is
-    the *built* graph's LLM nodes, so a mode that enters at ``extract`` and
-    stops is not held to the tiers it never routes through.
-
-    ``usage`` is the sweep's token cost per node, summed across every case and
-    every execution within a case. A sweep is the only place a real per-node
-    number comes from — a single job's numbers are one sample of one system —
-    so it is folded here rather than left to whoever reads the artifact.
-
-    ``latency`` is the same fold over the same executions, in wall-clock. It is
-    folded here for the same reason and one more: ``duration_ms`` is recorded
-    per node run and read back by nothing, so a sweep that does not fold it
-    measures the latency the Evaluation section of
-    [#115](https://github.com/mstarks01/work-agent/issues/115) asks for and
-    then throws it away.
-
-    ``grounds`` and ``grounds_failures`` are the two halves of the same
-    instrument: what the cases that finished did with ``grounds``, and what the
-    cases that did not finished on. A case appears in exactly one of them.
-
-    ``coverage`` is every case's per-lane coverage rows, unpooled, one entry per
-    ``(framework, row)`` pair. One case's row is not a readable number — see
-    :mod:`evals.harness.coverage` — so what rides here is the input to the
-    aggregate rather than the aggregate itself, and the framework rides beside
-    it because a lane slug belongs to whichever package declared it.
-
-    ``applicability`` is the ASVS half, one row per case that declares the
-    framework. It is a separate list rather than a column on ``payloads``
-    because it is a different instrument: STRIDE's scorer grades an open claim
-    set through a judge, and this one is a confusion matrix over a finite
-    catalog with no model call anywhere (#167). Pooling them would put two
-    numbers that are not comparable under one heading.
-
-    ``extractions`` is what the extraction mode produced and every other mode
-    leaves empty. It is kept beside its own payloads because the sweep prints
-    an aggregate over it, and folding a printed number out of JSON already
-    written is how the printed line and the artifact come to disagree.
-    """
-
-    payloads: list[dict[str, Any]]
-    failures: list[str]
-    runs: dict[str, modes.AnalysisRun]
-    provenance: RunProvenance
-    expected_nodes: list[str]
-    usage: dict[str, TokenUsage]
-    latency: dict[str, NodeLatency]
-    grounds: list[CaseGrounds]
-    grounds_failures: list[GroundsFailure]
-    coverage: list[TaggedRow]
-    #: The frameworks this sweep's graphs were built for, so the coverage table
-    #: can report a package whose every lane went silent rather than drop it.
-    frameworks: tuple[FrameworkName, ...]
-    extractions: list[modes.ExtractionScore]
-    applicability: list[ApplicabilityScore]
-    applicability_yields: list[ApplicabilityYield]
-
-    @property
-    def observations(self) -> dict[str, frozenset[str]]:
-        """The node -> fingerprint sets the certification verdict rules on."""
-        return self.provenance.observations()
 
 
 async def _run_mode(
@@ -494,14 +411,20 @@ def _score_runs(
     cases: Sequence[GoldenCase],
     runs: dict[str, modes.AnalysisRun],
     judge: Judge,
-) -> tuple[list[CaseScore], list[CriticYield]]:
-    """Score every case on both sides of the critic.
+) -> tuple[tuple[CaseScore, ...], tuple[CriticYield, ...]]:
+    """Score every case that carries a STRIDE block, on both sides of the critic.
 
     Yield comes out of the same pass rather than a second sweep: the pre-critic
     drafts are a superset of the report's threats, so scoring them first leaves
     the post-critic pass replaying memoized rulings. The returned ``CaseScore``
     is the post-critic one — what every metric in this harness has always
     meant.
+
+    **A case that did not run this framework is skipped, never failed on.** The
+    two instruments this pass feeds declare ``frameworks=("stride",)``, and a
+    scorer that reads a package's own record has nothing to say about a case
+    that ran a different package. Asking for the block regardless is what made a
+    sweep of one framework die inside another framework's scorer.
     """
     scored = [
         score_case_with_yield(
@@ -511,11 +434,11 @@ def _score_runs(
             judge,
         )
         for case in cases
-        if case.id in runs
+        if case.id in runs and optional_block(runs[case.id].report, "stride")
     ]
     return (
-        [entry.score for entry in scored],
-        [entry.critic_yield for entry in scored],
+        tuple(entry.score for entry in scored),
+        tuple(entry.critic_yield for entry in scored),
     )
 
 
@@ -559,188 +482,6 @@ def _models_record(
     }
 
 
-def _print_scores(scores: Sequence[CaseScore]) -> None:
-    for score in scores:
-        print(
-            f"{score.case_id:<26} must-find {score.must_find_matched}/"
-            f"{score.must_find_total}"
-            f"  recall {score.recall:.2f}"
-            f"  lane {score.lane_accuracy:.2f}"
-            f"  element {score.element_accuracy:.2f}"
-            f"  unsupported {score.unsupported_rate:.2f}"
-        )
-    if scores:
-        delta = exemplar_delta(scores)
-        print(
-            f"exemplar delta: near {delta['near_recall']:.2f}"
-            f" vs far {delta['far_recall']:.2f}"
-            f" = {delta['delta']:+.2f} (tracked, non-gating)"
-        )
-
-
-def _print_yields(yields: Sequence[CriticYield]) -> None:
-    """Both sides of the critic, always printed together.
-
-    ``killed-real`` is deliberately on the same line as ``killed-unsupported``:
-    a kill count read on its own says nothing about whether the critic is
-    filtering noise or destroying findings.
-    """
-    for entry in yields:
-        print(
-            f"{entry.case_id:<26} critic {entry.drafts_in}->{entry.threats_out}"
-            f"  killed-unsupported {entry.unsupported_killed}/{entry.unsupported_before}"
-            f"  killed-real {entry.matched_killed}/{entry.matched_before}"
-            f"  (must-find {entry.must_find_killed})"
-        )
-    if yields:
-        totals = aggregate_yield(yields)
-        print(
-            f"critic yield: killed {totals['killed']}/{totals['drafts_in']}"
-            f" ({totals['kill_rate']:.0%}),"
-            f" unsupported caught {totals['unsupported_kill_rate']:.0%},"
-            f" real destroyed {totals['matched_kill_rate']:.0%}"
-            " (instrument, non-gating)"
-        )
-
-
-def _print_extraction(scores: Sequence[modes.ExtractionScore]) -> None:
-    """What an extraction sweep found, per case and then per attribute.
-
-    The per-attribute split is the line this instrument exists for. An element
-    recall of 1.00 says the extraction named the right things; it says nothing
-    about whether it typed them, and a rule reads the type. So a sweep whose
-    ``boundary.kind`` row reads 40% has found a real regression behind two
-    perfect element numbers.
-
-    Every number here is **non-gating**. A low agreement is a question to take
-    to the source text, not a defect on its own
-    ([#179](https://github.com/mstarks01/work-agent/issues/179)).
-    """
-    for score in scores:
-        agreed = len(score.attributes) - len(score.differing)
-        print(
-            f"{score.case_id:<26} extraction recall {score.recall:.2f}"
-            f"  precision {score.precision:.2f}"
-            f"  crossings {'match' if score.crossings_match else 'DIFFER'}"
-            f"  attributes {agreed}/{len(score.attributes)}"
-        )
-    if not scores:
-        return
-    totals = modes.aggregate_attributes(scores)
-    print(
-        f"attributes: {totals['agreed']}/{totals['compared']} agree"
-        f" ({totals['agreement']:.0%}) (instrument, non-gating)"
-    )
-    for name, split in totals["by_attribute"].items():
-        print(
-            f"  {name:28} {split['agreed']:5,}/{split['compared']:<7,}"
-            f" {split['agreement']:.0%}"
-        )
-
-
-def _print_grounds(
-    measurements: Sequence[CaseGrounds], failures: Sequence[GroundsFailure]
-) -> None:
-    """The three measurements, printed with the branch mix beside the rates.
-
-    ``quoteless`` is on the same line as the rates and is not a fault:
-    ``analyze.md``'s branch rule predicts a real share of findings whose
-    trigger was an unknown or a crossing rather than the submitter's words.
-    Read low with suspicion, not high.
-    """
-    for entry in measurements:
-        counts = entry.kind_counts
-        print(
-            f"{entry.case_id:<26} grounds {entry.ground_count}"
-            f" on {entry.threat_count} threats ({entry.grounds_per_threat:.2f} ea)"
-            f"  q/u/a/d {counts['quote']}/{counts['unknown-attribute']}"
-            f"/{counts['absent-attribute']}/{counts['derived-fact']}"
-            f"  quoteless {entry.quoteless_rate:.0%}"
-            f"  unverified {entry.unverified_count}/{entry.quote_count}"
-        )
-    for failure in failures:
-        scope = (
-            f": {len(failure.threat_ids)}/{failure.draft_count} threats"
-            if failure.kind == "fail-closed"
-            else ""
-        )
-        print(f"{failure.case_id:<26} grounds FAILED ({failure.kind}{scope})")
-    if measurements or failures:
-        totals = aggregate_grounds(measurements, failures)
-        print(
-            f"grounds: {totals['grounds_per_threat']:.2f} per threat,"
-            f" quoteless {totals['quoteless_rate']:.0%},"
-            f" unverified {totals['unverified_rate']:.1%},"
-            f" failed cases {totals['failed_cases']}"
-            f" (fail-closed {totals['fail_closed_cases']},"
-            f" other {totals['other_failed_cases']})"
-            " (instrument, non-gating)"
-        )
-
-
-def _print_applicability(scores: Sequence[ApplicabilityScore]) -> None:
-    """ASVS's rows, then the pooled figures. Never folded into STRIDE's table.
-
-    The two scorers answer different questions over different sets — an open
-    claim set through a judge, and a finite catalog by string compare — so one
-    combined recall column would be an average of two things nobody asked for.
-    """
-    if not scores:
-        return
-    print("\nASVS applicability (mechanical, no judge)")
-    print(
-        f"{'case':<26} {'lvl':>3} {'rec':>6} {'must':>6} {'prec':>6}"
-        f" {'miss':>5} {'over':>5} {'rej':>5} {'off':>4}"
-    )
-    for score in scores:
-        print(
-            f"{score.case:<26} {score.level:>3} {score.recall:>6.0%}"
-            f" {score.must_find_recall:>6.0%} {score.precision:>6.0%}"
-            f" {len(score.missed):>5} {len(score.over_applied):>5}"
-            f" {len(score.rejected):>5} {len(score.off_catalog):>4}"
-        )
-    totals = pooled_applicability(scores)
-    print(
-        f"pooled over {totals['cases']} cases: recall {totals['recall']:.0%}"
-        f" ({totals['matched']}/{totals['expected']}),"
-        f" must-find {totals['must_find_recall']:.0%},"
-        f" precision {totals['precision']:.0%},"
-        f" off-catalog {totals['off_catalog']}"
-        " (instrument, non-gating)"
-    )
-
-
-def _print_applicability_yield(yields: Sequence[ApplicabilityYield]) -> None:
-    """This framework's critic, both sides, never one.
-
-    ``destroyed`` is the number that can veto the pattern here — the critic
-    ruling inapplicable a requirement the case says applies — and it is printed
-    beside ``earned`` for the reason
-    :mod:`evals.harness.critic_yield` prints its pair: a rejection count alone
-    reads as the critic working or as the critic breaking things.
-    """
-    if not yields:
-        return
-    print("\nASVS critic yield (mechanical, no judge)")
-    print(
-        f"{'case':<26} {'drafts':>7} {'confirmed':>10} {'rejected':>9} {'earned':>7} {'destroyed':>10}"
-    )
-    for entry in yields:
-        print(
-            f"{entry.case:<26} {entry.drafts:>7} {len(entry.confirmed):>10}"
-            f" {len(entry.rejected):>9} {len(entry.earned):>7}"
-            f" {len(entry.destroyed):>10}"
-        )
-    totals = aggregate_applicability_yield(yields)
-    print(
-        f"pooled: rejected {totals['rejected']}/{totals['drafts']}"
-        f" ({totals['rejection_rate']:.0%}),"
-        f" earned {totals['earned']}, destroyed {totals['destroyed']}"
-        f" ({totals['destroyed_rate']:.0%} of rejections)"
-        " (instrument, non-gating)"
-    )
-
-
 def command_run(args: argparse.Namespace) -> int:
     cases = _select(load_corpus(args.corpus), args.case)
     # One deployment for the whole sweep: the graph it runs, the manifest it is
@@ -766,25 +507,20 @@ def command_run(args: argparse.Namespace) -> int:
     # vacuously true of a sweep that observed no fingerprint at all.
     trusted = certification.certified and certification.complete
 
-    # Before the judge, and unconditional: the extraction, grounds and coverage
-    # measurements cost no provider call, so ``--no-scoring`` still emits them.
-    _print_extraction(mode_run.extractions)
-    _print_grounds(mode_run.grounds, mode_run.grounds_failures)
-    lanes = aggregate_coverage(mode_run.coverage, mode_run.frameworks)
-    _print_coverage(lanes, offered=bool(mode_run.coverage))
-    # Costs no provider call either: ASVS matches by requirement ID, so its
-    # whole scorer is a set comparison and ``--no-scoring`` still emits it.
-    _print_applicability(mode_run.applicability)
-    _print_applicability_yield(mode_run.applicability_yields)
+    # Before the judge, and unconditional: every mechanical instrument costs no
+    # provider call, so ``--no-scoring`` and a provider this sweep cannot reach
+    # both still emit them.
+    sweep = Sweep(run=mode_run)
+    render_all(sweep, judged=False)
 
-    scores: list[CaseScore] = []
-    yields: list[CriticYield] = []
+    scores: tuple[CaseScore, ...] = ()
+    yields: tuple[CriticYield, ...] = ()
     judge: PinnedJudge | None = None
     if mode_run.runs and not args.no_scoring:
         judge = _live_judge(deployment)
         scores, yields = _score_runs(cases, mode_run.runs, judge)
-        _print_scores(scores)
-        _print_yields(yields)
+    sweep = replace(sweep, scores=scores, yields=yields)
+    render_all(sweep, judged=True)
 
     artifact = {
         "artifact_version": ARTIFACT_VERSION,
@@ -808,73 +544,13 @@ def command_run(args: argparse.Namespace) -> int:
         },
         "structural_failures": failures,
         "mode_output": mode_run.payloads,
-        # The per-case attribute numbers ride in ``mode_output`` beside the
-        # element ones; this is the sweep-wide fold, which is where a value the
-        # pipeline stopped producing shows up as a column rather than as one
-        # line per case (#195). ``None`` outside the extraction mode, so an
-        # unmeasured attribute set never reads as a fully agreeing one.
-        "attribute_aggregate": (
-            modes.aggregate_attributes(mode_run.extractions)
-            if mode_run.extractions
-            else None
-        ),
         # Aggregates carry the verdict so nothing downstream folds an
         # uncertified run into a trusted number unaware.
-        "scores": [score.to_json() for score in scores],
-        # ASVS's own key rather than a row in ``scores``: a confusion matrix
-        # over a finite catalog and a judge-relative recall figure are not the
-        # same measurement, and one list would invite a reader to average them.
-        "applicability": [score.to_json() for score in mode_run.applicability],
-        "applicability_aggregate": (
-            pooled_applicability(mode_run.applicability)
-            if mode_run.applicability
-            else None
-        ),
-        # Its own key beside STRIDE's for the reason the scores are: one column
-        # pooling a judge-relative recall with a set comparison would be an
-        # average of two things nobody asked for.
-        "applicability_exemplar_delta": (
-            applicability_exemplar_delta(mode_run.applicability)
-            if mode_run.applicability
-            else None
-        ),
-        # The corpus feedback loop's ASVS half: requirements a run ruled
-        # applicable that the case did not expect, for the next reading session
-        # to settle. No judge, because the set arithmetic already separated the
-        # package-bug case into ``off_catalog``.
-        "over_applied_for_promotion": over_applied_for_promotion(
-            mode_run.applicability
-        ),
-        # This framework's critic, both sides. Its own keys rather than rows in
-        # ``critic_yield``: STRIDE's kill count is judge-relative and this one is
-        # set arithmetic, so a shared table would invite a rate across both.
-        "applicability_yield": [
-            entry.to_json() for entry in mode_run.applicability_yields
-        ],
-        "applicability_yield_aggregate": (
-            aggregate_applicability_yield(mode_run.applicability_yields)
-            if mode_run.applicability_yields
-            else None
-        ),
         "trusted": trusted,
-        "exemplar_delta": exemplar_delta(scores) if scores else None,
-        "critic_yield": [entry.to_json() for entry in yields],
-        "critic_yield_aggregate": aggregate_yield(yields) if yields else None,
-        "grounds": [entry.to_json() for entry in mode_run.grounds],
-        "grounds_failures": [
-            failure.to_json() for failure in mode_run.grounds_failures
-        ],
-        "grounds_aggregate": (
-            aggregate_grounds(mode_run.grounds, mode_run.grounds_failures)
-            if mode_run.grounds or mode_run.grounds_failures
-            else None
-        ),
-        # Written whether or not anything was offered: an absent block and a
-        # block of zeroes would otherwise be indistinguishable to a reader
-        # comparing two sweeps.
-        "coverage": [lane.to_json() for lane in lanes],
-        "coverage_totals": coverage_totals(lanes),
-        "unlisted_for_promotion": unlisted_for_promotion(scores),
+        # Every instrument's own keys, from the table that also printed them.
+        # One source for the printed line and the written number is what stops
+        # the two disagreeing.
+        **artifact_blocks(sweep),
     }
     if args.out:
         Path(args.out).write_text(json.dumps(artifact, indent=2) + "\n", "utf-8")
@@ -948,44 +624,6 @@ def _print_latency(latency: dict[str, NodeLatency]) -> None:
             f"  {node:34} {spent.executions:6,} {spent.total_ms:12,}"
             f" {round(spent.mean_ms):10,} {spent.slowest_ms:10,}"
         )
-
-
-def _print_coverage(lanes: Sequence[LaneCoverage], offered: bool) -> None:
-    """What each lane was offered and how much of it its drafts cite.
-
-    Read as a rate over the whole sweep, never per case, and never as a score:
-    an agent that examined a lead and correctly rejected it cites nothing, so a
-    low rate is a question to ask rather than a failure. The number that is
-    unambiguous is a lane whose rules fire nowhere at all: those rules read a
-    shape this corpus does not have, or nothing at all.
-
-    The rules column is **firings over evaluations** — one rule against one
-    case — because pooling multiplies the lane's rules by the cases.
-    """
-    if not offered:
-        print("coverage: no case produced a report to account for")
-        return
-    print("coverage (whole sweep, per lane — cited, not considered):")
-    header = f"  {'framework':10} {'lane':30} {'drafts':>7} {'rules fired':>11}"
-    print(f"{header} {'candidates':>12} {'elements':>12} {'crossings':>12}")
-    for lane in lanes:
-        cited = [
-            f"{lane.totals[cited_field]}/{lane.totals[offered_field]}"
-            for offered_field, cited_field in CITED_PAIRS[:3]
-        ]
-        print(
-            f"  {lane.framework:10} {lane.lane:30} {lane.drafts:7,}"
-            f" {lane.rules_fired:>4}/{lane.rules:<5}"
-            f" {cited[0]:>12} {cited[1]:>12} {cited[2]:>12}"
-        )
-    totals = coverage_totals(lanes)
-    print(
-        f"coverage: {totals['rules_fired']}/{totals['rules']} rule evaluations fired,"
-        f" candidates cited {totals['cited_rates']['candidates_cited']:.0%},"
-        f" elements {totals['cited_rates']['elements_cited']:.0%},"
-        f" unknown controls {totals['cited_rates']['unknown_controls_cited']:.0%}"
-        " (instrument, non-gating)"
-    )
 
 
 def _print_certification(result: CertifyResult) -> None:
