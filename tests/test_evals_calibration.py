@@ -96,7 +96,7 @@ def test_result_serializes_every_disagreement(pairs, labels):
 
 
 def test_reference_claims_stay_attached_to_the_corpus(pairs):
-    # build_pairs.py pulls reference claims from threats.json by index, so a
+    # build_pairs.py pulls reference claims from claims/stride.json by index, so a
     # reworded reference cannot silently detach a fixture from what it labels.
     from pathlib import Path
 

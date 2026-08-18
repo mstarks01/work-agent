@@ -41,12 +41,6 @@ ASSET_VOCABULARY = "Element.assets"
 #: *cannot* produce — no prompt rule chooses it, or the gate rejects it — does
 #: not belong here; it belongs fixed.
 UNEXERCISED: dict[str, str] = {
-    "TrustBoundary.kind=privilege": (
-        "No corpus case describes a zone the same party controls that holds"
-        " authority the other side does not — an admin zone, a control plane,"
-        " a production estate reached from a corporate one. This is a gap in"
-        " the corpus, tracked by issue #193."
-    ),
     "TrustBoundary.kind=other": (
         "`other` is the last resort prompts/extract.md defines, not a value a"
         " case should reach for: a zone typed `other` tells a downstream rule"

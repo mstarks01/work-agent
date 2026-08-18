@@ -3,7 +3,7 @@
 ``LABELS`` is the hand-labelling itself: one tuple per candidate pair, each
 label decided by a human reading the pair, each carrying the rationale that
 decided it. Reference claims are pulled verbatim from each case's
-``threats.json`` by index, so a reworded reference cannot silently detach a
+``claims/stride.json`` by index, so a reworded reference cannot silently detach a
 fixture from the claim it was labelled against — ``verify_corpus.py`` fails
 when it does.
 
@@ -349,12 +349,41 @@ LABELS = [
     ("12-overclaiming-supplier-portal", 13, "A supplier signed in to the portal reaches compliance documents belonging to a different supplier.", "match", "Same escalation, same target."),
     ("12-overclaiming-supplier-portal", 13, "A supplier escalates to a category manager role in the portal.", "no-match", "Hard negative: cross-tenant access and vertical role escalation are different claims, and only the former is in the corpus."),
     ("12-overclaiming-supplier-portal", 14, "An attacker who influences the extract's contents gets the supplier master service to act on it beyond a plain data load.", "match", "Same escalation, same mechanism."),
+    # ---------------------------------------------------------------- case 13
+    ("13-dispatch-control-plane", 0, "An attacker who obtains the importer's API token posts work orders to the dispatch API as the importer.", "match", "Pure paraphrase: same action, same flow, same stated credential."),
+    ("13-dispatch-control-plane", 0, "An attacker guesses the importer's API token, which is too short to resist it.", "no-match", "Unsupported, and a different action: the source states the token was never rotated and states nothing about its length."),
+    ("13-dispatch-control-plane", 1, "An attacker opens a live status socket to the dispatch API as a duty engineer, since the handshake's authentication is not established.", "match", "Same action, same flow; hedged phrasing does not change the claim."),
+    ("13-dispatch-control-plane", 1, "An attacker steals a duty engineer's session token out of the browser and opens the socket with it.", "no-match", "Hard negative: recovering a session and opening an unauthenticated handshake are different actions, and the corpus carries only the second."),
+    ("13-dispatch-control-plane", 2, "An attacker stands up a service that answers the importer's hourly pull in the partner's place.", "match", "Same action, same flow."),
+    ("13-dispatch-control-plane", 3, "An attacker signs in to the console as a duty engineer because no multi-factor authentication is enforced.", "no-match", "Unsupported: the source states nobody wrote the sign-in down, so an asserted absence of a second factor is invented rather than read."),
+    ("13-dispatch-control-plane", 4, "An attacker who answers the pull returns a schedule carrying work orders the partner never sent, and a depot works them.", "match", "Same action and the same path into the control plane; the candidate names the consequence the reference's notes give."),
+    ("13-dispatch-control-plane", 4, "An attacker modifies the partner's XML document while it is in transit to the importer.", "no-match", "Hard negative: the reference's action is answering the pull, and in-transit modification is a distinct claim the corpus does not carry on a flow stated to run over HTTPS."),
+    ("13-dispatch-control-plane", 5, "An attacker on the corporate network rewrites a crew move on its way to the dispatch API.", "match", "Same action, same flow."),
+    ("13-dispatch-control-plane", 5, "An attacker on the corporate network reads a dispatch request in flight.", "no-match", "Hard negative: reading and altering the same flow are two lanes, and the corpus keeps them apart deliberately."),
+    ("13-dispatch-control-plane", 6, "An attacker inside the control plane alters job orders in the dispatch database.", "match", "Same action, same target."),
+    ("13-dispatch-control-plane", 7, "An attacker deletes documents from the schedule archive so no copy of the day's work survives.", "no-match", "Destruction rather than alteration, and the corpus does not carry it."),
+    ("13-dispatch-control-plane", 8, "A duty engineer disputes a crew move and nothing in the job order names a person.", "match", "Same claim stated as the condition rather than the dispute."),
+    ("13-dispatch-control-plane", 8, "A duty engineer disputes a crew move and the dispatch API's audit log names the wrong actor.", "no-match", "Unsupported: there is no log element in the model, and the reference's claim is precisely that the job order carries no person."),
+    ("13-dispatch-control-plane", 10, "An attacker on the corporate network reads crew job status off the open socket, whose transport is unstated.", "match", "Same read action, same flow."),
+    ("13-dispatch-control-plane", 11, "An attacker who gets hold of a dispatch database backup reads crew mobile numbers.", "match", "A backup is a narrower instance of obtaining a copy; same action, same target."),
+    ("13-dispatch-control-plane", 11, "An attacker reads crew names out of the schedule archive.", "no-match", "Unsupported: the archive holds the partner's schedule documents, and the model puts no crew details in it."),
+    ("13-dispatch-control-plane", 12, "An attacker returns an XML document whose external entity makes the importer fetch an internal file and hand it back.", "match", "Same action, same mechanism."),
+    ("13-dispatch-control-plane", 13, "An attacker who reaches the corporate file store reads the partner's schedule documents.", "match", "Same action, same target."),
+    ("13-dispatch-control-plane", 14, "An attacker opens sockets to the dispatch API until engineers can no longer see live job status.", "match", "Same action, same target."),
+    ("13-dispatch-control-plane", 15, "An attacker returns an XML document with nested entity expansion, so the hourly import never completes.", "match", "A narrower instance of the same action and the same silent-staleness consequence."),
+    ("13-dispatch-control-plane", 16, "An attacker on the corporate network uses the importer's token to act inside the production control plane.", "match", "Same escalation, same mechanism."),
+    ("13-dispatch-control-plane", 16, "An attacker who takes the dispatch API gains rights across the corporate network.", "no-match", "Hard negative and the wrong direction: the authority sits in the control plane, so a move out of it is not the escalation the reference claims."),
+    ("13-dispatch-control-plane", 17, "An attacker lures a signed-in duty engineer to a page that calls the dispatch API from the attacker's own origin.", "match", "Same action, same flow."),
+    ("13-dispatch-control-plane", 17, "An attacker calls the dispatch API from their own origin, which the API allows because its policy permits any origin.", "no-match", "Unsupported: the source states the allowed origins were never recorded, and reading that as a permissive policy invents a value."),
+    ("13-dispatch-control-plane", 18, "An attacker who can publish files on the corporate web host serves script that dispatches crews.", "match", "Same action, same mechanism."),
 ]
 
 
 def main() -> None:
     threats_by_case = {
-        case_dir.name: json.loads((case_dir / "threats.json").read_text())
+        case_dir.name: json.loads(
+            (case_dir / "claims" / "stride.json").read_text()
+        )
         for case_dir in sorted(CORPUS.iterdir())
         if case_dir.is_dir()
     }

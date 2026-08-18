@@ -1,0 +1,31 @@
+{
+  "id": "13-dispatch-control-plane",
+  "title": "Browser dispatch console reaching a production control plane, fed by a partner's SOAP schedule",
+  "domain": "field-service-dispatch",
+  "provenance": "Synthetic system authored for this corpus (issue #193). Not derived from, or sanitized from, any real system: there is nothing to leak by omission.",
+  "bootstrap": "agent-stand-in",
+  "sources": [
+    {
+      "kind": "description",
+      "label": "System description",
+      "file": "source.md",
+      "sha256": "7e370ab58f5a0138f9dd36d41cb6d3ef2b88e15594ab7995a9eb1488b157fec7"
+    }
+  ],
+  "source_sha256": "dbe860e5ea0f36087c47975d1b907632bc82dff402690c9540b8f65cbbe3ff1d",
+  "frameworks": [
+    {
+      "name": "asvs",
+      "options": {
+        "level": 1
+      },
+      "exemplar_proximity": "far"
+    },
+    {
+      "name": "stride",
+      "options": {},
+      "exemplar_proximity": "far"
+    }
+  ],
+  "notes": "Authored for issue #193, which named four things the corpus could not exercise. The zone shape is the first of them: the production control plane is the corpus's only privilege boundary, so it is the only case where elevation-of-privilege-privilege-zone-crossing fires on authority rather than on a second party, and three flows enter it — a browser call, a WebSocket and an hourly machine post. Same company on both sides, which is what separates this case from every tenant boundary the corpus already carried. The other three are ASVS lanes with no shape to read: the importer parses a partner's SOAP feed as XML, the console calls the API cross-origin from a different origin, and the live status channel is a WebSocket whose transport and handshake nobody wrote down. Far from the payments exemplar: the authority the case turns on is a zone rather than an account, and the strongest lead into that zone is an API token issued once at build time and never rotated."
+}
