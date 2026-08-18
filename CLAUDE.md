@@ -18,10 +18,12 @@ orthogonal to these. See `docs/agents/triage-labels.md`.
 
 ### Framework parity
 
-Two **Framework Package**s ship: STRIDE and ASVS. Any fix, enhancement, eval or test for
-one needs an explicit answer in the PR body for the other — "nothing changes for ASVS,
-because ..." is a fine answer; silence is not. It runs both ways. See
-`docs/agents/framework-parity.md`.
+Any fix, enhancement, eval or test for one **Framework Package** needs an explicit answer
+in the PR body for **every other package in `PACKAGES`** — "nothing changes, because a
+framework whose claims carry a catalog identifier needs no equivalence judgement" is a
+fine answer; silence is not. State the reason as a property of the framework, never as its
+name, so it answers for packages nobody has written yet. It runs every way, not outward
+from STRIDE. See `docs/agents/framework-parity.md`.
 
 ### Domain docs
 
