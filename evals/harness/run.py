@@ -56,6 +56,7 @@ from evals.harness.certify import PromotionPlan, plan_promotion, promote
 from evals.harness.coverage import (
     CITED_PAIRS,
     LaneCoverage,
+    TaggedRow,
     aggregate_coverage,
     coverage_totals,
 )
@@ -111,7 +112,6 @@ from stride_service.report import (
     latency_by_node,
     usage_by_node,
 )
-from stride_service.report import LaneCoverage as ReportLaneCoverage
 
 EVALS_ROOT = Path(__file__).resolve().parents[1]
 DEFAULT_CORPUS_DIR = EVALS_ROOT / "corpus"
@@ -279,10 +279,11 @@ class ModeRun:
     instrument: what the cases that finished did with ``grounds``, and what the
     cases that did not finished on. A case appears in exactly one of them.
 
-    ``coverage`` is every case's per-category coverage rows, unpooled. One
-    case's row is not a readable number — see
+    ``coverage`` is every case's per-lane coverage rows, unpooled, one entry per
+    ``(framework, row)`` pair. One case's row is not a readable number — see
     :mod:`evals.harness.coverage` — so what rides here is the input to the
-    aggregate rather than the aggregate itself.
+    aggregate rather than the aggregate itself, and the framework rides beside
+    it because a lane slug belongs to whichever package declared it.
 
     ``applicability`` is the ASVS half, one row per case that declares the
     framework. It is a separate list rather than a column on ``payloads``
@@ -306,7 +307,10 @@ class ModeRun:
     latency: dict[str, NodeLatency]
     grounds: list[CaseGrounds]
     grounds_failures: list[GroundsFailure]
-    coverage: list[ReportLaneCoverage]
+    coverage: list[TaggedRow]
+    #: The frameworks this sweep's graphs were built for, so the coverage table
+    #: can report a package whose every lane went silent rather than drop it.
+    frameworks: tuple[FrameworkName, ...]
     extractions: list[modes.ExtractionScore]
     applicability: list[ApplicabilityScore]
 
@@ -362,7 +366,7 @@ async def _run_mode(
     executions: list[NodeRun] = []
     grounds: list[CaseGrounds] = []
     grounds_failures: list[GroundsFailure] = []
-    coverage: list[ReportLaneCoverage] = []
+    coverage: list[TaggedRow] = []
     extractions: list[modes.ExtractionScore] = []
     applicability: list[ApplicabilityScore] = []
 
@@ -396,13 +400,25 @@ async def _run_mode(
 
         runs[case.id] = run
         executions += run.report.nodes
-        coverage += stride_block(run.report).coverage
         issues = report_issues(run.report)
         failures += [f"{case.id}: {issue}" for issue in issues]
-        measurement = measure_grounds(
-            case.id, run.merged_drafts, stride_block(run.report).unverified_grounds
-        )
-        grounds.append(measurement)
+        # Every block the job selected, not STRIDE's alone. Coverage and grounds
+        # are folds over what a lane agent was offered and what its drafts cite,
+        # and no package is exempt from either — ADR 0002 exempts none from
+        # finding-level attribution, and Coverage is reported per lane of every
+        # framework a job runs.
+        measurements = []
+        for block in run.report.analyses:
+            coverage += [(block.framework, row) for row in block.coverage]
+            measurements.append(
+                measure_grounds(
+                    case.id,
+                    block.framework,
+                    run.drafts.get(block.framework, ()),
+                    block.unverified_grounds,
+                )
+            )
+        grounds += measurements
         # The measurement rides in the artifact rather than in the report, so a
         # reader gets the number without opening a second file. The report is
         # kept too, in the directory beside the artifact, and that is what a
@@ -410,7 +426,7 @@ async def _run_mode(
         payload: dict[str, Any] = {
             "case": case.id,
             "structural_issues": issues,
-            "grounds": measurement.to_json(),
+            "grounds": [entry.to_json() for entry in measurements],
         }
         # Only where the case declared the framework. A case ASVS's
         # **Precondition** refuses carries no reference set, and scoring the
@@ -445,6 +461,13 @@ async def _run_mode(
         grounds=grounds,
         grounds_failures=grounds_failures,
         coverage=coverage,
+        # Read off the graphs that were built, never off the keys they were
+        # requested under. The two differ wherever a caller substitutes a
+        # pipeline, and the coverage table has to report the lanes that actually
+        # ran rather than the ones the corpus asked for.
+        frameworks=tuple(
+            sorted({name for built in pipelines.values() for name in built.frameworks})
+        ),
         extractions=extractions,
         applicability=applicability,
     )
@@ -699,7 +722,7 @@ def command_run(args: argparse.Namespace) -> int:
     # measurements cost no provider call, so ``--no-scoring`` still emits them.
     _print_extraction(mode_run.extractions)
     _print_grounds(mode_run.grounds, mode_run.grounds_failures)
-    lanes = aggregate_coverage(mode_run.coverage)
+    lanes = aggregate_coverage(mode_run.coverage, mode_run.frameworks)
     _print_coverage(lanes, offered=bool(mode_run.coverage))
     # Costs no provider call either: ASVS matches by requirement ID, so its
     # whole scorer is a set comparison and ``--no-scoring`` still emits it.
@@ -868,7 +891,7 @@ def _print_coverage(lanes: Sequence[LaneCoverage], offered: bool) -> None:
         print("coverage: no case produced a report to account for")
         return
     print("coverage (whole sweep, per lane — cited, not considered):")
-    header = f"  {'category':22} {'drafts':>7} {'rules fired':>11}"
+    header = f"  {'framework':10} {'lane':30} {'drafts':>7} {'rules fired':>11}"
     print(f"{header} {'candidates':>12} {'elements':>12} {'crossings':>12}")
     for lane in lanes:
         cited = [
@@ -876,7 +899,7 @@ def _print_coverage(lanes: Sequence[LaneCoverage], offered: bool) -> None:
             for offered_field, cited_field in CITED_PAIRS[:3]
         ]
         print(
-            f"  {lane.category:22} {lane.drafts:7,}"
+            f"  {lane.framework:10} {lane.lane:30} {lane.drafts:7,}"
             f" {lane.rules_fired:>4}/{lane.rules:<5}"
             f" {cited[0]:>12} {cited[1]:>12} {cited[2]:>12}"
         )
