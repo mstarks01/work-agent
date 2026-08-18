@@ -43,12 +43,6 @@ from pathlib import Path
 from typing import Any
 
 from evals.harness import modes
-from evals.harness.applicability import (
-    ApplicabilityScore,
-    ApplicabilityYield,
-    score_applicability,
-    score_yield,
-)
 from evals.harness.calibration import (
     AGREEMENT_BAR,
     LabelledPair,
@@ -71,6 +65,7 @@ from evals.harness.instruments import (
     Sweep,
     artifact_blocks,
     render_all,
+    score_blocks,
 )
 from evals.harness.judge import Judge, PinnedJudge, load_judge_config
 from evals.harness.provenance import (
@@ -294,8 +289,7 @@ async def _run_mode(
     grounds_failures: list[GroundsFailure] = []
     coverage: list[TaggedRow] = []
     extractions: list[modes.ExtractionScore] = []
-    applicability: list[ApplicabilityScore] = []
-    applicability_yields: list[ApplicabilityYield] = []
+    rows: dict[str, list[Any]] = {}
 
     for case in cases:
         pipeline = pipeline_for(case)
@@ -355,21 +349,12 @@ async def _run_mode(
             "structural_issues": issues,
             "grounds": [entry.to_json() for entry in measurements],
         }
-        # Only where the case declared the framework. A case ASVS's
-        # **Precondition** refuses carries no reference set, and scoring the
-        # empty block it would still produce reports zero recall for a framework
-        # that correctly did nothing.
-        asvs = optional_block(run.report, "asvs")
-        if asvs is not None:
-            applies = score_applicability(case, asvs)
-            applicability.append(applies)
-            payload["applicability"] = applies.to_json()
-            # Both sides of this framework's critic, from the block the run
-            # already produced: no judge and no second scoring pass, because
-            # both sides are requirement identifiers.
-            critic = score_yield(case, asvs, run.drafts.get("asvs", ()))
-            applicability_yields.append(critic)
-            payload["applicability_yield"] = critic.to_json()
+        # Each block's own per-case rows, looked up by framework rather than
+        # branched on by name. A package this build carries and no table entry
+        # names raises here rather than scoring nothing.
+        for name, row in score_blocks(case, run.report, run.drafts).items():
+            rows.setdefault(name, []).append(row)
+            payload[name] = row.to_json()
         payloads.append(payload)
 
     return ModeRun(
@@ -402,8 +387,7 @@ async def _run_mode(
             sorted({name for built in pipelines.values() for name in built.frameworks})
         ),
         extractions=extractions,
-        applicability=applicability,
-        applicability_yields=applicability_yields,
+        rows={name: tuple(collected) for name, collected in rows.items()},
     )
 
 

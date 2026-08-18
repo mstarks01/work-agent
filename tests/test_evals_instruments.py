@@ -67,8 +67,7 @@ def empty_run(frameworks: tuple[FrameworkName, ...]) -> ModeRun:
         coverage=[],
         frameworks=frameworks,
         extractions=[],
-        applicability=[],
-        applicability_yields=[],
+        rows={},
     )
 
 
