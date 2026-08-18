@@ -508,3 +508,26 @@ def artifact_yield(yields: Sequence[ApplicabilityYield]) -> dict[str, Any]:
         "applicability_yield": [entry.to_json() for entry in yields],
         "applicability_yield_aggregate": aggregate_yield(yields) if yields else None,
     }
+
+
+def score_case(
+    case: GoldenCase, block: FrameworkAnalysis, drafts: Sequence[Any]
+) -> dict[str, Any]:
+    """Both of this package's per-case rows, keyed by the instrument reading each.
+
+    The keys are instrument names, so the sweep accumulates a row without
+    knowing which package produced it and the per-case payload carries it under
+    the same name the artifact does.
+
+    Scored only where the case declared the framework: a case this package's
+    **Precondition** refuses carries no reference set, and scoring the empty
+    block it would still produce reports zero recall for a framework that
+    correctly did nothing. The block's presence is that declaration.
+    """
+    return {
+        "applicability": score_applicability(case, block),
+        # Both sides of this framework's critic, from the block the run already
+        # produced: no judge and no second scoring pass, because both sides are
+        # requirement identifiers.
+        "applicability_yield": score_yield(case, block, drafts),
+    }
