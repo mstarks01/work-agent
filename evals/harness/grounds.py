@@ -1,4 +1,4 @@
-"""What the category agents actually did with ``grounds``, counted.
+"""What the lane agents actually did with ``grounds``, counted.
 
 Three prompt rules govern finding-level attribution and **none of them is
 mechanically enforced**, so this module is the only thing that can say whether
@@ -47,8 +47,10 @@ from pydantic import ValidationError
 
 from stride_service.critic import DraftJoinError, GroundsUnverifiedError
 from stride_service.evidence import EvidenceResolutionError
-from stride_service.frameworks.stride.record import DraftThreat, StrideCategory
+from stride_service.frameworks import PACKAGES
 from stride_service.report import (
+    Claim,
+    FrameworkName,
     GroundKind,
     UnverifiedGround,
 )
@@ -84,7 +86,11 @@ class ThreatGrounds:
     """
 
     threat_id: str
-    category: StrideCategory
+    framework: FrameworkName
+    #: The lane the claim was found in, read off whichever field this package's
+    #: ``IdRule`` stamps it into — ``category`` for STRIDE, ``chapter`` for ASVS.
+    #: Empty for a package whose record carries no lane, which is legal.
+    lane: str
     kinds: tuple[GroundKind, ...]
     unverified: tuple[int, ...]
 
@@ -103,7 +109,8 @@ class ThreatGrounds:
     def to_json(self) -> dict[str, Any]:
         return {
             "threat_id": self.threat_id,
-            "category": self.category,
+            "framework": self.framework,
+            "lane": self.lane,
             "total": self.total,
             "kinds": list(self.kinds),
             "unverified": list(self.unverified),
@@ -123,6 +130,7 @@ class CaseGrounds:
     """
 
     case_id: str
+    framework: FrameworkName
     threats: tuple[ThreatGrounds, ...]
 
     # --- measurement 1: how many grounds, and of which branch ------------
@@ -178,6 +186,7 @@ class CaseGrounds:
     def to_json(self) -> dict[str, Any]:
         return {
             "case": self.case_id,
+            "framework": self.framework,
             "counts": {
                 "threats": self.threat_count,
                 "grounds": self.ground_count,
@@ -251,27 +260,51 @@ def ratio(numerator: float, denominator: float) -> float:
     return numerator / denominator if denominator else 0.0
 
 
+def lane_of(framework: FrameworkName, draft: Claim) -> str:
+    """The lane a draft was found in, without naming any framework's field.
+
+    A package declares which record field its ``IdRule`` stamps the lane into,
+    so this reads the declaration rather than a field name. A package whose
+    record carries no lane answers the empty string, which is a legal shape
+    (``lane_field`` is ``None``) rather than a defect to raise on.
+    """
+    field = PACKAGES[framework].id_rule.lane_field
+    return str(getattr(draft, field, "")) if field else ""
+
+
 def measure_grounds(
     case_id: str,
-    drafts: Sequence[DraftThreat],
+    framework: FrameworkName,
+    drafts: Sequence[Claim],
     unverified: Iterable[UnverifiedGround],
 ) -> CaseGrounds:
-    """Fold one case's drafts and its unverified marks into one measurement.
+    """Fold one framework's drafts and its unverified marks into one measurement.
+
+    **Per framework, over that framework's own drafts and its own block's
+    marks.** ADR 0002 exempts no package from finding-level attribution, so
+    every one of them has a quoteless and an unverified rate; pooling two
+    packages' drafts here would put one number over two populations whose agents
+    were given different instructions.
+
+    Typed against the neutral :class:`~stride_service.report.Claim` because that
+    is what carries ``grounds``. Nothing here reads a field a package declares.
 
     A mark naming a draft that is not here is dropped rather than raised on:
-    :class:`~stride_service.report.StrideReport` already refuses to be built
-    with a dangling mark, so reaching this function with one means the report
-    was never assembled and the sweep has a louder problem than a metric.
+    the report already refuses to be built with a dangling mark, so reaching
+    this function with one means the report was never assembled and the sweep
+    has a louder problem than a metric.
     """
     marked: dict[str, set[int]] = {}
     for mark in unverified:
         marked.setdefault(mark.claim_id, set()).add(mark.index)
     return CaseGrounds(
         case_id=case_id,
+        framework=framework,
         threats=tuple(
             ThreatGrounds(
                 threat_id=draft.id,
-                category=draft.category,
+                framework=framework,
+                lane=lane_of(framework, draft),
                 kinds=tuple(ground.kind for ground in draft.grounds),
                 unverified=tuple(sorted(marked.get(draft.id, ()))),
             )
