@@ -37,7 +37,7 @@ from evals.harness.judge import ClaimPair, UnmatchedThreat, claim_payload
 from evals.harness.reference import ReferenceThreat, load_corpus
 from tests.factories import valid_model
 
-#: What element agreement alone is worth on the hand labels, measured
+#: What element agreement alone is worth on the recorded labels, measured
 #: 2026-08-18 over the 201 ``match`` pairs that carry candidate element IDs.
 #: Every number here is quoted in #201, so moving one means updating the issue.
 MEASURED = {
@@ -54,7 +54,7 @@ MEASURED = {
 #: The frontier, both errors at once. ``splits`` counts the ``match`` pairs a
 #: rule calls different; ``merges`` counts the reference-claim pairs a rule calls
 #: the same, over the 287 within-lane pairs the corpus holds — and every one of
-#: those is a pair a reviewer ruled distinct, so every merge is an error.
+#: those is a pair the corpus records as a distinct claim, so every merge is an error.
 #:
 #: Read down the table: no rule here is usable. The tightest loses 90 of 201
 #: paraphrases; the loosest destroys 126 findings. **The interesting row is

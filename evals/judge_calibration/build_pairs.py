@@ -1,8 +1,9 @@
 """Assemble the judge-calibration fixtures from hand-labelled tuples.
 
-``LABELS`` is the hand-labelling itself: one tuple per candidate pair, each
-label decided by a human reading the pair, each carrying the rationale that
-decided it. Reference claims are pulled verbatim from each case's
+``LABELS`` is the labelling itself: one tuple per candidate pair, each carrying
+the rationale that argued for it. **Agent-authored and unreviewed** — nobody has
+read these pairs, so they are what the suite scores against rather than ground
+truth, and ``evals/README.md`` states that once for the whole directory. Reference claims are pulled verbatim from each case's
 ``claims/stride.json`` by index, so a reworded reference cannot silently detach a
 fixture from the claim it was labelled against — ``verify_corpus.py`` fails
 when it does.
@@ -28,10 +29,10 @@ blessed model does this sentence name? The corpus's own conventions apply — a
 flow, process, store or entity, one or two of them, and never a boundary, which
 the reference sets cite once in 431.
 
-**A draft until a reviewer signs it.** ``evals/BLESSING.md`` step 6 is one
+**Unreviewed, like every other field here.** ``evals/BLESSING.md`` step 6 is one
 reading session over the labelled pairs, and this field joins what that session
-reads. The number it feeds is provisional until then, in the same way a
-bootstrap ``model.json`` is provisional before step 3.
+would read. No case has been through it, so the number this field feeds carries
+the same provenance as the labels it is compared against.
 """
 
 import json

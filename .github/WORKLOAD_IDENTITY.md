@@ -169,7 +169,7 @@ first run after the setup above:
 1. `gh workflow run "Evals (live Vertex)" -f mode=extraction` — exercises the
    `base` tier through the `extract` node.
 2. `gh workflow run "Evals (live Vertex)" -f calibrate=true` — exercises the
-   judge's own model and is the first execution of the ≥90% judge–human
+   judge's own model and is the first execution of the ≥90% judge–label
    agreement bar.
 3. Read `models.judge_served` in the run artifact. That is the provider's own
    report of which build answered. An empty list means it stopped returning a

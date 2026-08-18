@@ -1,9 +1,16 @@
-"""Judge-vs-human agreement over the hand-labelled fixtures.
+"""Judge-vs-label agreement over the recorded fixtures.
 
-The SME hand-labelled ~100 candidate pairs match / no-match in the same session
-that blessed the corpus, and judge-human agreement must be **>= 90%**
-(comparator: Semgrep's 92-96% on an analogous triage task). Failing the bar
-means the judge prompt needs work, not ship-anyway.
+``evals/judge_calibration/pairs.json`` holds candidate pairs marked match /
+no-match, and judge-label agreement must be **>= 90%** (comparator: Semgrep's
+92-96% on an analogous triage task). Failing the bar means the judge prompt needs
+work, not ship-anyway.
+
+**The labels are agent-authored and nobody has reviewed them.** So this measures
+whether the judge reproduces what an earlier agent wrote down, and not whether
+either is right; the comparator above is a figure from a task with real reviewer
+agreement, and this number is not comparable to it. ``evals/README.md`` states
+the provenance once for the whole directory. Everything below says "the labels"
+rather than "the human" for that reason.
 
 This is what makes a judge change a real gate rather than a dependency bump:
 re-run it on any change to ``evals/config/judge.toml``, because a new judge
@@ -44,7 +51,7 @@ class CalibrationError(ValueError):
 
 @dataclass(frozen=True)
 class LabelledPair:
-    """One hand-labelled pair: the human's answer, and why."""
+    """One recorded pair: the label, and the note that argued for it."""
 
     case: str
     category: StrideCategory
@@ -56,7 +63,8 @@ class LabelledPair:
     note: str
 
     @property
-    def human_match(self) -> bool:
+    def label_match(self) -> bool:
+        """What the recorded label says, as a boolean the scorer can compare."""
         return self.label == "match"
 
     def to_claim_pair(self) -> ClaimPair:
@@ -72,7 +80,7 @@ class LabelledPair:
 
 @dataclass(frozen=True)
 class Disagreement:
-    """One pair the judge and the human read differently.
+    """One pair the judge and the recorded label read differently.
 
     Kept whole rather than counted: the bar failing is a prompt-authoring
     task, and a bare percentage says nothing about which distinction the judge
@@ -89,9 +97,9 @@ class Disagreement:
             "category": self.pair.category,
             "reference_claim": self.pair.reference_claim,
             "candidate_claim": self.pair.candidate_claim,
-            "human": self.pair.label,
+            "label": self.pair.label,
             "judge": "match" if self.judge_match else "no-match",
-            "human_note": self.pair.note,
+            "label_note": self.pair.note,
             "judge_rationale": self.judge_rationale,
         }
 
@@ -102,8 +110,8 @@ class CalibrationResult:
 
     ``rulings`` is what this judge answered for every pair, in the order the
     pairs were given. It exists so two judges can be compared *to each other*
-    and not only to the human: agreement against the labels tells you each
-    judge's accuracy, and nothing about whether the two would reach the same
+    and not only to the labels: agreement against the labels tells you how far
+    each judge reproduces them, and nothing about whether the two would reach the same
     conclusion — two judges at 92% can disagree with each other on every one of
     the pairs they each got wrong. It is deliberately absent from
     :meth:`to_json`, where a hundred booleans would bury the disagreements a
@@ -160,7 +168,7 @@ class JudgeComparison:
     The objective is explicitly **not** unanimity. Judges are allowed to differ;
     what must not happen is a comparison of two subject models flipping because
     the judge changed vendor. Where agreement between judges is materially lower
-    than agreement with the human, that is the finding, and it is reported as
+    than agreement with the labels, that is the finding, and it is reported as
     uncertainty rather than resolved by picking a favourite.
     """
 
@@ -189,7 +197,7 @@ class JudgeComparison:
         return any(candidate.result.meets_bar for candidate in self.candidates)
 
     def agreement_between(self, first: str, second: str) -> float:
-        """How often two candidates ruled the same way, human labels aside."""
+        """How often two candidates ruled the same way, the labels aside."""
         left = self._rulings(first)
         right = self._rulings(second)
         if not left:
@@ -218,7 +226,7 @@ class JudgeComparison:
                     "category": pair.category,
                     "reference_claim": pair.reference_claim,
                     "candidate_claim": pair.candidate_claim,
-                    "human": pair.label,
+                    "label": pair.label,
                     "judges": {
                         label: "match" if match else "no-match"
                         for label, match in rulings.items()
@@ -309,7 +317,7 @@ def load_pairs(path: Path | str = DEFAULT_PAIRS_PATH) -> tuple[LabelledPair, ...
 
 
 def measure_agreement(judge: Judge, pairs: Sequence[LabelledPair]) -> CalibrationResult:
-    """Run the judge over every labelled pair and compare with the human."""
+    """Run the judge over every labelled pair and compare with the label."""
     if not pairs:
         raise CalibrationError("no labelled pairs to calibrate against")
 
@@ -320,7 +328,7 @@ def measure_agreement(judge: Judge, pairs: Sequence[LabelledPair]) -> Calibratio
     for pair in pairs:
         ruling = judge.equivalent(pair.to_claim_pair())
         rulings.append(ruling.match)
-        if ruling.match == pair.human_match:
+        if ruling.match == pair.label_match:
             agreements += 1
             continue
         disagreement = Disagreement(

@@ -1,7 +1,7 @@
 """Candidate-trigger recall: did deterministic analysis see the lead at all?
 
 A separate number from finding recall, and it answers a narrower question. For
-each reference threat an SME says a working tool must report, this asks whether
+each reference threat the corpus says a working tool must report, this asks whether
 :mod:`stride_service.candidates` fired a rule *in that threat's category* on
 *at least one of the elements it is about*. It says nothing about whether the
 agent then found the threat — that is finding recall, and it is scored
