@@ -1,146 +1,250 @@
 [
   {
     "category": "spoofing",
-    "affected_element_ids": ["flow:calling-service-to-inference-gateway:submit-inference-request", "entity:calling-service"],
+    "affected_element_ids": [
+      "flow:calling-service-to-inference-gateway:submit-inference-request",
+      "entity:calling-service"
+    ],
     "claim": "An attacker who obtains a never-expiring API key calls the inference gateway as that team indefinitely.",
     "tier": "must-find",
-    "severity": {"likelihood": "high", "impact": "high"},
+    "severity": {
+      "likelihood": "high",
+      "impact": "high"
+    },
     "notes": "Bearer credential with no expiry on an internet-facing endpoint; compromise is permanent until noticed."
   },
   {
     "category": "spoofing",
-    "affected_element_ids": ["flow:inference-gateway-to-model-server:forward-request", "process:model-server"],
+    "affected_element_ids": [
+      "flow:inference-gateway-to-model-server:forward-request",
+      "process:model-server"
+    ],
     "claim": "Any workload inside the model network submits inference requests posing as the gateway, which the model server accepts on network position alone.",
     "tier": "must-find",
-    "severity": {"likelihood": "medium", "impact": "high"},
+    "severity": {
+      "likelihood": "medium",
+      "impact": "high"
+    },
     "notes": "Stated absence of authentication behind a boundary that is only 'meant to be' closed."
   },
   {
     "category": "spoofing",
-    "affected_element_ids": ["flow:ml-engineer-to-model-registry:publish-artifact", "entity:ml-engineer"],
+    "affected_element_ids": [
+      "flow:ml-engineer-to-model-registry:publish-artifact",
+      "entity:ml-engineer"
+    ],
     "claim": "An attacker publishes a model artifact under a shared group account with no individual identity behind it.",
     "tier": "expected",
-    "severity": {"likelihood": "medium", "impact": "high"},
+    "severity": {
+      "likelihood": "medium",
+      "impact": "high"
+    },
     "notes": "Publish authentication is unknown and possibly shared; report as unverified."
   },
   {
     "category": "tampering",
-    "affected_element_ids": ["store:model-registry", "flow:model-server-to-model-registry:load-artifact"],
+    "affected_element_ids": [
+      "store:model-registry",
+      "flow:model-server-to-model-registry:load-artifact"
+    ],
     "claim": "An attacker who can write to the registry swaps the model artifact and the model server loads it without any integrity verification.",
     "tier": "must-find",
-    "severity": {"likelihood": "high", "impact": "high"},
+    "severity": {
+      "likelihood": "high",
+      "impact": "high"
+    },
     "notes": "The defining supply-chain finding of this case; the source states verification is absent."
   },
   {
     "category": "tampering",
-    "affected_element_ids": ["store:feature-store", "flow:model-server-to-feature-store:read-features"],
+    "affected_element_ids": [
+      "store:feature-store",
+      "flow:model-server-to-feature-store:read-features"
+    ],
     "claim": "An attacker with model-network access writes to the unauthenticated Redis feature store and changes the features a decision is made on.",
     "tier": "must-find",
-    "severity": {"likelihood": "medium", "impact": "high"},
+    "severity": {
+      "likelihood": "medium",
+      "impact": "high"
+    },
     "notes": "No password is a stated fact, not an unknown; poisoning features silently changes inference output."
   },
   {
     "category": "tampering",
-    "affected_element_ids": ["flow:inference-gateway-to-model-server:forward-request"],
+    "affected_element_ids": [
+      "flow:inference-gateway-to-model-server:forward-request"
+    ],
     "claim": "An attacker inside the model network alters request payloads in flight on the unauthenticated, unencrypted forward path.",
     "tier": "expected",
-    "severity": {"likelihood": "medium", "impact": "medium"},
+    "severity": {
+      "likelihood": "medium",
+      "impact": "medium"
+    },
     "notes": "Same flow as the spoofing entry; the lane difference is modifying content versus assuming identity."
   },
   {
     "category": "repudiation",
-    "affected_element_ids": ["store:model-registry", "entity:ml-engineer"],
+    "affected_element_ids": [
+      "store:model-registry",
+      "entity:ml-engineer"
+    ],
     "claim": "Nobody can establish which engineer published a given model artifact, because publication runs through a shared account.",
     "tier": "must-find",
-    "severity": {"likelihood": "medium", "impact": "medium"},
+    "severity": {
+      "likelihood": "medium",
+      "impact": "medium"
+    },
     "notes": "Model provenance is the audit trail that matters here; a shared account destroys it."
   },
   {
     "category": "repudiation",
-    "affected_element_ids": ["store:inference-log", "entity:calling-service"],
+    "affected_element_ids": [
+      "store:inference-log",
+      "entity:calling-service"
+    ],
     "claim": "A calling team disputes a request the log attributes to them, and a shared long-lived API key cannot establish who actually sent it.",
     "tier": "expected",
-    "severity": {"likelihood": "medium", "impact": "medium"},
+    "severity": {
+      "likelihood": "medium",
+      "impact": "medium"
+    },
     "notes": "The log records the key's team, not an actor; distinct from disclosure findings about the same store."
   },
   {
     "category": "information-disclosure",
-    "affected_element_ids": ["store:inference-log"],
+    "affected_element_ids": [
+      "store:inference-log"
+    ],
     "claim": "An attacker who reaches the inference log reads raw end-user prompts, whose protection at rest is unverified.",
     "tier": "must-find",
-    "severity": {"likelihood": "medium", "impact": "high"},
+    "severity": {
+      "likelihood": "medium",
+      "impact": "high"
+    },
     "notes": "A debugging store that silently became the most sensitive data collection in the system."
   },
   {
     "category": "information-disclosure",
-    "affected_element_ids": ["store:feature-store"],
+    "affected_element_ids": [
+      "store:feature-store"
+    ],
     "claim": "An attacker with model-network access reads per-customer account age and spend bands from the unauthenticated feature store.",
     "tier": "must-find",
-    "severity": {"likelihood": "medium", "impact": "high"},
+    "severity": {
+      "likelihood": "medium",
+      "impact": "high"
+    },
     "notes": "Stated absence of authentication over data tagged pii and financial."
   },
   {
     "category": "information-disclosure",
-    "affected_element_ids": ["process:model-server", "flow:calling-service-to-inference-gateway:submit-inference-request"],
-    "claim": "A caller crafts a request that makes the model emit customer features or training data belonging to a different tenant.",
+    "affected_element_ids": [
+      "process:model-server",
+      "flow:calling-service-to-inference-gateway:submit-inference-request"
+    ],
+    "claim": "A caller crafts a request that makes the model emit customer features belonging to a different tenant.",
     "tier": "expected",
-    "severity": {"likelihood": "medium", "impact": "high"},
-    "notes": "Model-mediated disclosure: the gateway authenticates the team but nothing scopes which customers' features a request may pull."
+    "severity": {
+      "likelihood": "medium",
+      "impact": "high"
+    },
+    "notes": "Model-mediated disclosure: the gateway authenticates the team but nothing scopes which customers' features a request may pull. Review sitting 01 struck 'or training data' from this claim: no training pipeline exists in this model, and the label set already rules training-time attacks out of scope for this case, so the claim graded the tool against a fact the model does not hold."
   },
   {
     "category": "information-disclosure",
-    "affected_element_ids": ["flow:inference-gateway-to-model-server:forward-request"],
+    "affected_element_ids": [
+      "flow:inference-gateway-to-model-server:forward-request"
+    ],
     "claim": "An attacker on the internal path reads end-user text out of forwarded requests, because transport encryption there is unverified.",
     "tier": "expected",
-    "severity": {"likelihood": "medium", "impact": "medium"},
+    "severity": {
+      "likelihood": "medium",
+      "impact": "medium"
+    },
     "notes": "Boundary crossing from serving edge into model network with no stated protection."
   },
   {
     "category": "denial-of-service",
-    "affected_element_ids": ["process:inference-gateway", "flow:calling-service-to-inference-gateway:submit-inference-request"],
+    "affected_element_ids": [
+      "process:inference-gateway",
+      "flow:calling-service-to-inference-gateway:submit-inference-request"
+    ],
     "claim": "A caller holding a valid key floods the gateway with inference requests and exhausts the shared GPU capacity behind it.",
     "tier": "must-find",
-    "severity": {"likelihood": "high", "impact": "high"},
+    "severity": {
+      "likelihood": "high",
+      "impact": "high"
+    },
     "notes": "GPU capacity is the scarce, expensive resource; no quota or rate limit per key is described."
   },
   {
     "category": "denial-of-service",
-    "affected_element_ids": ["store:feature-store", "process:model-server"],
+    "affected_element_ids": [
+      "store:feature-store",
+      "process:model-server"
+    ],
     "claim": "An attacker with model-network access flushes or fills the unauthenticated Redis store, stalling every request that needs features.",
     "tier": "expected",
-    "severity": {"likelihood": "medium", "impact": "high"},
+    "severity": {
+      "likelihood": "medium",
+      "impact": "high"
+    },
     "notes": "An unauthenticated cache is as easy to destroy as to read."
   },
   {
     "category": "denial-of-service",
-    "affected_element_ids": ["store:model-registry", "process:model-server"],
+    "affected_element_ids": [
+      "store:model-registry",
+      "process:model-server"
+    ],
     "claim": "An attacker deletes or corrupts the registry artifact so the model server cannot start after a restart.",
     "tier": "expected",
-    "severity": {"likelihood": "low", "impact": "high"},
+    "severity": {
+      "likelihood": "low",
+      "impact": "high"
+    },
     "notes": "Startup dependency with no fallback described."
   },
   {
     "category": "elevation-of-privilege",
-    "affected_element_ids": ["store:model-registry", "process:model-server"],
+    "affected_element_ids": [
+      "store:model-registry",
+      "process:model-server"
+    ],
     "claim": "An attacker who can write to the registry turns an unverified artifact load into code execution on the GPU nodes.",
     "tier": "must-find",
-    "severity": {"likelihood": "medium", "impact": "high"},
+    "severity": {
+      "likelihood": "medium",
+      "impact": "high"
+    },
     "notes": "Model artifacts are loaded as code; the escalation framing of the swap finding."
   },
   {
     "category": "elevation-of-privilege",
-    "affected_element_ids": ["process:inference-gateway", "process:model-server"],
+    "affected_element_ids": [
+      "process:inference-gateway",
+      "process:model-server"
+    ],
     "claim": "An attacker who compromises the internet-facing gateway inherits unauthenticated access to everything in the model network.",
     "tier": "must-find",
-    "severity": {"likelihood": "medium", "impact": "high"},
+    "severity": {
+      "likelihood": "medium",
+      "impact": "high"
+    },
     "notes": "The whole model network's security rests on the gateway being the only reachable path."
   },
   {
     "category": "elevation-of-privilege",
-    "affected_element_ids": ["entity:calling-service", "process:inference-gateway"],
+    "affected_element_ids": [
+      "entity:calling-service",
+      "process:inference-gateway"
+    ],
     "claim": "A caller uses its key to reach models or capabilities its team was never entitled to, because the key authenticates without scoping what it may invoke.",
     "tier": "expected",
-    "severity": {"likelihood": "medium", "impact": "medium"},
+    "severity": {
+      "likelihood": "medium",
+      "impact": "medium"
+    },
     "notes": "Authorization scope on a multi-tenant gateway is unspecified; report as unverified."
   }
 ]
