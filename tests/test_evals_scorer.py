@@ -1,6 +1,6 @@
 """The scorer, offline, with zero provider calls.
 
-Every judgement call goes through a stand-in replaying the SME's recorded
+Every judgement call goes through a stand-in replaying the corpus's recorded
 labels, so what is under test here is the mechanical half — the lane prefilter,
 the one-to-one assignment, the buckets, the severity arithmetic — which is
 exactly the half that must never drift.
@@ -171,7 +171,7 @@ def test_needs_info_threats_bypass_adjudication(case):
 
 
 def test_element_disagreement_is_scored_not_filtered(case):
-    # A correct threat may cite the process where the SME cited the flow at its
+    # A correct threat may cite the process where the corpus cited the flow at its
     # endpoint. That must still match, and show up as an element-accuracy miss
     # rather than a recall miss.
     reference = case.claims_for("stride")[0]

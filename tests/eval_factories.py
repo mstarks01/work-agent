@@ -1,7 +1,7 @@
 """Scripted judges and threat builders for the offline eval tests.
 
 The whole scorer is exercised with **zero provider calls**: the judge is a
-seam, so a stand-in replaying the SME's recorded labels plays its part exactly.
+seam, so a stand-in replaying the corpus's recorded labels plays its part exactly.
 That is what the credential-free PR job runs.
 """
 
@@ -80,7 +80,7 @@ class ScriptedJudge:
 
 
 class LabelReplayJudge:
-    """Replays the hand labels, optionally disagreeing on the first ``flip``."""
+    """Replays the recorded labels, optionally disagreeing on the first ``flip``."""
 
     def __init__(
         self,

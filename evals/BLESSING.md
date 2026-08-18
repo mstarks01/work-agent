@@ -6,6 +6,15 @@ This is a one-time, offline authoring task — nothing here runs during a live
 analysis. The whole point of the document is **step 3**; everything else is
 bookkeeping around it.
 
+> **Nobody has ever run this document.** All 13 cases in `evals/corpus/` were
+> written by an agent, and no person has read a `model.json`, a reference set or
+> a labelled pair. The `corrections.md` files record what an agent changed
+> against the source text, not what a reviewer caught. Steps 3 and 6 below
+> describe what *should* happen and what has not happened yet, so treat this as
+> a procedure waiting for its first run rather than a record of one. Every
+> number the suite reports carries that provenance — see the top of
+> [README.md](README.md).
+
 ## What a case is
 
 Two artifacts plus the input they're built from:
@@ -176,9 +185,11 @@ Write one entry per threat, against the corrected model's element IDs:
 
 ### 5. Label the judge-calibration pairs
 
-In the same sitting, hand-label candidate threat pairs as match / no-match in
-`build_pairs.py`. These are the ground truth for the **≥90% judge–human agreement
-bar**, and they're what lets the scorer be tested with no live calls at all.
+In the same sitting, label candidate threat pairs as match / no-match in
+`build_pairs.py`. These are what the **≥90% judge–label agreement bar** scores
+against, and they're what lets the scorer be tested with no live calls at all.
+They are not ground truth: nobody has reviewed them, so the bar says the judge
+reproduces them and says nothing about whether they are right.
 
 - **Label within a category only** — the prefilter means cross-category pairs
   never reach the judge.

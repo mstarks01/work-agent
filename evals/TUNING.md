@@ -65,7 +65,7 @@ loop you repeat per idea.
 ## Step 1 — Trust the judge
 
 Recall and precision are measured by an LLM judge. If the judge disagrees with
-human labels, every number downstream is noise. Check it first:
+the recorded labels, every number downstream is noise. Check it first:
 
 ```sh
 python -m evals.harness.run calibrate --out agreement.json
@@ -74,6 +74,10 @@ python -m evals.harness.run calibrate --out agreement.json
 This must report **≥90% agreement**. If it doesn't, the fix is the judge prompt
 (`evals/prompts/`), not a lower bar — a lenient judge inflates recall silently,
 which is the expensive way to be wrong. Don't tune anything until this passes.
+
+What passing means is narrower than it looks. The labels are agent-authored and
+nobody has reviewed them, so this measures whether the judge reproduces them and
+not whether they are right. See the top of [README.md](README.md).
 
 ### Comparing candidate judges
 
@@ -92,9 +96,9 @@ python -m evals.harness.run calibrate \
 Two numbers come back, and the second is the one a single agreement percentage
 cannot give you:
 
-- **agreement with the human labels**, per candidate — accuracy, which is what
-  selects a production judge.
-- **agreement between candidates**, human labels aside. Two judges can both sit
+- **agreement with the recorded labels**, per candidate — which is what selects
+  a production judge.
+- **agreement between candidates**, the labels aside. Two judges can both sit
   at 92% and still disagree with each other on every pair they each got wrong.
   That is exactly the case where *"model A beats model B"* turns over when the
   judge changes vendor, and per-candidate accuracy would show none of it.

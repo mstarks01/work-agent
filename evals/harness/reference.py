@@ -96,7 +96,10 @@ class ReferenceSeverity(BaseModel):
 
 
 class ReferenceClaim(BaseModel):
-    """One claim the SME says a working tool must (or should) report.
+    """One claim the corpus asserts a working tool must (or should) report.
+
+    Agent-authored and unreviewed, like everything under ``evals/`` —
+    ``evals/README.md`` states the provenance once for the whole directory.
 
     The neutral half: a claim string to match on, the tier that weights it, the
     elements it is about, and rationale that is never scored. Everything a
