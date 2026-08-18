@@ -154,7 +154,7 @@ def test_a_sweep_with_no_scoring_is_refused_rather_than_read_as_a_zero(
 ):
     path = write_run(tmp_path, "a.json", provenance(sampling), [])
 
-    with pytest.raises(ProvenanceError, match="no scores block"):
+    with pytest.raises(ProvenanceError, match="no scores or applicability block"):
         load_runs([path])
 
 

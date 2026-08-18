@@ -13,6 +13,8 @@ half of the contract entirely.
 
 from __future__ import annotations
 
+from pathlib import Path
+
 import pytest
 
 from evals import verify_corpus
@@ -251,3 +253,90 @@ def test_coverage_reports_every_lane_of_every_framework_that_ran():
     assert len(both) == len(PACKAGES["stride"].lanes) + len(PACKAGES["asvs"].lanes)
     assert len([lane for lane in both if lane.framework == "asvs"]) == 17
     assert all(lane.cases == 0 for lane in both)
+
+
+def test_the_exemplar_delta_reads_this_package_s_own_proximity(case, corpus):
+    """`exemplar_proximity` sits on the `(case, framework)` pair, not the case.
+
+    Exemplars live at `frameworks/<name>/lanes/<lane>/exemplars.md`, so a case
+    near STRIDE's payments exemplar is near nothing of ASVS's. A delta that read
+    one declaration for both packages would answer the wrong question for one of
+    them.
+    """
+    from evals.harness.applicability import exemplar_delta
+
+    expected = [reference.requirement for reference in case.references["asvs"]]
+    near = score_applicability(case, Block(ruling(r) for r in expected))
+    far = score_applicability(case, Block([]))
+    delta = exemplar_delta(
+        [near, far.__class__(**{**far.__dict__, "exemplar_proximity": "far"})]
+    )
+
+    assert delta["near_recall"] == 1.0
+    assert delta["far_recall"] == 0.0
+    assert delta["delta"] == 1.0
+
+
+def test_over_applied_requirements_are_surfaced_for_the_next_reading(case):
+    """The corpus feedback loop, without a judge.
+
+    STRIDE needs one to tell a grounded unlisted threat from noise. Here the
+    list is set arithmetic, and `off_catalog` has already taken out the entry
+    that is a package bug rather than a judgement — so it never appears.
+    """
+    from evals.harness.applicability import over_applied_for_promotion
+
+    universe = {entry.id for entry in requirements_for(declared_level(case))}
+    unexpected = min(
+        universe - {reference.requirement for reference in case.references["asvs"]}
+    )
+    beyond = next(entry.id for entry in requirements_for(3) if entry.id not in universe)
+
+    score = score_applicability(case, Block([ruling(unexpected), ruling(beyond)]))
+    surfaced = over_applied_for_promotion([score])
+
+    assert [entry["requirement"] for entry in surfaced] == [unexpected]
+    assert score.off_catalog == (beyond,)
+
+
+def test_stability_reads_the_applicability_block_too():
+    """ASVS run-to-run spread was unmeasured; #200's body said otherwise.
+
+    It also survives `--no-scoring`: ASVS matches by requirement ID with no
+    model call, so a credential-free sweep still carries a comparable half where
+    STRIDE's is absent.
+    """
+    from evals.harness.provenance import EvalArtifact, RunProvenance
+    from evals.harness.stability import read_run
+
+    artifact = EvalArtifact(
+        path=Path("sweep.json"),
+        mode="analysis",
+        cases=("01-payments-checkout",),
+        trusted=True,
+        structural_failures=(),
+        provenance=RunProvenance(
+            sampling_config_version=1,
+            tiers_config_version=1,
+            sampling={},
+            node_runs={},
+        ),
+        raw={
+            # Empty, as a --no-scoring sweep leaves it.
+            "scores": [],
+            "applicability": [
+                {
+                    "case": "01-payments-checkout",
+                    "matched": ["V1.2.4", "V6.2.1"],
+                    "expected": 4,
+                    "recall": 0.5,
+                }
+            ],
+        },
+    )
+
+    run = read_run(artifact)
+
+    assert run.cases == {("asvs", "01-payments-checkout")}
+    assert run.matched[("asvs", "01-payments-checkout")] == {"V1.2.4", "V6.2.1"}
+    assert run.recall[("asvs", "01-payments-checkout")] == 0.5

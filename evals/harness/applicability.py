@@ -27,11 +27,11 @@ cannot steer a number (OWASP LLM01).
 
 from __future__ import annotations
 
-from collections.abc import Mapping, Sequence
+from collections.abc import Iterable, Mapping, Sequence
 from dataclasses import dataclass
 from typing import Any
 
-from evals.harness.reference import GoldenCase, ReferenceRequirement
+from evals.harness.reference import CaseFramework, GoldenCase, ReferenceRequirement
 from stride_service.frameworks.asvs.catalog import requirements_for
 from stride_service.frameworks.asvs.record import requirement_of
 from stride_service.report import FrameworkAnalysis, FrameworkName, RuledClaim
@@ -67,6 +67,11 @@ class ApplicabilityScore:
 
     case: str
     level: int
+    #: Whether this case is near the architectures *this package's* exemplars
+    #: demonstrate. On the ``(case, framework)`` pair because exemplars live at
+    #: ``frameworks/<name>/lanes/<lane>/exemplars.md`` — a case near STRIDE's
+    #: payments exemplar is near nothing of ASVS's.
+    exemplar_proximity: str
     universe: int
     expected: tuple[str, ...]
     must_find: tuple[str, ...]
@@ -105,6 +110,7 @@ class ApplicabilityScore:
             "case": self.case,
             "framework": FRAMEWORK,
             "level": self.level,
+            "exemplar_proximity": self.exemplar_proximity,
             "universe": self.universe,
             "expected": len(self.expected),
             "must_find": len(self.must_find),
@@ -121,6 +127,14 @@ class ApplicabilityScore:
         }
 
 
+def declared(case: GoldenCase) -> CaseFramework:
+    """This case's ASVS declaration, or a refusal naming what is missing."""
+    for entry in case.meta.frameworks:
+        if entry.name == FRAMEWORK:
+            return entry
+    raise ApplicabilityError(f"{case.id}: case.json does not declare asvs")
+
+
 def declared_level(case: GoldenCase) -> int:
     """The ASVS level this case declares, which decides its universe.
 
@@ -129,17 +143,13 @@ def declared_level(case: GoldenCase) -> int:
     reference set. A case that declares ASVS without one cannot be scored, and
     saying so here beats scoring it against the wrong catalog slice.
     """
-    for declared in case.meta.frameworks:
-        if declared.name != FRAMEWORK:
-            continue
-        level = declared.options.get("level")
-        if not isinstance(level, int):
-            raise ApplicabilityError(
-                f"{case.id}: case.json declares asvs with no integer level, so"
-                " the requirement set it rules on is undefined"
-            )
-        return level
-    raise ApplicabilityError(f"{case.id}: case.json does not declare asvs")
+    level = declared(case).options.get("level")
+    if not isinstance(level, int):
+        raise ApplicabilityError(
+            f"{case.id}: case.json declares asvs with no integer level, so"
+            " the requirement set it rules on is undefined"
+        )
+    return level
 
 
 def applied_requirements(claims: Sequence[RuledClaim]) -> tuple[set[str], set[str]]:
@@ -189,6 +199,7 @@ def score_applicability(
     return ApplicabilityScore(
         case=case.id,
         level=level,
+        exemplar_proximity=declared(case).exemplar_proximity,
         universe=len(universe),
         expected=tuple(sorted(expected)),
         must_find=tuple(sorted(must_find)),
@@ -228,3 +239,57 @@ def pooled(scores: Sequence[ApplicabilityScore]) -> Mapping[str, Any]:
         "precision": round(matched / applied, 4) if applied else 0.0,
         "off_catalog": sum(len(score.off_catalog) for score in scores),
     }
+
+
+def exemplar_delta(scores: Sequence[ApplicabilityScore]) -> dict[str, float]:
+    """The near-vs-far applicability-recall delta: tracked, **non-gating**.
+
+    The same question the STRIDE scorer's delta asks — does output get worse
+    away from the architectures this package's exemplars demonstrate — over the
+    number this package produces. It is a separate function rather than a shared
+    one because the recall it averages is a different measurement, and a
+    ``near_recall`` column pooling both would be an average of a judge-relative
+    figure and a set comparison.
+    """
+    near = [score for score in scores if score.exemplar_proximity == "near"]
+    far = [score for score in scores if score.exemplar_proximity == "far"]
+    near_recall = _mean(score.recall for score in near)
+    far_recall = _mean(score.recall for score in far)
+    return {
+        "near_recall": round(near_recall, 3),
+        "far_recall": round(far_recall, 3),
+        "delta": round(near_recall - far_recall, 3),
+    }
+
+
+def over_applied_for_promotion(
+    scores: Sequence[ApplicabilityScore],
+) -> list[dict[str, Any]]:
+    """The corpus feedback loop, ASVS's half.
+
+    A requirement a run ruled applicable that the case did not expect is either
+    the run over-applying or the reference set being incomplete — the same
+    distinction ``valid-unlisted`` draws for STRIDE, surfaced for the next
+    reading session to settle.
+
+    **Cheaper than STRIDE's, and worth saying why.** STRIDE needs a judge to
+    separate a grounded unlisted threat from noise. Here the list falls out of
+    set arithmetic, and ``off_catalog`` has already taken out the case that is a
+    package bug rather than a judgement — so this costs nothing and carries no
+    model's opinion.
+    """
+    return [
+        {
+            "case": score.case,
+            "framework": FRAMEWORK,
+            "level": score.level,
+            "requirement": requirement,
+        }
+        for score in scores
+        for requirement in score.over_applied
+    ]
+
+
+def _mean(values: Iterable[float]) -> float:
+    collected = list(values)
+    return sum(collected) / len(collected) if collected else 0.0

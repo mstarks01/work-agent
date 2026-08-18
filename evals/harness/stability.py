@@ -34,21 +34,35 @@ from typing import Any
 
 from evals.harness.provenance import EvalArtifact, ProvenanceError, load_artifact
 from evals.harness.scorer import ratio
+from stride_service.report import FrameworkName
+
+#: One case of one framework. Stability is per framework because the two
+#: instruments answer over different sets — STRIDE's open claim set through a
+#: judge, ASVS's finite catalog by string compare — so pooling their spread
+#: would report one volatility figure over two populations.
+Scope = tuple[FrameworkName, str]
 
 
 @dataclass(frozen=True)
 class ScoredRun:
-    """One finished sweep, reduced to what a stability comparison reads."""
+    """One finished sweep, reduced to what a stability comparison reads.
+
+    ``matched`` holds **strings** for both frameworks, because what identifies a
+    matched reference differs: STRIDE's scorer emits an index into the case's
+    reference list, and ASVS's emits the standard's own requirement identifier.
+    Rendering the index as a string keeps one set type and one Jaccard, and the
+    identifiers never collide because the key carries the framework.
+    """
 
     label: str
     mode: str
     models: dict[str, Any]
-    matched: dict[str, frozenset[int]]
-    references: dict[str, int]
-    recall: dict[str, float]
+    matched: dict[Scope, frozenset[str]]
+    references: dict[Scope, int]
+    recall: dict[Scope, float]
 
     @property
-    def cases(self) -> frozenset[str]:
+    def cases(self) -> frozenset[Scope]:
         return frozenset(self.matched)
 
 
@@ -63,6 +77,7 @@ class CaseStability:
     without anything having changed.
     """
 
+    framework: FrameworkName
     case_id: str
     runs: int
     references: int
@@ -82,6 +97,7 @@ class CaseStability:
 
     def to_json(self) -> dict[str, Any]:
         return {
+            "framework": self.framework,
             "case": self.case_id,
             "runs": self.runs,
             "references": self.references,
@@ -96,36 +112,48 @@ class CaseStability:
 
 
 def read_run(artifact: EvalArtifact) -> ScoredRun:
-    """Reduce a loaded artifact to its per-case matched-reference sets.
+    """Reduce a loaded artifact to its per-``(framework, case)`` matched sets.
 
-    A sweep run with ``--no-scoring`` carries no ``scores`` block and is
-    refused here rather than reported as a run that matched nothing: an empty
-    overlap and an unscored sweep are opposite facts about the system.
+    Both blocks, because both are recall against a reference set: ``scores`` is
+    STRIDE's, and ``applicability`` is ASVS's.
+
+    A sweep carrying neither measured no recall to compare and is refused here
+    rather than reported as a run that matched nothing — an empty overlap and an
+    unscored sweep are opposite facts about the system. **Carrying only
+    ``applicability`` is enough**, and that is not a degenerate case: ASVS
+    matches by requirement ID with no model call, so a ``--no-scoring`` sweep
+    still produces a comparable ASVS half. Its stability is measurable without
+    credentials, where STRIDE's is not.
     """
-    scores = artifact.raw.get("scores")
-    if not isinstance(scores, list) or not scores:
-        raise ProvenanceError(
-            f"{artifact.path}: no scores block, so this sweep measured no recall"
-            " to compare — re-run it without --no-scoring"
-        )
-    matched: dict[str, frozenset[int]] = {}
-    references: dict[str, int] = {}
-    recall: dict[str, float] = {}
-    for score in scores:
-        # Refused by name rather than raised through: an artifact whose score
-        # blocks are the wrong shape is a file to re-produce, and a KeyError
-        # out of a comparison reads as a defect in the comparison.
-        try:
-            case_id = str(score["case"])
-            matched[case_id] = frozenset(
-                int(pair["reference_index"]) for pair in score["matched"]
+    matched: dict[Scope, frozenset[str]] = {}
+    references: dict[Scope, int] = {}
+    recall: dict[Scope, float] = {}
+
+    # Refused by name rather than raised through: an artifact whose blocks are
+    # the wrong shape is a file to re-produce, and a KeyError out of a
+    # comparison reads as a defect in the comparison.
+    try:
+        for score in artifact.raw.get("scores") or ():
+            scope: Scope = ("stride", str(score["case"]))
+            matched[scope] = frozenset(
+                str(pair["reference_index"]) for pair in score["matched"]
             )
-            references[case_id] = int(score["counts"]["references"])
-            recall[case_id] = float(score["metrics"]["recall"])
-        except (KeyError, TypeError, ValueError) as exc:
-            raise ProvenanceError(
-                f"{artifact.path}: malformed score block: {exc}"
-            ) from exc
+            references[scope] = int(score["counts"]["references"])
+            recall[scope] = float(score["metrics"]["recall"])
+        for entry in artifact.raw.get("applicability") or ():
+            scope = ("asvs", str(entry["case"]))
+            matched[scope] = frozenset(str(item) for item in entry["matched"])
+            references[scope] = int(entry["expected"])
+            recall[scope] = float(entry["recall"])
+    except (KeyError, TypeError, ValueError) as exc:
+        raise ProvenanceError(f"{artifact.path}: malformed score block: {exc}") from exc
+
+    if not matched:
+        raise ProvenanceError(
+            f"{artifact.path}: no scores or applicability block, so this sweep"
+            " measured no recall to compare — re-run it without --no-scoring,"
+            " or over a case that declares a mechanically scored framework"
+        )
     return ScoredRun(
         label=artifact.path.name,
         mode=artifact.mode,
@@ -141,7 +169,7 @@ def load_runs(paths: Iterable[Path | str]) -> list[ScoredRun]:
     return [read_run(load_artifact(path)) for path in paths]
 
 
-def _mean_jaccard(sets: Sequence[frozenset[int]]) -> float:
+def _mean_jaccard(sets: Sequence[frozenset[str]]) -> float:
     """Mean pairwise Jaccard, with the empty-vs-empty pair scored 1.0.
 
     Two runs that both found nothing agree completely, and calling that 0.0
@@ -169,17 +197,19 @@ def compare_runs(runs: Sequence[ScoredRun]) -> list[CaseStability]:
         raise ValueError("the runs share no scored case, so nothing is comparable")
 
     stability = []
-    for case_id in sorted(shared):
-        sets = [run.matched[case_id] for run in runs]
-        references = runs[0].references[case_id]
+    for scope in sorted(shared):
+        framework, case_id = scope
+        sets = [run.matched[scope] for run in runs]
+        references = runs[0].references[scope]
         always = len(frozenset.intersection(*sets))
         ever = len(frozenset.union(*sets))
         stability.append(
             CaseStability(
+                framework=framework,
                 case_id=case_id,
                 runs=len(runs),
                 references=references,
-                recalls=tuple(run.recall[case_id] for run in runs),
+                recalls=tuple(run.recall[scope] for run in runs),
                 always=always,
                 sometimes=ever - always,
                 never=references - ever,
@@ -232,7 +262,7 @@ def comparability_warnings(runs: Sequence[ScoredRun]) -> list[str]:
     if unshared:
         warnings.append(
             "cases scored by only some runs, excluded from the comparison:"
-            f" {', '.join(sorted(unshared))}"
+            f" {', '.join(f'{name}/{case}' for name, case in sorted(unshared))}"
         )
     return warnings
 
