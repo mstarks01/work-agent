@@ -23,7 +23,9 @@ sentence with the commands filled in.
   `evals/config/judge.toml` has its own `(vendor, model)` pair and may need a
   different one. See
   [Configuration](../docs/Configuration.md#provider-environment). The offline
-  steps (`verify_corpus.py`, `pytest`) need none of this.
+  steps (`verify_corpus.py`, `pytest`) need none of this, and neither does
+  candidate-trigger recall — see
+  [the mechanically matched half](#the-mechanically-matched-half).
 - **Dependencies installed:** `uv sync`.
 - **A clean corpus:** `python evals/verify_corpus.py` should be green.
 
@@ -64,8 +66,16 @@ loop you repeat per idea.
 
 ## Step 1 — Trust the judge
 
-Recall and precision are measured by an LLM judge. If the judge disagrees with
-the recorded labels, every number downstream is noise. Check it first:
+**This step gates STRIDE's numbers and nothing else.** A **Framework Package**
+whose claims carry a catalog identifier is matched by string, with no model call
+anywhere — ASVS is one, so its numbers are unaffected by anything in this step
+and by anything in `evals/config/judge.toml`. If you are blocked on judge
+calibration you can still tune against
+[the mechanically matched numbers](#the-mechanically-matched-half) below.
+
+STRIDE's recall and precision are measured by an LLM judge. If the judge
+disagrees with the recorded labels, every number downstream of it is noise.
+Check it first:
 
 ```sh
 python -m evals.harness.run calibrate --out agreement.json
@@ -171,6 +181,34 @@ list). When tuning, watch these three:
 All of these are *relative to the judge*. Use them to compare configurations and
 track movement; never quote them as absolute scores or against other tools.
 
+### The mechanically matched half
+
+ASVS's numbers are not judge-relative, because ASVS is not judged. Watch these,
+under `applicability` and `applicability_aggregate` in the artifact:
+
+| Metric | What a good change does | Trap |
+| --- | --- | --- |
+| **applicability recall and precision** | both go up, or one holds while the other rises | **Read them together or not at all.** An ASVS claim rules applicability and never a pass, so a lane that ruled *everything* applicable scores 100% recall. Recall alone is trivially winnable and worthless. |
+| **`off_catalog`** | is zero, and stays zero | Not a tuning number. It counts claims naming a requirement the run's level does not carry — the package composing an identifier its own catalog cannot reach. Any value here is a bug to fix, not a lever to pull. |
+| **applicability exemplar delta** | shrinks or holds | Same question as STRIDE's, over this package's own exemplars. `exemplar_proximity` sits on the `(case, framework)` pair, so a case near STRIDE's payments exemplar is near nothing of ASVS's. |
+
+**What moves each cell, when recall is short:**
+
+| Cell | Usual cause | Where to look |
+| --- | --- | --- |
+| `missed` | the lane agent did not raise a requirement the case expects | that chapter's `frameworks/asvs/lanes/<chapter>/skill.md` and its exemplars |
+| `over_applied` | the agent ruled a requirement applicable the case did not expect | the chapter's `## Applicability` section — or the corpus, see below |
+| `off_catalog` | the composed identifier is outside the run's level | a defect in the package, never in a prompt |
+
+**And check the lead first.** `evals/harness/triggers.py` reports, per framework,
+whether a deterministic rule fired in a claim's lane on an element it names.
+ASVS sits at 32% against STRIDE's 80%, and eleven of its seventeen chapters draw
+no lead on any reference claim at all
+([#218](https://github.com/mstarks01/work-agent/issues/218)). A missed
+requirement in one of those chapters is not a prompt problem — the agent was
+never handed the lead. **This costs no provider call**, so read it before
+spending a sweep.
+
 ## Step 3 — Change exactly one lever
 
 Change one thing at a time — two at once and you can't tell which moved the
@@ -212,13 +250,19 @@ a sampling change.
 
 ### The corpus
 
-The reference threat sets aren't meant to be exhaustive up front — they grow from
-real output. Every run flags grounded, plausible threats it produced that aren't
-in the reference set, under `unlisted_for_promotion` in the artifact:
+The reference sets aren't meant to be exhaustive up front — they grow from real
+output. Every run flags what it produced that the reference set does not carry,
+one key per framework:
 
 ```sh
-jq '.unlisted_for_promotion' baseline-1.json
+jq '.unlisted_for_promotion'      baseline-1.json   # STRIDE: grounded, plausible, unlisted
+jq '.over_applied_for_promotion'  baseline-1.json   # ASVS: ruled applicable, not expected
 ```
+
+The two are the same question and cost differently. STRIDE's needs the judge to
+tell a grounded unlisted threat from noise. ASVS's falls out of set arithmetic,
+and `off_catalog` has already taken out the entry that is a package bug rather
+than a judgement — so it is free and carries no model's opinion.
 
 Recurring ones are worth adding to a case's reference set (see
 [`BLESSING.md`](BLESSING.md)). This makes the corpus a better yardstick over
@@ -361,8 +405,9 @@ Not every metric stops the world. The gating is deliberately staged:
 | **Structural validity** (report parses, references resolve, severity matches the matrix, summary matches contents) | **Yes, always** | A malformed report is never a valid result. |
 | **Certification** (every fingerprint blessed) | Only under `--require-certified` | Surfaced on every run, so a configuration that has drifted is never trusted silently. |
 | **must-find recall, near/far delta, critic yield, coverage** | No — printed and recorded | These are findings to act on, not build breakers, until enough baselines exist to know what "normal" is. |
+| **applicability recall, precision and `off_catalog`** | No — printed and recorded | Same reason, and they cost no provider call: `--no-scoring` still emits them. |
 | **Token usage and latency** | No — printed and recorded | Cost and wall-clock per node. What they inform is a budget decision, not a correctness one. |
-| **Stability** | No — and it is not part of a run at all | It needs two finished sweeps, so it is its own command over their artifacts. |
+| **Stability** | No — and it is not part of a run at all | It needs two finished sweeps, so it is its own command over their artifacts. Its ASVS half survives `--no-scoring`, so a credential-free pair of sweeps still measures ASVS's run-to-run spread. |
 
 The shipped default remains `temperature = 0`. Tuning the per-tier values to
 something better is exactly the loop above — run it once you have live
