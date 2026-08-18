@@ -172,7 +172,15 @@ measures agreement with them and not correctness.
 
 Every number here is measured **by the judge** — use them to compare
 configurations and track movement, never as absolute scores or against another
-tool's published figures. The **grounds** measurements at the end are the
+tool's published figures.
+
+**Except ASVS's.** The `applicability` block is a confusion matrix over a finite
+catalog, matched by requirement ID with no model call anywhere, so it is not
+judge-relative and does not carry that caveat. It is reported separately for
+that reason: pooling it with the judged numbers would put two things that are
+not comparable under one heading. It carries the other caveat instead — the
+reference records it scores against are agent-authored and unreviewed, like
+everything else here. The **grounds** measurements at the end are the
 exception: they are counted mechanically and mean the same thing across judges.
 
 - **must-find recall** — did the tool find the threats a case marks as
