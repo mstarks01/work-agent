@@ -23,18 +23,66 @@ named the process, and ``tests/test_claim_identity.py`` records what it costs on
 the blessed corpus: an order of magnitude more claims merge, every one of them a
 pair a reviewer ruled distinct.
 
+**A Trust Boundary is dropped before the comparison.** It is an Element with an
+Element ID like any other, and the reference sets cite one in 431 citations —
+a zone is the context a claim sits in rather than the thing the claim is about.
+Comparing on a citation that arbitrary is noise, and dropping it costs nothing
+the corpus can show.
+
+:func:`endpoint_form` is the looser comparison the frontier in
+``tests/test_evals_identity.py`` is measured over. It is **not** what
+:class:`MechanicalIdentity` answers with, because on its own it merges far more
+than it recovers; it exists so the trade-off is a number rather than an opinion.
+
 Nothing here is a judge replacement. The judge stays the decider until the
 numbers say otherwise, which is #201's own third bullet.
 """
 
 from __future__ import annotations
 
+from collections.abc import Iterable, Mapping
+
 from evals.harness.judge import BucketRuling, ClaimPair, ClaimRuling, UnmatchedThreat
 from stride_service.system_model import SystemModel
+
+#: One case's **Data Flow**s as ``flow id -> (source id, destination id)``.
+FlowMap = Mapping[str, tuple[str, str]]
 
 
 class IdentityError(ValueError):
     """A pair carries no candidate elements, so the rule cannot answer it."""
+
+
+def comparable_elements(element_ids: Iterable[str]) -> frozenset[str]:
+    """The cited **Element**s the identity comparison reads: every one but a zone."""
+    return frozenset(
+        element_id
+        for element_id in element_ids
+        if not element_id.startswith("boundary:")
+    )
+
+
+def endpoint_form(element_ids: Iterable[str], flows: FlowMap) -> frozenset[str]:
+    """Every cited **Data Flow** replaced by the two **Element**s it runs between.
+
+    One place in the graph, spelled one way. The hand labels record the same
+    finding cited as a flow by one writer and as the process at the end of that
+    flow by another — ``evals/BLESSING.md`` step 5 calls that an element-agreement
+    difference and labels the pair a match — and this is what makes those two
+    citations equal without asking anybody.
+
+    It reads the flow map rather than parsing an **Element ID**, because a flow's
+    ID spells its endpoints by *name* and two elements of different types may
+    legally carry one name inside a **System Model**.
+    """
+    resolved: set[str] = set()
+    for element_id in comparable_elements(element_ids):
+        endpoints = flows.get(element_id)
+        if endpoints is None:
+            resolved.add(element_id)
+        else:
+            resolved.update(endpoints)
+    return frozenset(resolved)
 
 
 class MechanicalIdentity:
@@ -54,8 +102,8 @@ class MechanicalIdentity:
                 f" {pair.candidate_claim!r}, so mechanical identity has nothing"
                 " to compare; assign them in build_pairs.py or exclude the pair"
             )
-        reference = sorted(pair.reference_element_ids)
-        candidate = sorted(pair.candidate_element_ids)
+        reference = sorted(comparable_elements(pair.reference_element_ids))
+        candidate = sorted(comparable_elements(pair.candidate_element_ids))
         return ClaimRuling(
             match=reference == candidate,
             rationale=f"reference elements {reference}; candidate {candidate}",

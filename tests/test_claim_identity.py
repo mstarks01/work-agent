@@ -17,8 +17,8 @@ The other direction — one claim spelled two ways landing on two keys — is th
 one #201's title names, and it is measured next door in
 ``tests/test_evals_identity.py`` over the judge-calibration labels. Read the two
 together: this file prices a false merge, that one prices a false split, and
-neither number means anything alone. Equality collides 1 pair here and splits 91
-of 201 there; relaxing to a shared element collides 34 here and splits 5 there.
+neither number means anything alone. ``FRONTIER`` there carries both errors for
+six comparison rules at once, and this file is the merge column of its first row.
 
 So this says nothing on its own about whether ``mechanism`` is needed. What it
 does is keep a running count of the claims the corpus holds that the existing

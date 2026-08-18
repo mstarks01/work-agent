@@ -20,13 +20,21 @@ Free of provider calls: the rule is arithmetic over two sorted lists.
 
 from __future__ import annotations
 
+import itertools
 import random
 
 import pytest
 
+from evals import verify_corpus
 from evals.harness.calibration import AGREEMENT_BAR, load_pairs, measure_agreement
-from evals.harness.identity import IdentityError, MechanicalIdentity
+from evals.harness.identity import (
+    IdentityError,
+    MechanicalIdentity,
+    comparable_elements,
+    endpoint_form,
+)
 from evals.harness.judge import ClaimPair, UnmatchedThreat, claim_payload
+from evals.harness.reference import ReferenceThreat, load_corpus
 from tests.factories import valid_model
 
 #: What element agreement alone is worth on the hand labels, measured
@@ -34,19 +42,79 @@ from tests.factories import valid_model
 #: Every number here is quoted in #201, so moving one means updating the issue.
 MEASURED = {
     "assigned_pairs": 201,
-    # The rule the record can express today: the two element sets are equal.
-    "equality_agreements": 110,
+    # The rule the record can express today: the two element sets are equal,
+    # with zones dropped.
+    "equality_agreements": 111,
     # It never merges two claims a human called different, and splits nearly
     # half of the ones a human called the same.
     "false_matches": 0,
-    "false_non_matches": 91,
-    # Two relaxations, measured for the trade-off rather than adopted. Both buy
-    # paraphrases back on this half and cost false merges on the other, which
-    # ``tests/test_claim_identity.py`` prices at 1 collision for equality
-    # against 34 for overlap over the blessed reference sets.
-    "either_subset_agreements": 159,
-    "any_overlap_agreements": 196,
+    "false_non_matches": 90,
 }
+
+#: The frontier, both errors at once. ``splits`` counts the ``match`` pairs a
+#: rule calls different; ``merges`` counts the reference-claim pairs a rule calls
+#: the same, over the 287 within-lane pairs the corpus holds — and every one of
+#: those is a pair a reviewer ruled distinct, so every merge is an error.
+#:
+#: Read down the table: no rule here is usable. The tightest loses 90 of 201
+#: paraphrases; the loosest destroys 126 findings. **The interesting row is
+#: endpoint subset**, which clears the 90% bar on splits and is the only row
+#: whose merges are few enough to enumerate and design against — which is what
+#: #201's ``mechanism`` has to separate.
+FRONTIER = {
+    "equality": {"splits": 90, "merges": 1},
+    "endpoint equality": {"splits": 61, "merges": 6},
+    "subset": {"splits": 42, "merges": 7},
+    "endpoint subset": {"splits": 15, "merges": 23},
+    "overlap": {"splits": 5, "merges": 34},
+    "endpoint overlap": {"splits": 2, "merges": 126},
+}
+
+
+def _rules(flows_by_case):
+    """Each frontier rule as ``(case, elements, elements) -> same claim?``."""
+
+    def bare(case, ids):
+        return comparable_elements(ids)
+
+    def ends(case, ids):
+        return endpoint_form(ids, flows_by_case[case])
+
+    def equal(shape):
+        return lambda case, a, b: shape(case, a) == shape(case, b)
+
+    def subset(shape):
+        return lambda case, a, b: (
+            shape(case, a) <= shape(case, b) or shape(case, b) <= shape(case, a)
+        )
+
+    def overlap(shape):
+        return lambda case, a, b: bool(shape(case, a) & shape(case, b))
+
+    return {
+        "equality": equal(bare),
+        "endpoint equality": equal(ends),
+        "subset": subset(bare),
+        "endpoint subset": subset(ends),
+        "overlap": overlap(bare),
+        "endpoint overlap": overlap(ends),
+    }
+
+
+@pytest.fixture(scope="module")
+def corpus():
+    return load_corpus(verify_corpus.CORPUS_DIR)
+
+
+@pytest.fixture(scope="module")
+def flows_by_case(corpus):
+    """Each case's ``flow id -> (source, destination)``, for the endpoint rules."""
+    return {
+        case.meta.id: {
+            flow.id: (flow.source, flow.destination) for flow in case.model.data_flows
+        }
+        for case in corpus
+    }
 
 
 @pytest.fixture(scope="module")
@@ -82,26 +150,46 @@ def test_element_agreement_alone_does_not_reach_the_judge_s_bar(assigned):
     assert result.agreement < AGREEMENT_BAR
 
 
-def test_the_two_relaxations_are_priced(assigned):
-    """What loosening the element comparison recovers on this half.
+def test_the_frontier_is_priced_on_both_errors(assigned, corpus, flows_by_case):
+    """Every rule in :data:`FRONTIER`, against both ways of being wrong.
 
-    Neither is adopted. The point of measuring both is that the gap between them
-    is where ``mechanism`` would have to work: overlap recovers almost every
-    paraphrase, and the blessed reference sets say it merges 34 pairs a reviewer
-    ruled distinct, so nothing in the middle is free.
+    None of them is adopted. Measuring them together is the point: a rule read on
+    one axis always looks good, and the pair of numbers is what shows that no
+    comparison of **Element**s alone is usable.
     """
-    subset = 0
-    overlap = 0
-    for pair in assigned:
-        reference = set(pair.reference_element_ids)
-        candidate = set(pair.candidate_element_ids or ())
-        if reference <= candidate or candidate <= reference:
-            subset += 1
-        if reference & candidate:
-            overlap += 1
+    rules = _rules(flows_by_case)
+    measured = {}
+    for name, rule in rules.items():
+        splits = sum(
+            1
+            for pair in assigned
+            if not rule(
+                pair.case, pair.reference_element_ids, pair.candidate_element_ids
+            )
+        )
+        merges = 0
+        for case in corpus:
+            claims = [
+                claim
+                for claim in case.references.get("stride", ())
+                if isinstance(claim, ReferenceThreat)
+            ]
+            for left, right in itertools.combinations(claims, 2):
+                if left.category != right.category:
+                    continue
+                if rule(
+                    case.meta.id,
+                    left.affected_element_ids,
+                    right.affected_element_ids,
+                ):
+                    merges += 1
+        measured[name] = {"splits": splits, "merges": merges}
 
-    assert subset == MEASURED["either_subset_agreements"]
-    assert overlap == MEASURED["any_overlap_agreements"]
+    assert measured == FRONTIER, (
+        f"the frontier moved to {measured}. Update FRONTIER and re-quote it on"
+        " #201; the design of `mechanism` is argued from these six pairs of"
+        " numbers."
+    )
 
 
 def test_a_candidate_with_no_assigned_elements_is_refused():
