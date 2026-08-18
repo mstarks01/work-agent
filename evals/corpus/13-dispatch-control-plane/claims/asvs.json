@@ -1,0 +1,66 @@
+[
+  {
+    "chapter": "encoding-and-sanitization",
+    "requirement": "V1.5.1",
+    "affected_element_ids": [
+      "process:schedule-importer",
+      "flow:schedule-importer-to-scheduling-partner:pull-schedule-feed"
+    ],
+    "claim": "The importer parses a partner's SOAP feed as XML and nothing states whether external entities are disabled.",
+    "tier": "must-find",
+    "notes": "The corpus's first XML parse, and the reason this case was authored for the encoding-and-sanitization lane."
+  },
+  {
+    "chapter": "web-frontend-security",
+    "requirement": "V3.4.2",
+    "affected_element_ids": [
+      "process:dispatch-api",
+      "process:dispatch-console",
+      "flow:dispatch-console-to-dispatch-api:dispatch-requests"
+    ],
+    "claim": "Nothing states which origins the dispatch API returns in its Access-Control-Allow-Origin header.",
+    "tier": "must-find",
+    "notes": "The source states the policy exists and states that nobody recorded its origins, so this is an unknown somebody registered rather than an absent control."
+  },
+  {
+    "chapter": "web-frontend-security",
+    "requirement": "V3.5.1",
+    "affected_element_ids": [
+      "process:dispatch-api",
+      "flow:dispatch-console-to-dispatch-api:dispatch-requests"
+    ],
+    "claim": "Nothing states what validates a cross-origin dispatch request as one the console originated.",
+    "tier": "expected",
+    "notes": "Separate from the header's value: one requirement asks which origins are named and this one asks what checks the request itself."
+  },
+  {
+    "chapter": "api-and-web-service",
+    "requirement": "V4.4.1",
+    "affected_element_ids": ["flow:dispatch-console-to-dispatch-api:live-job-status"],
+    "claim": "Nothing states whether the live job status WebSocket runs over TLS.",
+    "tier": "must-find",
+    "notes": "The corpus's first WebSocket, and the transport is the attribute the source leaves unwritten by name."
+  },
+  {
+    "chapter": "session-management",
+    "requirement": "V7.2.1",
+    "affected_element_ids": [
+      "flow:dispatch-console-to-dispatch-api:live-job-status",
+      "process:dispatch-api"
+    ],
+    "claim": "Nothing states whether the dispatch API checks an engineer's session again once the socket is open.",
+    "tier": "expected",
+    "notes": "A long-lived channel is where session verification stops being a per-request property, which is the shape no other case carries."
+  },
+  {
+    "chapter": "authentication",
+    "requirement": "V6.1.1",
+    "affected_element_ids": [
+      "flow:duty-engineer-to-dispatch-console:open-console",
+      "process:dispatch-console"
+    ],
+    "claim": "No documentation states how an engineer signs in to the console or what limits repeated attempts.",
+    "tier": "expected",
+    "notes": "The source states the sign-in was never written down, which is the documentation this requirement asks for."
+  }
+]

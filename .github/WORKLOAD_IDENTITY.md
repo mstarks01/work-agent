@@ -6,7 +6,7 @@ this repository.
 
 The same four variables enable the Vertex lane of
 `.github/workflows/provider-smoke.yml`, which is the cheaper of the two and the
-one to watch first: it runs one small job rather than the twelve-case corpus, so
+one to watch first: it runs one small job rather than the thirteen-case corpus, so
 it answers "does Vertex serve this graph" for cents, on every pull request.
 
 This covers **Vertex only**, because that is what `evals-live.yml` selects in
@@ -144,7 +144,7 @@ Confirmed against Vertex list pricing (standard tier, July 2026) for the models
 | Gemini 2.5 Pro | $1.25 / 1M | $10.00 / 1M |
 | Gemini 2.5 Flash | $0.30 / 1M | $2.50 / 1M |
 
-A full `end-to-end` sweep is twelve cases × (one `base` extraction + six
+A full `end-to-end` sweep is thirteen cases × (one `base` extraction + six
 `strong` category agents + one `strong` critic), plus the judge's calls during scoring.
 Output tokens dominate at $10/1M, and the eight-way `strong` fan-out is the
 whole bill. The original "~$0.30/case" estimate is the right order of magnitude

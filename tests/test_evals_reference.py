@@ -30,7 +30,7 @@ def corpus():
 
 
 def test_loads_every_shipped_case(corpus):
-    assert len(corpus) == 12
+    assert len(corpus) == 13
     assert [case.id for case in corpus] == sorted(case.id for case in corpus)
 
 
@@ -59,7 +59,7 @@ def test_the_near_controls_are_outnumbered_by_far_cases(corpus):
 
     A guard on the instrument rather than on the corpus: `far_recall` is what
     the honest question is asked of, and each near control taken out of the far
-    population costs it a case. At two of twelve that is comfortable; the check
+    population costs it a case. At two of thirteen that is comfortable; the check
     exists so a third exemplar system cannot quietly make it not.
     """
     near = sum(
