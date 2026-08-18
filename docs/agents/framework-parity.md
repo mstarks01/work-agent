@@ -73,6 +73,37 @@ new one fails until it is. Its `DECLARED` map is also the checklist to re-read
 when a package lands — every entry reading *"this code is that framework's"* is a
 dispatch a third package may need adding to.
 
+### The rule has a second axis
+
+The shape above is about **which framework** a piece of code reads. The same
+shape turned up on a second axis, and it is worth naming because the axis is not
+obvious until somebody trips over it: **which measurement the eval sweep
+reports.**
+
+An **instrument** is one reading over a finished sweep — a per-case row, a fold
+over those rows, a rendering, and the artifact keys it owns. Seven exist. Each
+one already had all four parts, and nothing named the shape, so each was wired by
+hand into four places in `evals/harness/run.py`. Adding ASVS's two instruments
+cost six artifact keys and two renderers, written one at a time. Nothing raised;
+a sweep missing an instrument simply printed one measurement fewer.
+
+`evals/harness/instruments.py` holds that table now, and it carries the framework
+axis inside it: every entry declares the packages whose record it reads, so a
+sweep of one package skips another package's scorer rather than failing in it.
+That declaration closed a one-package assumption the harness still carried —
+the STRIDE scorer asked **every** case in a sweep for a STRIDE block, so a sweep
+of a package producing no such block died inside a scorer that had nothing to say
+about it. No corpus case declared one framework without STRIDE, so nothing caught
+it: correct when written, silent afterwards, exactly the shape above.
+
+**So the question to ask a new axis is the same one.** When a piece of machinery
+grows an entry per framework, per measurement, per mode or per anything else,
+prefer a table keyed by that thing. Then ask what forces the table to stay
+complete, because a table nobody checks against the registry has the same silent
+failure as the branch it replaced — an entry missing from
+`evals.harness.instruments.INSTRUMENTS` would be a package measured by nothing at
+all.
+
 ## Why this rule exists
 
 The repo name, the service name, the package root and most of the history all
@@ -134,11 +165,12 @@ A less-exercised package makes a gap quieter, not smaller:
   graded still **certifies**. Certification is a claim about a deployment's
   blessed list and never a claim about quality, and this is the seam where the
   two read alike.
-- A STRIDE reference claim gets exercised by a sweep eventually. An ASVS
-  reference record is read by nothing until #200 lands, so a defect in one
-  survives until somebody reads it — and becomes a wrong number the day the
-  applicability matrix ships. **Any package added before #200 lands inherits
-  that same silence.**
+- A reference record nothing grades is a defect that survives until somebody
+  reads it, and becomes a wrong number the day a matrix over it ships. The
+  corpus's 63 ASVS records sat in exactly that state until
+  [#214](https://github.com/mstarks01/work-agent/pull/214) scored them. **A
+  package registered without an instrument that reads its record inherits the
+  same silence**, which is why `test_every_package_has_an_instrument` exists.
 
 ## When a new package lands, the question runs backwards
 
@@ -152,8 +184,12 @@ one-package assumption survived:
 - **Fan-out arithmetic.** `config/resilience.toml`'s ceiling and every count in
   `docs/Configuration.md` are stated as one `strong` request per lane of every
   framework a job runs. A new lane count changes the product.
-- **The eval sweep.** Does anything grade the new package's block, or does
-  `run.py` still pick one framework's block off the report?
+- **The eval sweep.** Mechanical now: `test_every_package_has_an_instrument`
+  and `test_every_package_declares_a_scorer` both fail until the new package is
+  named. What they cannot decide is whether the instrument it was attached to
+  *fits* — an instrument that reads a category and two rated severity axes says
+  nothing about a package whose claims carry a catalog identifier, so a package
+  whose record no existing instrument can read needs its own.
 - **The corpus.** Does every case that satisfies the new package's
   **Precondition** carry a reference set for it? The merge bar checks that every
   lane of every carried package has a `must-find` record somewhere, so a package
@@ -175,11 +211,15 @@ for free" is a claim to check, never one to assume.
 
 ## Where this is enforced
 
-Three mechanical instances, each for a narrow question:
+Four mechanical instances, each for a narrow question:
 
 - **`tests/test_framework_neutrality.py`** — every framework literal outside a
   package root is declared with a reason, so a new one fails until somebody says
   why it is not a table. This is the check derived from the root cause above.
+- **The registry checks in the same module** — every carried package is named by
+  an instrument and declares a per-case scorer, and neither table names a package
+  this build does not carry. These close the second axis: a table stays complete
+  only while something compares it to `PACKAGES`.
 - **`tests/test_case_review.py`** — a step 6 sign-off is checked against every
   framework the case declares, so a review that read one package's reference set
   leaves the case in debt.
