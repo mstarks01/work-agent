@@ -14,7 +14,8 @@ Two artifacts plus the input they're built from:
 evals/corpus/<NN>-<slug>/
   source.md       the submitted text — exactly what the service would receive
   model.json      the blessed System Model; must pass the shipped validator
-  threats.json    the reference threat set, written against model.json's IDs
+  claims/<framework>.json
+                  that framework's reference set, written against model.json's IDs
   corrections.md  how the model was corrected against the source, and what that says
   case.json       metadata, plus the sources array declaring the case's input
 ```
@@ -196,9 +197,9 @@ bar**, and they're what lets the scorer be tested with no live calls at all.
 ### 6. Bless and merge
 
 One reading session, one pull request, one approval. The reviewer signs off on
-`source.md`, `model.json`, `threats.json`, and the labelled pairs **together** —
-they're one artifact, and reviewing them separately loses the property that the
-threat set is exhaustive *against that model*.
+`source.md`, `model.json`, the `claims/` reference sets, and the labelled pairs
+**together** — they're one artifact, and reviewing them separately loses the
+property that the threat set is exhaustive *against that model*.
 
 Merge checklist:
 

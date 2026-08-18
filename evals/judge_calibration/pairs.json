@@ -2502,5 +2502,213 @@
     "candidate_claim": "An attacker who influences the extract's contents gets the supplier master service to act on it beyond a plain data load.",
     "label": "match",
     "note": "Same escalation, same mechanism."
+  },
+  {
+    "case": "13-dispatch-control-plane",
+    "category": "spoofing",
+    "reference_claim": "An attacker who holds the importer's never-rotated API token posts work orders to the dispatch API as the importer.",
+    "candidate_claim": "An attacker who obtains the importer's API token posts work orders to the dispatch API as the importer.",
+    "label": "match",
+    "note": "Pure paraphrase: same action, same flow, same stated credential."
+  },
+  {
+    "case": "13-dispatch-control-plane",
+    "category": "spoofing",
+    "reference_claim": "An attacker who holds the importer's never-rotated API token posts work orders to the dispatch API as the importer.",
+    "candidate_claim": "An attacker guesses the importer's API token, which is too short to resist it.",
+    "label": "no-match",
+    "note": "Unsupported, and a different action: the source states the token was never rotated and states nothing about its length."
+  },
+  {
+    "case": "13-dispatch-control-plane",
+    "category": "spoofing",
+    "reference_claim": "An attacker opens a WebSocket to the dispatch API in a duty engineer's name, because nothing states what the handshake checks.",
+    "candidate_claim": "An attacker opens a live status socket to the dispatch API as a duty engineer, since the handshake's authentication is not established.",
+    "label": "match",
+    "note": "Same action, same flow; hedged phrasing does not change the claim."
+  },
+  {
+    "case": "13-dispatch-control-plane",
+    "category": "spoofing",
+    "reference_claim": "An attacker opens a WebSocket to the dispatch API in a duty engineer's name, because nothing states what the handshake checks.",
+    "candidate_claim": "An attacker steals a duty engineer's session token out of the browser and opens the socket with it.",
+    "label": "no-match",
+    "note": "Hard negative: recovering a session and opening an unauthenticated handshake are different actions, and the corpus carries only the second."
+  },
+  {
+    "case": "13-dispatch-control-plane",
+    "category": "spoofing",
+    "reference_claim": "An attacker answers the hourly pull as the scheduling partner, because nothing states how the importer identifies the partner.",
+    "candidate_claim": "An attacker stands up a service that answers the importer's hourly pull in the partner's place.",
+    "label": "match",
+    "note": "Same action, same flow."
+  },
+  {
+    "case": "13-dispatch-control-plane",
+    "category": "spoofing",
+    "reference_claim": "An attacker signs in to the dispatch console as a duty engineer, because nothing states what the sign-in checks.",
+    "candidate_claim": "An attacker signs in to the console as a duty engineer because no multi-factor authentication is enforced.",
+    "label": "no-match",
+    "note": "Unsupported: the source states nobody wrote the sign-in down, so an asserted absence of a second factor is invented rather than read."
+  },
+  {
+    "case": "13-dispatch-control-plane",
+    "category": "tampering",
+    "reference_claim": "An attacker returns an XML document to the hourly pull that plants work orders the partner never sent.",
+    "candidate_claim": "An attacker who answers the pull returns a schedule carrying work orders the partner never sent, and a depot works them.",
+    "label": "match",
+    "note": "Same action and the same path into the control plane; the candidate names the consequence the reference's notes give."
+  },
+  {
+    "case": "13-dispatch-control-plane",
+    "category": "tampering",
+    "reference_claim": "An attacker returns an XML document to the hourly pull that plants work orders the partner never sent.",
+    "candidate_claim": "An attacker modifies the partner's XML document while it is in transit to the importer.",
+    "label": "no-match",
+    "note": "Hard negative: the reference's action is answering the pull, and in-transit modification is a distinct claim the corpus does not carry on a flow stated to run over HTTPS."
+  },
+  {
+    "case": "13-dispatch-control-plane",
+    "category": "tampering",
+    "reference_claim": "An attacker on the corporate network alters a dispatch request on its way into the control plane, because nothing states the call is encrypted.",
+    "candidate_claim": "An attacker on the corporate network rewrites a crew move on its way to the dispatch API.",
+    "label": "match",
+    "note": "Same action, same flow."
+  },
+  {
+    "case": "13-dispatch-control-plane",
+    "category": "tampering",
+    "reference_claim": "An attacker on the corporate network alters a dispatch request on its way into the control plane, because nothing states the call is encrypted.",
+    "candidate_claim": "An attacker on the corporate network reads a dispatch request in flight.",
+    "label": "no-match",
+    "note": "Hard negative: reading and altering the same flow are two lanes, and the corpus keeps them apart deliberately."
+  },
+  {
+    "case": "13-dispatch-control-plane",
+    "category": "tampering",
+    "reference_claim": "An attacker inside the control plane writes job orders straight into the dispatch database, because nothing states what the connection checks.",
+    "candidate_claim": "An attacker inside the control plane alters job orders in the dispatch database.",
+    "label": "match",
+    "note": "Same action, same target."
+  },
+  {
+    "case": "13-dispatch-control-plane",
+    "category": "tampering",
+    "reference_claim": "An attacker rewrites a document in the schedule archive so the kept copy no longer matches what the partner sent.",
+    "candidate_claim": "An attacker deletes documents from the schedule archive so no copy of the day's work survives.",
+    "label": "no-match",
+    "note": "Destruction rather than alteration, and the corpus does not carry it."
+  },
+  {
+    "case": "13-dispatch-control-plane",
+    "category": "repudiation",
+    "reference_claim": "A duty engineer denies moving a crew, and the job order names only the token or session that wrote it.",
+    "candidate_claim": "A duty engineer disputes a crew move and nothing in the job order names a person.",
+    "label": "match",
+    "note": "Same claim stated as the condition rather than the dispute."
+  },
+  {
+    "case": "13-dispatch-control-plane",
+    "category": "repudiation",
+    "reference_claim": "A duty engineer denies moving a crew, and the job order names only the token or session that wrote it.",
+    "candidate_claim": "A duty engineer disputes a crew move and the dispatch API's audit log names the wrong actor.",
+    "label": "no-match",
+    "note": "Unsupported: there is no log element in the model, and the reference's claim is precisely that the job order carries no person."
+  },
+  {
+    "case": "13-dispatch-control-plane",
+    "category": "information-disclosure",
+    "reference_claim": "An attacker on the corporate network reads the live job status stream, because nothing states the WebSocket runs over TLS.",
+    "candidate_claim": "An attacker on the corporate network reads crew job status off the open socket, whose transport is unstated.",
+    "label": "match",
+    "note": "Same read action, same flow."
+  },
+  {
+    "case": "13-dispatch-control-plane",
+    "category": "information-disclosure",
+    "reference_claim": "An attacker who obtains a copy of the dispatch database reads the crew names and mobile numbers in it.",
+    "candidate_claim": "An attacker who gets hold of a dispatch database backup reads crew mobile numbers.",
+    "label": "match",
+    "note": "A backup is a narrower instance of obtaining a copy; same action, same target."
+  },
+  {
+    "case": "13-dispatch-control-plane",
+    "category": "information-disclosure",
+    "reference_claim": "An attacker who obtains a copy of the dispatch database reads the crew names and mobile numbers in it.",
+    "candidate_claim": "An attacker reads crew names out of the schedule archive.",
+    "label": "no-match",
+    "note": "Unsupported: the archive holds the partner's schedule documents, and the model puts no crew details in it."
+  },
+  {
+    "case": "13-dispatch-control-plane",
+    "category": "information-disclosure",
+    "reference_claim": "An attacker returns an XML document whose external entity makes the importer read a file off the corporate network and hand it back.",
+    "candidate_claim": "An attacker returns an XML document whose external entity makes the importer fetch an internal file and hand it back.",
+    "label": "match",
+    "note": "Same action, same mechanism."
+  },
+  {
+    "case": "13-dispatch-control-plane",
+    "category": "information-disclosure",
+    "reference_claim": "An attacker who reaches the corporate file store reads the partner's schedule documents out of the archive.",
+    "candidate_claim": "An attacker who reaches the corporate file store reads the partner's schedule documents.",
+    "label": "match",
+    "note": "Same action, same target."
+  },
+  {
+    "case": "13-dispatch-control-plane",
+    "category": "denial-of-service",
+    "reference_claim": "An attacker holds open enough WebSockets to the dispatch API that duty engineers lose live job status.",
+    "candidate_claim": "An attacker opens sockets to the dispatch API until engineers can no longer see live job status.",
+    "label": "match",
+    "note": "Same action, same target."
+  },
+  {
+    "case": "13-dispatch-control-plane",
+    "category": "denial-of-service",
+    "reference_claim": "An attacker returns an XML document large enough that the hourly import never finishes and tomorrow's work never reaches the control plane.",
+    "candidate_claim": "An attacker returns an XML document with nested entity expansion, so the hourly import never completes.",
+    "label": "match",
+    "note": "A narrower instance of the same action and the same silent-staleness consequence."
+  },
+  {
+    "case": "13-dispatch-control-plane",
+    "category": "elevation-of-privilege",
+    "reference_claim": "An attacker on the corporate network uses the importer's token to act in the control plane, where a corporate laptop holds no rights at all.",
+    "candidate_claim": "An attacker on the corporate network uses the importer's token to act inside the production control plane.",
+    "label": "match",
+    "note": "Same escalation, same mechanism."
+  },
+  {
+    "case": "13-dispatch-control-plane",
+    "category": "elevation-of-privilege",
+    "reference_claim": "An attacker on the corporate network uses the importer's token to act in the control plane, where a corporate laptop holds no rights at all.",
+    "candidate_claim": "An attacker who takes the dispatch API gains rights across the corporate network.",
+    "label": "no-match",
+    "note": "Hard negative and the wrong direction: the authority sits in the control plane, so a move out of it is not the escalation the reference claims."
+  },
+  {
+    "case": "13-dispatch-control-plane",
+    "category": "elevation-of-privilege",
+    "reference_claim": "An attacker gets a duty engineer's browser to dispatch a crew from a page the attacker controls, because the API's allowed origins and its credential rule are unrecorded.",
+    "candidate_claim": "An attacker lures a signed-in duty engineer to a page that calls the dispatch API from the attacker's own origin.",
+    "label": "match",
+    "note": "Same action, same flow."
+  },
+  {
+    "case": "13-dispatch-control-plane",
+    "category": "elevation-of-privilege",
+    "reference_claim": "An attacker gets a duty engineer's browser to dispatch a crew from a page the attacker controls, because the API's allowed origins and its credential rule are unrecorded.",
+    "candidate_claim": "An attacker calls the dispatch API from their own origin, which the API allows because its policy permits any origin.",
+    "label": "no-match",
+    "note": "Unsupported: the source states the allowed origins were never recorded, and reading that as a permissive policy invents a value."
+  },
+  {
+    "case": "13-dispatch-control-plane",
+    "category": "elevation-of-privilege",
+    "reference_claim": "An attacker who can publish on the corporate web host serves script from the console's own origin and dispatches crews with it.",
+    "candidate_claim": "An attacker who can publish files on the corporate web host serves script that dispatches crews.",
+    "label": "match",
+    "note": "Same action, same mechanism."
   }
 ]

@@ -32,18 +32,7 @@ CORPUS_DIR = Path(__file__).resolve().parents[1] / "evals" / "corpus"
 #: describes the shape — so every one is a gap in the corpus rather than in the
 #: rule. A rule whose predicate cannot match what extraction produces does not
 #: belong here; it belongs fixed.
-UNEXERCISED: dict[str, str] = {
-    "encoding-and-sanitization-xml-parser": (
-        "No corpus case parses XML, SOAP or SVG. Checked for synonyms, not"
-        " only for the test's own terms."
-    ),
-    "web-frontend-security-cors": (
-        "No corpus case describes a cross-origin browser call."
-    ),
-    "api-and-web-service-websocket": (
-        "No corpus case carries a WebSocket or any long-lived browser channel."
-    ),
-}
+UNEXERCISED: dict[str, str] = {}
 
 
 @pytest.fixture(scope="module")
