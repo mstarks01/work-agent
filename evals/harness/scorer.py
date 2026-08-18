@@ -635,3 +635,36 @@ def unlisted_for_promotion(scores: Sequence[CaseScore]) -> list[dict[str, Any]]:
         for entry in score.adjudicated
         if entry.bucket == "valid-unlisted"
     ]
+
+
+def render(scores: Sequence[CaseScore]) -> None:
+    """Every case's row, then the near/far exemplar delta under them."""
+    for score in scores:
+        print(
+            f"{score.case_id:<26} must-find {score.must_find_matched}/"
+            f"{score.must_find_total}"
+            f"  recall {score.recall:.2f}"
+            f"  lane {score.lane_accuracy:.2f}"
+            f"  element {score.element_accuracy:.2f}"
+            f"  unsupported {score.unsupported_rate:.2f}"
+        )
+    if scores:
+        delta = exemplar_delta(scores)
+        print(
+            f"exemplar delta: near {delta['near_recall']:.2f}"
+            f" vs far {delta['far_recall']:.2f}"
+            f" = {delta['delta']:+.2f} (tracked, non-gating)"
+        )
+
+
+def artifact(scores: Sequence[CaseScore]) -> dict[str, Any]:
+    """This instrument's artifact keys.
+
+    The aggregates carry the sweep's verdict alongside them on the envelope, so
+    nothing downstream folds an uncertified run into a trusted number unaware.
+    """
+    return {
+        "scores": [score.to_json() for score in scores],
+        "exemplar_delta": exemplar_delta(scores) if scores else None,
+        "unlisted_for_promotion": unlisted_for_promotion(scores),
+    }

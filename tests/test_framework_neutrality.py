@@ -53,6 +53,9 @@ from pathlib import Path
 
 import pytest
 
+from evals.harness.instruments import INSTRUMENTS
+from stride_service.frameworks import PACKAGES
+
 REPO_ROOT = Path(__file__).resolve().parents[1]
 SEARCHED = ("src", "evals")
 
@@ -104,6 +107,13 @@ DECLARED: dict[str, str] = {
         "EVAL_FRAMEWORKS is the fallback for a case declaring none; the sweep"
         " reads `case_frameworks()`. `merged_drafts` is a named accessor for"
         " STRIDE's scorer, over the framework-keyed `drafts` map."
+    ),
+    "evals/harness/instruments.py": (
+        "A table keyed by instrument. Each entry declares the packages whose"
+        " record it reads, so an instrument that grades one package's claims is"
+        " skipped by a sweep that ran another rather than failing inside it."
+        " `test_every_package_has_an_instrument` is what keeps the declarations"
+        " complete."
     ),
     "evals/harness/run.py": (
         "`stride_block` is a named accessor over the neutral `framework_block`."
@@ -217,4 +227,41 @@ def test_the_pattern_covers_the_whole_registry():
         "PACKAGES has changed. Widen LITERAL and the parametrize above it, then"
         " re-read DECLARED: every entry reading 'this code is that framework's'"
         " is a dispatch a third package may need adding to."
+    )
+
+
+def test_every_package_has_an_instrument():
+    """No package is carried without something measuring it.
+
+    The instrument table declares which packages each entry reads. That makes a
+    sweep skip an instrument it has no record for — the property that lets one
+    framework run alone — but it is also the way a package could be carried and
+    silently measured by nothing at all. A package that ran and reported no
+    number is the failure this whole module exists for, so the declarations are
+    checked against ``PACKAGES`` rather than trusted.
+    """
+    measured = {
+        framework
+        for instrument in INSTRUMENTS.values()
+        for framework in instrument.frameworks
+    }
+    unmeasured = sorted(set(PACKAGES) - measured)
+    assert not unmeasured, (
+        f"these packages are carried and no instrument declares them:"
+        f" {unmeasured}. A sweep that runs one would print and record nothing"
+        " for it. Add an entry to evals.harness.instruments.INSTRUMENTS, or"
+        " name the package on an existing entry's `frameworks`."
+    )
+
+
+def test_no_instrument_names_a_package_this_build_does_not_carry():
+    """The other direction: a declaration that outlived its package."""
+    declared = {
+        framework
+        for instrument in INSTRUMENTS.values()
+        for framework in instrument.frameworks
+    }
+    unknown = sorted(declared - set(PACKAGES))
+    assert not unknown, (
+        f"instruments declare frameworks this build does not carry: {unknown}"
     )

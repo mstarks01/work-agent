@@ -168,3 +168,54 @@ def coverage_totals(lanes: Sequence[LaneCoverage]) -> dict[str, Any]:
             for offered, cited in CITED_PAIRS
         },
     }
+
+
+def render(lanes: Sequence[LaneCoverage], offered: bool) -> None:
+    """What each lane was offered and how much of it its drafts cite.
+
+    Read as a rate over the whole sweep, never per case, and never as a score:
+    an agent that examined a lead and correctly rejected it cites nothing, so a
+    low rate is a question to ask rather than a failure. The number that is
+    unambiguous is a lane whose rules fire nowhere at all: those rules read a
+    shape this corpus does not have, or nothing at all.
+
+    The rules column is **firings over evaluations** — one rule against one
+    case — because pooling multiplies the lane's rules by the cases.
+    """
+    if not offered:
+        print("coverage: no case produced a report to account for")
+        return
+    print("coverage (whole sweep, per lane — cited, not considered):")
+    header = f"  {'framework':10} {'lane':30} {'drafts':>7} {'rules fired':>11}"
+    print(f"{header} {'candidates':>12} {'elements':>12} {'crossings':>12}")
+    for lane in lanes:
+        cited = [
+            f"{lane.totals[cited_field]}/{lane.totals[offered_field]}"
+            for offered_field, cited_field in CITED_PAIRS[:3]
+        ]
+        print(
+            f"  {lane.framework:10} {lane.lane:30} {lane.drafts:7,}"
+            f" {lane.rules_fired:>4}/{lane.rules:<5}"
+            f" {cited[0]:>12} {cited[1]:>12} {cited[2]:>12}"
+        )
+    totals = coverage_totals(lanes)
+    print(
+        f"coverage: {totals['rules_fired']}/{totals['rules']} rule evaluations fired,"
+        f" candidates cited {totals['cited_rates']['candidates_cited']:.0%},"
+        f" elements {totals['cited_rates']['elements_cited']:.0%},"
+        f" unknown controls {totals['cited_rates']['unknown_controls_cited']:.0%}"
+        " (instrument, non-gating)"
+    )
+
+
+def artifact(lanes: Sequence[LaneCoverage]) -> dict[str, Any]:
+    """This instrument's artifact keys.
+
+    Written whether or not anything was offered: an absent block and a block of
+    zeroes would otherwise be indistinguishable to a reader comparing two
+    sweeps.
+    """
+    return {
+        "coverage": [lane.to_json() for lane in lanes],
+        "coverage_totals": coverage_totals(lanes),
+    }
