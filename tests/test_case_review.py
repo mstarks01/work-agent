@@ -13,6 +13,15 @@ This makes the debt countable and stops it growing. A case carrying a
 in :data:`UNREVIEWED` with what it is still exposed to, and a **new** case that
 arrives without a block fails.
 
+**A review must cover every framework the case carries.** Step 6 asks the reader
+to sign off on the reference sets *together*, because the property being
+established — that the set is exhaustive against that model — is not
+framework-local: one shared **System Model** feeds N reference sets, and a
+session that read STRIDE's 21 claims says nothing about the 17 ASVS records
+beside them. So the ``read`` list is checked against the case's declared
+frameworks rather than merely being present, and a case reviewed for one
+framework stays debt for the other.
+
 Deterministic over ``case.json`` and free of provider calls, which is why it
 gates on every PR.
 """
@@ -22,7 +31,7 @@ from __future__ import annotations
 import pytest
 
 from evals import verify_corpus
-from evals.harness.reference import load_corpus
+from evals.harness.reference import CLAIMS_DIR, load_corpus
 
 #: Cases nobody has read, each with what that leaves unchecked. Every entry is
 #: debt rather than an exemption: unlike the lists in ``test_rule_coverage.py``
@@ -31,40 +40,75 @@ from evals.harness.reference import load_corpus
 #: the list is meant to shrink to nothing.
 UNREVIEWED: dict[str, str] = {
     "01-payments-checkout": (
-        "The control case. Every far-domain recall number in the suite is a delta"
-        " against this one, so an error in its 21 reference claims moves every"
-        " comparison the corpus exists to make. Reviewed first: REVIEW-02."
+        "The control case, and the only one carrying both frameworks in quantity. "
+        "Every far-domain recall number in the suite is a delta against this one, "
+        "so an error in its 21 STRIDE claims moves every comparison the corpus "
+        "exists to make. Its 17 ASVS records are scored by nothing at all (#200)."
+        "Reviewed first: REVIEW-02."
     ),
-    "02-iot-fleet-telemetry": "18 reference claims, unread.",
-    "03-batch-data-pipeline": "17 reference claims, unread.",
+    "02-iot-fleet-telemetry": (
+        "18 STRIDE claims and 8 ASVS records, unread. The ASVS records are also "
+        "scored by nothing (#200)."
+    ),
+    "03-batch-data-pipeline": "17 STRIDE claims, unread. Declares STRIDE only.",
     "04-ml-inference-service": (
-        "18 reference claims. One of them asserted the model emits training data"
-        " in a case with no training pipeline; review sitting 01 found it through"
-        " a judge-calibration pair rather than by reading the case, so the rest of"
-        " this set is still unread."
+        "18 STRIDE claims and 10 ASVS records. One STRIDE claim asserted the "
+        "model emits training data in a case with no training pipeline; review "
+        "sitting 01 found it through a judge-calibration pair rather than by "
+        "reading the case, so the rest of both sets is still unread."
     ),
-    "05-cookbook-queue-webapp": "17 reference claims, unread.",
+    "05-cookbook-queue-webapp": (
+        "17 STRIDE claims and 7 ASVS records, unread. The ASVS records are also "
+        "scored by nothing (#200)."
+    ),
     "06-cookbook-online-game": (
-        "18 reference claims. Review sitting 01 relabelled a pair against this"
-        " case's fabricated-progression claim, which is the nearest anybody has"
-        " come to reading it."
+        "18 STRIDE claims. Review sitting 01 relabelled a pair against this "
+        "case's fabricated-progression claim, which is the nearest anybody has "
+        "come to reading it."
     ),
-    "07-cicd-store-deploy": "24 reference claims, unread.",
-    "08-sso-identity-broker": "23 reference claims, unread.",
-    "09-cookbook-sokify-retail": "20 reference claims, unread.",
-    "10-cookbook-generic-cms": "17 reference claims, unread.",
-    "11-sparse-shift-scheduling": "16 reference claims, unread.",
-    "12-overclaiming-supplier-portal": "15 reference claims, unread.",
-    "13-dispatch-control-plane": "19 reference claims, unread.",
+    "07-cicd-store-deploy": "24 STRIDE claims, unread. Declares STRIDE only.",
+    "08-sso-identity-broker": "23 STRIDE claims, unread. Declares STRIDE only.",
+    "09-cookbook-sokify-retail": (
+        "20 STRIDE claims and 7 ASVS records, unread. The ASVS records are also "
+        "scored by nothing (#200)."
+    ),
+    "10-cookbook-generic-cms": (
+        "17 STRIDE claims and 8 ASVS records, unread. The ASVS records are also "
+        "scored by nothing (#200)."
+    ),
+    "11-sparse-shift-scheduling": "16 STRIDE claims, unread. Declares STRIDE only.",
+    "12-overclaiming-supplier-portal": "15 STRIDE claims, unread. Declares STRIDE only.",
+    "13-dispatch-control-plane": (
+        "19 STRIDE claims and 6 ASVS records, unread. The ASVS records are also "
+        "scored by nothing (#200)."
+    ),
 }
 
 
 @pytest.fixture(scope="module")
-def reviewed_by_case():
-    """Whether each case carries a step 6 sign-off."""
+def corpus():
+    return load_corpus(verify_corpus.CORPUS_DIR)
+
+
+@pytest.fixture(scope="module")
+def reviewed_by_case(corpus):
+    """Whether each case carries a step 6 sign-off covering all of its frameworks."""
     return {
         case.meta.id: case.meta.review is not None
-        for case in load_corpus(verify_corpus.CORPUS_DIR)
+        and not required_reading(case) - set(case.meta.review.read)
+        for case in corpus
+    }
+
+
+def required_reading(case) -> set[str]:
+    """What a complete step 6 session reads for this case.
+
+    The shared artefacts, plus one reference set per framework the case declares.
+    Derived from the declaration rather than listed, so a case that gains a third
+    framework's reference set re-opens its review by construction.
+    """
+    return {"source.md", "model.json"} | {
+        f"{CLAIMS_DIR}/{declared.name}.json" for declared in case.meta.frameworks
     }
 
 
@@ -97,3 +141,24 @@ def test_every_listed_case_exists(reviewed_by_case):
     """The list names cases, not ghosts — a renamed case must be re-entered."""
     missing = sorted(set(UNREVIEWED) - set(reviewed_by_case))
     assert not missing, f"UNREVIEWED names cases that do not exist: {missing}"
+
+
+def test_a_review_covers_every_framework_the_case_carries(corpus):
+    """A session that read one framework's set has not reviewed the case.
+
+    The failure this exists for: case 01 declares both frameworks, so a `read`
+    list naming ``claims/stride.json`` alone leaves 17 ASVS records unread while
+    the case reads as signed off.
+    """
+    partial = {
+        case.meta.id: sorted(required_reading(case) - set(case.meta.review.read))
+        for case in corpus
+        if case.meta.review is not None
+    }
+    incomplete = {case_id: gap for case_id, gap in partial.items() if gap}
+    assert not incomplete, (
+        f"these cases carry a review that did not cover everything: {incomplete}."
+        " Step 6 signs off on the model and every framework's reference set"
+        " together; read what is missing and extend the `read` list, or the case"
+        " belongs back in UNREVIEWED."
+    )
