@@ -404,7 +404,7 @@ reports eight answers:
 | --- | --- |
 | model binding | each node reached the provider its tier selects |
 | structured extraction | a model came back and cleared the validity gate |
-| analyst structured output | all six category lanes parsed |
+| analyst structured output | every lane of every framework parsed |
 | critic structured output | the ruling parsed and reached the report |
 | sampling parameter validation | the provider accepted this tier's params |
 | served-model capture | what actually answered, where the provider said |
@@ -440,10 +440,12 @@ in time.
 `max_active_jobs` is the only bound here that is per **caller** rather than per
 job, and the others are why it has to exist: a caller who respects every one of
 them and simply keeps submitting is inside the contract while spending the
-deployment's whole provider quota. Each accepted job fans the six STRIDE
-category agents out in parallel on the `strong` tier, so the shipped `3` is
-eighteen concurrent `strong`-tier requests — the burst a per-minute quota
-actually sees, and the arithmetic to redo before raising it. A submission past
+deployment's whole provider quota. Each accepted job fans out one lane
+agent per lane of every framework it runs, in parallel on the `strong` tier:
+six for STRIDE, seventeen for ASVS, twenty-three for a job that names both. The
+shipped `3` is therefore sixty-nine concurrent `strong`-tier requests on that
+selection — the burst a per-minute quota actually sees, and the arithmetic to
+redo before raising the ceiling or carrying another framework. A submission past
 the ceiling is refused with `429`, never queued: a queued job holds the caller's
 place in the quota anyway, so only a refusal sheds load. It counts jobs **in
 flight** (`queued` plus `running`), not submissions per interval, so it is
@@ -499,11 +501,11 @@ Two things become possible there that could not exist below the adapter:
   retry costs a token, a successful request credits `0.1` of one. Retries are
   capped at a share of *working traffic* rather than at a count per node — and a
   count per node is precisely the wrong response to a provider-wide failure,
-  since it hands every node its full allowance regardless of what the other five
-  are seeing. Correlated failure empties the bucket once for everyone and the
+  since it hands every node its full allowance regardless of what the other
+  lanes are seeing. Correlated failure empties the bucket once for everyone and the
   service stops retrying; an isolated failure finds it full and is retried
   exactly as before.
-- **Decorrelated timing.** Six category agents that start together fail together, and
+- **Decorrelated timing.** Lane agents that start together fail together, and
   on any fixed curve retry together, reconverging on the quota they just
   tripped. Retries use full jitter — a uniform draw across the whole interval,
   not a delay with noise added — and a provider's `Retry-After` overrides the
@@ -613,7 +615,7 @@ it with a measurement — see [Tuning the models](../evals/TUNING.md).
 | `STRIDE_MAX_SOURCES` | How many sources one job may carry. |
 | `STRIDE_JOB_DEADLINE_MS` | Wall-clock budget for one whole job, milliseconds. Turn it down to shed load. |
 | `STRIDE_RETRY_BUDGET_RATIO` | Retries as a share of successful requests. Turn it down to give up sooner under sustained failure. |
-| `STRIDE_MAX_ACTIVE_JOBS` | Jobs one token subject may have in flight. Turn it down to shed load; raising it multiplies by six at the category fan-out. |
+| `STRIDE_MAX_ACTIVE_JOBS` | Jobs one token subject may have in flight. Turn it down to shed load; raising it multiplies by the lane count of the frameworks a job names. |
 
 ### How strictly each override family is checked
 
