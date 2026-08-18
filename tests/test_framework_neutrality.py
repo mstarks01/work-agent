@@ -53,7 +53,7 @@ from pathlib import Path
 
 import pytest
 
-from evals.harness.instruments import INSTRUMENTS
+from evals.harness.instruments import INSTRUMENTS, PACKAGE_SCORERS
 from stride_service.frameworks import PACKAGES
 
 REPO_ROOT = Path(__file__).resolve().parents[1]
@@ -117,9 +117,11 @@ DECLARED: dict[str, str] = {
     ),
     "evals/harness/run.py": (
         "`stride_block` is a named accessor over the neutral `framework_block`."
-        " The ASVS branch dispatches to the one mechanically matched scorer this"
-        " build carries. **When a third package lands, make that dispatch a"
-        " table keyed by framework rather than adding a second branch.**"
+        " The judged scoring pass is that package's, because a judge grading an"
+        " open claim set is not a per-case fold; it names the block it grades so"
+        " a sweep of another package skips it rather than fails in it. The"
+        " per-case mechanical dispatch that used to branch here is now"
+        " `PACKAGE_SCORERS`, a table keyed by framework."
     ),
     "evals/harness/stability.py": (
         "Reads both artifact blocks by name — `scores` is STRIDE's and"
@@ -264,4 +266,29 @@ def test_no_instrument_names_a_package_this_build_does_not_carry():
     unknown = sorted(declared - set(PACKAGES))
     assert not unknown, (
         f"instruments declare frameworks this build does not carry: {unknown}"
+    )
+
+
+def test_every_package_declares_a_scorer():
+    """A carried package says what its own record is measured with.
+
+    ``None`` is a legitimate answer — it declares that the framework-neutral
+    instruments are the whole of the mechanical reading, which is true of a
+    package whose claims are graded through a judge. A *missing* key is not an
+    answer, and it is what an ``if`` naming one package left behind for every
+    package written after it.
+    """
+    undeclared = sorted(set(PACKAGES) - set(PACKAGE_SCORERS))
+    assert not undeclared, (
+        f"these packages are carried and PACKAGE_SCORERS does not name them:"
+        f" {undeclared}. Declare the per-case scorer their record earns, or"
+        " `None` to say the neutral instruments are the whole of it."
+    )
+
+
+def test_no_scorer_names_a_package_this_build_does_not_carry():
+    """The other direction: a scorer that outlived its package."""
+    unknown = sorted(set(PACKAGE_SCORERS) - set(PACKAGES))
+    assert not unknown, (
+        f"PACKAGE_SCORERS names frameworks this build does not carry: {unknown}"
     )
