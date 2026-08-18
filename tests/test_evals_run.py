@@ -13,8 +13,8 @@ import json
 
 import pytest
 
-from evals.harness.modes import AttributeCheck, ExtractionScore
-from evals.harness.run import _models_record, _print_certification, _print_extraction
+from evals.harness.modes import AttributeCheck, ExtractionScore, render_extraction
+from evals.harness.run import _models_record, _print_certification
 from stride_service.certification import CertifyResult, UncertifiedNode
 from stride_service.deployment import Deployment
 from tests.factories import TEST_CREDENTIAL_ENV, TEST_TIER_ENV
@@ -99,7 +99,7 @@ class TestWhatAnExtractionSweepPrints:
         )
 
     def test_a_disagreeing_attribute_is_named_without_a_verdict(self, capsys):
-        _print_extraction([self.score(agreeing=False)])
+        render_extraction([self.score(agreeing=False)])
 
         out = capsys.readouterr().out
         assert "attributes 0/1" in out
@@ -108,7 +108,7 @@ class TestWhatAnExtractionSweepPrints:
         assert "FAIL" not in out
 
     def test_the_element_numbers_are_printed_beside_the_attribute_ones(self, capsys):
-        _print_extraction([self.score(agreeing=True)])
+        render_extraction([self.score(agreeing=True)])
 
         out = capsys.readouterr().out
         assert "recall 1.00" in out
