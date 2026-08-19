@@ -137,7 +137,8 @@ Include, as far as you know them:
   text implies none, the whole system is treated as one zone.
 - **Security-relevant attributes** — for each component and flow:
   `authentication`, `encryption_in_transit`, `encryption_at_rest`, `exposure`
-  (is it internet-facing?), and `data_classification`.
+  (is it internet-facing?), `interface_kind` (does the process present a web
+  interface?), and `data_classification`.
 - **Sensitive assets** in play — credentials, PII, financial, health, secrets,
   business-critical or availability-critical data.
 

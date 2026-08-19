@@ -1660,19 +1660,24 @@ ASVS_OPTIONS = {graph.STATE_FRAMEWORK_OPTIONS: {"asvs": {"level": 1}}}
 
 
 def non_web_model():
-    """The shared model with every flow speaking something other than the web.
+    """The shared model with every process presenting something other than the web.
 
-    Both protocols are *stated*, which is what makes ASVS answer ``refuted``
-    rather than ``undecidable``: the input said, and what it said was not a web
-    application.
+    Every ``interface_kind`` is *stated*, which is what makes ASVS answer
+    ``refuted`` rather than ``undecidable``: the input said, and what it said was
+    not a web application. The flows are given a stated non-web protocol too, so
+    the model is decided whichever half of the precondition reads it.
     """
     model = valid_model()
     return model.model_copy(
         update={
+            "processes": [
+                process.model_copy(update={"interface_kind": "non-web"})
+                for process in model.processes
+            ],
             "data_flows": [
                 flow.model_copy(update={"protocol": "AMQP"})
                 for flow in model.data_flows
-            ]
+            ],
         }
     )
 

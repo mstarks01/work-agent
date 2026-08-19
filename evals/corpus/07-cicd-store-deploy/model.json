@@ -26,35 +26,46 @@
       "id": "process:build-runner",
       "name": "build runner",
       "description": "Picks up a merge to main, fetches the source, resolves the dependency lockfile and produces a container image tagged with the commit sha. Holds the shared build token used to call the deploy controller.",
-      "assets": ["credentials", "business-critical-data"],
+      "assets": [
+        "credentials",
+        "business-critical-data"
+      ],
       "source_excerpt": "The build runner picks the merge up, fetches the source, resolves the dependency lockfile and produces a container image.",
       "source_label": "System description",
       "technology": "unknown",
       "trust_zone": "boundary:build-environment",
-      "exposure": "internal"
+      "exposure": "internal",
+      "interface_kind": "unknown"
     },
     {
       "id": "process:deploy-controller",
       "name": "deploy controller",
-      "description": "Holds one record — which image sha the estate should be on. Set by the build runner, polled by every store server.",
-      "assets": ["business-critical-data"],
+      "description": "Holds one record \u2014 which image sha the estate should be on. Set by the build runner, polled by every store server.",
+      "assets": [
+        "business-critical-data"
+      ],
       "source_excerpt": "The deploy controller runs on the corporate network and holds one record: which image sha the estate should be on.",
       "source_label": "System description",
       "technology": "unknown",
       "trust_zone": "boundary:corporate-network",
-      "exposure": "internal"
+      "exposure": "internal",
+      "interface_kind": "unknown"
     },
     {
       "id": "process:store-server",
       "name": "store server",
       "description": "The back-office server in each of about 1,200 stores, running the till software as a container. Polls the deploy controller once a minute and pulls and restarts on a new release.",
-      "assets": ["business-critical-data", "availability-critical"],
+      "assets": [
+        "business-critical-data",
+        "availability-critical"
+      ],
       "source_excerpt": "Each store has a small server in the back office running the till software as a container.",
       "source_label": "System description",
       "notes": "One element stands for the whole fleet of ~1,200 identical servers; the source describes them collectively and states no per-store difference.",
       "technology": "container runtime running the till software",
       "trust_zone": "boundary:store-estate",
-      "exposure": "internal"
+      "exposure": "internal",
+      "interface_kind": "unknown"
     }
   ],
   "data_stores": [
@@ -62,7 +73,9 @@
       "id": "store:git-server",
       "name": "git server",
       "description": "Self-hosted git server holding developer branches and main; a merge to main is what starts a build.",
-      "assets": ["business-critical-data"],
+      "assets": [
+        "business-critical-data"
+      ],
       "source_excerpt": "Developers push their branches to our self-hosted git server, which sits on the corporate network.",
       "source_label": "System description",
       "notes": "The source treats the git server both as somewhere source rests and as something developers push to; modelled as a Data Store, which is where the source code actually lives.",
@@ -75,7 +88,9 @@
       "id": "store:image-registry",
       "name": "image registry",
       "description": "Holds the container images, tagged with the commit sha. Sits in the build environment and is reachable from the store estate over the WAN.",
-      "assets": ["business-critical-data"],
+      "assets": [
+        "business-critical-data"
+      ],
       "source_excerpt": "It pushes the finished image to our image registry, which is also in the build environment.",
       "source_label": "System description",
       "technology": "container image registry",
@@ -89,7 +104,9 @@
       "id": "flow:developer-to-git-server:push-branches",
       "name": "push branches",
       "description": "Developers push their branches to the git server; a merge to main is what starts a build.",
-      "assets": ["business-critical-data"],
+      "assets": [
+        "business-critical-data"
+      ],
       "source_excerpt": "Developers push their branches to our self-hosted git server, which sits on the corporate network.",
       "source_label": "System description",
       "source": "entity:developer",
@@ -117,7 +134,9 @@
       "id": "flow:build-runner-to-git-server:fetch-source",
       "name": "fetch source",
       "description": "The runner picks the merge up and fetches the source it is going to build.",
-      "assets": ["business-critical-data"],
+      "assets": [
+        "business-critical-data"
+      ],
       "source_excerpt": "The build runner picks the merge up, fetches the source, resolves the dependency lockfile and produces a container image.",
       "source_label": "System description",
       "source": "process:build-runner",
@@ -132,12 +151,12 @@
       "name": "resolve dependencies",
       "description": "The runner resolves the lockfile against the public package registry and takes what it downloads as given.",
       "assets": [],
-      "source_excerpt": "Dependency resolution reaches out to the public package registry on the internet, and the lockfile is taken as given — the runner does not verify signatures on what it downloads.",
+      "source_excerpt": "Dependency resolution reaches out to the public package registry on the internet, and the lockfile is taken as given \u2014 the runner does not verify signatures on what it downloads.",
       "source_label": "System description",
       "source": "process:build-runner",
       "destination": "entity:public-package-registry",
       "protocol": "unknown",
-      "authentication": "none — the runner does not verify signatures on the packages it downloads",
+      "authentication": "none \u2014 the runner does not verify signatures on the packages it downloads",
       "data_description": "dependency packages named by the lockfile, which is taken as given",
       "encryption_in_transit": "unknown"
     },
@@ -145,7 +164,9 @@
       "id": "flow:build-runner-to-image-registry:push-image",
       "name": "push image",
       "description": "The runner pushes the finished image, tagged with the commit sha, to the registry.",
-      "assets": ["business-critical-data"],
+      "assets": [
+        "business-critical-data"
+      ],
       "source_excerpt": "It pushes the finished image to our image registry, which is also in the build environment.",
       "source_label": "System description",
       "source": "process:build-runner",
@@ -159,7 +180,10 @@
       "id": "flow:build-runner-to-deploy-controller:set-current-release",
       "name": "set current release",
       "description": "The runner calls the controller and asks it to make the image it just pushed the current release.",
-      "assets": ["credentials", "business-critical-data"],
+      "assets": [
+        "credentials",
+        "business-critical-data"
+      ],
       "source_excerpt": "The token the runner uses to call the controller is a shared build token that is the same for every pipeline and has not been rotated since the pipeline was set up.",
       "source_label": "System description",
       "source": "process:build-runner",
@@ -187,7 +211,9 @@
       "id": "flow:store-server-to-image-registry:pull-image",
       "name": "pull image",
       "description": "On a changed release the store server pulls that image from the registry over the WAN and restarts the container.",
-      "assets": ["business-critical-data"],
+      "assets": [
+        "business-critical-data"
+      ],
       "source_excerpt": "if it differs from what it is running it pulls that image from the registry and restarts the container. The registry allows the pull; nobody has written down what a store server presents to it",
       "source_label": "System description",
       "source": "process:store-server",

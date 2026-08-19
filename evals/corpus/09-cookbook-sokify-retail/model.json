@@ -17,61 +17,79 @@
       "id": "process:mobile-app",
       "name": "Mobile app",
       "description": "The only customer-facing channel; customers browse and order through it. There is no website. It talks to the web API over HTTP.",
-      "assets": ["pii"],
+      "assets": [
+        "pii"
+      ],
       "source_excerpt": "Customers browse and order through our mobile app; there is no website.",
       "source_label": "System description",
-      "notes": "Tagged pii because the app is the only stated route by which a customer's details reach the web API — the source rules out a website. It is not tagged financial: the source never says where payment details are captured, only that the database holds the card they paid with.",
+      "notes": "Tagged pii because the app is the only stated route by which a customer's details reach the web API \u2014 the source rules out a website. It is not tagged financial: the source never says where payment details are captured, only that the database holds the card they paid with.",
       "technology": "mobile app",
       "trust_zone": "boundary:customer-device",
-      "exposure": "unknown"
+      "exposure": "unknown",
+      "interface_kind": "non-web"
     },
     {
       "id": "process:web-api",
       "name": "Web API",
       "description": "Receives traffic from the mobile app over HTTP, keeps customers in the user database, hands placed orders over to SIMS, and also receives SQL statements from the catalogue spreadsheet's macros.",
-      "assets": ["pii", "financial", "business-critical-data"],
-      "source_excerpt": "The app talks to the web API over HTTP — not HTTPS, it's on the list.",
+      "assets": [
+        "pii",
+        "financial",
+        "business-critical-data"
+      ],
+      "source_excerpt": "The app talks to the web API over HTTP \u2014 not HTTPS, it's on the list.",
       "source_label": "System description",
       "notes": "The source states outright that nobody can say what the API does about authentication, so every flow into it holds authentication unknown rather than absent.",
       "technology": "unknown",
       "trust_zone": "boundary:sokify-internal-systems",
-      "exposure": "internet-facing"
+      "exposure": "internet-facing",
+      "interface_kind": "web"
     },
     {
       "id": "process:sims",
       "name": "SIMS",
       "description": "The stock and inventory system, running since long before the app existed. On receiving an order it writes the delivery address into a flat file kept alongside it and sends a dispatch note to the fax gateway.",
-      "assets": ["pii", "business-critical-data"],
+      "assets": [
+        "pii",
+        "business-critical-data"
+      ],
       "source_excerpt": "the API hands the order over to SIMS, our stock and inventory system, which has been running since long before the app existed",
       "source_label": "System description",
       "notes": "",
       "technology": "unknown",
       "trust_zone": "boundary:sokify-internal-systems",
-      "exposure": "unknown"
+      "exposure": "unknown",
+      "interface_kind": "unknown"
     },
     {
       "id": "process:fax-gateway",
       "name": "Fax gateway",
       "description": "Receives dispatch notes from SIMS and faxes the customer a confirmation carrying their name and address. It dials the number stored against the order, and nobody checks the fax arrived at the right place.",
-      "assets": ["pii"],
+      "assets": [
+        "pii"
+      ],
       "source_excerpt": "it sends a dispatch note to the fax gateway, which faxes the customer a confirmation with their name and address on it",
       "source_label": "System description",
       "notes": "The source does not say whether the gateway is operated in-house or by a third party; it is zoned with Sokify's own systems on the strength of being described as part of what SIMS does with an order.",
       "technology": "fax",
       "trust_zone": "boundary:sokify-internal-systems",
-      "exposure": "unknown"
+      "exposure": "unknown",
+      "interface_kind": "non-web"
     },
     {
       "id": "process:catalogue-spreadsheet",
       "name": "Catalogue spreadsheet",
       "description": "The spreadsheet in which Marketing keep the catalogue; its macros send SQL statements straight to the web API to change prices and product copy. Described as a stopgap that is still in place. It lives on a marketing laptop in the office.",
-      "assets": ["business-critical-data"],
+      "assets": [
+        "business-critical-data"
+      ],
       "source_excerpt": "The macros in it send SQL statements straight to the web API to change prices and product copy",
       "source_label": "System description",
       "notes": "Typed as a process rather than an external entity: it is the org's own tooling and the source describes it by what its macros execute, not by who operates it. It is the resting place of the catalogue and the code that pushes SQL, and is modelled once.",
       "technology": "spreadsheet with macros",
       "trust_zone": "boundary:marketing-office",
-      "exposure": "unknown"
+      "exposure": "unknown",
+      "interface_kind": "non-web"
     }
   ],
   "data_stores": [
@@ -79,7 +97,10 @@
       "id": "store:user-database",
       "name": "User database",
       "description": "Holds customers as kept by the web API: name, address, and the card they paid with.",
-      "assets": ["pii", "financial"],
+      "assets": [
+        "pii",
+        "financial"
+      ],
       "source_excerpt": "The web API keeps customers in the user database: name, address, and the card they paid with.",
       "source_label": "System description",
       "notes": "",
@@ -92,8 +113,10 @@
       "id": "store:delivery-address-flat-file",
       "name": "Delivery address flat file",
       "description": "A flat file kept alongside SIMS into which SIMS writes the delivery address for an order. Only addresses go in that file, nothing else.",
-      "assets": ["pii"],
-      "source_excerpt": "It writes the delivery address into a flat file kept alongside it — only addresses go in that file, nothing else",
+      "assets": [
+        "pii"
+      ],
+      "source_excerpt": "It writes the delivery address into a flat file kept alongside it \u2014 only addresses go in that file, nothing else",
       "source_label": "System description",
       "notes": "",
       "technology": "flat file",
@@ -107,7 +130,9 @@
       "id": "flow:customer-to-mobile-app:browse-and-order",
       "name": "Browse and order",
       "description": "Customers browse the catalogue and place orders through the mobile app.",
-      "assets": ["pii"],
+      "assets": [
+        "pii"
+      ],
       "source_excerpt": "Customers browse and order through our mobile app; there is no website.",
       "source_label": "System description",
       "notes": "",
@@ -122,8 +147,10 @@
       "id": "flow:mobile-app-to-web-api:api-traffic",
       "name": "API traffic",
       "description": "The app talks to the web API over HTTP, not HTTPS; the source notes this is already on the list.",
-      "assets": ["pii"],
-      "source_excerpt": "The app talks to the web API over HTTP — not HTTPS, it's on the list.",
+      "assets": [
+        "pii"
+      ],
+      "source_excerpt": "The app talks to the web API over HTTP \u2014 not HTTPS, it's on the list.",
       "source_label": "System description",
       "notes": "",
       "source": "process:mobile-app",
@@ -131,14 +158,16 @@
       "protocol": "HTTP",
       "authentication": "unknown",
       "data_description": "Order placement traffic carrying customer details",
-      "encryption_in_transit": "none — the app talks to the web API over HTTP, not HTTPS"
+      "encryption_in_transit": "none \u2014 the app talks to the web API over HTTP, not HTTPS"
     },
     {
       "id": "flow:catalogue-spreadsheet-to-web-api:sql-statements",
       "name": "SQL statements",
       "description": "The macros in the catalogue spreadsheet send SQL statements straight to the web API to change prices and product copy.",
-      "assets": ["business-critical-data"],
-      "source_excerpt": "The macros in it send SQL statements straight to the web API to change prices and product copy — it was a stopgap and it is still here.",
+      "assets": [
+        "business-critical-data"
+      ],
+      "source_excerpt": "The macros in it send SQL statements straight to the web API to change prices and product copy \u2014 it was a stopgap and it is still here.",
       "source_label": "System description",
       "notes": "",
       "source": "process:catalogue-spreadsheet",
@@ -152,7 +181,10 @@
       "id": "flow:web-api-to-user-database:customer-records",
       "name": "Customer records",
       "description": "The web API keeps customers in the user database.",
-      "assets": ["pii", "financial"],
+      "assets": [
+        "pii",
+        "financial"
+      ],
       "source_excerpt": "The web API keeps customers in the user database: name, address, and the card they paid with.",
       "source_label": "System description",
       "notes": "",
@@ -167,7 +199,10 @@
       "id": "flow:web-api-to-sims:order-handover",
       "name": "Order handover",
       "description": "When an order is placed the API hands the order over to SIMS.",
-      "assets": ["pii", "business-critical-data"],
+      "assets": [
+        "pii",
+        "business-critical-data"
+      ],
       "source_excerpt": "When an order is placed the API hands the order over to SIMS, our stock and inventory system",
       "source_label": "System description",
       "notes": "",
@@ -182,7 +217,9 @@
       "id": "flow:sims-to-delivery-address-flat-file:address-write",
       "name": "Address write",
       "description": "SIMS writes the delivery address into a flat file kept alongside it.",
-      "assets": ["pii"],
+      "assets": [
+        "pii"
+      ],
       "source_excerpt": "It writes the delivery address into a flat file kept alongside it",
       "source_label": "System description",
       "notes": "",
@@ -197,7 +234,9 @@
       "id": "flow:sims-to-fax-gateway:dispatch-note",
       "name": "Dispatch note",
       "description": "SIMS sends a dispatch note to the fax gateway for the order.",
-      "assets": ["pii"],
+      "assets": [
+        "pii"
+      ],
       "source_excerpt": "it sends a dispatch note to the fax gateway",
       "source_label": "System description",
       "notes": "",
@@ -212,10 +251,12 @@
       "id": "flow:fax-gateway-to-customer:confirmation-fax",
       "name": "Confirmation fax",
       "description": "The gateway dials the number stored against the order and faxes the customer a confirmation with their name and address on it; nobody checks it arrived at the right place.",
-      "assets": ["pii"],
+      "assets": [
+        "pii"
+      ],
       "source_excerpt": "The gateway dials the number stored against the order and nobody checks it arrived at the right place.",
       "source_label": "System description",
-      "notes": "The stated absence is destination verification, not authentication in general — the source says nobody checks the fax arrived at the right place, and says nothing else about how this leg is controlled.",
+      "notes": "The stated absence is destination verification, not authentication in general \u2014 the source says nobody checks the fax arrived at the right place, and says nothing else about how this leg is controlled.",
       "source": "process:fax-gateway",
       "destination": "entity:customer",
       "protocol": "fax",

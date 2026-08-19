@@ -176,7 +176,14 @@ RECRITIC_PROMPT_TOKEN_CAP = 1100
 # examples, and the trust boundary `kind` rule: an attribute the prompt does not
 # tell the transcriber how to fill is an attribute whose legal values never
 # reach the model, and a downstream rule keyed on one of them fires nowhere.
-EXTRACT_PROMPT_TOKEN_CAP = 2300
+#
+# Raised from 2300 with `interface_kind`, on that same sentence. The attribute
+# decides whether a framework scoping itself to web applications runs at all
+# ([#219](https://github.com/mstarks01/work-agent/issues/219)), and it needs the
+# rule *and* both worked examples, because the failure it exists to prevent is a
+# transcriber reading one of the two facts off the other. ~90 tokens spare,
+# which is about what one more attribute rule costs.
+EXTRACT_PROMPT_TOKEN_CAP = 2450
 REPAIR_PROMPT_TOKEN_CAP = 800
 
 

@@ -433,28 +433,50 @@ def asvs_precondition(model: SystemModel) -> PreconditionResult:
     assumes an operator settled that before opening it. STRIDE's precondition is
     total, so ASVS is the first framework here that can answer no.
 
-    The read is the **Data Flow** protocols, which is the one place the model
-    records what a connection speaks:
+    **The read is what the processes say they present**, not what the flows say
+    they carry. Those are different facts, and reading the second for the first
+    is what
+    [#219](https://github.com/mstarks01/work-agent/issues/219) found: six corpus
+    cases answered ``undecidable`` — among them a process named ``scheduling web
+    app`` and another named ``supplier portal`` — because every flow's
+    ``protocol`` was ``unknown``. The transport was genuinely unstated, and
+    ``unknown`` was the correct value for it. The applicability question was
+    simply not a question about transport.
 
-    * ``satisfied`` — at least one flow speaks a web protocol.
-    * ``undecidable`` — no flow speaks one, and at least one flow says nothing.
-      The input never said, and submitting more about the system settles it.
-    * ``refuted`` — every flow states a protocol and none of them is the web.
+    A stated protocol still satisfies, because a flow that says HTTPS says the
+    same thing by another route. **It can no longer refuse on its own**, and it
+    can no longer hold the answer open: a model whose every process states
+    ``non-web`` has answered, whatever its flows leave unsaid.
 
-    A model with no flows at all is ``undecidable`` on the same terms: nothing
-    said, rather than nothing there.
+    * ``satisfied`` — a process presents a web interface, or a flow speaks a web
+      protocol.
+    * ``undecidable`` — nothing says web and something never said. The input
+      never settled it, and submitting more about the system does.
+    * ``refuted`` — every process states a non-web interface, or (for a model
+      carrying no processes) every flow states a non-web protocol.
 
-    **One flow that never said is enough to hold the answer open**, and that is
+    A model with no processes and no flows is ``undecidable`` on the same terms:
+    nothing said, rather than nothing there.
+
+    **Anything that never said is enough to hold the answer open**, and that is
     the whole point of carrying three states rather than two. Reading silence as
-    a non-web protocol would tell an operator "do not name ASVS for this system"
-    when the truth is "your input did not say" — and those two have different
-    remedies, which is the distinction this repo refuses to collapse anywhere
-    else.
+    a refusal would tell an operator "do not name ASVS for this system" when the
+    truth is "your input did not say" — and those two have different remedies,
+    which is the distinction this repo refuses to collapse anywhere else.
     """
-    silent = False
-    for flow in model.data_flows:
-        protocol = flow.protocol.lower()
-        if any(term in protocol for term in WEB_PROTOCOL_TERMS):
-            return "satisfied"
-        silent = silent or not _states_a_protocol(flow.protocol)
-    return "undecidable" if silent or not model.data_flows else "refuted"
+    kinds = [process.interface_kind for process in model.processes]
+    speaks_web = any(
+        term in flow.protocol.lower()
+        for flow in model.data_flows
+        for term in WEB_PROTOCOL_TERMS
+    )
+    if "web" in kinds or speaks_web:
+        return "satisfied"
+
+    # No process to read: fall back to the flows, which is the whole of what a
+    # model carrying only stores and entities can be asked.
+    if not kinds:
+        silent = any(not _states_a_protocol(flow.protocol) for flow in model.data_flows)
+        return "undecidable" if silent or not model.data_flows else "refuted"
+
+    return "undecidable" if "unknown" in kinds else "refuted"
