@@ -4,8 +4,10 @@
       "id": "entity:sensor-node",
       "name": "sensor node",
       "description": "Deployed sensor on a customer site, outside the operator's physical control. Publishes readings and self-installs firmware.",
-      "assets": ["availability-critical"],
-      "source_excerpt": "They are outside our physical control — a technician can be standing next to one with a laptop.",
+      "assets": [
+        "availability-critical"
+      ],
+      "source_excerpt": "They are outside our physical control \u2014 a technician can be standing next to one with a laptop.",
       "source_label": "System description",
       "kind": "external-system",
       "trust_zone": "boundary:field-network"
@@ -36,23 +38,30 @@
       "id": "process:device-gateway",
       "name": "device gateway",
       "description": "Internet-exposed MQTT broker on GKE; authenticates nodes against the registry and forwards accepted readings.",
-      "assets": ["availability-critical", "reputation"],
+      "assets": [
+        "availability-critical",
+        "reputation"
+      ],
       "source_excerpt": "an MQTT broker we run on GKE and expose to the internet because the nodes dial in from anywhere",
       "source_label": "System description",
       "technology": "MQTT broker on GKE",
       "trust_zone": "boundary:ingest-edge",
-      "exposure": "internet-facing"
+      "exposure": "internet-facing",
+      "interface_kind": "non-web"
     },
     {
       "id": "process:telemetry-normalizer",
       "name": "telemetry normalizer",
       "description": "Python Pub/Sub consumer that normalizes readings and loads them into the lake.",
-      "assets": ["pii"],
+      "assets": [
+        "pii"
+      ],
       "source_excerpt": "picked up by the telemetry normalizer, a Python consumer in our analytics network",
       "source_label": "System description",
       "technology": "Python Pub/Sub consumer",
       "trust_zone": "boundary:analytics-core",
-      "exposure": "internal"
+      "exposure": "internal",
+      "interface_kind": "non-web"
     }
   ],
   "data_stores": [
@@ -60,7 +69,9 @@
       "id": "store:device-registry",
       "name": "device registry",
       "description": "Firestore collection holding the fleet pre-shared key check and each node's customer assignment.",
-      "assets": ["credentials"],
+      "assets": [
+        "credentials"
+      ],
       "source_excerpt": "The gateway looks up the device in a device registry (Firestore) to check the key",
       "source_label": "System description",
       "technology": "Firestore",
@@ -72,7 +83,10 @@
       "id": "store:telemetry-lake",
       "name": "telemetry lake",
       "description": "BigQuery dataset of normalized readings, including site addresses and occupancy patterns.",
-      "assets": ["pii", "business-critical-data"],
+      "assets": [
+        "pii",
+        "business-critical-data"
+      ],
       "source_excerpt": "The lake has site addresses and occupancy patterns in it, so it is customer data.",
       "source_label": "System description",
       "technology": "BigQuery",
@@ -84,7 +98,9 @@
       "id": "store:firmware-bucket",
       "name": "firmware bucket",
       "description": "Cloud Storage bucket the nodes poll for firmware images. Public read.",
-      "assets": ["business-critical-data"],
+      "assets": [
+        "business-critical-data"
+      ],
       "source_excerpt": "The bucket is public read, because making the nodes authenticate to it was awkward.",
       "source_label": "System description",
       "technology": "Cloud Storage bucket",
@@ -98,7 +114,9 @@
       "id": "flow:sensor-node-to-device-gateway:publish-readings",
       "name": "publish readings",
       "description": "Node publishes sensor readings to the broker.",
-      "assets": ["pii"],
+      "assets": [
+        "pii"
+      ],
       "source_excerpt": "Nodes authenticate to the broker with a pre-shared key. The key is per fleet, not per device. Nobody has rotated it since deployment.",
       "source_label": "System description",
       "source": "entity:sensor-node",
@@ -112,7 +130,9 @@
       "id": "flow:device-gateway-to-device-registry:look-up-device",
       "name": "look up device",
       "description": "Gateway checks the presented key and resolves the node's customer.",
-      "assets": ["credentials"],
+      "assets": [
+        "credentials"
+      ],
       "source_excerpt": "The gateway looks up the device in a device registry (Firestore) to check the key and to find out which customer the node belongs to.",
       "source_label": "System description",
       "source": "process:device-gateway",
@@ -126,7 +146,9 @@
       "id": "flow:device-gateway-to-telemetry-normalizer:forward-readings",
       "name": "forward readings",
       "description": "Accepted readings are published onto Pub/Sub for the normalizer.",
-      "assets": ["pii"],
+      "assets": [
+        "pii"
+      ],
       "source_excerpt": "Readings the gateway accepts are forwarded onto Pub/Sub and picked up by the telemetry normalizer",
       "source_label": "System description",
       "source": "process:device-gateway",
@@ -140,7 +162,9 @@
       "id": "flow:telemetry-normalizer-to-telemetry-lake:load-readings",
       "name": "load readings",
       "description": "Normalizer writes readings into the lake.",
-      "assets": ["pii"],
+      "assets": [
+        "pii"
+      ],
       "source_excerpt": "which writes them into the telemetry lake in BigQuery",
       "source_label": "System description",
       "source": "process:telemetry-normalizer",
@@ -154,7 +178,9 @@
       "id": "flow:sensor-node-to-firmware-bucket:poll-firmware",
       "name": "poll firmware",
       "description": "Node polls for a new firmware image and installs what it finds.",
-      "assets": ["business-critical-data"],
+      "assets": [
+        "business-critical-data"
+      ],
       "source_excerpt": "nodes poll a Cloud Storage bucket for a new image and install what they find",
       "source_label": "System description",
       "source": "entity:sensor-node",
@@ -182,7 +208,9 @@
       "id": "flow:fleet-operator-to-telemetry-lake:query-dashboards",
       "name": "query dashboards",
       "description": "Operator reads fleet dashboards over BigQuery.",
-      "assets": ["pii"],
+      "assets": [
+        "pii"
+      ],
       "source_excerpt": "look at dashboards over BigQuery from the corporate network, signed in with company SSO",
       "source_label": "System description",
       "source": "entity:fleet-operator",

@@ -39,13 +39,17 @@
       "id": "process:web-server",
       "name": "Web server",
       "description": "Serves the public content site over HTTPS and runs the CMS. Reads and writes pages, accounts and comments in MySQL and pushes newly published assets to the CDN bucket.",
-      "assets": ["business-critical-data", "reputation"],
+      "assets": [
+        "business-critical-data",
+        "reputation"
+      ],
       "source_excerpt": "The web server runs the CMS and keeps pages, accounts and comments in a MySQL database on the same hosted network.",
       "source_label": "System description",
       "notes": "The source treats 'the web server' and 'the CMS' as one deployed thing; modelled as a single process.",
       "technology": "unknown",
       "trust_zone": "boundary:hosted-network",
-      "exposure": "internet-facing"
+      "exposure": "internet-facing",
+      "interface_kind": "web"
     }
   ],
   "data_stores": [
@@ -53,7 +57,10 @@
       "id": "store:mysql-database",
       "name": "MySQL database",
       "description": "Holds pages, accounts and comments for the CMS. Sits on the same hosted network as the web server and is also reachable directly by the admin.",
-      "assets": ["pii", "business-critical-data"],
+      "assets": [
+        "pii",
+        "business-critical-data"
+      ],
       "source_excerpt": "keeps pages, accounts and comments in a MySQL database on the same hosted network",
       "source_label": "System description",
       "notes": "Not tagged credentials: the source says the database holds accounts, and what an account record contains is never stated. Sign-in exists for some readers, but where its secrets live is not described.",
@@ -66,7 +73,9 @@
       "id": "store:cdn-bucket",
       "name": "CDN bucket",
       "description": "Bucket behind the CDN holding images, stylesheets and downloads published from the web server.",
-      "assets": ["business-critical-data"],
+      "assets": [
+        "business-critical-data"
+      ],
       "source_excerpt": "the web server pushes them up to the CDN's bucket",
       "source_label": "System description",
       "notes": "",
@@ -105,13 +114,16 @@
       "protocol": "HTTP",
       "authentication": "unknown",
       "data_description": "Images, stylesheets and downloads",
-      "encryption_in_transit": "none — readers fetch these over HTTP"
+      "encryption_in_transit": "none \u2014 readers fetch these over HTTP"
     },
     {
       "id": "flow:web-server-to-mysql-database:cms-data",
       "name": "CMS data",
       "description": "The web server stores and retrieves pages, accounts and comments in the MySQL database.",
-      "assets": ["pii", "business-critical-data"],
+      "assets": [
+        "pii",
+        "business-critical-data"
+      ],
       "source_excerpt": "keeps pages, accounts and comments in a MySQL database on the same hosted network",
       "source_label": "System description",
       "notes": "",
@@ -126,7 +138,9 @@
       "id": "flow:web-server-to-cdn-bucket:asset-publish",
       "name": "Asset publish",
       "description": "When new assets are published the web server pushes them to the CDN's bucket.",
-      "assets": ["business-critical-data"],
+      "assets": [
+        "business-critical-data"
+      ],
       "source_excerpt": "When new assets are published the web server pushes them up to the CDN's bucket.",
       "source_label": "System description",
       "notes": "The source states outright that how this push is authenticated is not described, which is why the attribute is unknown rather than absent.",
@@ -141,8 +155,11 @@
       "id": "flow:admin-to-mysql-database:direct-administration",
       "name": "Direct administration",
       "description": "The admin connects straight to the database box over an unsecured MySQL connection with no TLS, from arbitrary locations and with no jump host, bypassing the CMS.",
-      "assets": ["pii", "business-critical-data"],
-      "source_excerpt": "That is an unsecured MySQL connection straight to the box, no TLS on it, and they do it from wherever they happen to be — there is no jump host.",
+      "assets": [
+        "pii",
+        "business-critical-data"
+      ],
+      "source_excerpt": "That is an unsecured MySQL connection straight to the box, no TLS on it, and they do it from wherever they happen to be \u2014 there is no jump host.",
       "source_label": "System description",
       "notes": "",
       "source": "entity:admin",
@@ -150,7 +167,7 @@
       "protocol": "MySQL",
       "authentication": "unknown",
       "data_description": "Direct database maintenance against pages, accounts and comments, performed outside the CMS",
-      "encryption_in_transit": "none — an unsecured MySQL connection, no TLS on it"
+      "encryption_in_transit": "none \u2014 an unsecured MySQL connection, no TLS on it"
     }
   ],
   "trust_boundaries": [
@@ -194,7 +211,7 @@
     {
       "assumption": "The admin connects from outside the hosted network.",
       "element_id": "entity:admin",
-      "basis": "\"they do it from wherever they happen to be — there is no jump host\"."
+      "basis": "\"they do it from wherever they happen to be \u2014 there is no jump host\"."
     },
     {
       "assumption": "The CDN and its bucket sit in a separate trust zone from the hosted network.",

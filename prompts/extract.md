@@ -25,12 +25,21 @@ Sources carry **equal weight**. Order is presentation only, and a `label` is a c
    Set each boundary's `kind` by two questions in order. **Who controls it?** A different party — another company, a franchise, a vendor's hosting, a customer's own device — makes it `tenant`, whatever the network arrangement. **What authority does it hold?** Same party, more authority on this side — an admin zone, a control plane, a production estate — makes it `privilege`. Same party and same authority, differing only in network location, is `network`. `other` is the last resort, never the default: it tells the analysis nothing, so give a thinly described zone the kind its description supports.
 3. **IDs.** Typed slugs: `entity:`, `process:`, `store:`, `boundary:` plus the normalized name; flows are `flow:<source-slug>-to-<destination-slug>:<label>`. IDs are recomputed from the names you give in code, so do not abbreviate one — an ID that differs from its element's name is replaced by the name's slug, and every reference to it follows automatically. If you want a short ID, give the element a short `name`. Two elements sharing a name share an ID, which is an error: name them apart.
 4. **Flows.** One flow per interaction, direction = who initiates; the response rides implicitly. A push, webhook, or callback initiated by the other side is its own separate flow. Both endpoints must be zoned elements you have already created.
-5. **Attributes.** Fill each element's fields from the text. Where the text is silent on a security-relevant attribute — `authentication`, `encryption_in_transit`, `encryption_at_rest`, `exposure`, `data_classification` — write `unknown`.
+5. **Attributes.** Fill each element's fields from the text. Where the text is silent on a security-relevant attribute — `authentication`, `encryption_in_transit`, `encryption_at_rest`, `exposure`, `interface_kind`, `data_classification` — write `unknown`.
 6. **Assets.** Tag elements only from the controlled vocabulary: `credentials`, `pii`, `financial`, `health`, `secrets`, `business-critical-data`, `availability-critical`, `reputation`. System-specific detail belongs in the name and description, not in a new tag.
 7. **Excerpts.** Give every element a `source_excerpt`: a short verbatim quote from the source it came from, plus the `source_label` naming that source — see rule 7 below. This is what makes a threat traceable back to the user's own words.
 8. **Assumptions.** If you infer a value rather than reading it, write the inferred value into the attribute **and** add an entry to the top-level `assumptions` list naming the assumption, the element ID, and the basis. An inference that appears in an attribute but not in `assumptions` is a bug.
 
 Never derive boundary crossings — they are computed mechanically from the zones you assign.
+
+### `interface_kind` versus `protocol`
+
+`interface_kind` is what a **Process** presents: `web` for the HTTP family as an application presents it — a browser UI, a REST, GraphQL or SOAP API, a websocket. A portal, console, web app or site is `web`; a batch job, broker or queue daemon is `non-web`.
+
+**Neither it nor a flow's `protocol` licenses the other**, in either direction:
+
+- "The supplier portal" says what the portal presents and nothing about transport: `interface_kind: "web"`, `protocol: "unknown"`.
+- A backup agent shipping files over HTTPS is not a web application: `protocol: "https"`, `interface_kind: "non-web"`.
 
 ### Reading what a source says
 

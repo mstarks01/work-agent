@@ -64,6 +64,7 @@ def zoned_pair(source_kind, destination_kind):
                 technology="x",
                 trust_zone=f"boundary:{name}",
                 exposure="internal",
+                interface_kind="non-web",
             )
             for name in ("theirs", "ours")
         ],
@@ -101,6 +102,7 @@ def model():
                 technology="FastAPI",
                 trust_zone="boundary:dmz",
                 exposure="internet-facing",
+                interface_kind="web",
             ),
             Process(
                 id="process:admin",
@@ -108,6 +110,7 @@ def model():
                 technology="Django",
                 trust_zone="boundary:privileged",
                 exposure="internal",
+                interface_kind="non-web",
             ),
         ],
         data_stores=[
@@ -299,6 +302,7 @@ class TestFiring:
                     technology="x",
                     trust_zone="boundary:z",
                     exposure="internal",
+                    interface_kind="non-web",
                 )
             ],
             trust_boundaries=[TrustBoundary(id="boundary:z", name="Z", kind="network")],

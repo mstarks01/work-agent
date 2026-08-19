@@ -4,7 +4,9 @@
       "id": "entity:player",
       "name": "player",
       "description": "A person playing the game on their own machine.",
-      "assets": ["pii"],
+      "assets": [
+        "pii"
+      ],
       "source_excerpt": "Players run our game client on their own machines. We do not control those machines.",
       "source_label": "System description",
       "kind": "human",
@@ -31,40 +33,51 @@
       "source_label": "System description",
       "technology": "unknown",
       "trust_zone": "boundary:player-local-machine",
-      "exposure": "unknown"
+      "exposure": "unknown",
+      "interface_kind": "non-web"
     },
     {
       "id": "process:lobby",
       "name": "lobby",
       "description": "Matchmaking service that clients connect to and that hands matches to the game servers.",
-      "assets": ["availability-critical"],
+      "assets": [
+        "availability-critical"
+      ],
       "source_excerpt": "It talks to the lobby on TCP 1234 for matchmaking",
       "source_label": "System description",
       "technology": "unknown",
       "trust_zone": "boundary:prod-network",
-      "exposure": "internet-facing"
+      "exposure": "internet-facing",
+      "interface_kind": "unknown"
     },
     {
       "id": "process:game-servers",
       "name": "game servers",
       "description": "Match servers that clients connect to directly and that record match outcomes.",
-      "assets": ["availability-critical", "business-critical-data"],
+      "assets": [
+        "availability-critical",
+        "business-critical-data"
+      ],
       "source_excerpt": "once a match starts it talks directly to the game servers on TCP 1235",
       "source_label": "System description",
       "technology": "unknown",
       "trust_zone": "boundary:prod-network",
-      "exposure": "internet-facing"
+      "exposure": "internet-facing",
+      "interface_kind": "unknown"
     },
     {
       "id": "process:moderation-website",
       "name": "moderation website",
       "description": "Internal tool used by customer support to view and act on player accounts.",
-      "assets": ["pii"],
+      "assets": [
+        "pii"
+      ],
       "source_excerpt": "use a moderation website to look at and act on player accounts",
       "source_label": "System description",
       "technology": "unknown",
       "trust_zone": "boundary:prod-network",
-      "exposure": "unknown"
+      "exposure": "unknown",
+      "interface_kind": "web"
     }
   ],
   "data_stores": [
@@ -72,7 +85,10 @@
       "id": "store:player-database",
       "name": "player database",
       "description": "Player accounts, written by the game servers and the moderation website and read by the lobby.",
-      "assets": ["pii", "business-critical-data"],
+      "assets": [
+        "pii",
+        "business-critical-data"
+      ],
       "source_excerpt": "The lobby reads the player database to set up a match",
       "source_label": "System description",
       "technology": "unknown",
@@ -84,7 +100,9 @@
       "id": "store:stats-database",
       "name": "stats database",
       "description": "Match statistics written during and after a match.",
-      "assets": ["business-critical-data"],
+      "assets": [
+        "business-critical-data"
+      ],
       "source_excerpt": "The game servers read and write the stats database during and after a match",
       "source_label": "System description",
       "technology": "unknown",
@@ -154,7 +172,9 @@
       "id": "flow:lobby-to-player-database:read-players",
       "name": "read players",
       "description": "Lobby reads player records to form a match.",
-      "assets": ["pii"],
+      "assets": [
+        "pii"
+      ],
       "source_excerpt": "The lobby reads the player database to set up a match",
       "source_label": "System description",
       "source": "process:lobby",
@@ -168,7 +188,9 @@
       "id": "flow:game-servers-to-stats-database:read-write-stats",
       "name": "read write stats",
       "description": "Game servers record match statistics.",
-      "assets": ["business-critical-data"],
+      "assets": [
+        "business-critical-data"
+      ],
       "source_excerpt": "The game servers read and write the stats database during and after a match",
       "source_label": "System description",
       "source": "process:game-servers",
@@ -182,7 +204,10 @@
       "id": "flow:game-servers-to-player-database:update-players",
       "name": "update players",
       "description": "Game servers write match outcomes back onto player records.",
-      "assets": ["pii", "business-critical-data"],
+      "assets": [
+        "pii",
+        "business-critical-data"
+      ],
       "source_excerpt": "they also write back to the player database",
       "source_label": "System description",
       "source": "process:game-servers",
@@ -196,7 +221,9 @@
       "id": "flow:customer-support-to-moderation-website:moderate-accounts",
       "name": "moderate accounts",
       "description": "Support staff review and act on player accounts.",
-      "assets": ["pii"],
+      "assets": [
+        "pii"
+      ],
       "source_excerpt": "customer support staff work from the corporate network and use a moderation website",
       "source_label": "System description",
       "source": "entity:customer-support",
@@ -210,7 +237,9 @@
       "id": "flow:moderation-website-to-player-database:read-write-players",
       "name": "read write players",
       "description": "Moderation website reads and writes player records directly.",
-      "assets": ["pii"],
+      "assets": [
+        "pii"
+      ],
       "source_excerpt": "That website reads and writes the player database directly.",
       "source_label": "System description",
       "source": "process:moderation-website",

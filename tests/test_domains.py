@@ -34,6 +34,7 @@ def process(name, technology="python", zone="boundary:z"):
         technology=technology,
         trust_zone=zone,
         exposure="internal",
+        interface_kind="non-web",
     )
 
 

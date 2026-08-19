@@ -103,13 +103,29 @@ class ExternalEntity(_Element):
 
 
 class Process(_Element):
-    """Running code or a component that transforms data."""
+    """Running code or a component that transforms data.
+
+    ``interface_kind`` says what kind of interface this process presents, which
+    is a different fact from what any connection to it carries. A process can
+    present a web interface over a transport nobody stated, and a flow can state
+    HTTPS to something that is not an application at all. Keeping the two apart
+    is what lets a framework scope itself to web applications without a model
+    having to guess at transport — see
+    :func:`~stride_service.frameworks.asvs.rules.asvs_precondition`.
+
+    ``web`` covers the HTTP family as an application presents it: a browser UI, a
+    REST, GraphQL or SOAP API, a websocket endpoint. ``non-web`` is anything
+    else — a batch job, a broker, a daemon reading a queue. ``unknown`` is the
+    default the extraction starts from and the honest answer whenever the input
+    does not say, exactly as it is for every other attribute here.
+    """
 
     id_prefix: ClassVar[str] = "process"
 
     technology: str = Field(max_length=200)
     trust_zone: str
     exposure: Literal["internet-facing", "internal", "unknown"]
+    interface_kind: Literal["web", "non-web", "unknown"]
 
 
 class DataStore(_Element):

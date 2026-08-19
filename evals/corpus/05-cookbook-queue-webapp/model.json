@@ -16,23 +16,29 @@
       "id": "process:web-application",
       "name": "web application",
       "description": "Serves the browser and enqueues work rather than performing it inline.",
-      "assets": ["reputation"],
+      "assets": [
+        "reputation"
+      ],
       "source_excerpt": "the web application runs in our web tier",
       "source_label": "System description",
       "technology": "unknown",
       "trust_zone": "boundary:web-tier",
-      "exposure": "internet-facing"
+      "exposure": "internet-facing",
+      "interface_kind": "web"
     },
     {
       "id": "process:background-worker",
       "name": "background worker",
       "description": "Consumes queued jobs and performs the work against the database.",
-      "assets": ["business-critical-data"],
+      "assets": [
+        "business-critical-data"
+      ],
       "source_excerpt": "a background worker process picks them up and does the work",
       "source_label": "System description",
       "technology": "unknown",
       "trust_zone": "boundary:backend-tier",
-      "exposure": "internal"
+      "exposure": "internal",
+      "interface_kind": "non-web"
     }
   ],
   "data_stores": [
@@ -40,7 +46,9 @@
       "id": "store:message-queue",
       "name": "message queue",
       "description": "Carries jobs from the web application to the worker.",
-      "assets": ["business-critical-data"],
+      "assets": [
+        "business-critical-data"
+      ],
       "source_excerpt": "It puts jobs onto a message queue, and a background worker process picks them up",
       "source_label": "System description",
       "technology": "unknown",
@@ -52,7 +60,9 @@
       "id": "store:database",
       "name": "database",
       "description": "Application records and the application's log records.",
-      "assets": ["business-critical-data"],
+      "assets": [
+        "business-critical-data"
+      ],
       "source_excerpt": "The background worker reads and writes the database. The database is also where we keep the application's log records.",
       "source_label": "System description",
       "technology": "unknown",
@@ -64,8 +74,11 @@
       "id": "store:web-application-config",
       "name": "web application config",
       "description": "Configuration for the web application, holding its message-queue credentials.",
-      "assets": ["credentials", "secrets"],
-      "source_excerpt": "Both of those config stores hold the credentials the process needs — the web application's queue credentials",
+      "assets": [
+        "credentials",
+        "secrets"
+      ],
+      "source_excerpt": "Both of those config stores hold the credentials the process needs \u2014 the web application's queue credentials",
       "source_label": "System description",
       "technology": "unknown",
       "trust_zone": "boundary:web-tier",
@@ -76,7 +89,10 @@
       "id": "store:worker-config",
       "name": "worker config",
       "description": "Configuration for the background worker, holding its database credentials.",
-      "assets": ["credentials", "secrets"],
+      "assets": [
+        "credentials",
+        "secrets"
+      ],
       "source_excerpt": "and the worker's database credentials",
       "source_label": "System description",
       "technology": "unknown",
@@ -104,7 +120,9 @@
       "id": "flow:web-application-to-message-queue:enqueue-job",
       "name": "enqueue job",
       "description": "Application places a job on the queue.",
-      "assets": ["business-critical-data"],
+      "assets": [
+        "business-critical-data"
+      ],
       "source_excerpt": "It puts jobs onto a message queue",
       "source_label": "System description",
       "source": "process:web-application",
@@ -118,7 +136,9 @@
       "id": "flow:background-worker-to-message-queue:consume-job",
       "name": "consume job",
       "description": "Worker takes jobs off the queue.",
-      "assets": ["business-critical-data"],
+      "assets": [
+        "business-critical-data"
+      ],
       "source_excerpt": "a background worker process picks them up and does the work",
       "source_label": "System description",
       "source": "process:background-worker",
@@ -132,7 +152,9 @@
       "id": "flow:background-worker-to-database:read-write-records",
       "name": "read write records",
       "description": "Worker reads and writes application records and log records.",
-      "assets": ["business-critical-data"],
+      "assets": [
+        "business-critical-data"
+      ],
       "source_excerpt": "The background worker reads and writes the database.",
       "source_label": "System description",
       "source": "process:background-worker",
@@ -146,7 +168,9 @@
       "id": "flow:web-application-to-web-application-config:read-configuration",
       "name": "read configuration",
       "description": "Application reads its settings, including queue credentials.",
-      "assets": ["credentials"],
+      "assets": [
+        "credentials"
+      ],
       "source_excerpt": "the web application has a web application config",
       "source_label": "System description",
       "source": "process:web-application",
@@ -160,7 +184,9 @@
       "id": "flow:background-worker-to-worker-config:read-configuration",
       "name": "read configuration",
       "description": "Worker reads its settings, including database credentials.",
-      "assets": ["credentials"],
+      "assets": [
+        "credentials"
+      ],
       "source_excerpt": "and the worker has a worker config",
       "source_label": "System description",
       "source": "process:background-worker",

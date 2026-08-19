@@ -204,18 +204,103 @@ def test_the_agent_supplies_a_key_and_never_a_chapter():
     [
         ("01-payments-checkout", "satisfied"),
         ("10-cookbook-generic-cms", "satisfied"),
-        ("03-batch-data-pipeline", "undecidable"),
+        # Named a web app in its own prose, and every flow's protocol unstated.
+        # This case is why the precondition stopped reading transport (#219).
+        ("11-sparse-shift-scheduling", "satisfied"),
+        ("12-overclaiming-supplier-portal", "satisfied"),
+        # Airflow and Spark: the model states what both processes present, and
+        # neither is the web. A statement, not a silence.
+        ("03-batch-data-pipeline", "refuted"),
+        # The source never says what the controller or the store servers
+        # present, so nothing here is decided. Its remedy is to submit more.
         ("07-cicd-store-deploy", "undecidable"),
     ],
 )
 def test_the_precondition_answers_the_corpus_as_measured(case_id, expected):
-    """ASVS applies cleanly to fewer than half of this repo's own corpus.
+    """All three states, against real models.
 
-    That is the measurement the corpus split respects rather than works around,
-    and it is the first time a precondition in this repo answers anything but
-    ``satisfied`` against a real model.
+    The split moved when the precondition stopped answering "is this a web
+    application?" from a **Data Flow**'s ``protocol``
+    ([#219](https://github.com/mstarks01/work-agent/issues/219)). Four cases
+    whose prose names a web application had been refused for saying nothing
+    about transport, which was the wrong question asked of the wrong field.
     """
     assert run_precondition(ASVS, corpus_model(case_id)) == expected
+
+
+@pytest.mark.parametrize(
+    ("kinds", "expected"),
+    [
+        (("web", "non-web"), "satisfied"),
+        (("web", "unknown"), "satisfied"),
+        (("unknown", "non-web"), "undecidable"),
+        (("unknown", "unknown"), "undecidable"),
+        (("non-web", "non-web"), "refuted"),
+    ],
+)
+def test_the_processes_decide_whatever_the_flows_leave_unsaid(kinds, expected):
+    """One process presenting the web is enough; one silent one holds it open.
+
+    Every flow here states no protocol at all, which is the shape that used to
+    force ``undecidable`` however plainly the processes were described.
+    """
+    model = valid_model()
+    template = model.processes[0]
+    processes = [
+        template.model_copy(update={"id": f"process:p{index}", "interface_kind": kind})
+        for index, kind in enumerate(kinds)
+    ]
+    silent = [
+        flow.model_copy(update={"protocol": "unknown"}) for flow in model.data_flows
+    ]
+
+    answer = run_precondition(
+        ASVS, model.model_copy(update={"processes": processes, "data_flows": silent})
+    )
+
+    assert answer == expected
+
+
+def test_a_stated_web_protocol_still_satisfies_on_its_own():
+    """A flow that says HTTPS says the same thing by another route.
+
+    Kept as a satisfier because it is one. What it lost is the power to *refuse*
+    and the power to hold the answer open, neither of which was ever a fact about
+    transport.
+    """
+    model = valid_model()
+    non_web = [
+        process.model_copy(update={"interface_kind": "non-web"})
+        for process in model.processes
+    ]
+    web = [flow.model_copy(update={"protocol": "HTTPS"}) for flow in model.data_flows]
+
+    answer = run_precondition(
+        ASVS, model.model_copy(update={"processes": non_web, "data_flows": web})
+    )
+
+    assert answer == "satisfied"
+
+
+def test_a_flow_that_never_said_no_longer_holds_a_decided_model_open():
+    """The defect #219 reported, as a test.
+
+    Every process states a non-web interface and no flow states anything. The
+    model has answered the question; the unstated transport is a different fact
+    and no longer overrides it.
+    """
+    model = valid_model()
+    decided = [
+        process.model_copy(update={"interface_kind": "non-web"})
+        for process in model.processes
+    ]
+    silent = [flow.model_copy(update={"protocol": ""}) for flow in model.data_flows]
+
+    answer = run_precondition(
+        ASVS, model.model_copy(update={"processes": decided, "data_flows": silent})
+    )
+
+    assert answer == "refuted"
 
 
 @pytest.mark.parametrize(
@@ -231,10 +316,11 @@ def test_the_precondition_answers_the_corpus_as_measured(case_id, expected):
         (("HTTPS", "SFTP"), "satisfied"),
     ],
 )
-def test_one_flow_that_never_said_holds_the_answer_open(protocols, expected):
-    """Silence is ``undecidable``, and a stated non-web protocol is ``refuted``.
+def test_a_model_with_no_processes_is_answered_by_its_flows(protocols, expected):
+    """The fallback, for a model carrying no **Process** to ask.
 
-    The two are never collapsed, because the remedy differs: one says do not name
+    Silence is ``undecidable`` and a stated non-web protocol is ``refuted``. The
+    two are never collapsed, because the remedy differs: one says do not name
     this framework for this system, the other says the input did not say. A blank
     protocol reaches a **Valid System Model** — the gate sets no minimum length —
     and reading it as a stated non-web protocol would tell an operator to drop
@@ -250,36 +336,20 @@ def test_one_flow_that_never_said_holds_the_answer_open(protocols, expected):
         for flow, protocol in zip(model.data_flows, protocols, strict=True)
     ]
 
-    answer = run_precondition(ASVS, model.model_copy(update={"data_flows": flows}))
+    answer = run_precondition(
+        ASVS, model.model_copy(update={"processes": [], "data_flows": flows})
+    )
 
     assert answer == expected
 
 
-def test_a_model_with_no_flows_at_all_is_undecidable():
+def test_a_model_with_nothing_to_read_at_all_is_undecidable():
     """Nothing said, rather than nothing there."""
     model = valid_model()
 
-    assert run_precondition(ASVS, model.model_copy(update={"data_flows": []})) == (
-        "undecidable"
-    )
-
-
-def test_a_system_whose_protocols_are_all_stated_and_none_web_is_refuted():
-    """The third state, and the one the corpus has no case for.
-
-    ``refuted`` says do not name this framework for this system. It needs every
-    flow to state a protocol, which is what separates it from ``undecidable``.
-    """
-    model = corpus_model("03-batch-data-pipeline")
-    stated = model.model_copy(
-        update={
-            "data_flows": [
-                flow.model_copy(update={"protocol": "SFTP"})
-                for flow in model.data_flows
-            ]
-        }
-    )
-    assert run_precondition(ASVS, stated) == "refuted"
+    assert run_precondition(
+        ASVS, model.model_copy(update={"processes": [], "data_flows": []})
+    ) == ("undecidable")
 
 
 # --- The block ---------------------------------------------------------------
