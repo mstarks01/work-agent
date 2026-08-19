@@ -514,9 +514,9 @@ def declared_options(meta: dict) -> dict[str, Mapping[str, Any]]:
 #: Cases whose model satisfies a framework's **Precondition** and which carry no
 #: reference set for it yet, with what each one is still missing.
 #:
-#: **Debt, never an exemption.** Every entry is a case the corpus should grade
-#: and does not, so every ASVS number in the suite is computed over less of the
-#: corpus than it could be. The list is meant to reach zero.
+#: **Missing work, never an exemption.** Every entry is a case the corpus
+#: should grade and does not, so every ASVS number in the suite is computed
+#: over less of the corpus than it could be. The list is meant to reach zero.
 #:
 #: These four arrived together when `interface_kind` landed
 #: ([#219](https://github.com/mstarks01/work-agent/issues/219)). Before it, the
@@ -568,8 +568,9 @@ def framework_issues(case_dir: Path, meta: dict, model: SystemModel) -> Iterator
                 )
             continue
         if name not in declared:
-            # Named debt is not silence: the case is listed, what it owes is
-            # written down, and an entry that stops being owed fails below.
+            # A named gap is not silence: the case is listed, what it still
+            # needs is written down, and an entry that no longer applies fails
+            # below.
             if name not in PENDING_REFERENCE_SETS.get(case_dir.name, frozenset()):
                 yield (
                     f"case.json does not declare {name!r}, whose precondition"
@@ -581,8 +582,8 @@ def framework_issues(case_dir: Path, meta: dict, model: SystemModel) -> Iterator
         if name in PENDING_REFERENCE_SETS.get(case_dir.name, frozenset()):
             yield (
                 f"case.json declares {name!r} and PENDING_REFERENCE_SETS still"
-                f" lists {case_dir.name!r} as owing it; the debt is paid, so"
-                " remove the entry"
+                f" lists {case_dir.name!r} as missing it; the reference set"
+                " exists now, so remove the entry"
             )
         if not claims_file(case_dir, name).is_file():
             yield f"case.json declares {name!r}, but {CLAIMS_DIR}/{name}.json is absent"
