@@ -90,7 +90,7 @@ class JudgeConfig(BaseModel):
     the suite measured a new production temperature.
 
     The judge selects a vendor like any tier does; its legitimacy rests on
-    measured agreement against hand labels rather than on sharing a vendor with
+    measured agreement against the recorded labels rather than on sharing a vendor with
     the system under test. Running the build-time gate over ``(vendor, model,
     temperature)`` here is what makes "o-series cannot judge" fail closed
     rather than surprise a sweep: greedy decoding is required, and o-series
@@ -162,7 +162,7 @@ class ClaimPair:
     The two element-ID fields are **not shown to the judge**. They are here for
     the mechanical identity rule in :mod:`evals.harness.identity`, which reads
     the same pair and answers the same question without a model call, so that
-    the two can be measured against one set of hand labels. Feeding them to the
+    the two can be measured against one set of recorded labels. Feeding them to the
     judge would re-baseline every calibration number this repo holds, so
     :func:`claim_payload` builds its payload from the category and the two claim
     strings and nothing else — pinned by a test rather than left to care.

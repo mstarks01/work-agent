@@ -86,8 +86,9 @@ This must report **≥90% agreement**. If it doesn't, the fix is the judge promp
 which is the expensive way to be wrong. Don't tune anything until this passes.
 
 What passing means is narrower than it looks. The labels are agent-authored and
-nobody has reviewed them, so this measures whether the judge reproduces them and
-not whether they are right. See the top of [README.md](README.md).
+a person has read 30 of the 339, so this measures whether the judge reproduces
+them and not whether they are right. And no judge has ever been measured against
+them — this step has never run. See the top of [README.md](README.md).
 
 ### Comparing candidate judges
 

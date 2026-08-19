@@ -21,12 +21,14 @@ that model — is not something you can check for one framework and infer for th
 other. Reviewing them apart is what step 6 forbids.
 
 **The ASVS half carries an extra weight.** Nothing anywhere scores those 17
-records. `evals/harness/run.py` grades the STRIDE block and raises if it is
-absent; there is no applicability confusion matrix in `evals/` at all, which is
-[#200](https://github.com/mstarks01/work-agent/issues/200). So a STRIDE claim at
-least gets exercised by a sweep eventually. An ASVS record is checked for shape
-by `verify_corpus.py` and then read by nothing. **This sitting is the only thing
-that will ever look at them.**
+records. Both blocks are now scored by a sweep:
+`evals/harness/instruments.py` maps `asvs` to `applicability.score_case` in
+`PACKAGE_SCORERS`, which closed
+[#200](https://github.com/mstarks01/work-agent/issues/200), and the ASVS half
+comes back as a confusion matrix over the catalog with no judge in it. So both
+sets get exercised eventually. What no sweep can do is ask whether a set is
+*exhaustive* — a requirement nobody wrote down is one the matrix scores nothing
+for missing. **That question is this sitting's alone.**
 
 ## The one rule
 
