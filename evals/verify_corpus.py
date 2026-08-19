@@ -514,25 +514,19 @@ def declared_options(meta: dict) -> dict[str, Mapping[str, Any]]:
 #: Cases whose model satisfies a framework's **Precondition** and which carry no
 #: reference set for it yet, with what each one is still missing.
 #:
-#: **Missing work, never an exemption.** Every entry is a case the corpus
-#: should grade and does not, so every ASVS number in the suite is computed
-#: over less of the corpus than it could be. The list is meant to reach zero.
+#: **Missing work, never an exemption.** Every entry is a case the corpus should
+#: grade and does not, so every ASVS number in the suite is computed over less of
+#: the corpus than it could be. The list is meant to reach zero, and is there now.
 #:
-#: These four arrived together when `interface_kind` landed
-#: ([#219](https://github.com/mstarks01/work-agent/issues/219)). Before it, the
-#: precondition read a **Data Flow**'s ``protocol`` to answer a question about
-#: what a **Process** presents, so a case whose transport nobody stated was
-#: refused however plainly its prose named a web application. Writing the
-#: reference sets is a reading session over each case's ``source.md``
-#: (`evals/BLESSING.md` step 3), not a mechanical edit, which is why the
-#: mechanism ships with the debt named rather than with 4 agent-authored sets
-#: nobody has read.
-PENDING_REFERENCE_SETS: dict[str, frozenset[str]] = {
-    "06-cookbook-online-game": frozenset({"asvs"}),
-    "08-sso-identity-broker": frozenset({"asvs"}),
-    "11-sparse-shift-scheduling": frozenset({"asvs"}),
-    "12-overclaiming-supplier-portal": frozenset({"asvs"}),
-}
+#: It held four cases between
+#: [#234](https://github.com/mstarks01/work-agent/pull/234), which made the
+#: precondition read what a **Process** presents, and
+#: [#236](https://github.com/mstarks01/work-agent/pull/236), which wrote the four
+#: reference sets. Kept rather than deleted because the next package whose
+#: precondition can refuse will need it the same way: a case that starts
+#: satisfying one and carries no records for it belongs here by name, not in
+#: silence.
+PENDING_REFERENCE_SETS: dict[str, frozenset[str]] = {}
 
 
 def framework_issues(case_dir: Path, meta: dict, model: SystemModel) -> Iterator[str]:
