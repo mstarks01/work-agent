@@ -50,7 +50,7 @@ corpus that broke that rule would grade a shape production refuses.
 exactly as a report's `InputRef` computes it — not a digest of the text.
 
 The judge fixtures live alongside, in `evals/judge_calibration/`:
-`build_pairs.py` holds the hand labels, and `pairs.json` is generated from it.
+`build_pairs.py` holds the labels, and `pairs.json` is generated from it.
 
 Run `python evals/verify_corpus.py` to check everything mechanical about the
 above; it must be green before a case merges. It checks that every declared file
@@ -232,8 +232,9 @@ claim-equivalence judgement and contributes no pair — that is settled design
 In the same sitting, label candidate threat pairs as match / no-match in
 `build_pairs.py`. These are what the **≥90% judge–label agreement bar** scores
 against, and they're what lets the scorer be tested with no live calls at all.
-They are not ground truth: nobody has reviewed them, so the bar says the judge
-reproduces them and says nothing about whether they are right.
+They are not ground truth: a person has read 30 of the 339, in review sitting
+01, so the bar says the judge reproduces what an agent wrote and says almost
+nothing about whether it is right.
 
 - **Label within a category only** — the prefilter means cross-category pairs
   never reach the judge.

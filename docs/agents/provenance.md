@@ -29,6 +29,17 @@ consequence is stated once at the top of `evals/README.md`: every agreement
 figure the suite reports is **self-consistency, not accuracy** — including the
 90% bar.
 
+**#206 fixed the headline claims and missed the vocabulary.** `SME` survived in
+`reference.py`, `scorer.py`, `modes.py` and `evals/prompts/judge_adjudication.md`;
+"hand labels" survived in `judge.py`, `scorer.py`, `BLESSING.md` and
+`judge.toml`; "ground truth" survived in `critic_yield.py` and `scorer.py`.
+Each one re-asserted the reviewer the headline had just retracted. That is the
+second half of the same lesson: a claim retracted in one paragraph stays alive
+in every noun that assumed it, and only a grep for the *vocabulary* finds those.
+The `review` block on `CaseMetadata` and `tests/test_case_review.py` are the
+field-shaped fix — a case is reviewed when it carries the block, and no prose
+can say otherwise.
+
 ## The failure was partial disclosure, not concealment
 
 Worth being precise, because "somebody lied" is the wrong warning to carry

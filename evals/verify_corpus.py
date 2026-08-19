@@ -49,13 +49,13 @@ SOURCE_KINDS = frozenset(get_args(SourceKind))
 CORPUS_DIR = Path(__file__).resolve().parent / "corpus"
 CALIBRATION_PATH = Path(__file__).resolve().parent / "judge_calibration" / "pairs.json"
 
-# Ground truth must be exhaustively enumerable by a human, which is only true
-# of small systems.
+# A reference set must be exhaustively enumerable by a person, which is only
+# true of small systems.
 MIN_ELEMENTS = 8
 MAX_ELEMENTS = 20
 
-# ~100 hand-labelled pairs, and a fixture set that is all matches or all
-# non-matches cannot measure agreement.
+# A floor, not a count: the fixtures hold 339. A set below this, or one that
+# is all matches or all non-matches, cannot measure agreement.
 MIN_CALIBRATION_PAIRS = 100
 MIN_LABEL_SHARE = 0.3
 

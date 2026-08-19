@@ -1,9 +1,11 @@
-"""Assemble the judge-calibration fixtures from hand-labelled tuples.
+"""Assemble the judge-calibration fixtures from the recorded label tuples.
 
 ``LABELS`` is the labelling itself: one tuple per candidate pair, each carrying
-the rationale that argued for it. **Agent-authored and unreviewed** — nobody has
-read these pairs, so they are what the suite scores against rather than ground
-truth, and ``evals/README.md`` states that once for the whole directory. Reference claims are pulled verbatim from each case's
+the rationale that argued for it. **Agent-authored, and a person has read 30 of
+them** — review sitting 01 (``REVIEW-01.md``, 2026-08-18) took the 30 hardest
+pairs and relabelled one. The other 309 are what the suite scores against rather
+than ground truth, and ``evals/README.md`` states that once for the whole
+directory. Reference claims are pulled verbatim from each case's
 ``claims/stride.json`` by index, so a reworded reference cannot silently detach a
 fixture from the claim it was labelled against — ``verify_corpus.py`` fails
 when it does.
@@ -29,10 +31,11 @@ blessed model does this sentence name? The corpus's own conventions apply — a
 flow, process, store or entity, one or two of them, and never a boundary, which
 the reference sets cite once in 431.
 
-**Unreviewed, like every other field here.** ``evals/BLESSING.md`` step 6 is one
-reading session over the labelled pairs, and this field joins what that session
-would read. No case has been through it, so the number this field feeds carries
-the same provenance as the labels it is compared against.
+**Unreviewed, unlike the labels beside it.** Sitting 01 asked whether two
+write-ups are one threat; it never read an element assignment. ``BLESSING.md``
+step 5 is where a session labels these pairs and step 6 is where it blesses a
+case, and no case carries a ``review`` block yet — so the number this field feeds
+carries the provenance the labels carried before sitting 01.
 """
 
 import json

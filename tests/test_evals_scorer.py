@@ -45,7 +45,7 @@ def test_candidate_claim_is_the_title(case):
 
 
 def test_matches_reference_via_recorded_labels(case, labelled_pairs):
-    # The fixtures are the ground truth for the judged half: a produced threat
+    # The fixtures define the expected behaviour for the judged half: a produced threat
     # titled with a labelled candidate claim must land on its reference.
     pair = next(
         pair
