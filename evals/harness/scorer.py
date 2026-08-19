@@ -19,7 +19,7 @@ Mechanical first, judgement only where nothing else will do:
 
 Two things this module deliberately does *not* do. Element agreement is
 **scored, never used as a prefilter**: a correct threat may cite the data flow
-where the SME cited the process at its endpoint, and filtering on it would
+where the reference cited the process at its endpoint, and filtering on it would
 score a hit as a miss. And ``needs-info`` threats are never false positives —
 they are the designed behaviour the third exemplar per category teaches, and
 get their own bucket.
@@ -66,7 +66,7 @@ def candidate_claim(threat: DraftThreat) -> str:
     The ``title``: one scannable line naming the attacker action and its
     target, which is exactly the register a ``ReferenceThreat.claim`` is
     written in. Grading the 4000-character ``description`` instead would grade
-    prose no one asked the model to reproduce, and it is what the hand-labelled
+    prose no one asked the model to reproduce, and it is what the recorded
     calibration fixtures were written against — so the judged task offline and
     the judged task in a live run are the same task. It is defined on the
     *draft* base class for the same reason: a draft and the threat it becomes
@@ -619,8 +619,8 @@ def exemplar_delta(scores: Sequence[CaseScore]) -> dict[str, float]:
 def unlisted_for_promotion(scores: Sequence[CaseScore]) -> list[dict[str, Any]]:
     """The corpus feedback loop.
 
-    Grounded threats the reference set does not carry, surfaced for SME review
-    and promotion at the next blessing pass. Non-exhaustive ground truth
+    Grounded threats the reference set does not carry, surfaced for review and
+    promotion at the next blessing pass. A non-exhaustive reference set
     converges from real output; it never converges from someone trying to be
     exhaustive up front.
     """

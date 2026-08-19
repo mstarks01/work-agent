@@ -52,7 +52,7 @@ from evals.harness.scorer import CaseScore, candidate_claim, ratio, score_case
 from stride_service.frameworks.stride.record import DraftThreat, StrideCategory
 
 # What one produced threat turned out to be, in the pass that scored it. The
-# first two are hits against ground truth, the last four are the ways of
+# first two are hits against the reference set, the last four are the ways of
 # missing it; ``needs-info`` is post-critic only, since it is a verdict.
 Disposition = Literal[
     "matched-must-find",

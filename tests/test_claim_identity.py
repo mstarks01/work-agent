@@ -7,8 +7,8 @@ already on the record — the lane, the affected **Element** IDs and the
 **Grounds** — and only ``mechanism`` would be new.
 
 This measures what those existing parts are worth, in the one direction the
-corpus can answer. A blessed reference set is a set of claims a reviewer ruled
-**distinct**, so two of them sharing an identity key is the key merging findings
+corpus can answer. A blessed reference set is a set of claims their author
+recorded as **distinct**, so two of them sharing an identity key is the key merging findings
 that are not the same finding. That is a false merge, and it is the failure that
 would make mechanical identity unusable: a deduplicator that drops a real
 threat is worse than one that reports a paraphrase twice.

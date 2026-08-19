@@ -481,7 +481,7 @@ async def run_analysis(case: GoldenCase, pipeline: Pipeline) -> AnalysisRun:
     """Mode 2: the blessed model injected at ``prepare``.
 
     The seeded ``valid_model`` is the blessed one, so the category agents see exactly
-    what the SME blessed and nothing depends on that run's extraction.
+    what the corpus blessed and nothing depends on that run's extraction.
     """
     graph_run = await run_graph(
         pipeline,

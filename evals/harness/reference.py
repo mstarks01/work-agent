@@ -79,7 +79,7 @@ class CorpusError(ValueError):
 
 
 class ReferenceSeverity(BaseModel):
-    """The SME's severity for a reference threat: the two rated axes only.
+    """The recorded severity for a reference threat: the two rated axes only.
 
     The band is derived by the shipped matrix exactly as production derives
     it, so severity calibration compares like with like and needs no judge.
@@ -116,7 +116,7 @@ class ReferenceClaim(BaseModel):
     claim: str = Field(min_length=1, max_length=500)
     tier: Tier
     affected_element_ids: tuple[str, ...] = ()
-    notes: str = ""  # SME rationale, never scored
+    notes: str = ""  # the author's rationale, never scored
 
     @property
     def must_find(self) -> bool:

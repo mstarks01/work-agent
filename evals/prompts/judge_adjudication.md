@@ -51,5 +51,5 @@ Return JSON with exactly two fields:
 - `bucket` — `unsupported`, `valid-unlisted`, or `noise`.
 - `rationale` — one sentence. For `unsupported`, name the exact unsupported
   fact and what the model says instead; for `noise`, name the claim it
-  duplicates. This is read by humans auditing the run and by the SME deciding
-  what to promote into the reference set.
+  duplicates. This is read by whoever audits the run and runs the next blessing
+  pass, deciding what to promote into the reference set.

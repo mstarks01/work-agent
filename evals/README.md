@@ -6,15 +6,33 @@ two threats describe the same thing.
 
 ## Read this before you quote a number
 
-**No human has reviewed anything in this directory.** Every golden case, every
-reference claim and every one of the judge-calibration labels was written by an
-agent. `BLESSING.md` describes a human reading session that has never taken
-place, and no `corrections.md` records a correction a person made.
+**An agent wrote all of it, and a person has read 30 of the 339 judge labels.**
+Every golden case, every reference claim and every calibration label was written
+by an agent. One review sitting has happened:
+[`judge_calibration/REVIEW-01.md`](judge_calibration/REVIEW-01.md), on
+2026-08-18, over the 30 hardest pairs. It answered 25 `same`, 1 `different` and 4
+`unclear`, and it changed two things — a wrong label, and a reference claim in
+case 04 that asserted a fact its own model does not hold.
+
+**No case has been through `BLESSING.md` step 6.** That is the reading session
+over a case's source, model and reference sets together, and it is what would
+catch the case-04 defect anywhere else. A case that has had one carries a
+`review` block in its `case.json`; none of the 13 does.
+`tests/test_case_review.py` names every one as debt and fails a new case that
+arrives without a block.
 
 So every agreement figure the suite produces is **self-consistency, not
 accuracy**: it measures how closely one model reproduces what an earlier agent
 wrote down. That includes the 90% bar. A judge at 95% agrees with an agent's
-opinions 95% of the time, and nothing here says those opinions are right.
+opinions 95% of the time, and sitting 01 is the only evidence anywhere that any
+of those opinions are right.
+
+**The 90% bar has never executed.** No judge has ever been measured against
+these labels — see
+[ADR 0003](../docs/adr/0003-no-privileged-vendor.md#test-and-evaluation-bias--partly-fixed-partly-open),
+which records the measurement system's own vendor dependence as open. So the
+figures the rest of this file describes are what the harness *would* report; no
+run has produced them.
 
 Why it drifted, and the rule taken from it, are in
 [docs/agents/provenance.md](../docs/agents/provenance.md): `bootstrap` on
@@ -71,7 +89,7 @@ evals/
 | `harness/grounds.py` | What the category agents did with `grounds` — the branch mix, the padding number and the unverified-quote rate — plus the two failures the grounding path kills a case with. Judge-free. |
 | `harness/coverage.py` | What each category agent was offered and how much of it its drafts cite, pooled over the sweep. Judge-free. |
 | `harness/stability.py` | Run-to-run stability: which references two or more finished sweeps agree on. Judge-free, and reads artifacts rather than re-running. |
-| `harness/calibration.py` | Judge-vs-human agreement over the labelled fixtures. |
+| `harness/calibration.py` | Judge-vs-label agreement over the labelled fixtures. |
 | `harness/provenance.py` | What each node execution actually ran on — tier, requested route, served build, fingerprint — written into the artifact and read back by a promotion. |
 | `harness/certify.py` | Promoting a winning configuration: rewrites `config/sampling.toml` and records its fingerprints as blessed. The certification check itself lives in the service (`stride_service.certification`), which this imports. |
 | `harness/modes.py` | The three run modes over the shipped graph, and the extraction score: element agreement, the derived crossings, and the attributes a Candidate rule reads. Judge-free. |
