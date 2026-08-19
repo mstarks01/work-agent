@@ -363,6 +363,7 @@ class StubPipelineRunner:
                     technology="unknown",
                     trust_zone="boundary:system",
                     exposure="unknown",
+                    interface_kind="non-web",
                 )
             ],
             trust_boundaries=[

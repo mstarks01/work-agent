@@ -4,7 +4,9 @@
       "id": "entity:supplier",
       "name": "supplier",
       "description": "A supplier who uploads their own compliance paperwork.",
-      "assets": ["pii"],
+      "assets": [
+        "pii"
+      ],
       "source_excerpt": "Suppliers upload their compliance paperwork through a portal",
       "source_label": "System description",
       "kind": "human",
@@ -36,24 +38,30 @@
       "id": "process:supplier-portal",
       "name": "supplier portal",
       "description": "Vendor-hosted SaaS product suppliers upload to and category managers review in.",
-      "assets": ["pii"],
+      "assets": [
+        "pii"
+      ],
       "source_excerpt": "The portal is a SaaS product.",
       "source_label": "System description",
       "technology": "unknown",
-      "notes": "The datasheet's phrases — secure by design, enterprise-grade encryption throughout, fully authenticated and audited, fully compliant — name no technology and state no verifiable control, so none of them set an attribute here.",
+      "notes": "The datasheet's phrases \u2014 secure by design, enterprise-grade encryption throughout, fully authenticated and audited, fully compliant \u2014 name no technology and state no verifiable control, so none of them set an attribute here.",
       "trust_zone": "boundary:vendor-platform",
-      "exposure": "internet-facing"
+      "exposure": "internet-facing",
+      "interface_kind": "web"
     },
     {
       "id": "process:supplier-master-service",
       "name": "supplier master service",
       "description": "Loads the nightly extract from the landing bucket and writes supplier records.",
-      "assets": ["business-critical-data"],
+      "assets": [
+        "business-critical-data"
+      ],
       "source_excerpt": "Our supplier master service loads that file and writes the records into the supplier database.",
       "source_label": "System description",
       "technology": "unknown",
       "trust_zone": "boundary:cloud-account",
-      "exposure": "internal"
+      "exposure": "internal",
+      "interface_kind": "non-web"
     }
   ],
   "data_stores": [
@@ -61,7 +69,10 @@
       "id": "store:document-store",
       "name": "document store",
       "description": "Where the uploaded compliance documents rest, inside the vendor's platform.",
-      "assets": ["pii", "business-critical-data"],
+      "assets": [
+        "pii",
+        "business-critical-data"
+      ],
       "source_excerpt": "The documents themselves stay in the vendor's platform.",
       "source_label": "System description",
       "technology": "unknown",
@@ -74,7 +85,10 @@
       "id": "store:landing-bucket",
       "name": "landing bucket",
       "description": "Bucket in our cloud account the vendor pushes the nightly extract into.",
-      "assets": ["pii", "business-critical-data"],
+      "assets": [
+        "pii",
+        "business-critical-data"
+      ],
       "source_excerpt": "Every night the vendor pushes a supplier data extract to a landing bucket in our cloud account.",
       "source_label": "System description",
       "technology": "unknown",
@@ -86,7 +100,10 @@
       "id": "store:supplier-database",
       "name": "supplier database",
       "description": "Holds the supplier records loaded from the nightly extract.",
-      "assets": ["pii", "business-critical-data"],
+      "assets": [
+        "pii",
+        "business-critical-data"
+      ],
       "source_excerpt": "writes the records into the supplier database",
       "source_label": "System description",
       "technology": "unknown",
@@ -100,7 +117,10 @@
       "id": "flow:supplier-to-supplier-portal:upload-documents",
       "name": "upload documents",
       "description": "Supplier uploads compliance paperwork to the portal.",
-      "assets": ["pii", "business-critical-data"],
+      "assets": [
+        "pii",
+        "business-critical-data"
+      ],
       "source_excerpt": "Suppliers upload their compliance paperwork through a portal",
       "source_label": "System description",
       "source": "entity:supplier",
@@ -114,7 +134,10 @@
       "id": "flow:category-manager-to-supplier-portal:review-documents",
       "name": "review documents",
       "description": "Category manager reviews uploaded paperwork and records an approval or rejection.",
-      "assets": ["pii", "business-critical-data"],
+      "assets": [
+        "pii",
+        "business-critical-data"
+      ],
       "source_excerpt": "review what has been uploaded and approve or reject it",
       "source_label": "System description",
       "source": "entity:category-manager",
@@ -129,7 +152,10 @@
       "id": "flow:supplier-portal-to-document-store:store-documents",
       "name": "store documents",
       "description": "The portal puts uploaded documents into the vendor platform's store.",
-      "assets": ["pii", "business-critical-data"],
+      "assets": [
+        "pii",
+        "business-critical-data"
+      ],
       "source_excerpt": "The documents themselves stay in the vendor's platform.",
       "source_label": "System description",
       "source": "process:supplier-portal",
@@ -143,7 +169,10 @@
       "id": "flow:portal-vendor-to-landing-bucket:push-nightly-extract",
       "name": "push nightly extract",
       "description": "The vendor initiates a nightly push of the supplier data extract into our bucket.",
-      "assets": ["pii", "business-critical-data"],
+      "assets": [
+        "pii",
+        "business-critical-data"
+      ],
       "source_excerpt": "Every night the vendor pushes a supplier data extract to a landing bucket in our cloud account.",
       "source_label": "System description",
       "source": "entity:portal-vendor",
@@ -158,7 +187,10 @@
       "id": "flow:supplier-master-service-to-landing-bucket:load-extract",
       "name": "load extract",
       "description": "The supplier master service picks the extract file up from the bucket as-is.",
-      "assets": ["pii", "business-critical-data"],
+      "assets": [
+        "pii",
+        "business-critical-data"
+      ],
       "source_excerpt": "the file arrives as a plain CSV and is picked up as-is",
       "source_label": "System description",
       "source": "process:supplier-master-service",
@@ -172,7 +204,10 @@
       "id": "flow:supplier-master-service-to-supplier-database:write-supplier-records",
       "name": "write supplier records",
       "description": "The service writes the loaded records into the supplier database.",
-      "assets": ["pii", "business-critical-data"],
+      "assets": [
+        "pii",
+        "business-critical-data"
+      ],
       "source_excerpt": "writes the records into the supplier database",
       "source_label": "System description",
       "source": "process:supplier-master-service",

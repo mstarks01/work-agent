@@ -247,6 +247,7 @@ def valid_model(source_label: str = DEFAULT_DESCRIPTION_LABEL) -> SystemModel:
                 technology="Python/FastAPI on Cloud Run",
                 trust_zone="boundary:internal-network",
                 exposure="internet-facing",
+                interface_kind="web",
                 source_excerpt="the web app runs on Cloud Run",
                 source_label=source_label,
             )

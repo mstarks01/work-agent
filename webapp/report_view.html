@@ -583,7 +583,7 @@
     "external-entity": e => [
       `kind: ${e.kind}` + (e.assets.length ? ` · assets: ${e.assets.join(", ")}` : ""),
     ],
-    "process": e => [`${e.technology} · exposure: ${e.exposure}`],
+    "process": e => [`${e.technology} · exposure: ${e.exposure} · presents: ${e.interface_kind}`],
     "data-store": e => [
       `${e.technology} · ${e.data_classification} · at rest: `, mark(e.encryption_at_rest),
     ],

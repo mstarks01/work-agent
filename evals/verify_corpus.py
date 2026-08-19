@@ -511,6 +511,30 @@ def declared_options(meta: dict) -> dict[str, Mapping[str, Any]]:
     }
 
 
+#: Cases whose model satisfies a framework's **Precondition** and which carry no
+#: reference set for it yet, with what each one is still missing.
+#:
+#: **Debt, never an exemption.** Every entry is a case the corpus should grade
+#: and does not, so every ASVS number in the suite is computed over less of the
+#: corpus than it could be. The list is meant to reach zero.
+#:
+#: These four arrived together when `interface_kind` landed
+#: ([#219](https://github.com/mstarks01/work-agent/issues/219)). Before it, the
+#: precondition read a **Data Flow**'s ``protocol`` to answer a question about
+#: what a **Process** presents, so a case whose transport nobody stated was
+#: refused however plainly its prose named a web application. Writing the
+#: reference sets is a reading session over each case's ``source.md``
+#: (`evals/BLESSING.md` step 3), not a mechanical edit, which is why the
+#: mechanism ships with the debt named rather than with 4 agent-authored sets
+#: nobody has read.
+PENDING_REFERENCE_SETS: dict[str, frozenset[str]] = {
+    "06-cookbook-online-game": frozenset({"asvs"}),
+    "08-sso-identity-broker": frozenset({"asvs"}),
+    "11-sparse-shift-scheduling": frozenset({"asvs"}),
+    "12-overclaiming-supplier-portal": frozenset({"asvs"}),
+}
+
+
 def framework_issues(case_dir: Path, meta: dict, model: SystemModel) -> Iterator[str]:
     """The per-case half of the merge bar: two of #167's three checks.
 
@@ -544,12 +568,22 @@ def framework_issues(case_dir: Path, meta: dict, model: SystemModel) -> Iterator
                 )
             continue
         if name not in declared:
-            yield (
-                f"case.json does not declare {name!r}, whose precondition"
-                " satisfies this case; every framework a case runs must carry a"
-                " reference set"
-            )
+            # Named debt is not silence: the case is listed, what it owes is
+            # written down, and an entry that stops being owed fails below.
+            if name not in PENDING_REFERENCE_SETS.get(case_dir.name, frozenset()):
+                yield (
+                    f"case.json does not declare {name!r}, whose precondition"
+                    " satisfies this case; every framework a case runs must carry"
+                    " a reference set. If it is not being written now, add it to"
+                    " PENDING_REFERENCE_SETS with what the case is missing"
+                )
             continue
+        if name in PENDING_REFERENCE_SETS.get(case_dir.name, frozenset()):
+            yield (
+                f"case.json declares {name!r} and PENDING_REFERENCE_SETS still"
+                f" lists {case_dir.name!r} as owing it; the debt is paid, so"
+                " remove the entry"
+            )
         if not claims_file(case_dir, name).is_file():
             yield f"case.json declares {name!r}, but {CLAIMS_DIR}/{name}.json is absent"
 

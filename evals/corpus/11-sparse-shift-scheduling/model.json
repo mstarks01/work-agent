@@ -4,7 +4,9 @@
       "id": "entity:colleague",
       "name": "colleague",
       "description": "A store colleague who looks at the shifts they have been given.",
-      "assets": ["pii"],
+      "assets": [
+        "pii"
+      ],
       "source_excerpt": "Colleagues use the same app to look at the shifts they have been given. Colleagues reach the app from their own phones.",
       "source_label": "System description",
       "kind": "human",
@@ -36,23 +38,30 @@
       "id": "process:scheduling-web-app",
       "name": "scheduling web app",
       "description": "The app both managers and colleagues use; holds no rota data of its own.",
-      "assets": ["pii"],
+      "assets": [
+        "pii"
+      ],
       "source_excerpt": "Store managers use a scheduling web app to build the weekly rota for their store.",
       "source_label": "System description",
       "technology": "unknown",
       "trust_zone": "boundary:internal-network",
-      "exposure": "internet-facing"
+      "exposure": "internet-facing",
+      "interface_kind": "web"
     },
     {
       "id": "process:scheduling-service",
       "name": "scheduling service",
       "description": "Reads and writes the rotas and produces the weekly payroll export.",
-      "assets": ["pii", "business-critical-data"],
+      "assets": [
+        "pii",
+        "business-critical-data"
+      ],
       "source_excerpt": "The scheduling service is what actually reads and writes the rotas",
       "source_label": "System description",
       "technology": "unknown",
       "trust_zone": "boundary:internal-network",
-      "exposure": "internal"
+      "exposure": "internal",
+      "interface_kind": "unknown"
     }
   ],
   "data_stores": [
@@ -60,7 +69,10 @@
       "id": "store:rota-database",
       "name": "rota database",
       "description": "Holds the rotas, and colleague names, contact details and stated availability.",
-      "assets": ["pii", "business-critical-data"],
+      "assets": [
+        "pii",
+        "business-critical-data"
+      ],
       "source_excerpt": "Colleague names, contact details and stated availability are held in that database.",
       "source_label": "System description",
       "technology": "unknown",
@@ -72,7 +84,9 @@
       "id": "store:file-share",
       "name": "file share",
       "description": "Where the weekly payroll export is written and left for the payroll system to collect.",
-      "assets": ["pii"],
+      "assets": [
+        "pii"
+      ],
       "source_excerpt": "Once a week the scheduling service writes a payroll export onto a file share.",
       "source_label": "System description",
       "technology": "unknown",
@@ -86,7 +100,9 @@
       "id": "flow:colleague-to-scheduling-web-app:view-shifts",
       "name": "view shifts",
       "description": "Colleague opens the app to see their own shifts; the response rides the same interaction.",
-      "assets": ["pii"],
+      "assets": [
+        "pii"
+      ],
       "source_excerpt": "Colleagues use the same app to look at the shifts they have been given.",
       "source_label": "System description",
       "source": "entity:colleague",
@@ -100,7 +116,10 @@
       "id": "flow:store-manager-to-scheduling-web-app:build-rota",
       "name": "build rota",
       "description": "Manager builds and changes the weekly rota for their store.",
-      "assets": ["pii", "business-critical-data"],
+      "assets": [
+        "pii",
+        "business-critical-data"
+      ],
       "source_excerpt": "Store managers use a scheduling web app to build the weekly rota for their store.",
       "source_label": "System description",
       "source": "entity:store-manager",
@@ -114,7 +133,10 @@
       "id": "flow:scheduling-web-app-to-scheduling-service:rota-requests",
       "name": "rota requests",
       "description": "The app asks the service for rota reads and writes.",
-      "assets": ["pii", "business-critical-data"],
+      "assets": [
+        "pii",
+        "business-critical-data"
+      ],
       "source_excerpt": "The web app talks to a scheduling service.",
       "source_label": "System description",
       "source": "process:scheduling-web-app",
@@ -128,7 +150,10 @@
       "id": "flow:scheduling-service-to-rota-database:read-write-rotas",
       "name": "read write rotas",
       "description": "The service reads and writes rotas and colleague details.",
-      "assets": ["pii", "business-critical-data"],
+      "assets": [
+        "pii",
+        "business-critical-data"
+      ],
       "source_excerpt": "The scheduling service is what actually reads and writes the rotas, which live in a rota database.",
       "source_label": "System description",
       "source": "process:scheduling-service",
@@ -142,7 +167,9 @@
       "id": "flow:scheduling-service-to-file-share:write-payroll-export",
       "name": "write payroll export",
       "description": "The service writes the weekly payroll export to the share.",
-      "assets": ["pii"],
+      "assets": [
+        "pii"
+      ],
       "source_excerpt": "Once a week the scheduling service writes a payroll export onto a file share.",
       "source_label": "System description",
       "source": "process:scheduling-service",
@@ -156,7 +183,9 @@
       "id": "flow:payroll-system-to-file-share:collect-payroll-export",
       "name": "collect payroll export",
       "description": "The payroll system initiates the collection of the export from the share.",
-      "assets": ["pii"],
+      "assets": [
+        "pii"
+      ],
       "source_excerpt": "The payroll system, which is run by another team, collects the export from the file share.",
       "source_label": "System description",
       "source": "entity:payroll-system",

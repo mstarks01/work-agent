@@ -14,7 +14,9 @@
       "id": "entity:scheduling-partner",
       "name": "scheduling partner",
       "description": "Another company that publishes tomorrow's planned work as a SOAP feed.",
-      "assets": ["business-critical-data"],
+      "assets": [
+        "business-critical-data"
+      ],
       "source_excerpt": "A scheduling partner, which is another company, publishes tomorrow's planned work.",
       "source_label": "System description",
       "kind": "external-system",
@@ -26,34 +28,45 @@
       "id": "process:dispatch-console",
       "name": "dispatch console",
       "description": "Single-page JavaScript app the engineer opens in a browser; the corporate web host serves it, and it calls the dispatch API from a different origin.",
-      "assets": ["business-critical-data"],
+      "assets": [
+        "business-critical-data"
+      ],
       "source_excerpt": "The console is a single-page JavaScript app and our corporate web host serves it.",
       "source_label": "System description",
       "technology": "single-page JavaScript app in the browser",
       "trust_zone": "boundary:corporate-network",
-      "exposure": "unknown"
+      "exposure": "unknown",
+      "interface_kind": "web"
     },
     {
       "id": "process:dispatch-api",
       "name": "dispatch API",
       "description": "Runs in the production control plane; moves crews, changes a depot's work for the day, and reads and writes the dispatch database.",
-      "assets": ["pii", "business-critical-data"],
+      "assets": [
+        "pii",
+        "business-critical-data"
+      ],
       "source_excerpt": "The console calls the dispatch API. The dispatch API runs in the production control plane.",
       "source_label": "System description",
       "technology": "unknown",
       "trust_zone": "boundary:production-control-plane",
-      "exposure": "internal"
+      "exposure": "internal",
+      "interface_kind": "web"
     },
     {
       "id": "process:schedule-importer",
       "name": "schedule importer",
       "description": "Runs on the corporate network; every hour it pulls the partner's feed, parses it, archives the document, and posts the parsed work orders to the dispatch API.",
-      "assets": ["business-critical-data", "credentials"],
+      "assets": [
+        "business-critical-data",
+        "credentials"
+      ],
       "source_excerpt": "Every hour it pulls the partner's SOAP feed over HTTPS and parses the XML document it gets back.",
       "source_label": "System description",
       "technology": "parses the partner's SOAP feed as an XML document; no product named",
       "trust_zone": "boundary:corporate-network",
-      "exposure": "unknown"
+      "exposure": "unknown",
+      "interface_kind": "non-web"
     }
   ],
   "data_stores": [
@@ -61,7 +74,10 @@
       "id": "store:dispatch-database",
       "name": "dispatch database",
       "description": "Holds the job orders, the crew names and the crew mobile numbers. Each job order carries the token or session that created it and nothing about the person behind it.",
-      "assets": ["pii", "business-critical-data"],
+      "assets": [
+        "pii",
+        "business-critical-data"
+      ],
       "source_excerpt": "That database holds the job orders, the crew names and the crew mobile numbers.",
       "source_label": "System description",
       "technology": "unknown",
@@ -74,7 +90,9 @@
       "id": "store:schedule-archive",
       "name": "schedule archive",
       "description": "Folder on the corporate file store holding every XML document the importer downloads.",
-      "assets": ["business-critical-data"],
+      "assets": [
+        "business-critical-data"
+      ],
       "source_excerpt": "It writes each document it downloads into the schedule archive, a folder on the corporate file store.",
       "source_label": "System description",
       "technology": "folder on the corporate file store",
@@ -88,7 +106,9 @@
       "id": "flow:duty-engineer-to-dispatch-console:open-console",
       "name": "open console",
       "description": "The engineer opens the console in their browser and signs in to it.",
-      "assets": ["credentials"],
+      "assets": [
+        "credentials"
+      ],
       "source_excerpt": "They open the dispatch console in their browser.",
       "source_label": "System description",
       "source": "entity:duty-engineer",
@@ -103,7 +123,9 @@
       "id": "flow:dispatch-console-to-dispatch-api:dispatch-requests",
       "name": "dispatch requests",
       "description": "The console calls the dispatch API cross-origin, because the two are served from different origins; which origins the API allows, and whether it allows credentials, is not recorded.",
-      "assets": ["business-critical-data"],
+      "assets": [
+        "business-critical-data"
+      ],
       "source_excerpt": "The console and the API are served from different origins, so the API answers the console cross-origin.",
       "source_label": "System description",
       "source": "process:dispatch-console",
@@ -117,7 +139,9 @@
       "id": "flow:dispatch-console-to-dispatch-api:live-job-status",
       "name": "live job status",
       "description": "The console opens a WebSocket to the dispatch API and holds it open for live job status.",
-      "assets": ["business-critical-data"],
+      "assets": [
+        "business-critical-data"
+      ],
       "source_excerpt": "The console also opens a WebSocket to the dispatch API and holds it open for live job status.",
       "source_label": "System description",
       "source": "process:dispatch-console",
@@ -132,7 +156,9 @@
       "id": "flow:schedule-importer-to-scheduling-partner:pull-schedule-feed",
       "name": "pull schedule feed",
       "description": "The importer pulls the partner's SOAP feed every hour and parses the XML document it gets back.",
-      "assets": ["business-critical-data"],
+      "assets": [
+        "business-critical-data"
+      ],
       "source_excerpt": "Every hour it pulls the partner's SOAP feed over HTTPS and parses the XML document it gets back.",
       "source_label": "System description",
       "source": "process:schedule-importer",
@@ -147,7 +173,9 @@
       "id": "flow:schedule-importer-to-schedule-archive:store-schedule-documents",
       "name": "store schedule documents",
       "description": "The importer writes each downloaded XML document into the archive folder.",
-      "assets": ["business-critical-data"],
+      "assets": [
+        "business-critical-data"
+      ],
       "source_excerpt": "It writes each document it downloads into the schedule archive, a folder on the corporate file store.",
       "source_label": "System description",
       "source": "process:schedule-importer",
@@ -161,7 +189,10 @@
       "id": "flow:schedule-importer-to-dispatch-api:post-work-orders",
       "name": "post work orders",
       "description": "The importer posts the parsed work orders to the same dispatch API the console calls.",
-      "assets": ["business-critical-data", "credentials"],
+      "assets": [
+        "business-critical-data",
+        "credentials"
+      ],
       "source_excerpt": "The importer then posts the parsed work orders to the same dispatch API the console calls. It presents an API token.",
       "source_label": "System description",
       "source": "process:schedule-importer",
@@ -175,7 +206,10 @@
       "id": "flow:dispatch-api-to-dispatch-database:read-write-job-orders",
       "name": "read write job orders",
       "description": "The API reads and writes the job orders and the crew details behind them.",
-      "assets": ["pii", "business-critical-data"],
+      "assets": [
+        "pii",
+        "business-critical-data"
+      ],
       "source_excerpt": "The dispatch API reads and writes the dispatch database.",
       "source_label": "System description",
       "source": "process:dispatch-api",
@@ -200,7 +234,9 @@
       "id": "boundary:production-control-plane",
       "name": "production control plane",
       "description": "Same company and same staff as the corporate network, and it holds the live estate: an account here can move a crew and change a depot's work for the day. Not reachable from the internet.",
-      "assets": ["business-critical-data"],
+      "assets": [
+        "business-critical-data"
+      ],
       "source_excerpt": "The control plane is the same company and the same staff, but it is the zone that holds the live estate: an account there can move a crew, and it can change the work a depot does that day. A corporate laptop holds none of those rights.",
       "source_label": "System description",
       "kind": "privilege"

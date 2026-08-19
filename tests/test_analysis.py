@@ -69,6 +69,7 @@ def chain():
                 technology="nginx",
                 trust_zone="boundary:dmz",
                 exposure="internet-facing",
+                interface_kind="web",
             ),
             Process(
                 id="process:worker",
@@ -76,6 +77,7 @@ def chain():
                 technology="python",
                 trust_zone="boundary:core",
                 exposure="internal",
+                interface_kind="non-web",
             ),
         ],
         data_stores=[
@@ -160,6 +162,7 @@ class TestTraversal:
                     technology="x",
                     trust_zone="boundary:z",
                     exposure="internal",
+                    interface_kind="non-web",
                 )
                 for name in ("a", "b")
             ],
@@ -212,6 +215,7 @@ class TestStructuralFacts:
             technology="x",
             trust_zone="boundary:z",
             exposure="internal",
+            interface_kind="non-web",
             assets=["pii", "availability-critical", "reputation"],
         )
         assert sensitive_assets(element) == ("pii",)
