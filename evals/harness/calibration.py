@@ -5,12 +5,17 @@ no-match, and judge-label agreement must be **>= 90%** (comparator: Semgrep's
 92-96% on an analogous triage task). Failing the bar means the judge prompt needs
 work, not ship-anyway.
 
-**The labels are agent-authored and nobody has reviewed them.** So this measures
-whether the judge reproduces what an earlier agent wrote down, and not whether
-either is right; the comparator above is a figure from a task with real reviewer
-agreement, and this number is not comparable to it. ``evals/README.md`` states
-the provenance once for the whole directory. Everything below says "the labels"
-rather than "the human" for that reason.
+**The labels are agent-authored, and a person has read 30 of the 339.** Review
+sitting 01 (``evals/judge_calibration/REVIEW-01.md``, 2026-08-18) took the 30
+hardest pairs and relabelled one. So this measures whether the judge reproduces
+what an earlier agent wrote down, and not whether either is right; the comparator
+above is a figure from a task with full reviewer agreement, and this number is
+not comparable to it. ``evals/README.md`` states the provenance once for the
+whole directory. Everything below says "the labels" rather than "the human" for
+that reason.
+
+**No judge has ever been measured against them.** The bar below is what this
+module would enforce; ADR 0003 records that the check has never run.
 
 This is what makes a judge change a real gate rather than a dependency bump:
 re-run it on any change to ``evals/config/judge.toml``, because a new judge
