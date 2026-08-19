@@ -1,0 +1,69 @@
+[
+  {
+    "chapter": "encoding-and-sanitization",
+    "requirement": "V1.2.4",
+    "affected_element_ids": [
+      "process:moderation-website",
+      "store:player-database",
+      "flow:moderation-website-to-player-database:read-write-players"
+    ],
+    "claim": "The moderation website reads and writes the player database directly and nothing says how its queries are built.",
+    "tier": "must-find",
+    "notes": "A process reaching a store is the fact that makes the requirement apply; the input settles nothing about query construction."
+  },
+  {
+    "chapter": "validation-and-business-logic",
+    "requirement": "V2.2.2",
+    "affected_element_ids": [
+      "entity:customer-support",
+      "process:moderation-website"
+    ],
+    "claim": "Nothing says which side validates the moderation actions support staff take on player accounts.",
+    "tier": "expected",
+    "notes": "The website acts on accounts on a reviewer's behalf, so the trusted-service-layer rule applies. Weaker than the store record because no interface detail is stated."
+  },
+  {
+    "chapter": "web-frontend-security",
+    "requirement": "V3.3.1",
+    "affected_element_ids": [
+      "entity:customer-support",
+      "process:moderation-website",
+      "flow:customer-support-to-moderation-website:moderate-accounts"
+    ],
+    "claim": "The moderation website is browser-delivered and no cookie attribute is stated.",
+    "tier": "expected",
+    "notes": "`interface_kind: web` puts this system in the chapter. Expected rather than must-find because the source names no session mechanism at all."
+  },
+  {
+    "chapter": "authentication",
+    "requirement": "V6.1.1",
+    "affected_element_ids": [
+      "process:moderation-website"
+    ],
+    "claim": "No documentation defines rate limiting or anti-automation for the moderation website.",
+    "tier": "expected",
+    "notes": "A documentation requirement: the subject sits outside the running system, so needs-info by construction."
+  },
+  {
+    "chapter": "authorization",
+    "requirement": "V8.1.1",
+    "affected_element_ids": [
+      "process:moderation-website"
+    ],
+    "claim": "No authorization documentation defines which support staff may act on which player accounts.",
+    "tier": "expected",
+    "notes": "Documentation requirement, as V6.1.1."
+  },
+  {
+    "chapter": "authorization",
+    "requirement": "V8.2.2",
+    "affected_element_ids": [
+      "entity:customer-support",
+      "process:moderation-website",
+      "store:player-database"
+    ],
+    "claim": "Support staff act on player accounts and nothing restricts which accounts a given member of staff may reach.",
+    "tier": "must-find",
+    "notes": "Data-specific access over a store holding every player. The source says the diagram records no authentication on any link, so nothing settles it."
+  }
+]

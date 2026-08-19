@@ -1,0 +1,115 @@
+[
+  {
+    "chapter": "encoding-and-sanitization",
+    "requirement": "V1.2.4",
+    "affected_element_ids": [
+      "process:supplier-master-service",
+      "store:supplier-database",
+      "flow:supplier-master-service-to-supplier-database:write-supplier-records"
+    ],
+    "claim": "The supplier master service writes records from a vendor CSV into the supplier database and nothing says how those writes are built.",
+    "tier": "must-find",
+    "notes": "The runbook states the file arrives as plain CSV and is picked up as-is, which is the fact that makes an untrusted-input path concrete."
+  },
+  {
+    "chapter": "file-handling",
+    "requirement": "V5.2.1",
+    "affected_element_ids": [
+      "process:supplier-portal",
+      "store:document-store"
+    ],
+    "claim": "Suppliers upload compliance documents and nothing states a size the portal will accept.",
+    "tier": "expected",
+    "notes": "Upload is stated; the limit is not."
+  },
+  {
+    "chapter": "file-handling",
+    "requirement": "V5.2.2",
+    "affected_element_ids": [
+      "entity:supplier",
+      "process:supplier-portal",
+      "flow:supplier-to-supplier-portal:upload-documents"
+    ],
+    "claim": "Suppliers upload insurance certificates and audit documents and nothing says the portal checks the file against an expected type.",
+    "tier": "must-find",
+    "notes": "An upload from outside the organization is the trigger. The vendor datasheet asserts the platform is secure by design, which is a claim rather than a stated control."
+  },
+  {
+    "chapter": "authentication",
+    "requirement": "V6.1.1",
+    "affected_element_ids": [
+      "process:supplier-portal"
+    ],
+    "claim": "No documentation defines rate limiting or anti-automation on the supplier sign-in.",
+    "tier": "expected",
+    "notes": "Documentation requirement. The datasheet's 'fully authenticated' is not a control the input states."
+  },
+  {
+    "chapter": "authentication",
+    "requirement": "V6.2.1",
+    "affected_element_ids": [
+      "entity:supplier",
+      "process:supplier-portal"
+    ],
+    "claim": "Suppliers sign in with a password and no minimum length is stated.",
+    "tier": "expected",
+    "notes": "Password authentication is stated outright, so the chapter applies; the parameter is what nothing settles."
+  },
+  {
+    "chapter": "authentication",
+    "requirement": "V6.4.1",
+    "affected_element_ids": [
+      "entity:supplier",
+      "entity:portal-vendor",
+      "process:supplier-portal"
+    ],
+    "claim": "The vendor issues each supplier a username and password, and nothing says the initial credential is randomly generated or expires.",
+    "tier": "must-find",
+    "notes": "A stated issued credential is exactly this requirement's subject, and the party issuing it is outside the organization."
+  },
+  {
+    "chapter": "authorization",
+    "requirement": "V8.2.2",
+    "affected_element_ids": [
+      "entity:supplier",
+      "process:supplier-portal",
+      "store:document-store"
+    ],
+    "claim": "Every supplier uploads into one platform and nothing restricts a supplier to its own documents.",
+    "tier": "must-find",
+    "notes": "The documents carry contact details for the suppliers' own staff, so data-specific access is the requirement. The datasheet asserts access is fully authenticated, which says nothing about which data a signed-in supplier reaches."
+  },
+  {
+    "chapter": "secure-communication",
+    "requirement": "V12.2.1",
+    "affected_element_ids": [
+      "entity:supplier",
+      "process:supplier-portal",
+      "flow:supplier-to-supplier-portal:upload-documents"
+    ],
+    "claim": "Suppliers upload to an externally hosted portal and no flow states its transport.",
+    "tier": "must-find",
+    "notes": "'Enterprise-grade encryption throughout' is the vendor's claim about its own product, not a stated fact about this connection. The requirement applies and is unsettled."
+  },
+  {
+    "chapter": "secure-coding-and-architecture",
+    "requirement": "V15.1.1",
+    "affected_element_ids": [
+      "process:supplier-portal",
+      "entity:portal-vendor"
+    ],
+    "claim": "The whole portal is a third-party product and no documentation defines remediation time frames for it.",
+    "tier": "must-find",
+    "notes": "The source states the organization runs no part of the portal, which makes the third-party rule the central one for this case."
+  },
+  {
+    "chapter": "secure-coding-and-architecture",
+    "requirement": "V15.2.1",
+    "affected_element_ids": [
+      "process:supplier-portal"
+    ],
+    "claim": "Nothing says the portal's components sit inside any documented update window.",
+    "tier": "expected",
+    "notes": "Follows V15.1.1: with no documented time frame there is nothing to hold the components to."
+  }
+]
