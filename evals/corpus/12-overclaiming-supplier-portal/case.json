@@ -15,10 +15,17 @@
   "source_sha256": "9ca2ac1269af568776341049f4267cdd894de668e31b084f2c6b24044024ce6d",
   "frameworks": [
     {
+      "name": "asvs",
+      "options": {
+        "level": 1
+      },
+      "exemplar_proximity": "far"
+    },
+    {
       "name": "stride",
       "options": {},
       "exemplar_proximity": "far"
     }
   ],
-  "notes": "Adversarial case 2 of 2, replacing the repair-to-reject case ticket 029 originally specified (see the ticket resolution: that path is unreachable from source text and is already pinned offline by tests/test_pipeline.py). Where case 11 grades silence, this one grades noise dressed as fact. The source is dense with assurance that states nothing verifiable — secure by design, enterprise-grade encryption throughout, fully authenticated and audited, fully compliant — and none of it may set an attribute; it also contradicts itself outright, claiming the nightly extract is encrypted end to end where the runbook says it arrives as a plain CSV, which must resolve to unknown rather than to either side. One genuine control is stated among the noise (vendor-issued username and password on supplier sign-in) so the case cannot be passed by discarding everything, and one genuine absence is stated (picked up as-is) so grounded findings remain available. Far from the payments exemplar in shape: the trust hand-off is an organizational one into a platform we run no part of and can verify nothing inside, and the availability failure is silent staleness."
+  "notes": "Adversarial case 2 of 2, replacing the repair-to-reject case ticket 029 originally specified (see the ticket resolution: that path is unreachable from source text and is already pinned offline by tests/test_pipeline.py). Where case 11 grades silence, this one grades noise dressed as fact. The source is dense with assurance that states nothing verifiable \u2014 secure by design, enterprise-grade encryption throughout, fully authenticated and audited, fully compliant \u2014 and none of it may set an attribute; it also contradicts itself outright, claiming the nightly extract is encrypted end to end where the runbook says it arrives as a plain CSV, which must resolve to unknown rather than to either side. One genuine control is stated among the noise (vendor-issued username and password on supplier sign-in) so the case cannot be passed by discarding everything, and one genuine absence is stated (picked up as-is) so grounded findings remain available. Far from the payments exemplar in shape: the trust hand-off is an organizational one into a platform we run no part of and can verify nothing inside, and the availability failure is silent staleness."
 }

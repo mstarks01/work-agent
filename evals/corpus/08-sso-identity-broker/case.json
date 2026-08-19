@@ -15,10 +15,17 @@
   "source_sha256": "e2793466d1786a2ac92fe27fca08ea0765e63407522bee48e3f2ff825f7196a7",
   "frameworks": [
     {
+      "name": "asvs",
+      "options": {
+        "level": 2
+      },
+      "exemplar_proximity": "far"
+    },
+    {
       "name": "stride",
       "options": {},
       "exemplar_proximity": "far"
     }
   ],
-  "notes": "Internal-systems case 2 of 2 (ticket 029). The trust shape no other case carries is trust granted to claims and to parties rather than to network position: authorization is decided entirely from groups inside a signed token, nothing calls back to the issuer, and one federated partner is trusted to assert identities with no written limit on who. The instrument that makes this case worth its slot is that the boundary crossings under-describe the risk — only four flows cross a zone, and the case's two highest-severity references (a store-manager token working against every store, and a leaver retaining access across a nightly sync plus a twelve-hour non-revocable token) cross nothing at all. Every other case in the corpus rewards an analyst that follows the crossings; this one punishes an analyst that follows only the crossings. It is also the only case whose worst finding is stated as a completed fact rather than as a gap, and the only one whose hardest finding is assembled from three facts no single sentence of the source contains."
+  "notes": "Internal-systems case 2 of 2 (ticket 029). The trust shape no other case carries is trust granted to claims and to parties rather than to network position: authorization is decided entirely from groups inside a signed token, nothing calls back to the issuer, and one federated partner is trusted to assert identities with no written limit on who. The instrument that makes this case worth its slot is that the boundary crossings under-describe the risk \u2014 only four flows cross a zone, and the case's two highest-severity references (a store-manager token working against every store, and a leaver retaining access across a nightly sync plus a twelve-hour non-revocable token) cross nothing at all. Every other case in the corpus rewards an analyst that follows the crossings; this one punishes an analyst that follows only the crossings. It is also the only case whose worst finding is stated as a completed fact rather than as a gap, and the only one whose hardest finding is assembled from three facts no single sentence of the source contains."
 }
