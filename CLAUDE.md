@@ -42,6 +42,16 @@ file's prose about a reviewer drifted the moment nobody was one. When a design n
 role, ship the field and its debt list before the artifact. Write guides in the
 imperative, never the past tense. See `docs/agents/provenance.md`.
 
+### Claim identity
+
+A **Claim**'s identity is a value code computes from its fields — framework,
+lane, endpoint-resolved **Element** IDs, and an action verb from a closed set —
+never from its prose. It is **versioned**, and a vote stores its components
+rather than its hash, so improving the rule re-keys the whole ledger by
+recomputation and costs no re-vote. That is what a judge change cannot offer.
+A human vote is the only ground truth here, and its reason code decides whether
+it moves an analysis number or a writing one. See `docs/agents/claim-identity.md`.
+
 ### Domain docs
 
 Single-context: one `CONTEXT.md` glossary at the repo root, ADRs in `docs/adr/`.
