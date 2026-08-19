@@ -182,6 +182,28 @@ list). When tuning, watch these three:
 All of these are *relative to the judge*. Use them to compare configurations and
 track movement; never quote them as absolute scores or against other tools.
 
+### The half a person grades
+
+Neither of the two halves above says whether a finding is *right* — both grade
+the tool against records an agent wrote. The review loop is what adds a human
+judgement, and it costs no credentials:
+
+```sh
+uv run python webapp/review.py --voter <your-name> --artifact baseline-1.json
+```
+
+Watch two numbers, and read them the way you read critic yield — as a pair:
+
+| Metric | What a good change does | Trap |
+| --- | --- | --- |
+| **up-vote rate** (per case) | rises, or holds | It rises trivially if the tool produces fewer, safer findings. Read it against how many findings the run produced. |
+| **substance down-vote rate** | falls | A style down-vote is not this number. `poorly-written` leaves the finding in the pool and moves the writing score, so a config that writes worse cannot flatter this one. |
+
+A vote hangs on a finding's fingerprint, so tuning does not re-spend it: after
+the first sitting, a configuration change puts only its *new* findings in the
+queue. That is what makes this affordable per experiment rather than per
+session.
+
 ### The mechanically matched half
 
 ASVS's numbers are not judge-relative, because ASVS is not judged. Watch these,
