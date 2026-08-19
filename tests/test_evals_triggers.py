@@ -30,12 +30,18 @@ CORPUS = Path(__file__).resolve().parents[1] / "evals" / "corpus"
 #: a better one, and a collapse — a rule silently matching nothing after a
 #: schema change — still fails.
 #:
-#: **ASVS's numbers are low and that is a finding, not a calibration.** Measured
-#: 2026-08-18 at 0.37 must-find / 0.32 overall over 62 scoreable records. Its
+#: **ASVS's numbers are low and that is a finding, not a calibration.** Its
 #: predicates are presence tests (#160), which fire on a shape being *there*
 #: rather than on the shape a requirement is about, so a rule can fire all over
 #: a model and never on the element its own reference record names. The floor is
 #: recorded so the number cannot quietly fall further while #218 is open.
+#:
+#: Measured 2026-08-18 at 0.37 must-find / 0.32 overall over 62 scoreable
+#: records, and 2026-08-19 at 0.34 / 0.32 over 98, when four cases gained
+#: reference sets (#236). The floors do not move for that. A corpus that grows
+#: by a third moves the measurement for a reason unrelated to rule quality, and
+#: a floor chasing each re-measurement stops being able to catch the collapse it
+#: is for.
 TRIGGER_FLOORS: dict[str, dict[str, float]] = {
     "stride": {"must_find_recall": 0.70, "recall": 0.65},
     "asvs": {"must_find_recall": 0.27, "recall": 0.23},
@@ -55,8 +61,6 @@ UNTRIGGERED_LANES: dict[str, str] = dict.fromkeys(
         "authorization",
         "configuration",
         "cryptography",
-        "data-protection",
-        "file-handling",
         "secure-coding-and-architecture",
         "secure-communication",
         "security-logging-and-error-handling",

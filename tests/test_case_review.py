@@ -62,12 +62,17 @@ UNREVIEWED: dict[str, str] = {
         "scored by nothing (#200)."
     ),
     "06-cookbook-online-game": (
-        "18 STRIDE claims. Review sitting 01 relabelled a pair against this "
-        "case's fabricated-progression claim, which is the nearest anybody has "
-        "come to reading it."
+        "18 STRIDE claims and 6 ASVS records. Review sitting 01 relabelled a "
+        "pair against this case's fabricated-progression claim, which is the "
+        "nearest anybody has come to reading it. The ASVS records cover the "
+        "moderation website alone, which is the only part ASVS scopes itself to."
     ),
     "07-cicd-store-deploy": "24 STRIDE claims, unread. Declares STRIDE only.",
-    "08-sso-identity-broker": "23 STRIDE claims, unread. Declares STRIDE only.",
+    "08-sso-identity-broker": (
+        "23 STRIDE claims and 12 ASVS records, unread. The only case scored at "
+        "ASVS level 2, and the records were written by an agent in #236 against "
+        "a source nobody has read against its model."
+    ),
     "09-cookbook-sokify-retail": (
         "20 STRIDE claims and 7 ASVS records, unread. The ASVS records are also "
         "scored by nothing (#200)."
@@ -76,8 +81,15 @@ UNREVIEWED: dict[str, str] = {
         "17 STRIDE claims and 8 ASVS records, unread. The ASVS records are also "
         "scored by nothing (#200)."
     ),
-    "11-sparse-shift-scheduling": "16 STRIDE claims, unread. Declares STRIDE only.",
-    "12-overclaiming-supplier-portal": "15 STRIDE claims, unread. Declares STRIDE only.",
+    "11-sparse-shift-scheduling": (
+        "16 STRIDE claims and 8 ASVS records, unread. The sparsest source in the "
+        "corpus, so its ASVS records rest on the least stated material of any."
+    ),
+    "12-overclaiming-supplier-portal": (
+        "15 STRIDE claims and 10 ASVS records, unread. The vendor datasheet in "
+        "its source asserts controls the input never states, so a reader has to "
+        "separate the claim from the fact on every record."
+    ),
     "13-dispatch-control-plane": (
         "19 STRIDE claims and 6 ASVS records, unread. The ASVS records are also "
         "scored by nothing (#200)."

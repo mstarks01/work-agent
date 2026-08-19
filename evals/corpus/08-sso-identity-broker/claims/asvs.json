@@ -1,0 +1,142 @@
+[
+  {
+    "chapter": "authentication",
+    "requirement": "V6.1.1",
+    "affected_element_ids": [
+      "entity:colleague",
+      "process:identity-broker",
+      "flow:colleague-to-identity-broker:sign-in"
+    ],
+    "claim": "No documentation defines rate limiting or anti-automation on a sign-in colleagues reach from their own devices at home.",
+    "tier": "expected",
+    "notes": "A documentation requirement: the subject sits outside the running system, so needs-info by construction."
+  },
+  {
+    "chapter": "session-management",
+    "requirement": "V7.1.3",
+    "affected_element_ids": [
+      "entity:franchise-identity-provider",
+      "process:identity-broker",
+      "flow:franchise-identity-provider-to-identity-broker:vouch-for-colleague"
+    ],
+    "claim": "The broker accepts a franchise provider's assertion as a sign-in and nothing documents the trust relationships in that federation.",
+    "tier": "expected",
+    "notes": "The source states the gap as which colleagues the provider may vouch for. This requirement asks for the documented relationship rather than the check itself."
+  },
+  {
+    "chapter": "session-management",
+    "requirement": "V7.4.2",
+    "affected_element_ids": [
+      "entity:hr-system",
+      "process:identity-broker",
+      "flow:identity-broker-to-hr-system:nightly-group-pull"
+    ],
+    "claim": "A leaver stops being a colleague on a nightly pull while their twelve-hour token stays usable, and nothing can end it early.",
+    "tier": "must-find",
+    "notes": "The source states all three facts: nightly leaver processing, a twelve-hour lifetime, and no way to pull a token back. This requirement is the one they meet."
+  },
+  {
+    "chapter": "authorization",
+    "requirement": "V8.2.2",
+    "affected_element_ids": [
+      "entity:colleague",
+      "process:store-admin-console",
+      "flow:colleague-to-store-admin-console:change-prices-and-void"
+    ],
+    "claim": "The console reads the store-manager group from the token and never checks which store the holder belongs to.",
+    "tier": "must-find",
+    "notes": "The source states the defect outright: a store-manager token works against every store. Data-specific access is the requirement it fails."
+  },
+  {
+    "chapter": "authorization",
+    "requirement": "V8.4.1",
+    "affected_element_ids": [
+      "entity:franchise-identity-provider",
+      "entity:colleague",
+      "process:store-admin-console"
+    ],
+    "claim": "Franchise colleagues and staff colleagues share one console and one token format, with no control keeping one tenant's operations off another's.",
+    "tier": "must-find",
+    "notes": "Two tenants are stated \u2014 the organization's own stores and the franchise stores \u2014 and the store check that would separate them is stated to be absent."
+  },
+  {
+    "chapter": "self-contained-tokens",
+    "requirement": "V9.1.2",
+    "affected_element_ids": [
+      "process:identity-broker",
+      "store:key-store"
+    ],
+    "claim": "Nothing states which signing algorithms the broker issues under or which an application will accept.",
+    "tier": "expected",
+    "notes": "Tokens are self-contained and signature-checked, so the chapter applies; the allowlist is what nothing settles."
+  },
+  {
+    "chapter": "self-contained-tokens",
+    "requirement": "V9.2.4",
+    "affected_element_ids": [
+      "process:identity-broker",
+      "process:store-admin-console",
+      "store:key-store"
+    ],
+    "claim": "One signing key issues tokens for every application and nothing distinguishes the audience a token was issued for.",
+    "tier": "must-find",
+    "notes": "The source states the shared key directly. This requirement is the one a shared issuing key lands on, which is why the case is scored at level 2."
+  },
+  {
+    "chapter": "cryptography",
+    "requirement": "V11.4.1",
+    "affected_element_ids": [
+      "process:identity-broker",
+      "store:key-store"
+    ],
+    "claim": "The broker signs every token and nothing states the hash function behind that signature.",
+    "tier": "expected",
+    "notes": "Signing is stated; the primitive is not."
+  },
+  {
+    "chapter": "secure-communication",
+    "requirement": "V12.2.1",
+    "affected_element_ids": [
+      "entity:colleague",
+      "process:identity-broker",
+      "flow:colleague-to-identity-broker:sign-in"
+    ],
+    "claim": "Colleagues sign in from their own devices at home and no flow states its transport.",
+    "tier": "must-find",
+    "notes": "The broker is stated to be reachable from outside and its transport is stated nowhere. Applicability comes from what the broker presents, not from this silence \u2014 see ADR 0014."
+  },
+  {
+    "chapter": "security-logging-and-error-handling",
+    "requirement": "V16.1.1",
+    "affected_element_ids": [
+      "process:identity-broker",
+      "store:audit-log",
+      "flow:identity-broker-to-audit-log:write-sign-ins"
+    ],
+    "claim": "An audit log exists and nobody has written down what it records or whether it covers the franchise route.",
+    "tier": "must-find",
+    "notes": "The source states the gap in the inventory's own terms, which is what this requirement asks for."
+  },
+  {
+    "chapter": "security-logging-and-error-handling",
+    "requirement": "V16.2.1",
+    "affected_element_ids": [
+      "store:audit-log"
+    ],
+    "claim": "Nothing states what metadata a sign-in entry carries, so nothing says an investigation could reconstruct one.",
+    "tier": "expected",
+    "notes": "Follows V16.1.1: with no inventory there is nothing stating the fields."
+  },
+  {
+    "chapter": "data-protection",
+    "requirement": "V14.1.1",
+    "affected_element_ids": [
+      "store:directory",
+      "store:audit-log",
+      "store:key-store"
+    ],
+    "claim": "The directory, the audit log and the key store hold colleague and credential data and nothing classifies any of it.",
+    "tier": "expected",
+    "notes": "The source states nobody wrote down whether the directory or the log are encrypted where they sit, which is the downstream half of an absent classification."
+  }
+]
