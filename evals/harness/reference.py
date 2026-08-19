@@ -44,8 +44,9 @@ from pathlib import Path
 from types import MappingProxyType
 from typing import Literal
 
-from pydantic import BaseModel, ConfigDict, Field, ValidationError
+from pydantic import BaseModel, ConfigDict, Field, ValidationError, field_validator
 
+from evals.harness.verbs import check_verb
 from stride_service.frameworks.asvs.record import AsvsChapter
 from stride_service.frameworks.stride.record import StrideCategory
 from stride_service.report import (
@@ -117,6 +118,21 @@ class ReferenceClaim(BaseModel):
     tier: Tier
     affected_element_ids: tuple[str, ...] = ()
     notes: str = ""  # the author's rationale, never scored
+    #: The attacker action, from :mod:`evals.harness.verbs`. Assigned as the
+    #: claim is written (``BLESSING.md`` step 4b) rather than derived later,
+    #: because deriving it re-runs the author's decision with less context.
+    #: ``None`` where nobody has assigned one, which
+    #: ``tests/test_verb_coverage.py`` counts per case. It is what fingerprint
+    #: version 2 reads, so the count reaching zero is what lets the default move.
+    verb: str | None = None
+
+    @field_validator("verb")
+    @classmethod
+    def _known_verb(cls, value: str | None) -> str | None:
+        """An unrecognised verb fails here rather than matching nothing later."""
+        if value is not None:
+            check_verb(value)
+        return value
 
     @property
     def must_find(self) -> bool:

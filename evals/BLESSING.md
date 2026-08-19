@@ -222,6 +222,26 @@ the package grades nothing.
   legal, and it drops out of candidate-trigger recall by name rather than
   counting as a miss.
 
+### 4b. Assign an action verb to every claim
+
+Each reference claim carries a `verb` from `evals/harness/verbs.py`, chosen as
+you write the claim and beside the elements you cite. It names **what the
+attacker does** — never the object, which the **Element** IDs already carry, and
+never the consequence.
+
+The distinctions the vocabulary draws are the ones the corpus already draws in
+its own notes: reading at rest is not reading on the wire, forging a message is
+not replaying one, altering data is not destroying it. Read `GLOSS` in that
+module and pick the closest; an unrecognised verb fails the corpus lint rather
+than silently matching nothing.
+
+Assign it here rather than deriving it later. Later means re-running the
+decision with less context, and getting a different answer on exactly the claims
+where the difference matters.
+
+`tests/test_verb_coverage.py` counts what is still unassigned, per case. The
+count only moves when somebody does this step.
+
 ### 5. Label the judge-calibration pairs
 
 **STRIDE only.** The judge exists because STRIDE's claim set is open and its

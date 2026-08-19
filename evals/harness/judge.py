@@ -178,6 +178,15 @@ class ClaimPair:
     candidate_claim: str
     reference_element_ids: tuple[str, ...]
     candidate_element_ids: tuple[str, ...] | None
+    # The action each side names, from evals.harness.verbs. Not shown to the
+    # judge either, and for the same reason the element IDs are not: a rule in
+    # :mod:`evals.harness.identity` reads them and is scored against the judge
+    # over one set of labels, which only means anything while the two answer
+    # from different evidence. ``None`` where nobody has assigned one, which is
+    # every reference claim today -- ``tests/test_verb_coverage.py`` holds that
+    # debt and shrinks it.
+    reference_verb: str | None = None
+    candidate_verb: str | None = None
 
 
 class ClaimRuling(BaseModel):

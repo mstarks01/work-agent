@@ -75,6 +75,7 @@ evals/
   config/judge.toml             the judge's own pinned model and settings
   prompts/                      the judge's prompts (NOT the shipped prompts/)
   harness/                      the scorer and the eval runner
+  review/votes.jsonl            the vote ledger — the only human record here
 ```
 
 ## The harness
@@ -90,6 +91,10 @@ evals/
 | `harness/coverage.py` | What each category agent was offered and how much of it its drafts cite, pooled over the sweep. Judge-free. |
 | `harness/stability.py` | Run-to-run stability: which references two or more finished sweeps agree on. Judge-free, and reads artifacts rather than re-running. |
 | `harness/calibration.py` | Judge-vs-label agreement over the labelled fixtures. |
+| `harness/verbs.py` | The closed vocabulary of attacker actions, and what counts as one action. Judge-free. |
+| `harness/fingerprint.py` | A **Claim**'s identity as a versioned value code computes. No model call. |
+| `harness/ledger.py` | The append-only record of what a **person** decided about a finding. |
+| `harness/queue.py` | Which findings a reviewer is asked about, and in what order. Blind to the configuration. |
 | `harness/provenance.py` | What each node execution actually ran on — tier, requested route, served build, fingerprint — written into the artifact and read back by a promotion. |
 | `harness/certify.py` | Promoting a winning configuration: rewrites `config/sampling.toml` and records its fingerprints as blessed. The certification check itself lives in the service (`stride_service.certification`), which this imports. |
 | `harness/modes.py` | The three run modes over the shipped graph, and the extraction score: element agreement, the derived crossings, and the attributes a Candidate rule reads. Judge-free. |
@@ -266,6 +271,45 @@ and wording do not — and splits every reference into matched-in-every-run,
 matched-in-some, and matched-in-none. The middle bucket is the band a one-sweep
 recall number can move within while nothing has actually changed, which is what
 any comparison of two other numbers has to clear before it means anything.
+
+## Reviewing findings
+
+Everything above measures the tool against records an agent wrote. This is the
+one loop that measures it against what a **person** says, and it needs no
+credentials at all — it reads a finished sweep and writes one line per click.
+
+```sh
+python -m evals.harness.run run --mode analysis --out artifact.json  # needs credentials
+uv run python webapp/review.py --voter <your-name> --artifact artifact.json
+```
+
+The reviewer answers one question per finding — **could this attack happen in
+this system?** — as up, down, unsure, or needs-more-evidence. A down-vote picks
+one reason from a closed set, and the reason decides which number moves:
+
+| Reason kind | Counts against the analysis? | Stays in the reference pool? |
+|---|---|---|
+| substance (`not-a-threat`, `unsupported-by-the-model`, …) | yes | no |
+| style (`too-vague`, `poorly-written`, …) | **no** | **yes** |
+
+That split is the control for personal preference, and it is mechanical. A
+reviewer who dislikes a finding's wording cannot move recall with that opinion,
+because the reason they picked routes it to the writing score instead.
+
+Three properties make the record worth keeping:
+
+- **A vote is spent once.** It hangs on a **fingerprint** — framework, lane and
+  endpoint-resolved elements — not on a run, so it stays valid when the wording
+  moves, when the model changes, and when a prompt is rewritten. The second
+  sitting over one configuration shows nothing; a sitting after a change shows
+  only what changed.
+- **Nothing is ever overwritten.** A correction is a new event, so any past
+  state of the ledger is reconstructible, and the numbers computed from it can
+  be recomputed to the same digit.
+- **The reviewer is blind to the configuration.** `QueueItem` has no field for a
+  model name, and the vote is stamped with it afterwards.
+
+`docs/agents/claim-identity.md` holds the design and the measurements behind it.
 
 ## The corpus
 

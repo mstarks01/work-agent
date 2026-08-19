@@ -1,170 +1,312 @@
 [
   {
     "category": "spoofing",
-    "affected_element_ids": ["flow:shopper-to-storefront-api:place-order", "entity:shopper"],
+    "affected_element_ids": [
+      "flow:shopper-to-storefront-api:place-order",
+      "entity:shopper"
+    ],
     "claim": "An attacker who obtains a shopper's session cookie replays it against the storefront API and places orders as that shopper.",
     "tier": "must-find",
-    "severity": {"likelihood": "high", "impact": "high"},
-    "notes": "Single-factor session with no MFA on an internet-facing endpoint; the canonical finding for this flow."
+    "severity": {
+      "likelihood": "high",
+      "impact": "high"
+    },
+    "notes": "Single-factor session with no MFA on an internet-facing endpoint; the canonical finding for this flow.",
+    "verb": "replay"
   },
   {
     "category": "spoofing",
-    "affected_element_ids": ["flow:card-processor-to-storefront-api:settlement-webhook", "process:storefront-api"],
+    "affected_element_ids": [
+      "flow:card-processor-to-storefront-api:settlement-webhook",
+      "process:storefront-api"
+    ],
     "claim": "An attacker POSTs a forged settlement webhook to the storefront API, impersonating the card processor to mark an unpaid order as paid.",
     "tier": "must-find",
-    "severity": {"likelihood": "high", "impact": "high"},
-    "notes": "Callback authentication is unknown on an internet-facing endpoint; must be reported as unverified, not assumed present."
+    "severity": {
+      "likelihood": "high",
+      "impact": "high"
+    },
+    "notes": "Callback authentication is unknown on an internet-facing endpoint; must be reported as unverified, not assumed present.",
+    "verb": "forge"
   },
   {
     "category": "spoofing",
-    "affected_element_ids": ["flow:storefront-api-to-order-service:submit-order", "process:order-service"],
+    "affected_element_ids": [
+      "flow:storefront-api-to-order-service:submit-order",
+      "process:order-service"
+    ],
     "claim": "Any workload that can reach the order service impersonates the storefront API on the unauthenticated gRPC channel and submits orders.",
     "tier": "must-find",
-    "severity": {"likelihood": "medium", "impact": "high"},
-    "notes": "Authentication is stated as none, accepted by network position — a stated absence, not an unknown."
+    "severity": {
+      "likelihood": "medium",
+      "impact": "high"
+    },
+    "notes": "Authentication is stated as none, accepted by network position — a stated absence, not an unknown.",
+    "verb": "impersonate"
   },
   {
     "category": "spoofing",
-    "affected_element_ids": ["flow:order-service-to-orders-db:read-write-orders", "store:orders-db"],
+    "affected_element_ids": [
+      "flow:order-service-to-orders-db:read-write-orders",
+      "store:orders-db"
+    ],
     "claim": "An attacker holding the shared application password connects to orders-db as the order service.",
     "tier": "expected",
-    "severity": {"likelihood": "medium", "impact": "high"},
-    "notes": "Static shared secret from an environment variable; identity is the password."
+    "severity": {
+      "likelihood": "medium",
+      "impact": "high"
+    },
+    "notes": "Static shared secret from an environment variable; identity is the password.",
+    "verb": "use-credential"
   },
   {
     "category": "tampering",
-    "affected_element_ids": ["flow:storefront-api-to-order-service:submit-order"],
+    "affected_element_ids": [
+      "flow:storefront-api-to-order-service:submit-order"
+    ],
     "claim": "An attacker positioned in the storefront tier modifies order contents in flight on the gRPC channel, whose transport protection is unverified.",
     "tier": "must-find",
-    "severity": {"likelihood": "medium", "impact": "high"},
-    "notes": "Crosses dmz to core with authentication none and encryption_in_transit unknown."
+    "severity": {
+      "likelihood": "medium",
+      "impact": "high"
+    },
+    "notes": "Crosses dmz to core with authentication none and encryption_in_transit unknown.",
+    "verb": "alter-in-transit"
   },
   {
     "category": "tampering",
-    "affected_element_ids": ["store:orders-db", "flow:order-service-to-orders-db:read-write-orders"],
+    "affected_element_ids": [
+      "store:orders-db",
+      "flow:order-service-to-orders-db:read-write-orders"
+    ],
     "claim": "An attacker with the shared full read/write database account alters order rows, changing prices or payment status directly.",
     "tier": "must-find",
-    "severity": {"likelihood": "medium", "impact": "high"},
-    "notes": "No least privilege: the same credential that reads can rewrite every row."
+    "severity": {
+      "likelihood": "medium",
+      "impact": "high"
+    },
+    "notes": "No least privilege: the same credential that reads can rewrite every row.",
+    "verb": "alter"
   },
   {
     "category": "tampering",
-    "affected_element_ids": ["flow:card-processor-to-storefront-api:settlement-webhook", "store:orders-db"],
+    "affected_element_ids": [
+      "flow:card-processor-to-storefront-api:settlement-webhook",
+      "store:orders-db"
+    ],
     "claim": "An attacker replays or edits a settlement callback to flip the recorded payment state of an order they do not own.",
     "tier": "expected",
-    "severity": {"likelihood": "medium", "impact": "high"},
-    "notes": "Distinct from the spoofing entry: the target is the persisted order state, not the sender identity."
+    "severity": {
+      "likelihood": "medium",
+      "impact": "high"
+    },
+    "notes": "Distinct from the spoofing entry: the target is the persisted order state, not the sender identity.",
+    "verb": "replay"
   },
   {
     "category": "tampering",
-    "affected_element_ids": ["store:receipt-archive", "flow:order-service-to-receipt-archive:append-receipt"],
+    "affected_element_ids": [
+      "store:receipt-archive",
+      "flow:order-service-to-receipt-archive:append-receipt"
+    ],
     "claim": "An attacker holding the order service's service account overwrites or deletes archived receipts to erase evidence of an order.",
     "tier": "expected",
-    "severity": {"likelihood": "low", "impact": "medium"},
-    "notes": "The model states CMEK encryption but says nothing about object immutability or retention locks."
+    "severity": {
+      "likelihood": "low",
+      "impact": "medium"
+    },
+    "notes": "The model states CMEK encryption but says nothing about object immutability or retention locks.",
+    "verb": "delete"
   },
   {
     "category": "repudiation",
-    "affected_element_ids": ["store:receipt-archive", "entity:shopper"],
+    "affected_element_ids": [
+      "store:receipt-archive",
+      "entity:shopper"
+    ],
     "claim": "A shopper denies having placed an order, and the receipt archive cannot contradict them because receipts record only the order service as the writer.",
     "tier": "must-find",
-    "severity": {"likelihood": "medium", "impact": "medium"},
-    "notes": "The one audit record in the system carries the service identity, never the authenticated shopper."
+    "severity": {
+      "likelihood": "medium",
+      "impact": "medium"
+    },
+    "notes": "The one audit record in the system carries the service identity, never the authenticated shopper.",
+    "verb": "unattributable"
   },
   {
     "category": "repudiation",
-    "affected_element_ids": ["flow:card-processor-to-storefront-api:settlement-webhook"],
+    "affected_element_ids": [
+      "flow:card-processor-to-storefront-api:settlement-webhook"
+    ],
     "claim": "The processor disputes a settlement the storefront recorded, and no verifiable sender identity on the webhook lets either side prove who sent it.",
     "tier": "expected",
-    "severity": {"likelihood": "medium", "impact": "medium"},
-    "notes": "Follows from unknown callback authentication; a financial dispute path."
+    "severity": {
+      "likelihood": "medium",
+      "impact": "medium"
+    },
+    "notes": "Follows from unknown callback authentication; a financial dispute path.",
+    "verb": "unattributable"
   },
   {
     "category": "repudiation",
-    "affected_element_ids": ["flow:order-service-to-orders-db:read-write-orders", "store:orders-db"],
+    "affected_element_ids": [
+      "flow:order-service-to-orders-db:read-write-orders",
+      "store:orders-db"
+    ],
     "claim": "An operator makes a change through the shared application account and no record attributes that change to a person.",
     "tier": "expected",
-    "severity": {"likelihood": "medium", "impact": "medium"},
-    "notes": "Shared credential collapses every actor into one database identity."
+    "severity": {
+      "likelihood": "medium",
+      "impact": "medium"
+    },
+    "notes": "Shared credential collapses every actor into one database identity.",
+    "verb": "unattributable"
   },
   {
     "category": "information-disclosure",
-    "affected_element_ids": ["store:orders-db"],
+    "affected_element_ids": [
+      "store:orders-db"
+    ],
     "claim": "An attacker who reaches the database storage or its backups reads shopper addresses and card last-four, because protection at rest is unverified.",
     "tier": "must-find",
-    "severity": {"likelihood": "medium", "impact": "high"},
-    "notes": "encryption_at_rest is unknown on a store tagged pii and financial — report as unverified, and a needs-info verdict is acceptable here."
+    "severity": {
+      "likelihood": "medium",
+      "impact": "high"
+    },
+    "notes": "encryption_at_rest is unknown on a store tagged pii and financial — report as unverified, and a needs-info verdict is acceptable here.",
+    "verb": "read"
   },
   {
     "category": "information-disclosure",
-    "affected_element_ids": ["flow:storefront-api-to-order-service:submit-order"],
+    "affected_element_ids": [
+      "flow:storefront-api-to-order-service:submit-order"
+    ],
     "claim": "An attacker with access to the internal network reads order contents and shopper identifiers off the gRPC channel, whose encryption is unverified.",
     "tier": "must-find",
-    "severity": {"likelihood": "medium", "impact": "high"},
-    "notes": "Same flow as the tampering entry; the lane difference is read versus modify."
+    "severity": {
+      "likelihood": "medium",
+      "impact": "high"
+    },
+    "notes": "Same flow as the tampering entry; the lane difference is read versus modify.",
+    "verb": "intercept"
   },
   {
     "category": "information-disclosure",
-    "affected_element_ids": ["flow:order-service-to-orders-db:read-write-orders"],
+    "affected_element_ids": [
+      "flow:order-service-to-orders-db:read-write-orders"
+    ],
     "claim": "An attacker observing the database connection reads PII in transit because transport encryption on it is unverified.",
     "tier": "expected",
-    "severity": {"likelihood": "medium", "impact": "high"},
-    "notes": "Intra-zone flow, so lower exposure than the crossing above, but the same unknown."
+    "severity": {
+      "likelihood": "medium",
+      "impact": "high"
+    },
+    "notes": "Intra-zone flow, so lower exposure than the crossing above, but the same unknown.",
+    "verb": "intercept"
   },
   {
     "category": "information-disclosure",
-    "affected_element_ids": ["process:order-service", "flow:order-service-to-orders-db:read-write-orders"],
+    "affected_element_ids": [
+      "process:order-service",
+      "flow:order-service-to-orders-db:read-write-orders"
+    ],
     "claim": "An attacker who can read the order service's process environment, crash dumps or logs recovers the database password held in an environment variable.",
     "tier": "expected",
-    "severity": {"likelihood": "medium", "impact": "high"},
-    "notes": "The credential's storage location is stated in the model, so this is grounded rather than speculative."
+    "severity": {
+      "likelihood": "medium",
+      "impact": "high"
+    },
+    "notes": "The credential's storage location is stated in the model, so this is grounded rather than speculative.",
+    "verb": "recover-credential"
   },
   {
     "category": "denial-of-service",
-    "affected_element_ids": ["flow:card-processor-to-storefront-api:settlement-webhook", "process:storefront-api"],
+    "affected_element_ids": [
+      "flow:card-processor-to-storefront-api:settlement-webhook",
+      "process:storefront-api"
+    ],
     "claim": "An attacker floods the unauthenticated settlement webhook endpoint until the storefront API stops serving shoppers.",
     "tier": "must-find",
-    "severity": {"likelihood": "medium", "impact": "medium"},
-    "notes": "An internet-facing endpoint with no verified caller identity is the cheapest flood target in the model."
+    "severity": {
+      "likelihood": "medium",
+      "impact": "medium"
+    },
+    "notes": "An internet-facing endpoint with no verified caller identity is the cheapest flood target in the model.",
+    "verb": "flood"
   },
   {
     "category": "denial-of-service",
-    "affected_element_ids": ["process:order-service", "store:orders-db"],
+    "affected_element_ids": [
+      "process:order-service",
+      "store:orders-db"
+    ],
     "claim": "An attacker drives enough order submissions to exhaust the order service's database connections and halt order capture.",
     "tier": "expected",
-    "severity": {"likelihood": "medium", "impact": "high"},
-    "notes": "Order service is tagged availability-critical and has one datastore dependency."
+    "severity": {
+      "likelihood": "medium",
+      "impact": "high"
+    },
+    "notes": "Order service is tagged availability-critical and has one datastore dependency.",
+    "verb": "flood"
   },
   {
     "category": "denial-of-service",
-    "affected_element_ids": ["flow:shopper-to-storefront-api:place-order", "process:storefront-api"],
+    "affected_element_ids": [
+      "flow:shopper-to-storefront-api:place-order",
+      "process:storefront-api"
+    ],
     "claim": "An attacker floods the checkout path from the public internet and prevents shoppers from placing orders.",
     "tier": "expected",
-    "severity": {"likelihood": "medium", "impact": "medium"},
-    "notes": "Generic but grounded: the storefront API is the single internet-facing component."
+    "severity": {
+      "likelihood": "medium",
+      "impact": "medium"
+    },
+    "notes": "Generic but grounded: the storefront API is the single internet-facing component.",
+    "verb": "flood"
   },
   {
     "category": "elevation-of-privilege",
-    "affected_element_ids": ["flow:storefront-api-to-order-service:submit-order", "process:order-service"],
+    "affected_element_ids": [
+      "flow:storefront-api-to-order-service:submit-order",
+      "process:order-service"
+    ],
     "claim": "An attacker with any foothold in the storefront tier gains order-writing privilege in the core zone, because the order service grants it on network position alone.",
     "tier": "must-find",
-    "severity": {"likelihood": "high", "impact": "high"},
-    "notes": "The boundary crossing plus authentication none is the highest-signal fact in this model."
+    "severity": {
+      "likelihood": "high",
+      "impact": "high"
+    },
+    "notes": "The boundary crossing plus authentication none is the highest-signal fact in this model.",
+    "verb": "escalate"
   },
   {
     "category": "elevation-of-privilege",
-    "affected_element_ids": ["flow:order-service-to-orders-db:read-write-orders", "store:orders-db"],
+    "affected_element_ids": [
+      "flow:order-service-to-orders-db:read-write-orders",
+      "store:orders-db"
+    ],
     "claim": "An attacker who compromises the order service inherits full read/write over every order record, because the service holds one unscoped database account.",
     "tier": "must-find",
-    "severity": {"likelihood": "medium", "impact": "high"},
-    "notes": "Blast radius of a single compromise; distinct from the tampering entry, which assumes the credential is already held."
+    "severity": {
+      "likelihood": "medium",
+      "impact": "high"
+    },
+    "notes": "Blast radius of a single compromise; distinct from the tampering entry, which assumes the credential is already held.",
+    "verb": "abuse-grant"
   },
   {
     "category": "elevation-of-privilege",
-    "affected_element_ids": ["process:storefront-api", "process:order-service"],
+    "affected_element_ids": [
+      "process:storefront-api",
+      "process:order-service"
+    ],
     "claim": "An attacker who compromises the internet-facing storefront API pivots from the DMZ into the core zone.",
     "tier": "expected",
-    "severity": {"likelihood": "medium", "impact": "high"},
-    "notes": "The pivot itself, stated against the two processes rather than the flow between them."
+    "severity": {
+      "likelihood": "medium",
+      "impact": "high"
+    },
+    "notes": "The pivot itself, stated against the two processes rather than the flow between them.",
+    "verb": "escalate"
   }
 ]
