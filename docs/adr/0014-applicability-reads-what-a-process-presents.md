@@ -82,7 +82,7 @@ That last one is worth keeping — #219's own body asserts the controller is
 The precondition holding the answer open is the correct outcome, and the remedy
 is to submit more about the system.
 
-**Four cases now owe a reference set.** `06`, `08`, `11` and `12` satisfy the
+**Four cases now need a reference set.** `06`, `08`, `11` and `12` satisfy the
 precondition and carry no ASVS records. They are named in
 `PENDING_REFERENCE_SETS` in `evals/verify_corpus.py`, which fails a case that
 newly satisfies and is not listed, and fails a listed case that has since
@@ -92,8 +92,8 @@ mechanism ships with the debt named rather than with four agent-authored sets
 nobody has read.
 
 **Every ASVS number in the suite still measures 7 cases.** The reference sets are
-what a sweep grades, so the numbers move when the debt above is paid, not when
-this lands.
+what a sweep grades, so the numbers move when somebody writes the four sets
+above, not when this lands.
 
 **A model is not portable across this change.** `interface_kind` is required and
 has no default, so every `model.json` and every constructed `Process` states it.
