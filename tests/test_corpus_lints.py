@@ -89,7 +89,9 @@ def test_a_case_that_declares_no_framework_it_runs_is_caught():
 
     assert sorted(problems) == sorted(
         f"case.json does not declare {name!r}, whose precondition satisfies this"
-        " case; every framework a case runs must carry a reference set"
+        " case; every framework a case runs must carry a reference set. If it is"
+        " not being written now, add it to PENDING_REFERENCE_SETS with what the"
+        " case is missing"
         for name in verify_corpus.PACKAGES
     )
 
@@ -97,8 +99,9 @@ def test_a_case_that_declares_no_framework_it_runs_is_caught():
 def test_a_case_declaring_a_framework_its_model_does_not_satisfy_is_caught():
     """The other direction, and ASVS is the first framework that can fire it.
 
-    STRIDE's precondition is total, so no case can over-declare it. A case whose
-    flows never say they carry the web answers ``undecidable`` for ASVS, and a
+    STRIDE's precondition is total, so no case can over-declare it. The batch
+    pipeline answers ``refuted``: every process in it states a non-web interface,
+    which is the model saying what the system is rather than failing to say. A
     reference set there would grade a run whose lanes never ran.
     """
     case_dir = next(
@@ -111,7 +114,7 @@ def test_a_case_declaring_a_framework_its_model_does_not_satisfy_is_caught():
     problems = list(verify_corpus.framework_issues(case_dir, meta, model))
 
     assert any(
-        "declares 'asvs', but its precondition answers undecidable" in problem
+        "declares 'asvs', but its precondition answers refuted" in problem
         for problem in problems
     )
 

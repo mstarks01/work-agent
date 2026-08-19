@@ -59,6 +59,7 @@ class TestSchema:
             technology="unknown",
             trust_zone="boundary:internal-network",
             exposure="unknown",
+            interface_kind="non-web",
         )
         assert process.exposure == "unknown"
 
