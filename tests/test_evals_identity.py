@@ -32,9 +32,11 @@ from evals.harness.identity import (
     MechanicalIdentity,
     comparable_elements,
     endpoint_form,
+    endpoint_subset,
 )
 from evals.harness.judge import ClaimPair, UnmatchedThreat, claim_payload
 from evals.harness.reference import ReferenceThreat, load_corpus
+from evals.harness.verbs import UNSEPARATED, same_action
 from tests.factories import valid_model
 
 #: What element agreement alone is worth on the recorded labels, measured
@@ -243,3 +245,98 @@ def test_the_judge_never_sees_the_element_ids():
 
     assert set(payload) == {"stride_category", "claim_a", "claim_b"}
     assert "shopper-to-storefront-api" not in repr(payload)
+
+
+#: The verb half, measured over the cases that carry verbs — which is case 01
+#: today, and grows as ``tests/test_verb_coverage.py``'s debt shrinks. Both
+#: columns, for the reason ``FRONTIER`` carries both: the merge count alone
+#: would make the tightest possible rule look best.
+#:
+#: ``subset`` is what ``endpoint subset`` merges on these cases; ``subset_verb``
+#: is what survives the verb. The gap between them is what the verb buys.
+VERB_MEASURED = {
+    "cases": 1,
+    "within_lane_pairs": 27,
+    "subset": 4,
+    "subset_verb": 1,
+}
+
+
+def test_the_verb_separates_what_elements_alone_merge(corpus, flows_by_case):
+    """The measurement #201 rests on, over real reference sets and real verbs.
+
+    Not a re-run of the 23-pair analysis that argued for the vocabulary: this
+    reads the corpus through the shipped loader, so it moves when a blessing
+    pass assigns verbs to another case, and it fails when it moves.
+    """
+    assigned = [
+        case
+        for case in corpus
+        if all(
+            claim.verb
+            for claim in case.references.get("stride", ())
+            if isinstance(claim, ReferenceThreat)
+        )
+    ]
+
+    pairs = subset = subset_verb = 0
+    for case in assigned:
+        flows = flows_by_case[case.meta.id]
+        claims = [
+            claim
+            for claim in case.references["stride"]
+            if isinstance(claim, ReferenceThreat)
+        ]
+        for left, right in itertools.combinations(claims, 2):
+            if left.category != right.category:
+                continue
+            pairs += 1
+            if not endpoint_subset(
+                left.affected_element_ids, right.affected_element_ids, flows
+            ):
+                continue
+            subset += 1
+            if same_action(left.verb, right.verb):
+                subset_verb += 1
+
+    measured = {
+        "cases": len(assigned),
+        "within_lane_pairs": pairs,
+        "subset": subset,
+        "subset_verb": subset_verb,
+    }
+    assert measured == VERB_MEASURED, (
+        f"the verb measurement moved to {measured}. Update VERB_MEASURED and"
+        " re-quote it in docs/agents/claim-identity.md, which cites these"
+        " numbers as the argument for the verb."
+    )
+    assert subset_verb < subset, "the verb bought nothing on this corpus"
+
+
+def test_every_surviving_merge_is_a_recorded_one(corpus, flows_by_case):
+    """A merge the verb does not break must be named in ``UNSEPARATED``.
+
+    Otherwise the three recorded exceptions become a floor nobody notices
+    rising: a fourth would sit in the count and nowhere else.
+    """
+    recorded = {(case, lane) for case, lane, _ in UNSEPARATED}
+    for case in corpus:
+        claims = [
+            claim
+            for claim in case.references.get("stride", ())
+            if isinstance(claim, ReferenceThreat)
+        ]
+        if not claims or not all(claim.verb for claim in claims):
+            continue
+        flows = flows_by_case[case.meta.id]
+        for left, right in itertools.combinations(claims, 2):
+            same_lane = left.category == right.category
+            merged = same_lane and endpoint_subset(
+                left.affected_element_ids, right.affected_element_ids, flows
+            )
+            if merged and same_action(left.verb, right.verb):
+                assert (case.meta.id, left.category) in recorded, (
+                    f"{case.meta.id}/{left.category} survives the verb rule and"
+                    " is not in verbs.UNSEPARATED. Add it with the reason, or"
+                    f" separate it:\n  A: {left.claim}\n  B: {right.claim}"
+                )

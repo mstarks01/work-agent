@@ -27,8 +27,16 @@ from collections.abc import Callable, Iterator, Mapping
 from pathlib import Path
 from typing import Any, get_args
 
-sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "src"))
+_REPO_ROOT = Path(__file__).resolve().parents[1]
+sys.path.insert(0, str(_REPO_ROOT / "src"))
+# The repository root too, so this runs both as a script and as an import from
+# ``tests/test_corpus_lints.py``. The vocabulary below is the one thing this
+# module takes from the harness: a frozenset of strings is data, not the loader
+# the note on CLAIMS_DIR refuses to check the corpus through, and spelling
+# twenty verbs twice would guarantee the two copies drift.
+sys.path.insert(0, str(_REPO_ROOT))
 
+from evals.harness.verbs import unknown_verbs
 from stride_service.frameworks import PACKAGES, run_precondition
 from stride_service.frameworks.asvs.catalog import ASVS_LEVELS, requirements_for
 from stride_service.frameworks.stride.record import STRIDE_CATEGORIES
@@ -181,6 +189,19 @@ LANES_REQUIRED_PER_CASE: Mapping[FrameworkName, bool] = {
 RECORD_FIELDS: Mapping[FrameworkName, frozenset[str]] = {
     "asvs": CLAIM_FIELDS | {"chapter", "requirement"},
     "stride": CLAIM_FIELDS | {"category", "severity"},
+}
+#: Fields a record **may** carry, keyed like the required set beside it. A field
+#: here is permitted and never demanded, which is what lets the corpus fill in
+#: ``verb`` one blessing pass at a time instead of in one unreviewable edit.
+#: ``tests/test_verb_coverage.py`` is what stops that becoming permanent: it
+#: counts the claims still missing one and fails when the count moves.
+#:
+#: ASVS carries no entry because its records need no verb — a claim whose
+#: identity is a catalog requirement identifier composes nothing. That is a
+#: property of the framework, so it answers for a package nobody has written.
+OPTIONAL_RECORD_FIELDS: Mapping[FrameworkName, frozenset[str]] = {
+    "asvs": frozenset(),
+    "stride": frozenset({"verb"}),
 }
 RECORD_CHECKS: Mapping[
     FrameworkName, Callable[[str, dict, Mapping[str, Any]], Iterator[str]]
@@ -429,13 +450,14 @@ def _check_claims(
         return
 
     fields = RECORD_FIELDS[framework]
+    optional = OPTIONAL_RECORD_FIELDS[framework]
     for index, record in enumerate(records):
         where = f"{framework}[{index}]"
         if not isinstance(record, dict):
             yield f"{where} is not an object"
             continue
         missing = fields - record.keys()
-        unexpected = record.keys() - fields
+        unexpected = record.keys() - fields - optional
         if missing:
             yield f"{where} is missing fields: {sorted(missing)}"
             continue
@@ -444,6 +466,12 @@ def _check_claims(
 
         if record["tier"] not in TIERS:
             yield f"{where} tier {record['tier']!r} is not must-find/expected"
+
+        # A verb outside the vocabulary would compare equal to nothing, which
+        # reads downstream as a tool that found nothing rather than as a claim
+        # written wrong. Caught here, where the claim is.
+        for bad in unknown_verbs([record["verb"]] if "verb" in record else []):
+            yield f"{where} verb {bad!r} is not in evals.harness.verbs"
 
         # Mirrors the exemplar lint: a reference record that cites an element
         # the blessed model does not have is unscoreable. Citing *none* is legal

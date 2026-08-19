@@ -43,6 +43,7 @@ from __future__ import annotations
 from collections.abc import Iterable, Mapping
 
 from evals.harness.judge import BucketRuling, ClaimPair, ClaimRuling, UnmatchedThreat
+from evals.harness.verbs import same_action
 from stride_service.system_model import SystemModel
 
 #: One case's **Data Flow**s as ``flow id -> (source id, destination id)``.
@@ -83,6 +84,77 @@ def endpoint_form(element_ids: Iterable[str], flows: FlowMap) -> frozenset[str]:
         else:
             resolved.update(endpoints)
     return frozenset(resolved)
+
+
+def endpoint_subset(
+    left_ids: Iterable[str], right_ids: Iterable[str], flows: FlowMap
+) -> bool:
+    """Does one claim's **Element** set contain the other's, once resolved?
+
+    The loosest element rule that is still usable, and the frontier in
+    ``tests/test_evals_identity.py`` is what says so: 14 false splits over the
+    200 labelled pairs against ``equality``'s 89, at the price of 23 false
+    merges over 287 reference pairs against ``equality``'s 1.
+
+    Subset rather than equality because the two sides are written at different
+    grain — one names the flow and the process it ends at, the other names only
+    the process — and neither is wrong. Subset accepts that; equality calls it a
+    different claim.
+
+    On its own this over-merges, which is why nothing calls it alone:
+    :class:`SubsetVerbIdentity` is the rule, and this is one half of it.
+    """
+    left = endpoint_form(left_ids, flows)
+    right = endpoint_form(right_ids, flows)
+    return left <= right or right <= left
+
+
+class SubsetVerbIdentity:
+    """Endpoint subset **and** one action: the rule #201 argues for.
+
+    Each half fails alone and the pair does not. Elements alone cannot separate
+    a read from a write against one store, and a verb alone cannot separate two
+    reads of two different stores. Together they answer both, and the
+    measurement says how far: over the 23 reference-claim pairs ``endpoint
+    subset`` wrongly merges, the vocabulary separates 20, and
+    :data:`~evals.harness.verbs.UNSEPARATED` names the three it does not with
+    the reason for each.
+
+    Built to the ``Judge`` protocol like :class:`MechanicalIdentity`, so
+    :func:`~evals.harness.calibration.measure_agreement` scores it against the
+    same recorded labels on the same bar. Two rules, one scoreboard.
+
+    **It refuses a pair carrying no verb rather than guessing one.** No
+    reference claim carries one yet, so this rule cannot be scored over the
+    corpus today; ``tests/test_verb_coverage.py`` names that debt. Treating an
+    absent verb as a wildcard would quietly grade the element half alone and
+    report the number as this rule's.
+    """
+
+    def equivalent(self, pair: ClaimPair, flows: FlowMap) -> ClaimRuling:
+        if pair.candidate_element_ids is None:
+            raise IdentityError(
+                f"{pair.case}: no element IDs are assigned to candidate claim"
+                f" {pair.candidate_claim!r}, so this rule has nothing to compare"
+            )
+        if pair.reference_verb is None or pair.candidate_verb is None:
+            raise IdentityError(
+                f"{pair.case}: one side carries no action verb, so the verb half"
+                " of this rule cannot answer; assign both from"
+                " evals.harness.verbs, or score MechanicalIdentity instead"
+            )
+        elements = endpoint_subset(
+            pair.reference_element_ids, pair.candidate_element_ids, flows
+        )
+        action = same_action(pair.reference_verb, pair.candidate_verb)
+        return ClaimRuling(
+            match=elements and action,
+            rationale=(
+                f"elements {'overlap' if elements else 'disjoint'};"
+                f" {pair.reference_verb} vs {pair.candidate_verb}"
+                f" {'is one action' if action else 'are two actions'}"
+            ),
+        )
 
 
 class MechanicalIdentity:
