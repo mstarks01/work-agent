@@ -15,5 +15,9 @@ month be recomputed to the same digit today.
 Write to it through `webapp/review.py`, which validates every field against a
 closed set before the line is written. `evals/harness/ledger.py` is the reader.
 
+[`../VOTING.md`](../VOTING.md) is how a sitting fills this file: what each
+answer moves, what the four standings do to a number, and how `rekey` moves
+every vote when the match rule changes.
+
 The file does not exist until the first sitting. That is a starting state and
 not a fault; the loader returns an empty ledger.

@@ -51,10 +51,13 @@ say "the labels" or "the reference set", read *what an agent recorded*.
 
 Nothing in this directory ships in the production image — the corpus, the
 ledger, and the scorer are test-side only, and the package build takes just
-`src/stride_service`. Two companion guides:
+`src/stride_service`. Three companion guides:
 
 - **[BLESSING.md](BLESSING.md)** — how to author a new golden case, including a
   reference set per framework it declares.
+- **[VOTING.md](VOTING.md)** — how to hold a review sitting: what each answer
+  moves, what the four standings do to a number, and how to re-key the ledger
+  when the match rule changes.
 - **[TUNING.md](TUNING.md)** — how to use these evals to improve the models. Read
   it per instrument: every score is computed offline, and only producing
   a fresh sweep's reports needs credentials.

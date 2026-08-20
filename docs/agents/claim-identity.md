@@ -7,6 +7,10 @@ This is the design [#201](https://github.com/mstarks01/work-agent/issues/201)
 asks for, plus the thing it makes affordable: a human vote that stays valid
 across runs, models and prompt edits.
 
+The procedure that runs on top of it — how to hold a review sitting, and how to
+re-key the ledger after a rule change — is
+[`evals/VOTING.md`](../../evals/VOTING.md).
+
 ## The rule
 
 One question decides everything else: **what does the attacker do, and to
