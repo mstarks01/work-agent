@@ -35,6 +35,7 @@ from typing import Any
 from evals.harness.fingerprint import (
     components_for,
     fingerprint,
+    identifier_of,
     lane_field,
     version_for,
 )
@@ -105,7 +106,8 @@ def measure_case(
             getattr(claim, lane_of),
             tuple(claim.affected_element_ids),
             flows,
-            verb=claim.verb if version >= 2 else None,
+            verb=claim.verb if version == 2 else None,
+            identifier=identifier_of(framework, claim.id) if version == 3 else None,
         )
         current = live.get(fingerprint(components, version=version), ())
         if not current:

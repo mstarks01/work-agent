@@ -37,6 +37,7 @@ def vote(
     voter: str = "ada",
     framework: FrameworkName = "stride",
     verb: str | None = "impersonate",
+    identifier: str | None = None,
     element_ids: tuple[str, ...] = ("entity:customer",),
 ) -> Vote:
     """One vote on the finding the same components would key."""
@@ -46,7 +47,8 @@ def vote(
         lane,
         element_ids,
         FLOWS,
-        verb=verb if version >= 2 else None,
+        verb=verb if version == 2 else None,
+        identifier=identifier if version == 3 else None,
     )
     return Vote(
         fingerprint=fingerprint(components, version=version),
@@ -173,7 +175,7 @@ class TestEveryPackageIsGradedOnItsProse:
     """Neutral by construction: prose quality is nobody's framework's property."""
 
     def test_an_asvs_claim_is_measured_under_its_own_key(self):
-        """ASVS keys at version 1 off its chapter, and carries no verb."""
+        """ASVS keys at version 3: its chapter, its elements, its requirement."""
         report = sample_report(analyses=[asvs_block(1, [sample_asvs_claim()])])
         votes = Ledger(
             [
@@ -183,6 +185,7 @@ class TestEveryPackageIsGradedOnItsProse:
                     "unhelpful-mitigation",
                     framework="asvs",
                     verb=None,
+                    identifier="V6.2.1",
                     element_ids=(),
                 )
             ]
@@ -259,3 +262,38 @@ class TestTheAggregate:
 
         assert [row["case"] for row in block["writing"]] == ["01", "02", "02"]
         assert block["writing_aggregate"]["objections"] == 3
+
+
+def test_two_asvs_rulings_in_one_chapter_are_not_one_finding():
+    """The collapse version 3 closes, read through this instrument.
+
+    Under version 1 both rulings keyed alike, so a style objection to one
+    counted the other as answered too.
+    """
+    report = sample_report(
+        analyses=[
+            asvs_block(
+                1,
+                [
+                    sample_asvs_claim("v5.0.0-6.2.1"),
+                    sample_asvs_claim("v5.0.0-6.2.2"),
+                ],
+            )
+        ]
+    )
+    votes = Ledger(
+        [
+            vote(
+                "authentication",
+                "down",
+                "too-vague",
+                framework="asvs",
+                verb=None,
+                identifier="V6.2.1",
+                element_ids=(),
+            )
+        ]
+    )
+    row = measure(report, votes)
+
+    assert (row.produced, row.answered, row.objections) == (2, 1, 1)

@@ -140,6 +140,36 @@ class ModeRun:
     #: rather than as a field somebody has to add.
     rows: Mapping[str, tuple[Any, ...]]
 
+    @classmethod
+    def empty(cls, frameworks: tuple[FrameworkName, ...] = ()) -> ModeRun:
+        """A sweep that ran ``frameworks`` and measured nothing.
+
+        What a reading over an artifact needs: re-scoring a finished sweep
+        recomputes the instruments that read the ledger and leaves every
+        run-level block as the sweep wrote it, so it needs a run-shaped value
+        that claims to have measured nothing rather than a second Sweep type.
+        """
+        return cls(
+            payloads=[],
+            failures=[],
+            runs={},
+            provenance=RunProvenance(
+                sampling_config_version=1,
+                tiers_config_version=1,
+                sampling={},
+                node_runs={},
+            ),
+            expected_nodes=[],
+            usage={},
+            latency={},
+            grounds=[],
+            grounds_failures=[],
+            coverage=[],
+            frameworks=frameworks,
+            extractions=[],
+            rows={},
+        )
+
     @property
     def observations(self) -> dict[str, frozenset[str]]:
         """The node -> fingerprint sets the certification verdict rules on."""
