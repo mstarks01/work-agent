@@ -21,9 +21,12 @@ separates that exact pair on case 01. But "reads customer records" and "reads
 the whole database" are one verb, because the object is carried by the
 **Element** IDs beside it.
 
-Measured, not asserted: over the 23 reference-claim pairs that share endpoints
-in ``tests/test_evals_identity.py``'s ``endpoint subset`` row, this vocabulary
-separates 20. The three it does not are recorded in :data:`UNSEPARATED`.
+Measured, not asserted, and now over the whole corpus. All 243 reference claims
+carry a verb. ``tests/test_evals_identity.py``'s ``FRONTIER`` prices the rule on
+both errors at once: against ``endpoint subset`` alone it costs **one** more
+false split of 200 labelled pairs and removes **twenty** of the 23 false merges
+of 287 reference pairs. The three merges it does not break are recorded in
+:data:`UNSEPARATED`, with the reason for each.
 """
 
 from __future__ import annotations

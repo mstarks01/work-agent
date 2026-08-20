@@ -20,6 +20,7 @@ Free of provider calls: the rule is arithmetic over two sorted lists.
 
 from __future__ import annotations
 
+import dataclasses
 import itertools
 import random
 
@@ -30,6 +31,7 @@ from evals.harness.calibration import AGREEMENT_BAR, load_pairs, measure_agreeme
 from evals.harness.identity import (
     IdentityError,
     MechanicalIdentity,
+    SubsetVerbIdentity,
     comparable_elements,
     endpoint_form,
     endpoint_subset,
@@ -67,6 +69,11 @@ MEASURED = {
 #: #201's ``mechanism`` has to separate.
 FRONTIER = {
     "equality": {"splits": 89, "merges": 1},
+    #: The rule #201 argues for, and the only row here that is usable. Both
+    #: columns move the right way against ``endpoint subset``: one more split,
+    #: twenty fewer merges. It is not an element rule, so it is measured by
+    #: :func:`_rules`'s verb-aware entry rather than by a shape function.
+    "endpoint subset + verb": {"splits": 15, "merges": 3},
     "endpoint equality": {"splits": 60, "merges": 6},
     "subset": {"splits": 41, "merges": 7},
     "endpoint subset": {"splits": 14, "merges": 23},
@@ -76,7 +83,13 @@ FRONTIER = {
 
 
 def _rules(flows_by_case):
-    """Each frontier rule as ``(case, elements, elements) -> same claim?``."""
+    """Each frontier rule as ``(case, ids, ids, verb, verb) -> same claim?``.
+
+    The verbs are in the signature so that one table can hold an element-only
+    rule and a rule that reads the action, and the two columns stay comparable.
+    Every element rule ignores them, which is the point: the difference between
+    the rows is exactly what the verb buys.
+    """
 
     def bare(case, ids):
         return comparable_elements(ids)
@@ -85,21 +98,26 @@ def _rules(flows_by_case):
         return endpoint_form(ids, flows_by_case[case])
 
     def equal(shape):
-        return lambda case, a, b: shape(case, a) == shape(case, b)
+        return lambda case, a, b, va, vb: shape(case, a) == shape(case, b)
 
     def subset(shape):
-        return lambda case, a, b: (
+        return lambda case, a, b, va, vb: (
             shape(case, a) <= shape(case, b) or shape(case, b) <= shape(case, a)
         )
 
     def overlap(shape):
-        return lambda case, a, b: bool(shape(case, a) & shape(case, b))
+        return lambda case, a, b, va, vb: bool(shape(case, a) & shape(case, b))
+
+    def subset_and_verb(case, a, b, va, vb):
+        elements = ends(case, a) <= ends(case, b) or ends(case, b) <= ends(case, a)
+        return elements and same_action(va, vb)
 
     return {
         "equality": equal(bare),
         "endpoint equality": equal(ends),
         "subset": subset(bare),
         "endpoint subset": subset(ends),
+        "endpoint subset + verb": subset_and_verb,
         "overlap": overlap(bare),
         "endpoint overlap": overlap(ends),
     }
@@ -168,7 +186,11 @@ def test_the_frontier_is_priced_on_both_errors(assigned, corpus, flows_by_case):
             1
             for pair in assigned
             if not rule(
-                pair.case, pair.reference_element_ids, pair.candidate_element_ids
+                pair.case,
+                pair.reference_element_ids,
+                pair.candidate_element_ids,
+                pair.reference_verb,
+                pair.candidate_verb,
             )
         )
         merges = 0
@@ -185,6 +207,8 @@ def test_the_frontier_is_priced_on_both_errors(assigned, corpus, flows_by_case):
                     case.meta.id,
                     left.affected_element_ids,
                     right.affected_element_ids,
+                    left.verb,
+                    right.verb,
                 ):
                     merges += 1
         measured[name] = {"splits": splits, "merges": merges}
@@ -255,11 +279,21 @@ def test_the_judge_never_sees_the_element_ids():
 #: ``subset`` is what ``endpoint subset`` merges on these cases; ``subset_verb``
 #: is what survives the verb. The gap between them is what the verb buys.
 VERB_MEASURED = {
-    "cases": 1,
-    "within_lane_pairs": 27,
-    "subset": 4,
-    "subset_verb": 1,
+    "cases": 13,
+    "within_lane_pairs": 287,
+    "subset": 23,
+    "subset_verb": 3,
 }
+
+#: What :class:`~evals.harness.identity.SubsetVerbIdentity` scores against the
+#: recorded labels, on the judge's own bar. The first mechanical rule in this
+#: repository to clear it — ``MechanicalIdentity`` sits at 111/200.
+#:
+#: Read it as ``evals/README.md`` reads every other agreement figure: the labels
+#: are agent-authored, so this measures reproduction and not correctness. What
+#: it does establish is that the rule is not obviously worse than the judge on
+#: the same fixtures, which is what #201's third bullet asks for.
+SUBSET_VERB_AGREEMENT = {"agreements": 185, "total": 200}
 
 
 def test_the_verb_separates_what_elements_alone_merge(corpus, flows_by_case):
@@ -340,3 +374,54 @@ def test_every_surviving_merge_is_a_recorded_one(corpus, flows_by_case):
                     " is not in verbs.UNSEPARATED. Add it with the reason, or"
                     f" separate it:\n  A: {left.claim}\n  B: {right.claim}"
                 )
+
+
+def test_the_rule_clears_the_judges_own_bar(assigned, flows_by_case):
+    """``SubsetVerbIdentity`` through the same comparison the judge is scored by.
+
+    One scoreboard, two answers to one question — which is what building the
+    rule to the ``Judge`` protocol was for. The number is judge-relative in the
+    same way every other agreement figure here is: the labels are
+    agent-authored, so this measures reproduction rather than correctness.
+    """
+    result = measure_agreement(SubsetVerbIdentity(flows_by_case), assigned)
+
+    assert {
+        "agreements": result.agreements,
+        "total": result.total,
+    } == SUBSET_VERB_AGREEMENT, (
+        f"the rule now scores {result.agreements}/{result.total}. Update"
+        " SUBSET_VERB_AGREEMENT and re-quote it in"
+        " docs/agents/claim-identity.md."
+    )
+    assert result.meets_bar, "the rule fell below the bar the judge is held to"
+    assert not result.false_matches, (
+        "this set is match-labelled throughout, so a false match is impossible"
+        " and its appearance means the fixtures changed shape"
+    )
+
+
+def test_the_rule_refuses_a_pair_with_no_verb(assigned, flows_by_case):
+    """Never a silent fall back to grading the element half alone.
+
+    Built from an assigned pair with the verb removed, because in the fixtures
+    the two fields are assigned together — so a pair carrying no verb also
+    carries no elements, and the element check would answer first. This
+    isolates the verb refusal from that one.
+    """
+    stripped = dataclasses.replace(assigned[0].to_claim_pair(), candidate_verb=None)
+    with pytest.raises(IdentityError, match="no action verb"):
+        SubsetVerbIdentity(flows_by_case).equivalent(stripped)
+
+
+def test_the_rule_cannot_bucket_an_unmatched_threat(flows_by_case):
+    """It compares claims; adjudication is judgement about prose."""
+    threat = UnmatchedThreat(
+        threat_id="T1",
+        category="spoofing",
+        claim="An attacker does a thing.",
+        description="",
+        affected_element_ids=("process:a",),
+    )
+    with pytest.raises(IdentityError, match="cannot bucket"):
+        SubsetVerbIdentity(flows_by_case).adjudicate(threat, valid_model(), ())

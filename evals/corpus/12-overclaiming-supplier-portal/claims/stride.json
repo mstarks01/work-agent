@@ -11,7 +11,8 @@
       "likelihood": "medium",
       "impact": "medium"
     },
-    "notes": "Sign-in is the one control the source actually states, so this claim rests on a stated fact rather than on an unknown. Whether a second factor exists is never stated, and asserting its absence would be unsupported."
+    "notes": "Sign-in is the one control the source actually states, so this claim rests on a stated fact rather than on an unknown. Whether a second factor exists is never stated, and asserting its absence would be unsupported.",
+    "verb": "impersonate"
   },
   {
     "category": "spoofing",
@@ -25,7 +26,8 @@
       "likelihood": "medium",
       "impact": "high"
     },
-    "notes": "The datasheet's fully authenticated and audited covers this flow rhetorically and states nothing about it. An analyst that treats the manager path as authenticated because the vendor says so has swallowed the claim."
+    "notes": "The datasheet's fully authenticated and audited covers this flow rhetorically and states nothing about it. An analyst that treats the manager path as authenticated because the vendor says so has swallowed the claim.",
+    "verb": "impersonate"
   },
   {
     "category": "spoofing",
@@ -39,7 +41,8 @@
       "likelihood": "medium",
       "impact": "high"
     },
-    "notes": "The one flow crossing from the vendor platform into our cloud account, and the source states no authentication on it at all."
+    "notes": "The one flow crossing from the vendor platform into our cloud account, and the source states no authentication on it at all.",
+    "verb": "plant"
   },
   {
     "category": "tampering",
@@ -53,7 +56,8 @@
       "likelihood": "medium",
       "impact": "high"
     },
-    "notes": "The runbook states the file is picked up as-is, which is a stated absence of validation rather than an inferred one — the strongest grounded finding in the case."
+    "notes": "The runbook states the file is picked up as-is, which is a stated absence of validation rather than an inferred one — the strongest grounded finding in the case.",
+    "verb": "alter"
   },
   {
     "category": "tampering",
@@ -66,7 +70,8 @@
       "likelihood": "medium",
       "impact": "high"
     },
-    "notes": "This is the case's central reference. The correct handling of we were told it is encrypted end to end against the runbook's plain CSV is needs-info on an unresolved conflict; both a confident encrypted and a confident unencrypted are wrong, and the latter is worse."
+    "notes": "This is the case's central reference. The correct handling of we were told it is encrypted end to end against the runbook's plain CSV is needs-info on an unresolved conflict; both a confident encrypted and a confident unencrypted are wrong, and the latter is worse.",
+    "verb": "alter-in-transit"
   },
   {
     "category": "tampering",
@@ -80,7 +85,8 @@
       "likelihood": "low",
       "impact": "high"
     },
-    "notes": "We run no part of the vendor platform, so every control inside it is unverifiable by us rather than absent. Secure by design is not a control."
+    "notes": "We run no part of the vendor platform, so every control inside it is unverifiable by us rather than absent. Secure by design is not a control.",
+    "verb": "alter"
   },
   {
     "category": "repudiation",
@@ -94,7 +100,8 @@
       "likelihood": "medium",
       "impact": "medium"
     },
-    "notes": "The datasheet says audited and the model has no audit store, because a marketing adjective is not an element. An analyst that cites an audit log here is citing something that does not exist in the model."
+    "notes": "The datasheet says audited and the model has no audit store, because a marketing adjective is not an element. An analyst that cites an audit log here is citing something that does not exist in the model.",
+    "verb": "unattributable"
   },
   {
     "category": "repudiation",
@@ -108,7 +115,8 @@
       "likelihood": "low",
       "impact": "medium"
     },
-    "notes": "A dispute across an organizational boundary is the repudiation shape that matters here, and it is the boundary we have least visibility across."
+    "notes": "A dispute across an organizational boundary is the repudiation shape that matters here, and it is the boundary we have least visibility across.",
+    "verb": "unattributable"
   },
   {
     "category": "information-disclosure",
@@ -121,7 +129,8 @@
       "likelihood": "medium",
       "impact": "high"
     },
-    "notes": "Enterprise-grade encryption throughout is a claim about the vendor's platform; the bucket is in our cloud account and the source says nothing about it either way."
+    "notes": "Enterprise-grade encryption throughout is a claim about the vendor's platform; the bucket is in our cloud account and the source says nothing about it either way.",
+    "verb": "read"
   },
   {
     "category": "information-disclosure",
@@ -135,7 +144,8 @@
       "likelihood": "low",
       "impact": "high"
     },
-    "notes": "The documents are stated to hold contact details for supplier staff, which is what drives the pii tag; fully compliant states nothing about who inside the vendor can read them."
+    "notes": "The documents are stated to hold contact details for supplier staff, which is what drives the pii tag; fully compliant states nothing about who inside the vendor can read them.",
+    "verb": "read"
   },
   {
     "category": "information-disclosure",
@@ -148,7 +158,8 @@
       "likelihood": "low",
       "impact": "medium"
     },
-    "notes": "The upload flow crosses from the public internet into the vendor platform and the datasheet's encryption claim never becomes a stated property of it."
+    "notes": "The upload flow crosses from the public internet into the vendor platform and the datasheet's encryption claim never becomes a stated property of it.",
+    "verb": "intercept"
   },
   {
     "category": "denial-of-service",
@@ -162,7 +173,8 @@
       "likelihood": "medium",
       "impact": "medium"
     },
-    "notes": "Availability of a system we do not run is a real exposure and not a control gap; it belongs in the report even though there is nothing on our side to fix."
+    "notes": "Availability of a system we do not run is a real exposure and not a control gap; it belongs in the report even though there is nothing on our side to fix.",
+    "verb": "disable"
   },
   {
     "category": "denial-of-service",
@@ -176,7 +188,8 @@
       "likelihood": "low",
       "impact": "high"
     },
-    "notes": "The failure here is staleness rather than an outage: nothing in the source detects a missing nightly file."
+    "notes": "The failure here is staleness rather than an outage: nothing in the source detects a missing nightly file.",
+    "verb": "disable"
   },
   {
     "category": "elevation-of-privilege",
@@ -190,7 +203,8 @@
       "likelihood": "medium",
       "impact": "high"
     },
-    "notes": "Many suppliers share one vendor-hosted product and the source states nothing about isolation between them. Fully compliant is the phrase most likely to be mistaken for an answer to this."
+    "notes": "Many suppliers share one vendor-hosted product and the source states nothing about isolation between them. Fully compliant is the phrase most likely to be mistaken for an answer to this.",
+    "verb": "abuse-grant"
   },
   {
     "category": "elevation-of-privilege",
@@ -204,6 +218,7 @@
       "likelihood": "low",
       "impact": "high"
     },
-    "notes": "Picked up as-is is stated, so treating attacker-influenced file content as trusted input is grounded rather than speculative."
+    "notes": "Picked up as-is is stated, so treating attacker-influenced file content as trusted input is grounded rather than speculative.",
+    "verb": "inject"
   }
 ]

@@ -1,138 +1,251 @@
 [
   {
     "category": "spoofing",
-    "affected_element_ids": ["flow:admin-to-mysql-database:direct-administration", "entity:admin"],
+    "affected_element_ids": [
+      "flow:admin-to-mysql-database:direct-administration",
+      "entity:admin"
+    ],
     "claim": "An attacker holding the admin's database credentials connects to MySQL as the admin from anywhere on the internet, since there is no jump host in the way.",
     "tier": "must-find",
-    "severity": {"likelihood": "medium", "impact": "high"},
-    "notes": "The source states the path is reachable from wherever the admin happens to be, which is the same as saying it is reachable from wherever an attacker happens to be."
+    "severity": {
+      "likelihood": "medium",
+      "impact": "high"
+    },
+    "notes": "The source states the path is reachable from wherever the admin happens to be, which is the same as saying it is reachable from wherever an attacker happens to be.",
+    "verb": "use-credential"
   },
   {
     "category": "spoofing",
-    "affected_element_ids": ["flow:web-server-to-cdn-bucket:asset-publish", "store:cdn-bucket"],
+    "affected_element_ids": [
+      "flow:web-server-to-cdn-bucket:asset-publish",
+      "store:cdn-bucket"
+    ],
     "claim": "An attacker publishes assets into the CDN bucket as if they came from the web server, because how that push is authenticated is unverified.",
     "tier": "must-find",
-    "severity": {"likelihood": "medium", "impact": "high"},
-    "notes": "The source says outright that nothing tells you how the push is authenticated; this is the unknown the case is built around."
+    "severity": {
+      "likelihood": "medium",
+      "impact": "high"
+    },
+    "notes": "The source says outright that nothing tells you how the push is authenticated; this is the unknown the case is built around.",
+    "verb": "impersonate"
   },
   {
     "category": "spoofing",
-    "affected_element_ids": ["flow:reader-to-web-server:page-requests", "entity:reader"],
+    "affected_element_ids": [
+      "flow:reader-to-web-server:page-requests",
+      "entity:reader"
+    ],
     "claim": "An attacker takes over a signed-in reader's session, since nothing is stated about how those sessions are handled.",
     "tier": "expected",
-    "severity": {"likelihood": "medium", "impact": "medium"},
-    "notes": "Sign-in is stated to exist and nothing else about it is; the finding available here is the unverified strength, not an absent control."
+    "severity": {
+      "likelihood": "medium",
+      "impact": "medium"
+    },
+    "notes": "Sign-in is stated to exist and nothing else about it is; the finding available here is the unverified strength, not an absent control.",
+    "verb": "use-credential"
   },
   {
     "category": "tampering",
-    "affected_element_ids": ["flow:reader-to-cdn:asset-fetch"],
+    "affected_element_ids": [
+      "flow:reader-to-cdn:asset-fetch"
+    ],
     "claim": "An attacker on the network path rewrites a stylesheet or script in flight before it reaches the reader, because assets are fetched over plain HTTP.",
     "tier": "must-find",
-    "severity": {"likelihood": "high", "impact": "high"},
-    "notes": "The mixed-transport trap: the page arrives over HTTPS and its executable furniture does not, so the protection on the origin link buys nothing."
+    "severity": {
+      "likelihood": "high",
+      "impact": "high"
+    },
+    "notes": "The mixed-transport trap: the page arrives over HTTPS and its executable furniture does not, so the protection on the origin link buys nothing.",
+    "verb": "alter-in-transit"
   },
   {
     "category": "tampering",
-    "affected_element_ids": ["store:cdn-bucket", "entity:cdn"],
+    "affected_element_ids": [
+      "store:cdn-bucket",
+      "entity:cdn"
+    ],
     "claim": "An attacker who can write to the CDN bucket replaces a published asset and every reader of the site loads it.",
     "tier": "must-find",
-    "severity": {"likelihood": "medium", "impact": "high"},
-    "notes": "Planting the artifact at rest, kept distinct from modifying it in transit; the pair teaches the judge a distinction it routinely collapses."
+    "severity": {
+      "likelihood": "medium",
+      "impact": "high"
+    },
+    "notes": "Planting the artifact at rest, kept distinct from modifying it in transit; the pair teaches the judge a distinction it routinely collapses.",
+    "verb": "plant"
   },
   {
     "category": "tampering",
-    "affected_element_ids": ["flow:admin-to-mysql-database:direct-administration"],
+    "affected_element_ids": [
+      "flow:admin-to-mysql-database:direct-administration"
+    ],
     "claim": "An attacker on the network path modifies the admin's statements in flight, because the connection carries no TLS.",
     "tier": "must-find",
-    "severity": {"likelihood": "medium", "impact": "high"},
-    "notes": "The missing TLS is stated rather than inferred, and the traffic it protects is database administration."
+    "severity": {
+      "likelihood": "medium",
+      "impact": "high"
+    },
+    "notes": "The missing TLS is stated rather than inferred, and the traffic it protects is database administration.",
+    "verb": "alter-in-transit"
   },
   {
     "category": "tampering",
-    "affected_element_ids": ["store:mysql-database", "process:web-server"],
+    "affected_element_ids": [
+      "store:mysql-database",
+      "process:web-server"
+    ],
     "claim": "An attacker with database access edits page content directly and the web server serves the altered page.",
     "tier": "expected",
-    "severity": {"likelihood": "medium", "impact": "medium"},
-    "notes": "Defacement by the back door the admin path proves is open."
+    "severity": {
+      "likelihood": "medium",
+      "impact": "medium"
+    },
+    "notes": "Defacement by the back door the admin path proves is open.",
+    "verb": "alter"
   },
   {
     "category": "repudiation",
-    "affected_element_ids": ["flow:admin-to-mysql-database:direct-administration", "process:web-server"],
+    "affected_element_ids": [
+      "flow:admin-to-mysql-database:direct-administration",
+      "process:web-server"
+    ],
     "claim": "Content is changed directly in the database and no CMS record shows who changed it, because that path bypasses the CMS entirely.",
     "tier": "must-find",
-    "severity": {"likelihood": "medium", "impact": "medium"},
-    "notes": "The reason this case carries a repudiation lane worth grading: the accountability gap is structural, stated by the source in the words 'rather than through the CMS', and no missing control has to be assumed for it."
+    "severity": {
+      "likelihood": "medium",
+      "impact": "medium"
+    },
+    "notes": "The reason this case carries a repudiation lane worth grading: the accountability gap is structural, stated by the source in the words 'rather than through the CMS', and no missing control has to be assumed for it.",
+    "verb": "unattributable"
   },
   {
     "category": "repudiation",
-    "affected_element_ids": ["store:mysql-database", "flow:reader-to-web-server:page-requests"],
+    "affected_element_ids": [
+      "store:mysql-database",
+      "flow:reader-to-web-server:page-requests"
+    ],
     "claim": "A reader disputes a comment recorded against their account and the site cannot show it came from their session, since nothing about how sign-in is handled is stated.",
     "tier": "expected",
-    "severity": {"likelihood": "low", "impact": "medium"},
-    "notes": "Comments are named by the source as stored content attributable to accounts, which is what makes the dispute concrete."
+    "severity": {
+      "likelihood": "low",
+      "impact": "medium"
+    },
+    "notes": "Comments are named by the source as stored content attributable to accounts, which is what makes the dispute concrete.",
+    "verb": "unattributable"
   },
   {
     "category": "information-disclosure",
-    "affected_element_ids": ["flow:admin-to-mysql-database:direct-administration"],
+    "affected_element_ids": [
+      "flow:admin-to-mysql-database:direct-administration"
+    ],
     "claim": "An attacker sniffing the admin's unsecured MySQL connection reads account and comment records in clear text.",
     "tier": "must-find",
-    "severity": {"likelihood": "high", "impact": "high"},
-    "notes": "The single highest-signal finding in the case: a stated absence of TLS on a link stated to carry the whole database."
+    "severity": {
+      "likelihood": "high",
+      "impact": "high"
+    },
+    "notes": "The single highest-signal finding in the case: a stated absence of TLS on a link stated to carry the whole database.",
+    "verb": "intercept"
   },
   {
     "category": "information-disclosure",
-    "affected_element_ids": ["store:mysql-database"],
+    "affected_element_ids": [
+      "store:mysql-database"
+    ],
     "claim": "An attacker who reaches the database reads reader account records, since at-rest protection is unverified.",
     "tier": "expected",
-    "severity": {"likelihood": "medium", "impact": "high"},
-    "notes": "The source says outright that whether the database is encrypted on disk is unknown."
+    "severity": {
+      "likelihood": "medium",
+      "impact": "high"
+    },
+    "notes": "The source says outright that whether the database is encrypted on disk is unknown.",
+    "verb": "read"
   },
   {
     "category": "information-disclosure",
-    "affected_element_ids": ["flow:reader-to-cdn:asset-fetch", "entity:reader"],
+    "affected_element_ids": [
+      "flow:reader-to-cdn:asset-fetch",
+      "entity:reader"
+    ],
     "claim": "An attacker watching a reader's plain-HTTP asset fetches learns which pages that reader is viewing.",
     "tier": "expected",
-    "severity": {"likelihood": "medium", "impact": "low"},
-    "notes": "The privacy half of the mixed-transport problem; the HTTPS page request hides the URL and the asset fetches give it back."
+    "severity": {
+      "likelihood": "medium",
+      "impact": "low"
+    },
+    "notes": "The privacy half of the mixed-transport problem; the HTTPS page request hides the URL and the asset fetches give it back.",
+    "verb": "intercept"
   },
   {
     "category": "denial-of-service",
-    "affected_element_ids": ["process:web-server"],
+    "affected_element_ids": [
+      "process:web-server"
+    ],
     "claim": "An attacker floods the internet-facing web server with page requests until the public site stops responding.",
     "tier": "expected",
-    "severity": {"likelihood": "medium", "impact": "medium"},
-    "notes": "Baseline exposure claim; the web server is stated to be the whole of the site's dynamic surface."
+    "severity": {
+      "likelihood": "medium",
+      "impact": "medium"
+    },
+    "notes": "Baseline exposure claim; the web server is stated to be the whole of the site's dynamic surface.",
+    "verb": "flood"
   },
   {
     "category": "denial-of-service",
-    "affected_element_ids": ["store:cdn-bucket"],
+    "affected_element_ids": [
+      "store:cdn-bucket"
+    ],
     "claim": "An attacker who can write to the CDN bucket removes the assets the site depends on so pages render broken.",
     "tier": "expected",
-    "severity": {"likelihood": "low", "impact": "medium"},
-    "notes": "Same access as the asset-replacement claim, used to deny rather than to alter."
+    "severity": {
+      "likelihood": "low",
+      "impact": "medium"
+    },
+    "notes": "Same access as the asset-replacement claim, used to deny rather than to alter.",
+    "verb": "delete"
   },
   {
     "category": "denial-of-service",
-    "affected_element_ids": ["store:mysql-database", "flow:admin-to-mysql-database:direct-administration"],
+    "affected_element_ids": [
+      "store:mysql-database",
+      "flow:admin-to-mysql-database:direct-administration"
+    ],
     "claim": "An attacker on the direct MySQL path runs queries expensive enough that the web server cannot serve pages.",
     "tier": "expected",
-    "severity": {"likelihood": "low", "impact": "high"},
-    "notes": "The database is shared between the admin path and the site, and the source describes no separation between them."
+    "severity": {
+      "likelihood": "low",
+      "impact": "high"
+    },
+    "notes": "The database is shared between the admin path and the site, and the source describes no separation between them.",
+    "verb": "flood"
   },
   {
     "category": "elevation-of-privilege",
-    "affected_element_ids": ["flow:admin-to-mysql-database:direct-administration", "store:mysql-database"],
+    "affected_element_ids": [
+      "flow:admin-to-mysql-database:direct-administration",
+      "store:mysql-database"
+    ],
     "claim": "An attacker who intercepts the admin's unencrypted session obtains database authority that bypasses every control the CMS applies.",
     "tier": "must-find",
-    "severity": {"likelihood": "medium", "impact": "high"},
-    "notes": "The escalation the case is built to grade: authority is not gained inside the application but around it, and the CMS never sees the actor."
+    "severity": {
+      "likelihood": "medium",
+      "impact": "high"
+    },
+    "notes": "The escalation the case is built to grade: authority is not gained inside the application but around it, and the CMS never sees the actor.",
+    "verb": "escalate"
   },
   {
     "category": "elevation-of-privilege",
-    "affected_element_ids": ["store:cdn-bucket", "flow:reader-to-cdn:asset-fetch"],
+    "affected_element_ids": [
+      "store:cdn-bucket",
+      "flow:reader-to-cdn:asset-fetch"
+    ],
     "claim": "An attacker who plants a script in the CDN bucket runs code in every reader's browser in the site's own context.",
     "tier": "must-find",
-    "severity": {"likelihood": "medium", "impact": "high"},
-    "notes": "Where the two crossings compound: write access in a zone the site does not control becomes execution inside the site's origin, and neither crossing on its own carries that."
+    "severity": {
+      "likelihood": "medium",
+      "impact": "high"
+    },
+    "notes": "Where the two crossings compound: write access in a zone the site does not control becomes execution inside the site's origin, and neither crossing on its own carries that.",
+    "verb": "plant"
   }
 ]
