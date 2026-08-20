@@ -48,6 +48,7 @@ from pathlib import Path
 import pytest
 from pydantic import ValidationError
 
+from stride_service.actions import menu
 from stride_service.critic import mentioned_ids
 from stride_service.evidence import (
     ABSENT_PREFIX,
@@ -596,3 +597,32 @@ COMPOSED_ANALYZE_TOKEN_BUDGET = 5800
 def test_composed_analyze_prompt_within_budget(category):
     composed = compose_analyze_prompt(loader, package_loader, category)
     assert estimate_tokens(composed) <= COMPOSED_ANALYZE_TOKEN_BUDGET
+
+
+def test_the_verb_menu_in_the_output_contract_is_the_vocabulary():
+    """``frameworks/stride/output.md`` carries exactly ``actions.menu()``.
+
+    Without this the menu is a static copy that happens to match. A verb added
+    to :data:`~stride_service.actions.ActionVerb` would reach the response
+    schema — so the provider would accept it — and never reach the prompt, so no
+    agent would learn the distinction exists. The field would be enforceable and
+    unfillable, which is worse than either alone.
+
+    ``actions.menu()``'s docstring claims it is built rather than written out.
+    This is what makes that claim true rather than an intention.
+
+    **Line by line rather than a substring test.** ``menu() in contract`` passes
+    when a verb is *appended* to the last family, because the generated text is
+    still a prefix of the altered line — which is exactly the drift direction a
+    new verb takes. Comparing the family lines as a list catches an addition, a
+    removal and a reordering alike.
+    """
+    contract = (PACKAGE_DIR / "output.md").read_text(encoding="utf-8")
+    # ``- *family*:`` and not ``- **`field`**``, which a ``startswith("- *")``
+    # would also take: one asterisk, a word, then the colon.
+    family_line = re.compile(r"^- \*[a-z-]+\*: ")
+    in_contract = [line for line in contract.splitlines() if family_line.match(line)]
+    assert in_contract == menu().splitlines(), (
+        "the verb menu in frameworks/stride/output.md is not what"
+        " stride_service.actions.menu() emits. Regenerate it:\n\n" + menu()
+    )

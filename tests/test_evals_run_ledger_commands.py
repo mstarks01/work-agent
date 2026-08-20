@@ -1,0 +1,142 @@
+"""The two credential-free ledger commands: ``review`` and ``rekey``.
+
+``rekey`` is the operation the whole versioning argument rests on — a better
+recogniser changes every key, and a vote stores its components so moving the
+ledger is arithmetic over a file rather than a re-vote. Before these tests the
+capability was claimed in three docstrings and reachable from nothing.
+
+Deterministic and free of provider calls, so they gate on every PR.
+"""
+
+from __future__ import annotations
+
+import json
+
+from evals.harness.fingerprint import Components
+from evals.harness.ledger import append, cast, load
+from evals.harness.run import main
+
+
+def seed(path, *, version=1):
+    for target, verb in (("process:a", "read"), ("store:b", "alter")):
+        append(
+            cast(
+                Components("stride", "information-disclosure", (target,), verb=verb),
+                "01-payments-checkout",
+                "up",
+                "ada",
+                version=version,
+            ),
+            path,
+        )
+
+
+def test_rekey_previews_without_writing(tmp_path, capsys):
+    """A preview that also edited would be a preview nobody could trust."""
+    led = tmp_path / "votes.jsonl"
+    seed(led)
+    before = led.read_text(encoding="utf-8")
+
+    assert main(["rekey", "--to-version", "2", "--ledger", str(led)]) == 0
+
+    assert led.read_text(encoding="utf-8") == before
+    out = capsys.readouterr().out
+    assert "2 fingerprints move" in out
+    assert "nothing written" in out
+
+
+def test_rekey_moves_every_key_and_keeps_every_vote(tmp_path):
+    """The property: no re-vote, no provider, and the verdicts survive."""
+    led = tmp_path / "votes.jsonl"
+    seed(led)
+    original = load(led)
+
+    assert main(["rekey", "--to-version", "2", "--ledger", str(led), "--yes"]) == 0
+
+    moved = load(led)
+    assert all(vote.fingerprint.startswith("v2:") for vote in moved)
+    assert [v.verdict for v in moved] == [v.verdict for v in original.votes]
+    assert [v.voter for v in moved] == [v.voter for v in original.votes]
+    assert [v.components for v in moved] == [v.components for v in original.votes]
+    assert len(moved.pool()) == len(original.pool())
+
+
+def test_rekey_refuses_a_move_the_components_cannot_satisfy(tmp_path, capsys):
+    """Fail-closed, so a partial re-key is impossible."""
+    led = tmp_path / "votes.jsonl"
+    append(
+        cast(
+            Components("asvs", "V1", ("process:a",)),
+            "01-payments-checkout",
+            "up",
+            "ada",
+            version=1,
+        ),
+        led,
+    )
+    before = led.read_text(encoding="utf-8")
+
+    assert main(["rekey", "--to-version", "2", "--ledger", str(led), "--yes"]) == 1
+
+    assert led.read_text(encoding="utf-8") == before, "a refusal must not write"
+    assert "cannot re-key" in capsys.readouterr().out
+
+
+def test_rekey_on_an_empty_ledger_is_not_an_error(tmp_path, capsys):
+    assert main(["rekey", "--to-version", "2", "--ledger", str(tmp_path / "nil")]) == 0
+    assert "no votes to re-key" in capsys.readouterr().out
+
+
+def _sweep(tmp_path):
+    """A sweep artifact and the reports directory ``run --out`` writes beside it."""
+    artifact = tmp_path / "artifact.json"
+    artifact.write_text(json.dumps({"mode": "analysis"}), encoding="utf-8")
+    reports = tmp_path / "artifact.json.reports"
+    reports.mkdir()
+    (reports / "01-payments-checkout.report.json").write_text(
+        json.dumps(
+            {
+                "engine_version": "test-1.0",
+                "analyses": [
+                    {
+                        "framework": "stride",
+                        "claims": [
+                            {
+                                "id": "S-01",
+                                "category": "spoofing",
+                                "title": "A finding",
+                                "description": "d",
+                                "affected_element_ids": ["entity:shopper"],
+                                "verb": "impersonate",
+                                "grounds": [{"kind": "quote", "text": "t"}],
+                            }
+                        ],
+                    }
+                ],
+            }
+        ),
+        encoding="utf-8",
+    )
+    return artifact
+
+
+def test_review_reports_what_is_waiting(tmp_path, capsys):
+    artifact = _sweep(tmp_path)
+    led = tmp_path / "votes.jsonl"
+
+    assert main(["review", str(artifact), "--voter", "ada", "--ledger", str(led)]) == 0
+
+    out = capsys.readouterr().out
+    assert "1 findings waiting for ada" in out
+    assert "01-payments-checkout" in out
+    assert "webapp/review.py" in out, "a reviewer needs to be told how to answer"
+
+
+def test_review_writes_nothing(tmp_path):
+    """Read-only, like ``promote`` and ``stability``."""
+    artifact = _sweep(tmp_path)
+    led = tmp_path / "votes.jsonl"
+
+    main(["review", str(artifact), "--voter", "ada", "--ledger", str(led)])
+
+    assert not led.exists()
