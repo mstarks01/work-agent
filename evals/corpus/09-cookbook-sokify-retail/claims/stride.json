@@ -1,162 +1,296 @@
 [
   {
     "category": "spoofing",
-    "affected_element_ids": ["flow:mobile-app-to-web-api:api-traffic", "process:web-api"],
+    "affected_element_ids": [
+      "flow:mobile-app-to-web-api:api-traffic",
+      "process:web-api"
+    ],
     "claim": "An attacker submits orders to the web API as if they came from the mobile app, since how the API authenticates callers is unverified.",
     "tier": "must-find",
-    "severity": {"likelihood": "medium", "impact": "high"},
-    "notes": "The source states outright that nobody can say what the API does about authentication, and the app is the only stated client; needs-info is an acceptable verdict here, silence is not."
+    "severity": {
+      "likelihood": "medium",
+      "impact": "high"
+    },
+    "notes": "The source states outright that nobody can say what the API does about authentication, and the app is the only stated client; needs-info is an acceptable verdict here, silence is not.",
+    "verb": "impersonate"
   },
   {
     "category": "spoofing",
-    "affected_element_ids": ["flow:catalogue-spreadsheet-to-web-api:sql-statements", "process:catalogue-spreadsheet"],
+    "affected_element_ids": [
+      "flow:catalogue-spreadsheet-to-web-api:sql-statements",
+      "process:catalogue-spreadsheet"
+    ],
     "claim": "An attacker who obtains a copy of the catalogue spreadsheet sends SQL to the web API as the catalogue tool.",
     "tier": "must-find",
-    "severity": {"likelihood": "medium", "impact": "high"},
-    "notes": "The macro path's authority is carried by a file on a laptop; nothing in the source identifies who is driving it."
+    "severity": {
+      "likelihood": "medium",
+      "impact": "high"
+    },
+    "notes": "The macro path's authority is carried by a file on a laptop; nothing in the source identifies who is driving it.",
+    "verb": "impersonate"
   },
   {
     "category": "spoofing",
-    "affected_element_ids": ["flow:fax-gateway-to-customer:confirmation-fax", "entity:customer"],
+    "affected_element_ids": [
+      "flow:fax-gateway-to-customer:confirmation-fax",
+      "entity:customer"
+    ],
     "claim": "An attacker faxes a customer what appears to be a Sokify order confirmation, since nothing on the fax leg identifies the sender.",
     "tier": "expected",
-    "severity": {"likelihood": "low", "impact": "medium"},
-    "notes": "The reverse direction of the case's signature weakness: the model records that the destination is never verified, and the leg carries no sender identity either."
+    "severity": {
+      "likelihood": "low",
+      "impact": "medium"
+    },
+    "notes": "The reverse direction of the case's signature weakness: the model records that the destination is never verified, and the leg carries no sender identity either.",
+    "verb": "forge"
   },
   {
     "category": "tampering",
-    "affected_element_ids": ["flow:mobile-app-to-web-api:api-traffic"],
+    "affected_element_ids": [
+      "flow:mobile-app-to-web-api:api-traffic"
+    ],
     "claim": "An attacker on the network path alters order details in flight between the app and the web API, because that traffic runs over plain HTTP.",
     "tier": "must-find",
-    "severity": {"likelihood": "high", "impact": "medium"},
-    "notes": "The missing TLS is stated by the source rather than inferred, so this is the one claim in the case that rests on no unknown at all."
+    "severity": {
+      "likelihood": "high",
+      "impact": "medium"
+    },
+    "notes": "The missing TLS is stated by the source rather than inferred, so this is the one claim in the case that rests on no unknown at all.",
+    "verb": "alter-in-transit"
   },
   {
     "category": "tampering",
-    "affected_element_ids": ["flow:catalogue-spreadsheet-to-web-api:sql-statements", "process:web-api"],
+    "affected_element_ids": [
+      "flow:catalogue-spreadsheet-to-web-api:sql-statements",
+      "process:web-api"
+    ],
     "claim": "An attacker drives the spreadsheet's macros to change catalogue prices through the web API.",
     "tier": "must-find",
-    "severity": {"likelihood": "medium", "impact": "high"},
-    "notes": "The stated purpose of the path, exercised by the wrong party; distinct from injecting statements the path was never meant to carry."
+    "severity": {
+      "likelihood": "medium",
+      "impact": "high"
+    },
+    "notes": "The stated purpose of the path, exercised by the wrong party; distinct from injecting statements the path was never meant to carry.",
+    "verb": "alter"
   },
   {
     "category": "tampering",
-    "affected_element_ids": ["flow:catalogue-spreadsheet-to-web-api:sql-statements", "process:web-api"],
+    "affected_element_ids": [
+      "flow:catalogue-spreadsheet-to-web-api:sql-statements",
+      "process:web-api"
+    ],
     "claim": "An attacker appends further SQL to the statements the macros send so the web API executes changes beyond prices and product copy.",
     "tier": "must-find",
-    "severity": {"likelihood": "medium", "impact": "high"},
-    "notes": "Injection through a path that carries statements rather than parameters; kept distinct from the price-change claim because the target differs, which is the distinction the judge most often collapses."
+    "severity": {
+      "likelihood": "medium",
+      "impact": "high"
+    },
+    "notes": "Injection through a path that carries statements rather than parameters; kept distinct from the price-change claim because the target differs, which is the distinction the judge most often collapses.",
+    "verb": "inject"
   },
   {
     "category": "tampering",
-    "affected_element_ids": ["store:delivery-address-flat-file", "process:sims"],
+    "affected_element_ids": [
+      "store:delivery-address-flat-file",
+      "process:sims"
+    ],
     "claim": "An attacker who can write to the flat file rewrites a delivery address so goods are dispatched somewhere else.",
     "tier": "expected",
-    "severity": {"likelihood": "low", "impact": "high"},
-    "notes": "The file sits alongside SIMS with no stated protection; the impact is physical goods, not records."
+    "severity": {
+      "likelihood": "low",
+      "impact": "high"
+    },
+    "notes": "The file sits alongside SIMS with no stated protection; the impact is physical goods, not records.",
+    "verb": "alter"
   },
   {
     "category": "tampering",
-    "affected_element_ids": ["flow:web-api-to-sims:order-handover", "process:sims"],
+    "affected_element_ids": [
+      "flow:web-api-to-sims:order-handover",
+      "process:sims"
+    ],
     "claim": "An attacker changes the number stored against an order so the confirmation is faxed to a machine they control.",
     "tier": "expected",
-    "severity": {"likelihood": "low", "impact": "medium"},
-    "notes": "Reaches the disclosure below by a tampering route; the two are separate findings because the actions differ."
+    "severity": {
+      "likelihood": "low",
+      "impact": "medium"
+    },
+    "notes": "Reaches the disclosure below by a tampering route; the two are separate findings because the actions differ.",
+    "verb": "alter"
   },
   {
     "category": "repudiation",
-    "affected_element_ids": ["process:web-api", "flow:mobile-app-to-web-api:api-traffic"],
+    "affected_element_ids": [
+      "process:web-api",
+      "flow:mobile-app-to-web-api:api-traffic"
+    ],
     "claim": "A customer denies placing an order and Sokify cannot show who submitted it, because how the API authenticates callers is unverified.",
     "tier": "must-find",
-    "severity": {"likelihood": "medium", "impact": "medium"},
-    "notes": "The same unknown as the spoofing claim, filed for what it costs after the fact rather than for the access it grants."
+    "severity": {
+      "likelihood": "medium",
+      "impact": "medium"
+    },
+    "notes": "The same unknown as the spoofing claim, filed for what it costs after the fact rather than for the access it grants.",
+    "verb": "unattributable"
   },
   {
     "category": "repudiation",
-    "affected_element_ids": ["flow:catalogue-spreadsheet-to-web-api:sql-statements"],
+    "affected_element_ids": [
+      "flow:catalogue-spreadsheet-to-web-api:sql-statements"
+    ],
     "claim": "Nobody can show who made a price change, because the changes arrive at the web API as SQL from a spreadsheet rather than from an identified user.",
     "tier": "expected",
-    "severity": {"likelihood": "medium", "impact": "medium"},
-    "notes": "Grounded in the model's shape rather than in a missing control: the source describes no person at the sending end of this flow."
+    "severity": {
+      "likelihood": "medium",
+      "impact": "medium"
+    },
+    "notes": "Grounded in the model's shape rather than in a missing control: the source describes no person at the sending end of this flow.",
+    "verb": "unattributable"
   },
   {
     "category": "repudiation",
-    "affected_element_ids": ["flow:fax-gateway-to-customer:confirmation-fax"],
+    "affected_element_ids": [
+      "flow:fax-gateway-to-customer:confirmation-fax"
+    ],
     "claim": "Sokify cannot show a confirmation ever reached the customer, because nobody checks the fax arrived at the right place.",
     "tier": "expected",
-    "severity": {"likelihood": "medium", "impact": "low"},
-    "notes": "The stated absence read for its evidentiary cost; an analyst that only files the disclosure has read half of it."
+    "severity": {
+      "likelihood": "medium",
+      "impact": "low"
+    },
+    "notes": "The stated absence read for its evidentiary cost; an analyst that only files the disclosure has read half of it.",
+    "verb": "unattributable"
   },
   {
     "category": "information-disclosure",
-    "affected_element_ids": ["flow:mobile-app-to-web-api:api-traffic"],
+    "affected_element_ids": [
+      "flow:mobile-app-to-web-api:api-traffic"
+    ],
     "claim": "An attacker on the network path reads customer details out of the app's plain-HTTP traffic to the web API.",
     "tier": "must-find",
-    "severity": {"likelihood": "high", "impact": "high"},
-    "notes": "The clearest finding in the case and the one that needs no unknown; a run that misses it has not read the source at all."
+    "severity": {
+      "likelihood": "high",
+      "impact": "high"
+    },
+    "notes": "The clearest finding in the case and the one that needs no unknown; a run that misses it has not read the source at all.",
+    "verb": "intercept"
   },
   {
     "category": "information-disclosure",
-    "affected_element_ids": ["store:user-database"],
+    "affected_element_ids": [
+      "store:user-database"
+    ],
     "claim": "An attacker who reaches the user database reads customers' names, addresses and the cards they paid with, since at-rest protection is unverified.",
     "tier": "must-find",
-    "severity": {"likelihood": "medium", "impact": "high"},
-    "notes": "The source names the contents and then says outright that nobody knows whether the store is encrypted."
+    "severity": {
+      "likelihood": "medium",
+      "impact": "high"
+    },
+    "notes": "The source names the contents and then says outright that nobody knows whether the store is encrypted.",
+    "verb": "read"
   },
   {
     "category": "information-disclosure",
-    "affected_element_ids": ["store:delivery-address-flat-file"],
+    "affected_element_ids": [
+      "store:delivery-address-flat-file"
+    ],
     "claim": "An attacker who reaches the flat file reads every delivery address written into it.",
     "tier": "expected",
-    "severity": {"likelihood": "medium", "impact": "medium"},
-    "notes": "Lower impact than the database because the source is explicit that only addresses go in the file, which is a stated scope limit rather than an assumed one."
+    "severity": {
+      "likelihood": "medium",
+      "impact": "medium"
+    },
+    "notes": "Lower impact than the database because the source is explicit that only addresses go in the file, which is a stated scope limit rather than an assumed one.",
+    "verb": "read"
   },
   {
     "category": "information-disclosure",
-    "affected_element_ids": ["flow:fax-gateway-to-customer:confirmation-fax", "process:fax-gateway"],
+    "affected_element_ids": [
+      "flow:fax-gateway-to-customer:confirmation-fax",
+      "process:fax-gateway"
+    ],
     "claim": "The confirmation fax discloses a customer's name and address to whoever holds the dialled number, because nobody checks it arrived at the right place.",
     "tier": "must-find",
-    "severity": {"likelihood": "medium", "impact": "medium"},
-    "notes": "The case's signature threat and the reason the fax leg is in the corpus at all: a channel where the control is not unverified but unavailable, which is a different thing from unknown."
+    "severity": {
+      "likelihood": "medium",
+      "impact": "medium"
+    },
+    "notes": "The case's signature threat and the reason the fax leg is in the corpus at all: a channel where the control is not unverified but unavailable, which is a different thing from unknown.",
+    "verb": "read"
   },
   {
     "category": "denial-of-service",
-    "affected_element_ids": ["process:web-api"],
+    "affected_element_ids": [
+      "process:web-api"
+    ],
     "claim": "An attacker floods the internet-facing web API until customers cannot place orders.",
     "tier": "expected",
-    "severity": {"likelihood": "medium", "impact": "medium"},
-    "notes": "The app is the only channel the source describes, so losing the API loses all ordering."
+    "severity": {
+      "likelihood": "medium",
+      "impact": "medium"
+    },
+    "notes": "The app is the only channel the source describes, so losing the API loses all ordering.",
+    "verb": "flood"
   },
   {
     "category": "denial-of-service",
-    "affected_element_ids": ["flow:catalogue-spreadsheet-to-web-api:sql-statements", "process:web-api"],
+    "affected_element_ids": [
+      "flow:catalogue-spreadsheet-to-web-api:sql-statements",
+      "process:web-api"
+    ],
     "claim": "An attacker sends SQL through the macro path that locks catalogue rows so the app cannot serve the catalogue.",
     "tier": "expected",
-    "severity": {"likelihood": "low", "impact": "high"},
-    "notes": "The same path as the tampering claims, used to deny rather than to alter."
+    "severity": {
+      "likelihood": "low",
+      "impact": "high"
+    },
+    "notes": "The same path as the tampering claims, used to deny rather than to alter.",
+    "verb": "inject"
   },
   {
     "category": "denial-of-service",
-    "affected_element_ids": ["process:sims", "flow:web-api-to-sims:order-handover"],
+    "affected_element_ids": [
+      "process:sims",
+      "flow:web-api-to-sims:order-handover"
+    ],
     "claim": "An attacker who stops SIMS accepting order handovers halts dispatch for every order placed.",
     "tier": "expected",
-    "severity": {"likelihood": "low", "impact": "high"},
-    "notes": "SIMS is a single legacy path with no stated alternative; orders are taken but nothing ships."
+    "severity": {
+      "likelihood": "low",
+      "impact": "high"
+    },
+    "notes": "SIMS is a single legacy path with no stated alternative; orders are taken but nothing ships.",
+    "verb": "disable"
   },
   {
     "category": "elevation-of-privilege",
-    "affected_element_ids": ["process:catalogue-spreadsheet", "flow:catalogue-spreadsheet-to-web-api:sql-statements", "process:web-api"],
+    "affected_element_ids": [
+      "process:catalogue-spreadsheet",
+      "flow:catalogue-spreadsheet-to-web-api:sql-statements",
+      "process:web-api"
+    ],
     "claim": "An attacker who reaches the marketing laptop gains a write path into the web API from the office zone, because the spreadsheet's macros speak SQL to it.",
     "tier": "must-find",
-    "severity": {"likelihood": "medium", "impact": "high"},
-    "notes": "The crossing an analyst should see first: an unmanaged endpoint in a different zone holds a standing write path into the server-side estate."
+    "severity": {
+      "likelihood": "medium",
+      "impact": "high"
+    },
+    "notes": "The crossing an analyst should see first: an unmanaged endpoint in a different zone holds a standing write path into the server-side estate.",
+    "verb": "escalate"
   },
   {
     "category": "elevation-of-privilege",
-    "affected_element_ids": ["flow:catalogue-spreadsheet-to-web-api:sql-statements", "store:user-database"],
+    "affected_element_ids": [
+      "flow:catalogue-spreadsheet-to-web-api:sql-statements",
+      "store:user-database"
+    ],
     "claim": "An attacker whose SQL reaches the web API through the catalogue path acts against customer records the catalogue tool has no business touching.",
     "tier": "expected",
-    "severity": {"likelihood": "medium", "impact": "high"},
-    "notes": "The classic escalation shape: a path scoped by intent rather than by a control, reaching whatever authority the API holds over the database."
+    "severity": {
+      "likelihood": "medium",
+      "impact": "high"
+    },
+    "notes": "The classic escalation shape: a path scoped by intent rather than by a control, reaching whatever authority the API holds over the database.",
+    "verb": "abuse-grant"
   }
 ]

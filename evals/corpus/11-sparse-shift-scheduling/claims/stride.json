@@ -11,7 +11,8 @@
       "likelihood": "medium",
       "impact": "medium"
     },
-    "notes": "The source explicitly says nobody has documented how colleagues sign in. needs-info is the right verdict here; silence is not."
+    "notes": "The source explicitly says nobody has documented how colleagues sign in. needs-info is the right verdict here; silence is not.",
+    "verb": "impersonate"
   },
   {
     "category": "spoofing",
@@ -25,7 +26,8 @@
       "likelihood": "medium",
       "impact": "high"
     },
-    "notes": "Same unknown as the colleague lane but a materially higher impact, which is why the two are kept as separate references rather than one."
+    "notes": "Same unknown as the colleague lane but a materially higher impact, which is why the two are kept as separate references rather than one.",
+    "verb": "impersonate"
   },
   {
     "category": "spoofing",
@@ -39,7 +41,8 @@
       "likelihood": "medium",
       "impact": "high"
     },
-    "notes": "This is the boundary crossing the source draws most clearly and says least about. The payroll team environment is a zone we are told nothing else about."
+    "notes": "This is the boundary crossing the source draws most clearly and says least about. The payroll team environment is a zone we are told nothing else about.",
+    "verb": "impersonate"
   },
   {
     "category": "spoofing",
@@ -52,7 +55,8 @@
       "likelihood": "medium",
       "impact": "high"
     },
-    "notes": "Stated as undocumented in the closing paragraph, which is the sentence most likely to be dropped in extraction."
+    "notes": "Stated as undocumented in the closing paragraph, which is the sentence most likely to be dropped in extraction.",
+    "verb": "impersonate"
   },
   {
     "category": "tampering",
@@ -66,7 +70,8 @@
       "likelihood": "medium",
       "impact": "high"
     },
-    "notes": "The export rests unattended between two independent trust zones, and nothing states any integrity control over it. This is the case's strongest finding."
+    "notes": "The export rests unattended between two independent trust zones, and nothing states any integrity control over it. This is the case's strongest finding.",
+    "verb": "alter"
   },
   {
     "category": "tampering",
@@ -80,7 +85,8 @@
       "likelihood": "low",
       "impact": "high"
     },
-    "notes": "Reaching the store and modifying it is a distinct claim from reading it; the pair is deliberately split across lanes."
+    "notes": "Reaching the store and modifying it is a distinct claim from reading it; the pair is deliberately split across lanes.",
+    "verb": "alter"
   },
   {
     "category": "tampering",
@@ -93,7 +99,8 @@
       "likelihood": "low",
       "impact": "medium"
     },
-    "notes": "Encryption in transit is stated as undocumented, not as absent; an analyst asserting there is no TLS here is unsupported."
+    "notes": "Encryption in transit is stated as undocumented, not as absent; an analyst asserting there is no TLS here is unsupported.",
+    "verb": "alter-in-transit"
   },
   {
     "category": "repudiation",
@@ -107,7 +114,8 @@
       "likelihood": "medium",
       "impact": "medium"
     },
-    "notes": "No log or audit store appears anywhere in the source. Absence of a logging element is a legitimate repudiation finding; absence of a stated control is not."
+    "notes": "No log or audit store appears anywhere in the source. Absence of a logging element is a legitimate repudiation finding; absence of a stated control is not.",
+    "verb": "unattributable"
   },
   {
     "category": "repudiation",
@@ -121,7 +129,8 @@
       "likelihood": "medium",
       "impact": "medium"
     },
-    "notes": "Pairs with the spoofing claim on the same flow: one is getting in as payroll, this one is that nothing afterwards distinguishes them."
+    "notes": "Pairs with the spoofing claim on the same flow: one is getting in as payroll, this one is that nothing afterwards distinguishes them.",
+    "verb": "unattributable"
   },
   {
     "category": "information-disclosure",
@@ -134,7 +143,8 @@
       "likelihood": "medium",
       "impact": "high"
     },
-    "notes": "The source states what the data is but never classifies it. The pii tag comes from the content, and data_classification stays unknown; a case that conflates the two is exactly what this case is here to catch."
+    "notes": "The source states what the data is but never classifies it. The pii tag comes from the content, and data_classification stays unknown; a case that conflates the two is exactly what this case is here to catch.",
+    "verb": "read"
   },
   {
     "category": "information-disclosure",
@@ -148,7 +158,8 @@
       "likelihood": "medium",
       "impact": "high"
     },
-    "notes": "Aggregation is the point: the export concentrates in one artifact what the database holds per colleague."
+    "notes": "Aggregation is the point: the export concentrates in one artifact what the database holds per colleague.",
+    "verb": "read"
   },
   {
     "category": "information-disclosure",
@@ -161,7 +172,8 @@
       "likelihood": "low",
       "impact": "medium"
     },
-    "notes": "The one flow that leaves the internal network on the colleague side, with encryption explicitly undocumented."
+    "notes": "The one flow that leaves the internal network on the colleague side, with encryption explicitly undocumented.",
+    "verb": "intercept"
   },
   {
     "category": "denial-of-service",
@@ -174,7 +186,8 @@
       "likelihood": "medium",
       "impact": "medium"
     },
-    "notes": "The web app is the one process the model infers to be reachable from outside, and that inference is recorded as an assumption rather than asserted."
+    "notes": "The web app is the one process the model infers to be reachable from outside, and that inference is recorded as an assumption rather than asserted.",
+    "verb": "flood"
   },
   {
     "category": "denial-of-service",
@@ -188,7 +201,8 @@
       "likelihood": "low",
       "impact": "high"
     },
-    "notes": "A weekly batch with a deadline behind it fails differently from a request path: the damage is a missed pay run, not slow pages."
+    "notes": "A weekly batch with a deadline behind it fails differently from a request path: the damage is a missed pay run, not slow pages.",
+    "verb": "disable"
   },
   {
     "category": "elevation-of-privilege",
@@ -202,7 +216,8 @@
       "likelihood": "medium",
       "impact": "high"
     },
-    "notes": "Both roles are stated to use the same app, and no authorization rule between them is stated anywhere. This is the finding that follows from the shared-app fact rather than from any missing control."
+    "notes": "Both roles are stated to use the same app, and no authorization rule between them is stated anywhere. This is the finding that follows from the shared-app fact rather than from any missing control.",
+    "verb": "abuse-grant"
   },
   {
     "category": "elevation-of-privilege",
@@ -216,6 +231,7 @@
       "likelihood": "low",
       "impact": "high"
     },
-    "notes": "The service is where writes actually happen, which the source says outright; whether it re-checks anything the app checked is undocumented."
+    "notes": "The service is where writes actually happen, which the source says outright; whether it re-checks anything the app checked is undocumented.",
+    "verb": "escalate"
   }
 ]

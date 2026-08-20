@@ -30,32 +30,50 @@ differently and one finding becomes two.
 ## Why the verb, and what it is worth
 
 Elements alone cannot separate a read from a write against one store. The
-frontier in `tests/test_evals_identity.py` prices every element-only rule on
-both errors at once:
+frontier in `tests/test_evals_identity.py` prices every rule on both errors at
+once — false splits over the 200 labelled match pairs, false merges over the 287
+within-lane reference pairs:
 
 | Rule | False splits (of 200) | False merges (of 287) |
 |---|---|---|
 | equality | 89 | 1 |
 | endpoint subset | 14 | 23 |
+| **endpoint subset + verb** | **15** | **3** |
 | overlap | 4 | 34 |
+| endpoint overlap | 1 | 126 |
 
-No row is usable. `endpoint subset` clears the 90% bar on splits and pays 23
-merges for it — and the verb is what buys those back. Over those 23 pairs the
-vocabulary separates **20**. `verbs.UNSEPARATED` names the three it does not,
-each with the reason, and none of the three is a gap in the vocabulary: one is
-arguably a correct merge, one is a lane where no attacker acts, and one is a
-corpus wording gap.
+No element-only row is usable: the tightest loses 89 paraphrases and the loosest
+destroys 126 findings. **The verb row is the first one that is.** One more split
+buys twenty fewer merges.
 
-**That measurement is agent-authored and unreviewed**, like everything else
-under `evals/`. The 23 assignments it rests on are 23 printed rows; a person
-checks them in ten minutes, and `verbs.UNSEPARATED` is where the result goes.
+Scored on the judge's own scoreboard, through the same `measure_agreement`:
 
-It is also now measured through the shipped loader rather than by analysis.
-Case 01 carries a verb on all 21 of its claims, and `VERB_MEASURED` in
-`tests/test_evals_identity.py` pins what that buys: over its 27 within-lane
-reference pairs, `endpoint subset` merges 4 and the verb cuts that to **1**. The
-one survivor is the elevation pair `UNSEPARATED` already names. That test grows
-as the debt shrinks, and fails when the numbers move.
+| Rule | Agreement with the recorded labels |
+|---|---|
+| `MechanicalIdentity` (element equality) | 111/200 = 55.5% |
+| `SubsetVerbIdentity` | **185/200 = 92.5%** |
+
+That clears the 90% bar the judge is held to. Read it the way `evals/README.md`
+reads every agreement figure here: the labels are agent-authored, so this
+measures reproduction and not correctness. What it establishes is that the rule
+is not obviously worse than a judge on the same fixtures — which is what #201's
+third bullet asks for before the judge can be retired.
+
+**The three merges the verb does not break** are in `verbs.UNSEPARATED`, each
+with the reason. None is a gap in the vocabulary: one is arguably a correct
+merge the corpus itself calls adjacent, one is a repudiation lane where no
+attacker acts so no verb applies, and one is a corpus wording gap. The single
+extra split is also known — case 13 labels "writes job orders straight into the
+database" and "alters job orders in the database" one threat, and the vocabulary
+calls those `forge` and `alter`. That is a label worth a reading session rather
+than a rule to loosen.
+
+**All of it is agent-authored and unreviewed**, like everything under `evals/`.
+243 reference verbs and 200 candidate verbs, assigned by an agent. The candidate
+side was assigned from each candidate's own wording rather than by copying the
+reference's, for the reason `build_pairs.py` gives about element IDs: reading the
+answer first makes every pair agree by construction and the measurement
+worthless.
 
 ## The version is in the value
 
@@ -68,9 +86,16 @@ This is the property the judge design could not offer. `evals/config/judge.toml`
 records the problem in its own header: a judge upgrade silently re-scores every
 historical number. Here the re-score is explicit, total, offline and free.
 
-`DEFAULT_VERSION` is 1 because twelve of thirteen cases carry no verb yet.
-`tests/test_verb_coverage.py` counts that debt per case and fails when it moves
-in either direction. When every case reaches zero, the default becomes 2.
+`DEFAULT_VERSION` is 1, and the reason is no longer the corpus — every reference
+claim carries a verb, and `tests/test_verb_coverage.py` guards that. It is the
+**produced** claim that does not: `Claim` in `src/stride_service/report.py` has
+no verb field, so a finding from a live run cannot be fingerprinted at version 2.
+
+Moving the default needs three things: the field on the record, the six STRIDE
+lane prompts that would fill it from the closed vocabulary, and an answer for
+every other package in `PACKAGES`. Until then a queue built over real findings
+runs at version 1, and asking for version 2 without a verb fails closed rather
+than hashing over an absent one.
 
 ## The vote
 
