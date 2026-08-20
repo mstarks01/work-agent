@@ -67,6 +67,7 @@ if str(REPO_ROOT) not in sys.path:
 
 from evals import verify_corpus
 from evals.harness import queue as review_queue
+from evals.harness.fingerprint import lane_field
 from evals.harness.ledger import (
     DEFAULT_LEDGER_PATH,
     REASON_GLOSS,
@@ -147,13 +148,18 @@ class Session:
 
 
 def build_session(
-    findings: Sequence[review_queue.Finding],
+    runs: Sequence[Sequence[review_queue.Finding]],
     voter: str,
     ledger_path: Path = DEFAULT_LEDGER_PATH,
     configs: Mapping[str, str] | None = None,
     corpus_dir: Path | None = None,
 ) -> Session:
-    """Resolve the corpus once, build the queue, and hold it for the sitting."""
+    """Resolve the corpus once, build the queue, and hold it for the sitting.
+
+    ``runs`` is one sequence of findings per sweep, not one flat list, because
+    the queue asks first about a finding the sweeps disagree on. That count
+    only exists if the caller says where one run ends and the next begins.
+    """
     corpus = load_corpus(corpus_dir or verify_corpus.CORPUS_DIR)
     flows = {
         case.meta.id: {
@@ -167,7 +173,7 @@ def build_session(
     }
     ledger = load(ledger_path)
     items = review_queue.build(
-        findings,
+        review_queue.merge_runs(runs, flows),
         flows,
         ledger,
         reference_pool=ledger.pool(),
@@ -510,8 +516,33 @@ _REVIEW_PAGE = (
 )
 
 
+def findings_from_artifacts(
+    paths: Sequence[Path],
+) -> tuple[list[list[review_queue.Finding]], dict[str, str]]:
+    """Read several sweeps, keeping each one's findings apart.
+
+    Several artifacts of **one configuration** is the intended input: that is
+    what makes a finding's run count readable, and what lets the queue ask
+    first about the findings those sweeps disagree on. The configurations are
+    merged per case, and a case whose sweeps report different ones records all
+    of them, so a vote's ``config`` never names one sweep as though it were the
+    whole input.
+    """
+    runs = []
+    configs: dict[str, set[str]] = {}
+    for path in paths:
+        findings, per_case = findings_from_artifact(path)
+        runs.append(findings)
+        for case, config in per_case.items():
+            configs.setdefault(case, set()).add(config)
+    return runs, {
+        case: ", ".join(sorted(value for value in values if value))
+        for case, values in configs.items()
+    }
+
+
 def findings_from_artifact(path: Path) -> tuple[list[review_queue.Finding], dict]:
-    """Read a sweep's saved reports into queue findings.
+    """Read one sweep's saved reports into queue findings.
 
     Reads the ``.reports/`` directory a ``run --out`` writes beside its
     artifact, because that is where the claims themselves live: the artifact
@@ -537,7 +568,7 @@ def findings_from_artifact(path: Path) -> tuple[list[review_queue.Finding], dict
                     review_queue.Finding(
                         case=case,
                         framework=block["framework"],
-                        lane=str(claim.get("category", block["framework"])),
+                        lane=str(claim[lane_field(block["framework"])]),
                         title=claim.get("title", ""),
                         description=claim.get("description", ""),
                         element_ids=tuple(claim.get("affected_element_ids", ())),
@@ -565,19 +596,23 @@ def main(argv: Sequence[str] | None = None) -> int:
     parser.add_argument(
         "--artifact",
         type=Path,
-        help="a sweep artifact whose .reports/ directory holds the findings",
+        action="append",
+        default=[],
+        help="a sweep artifact whose .reports/ directory holds the findings."
+        " Give it once per sweep of one configuration: the queue asks first"
+        " about the findings those sweeps disagree on",
     )
     parser.add_argument("--ledger", type=Path, default=DEFAULT_LEDGER_PATH)
     args = parser.parse_args(argv)
 
-    if args.artifact is None:
+    if not args.artifact:
         parser.error(
             "--artifact is required: there is nothing to review until a sweep"
             " has produced findings. Run `python -m evals.harness.run run"
             " --mode analysis --out artifact.json` first."
         )
-    findings, configs = findings_from_artifact(args.artifact)
-    session = build_session(findings, args.voter, args.ledger, configs)
+    runs, configs = findings_from_artifacts(args.artifact)
+    session = build_session(runs, args.voter, args.ledger, configs)
     print(f"{len(session.items)} findings waiting for {args.voter}")
     print(f"ledger: {args.ledger}")
     print(f"open http://{HOST}:{PORT}/")

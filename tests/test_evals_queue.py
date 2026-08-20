@@ -14,7 +14,14 @@ import pytest
 
 from evals.harness.fingerprint import components_for, fingerprint
 from evals.harness.ledger import Ledger, cast
-from evals.harness.queue import PRIORITIES, Finding, build, priority_of, summarise
+from evals.harness.queue import (
+    PRIORITIES,
+    Finding,
+    build,
+    merge_runs,
+    priority_of,
+    summarise,
+)
 
 FLOWS = {
     "01": {"flow:a-to-b:call": ("process:a", "process:b")},
@@ -202,3 +209,47 @@ def test_each_framework_is_keyed_by_its_own_rule():
 
     assert items["stride"].fingerprint.startswith("v2:")
     assert items["asvs"].fingerprint.startswith("v1:")
+
+
+class TestTheRunCountsComeFromTheRuns:
+    """``merge_runs`` is where ``volatile`` stops being a field nobody sets.
+
+    The counts are read off several sweeps of one configuration rather than
+    declared on a finding, so a sitting held over one artifact reports 1 of 1
+    and asks its questions in the other two priorities' order.
+    """
+
+    def test_a_finding_two_sweeps_of_five_produced_is_volatile(self):
+        steady = finding(title="Every time", target="process:a")
+        sometimes = finding(title="Sometimes", target="process:b")
+        runs = [[steady, sometimes], [steady, sometimes], [steady], [steady], [steady]]
+
+        merged = {row.title: row for row in merge_runs(runs, FLOWS)}
+
+        assert (merged["Sometimes"].seen_in, merged["Sometimes"].runs) == (2, 5)
+        assert (merged["Every time"].seen_in, merged["Every time"].runs) == (5, 5)
+
+    def test_one_artifact_makes_nothing_volatile(self):
+        merged = merge_runs([[finding()]], FLOWS)
+
+        assert (merged[0].seen_in, merged[0].runs) == (1, 1)
+        assert build(merged, FLOWS, Ledger())[0].volatile is False
+
+    def test_a_run_naming_one_identity_twice_counts_once_for_that_run(self):
+        """The denominator is runs, so a repeated lane is a different question."""
+        twice = [finding(title="First spelling"), finding(title="Second spelling")]
+
+        merged = merge_runs([twice, [finding(title="First spelling")]], FLOWS)
+
+        assert len(merged) == 1
+        assert (merged[0].seen_in, merged[0].runs) == (2, 2)
+
+    def test_the_merged_finding_is_the_one_the_queue_asks_about(self):
+        """Merging and building key alike, or a run count rides a stranger."""
+        sometimes = finding(title="Sometimes", target="process:b")
+        merged = merge_runs([[sometimes], [finding()]], FLOWS)
+
+        items = {item.finding.title: item for item in build(merged, FLOWS, Ledger())}
+
+        assert items["Sometimes"].volatile is True
+        assert "some runs and not others" in items["Sometimes"].why

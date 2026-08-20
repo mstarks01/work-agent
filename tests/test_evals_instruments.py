@@ -147,7 +147,7 @@ class TestTheTableCoversTheArtifact:
                 owners[key] = name
 
     def test_the_instrument_keys_are_the_ones_the_artifact_carried(self):
-        """The 17 keys the hand-written artifact literal used to spell out.
+        """The 19 keys a sweep writes, pinned one by one.
 
         Pinned as a literal because this is the one place a silent loss would
         not show up as a failing fold: an instrument dropped from the table
@@ -172,6 +172,8 @@ class TestTheTableCoversTheArtifact:
             "unlisted_for_promotion",
             "critic_yield",
             "critic_yield_aggregate",
+            "writing",
+            "writing_aggregate",
         }
 
 
@@ -186,9 +188,15 @@ class TestTheScoredSplit:
         assert "coverage:" in printed
 
     def test_the_scored_instruments_are_the_ones_that_read_scores(self):
-        """Only the two per-package scorers are on the scored side."""
+        """The two per-package scorers, and the one that reads the ledger.
+
+        ``writing`` is scored for a different reason from the other two: it
+        needs no score, but the vote ledger is only loaded on the scored pass,
+        and a reading over votes nobody loaded would report every sweep as
+        unobjected-to.
+        """
         scored = {name for name, i in INSTRUMENTS.items() if i.scored}
-        assert scored == {"scores", "critic_yield"}
+        assert scored == {"scores", "critic_yield", "writing"}
 
 
 class TestScoringSkipsAPackageItDoesNotRead:
