@@ -162,8 +162,12 @@ them the way you read critic yield — as a pair:
 | **`pooled`** against **`unvoted`** | `pooled` rises while `unvoted` falls | `rejected_rate` reads 0.0 over a cold ledger. A low number beside a large `unvoted` count means nobody has looked, not that the tool is right. |
 | **`writing_aggregate.objection_rate`** | falls, or holds | Where a style objection lands, and the only number it moves. It is a rate over the findings people answered, so read `answered` beside it. |
 
-The votes reach the numbers on the **next** sweep: the scorer reads the ledger
-while it scores a run, so re-run the arm after a sitting.
+The votes reach the numbers with no provider call: `score` re-reads the ledger
+over a finished sweep's saved reports.
+
+```sh
+python -m evals.harness.run score baseline-1.json
+```
 
 A vote hangs on a finding's fingerprint, so tuning does not re-spend it: after
 the first sitting, a configuration change puts only its *new* findings in the

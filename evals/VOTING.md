@@ -131,13 +131,17 @@ that is the point of the split.
 
 ## Step 3 — Read what the votes did
 
-The scorer reads the ledger while it scores a run. So your votes move the
-numbers of the **next** sweep, not the artifact you just voted over. Re-run the
-sweep to see them:
+Re-score the sweep you just voted over. It reads the ledger as it stands now,
+costs no provider call, and rewrites the artifact in place:
 
 ```sh
-python -m evals.harness.run run --mode analysis --out after-votes.json
+python -m evals.harness.run score baseline-1.json
 ```
+
+It recomputes only the readings that read the ledger — the standings, the
+critic's yield and the writing numbers. Grounds, coverage and provenance are
+facts about the run that no later vote changes, so they stay as the sweep wrote
+them. Pass `--out` to write a second file instead of rewriting the first.
 
 Every finding that matches no reference claim gets one of four standings, and
 the artifact counts them per case:
@@ -155,7 +159,7 @@ not score itself on the answer that flatters it most.
 Your style rejections land beside the standings, under `writing`:
 
 ```sh
-jq '.writing_aggregate' after-votes.json
+jq '.writing_aggregate' baseline-1.json
 ```
 
 `objection_rate` is the share of the findings **somebody answered** that drew a
@@ -174,7 +178,7 @@ The reference sets are not exhaustive, and they grow from real output that a
 person confirmed:
 
 ```sh
-jq '.unlisted_for_promotion' after-votes.json
+jq '.unlisted_for_promotion' baseline-1.json
 ```
 
 Every entry is a finding somebody voted into the pool: real, and absent from the
@@ -252,7 +256,14 @@ from. A rule change is then arithmetic over the file.
    the pool, which a re-key never changes. `--yes` rewrites the file through an
    atomic rename, so an interrupted re-key leaves the old file whole.
 
-4. **Commit the ledger with the rule.** Nobody votes again, and no run calls a
+4. **Re-score the sweeps you still compare against.** Their standings were
+   computed under the old keys:
+
+   ```sh
+   python -m evals.harness.run score baseline-1.json
+   ```
+
+5. **Commit the ledger with the rule.** Nobody votes again, and no run calls a
    provider.
 
 ## What a sitting does not tell you
@@ -272,9 +283,10 @@ from. A rule change is then arithmetic over the file.
 One ledger, one pool and one queue serve every **Framework Package**, because a
 vote records a fact about a system rather than about a framework.
 
-What differs is only the key. A package whose claims carry a catalog identifier
-already has an identity, so its findings key at version 1 and compose no verb —
-ASVS is one. A package with an open claim set composes an identity from its lane,
-its action verb and the elements it names, at version 2. A package added to
-`PACKAGES` and missing from `VERSION_FOR` raises at its first finding, so its
-author answers the question rather than inheriting a default.
+What differs is only the key. A package with an open claim set composes an
+identity from its lane, its action verb and the elements it names — version 2,
+which is STRIDE's. A package whose claims name a requirement in a catalog is
+keyed by that requirement and the place it was ruled in — version 3, which is
+ASVS's. A package added to `PACKAGES` and missing from `VERSION_FOR` raises at
+its first finding, so its author answers the question rather than inheriting a
+default.

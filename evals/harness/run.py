@@ -61,7 +61,13 @@ from evals.harness.grounds import (
     classify_failure,
 )
 from evals.harness.identity import SubsetVerbIdentity
-from evals.harness.instruments import ModeRun, Sweep, measure_case, render_all
+from evals.harness.instruments import (
+    INSTRUMENTS,
+    ModeRun,
+    Sweep,
+    measure_case,
+    render_all,
+)
 from evals.harness.provenance import (
     UNSET,
     ProvenanceError,
@@ -81,6 +87,7 @@ from evals.harness.stability import (
 from evals.harness.structural import report_issues
 from stride_service.certification import CertificationError, CertifyResult, certify
 from stride_service.deployment import Deployment
+from stride_service.frameworks import PACKAGES
 from stride_service.frameworks.stride.record import Threat
 from stride_service.graph import Pipeline
 from stride_service.report import (
@@ -197,7 +204,23 @@ def _write_reports(out: str, mode: str, runs: Mapping[str, modes.AnalysisRun]) -
     for case_id, run in sorted(runs.items()):
         path = directory / f"{case_id}.report.json"
         path.write_text(run.report.model_dump_json(indent=2) + "\n", "utf-8")
-        total_bytes += path.stat().st_size
+        # The drafts beside the report, because the report is what survived the
+        # critic and half of what a score reads is what did not. Without them
+        # ``score`` could recompute recall and not critic yield, and a command
+        # that re-scores some of a sweep is worse than one that refuses.
+        drafts = directory / f"{case_id}.drafts.json"
+        drafts.write_text(
+            json.dumps(
+                {
+                    framework: [claim.model_dump(mode="json") for claim in claims]
+                    for framework, claims in run.drafts.items()
+                },
+                indent=2,
+            )
+            + "\n",
+            "utf-8",
+        )
+        total_bytes += path.stat().st_size + drafts.stat().st_size
     print(f"{len(runs)} report(s) written to {directory} ({total_bytes / 1024:.0f} KB)")
 
 
@@ -670,6 +693,102 @@ def command_review(args: argparse.Namespace) -> int:
     return 0
 
 
+def _runs_from_reports(artifact: Path, cases: Sequence[GoldenCase]) -> dict[str, Any]:
+    """Read a finished sweep's saved reports and drafts back into runs.
+
+    The pair is what a score needs: the report holds what survived the critic
+    and the drafts hold what it was handed, and critic yield is the difference.
+    A sweep whose directory carries a report and no drafts refuses here rather
+    than scoring the half it can — re-run that sweep.
+    """
+    directory = reports_dir(artifact)
+    if not directory.is_dir():
+        raise modes.EvalRunError(
+            f"{directory} does not exist; a score reads the reports a sweep"
+            " writes beside its artifact, not the artifact alone"
+        )
+
+    runs: dict[str, Any] = {}
+    for case in cases:
+        report_path = directory / f"{case.id}.report.json"
+        drafts_path = directory / f"{case.id}.drafts.json"
+        if not report_path.exists():
+            continue
+        if not drafts_path.exists():
+            raise modes.EvalRunError(
+                f"{drafts_path} is missing; this sweep predates the drafts"
+                " being written beside its report, so its critic yield cannot"
+                " be recomputed. Re-run the sweep rather than scoring half of it"
+            )
+        report = Report.model_validate_json(report_path.read_text(encoding="utf-8"))
+        raw = json.loads(drafts_path.read_text(encoding="utf-8"))
+        drafts = {
+            framework: tuple(
+                PACKAGES[framework].record.model_validate(claim) for claim in claims
+            )
+            for framework, claims in raw.items()
+        }
+        runs[case.id] = modes.AnalysisRun(report=report, drafts=drafts)
+    if not runs:
+        raise modes.EvalRunError(
+            f"{directory} carries no report for any case in the artifact"
+        )
+    return runs
+
+
+def command_score(args: argparse.Namespace) -> int:
+    """Re-score a finished sweep against the ledger as it stands now.
+
+    A vote is cast after the sweep that produced the finding, so without this
+    the answer reached the numbers only on the *next* sweep — and a sweep costs
+    a provider. This costs nothing: the reports are on disk, the matcher is a
+    rule and the standings come from the vote ledger.
+
+    **It rewrites the readings that read the ledger, and nothing else.** The
+    instruments marked ``scored`` are recomputed and their keys replaced; every
+    run-level block stays exactly as the sweep wrote it, because grounds,
+    coverage and provenance are facts about a run that no later vote changes.
+    """
+    path = Path(args.artifact)
+    loaded = load_artifact(path)
+    cases = [case for case in load_corpus(args.corpus) if case.id in loaded.cases]
+    if not cases:
+        print(f"{path}: none of its cases are in {args.corpus}", file=sys.stderr)
+        return 1
+
+    runs = _runs_from_reports(path, cases)
+    votes = ledger.load(Path(args.ledger))
+    matcher = SubsetVerbIdentity(_flows_by_case(cases))
+    scores, yields = _score_runs(cases, runs, matcher, votes)
+    rated = writing.measure(
+        cases, {case: run.report for case, run in runs.items()}, votes
+    )
+
+    frameworks = tuple(
+        sorted(
+            {block.framework for run in runs.values() for block in run.report.analyses}
+        )
+    )
+    sweep = Sweep(
+        run=ModeRun.empty(frameworks),
+        scores=scores,
+        yields=yields,
+        writing=rated,
+    )
+    render_all(sweep, scored=True)
+
+    raw = dict(loaded.raw)
+    for instrument in INSTRUMENTS.values():
+        if instrument.scored:
+            raw |= instrument.artifact(sweep)
+
+    out = Path(args.out) if args.out else path
+    out.write_text(json.dumps(raw, indent=2) + "\n", "utf-8")
+    print(f"\n{len(votes)} vote(s) read from {args.ledger}")
+    print(f"{out} rewritten" if out == path else f"scored artifact written to {out}")
+    return 0
+
+
 def command_rekey(args: argparse.Namespace) -> int:
     """Recompute every vote's fingerprint under a new rule, in place.
 
@@ -936,6 +1055,28 @@ def main(argv: Sequence[str] | None = None) -> int:
         help="write the files; without it the promotion is only previewed",
     )
     promote_parser.set_defaults(func=command_promote)
+
+    score_parser = subparsers.add_parser(
+        "score",
+        help="re-score a finished sweep against the ledger (no credentials)",
+    )
+    score_parser.add_argument("artifact", help="a sweep artifact with a .reports/ dir")
+    score_parser.add_argument(
+        "--ledger",
+        default=str(ledger.DEFAULT_LEDGER_PATH),
+        help="the vote ledger the standings are read from",
+    )
+    score_parser.add_argument(
+        "--corpus",
+        default=str(DEFAULT_CORPUS_DIR),
+        help="corpus root, for the reference sets and flow maps",
+    )
+    score_parser.add_argument(
+        "--out",
+        help="where to write the scored artifact; without it the input is"
+        " rewritten in place",
+    )
+    score_parser.set_defaults(func=command_score)
 
     rekey_parser = subparsers.add_parser(
         "rekey", help="recompute every vote's fingerprint under another rule"

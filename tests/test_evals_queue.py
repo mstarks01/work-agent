@@ -191,24 +191,45 @@ def test_each_framework_is_keyed_by_its_own_rule():
     """A sweep carries both packages, and they do not identify claims alike.
 
     ASVS composes no verb, so keying it at version 2 would read a field it never
-    has. The version rides in the value, so the two cannot be compared by
-    accident either.
+    has; STRIDE names no requirement, so version 3 would read one it never has.
+    The version rides in the value, so the two cannot be compared by accident
+    either.
     """
     stride = finding(target="process:a")
     asvs = Finding(
         case="01",
         framework="asvs",
-        lane="V1",
+        lane="authentication",
         title="A requirement ruling",
         description="",
         element_ids=("process:a",),
+        identifier="V6.2.1",
     )
     items = {
         item.finding.framework: item for item in build([stride, asvs], FLOWS, Ledger())
     }
 
     assert items["stride"].fingerprint.startswith("v2:")
-    assert items["asvs"].fingerprint.startswith("v1:")
+    assert items["asvs"].fingerprint.startswith("v3:")
+
+
+def test_two_requirements_in_one_chapter_are_two_questions():
+    """One vote must not answer for a requirement nobody read."""
+
+    def ruling(identifier):
+        return Finding(
+            case="01",
+            framework="asvs",
+            lane="authentication",
+            title=f"Ruling on {identifier}",
+            description="",
+            element_ids=("process:a",),
+            identifier=identifier,
+        )
+
+    items = build([ruling("V6.2.1"), ruling("V6.2.2")], FLOWS, Ledger())
+
+    assert len({item.fingerprint for item in items}) == 2
 
 
 class TestTheRunCountsComeFromTheRuns:

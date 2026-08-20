@@ -29,21 +29,29 @@ It is the default. :class:`~stride_service.report.Claim` carries the verb and
 :class:`~stride_service.frameworks.stride.record.DraftThreat` requires it, so a
 finding out of a live run fingerprints at version 2 like a reference claim does.
 
-**Version 1 stays computable, and that is not a compatibility shim.** A package
-whose claims carry a catalog identifier composes no verb, so version 1 is the
-rule its findings are keyed under — and any ledger row written before the field
-existed re-keys to version 2 by recomputation rather than by a re-vote.
+**Version 3 reads a catalog identifier instead of an action.** A package whose
+claims name a requirement in a published catalog is already identified, so the
+rule that keys it is place plus that identifier: ASVS's ``V6.2.1`` in the
+chapter it was ruled in, over the elements it names. Version 1 keyed such a
+claim by place alone, which made two requirements ruled on one element in one
+chapter a single fingerprint — and one vote answered for both.
+
+**Every version stays computable, and that is not a compatibility shim.** Which
+rule keys a package is :data:`VERSION_FOR`, and the entries follow from what a
+package's claims are. A ledger row written under an older rule re-keys by
+recomputation rather than by a re-vote.
 """
 
 from __future__ import annotations
 
 import hashlib
-from collections.abc import Iterable, Mapping
+from collections.abc import Callable, Iterable, Mapping
 from dataclasses import dataclass
 from typing import Any
 
 from evals.harness.identity import FlowMap, endpoint_form
 from evals.harness.verbs import check_verb
+from stride_service.frameworks.asvs.record import requirement_of
 from stride_service.report import FrameworkName
 
 #: The version a caller gets when it does not choose. Bumping it is a re-keying
@@ -64,15 +72,15 @@ DEFAULT_VERSION = 2
 #: The entries are not a preference. They follow from what a package's claims
 #: are: an open claim set has no identifier behind it, so the action is half of
 #: what makes two claims one finding and the rule must read it. A claim carrying
-#: a catalog requirement identifier already *is* identified, composes no verb,
-#: and version 1 is not a lesser rule for it but the whole of the right one.
+#: a catalog requirement identifier is identified by that identifier, composes
+#: no verb, and is keyed by place plus the identifier.
 #:
 #: So a package added to ``PACKAGES`` and missing here raises at the first
 #: finding it produces, which is the question its author should answer: does
 #: this package's claim carry its own identity, or compose one?
 VERSION_FOR: dict[FrameworkName, int] = {
     "stride": 2,
-    "asvs": 1,
+    "asvs": 3,
 }
 
 #: Which field on a claim names the lane it was reached in. **Keyed, never
@@ -91,10 +99,24 @@ LANE_FIELD: dict[FrameworkName, str] = {
 }
 
 
+#: How a package's claim names its catalog identifier, read off the claim ID.
+#: **Keyed, never branched**, and checked against ``PACKAGES`` by
+#: ``tests/test_framework_neutrality.py``.
+#:
+#: ``None`` is a declaration and not a hole: it says this package's claims carry
+#: no identifier, so its findings compose one from an action and a place. The
+#: ASVS entry is that package's own parser — the identifier is the standard's,
+#: and only the package that owns the catalog can read it out of a claim ID.
+IDENTIFIER_OF: dict[FrameworkName, Callable[[str], str] | None] = {
+    "stride": None,
+    "asvs": requirement_of,
+}
+
+
 #: Every version this module can compute. A key missing here raises rather than
 #: falling back — a fingerprint quietly computed under the wrong rule is a vote
 #: silently attached to the wrong finding.
-SUPPORTED_VERSIONS = (1, 2)
+SUPPORTED_VERSIONS = (1, 2, 3)
 
 
 class FingerprintError(ValueError):
@@ -119,6 +141,10 @@ class Components:
     lane: str
     targets: tuple[str, ...]
     verb: str | None = None
+    #: The catalog identifier this claim names, for a package whose claims carry
+    #: one. ``None`` for a package that composes an identity instead, and
+    #: version 3 refuses to hash without it.
+    identifier: str | None = None
 
     def to_json(self) -> dict[str, Any]:
         return {
@@ -126,6 +152,7 @@ class Components:
             "lane": self.lane,
             "targets": list(self.targets),
             "verb": self.verb,
+            "identifier": self.identifier,
         }
 
     @classmethod
@@ -136,9 +163,38 @@ class Components:
                 lane=raw["lane"],
                 targets=tuple(raw["targets"]),
                 verb=raw.get("verb"),
+                identifier=raw.get("identifier"),
             )
         except (KeyError, TypeError) as exc:
             raise FingerprintError(f"malformed components: {exc}") from exc
+
+
+def identifier_of(framework: FrameworkName, claim_id: str) -> str | None:
+    """The catalog identifier inside one claim ID, or ``None``.
+
+    ``None`` where the package declares no parser, which is what a claim set
+    with no catalog behind it means. A package that declares one and produces a
+    claim ID it cannot read raises here rather than keying the finding under an
+    empty identifier, where every unreadable ID would collapse into one.
+    """
+    try:
+        reader = IDENTIFIER_OF[framework]
+    except KeyError:
+        raise FingerprintError(
+            f"no identifier reader is declared for {framework!r};"
+            " add it to IDENTIFIER_OF — that package's own parser if its claims"
+            " name a catalog requirement, None if they compose an identity"
+        ) from None
+    if reader is None:
+        return None
+    identifier = reader(claim_id)
+    if not identifier:
+        raise FingerprintError(
+            f"{framework!r} declares a catalog identifier and {claim_id!r}"
+            " carries none; a claim ID its own package cannot read is a defect"
+            " in the package, never a finding to key"
+        )
+    return identifier
 
 
 def lane_field(framework: FrameworkName) -> str:
@@ -173,7 +229,7 @@ def version_for(framework: FrameworkName) -> int:
         raise FingerprintError(
             f"no fingerprint version is declared for {framework!r};"
             " add it to VERSION_FOR — 2 if its claims compose an identity from"
-            " an action and a place, 1 if they carry a catalog identifier"
+            " an action and a place, 3 if they name a catalog requirement"
         ) from None
 
 
@@ -183,6 +239,7 @@ def components_for(
     element_ids: Iterable[str],
     flows: FlowMap,
     verb: str | None = None,
+    identifier: str | None = None,
 ) -> Components:
     """Build the components for one claim, resolving its elements once.
 
@@ -200,6 +257,7 @@ def components_for(
         lane=lane,
         targets=tuple(sorted(endpoint_form(element_ids, flows))),
         verb=verb,
+        identifier=identifier,
     )
 
 
@@ -229,6 +287,13 @@ def fingerprint(components: Components, version: int = DEFAULT_VERSION) -> str:
                 " version 1"
             )
         parts.append(check_verb(components.verb))
+    if version == 3:
+        if not components.identifier:
+            raise FingerprintError(
+                "version 3 reads a catalog identifier and this claim names"
+                " none; key a claim that composes its identity at version 2"
+            )
+        parts.append(components.identifier)
     # NUL joins the parts because it cannot occur in any of them, so no value
     # can impersonate a boundary between two others.
     digest = hashlib.sha256("\0".join(parts).encode("utf-8")).hexdigest()
