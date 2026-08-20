@@ -1,48 +1,27 @@
-"""The vocabulary is a table, so it is checked against its own registry.
+"""The measurement's half of the vocabulary: equivalence, and what it cannot separate.
+
+The vocabulary itself ships in :mod:`stride_service.actions` and is checked by
+``tests/test_actions.py`` — every verb glossed, every family disjoint, the menu
+covering the set. What is left here is what only a measurement has: which verbs
+count as **one** action, and the three corpus pairs the rule cannot tell apart.
 
 A table nobody compares to its registry fails as quietly as the ``if`` it
-replaced — ``CLAUDE.md`` states that as a repository rule, and these are the
-comparisons that make it decidable for :mod:`evals.harness.verbs`: every verb
-has a gloss, every family is disjoint, and every verb named in
-:data:`~evals.harness.verbs.EQUIVALENT` is a real one.
+replaced, which is why :data:`~evals.harness.verbs.EQUIVALENT` is checked
+against the shipped set rather than trusted.
 
 Deterministic and free of provider calls, so it gates on every PR.
 """
 
 from __future__ import annotations
 
-import pytest
-
 from evals.harness.verbs import (
     ACTION_VERBS,
     EQUIVALENT,
-    FAMILIES,
-    GLOSS,
     UNSEPARATED,
-    VerbError,
     canonical,
-    check_verb,
-    family_of,
     same_action,
     unknown_verbs,
 )
-
-
-def test_every_verb_has_a_gloss():
-    """A verb with no gloss is a verb two people will assign two ways."""
-    assert set(GLOSS) == set(ACTION_VERBS)
-
-
-def test_families_partition_the_vocabulary():
-    """No verb sits in two families, and none sits outside every family."""
-    listed = [verb for verbs in FAMILIES.values() for verb in verbs]
-    assert len(listed) == len(set(listed)), "a verb appears in two families"
-    assert set(listed) == set(ACTION_VERBS)
-
-
-def test_every_family_is_named_for_a_question_it_answers():
-    """Families are a reader's index, so an empty one would index nothing."""
-    assert all(verbs for verbs in FAMILIES.values())
 
 
 def test_equivalence_groups_name_real_verbs():
@@ -66,19 +45,6 @@ def test_canonical_is_identity_while_nothing_is_equivalent():
     assert all(canonical(verb) == verb for verb in ACTION_VERBS)
     assert same_action("read", "read")
     assert not same_action("read", "intercept")
-
-
-def test_an_unknown_verb_fails_closed():
-    """Never silently unmatched: a bad verb raises where it is written."""
-    with pytest.raises(VerbError, match="is not an action verb"):
-        check_verb("exfiltrate")
-    with pytest.raises(VerbError):
-        canonical("exfiltrate")
-    assert unknown_verbs(["read", "exfiltrate", "nope"]) == ("exfiltrate", "nope")
-
-
-def test_every_verb_resolves_to_a_family():
-    assert all(family_of(verb) in FAMILIES for verb in ACTION_VERBS)
 
 
 def test_the_unseparated_pairs_carry_a_reason_each():
