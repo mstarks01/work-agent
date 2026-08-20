@@ -43,6 +43,7 @@ from pydantic import (
 )
 from pydantic.json_schema import SkipJsonSchema
 
+from stride_service.actions import ActionVerb
 from stride_service.sources import Source
 from stride_service.system_model import BoundaryCrossing, SystemModel
 
@@ -546,6 +547,14 @@ class Claim(BaseModel):
     title: str = Field(min_length=1, max_length=200)
     description: str = Field(min_length=1, max_length=4000)
     affected_element_ids: list[str] = Field(default_factory=list)
+    # What the attacker does, from :mod:`stride_service.actions`. Optional here
+    # and narrowed by the packages that need it, exactly as
+    # ``affected_element_ids`` is: a package whose claims carry a catalog
+    # identifier already has an identity and composes none, so demanding a verb
+    # of it would be demanding a field nothing reads. A package with an open
+    # claim set narrows this to required, because for those claims the action is
+    # half of what makes two of them the same finding.
+    verb: ActionVerb | None = None
     grounds: list[Ground] = Field(min_length=1)
 
     @classmethod
@@ -703,6 +712,10 @@ class Proposal(BaseModel):
     # :class:`Claim`'s own is: a proposal that validates must be resolvable into
     # a claim that validates, so the two sides of that pair move together.
     affected_element_ids: list[str] = Field(default_factory=list)
+    # Unconstrained here and narrowed by the packages that need it, for the
+    # reason the line above gives: a proposal that validates must resolve into a
+    # claim that validates, so the two sides of that pair move together.
+    verb: ActionVerb | None = None
     evidence_refs: list[str] = Field(default_factory=list)
     quotes: list[QuoteCandidate] = Field(default_factory=list)
 

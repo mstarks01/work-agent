@@ -565,7 +565,31 @@ def test_no_non_markdown_files_under_prompts():
 # text came back with a heading and a sentence fixing what one claim is. The
 # worst lane now sits at ~5.6K of the 5.7K and the worst case at ~7.3K against
 # the 6-8K envelope. The rule stands unchanged for the next raise.
-COMPOSED_ANALYZE_TOKEN_BUDGET = 5700
+# RAISED BY 100 FOR THE ACTION VERB, and the rule above was met: two deletions
+# came with it, both of them things the new field now says better.
+#
+# `verb` is a required field on every STRIDE claim, so its cost is a floor
+# rather than a choice — three exemplars per composed prompt each carry one, and
+# an agent that is not told the families picks the first verb that reads
+# plausibly. What kept the raise to 100 is that the vocabulary is enforced by the
+# response schema (`constrain_output = true` on both tiers), so `actions.menu()`
+# emits the seven family lines and not twenty glosses: the prompt supplies the
+# shape of the choice and the schema supplies the strings.
+#
+# The two deletions:
+#
+#   - The `title` rule told the agent to "name the attacker action and its
+#     target" with an observation/threat example. That is what `verb` now is,
+#     in a field, and a rule restated in prose beside the field that carries it
+#     is the drift `docs/agents/provenance.md` is about.
+#   - "One threat per distinct attacker action against a distinct element" came
+#     back as "one threat per `verb` and `affected_element_ids` pair" — the same
+#     rule, shorter, and pointing at the two fields that now decide it rather
+#     than describing them.
+#
+# The worst lane sits at ~5.73K of the 5.8K and the worst case at ~7.4K against
+# the 6-8K envelope. The rule stands unchanged for the next raise.
+COMPOSED_ANALYZE_TOKEN_BUDGET = 5800
 
 
 @pytest.mark.parametrize("category", STRIDE_CATEGORIES)

@@ -17,6 +17,7 @@ from evals.harness.judge import (
     UnmatchedThreat,
 )
 from evals.harness.reference import ReferenceThreat
+from stride_service.actions import ActionVerb
 from stride_service.frameworks.stride.record import (
     STRIDE_VERSION,
     DraftThreat,
@@ -110,6 +111,7 @@ def draft_threat(
     title: str,
     *,
     element_ids: Iterable[str] = ("entity:shopper",),
+    verb: ActionVerb = "impersonate",
     likelihood: Rating = "high",
     impact: Rating = "high",
 ) -> DraftThreat:
@@ -131,6 +133,9 @@ def draft_threat(
         title=title,
         description=f"{title} Details for the scorer's adjudication step.",
         affected_element_ids=list(element_ids),
+        # Overridable, because a scorer test that wants two drafts to be one
+        # finding — or two — sets exactly this and the elements beside it.
+        verb=verb,
         grounds=[
             Ground(
                 kind="unknown-attribute",

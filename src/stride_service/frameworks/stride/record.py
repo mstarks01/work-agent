@@ -20,6 +20,7 @@ from typing import Literal, get_args
 
 from pydantic import ConfigDict, Field
 
+from stride_service.actions import ActionVerb
 from stride_service.report import (
     AnalysisMarks,
     BlockSummary,
@@ -145,6 +146,11 @@ class DraftThreat(Claim):
 
     category: StrideCategory
     affected_element_ids: list[str] = Field(min_length=1)
+    #: Required here where the base allows ``None``. STRIDE's claims are an open
+    #: set with no catalog identifier behind them, so two of them are the same
+    #: finding when they name one action against one place — and a threat that
+    #: names no action leaves the first half of that unanswerable.
+    verb: ActionVerb
     severity: Severity
     mitigations: list[Mitigation] = Field(default_factory=list)
 
@@ -258,6 +264,11 @@ class ThreatProposal(Proposal):
     # error that fails the node, and a sequence has no spelling.
     sequence: int = Field(ge=1, le=MAX_SEQUENCE)
     affected_element_ids: list[str] = Field(min_length=1)
+    # Narrowed with :class:`DraftThreat`'s, and for the reason that class gives:
+    # a proposal that validates must resolve into a draft that validates. The
+    # agent picks from the closed vocabulary; an unrecognised verb is refused by
+    # the response schema before the node returns, not by a check afterwards.
+    verb: ActionVerb
     severity: Severity
     mitigations: list[Mitigation] = Field(default_factory=list)
 
