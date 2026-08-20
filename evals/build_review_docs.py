@@ -1,0 +1,376 @@
+"""Generate the step-6 reading document for every case that has no review.
+
+``BLESSING.md`` step 6 is one sitting: a person reads a case's sources, its
+blessed model and every declared framework's reference set together, and asks
+whether the sets describe what could actually go wrong with this system. No
+generator can do the sitting — that is the point of it — but a generator can
+put everything the reader needs in one file, in the order the method requires,
+so a sitting is pure reading time.
+
+The template is ``corpus/01-payments-checkout/REVIEW-02.md``, the first such
+document and the record of what a sitting needs: the sources verbatim, the
+model as tables, the reader's own list *before* the recorded sets, one mark
+per record, and the exact ``review`` block to paste at the end. Case 01 keeps
+its hand-written document; this writes ``REVIEW.md`` for every other case whose
+``case.json`` carries no ``review`` block, and refreshes it as reference sets
+change — the document is derived, so editing it by hand is editing the wrong
+file.
+
+Run: ``python evals/build_review_docs.py``. Offline, no dependencies beyond
+the repository.
+"""
+
+from __future__ import annotations
+
+import json
+from pathlib import Path
+
+EVALS = Path(__file__).resolve().parent
+CORPUS = EVALS / "corpus"
+
+#: Case 01's sitting document predates this generator and is the template it
+#: was derived from; regenerating it would overwrite the historical record.
+HAND_WRITTEN = frozenset({"01-payments-checkout"})
+
+PREAMBLE = """\
+**What you are checking.** Not whether two write-ups are the same threat — the
+identity rule decides that mechanically. This asks the question underneath:
+**do these reference sets describe what could actually go wrong with this
+system?** If a set misses a whole class of attack, the tool scores full marks
+for missing it too, and nothing in the repo would ever say so.
+
+## The one rule
+
+**Read Part 1 and write your own list before you open Part 2.** If you read
+the recorded threats first you will find them reasonable, and the sitting
+measures nothing. Your list does not have to be good or complete — it only has
+to be yours, written first.
+
+Roughly an hour.
+"""
+
+OWN_LIST = """\
+### Your list
+
+Write what could go wrong. Anything: an attack, a missing control, a question
+the text does not answer. Bullet points, in any order, no need to sort by
+category.
+
+```
+-
+-
+-
+```
+"""
+
+MARKS = """\
+For each, mark one of:
+
+- `agree` — a real finding against this system, worth reporting.
+- `doubt` — overstated, unsupported by the text, or not really a finding here.
+- `dup` — the same finding as another entry on this list, by number.
+
+Then, at the end of the last part, note anything on **your** list that is not
+on either of them. That is the finding this sitting exists for.
+"""
+
+MISSING = """\
+---
+
+## What was on your list and not on either of theirs
+
+The point of the sitting. One line each, and say which set you expected it in.
+
+```
+-
+-
+```
+"""
+
+
+def load_meta(path: Path) -> dict:
+    """One case.json, typed as the mapping it always is."""
+    meta = json.loads(path.read_text(encoding="utf-8"))
+    assert isinstance(meta, dict), path
+    return meta
+
+
+def load_records(path: Path) -> list[dict]:
+    """One claims file or model.json's shape: a JSON object or array."""
+    records = json.loads(path.read_text(encoding="utf-8"))
+    assert isinstance(records, list), path
+    return records
+
+
+def quoted(text: str) -> str:
+    return "\n".join(f"> {line}".rstrip() for line in text.splitlines())
+
+
+def table(headers: list[str], rows: list[list[str]]) -> str:
+    out = ["| " + " | ".join(headers) + " |", "|" + "---|" * len(headers)]
+    out += ["| " + " | ".join(row) + " |" for row in rows]
+    return "\n".join(out)
+
+
+def model_tables(model: dict) -> str:
+    parts = []
+    if model.get("external_entities"):
+        parts.append("**External entities**\n")
+        parts.append(
+            table(
+                ["id", "kind", "zone"],
+                [
+                    [e["id"], e["kind"], e["trust_zone"]]
+                    for e in model["external_entities"]
+                ],
+            )
+        )
+    if model.get("processes"):
+        parts.append("\n**Processes**\n")
+        parts.append(
+            table(
+                ["id", "exposure", "interface", "zone", "technology"],
+                [
+                    [
+                        p["id"],
+                        p["exposure"],
+                        p["interface_kind"],
+                        p["trust_zone"],
+                        p["technology"],
+                    ]
+                    for p in model["processes"]
+                ],
+            )
+        )
+    if model.get("data_stores"):
+        parts.append("\n**Data stores**\n")
+        parts.append(
+            table(
+                ["id", "zone", "at rest", "classification"],
+                [
+                    [
+                        s["id"],
+                        s["trust_zone"],
+                        s["encryption_at_rest"],
+                        s["data_classification"],
+                    ]
+                    for s in model["data_stores"]
+                ],
+            )
+        )
+    if model.get("data_flows"):
+        parts.append("\n**Data flows**\n")
+        parts.append(
+            table(
+                [
+                    "id",
+                    "source",
+                    "destination",
+                    "protocol",
+                    "authentication",
+                    "in transit",
+                ],
+                [
+                    [
+                        f["id"],
+                        f["source"],
+                        f["destination"],
+                        f["protocol"],
+                        f["authentication"],
+                        f["encryption_in_transit"],
+                    ]
+                    for f in model["data_flows"]
+                ],
+            )
+        )
+    if model.get("trust_boundaries"):
+        parts.append("\n**Trust boundaries**\n")
+        parts.append(
+            table(
+                ["id", "kind"],
+                [[b["id"], b["kind"]] for b in model["trust_boundaries"]],
+            )
+        )
+
+    noted = [
+        (el["id"], el["notes"])
+        for group in (
+            "external_entities",
+            "processes",
+            "data_stores",
+            "data_flows",
+            "trust_boundaries",
+        )
+        for el in model.get(group, [])
+        if el.get("notes")
+    ]
+    if noted:
+        parts.append(
+            "\n**Recorded notes** — hedges, probed gaps and source disagreements"
+            " live here, so read them before the sets.\n"
+        )
+        for element_id, note in noted:
+            parts.append(f"- `{element_id}` — {note}")
+    if model.get("assumptions"):
+        parts.append("\n**Assumptions**\n")
+        for entry in model["assumptions"]:
+            parts.append(
+                f"- `{entry['element_id']}` — {entry['assumption']} (basis: {entry['basis']})"
+            )
+    return "\n".join(parts)
+
+
+def stride_part(claims: list[dict], part: int) -> str:
+    lines = [f"## Part {part} — the {len(claims)} recorded STRIDE threats\n"]
+    lines.append("Only after your own list exists.\n")
+    lines.append(MARKS)
+    current = None
+    for number, claim in enumerate(claims, start=1):
+        if claim["category"] != current:
+            current = claim["category"]
+            lines.append(f"\n### {current}\n")
+        severity = claim["severity"]
+        lines.append(f"**{number}.** {claim['claim']}\n")
+        cites = ", ".join(f"`{i}`" for i in claim["affected_element_ids"])
+        lines.append(f"- cites: {cites}")
+        lines.append(
+            f"- tier: {claim['tier']} · severity: {severity['likelihood']}/{severity['impact']}"
+            f" · verb: `{claim['verb']}`"
+        )
+        if claim.get("notes"):
+            lines.append(f"- recorded note: {claim['notes']}")
+        lines.append("\n> mark:\n")
+    return "\n".join(lines)
+
+
+def asvs_part(records: list[dict], part: int) -> str:
+    lines = [f"## Part {part} — the {len(records)} recorded ASVS records\n"]
+    lines.append(
+        "The narrower question, per record: **does this requirement apply to"
+        " this system, and does the input show it satisfied?** An ASVS claim"
+        " rules applicability and never a pass.\n"
+    )
+    current = None
+    for number, record in enumerate(records, start=1):
+        if record["chapter"] != current:
+            current = record["chapter"]
+            lines.append(f"\n### {current}\n")
+        lines.append(f"**A{number}.** `{record['requirement']}` — {record['claim']}\n")
+        cites = ", ".join(f"`{i}`" for i in record["affected_element_ids"])
+        lines.append(f"- cites: {cites}")
+        lines.append(f"- tier: {record['tier']}")
+        if record.get("notes"):
+            lines.append(f"- recorded note: {record['notes']}")
+        lines.append("\n> mark:\n")
+    return "\n".join(lines)
+
+
+def closing(case_id: str, meta: dict) -> str:
+    read = ["source.md"]
+    read += [source["file"] for source in meta["sources"] if source["file"] not in read]
+    read.append("model.json")
+    read += [f"claims/{fw['name']}.json" for fw in meta["frameworks"]]
+    read_json = ", ".join(f'"{name}"' for name in read)
+    return f"""\
+---
+
+## What to do with the result
+
+**Counts first**, kept apart per framework: how many `agree`, `doubt`, `dup`
+per part, and how many of your own items are missing from either set.
+
+- **Few doubts, nothing important missing** — the sets hold, and the numbers
+  measured against them have a standard behind them.
+- **A whole class of attack missing** — the serious outcome. Recall is measured
+  against these sets, so the tool has been scoring full marks for a gap nobody
+  could see. Extend the set, and re-derive what was quoted against it.
+- **Several doubts** — the sets overstate, inflating the denominator. Cheaper
+  direction, still wrong.
+
+**Then record the sign-off.** Add this to
+`evals/corpus/{case_id}/case.json`, which is what
+`tests/test_case_review.py` reads:
+
+```json
+  "review": {{
+    "reviewer": "<your name or handle>",
+    "date": "<YYYY-MM-DD>",
+    "read": [{read_json}],
+    "notes": "<counts, and anything you changed>"
+  }},
+```
+
+If this case is named in `UNREVIEWED` in `tests/test_case_review.py`, delete
+its line — the debt list is only honest if it shrinks when the debt is paid. A
+case not named there is new, and merges with this block from the start.
+
+`tests/test_case_review.py` checks that `read` covers every framework the case
+declares, so every claims file above is required.
+"""
+
+
+def build_doc(case_dir: Path) -> str:
+    meta = load_meta(case_dir / "case.json")
+    model = load_meta(case_dir / "model.json")
+    frameworks = [fw["name"] for fw in meta["frameworks"]]
+
+    lines = [
+        f"# Review sitting — is `{meta['id']}`'s reference list right?\n",
+        f"`evals/BLESSING.md` step 6, over `evals/corpus/{meta['id']}`.",
+        f"\n**{meta['title']}** — domain `{meta['domain']}`.\n",
+        PREAMBLE,
+        "---\n",
+        "## Part 1 — the system, and your own list\n",
+    ]
+    for source in meta["sources"]:
+        text = (case_dir / source["file"]).read_text(encoding="utf-8")
+        lines.append(f"### {source['label']} ({source['kind']})\n")
+        lines.append("Exactly what the service would receive.\n")
+        lines.append(quoted(text))
+        lines.append("")
+    lines.append("### What the model says is in it\n")
+    lines.append(
+        "Not part of the question, but the records cite these names, so you"
+        " need them.\n"
+    )
+    lines.append(model_tables(model))
+    lines.append("")
+    lines.append(OWN_LIST)
+    lines.append("---\n")
+
+    part = 2
+    for name in frameworks:
+        claims = load_records(case_dir / "claims" / f"{name}.json")
+        if name == "stride":
+            lines.append(stride_part(claims, part))
+        elif name == "asvs":
+            lines.append(asvs_part(claims, part))
+        else:
+            raise SystemExit(
+                f"{meta['id']}: no renderer for framework {name!r}; add one"
+                " before generating its reading document"
+            )
+        part += 1
+
+    lines.append(MISSING)
+    lines.append(closing(meta["id"], meta))
+    return "\n".join(lines)
+
+
+def main() -> int:
+    written = 0
+    for case_dir in sorted(CORPUS.iterdir()):
+        if not case_dir.is_dir() or case_dir.name in HAND_WRITTEN:
+            continue
+        meta = load_meta(case_dir / "case.json")
+        if meta.get("review"):
+            continue
+        (case_dir / "REVIEW.md").write_text(build_doc(case_dir), encoding="utf-8")
+        written += 1
+        print(f"wrote {case_dir.name}/REVIEW.md")
+    print(f"{written} reading document(s)")
+    return 0
+
+
+if __name__ == "__main__":
+    raise SystemExit(main())
