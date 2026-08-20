@@ -96,6 +96,7 @@ evals/
 | `harness/fingerprint.py` | A **Claim**'s identity as a versioned value code computes. No model call. |
 | `harness/ledger.py` | The append-only record of what a **person** decided about a finding. |
 | `harness/queue.py` | Which findings a reviewer is asked about, and in what order. Blind to the configuration. |
+| `harness/identity.py` | `MechanicalFirstJudge` — the rule settles a match, the judge decides everything else. |
 | `harness/provenance.py` | What each node execution actually ran on — tier, requested route, served build, fingerprint — written into the artifact and read back by a promotion. |
 | `harness/certify.py` | Promoting a winning configuration: rewrites `config/sampling.toml` and records its fingerprints as blessed. The certification check itself lives in the service (`stride_service.certification`), which this imports. |
 | `harness/modes.py` | The three run modes over the shipped graph, and the extraction score: element agreement, the derived crossings, and the attributes a Candidate rule reads. Judge-free. |
@@ -280,9 +281,14 @@ one loop that measures it against what a **person** says, and it needs no
 credentials at all — it reads a finished sweep and writes one line per click.
 
 ```sh
-python -m evals.harness.run run --mode analysis --out artifact.json  # needs credentials
+python -m evals.harness.run run --mode analysis --out artifact.json   # needs credentials
+python -m evals.harness.run review artifact.json --voter <your-name>  # what is waiting
 uv run python webapp/review.py --voter <your-name> --artifact artifact.json
 ```
+
+`review` is credential-free and read-only, like `promote` and `stability`. The
+web app is where an answer is recorded, because a vote wants the source text
+beside the finding.
 
 The reviewer answers one question per finding — **could this attack happen in
 this system?** — as up, down, unsure, or needs-more-evidence. A down-vote picks

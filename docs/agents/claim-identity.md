@@ -166,3 +166,16 @@ quietly as the `if` it replaced.
 | `evals/harness/ledger.py` | The append-only vote record, the reason split, the pool, the re-key. |
 | `evals/harness/queue.py` | Which findings a reviewer is asked, in what order, blind to the configuration. |
 | `webapp/review.py` | The reviewer's interface. Loopback, no credentials, no engine. |
+
+## Where the rule is used
+
+`MechanicalFirstJudge` wraps the pinned judge for every scored sweep. **It takes
+one direction only**, because the rule's two errors are not the same size: it
+merges 3 of 287 reference pairs and splits 15 of 200 labelled matches. So a
+`match` from the rule is the answer and no model is asked; a `no-match` from it
+goes to the judge, because believing it would take 7% of recall out silently.
+
+The gain is determinism before it is cost. A match the rule settles cannot move
+between two runs of one configuration — which is exactly the band
+`evals/harness/stability.py` measures and every comparison has to clear. A sweep
+prints how many pairs it settled and how many it judged.
