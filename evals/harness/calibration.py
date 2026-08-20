@@ -64,6 +64,11 @@ class LabelledPair:
     candidate_claim: str
     reference_element_ids: tuple[str, ...]
     candidate_element_ids: tuple[str, ...] | None
+    #: The action each side names. The reference's comes free from the corpus;
+    #: the candidate's is a hand assignment, and is ``None`` on the no-match
+    #: half for the same reason its element IDs are.
+    reference_verb: str | None
+    candidate_verb: str | None
     label: Label
     note: str
 
@@ -80,6 +85,8 @@ class LabelledPair:
             candidate_claim=self.candidate_claim,
             reference_element_ids=self.reference_element_ids,
             candidate_element_ids=self.candidate_element_ids,
+            reference_verb=self.reference_verb,
+            candidate_verb=self.candidate_verb,
         )
 
 
@@ -306,6 +313,8 @@ def load_pairs(path: Path | str = DEFAULT_PAIRS_PATH) -> tuple[LabelledPair, ...
                     if entry["candidate_element_ids"] is None
                     else tuple(entry["candidate_element_ids"])
                 ),
+                reference_verb=entry.get("reference_verb"),
+                candidate_verb=entry.get("candidate_verb"),
                 label=entry["label"],
                 note=entry.get("note", ""),
             )

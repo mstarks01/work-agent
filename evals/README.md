@@ -92,6 +92,7 @@ evals/
 | `harness/stability.py` | Run-to-run stability: which references two or more finished sweeps agree on. Judge-free, and reads artifacts rather than re-running. |
 | `harness/calibration.py` | Judge-vs-label agreement over the labelled fixtures. |
 | `harness/verbs.py` | The closed vocabulary of attacker actions, and what counts as one action. Judge-free. |
+| `harness/identity.py` | Claim identity from the fields a claim carries. `SubsetVerbIdentity` scores 185/200 against the recorded labels, over the 90% bar, with no model call. |
 | `harness/fingerprint.py` | A **Claim**'s identity as a versioned value code computes. No model call. |
 | `harness/ledger.py` | The append-only record of what a **person** decided about a finding. |
 | `harness/queue.py` | Which findings a reviewer is asked about, and in what order. Blind to the configuration. |

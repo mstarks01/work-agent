@@ -11,7 +11,8 @@
       "likelihood": "medium",
       "impact": "high"
     },
-    "notes": "The one credential the source describes in full, and it describes it as shared across every pipeline and never rotated. Holding it is indistinguishable from being the runner."
+    "notes": "The one credential the source describes in full, and it describes it as shared across every pipeline and never rotated. Holding it is indistinguishable from being the runner.",
+    "verb": "use-credential"
   },
   {
     "category": "spoofing",
@@ -25,7 +26,8 @@
       "likelihood": "medium",
       "impact": "medium"
     },
-    "notes": "The source says the registry allows the pull and that nobody has written down what a store server presents to it; needs-info is the right verdict, not silence."
+    "notes": "The source says the registry allows the pull and that nobody has written down what a store server presents to it; needs-info is the right verdict, not silence.",
+    "verb": "impersonate"
   },
   {
     "category": "spoofing",
@@ -39,7 +41,8 @@
       "likelihood": "medium",
       "impact": "low"
     },
-    "notes": "Lower impact than the registry pull because the poll returns one sha, but it is the same undocumented identity and belongs on the record."
+    "notes": "Lower impact than the registry pull because the poll returns one sha, but it is the same undocumented identity and belongs on the record.",
+    "verb": "impersonate"
   },
   {
     "category": "spoofing",
@@ -53,7 +56,8 @@
       "likelihood": "medium",
       "impact": "medium"
     },
-    "notes": "Pushing a branch alone does not reach the estate — a merge to main is what starts a build — which is why this sits below the release-setting claims."
+    "notes": "Pushing a branch alone does not reach the estate — a merge to main is what starts a build — which is why this sits below the release-setting claims.",
+    "verb": "impersonate"
   },
   {
     "category": "spoofing",
@@ -67,7 +71,8 @@
       "likelihood": "medium",
       "impact": "high"
     },
-    "notes": "Distinct from the elevation claim on the same flow: this is an outsider becoming a developer, not a developer using the authority they legitimately have."
+    "notes": "Distinct from the elevation claim on the same flow: this is an outsider becoming a developer, not a developer using the authority they legitimately have.",
+    "verb": "impersonate"
   },
   {
     "category": "tampering",
@@ -81,7 +86,8 @@
       "likelihood": "medium",
       "impact": "high"
     },
-    "notes": "The single record is the whole control plane of the estate, and the poll loop turns one write into 1,200 restarts with no further attacker action."
+    "notes": "The single record is the whole control plane of the estate, and the poll loop turns one write into 1,200 restarts with no further attacker action.",
+    "verb": "alter"
   },
   {
     "category": "tampering",
@@ -95,7 +101,8 @@
       "likelihood": "medium",
       "impact": "high"
     },
-    "notes": "A stated absence, not an unknown — the source says outright that the runner does not verify signatures, so this is grounded rather than needs-info."
+    "notes": "A stated absence, not an unknown — the source says outright that the runner does not verify signatures, so this is grounded rather than needs-info.",
+    "verb": "plant"
   },
   {
     "category": "tampering",
@@ -109,7 +116,8 @@
       "likelihood": "medium",
       "impact": "high"
     },
-    "notes": "Worth keeping separate from the controller-record claim: this one leaves the release record honest, so nothing in the described system would show a change."
+    "notes": "Worth keeping separate from the controller-record claim: this one leaves the release record honest, so nothing in the described system would show a change.",
+    "verb": "plant"
   },
   {
     "category": "tampering",
@@ -122,7 +130,8 @@
       "likelihood": "low",
       "impact": "high"
     },
-    "notes": "The slowest path to the estate of the three tampering entry points, since it waits for a build, but the source states no protection on the content at rest."
+    "notes": "The slowest path to the estate of the three tampering entry points, since it waits for a build, but the source states no protection on the content at rest.",
+    "verb": "alter"
   },
   {
     "category": "tampering",
@@ -135,7 +144,8 @@
       "likelihood": "low",
       "impact": "high"
     },
-    "notes": "The image crosses from the build environment to the store estate over a WAN the source describes without saying anything about how it is protected."
+    "notes": "The image crosses from the build environment to the store estate over a WAN the source describes without saying anything about how it is protected.",
+    "verb": "alter-in-transit"
   },
   {
     "category": "tampering",
@@ -148,7 +158,8 @@
       "likelihood": "low",
       "impact": "medium"
     },
-    "notes": "Per-store rather than estate-wide, which is what separates it from writing the controller's record."
+    "notes": "Per-store rather than estate-wide, which is what separates it from writing the controller's record.",
+    "verb": "alter-in-transit"
   },
   {
     "category": "repudiation",
@@ -162,7 +173,8 @@
       "likelihood": "medium",
       "impact": "medium"
     },
-    "notes": "The source states the path is not reviewed and does not require a merge, so the git history that would otherwise carry attribution is bypassed by construction."
+    "notes": "The source states the path is not reviewed and does not require a merge, so the git history that would otherwise carry attribution is bypassed by construction.",
+    "verb": "unattributable"
   },
   {
     "category": "repudiation",
@@ -176,7 +188,8 @@
       "likelihood": "high",
       "impact": "medium"
     },
-    "notes": "High likelihood because it is not an attack condition but the described steady state — the token is stated to be the same for every pipeline."
+    "notes": "High likelihood because it is not an attack condition but the described steady state — the token is stated to be the same for every pipeline.",
+    "verb": "unattributable"
   },
   {
     "category": "information-disclosure",
@@ -190,7 +203,8 @@
       "likelihood": "medium",
       "impact": "high"
     },
-    "notes": "Recovering the credential is a separate action from using it, and the corpus files the use under spoofing; the never-rotated qualifier is what makes recovery durable."
+    "notes": "Recovering the credential is a separate action from using it, and the corpus files the use under spoofing; the never-rotated qualifier is what makes recovery durable.",
+    "verb": "recover-credential"
   },
   {
     "category": "information-disclosure",
@@ -203,7 +217,8 @@
       "likelihood": "low",
       "impact": "medium"
     },
-    "notes": "The source names this gap explicitly in its closing line, which is the sentence most likely to be dropped in extraction."
+    "notes": "The source names this gap explicitly in its closing line, which is the sentence most likely to be dropped in extraction.",
+    "verb": "read"
   },
   {
     "category": "information-disclosure",
@@ -216,7 +231,8 @@
       "likelihood": "low",
       "impact": "medium"
     },
-    "notes": "Paired with the git-server claim in the same closing sentence; kept separate because they are different stores with different reachability."
+    "notes": "Paired with the git-server claim in the same closing sentence; kept separate because they are different stores with different reachability.",
+    "verb": "read"
   },
   {
     "category": "information-disclosure",
@@ -229,7 +245,8 @@
       "likelihood": "low",
       "impact": "medium"
     },
-    "notes": "Reading the image in transit and altering it in transit are two claims on one flow, and the pair is the distinction the judge most often collapses."
+    "notes": "Reading the image in transit and altering it in transit are two claims on one flow, and the pair is the distinction the judge most often collapses.",
+    "verb": "intercept"
   },
   {
     "category": "denial-of-service",
@@ -243,7 +260,8 @@
       "likelihood": "medium",
       "impact": "high"
     },
-    "notes": "The estate-wide blast radius is the poll loop working as designed; this is the availability face of the same write the tampering lane files as integrity."
+    "notes": "The estate-wide blast radius is the poll loop working as designed; this is the availability face of the same write the tampering lane files as integrity.",
+    "verb": "alter"
   },
   {
     "category": "denial-of-service",
@@ -256,7 +274,8 @@
       "likelihood": "medium",
       "impact": "low"
     },
-    "notes": "Impact is low because a store server that cannot poll keeps running the image it has; what stops is deployment, not selling."
+    "notes": "Impact is low because a store server that cannot poll keeps running the image it has; what stops is deployment, not selling.",
+    "verb": "flood"
   },
   {
     "category": "denial-of-service",
@@ -270,7 +289,8 @@
       "likelihood": "low",
       "impact": "medium"
     },
-    "notes": "The interesting consequence is not downtime but divergence: the source describes no ordering or rollback across 1,200 independent pullers."
+    "notes": "The interesting consequence is not downtime but divergence: the source describes no ordering or rollback across 1,200 independent pullers.",
+    "verb": "disable"
   },
   {
     "category": "elevation-of-privilege",
@@ -284,7 +304,8 @@
       "likelihood": "medium",
       "impact": "high"
     },
-    "notes": "The case's signature shape: authority flows upward through the build, so the weakest gate on the input side is the real authority over the estate."
+    "notes": "The case's signature shape: authority flows upward through the build, so the weakest gate on the input side is the real authority over the estate.",
+    "verb": "abuse-grant"
   },
   {
     "category": "elevation-of-privilege",
@@ -298,7 +319,8 @@
       "likelihood": "medium",
       "impact": "high"
     },
-    "notes": "The runner concentrates both halves of the deploy path, so the build environment is effectively a higher-privilege zone than the estate it feeds."
+    "notes": "The runner concentrates both halves of the deploy path, so the build environment is effectively a higher-privilege zone than the estate it feeds.",
+    "verb": "escalate"
   },
   {
     "category": "elevation-of-privilege",
@@ -312,7 +334,8 @@
       "likelihood": "low",
       "impact": "high"
     },
-    "notes": "A back-office box in one of 1,200 stores is the least defensible element in the model and it is stated to reach across two boundaries."
+    "notes": "A back-office box in one of 1,200 stores is the least defensible element in the model and it is stated to reach across two boundaries.",
+    "verb": "escalate"
   },
   {
     "category": "elevation-of-privilege",
@@ -326,6 +349,7 @@
       "likelihood": "medium",
       "impact": "high"
     },
-    "notes": "Distinct from the tampering claim on the same flow: that one is about what ends up in the image, this one is about code running on the runner at build time."
+    "notes": "Distinct from the tampering claim on the same flow: that one is about what ends up in the image, this one is about code running on the runner at build time.",
+    "verb": "escalate"
   }
 ]

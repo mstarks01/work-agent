@@ -1,146 +1,271 @@
 [
   {
     "category": "spoofing",
-    "affected_element_ids": ["flow:game-client-to-lobby:matchmaking", "process:lobby"],
+    "affected_element_ids": [
+      "flow:game-client-to-lobby:matchmaking",
+      "process:lobby"
+    ],
     "claim": "An attacker connects to the exposed lobby port as another player, because how the lobby authenticates a client is unverified.",
     "tier": "must-find",
-    "severity": {"likelihood": "high", "impact": "high"},
-    "notes": "An internet-exposed port with unknown authentication is the highest-signal fact in the model."
+    "severity": {
+      "likelihood": "high",
+      "impact": "high"
+    },
+    "notes": "An internet-exposed port with unknown authentication is the highest-signal fact in the model.",
+    "verb": "impersonate"
   },
   {
     "category": "spoofing",
-    "affected_element_ids": ["flow:game-client-to-game-servers:gameplay-traffic", "process:game-servers"],
+    "affected_element_ids": [
+      "flow:game-client-to-game-servers:gameplay-traffic",
+      "process:game-servers"
+    ],
     "claim": "An attacker connects directly to a game server on its exposed port, bypassing the lobby, as a player who was never assigned to that match.",
     "tier": "must-find",
-    "severity": {"likelihood": "high", "impact": "high"},
-    "notes": "The direct client-to-server path is a second entry point that skips whatever matchmaking establishes."
+    "severity": {
+      "likelihood": "high",
+      "impact": "high"
+    },
+    "notes": "The direct client-to-server path is a second entry point that skips whatever matchmaking establishes.",
+    "verb": "impersonate"
   },
   {
     "category": "spoofing",
-    "affected_element_ids": ["flow:customer-support-to-moderation-website:moderate-accounts", "process:moderation-website"],
+    "affected_element_ids": [
+      "flow:customer-support-to-moderation-website:moderate-accounts",
+      "process:moderation-website"
+    ],
     "claim": "An attacker reaches the moderation website posing as a support agent, since its authentication is unverified.",
     "tier": "expected",
-    "severity": {"likelihood": "medium", "impact": "high"},
-    "notes": "A tool that can act on any player account; its access control is entirely unstated."
+    "severity": {
+      "likelihood": "medium",
+      "impact": "high"
+    },
+    "notes": "A tool that can act on any player account; its access control is entirely unstated.",
+    "verb": "impersonate"
   },
   {
     "category": "tampering",
-    "affected_element_ids": ["process:game-client", "flow:game-client-to-game-servers:gameplay-traffic"],
+    "affected_element_ids": [
+      "process:game-client",
+      "flow:game-client-to-game-servers:gameplay-traffic"
+    ],
     "claim": "A player modifies the game client on their own machine and sends manipulated gameplay actions that the servers accept.",
     "tier": "must-find",
-    "severity": {"likelihood": "high", "impact": "high"},
-    "notes": "The defining threat of this domain: the client runs on hardware the operator explicitly does not control, so client-side state is attacker-controlled input."
+    "severity": {
+      "likelihood": "high",
+      "impact": "high"
+    },
+    "notes": "The defining threat of this domain: the client runs on hardware the operator explicitly does not control, so client-side state is attacker-controlled input.",
+    "verb": "forge"
   },
   {
     "category": "tampering",
-    "affected_element_ids": ["store:stats-database", "flow:game-servers-to-stats-database:read-write-stats"],
+    "affected_element_ids": [
+      "store:stats-database",
+      "flow:game-servers-to-stats-database:read-write-stats"
+    ],
     "claim": "An attacker alters match statistics in the stats database to change rankings or rewards.",
     "tier": "must-find",
-    "severity": {"likelihood": "medium", "impact": "medium"},
-    "notes": "Competitive integrity is the business asset; write authentication on this path is unverified."
+    "severity": {
+      "likelihood": "medium",
+      "impact": "medium"
+    },
+    "notes": "Competitive integrity is the business asset; write authentication on this path is unverified.",
+    "verb": "alter"
   },
   {
     "category": "tampering",
-    "affected_element_ids": ["store:player-database", "flow:game-servers-to-player-database:update-players"],
+    "affected_element_ids": [
+      "store:player-database",
+      "flow:game-servers-to-player-database:update-players"
+    ],
     "claim": "An attacker who influences a game server writes fabricated progression onto player records.",
     "tier": "expected",
-    "severity": {"likelihood": "medium", "impact": "medium"},
-    "notes": "Three separate writers reach this store, each with unverified authentication."
+    "severity": {
+      "likelihood": "medium",
+      "impact": "medium"
+    },
+    "notes": "Three separate writers reach this store, each with unverified authentication.",
+    "verb": "forge"
   },
   {
     "category": "repudiation",
-    "affected_element_ids": ["process:moderation-website", "store:player-database"],
+    "affected_element_ids": [
+      "process:moderation-website",
+      "store:player-database"
+    ],
     "claim": "A support agent's action on a player account cannot be attributed to them, because nothing records who performed a moderation change.",
     "tier": "must-find",
-    "severity": {"likelihood": "medium", "impact": "high"},
-    "notes": "A privileged tool acting directly on records with no audit path described anywhere in the model."
+    "severity": {
+      "likelihood": "medium",
+      "impact": "high"
+    },
+    "notes": "A privileged tool acting directly on records with no audit path described anywhere in the model.",
+    "verb": "unattributable"
   },
   {
     "category": "repudiation",
-    "affected_element_ids": ["store:player-database", "process:game-servers"],
+    "affected_element_ids": [
+      "store:player-database",
+      "process:game-servers"
+    ],
     "claim": "A player disputes a change to their record and no log distinguishes whether the lobby, a game server or the moderation website made it.",
     "tier": "expected",
-    "severity": {"likelihood": "medium", "impact": "medium"},
-    "notes": "Multiple writers, one store, no recorded provenance."
+    "severity": {
+      "likelihood": "medium",
+      "impact": "medium"
+    },
+    "notes": "Multiple writers, one store, no recorded provenance.",
+    "verb": "unattributable"
   },
   {
     "category": "information-disclosure",
-    "affected_element_ids": ["store:player-database"],
+    "affected_element_ids": [
+      "store:player-database"
+    ],
     "claim": "An attacker who reaches the player database reads player account data, whose protection at rest is unverified.",
     "tier": "must-find",
-    "severity": {"likelihood": "medium", "impact": "high"},
-    "notes": "Report as unverified; needs-info is an acceptable verdict given the model states nothing."
+    "severity": {
+      "likelihood": "medium",
+      "impact": "high"
+    },
+    "notes": "Report as unverified; needs-info is an acceptable verdict given the model states nothing.",
+    "verb": "read"
   },
   {
     "category": "information-disclosure",
-    "affected_element_ids": ["flow:game-client-to-lobby:matchmaking", "flow:game-client-to-game-servers:gameplay-traffic"],
+    "affected_element_ids": [
+      "flow:game-client-to-lobby:matchmaking",
+      "flow:game-client-to-game-servers:gameplay-traffic"
+    ],
     "claim": "An attacker on the network path reads matchmaking and gameplay traffic, including player identifiers, because encryption on both client links is unverified.",
     "tier": "must-find",
-    "severity": {"likelihood": "medium", "impact": "medium"},
-    "notes": "Both links are recorded as bare port numbers — the model gives no transport protection at all."
+    "severity": {
+      "likelihood": "medium",
+      "impact": "medium"
+    },
+    "notes": "Both links are recorded as bare port numbers — the model gives no transport protection at all.",
+    "verb": "intercept"
   },
   {
     "category": "information-disclosure",
-    "affected_element_ids": ["process:game-client", "process:game-servers"],
+    "affected_element_ids": [
+      "process:game-client",
+      "process:game-servers"
+    ],
     "claim": "A player extracts information from their own client that the server sends but should not reveal, such as other players' positions.",
     "tier": "expected",
-    "severity": {"likelihood": "high", "impact": "medium"},
-    "notes": "Domain-specific and grounded in the untrusted-client fact; the classic wallhack shape."
+    "severity": {
+      "likelihood": "high",
+      "impact": "medium"
+    },
+    "notes": "Domain-specific and grounded in the untrusted-client fact; the classic wallhack shape.",
+    "verb": "elicit"
   },
   {
     "category": "information-disclosure",
-    "affected_element_ids": ["process:moderation-website", "store:player-database"],
+    "affected_element_ids": [
+      "process:moderation-website",
+      "store:player-database"
+    ],
     "claim": "A support agent reads player account data beyond what a moderation decision requires, because the website's access to the database is unscoped.",
     "tier": "expected",
-    "severity": {"likelihood": "medium", "impact": "medium"},
-    "notes": "Direct read/write to the store, with no narrower grant described."
+    "severity": {
+      "likelihood": "medium",
+      "impact": "medium"
+    },
+    "notes": "Direct read/write to the store, with no narrower grant described.",
+    "verb": "abuse-grant"
   },
   {
     "category": "denial-of-service",
-    "affected_element_ids": ["process:lobby", "flow:game-client-to-lobby:matchmaking"],
+    "affected_element_ids": [
+      "process:lobby",
+      "flow:game-client-to-lobby:matchmaking"
+    ],
     "claim": "An attacker floods the exposed lobby until players can no longer be matched into games.",
     "tier": "must-find",
-    "severity": {"likelihood": "high", "impact": "high"},
-    "notes": "The lobby is a single availability-critical chokepoint that every session passes through."
+    "severity": {
+      "likelihood": "high",
+      "impact": "high"
+    },
+    "notes": "The lobby is a single availability-critical chokepoint that every session passes through.",
+    "verb": "flood"
   },
   {
     "category": "denial-of-service",
-    "affected_element_ids": ["process:game-servers", "flow:game-client-to-game-servers:gameplay-traffic"],
+    "affected_element_ids": [
+      "process:game-servers",
+      "flow:game-client-to-game-servers:gameplay-traffic"
+    ],
     "claim": "An attacker floods a game server's exposed port and disrupts a match in progress for every player in it.",
     "tier": "must-find",
-    "severity": {"likelihood": "high", "impact": "medium"},
-    "notes": "Directly reachable match servers are the domain's signature availability problem; a disrupted match cannot be retried."
+    "severity": {
+      "likelihood": "high",
+      "impact": "medium"
+    },
+    "notes": "Directly reachable match servers are the domain's signature availability problem; a disrupted match cannot be retried.",
+    "verb": "flood"
   },
   {
     "category": "denial-of-service",
-    "affected_element_ids": ["store:player-database", "process:lobby"],
+    "affected_element_ids": [
+      "store:player-database",
+      "process:lobby"
+    ],
     "claim": "An attacker drives enough matchmaking requests to exhaust the player database and stall both matchmaking and moderation.",
     "tier": "expected",
-    "severity": {"likelihood": "medium", "impact": "medium"},
-    "notes": "One store shared by the player path and the staff path."
+    "severity": {
+      "likelihood": "medium",
+      "impact": "medium"
+    },
+    "notes": "One store shared by the player path and the staff path.",
+    "verb": "flood"
   },
   {
     "category": "elevation-of-privilege",
-    "affected_element_ids": ["process:game-servers", "store:player-database"],
+    "affected_element_ids": [
+      "process:game-servers",
+      "store:player-database"
+    ],
     "claim": "An attacker who compromises an internet-exposed game server gains write access to player records across the production network.",
     "tier": "must-find",
-    "severity": {"likelihood": "medium", "impact": "high"},
-    "notes": "The exposed element writes the sensitive store directly, with no intermediary and unverified authentication."
+    "severity": {
+      "likelihood": "medium",
+      "impact": "high"
+    },
+    "notes": "The exposed element writes the sensitive store directly, with no intermediary and unverified authentication.",
+    "verb": "escalate"
   },
   {
     "category": "elevation-of-privilege",
-    "affected_element_ids": ["process:moderation-website", "entity:customer-support"],
+    "affected_element_ids": [
+      "process:moderation-website",
+      "entity:customer-support"
+    ],
     "claim": "An attacker who gets any access to the moderation website acquires privilege over every player account it can reach.",
     "tier": "must-find",
-    "severity": {"likelihood": "medium", "impact": "high"},
-    "notes": "No role separation inside the tool is described; the blast radius is the whole player base."
+    "severity": {
+      "likelihood": "medium",
+      "impact": "high"
+    },
+    "notes": "No role separation inside the tool is described; the blast radius is the whole player base.",
+    "verb": "abuse-grant"
   },
   {
     "category": "elevation-of-privilege",
-    "affected_element_ids": ["process:game-client", "process:lobby"],
+    "affected_element_ids": [
+      "process:game-client",
+      "process:lobby"
+    ],
     "claim": "A player uses their control over the client to obtain a match assignment or account state they are not entitled to.",
     "tier": "expected",
-    "severity": {"likelihood": "medium", "impact": "medium"},
-    "notes": "Escalation framing of the untrusted-client fact, against the lobby rather than the game servers."
+    "severity": {
+      "likelihood": "medium",
+      "impact": "medium"
+    },
+    "notes": "Escalation framing of the untrusted-client fact, against the lobby rather than the game servers.",
+    "verb": "escalate"
   }
 ]

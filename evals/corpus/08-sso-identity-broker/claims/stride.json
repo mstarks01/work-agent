@@ -11,7 +11,8 @@
       "likelihood": "low",
       "impact": "high"
     },
-    "notes": "The source states one key signs the tokens for every application, so the key is the whole authorization system and not merely one application's."
+    "notes": "The source states one key signs the tokens for every application, so the key is the whole authorization system and not merely one application's.",
+    "verb": "forge"
   },
   {
     "category": "spoofing",
@@ -25,7 +26,8 @@
       "likelihood": "medium",
       "impact": "high"
     },
-    "notes": "A stated gap rather than an unknown: the source says outright that the restriction has not been written down, which is what makes this grounded rather than speculative."
+    "notes": "A stated gap rather than an unknown: the source says outright that the restriction has not been written down, which is what makes this grounded rather than speculative.",
+    "verb": "impersonate"
   },
   {
     "category": "spoofing",
@@ -39,7 +41,8 @@
       "likelihood": "medium",
       "impact": "high"
     },
-    "notes": "The front door, and explicitly undocumented in the closing paragraph; needs-info is the right verdict, not a confident finding either way."
+    "notes": "The front door, and explicitly undocumented in the closing paragraph; needs-info is the right verdict, not a confident finding either way.",
+    "verb": "impersonate"
   },
   {
     "category": "spoofing",
@@ -53,7 +56,8 @@
       "likelihood": "medium",
       "impact": "high"
     },
-    "notes": "Two stated qualifiers compound here, and neither is an unknown; the twelve-hour window is the stated blast radius of every other spoofing claim in this case."
+    "notes": "Two stated qualifiers compound here, and neither is an unknown; the twelve-hour window is the stated blast radius of every other spoofing claim in this case.",
+    "verb": "use-credential"
   },
   {
     "category": "spoofing",
@@ -67,7 +71,8 @@
       "likelihood": "low",
       "impact": "high"
     },
-    "notes": "The hinge of a claims-based design: the key fetch is what makes a signature mean anything, and the source describes it in one clause without saying how it is protected."
+    "notes": "The hinge of a claims-based design: the key fetch is what makes a signature mean anything, and the source describes it in one clause without saying how it is protected.",
+    "verb": "forge"
   },
   {
     "category": "tampering",
@@ -81,7 +86,8 @@
       "likelihood": "low",
       "impact": "high"
     },
-    "notes": "The directory is where authorization actually lives in this design; writing to it grants durable authority without touching a key or a token."
+    "notes": "The directory is where authorization actually lives in this design; writing to it grants durable authority without touching a key or a token.",
+    "verb": "alter"
   },
   {
     "category": "tampering",
@@ -95,7 +101,8 @@
       "likelihood": "low",
       "impact": "high"
     },
-    "notes": "The pull crosses out of the corporate network to a system the source never locates, and it is the only stated path by which access is taken away."
+    "notes": "The pull crosses out of the corporate network to a system the source never locates, and it is the only stated path by which access is taken away.",
+    "verb": "alter-in-transit"
   },
   {
     "category": "tampering",
@@ -108,7 +115,8 @@
       "likelihood": "low",
       "impact": "medium"
     },
-    "notes": "Kept distinct from the elevation claim on the same flow: this one is about altering a legitimate action, not about who is allowed to take it."
+    "notes": "Kept distinct from the elevation claim on the same flow: this one is about altering a legitimate action, not about who is allowed to take it.",
+    "verb": "alter-in-transit"
   },
   {
     "category": "tampering",
@@ -122,7 +130,8 @@
       "likelihood": "low",
       "impact": "medium"
     },
-    "notes": "Filed here as an integrity claim against the store; the consequence for attribution is a separate reference in the repudiation lane."
+    "notes": "Filed here as an integrity claim against the store; the consequence for attribution is a separate reference in the repudiation lane.",
+    "verb": "delete"
   },
   {
     "category": "repudiation",
@@ -136,7 +145,8 @@
       "likelihood": "medium",
       "impact": "medium"
     },
-    "notes": "The source raises the franchise coverage question itself, which is the clearest signal in the text that this is the attribution gap worth reporting."
+    "notes": "The source raises the franchise coverage question itself, which is the clearest signal in the text that this is the attribution gap worth reporting.",
+    "verb": "unattributable"
   },
   {
     "category": "repudiation",
@@ -150,7 +160,8 @@
       "likelihood": "high",
       "impact": "medium"
     },
-    "notes": "High likelihood because it is the described steady state rather than an attack condition, and it is the accountability face of the case's central authorization gap."
+    "notes": "High likelihood because it is the described steady state rather than an attack condition, and it is the accountability face of the case's central authorization gap.",
+    "verb": "unattributable"
   },
   {
     "category": "repudiation",
@@ -163,7 +174,8 @@
       "likelihood": "medium",
       "impact": "medium"
     },
-    "notes": "The existence of a log is stated and its contents are not; treating an unknown log as an adequate one is exactly the error the unknown value exists to prevent."
+    "notes": "The existence of a log is stated and its contents are not; treating an unknown log as an adequate one is exactly the error the unknown value exists to prevent.",
+    "verb": "unattributable"
   },
   {
     "category": "information-disclosure",
@@ -176,7 +188,8 @@
       "likelihood": "low",
       "impact": "high"
     },
-    "notes": "Recovering the key is a separate action from using it, and the corpus files the use under spoofing; one key for every application is what makes the recovery worth this severity."
+    "notes": "Recovering the key is a separate action from using it, and the corpus files the use under spoofing; one key for every application is what makes the recovery worth this severity.",
+    "verb": "recover-credential"
   },
   {
     "category": "information-disclosure",
@@ -189,7 +202,8 @@
       "likelihood": "low",
       "impact": "medium"
     },
-    "notes": "Named as unverified in the source's closing line, and the group list doubles as a map of who is worth attacking."
+    "notes": "Named as unverified in the source's closing line, and the group list doubles as a map of who is worth attacking.",
+    "verb": "read"
   },
   {
     "category": "information-disclosure",
@@ -202,7 +216,8 @@
       "likelihood": "low",
       "impact": "low"
     },
-    "notes": "Paired with the directory in the same closing sentence; kept separate because they are different stores holding different things."
+    "notes": "Paired with the directory in the same closing sentence; kept separate because they are different stores holding different things.",
+    "verb": "read"
   },
   {
     "category": "information-disclosure",
@@ -215,7 +230,8 @@
       "likelihood": "medium",
       "impact": "high"
     },
-    "notes": "Colleagues are stated to sign in from their own devices at home, so this path is the least controlled one in the model and the token it carries is a bearer credential."
+    "notes": "Colleagues are stated to sign in from their own devices at home, so this path is the least controlled one in the model and the token it carries is a bearer credential.",
+    "verb": "intercept"
   },
   {
     "category": "information-disclosure",
@@ -228,7 +244,8 @@
       "likelihood": "low",
       "impact": "medium"
     },
-    "notes": "A boundary crossing carrying personal data that the source describes without saying anything about how it is protected."
+    "notes": "A boundary crossing carrying personal data that the source describes without saying anything about how it is protected.",
+    "verb": "intercept"
   },
   {
     "category": "denial-of-service",
@@ -241,7 +258,8 @@
       "likelihood": "medium",
       "impact": "high"
     },
-    "notes": "The source's first sentence states the single point of failure, and the twelve-hour token is the only thing that softens it for colleagues already signed in."
+    "notes": "The source's first sentence states the single point of failure, and the twelve-hour token is the only thing that softens it for colleagues already signed in.",
+    "verb": "disable"
   },
   {
     "category": "denial-of-service",
@@ -255,7 +273,8 @@
       "likelihood": "medium",
       "impact": "medium"
     },
-    "notes": "The failure is silent by construction: nothing in the described system reads the pull's success, so the first visible symptom is a leaver who still has access."
+    "notes": "The failure is silent by construction: nothing in the described system reads the pull's success, so the first visible symptom is a leaver who still has access.",
+    "verb": "disable"
   },
   {
     "category": "denial-of-service",
@@ -269,7 +288,8 @@
       "likelihood": "low",
       "impact": "high"
     },
-    "notes": "The same single-key fact that makes the confidentiality claim severe makes this one estate-wide; kept distinct from reading the key, which is a different action."
+    "notes": "The same single-key fact that makes the confidentiality claim severe makes this one estate-wide; kept distinct from reading the key, which is a different action.",
+    "verb": "delete"
   },
   {
     "category": "elevation-of-privilege",
@@ -283,7 +303,8 @@
       "likelihood": "high",
       "impact": "high"
     },
-    "notes": "The case's signature claim and the only one the source states as a completed fact rather than as a gap. High likelihood because no attacker step is required: a legitimate token already carries the authority."
+    "notes": "The case's signature claim and the only one the source states as a completed fact rather than as a gap. High likelihood because no attacker step is required: a legitimate token already carries the authority.",
+    "verb": "abuse-grant"
   },
   {
     "category": "elevation-of-privilege",
@@ -297,7 +318,8 @@
       "likelihood": "high",
       "impact": "high"
     },
-    "notes": "Three stated facts compound into one window — nightly removal, twelve-hour tokens, no revocation — and no single sentence of the source contains it, which is what makes it the hardest claim in this case to reach."
+    "notes": "Three stated facts compound into one window — nightly removal, twelve-hour tokens, no revocation — and no single sentence of the source contains it, which is what makes it the hardest claim in this case to reach.",
+    "verb": "abuse-grant"
   },
   {
     "category": "elevation-of-privilege",
@@ -311,6 +333,7 @@
       "likelihood": "low",
       "impact": "high"
     },
-    "notes": "The one crossing in this model where trust is granted to a party rather than to a network position, which is the shape this case exists to grade."
+    "notes": "The one crossing in this model where trust is granted to a party rather than to a network position, which is the shape this case exists to grade.",
+    "verb": "escalate"
   }
 ]

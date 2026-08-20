@@ -94,6 +94,8 @@ PAIR_FIELDS = frozenset(
         "reference_element_ids",
         "candidate_claim",
         "candidate_element_ids",
+        "reference_verb",
+        "candidate_verb",
         "label",
         "note",
     )

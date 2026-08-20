@@ -124,14 +124,22 @@ class SubsetVerbIdentity:
     :func:`~evals.harness.calibration.measure_agreement` scores it against the
     same recorded labels on the same bar. Two rules, one scoreboard.
 
-    **It refuses a pair carrying no verb rather than guessing one.** No
-    reference claim carries one yet, so this rule cannot be scored over the
-    corpus today; ``tests/test_verb_coverage.py`` names that debt. Treating an
+    **It refuses a pair carrying no verb rather than guessing one.** Treating an
     absent verb as a wildcard would quietly grade the element half alone and
     report the number as this rule's.
+
+    The **Data Flow** map is held per instance rather than passed per call, so
+    the signature matches the ``Judge`` protocol and one comparison can score
+    this rule beside the pinned judge. It is per case for the same reason
+    :class:`~evals.harness.judge.MemoJudge` is scoped per case: two cases may
+    spell one flow ID differently, and a shared map would resolve one case's
+    citation against another's graph.
     """
 
-    def equivalent(self, pair: ClaimPair, flows: FlowMap) -> ClaimRuling:
+    def __init__(self, flows_by_case: Mapping[str, FlowMap]) -> None:
+        self._flows = flows_by_case
+
+    def equivalent(self, pair: ClaimPair) -> ClaimRuling:
         if pair.candidate_element_ids is None:
             raise IdentityError(
                 f"{pair.case}: no element IDs are assigned to candidate claim"
@@ -144,7 +152,9 @@ class SubsetVerbIdentity:
                 " evals.harness.verbs, or score MechanicalIdentity instead"
             )
         elements = endpoint_subset(
-            pair.reference_element_ids, pair.candidate_element_ids, flows
+            pair.reference_element_ids,
+            pair.candidate_element_ids,
+            self._flows.get(pair.case, {}),
         )
         action = same_action(pair.reference_verb, pair.candidate_verb)
         return ClaimRuling(
@@ -154,6 +164,24 @@ class SubsetVerbIdentity:
                 f" {pair.reference_verb} vs {pair.candidate_verb}"
                 f" {'is one action' if action else 'are two actions'}"
             ),
+        )
+
+    def adjudicate(
+        self,
+        threat: UnmatchedThreat,
+        system_model: SystemModel,
+        sibling_claims: tuple[str, ...],
+    ) -> BucketRuling:
+        """Refused, for the reason :class:`MechanicalIdentity` refuses it.
+
+        Bucketing an unmatched threat asks whether the **System Model** supports
+        a claim nobody wrote down. No comparison of fields answers that, and a
+        made-up answer would put a meaningless number into a metric.
+        """
+        del threat, system_model, sibling_claims
+        raise IdentityError(
+            "this rule compares claims and cannot bucket an unmatched threat;"
+            " that call needs the judge"
         )
 
 
