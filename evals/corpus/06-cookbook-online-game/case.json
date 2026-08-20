@@ -2,7 +2,7 @@
   "id": "06-cookbook-online-game",
   "title": "Online battle-royale game, player-facing flows",
   "domain": "online-game",
-  "provenance": "OWASP Threat Model Cookbook, \"Battle Royale Game Flow Diagram\" (Flow Diagram/online-battleroyale-game/onlinegame.py, pytm), https://github.com/OWASP/threat-model-cookbook \u2014 textual and graphical representations CC-BY 4.0. Converted to submitted-text form for this corpus.",
+  "provenance": "OWASP Threat Model Cookbook, \"Battle Royale Game Flow Diagram\" (Flow Diagram/online-battleroyale-game/onlinegame.py, pytm), https://github.com/OWASP/threat-model-cookbook — textual and graphical representations CC-BY 4.0. Converted to submitted-text form for this corpus.",
   "bootstrap": "agent-stand-in",
   "sources": [
     {
@@ -27,5 +27,5 @@
       "exemplar_proximity": "far"
     }
   ],
-  "notes": "Cookbook conversion 2 of 2. The full source diagram is 32 elements, over the 8-20 band that makes ground truth exhaustively enumerable (ticket 009 decision 5), so this case converts a deliberately scoped subset: the player path (client, lobby, game servers, both databases) plus the support/moderation path. Dropped from the source diagram: the anonymous web user, the stats website, and the REST API behind it \u2014 a self-contained web sub-tree whose removal changes no remaining element's attributes. Far from the payments exemplar in the way that matters most for the delta: the untrusted element is a process running the operator's own code on hardware the operator does not control, which is a trust shape the exemplar has no instance of at all."
+  "notes": "Cookbook conversion 2 of 2. The full source diagram is 32 elements, over the 8-20 band that makes ground truth exhaustively enumerable (ticket 009 decision 5), so this case converts a deliberately scoped subset: the player path (client, lobby, game servers, both databases) plus the support/moderation path. Dropped from the source diagram: the anonymous web user, the stats website, and the REST API behind it — a self-contained web sub-tree whose removal changes no remaining element's attributes. Far from the payments exemplar in the way that matters most for the delta: the untrusted element is a process running the operator's own code on hardware the operator does not control, which is a trust shape the exemplar has no instance of at all."
 }

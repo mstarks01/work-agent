@@ -65,7 +65,6 @@ UNTRIGGERED_LANES: dict[str, str] = dict.fromkeys(
         "secure-communication",
         "security-logging-and-error-handling",
         "self-contained-tokens",
-        "validation-and-business-logic",
         "webrtc",
     ),
     "asvs: the chapter's rule fires on some model but never on an element one of"
