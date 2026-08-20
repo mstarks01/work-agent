@@ -23,7 +23,10 @@ the repository.
 from __future__ import annotations
 
 import json
+from collections.abc import Callable
 from pathlib import Path
+
+from stride_service.frameworks import PACKAGES
 
 EVALS = Path(__file__).resolve().parent
 CORPUS = EVALS / "corpus"
@@ -265,6 +268,25 @@ def asvs_part(records: list[dict], part: int) -> str:
     return "\n".join(lines)
 
 
+#: One renderer per framework, keyed rather than branched: a package missing
+#: from this table raises `KeyError` at its first case, and the check below
+#: keeps the table complete against the registry — a table nobody compares to
+#: `PACKAGES` fails as quietly as the branch it replaces. Each renderer asks
+#: the question that package's records rule on: STRIDE's is a threat, ASVS's
+#: is applicability.
+RENDERERS: dict[str, Callable[[list[dict], int], str]] = {
+    "stride": stride_part,
+    "asvs": asvs_part,
+}
+
+_missing = set(PACKAGES) - set(RENDERERS)
+if _missing:
+    raise SystemExit(
+        f"no reading-document renderer for {sorted(_missing)}; add a row to"
+        " RENDERERS so that package's reference set reaches a sitting"
+    )
+
+
 def closing(case_id: str, meta: dict) -> str:
     read = ["source.md"]
     read += [source["file"] for source in meta["sources"] if source["file"] not in read]
@@ -341,15 +363,7 @@ def build_doc(case_dir: Path) -> str:
     part = 2
     for name in frameworks:
         claims = load_records(case_dir / "claims" / f"{name}.json")
-        if name == "stride":
-            lines.append(stride_part(claims, part))
-        elif name == "asvs":
-            lines.append(asvs_part(claims, part))
-        else:
-            raise SystemExit(
-                f"{meta['id']}: no renderer for framework {name!r}; add one"
-                " before generating its reading document"
-            )
+        lines.append(RENDERERS[name](claims, part))
         part += 1
 
     lines.append(MISSING)
