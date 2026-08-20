@@ -1,4 +1,4 @@
-"""The eval CLI: run a mode over the corpus, calibrate the judge, promote a winner.
+"""The eval CLI: run a mode over the corpus, calibrate the rule, promote a winner.
 
 Gating is **Tier 1 structural only**. A report that does not parse, whose
 references dangle, whose severity bands contradict the matrix or whose summary
@@ -7,10 +7,10 @@ printed and written to the artifact, and deliberately **does not block** until
 baseline sweeps have established its normal range: a gate that fires before
 anyone knows that range trains people to bypass it.
 
-Everything the run measured lands in one JSON artifact: every judge ruling with
+Everything the run measured lands in one JSON artifact: every matching ruling with
 its rationale, every bucket decision, the severity confusion, the near/far
 exemplar delta, and the ``valid-unlisted`` threats queued for the corpus's next
-blessing pass. The metrics are judge-relative — track movement with them, never
+blessing pass. The metrics are rule-and-ledger-relative — track movement with them, never
 quote them as absolutes.
 
 Everything the run *produced* lands beside it, one whole report per case, in the
@@ -47,8 +47,6 @@ from evals.harness.artifact import EvalArtifact, load_artifact
 from evals.harness.artifact import build as build_artifact
 from evals.harness.calibration import (
     AGREEMENT_BAR,
-    LabelledPair,
-    compare_judges,
     load_pairs,
     measure_agreement,
 )
@@ -62,9 +60,8 @@ from evals.harness.grounds import (
     GroundsFailure,
     classify_failure,
 )
-from evals.harness.identity import MechanicalFirstJudge
+from evals.harness.identity import SubsetVerbIdentity
 from evals.harness.instruments import ModeRun, Sweep, measure_case, render_all
-from evals.harness.judge import Judge, PinnedJudge, load_judge_config
 from evals.harness.provenance import (
     UNSET,
     ProvenanceError,
@@ -72,7 +69,7 @@ from evals.harness.provenance import (
     provenance_of,
 )
 from evals.harness.reference import GoldenCase, load_corpus
-from evals.harness.scorer import CaseScore, ratio
+from evals.harness.scorer import CaseScore
 from evals.harness.stability import (
     CaseStability,
     ScoredRun,
@@ -146,37 +143,6 @@ def stride_threats(report: Report) -> list[Threat]:
             "the stride block's claims did not load as Threat records"
         )
     return narrowed
-
-
-def _live_judge(
-    deployment: Deployment, config_path: Path | str | None = None
-) -> PinnedJudge:
-    """The pinned judge, retry-and-timeout-hardened like the graph.
-
-    A calibration or scoring sweep is hours of paid work; without the same
-    resilience config the graph carries, one 429 to the judge throws all of it
-    away. It is the deployment's config, not a second read of the file, so the
-    judge cannot end up hardened differently from the graph it is scoring.
-
-    ``config_path`` selects a *candidate* judge for calibration. It is
-    deliberately not offered to ``run``: a scored sweep must be measured by the
-    judge its numbers will be compared against, which is the one in
-    ``evals/config/judge.toml``. Pointing a sweep at some other judge produces
-    numbers that look like the tracked series and are not comparable to it.
-    """
-    config = load_judge_config(config_path) if config_path else load_judge_config()
-    return PinnedJudge(config, resilience=deployment.resilience)
-
-
-def _judge_label(config_path: Path | str | None) -> str:
-    """How a candidate judge is named in a comparison report.
-
-    ``vendor/model`` rather than the file path: the path is where a candidate
-    was written down, and the pair is what was actually measured. Two files
-    naming the same pair would otherwise read as two candidates.
-    """
-    config = load_judge_config(config_path) if config_path else load_judge_config()
-    return f"{config.vendor}/{config.model}"
 
 
 def _select(cases: Sequence[GoldenCase], wanted: Sequence[str]) -> list[GoldenCase]:
@@ -377,7 +343,8 @@ def _flows_by_case(
 def _score_runs(
     cases: Sequence[GoldenCase],
     runs: dict[str, modes.AnalysisRun],
-    judge: Judge,
+    matcher: SubsetVerbIdentity,
+    votes: ledger.Ledger,
 ) -> tuple[tuple[CaseScore, ...], tuple[CriticYield, ...]]:
     """Score every case that carries a STRIDE block, on both sides of the critic.
 
@@ -398,7 +365,8 @@ def _score_runs(
             case,
             runs[case.id].merged_drafts,
             stride_threats(runs[case.id].report),
-            judge,
+            matcher,
+            votes,
         )
         for case in cases
         if case.id in runs and optional_block(runs[case.id].report, "stride")
@@ -409,30 +377,16 @@ def _score_runs(
     )
 
 
-def _models_record(
-    deployment: Deployment,
-    judge: PinnedJudge | None,
-    judge_config_path: Path | str | None = None,
-) -> dict[str, Any]:
-    """What this run asked its providers for, and what they say they served.
+def _models_record(deployment: Deployment) -> dict[str, Any]:
+    """What this run asked its providers for.
 
-    The tier strings are stable GA identifiers, not immutable builds, so the
-    artifact records both halves. A metric that moved between two runs with
-    different ``judge_served`` values is a model change, not a regression, and
-    nothing else in the artifact would show that.
-
-    ``judge_config_path`` records the *candidate* a calibration measured, which
-    is not always the shipped one. Reading the default here while the run used
-    a candidate would attribute a number to the wrong judge — the exact
-    mislabelling this record exists to prevent. A comparison passes neither,
-    since it measured several and names them in its own payload.
+    The tier strings are stable GA identifiers, not immutable builds; the
+    served builds are recorded per node in the provenance block. No judge
+    appears here: claim matching is the identity rule, which is code in this
+    repository and is versioned by the fingerprint version in every key it
+    produces.
     """
     tiers = deployment.tiers
-    judge_config = (
-        load_judge_config(judge_config_path)
-        if judge_config_path
-        else load_judge_config()
-    )
     return {
         "tiers_config_version": tiers.version,
         # Dumped, not handed over whole: a ``TierSelection`` is a pydantic model
@@ -443,17 +397,14 @@ def _models_record(
             tier: selection.model_dump(mode="json")
             for tier, selection in tiers.tiers.items()
         },
-        "judge_config_version": judge_config.version,
-        "judge": judge_config.model,
-        "judge_served": list(judge.served_model_versions) if judge else [],
     }
 
 
 def command_run(args: argparse.Namespace) -> int:
     cases = _select(load_corpus(args.corpus), args.case)
-    # One deployment for the whole sweep: the graph it runs, the manifest it is
-    # certified against and the resilience the judge inherits are then one
-    # configuration rather than four reads that could disagree.
+    # One deployment for the whole sweep: the graph it runs and the manifest it
+    # is certified against are then one configuration rather than two reads
+    # that could disagree.
     deployment = Deployment.from_env()
     mode_run = asyncio.run(_run_mode(cases, args.mode, deployment))
     failures = mode_run.failures
@@ -474,36 +425,34 @@ def command_run(args: argparse.Namespace) -> int:
     # vacuously true of a sweep that observed no fingerprint at all.
     trusted = certification.certified and certification.complete
 
-    # Before the judge, and unconditional: every mechanical instrument costs no
-    # provider call, so ``--no-scoring`` and a provider this sweep cannot reach
-    # both still emit them.
+    # First the run-level instruments, then the scores: the split predates
+    # scoring being free and is kept because the two halves read differently —
+    # one is about the graph's behaviour, the other about its output.
     sweep = Sweep(run=mode_run)
-    render_all(sweep, judged=False)
+    render_all(sweep, scored=False)
 
     scores: tuple[CaseScore, ...] = ()
     yields: tuple[CriticYield, ...] = ()
-    judge: PinnedJudge | None = None
-    if mode_run.runs and not args.no_scoring:
-        judge = _live_judge(deployment)
-        # The mechanical rule first, the judge on what it declines. Wrapped here
-        # rather than inside the scorer so that ``score_case`` stays a function
-        # of whatever ``Judge`` it is handed — which is what lets the offline
-        # tests drive it with a scripted stand-in and no provider at all.
-        matcher = MechanicalFirstJudge(judge, _flows_by_case(cases))
-        scores, yields = _score_runs(cases, mode_run.runs, matcher)
-        settled, delegated = matcher.settled, matcher.delegated
-        total = settled + delegated
-        print(
-            f"claim matching: {settled} of {total} pairs settled by rule"
-            f" ({ratio(settled, total):.0%}), {delegated} judged"
-        )
+    if mode_run.runs:
+        # Claim matching is the identity rule and standing comes from the vote
+        # ledger; both are offline, so a sweep is always scored. What a person
+        # has not voted on yet is counted, printed, and served by ``queue``.
+        matcher = SubsetVerbIdentity(_flows_by_case(cases))
+        votes = ledger.load(Path(args.ledger))
+        scores, yields = _score_runs(cases, mode_run.runs, matcher, votes)
+        unvoted = sum(score.unvoted_count for score in scores)
+        if unvoted:
+            print(
+                f"{unvoted} unlisted finding(s) have no vote; run"
+                " `python -m evals.harness.run queue` to review them"
+            )
     sweep = replace(sweep, scores=scores, yields=yields)
-    render_all(sweep, judged=True)
+    render_all(sweep, scored=True)
 
     artifact = build_artifact(
         mode=args.mode,
         cases=[case.id for case in cases],
-        models=_models_record(deployment, judge),
+        models=_models_record(deployment),
         certification=certification,
         provenance=mode_run.provenance,
         usage=mode_run.usage,
@@ -721,8 +670,8 @@ def command_rekey(args: argparse.Namespace) -> int:
     The operation the whole versioning argument rests on: a better recogniser
     changes every key, and a vote stores its **components** rather than its
     hash, so moving the ledger is arithmetic over a file. No provider, no
-    credentials, no re-vote. That is what a judge change cannot offer — a new
-    judge silently re-scores history and there is no way to recompute it.
+    credentials, no re-vote: the ledger stores each vote's components, so a
+    version bump is a pure recomputation over the file.
 
     Refuses to write anything unless ``--yes`` is given, like ``promote``: this
     rewrites the only human record in the repository, and a preview that also
@@ -798,7 +747,7 @@ def _print_stability(
     """The per-case spread, with what makes the runs incomparable printed first.
 
     The warnings lead because they change what every number below means: a
-    spread measured across two judges is not run-to-run noise, and a reader who
+    spread measured across two matcher versions is not run-to-run noise, and a reader who
     meets that caveat after the table has already read the table.
     """
     for warning in comparability_warnings(runs):
@@ -887,115 +836,33 @@ def _print_promotion(
 
 
 def command_calibrate(args: argparse.Namespace) -> int:
-    """The >= 90% judge-label bar; failing it blocks a judge change.
+    """The >= 90% rule-label bar; failing it blocks a rule change.
 
-    One ``--judge-config`` (or none) measures a single judge and gates on it.
-    Several put the candidates side by side over the identical pairs, which is
-    the selection exercise: a production judge chosen on measured agreement
-    rather than on which platform the project started on.
+    Prices the shipped identity rule against the recorded labels. Offline and
+    free: the rule is code, the labels are in the repository, and no provider
+    is contacted. Run it on any change to the rule or to
+    ``evals/harness/verbs.py``, because a matcher change silently re-scores
+    every historical number.
     """
-    deployment = Deployment.from_env()
     pairs = load_pairs()
-    if len(args.judge_config) > 1:
-        return _calibrate_many(deployment, pairs, args)
-    config_path = args.judge_config[0] if args.judge_config else None
-    return _calibrate_one(deployment, pairs, config_path, args.out)
-
-
-def _calibrate_one(
-    deployment: Deployment,
-    pairs: Sequence[LabelledPair],
-    config_path: str | None,
-    out: str | None,
-) -> int:
-    judge = _live_judge(deployment, config_path)
-    result = measure_agreement(judge, pairs)
+    matcher = SubsetVerbIdentity(_flows_by_case(load_corpus(args.corpus)))
+    result = measure_agreement(matcher, pairs)
     print(
-        f"judge-label agreement {result.agreement:.1%} over {result.total} pairs"
-        f" (bar {AGREEMENT_BAR:.0%})"
+        f"rule-label agreement {result.agreement:.1%} over {result.total} pairs"
+        f" (bar {AGREEMENT_BAR:.0%}); {result.refused} pair(s) refused"
     )
     print(
         f"  false matches {len(result.false_matches)},"
         f" false non-matches {len(result.false_non_matches)}"
     )
-    if out:
-        payload = {
-            **result.to_json(),
-            "models": _models_record(deployment, judge, config_path),
-        }
-        Path(out).write_text(json.dumps(payload, indent=2) + "\n", "utf-8")
+    if args.out:
+        Path(args.out).write_text(
+            json.dumps(result.to_json(), indent=2) + "\n", "utf-8"
+        )
     if result.meets_bar:
         return 0
     print(
-        "judge does not meet the agreement bar: the judge prompt needs work,"
-        " not a lowered bar",
-        file=sys.stderr,
-    )
-    return 1
-
-
-def _calibrate_many(
-    deployment: Deployment, pairs: Sequence[LabelledPair], args: argparse.Namespace
-) -> int:
-    """Several candidate judges over the same pairs, reported side by side.
-
-    Exits non-zero only when **no** candidate clears the bar. A single judge
-    below the bar is that judge's problem; every candidate below it is the
-    measurement system's, and there is no judge to select.
-    """
-    judges = {
-        _judge_label(path): _live_judge(deployment, path) for path in args.judge_config
-    }
-    comparison = compare_judges(judges, pairs)
-
-    width = max(len(label) for label in judges)
-    print(f"judge-label agreement over {len(pairs)} pairs (bar {AGREEMENT_BAR:.0%})")
-    for candidate in comparison.candidates:
-        mark = "ok " if candidate.result.meets_bar else "BAR"
-        print(
-            f"  {mark} {candidate.label:<{width}}  {candidate.result.agreement:.1%}"
-            f"  (false match {len(candidate.result.false_matches)},"
-            f" false non-match {len(candidate.result.false_non_matches)})"
-        )
-
-    # The half a per-judge accuracy cannot show: two judges at the same
-    # agreement can still disagree with each other on every pair they each got
-    # wrong, and that is what decides whether a conclusion is judge-dependent.
-    print("\njudge-vs-judge agreement (the recorded labels aside)")
-    labels = [candidate.label for candidate in comparison.candidates]
-    for index, first in enumerate(labels):
-        for second in labels[index + 1 :]:
-            print(
-                f"  {first} vs {second}:"
-                f" {comparison.agreement_between(first, second):.1%}"
-            )
-
-    divergences = comparison.divergences()
-    print(f"\n{len(divergences)} of {len(pairs)} pairs are ruled differently")
-    if divergences:
-        print(
-            "Report these as uncertainty rather than picking a winner: a"
-            " conclusion that moves with the judge's vendor is not a finding"
-            " about the models being compared."
-        )
-
-    if args.out:
-        payload = {
-            **comparison.to_json(),
-            "models": _models_record(deployment, judge=None),
-        }
-        Path(args.out).write_text(json.dumps(payload, indent=2) + "\n", "utf-8")
-
-    if comparison.meets_bar:
-        print(f"\nhighest agreement: {comparison.best.label}")
-        print(
-            "Selecting it is a reviewed commit to evals/config/judge.toml with"
-            " a version bump, not something this command applies — a judge"
-            " change silently re-scores every historical number."
-        )
-        return 0
-    print(
-        "no candidate meets the agreement bar: the judge prompt needs work,"
+        "the rule does not meet the agreement bar: the rule needs work,"
         " not a lowered bar",
         file=sys.stderr,
     )
@@ -1011,16 +878,16 @@ def main(argv: Sequence[str] | None = None) -> int:
     run_parser.add_argument("--case", action="append", default=[])
     run_parser.add_argument("--corpus", default=DEFAULT_CORPUS_DIR)
     run_parser.add_argument(
+        "--ledger",
+        default=str(ledger.DEFAULT_LEDGER_PATH),
+        help="the vote ledger the scorer reads standings from",
+    )
+    run_parser.add_argument(
         "--out",
         help=(
             "where to write the run artifact. Each finished case's whole report"
             " is written beside it, as <out>.reports/<case>.report.json"
         ),
-    )
-    run_parser.add_argument(
-        "--no-scoring",
-        action="store_true",
-        help="run the graph and apply Tier 1 gates without spending judge calls",
     )
     run_parser.add_argument(
         "--require-certified",
@@ -1030,20 +897,13 @@ def main(argv: Sequence[str] | None = None) -> int:
     run_parser.set_defaults(func=command_run)
 
     calibrate_parser = subparsers.add_parser(
-        "calibrate", help="measure judge-label agreement over the fixtures"
+        "calibrate", help="measure rule-label agreement over the fixtures"
     )
     calibrate_parser.add_argument("--out", help="where to write the agreement report")
     calibrate_parser.add_argument(
-        "--judge-config",
-        action="append",
-        default=[],
-        metavar="PATH",
-        help=(
-            "a candidate judge config to measure instead of evals/config/judge.toml."
-            " Repeat it to put candidates side by side over the same pairs, which"
-            " also reports judge-vs-judge agreement — pass one per model family to"
-            " see whether a conclusion depends on the judge's vendor."
-        ),
+        "--corpus",
+        default=str(DEFAULT_CORPUS_DIR),
+        help="corpus root, for the flow maps the rule resolves endpoints against",
     )
     calibrate_parser.set_defaults(func=command_calibrate)
 

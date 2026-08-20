@@ -2,7 +2,7 @@
 
 The critic is the most expensive node in the graph — one strong-tier pass over
 every category agent's output — and this module is the evidence that it earns that
-cost. It is deliberately two-sided: a critic that kills unsupported threats is
+cost. It is deliberately two-sided: a critic that kills rejected threats is
 earning its cost, and the *same* critic killing threats that matched a
 reference is destroying real findings. Only the pair means anything. A kill
 count alone can be read as either.
@@ -21,18 +21,15 @@ dispositions, which is the state the critic actually faced.
 
 Two properties hold this together:
 
-* **The judged task is identical on both sides.** Both passes go through
+* **The scored task is identical on both sides.** Both passes go through
   :func:`~evals.harness.scorer.score_case`, whose claim is the threat's
-  ``title`` either way. A different claim string on one side makes the two
-  numbers incomparable and the yield meaningless.
-* **The pre-critic pass runs first**, sharing a
-  :class:`~evals.harness.judge.MemoJudge` with the post-critic pass. The
-  subset's questions are then already answered, so the second pass is close to
-  free — and identical answers to identical questions are guaranteed rather
-  than hoped for.
+  ``title`` either way, ruled by the same deterministic matcher against the
+  same ledger. Identical questions get identical answers by construction — the
+  rule is a pure function — so nothing has to be memoized to guarantee it.
 
-Credential-free, like the rest of the scorer: it takes plain data and a
-:class:`~evals.harness.judge.Judge`.
+Credential-free, like the rest of the scorer: it takes plain data, a
+:class:`~evals.harness.identity.Matcher` and a
+:class:`~evals.harness.ledger.Ledger`.
 
 **Non-gating.** This is an instrument. Any threshold over these numbers comes
 from observed spread across the baseline sweeps, not from a guess here — and
@@ -46,7 +43,8 @@ from collections.abc import Sequence
 from dataclasses import dataclass
 from typing import Any, Literal
 
-from evals.harness.judge import Judge, MemoJudge
+from evals.harness.identity import Matcher
+from evals.harness.ledger import Ledger
 from evals.harness.reference import GoldenCase
 from evals.harness.scorer import CaseScore, candidate_claim, ratio, score_case
 from stride_service.frameworks.stride.record import DraftThreat, StrideCategory
@@ -58,9 +56,10 @@ Disposition = Literal[
     "matched-must-find",
     "matched-expected",
     "lane-error",
-    "unsupported",
-    "valid-unlisted",
-    "noise",
+    "rejected",
+    "pooled",
+    "open",
+    "unvoted",
     "needs-info",
     "unscored",
 ]
@@ -100,8 +99,8 @@ class CriticYield:
     drafts_in: int
     threats_out: int
     killed: tuple[KilledDraft, ...]
-    unsupported_before: int
-    unsupported_after: int
+    rejected_before: int
+    rejected_after: int
     matched_before: int
     matched_after: int
     must_find_before: int
@@ -111,9 +110,10 @@ class CriticYield:
     # --- the two numbers that matter -------------------------------------
 
     @property
-    def unsupported_killed(self) -> int:
-        """The critic earning its cost: unsupported drafts it removed."""
-        return sum(1 for draft in self.killed if draft.disposition == "unsupported")
+    def rejected_killed(self) -> int:
+        """The critic earning its cost: drafts it removed that a person had
+        already rejected for substance."""
+        return sum(1 for draft in self.killed if draft.disposition == "rejected")
 
     @property
     def matched_killed(self) -> int:
@@ -131,7 +131,7 @@ class CriticYield:
             1 for draft in self.killed if draft.disposition == "matched-must-find"
         )
 
-    # --- rates, all judge-relative ---------------------------------------
+    # --- rates, all rule-and-ledger-relative ------------------------------
 
     @property
     def kill_count(self) -> int:
@@ -143,9 +143,9 @@ class CriticYield:
         return ratio(self.kill_count, self.drafts_in)
 
     @property
-    def unsupported_kill_rate(self) -> float:
-        """Of the unsupported drafts it was handed, the share it caught."""
-        return ratio(self.unsupported_killed, self.unsupported_before)
+    def rejected_kill_rate(self) -> float:
+        """Of the human-rejected drafts it was handed, the share it caught."""
+        return ratio(self.rejected_killed, self.rejected_before)
 
     @property
     def matched_kill_rate(self) -> float:
@@ -154,14 +154,17 @@ class CriticYield:
 
     @property
     def kill_precision(self) -> float:
-        """Of what it killed, the share that was unsupported.
+        """Of what it killed, the share a person had rejected for substance.
 
         Deliberately *not* the inverse of :attr:`matched_kill_rate`: a killed
-        ``valid-unlisted`` draft is neither a win nor a loss here, because the
-        reference sets are non-exhaustive by construction and the corpus
-        feedback loop, not this instrument, is what settles those.
+        ``pooled`` or ``unvoted`` draft is neither a win nor a loss here,
+        because the reference sets are non-exhaustive by construction and the
+        corpus feedback loop, not this instrument, is what settles those. Over
+        a cold ledger this reads 0.0 for the same reason the scorer's
+        ``rejected_rate`` does — the denominator of trust is votes, and there
+        are none yet.
         """
-        return ratio(self.unsupported_killed, self.kill_count)
+        return ratio(self.rejected_killed, self.kill_count)
 
     def to_json(self) -> dict[str, Any]:
         return {
@@ -170,9 +173,9 @@ class CriticYield:
                 "drafts_in": self.drafts_in,
                 "threats_out": self.threats_out,
                 "killed": self.kill_count,
-                "unsupported_before": self.unsupported_before,
-                "unsupported_after": self.unsupported_after,
-                "unsupported_killed": self.unsupported_killed,
+                "rejected_before": self.rejected_before,
+                "rejected_after": self.rejected_after,
+                "rejected_killed": self.rejected_killed,
                 "matched_before": self.matched_before,
                 "matched_after": self.matched_after,
                 "matched_killed": self.matched_killed,
@@ -183,7 +186,7 @@ class CriticYield:
             },
             "metrics": {
                 "kill_rate": round(self.kill_rate, 3),
-                "unsupported_kill_rate": round(self.unsupported_kill_rate, 3),
+                "rejected_kill_rate": round(self.rejected_kill_rate, 3),
                 "matched_kill_rate": round(self.matched_kill_rate, 3),
                 "kill_precision": round(self.kill_precision, 3),
             },
@@ -204,21 +207,17 @@ def score_case_with_yield(
     case: GoldenCase,
     drafts: Sequence[DraftThreat],
     produced: Sequence[DraftThreat],
-    judge: Judge,
+    matcher: Matcher,
+    votes: Ledger,
 ) -> ScoredCase:
-    """Score both sides of the critic, sharing one memo of judge rulings.
+    """Score both sides of the critic through one matcher and one ledger.
 
     ``score`` is the post-critic score the rest of the harness already
     reports — identical to what :func:`score_case` alone would have returned,
-    because the memo only ever replays answers to questions the pre-critic pass
-    already asked.
-
-    Order matters for cost, not for correctness: the pre-critic set is the
-    superset, so asking it first is what makes the second pass nearly free.
+    because the rule is deterministic and both passes read one ledger.
     """
-    memo = MemoJudge(judge)
-    pre = score_case(case, drafts, memo)
-    post = score_case(case, produced, memo)
+    pre = score_case(case, drafts, matcher, votes)
+    post = score_case(case, produced, matcher, votes)
     return ScoredCase(
         score=post, pre_critic=pre, critic_yield=_yield(pre, post, drafts)
     )
@@ -245,8 +244,8 @@ def _yield(
         drafts_in=pre.produced_count,
         threats_out=post.produced_count,
         killed=killed,
-        unsupported_before=pre.bucket_counts["unsupported"],
-        unsupported_after=post.bucket_counts["unsupported"],
+        rejected_before=pre.standing_counts["rejected"],
+        rejected_after=post.standing_counts["rejected"],
         matched_before=len(pre.matched),
         matched_after=len(post.matched),
         must_find_before=pre.must_find_matched,
@@ -261,8 +260,8 @@ def _dispositions(score: CaseScore) -> dict[str, tuple[Disposition, int | None]]
     Threat IDs are unique within a run — :func:`~stride_service.critic.
     join_drafts` fails closed if two category agents reuse one — so a dict is a safe
     index. The scorer's outcomes are mutually exclusive by construction: a
-    threat is matched, or a lane error, or ``needs-info``, or adjudicated into
-    exactly one bucket. ``unscored`` should be unreachable, and is here so that
+    threat is matched, or a lane error, or ``needs-info``, or unlisted with
+    exactly one standing. ``unscored`` should be unreachable, and is here so that
     a future scorer path which stops covering the produced set surfaces as a
     visible label in the artifact rather than a ``KeyError`` mid-sweep.
     """
@@ -274,8 +273,8 @@ def _dispositions(score: CaseScore) -> dict[str, tuple[Disposition, int | None]]
         records[pair.threat_id] = (matched, pair.reference_index)
     for error in score.lane_errors:
         records[error.threat_id] = ("lane-error", error.reference_index)
-    for entry in score.adjudicated:
-        records[entry.threat_id] = (entry.bucket, None)
+    for entry in score.unlisted:
+        records[entry.threat_id] = (entry.standing, None)
     for threat_id in score.needs_info_unmatched:
         records[threat_id] = ("needs-info", None)
     for threat_id in score.produced_ids:
@@ -292,8 +291,8 @@ def aggregate_yield(yields: Sequence[CriticYield]) -> dict[str, Any]:
     """
     drafts_in = sum(entry.drafts_in for entry in yields)
     killed = sum(entry.kill_count for entry in yields)
-    unsupported_before = sum(entry.unsupported_before for entry in yields)
-    unsupported_killed = sum(entry.unsupported_killed for entry in yields)
+    rejected_before = sum(entry.rejected_before for entry in yields)
+    rejected_killed = sum(entry.rejected_killed for entry in yields)
     matched_before = sum(entry.matched_before for entry in yields)
     matched_killed = sum(entry.matched_killed for entry in yields)
     must_find_killed = sum(entry.must_find_killed for entry in yields)
@@ -302,29 +301,27 @@ def aggregate_yield(yields: Sequence[CriticYield]) -> dict[str, Any]:
         "drafts_in": drafts_in,
         "threats_out": sum(entry.threats_out for entry in yields),
         "killed": killed,
-        "unsupported_killed": unsupported_killed,
+        "rejected_killed": rejected_killed,
         "matched_killed": matched_killed,
         "must_find_killed": must_find_killed,
         "kill_rate": round(ratio(killed, drafts_in), 3),
-        "unsupported_kill_rate": round(
-            ratio(unsupported_killed, unsupported_before), 3
-        ),
+        "rejected_kill_rate": round(ratio(rejected_killed, rejected_before), 3),
         "matched_kill_rate": round(ratio(matched_killed, matched_before), 3),
-        "kill_precision": round(ratio(unsupported_killed, killed), 3),
+        "kill_precision": round(ratio(rejected_killed, killed), 3),
     }
 
 
 def render(yields: Sequence[CriticYield]) -> None:
     """Both sides of the critic, always printed together.
 
-    ``killed-real`` is deliberately on the same line as ``killed-unsupported``:
-    a kill count read on its own says nothing about whether the critic is
-    filtering noise or destroying findings.
+    ``killed-real`` is deliberately on the same line as ``killed-rejected``:
+    a kill count read on its own says nothing about whether the critic removes
+    noise or destroys findings.
     """
     for entry in yields:
         print(
             f"{entry.case_id:<26} critic {entry.drafts_in}->{entry.threats_out}"
-            f"  killed-unsupported {entry.unsupported_killed}/{entry.unsupported_before}"
+            f"  killed-rejected {entry.rejected_killed}/{entry.rejected_before}"
             f"  killed-real {entry.matched_killed}/{entry.matched_before}"
             f"  (must-find {entry.must_find_killed})"
         )
@@ -333,7 +330,7 @@ def render(yields: Sequence[CriticYield]) -> None:
         print(
             f"critic yield: killed {totals['killed']}/{totals['drafts_in']}"
             f" ({totals['kill_rate']:.0%}),"
-            f" unsupported caught {totals['unsupported_kill_rate']:.0%},"
+            f" rejected caught {totals['rejected_kill_rate']:.0%},"
             f" real destroyed {totals['matched_kill_rate']:.0%}"
             " (instrument, non-gating)"
         )

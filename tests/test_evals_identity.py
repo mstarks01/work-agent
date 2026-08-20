@@ -1,4 +1,4 @@
-"""Mechanical claim identity, scored against the same labels as the judge.
+"""Mechanical claim identity, scored against the recorded labels.
 
 The measurement [#201](https://github.com/mstarks01/work-agent/issues/201) asks
 for. `tests/test_claim_identity.py` answered the false-merge direction over the
@@ -7,7 +7,7 @@ blessed reference sets — the lane and the element set separate 242 of 243 clai
 calibration set's candidate side was a bare string. It now carries element IDs,
 so this runs :class:`~evals.harness.identity.MechanicalIdentity` through
 :func:`~evals.harness.calibration.measure_agreement`, against the same hand
-labels and the same 90% bar as the pinned judge.
+labels and the same 90% bar every matcher is held to.
 
 **Recorded, not thresholded.** The figures below are asserted exactly rather
 than against a floor. A corpus case, a relabelled pair or a re-cut element set
@@ -22,7 +22,6 @@ from __future__ import annotations
 
 import dataclasses
 import itertools
-import random
 
 import pytest
 
@@ -36,10 +35,8 @@ from evals.harness.identity import (
     endpoint_form,
     endpoint_subset,
 )
-from evals.harness.judge import ClaimPair, UnmatchedThreat, claim_payload
 from evals.harness.reference import ReferenceThreat, load_corpus
 from evals.harness.verbs import UNSEPARATED, same_action
-from tests.factories import valid_model
 
 #: What element agreement alone is worth on the recorded labels, measured
 #: 2026-08-18 over the 200 ``match`` pairs that carry candidate element IDs.
@@ -157,7 +154,7 @@ def test_every_assigned_pair_is_a_match_label(assigned):
     assert len(assigned) == MEASURED["assigned_pairs"]
 
 
-def test_element_agreement_alone_does_not_reach_the_judge_s_bar(assigned):
+def test_element_agreement_alone_does_not_reach_the_bar(assigned):
     result = measure_agreement(MechanicalIdentity(), assigned)
 
     assert result.total == MEASURED["assigned_pairs"]
@@ -234,43 +231,6 @@ def test_a_candidate_with_no_assigned_elements_is_refused():
         MechanicalIdentity().equivalent(unassigned.to_claim_pair())
 
 
-def test_bucketing_an_unmatched_threat_is_refused():
-    """The rule answers one of the judge's two calls and says so on the other."""
-    threat = UnmatchedThreat(
-        threat_id="S-01",
-        category="spoofing",
-        claim="An attacker replays a stolen session cookie.",
-        description="d",
-        affected_element_ids=("process:storefront-api",),
-    )
-
-    with pytest.raises(IdentityError, match="cannot bucket"):
-        MechanicalIdentity().adjudicate(threat, valid_model(), ())
-
-
-def test_the_judge_never_sees_the_element_ids():
-    """The pinned judge's payload is unchanged, so no calibration re-baselines.
-
-    ``ClaimPair`` gained two fields for the rule above. Passing them to the judge
-    would change what it is asked on every pair and silently invalidate every
-    agreement number this repo holds, so the payload is pinned here rather than
-    left to whoever next edits :func:`claim_payload`.
-    """
-    pair = ClaimPair(
-        case="01-payments-checkout",
-        category="spoofing",
-        reference_claim="An attacker replays a stolen session cookie.",
-        candidate_claim="An attacker reuses a stolen cookie to order as the shopper.",
-        reference_element_ids=("flow:shopper-to-storefront-api:place-order",),
-        candidate_element_ids=("entity:shopper",),
-    )
-
-    payload = claim_payload(pair, rng=random.Random(0))
-
-    assert set(payload) == {"stride_category", "claim_a", "claim_b"}
-    assert "shopper-to-storefront-api" not in repr(payload)
-
-
 #: The verb half, measured over the cases that carry verbs — which is case 01
 #: today, and grows as ``tests/test_verb_coverage.py``'s debt shrinks. Both
 #: columns, for the reason ``FRONTIER`` carries both: the merge count alone
@@ -286,13 +246,12 @@ VERB_MEASURED = {
 }
 
 #: What :class:`~evals.harness.identity.SubsetVerbIdentity` scores against the
-#: recorded labels, on the judge's own bar. The first mechanical rule in this
-#: repository to clear it — ``MechanicalIdentity`` sits at 111/200.
+#: recorded labels, on the shared bar. The first mechanical rule in this
+#: repository to clear it — ``MechanicalIdentity`` sits at 111/200 — and the
+#: number the judge's retirement rests on.
 #:
 #: Read it as ``evals/README.md`` reads every other agreement figure: the labels
-#: are agent-authored, so this measures reproduction and not correctness. What
-#: it does establish is that the rule is not obviously worse than the judge on
-#: the same fixtures, which is what #201's third bullet asks for.
+#: are agent-authored, so this measures reproduction and not correctness.
 SUBSET_VERB_AGREEMENT = {"agreements": 185, "total": 200}
 
 
@@ -376,8 +335,8 @@ def test_every_surviving_merge_is_a_recorded_one(corpus, flows_by_case):
                 )
 
 
-def test_the_rule_clears_the_judges_own_bar(assigned, flows_by_case):
-    """``SubsetVerbIdentity`` through the same comparison the judge is scored by.
+def test_the_rule_clears_the_bar(assigned, flows_by_case):
+    """``SubsetVerbIdentity`` through the shared scoreboard.
 
     One scoreboard, two answers to one question — which is what building the
     rule to the ``Judge`` protocol was for. The number is judge-relative in the
@@ -394,7 +353,7 @@ def test_the_rule_clears_the_judges_own_bar(assigned, flows_by_case):
         " SUBSET_VERB_AGREEMENT and re-quote it in"
         " docs/agents/claim-identity.md."
     )
-    assert result.meets_bar, "the rule fell below the bar the judge is held to"
+    assert result.meets_bar, "the rule fell below the bar"
     assert not result.false_matches, (
         "this set is match-labelled throughout, so a false match is impossible"
         " and its appearance means the fixtures changed shape"
@@ -412,16 +371,3 @@ def test_the_rule_refuses_a_pair_with_no_verb(assigned, flows_by_case):
     stripped = dataclasses.replace(assigned[0].to_claim_pair(), candidate_verb=None)
     with pytest.raises(IdentityError, match="no action verb"):
         SubsetVerbIdentity(flows_by_case).equivalent(stripped)
-
-
-def test_the_rule_cannot_bucket_an_unmatched_threat(flows_by_case):
-    """It compares claims; adjudication is judgement about prose."""
-    threat = UnmatchedThreat(
-        threat_id="T1",
-        category="spoofing",
-        claim="An attacker does a thing.",
-        description="",
-        affected_element_ids=("process:a",),
-    )
-    with pytest.raises(IdentityError, match="cannot bucket"):
-        SubsetVerbIdentity(flows_by_case).adjudicate(threat, valid_model(), ())

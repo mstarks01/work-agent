@@ -1,20 +1,11 @@
 """Claim identity decided by the fields a claim carries, with no model call.
 
-[#201](https://github.com/mstarks01/work-agent/issues/201) proposes resolving a
+[#201](https://github.com/mstarks01/work-agent/issues/201) proposed resolving a
 **Claim** to the parts that decide its identity, so two spellings of one threat
-compare equal without the judge. This is that rule, built to the ``Judge``
-protocol so that :func:`~evals.harness.calibration.measure_agreement` scores it
-against the same recorded labels, on the same 90% bar, as the pinned judge. One
-scoreboard, two answers to one question.
-
-**What it reads, and what it does not.** #201 names four parts. Three are on the
-record — the lane, the affected **Element** IDs and the **Grounds** — and
-``mechanism`` is the only new one. Of those three, the lane is already equal on
-every pair a scorer or a calibration set builds, because both only ever pair
-within a lane, and a reference claim carries no grounds to compare. So on this
-data the rule is element-set equality, and saying so plainly is the point: a
-number produced here measures how far element agreement alone goes, and it is
-not a rehearsal of the model #201 sketches.
+compare equal without a model. This is that rule, and since the model judge was
+retired it is the only decider of claim equivalence in the harness: the scorer
+matches with it, the queue keys findings with the same components, and a human
+vote answers what no comparison of fields can.
 
 **Set equality, never overlap.** ``affected_element_ids`` is a list whose order
 no rule reads, so the comparison sorts. Relaxing equality to a shared element is
@@ -34,23 +25,20 @@ the corpus can show.
 :class:`MechanicalIdentity` answers with, because on its own it merges far more
 than it recovers; it exists so the trade-off is a number rather than an opinion.
 
-Nothing here is a judge replacement. The judge stays the decider until the
-numbers say otherwise, which is #201's own third bullet.
+What the rule cannot answer, a human answers. Bucketing an unmatched threat
+asks whether the **System Model** supports a claim nobody wrote down; the
+scorer routes that question to the review queue, and the vote ledger holds the
+answers. See ``evals/harness/ledger.py``.
 """
 
 from __future__ import annotations
 
 from collections.abc import Iterable, Mapping
+from dataclasses import dataclass
+from typing import Protocol
 
-from evals.harness.judge import (
-    BucketRuling,
-    ClaimPair,
-    ClaimRuling,
-    Judge,
-    UnmatchedThreat,
-)
 from evals.harness.verbs import same_action
-from stride_service.system_model import SystemModel
+from stride_service.frameworks.stride.record import StrideCategory
 
 #: One case's **Data Flow**s as ``flow id -> (source id, destination id)``.
 FlowMap = Mapping[str, tuple[str, str]]
@@ -58,6 +46,52 @@ FlowMap = Mapping[str, tuple[str, str]]
 
 class IdentityError(ValueError):
     """A pair carries no candidate elements, so the rule cannot answer it."""
+
+
+@dataclass(frozen=True)
+class ClaimPair:
+    """One candidate pair for the identity rule, always within a lane.
+
+    ``candidate_element_ids`` is ``None`` where nobody has assigned them yet,
+    which is a different fact from an empty tuple and is why the rule refuses
+    those pairs instead of scoring them as a miss. The verbs come from
+    ``evals.harness.verbs``; ``None`` marks an unassigned side, and the rule
+    refuses that too rather than grading the element half alone.
+    """
+
+    case: str
+    category: StrideCategory
+    reference_claim: str
+    candidate_claim: str
+    reference_element_ids: tuple[str, ...]
+    candidate_element_ids: tuple[str, ...] | None
+    reference_verb: str | None = None
+    candidate_verb: str | None = None
+
+
+@dataclass(frozen=True)
+class ClaimRuling:
+    """The rule's answer on one pair: same attacker action, same target?
+
+    ``rationale`` is diagnostic. The run artifact records it beside the ruling
+    so a disagreement is auditable; no metric reads it.
+    """
+
+    match: bool
+    rationale: str
+
+
+class Matcher(Protocol):
+    """Anything that can rule on claim equivalence.
+
+    Two implementations ship — :class:`SubsetVerbIdentity` and
+    :class:`MechanicalIdentity` — and the tests drive the scorer with scripted
+    stand-ins. Every implementation is code: the protocol exists for the
+    scoreboard in ``evals/harness/calibration.py``, which prices any candidate
+    rule against the same recorded labels.
+    """
+
+    def equivalent(self, pair: ClaimPair) -> ClaimRuling: ...
 
 
 def comparable_elements(element_ids: Iterable[str]) -> frozenset[str]:
@@ -126,7 +160,7 @@ class SubsetVerbIdentity:
     :data:`~evals.harness.verbs.UNSEPARATED` names the three it does not with
     the reason for each.
 
-    Built to the ``Judge`` protocol like :class:`MechanicalIdentity`, so
+    A :class:`Matcher` like :class:`MechanicalIdentity`, so
     :func:`~evals.harness.calibration.measure_agreement` scores it against the
     same recorded labels on the same bar. Two rules, one scoreboard.
 
@@ -135,11 +169,10 @@ class SubsetVerbIdentity:
     report the number as this rule's.
 
     The **Data Flow** map is held per instance rather than passed per call, so
-    the signature matches the ``Judge`` protocol and one comparison can score
-    this rule beside the pinned judge. It is per case for the same reason
-    :class:`~evals.harness.judge.MemoJudge` is scoped per case: two cases may
-    spell one flow ID differently, and a shared map would resolve one case's
-    citation against another's graph.
+    the signature matches the :class:`Matcher` protocol and one scoreboard can
+    price every rule. It is per case because two cases may spell one flow ID
+    differently, and a shared map would resolve one case's citation against
+    another's graph.
     """
 
     def __init__(self, flows_by_case: Mapping[str, FlowMap]) -> None:
@@ -172,33 +205,13 @@ class SubsetVerbIdentity:
             ),
         )
 
-    def adjudicate(
-        self,
-        threat: UnmatchedThreat,
-        system_model: SystemModel,
-        sibling_claims: tuple[str, ...],
-    ) -> BucketRuling:
-        """Refused, for the reason :class:`MechanicalIdentity` refuses it.
-
-        Bucketing an unmatched threat asks whether the **System Model** supports
-        a claim nobody wrote down. No comparison of fields answers that, and a
-        made-up answer would put a meaningless number into a metric.
-        """
-        del threat, system_model, sibling_claims
-        raise IdentityError(
-            "this rule compares claims and cannot bucket an unmatched threat;"
-            " that call needs the judge"
-        )
-
 
 class MechanicalIdentity:
-    """The identity rule as a ``Judge``, so one comparison scores both.
+    """Element equality alone, kept as the floor the frontier is priced against.
 
-    Answers ``equivalent`` and refuses ``adjudicate``. Bucketing an unmatched
-    threat asks whether the **System Model** supports a claim nobody wrote down,
-    which is judgement about prose and not a comparison of fields — there is no
-    mechanical answer to give, and returning a made-up one would put a number
-    into a metric that means nothing.
+    Version 1 of the fingerprint rule. Nothing scores with it; it exists so a
+    change to :class:`SubsetVerbIdentity` is always a measured step up from a
+    recorded floor rather than a step from nowhere.
     """
 
     def equivalent(self, pair: ClaimPair) -> ClaimRuling:
@@ -214,73 +227,3 @@ class MechanicalIdentity:
             match=reference == candidate,
             rationale=f"reference elements {reference}; candidate {candidate}",
         )
-
-    def adjudicate(
-        self,
-        threat: UnmatchedThreat,
-        system_model: SystemModel,
-        sibling_claims: tuple[str, ...],
-    ) -> BucketRuling:
-        del threat, system_model, sibling_claims
-        raise IdentityError(
-            "mechanical identity compares claims and cannot bucket an unmatched"
-            " threat; that call needs the judge"
-        )
-
-
-class MechanicalFirstJudge:
-    """The rule where it is trustworthy, the judge everywhere else.
-
-    **The two errors are not symmetric, and that is the whole design.** Over the
-    corpus, :class:`SubsetVerbIdentity` merges 3 of 287 reference pairs it should
-    have kept apart, and splits 15 of 200 pairs the labels call one claim. So a
-    ``match`` from the rule is right about 99% of the time and a ``no-match``
-    from it is wrong about 7% of the time.
-
-    This accepts the first and refuses to act on the second: where the rule says
-    the two claims are one finding, that is the answer and no model is asked;
-    where it says they are not, the judge decides. A wrapper that accepted both
-    directions would take the rule's 15 splits straight out of recall.
-
-    **The gain is determinism before it is cost.** Every match the rule settles
-    is a match that cannot move between two runs of the same configuration, which
-    is exactly the band ``evals/harness/stability.py`` measures and every
-    comparison has to clear. The saved provider calls are real and are the lesser
-    reason.
-
-    ``adjudicate`` is delegated whole. Bucketing an unmatched threat asks whether
-    the **System Model** supports a claim nobody wrote down, and no comparison of
-    fields answers that — :class:`SubsetVerbIdentity` refuses it for that reason,
-    so there is nothing here to short-circuit.
-    """
-
-    def __init__(self, inner: Judge, flows_by_case: Mapping[str, FlowMap]) -> None:
-        self._inner = inner
-        self._rule = SubsetVerbIdentity(flows_by_case)
-        #: Pairs the rule settled, and pairs it passed on. Reported in the
-        #: artifact so a reader can see how much of a score was decided by code.
-        self.settled = 0
-        self.delegated = 0
-
-    def equivalent(self, pair: ClaimPair) -> ClaimRuling:
-        try:
-            ruling = self._rule.equivalent(pair)
-        except IdentityError:
-            # A pair the rule cannot read — a claim carrying no verb, which is
-            # every claim of a package that composes none. Not an error here:
-            # the judge is what those pairs were always going to use.
-            self.delegated += 1
-            return self._inner.equivalent(pair)
-        if ruling.match:
-            self.settled += 1
-            return ruling
-        self.delegated += 1
-        return self._inner.equivalent(pair)
-
-    def adjudicate(
-        self,
-        threat: UnmatchedThreat,
-        system_model: SystemModel,
-        sibling_claims: tuple[str, ...],
-    ) -> BucketRuling:
-        return self._inner.adjudicate(threat, system_model, sibling_claims)

@@ -266,17 +266,18 @@ def test_an_eval_report_carries_every_field_production_stamps(case):
 
 
 def test_analysis_mode_scores_against_the_reference_set(case):
+    from evals.harness.ledger import Ledger
     from evals.harness.scorer import score_case
-    from tests.eval_factories import ScriptedJudge
+    from tests.eval_factories import ScriptedMatcher
 
     pipeline = build(case, ENTRY_PREPARE, {})
     report = asyncio.run(modes.run_analysis(case, pipeline)).report
     # The scripted threats are titled with reference claims verbatim, so a
-    # judge that matches identical strings is the honest stand-in here.
+    # matcher on identical strings is the honest stand-in here.
     claims = report.analyses[0].claims
-    judge = ScriptedJudge((claim.title, claim.title) for claim in claims)
+    matcher = ScriptedMatcher((claim.title, claim.title) for claim in claims)
 
-    score = score_case(case, claims, judge)
+    score = score_case(case, claims, matcher, Ledger())
 
     assert len(score.matched) == len(STRIDE_CATEGORIES)
     assert score.element_accuracy == 1.0

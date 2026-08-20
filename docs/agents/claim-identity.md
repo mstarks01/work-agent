@@ -52,18 +52,19 @@ No element-only row is usable: the tightest loses 89 paraphrases and the loosest
 destroys 126 findings. **The verb row is the first one that is.** One more split
 buys twenty fewer merges.
 
-Scored on the judge's own scoreboard, through the same `measure_agreement`:
+Scored on the shared scoreboard, through `measure_agreement`:
 
 | Rule | Agreement with the recorded labels |
 |---|---|
 | `MechanicalIdentity` (element equality) | 111/200 = 55.5% |
 | `SubsetVerbIdentity` | **185/200 = 92.5%** |
 
-That clears the 90% bar the judge is held to. Read it the way `evals/README.md`
-reads every agreement figure here: the labels are agent-authored, so this
-measures reproduction and not correctness. What it establishes is that the rule
-is not obviously worse than a judge on the same fixtures — which is what #201's
-third bullet asks for before the judge can be retired.
+That clears the 90% bar every matcher is held to. Read it the way
+`evals/README.md` reads every agreement figure here: the labels are
+agent-authored, so this measures reproduction and not correctness. It is the
+number the judge's retirement rested on — #201's third bullet asked that the
+rule not be obviously worse than the judge before the judge could go, and this
+is the measurement that answered it.
 
 **The three merges the verb does not break** are in `verbs.UNSEPARATED`, each
 with the reason. None is a gap in the vocabulary: one is arguably a correct
@@ -88,9 +89,9 @@ its hash — so **a vote stores its components**, and `ledger.rekey` recomputes
 the whole file under a new version with no re-vote, no provider and no
 credentials.
 
-This is the property the judge design could not offer. `evals/config/judge.toml`
-records the problem in its own header: a judge upgrade silently re-scores every
-historical number. Here the re-score is explicit, total, offline and free.
+This is the property the retired judge design could not offer — a judge
+upgrade silently re-scored every historical number, with no way to recompute
+the old ones. Here the re-score is explicit, total, offline and free.
 
 **The version is not one global default.** It is `VERSION_FOR`, a table keyed by
 framework, checked against `PACKAGES` and declared in
@@ -162,20 +163,20 @@ quietly as the `if` it replaced.
 |---|---|
 | `evals/harness/verbs.py` | The closed vocabulary, the equivalence table, the three it cannot separate. |
 | `evals/harness/fingerprint.py` | `Components`, the versioned hash, and the version read back off the value. |
-| `evals/harness/identity.py` | `endpoint_subset`, and `SubsetVerbIdentity` as a `Judge` so one scoreboard scores both. |
+| `evals/harness/identity.py` | `endpoint_subset`, `SubsetVerbIdentity`, and the `Matcher` protocol one scoreboard scores every rule through. |
 | `evals/harness/ledger.py` | The append-only vote record, the reason split, the pool, the re-key. |
 | `evals/harness/queue.py` | Which findings a reviewer is asked, in what order, blind to the configuration. |
 | `webapp/review.py` | The reviewer's interface. Loopback, no credentials, no engine. |
 
 ## Where the rule is used
 
-`MechanicalFirstJudge` wraps the pinned judge for every scored sweep. **It takes
-one direction only**, because the rule's two errors are not the same size: it
-merges 3 of 287 reference pairs and splits 15 of 200 labelled matches. So a
-`match` from the rule is the answer and no model is asked; a `no-match` from it
-goes to the judge, because believing it would take 7% of recall out silently.
+The rule is the only matcher a scored sweep has. A `match` is a recall hit; a
+`no-match` leaves the finding unmatched, and its fingerprint is looked up in
+the vote ledger — `rejected`, `pooled`, `open` or `unvoted`. Nothing asks a
+model. The rule's known error costs are the record above: 3 of 287 reference
+pairs merged, 15 of 200 labelled matches split, and a split surfaces as an
+unvoted finding in the queue rather than vanishing.
 
 The gain is determinism before it is cost. A match the rule settles cannot move
 between two runs of one configuration — which is exactly the band
-`evals/harness/stability.py` measures and every comparison has to clear. A sweep
-prints how many pairs it settled and how many it judged.
+`evals/harness/stability.py` measures and every comparison has to clear.

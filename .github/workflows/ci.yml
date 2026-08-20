@@ -2,7 +2,7 @@
 #
 # Everything here is credential-free by construction: the pytest suite, the
 # corpus lints, the prompt/skill lints, and the eval scorer replayed over the
-# recorded judge labels in evals/judge_calibration/. No job here may ever be granted
+# recorded match labels in evals/calibration_labels/. No job here may ever be granted
 # `id-token: write` — the offline/live split is the security boundary that
 # keeps untrusted-PR-shaped work away from the Vertex identity, not a speed
 # optimization. Live evals live in evals-live.yml.
@@ -56,7 +56,7 @@ jobs:
       # Markdown is excluded because ruff would reformat the illustrative code
       # fences in docs/ — schema sketches whose aligned trailing comments are
       # prose, not source. The formatter's one source-tree exemption
-      # (evals/judge_calibration/build_pairs.py) lives in pyproject.toml.
+      # (evals/calibration_labels/build_pairs.py) lives in pyproject.toml.
       - name: Format
         run: uv run ruff format --check . --exclude '*.md'
 

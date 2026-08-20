@@ -1,21 +1,16 @@
-"""Scripted judges and threat builders for the offline eval tests.
+"""Scripted matchers and threat builders for the offline eval tests.
 
-The whole scorer is exercised with **zero provider calls**: the judge is a
-seam, so a stand-in replaying the corpus's recorded labels plays its part exactly.
-That is what the credential-free PR job runs.
+The whole scorer runs with **zero provider calls** in production too, but the
+tests script the matcher anyway: a stand-in that replays recorded labels lets a
+test state a matching outcome directly instead of reverse-engineering element
+IDs and verbs that produce it.
 """
 
 from __future__ import annotations
 
 from collections.abc import Callable, Iterable
 
-from evals.harness.judge import (
-    Bucket,
-    BucketRuling,
-    ClaimPair,
-    ClaimRuling,
-    UnmatchedThreat,
-)
+from evals.harness.identity import ClaimPair, ClaimRuling
 from evals.harness.reference import ReferenceThreat
 from stride_service.actions import ActionVerb
 from stride_service.frameworks.stride.record import (
@@ -31,7 +26,6 @@ from stride_service.report import (
     UnknownRef,
     Verdict,
 )
-from stride_service.system_model import SystemModel
 
 CATEGORY_LETTERS = {
     "spoofing": "S",
@@ -43,45 +37,25 @@ CATEGORY_LETTERS = {
 }
 
 
-class ScriptedJudge:
+class ScriptedMatcher:
     """Answers from recorded data, and counts what it was asked.
 
-    ``matching_pairs`` holds ``(reference_claim, candidate_claim)`` tuples the
-    human called equivalent; anything else is a non-match. ``buckets`` maps a
-    threat ID to its adjudicated bucket, defaulting to ``valid-unlisted`` —
-    the bucket that is explicitly *not* a failure.
+    ``matching_pairs`` holds ``(reference_claim, candidate_claim)`` tuples a
+    label called equivalent; anything else is a non-match.
     """
 
-    def __init__(
-        self,
-        matching_pairs: Iterable[tuple[str, str]] = (),
-        buckets: dict[str, Bucket] | None = None,
-    ) -> None:
+    def __init__(self, matching_pairs: Iterable[tuple[str, str]] = ()) -> None:
         self.matching_pairs = set(matching_pairs)
-        self.buckets = buckets or {}
         self.claim_calls: list[ClaimPair] = []
-        self.adjudication_calls: list[UnmatchedThreat] = []
 
     def equivalent(self, pair: ClaimPair) -> ClaimRuling:
         self.claim_calls.append(pair)
         match = (pair.reference_claim, pair.candidate_claim) in self.matching_pairs
         return ClaimRuling(match=match, rationale="scripted")
 
-    def adjudicate(
-        self,
-        threat: UnmatchedThreat,
-        system_model: SystemModel,
-        sibling_claims: tuple[str, ...],
-    ) -> BucketRuling:
-        self.adjudication_calls.append(threat)
-        return BucketRuling(
-            bucket=self.buckets.get(threat.threat_id, "valid-unlisted"),
-            rationale="scripted",
-        )
 
-
-class LabelReplayJudge:
-    """Replays the recorded labels, optionally disagreeing on the first ``flip``."""
+class LabelReplayMatcher:
+    """Replays the recorded labels, optionally disagreeing where ``flip`` says."""
 
     def __init__(
         self,
@@ -92,17 +66,9 @@ class LabelReplayJudge:
         self._flip = flip or (lambda _pair: False)
 
     def equivalent(self, pair: ClaimPair) -> ClaimRuling:
-        human = self._labels[(pair.reference_claim, pair.candidate_claim)]
-        match = not human if self._flip(pair) else human
+        label = self._labels[(pair.reference_claim, pair.candidate_claim)]
+        match = not label if self._flip(pair) else label
         return ClaimRuling(match=match, rationale="replayed label")
-
-    def adjudicate(
-        self,
-        threat: UnmatchedThreat,
-        system_model: SystemModel,
-        sibling_claims: tuple[str, ...],
-    ) -> BucketRuling:
-        raise AssertionError("calibration never adjudicates")
 
 
 def draft_threat(

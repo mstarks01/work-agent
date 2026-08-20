@@ -51,9 +51,10 @@ a **table**, `VERSION_FOR`, not a default: an open claim set composes an identit
 from an action and a place, and a claim carrying a catalog identifier already has
 one. It is **versioned**, and a vote stores its components rather than its hash,
 so improving the rule re-keys the whole ledger by recomputation and costs no
-re-vote — which is what a judge change cannot offer. A human vote is the only
-ground truth here, and its reason code decides whether it moves an analysis
-number or a writing one. See `docs/agents/claim-identity.md`.
+re-vote. There is **no model judge**: the rule decides every match, and a
+human vote is the only ground truth on whether an unmatched finding is real —
+its reason code decides whether it moves an analysis number or a writing one.
+See `docs/agents/claim-identity.md`.
 
 ### Domain docs
 

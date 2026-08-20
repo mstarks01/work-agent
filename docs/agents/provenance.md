@@ -13,7 +13,7 @@ For a year, four files stated that a human had reviewed the golden corpus:
 
 - `evals/harness/calibration.py` — "The SME hand-labelled ~100 candidate pairs...
   judge-human agreement must be >= 90%"
-- `evals/judge_calibration/build_pairs.py` — "each label decided by a human
+- `evals/calibration_labels/build_pairs.py` — "each label decided by a human
   reading the pair"
 - `evals/harness/reference.py` — "One claim the SME says a working tool must
   report"

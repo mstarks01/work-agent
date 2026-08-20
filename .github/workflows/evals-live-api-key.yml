@@ -217,29 +217,11 @@ jobs:
                "sweep, but ${SECRET_NAME} is not set. See the job summary."
           exit 1
 
-      # --no-scoring, and this is a real limitation rather than a saving.
-      #
-      # The judge is pinned to vertex/gemini-2.5-pro in evals/config/judge.toml,
-      # deliberately: its legitimacy "rests on measured agreement against hand
-      # labels rather than on sharing a vendor with the system under test". So a
-      # SCORED sweep of Anthropic or OpenAI needs Vertex credentials too -- for
-      # the judge, not for the system -- and this job has none and must not
-      # acquire them (see the permissions block).
-      #
-      # What still runs is the whole graph and every Tier 1 structural gate:
-      # extraction, the six category agents, the critic and its re-ask,
-      # assembly, and the checks that a report parses, resolves its references,
-      # agrees with its own summary, and did not lose a category to a truncated
-      # node. Those are the failures a never-exercised vendor actually has.
-      # What is missing is must-find recall and the severity confusion -- the
-      # judge-relative numbers.
-      #
-      # Making this scored is a follow-up that needs the judge reachable from a
-      # job that holds no cloud identity. Splitting scoring into its own job
-      # that reads the artifact is the shape that keeps the credentials
-      # disjoint; it is not built here because federation is unprovisioned, so
-      # it could not be tested.
-      - name: Run golden-case evals (structural gates only)
+      # Scored, on every vendor: claim matching is the identity rule and the
+      # standing of the unmatched comes from the vote ledger, so scoring costs
+      # no credential this job does not already hold. Findings nobody voted on
+      # land as `unvoted` in the artifact and wait for a review sitting.
+      - name: Run golden-case evals
         if: >-
           github.event_name != 'workflow_dispatch'
           || inputs.vendor == 'both'
@@ -251,7 +233,6 @@ jobs:
         run: |
           uv run python -m evals.harness.run run \
             --mode "$EVAL_MODE" \
-            --no-scoring \
             --out "eval-artifact-${{ matrix.vendor }}.json"
 
       # always(), so a failed sweep still surfaces whatever it produced. Unlike

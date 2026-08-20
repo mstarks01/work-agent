@@ -1,15 +1,16 @@
 # Evals
 
 How we measure the analysis quality: a corpus of "golden" cases, a scorer that
-compares the service's output against them, and an LLM judge that decides when
-two threats describe the same thing.
+compares the service's output against them, a deterministic identity rule that
+decides when two threats describe the same thing, and a vote ledger that holds
+what a person decided about each finding.
 
 ## Read this before you quote a number
 
-**An agent wrote all of it, and a person has read 30 of the 339 judge labels.**
+**An agent wrote all of it, and a person has read 30 of the 339 match labels.**
 Every golden case, every reference claim and every calibration label was written
 by an agent. One review sitting has happened:
-[`judge_calibration/REVIEW-01.md`](judge_calibration/REVIEW-01.md), on
+[`calibration_labels/REVIEW-01.md`](calibration_labels/REVIEW-01.md), on
 2026-08-18, over the 30 hardest pairs. It answered 25 `same`, 1 `different` and 4
 `unclear`, and it changed two things — a wrong label, and a reference claim in
 case 04 that asserted a fact its own model does not hold.
@@ -22,17 +23,20 @@ catch the case-04 defect anywhere else. A case that has had one carries a
 arrives without a block.
 
 So every agreement figure the suite produces is **self-consistency, not
-accuracy**: it measures how closely one model reproduces what an earlier agent
-wrote down. That includes the 90% bar. A judge at 95% agrees with an agent's
-opinions 95% of the time, and sitting 01 is the only evidence anywhere that any
-of those opinions are right.
+accuracy**: it measures how closely a rule reproduces what an earlier agent
+wrote down. That includes the 90% bar. A rule at 92.5% agrees with an agent's
+opinions 92.5% of the time, and sitting 01 is the only evidence anywhere that
+any of those opinions are right.
 
-**The 90% bar has never executed.** No judge has ever been measured against
-these labels — see
-[ADR 0003](../docs/adr/0003-no-privileged-vendor.md#test-and-evaluation-bias--partly-fixed-partly-open),
-which records the measurement system's own vendor dependence as open. So the
-figures the rest of this file describes are what the harness *would* report; no
-run has produced them.
+**There is no model judge.** Claim matching is `SubsetVerbIdentity`, a rule in
+`harness/identity.py`; it scores 185/200 against the recorded labels
+(`python -m evals.harness.run calibrate`), over the 90% bar, with no provider
+call. Whether an unmatched finding is real is a question about prose, and a
+person answers it: each unmatched finding is keyed by its fingerprint and
+looked up in the vote ledger (`harness/ledger.py`). A finding nobody voted on
+is `unvoted` — visible, non-gating, and served by the review queue. The
+retired LLM judge and the vendor question it carried are recorded in
+[ADR 0003](../docs/adr/0003-no-privileged-vendor.md).
 
 Why it drifted, and the rule taken from it, are in
 [docs/agents/provenance.md](../docs/agents/provenance.md): `bootstrap` on
@@ -45,15 +49,15 @@ not evidence that this tool finds real threats, and they must never be quoted
 against another tool's published figures. Where this file and the ones beside it
 say "the labels" or "the reference set", read *what an agent recorded*.
 
-Nothing in this directory ships in the production image — the corpus, the judge,
-and the scorer are test-side only, and the package build takes just
+Nothing in this directory ships in the production image — the corpus, the
+ledger, and the scorer are test-side only, and the package build takes just
 `src/stride_service`. Two companion guides:
 
 - **[BLESSING.md](BLESSING.md)** — how to author a new golden case, including a
   reference set per framework it declares.
 - **[TUNING.md](TUNING.md)** — how to use these evals to improve the models. Read
-  it per instrument: step 1 gates the judged numbers only, and the mechanically
-  matched half is tunable without credentials.
+  it per instrument: every score is computed offline, and only producing
+  a fresh sweep's reports needs credentials.
 
 ## Layout
 
@@ -69,11 +73,9 @@ evals/
     claims/<framework>.json     that framework's reference set, keyed to model.json's IDs
     corrections.md              notes on how the model was corrected, and why
     case.json                   metadata, provenance, and the declared sources
-  judge_calibration/
-    build_pairs.py              the judge fixtures and their labels (edit this)
+  calibration_labels/
+    build_pairs.py              the match fixtures and their labels (edit this)
     pairs.json                  generated from build_pairs.py (never hand-edit)
-  config/judge.toml             the judge's own pinned model and settings
-  prompts/                      the judge's prompts (NOT the shipped prompts/)
   harness/                      the scorer and the eval runner
   review/votes.jsonl            the vote ledger — the only human record here
 ```
@@ -84,31 +86,29 @@ evals/
 |---|---|
 | `harness/reference.py` | The `ReferenceThreat` type and the fail-closed corpus loader. |
 | `harness/structural.py` | The structural gates — the only checks that fail a run. |
-| `harness/judge.py` | The pinned judge, its two calls, and the `Judge` seam for testing. |
-| `harness/scorer.py` | The scoring pipeline: prefilter → judge → match → bucket → severity. |
+| `harness/scorer.py` | The scoring pipeline: prefilter → rule → match → standing → severity. |
 | `harness/critic_yield.py` | What the critic added and removed, scored on both sides. |
-| `harness/grounds.py` | What the category agents did with `grounds` — the branch mix, the padding number and the unverified-quote rate — plus the two failures the grounding path kills a case with. Judge-free. |
-| `harness/coverage.py` | What each category agent was offered and how much of it its drafts cite, pooled over the sweep. Judge-free. |
-| `harness/stability.py` | Run-to-run stability: which references two or more finished sweeps agree on. Judge-free, and reads artifacts rather than re-running. |
-| `harness/calibration.py` | Judge-vs-label agreement over the labelled fixtures. |
-| `harness/verbs.py` | The closed vocabulary of attacker actions, and what counts as one action. Judge-free. |
+| `harness/grounds.py` | What the category agents did with `grounds` — the branch mix, the padding number and the unverified-quote rate — plus the two failures the grounding path kills a case with. |
+| `harness/coverage.py` | What each category agent was offered and how much of it its drafts cite, pooled over the sweep. |
+| `harness/stability.py` | Run-to-run stability: which references two or more finished sweeps agree on. Reads artifacts rather than re-running. |
+| `harness/calibration.py` | Rule-vs-label agreement over the labelled fixtures — the scoreboard any rule change must clear. |
+| `harness/verbs.py` | The closed vocabulary of attacker actions, and what counts as one action. |
 | `harness/identity.py` | Claim identity from the fields a claim carries. `SubsetVerbIdentity` scores 185/200 against the recorded labels, over the 90% bar, with no model call. |
 | `harness/fingerprint.py` | A **Claim**'s identity as a versioned value code computes. No model call. |
 | `harness/ledger.py` | The append-only record of what a **person** decided about a finding. |
 | `harness/queue.py` | Which findings a reviewer is asked about, and in what order. Blind to the configuration. |
-| `harness/identity.py` | `MechanicalFirstJudge` — the rule settles a match, the judge decides everything else. |
 | `harness/provenance.py` | What each node execution actually ran on — tier, requested route, served build, fingerprint — written into the artifact and read back by a promotion. |
 | `harness/certify.py` | Promoting a winning configuration: rewrites `config/sampling.toml` and records its fingerprints as blessed. The certification check itself lives in the service (`stride_service.certification`), which this imports. |
-| `harness/modes.py` | The three run modes over the shipped graph, and the extraction score: element agreement, the derived crossings, and the attributes a Candidate rule reads. Judge-free. |
+| `harness/modes.py` | The three run modes over the shipped graph, and the extraction score: element agreement, the derived crossings, and the attributes a Candidate rule reads. |
 | `harness/run.py` | The command-line entry point. |
 
 Sampling parameters are **not** here: the harness reads `config/sampling.toml`
 at the repo root, the exact same file production reads. Grading a configuration
 you don't ship is how a test suite goes green while production quietly drifts.
-The judge's own model is pinned separately in `evals/config/judge.toml` — it
-names a `(vendor, model)` pair like any tier does, and has no environment
-override. Changing anything in that file re-scores every past result, so treat
-it as a re-baselining event rather than a dependency bump.
+The matching rule is versioned in the fingerprints it produces
+(`harness/fingerprint.py`), so a rule change is a visible re-keying event
+rather than a silent re-score: `rekey` recomputes every vote's key from its
+stored components, offline and with no re-vote.
 
 Every run also records which model builds the provider actually served, not just
 which ones it asked for. Stable model identifiers name the current build rather
@@ -128,9 +128,9 @@ version it does not know rather than interpreting it best-effort.
 Offline — no credentials, safe on every change:
 
 ```sh
-python evals/verify_corpus.py                 # check every case and the judge fixtures
+python evals/verify_corpus.py                 # check every case and the match fixtures
 python evals/verify_corpus.py --write-sha     # restamp source digests after editing a source
-python evals/judge_calibration/build_pairs.py # regenerate pairs.json from the labels
+python evals/calibration_labels/build_pairs.py # regenerate pairs.json from the labels
 pytest tests/test_evals_*.py tests/test_corpus_lints.py
 ```
 
@@ -140,15 +140,15 @@ Live — needs credentials for whichever vendor the tiers are configured to use
 ```sh
 python -m evals.harness.run run --mode analysis --out artifact.json
 python -m evals.harness.run run --mode extraction --case 01-payments-checkout
-python -m evals.harness.run calibrate --out agreement.json
+```
 
-# Several candidate judges over the same pairs, side by side. Reports agreement
-# with the recorded labels per candidate AND agreement between candidates, which is
-# what says whether a conclusion depends on the judge's vendor. See TUNING.md.
-python -m evals.harness.run calibrate \
-  --judge-config evals/config/judge.toml \
-  --judge-config /tmp/judge-anthropic.toml \
-  --out judge-comparison.json
+Scoring itself is offline: matching is the identity rule, and the standing of
+each unmatched finding comes from the vote ledger. `calibrate` is offline too —
+it prices the rule against the recorded labels and gates a rule change on the
+90% bar:
+
+```sh
+python -m evals.harness.run calibrate --out agreement.json
 ```
 
 A `run --out artifact.json` also writes `artifact.reports/<case>.report.json` —
@@ -166,11 +166,6 @@ them correctly scores 1.00 on both, and a `kind` or an `exposure` the live
 pipeline stopped producing appears only in that column. Every number in it is
 an instrument. It carries no threshold and fails no run — a low agreement is a
 question to take back to the source text.
-
-`--judge-config` is offered on `calibrate` only. A scored `run` is always
-measured by the judge in `evals/config/judge.toml`: pointing a sweep at some
-other judge produces numbers that look like the tracked series and are not
-comparable to it.
 
 Offline again, once a sweep has been reviewed — `promote` needs no credentials,
 because everything it certifies was observed during the run and written into the
@@ -196,25 +191,22 @@ matrix, or a summary that disagrees with its own contents. Every quality metric
 below is computed, printed, and written to the artifact, but does **not** fail
 the run: a gate that fires before anyone knows the normal range just trains
 people to bypass it. `calibrate` is the exception — it fails below the 90%
-judge–label agreement bar, because a judge that disagrees with the recorded
+rule–label agreement bar, because a rule that disagrees with the recorded
 labels makes every other number meaningless. Read that bar as the top of this
 file describes it: the labels are agent-authored and unreviewed, so the bar
 measures agreement with them and not correctness.
 
 ## What the metrics mean
 
-Every number here is measured **by the judge** — use them to compare
-configurations and track movement, never as absolute scores or against another
-tool's published figures.
+Every number here is measured **against the rule and the ledger** — use
+them to compare configurations and track movement, never as absolute scores or
+against another tool's published figures. The reference sets they rest on are
+agent-authored and unreviewed.
 
-**Except ASVS's.** The `applicability` block is a confusion matrix over a finite
-catalog, matched by requirement ID with no model call anywhere, so it is not
-judge-relative and does not carry that caveat. It is reported separately for
-that reason: pooling it with the judged numbers would put two things that are
-not comparable under one heading. It carries the other caveat instead — the
-reference records it scores against are agent-authored and unreviewed, like
-everything else here. The **grounds** measurements at the end are the
-exception: they are counted mechanically and mean the same thing across judges.
+**ASVS's differ only in mechanism.** The `applicability` block is a confusion
+matrix over a finite catalog, matched by requirement ID: its claims carry
+their identity, so no rule composes one. It is reported separately because a
+catalog match and a composed match are not one kind of number.
 
 - **must-find recall** — did the tool find the threats a case marks as
   essential? Reported **per case**, never averaged: an average hides one case
@@ -224,17 +216,18 @@ exception: they are counted mechanically and mean the same thing across judges.
 - **element accuracy** — did the threat cite the right element? Scored, but never
   used to reject a match — citing the process where the reference cited the flow
   at its endpoint still counts as the same threat.
-- **unsupported rate** — of the threats the tool produced that aren't in the
-  reference set, how many assert facts the model doesn't support? This is the one
-  "extra threat" bucket that counts against the tool; a plausible, grounded extra
-  does not.
+- **rejected rate** — of the threats the tool produced that aren't in the
+  reference set, how many did a person vote down for substance? The one "extra
+  threat" standing that counts against the tool. It reads 0.0 over a cold
+  ledger, beside an **unvoted** count that says how much of the answer still
+  waits on a review sitting — a plausible, grounded extra never gates.
 - **critic yield** — always read as a **pair**: how many junk threats the critic
   removed (good) *against* how many real threats it removed (bad). A kill count
   on its own tells you nothing about which of those two is happening.
 - **near/far exemplar delta** — see below.
 
-The **grounds** measurements are judge-free, and each one watches a prompt rule
-that nothing enforces mechanically:
+The **grounds** measurements each watch a prompt rule that nothing enforces
+mechanically:
 
 - **grounds per threat** — `analyze.md` asks for one ground per load-bearing
   fact with no padding, so this should stay low. Rising means the agents are
@@ -252,7 +245,7 @@ that nothing enforces mechanically:
   no ground verified at all). Both remain structural failures, so a run that
   hits either still exits non-zero.
 
-**Coverage** is judge-free too, and is a rate over the whole sweep rather than a
+**Coverage** is a rate over the whole sweep rather than a
 per-case number: it counts what deterministic code offered each lane —
 candidates, elements, boundary crossings, unknown controls — against how much of
 it the lane's drafts cite. Read it as *cited*, never as *considered*: an agent
@@ -299,8 +292,9 @@ python -m evals.harness.run rekey --to-version 2 --yes  # rewrite
 
 A vote stores the fields its fingerprint was computed from, so re-keying is
 arithmetic over one file — no provider, no credentials, and every verdict, voter
-and date survives. That is the difference between this and a judge-scored
-history, which a judge change re-scores with no way to recompute it.
+and date survives. That property is what made the vote affordable: a
+model-scored history re-scores whole every time its scorer changes, with no
+way to recompute the old numbers.
 
 The reviewer answers one question per finding — **could this attack happen in
 this system?** — as up, down, unsure, or needs-more-evidence. A down-vote picks
@@ -370,9 +364,10 @@ runnable by hand.
 
 ## Things to keep in mind
 
-- **The metrics are judge-relative.** Recall and precision numbers move *with*
-  the judge and its prompt. They're valid for tracking change and comparing
-  configurations, not as absolutes and not comparable to other tools' figures.
+- **The metrics are rule-and-ledger-relative.** Recall and precision move
+  *with* the identity rule's version and with what the ledger holds. They're
+  valid for tracking change and comparing configurations, not as absolutes and
+  not comparable to other tools' figures.
 - **Reference sets grow from real output.** They aren't meant to be exhaustive up
   front. Each run surfaces grounded, plausible threats it produced that aren't in
   the reference set; recurring ones get promoted into the reference set on the

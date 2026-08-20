@@ -1,49 +1,50 @@
-"""Judge-vs-label agreement over the recorded fixtures.
+"""Rule-vs-label agreement over the recorded fixtures.
 
-``evals/judge_calibration/pairs.json`` holds candidate pairs marked match /
-no-match, and judge-label agreement must be **>= 90%** (comparator: Semgrep's
-92-96% on an analogous triage task). Failing the bar means the judge prompt needs
-work, not ship-anyway.
+``evals/calibration_labels/pairs.json`` holds candidate pairs marked match /
+no-match, and a matcher's agreement with those labels must be **>= 90%**
+(comparator: Semgrep's 92-96% on an analogous triage task). The matcher under
+this bar is the identity rule from :mod:`evals.harness.identity` — the model
+judge this scoreboard was built for is retired, and the scoreboard outlived it:
+any future rule version is priced here against the same labels before it ships.
 
 **The labels are agent-authored, and a person has read 30 of the 339.** Review
-sitting 01 (``evals/judge_calibration/REVIEW-01.md``, 2026-08-18) took the 30
-hardest pairs and relabelled one. So this measures whether the judge reproduces
-what an earlier agent wrote down, and not whether either is right; the comparator
-above is a figure from a task with full reviewer agreement, and this number is
-not comparable to it. ``evals/README.md`` states the provenance once for the
-whole directory. Everything below says "the labels" rather than "the human" for
-that reason.
+sitting 01 (``evals/calibration_labels/REVIEW-01.md``, 2026-08-18) took the 30
+hardest pairs and relabelled one. So agreement measures whether a rule
+reproduces what an earlier agent wrote down, and not whether either is right;
+the comparator above is a figure from a task with full reviewer agreement, and
+this number is not comparable to it. ``evals/README.md`` states the provenance
+once for the whole directory. Everything below says "the labels" rather than
+"the human" for that reason.
 
-**No judge has ever been measured against them.** The bar below is what this
-module would enforce; ADR 0003 records that the check has never run.
-
-This is what makes a judge change a real gate rather than a dependency bump:
-re-run it on any change to ``evals/config/judge.toml``, because a new judge
-silently re-scores history.
+**A rule may refuse a pair, and a refusal is not a miss.** The identity rule
+refuses a pair it cannot read — no candidate element IDs, no verb — rather
+than grading half of itself. Refused pairs are counted and reported beside the
+agreement, never inside it: folding them in either direction would let a rule
+buy accuracy by refusing the hard pairs.
 
 The consequence to state plainly, every time these numbers are quoted: recall
-and precision from this suite are **judge-relative**. They are valid for
+and precision from this suite are **rule-relative**. They are valid for
 tracking movement and comparing configurations, and they are not absolutes
 comparable to published figures from other tools.
 
 The same fixtures do double duty as the offline unit-test corpus for
-:mod:`evals.harness.scorer`, where a scripted judge replays the recorded labels
-and no provider call happens at all.
+:mod:`evals.harness.scorer`, where a scripted matcher replays the recorded
+labels and no provider call happens at all.
 """
 
 from __future__ import annotations
 
 import json
-from collections.abc import Mapping, Sequence
+from collections.abc import Sequence
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Any, Literal
 
-from evals.harness.judge import ClaimPair, Judge
+from evals.harness.identity import ClaimPair, IdentityError, Matcher
 from stride_service.frameworks.stride.record import STRIDE_CATEGORIES, StrideCategory
 
 EVALS_ROOT = Path(__file__).resolve().parents[1]
-DEFAULT_PAIRS_PATH = EVALS_ROOT / "judge_calibration" / "pairs.json"
+DEFAULT_PAIRS_PATH = EVALS_ROOT / "calibration_labels" / "pairs.json"
 
 AGREEMENT_BAR = 0.90
 
@@ -92,16 +93,16 @@ class LabelledPair:
 
 @dataclass(frozen=True)
 class Disagreement:
-    """One pair the judge and the recorded label read differently.
+    """One pair the matcher and the recorded label read differently.
 
     Kept whole rather than counted: the bar failing is a prompt-authoring
-    task, and a bare percentage says nothing about which distinction the judge
+    task, and a bare percentage says nothing about which distinction the rule
     is missing. False matches inflate recall; false non-matches deflate it.
     """
 
     pair: LabelledPair
-    judge_match: bool
-    judge_rationale: str
+    matcher_match: bool
+    matcher_rationale: str
 
     def to_json(self) -> dict[str, Any]:
         return {
@@ -110,9 +111,9 @@ class Disagreement:
             "reference_claim": self.pair.reference_claim,
             "candidate_claim": self.pair.candidate_claim,
             "label": self.pair.label,
-            "judge": "match" if self.judge_match else "no-match",
+            "matcher": "match" if self.matcher_match else "no-match",
             "label_note": self.pair.note,
-            "judge_rationale": self.judge_rationale,
+            "matcher_rationale": self.matcher_rationale,
         }
 
 
@@ -120,21 +121,18 @@ class Disagreement:
 class CalibrationResult:
     """Agreement, the two error directions, and every disagreement.
 
-    ``rulings`` is what this judge answered for every pair, in the order the
-    pairs were given. It exists so two judges can be compared *to each other*
-    and not only to the labels: agreement against the labels tells you how far
-    each judge reproduces them, and nothing about whether the two would reach the same
-    conclusion — two judges at 92% can disagree with each other on every one of
-    the pairs they each got wrong. It is deliberately absent from
-    :meth:`to_json`, where a hundred booleans would bury the disagreements a
-    reader is actually there to read.
+    ``total`` counts the pairs the matcher answered. ``refused`` counts the
+    pairs it declined to read; they sit outside the agreement because a rule
+    that says "I cannot answer this" is not wrong about it — and the count is
+    always reported beside the bar, so a rule cannot buy accuracy by refusing
+    the hard pairs unseen.
     """
 
     total: int
     agreements: int
     false_matches: tuple[Disagreement, ...]
     false_non_matches: tuple[Disagreement, ...]
-    rulings: tuple[bool, ...] = ()
+    refused: int = 0
 
     @property
     def agreement(self) -> float:
@@ -151,140 +149,10 @@ class CalibrationResult:
             "agreement": round(self.agreement, 4),
             "bar": AGREEMENT_BAR,
             "meets_bar": self.meets_bar,
+            "refused": self.refused,
             "false_matches": [entry.to_json() for entry in self.false_matches],
             "false_non_matches": [entry.to_json() for entry in self.false_non_matches],
         }
-
-
-@dataclass(frozen=True)
-class Candidate:
-    """One judge in a comparison: what it is, and how it scored."""
-
-    label: str
-    result: CalibrationResult
-
-    def to_json(self) -> dict[str, Any]:
-        return {"judge": self.label, **self.result.to_json()}
-
-
-@dataclass(frozen=True)
-class JudgeComparison:
-    """Several judges measured over the *same* labelled pairs.
-
-    This answers the question a single agreement number cannot: does a
-    conclusion depend on which vendor's model was asked? Selecting a production
-    judge on measured agreement is the first half of that
-    ([#116](https://github.com/mstarks01/work-agent/issues/116)); the second is
-    whether the judges that *did* meet the bar would have ruled the same way.
-
-    The objective is explicitly **not** unanimity. Judges are allowed to differ;
-    what must not happen is a comparison of two subject models flipping because
-    the judge changed vendor. Where agreement between judges is materially lower
-    than agreement with the labels, that is the finding, and it is reported as
-    uncertainty rather than resolved by picking a favourite.
-    """
-
-    candidates: tuple[Candidate, ...]
-    pairs: tuple[LabelledPair, ...]
-
-    @property
-    def best(self) -> Candidate:
-        """The highest-agreement candidate; ties break on the order given.
-
-        A recommendation, never an application. Nothing here rewrites
-        ``evals/config/judge.toml`` — changing the judge re-scores history, so
-        it stays a reviewed commit that bumps the config version.
-        """
-        return max(self.candidates, key=lambda candidate: candidate.result.agreement)
-
-    @property
-    def meets_bar(self) -> bool:
-        """Whether *any* candidate clears the bar.
-
-        The single-judge check asks whether the production judge is defensible.
-        A comparison asks whether a defensible judge exists at all — so it fails
-        only when none does, which is a statement about the measurement system
-        rather than about one model.
-        """
-        return any(candidate.result.meets_bar for candidate in self.candidates)
-
-    def agreement_between(self, first: str, second: str) -> float:
-        """How often two candidates ruled the same way, the labels aside."""
-        left = self._rulings(first)
-        right = self._rulings(second)
-        if not left:
-            return 0.0
-        matched = sum(1 for a, b in zip(left, right, strict=True) if a == b)
-        return matched / len(left)
-
-    def divergences(self) -> tuple[dict[str, Any], ...]:
-        """Every pair the candidates did not all rule the same way.
-
-        Kept whole rather than counted, for the reason :class:`Disagreement`
-        is: a rate says the judges differ somewhere, and the actionable question
-        is *on what kind of claim*, which only the pairs themselves answer.
-        """
-        divergent = []
-        for index, pair in enumerate(self.pairs):
-            rulings = {
-                candidate.label: candidate.result.rulings[index]
-                for candidate in self.candidates
-            }
-            if len(set(rulings.values())) == 1:
-                continue
-            divergent.append(
-                {
-                    "case": pair.case,
-                    "category": pair.category,
-                    "reference_claim": pair.reference_claim,
-                    "candidate_claim": pair.candidate_claim,
-                    "label": pair.label,
-                    "judges": {
-                        label: "match" if match else "no-match"
-                        for label, match in rulings.items()
-                    },
-                }
-            )
-        return tuple(divergent)
-
-    def to_json(self) -> dict[str, Any]:
-        labels = [candidate.label for candidate in self.candidates]
-        return {
-            "bar": AGREEMENT_BAR,
-            "meets_bar": self.meets_bar,
-            "best": self.best.label,
-            "candidates": [candidate.to_json() for candidate in self.candidates],
-            "pairwise_agreement": {
-                f"{first} vs {second}": round(self.agreement_between(first, second), 4)
-                for index, first in enumerate(labels)
-                for second in labels[index + 1 :]
-            },
-            "divergences": list(self.divergences()),
-        }
-
-    def _rulings(self, label: str) -> tuple[bool, ...]:
-        for candidate in self.candidates:
-            if candidate.label == label:
-                return candidate.result.rulings
-        raise CalibrationError(f"no candidate labelled {label!r}")
-
-
-def compare_judges(
-    judges: Mapping[str, Judge], pairs: Sequence[LabelledPair]
-) -> JudgeComparison:
-    """Measure several judges over one set of pairs.
-
-    Every judge sees the identical pairs in the identical order — the whole
-    comparison rests on that, since agreement between two candidates is computed
-    positionally.
-    """
-    if not judges:
-        raise CalibrationError("no judges to compare")
-    candidates = tuple(
-        Candidate(label=label, result=measure_agreement(judge, pairs))
-        for label, judge in judges.items()
-    )
-    return JudgeComparison(candidates=candidates, pairs=tuple(pairs))
 
 
 def load_pairs(path: Path | str = DEFAULT_PAIRS_PATH) -> tuple[LabelledPair, ...]:
@@ -330,23 +198,33 @@ def load_pairs(path: Path | str = DEFAULT_PAIRS_PATH) -> tuple[LabelledPair, ...
     return tuple(pairs)
 
 
-def measure_agreement(judge: Judge, pairs: Sequence[LabelledPair]) -> CalibrationResult:
-    """Run the judge over every labelled pair and compare with the label."""
+def measure_agreement(
+    matcher: Matcher, pairs: Sequence[LabelledPair]
+) -> CalibrationResult:
+    """Run the matcher over every labelled pair and compare with the label.
+
+    A refusal (:class:`~evals.harness.identity.IdentityError`) is counted and
+    set aside, never scored: the fixtures deliberately keep pairs the rule
+    cannot read, so the refusing path stays exercised.
+    """
     if not pairs:
         raise CalibrationError("no labelled pairs to calibrate against")
 
     agreements = 0
-    rulings: list[bool] = []
+    refused = 0
     false_matches: list[Disagreement] = []
     false_non_matches: list[Disagreement] = []
     for pair in pairs:
-        ruling = judge.equivalent(pair.to_claim_pair())
-        rulings.append(ruling.match)
+        try:
+            ruling = matcher.equivalent(pair.to_claim_pair())
+        except IdentityError:
+            refused += 1
+            continue
         if ruling.match == pair.label_match:
             agreements += 1
             continue
         disagreement = Disagreement(
-            pair=pair, judge_match=ruling.match, judge_rationale=ruling.rationale
+            pair=pair, matcher_match=ruling.match, matcher_rationale=ruling.rationale
         )
         if ruling.match:
             false_matches.append(disagreement)
@@ -354,9 +232,9 @@ def measure_agreement(judge: Judge, pairs: Sequence[LabelledPair]) -> Calibratio
             false_non_matches.append(disagreement)
 
     return CalibrationResult(
-        total=len(pairs),
+        total=len(pairs) - refused,
         agreements=agreements,
         false_matches=tuple(false_matches),
         false_non_matches=tuple(false_non_matches),
-        rulings=tuple(rulings),
+        refused=refused,
     )
