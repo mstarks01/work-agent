@@ -130,6 +130,12 @@ DECLARED: dict[str, str] = {
         " per-case mechanical dispatch that used to branch here is now"
         " `PACKAGE_SCORERS`, a table keyed by framework."
     ),
+    "evals/build_review_docs.py": (
+        "RENDERERS is a table keyed by framework, checked against PACKAGES at"
+        " import: a package without a renderer fails the generator loudly"
+        " rather than dropping its reference set from a sitting. Each entry"
+        " asks the question its package's records rule on."
+    ),
     "evals/harness/stability.py": (
         "Reads both artifact blocks by name — `scores` is STRIDE's and"
         " `applicability` is ASVS's — because the two carry different"
