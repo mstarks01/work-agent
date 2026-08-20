@@ -698,7 +698,7 @@ class SessionState:
 
     The two families are handed in rather than read from module constants: a
     graph's keys are a function of the frameworks it was built for
-    (:func:`declared_keys`), so a node checks against the graph it is running in.
+    (:meth:`GraphKeys.of`), so a node checks against the graph it is running in.
     """
 
     def __init__(

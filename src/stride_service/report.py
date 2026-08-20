@@ -472,7 +472,7 @@ class Verdict(ProposedVerdict):
     for exactly this would never run.
 
     What survives here is the invariant on the *report*: a ``Verdict`` is
-    constructed only by :func:`~stride_service.critic.assemble_threats`, out of
+    constructed only by :func:`~stride_service.critic.assemble_claims`, out of
     a proposal the review seam has already passed, so the check below is this
     service auditing its own construction rather than refereeing a model's.
     """
