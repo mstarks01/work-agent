@@ -298,7 +298,7 @@ on either of them. That is the finding this sitting exists for.
 
 - cites: `flow:store-server-to-image-registry:pull-image`
 - tier: expected · severity: low/medium · verb: `intercept`
-- recorded note: Reading the image in transit and altering it in transit are two claims on one flow, and the pair is the distinction the judge most often collapses.
+- recorded note: Reading the image in transit and altering it in transit are two claims on one flow. The elements are identical, so the action verb is the only thing that separates them: `intercept` against `alter-in-transit`.
 
 > mark:
 

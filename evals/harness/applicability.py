@@ -1,14 +1,15 @@
-"""ASVS's scorer: an applicability confusion matrix, with no judge anywhere.
+"""ASVS's scorer: an applicability confusion matrix over a finite catalog.
 
-STRIDE's claim set is open, so grading it needs a model to decide when two
-sentences are one claim. **ASVS's is closed**, and that one difference removes
-the judge entirely: the catalog is finite, a claim carries the standard's own
-identifier, and two claims about one requirement compare by string. #167 settled
-that, and this module is what it looks like.
+STRIDE's claim set is open, so grading it needs a rule that composes an identity
+from what a claim carries — a lane, an action verb and the elements it names.
+**ASVS's is closed**, and that one difference removes even the rule: the catalog
+is finite, a claim carries the standard's own identifier, and two claims about
+one requirement compare by string. #167 settled that, and this module is what it
+looks like.
 
 So the shape of the answer differs too. STRIDE's scorer reports recall against an
-open list and adjudicates whatever else a run produced, because "the corpus did
-not list it" cannot mean "it is wrong". Here it can: a run at level ``L`` rules on
+open list and asks a person about whatever else a run produced, because "the
+corpus did not list it" cannot mean "it is wrong". Here it can: a run at level ``L`` rules on
 :func:`~stride_service.frameworks.asvs.catalog.requirements_for` and nothing
 else, so the complement of the reference set is a real negative and the four
 cells of a confusion matrix are all reachable.
@@ -253,7 +254,7 @@ def exemplar_delta(scores: Sequence[ApplicabilityScore]) -> dict[str, float]:
     away from the architectures this package's exemplars demonstrate — over the
     number this package produces. It is a separate function rather than a shared
     one because the recall it averages is a different measurement, and a
-    ``near_recall`` column pooling both would be an average of a judge-relative
+    ``near_recall`` column pooling both would be an average of a rule-relative
     figure and a set comparison.
     """
     near = [score for score in scores if score.exemplar_proximity == "near"]
@@ -277,11 +278,11 @@ def over_applied_for_promotion(
     distinction ``valid-unlisted`` draws for STRIDE, surfaced for the next
     reading session to settle.
 
-    **Cheaper than STRIDE's, and worth saying why.** STRIDE needs a judge to
-    separate a grounded unlisted threat from noise. Here the list falls out of
-    set arithmetic, and ``off_catalog`` has already taken out the case that is a
-    package bug rather than a judgement — so this costs nothing and carries no
-    model's opinion.
+    **Cheaper than STRIDE's, and worth saying why.** STRIDE needs a person to
+    separate a grounded unlisted threat from noise, one vote per finding. Here
+    the list falls out of set arithmetic, and ``off_catalog`` has already taken
+    out the case that is a package bug rather than a judgement — so this costs
+    no reviewer's attention at all.
     """
     return [
         {
@@ -313,10 +314,10 @@ class ApplicabilityYield:
 
     Only the pair means anything. A rejection count alone reads as either.
 
-    **No judge and no second scoring pass.** STRIDE's yield works by scoring one
-    case twice through the judge, sharing a memo so the subset is close to free.
-    Here both sides are requirement identifiers, so the whole instrument is set
-    arithmetic over the block the run already produced.
+    **No second scoring pass.** STRIDE's yield works by scoring one case twice
+    through the identity rule, which is cheap because the rule is a pure
+    function. Here both sides are requirement identifiers, so the whole
+    instrument is set arithmetic over the block the run already produced.
     """
 
     case: str
@@ -418,12 +419,13 @@ def render(scores: Sequence[ApplicabilityScore]) -> None:
     """ASVS's rows, then the pooled figures. Never folded into STRIDE's table.
 
     The two scorers answer different questions over different sets — an open
-    claim set through a judge, and a finite catalog by string compare — so one
-    combined recall column would be an average of two things nobody asked for.
+    claim set through a composed identity, and a finite catalog by string
+    compare — so one combined recall column would be an average of two things
+    nobody asked for.
     """
     if not scores:
         return
-    print("\nASVS applicability (mechanical, no judge)")
+    print("\nASVS applicability (mechanical, catalog match)")
     print(
         f"{'case':<26} {'lvl':>3} {'rec':>6} {'must':>6} {'prec':>6}"
         f" {'miss':>5} {'over':>5} {'rej':>5} {'off':>4}"
@@ -450,12 +452,12 @@ def artifact(scores: Sequence[ApplicabilityScore]) -> dict[str, Any]:
     """This instrument's artifact keys.
 
     Its own keys rather than rows in ``scores``: a confusion matrix over a
-    finite catalog and a judge-relative recall figure are not the same
+    finite catalog and a rule-relative recall figure are not the same
     measurement, and one list would invite a reader to average them.
 
     ``over_applied_for_promotion`` is the corpus feedback loop's half of this
     instrument — requirements a run ruled applicable that the case did not
-    expect, for the next reading session to settle. No judge, because the set
+    expect, for the next reading session to settle. No vote needed, because the set
     arithmetic already separated the package-bug case into ``off_catalog``.
     """
     return {
@@ -477,7 +479,7 @@ def render_yield(yields: Sequence[ApplicabilityYield]) -> None:
     """
     if not yields:
         return
-    print("\nASVS critic yield (mechanical, no judge)")
+    print("\nASVS critic yield (mechanical, catalog match)")
     print(
         f"{'case':<26} {'drafts':>7} {'confirmed':>10} {'rejected':>9} {'earned':>7} {'destroyed':>10}"
     )
@@ -501,7 +503,7 @@ def artifact_yield(yields: Sequence[ApplicabilityYield]) -> dict[str, Any]:
     """This instrument's artifact keys.
 
     Its own keys beside STRIDE's for the reason the scores are: one column
-    pooling a judge-relative kill count with set arithmetic would be a rate
+    pooling a rule-relative kill count with set arithmetic would be a rate
     across both.
     """
     return {
@@ -527,7 +529,7 @@ def score_case(
     return {
         "applicability": score_applicability(case, block),
         # Both sides of this framework's critic, from the block the run already
-        # produced: no judge and no second scoring pass, because both sides are
+        # produced: no second scoring pass, because both sides are
         # requirement identifiers.
         "applicability_yield": score_yield(case, block, drafts),
     }

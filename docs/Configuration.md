@@ -290,8 +290,7 @@ configuration that does not work.
 
 `supports_structured_output` is a **different and weaker question** — whether a
 schema is honoured at all — and answers yes for models on both paths. It cannot
-substitute for this check. The eval judge runs both at config-load time for the
-same reason (`evals/harness/judge.py`).
+substitute for this check.
 
 **The check is scoped to tiers that send a schema.** A tier running
 `constrain_output = false` sends none, so how its provider *would* have

@@ -25,7 +25,7 @@ records. Both blocks are now scored by a sweep:
 `evals/harness/instruments.py` maps `asvs` to `applicability.score_case` in
 `PACKAGE_SCORERS`, which closed
 [#200](https://github.com/mstarks01/work-agent/issues/200), and the ASVS half
-comes back as a confusion matrix over the catalog with no judge in it. So both
+comes back as a confusion matrix over the catalog, matched by string. So both
 sets get exercised eventually. What no sweep can do is ask whether a set is
 *exhaustive* — a requirement nobody wrote down is one the matrix scores nothing
 for missing. **That question is this sitting's alone.**

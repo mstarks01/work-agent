@@ -1,4 +1,4 @@
-"""Mechanical checks over the golden corpus and the judge-calibration fixtures.
+"""Mechanical checks over the golden corpus and the calibration-label fixtures.
 
 Everything here is deterministic and credential-free by construction;
 ``tests/test_corpus_lints.py`` runs the same checks in CI.
@@ -682,9 +682,9 @@ def calibration_inputs() -> tuple[dict[str, set[str]], dict[str, dict[str, list[
     """What :func:`check_calibration` compares fixtures against, per case.
 
     The blessed model's element IDs, and each STRIDE reference claim mapped to
-    its own sorted element IDs. STRIDE's reference file only, because the judge
-    is STRIDE's: a framework that matches by requirement ID reaches no
-    claim-equivalence judgement and contributes no pair.
+    its own sorted element IDs. STRIDE's reference file only, because the
+    composed identity is STRIDE's: a framework that matches by requirement ID
+    reaches no claim-equivalence question and contributes no pair.
     """
     elements: dict[str, set[str]] = {}
     claims: dict[str, dict[str, list[str]]] = {}
@@ -740,7 +740,7 @@ def check_calibration(
     elements_by_case: dict[str, set[str]],
     claims_by_case: dict[str, dict[str, list[str]]],
 ) -> list[str]:
-    """Every mechanical failure in the judge-calibration fixtures.
+    """Every mechanical failure in the calibration-label fixtures.
 
     The two element-ID fields are checked the way the claim strings are, and for
     the same reason. ``reference_element_ids`` is copied out of the corpus by

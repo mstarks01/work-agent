@@ -16,7 +16,7 @@ the whole defensibility argument rests on it.
 improving it changes every key — see :mod:`evals.harness.fingerprint`. Storing
 what the key was computed *from* makes a version bump a pure recompute over this
 file rather than a re-vote, which is what stops the ledger expiring the way a
-judge-scored history does.
+model-scored history does.
 
 **One reason code, from a closed set, and it decides where the vote lands.** A
 reviewer who dislikes a finding's writing and a reviewer who says it is not a
