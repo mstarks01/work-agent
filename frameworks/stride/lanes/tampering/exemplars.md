@@ -20,6 +20,7 @@ Keep the lane straight. Speaking *as* the web API is spoofing; altering the mess
     "process:ledger-service",
     "store:accounts-db"
   ],
+  "verb": "alter-in-transit",
   "evidence_refs": [
     "crossing:flow:web-api-to-ledger-service:post-transfer",
     "absent:flow:web-api-to-ledger-service:post-transfer:authentication",
@@ -58,6 +59,7 @@ Keep the lane straight. Speaking *as* the web API is spoofing; altering the mess
     "flow:ledger-service-to-accounts-db:read-write-balances",
     "process:ledger-service"
   ],
+  "verb": "alter",
   "evidence_refs": [],
   "quotes": [
     {
@@ -98,6 +100,7 @@ Written against exemplar system B. The submitter's own words are the trigger her
     "flow:mqtt-broker-to-stream-processor:consume-topic",
     "store:telemetry-store"
   ],
+  "verb": "forge",
   "evidence_refs": [
     "crossing:flow:mqtt-broker-to-stream-processor:consume-topic",
     "unknown:flow:mqtt-broker-to-stream-processor:consume-topic:authentication"

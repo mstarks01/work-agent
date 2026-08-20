@@ -406,6 +406,9 @@ def sample_threat(
         "description": "Stolen session cookies let an attacker impersonate"
         " the customer against the web app.",
         "affected_element_ids": ["flow:customer-to-web-app:login"],
+        # The default draft's action, matching its title: a stolen session used
+        # against the web app. Tests that care about identity override it.
+        "verb": "use-credential",
         # One quote and one derived fact, so a default draft exercises two
         # branches rather than the cheapest one. The quote is a verbatim span of
         # the source ``sample_report`` submits, so it verifies through the

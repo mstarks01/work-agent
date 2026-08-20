@@ -21,7 +21,14 @@ FLOWS = {
 }
 
 
-def finding(title="A threat", target="process:a", case="01", seen_in=1, runs=1):
+def finding(
+    title="A threat",
+    target="process:a",
+    case="01",
+    seen_in=1,
+    runs=1,
+    verb="impersonate",
+):
     return Finding(
         case=case,
         framework="stride",
@@ -30,13 +37,17 @@ def finding(title="A threat", target="process:a", case="01", seen_in=1, runs=1):
         description="An attacker does the thing.",
         element_ids=(target,),
         quotes=("the source says so",),
+        verb=verb,
         seen_in=seen_in,
         runs=runs,
     )
 
 
 def value_of(item):
-    return components_for("stride", "spoofing", item.element_ids, FLOWS["01"])
+    """The components the queue would build for this finding, at its own version."""
+    return components_for(
+        "stride", "spoofing", item.element_ids, FLOWS["01"], verb=item.verb
+    )
 
 
 def test_an_answered_finding_never_comes_back():
@@ -71,6 +82,7 @@ def test_a_flow_and_its_endpoints_are_one_question():
         title="Cited as a flow",
         description="",
         element_ids=("flow:a-to-b:call",),
+        verb="intercept",
     )
     as_ends = Finding(
         case="01",
@@ -79,6 +91,7 @@ def test_a_flow_and_its_endpoints_are_one_question():
         title="Cited as endpoints",
         description="",
         element_ids=("process:a", "process:b"),
+        verb="intercept",
     )
     assert len(build([as_flow, as_ends], FLOWS, Ledger())) == 1
 
@@ -161,7 +174,31 @@ def test_the_summary_counts_what_a_reviewer_decides_from(tmp_path):
     assert summary["pool"] == 1
 
 
-def test_version_two_needs_a_verb_and_says_so():
-    """Never a silent fall back to the weaker rule."""
+def test_a_stride_finding_with_no_verb_fails_closed():
+    """Never a silent fall back to the weaker rule for a package that has one."""
     with pytest.raises(Exception, match="verb"):
-        build([finding()], FLOWS, Ledger(), version=2)
+        build([finding(verb=None)], FLOWS, Ledger())
+
+
+def test_each_framework_is_keyed_by_its_own_rule():
+    """A sweep carries both packages, and they do not identify claims alike.
+
+    ASVS composes no verb, so keying it at version 2 would read a field it never
+    has. The version rides in the value, so the two cannot be compared by
+    accident either.
+    """
+    stride = finding(target="process:a")
+    asvs = Finding(
+        case="01",
+        framework="asvs",
+        lane="V1",
+        title="A requirement ruling",
+        description="",
+        element_ids=("process:a",),
+    )
+    items = {
+        item.finding.framework: item for item in build([stride, asvs], FLOWS, Ledger())
+    }
+
+    assert items["stride"].fingerprint.startswith("v2:")
+    assert items["asvs"].fingerprint.startswith("v1:")
