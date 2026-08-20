@@ -72,7 +72,7 @@ def test_candidate_claim_is_the_title(case):
 
 
 def test_matches_reference_via_recorded_labels(case, labelled_pairs, no_votes):
-    # The fixtures define the expected behaviour for the judged half: a produced threat
+    # The fixtures define the expected matching behaviour: a produced threat
     # titled with a labelled candidate claim must land on its reference.
     pair = next(
         pair
@@ -95,7 +95,7 @@ def test_matches_reference_via_recorded_labels(case, labelled_pairs, no_votes):
     assert score.matched[0].element_overlap is True
 
 
-def test_lane_prefilter_never_judges_across_lanes(case, no_votes):
+def test_lane_prefilter_never_compares_across_lanes(case, no_votes):
     produced = [produced_threat(1, "denial-of-service", "A flood takes the API down.")]
     matcher = ScriptedMatcher()
 
@@ -115,7 +115,7 @@ def _is_cross_lane(pair, case) -> bool:
 
 
 def test_assignment_is_one_to_one(case, no_votes):
-    # Two produced threats the judge calls equivalent to the *same* reference
+    # Two produced threats the matcher calls equivalent to the *same* reference
     # must consume one reference between them; without this recall inflates and
     # stops meaning anything.
     reference = case.claims_for("stride")[0]

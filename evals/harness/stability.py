@@ -9,9 +9,9 @@ anything.
 
 The instrument is the **reference index**, not the threat text. A produced
 threat gets a fresh ID every run and its wording moves, so text can only be
-compared through the judge; the reference it was matched to is a corpus
+compared as prose; the reference it was matched to is a corpus
 coordinate that means the same thing in every sweep. So this module measures
-set overlap over ``scores[].matched[].reference_index`` and needs no judge, no
+set overlap over ``scores[].matched[].reference_index`` and needs no re-scoring, no
 provider and no credentials — it reads finished artifacts, the way ``promote``
 does.
 
@@ -39,7 +39,7 @@ from stride_service.report import FrameworkName
 
 #: One case of one framework. Stability is per framework because the two
 #: instruments answer over different sets — STRIDE's open claim set through a
-#: judge, ASVS's finite catalog by string compare — so pooling their spread
+#: composed identity, ASVS's finite catalog by string compare — so pooling their spread
 #: would report one volatility figure over two populations.
 Scope = tuple[FrameworkName, str]
 
@@ -246,7 +246,7 @@ def comparability_warnings(runs: Sequence[ScoredRun]) -> list[str]:
 
     Reported rather than refused, on the same principle
     :class:`~evals.harness.artifact.EvalArtifact` applies to a sweep with
-    failures: comparing two modes or two judges is sometimes exactly the
+    failures: comparing two modes or two configurations is sometimes exactly the
     question being asked, and the tool's job is to make sure it is a chosen
     comparison rather than an accidental one. Anything here means the spread
     below includes a configuration difference, not just sampling noise.
@@ -270,8 +270,8 @@ def _model_warnings(runs: Sequence[ScoredRun]) -> list[str]:
     """Every ``models`` field the runs disagree on, named individually.
 
     Field by field because the two disagreements mean different things: a
-    changed generator is the thing under test, and a changed judge silently
-    re-measures every case that did not change at all.
+    changed generator is the thing under test, and a changed measurement
+    silently re-measures every case that did not change at all.
     """
     fields = sorted({field for run in runs for field in run.models})
     return [

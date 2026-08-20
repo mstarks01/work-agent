@@ -7,7 +7,7 @@ fix — the confusion matrix itself, and the wiring that decides which framework
 a case's graph is built for.
 
 Everything here is free of provider calls, because the scorer is a set
-comparison: ASVS matches by requirement ID, so #167 removed the judge from this
+comparison: ASVS matches by requirement ID, so #167 removed claim equivalence from this
 half of the contract entirely.
 """
 
@@ -278,7 +278,7 @@ def test_the_exemplar_delta_reads_this_package_s_own_proximity(case, corpus):
 
 
 def test_over_applied_requirements_are_surfaced_for_the_next_reading(case):
-    """The corpus feedback loop, without a judge.
+    """The corpus feedback loop, by catalog arithmetic.
 
     STRIDE needs one to tell a grounded unlisted threat from noise. Here the
     list is set arithmetic, and `off_catalog` has already taken out the entry

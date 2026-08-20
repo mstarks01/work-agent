@@ -2,7 +2,7 @@
 
 [#201](https://github.com/mstarks01/work-agent/issues/201) proposes resolving a
 **Claim** to the parts that decide its identity, so that two spellings of one
-threat compare equal without a judge call. Three of the four parts it names are
+threat compare equal with no model call. Three of the four parts it names are
 already on the record — the lane, the affected **Element** IDs and the
 **Grounds** — and only ``mechanism`` would be new.
 
@@ -15,7 +15,7 @@ threat is worse than one that reports a paraphrase twice.
 
 The other direction — one claim spelled two ways landing on two keys — is the
 one #201's title names, and it is measured next door in
-``tests/test_evals_identity.py`` over the judge-calibration labels. Read the two
+``tests/test_evals_identity.py`` over the recorded calibration labels. Read the two
 together: this file prices a false merge, that one prices a false split, and
 neither number means anything alone. ``FRONTIER`` there carries both errors for
 six comparison rules at once, and this file is the merge column of its first row.

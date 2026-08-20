@@ -209,7 +209,8 @@ def check_temperature(
     Public because two gates need the same answer and they read the parameter
     from different files. A caller that ran only :func:`check_supported` would
     load a configuration the provider rejects on its first request — which is
-    what the eval judge did to a calibration sweep before this existed.
+    what a calibration sweep hit before this existed: the config loaded, and
+    the provider refused pair one.
     ``config_file`` is the file the caller read the value from, so the message
     names somewhere the reader can edit.
     """
