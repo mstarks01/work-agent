@@ -123,8 +123,9 @@ two different facts, and averaging them lets taste move a recall number. So:
 
 - `SUBSTANCE_REASONS` — the finding is wrong. Counts against the configuration,
   and the finding leaves the reference pool.
-- `STYLE_REASONS` — the finding is real and badly written. Moves the writing
-  score, and the finding **stays** in the pool.
+- `STYLE_REASONS` — the finding is real and badly written. Counted by
+  `evals/harness/writing.py`, per case and framework, and the finding **stays**
+  in the pool.
 
 That split is mechanical, not a request in a guide. `Vote.counts_against_analysis`
 and `Vote.joins_the_pool` are the two booleans that carry it.

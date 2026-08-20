@@ -87,11 +87,23 @@ def test_rekey_on_an_empty_ledger_is_not_an_error(tmp_path, capsys):
     assert "no votes to re-key" in capsys.readouterr().out
 
 
-def _sweep(tmp_path):
+def _claim(title="A finding", category="spoofing"):
+    return {
+        "id": "S-01",
+        "category": category,
+        "title": title,
+        "description": "d",
+        "affected_element_ids": ["entity:shopper"],
+        "verb": "impersonate",
+        "grounds": [{"kind": "quote", "text": "t"}],
+    }
+
+
+def _sweep(tmp_path, name="artifact.json", claims=None):
     """A sweep artifact and the reports directory ``run --out`` writes beside it."""
-    artifact = tmp_path / "artifact.json"
+    artifact = tmp_path / name
     artifact.write_text(json.dumps({"mode": "analysis"}), encoding="utf-8")
-    reports = tmp_path / "artifact.json.reports"
+    reports = tmp_path / f"{name}.reports"
     reports.mkdir()
     (reports / "01-payments-checkout.report.json").write_text(
         json.dumps(
@@ -100,17 +112,7 @@ def _sweep(tmp_path):
                 "analyses": [
                     {
                         "framework": "stride",
-                        "claims": [
-                            {
-                                "id": "S-01",
-                                "category": "spoofing",
-                                "title": "A finding",
-                                "description": "d",
-                                "affected_element_ids": ["entity:shopper"],
-                                "verb": "impersonate",
-                                "grounds": [{"kind": "quote", "text": "t"}],
-                            }
-                        ],
+                        "claims": [_claim()] if claims is None else claims,
                     }
                 ],
             }
@@ -127,9 +129,30 @@ def test_review_reports_what_is_waiting(tmp_path, capsys):
     assert main(["review", str(artifact), "--voter", "ada", "--ledger", str(led)]) == 0
 
     out = capsys.readouterr().out
-    assert "1 findings waiting for ada" in out
+    assert "1 findings waiting for ada, over 1 sweep(s)" in out
     assert "01-payments-checkout" in out
     assert "webapp/review.py" in out, "a reviewer needs to be told how to answer"
+
+
+def test_review_over_several_sweeps_counts_what_they_disagree_on(tmp_path, capsys):
+    """The reading ``volatile`` is for: one finding in one sweep of two."""
+    steady = _sweep(tmp_path, "one.json")
+    both = _sweep(
+        tmp_path,
+        "two.json",
+        claims=[_claim(), _claim("A second finding", "tampering")],
+    )
+    led = tmp_path / "votes.jsonl"
+
+    code = main(
+        ["review", str(steady), str(both), "--voter", "ada", "--ledger", str(led)]
+    )
+
+    assert code == 0
+    out = capsys.readouterr().out
+    assert "2 findings waiting for ada, over 2 sweep(s)" in out
+    assert "1 found in some runs and not others" in out
+    assert "--artifact" in out, "the command it prints has to name both sweeps"
 
 
 def test_review_writes_nothing(tmp_path):

@@ -11,45 +11,53 @@ Deterministic and free of provider calls, so it gates on every PR.
 
 from __future__ import annotations
 
+import json
+
 import pytest
 from fastapi.testclient import TestClient
 
 from evals.harness import queue as review_queue
 from evals.harness.ledger import load
-from webapp.review import build_session, create_app
+from webapp.review import build_session, create_app, findings_from_artifacts
+
+#: Found by every run of the sweep.
+STEADY = review_queue.Finding(
+    case="01-payments-checkout",
+    framework="stride",
+    lane="spoofing",
+    title="Session replay against the storefront",
+    description="An attacker replays a stolen cookie.",
+    element_ids=("entity:shopper",),
+    verb="replay",
+    quotes=("Shoppers sign in with email and password",),
+)
+
+#: Found by two runs of the five, which is what makes it the first question.
+SOMETIMES = review_queue.Finding(
+    case="01-payments-checkout",
+    framework="stride",
+    lane="tampering",
+    title="Order price rewritten in the database",
+    description="An attacker edits stored prices.",
+    element_ids=("store:orders-db",),
+    verb="alter",
+)
 
 
 @pytest.fixture
-def findings():
-    return [
-        review_queue.Finding(
-            case="01-payments-checkout",
-            framework="stride",
-            lane="spoofing",
-            title="Session replay against the storefront",
-            description="An attacker replays a stolen cookie.",
-            element_ids=("entity:shopper",),
-            verb="replay",
-            quotes=("Shoppers sign in with email and password",),
-        ),
-        review_queue.Finding(
-            case="01-payments-checkout",
-            framework="stride",
-            lane="tampering",
-            title="Order price rewritten in the database",
-            description="An attacker edits stored prices.",
-            element_ids=("store:orders-db",),
-            verb="alter",
-            seen_in=2,
-            runs=5,
-        ),
-    ]
+def runs():
+    """Five sweeps of one configuration, disagreeing about one finding.
+
+    The run counts are computed from this rather than declared on a finding:
+    that is the whole reason the app takes an artifact per sweep.
+    """
+    return [[STEADY, SOMETIMES], [STEADY, SOMETIMES], [STEADY], [STEADY], [STEADY]]
 
 
 @pytest.fixture
-def client(findings, tmp_path):
+def client(runs, tmp_path):
     session = build_session(
-        findings,
+        runs,
         voter="ada",
         ledger_path=tmp_path / "votes.jsonl",
         configs={"01-payments-checkout": "engine-1.2.3"},
@@ -250,3 +258,77 @@ def test_a_second_tab_cannot_double_answer_one_finding(client):
     assert stale.status_code == 200
     assert len(load(session.ledger_path)) == 2
     assert load(session.ledger_path).pool() == frozenset()
+
+
+class TestReadingSeveralSweeps:
+    """What the app is handed: one artifact per sweep, kept apart until merged."""
+
+    @staticmethod
+    def _sweep(tmp_path, name, claims, engine="engine-1.2.3"):
+        artifact = tmp_path / name
+        artifact.write_text("{}", encoding="utf-8")
+        reports = tmp_path / f"{name}.reports"
+        reports.mkdir()
+        (reports / "01-payments-checkout.report.json").write_text(
+            json.dumps({"engine_version": engine, "analyses": claims}),
+            encoding="utf-8",
+        )
+        return artifact
+
+    @staticmethod
+    def _stride(title="A finding", category="spoofing"):
+        return {
+            "framework": "stride",
+            "claims": [
+                {
+                    "id": "S-01",
+                    "category": category,
+                    "title": title,
+                    "description": "d",
+                    "affected_element_ids": ["entity:shopper"],
+                    "verb": "impersonate",
+                    "grounds": [{"kind": "quote", "text": "t"}],
+                }
+            ],
+        }
+
+    def test_each_artifact_becomes_its_own_run(self, tmp_path):
+        first = self._sweep(tmp_path, "one.json", [self._stride()])
+        second = self._sweep(
+            tmp_path, "two.json", [self._stride("Another", "tampering")]
+        )
+
+        runs, _ = findings_from_artifacts([first, second])
+
+        assert [len(run) for run in runs] == [1, 1]
+        assert [run[0].lane for run in runs] == ["spoofing", "tampering"]
+
+    def test_an_asvs_claim_takes_its_lane_from_its_own_field(self, tmp_path):
+        """A fallback to the framework name keyed every chapter alike."""
+        block = {
+            "framework": "asvs",
+            "claims": [
+                {
+                    "id": "v5.0.0-6.2.1",
+                    "chapter": "authentication",
+                    "title": "No password length policy is stated",
+                    "description": "d",
+                    "affected_element_ids": [],
+                    "grounds": [{"kind": "quote", "text": "t"}],
+                }
+            ],
+        }
+        artifact = self._sweep(tmp_path, "asvs.json", [block])
+
+        runs, _ = findings_from_artifacts([artifact])
+
+        assert runs[0][0].lane == "authentication"
+
+    def test_two_configurations_are_both_recorded_on_the_vote(self, tmp_path):
+        """A vote must not name one sweep as though it were the whole input."""
+        first = self._sweep(tmp_path, "one.json", [self._stride()], engine="engine-1")
+        second = self._sweep(tmp_path, "two.json", [self._stride()], engine="engine-2")
+
+        _, configs = findings_from_artifacts([first, second])
+
+        assert configs["01-payments-checkout"] == "engine-1, engine-2"
