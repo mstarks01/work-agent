@@ -121,10 +121,8 @@ def read_run(artifact: EvalArtifact) -> ScoredRun:
     A sweep carrying neither measured no recall to compare and is refused here
     rather than reported as a run that matched nothing — an empty overlap and an
     unscored sweep are opposite facts about the system. **Carrying only
-    ``applicability`` is enough**, and that is not a degenerate case: ASVS
-    matches by requirement ID with no model call, so a ``--no-scoring`` sweep
-    still produces a comparable ASVS half. Its stability is measurable without
-    credentials, where STRIDE's is not.
+    ``applicability`` is enough**: a sweep over ASVS-only cases produces no
+    STRIDE score block and its ASVS half still compares.
     """
     matched: dict[Scope, frozenset[str]] = {}
     references: dict[Scope, int] = {}
@@ -152,8 +150,8 @@ def read_run(artifact: EvalArtifact) -> ScoredRun:
     if not matched:
         raise ProvenanceError(
             f"{artifact.path}: no scores or applicability block, so this sweep"
-            " measured no recall to compare — re-run it without --no-scoring,"
-            " or over a case that declares a mechanically scored framework"
+            " measured no recall to compare — re-run it over a case that"
+            " declares a scored framework"
         )
     return ScoredRun(
         label=artifact.path.name,

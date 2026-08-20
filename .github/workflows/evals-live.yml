@@ -100,10 +100,6 @@ on:
         type: choice
         options: [end-to-end, analysis, extraction]
         default: end-to-end
-      calibrate:
-        description: "Also run the judge-vs-human agreement check"
-        type: boolean
-        default: false
 
 permissions: {}
 
@@ -281,18 +277,6 @@ jobs:
           EVAL_MODE: ${{ inputs.mode || 'end-to-end' }}
         run: uv run python -m evals.harness.run run --mode "$EVAL_MODE" --out eval-artifact.json
 
-      # Judge model and sampling are pinned in evals/config/judge.toml with no
-      # override, so this measures the judge the scores were produced by. It
-      # is not on the PR path-filtered trigger: it costs judge calls and its
-      # failure blocks a *judge* change, not a prompt change.
-      - name: Judge-vs-human agreement
-        # WITHOUT THE BACKSTOP: `inputs.calibrate` is the only way this runs.
-        # It used to fire unattended on the weekly schedule as well, so judge
-        # drift was measured whether or not anyone asked; now it is measured
-        # only when someone dispatches with the box ticked.
-        if: steps.preflight.outputs.configured == 'true' && inputs.calibrate
-        run: uv run python -m evals.harness.run calibrate --out judge-agreement.json
-
       # Layer 3 of the examples' honesty mechanism (#30). The offline lane
       # proves the docs show these files and that their branching runs against
       # a stub; only a live run can show that examples/orders.md still extracts
@@ -344,6 +328,5 @@ jobs:
           path: |
             eval-artifact.json
             eval-artifact.reports/
-            judge-agreement.json
           if-no-files-found: warn
           retention-days: 30

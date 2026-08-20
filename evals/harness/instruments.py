@@ -30,8 +30,8 @@ means the instrument only applies to a sweep that ran one of those packages,
 which is what lets a sweep of one framework skip another framework's scorer
 rather than fail in it.
 
-``judged`` says the reading needs the judge. The mechanical instruments render
-before the judge is built, so a sweep that cannot reach a provider still prints
+``scored`` says the reading needs the sweep's scores. The run-level instruments
+render first, so a sweep whose scoring path fails still prints
 the numbers that cost no provider call.
 """
 
@@ -100,7 +100,7 @@ class ModeRun:
     the instrument that reads it — ASVS's applicability rows arrive here, one
     per case that declares the framework. They are separate from ``payloads``
     because they are different instruments: STRIDE's scorer grades an open
-    claim set through a judge, and ASVS's is a confusion matrix over a finite
+    claim set through the identity rule, and ASVS's is a confusion matrix over a finite
     catalog with no model call anywhere (#167). Pooling them would put two
     numbers that are not comparable under one heading.
 
@@ -141,8 +141,8 @@ class ModeRun:
 class Sweep:
     """One finished sweep, as every instrument reads it.
 
-    The judged halves default to empty so the mechanical instruments can render
-    from the same value before a judge exists. ``--no-scoring`` leaves them
+    The scored halves default to empty so the run-level instruments can render
+    from the same value before scoring runs. A failed scoring pass leaves them
     empty for good, which is why every instrument's artifact keys are written
     from an empty input rather than skipped: a sweep that scored nothing and a
     sweep whose scores were all zero have to stay distinguishable.
@@ -188,8 +188,8 @@ class Instrument:
     keys: tuple[str, ...]
     #: The packages whose record this instrument reads. Empty means neutral.
     frameworks: tuple[FrameworkName, ...] = ()
-    #: Whether the reading needs the judge.
-    judged: bool = False
+    #: Whether the reading needs the sweep's scores rather than only its runs.
+    scored: bool = False
 
     def applies_to(self, ran: Sequence[FrameworkName]) -> bool:
         """Whether a sweep that ran ``ran`` has anything for this instrument."""
@@ -246,29 +246,29 @@ INSTRUMENTS: dict[str, Instrument] = {
         render=lambda sweep: scorer.render(sweep.scores),
         artifact=lambda sweep: scorer.artifact(sweep.scores),
         frameworks=("stride",),
-        judged=True,
+        scored=True,
         keys=("scores", "exemplar_delta", "unlisted_for_promotion"),
     ),
     "critic_yield": Instrument(
         render=lambda sweep: critic_yield.render(sweep.yields),
         artifact=lambda sweep: critic_yield.artifact(sweep.yields),
         frameworks=("stride",),
-        judged=True,
+        scored=True,
         keys=("critic_yield", "critic_yield_aggregate"),
     ),
 }
 
 
-def render_all(sweep: Sweep, *, judged: bool) -> None:
-    """Print one half of the table: the mechanical readings, or the judged ones.
+def render_all(sweep: Sweep, *, scored: bool) -> None:
+    """Print one half of the table: the run-level readings, or the scored ones.
 
     The split is what keeps a provider failure from costing the numbers that
-    never needed a provider. It reads ``judged`` off each entry rather than
+    never needed a provider. It reads ``scored`` off each entry rather than
     naming instruments, so a new mechanical instrument prints in the free pass
     with no edit here.
     """
     for instrument in INSTRUMENTS.values():
-        if instrument.judged == judged and instrument.applies_to(sweep.run.frameworks):
+        if instrument.scored == scored and instrument.applies_to(sweep.run.frameworks):
             instrument.render(sweep)
 
 
@@ -305,8 +305,8 @@ def artifact_blocks(sweep: Sweep) -> dict[str, Any]:
 #:
 #: ``None`` is a declaration, not a hole. It says grounds and coverage are the
 #: whole of what this package's record can be measured with mechanically —
-#: which is true of a package whose claims are graded through a judge, because
-#: a judged reading is not a per-case fold. ``test_every_package_declares_a_scorer``
+#: which is true of a package whose per-case numbers pool rather than fold,
+#: as STRIDE's do. ``test_every_package_declares_a_scorer``
 #: is what keeps it a decision.
 PACKAGE_SCORERS: dict[FrameworkName, CaseScorer | None] = {
     "stride": None,

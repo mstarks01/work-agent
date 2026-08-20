@@ -57,11 +57,15 @@ the record:
 - **`flash` / `pro` are gone.** Retired in the v3 tier cutover; `base` / `strong`
   are a capability axis.
 
-### Test and evaluation bias — partly fixed, partly open
+### Test and evaluation bias — closed by removal (2026-08-20)
 
-The eval judge is `vertex`/`gemini-2.5-pro` and its ≥90% human-agreement check
-has never run, so the measurement system's own vendor dependence is unmeasured.
-That is real and remains open — see Consequences.
+The eval judge was `vertex`/`gemini-2.5-pro` and its ≥90% agreement check
+never ran, so the measurement system's own vendor dependence was unmeasured.
+On 2026-08-20 the judge was removed instead of re-vendored: claim matching is
+the identity rule in `evals/harness/identity.py` (92.5% against the recorded
+labels, no provider call), and the standing of an unmatched finding comes from
+the human vote ledger. No vendor participates in any scored number, so the
+question this section tracked no longer has a subject.
 
 ## Decisions
 
@@ -178,18 +182,11 @@ lanes that would exercise it do not run.
 - A live lane pinned to a model the offline matrix does not profile now fails the
   offline suite, so the two cannot drift apart silently.
 - `docs/First-Run.md` no longer has a copyable configuration that cannot start.
-- **Still open, and not closed by this work**: the eval judge remains
-  `vertex`/`gemini-2.5-pro`, uncalibrated. The *harness* for selecting one on
-  measured agreement now exists — `calibrate --judge-config`, repeatable, which
-  reports per-candidate agreement with the human labels and, separately,
-  agreement between candidates. Only the numbers are missing, and they need live
-  credentials for all three families. Until they exist, no eval conclusion of the
-  form "model A beats model B" should be quoted without noting that the judge
-  shares a vendor with one of them.
-- The judge comparison **cannot run in CI as the workflows are shaped**, and
-  that follows from a security decision rather than an oversight: it needs Vertex
-  ADC and both API keys in one job, while this repository keeps `id-token: write`
-  and `secrets.STRIDE_*_API_KEY` in disjoint jobs. Splitting it into
-  per-candidate jobs that each emit an artifact, plus one that combines them, is
-  the shape that keeps the credentials disjoint. Not built here, because no lane
-  is provisioned and it could not be tested.
+- **Closed on 2026-08-20 by removal rather than measurement**: the eval judge
+  is gone. Claim matching is the identity rule, offline and vendor-free, gated
+  by `calibrate` on the same 90% bar against the same labels. Whether an
+  unmatched finding is real is answered by a human vote in
+  `evals/harness/ledger.py`, keyed by the finding's fingerprint so one vote
+  survives every future run. The caveat this list used to carry — that no
+  "model A beats model B" conclusion be quoted without noting the judge's
+  vendor — is retired with it: no vendor participates in any scored number.

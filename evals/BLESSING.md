@@ -49,7 +49,7 @@ corpus that broke that rule would grade a shape production refuses.
 `source_sha256` at the top level is the **aggregate over those refs**, computed
 exactly as a report's `InputRef` computes it — not a digest of the text.
 
-The judge fixtures live alongside, in `evals/judge_calibration/`:
+The match-label fixtures live alongside, in `evals/calibration_labels/`:
 `build_pairs.py` holds the labels, and `pairs.json` is generated from it.
 
 Run `python evals/verify_corpus.py` to check everything mechanical about the
@@ -171,10 +171,11 @@ assert different things.
 Write one entry per threat, against the corrected model's element IDs:
 `category`, `affected_element_ids`, `claim`, `tier`, `severity`, `notes`.
 
-- **`claim` is what the judge matches on.** One sentence, phrased as an attacker
-  action — *who does what to what*. Not a control recommendation, not a
-  description of a weakness. A claim written as a missing control gives the judge
-  nothing to compare.
+- **`claim` is one sentence, phrased as an attacker action** — *who does what
+  to what*. Not a control recommendation, not a description of a weakness. The
+  identity rule matches on the `verb` and the element IDs, but the claim
+  sentence is what a reviewer and a calibration label read, so a claim written
+  as a missing control leaves both with nothing to compare.
 - **Enumerate exhaustively, lane by lane.** Every case must carry at least one
   reference threat in each of the six STRIDE categories; `verify_corpus.py`
   enforces it.
@@ -183,9 +184,9 @@ Write one entry per threat, against the corrected model's element IDs:
   meaningless.
 - **Severity is `likelihood` and `impact` only** — the band is derived from the
   shipped matrix, so never write one.
-- **Keep same-element threats in different lanes distinct.** Reading a flow and
-  modifying it are two different claims; the pair teaches the judge the
-  distinction it most often gets wrong.
+- **Keep same-element threats in different lanes distinct.** Reading a flow
+  and modifying it are two different claims; the verb (`read` vs `alter`) is
+  exactly what the identity rule separates them by.
 - **`notes` is your rationale.** Never scored, always worth writing — it's what
   lets a later reviewer disagree with you specifically.
 
@@ -202,7 +203,7 @@ Write one entry per requirement you expect a ruling on: `chapter`,
 the package grades nothing.
 
 - **Name the requirement the standard's way**, `V6.2.1`. It is what the scorer
-  matches on, by string, with **no judge anywhere**. So the claim sentence is not
+  matches on, by string, with no identity composed. So the claim sentence is not
   the thing being compared here, and a paraphrase costs nothing.
 - **The set is closed, and that is what makes this different from 4a.** A run at
   the declared **ASVS Level** rules on a known list, so every requirement you
@@ -243,28 +244,29 @@ where the difference matters.
 verb outside the vocabulary. Every one of the corpus's 243 claims has one, so a
 new case that skips this step is the only way that test goes red.
 
-### 5. Label the judge-calibration pairs
+### 5. Label the calibration pairs
 
-**STRIDE only.** The judge exists because STRIDE's claim set is open and its
+**STRIDE only.** The labels exist because STRIDE's claim set is open and its
 claims are prose. ASVS matches by requirement ID, so it reaches no
-claim-equivalence judgement and contributes no pair — that is settled design
+claim-equivalence question and contributes no pair — that is settled design
 ([#167](https://github.com/mstarks01/work-agent/issues/167)), not an omission.
 
 In the same sitting, label candidate threat pairs as match / no-match in
 `build_pairs.py`. A pair that carries candidate element IDs carries a candidate
 **verb** beside them, assigned from the candidate sentence's own words — never
 by reading the reference's, which would make every pair agree by construction
-and the measurement worthless. These are what the **≥90% judge–label agreement bar** scores
-against, and they're what lets the scorer be tested with no live calls at all.
-They are not ground truth: a person has read 30 of the 339, in review sitting
-01, so the bar says the judge reproduces what an agent wrote and says almost
-nothing about whether it is right.
+and the measurement worthless. These are what the **≥90% rule–label agreement
+bar** scores against, and they're what lets the scorer be tested with no live
+calls at all. They are not ground truth: a person has read 30 of the 339, in
+review sitting 01, so the bar says the identity rule reproduces what an agent
+wrote and says almost nothing about whether it is right.
 
 - **Label within a category only** — the prefilter means cross-category pairs
-  never reach the judge.
+  are never compared.
 - **Weight toward hard negatives:** same element, same category, *different
-  attacker action*. Easy negatives measure nothing, and a judge that says "match"
-  too readily inflates recall silently — the expensive direction to be wrong.
+  attacker action*. Easy negatives measure nothing, and a rule that says
+  "match" too readily inflates recall silently — the expensive direction to be
+  wrong.
 - **Include pairs that differ only in which element they cite.** Those are
   matches: matching is decided on the claim, and element agreement is scored
   separately. This rule is why element agreement alone cannot decide claim
