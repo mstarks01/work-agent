@@ -69,6 +69,7 @@ def draft_payload(*, grounds: list[dict]) -> dict:
         "title": "A title.",
         "description": "A description.",
         "affected_element_ids": ["entity:shopper"],
+        "verb": "impersonate",
         "grounds": grounds,
         "severity": {"likelihood": "high", "impact": "high", "justification": "j"},
     }

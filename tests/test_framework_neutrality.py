@@ -95,6 +95,13 @@ DECLARED: dict[str, str] = {
         " named accessor for the scorer that grades STRIDE's open claim set;"
         " every neutral reader goes through `references[framework]`."
     ),
+    "evals/harness/fingerprint.py": (
+        "VERSION_FOR is a table keyed by framework. Self-completing — a package"
+        " missing from it raises at `version_for` on its first finding, and the"
+        " entries follow from what a package's claims are rather than from"
+        " preference: an open claim set composes an identity from an action and"
+        " a place (2), a claim carrying a catalog identifier already has one (1)."
+    ),
     "evals/harness/scorer.py": (
         "This code is STRIDE's. It reads a category and two rated severity axes,"
         " which only that package's record carries (#167)."

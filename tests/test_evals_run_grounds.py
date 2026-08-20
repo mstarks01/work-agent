@@ -95,6 +95,8 @@ def proposal(case, category, evidence: dict[str, Any], sequence: int = 1) -> dic
         "title": reference.claim,
         "description": f"{reference.claim} Scripted for the sweep test.",
         "affected_element_ids": list(reference.affected_element_ids),
+        # From the reference this stands in for; these tests grade grounds.
+        "verb": reference.verb,
         "severity": {
             "likelihood": reference.severity.likelihood,
             "impact": reference.severity.impact,
