@@ -274,7 +274,7 @@ on either of them. That is the finding this sitting exists for.
 
 - cites: `flow:catalogue-spreadsheet-to-web-api:sql-statements`, `process:web-api`
 - tier: must-find · severity: medium/high · verb: `inject`
-- recorded note: Injection through a path that carries statements rather than parameters; kept distinct from the price-change claim because the target differs, which is the distinction the judge most often collapses.
+- recorded note: Injection through a path that carries statements rather than parameters; kept distinct from the price-change claim because the target differs. `inject` against a claim about altering a price is a verb difference as well as an element one.
 
 > mark:
 

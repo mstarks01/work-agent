@@ -260,7 +260,7 @@ on either of them. That is the finding this sitting exists for.
 
 - cites: `store:cdn-bucket`, `entity:cdn`
 - tier: must-find · severity: medium/high · verb: `plant`
-- recorded note: Planting the artifact at rest, kept distinct from modifying it in transit; the pair teaches the judge a distinction it routinely collapses.
+- recorded note: Planting the artifact at rest, kept distinct from modifying it in transit: `plant` against `alter-in-transit` on one artifact, which element agreement alone would merge.
 
 > mark:
 

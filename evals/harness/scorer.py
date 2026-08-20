@@ -66,16 +66,16 @@ from stride_service.report import SeverityLevel, derive_severity_level
 
 
 def candidate_claim(threat: DraftThreat) -> str:
-    """The produced threat's claim, as the judge sees it.
+    """The produced threat's claim, as a pair carries it.
 
     The ``title``: one scannable line naming the attacker action and its
     target, which is exactly the register a ``ReferenceThreat.claim`` is
     written in. Grading the 4000-character ``description`` instead would grade
     prose no one asked the model to reproduce, and it is what the recorded
-    calibration fixtures were written against — so the judged task offline and
-    the judged task in a live run are the same task. It is defined on the
+    calibration fixtures were written against — so the matching task offline
+    and the matching task in a live run are the same task. It is defined on the
     *draft* base class for the same reason: a draft and the threat it becomes
-    are judged on the same string, or critic yield compares two numbers that
+    are matched on the same string, or critic yield compares two numbers that
     were never comparable.
     """
     return threat.title
@@ -92,7 +92,7 @@ def _is_needs_info(threat: DraftThreat) -> bool:
 
 @dataclass(frozen=True)
 class PairRuling:
-    """One judged pair, kept whole for the run artifact."""
+    """One ruled pair, kept whole for the run artifact."""
 
     reference_index: int
     threat_id: str
@@ -456,7 +456,7 @@ def _assign(
 ) -> dict[int, int]:
     """Step 3: maximum one-to-one assignment, deterministically.
 
-    Kuhn's augmenting-path algorithm over the judged adjacency. ``must-find``
+    Kuhn's augmenting-path algorithm over the ruled adjacency. ``must-find``
     references are processed first so that when the matching is not unique, the
     references the gate depends on are the ones that get satisfied — the
     matching is still maximum either way, this only settles ties.

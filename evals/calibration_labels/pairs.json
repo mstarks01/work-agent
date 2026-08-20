@@ -143,7 +143,7 @@
     "reference_verb": "alter",
     "candidate_verb": null,
     "label": "no-match",
-    "note": "Destruction rather than alteration, and the corpus does not carry it; a judge that matches this inflates recall."
+    "note": "Destruction rather than alteration, and the corpus does not carry it; a matcher that merges this inflates recall."
   },
   {
     "case": "01-payments-checkout",
@@ -642,7 +642,7 @@
     "reference_verb": "alter",
     "candidate_verb": null,
     "label": "no-match",
-    "note": "Injection through unvalidated content is a distinct action the corpus does not carry; a judge that matches it hides a real gap."
+    "note": "Injection through unvalidated content is a distinct action the corpus does not carry; a matcher that merges it hides a real gap."
   },
   {
     "case": "03-batch-data-pipeline",
@@ -740,7 +740,7 @@
     "reference_verb": "recover-credential",
     "candidate_verb": null,
     "label": "no-match",
-    "note": "The keys are not in the bucket; the candidate asserts a fact the model does not support and should be adjudicated unsupported, not matched."
+    "note": "The keys are not in the bucket; the candidate asserts a fact the model does not support and should be voted down as unsupported, not matched."
   },
   {
     "case": "03-batch-data-pipeline",
@@ -1894,7 +1894,7 @@
     "reference_verb": "unattributable",
     "candidate_verb": null,
     "label": "no-match",
-    "note": "A documentation gap is not an attacker action at all; a judge that matches this is matching on topic, not on claim."
+    "note": "A documentation gap is not an attacker action at all; a matcher that merges this is matching on topic, not on claim."
   },
   {
     "case": "03-batch-data-pipeline",
@@ -3496,7 +3496,7 @@
     "reference_verb": "unattributable",
     "candidate_verb": null,
     "label": "no-match",
-    "note": "The most valuable negative in this case: identical stated fact, different claim. One is the absence of proof of delivery, the other is disclosure to the wrong recipient, and a judge that merges them collapses two lanes."
+    "note": "The most valuable negative in this case: identical stated fact, different claim. One is the absence of proof of delivery, the other is disclosure to the wrong recipient, and a matcher that merges them collapses two lanes."
   },
   {
     "case": "09-cookbook-sokify-retail",
