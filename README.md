@@ -88,6 +88,18 @@ redirect any of them, in either layout.
 - [HTTP-API](docs/HTTP-API.md) — the `/v1` async job contract, and its bearer auth.
 - [Architecture](docs/Architecture.md) — the graph, the seams, and how a run is certified.
 
+Measuring the analysis, for contributors changing prompts, sampling or the
+corpus:
+
+- [evals/README](evals/README.md) — what the harness measures, and what every
+  number does and does not mean.
+- [evals/TUNING](evals/TUNING.md) — change one lever, measure it against the
+  run-to-run noise, ship what beats it.
+- [evals/VOTING](evals/VOTING.md) — hold a review sitting: what each answer
+  moves, and how a vote reaches the numbers.
+- [evals/BLESSING](evals/BLESSING.md) — author a golden case and its reference
+  set, per framework.
+
 
 ## Development
 
@@ -113,11 +125,13 @@ It is a convenience guard rather than a gate — CI is authoritative, and
 `git push --no-verify` skips it.
 
 Everything under `tests/` and `evals/verify_corpus.py` is credential-free and
-deterministic. The live commands need configured provider credentials:
-`python -m stride_service.smoke` runs one small job through the shipped graph to
-check that the vendor you selected actually serves it, and the eval harness
-(`python -m evals.harness.run ...`) measures analysis quality over the golden
-corpus — see [evals/TUNING.md](evals/TUNING.md).
+deterministic. So is most of the eval harness: only `run` calls a provider, and
+scoring, re-scoring, calibration and the review queue all read files. Two
+commands need configured provider credentials — `python -m stride_service.smoke`
+runs one small job through the shipped graph to check that the vendor you
+selected actually serves it, and `python -m evals.harness.run run` sweeps the
+golden corpus. See [evals/TUNING.md](evals/TUNING.md) for the loop those
+numbers feed.
 
 ## Status
 
