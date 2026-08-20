@@ -19,7 +19,7 @@ than read back on load; a stored summary that disagrees with the per-node record
 is a corrupted artifact, not a second opinion (OWASP A08).
 
 The resolved sampling is stored **once per tier**, not per execution, mirroring
-the clear block a :class:`~stride_service.report.StrideReport` already carries:
+the clear block a :class:`~stride_service.report.Report` already carries:
 a fingerprint is recomputable from a node's served build plus its tier's block,
 and repeating the block on every execution would be the same fact twelve times
 over, free to drift.

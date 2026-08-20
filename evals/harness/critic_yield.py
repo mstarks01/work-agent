@@ -12,7 +12,7 @@ kills ~20% of findings at 92-96% agreement with human triage, and unfiltered
 LLM threat enumeration runs ~86% raw false positives.
 
 **How it works.** The critic returns exactly the drafts it was given
-(:func:`~stride_service.critic.assemble_threats` enforces it), so a killed
+(:func:`~stride_service.critic.assemble_claims` enforces it), so a killed
 draft is one carrying a ``rejected`` verdict, and the two sides are a superset
 and its subset. That makes the whole instrument a matter of scoring the same
 case twice through the shipped scorer — no second metric implementation, no
