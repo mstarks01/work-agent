@@ -42,7 +42,7 @@ from dataclasses import replace
 from pathlib import Path
 from typing import Any
 
-from evals.harness import modes
+from evals.harness import ledger, modes, queue
 from evals.harness.artifact import EvalArtifact, load_artifact
 from evals.harness.artifact import build as build_artifact
 from evals.harness.calibration import (
@@ -61,6 +61,7 @@ from evals.harness.grounds import (
     GroundsFailure,
     classify_failure,
 )
+from evals.harness.identity import MechanicalFirstJudge
 from evals.harness.instruments import ModeRun, Sweep, measure_case, render_all
 from evals.harness.judge import Judge, PinnedJudge, load_judge_config
 from evals.harness.provenance import (
@@ -70,7 +71,7 @@ from evals.harness.provenance import (
     provenance_of,
 )
 from evals.harness.reference import GoldenCase, load_corpus
-from evals.harness.scorer import CaseScore
+from evals.harness.scorer import CaseScore, ratio
 from evals.harness.stability import (
     CaseStability,
     ScoredRun,
@@ -356,6 +357,22 @@ async def _run_mode(
     )
 
 
+def _flows_by_case(
+    cases: Sequence[GoldenCase],
+) -> dict[str, dict[str, tuple[str, str]]]:
+    """Each case's **Data Flow** map, which the identity rule resolves against.
+
+    Per case rather than pooled: two cases may spell one flow ID differently,
+    and a shared map would resolve one case's citation against another's graph.
+    """
+    return {
+        case.id: {
+            flow.id: (flow.source, flow.destination) for flow in case.model.data_flows
+        }
+        for case in cases
+    }
+
+
 def _score_runs(
     cases: Sequence[GoldenCase],
     runs: dict[str, modes.AnalysisRun],
@@ -467,7 +484,18 @@ def command_run(args: argparse.Namespace) -> int:
     judge: PinnedJudge | None = None
     if mode_run.runs and not args.no_scoring:
         judge = _live_judge(deployment)
-        scores, yields = _score_runs(cases, mode_run.runs, judge)
+        # The mechanical rule first, the judge on what it declines. Wrapped here
+        # rather than inside the scorer so that ``score_case`` stays a function
+        # of whatever ``Judge`` it is handed — which is what lets the offline
+        # tests drive it with a scripted stand-in and no provider at all.
+        matcher = MechanicalFirstJudge(judge, _flows_by_case(cases))
+        scores, yields = _score_runs(cases, mode_run.runs, matcher)
+        settled, delegated = matcher.settled, matcher.delegated
+        total = settled + delegated
+        print(
+            f"claim matching: {settled} of {total} pairs settled by rule"
+            f" ({ratio(settled, total):.0%}), {delegated} judged"
+        )
     sweep = replace(sweep, scores=scores, yields=yields)
     render_all(sweep, judged=True)
 
@@ -645,6 +673,44 @@ def command_promote(args: argparse.Namespace) -> int:
     for tier in sorted(manifest.tiers):
         print(f"  {tier}: {len(manifest.blessed_for(tier))} fingerprint(s)")
     print("Commit both files: a blessed set is a reviewed claim about this deployment.")
+    return 0
+
+
+def command_review(args: argparse.Namespace) -> int:
+    """What a reviewer has waiting, and what the ledger already holds.
+
+    Credential-free, like ``promote`` and ``stability``: it reads a finished
+    sweep's reports and ``evals/review/votes.jsonl`` and calls nothing. This is
+    the read-only half of the loop — ``webapp/review.py`` is where an answer is
+    recorded, because a vote wants the source text beside the finding and a
+    terminal is the wrong place to read 1,400 characters of prose.
+
+    Prints per case, never one total: a sitting is usually one case, and a
+    reviewer with fifteen minutes needs to know which one they can finish.
+    """
+    from webapp.review import build_session, findings_from_artifact
+
+    findings, _ = findings_from_artifact(Path(args.artifact))
+    session = build_session(findings, args.voter, Path(args.ledger))
+    waiting = session.remaining()
+    summary = queue.summarise(waiting, ledger.load(Path(args.ledger)))
+
+    print(f"{summary['waiting']} findings waiting for {args.voter}")
+    print(f"  {summary['volatile']} found in some runs and not others")
+    for case_id, count in summary["by_case"].items():
+        print(f"    {case_id:<34} {count}")
+    print(
+        f"\nledger: {summary['votes_recorded']} votes by"
+        f" {', '.join(summary['voters']) or 'nobody'};"
+        f" {summary['pool']} findings in the pool;"
+        f" {summary['double_voted']} answered twice"
+    )
+    if waiting:
+        print("\nrecord answers with:")
+        print(
+            f"  uv run python webapp/review.py --voter {args.voter}"
+            f" --artifact {args.artifact}"
+        )
     return 0
 
 
@@ -957,6 +1023,21 @@ def main(argv: Sequence[str] | None = None) -> int:
         help="write the files; without it the promotion is only previewed",
     )
     promote_parser.set_defaults(func=command_promote)
+
+    review_parser = subparsers.add_parser(
+        "review", help="what a reviewer has waiting over a finished sweep"
+    )
+    review_parser.add_argument("artifact", help="a sweep artifact with a .reports/ dir")
+    review_parser.add_argument(
+        "--voter",
+        required=True,
+        help="whose queue to report; a finding this person has answered is not"
+        " waiting for them, even when somebody else has not answered it",
+    )
+    review_parser.add_argument(
+        "--ledger", default=str(ledger.DEFAULT_LEDGER_PATH), help="the vote ledger"
+    )
+    review_parser.set_defaults(func=command_review)
 
     stability_parser = subparsers.add_parser(
         "stability",

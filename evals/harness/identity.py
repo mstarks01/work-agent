@@ -42,7 +42,13 @@ from __future__ import annotations
 
 from collections.abc import Iterable, Mapping
 
-from evals.harness.judge import BucketRuling, ClaimPair, ClaimRuling, UnmatchedThreat
+from evals.harness.judge import (
+    BucketRuling,
+    ClaimPair,
+    ClaimRuling,
+    Judge,
+    UnmatchedThreat,
+)
 from evals.harness.verbs import same_action
 from stride_service.system_model import SystemModel
 
@@ -220,3 +226,61 @@ class MechanicalIdentity:
             "mechanical identity compares claims and cannot bucket an unmatched"
             " threat; that call needs the judge"
         )
+
+
+class MechanicalFirstJudge:
+    """The rule where it is trustworthy, the judge everywhere else.
+
+    **The two errors are not symmetric, and that is the whole design.** Over the
+    corpus, :class:`SubsetVerbIdentity` merges 3 of 287 reference pairs it should
+    have kept apart, and splits 15 of 200 pairs the labels call one claim. So a
+    ``match`` from the rule is right about 99% of the time and a ``no-match``
+    from it is wrong about 7% of the time.
+
+    This accepts the first and refuses to act on the second: where the rule says
+    the two claims are one finding, that is the answer and no model is asked;
+    where it says they are not, the judge decides. A wrapper that accepted both
+    directions would take the rule's 15 splits straight out of recall.
+
+    **The gain is determinism before it is cost.** Every match the rule settles
+    is a match that cannot move between two runs of the same configuration, which
+    is exactly the band ``evals/harness/stability.py`` measures and every
+    comparison has to clear. The saved provider calls are real and are the lesser
+    reason.
+
+    ``adjudicate`` is delegated whole. Bucketing an unmatched threat asks whether
+    the **System Model** supports a claim nobody wrote down, and no comparison of
+    fields answers that — :class:`SubsetVerbIdentity` refuses it for that reason,
+    so there is nothing here to short-circuit.
+    """
+
+    def __init__(self, inner: Judge, flows_by_case: Mapping[str, FlowMap]) -> None:
+        self._inner = inner
+        self._rule = SubsetVerbIdentity(flows_by_case)
+        #: Pairs the rule settled, and pairs it passed on. Reported in the
+        #: artifact so a reader can see how much of a score was decided by code.
+        self.settled = 0
+        self.delegated = 0
+
+    def equivalent(self, pair: ClaimPair) -> ClaimRuling:
+        try:
+            ruling = self._rule.equivalent(pair)
+        except IdentityError:
+            # A pair the rule cannot read — a claim carrying no verb, which is
+            # every claim of a package that composes none. Not an error here:
+            # the judge is what those pairs were always going to use.
+            self.delegated += 1
+            return self._inner.equivalent(pair)
+        if ruling.match:
+            self.settled += 1
+            return ruling
+        self.delegated += 1
+        return self._inner.equivalent(pair)
+
+    def adjudicate(
+        self,
+        threat: UnmatchedThreat,
+        system_model: SystemModel,
+        sibling_claims: tuple[str, ...],
+    ) -> BucketRuling:
+        return self._inner.adjudicate(threat, system_model, sibling_claims)
