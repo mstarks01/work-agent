@@ -55,7 +55,7 @@ from stride_service.validation import parse_and_validate
 SOURCE_KINDS = frozenset(get_args(SourceKind))
 
 CORPUS_DIR = Path(__file__).resolve().parent / "corpus"
-CALIBRATION_PATH = Path(__file__).resolve().parent / "judge_calibration" / "pairs.json"
+CALIBRATION_PATH = Path(__file__).resolve().parent / "calibration_labels" / "pairs.json"
 
 # A reference set must be exhaustively enumerable by a person, which is only
 # true of small systems.
@@ -878,10 +878,10 @@ def main() -> int:
 
     if CALIBRATION_PATH.exists():
         for problem in check_calibration(*calibration_inputs()):
-            print(f"judge_calibration: {problem}")
+            print(f"calibration_labels: {problem}")
             failures += 1
     else:
-        print(f"judge_calibration: {CALIBRATION_PATH.name} not authored yet")
+        print(f"calibration_labels: {CALIBRATION_PATH.name} not authored yet")
         failures += 1
 
     print(f"{len(case_dirs())} cases checked, {failures} problems")
