@@ -16,16 +16,14 @@ sentence with the commands filled in.
 
 ## Before you start
 
-- **Credentials for your configured vendors.** The scoring runs call live
+- **Credentials for your configured vendors.** Producing a sweep calls live
   models, so you need whatever the tiers in `config/model_tiers.toml` select —
   Google Cloud application default credentials plus a project and location for
-  Vertex, or an API key for Anthropic or OpenAI. The judge in
-  `evals/config/judge.toml` has its own `(vendor, model)` pair and may need a
-  different one. See
-  [Configuration](../docs/Configuration.md#provider-environment). The offline
-  steps (`verify_corpus.py`, `pytest`) need none of this, and neither does
-  candidate-trigger recall — see
-  [the mechanically matched half](#the-mechanically-matched-half).
+  Vertex, or an API key for Anthropic or OpenAI. See
+  [Configuration](../docs/Configuration.md#provider-environment). Scoring
+  itself is offline — the matcher is a rule and the standing of the unmatched
+  comes from the vote ledger — and so are `verify_corpus.py`, `pytest` and
+  `calibrate`.
 - **Dependencies installed:** `uv sync`.
 - **A clean corpus:** `python evals/verify_corpus.py` should be green.
 
@@ -35,9 +33,9 @@ sentence with the commands filled in.
 flowchart TD
     subgraph setup["Once per tuning session"]
         direction TB
-        s1["1. Trust the judge<br/>calibrate"]
+        s1["1. Trust the rule<br/>calibrate"]
         s2["2. Establish a baseline<br/>run ×5 — the metric averages<br/>AND their spread"]
-        s1 -- "≥90% agreement,<br/>or fix the judge prompt" --> s2
+        s1 -- "≥90% agreement,<br/>or fix the rule" --> s2
     end
 
     subgraph tune["Repeat per idea"]
@@ -64,80 +62,37 @@ flowchart TD
 Do them in order. Steps 1–2 are setup you do once per tuning session; 3–5 are the
 loop you repeat per idea.
 
-## Step 1 — Trust the judge
+## Step 1 — Trust the rule
 
 **This step gates STRIDE's numbers and nothing else.** A **Framework Package**
-whose claims carry a catalog identifier is matched by string, with no model call
-anywhere — ASVS is one, so its numbers are unaffected by anything in this step
-and by anything in `evals/config/judge.toml`. If you are blocked on judge
-calibration you can still tune against
-[the mechanically matched numbers](#the-mechanically-matched-half) below.
+whose claims carry a catalog identifier is matched by string, with no rule
+composing an identity — ASVS is one, so its numbers are unaffected by anything
+in this step.
 
-STRIDE's recall and precision are measured by an LLM judge. If the judge
-disagrees with the recorded labels, every number downstream of it is noise.
-Check it first:
+STRIDE's recall and precision are measured by the identity rule
+(`evals/harness/identity.py`): endpoint subset plus one action verb. If the
+rule disagrees with the recorded labels, every number downstream of it is
+noise. Check it first — offline, no credentials:
 
 ```sh
 python -m evals.harness.run calibrate --out agreement.json
 ```
 
-This must report **≥90% agreement**. If it doesn't, the fix is the judge prompt
-(`evals/prompts/`), not a lower bar — a lenient judge inflates recall silently,
-which is the expensive way to be wrong. Don't tune anything until this passes.
+This must report **≥90% agreement**. If it doesn't, the fix is the rule or the
+verb vocabulary (`evals/harness/verbs.py`), not a lower bar — a lenient rule
+inflates recall silently, which is the expensive way to be wrong. Don't tune
+anything until this passes. The shipped rule reports 92.5% over the 200 pairs
+it can read, and the pairs it refuses are counted beside the bar.
 
 What passing means is narrower than it looks. The labels are agent-authored and
-a person has read 30 of the 339, so this measures whether the judge reproduces
-them and not whether they are right. And no judge has ever been measured against
-them — this step has never run. See the top of [README.md](README.md).
+a person has read 30 of the 339, so this measures whether the rule reproduces
+them and not whether they are right. See the top of [README.md](README.md).
 
-### Comparing candidate judges
-
-The judge is a `(vendor, model)` pair like any tier, so "is this the right
-judge?" is a measurable question rather than a historical one. Write a config
-per candidate and pass each with `--judge-config`:
-
-```sh
-python -m evals.harness.run calibrate \
-  --judge-config evals/config/judge.toml \
-  --judge-config /tmp/judge-anthropic.toml \
-  --judge-config /tmp/judge-openai.toml \
-  --out judge-comparison.json
-```
-
-Two numbers come back, and the second is the one a single agreement percentage
-cannot give you:
-
-- **agreement with the recorded labels**, per candidate — which is what selects
-  a production judge.
-- **agreement between candidates**, the labels aside. Two judges can both sit
-  at 92% and still disagree with each other on every pair they each got wrong.
-  That is exactly the case where *"model A beats model B"* turns over when the
-  judge changes vendor, and per-candidate accuracy would show none of it.
-
-Every pair the candidates ruled differently is listed whole, because the
-actionable question is *which kind of claim* they split on.
-
-The exercise fails only when **no** candidate clears the bar — one weak
-candidate is that candidate's problem, none clearing it is the measurement
-system's. Nothing is applied automatically: adopting a judge is a reviewed
-commit to `evals/config/judge.toml` with a version bump, because a judge change
-silently re-scores every historical number.
-
-A candidate must clear the same load-time gates a tier does. Greedy decoding is
-required of the judge, so an OpenAI o-series model is rejected when the config
-loads rather than hours into a sweep — it constrains `temperature` to exactly
-`1`. `uv run python -m stride_service.conformance` shows which pairs qualify.
-
-**This runs locally, not in CI, and that is a structural constraint rather than
-an omission.** A three-family comparison needs Vertex ADC *and* both API keys
-inside one job, and this repository deliberately keeps `id-token: write` and
-`secrets.STRIDE_*_API_KEY` in disjoint jobs — a job holding a long-lived
-third-party key must not also hold an identity it could exchange for cloud
-credentials (see the header of `.github/workflows/evals-live-api-key.yml`). So
-either run it from a workstation holding all three credentials, or split it into
-per-candidate jobs that each emit an artifact and a fourth that combines them.
-The second is the shape that keeps the credentials disjoint; it is not built
-here because none of the three lanes is provisioned, so it could not be tested.
+A rule change is a re-keying event, not a dependency bump: bump the fingerprint
+version, run `rekey`, and the whole vote ledger recomputes under the new rule
+with no re-vote. The retired LLM judge could not offer that, which is half of
+why it is gone; the other half is that a human vote answers the question the
+judge was guessing at.
 
 ## Step 2 — Establish a baseline (and its spread)
 
@@ -177,10 +132,11 @@ list). When tuning, watch these three:
 | --- | --- | --- |
 | **must-find recall** (per case) | goes up, or holds, on **every** case | An aggregate average hides one case collapsing. Always read per case. |
 | **near/far exemplar delta** | shrinks or holds | A change can lift average recall while widening this gap — a worse model that looks better. The far-domain cases are the honest test. |
-| **critic yield** (a pair) | kills more junk (`killed-unsupported`) without killing real findings (`killed-real`) | A kill count alone tells you nothing — read both halves together. |
+| **critic yield** (a pair) | kills more junk (`killed-rejected`) without killing real findings (`killed-real`) | A kill count alone tells you nothing — read both halves together. |
 
-All of these are *relative to the judge*. Use them to compare configurations and
-track movement; never quote them as absolute scores or against other tools.
+All of these are *relative to the rule and the ledger*. Use them to compare
+configurations and track movement; never quote them as absolute scores or
+against other tools.
 
 ### The half a person grades
 
@@ -206,8 +162,9 @@ session.
 
 ### The mechanically matched half
 
-ASVS's numbers are not judge-relative, because ASVS is not judged. Watch these,
-under `applicability` and `applicability_aggregate` in the artifact:
+ASVS's numbers rest on a catalog match rather than a composed identity.
+Watch these, under `applicability` and `applicability_aggregate` in the
+artifact:
 
 | Metric | What a good change does | Trap |
 | --- | --- | --- |
@@ -251,8 +208,8 @@ STRIDE_SAMPLING_STRONG_TEMPERATURE=0.4 \
   python -m evals.harness.run run --mode analysis --out warm-strong.json
 ```
 
-The canonical sampling experiment is three arms on the same corpus, **judged by
-the far-domain cases**:
+The canonical sampling experiment is three arms on the same corpus, **decided
+by the far-domain cases**:
 
 1. **`temperature = 0`** — the shipped default (greedy).
 2. **the model's own default** — a warmer temperature (`STRIDE_SAMPLING_*_TEMPERATURE`).
@@ -283,10 +240,11 @@ jq '.unlisted_for_promotion'      baseline-1.json   # STRIDE: grounded, plausibl
 jq '.over_applied_for_promotion'  baseline-1.json   # ASVS: ruled applicable, not expected
 ```
 
-The two are the same question and cost differently. STRIDE's needs the judge to
-tell a grounded unlisted threat from noise. ASVS's falls out of set arithmetic,
-and `off_catalog` has already taken out the entry that is a package bug rather
-than a judgement — so it is free and carries no model's opinion.
+The two are the same question, answered by different people's records.
+STRIDE's lists the findings a reviewer voted into the pool — real, just not in
+the reference set — so promotion consumes a human judgement already made.
+ASVS's falls out of set arithmetic, and `off_catalog` has already taken out
+the entry that is a package bug rather than a judgement.
 
 Recurring ones are worth adding to a case's reference set (see
 [`BLESSING.md`](BLESSING.md)). This makes the corpus a better yardstick over
@@ -429,9 +387,9 @@ Not every metric stops the world. The gating is deliberately staged:
 | **Structural validity** (report parses, references resolve, severity matches the matrix, summary matches contents) | **Yes, always** | A malformed report is never a valid result. |
 | **Certification** (every fingerprint blessed) | Only under `--require-certified` | Surfaced on every run, so a configuration that has drifted is never trusted silently. |
 | **must-find recall, near/far delta, critic yield, coverage** | No — printed and recorded | These are findings to act on, not build breakers, until enough baselines exist to know what "normal" is. |
-| **applicability recall, precision and `off_catalog`** | No — printed and recorded | Same reason, and they cost no provider call: `--no-scoring` still emits them. |
+| **applicability recall, precision and `off_catalog`** | No — printed and recorded | Same reason, and they cost no provider call. |
 | **Token usage and latency** | No — printed and recorded | Cost and wall-clock per node. What they inform is a budget decision, not a correctness one. |
-| **Stability** | No — and it is not part of a run at all | It needs two finished sweeps, so it is its own command over their artifacts. Its ASVS half survives `--no-scoring`, so a credential-free pair of sweeps still measures ASVS's run-to-run spread. |
+| **Stability** | No — and it is not part of a run at all | It needs two finished sweeps, so it is its own command over their artifacts. |
 
 The shipped default remains `temperature = 0`. Tuning the per-tier values to
 something better is exactly the loop above — run it once you have live

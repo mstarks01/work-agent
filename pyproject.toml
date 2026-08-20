@@ -104,7 +104,7 @@ warn_unused_ignores = true
 # Hand-labelled data table: one tuple per row is the editing and grep unit, and
 # 88-column wrapping turns each of its ~400 rows into six lines. Only formatting
 # is opted out here — `ruff check` still covers the file.
-exclude = ["evals/judge_calibration/build_pairs.py"]
+exclude = ["evals/calibration_labels/build_pairs.py"]
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]

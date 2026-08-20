@@ -1,39 +1,47 @@
 """Scoring produced threats against a golden case's reference set.
 
-Mechanical first, judgement only where nothing else will do:
+Mechanical everywhere; a human answers the one question code cannot:
 
 1. **Lane prefilter** (mechanical). A produced threat is only ever a candidate
    for same-category references. Not a shortcut: misfiled threats are rejected,
    never recategorized. Cuts pair count ~6x for free.
-2. **Per-pair claim equivalence** (judged). Binary, within lane, one line of
-   rationale each, individually auditable in the run artifact.
+2. **Per-pair claim equivalence** (mechanical). The identity rule from
+   :mod:`evals.harness.identity` — endpoint subset plus one action — with one
+   ruling per pair, individually auditable in the run artifact. It refuses a
+   pair it cannot read rather than guessing, so a reference claim without a
+   verb fails the sweep loudly.
 3. **One-to-one assignment** (mechanical). Deterministic maximum bipartite
    matching, so each produced threat consumes at most one reference; without it
    recall is inflatable and stops meaning anything.
-4. **Adjudication of the unmatched** (judged, three buckets). Unmatched is
-   *not* treated as a false positive: references are non-exhaustive by
-   construction, so that rule would punish finding real threats and push every
-   tuning cycle toward under-reporting. Only ``unsupported`` gates.
+4. **Standing of the unmatched** (voted). Unmatched is *not* a false positive:
+   references are non-exhaustive by construction, so that rule would punish
+   finding real threats and push every tuning cycle toward under-reporting.
+   Each unmatched threat is keyed by its fingerprint and looked up in the vote
+   ledger: a substance down-vote rejects it and gates, a vote that joins the
+   pool marks it real-but-unlisted, and a finding nobody answered is
+   ``unvoted`` — visible, non-gating, and exactly what the review queue serves.
 5. **Severity calibration** (mechanical). ``derive_severity_level`` is shipped
-   arithmetic; comparing bands needs no judge.
+   arithmetic; comparing bands needs no vote.
 
-Two things this module deliberately does *not* do. Element agreement is
-**scored, never used as a prefilter**: a correct threat may cite the data flow
-where the reference cited the process at its endpoint, and filtering on it would
-score a hit as a miss. And ``needs-info`` threats are never false positives —
-they are the designed behaviour the third exemplar per category teaches, and
-get their own bucket.
+Two things this module deliberately does *not* do. Element agreement at the
+citation level is **scored, never used as a prefilter**: the endpoint resolution
+inside the rule handles the flow-vs-process spelling, and the per-pair Jaccard
+here reports citation quality on matched pairs. And ``needs-info`` threats are
+never false positives — they are the designed behaviour the third exemplar per
+category teaches, and get their own bucket.
 
-Every number here is **judge-relative**. Valid for tracking movement and
-comparing configurations; not an absolute, and not comparable to published
-figures from other tools.
+Every number here is **rule-and-ledger-relative**. Valid for tracking movement
+and comparing configurations; not an absolute, and not comparable to published
+figures from other tools. The matching half is deterministic, so it cannot move
+between two runs of one configuration; the standing half moves only when a
+person votes.
 
 The scorer takes :class:`~stride_service.report.DraftThreat`, not
 :class:`~stride_service.report.Threat`, so the *same* function scores the
 pre-critic union and the post-critic report. Nothing is promoted to make that
 work: ``verdict`` and ``confidence`` are the critic's outputs, and synthesizing
 them to measure the critic would decide the answer by fiat. The one field a
-draft cannot supply — the ``needs-info`` adjudication bypass — is therefore
+draft cannot supply — the ``needs-info`` standing bypass — is therefore
 simply inactive before the critic has ruled, which is the honest reading of a
 set nobody has ruled on yet.
 """
@@ -43,14 +51,11 @@ from __future__ import annotations
 from collections import Counter
 from collections.abc import Iterable, Sequence
 from dataclasses import dataclass, field
-from typing import Any
+from typing import Any, Literal
 
-from evals.harness.judge import (
-    Bucket,
-    ClaimPair,
-    Judge,
-    UnmatchedThreat,
-)
+from evals.harness.fingerprint import components_for, fingerprint, version_for
+from evals.harness.identity import ClaimPair, Matcher
+from evals.harness.ledger import Ledger
 from evals.harness.reference import GoldenCase, ReferenceThreat
 from stride_service.frameworks.stride.record import (
     DraftThreat,
@@ -135,23 +140,41 @@ class MatchedPair:
         }
 
 
+#: Where an unmatched produced threat stands with the reviewers.
+#:
+#: ``rejected`` — a current vote carries a substance reason, so a person read
+#: the finding and said the analysis is wrong. The one gating standing.
+#: ``pooled`` — a current vote puts it in the pool: real, just not in the
+#: reference set yet. ``promotion_candidates`` surfaces these.
+#: ``open`` — somebody answered ``unsure`` or ``needs-evidence``; neither
+#: gates nor pools.
+#: ``unvoted`` — nobody answered. Non-gating and visible, and exactly the set
+#: the review queue serves.
+Standing = Literal["rejected", "pooled", "open", "unvoted"]
+
+
 @dataclass(frozen=True)
-class AdjudicatedThreat:
-    """An unmatched produced threat and the bucket it landed in."""
+class UnlistedThreat:
+    """An unmatched produced threat, its fingerprint, and its standing.
+
+    The fingerprint is the join key to the vote ledger and the review queue:
+    the standing recorded here is the ledger's answer at scoring time, and the
+    same key re-reads the ledger after the next sitting with no re-run.
+    """
 
     threat_id: str
     category: StrideCategory
     claim: str
-    bucket: Bucket
-    rationale: str
+    fingerprint: str
+    standing: Standing
 
     def to_json(self) -> dict[str, Any]:
         return {
             "threat_id": self.threat_id,
             "category": self.category,
             "claim": self.claim,
-            "bucket": self.bucket,
-            "rationale": self.rationale,
+            "fingerprint": self.fingerprint,
+            "standing": self.standing,
         }
 
 
@@ -194,7 +217,7 @@ class CaseScore:
     matched: tuple[MatchedPair, ...]
     missed: tuple[int, ...]
     lane_errors: tuple[LaneError, ...]
-    adjudicated: tuple[AdjudicatedThreat, ...]
+    unlisted: tuple[UnlistedThreat, ...]
     needs_info_unmatched: tuple[str, ...]
     rulings: tuple[PairRuling, ...] = field(repr=False)
     severity_confusion: dict[str, int] = field(default_factory=dict)
@@ -243,14 +266,25 @@ class CaseScore:
         )
 
     @property
-    def bucket_counts(self) -> dict[str, int]:
-        counts = Counter(entry.bucket for entry in self.adjudicated)
-        return {bucket: counts.get(bucket, 0) for bucket in _BUCKETS}
+    def standing_counts(self) -> dict[str, int]:
+        counts = Counter(entry.standing for entry in self.unlisted)
+        return {standing: counts.get(standing, 0) for standing in _STANDINGS}
 
     @property
-    def unsupported_rate(self) -> float:
-        """The one gating Tier 3 number: hallucination is what destroys trust."""
-        return ratio(self.bucket_counts["unsupported"], self.produced_count)
+    def rejected_rate(self) -> float:
+        """The one gating Tier 3 number: hallucination is what destroys trust.
+
+        Human-confirmed only: the numerator is findings a person voted down
+        for substance. An unvoted finding cannot raise it, so a sweep over a
+        cold ledger reads 0.0 — beside an ``unvoted`` count that says how much
+        of the answer is still waiting on a sitting.
+        """
+        return ratio(self.standing_counts["rejected"], self.produced_count)
+
+    @property
+    def unvoted_count(self) -> int:
+        """How much of the unlisted set no person has answered yet."""
+        return self.standing_counts["unvoted"]
 
     @property
     def severity_exact_rate(self) -> float:
@@ -272,7 +306,7 @@ class CaseScore:
                 "must_find_matched": self.must_find_matched,
                 "needs_info_unmatched": len(self.needs_info_unmatched),
                 "lane_errors": len(self.lane_errors),
-                **self.bucket_counts,
+                **self.standing_counts,
             },
             "metrics": {
                 "must_find_recall": round(self.must_find_recall, 3),
@@ -281,20 +315,20 @@ class CaseScore:
                 "lane_accuracy": round(self.lane_accuracy, 3),
                 "element_accuracy": round(self.element_accuracy, 3),
                 "element_jaccard": round(self.element_jaccard, 3),
-                "unsupported_rate": round(self.unsupported_rate, 3),
+                "rejected_rate": round(self.rejected_rate, 3),
                 "severity_exact_rate": round(self.severity_exact_rate, 3),
             },
             "severity_confusion": self.severity_confusion,
             "matched": [pair.to_json() for pair in self.matched],
             "missed": list(self.missed),
             "lane_errors": [error.to_json() for error in self.lane_errors],
-            "adjudicated": [entry.to_json() for entry in self.adjudicated],
+            "unlisted": [entry.to_json() for entry in self.unlisted],
             "needs_info_unmatched": list(self.needs_info_unmatched),
             "rulings": [ruling.to_json() for ruling in self.rulings],
         }
 
 
-_BUCKETS: tuple[Bucket, ...] = ("unsupported", "valid-unlisted", "noise")
+_STANDINGS: tuple[Standing, ...] = ("rejected", "pooled", "open", "unvoted")
 
 
 def ratio(numerator: float, denominator: float) -> float:
@@ -303,16 +337,23 @@ def ratio(numerator: float, denominator: float) -> float:
 
 
 def score_case(
-    case: GoldenCase, produced: Sequence[DraftThreat], judge: Judge
+    case: GoldenCase,
+    produced: Sequence[DraftThreat],
+    matcher: Matcher,
+    votes: Ledger,
 ) -> CaseScore:
     """Score one case's produced threats against its reference set.
 
     ``produced`` is a bare threat list rather than a report, and typed at the
     draft base class, so this one function scores both sides of the critic: the
     merged drafts going in, and the report's threats coming out.
+
+    ``votes`` decides the standing of every unmatched threat. Passing the
+    object rather than a path keeps this function pure: the caller loads the
+    ledger once, and a test hands in one it built in memory.
     """
     rulings: list[PairRuling] = []
-    in_lane = _judge_in_lane(case, produced, judge, rulings)
+    in_lane = _match_in_lane(case, produced, matcher, rulings)
     references = case.stride_claims()
     assignment = _assign(in_lane, references)
 
@@ -334,11 +375,11 @@ def score_case(
     ]
 
     lane_errors = _find_lane_errors(
-        case, produced, judge, rulings, unmatched_positions, missed
+        case, produced, matcher, rulings, unmatched_positions, missed
     )
     misfiled = {error.threat_id for error in lane_errors}
-    adjudicated, needs_info = _adjudicate(
-        case, produced, judge, unmatched_positions, misfiled
+    unlisted, needs_info = _standing_of_unmatched(
+        case, produced, votes, unmatched_positions, misfiled
     )
 
     return CaseScore(
@@ -351,23 +392,29 @@ def score_case(
         matched=matched,
         missed=missed,
         lane_errors=lane_errors,
-        adjudicated=adjudicated,
+        unlisted=unlisted,
         needs_info_unmatched=needs_info,
         rulings=tuple(rulings),
         severity_confusion=_severity_confusion(matched),
     )
 
 
-def _judge_in_lane(
+def _match_in_lane(
     case: GoldenCase,
     produced: Sequence[DraftThreat],
-    judge: Judge,
+    matcher: Matcher,
     rulings: list[PairRuling],
 ) -> dict[int, list[int]]:
-    """Step 1 and 2: same-lane pairs only, one judged verdict each.
+    """Step 1 and 2: same-lane pairs only, one ruled verdict each.
 
-    Returns reference index -> the positions in ``produced`` the judge called
+    Returns reference index -> the positions in ``produced`` the rule called
     equivalent, which is the bipartite graph step 3 assigns over.
+
+    The pair carries both verbs, because the rule's verb half is what separates
+    a read from a write against one store. A reference claim with no verb makes
+    the rule raise, which fails the sweep and names the case — the corpus
+    carries a verb on all 243 claims, so that failure means a new case arrived
+    without one.
     """
     candidates: dict[int, list[int]] = {}
     for reference_index, reference in enumerate(case.stride_claims()):
@@ -375,7 +422,7 @@ def _judge_in_lane(
         for position, threat in enumerate(produced):
             if threat.category != reference.category:
                 continue
-            ruling = judge.equivalent(
+            ruling = matcher.equivalent(
                 ClaimPair(
                     case=case.id,
                     category=reference.category,
@@ -383,6 +430,8 @@ def _judge_in_lane(
                     candidate_claim=candidate_claim(threat),
                     reference_element_ids=tuple(reference.affected_element_ids),
                     candidate_element_ids=tuple(threat.affected_element_ids),
+                    reference_verb=reference.verb,
+                    candidate_verb=threat.verb,
                 )
             )
             rulings.append(
@@ -464,16 +513,16 @@ def _matched_pair(
 def _find_lane_errors(
     case: GoldenCase,
     produced: Sequence[DraftThreat],
-    judge: Judge,
+    matcher: Matcher,
     rulings: list[PairRuling],
     unmatched_positions: Sequence[int],
     missed: Sequence[int],
 ) -> tuple[LaneError, ...]:
     """The cross-lane pass, over what is unmatched on *both* sides only.
 
-    Bounded on purpose: this is the second-largest source of judge calls in a
-    run, and a produced threat that already consumed a reference cannot also be
-    evidence of a lane error.
+    Bounded on purpose: a produced threat that already consumed a reference
+    cannot also be evidence of a lane error, and a reference that matched is
+    not missing.
     """
     errors: list[LaneError] = []
     claimed_references: set[int] = set()
@@ -484,7 +533,7 @@ def _find_lane_errors(
             already_used = reference_index in claimed_references
             if reference.category == threat.category or already_used:
                 continue
-            ruling = judge.equivalent(
+            ruling = matcher.equivalent(
                 ClaimPair(
                     case=case.id,
                     category=reference.category,
@@ -492,6 +541,8 @@ def _find_lane_errors(
                     candidate_claim=candidate_claim(threat),
                     reference_element_ids=tuple(reference.affected_element_ids),
                     candidate_element_ids=tuple(threat.affected_element_ids),
+                    reference_verb=reference.verb,
+                    candidate_verb=threat.verb,
                 )
             )
             rulings.append(
@@ -520,23 +571,31 @@ def _find_lane_errors(
     return tuple(errors)
 
 
-def _adjudicate(
+def _standing_of_unmatched(
     case: GoldenCase,
     produced: Sequence[DraftThreat],
-    judge: Judge,
+    votes: Ledger,
     unmatched_positions: Sequence[int],
     misfiled: set[str],
-) -> tuple[tuple[AdjudicatedThreat, ...], tuple[str, ...]]:
-    """Step 4: three buckets, and the ``needs-info`` set that bypasses them.
+) -> tuple[tuple[UnlistedThreat, ...], tuple[str, ...]]:
+    """Step 4: each unmatched threat's fingerprint, looked up in the ledger.
 
-    A ``needs-info`` threat is never a false positive — it is the designed
-    response to an unknown attribute — so it is counted, not judged. A threat
-    already recorded as a lane error is accounted for too, and judging it again
-    would double-count one mistake.
+    Whether the **System Model** supports a claim nobody wrote down is a
+    question about prose, and a person answers it — once per fingerprint,
+    kept forever. This function only reads the answers. A ``needs-info``
+    threat is never a false positive — it is the designed response to an
+    unknown attribute — so it is counted, not keyed. A threat already recorded
+    as a lane error is accounted for too, and keying it again would
+    double-count one mistake.
+
+    The fingerprint is computed exactly the way the review queue computes it,
+    from the same components under the same per-framework version, so a vote
+    cast from the queue lands on the finding scored here by construction.
     """
-    adjudicated: list[AdjudicatedThreat] = []
+    unlisted: list[UnlistedThreat] = []
     needs_info: list[str] = []
-    sibling_claims = tuple(candidate_claim(threat) for threat in produced)
+    flows = {flow.id: (flow.source, flow.destination) for flow in case.model.data_flows}
+    version = version_for("stride")
 
     for position in unmatched_positions:
         threat = produced[position]
@@ -545,29 +604,42 @@ def _adjudicate(
         if _is_needs_info(threat):
             needs_info.append(threat.id)
             continue
-        ruling = judge.adjudicate(
-            UnmatchedThreat(
-                threat_id=threat.id,
-                category=threat.category,
-                claim=candidate_claim(threat),
-                description=threat.description,
-                affected_element_ids=tuple(threat.affected_element_ids),
-            ),
-            case.model,
-            tuple(
-                claim for claim in sibling_claims if claim != candidate_claim(threat)
-            ),
+        components = components_for(
+            "stride",
+            threat.category,
+            tuple(threat.affected_element_ids),
+            flows,
+            verb=threat.verb,
         )
-        adjudicated.append(
-            AdjudicatedThreat(
+        value = fingerprint(components, version=version)
+        unlisted.append(
+            UnlistedThreat(
                 threat_id=threat.id,
                 category=threat.category,
                 claim=candidate_claim(threat),
-                bucket=ruling.bucket,
-                rationale=ruling.rationale,
+                fingerprint=value,
+                standing=_standing(votes, value),
             )
         )
-    return tuple(adjudicated), tuple(needs_info)
+    return tuple(unlisted), tuple(needs_info)
+
+
+def _standing(votes: Ledger, value: str) -> Standing:
+    """One fingerprint's standing, from the current votes and nothing else.
+
+    ``rejected`` wins over ``pooled`` when reviewers disagree: a standing that
+    hid a substance objection behind a second reviewer's up-vote would let the
+    gate pass on the vote most favourable to the tool. The disagreement itself
+    is the queue's business to surface for a third opinion.
+    """
+    current = [vote for (key, _), vote in votes.current().items() if key == value]
+    if any(vote.counts_against_analysis for vote in current):
+        return "rejected"
+    if any(vote.joins_the_pool for vote in current):
+        return "pooled"
+    if current:
+        return "open"
+    return "unvoted"
 
 
 def _severity_confusion(matched: Iterable[MatchedPair]) -> dict[str, int]:
@@ -617,23 +689,25 @@ def exemplar_delta(scores: Sequence[CaseScore]) -> dict[str, float]:
 
 
 def unlisted_for_promotion(scores: Sequence[CaseScore]) -> list[dict[str, Any]]:
-    """The corpus feedback loop.
+    """The corpus feedback loop: the pool feeds promotion.
 
-    Grounded threats the reference set does not carry, surfaced for review and
-    promotion at the next blessing pass. A non-exhaustive reference set
-    converges from real output; it never converges from someone trying to be
-    exhaustive up front.
+    Findings a person voted into the pool — real, just not in the reference
+    set — surfaced for the next blessing pass. A non-exhaustive reference set
+    converges from real output a reviewer confirmed; it never converges from
+    someone trying to be exhaustive up front. The fingerprint rides along so
+    the blessing pass can retire the vote's pool membership when the claim
+    becomes a reference.
     """
     return [
         {
             "case": score.case_id,
             "category": entry.category,
             "claim": entry.claim,
-            "rationale": entry.rationale,
+            "fingerprint": entry.fingerprint,
         }
         for score in scores
-        for entry in score.adjudicated
-        if entry.bucket == "valid-unlisted"
+        for entry in score.unlisted
+        if entry.standing == "pooled"
     ]
 
 
@@ -646,7 +720,8 @@ def render(scores: Sequence[CaseScore]) -> None:
             f"  recall {score.recall:.2f}"
             f"  lane {score.lane_accuracy:.2f}"
             f"  element {score.element_accuracy:.2f}"
-            f"  unsupported {score.unsupported_rate:.2f}"
+            f"  rejected {score.rejected_rate:.2f}"
+            f"  unvoted {score.unvoted_count}"
         )
     if scores:
         delta = exemplar_delta(scores)

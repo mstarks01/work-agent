@@ -302,9 +302,8 @@ def test_over_applied_requirements_are_surfaced_for_the_next_reading(case):
 def test_stability_reads_the_applicability_block_too():
     """ASVS run-to-run spread was unmeasured; #200's body said otherwise.
 
-    It also survives `--no-scoring`: ASVS matches by requirement ID with no
-    model call, so a credential-free sweep still carries a comparable half where
-    STRIDE's is absent.
+    ASVS matches by requirement ID with no model call, so a sweep of
+    ASVS-only cases still carries a comparable half where STRIDE's is absent.
     """
     from evals.harness.artifact import DECLARED_KEYS, EvalArtifact
     from evals.harness.provenance import RunProvenance
@@ -327,7 +326,7 @@ def test_stability_reads_the_applicability_block_too():
             # measured nothing writes an empty block rather than dropping one.
             **dict.fromkeys(DECLARED_KEYS),
             "models": {},
-            # Empty, as a --no-scoring sweep leaves it.
+            # Empty, as a sweep of ASVS-only cases leaves it.
             "scores": [],
             "applicability": [
                 {

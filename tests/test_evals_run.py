@@ -137,12 +137,12 @@ class TestTheArtifactCanActuallyBeWritten:
         """``tiers.tiers`` maps to pydantic ``TierSelection`` models, which
         ``json.dumps`` cannot encode and which reach the artifact whole unless
         this record dumps them."""
-        json.dumps(_models_record(deployment, None))
+        json.dumps(_models_record(deployment))
 
     def test_the_record_keeps_the_pair_it_is_read_for(self, deployment):
         """Encodable is not enough: ``promote`` reads the vendor and model back
         off a finished sweep, so dumping must not flatten them away."""
-        record = _models_record(deployment, None)
+        record = _models_record(deployment)
 
         assert (
             record["tiers"]["base"]["vendor"]

@@ -1,9 +1,9 @@
 """Critic yield, offline, with zero provider calls.
 
 The instrument has one job: say what the critic killed *and* what killing it
-cost. These tests hold the two halves apart — a critic that kills an unsupported
+cost. These tests hold the two halves apart — a critic that kills a rejected
 draft and a critic that kills a must-find draft must never produce the same
-number — and pin the two properties the whole measurement rests on: the judged
+number — and pin the two properties the whole measurement rests on: the scored
 claim is the same string on both sides, and the post-critic score is exactly
 what the scorer alone would have said.
 """
@@ -16,11 +16,12 @@ import pytest
 
 from evals.harness import critic_yield
 from evals.harness.critic_yield import aggregate_yield, score_case_with_yield
-from evals.harness.judge import MemoJudge
+from evals.harness.fingerprint import components_for, version_for
+from evals.harness.ledger import Ledger, cast
 from evals.harness.reference import load_case
 from evals.harness.scorer import score_case
 from stride_service.report import Verdict
-from tests.eval_factories import ScriptedJudge, draft_threat, promote
+from tests.eval_factories import ScriptedMatcher, draft_threat, promote
 
 CORPUS_DIR = Path(__file__).resolve().parents[1] / "evals" / "corpus"
 CONTROL_CASE = CORPUS_DIR / "01-payments-checkout"
@@ -43,10 +44,32 @@ def _draft_for(reference, sequence: int):
     )
 
 
-def _identity_judge(drafts, buckets=None):
+def _identity_matcher(drafts):
     """Matches identical claim strings, which is what the drafts carry."""
-    return ScriptedJudge(
-        ((draft.title, draft.title) for draft in drafts), buckets=buckets
+    return ScriptedMatcher((draft.title, draft.title) for draft in drafts)
+
+
+def _rejecting(case, *drafts):
+    """A ledger holding a substance down-vote on each given draft."""
+    flows = {flow.id: (flow.source, flow.destination) for flow in case.model.data_flows}
+    return Ledger(
+        [
+            cast(
+                components_for(
+                    "stride",
+                    draft.category,
+                    tuple(draft.affected_element_ids),
+                    flows,
+                    verb=draft.verb,
+                ),
+                case.id,
+                "down",
+                voter="test-reviewer",
+                reason="unsupported-by-the-model",
+                version=version_for("stride"),
+            )
+            for draft in drafts
+        ]
     )
 
 
@@ -60,21 +83,20 @@ def _expected(case):
 
 def test_scorer_takes_drafts_without_promoting_them(case):
     # The shape decision: drafts score as drafts. A draft carries no verdict,
-    # so the needs-info bypass is simply inactive and the threat is adjudicated
+    # so the needs-info bypass is simply inactive and the threat is keyed
     # like any other unmatched claim.
     drafts = [draft_threat(1, "spoofing", "An attacker forges a webhook.")]
-    judge = ScriptedJudge()
 
-    score = score_case(case, drafts, judge)
+    score = score_case(case, drafts, ScriptedMatcher(), Ledger())
 
     assert score.produced_ids == ("S-01",)
     assert score.needs_info_unmatched == ()
-    assert [entry.threat_id for entry in score.adjudicated] == ["S-01"]
+    assert [entry.threat_id for entry in score.unlisted] == ["S-01"]
 
 
 def test_needs_info_bypass_still_applies_to_ruled_threats(case):
     # And the post-critic side keeps the rule: a needs-info threat is never
-    # adjudicated as a false positive.
+    # keyed as a false positive.
     draft = draft_threat(1, "spoofing", "An attacker forges a webhook.")
     ruled = promote(
         draft,
@@ -90,41 +112,44 @@ def test_needs_info_bypass_still_applies_to_ruled_threats(case):
         ),
     )
 
-    score = score_case(case, [ruled], ScriptedJudge())
+    score = score_case(case, [ruled], ScriptedMatcher(), Ledger())
 
     assert score.needs_info_unmatched == ("S-01",)
-    assert score.adjudicated == ()
+    assert score.unlisted == ()
 
 
-def test_killing_an_unsupported_draft_is_the_critic_earning_its_cost(case):
+def test_killing_a_rejected_draft_is_the_critic_earning_its_cost(case):
     kept = _draft_for(_must_find(case), 1)
     junk = draft_threat(
         9, "tampering", "An attacker edits a table that does not exist."
     )
-    judge = _identity_judge([kept], buckets={junk.id: "unsupported"})
+    votes = _rejecting(case, junk)
 
-    scored = score_case_with_yield(case, [kept, junk], [promote(kept)], judge)
+    scored = score_case_with_yield(
+        case, [kept, junk], [promote(kept)], _identity_matcher([kept]), votes
+    )
     result = scored.critic_yield
 
     assert [entry.threat_id for entry in result.killed] == [junk.id]
-    assert result.killed[0].disposition == "unsupported"
-    assert result.unsupported_killed == 1
+    assert result.killed[0].disposition == "rejected"
+    assert result.rejected_killed == 1
     assert result.matched_killed == 0
     assert result.kill_precision == 1.0
-    assert result.unsupported_kill_rate == 1.0
+    assert result.rejected_kill_rate == 1.0
 
 
 def test_killing_a_matched_draft_is_the_number_that_can_veto_the_pattern(case):
     reference = _must_find(case)
     killed = _draft_for(reference, 1)
-    judge = _identity_judge([killed])
 
-    scored = score_case_with_yield(case, [killed], [], judge)
+    scored = score_case_with_yield(
+        case, [killed], [], _identity_matcher([killed]), Ledger()
+    )
     result = scored.critic_yield
 
     # The same kill count as the test above, and it means the opposite thing.
     assert result.kill_count == 1
-    assert result.unsupported_killed == 0
+    assert result.rejected_killed == 0
     assert result.matched_killed == 1
     assert result.must_find_killed == 1
     assert result.matched_kill_rate == 1.0
@@ -135,9 +160,10 @@ def test_killing_a_matched_draft_is_the_number_that_can_veto_the_pattern(case):
 def test_expected_tier_kills_are_separated_from_must_find(case):
     reference = _expected(case)
     killed = _draft_for(reference, 1)
-    judge = _identity_judge([killed])
 
-    result = score_case_with_yield(case, [killed], [], judge).critic_yield
+    result = score_case_with_yield(
+        case, [killed], [], _identity_matcher([killed]), Ledger()
+    ).critic_yield
 
     assert result.matched_killed == 1
     assert result.must_find_killed == 0
@@ -153,83 +179,40 @@ def test_the_post_critic_score_is_the_scorer_verbatim(case):
     threats = [promote(kept)]
 
     with_yield = score_case_with_yield(
-        case, [kept, junk], threats, _identity_judge([kept])
+        case, [kept, junk], threats, _identity_matcher([kept]), Ledger()
     ).score
-    alone = score_case(case, threats, _identity_judge([kept]))
+    alone = score_case(case, threats, _identity_matcher([kept]), Ledger())
 
     # Yield must be free of charge to every metric this harness already
     # reports: the pre-critic pass changes what is measured, never the answer.
     assert with_yield.to_json() == alone.to_json()
 
 
-def test_the_judged_claim_is_the_same_string_on_both_sides(case):
+def test_the_scored_claim_is_the_same_string_on_both_sides(case):
     reference = _must_find(case)
     draft = _draft_for(reference, 1)
-    judge = _identity_judge([draft])
+    matcher = _identity_matcher([draft])
 
-    score_case_with_yield(case, [draft], [promote(draft)], judge)
+    score_case_with_yield(case, [draft], [promote(draft)], matcher, Ledger())
 
-    asked = {pair.candidate_claim for pair in judge.claim_calls}
+    asked = {pair.candidate_claim for pair in matcher.claim_calls}
     assert asked == {reference.claim}
 
 
-def test_the_memo_spends_nothing_re_judging_the_surviving_subset(case):
-    reference = _must_find(case)
-    draft = _draft_for(reference, 1)
-    judge = _identity_judge([draft])
-
-    score_case_with_yield(case, [draft], [promote(draft)], judge)
-    both_sides = len(judge.claim_calls)
-
-    fresh = _identity_judge([draft])
-    score_case(case, [draft], fresh)
-
-    # Scoring twice costs what scoring the superset once cost.
-    assert both_sides == len(fresh.claim_calls)
-
-
 def test_a_critic_edit_to_the_title_is_a_real_second_question(case):
-    # The memo keys on the claim pair, not the threat ID, so a critic that
-    # rewrites a title is judged on the rewrite rather than silently credited
-    # with the draft's ruling.
+    # The pair carries the claim string, so a critic that rewrites a title is
+    # ruled on the rewrite rather than silently credited with the draft's
+    # ruling.
     reference = _must_find(case)
     draft = _draft_for(reference, 1)
     reworded = promote(draft.model_copy(update={"title": "Reworded by the critic."}))
-    judge = _identity_judge([draft])
+    matcher = _identity_matcher([draft])
 
-    score_case_with_yield(case, [draft], [reworded], judge)
+    score_case_with_yield(case, [draft], [reworded], matcher, Ledger())
 
     assert "Reworded by the critic." in {
-        pair.candidate_claim for pair in judge.claim_calls
+        pair.candidate_claim for pair in matcher.claim_calls
     }
-
-
-def test_memo_replays_one_answer_for_one_question():
-    calls: list[str] = []
-
-    class CountingJudge(ScriptedJudge):
-        def equivalent(self, pair):
-            calls.append(pair.candidate_claim)
-            return super().equivalent(pair)
-
-    from evals.harness.judge import ClaimPair
-
-    memo = MemoJudge(CountingJudge())
-    pair = ClaimPair(
-        case="01-payments-checkout",
-        category="spoofing",
-        reference_claim="a",
-        candidate_claim="b",
-        reference_element_ids=("process:storefront-api",),
-        candidate_element_ids=("process:storefront-api",),
-    )
-
-    first = memo.equivalent(pair)
-    second = memo.equivalent(pair)
-
-    assert first is second
-    assert calls == ["b"]
-    assert memo.hits == 1
 
 
 def test_aggregate_pools_counts_rather_than_averaging_rates(case):
@@ -243,10 +226,11 @@ def test_aggregate_pools_counts_rather_than_averaging_rates(case):
         case,
         [kept, junk],
         [promote(kept)],
-        _identity_judge([kept], buckets={junk.id: "unsupported"}),
+        _identity_matcher([kept]),
+        _rejecting(case, junk),
     ).critic_yield
     small = score_case_with_yield(
-        case, [kept], [promote(kept)], _identity_judge([kept])
+        case, [kept], [promote(kept)], _identity_matcher([kept]), Ledger()
     )
 
     totals = aggregate_yield([big, small.critic_yield])
@@ -254,7 +238,7 @@ def test_aggregate_pools_counts_rather_than_averaging_rates(case):
     assert totals["cases"] == 2
     assert totals["drafts_in"] == 3
     assert totals["killed"] == 1
-    assert totals["unsupported_killed"] == 1
+    assert totals["rejected_killed"] == 1
     # Pooled: 1 kill in 3 drafts, not the mean of 50% and 0%.
     assert totals["kill_rate"] == round(1 / 3, 3)
 
@@ -273,15 +257,15 @@ def test_the_cli_reports_both_sides_per_case_and_pooled(case, capsys):
         report=_report_with(case, [promote(kept)]),
         drafts={"stride": (kept, junk)},
     )
-    judge = _identity_judge([kept], buckets={junk.id: "unsupported"})
-
-    scores, yields = run._score_runs([case], {case.id: analysis}, judge)
+    scores, yields = run._score_runs(
+        [case], {case.id: analysis}, _identity_matcher([kept]), _rejecting(case, junk)
+    )
     critic_yield.render(yields)
 
     assert [score.case_id for score in scores] == [case.id]
-    assert yields[0].unsupported_killed == 1
+    assert yields[0].rejected_killed == 1
     printed = capsys.readouterr().out
-    assert "killed-unsupported 1/1" in printed
+    assert "killed-rejected 1/1" in printed
     assert "killed-real 0/1" in printed
 
 
@@ -330,12 +314,13 @@ def _report_with(case, threats):
 
 def test_an_untouched_critic_yields_nothing_and_breaks_nothing(case):
     draft = _draft_for(_must_find(case), 1)
-    judge = _identity_judge([draft])
 
-    result = score_case_with_yield(case, [draft], [promote(draft)], judge).critic_yield
+    result = score_case_with_yield(
+        case, [draft], [promote(draft)], _identity_matcher([draft]), Ledger()
+    ).critic_yield
 
     assert result.killed == ()
     assert result.kill_rate == 0.0
-    assert result.unsupported_kill_rate == 0.0
+    assert result.rejected_kill_rate == 0.0
     assert result.matched_kill_rate == 0.0
     assert result.to_json()["counts"]["drafts_in"] == 1

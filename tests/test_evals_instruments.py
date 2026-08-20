@@ -37,6 +37,7 @@ from evals.harness.instruments import (
     artifact_blocks,
     render_all,
 )
+from evals.harness.ledger import Ledger
 from evals.harness.provenance import RunProvenance
 from evals.harness.reference import load_case
 from stride_service.frameworks import PACKAGES
@@ -114,8 +115,8 @@ class TestOneFrameworkRunsAlone:
     def test_a_lone_package_renders_without_raising(self, framework, capsys):
         """Both halves of the table print, over a sweep that measured nothing."""
         sweep = Sweep(run=empty_run((framework,)))
-        render_all(sweep, judged=False)
-        render_all(sweep, judged=True)
+        render_all(sweep, scored=False)
+        render_all(sweep, scored=True)
         capsys.readouterr()
 
     @pytest.mark.parametrize("framework", sorted(PACKAGES))
@@ -174,19 +175,19 @@ class TestTheTableCoversTheArtifact:
         }
 
 
-class TestTheJudgedSplit:
+class TestTheScoredSplit:
     """The mechanical readings do not depend on a provider being reachable."""
 
-    def test_the_free_instruments_render_before_the_judge(self, capsys):
-        """A sweep that never built a judge still prints the mechanical half."""
+    def test_the_run_level_instruments_render_before_scoring(self, capsys):
+        """A sweep whose scoring pass failed still prints the run-level half."""
         sweep = Sweep(run=empty_run(tuple(PACKAGES)))
-        render_all(sweep, judged=False)
+        render_all(sweep, scored=False)
         printed = capsys.readouterr().out
         assert "coverage:" in printed
 
-    def test_the_judged_instruments_are_the_ones_that_need_a_judge(self):
-        """Only the two scorers that ask a model are on the judged side."""
-        judged = {name for name, i in INSTRUMENTS.items() if i.judged}
+    def test_the_scored_instruments_are_the_ones_that_read_scores(self):
+        """Only the two per-package scorers are on the scored side."""
+        judged = {name for name, i in INSTRUMENTS.items() if i.scored}
         assert judged == {"scores", "critic_yield"}
 
 
@@ -205,7 +206,9 @@ class TestScoringSkipsAPackageItDoesNotRead:
         assert optional_block(report, "stride") is None
 
         run = _AnalysisRunStub(report)
-        scores, yields = _score_runs([_CaseStub()], {"case": run}, _NeverAskedJudge())
+        scores, yields = _score_runs(
+            [_CaseStub()], {"case": run}, _NeverAskedMatcher(), Ledger()
+        )
         assert scores == ()
         assert yields == ()
 
@@ -225,11 +228,11 @@ class _AnalysisRunStub:
         self.drafts = drafts or {}
 
 
-class _NeverAskedJudge:
-    """A judge that fails the test if the skipped path ever consults it."""
+class _NeverAskedMatcher:
+    """A matcher that fails the test if the skipped path ever consults it."""
 
-    def rule(self, *args, **kwargs):
-        raise AssertionError("the judge was asked about a framework it does not grade")
+    def equivalent(self, *args, **kwargs):
+        raise AssertionError("the matcher was asked about a framework it cannot read")
 
 
 class TestTheDeclaredKeysAreTheWrittenKeys:
