@@ -85,7 +85,7 @@
       "likelihood": "medium",
       "impact": "high"
     },
-    "notes": "Injection through a path that carries statements rather than parameters; kept distinct from the price-change claim because the target differs, which is the distinction the judge most often collapses.",
+    "notes": "Injection through a path that carries statements rather than parameters; kept distinct from the price-change claim because the target differs. `inject` against a claim about altering a price is a verb difference as well as an element one.",
     "verb": "inject"
   },
   {

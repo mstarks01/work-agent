@@ -124,9 +124,9 @@ DECLARED: dict[str, str] = {
     ),
     "evals/harness/run.py": (
         "`stride_block` is a named accessor over the neutral `framework_block`."
-        " The judged scoring pass is that package's, because a judge grading an"
-        " open claim set is not a per-case fold; it names the block it grades so"
-        " a sweep of another package skips it rather than fails in it. The"
+        " The scoring pass is that package's, because grading an open claim set"
+        " is not a per-case fold; it names the block it grades so a sweep of"
+        " another package skips it rather than fails in it. The"
         " per-case mechanical dispatch that used to branch here is now"
         " `PACKAGE_SCORERS`, a table keyed by framework."
     ),
@@ -143,9 +143,9 @@ DECLARED: dict[str, str] = {
     ),
     "evals/verify_corpus.py": (
         "Five tables keyed by framework (record fields, record checks, lane"
-        " accessor, ASVS-only chapter check, judge-fixture input). All"
-        " self-completing except the last, which is STRIDE's because the judge"
-        " is (#167)."
+        " accessor, ASVS-only chapter check, calibration-fixture input). All"
+        " self-completing except the last, which is STRIDE's because a composed"
+        " claim identity is (#167)."
     ),
 }
 
@@ -287,7 +287,7 @@ def test_every_package_declares_a_scorer():
 
     ``None`` is a legitimate answer — it declares that the framework-neutral
     instruments are the whole of the mechanical reading, which is true of a
-    package whose claims are graded through a judge. A *missing* key is not an
+    package whose per-case numbers pool rather than fold. A *missing* key is not an
     answer, and it is what an ``if`` naming one package left behind for every
     package written after it.
     """

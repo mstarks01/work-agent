@@ -19,7 +19,7 @@ the moment a second package arrived, and silent either way.
 ## Why these run offline
 
 Nothing here needs a provider. The instruments are folds over records, so a
-report built by hand exercises the same path a sweep does, and the judge is
+report built by hand exercises the same path a sweep does, and the matcher is
 scripted. That is the point of the seam: the reading is separable from the run
 that produced it.
 """
@@ -187,8 +187,8 @@ class TestTheScoredSplit:
 
     def test_the_scored_instruments_are_the_ones_that_read_scores(self):
         """Only the two per-package scorers are on the scored side."""
-        judged = {name for name, i in INSTRUMENTS.items() if i.scored}
-        assert judged == {"scores", "critic_yield"}
+        scored = {name for name, i in INSTRUMENTS.items() if i.scored}
+        assert scored == {"scores", "critic_yield"}
 
 
 class TestScoringSkipsAPackageItDoesNotRead:

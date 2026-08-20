@@ -49,7 +49,7 @@ def write_run(tmp_path, name, record, scores, **overrides) -> Path:
         "trusted": True,
         "structural_failures": [],
         "provenance": record.to_json(),
-        "models": {"judge": "openai/gpt-4.1", "tiers_config_version": "3"},
+        "models": {"tiers": {"strong": "openai/gpt-4.1"}, "tiers_config_version": "3"},
         "scores": scores,
         "applicability": [],
     } | overrides
@@ -132,8 +132,12 @@ def test_a_case_only_one_run_scored_is_excluded_and_named(tmp_path, sampling):  
     assert any("02-iot-fleet" in warning for warning in comparability_warnings(runs))
 
 
-def test_a_changed_judge_is_warned_about_rather_than_refused(tmp_path, sampling):  # noqa: F811
-    """Comparing two judges is sometimes the question; it must be a chosen one."""
+def test_a_changed_model_is_warned_about_rather_than_refused(tmp_path, sampling):  # noqa: F811
+    """Comparing two configurations is often the question; it must be a chosen one.
+
+    Every field of the ``models`` record is compared, not a named list of them,
+    so a record that gains or loses a field keeps being compared without this
+    function changing. That is what let the judge field leave it silently."""
     record = provenance(sampling)
     scores = [score("01-payments-checkout", 2, [0])]
     runs = load_runs(
@@ -145,7 +149,7 @@ def test_a_changed_judge_is_warned_about_rather_than_refused(tmp_path, sampling)
                 record,
                 scores,
                 models={
-                    "judge": "vertex_ai/gemini-2.5-pro",
+                    "tiers": {"strong": "vertex_ai/gemini-2.5-pro"},
                     "tiers_config_version": "3",
                 },
             ),
@@ -154,7 +158,7 @@ def test_a_changed_judge_is_warned_about_rather_than_refused(tmp_path, sampling)
 
     warnings = comparability_warnings(runs)
 
-    assert any("judge" in warning for warning in warnings)
+    assert any("tiers" in warning for warning in warnings)
     assert compare_runs(runs)  # still compared
 
 

@@ -381,7 +381,7 @@ def _models_record(deployment: Deployment) -> dict[str, Any]:
     """What this run asked its providers for.
 
     The tier strings are stable GA identifiers, not immutable builds; the
-    served builds are recorded per node in the provenance block. No judge
+    served builds are recorded per node in the provenance block. No scorer
     appears here: claim matching is the identity rule, which is code in this
     repository and is versioned by the fingerprint version in every key it
     produces.

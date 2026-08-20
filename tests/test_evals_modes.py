@@ -409,7 +409,7 @@ def test_an_invented_control_is_caught_where_the_blessed_model_says_unknown(case
 
 
 def test_rewording_a_stated_control_is_not_a_disagreement(case):
-    """The state is scored, never the wording — which is what keeps the judge out."""
+    """The state is scored, never the wording — which is what keeps interpretation out."""
     reworded = edited(
         case.model,
         "data_stores",

@@ -83,7 +83,7 @@ class ReferenceSeverity(BaseModel):
     """The recorded severity for a reference threat: the two rated axes only.
 
     The band is derived by the shipped matrix exactly as production derives
-    it, so severity calibration compares like with like and needs no judge.
+    it, so severity calibration compares like with like and is pure arithmetic.
     """
 
     model_config = ConfigDict(extra="forbid", frozen=True)

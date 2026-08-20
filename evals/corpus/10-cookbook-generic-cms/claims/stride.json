@@ -70,7 +70,7 @@
       "likelihood": "medium",
       "impact": "high"
     },
-    "notes": "Planting the artifact at rest, kept distinct from modifying it in transit; the pair teaches the judge a distinction it routinely collapses.",
+    "notes": "Planting the artifact at rest, kept distinct from modifying it in transit: `plant` against `alter-in-transit` on one artifact, which element agreement alone would merge.",
     "verb": "plant"
   },
   {

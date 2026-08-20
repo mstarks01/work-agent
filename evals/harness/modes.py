@@ -137,10 +137,10 @@ def _tags(value: list[str]) -> str:
 #:
 #: **Two kinds of attribute, and nothing else.** A closed vocabulary — ``kind``,
 #: ``exposure``, the asset tags — is set arithmetic against the blessed model,
-#: exact and judge-free. A free-text control is not, but
+#: exact and needs no interpretation. A free-text control is not, but
 #: :func:`~stride_service.analysis.control_state` reduces it to ``unverified`` /
 #: ``absent`` / ``stated`` by its leading token, and *that* is comparable. So
-#: this measures the state rather than the wording, which keeps the judge out
+#: this measures the state rather than the wording, which keeps interpretation out
 #: and still catches the corpus's most repeated extraction failure: a control
 #: invented where the blessed model says ``unknown``.
 #:
@@ -206,7 +206,7 @@ class ExtractionScore:
     """Agreement between an extraction and the blessed model.
 
     Purely mechanical — element IDs are typed slugs, so set arithmetic answers
-    this without a judge. Element *naming* drift shows up as a miss plus a
+    this mechanically. Element *naming* drift shows up as a miss plus a
     spurious element, which is the honest reading: a threat filed against
     ``process:auth-svc`` does not resolve for a reader holding
     ``process:auth-service``.

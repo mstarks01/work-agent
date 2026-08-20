@@ -339,7 +339,7 @@ def test_the_rule_clears_the_bar(assigned, flows_by_case):
     """``SubsetVerbIdentity`` through the shared scoreboard.
 
     One scoreboard, two answers to one question — which is what building the
-    rule to the ``Judge`` protocol was for. The number is judge-relative in the
+    rule to the ``Matcher`` protocol was for. The number is rule-relative in the
     same way every other agreement figure here is: the labels are
     agent-authored, so this measures reproduction rather than correctness.
     """

@@ -143,7 +143,7 @@ output is usually a check that should read every package's output.
 **"It applies to some, by design."** State the design reason and cite where it
 was settled. Real example: claim-identity deduplication
 ([#201](https://github.com/mstarks01/work-agent/issues/201)) is STRIDE's alone,
-because ASVS matches by requirement ID with no judge — one requirement sits in
+because ASVS matches by requirement ID with no composed identity — one requirement sits in
 one chapter, which is one **Lane**, which is one **Lane Agent**, so two ASVS
 claims about one requirement cannot arise.
 [#167](https://github.com/mstarks01/work-agent/issues/167) settled that.

@@ -54,7 +54,7 @@ UNREVIEWED: dict[str, str] = {
     "04-ml-inference-service": (
         "18 STRIDE claims and 10 ASVS records. One STRIDE claim asserted the "
         "model emits training data in a case with no training pipeline; review "
-        "sitting 01 found it through a judge-calibration pair rather than by "
+        "sitting 01 found it through a calibration pair rather than by "
         "reading the case, so the rest of both sets is still unread."
     ),
     "05-cookbook-queue-webapp": (

@@ -1,5 +1,5 @@
 # Resilience configuration (wayfinder ticket 038) — operational bounds for the
-# service, read by the production graph, the eval harness, and the eval judge
+# service, read by the production graph and the eval harness
 # alike. Three knobs bound each LLM call, two bound a job's input, one bounds a
 # job's duration, and one bounds how many jobs a single caller may run at once.
 #

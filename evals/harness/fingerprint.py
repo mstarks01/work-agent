@@ -1,4 +1,4 @@
-"""A **Claim**'s identity as a value code computes, so two runs agree without a judge.
+"""A **Claim**'s identity as a value code computes, so two runs agree with no model call.
 
 A vote is worth collecting once. It is only worth collecting once if the thing
 voted on can be recognised again in a later run, whose wording moves and whose
@@ -9,8 +9,9 @@ over the fields a claim carries, never over its prose.
 improving the recogniser changes every key. That would be fatal if a vote stored
 only the hash — so a vote stores its :class:`Components`, and re-keying the whole
 ledger under a new version is a pure recompute over stored fields, offline, with
-no provider and no re-vote. The rule this repository already applies to a judge
-change ("a new judge silently re-scores history") is answered here by making the
+no provider and no re-vote. The problem a model-scored history has — a new
+scorer silently re-scores everything, with no way to recompute the old numbers —
+is answered here by making the
 re-score explicit, total and free.
 
 **Version 1 reads what a claim carries today.** Framework, lane and the

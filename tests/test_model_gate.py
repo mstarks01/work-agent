@@ -66,7 +66,7 @@ class TestValueConstraintsAreCaught:
 
     def test_o_series_rejects_greedy_decoding(self):
         # Both tiers pin temperature = 0.0, so this is how "o-series cannot
-        # judge" fails closed rather than surprising a sweep.
+        # judge" failed closed rather than surprising a sweep, back when one ran.
         with pytest.raises(ModelGateError):
             gate("openai", "o3", temperature=0.0)
 
