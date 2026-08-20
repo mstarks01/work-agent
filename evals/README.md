@@ -290,6 +290,18 @@ uv run python webapp/review.py --voter <your-name> --artifact artifact.json
 web app is where an answer is recorded, because a vote wants the source text
 beside the finding.
 
+When the identity rule changes, the ledger moves with it and costs no re-vote:
+
+```sh
+python -m evals.harness.run rekey --to-version 2        # preview, writes nothing
+python -m evals.harness.run rekey --to-version 2 --yes  # rewrite
+```
+
+A vote stores the fields its fingerprint was computed from, so re-keying is
+arithmetic over one file — no provider, no credentials, and every verdict, voter
+and date survives. That is the difference between this and a judge-scored
+history, which a judge change re-scores with no way to recompute it.
+
 The reviewer answers one question per finding — **could this attack happen in
 this system?** — as up, down, unsure, or needs-more-evidence. A down-vote picks
 one reason from a closed set, and the reason decides which number moves:

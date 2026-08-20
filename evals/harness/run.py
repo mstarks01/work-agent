@@ -42,7 +42,7 @@ from dataclasses import replace
 from pathlib import Path
 from typing import Any
 
-from evals.harness import ledger, modes, queue
+from evals.harness import fingerprint, ledger, modes, queue
 from evals.harness.artifact import EvalArtifact, load_artifact
 from evals.harness.artifact import build as build_artifact
 from evals.harness.calibration import (
@@ -55,6 +55,7 @@ from evals.harness.calibration import (
 from evals.harness.certify import PromotionPlan, plan_promotion, promote
 from evals.harness.coverage import TaggedRow
 from evals.harness.critic_yield import CriticYield, score_case_with_yield
+from evals.harness.fingerprint import FingerprintError
 from evals.harness.grounds import (
     CAUGHT,
     CaseGrounds,
@@ -714,6 +715,52 @@ def command_review(args: argparse.Namespace) -> int:
     return 0
 
 
+def command_rekey(args: argparse.Namespace) -> int:
+    """Recompute every vote's fingerprint under a new rule, in place.
+
+    The operation the whole versioning argument rests on: a better recogniser
+    changes every key, and a vote stores its **components** rather than its
+    hash, so moving the ledger is arithmetic over a file. No provider, no
+    credentials, no re-vote. That is what a judge change cannot offer — a new
+    judge silently re-scores history and there is no way to recompute it.
+
+    Refuses to write anything unless ``--yes`` is given, like ``promote``: this
+    rewrites the only human record in the repository, and a preview that also
+    edited would be a preview nobody could trust. The old file is replaced by an
+    atomic rename, so an interrupted re-key leaves it whole rather than half of
+    a new one.
+    """
+    path = Path(args.ledger)
+    current = ledger.load(path)
+    if not current:
+        print(f"{path}: no votes to re-key")
+        return 0
+
+    try:
+        moved = ledger.rekey(current.votes, version=args.to_version)
+    except FingerprintError as exc:
+        print(f"cannot re-key: {exc}")
+        return 1
+
+    changed = sum(
+        1
+        for before, after in zip(current.votes, moved, strict=True)
+        if before.fingerprint != after.fingerprint
+    )
+    was = sorted({fingerprint.version_of(v.fingerprint) for v in current.votes})
+    print(f"{len(moved)} votes at version {was} -> {args.to_version}")
+    print(f"{changed} fingerprints move, {len(moved) - changed} unchanged")
+    print(f"{len(current.pool())} findings in the pool, before and after")
+
+    if not args.yes:
+        print("\npreview only; nothing written. Re-run with --yes to apply.")
+        return 0
+
+    ledger.write_all(moved, path)
+    print(f"\n{path} rewritten")
+    return 0
+
+
 def command_stability(args: argparse.Namespace) -> int:
     """Compare two or more finished sweeps for run-to-run stability.
 
@@ -1023,6 +1070,24 @@ def main(argv: Sequence[str] | None = None) -> int:
         help="write the files; without it the promotion is only previewed",
     )
     promote_parser.set_defaults(func=command_promote)
+
+    rekey_parser = subparsers.add_parser(
+        "rekey", help="recompute every vote's fingerprint under another rule"
+    )
+    rekey_parser.add_argument(
+        "--to-version",
+        type=int,
+        required=True,
+        help="the fingerprint version to move to; see VERSION_FOR for which"
+        " rule each framework is keyed under",
+    )
+    rekey_parser.add_argument(
+        "--ledger", default=str(ledger.DEFAULT_LEDGER_PATH), help="the vote ledger"
+    )
+    rekey_parser.add_argument(
+        "--yes", action="store_true", help="write; without it this is a preview"
+    )
+    rekey_parser.set_defaults(func=command_rekey)
 
     review_parser = subparsers.add_parser(
         "review", help="what a reviewer has waiting over a finished sweep"
