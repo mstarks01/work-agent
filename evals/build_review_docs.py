@@ -323,8 +323,9 @@ per part, and how many of your own items are missing from either set.
 ```
 
 If this case is named in `UNREVIEWED` in `tests/test_case_review.py`, delete
-its line — the debt list is only honest if it shrinks when the debt is paid. A
-case not named there is new, and merges with this block from the start.
+its line. That list names the cases nobody has read, so it is only accurate
+while a reviewed case comes off it. A case not named there is new, and merges
+with this block from the start.
 
 `tests/test_case_review.py` checks that `read` covers every framework the case
 declares, so every claims file above is required.
