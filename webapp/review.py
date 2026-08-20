@@ -67,7 +67,7 @@ if str(REPO_ROOT) not in sys.path:
 
 from evals import verify_corpus
 from evals.harness import queue as review_queue
-from evals.harness.fingerprint import lane_field
+from evals.harness.fingerprint import identifier_of, lane_field
 from evals.harness.ledger import (
     DEFAULT_LEDGER_PATH,
     REASON_GLOSS,
@@ -575,6 +575,9 @@ def findings_from_artifact(path: Path) -> tuple[list[review_queue.Finding], dict
                         # ``None`` for a package that composes none, which is
                         # what its fingerprint version expects.
                         verb=claim.get("verb"),
+                        identifier=identifier_of(
+                            block["framework"], claim.get("id", "")
+                        ),
                         quotes=tuple(
                             ground["text"]
                             for ground in claim.get("grounds", [])

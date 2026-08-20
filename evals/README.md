@@ -104,7 +104,7 @@ evals/
 | `harness/provenance.py` | What each node execution actually ran on — tier, requested route, served build, fingerprint — written into the artifact and read back by a promotion. |
 | `harness/certify.py` | Promoting a winning configuration: rewrites `config/sampling.toml` and records its fingerprints as blessed. The certification check itself lives in the service (`stride_service.certification`), which this imports. |
 | `harness/modes.py` | The three run modes over the shipped graph, and the extraction score: element agreement, the derived crossings, and the attributes a Candidate rule reads. |
-| `harness/run.py` | The command-line entry point. |
+| `harness/run.py` | The command-line entry point. `score` re-reads the ledger over a finished sweep's saved reports, so a vote reaches the numbers without a second sweep. |
 
 Sampling parameters are **not** here: the harness reads `config/sampling.toml`
 at the repo root, the exact same file production reads. Grading a configuration
@@ -147,19 +147,27 @@ python -m evals.harness.run run --mode extraction --case 01-payments-checkout
 ```
 
 Scoring itself is offline: matching is the identity rule, and the standing of
-each unmatched finding comes from the vote ledger. `calibrate` is offline too —
-it prices the rule against the recorded labels and gates a rule change on the
-90% bar:
+each unmatched finding comes from the vote ledger. So a finished sweep can be
+scored again, against the ledger as it stands now, with no provider call:
+
+```sh
+python -m evals.harness.run score artifact.json
+```
+
+`calibrate` is offline too — it prices the rule against the recorded labels and
+gates a rule change on the 90% bar:
 
 ```sh
 python -m evals.harness.run calibrate --out agreement.json
 ```
 
-A `run --out artifact.json` also writes `artifact.reports/<case>.report.json` —
-one whole report for each case that finished. The artifact holds the aggregates
-this harness computes; the report holds what the agents said, so a question the
-metric set did not anticipate is answered offline instead of costing a second
-sweep. `extraction` mode stops at the validity gate, produces no report, and
+A `run --out artifact.json` also writes `artifact.reports/<case>.report.json`
+and `artifact.reports/<case>.drafts.json` — one whole report for each case that
+finished, and the drafts its critic was handed. The artifact holds the
+aggregates this harness computes; the pair holds what the agents said, so a
+question the metric set did not anticipate is answered offline instead of
+costing a second sweep, and `score` can recompute every scored reading from
+them. `extraction` mode stops at the validity gate, produces no report, and
 says so. Expect roughly 30–80 KB per report. These files are publishable: they
 carry corpus source text, which is in this repository.
 

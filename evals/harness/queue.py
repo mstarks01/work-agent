@@ -58,6 +58,9 @@ class Finding:
     element_ids: tuple[str, ...]
     quotes: tuple[str, ...] = ()
     verb: str | None = None
+    #: The catalog requirement this claim names, for a package whose claims
+    #: carry one. ``None`` where the package composes its identity instead.
+    identifier: str | None = None
     #: How many runs of the sweep produced this finding, out of how many ran.
     seen_in: int = 1
     runs: int = 1
@@ -95,6 +98,7 @@ class QueueItem:
             "element_ids": list(self.finding.element_ids),
             "quotes": list(self.finding.quotes),
             "verb": self.finding.verb,
+            "identifier": self.finding.identifier,
             "verb_gloss": GLOSS.get(self.finding.verb or "", ""),
             "verb_family": (family_of(self.finding.verb) if self.finding.verb else ""),
             "seen_in": self.finding.seen_in,
@@ -225,7 +229,8 @@ def _keyed(
             finding.lane,
             finding.element_ids,
             flows_by_case.get(finding.case, {}),
-            verb=finding.verb if version >= 2 else None,
+            verb=finding.verb if version == 2 else None,
+            identifier=finding.identifier if version == 3 else None,
         )
         yield fingerprint(components, version=version), components, finding
 

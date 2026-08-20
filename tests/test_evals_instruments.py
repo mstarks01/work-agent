@@ -38,7 +38,6 @@ from evals.harness.instruments import (
     render_all,
 )
 from evals.harness.ledger import Ledger
-from evals.harness.provenance import RunProvenance
 from evals.harness.reference import load_case
 from stride_service.frameworks import PACKAGES
 from stride_service.report import FrameworkName
@@ -51,30 +50,13 @@ CORPUS = Path(__file__).resolve().parents[1] / "evals" / "corpus"
 def empty_run(frameworks: tuple[FrameworkName, ...]) -> ModeRun:
     """A finished sweep that ran ``frameworks`` and measured nothing.
 
-    Every list is empty on purpose. What is under test is which instruments a
-    sweep *consults*, and an empty measurement set is the cleanest way to ask
-    that without a provider anywhere in the picture.
+    What is under test is which instruments a sweep *consults*, and an empty
+    measurement set is the cleanest way to ask that with no provider in the
+    picture. The shape is ``ModeRun.empty``'s, because ``score`` re-scores a
+    finished artifact through the same value and a fixture spelling its own
+    would stop testing what runs.
     """
-    return ModeRun(
-        payloads=[],
-        failures=[],
-        runs={},
-        provenance=RunProvenance(
-            sampling_config_version=1,
-            tiers_config_version=1,
-            sampling={},
-            node_runs={},
-        ),
-        expected_nodes=[],
-        usage={},
-        latency={},
-        grounds=[],
-        grounds_failures=[],
-        coverage=[],
-        frameworks=frameworks,
-        extractions=[],
-        rows={},
-    )
+    return ModeRun.empty(frameworks)
 
 
 class TestOneFrameworkRunsAlone:

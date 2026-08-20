@@ -14,6 +14,7 @@ import pytest
 
 from evals.harness.fingerprint import (
     DEFAULT_VERSION,
+    IDENTIFIER_OF,
     LANE_FIELD,
     SUPPORTED_VERSIONS,
     VERSION_FOR,
@@ -21,6 +22,7 @@ from evals.harness.fingerprint import (
     FingerprintError,
     components_for,
     fingerprint,
+    identifier_of,
     lane_field,
     version_for,
     version_of,
@@ -116,9 +118,62 @@ def test_each_package_names_its_lane_in_its_own_terms():
 
 
 def test_the_declared_versions_follow_from_what_a_claim_carries():
-    """STRIDE composes an identity; ASVS's claims already carry one."""
+    """STRIDE composes an identity; ASVS's claims name one in a catalog."""
     assert version_for("stride") == 2
-    assert version_for("asvs") == 1
+    assert version_for("asvs") == 3
+
+
+class TestACatalogIdentifierIsHalfTheKey:
+    """Version 3: place plus the requirement the claim names.
+
+    Version 1 keyed such a claim by place alone, so two requirements ruled on
+    one element in one chapter shared a fingerprint and one vote answered for
+    both.
+    """
+
+    def test_two_requirements_in_one_chapter_are_two_findings(self):
+        place = ("asvs", "authentication", ("process:web-app",))
+        first = Components(*place, identifier="V6.2.1")
+        second = Components(*place, identifier="V6.2.2")
+
+        assert fingerprint(first, version=3) != fingerprint(second, version=3)
+
+    def test_the_same_requirement_in_one_place_is_one_finding(self):
+        place = ("asvs", "authentication", ("process:web-app",))
+
+        assert fingerprint(
+            Components(*place, identifier="V6.2.1"), version=3
+        ) == fingerprint(Components(*place, identifier="V6.2.1"), version=3)
+
+    def test_a_claim_naming_no_requirement_fails_closed(self):
+        """Never a key composed over an empty identifier."""
+        with pytest.raises(FingerprintError, match="version 3"):
+            fingerprint(
+                Components("asvs", "authentication", ("process:web-app",)), version=3
+            )
+
+    def test_the_identifier_comes_out_of_the_package_that_owns_the_catalog(self):
+        assert identifier_of("asvs", "v5.0.0-6.2.1") == "V6.2.1"
+        assert identifier_of("stride", "S-01") is None
+
+    def test_an_unreadable_claim_id_raises_rather_than_keying_on_nothing(self):
+        with pytest.raises(FingerprintError, match="carries none"):
+            identifier_of("asvs", "S-01")
+
+    def test_the_identifier_table_covers_every_package(self):
+        assert set(IDENTIFIER_OF) == set(PACKAGES)
+
+    def test_a_package_with_no_declared_reader_raises(self):
+        with pytest.raises(FingerprintError, match="no identifier reader"):
+            identifier_of("nothing-declares-this", "x")
+
+    def test_the_components_carry_the_identifier_through_the_ledger(self):
+        """A vote stores its components, so a re-key has to find it again."""
+        components = Components(
+            "asvs", "authentication", ("process:web-app",), identifier="V6.2.1"
+        )
+
+        assert Components.from_json(components.to_json()) == components
 
 
 def test_version_one_ignores_the_verb_and_version_two_reads_it():

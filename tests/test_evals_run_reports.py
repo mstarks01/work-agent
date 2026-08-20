@@ -40,7 +40,12 @@ def test_every_finished_case_keeps_a_report(monkeypatch, case, tmp_path):
     _write_reports(str(out), "analysis", run.runs)
 
     written = sorted(path.name for path in reports_dir(out).iterdir())
-    assert written == [f"{case.id}.report.json", "case-second.report.json"]
+    assert written == [
+        f"{case.id}.drafts.json",
+        f"{case.id}.report.json",
+        "case-second.drafts.json",
+        "case-second.report.json",
+    ], "the drafts ride beside the report, because `score` reads both"
 
 
 def test_a_persisted_report_carries_what_the_artifact_cannot(
@@ -69,8 +74,8 @@ def test_a_case_that_died_leaves_no_report(monkeypatch, case, tmp_path):
 
     _write_reports(str(out), "analysis", run.runs)
 
-    written = [path.name for path in reports_dir(out).iterdir()]
-    assert written == ["case-second.report.json"]
+    written = sorted(path.name for path in reports_dir(out).iterdir())
+    assert written == ["case-second.drafts.json", "case-second.report.json"]
 
 
 def test_extraction_says_it_has_no_reports(tmp_path, capsys):

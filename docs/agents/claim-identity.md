@@ -18,10 +18,11 @@ what?**
 
 | Part | Where it comes from | Read by |
 |---|---|---|
-| framework | the block | v1, v2 |
-| lane | the block | v1, v2 |
-| targets | `affected_element_ids`, endpoint-resolved | v1, v2 |
+| framework | the block | v1, v2, v3 |
+| lane | the block, from the field its package declares (`LANE_FIELD`) | v1, v2, v3 |
+| targets | `affected_element_ids`, endpoint-resolved | v1, v2, v3 |
 | action verb | `stride_service.actions`, a closed set of 20 | v2 only |
+| catalog identifier | the claim ID, read by the package that owns the catalog (`IDENTIFIER_OF`) | v3 only |
 
 `Claim` carries `verb` and `DraftThreat` requires it, so a finding out of a live
 run keys the same way a reference claim does. The vocabulary is **service-side**
@@ -104,12 +105,16 @@ framework, checked against `PACKAGES` and declared in
 | Package | Version | Why |
 |---|---|---|
 | `stride` | 2 | an open claim set, so the action is half of what makes two claims one finding |
-| `asvs` | 1 | its claims carry a catalog requirement identifier and already have an identity |
+| `asvs` | 3 | its claims name a requirement in a catalog, so the identifier and the place it was ruled in are the key |
+
+Version 1 — place alone — keys nothing today. ASVS sat there until the collapse
+it caused was named: two requirements ruled on one element in one chapter shared
+a fingerprint, so one vote answered for both.
 
 Those entries follow from what a package's claims *are*, not from preference —
-so version 1 is not a lesser rule for ASVS, it is the whole of the right one. A
-package added to `PACKAGES` and missing from the table raises at its first
-finding, which is the question its author has to answer.
+a rule that reads an action is wrong for a claim that names a requirement, and
+the reverse. A package added to `PACKAGES` and missing from the table raises at
+its first finding, which is the question its author has to answer.
 
 ## The vote
 
@@ -151,11 +156,11 @@ removing the judge from the metric path is a consequence, not the goal.
 
 The rule is one rule, instantiated per framework and keyed, never branched.
 
-A package whose claims carry a catalog identifier already **has** an identity —
-the identifier is the fingerprint, and the verb never composes. A package with
-an open claim set composes one from lane, verb and targets. Both feed one
-ledger, one pool and one queue, because a vote records a fact about a system and
-not about a framework.
+A package whose claims name a catalog requirement is keyed by that requirement
+and the place it was ruled in, and the verb never composes. A package with an
+open claim set composes a key from lane, verb and targets. Both feed one ledger,
+one pool and one queue, because a vote records a fact about a system and not
+about a framework.
 
 `PACKAGE_SCORERS` in `evals/harness/instruments.py` is the table this follows,
 and it is checked against `PACKAGES`. A fingerprint rule keyed by framework must
