@@ -132,7 +132,9 @@ _NUM_RETRIES_KWARG = "num_retries"
 _TEMPERATURE_REMOVED_FROM = (4, 7)
 
 
-def _check_temperature_unset(model: str, sampling: TierSampling, source: str) -> None:
+def _check_temperature_unset(
+    model: str, temperature: float | None, source: str, config_file: str
+) -> None:
     """Fail closed when a Claude generation that removed ``temperature`` is sent one.
 
     Keyed on the **model**, not the vendor: Vertex-hosted Claude is the same
@@ -141,14 +143,14 @@ def _check_temperature_unset(model: str, sampling: TierSampling, source: str) ->
     is left entirely to :func:`check_supported`.
     """
     generation = claude_generation(model)
-    if sampling.temperature is None or generation is None:
+    if temperature is None or generation is None:
         return
     if generation >= _TEMPERATURE_REMOVED_FROM:
         removed = ".".join(str(part) for part in _TEMPERATURE_REMOVED_FROM)
         raise ModelGateError(
             f"{source}: Claude {removed} and later do not accept 'temperature',"
             f" and {model!r} would reject the request; remove the temperature"
-            " line for this tier in config/sampling.toml. Unsetting it leaves"
+            f" line in {config_file}. Unsetting it leaves"
             " the model's own default, which is the only value these"
             " generations serve."
         )
@@ -172,7 +174,7 @@ _REASONING_TEMPERATURE = 1.0
 
 
 def _check_reasoning_temperature(
-    model: str, sampling: TierSampling, source: str
+    model: str, temperature: float | None, source: str, config_file: str
 ) -> None:
     """Fail closed when an OpenAI reasoning family is sent a temperature it pins.
 
@@ -182,17 +184,37 @@ def _check_reasoning_temperature(
     A model that is not one of these families is left entirely to
     :func:`~stride_service.model_gate.check_supported`.
     """
-    if sampling.temperature is None or not openai_reasoning_model(model):
+    if temperature is None or not openai_reasoning_model(model):
         return
-    if sampling.temperature != _REASONING_TEMPERATURE:
+    if temperature != _REASONING_TEMPERATURE:
         raise ModelGateError(
             f"{source}: {model!r} is an OpenAI reasoning model and serves"
             f" 'temperature' only at its default of {_REASONING_TEMPERATURE:g};"
-            f" {sampling.temperature:g} would be rejected on the first request."
-            " Set it to 1 for this tier in config/sampling.toml, or unset it —"
-            " and note that either way this tier is no longer decoding greedily,"
-            " so its runs are no longer reproducible."
+            f" {temperature:g} would be rejected on the first request."
+            f" Set it to 1 in {config_file}, or unset it — and note that"
+            " either way this model is no longer decoding greedily, so its runs"
+            " are no longer reproducible."
         )
+
+
+def check_temperature(
+    model: str, temperature: float | None, source: str, config_file: str
+) -> None:
+    """Every temperature rule keyed on the model rather than on the vendor.
+
+    :func:`check_supported` asks LiteLLM, so it answers only for models the
+    pinned cost map already knows; both rules below cover a model newer than
+    that map, which is the case the shipped ``temperature = 0.0`` walks into.
+
+    Public because two gates need the same answer and they read the parameter
+    from different files. A caller that ran only :func:`check_supported` would
+    load a configuration the provider rejects on its first request — which is
+    what the eval judge did to a calibration sweep before this existed.
+    ``config_file`` is the file the caller read the value from, so the message
+    names somewhere the reader can edit.
+    """
+    _check_temperature_unset(model, temperature, source, config_file)
+    _check_reasoning_temperature(model, temperature, source, config_file)
 
 
 def _check_output_ceiling(
@@ -301,8 +323,12 @@ def build_tier_adapters(
         check_supported(
             vendor, selection.model, tier_sampling.gate_params(), source=source
         )
-        _check_temperature_unset(selection.model, tier_sampling, source)
-        _check_reasoning_temperature(selection.model, tier_sampling, source)
+        check_temperature(
+            selection.model,
+            tier_sampling.temperature,
+            source,
+            "config/sampling.toml",
+        )
         _check_output_ceiling(vendor, selection.model, tier_sampling, source)
         _check_native_structured_output(vendor, selection.model, tier_sampling, source)
         adapters[tier] = retrying(
