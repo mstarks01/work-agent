@@ -148,12 +148,17 @@ judgement, and it costs no credentials:
 uv run python webapp/review.py --voter <your-name> --artifact baseline-1.json
 ```
 
-Watch two numbers, and read them the way you read critic yield — as a pair:
+[VOTING.md](VOTING.md) is the whole procedure — what each answer moves, and
+what the four standings do to a number. When tuning, watch two of them, and read
+them the way you read critic yield — as a pair:
 
 | Metric | What a good change does | Trap |
 | --- | --- | --- |
-| **up-vote rate** (per case) | rises, or holds | It rises trivially if the tool produces fewer, safer findings. Read it against how many findings the run produced. |
-| **substance down-vote rate** | falls | A style down-vote is not this number. `poorly-written` leaves the finding in the pool and moves the writing score, so a config that writes worse cannot flatter this one. |
+| **`rejected_rate`** (per case) | falls, or holds | A style down-vote is not this number. `poorly-written` leaves the finding in the pool, so a config that writes worse cannot flatter this one. |
+| **`pooled`** against **`unvoted`** | `pooled` rises while `unvoted` falls | `rejected_rate` reads 0.0 over a cold ledger. A low number beside a large `unvoted` count means nobody has looked, not that the tool is right. |
+
+The votes reach the numbers on the **next** sweep: the scorer reads the ledger
+while it scores a run, so re-run the arm after a sitting.
 
 A vote hangs on a finding's fingerprint, so tuning does not re-spend it: after
 the first sitting, a configuration change puts only its *new* findings in the
