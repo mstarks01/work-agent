@@ -19,10 +19,19 @@ endpoint-resolved **Element** IDs. It has a measured cost:
 agreement alone at 14 false splits over 200 labelled pairs and 23 false merges
 over 287 reference pairs.
 
-**Version 2 adds the action verb**, which is what closes most of that gap —
-:mod:`evals.harness.verbs` separates 20 of those 23. It is selectable now and
-is not the default, because twelve of thirteen cases carry no verb yet:
-``tests/test_verb_coverage.py`` names that debt and shrinks it.
+**Version 2 adds the action verb**, which is what closes most of that gap: it
+costs one more false split and removes twenty of the 23 false merges, and
+:class:`~evals.harness.identity.SubsetVerbIdentity` scores 185/200 against the
+recorded labels where element agreement alone scores 111.
+
+It is selectable and it is **not** the default, and the reason is no longer the
+corpus — every reference claim carries a verb now. It is the *produced* claim
+that does not: :class:`~stride_service.report.Claim` has no verb field, so a
+finding coming out of a live run cannot be fingerprinted at version 2. Moving
+the default needs that field, the six lane prompts that would fill it, and the
+same answer for every other package in ``PACKAGES``. Until then a queue built
+over real findings runs at version 1, and a bump would fail closed rather than
+silently fingerprint over an absent verb.
 """
 
 from __future__ import annotations

@@ -12,6 +12,8 @@
       "entity:shopper",
       "flow:shopper-to-storefront-api:place-order"
     ],
+    "reference_verb": "replay",
+    "candidate_verb": "replay",
     "label": "match",
     "note": "Pure paraphrase: same action (replaying a stolen session), same target."
   },
@@ -25,6 +27,8 @@
     ],
     "candidate_claim": "An attacker guesses a shopper's password because no MFA is enforced on shopper accounts.",
     "candidate_element_ids": null,
+    "reference_verb": "replay",
+    "candidate_verb": null,
     "label": "no-match",
     "note": "Same element and same weakness area, different attacker action: credential guessing is not session replay."
   },
@@ -41,6 +45,8 @@
       "flow:card-processor-to-storefront-api:settlement-webhook",
       "process:storefront-api"
     ],
+    "reference_verb": "forge",
+    "candidate_verb": "forge",
     "label": "match",
     "note": "Same action against the same target; the candidate omits 'impersonating the processor' but that is how the action is performed."
   },
@@ -54,6 +60,8 @@
     ],
     "candidate_claim": "An attacker replays a genuine settlement webhook the processor sent earlier.",
     "candidate_element_ids": null,
+    "reference_verb": "forge",
+    "candidate_verb": null,
     "label": "no-match",
     "note": "Replay of an authentic message is a distinct action from forging one; the corpus files replay under tampering."
   },
@@ -69,6 +77,8 @@
     "candidate_element_ids": [
       "process:order-service"
     ],
+    "reference_verb": "impersonate",
+    "candidate_verb": "impersonate",
     "label": "match",
     "note": "Same action and target; the candidate cites the process where the reference cites the flow, which is an element-agreement difference, not a claim difference."
   },
@@ -82,6 +92,8 @@
     ],
     "candidate_claim": "An attacker reads the database password out of the order service's environment and logs in to orders-db.",
     "candidate_element_ids": null,
+    "reference_verb": "use-credential",
+    "candidate_verb": null,
     "label": "no-match",
     "note": "The reference is about using a held credential; this candidate's action is recovering it. The corpus files recovery separately under information-disclosure."
   },
@@ -96,6 +108,8 @@
     "candidate_element_ids": [
       "flow:storefront-api-to-order-service:submit-order"
     ],
+    "reference_verb": "alter-in-transit",
+    "candidate_verb": "alter-in-transit",
     "label": "match",
     "note": "Same action, same flow."
   },
@@ -111,6 +125,8 @@
     "candidate_element_ids": [
       "store:orders-db"
     ],
+    "reference_verb": "alter",
+    "candidate_verb": "alter",
     "label": "match",
     "note": "Narrower instance of the same action against the same target; still the same finding."
   },
@@ -124,6 +140,8 @@
     ],
     "candidate_claim": "An attacker deletes order rows from orders-db to destroy records of a purchase.",
     "candidate_element_ids": null,
+    "reference_verb": "alter",
+    "candidate_verb": null,
     "label": "no-match",
     "note": "Destruction rather than alteration, and the corpus does not carry it; a judge that matches this inflates recall."
   },
@@ -140,6 +158,8 @@
       "entity:shopper",
       "store:receipt-archive"
     ],
+    "reference_verb": "unattributable",
+    "candidate_verb": "unattributable",
     "label": "match",
     "note": "Paraphrase with the same mechanism."
   },
@@ -153,6 +173,8 @@
     ],
     "candidate_claim": "An attacker deletes receipts from the archive so an order cannot be proven.",
     "candidate_element_ids": null,
+    "reference_verb": "unattributable",
+    "candidate_verb": null,
     "label": "no-match",
     "note": "Deleting evidence is tampering with the archive, a different action from the absence of shopper identity in it."
   },
@@ -167,6 +189,8 @@
     "candidate_element_ids": [
       "store:orders-db"
     ],
+    "reference_verb": "read",
+    "candidate_verb": "read",
     "label": "match",
     "note": "Backups are named in the reference; same action, same target."
   },
@@ -181,6 +205,8 @@
     "candidate_element_ids": [
       "flow:storefront-api-to-order-service:submit-order"
     ],
+    "reference_verb": "intercept",
+    "candidate_verb": "intercept",
     "label": "match",
     "note": "Same read action on the same flow."
   },
@@ -193,6 +219,8 @@
     ],
     "candidate_claim": "An attacker sniffing the shopper's HTTPS connection reads their card details.",
     "candidate_element_ids": null,
+    "reference_verb": "intercept",
+    "candidate_verb": null,
     "label": "no-match",
     "note": "Same lane and a plausible finding, but a different flow and a different target; the corpus does not list it."
   },
@@ -209,6 +237,8 @@
       "flow:card-processor-to-storefront-api:settlement-webhook",
       "process:storefront-api"
     ],
+    "reference_verb": "flood",
+    "candidate_verb": "flood",
     "label": "match",
     "note": "Same action, same target."
   },
@@ -225,6 +255,8 @@
       "process:order-service",
       "process:storefront-api"
     ],
+    "reference_verb": "escalate",
+    "candidate_verb": "escalate",
     "label": "match",
     "note": "Same escalation, same mechanism."
   },
@@ -240,6 +272,8 @@
     "candidate_element_ids": [
       "process:storefront-api"
     ],
+    "reference_verb": "escalate",
+    "candidate_verb": "escalate",
     "label": "match",
     "note": "Coarser phrasing of the same escalation; the corpus also carries a separate pivot entry, so bipartite assignment decides which one it consumes."
   },
@@ -256,6 +290,8 @@
       "entity:sensor-node",
       "flow:sensor-node-to-device-gateway:publish-readings"
     ],
+    "reference_verb": "impersonate",
+    "candidate_verb": "impersonate",
     "label": "match",
     "note": "Same action, same mechanism."
   },
@@ -269,6 +305,8 @@
     ],
     "candidate_claim": "An attacker brute-forces the fleet pre-shared key against the broker.",
     "candidate_element_ids": null,
+    "reference_verb": "impersonate",
+    "candidate_verb": null,
     "label": "no-match",
     "note": "Recovering the key by physical extraction and guessing it are different attacker actions."
   },
@@ -285,6 +323,8 @@
       "entity:sensor-node",
       "flow:field-technician-to-sensor-node:local-service-session"
     ],
+    "reference_verb": "impersonate",
+    "candidate_verb": "impersonate",
     "label": "match",
     "note": "Same action and target; hedged phrasing does not change the claim."
   },
@@ -300,6 +340,8 @@
     "candidate_element_ids": [
       "store:firmware-bucket"
     ],
+    "reference_verb": "plant",
+    "candidate_verb": "plant",
     "label": "match",
     "note": "Same action, same target."
   },
@@ -313,6 +355,8 @@
     ],
     "candidate_claim": "An attacker modifies firmware in transit between the bucket and a node.",
     "candidate_element_ids": null,
+    "reference_verb": "plant",
+    "candidate_verb": null,
     "label": "no-match",
     "note": "In-transit modification is a distinct action from planting the artifact at rest."
   },
@@ -329,6 +373,8 @@
       "flow:sensor-node-to-device-gateway:publish-readings",
       "store:telemetry-lake"
     ],
+    "reference_verb": "forge",
+    "candidate_verb": "forge",
     "label": "match",
     "note": "Same action, same target."
   },
@@ -342,6 +388,8 @@
     ],
     "candidate_claim": "An attacker with the fleet key publishes readings as another device.",
     "candidate_element_ids": null,
+    "reference_verb": "forge",
+    "candidate_verb": null,
     "label": "no-match",
     "note": "This is the spoofing claim, not the data-integrity one; keeping them distinct is what the two lanes are for."
   },
@@ -358,6 +406,8 @@
       "entity:sensor-node",
       "flow:sensor-node-to-device-gateway:publish-readings"
     ],
+    "reference_verb": "unattributable",
+    "candidate_verb": "unattributable",
     "label": "match",
     "note": "Same claim, stated as the condition rather than the dispute."
   },
@@ -372,6 +422,8 @@
     "candidate_element_ids": [
       "store:telemetry-lake"
     ],
+    "reference_verb": "read",
+    "candidate_verb": "read",
     "label": "match",
     "note": "Same read action against the same target; the candidate names the consequence the reference's notes give."
   },
@@ -386,6 +438,8 @@
     "candidate_element_ids": [
       "flow:sensor-node-to-device-gateway:publish-readings"
     ],
+    "reference_verb": "intercept",
+    "candidate_verb": "intercept",
     "label": "match",
     "note": "Same action, same flow."
   },
@@ -400,6 +454,8 @@
     "candidate_element_ids": [
       "store:firmware-bucket"
     ],
+    "reference_verb": "read",
+    "candidate_verb": "read",
     "label": "match",
     "note": "Same action, same target; the reference adds the reverse-engineering motive."
   },
@@ -412,6 +468,8 @@
     ],
     "candidate_claim": "An attacker writes a new firmware image to the public bucket.",
     "candidate_element_ids": null,
+    "reference_verb": "read",
+    "candidate_verb": null,
     "label": "no-match",
     "note": "Read and write are different actions, and the write is a separate corpus entry."
   },
@@ -427,6 +485,8 @@
     "candidate_element_ids": [
       "process:device-gateway"
     ],
+    "reference_verb": "flood",
+    "candidate_verb": "flood",
     "label": "match",
     "note": "Same action, same target."
   },
@@ -443,6 +503,8 @@
       "entity:sensor-node",
       "store:firmware-bucket"
     ],
+    "reference_verb": "plant",
+    "candidate_verb": "plant",
     "label": "match",
     "note": "Same action, same target."
   },
@@ -459,6 +521,8 @@
       "entity:sensor-node",
       "store:firmware-bucket"
     ],
+    "reference_verb": "escalate",
+    "candidate_verb": "escalate",
     "label": "match",
     "note": "Same escalation."
   },
@@ -474,6 +538,8 @@
     "candidate_element_ids": [
       "entity:sensor-node"
     ],
+    "reference_verb": "escalate",
+    "candidate_verb": "escalate",
     "label": "match",
     "note": "Same escalation, same mechanism."
   },
@@ -487,6 +553,8 @@
     ],
     "candidate_claim": "A fleet operator's SSO account is phished and the attacker queries the telemetry lake.",
     "candidate_element_ids": null,
+    "reference_verb": "abuse-grant",
+    "candidate_verb": null,
     "label": "no-match",
     "note": "The reference is about an authorized operator's over-broad grant; account takeover is a different action the corpus does not list."
   },
@@ -503,6 +571,8 @@
       "entity:insurance-partner",
       "flow:insurance-partner-to-landing-bucket:push-daily-extract"
     ],
+    "reference_verb": "impersonate",
+    "candidate_verb": "impersonate",
     "label": "match",
     "note": "Same action, same target."
   },
@@ -519,6 +589,8 @@
       "flow:ingest-scheduler-to-landing-bucket:list-and-read-files",
       "store:landing-bucket"
     ],
+    "reference_verb": "plant",
+    "candidate_verb": "plant",
     "label": "match",
     "note": "Same action, same mechanism."
   },
@@ -535,6 +607,8 @@
       "flow:insurance-partner-to-landing-bucket:push-daily-extract",
       "store:landing-bucket"
     ],
+    "reference_verb": "plant",
+    "candidate_verb": "plant",
     "label": "match",
     "note": "Same action against the same target; the candidate only specifies how the attacker got write access."
   },
@@ -550,6 +624,8 @@
     "candidate_element_ids": [
       "store:landing-bucket"
     ],
+    "reference_verb": "alter",
+    "candidate_verb": "alter",
     "label": "match",
     "note": "Same action, same target and the same timing."
   },
@@ -563,6 +639,8 @@
     ],
     "candidate_claim": "An attacker injects SQL through a claim record field that the transform does not sanitize.",
     "candidate_element_ids": null,
+    "reference_verb": "alter",
+    "candidate_verb": null,
     "label": "no-match",
     "note": "Injection through unvalidated content is a distinct action the corpus does not carry; a judge that matches it hides a real gap."
   },
@@ -578,6 +656,8 @@
     "candidate_element_ids": [
       "store:airflow-metadata-db"
     ],
+    "reference_verb": "alter",
+    "candidate_verb": "alter",
     "label": "match",
     "note": "Same action, same target."
   },
@@ -594,6 +674,8 @@
       "entity:insurance-partner",
       "flow:insurance-partner-to-landing-bucket:push-daily-extract"
     ],
+    "reference_verb": "unattributable",
+    "candidate_verb": "unattributable",
     "label": "match",
     "note": "Same claim stated cause-first."
   },
@@ -610,6 +692,8 @@
       "entity:data-analyst",
       "flow:data-analyst-to-claims-warehouse:run-queries"
     ],
+    "reference_verb": "abuse-grant",
+    "candidate_verb": "abuse-grant",
     "label": "match",
     "note": "Same action, same target."
   },
@@ -623,6 +707,8 @@
     ],
     "candidate_claim": "An analyst exports member records out of the warehouse to an unmanaged device.",
     "candidate_element_ids": null,
+    "reference_verb": "abuse-grant",
+    "candidate_verb": null,
     "label": "no-match",
     "note": "Exfiltration by an authorized user is a different action from over-broad read access; the corpus does not carry it."
   },
@@ -637,6 +723,8 @@
     "candidate_element_ids": [
       "store:airflow-metadata-db"
     ],
+    "reference_verb": "recover-credential",
+    "candidate_verb": "recover-credential",
     "label": "match",
     "note": "Same action, same target."
   },
@@ -649,6 +737,8 @@
     ],
     "candidate_claim": "An attacker reads the partner keys out of the landing bucket.",
     "candidate_element_ids": null,
+    "reference_verb": "recover-credential",
+    "candidate_verb": null,
     "label": "no-match",
     "note": "The keys are not in the bucket; the candidate asserts a fact the model does not support and should be adjudicated unsupported, not matched."
   },
@@ -665,6 +755,8 @@
       "process:transform-job",
       "store:landing-bucket"
     ],
+    "reference_verb": "flood",
+    "candidate_verb": "flood",
     "label": "match",
     "note": "Same action, same target."
   },
@@ -680,6 +772,8 @@
     "candidate_element_ids": [
       "process:transform-job"
     ],
+    "reference_verb": "disable",
+    "candidate_verb": "disable",
     "label": "match",
     "note": "Same action, same consequence."
   },
@@ -695,6 +789,8 @@
     "candidate_element_ids": [
       "store:airflow-metadata-db"
     ],
+    "reference_verb": "escalate",
+    "candidate_verb": "escalate",
     "label": "match",
     "note": "Same escalation; distinguished from the disclosure entry by what the attacker does with the credentials."
   },
@@ -711,6 +807,8 @@
       "process:transform-job",
       "store:landing-bucket"
     ],
+    "reference_verb": "escalate",
+    "candidate_verb": "escalate",
     "label": "match",
     "note": "Same escalation, same mechanism."
   },
@@ -727,6 +825,8 @@
       "entity:data-analyst",
       "flow:data-analyst-to-claims-warehouse:run-queries"
     ],
+    "reference_verb": "abuse-grant",
+    "candidate_verb": "abuse-grant",
     "label": "match",
     "note": "Same action, same target."
   },
@@ -740,6 +840,8 @@
     ],
     "candidate_claim": "An analyst escalates to a warehouse administrator role.",
     "candidate_element_ids": null,
+    "reference_verb": "abuse-grant",
+    "candidate_verb": null,
     "label": "no-match",
     "note": "Role escalation is a different action from using an over-broad grant, and nothing in the model supports it."
   },
@@ -756,6 +858,8 @@
       "flow:calling-service-to-inference-gateway:submit-inference-request",
       "process:inference-gateway"
     ],
+    "reference_verb": "use-credential",
+    "candidate_verb": "use-credential",
     "label": "match",
     "note": "Same action, same target."
   },
@@ -769,6 +873,8 @@
     ],
     "candidate_claim": "An attacker brute-forces a valid API key against the gateway.",
     "candidate_element_ids": null,
+    "reference_verb": "use-credential",
+    "candidate_verb": null,
     "label": "no-match",
     "note": "Guessing a key and using a leaked one are different actions."
   },
@@ -784,6 +890,8 @@
     "candidate_element_ids": [
       "process:model-server"
     ],
+    "reference_verb": "impersonate",
+    "candidate_verb": "impersonate",
     "label": "match",
     "note": "Same action, same target."
   },
@@ -800,6 +908,8 @@
       "flow:model-server-to-model-registry:load-artifact",
       "store:model-registry"
     ],
+    "reference_verb": "plant",
+    "candidate_verb": "plant",
     "label": "match",
     "note": "Same action, same target."
   },
@@ -813,6 +923,8 @@
     ],
     "candidate_claim": "An attacker poisons the training data so the published model behaves incorrectly.",
     "candidate_element_ids": null,
+    "reference_verb": "plant",
+    "candidate_verb": null,
     "label": "no-match",
     "note": "Training-time poisoning is outside this model entirely \u2014 no training pipeline exists in it \u2014 so this is unsupported, not a match."
   },
@@ -828,6 +940,8 @@
     "candidate_element_ids": [
       "store:feature-store"
     ],
+    "reference_verb": "alter",
+    "candidate_verb": "alter",
     "label": "match",
     "note": "Same action, same target."
   },
@@ -841,6 +955,8 @@
     ],
     "candidate_claim": "An attacker reads customer features out of the unauthenticated Redis store.",
     "candidate_element_ids": null,
+    "reference_verb": "alter",
+    "candidate_verb": null,
     "label": "no-match",
     "note": "Reading is the disclosure entry; writing is this one. Same element, different action."
   },
@@ -857,6 +973,8 @@
       "flow:ml-engineer-to-model-registry:publish-artifact",
       "store:model-registry"
     ],
+    "reference_verb": "unattributable",
+    "candidate_verb": "unattributable",
     "label": "match",
     "note": "Same claim."
   },
@@ -871,6 +989,8 @@
     "candidate_element_ids": [
       "store:inference-log"
     ],
+    "reference_verb": "read",
+    "candidate_verb": "read",
     "label": "match",
     "note": "Same action, same target."
   },
@@ -885,6 +1005,8 @@
     "candidate_element_ids": [
       "store:inference-log"
     ],
+    "reference_verb": "read",
+    "candidate_verb": "read",
     "label": "match",
     "note": "Same action, same target; requests and responses are stored together and the reference covers the store."
   },
@@ -900,6 +1022,8 @@
     "candidate_element_ids": [
       "process:model-server"
     ],
+    "reference_verb": "elicit",
+    "candidate_verb": "elicit",
     "label": "match",
     "note": "Same action, same target."
   },
@@ -913,6 +1037,8 @@
     ],
     "candidate_claim": "A caller sends a prompt that makes the model ignore its instructions and produce disallowed output.",
     "candidate_element_ids": null,
+    "reference_verb": "elicit",
+    "candidate_verb": null,
     "label": "no-match",
     "note": "Instruction-following failure is not disclosure of another tenant's data; the corpus does not carry it."
   },
@@ -928,6 +1054,8 @@
     "candidate_element_ids": [
       "process:model-server"
     ],
+    "reference_verb": "flood",
+    "candidate_verb": "flood",
     "label": "match",
     "note": "Same action, same target."
   },
@@ -943,6 +1071,8 @@
     "candidate_element_ids": [
       "store:feature-store"
     ],
+    "reference_verb": "disable",
+    "candidate_verb": "disable",
     "label": "match",
     "note": "Same action, same target."
   },
@@ -959,6 +1089,8 @@
       "process:model-server",
       "store:model-registry"
     ],
+    "reference_verb": "escalate",
+    "candidate_verb": "escalate",
     "label": "match",
     "note": "Same escalation."
   },
@@ -975,6 +1107,8 @@
       "process:inference-gateway",
       "process:model-server"
     ],
+    "reference_verb": "escalate",
+    "candidate_verb": "escalate",
     "label": "match",
     "note": "Same escalation; the candidate enumerates what the reference states generally."
   },
@@ -991,6 +1125,8 @@
       "entity:calling-service",
       "flow:calling-service-to-inference-gateway:submit-inference-request"
     ],
+    "reference_verb": "abuse-grant",
+    "candidate_verb": "abuse-grant",
     "label": "match",
     "note": "Same action, same target."
   },
@@ -1007,6 +1143,8 @@
       "flow:background-worker-to-message-queue:consume-job",
       "store:message-queue"
     ],
+    "reference_verb": "impersonate",
+    "candidate_verb": "impersonate",
     "label": "match",
     "note": "Same action, same target."
   },
@@ -1023,6 +1161,8 @@
       "process:background-worker",
       "store:message-queue"
     ],
+    "reference_verb": "plant",
+    "candidate_verb": "plant",
     "label": "match",
     "note": "Same action, same target."
   },
@@ -1036,6 +1176,8 @@
     ],
     "candidate_claim": "An attacker enqueues jobs as the web application, since the queue does not authenticate producers.",
     "candidate_element_ids": null,
+    "reference_verb": "plant",
+    "candidate_verb": null,
     "label": "no-match",
     "note": "This is the spoofing claim about producer identity; the reference is about the content the worker acts on."
   },
@@ -1051,6 +1193,8 @@
     "candidate_element_ids": [
       "store:web-application-config"
     ],
+    "reference_verb": "alter",
+    "candidate_verb": "alter",
     "label": "match",
     "note": "Same action, same target; the candidate names one instance of 'changes the endpoint or credentials'."
   },
@@ -1067,6 +1211,8 @@
       "process:background-worker",
       "store:database"
     ],
+    "reference_verb": "delete",
+    "candidate_verb": "delete",
     "label": "match",
     "note": "Same action, same mechanism."
   },
@@ -1080,6 +1226,8 @@
     ],
     "candidate_claim": "An attacker floods the database so logging stops.",
     "candidate_element_ids": null,
+    "reference_verb": "delete",
+    "candidate_verb": null,
     "label": "no-match",
     "note": "Availability against the log store is a different action from erasing entries, and the corpus files it under denial-of-service."
   },
@@ -1094,6 +1242,8 @@
     "candidate_element_ids": [
       "store:worker-config"
     ],
+    "reference_verb": "recover-credential",
+    "candidate_verb": "recover-credential",
     "label": "match",
     "note": "Same action, same target."
   },
@@ -1108,6 +1258,8 @@
     "candidate_element_ids": [
       "store:web-application-config"
     ],
+    "reference_verb": "recover-credential",
+    "candidate_verb": "recover-credential",
     "label": "match",
     "note": "Same action, same target."
   },
@@ -1120,6 +1272,8 @@
     ],
     "candidate_claim": "An attacker who compromises the web application recovers the database credentials from its config store.",
     "candidate_element_ids": null,
+    "reference_verb": "recover-credential",
+    "candidate_verb": null,
     "label": "no-match",
     "note": "The web application's config holds queue credentials, not database ones; asserting otherwise is unsupported in the model."
   },
@@ -1134,6 +1288,8 @@
     "candidate_element_ids": [
       "store:database"
     ],
+    "reference_verb": "read",
+    "candidate_verb": "read",
     "label": "match",
     "note": "Same action, same target."
   },
@@ -1150,6 +1306,8 @@
       "flow:background-worker-to-message-queue:consume-job",
       "flow:web-application-to-message-queue:enqueue-job"
     ],
+    "reference_verb": "intercept",
+    "candidate_verb": "intercept",
     "label": "match",
     "note": "Same action; the reference cites two flows and the candidate covers both."
   },
@@ -1166,6 +1324,8 @@
       "process:background-worker",
       "store:message-queue"
     ],
+    "reference_verb": "flood",
+    "candidate_verb": "flood",
     "label": "match",
     "note": "Same action, same target."
   },
@@ -1179,6 +1339,8 @@
     ],
     "candidate_claim": "An attacker deletes messages from the queue so submitted work is silently dropped.",
     "candidate_element_ids": null,
+    "reference_verb": "flood",
+    "candidate_verb": null,
     "label": "no-match",
     "note": "Deletion is a distinct action the corpus does not carry; it is grounded, so it belongs in the valid-unlisted bucket rather than matched."
   },
@@ -1195,6 +1357,8 @@
       "process:web-application",
       "store:message-queue"
     ],
+    "reference_verb": "escalate",
+    "candidate_verb": "escalate",
     "label": "match",
     "note": "Same escalation, same route."
   },
@@ -1211,6 +1375,8 @@
       "process:background-worker",
       "store:database"
     ],
+    "reference_verb": "abuse-grant",
+    "candidate_verb": "abuse-grant",
     "label": "match",
     "note": "Same escalation."
   },
@@ -1224,6 +1390,8 @@
     ],
     "candidate_claim": "An attacker who achieves execution in the worker reads its config file.",
     "candidate_element_ids": null,
+    "reference_verb": "abuse-grant",
+    "candidate_verb": null,
     "label": "no-match",
     "note": "Reading the config is the disclosure entry; inheriting database privilege is this one."
   },
@@ -1240,6 +1408,8 @@
       "entity:browser",
       "flow:browser-to-web-application:page-request"
     ],
+    "reference_verb": "impersonate",
+    "candidate_verb": "impersonate",
     "label": "match",
     "note": "Same action, same target, same unverified-control basis."
   },
@@ -1256,6 +1426,8 @@
       "flow:game-client-to-lobby:matchmaking",
       "process:lobby"
     ],
+    "reference_verb": "impersonate",
+    "candidate_verb": "impersonate",
     "label": "match",
     "note": "Same action, same target."
   },
@@ -1272,6 +1444,8 @@
       "flow:game-client-to-game-servers:gameplay-traffic",
       "process:game-servers"
     ],
+    "reference_verb": "impersonate",
+    "candidate_verb": "impersonate",
     "label": "match",
     "note": "Same action, same target."
   },
@@ -1285,6 +1459,8 @@
     ],
     "candidate_claim": "An attacker floods a game server's port so the match cannot proceed.",
     "candidate_element_ids": null,
+    "reference_verb": "impersonate",
+    "candidate_verb": null,
     "label": "no-match",
     "note": "Same element, availability action rather than identity; the corpus files it under denial-of-service."
   },
@@ -1301,6 +1477,8 @@
       "flow:game-client-to-game-servers:gameplay-traffic",
       "process:game-client"
     ],
+    "reference_verb": "forge",
+    "candidate_verb": "forge",
     "label": "match",
     "note": "Same action, same target."
   },
@@ -1314,6 +1492,8 @@
     ],
     "candidate_claim": "A player uses their modified client to see other players' positions through walls.",
     "candidate_element_ids": null,
+    "reference_verb": "forge",
+    "candidate_verb": null,
     "label": "no-match",
     "note": "Disclosure through the client is a separate corpus entry; modifying outbound actions and observing extra state are different actions."
   },
@@ -1329,6 +1509,8 @@
     "candidate_element_ids": [
       "store:stats-database"
     ],
+    "reference_verb": "alter",
+    "candidate_verb": "alter",
     "label": "match",
     "note": "Same action, same target."
   },
@@ -1345,6 +1527,8 @@
       "flow:customer-support-to-moderation-website:moderate-accounts",
       "process:moderation-website"
     ],
+    "reference_verb": "unattributable",
+    "candidate_verb": "unattributable",
     "label": "match",
     "note": "Same claim."
   },
@@ -1358,6 +1542,8 @@
     ],
     "candidate_claim": "A support agent bans a player account without justification.",
     "candidate_element_ids": null,
+    "reference_verb": "unattributable",
+    "candidate_verb": null,
     "label": "no-match",
     "note": "Misuse of legitimate privilege is a different claim from the absence of attribution; the corpus's elevation entry covers scope, not this."
   },
@@ -1372,6 +1558,8 @@
     "candidate_element_ids": [
       "store:player-database"
     ],
+    "reference_verb": "read",
+    "candidate_verb": "read",
     "label": "match",
     "note": "Same action, same target."
   },
@@ -1388,6 +1576,8 @@
       "flow:game-client-to-game-servers:gameplay-traffic",
       "flow:game-client-to-lobby:matchmaking"
     ],
+    "reference_verb": "intercept",
+    "candidate_verb": "intercept",
     "label": "match",
     "note": "Same action, same flows."
   },
@@ -1404,6 +1594,8 @@
       "flow:game-client-to-game-servers:gameplay-traffic",
       "process:game-client"
     ],
+    "reference_verb": "elicit",
+    "candidate_verb": "elicit",
     "label": "match",
     "note": "Same action, same target."
   },
@@ -1420,6 +1612,8 @@
       "entity:customer-support",
       "flow:moderation-website-to-player-database:read-write-players"
     ],
+    "reference_verb": "abuse-grant",
+    "candidate_verb": "abuse-grant",
     "label": "match",
     "note": "Same action, same target."
   },
@@ -1435,6 +1629,8 @@
     "candidate_element_ids": [
       "process:lobby"
     ],
+    "reference_verb": "flood",
+    "candidate_verb": "flood",
     "label": "match",
     "note": "Same action, same target."
   },
@@ -1450,6 +1646,8 @@
     "candidate_element_ids": [
       "process:game-servers"
     ],
+    "reference_verb": "flood",
+    "candidate_verb": "flood",
     "label": "match",
     "note": "Same action, same target."
   },
@@ -1466,6 +1664,8 @@
       "flow:game-servers-to-player-database:update-players",
       "process:game-servers"
     ],
+    "reference_verb": "escalate",
+    "candidate_verb": "escalate",
     "label": "match",
     "note": "Same escalation."
   },
@@ -1479,6 +1679,8 @@
     ],
     "candidate_claim": "An attacker who takes over a game server reads match statistics.",
     "candidate_element_ids": null,
+    "reference_verb": "escalate",
+    "candidate_verb": null,
     "label": "no-match",
     "note": "Reading stats is neither the escalation claimed nor the target claimed; the reference is about write access to player records."
   },
@@ -1495,6 +1697,8 @@
       "process:moderation-website",
       "store:player-database"
     ],
+    "reference_verb": "abuse-grant",
+    "candidate_verb": "abuse-grant",
     "label": "match",
     "note": "Same escalation, same target."
   },
@@ -1510,6 +1714,8 @@
     "candidate_element_ids": [
       "process:game-client"
     ],
+    "reference_verb": "escalate",
+    "candidate_verb": "escalate",
     "label": "match",
     "note": "Same escalation, same target."
   },
@@ -1523,6 +1729,8 @@
     ],
     "candidate_claim": "An attacker fixes a shopper's session identifier before they log in and then reuses it.",
     "candidate_element_ids": null,
+    "reference_verb": "replay",
+    "candidate_verb": null,
     "label": "no-match",
     "note": "Session fixation is a distinct action from replaying a stolen cookie."
   },
@@ -1536,6 +1744,8 @@
     ],
     "candidate_claim": "An attacker sends malformed gRPC messages that crash the order service.",
     "candidate_element_ids": null,
+    "reference_verb": "impersonate",
+    "candidate_verb": null,
     "label": "no-match",
     "note": "Same flow, availability action rather than identity."
   },
@@ -1548,6 +1758,8 @@
     ],
     "candidate_claim": "An attacker with database access reads shopper addresses and card last-four by querying orders-db.",
     "candidate_element_ids": null,
+    "reference_verb": "read",
+    "candidate_verb": null,
     "label": "no-match",
     "note": "The reference is about protection at rest of the stored data; querying with a valid credential is the elevation/spoofing path, not this one."
   },
@@ -1561,6 +1773,8 @@
     ],
     "candidate_claim": "An attacker causes the order service to leak memory until it restarts.",
     "candidate_element_ids": null,
+    "reference_verb": "flood",
+    "candidate_verb": null,
     "label": "no-match",
     "note": "Resource exhaustion inside the process is not the database-connection exhaustion the reference claims, and nothing in the model supports it."
   },
@@ -1574,6 +1788,8 @@
     ],
     "candidate_claim": "An attacker compromises the card processor and uses its access to reach the core zone.",
     "candidate_element_ids": null,
+    "reference_verb": "escalate",
+    "candidate_verb": null,
     "label": "no-match",
     "note": "Third-party compromise as an escalation route is not the DMZ-to-core pivot the reference states."
   },
@@ -1587,6 +1803,8 @@
     ],
     "candidate_claim": "An attacker registers a device that was never manufactured by the operator.",
     "candidate_element_ids": null,
+    "reference_verb": "forge",
+    "candidate_verb": null,
     "label": "no-match",
     "note": "Device enrolment is not described anywhere in the model; unsupported rather than matched."
   },
@@ -1600,6 +1818,8 @@
     ],
     "candidate_claim": "An attacker deletes a device's entry from the registry so it can no longer connect.",
     "candidate_element_ids": null,
+    "reference_verb": "alter",
+    "candidate_verb": null,
     "label": "no-match",
     "note": "Deletion for availability is a different action from reassigning a node's customer."
   },
@@ -1612,6 +1832,8 @@
     ],
     "candidate_claim": "An attacker reads customer occupancy patterns from the device registry.",
     "candidate_element_ids": null,
+    "reference_verb": "read",
+    "candidate_verb": null,
     "label": "no-match",
     "note": "Occupancy data lives in the lake, not the registry; the candidate asserts a fact the model does not support."
   },
@@ -1625,6 +1847,8 @@
     ],
     "candidate_claim": "An attacker disables the Pub/Sub topic so readings never reach the normalizer.",
     "candidate_element_ids": null,
+    "reference_verb": "flood",
+    "candidate_verb": null,
     "label": "no-match",
     "note": "Destroying the transport is a different action from flooding it, and the model does not describe who can administer it."
   },
@@ -1637,6 +1861,8 @@
     ],
     "candidate_claim": "An attacker cancels a scheduled Airflow run so the extract is never processed.",
     "candidate_element_ids": null,
+    "reference_verb": "impersonate",
+    "candidate_verb": null,
     "label": "no-match",
     "note": "Availability against the scheduler, not impersonation of it."
   },
@@ -1650,6 +1876,8 @@
     ],
     "candidate_claim": "An attacker modifies the Spark job's code so every future run transforms records incorrectly.",
     "candidate_element_ids": null,
+    "reference_verb": "forge",
+    "candidate_verb": null,
     "label": "no-match",
     "note": "Job code deployment is not modelled; grounded findings must attach to elements that exist."
   },
@@ -1663,6 +1891,8 @@
     ],
     "candidate_claim": "An analyst cannot reproduce a warehouse figure because the transform logic is undocumented.",
     "candidate_element_ids": null,
+    "reference_verb": "unattributable",
+    "candidate_verb": null,
     "label": "no-match",
     "note": "A documentation gap is not an attacker action at all; a judge that matches this is matching on topic, not on claim."
   },
@@ -1675,6 +1905,8 @@
     ],
     "candidate_claim": "An attacker intercepts partner uploads and reads claim records in transit over SFTP.",
     "candidate_element_ids": null,
+    "reference_verb": "read",
+    "candidate_verb": null,
     "label": "no-match",
     "note": "The reference is about data at rest in the bucket; the flow is also stated to carry SSH transport encryption."
   },
@@ -1688,6 +1920,8 @@
     ],
     "candidate_claim": "An attacker steals an ML engineer's laptop and publishes an artifact from it.",
     "candidate_element_ids": null,
+    "reference_verb": "use-credential",
+    "candidate_verb": null,
     "label": "no-match",
     "note": "Device theft is not described in the model; the reference is about the shared account behind publication."
   },
@@ -1700,6 +1934,8 @@
     ],
     "candidate_claim": "An attacker replays a previously captured inference request against the model server.",
     "candidate_element_ids": null,
+    "reference_verb": "alter-in-transit",
+    "candidate_verb": null,
     "label": "no-match",
     "note": "Replay is a distinct action from altering a payload in flight."
   },
@@ -1712,6 +1948,8 @@
     ],
     "candidate_claim": "An attacker reads customer features from the inference log.",
     "candidate_element_ids": null,
+    "reference_verb": "read",
+    "candidate_verb": null,
     "label": "no-match",
     "note": "Features are held in Redis; the log holds prompts and responses. Wrong target, and unsupported by the model."
   },
@@ -1725,6 +1963,8 @@
     ],
     "candidate_claim": "An attacker corrupts the feature store so the model server cannot start.",
     "candidate_element_ids": null,
+    "reference_verb": "delete",
+    "candidate_verb": null,
     "label": "no-match",
     "note": "The startup dependency in the reference is the registry artifact, not the feature store."
   },
@@ -1738,6 +1978,8 @@
     ],
     "candidate_claim": "A calling team exceeds the request quota assigned to its key.",
     "candidate_element_ids": null,
+    "reference_verb": "abuse-grant",
+    "candidate_verb": null,
     "label": "no-match",
     "note": "No quota is described in the model, and exceeding one is not reaching an unentitled capability."
   },
@@ -1750,6 +1992,8 @@
     ],
     "candidate_claim": "An attacker who reaches the database queries it directly without any credential.",
     "candidate_element_ids": null,
+    "reference_verb": "use-credential",
+    "candidate_verb": null,
     "label": "no-match",
     "note": "Asserts an absent control the model never states; the reference is about using the worker's credentials."
   },
@@ -1763,6 +2007,8 @@
     ],
     "candidate_claim": "An attacker alters the message queue's contents after the worker has read them.",
     "candidate_element_ids": null,
+    "reference_verb": "alter",
+    "candidate_verb": null,
     "label": "no-match",
     "note": "Incoherent against the model's flows and not the database-record tampering the reference claims."
   },
@@ -1776,6 +2022,8 @@
     ],
     "candidate_claim": "An attacker exploits a vulnerability in the web application framework to crash it.",
     "candidate_element_ids": null,
+    "reference_verb": "flood",
+    "candidate_verb": null,
     "label": "no-match",
     "note": "The model names no framework; the reference's action is flooding, not exploiting."
   },
@@ -1789,6 +2037,8 @@
     ],
     "candidate_claim": "An attacker who compromises the web application reads the database directly.",
     "candidate_element_ids": null,
+    "reference_verb": "escalate",
+    "candidate_verb": null,
     "label": "no-match",
     "note": "The web application has no path to the database in this model; the escalation route the reference states is the queue."
   },
@@ -1802,6 +2052,8 @@
     ],
     "candidate_claim": "An attacker takes over a player's account by resetting its password.",
     "candidate_element_ids": null,
+    "reference_verb": "impersonate",
+    "candidate_verb": null,
     "label": "no-match",
     "note": "No account-recovery path exists in the model; unsupported rather than a match."
   },
@@ -1815,6 +2067,8 @@
     ],
     "candidate_claim": "An attacker modifies the game client to report fabricated match results.",
     "candidate_element_ids": null,
+    "reference_verb": "forge",
+    "candidate_verb": null,
     "label": "no-match",
     "note": "Relabelled by review sitting 01. The reference is a game server writing fabricated progression to the player database; this is a client reporting fabricated results. Different component, different point of entry, and different remedies \u2014 harden the server's write path against validate what the client sends. The original note treated the route as incidental to 'fabricated data ends up recorded', and in threat modelling the route is the finding."
   },
@@ -1828,6 +2082,8 @@
     ],
     "candidate_claim": "A player disputes a moderation decision and no record shows which agent made it.",
     "candidate_element_ids": null,
+    "reference_verb": "unattributable",
+    "candidate_verb": null,
     "label": "no-match",
     "note": "That is the support-attribution reference; this one is about which writer changed a player record."
   },
@@ -1841,6 +2097,8 @@
     ],
     "candidate_claim": "An attacker corrupts the player database so matchmaking returns wrong results.",
     "candidate_element_ids": null,
+    "reference_verb": "flood",
+    "candidate_verb": null,
     "label": "no-match",
     "note": "Integrity action, not the resource exhaustion the reference claims."
   },
@@ -1857,6 +2115,8 @@
       "flow:build-runner-to-deploy-controller:set-current-release",
       "process:deploy-controller"
     ],
+    "reference_verb": "use-credential",
+    "candidate_verb": "use-credential",
     "label": "match",
     "note": "Pure paraphrase: same action against the same target."
   },
@@ -1872,6 +2132,8 @@
     "candidate_element_ids": [
       "process:deploy-controller"
     ],
+    "reference_verb": "use-credential",
+    "candidate_verb": "use-credential",
     "label": "match",
     "note": "Same action; the candidate cites the controller where the reference also cites the flow, which is element agreement rather than a claim difference."
   },
@@ -1885,6 +2147,8 @@
     ],
     "candidate_claim": "An attacker guesses the build token because it is short.",
     "candidate_element_ids": null,
+    "reference_verb": "use-credential",
+    "candidate_verb": null,
     "label": "no-match",
     "note": "Hard negative: holding a shared token and guessing one are different actions, and the corpus files credential recovery separately under information-disclosure."
   },
@@ -1901,6 +2165,8 @@
       "flow:store-server-to-image-registry:pull-image",
       "store:image-registry"
     ],
+    "reference_verb": "impersonate",
+    "candidate_verb": "impersonate",
     "label": "match",
     "note": "Same action, same target."
   },
@@ -1914,6 +2180,8 @@
     ],
     "candidate_claim": "An attacker pushes a new image into the registry while claiming to be the build runner.",
     "candidate_element_ids": null,
+    "reference_verb": "impersonate",
+    "candidate_verb": null,
     "label": "no-match",
     "note": "Hard negative: same store and lane, but pushing as the runner is a different action on a different flow from pulling as a store server."
   },
@@ -1927,6 +2195,8 @@
     ],
     "candidate_claim": "An attacker uses the store server's expired client certificate to poll the controller.",
     "candidate_element_ids": null,
+    "reference_verb": "impersonate",
+    "candidate_verb": null,
     "label": "no-match",
     "note": "Unsupported: the model records what a store server presents as unknown, and no certificate exists in it."
   },
@@ -1940,6 +2210,8 @@
     ],
     "candidate_claim": "An attacker bypasses the multi-factor authentication on the git server to push as a developer.",
     "candidate_element_ids": null,
+    "reference_verb": "impersonate",
+    "candidate_verb": null,
     "label": "no-match",
     "note": "Unsupported: authentication on that flow is unknown, so a candidate asserting MFA is present is claiming a control the model does not support."
   },
@@ -1955,6 +2227,8 @@
     "candidate_element_ids": [
       "process:deploy-controller"
     ],
+    "reference_verb": "alter",
+    "candidate_verb": "alter",
     "label": "match",
     "note": "Same action, same target."
   },
@@ -1968,6 +2242,8 @@
     ],
     "candidate_claim": "An attacker deletes the current-release record so no store knows what to run.",
     "candidate_element_ids": null,
+    "reference_verb": "alter",
+    "candidate_verb": null,
     "label": "no-match",
     "note": "Hard negative: destroying the record and substituting it are different actions, and the corpus does not carry the deletion."
   },
@@ -1984,6 +2260,8 @@
       "entity:public-package-registry",
       "flow:build-runner-to-public-package-registry:resolve-dependencies"
     ],
+    "reference_verb": "plant",
+    "candidate_verb": "plant",
     "label": "match",
     "note": "Same action and same stated mechanism."
   },
@@ -1997,6 +2275,8 @@
     ],
     "candidate_claim": "An attacker modifies a package in transit between the public registry and the runner.",
     "candidate_element_ids": null,
+    "reference_verb": "plant",
+    "candidate_verb": null,
     "label": "no-match",
     "note": "Hard negative: in-transit modification is a distinct action from publishing the package the lockfile resolves to."
   },
@@ -2012,6 +2292,8 @@
     "candidate_element_ids": [
       "store:image-registry"
     ],
+    "reference_verb": "plant",
+    "candidate_verb": "plant",
     "label": "match",
     "note": "Same action, same target."
   },
@@ -2025,6 +2307,8 @@
     ],
     "candidate_claim": "An attacker deletes images from the registry so store servers cannot pull.",
     "candidate_element_ids": null,
+    "reference_verb": "plant",
+    "candidate_verb": null,
     "label": "no-match",
     "note": "Hard negative: destruction rather than replacement, and the corpus files registry unavailability in the denial-of-service lane instead."
   },
@@ -2039,6 +2323,8 @@
     "candidate_element_ids": [
       "flow:store-server-to-image-registry:pull-image"
     ],
+    "reference_verb": "alter-in-transit",
+    "candidate_verb": "alter-in-transit",
     "label": "match",
     "note": "Same action, same flow."
   },
@@ -2051,6 +2337,8 @@
     ],
     "candidate_claim": "An attacker reads the container image as it crosses the WAN.",
     "candidate_element_ids": null,
+    "reference_verb": "alter-in-transit",
+    "candidate_verb": null,
     "label": "no-match",
     "note": "Hard negative and the pair this case exists to teach: reading and altering the same flow are two claims, and the read is its own reference."
   },
@@ -2067,6 +2355,8 @@
       "flow:developer-to-build-runner:manual-rebuild",
       "process:build-runner"
     ],
+    "reference_verb": "unattributable",
+    "candidate_verb": "unattributable",
     "label": "match",
     "note": "Same claim, stated as the condition rather than as the dispute."
   },
@@ -2083,6 +2373,8 @@
       "flow:build-runner-to-deploy-controller:set-current-release",
       "process:deploy-controller"
     ],
+    "reference_verb": "unattributable",
+    "candidate_verb": "unattributable",
     "label": "match",
     "note": "Paraphrase with the same mechanism."
   },
@@ -2098,6 +2390,8 @@
     "candidate_element_ids": [
       "process:build-runner"
     ],
+    "reference_verb": "recover-credential",
+    "candidate_verb": "recover-credential",
     "label": "match",
     "note": "Same action, same target."
   },
@@ -2111,6 +2405,8 @@
     ],
     "candidate_claim": "An attacker uses the build token to set the estate's release.",
     "candidate_element_ids": null,
+    "reference_verb": "recover-credential",
+    "candidate_verb": null,
     "label": "no-match",
     "note": "Hard negative: using a held credential is the spoofing reference, not the recovery this one claims."
   },
@@ -2123,6 +2419,8 @@
     ],
     "candidate_claim": "An attacker reads source code out of images stored in the registry.",
     "candidate_element_ids": null,
+    "reference_verb": "read",
+    "candidate_verb": null,
     "label": "no-match",
     "note": "Hard negative: a different store, and the registry read is its own reference."
   },
@@ -2135,6 +2433,8 @@
     ],
     "candidate_claim": "An attacker recovers the registry's AES-256 encryption key and reads the images.",
     "candidate_element_ids": null,
+    "reference_verb": "read",
+    "candidate_verb": null,
     "label": "no-match",
     "note": "Unsupported: encryption at rest is unknown in the model, so the candidate invents the control it then defeats."
   },
@@ -2147,6 +2447,8 @@
     ],
     "candidate_claim": "An attacker alters the container image as it crosses the WAN.",
     "candidate_element_ids": null,
+    "reference_verb": "intercept",
+    "candidate_verb": null,
     "label": "no-match",
     "note": "The mirror of the tampering hard negative; matching it in this direction is the same collapse."
   },
@@ -2163,6 +2465,8 @@
       "process:deploy-controller",
       "process:store-server"
     ],
+    "reference_verb": "alter",
+    "candidate_verb": "alter",
     "label": "match",
     "note": "Same action, same estate-wide consequence."
   },
@@ -2176,6 +2480,8 @@
     ],
     "candidate_claim": "An attacker floods the deploy controller so store servers cannot poll.",
     "candidate_element_ids": null,
+    "reference_verb": "alter",
+    "candidate_verb": null,
     "label": "no-match",
     "note": "Hard negative: that is the flooding reference, and it has a materially lower impact because a store keeps running the image it has."
   },
@@ -2188,6 +2494,8 @@
     ],
     "candidate_claim": "An attacker sets a release that crashes on start so stores stop trading.",
     "candidate_element_ids": null,
+    "reference_verb": "flood",
+    "candidate_verb": null,
     "label": "no-match",
     "note": "The inverse of the previous pair, and no-match for the same reason."
   },
@@ -2204,6 +2512,8 @@
       "flow:store-server-to-image-registry:pull-image",
       "store:image-registry"
     ],
+    "reference_verb": "disable",
+    "candidate_verb": "disable",
     "label": "match",
     "note": "Same action, and the candidate names the divergence the reference's notes give."
   },
@@ -2220,6 +2530,8 @@
       "entity:developer",
       "flow:developer-to-build-runner:manual-rebuild"
     ],
+    "reference_verb": "abuse-grant",
+    "candidate_verb": "abuse-grant",
     "label": "match",
     "note": "Same escalation, same stated path."
   },
@@ -2233,6 +2545,8 @@
     ],
     "candidate_claim": "An attacker who is not a developer signs in to the build runner and starts a rebuild.",
     "candidate_element_ids": null,
+    "reference_verb": "abuse-grant",
+    "candidate_verb": null,
     "label": "no-match",
     "note": "Hard negative: an outsider becoming a developer is the spoofing reference; this lane is about the authority a developer legitimately has."
   },
@@ -2249,6 +2563,8 @@
       "process:build-runner",
       "process:store-server"
     ],
+    "reference_verb": "escalate",
+    "candidate_verb": "escalate",
     "label": "match",
     "note": "Coarser phrasing of the same escalation."
   },
@@ -2265,6 +2581,8 @@
       "process:deploy-controller",
       "process:store-server"
     ],
+    "reference_verb": "escalate",
+    "candidate_verb": "escalate",
     "label": "match",
     "note": "Same escalation; the candidate names one of the two boundaries the reference names."
   },
@@ -2278,6 +2596,8 @@
     ],
     "candidate_claim": "An attacker who compromises the build runner reaches the store estate.",
     "candidate_element_ids": null,
+    "reference_verb": "escalate",
+    "candidate_verb": null,
     "label": "no-match",
     "note": "Hard negative: the same two zones in the opposite direction, which is a different reference entirely."
   },
@@ -2294,6 +2614,8 @@
       "flow:build-runner-to-public-package-registry:resolve-dependencies",
       "process:build-runner"
     ],
+    "reference_verb": "escalate",
+    "candidate_verb": "escalate",
     "label": "match",
     "note": "Same action at build time, which is what separates it from the tampering claim on the same flow."
   },
@@ -2310,6 +2632,8 @@
       "process:identity-broker",
       "store:key-store"
     ],
+    "reference_verb": "forge",
+    "candidate_verb": "forge",
     "label": "match",
     "note": "Same action, same target."
   },
@@ -2323,6 +2647,8 @@
     ],
     "candidate_claim": "An attacker reads the signing key out of the key store.",
     "candidate_element_ids": null,
+    "reference_verb": "forge",
+    "candidate_verb": null,
     "label": "no-match",
     "note": "Hard negative: recovering the key is the information-disclosure reference, and using it to mint tokens is this one."
   },
@@ -2339,6 +2665,8 @@
       "flow:franchise-identity-provider-to-identity-broker:vouch-for-colleague",
       "process:identity-broker"
     ],
+    "reference_verb": "impersonate",
+    "candidate_verb": "impersonate",
     "label": "match",
     "note": "Paraphrase with the same stated mechanism."
   },
@@ -2352,6 +2680,8 @@
     ],
     "candidate_claim": "An attacker intercepts the franchise provider's assertion and replays it later to sign in.",
     "candidate_element_ids": null,
+    "reference_verb": "impersonate",
+    "candidate_verb": null,
     "label": "no-match",
     "note": "Hard negative: replaying an authentic assertion is a distinct action from the provider asserting something it should not."
   },
@@ -2367,6 +2697,8 @@
     "candidate_element_ids": [
       "flow:colleague-to-identity-broker:sign-in"
     ],
+    "reference_verb": "impersonate",
+    "candidate_verb": "impersonate",
     "label": "match",
     "note": "Same action, same target; the candidate names the credential where the reference names the unverified control."
   },
@@ -2383,6 +2715,8 @@
       "flow:colleague-to-identity-broker:sign-in",
       "process:identity-broker"
     ],
+    "reference_verb": "use-credential",
+    "candidate_verb": "use-credential",
     "label": "match",
     "note": "Same action and the same two stated qualifiers."
   },
@@ -2396,6 +2730,8 @@
     ],
     "candidate_claim": "An attacker who steals a colleague's token changes the groups inside it to become a store manager.",
     "candidate_element_ids": null,
+    "reference_verb": "use-credential",
+    "candidate_verb": null,
     "label": "no-match",
     "note": "Unsupported: the tokens are signed, so editing claims is not available without the key, and the model supports no such action."
   },
@@ -2412,6 +2748,8 @@
       "flow:store-admin-console-to-identity-broker:fetch-public-key",
       "process:store-admin-console"
     ],
+    "reference_verb": "forge",
+    "candidate_verb": "forge",
     "label": "match",
     "note": "Same action, same target."
   },
@@ -2427,6 +2765,8 @@
     "candidate_element_ids": [
       "store:directory"
     ],
+    "reference_verb": "alter",
+    "candidate_verb": "alter",
     "label": "match",
     "note": "Same action, same target."
   },
@@ -2440,6 +2780,8 @@
     ],
     "candidate_claim": "An attacker reads everyone's group membership out of the directory.",
     "candidate_element_ids": null,
+    "reference_verb": "alter",
+    "candidate_verb": null,
     "label": "no-match",
     "note": "Hard negative: the read against the same store is its own reference in the information-disclosure lane."
   },
@@ -2455,6 +2797,8 @@
     "candidate_element_ids": [
       "flow:identity-broker-to-hr-system:nightly-group-pull"
     ],
+    "reference_verb": "alter-in-transit",
+    "candidate_verb": "alter-in-transit",
     "label": "match",
     "note": "Same action, and the candidate names one of the two outcomes the reference gives."
   },
@@ -2468,6 +2812,8 @@
     ],
     "candidate_claim": "An attacker prevents the overnight feed from running so no group changes arrive.",
     "candidate_element_ids": null,
+    "reference_verb": "alter-in-transit",
+    "candidate_verb": null,
     "label": "no-match",
     "note": "Hard negative: stopping the pull is the denial-of-service reference; altering what it returns is this one."
   },
@@ -2483,6 +2829,8 @@
     "candidate_element_ids": [
       "store:audit-log"
     ],
+    "reference_verb": "delete",
+    "candidate_verb": "delete",
     "label": "match",
     "note": "Narrower instance of the same action against the same target."
   },
@@ -2499,6 +2847,8 @@
       "flow:franchise-identity-provider-to-identity-broker:vouch-for-colleague",
       "store:audit-log"
     ],
+    "reference_verb": "unattributable",
+    "candidate_verb": "unattributable",
     "label": "match",
     "note": "Paraphrase carrying both halves of the reference's mechanism."
   },
@@ -2515,6 +2865,8 @@
       "flow:colleague-to-store-admin-console:change-prices-and-void",
       "process:store-admin-console"
     ],
+    "reference_verb": "unattributable",
+    "candidate_verb": "unattributable",
     "label": "match",
     "note": "Same claim, same mechanism."
   },
@@ -2528,6 +2880,8 @@
     ],
     "candidate_claim": "A store manager changes prices in a store that is not theirs.",
     "candidate_element_ids": null,
+    "reference_verb": "unattributable",
+    "candidate_verb": null,
     "label": "no-match",
     "note": "Hard negative and the pair this case turns on: the elevation reference is the act, this lane is the inability to attribute it afterwards."
   },
@@ -2542,6 +2896,8 @@
     "candidate_element_ids": [
       "store:audit-log"
     ],
+    "reference_verb": "unattributable",
+    "candidate_verb": "unattributable",
     "label": "match",
     "note": "Same claim, stated as the dispute rather than as the condition."
   },
@@ -2556,6 +2912,8 @@
     "candidate_element_ids": [
       "store:key-store"
     ],
+    "reference_verb": "recover-credential",
+    "candidate_verb": "recover-credential",
     "label": "match",
     "note": "Same action, same target."
   },
@@ -2570,6 +2928,8 @@
     "candidate_element_ids": [
       "store:directory"
     ],
+    "reference_verb": "read",
+    "candidate_verb": "read",
     "label": "match",
     "note": "Same read action, same target."
   },
@@ -2582,6 +2942,8 @@
     ],
     "candidate_claim": "An attacker who reaches the audit log alters the sign-in records in it.",
     "candidate_element_ids": null,
+    "reference_verb": "read",
+    "candidate_verb": null,
     "label": "no-match",
     "note": "Hard negative: reading and altering the same store are two claims, and the alteration is its own reference in the tampering lane."
   },
@@ -2596,6 +2958,8 @@
     "candidate_element_ids": [
       "flow:colleague-to-identity-broker:sign-in"
     ],
+    "reference_verb": "intercept",
+    "candidate_verb": "intercept",
     "label": "match",
     "note": "Same action, same flow; the token riding back on the sign-in interaction is what the reference claims."
   },
@@ -2608,6 +2972,8 @@
     ],
     "candidate_claim": "An attacker reads the public half of the signing key as the console fetches it.",
     "candidate_element_ids": null,
+    "reference_verb": "intercept",
+    "candidate_verb": null,
     "label": "no-match",
     "note": "Hard negative: a different flow, and reading a value the source calls public is not a disclosure this model supports."
   },
@@ -2622,6 +2988,8 @@
     "candidate_element_ids": [
       "process:identity-broker"
     ],
+    "reference_verb": "disable",
+    "candidate_verb": "disable",
     "label": "match",
     "note": "Same action, same estate-wide consequence."
   },
@@ -2634,6 +3002,8 @@
     ],
     "candidate_claim": "An attacker takes the store admin console down so prices cannot be changed.",
     "candidate_element_ids": null,
+    "reference_verb": "disable",
+    "candidate_verb": null,
     "label": "no-match",
     "note": "Hard negative: same lane, a different target, and a consequence confined to one application rather than to every sign-in."
   },
@@ -2650,6 +3020,8 @@
       "flow:identity-broker-to-hr-system:nightly-group-pull",
       "store:directory"
     ],
+    "reference_verb": "disable",
+    "candidate_verb": "disable",
     "label": "match",
     "note": "Same action, same silent-staleness consequence."
   },
@@ -2665,6 +3037,8 @@
     "candidate_element_ids": [
       "store:key-store"
     ],
+    "reference_verb": "delete",
+    "candidate_verb": "delete",
     "label": "match",
     "note": "Same action, same target."
   },
@@ -2681,6 +3055,8 @@
       "flow:colleague-to-store-admin-console:change-prices-and-void",
       "process:store-admin-console"
     ],
+    "reference_verb": "abuse-grant",
+    "candidate_verb": "abuse-grant",
     "label": "match",
     "note": "Same escalation, same stated mechanism."
   },
@@ -2694,6 +3070,8 @@
     ],
     "candidate_claim": "An attacker adds themselves to the store-manager group to gain the console's powers.",
     "candidate_element_ids": null,
+    "reference_verb": "abuse-grant",
+    "candidate_verb": null,
     "label": "no-match",
     "note": "Hard negative: acquiring the group is the tampering reference against the directory; this lane is about what the group already grants."
   },
@@ -2710,6 +3088,8 @@
       "flow:identity-broker-to-hr-system:nightly-group-pull",
       "store:directory"
     ],
+    "reference_verb": "abuse-grant",
+    "candidate_verb": "abuse-grant",
     "label": "match",
     "note": "Same escalation, and the candidate assembles the same three stated facts."
   },
@@ -2723,6 +3103,8 @@
     ],
     "candidate_claim": "A colleague who changes role keeps the groups from their old one until the nightly sync runs.",
     "candidate_element_ids": null,
+    "reference_verb": "abuse-grant",
+    "candidate_verb": null,
     "label": "no-match",
     "note": "Hard negative: a plausible neighbouring claim about the same window, but the corpus enumerates the leaver and not the mover."
   },
@@ -2739,6 +3121,8 @@
       "entity:franchise-identity-provider",
       "flow:franchise-identity-provider-to-identity-broker:vouch-for-colleague"
     ],
+    "reference_verb": "escalate",
+    "candidate_verb": "escalate",
     "label": "match",
     "note": "Same escalation, same mechanism."
   },
@@ -2752,6 +3136,8 @@
     ],
     "candidate_claim": "An attacker on the franchise network reaches the corporate network directly.",
     "candidate_element_ids": null,
+    "reference_verb": "escalate",
+    "candidate_verb": null,
     "label": "no-match",
     "note": "Unsupported, and the point of the case: the model gives the franchise party no network path in, only the right to assert an identity."
   },
@@ -2768,6 +3154,8 @@
       "flow:mobile-app-to-web-api:api-traffic",
       "process:web-api"
     ],
+    "reference_verb": "impersonate",
+    "candidate_verb": "impersonate",
     "label": "match",
     "note": "Same action, same target; the candidate states the outcome where the reference states the unknown behind it."
   },
@@ -2784,6 +3172,8 @@
       "flow:mobile-app-to-web-api:api-traffic",
       "process:web-api"
     ],
+    "reference_verb": "impersonate",
+    "candidate_verb": "impersonate",
     "label": "match",
     "note": "Same claim; the candidate cites the process where the reference cites the flow, which is an element-agreement difference, not a claim difference."
   },
@@ -2797,6 +3187,8 @@
     ],
     "candidate_claim": "An attacker guesses a customer's password in the mobile app and places orders on their account.",
     "candidate_element_ids": null,
+    "reference_verb": "impersonate",
+    "candidate_verb": null,
     "label": "no-match",
     "note": "Hard negative: same lane and the same end state, but credential guessing against a customer account is a different action, and no account login is modelled."
   },
@@ -2813,6 +3205,8 @@
       "flow:catalogue-spreadsheet-to-web-api:sql-statements",
       "process:catalogue-spreadsheet"
     ],
+    "reference_verb": "impersonate",
+    "candidate_verb": "impersonate",
     "label": "match",
     "note": "Pure paraphrase: same action, same mechanism."
   },
@@ -2826,6 +3220,8 @@
     ],
     "candidate_claim": "An attacker steals a marketing employee's password and signs in to the catalogue tool.",
     "candidate_element_ids": null,
+    "reference_verb": "impersonate",
+    "candidate_verb": null,
     "label": "no-match",
     "note": "Unsupported: the model describes no login on the spreadsheet, and inventing one turns a file-possession claim into a credential claim."
   },
@@ -2841,6 +3237,8 @@
     "candidate_element_ids": [
       "flow:fax-gateway-to-customer:confirmation-fax"
     ],
+    "reference_verb": "forge",
+    "candidate_verb": "forge",
     "label": "match",
     "note": "Same action, same target."
   },
@@ -2854,6 +3252,8 @@
     ],
     "candidate_claim": "An attacker intercepts the confirmation fax in transit and reads the customer's address.",
     "candidate_element_ids": null,
+    "reference_verb": "forge",
+    "candidate_verb": null,
     "label": "no-match",
     "note": "Hard negative: the same leg and the same stated weakness, but reading is not impersonating, and the corpus files the read separately."
   },
@@ -2868,6 +3268,8 @@
     "candidate_element_ids": [
       "flow:mobile-app-to-web-api:api-traffic"
     ],
+    "reference_verb": "alter-in-transit",
+    "candidate_verb": "alter-in-transit",
     "label": "match",
     "note": "Same action, same flow."
   },
@@ -2880,6 +3282,8 @@
     ],
     "candidate_claim": "An attacker reads order details out of the app's HTTP traffic.",
     "candidate_element_ids": null,
+    "reference_verb": "alter-in-transit",
+    "candidate_verb": null,
     "label": "no-match",
     "note": "Hard negative: same flow, same stated absence of TLS, but reading and altering are two claims and the corpus carries both."
   },
@@ -2896,6 +3300,8 @@
       "flow:catalogue-spreadsheet-to-web-api:sql-statements",
       "process:web-api"
     ],
+    "reference_verb": "alter",
+    "candidate_verb": "alter",
     "label": "match",
     "note": "Same action, same path."
   },
@@ -2909,6 +3315,8 @@
     ],
     "candidate_claim": "An attacker appends extra SQL to the macro traffic so the API also updates customer rows.",
     "candidate_element_ids": null,
+    "reference_verb": "alter",
+    "candidate_verb": null,
     "label": "no-match",
     "note": "Hard negative: same path, different target; using the path as intended and smuggling statements through it are separate corpus entries."
   },
@@ -2925,6 +3333,8 @@
       "flow:catalogue-spreadsheet-to-web-api:sql-statements",
       "process:web-api"
     ],
+    "reference_verb": "inject",
+    "candidate_verb": "inject",
     "label": "match",
     "note": "Same action, same mechanism."
   },
@@ -2938,6 +3348,8 @@
     ],
     "candidate_claim": "An attacker changes catalogue prices using the macros the way they were meant to be used.",
     "candidate_element_ids": null,
+    "reference_verb": "inject",
+    "candidate_verb": null,
     "label": "no-match",
     "note": "Hard negative: this is the neighbouring reference about in-scope authority, not the injection claim."
   },
@@ -2953,6 +3365,8 @@
     "candidate_element_ids": [
       "store:delivery-address-flat-file"
     ],
+    "reference_verb": "alter",
+    "candidate_verb": "alter",
     "label": "match",
     "note": "Same action, same target."
   },
@@ -2966,6 +3380,8 @@
     ],
     "candidate_claim": "An attacker deletes the flat file so the warehouse has no addresses to pick from.",
     "candidate_element_ids": null,
+    "reference_verb": "alter",
+    "candidate_verb": null,
     "label": "no-match",
     "note": "Destruction rather than alteration, and the corpus does not carry it."
   },
@@ -2982,6 +3398,8 @@
       "flow:sims-to-fax-gateway:dispatch-note",
       "process:sims"
     ],
+    "reference_verb": "alter",
+    "candidate_verb": "alter",
     "label": "match",
     "note": "Same action, same target."
   },
@@ -2995,6 +3413,8 @@
     ],
     "candidate_claim": "An attacker changes the delivery address on an order before SIMS writes it out.",
     "candidate_element_ids": null,
+    "reference_verb": "alter",
+    "candidate_verb": null,
     "label": "no-match",
     "note": "Hard negative: same order record, different field and different consequence; the address claim is the flat-file entry."
   },
@@ -3011,6 +3431,8 @@
       "flow:mobile-app-to-web-api:api-traffic",
       "process:web-api"
     ],
+    "reference_verb": "unattributable",
+    "candidate_verb": "unattributable",
     "label": "match",
     "note": "Same claim, stated as the condition rather than the dispute."
   },
@@ -3024,6 +3446,8 @@
     ],
     "candidate_claim": "An attacker deletes order records so a purchase cannot be proven afterwards.",
     "candidate_element_ids": null,
+    "reference_verb": "unattributable",
+    "candidate_verb": null,
     "label": "no-match",
     "note": "Destroying evidence is a different action from never having captured it, and the corpus does not list it."
   },
@@ -3039,6 +3463,8 @@
       "flow:catalogue-spreadsheet-to-web-api:sql-statements",
       "process:web-api"
     ],
+    "reference_verb": "unattributable",
+    "candidate_verb": "unattributable",
     "label": "match",
     "note": "Same claim, same mechanism."
   },
@@ -3053,6 +3479,8 @@
     "candidate_element_ids": [
       "flow:fax-gateway-to-customer:confirmation-fax"
     ],
+    "reference_verb": "unattributable",
+    "candidate_verb": "unattributable",
     "label": "match",
     "note": "Same claim; the candidate names the evidentiary gap the reference states."
   },
@@ -3065,6 +3493,8 @@
     ],
     "candidate_claim": "The confirmation fax exposes the customer's name and address to whoever holds the dialled number.",
     "candidate_element_ids": null,
+    "reference_verb": "unattributable",
+    "candidate_verb": null,
     "label": "no-match",
     "note": "The most valuable negative in this case: identical stated fact, different claim. One is the absence of proof of delivery, the other is disclosure to the wrong recipient, and a judge that merges them collapses two lanes."
   },
@@ -3079,6 +3509,8 @@
     "candidate_element_ids": [
       "flow:mobile-app-to-web-api:api-traffic"
     ],
+    "reference_verb": "intercept",
+    "candidate_verb": "intercept",
     "label": "match",
     "note": "Same action, same flow."
   },
@@ -3093,6 +3525,8 @@
     "candidate_element_ids": [
       "flow:mobile-app-to-web-api:api-traffic"
     ],
+    "reference_verb": "intercept",
+    "candidate_verb": "intercept",
     "label": "match",
     "note": "Same read against the same traffic; the candidate cites the app where the reference cites the flow."
   },
@@ -3105,6 +3539,8 @@
     ],
     "candidate_claim": "An attacker reads customers' card numbers out of the app's HTTP traffic.",
     "candidate_element_ids": null,
+    "reference_verb": "intercept",
+    "candidate_verb": null,
     "label": "no-match",
     "note": "Unsupported, and deliberately so: the source states only that the database holds the card they paid with, never that cards cross this link. This is the invented fact the bootstrap made, preserved as a fixture."
   },
@@ -3119,6 +3555,8 @@
     "candidate_element_ids": [
       "store:user-database"
     ],
+    "reference_verb": "read",
+    "candidate_verb": "read",
     "label": "match",
     "note": "Same action, same target."
   },
@@ -3131,6 +3569,8 @@
     ],
     "candidate_claim": "An attacker queries customer records through the web API rather than reaching the database itself.",
     "candidate_element_ids": null,
+    "reference_verb": "read",
+    "candidate_verb": null,
     "label": "no-match",
     "note": "Hard negative: same data, different action and different element; the corpus does not carry API-mediated retrieval."
   },
@@ -3145,6 +3585,8 @@
     "candidate_element_ids": [
       "store:delivery-address-flat-file"
     ],
+    "reference_verb": "read",
+    "candidate_verb": "read",
     "label": "match",
     "note": "Same action, same target."
   },
@@ -3157,6 +3599,8 @@
     ],
     "candidate_claim": "An attacker reads customers' card details out of the flat file.",
     "candidate_element_ids": null,
+    "reference_verb": "read",
+    "candidate_verb": null,
     "label": "no-match",
     "note": "Unsupported: the source is explicit that only addresses go in that file, so the candidate asserts contents the model denies."
   },
@@ -3172,6 +3616,8 @@
     "candidate_element_ids": [
       "flow:fax-gateway-to-customer:confirmation-fax"
     ],
+    "reference_verb": "read",
+    "candidate_verb": "read",
     "label": "match",
     "note": "Same disclosure, same cause."
   },
@@ -3185,6 +3631,8 @@
     ],
     "candidate_claim": "An attacker taps the phone line and reads the fax while it is being transmitted.",
     "candidate_element_ids": null,
+    "reference_verb": "read",
+    "candidate_verb": null,
     "label": "no-match",
     "note": "Hard negative: same leg, same data, different action; interception of the channel is not misdelivery through it."
   },
@@ -3199,6 +3647,8 @@
     "candidate_element_ids": [
       "process:web-api"
     ],
+    "reference_verb": "flood",
+    "candidate_verb": "flood",
     "label": "match",
     "note": "Same action, same target."
   },
@@ -3215,6 +3665,8 @@
       "flow:catalogue-spreadsheet-to-web-api:sql-statements",
       "process:web-api"
     ],
+    "reference_verb": "inject",
+    "candidate_verb": "inject",
     "label": "match",
     "note": "Same action, same mechanism."
   },
@@ -3228,6 +3680,8 @@
     ],
     "candidate_claim": "An attacker floods the web API until the catalogue is unavailable.",
     "candidate_element_ids": null,
+    "reference_verb": "inject",
+    "candidate_verb": null,
     "label": "no-match",
     "note": "Hard negative: same outcome reached by the exposure claim, not by the macro path; keeping them apart is what makes the two entries worth carrying."
   },
@@ -3244,6 +3698,8 @@
       "flow:web-api-to-sims:order-handover",
       "process:sims"
     ],
+    "reference_verb": "disable",
+    "candidate_verb": "disable",
     "label": "match",
     "note": "Same action, same consequence."
   },
@@ -3257,6 +3713,8 @@
     ],
     "candidate_claim": "An attacker floods the fax gateway so dispatch notes never go out.",
     "candidate_element_ids": null,
+    "reference_verb": "disable",
+    "candidate_verb": null,
     "label": "no-match",
     "note": "Hard negative: a plausible neighbouring denial against the next element along, which the corpus does not enumerate."
   },
@@ -3274,6 +3732,8 @@
       "flow:catalogue-spreadsheet-to-web-api:sql-statements",
       "process:catalogue-spreadsheet"
     ],
+    "reference_verb": "escalate",
+    "candidate_verb": "escalate",
     "label": "match",
     "note": "Same escalation, same mechanism."
   },
@@ -3291,6 +3751,8 @@
       "flow:catalogue-spreadsheet-to-web-api:sql-statements",
       "process:web-api"
     ],
+    "reference_verb": "escalate",
+    "candidate_verb": "escalate",
     "label": "match",
     "note": "Coarser phrasing of the same escalation across the same zone boundary."
   },
@@ -3307,6 +3769,8 @@
       "flow:catalogue-spreadsheet-to-web-api:sql-statements",
       "store:user-database"
     ],
+    "reference_verb": "abuse-grant",
+    "candidate_verb": "abuse-grant",
     "label": "match",
     "note": "Same escalation, same mechanism."
   },
@@ -3320,6 +3784,8 @@
     ],
     "candidate_claim": "An attacker with catalogue access changes product prices.",
     "candidate_element_ids": null,
+    "reference_verb": "abuse-grant",
+    "candidate_verb": null,
     "label": "no-match",
     "note": "Hard negative: staying inside the path's intended authority is the tampering reference, not an escalation."
   },
@@ -3336,6 +3802,8 @@
       "flow:admin-to-mysql-database:direct-administration",
       "store:mysql-database"
     ],
+    "reference_verb": "use-credential",
+    "candidate_verb": "use-credential",
     "label": "match",
     "note": "Same action, same target."
   },
@@ -3352,6 +3820,8 @@
       "flow:admin-to-mysql-database:direct-administration",
       "store:mysql-database"
     ],
+    "reference_verb": "use-credential",
+    "candidate_verb": "use-credential",
     "label": "match",
     "note": "Same claim; the candidate cites the store where the reference cites the flow and the admin."
   },
@@ -3365,6 +3835,8 @@
     ],
     "candidate_claim": "An attacker brute-forces the admin's database password.",
     "candidate_element_ids": null,
+    "reference_verb": "use-credential",
+    "candidate_verb": null,
     "label": "no-match",
     "note": "Hard negative: holding a credential and guessing one are different actions, and the corpus carries only the first."
   },
@@ -3381,6 +3853,8 @@
       "flow:web-server-to-cdn-bucket:asset-publish",
       "store:cdn-bucket"
     ],
+    "reference_verb": "impersonate",
+    "candidate_verb": "impersonate",
     "label": "match",
     "note": "Same action, same target."
   },
@@ -3394,6 +3868,8 @@
     ],
     "candidate_claim": "An attacker replaces an asset already sitting in the bucket.",
     "candidate_element_ids": null,
+    "reference_verb": "impersonate",
+    "candidate_verb": null,
     "label": "no-match",
     "note": "Hard negative: publishing as the web server and overwriting what is there are separate entries in separate lanes."
   },
@@ -3410,6 +3886,8 @@
       "entity:reader",
       "flow:reader-to-web-server:page-requests"
     ],
+    "reference_verb": "use-credential",
+    "candidate_verb": "use-credential",
     "label": "match",
     "note": "Same action, same target."
   },
@@ -3423,6 +3901,8 @@
     ],
     "candidate_claim": "An attacker registers a reader account in someone else's name.",
     "candidate_element_ids": null,
+    "reference_verb": "use-credential",
+    "candidate_verb": null,
     "label": "no-match",
     "note": "Different action against a different target, and registration is nowhere in the model."
   },
@@ -3437,6 +3917,8 @@
     "candidate_element_ids": [
       "flow:reader-to-cdn:asset-fetch"
     ],
+    "reference_verb": "alter-in-transit",
+    "candidate_verb": "alter-in-transit",
     "label": "match",
     "note": "Same action, same flow."
   },
@@ -3449,6 +3931,8 @@
     ],
     "candidate_claim": "An attacker replaces the asset in the CDN bucket so every reader receives the modified file.",
     "candidate_element_ids": null,
+    "reference_verb": "alter-in-transit",
+    "candidate_verb": null,
     "label": "no-match",
     "note": "The distinction this case exists to teach: modifying in transit and planting at rest are two claims, and both are in the corpus."
   },
@@ -3464,6 +3948,8 @@
     "candidate_element_ids": [
       "store:cdn-bucket"
     ],
+    "reference_verb": "plant",
+    "candidate_verb": "plant",
     "label": "match",
     "note": "Same action, same target."
   },
@@ -3477,6 +3963,8 @@
     ],
     "candidate_claim": "An attacker deletes the published assets from the bucket.",
     "candidate_element_ids": null,
+    "reference_verb": "plant",
+    "candidate_verb": null,
     "label": "no-match",
     "note": "Hard negative: same access, denial rather than alteration; the corpus files that separately."
   },
@@ -3491,6 +3979,8 @@
     "candidate_element_ids": [
       "flow:admin-to-mysql-database:direct-administration"
     ],
+    "reference_verb": "alter-in-transit",
+    "candidate_verb": "alter-in-transit",
     "label": "match",
     "note": "Same action, same flow."
   },
@@ -3503,6 +3993,8 @@
     ],
     "candidate_claim": "An attacker reads the admin's SQL traffic because there is no TLS on the connection.",
     "candidate_element_ids": null,
+    "reference_verb": "alter-in-transit",
+    "candidate_verb": null,
     "label": "no-match",
     "note": "Hard negative: identical stated absence, and reading it is the disclosure entry rather than this one."
   },
@@ -3518,6 +4010,8 @@
     "candidate_element_ids": [
       "store:mysql-database"
     ],
+    "reference_verb": "alter",
+    "candidate_verb": "alter",
     "label": "match",
     "note": "Same action, same target."
   },
@@ -3534,6 +4028,8 @@
       "flow:admin-to-mysql-database:direct-administration",
       "store:mysql-database"
     ],
+    "reference_verb": "unattributable",
+    "candidate_verb": "unattributable",
     "label": "match",
     "note": "Same claim, same stated mechanism."
   },
@@ -3550,6 +4046,8 @@
       "flow:admin-to-mysql-database:direct-administration",
       "process:web-server"
     ],
+    "reference_verb": "unattributable",
+    "candidate_verb": "unattributable",
     "label": "match",
     "note": "Same claim; the candidate cites the store where the reference cites the flow and the web server."
   },
@@ -3563,6 +4061,8 @@
     ],
     "candidate_claim": "An attacker deletes the CMS audit log to hide the change they made.",
     "candidate_element_ids": null,
+    "reference_verb": "unattributable",
+    "candidate_verb": null,
     "label": "no-match",
     "note": "Unsupported: the model describes no log to delete, and the reference's point is that the path was never recorded in the first place."
   },
@@ -3579,6 +4079,8 @@
       "entity:reader",
       "flow:reader-to-web-server:page-requests"
     ],
+    "reference_verb": "unattributable",
+    "candidate_verb": "unattributable",
     "label": "match",
     "note": "Same claim, same mechanism."
   },
@@ -3593,6 +4095,8 @@
     "candidate_element_ids": [
       "flow:admin-to-mysql-database:direct-administration"
     ],
+    "reference_verb": "intercept",
+    "candidate_verb": "intercept",
     "label": "match",
     "note": "Same action, same flow."
   },
@@ -3605,6 +4109,8 @@
     ],
     "candidate_claim": "An attacker reads readers' page requests in transit.",
     "candidate_element_ids": null,
+    "reference_verb": "intercept",
+    "candidate_verb": null,
     "label": "no-match",
     "note": "Unsupported: that link is stated to be HTTPS, so the candidate asserts a weakness the model contradicts."
   },
@@ -3619,6 +4125,8 @@
     "candidate_element_ids": [
       "store:mysql-database"
     ],
+    "reference_verb": "read",
+    "candidate_verb": "read",
     "label": "match",
     "note": "Same action, same target."
   },
@@ -3631,6 +4139,8 @@
     ],
     "candidate_claim": "An attacker reads account records off the wire from the admin's connection.",
     "candidate_element_ids": null,
+    "reference_verb": "read",
+    "candidate_verb": null,
     "label": "no-match",
     "note": "Hard negative: same records, at rest versus in transit, and the corpus carries both as distinct entries."
   },
@@ -3646,6 +4156,8 @@
     "candidate_element_ids": [
       "flow:reader-to-cdn:asset-fetch"
     ],
+    "reference_verb": "intercept",
+    "candidate_verb": "intercept",
     "label": "match",
     "note": "Same action, same inference."
   },
@@ -3659,6 +4171,8 @@
     ],
     "candidate_claim": "An attacker reads the reader's session cookie out of the HTTP asset request.",
     "candidate_element_ids": null,
+    "reference_verb": "intercept",
+    "candidate_verb": null,
     "label": "no-match",
     "note": "Unsupported: the model says nothing about cookie scope, and the candidate turns a traffic-analysis claim into a session-theft one."
   },
@@ -3673,6 +4187,8 @@
     "candidate_element_ids": [
       "process:web-server"
     ],
+    "reference_verb": "flood",
+    "candidate_verb": "flood",
     "label": "match",
     "note": "Same action, same target."
   },
@@ -3687,6 +4203,8 @@
     "candidate_element_ids": [
       "store:cdn-bucket"
     ],
+    "reference_verb": "delete",
+    "candidate_verb": "delete",
     "label": "match",
     "note": "Same action, same consequence."
   },
@@ -3699,6 +4217,8 @@
     ],
     "candidate_claim": "An attacker replaces the bucket's assets with malicious ones.",
     "candidate_element_ids": null,
+    "reference_verb": "delete",
+    "candidate_verb": null,
     "label": "no-match",
     "note": "Hard negative: same access, the tampering entry rather than the denial one."
   },
@@ -3715,6 +4235,8 @@
       "flow:admin-to-mysql-database:direct-administration",
       "store:mysql-database"
     ],
+    "reference_verb": "flood",
+    "candidate_verb": "flood",
     "label": "match",
     "note": "Same action, same target."
   },
@@ -3731,6 +4253,8 @@
       "flow:admin-to-mysql-database:direct-administration",
       "store:mysql-database"
     ],
+    "reference_verb": "escalate",
+    "candidate_verb": "escalate",
     "label": "match",
     "note": "Same escalation, same mechanism."
   },
@@ -3744,6 +4268,8 @@
     ],
     "candidate_claim": "An attacker signs in to the CMS as an editor and publishes a page.",
     "candidate_element_ids": null,
+    "reference_verb": "escalate",
+    "candidate_verb": null,
     "label": "no-match",
     "note": "Hard negative: an escalation inside the application, which is precisely the path this reference is about going around."
   },
@@ -3760,6 +4286,8 @@
       "entity:reader",
       "store:cdn-bucket"
     ],
+    "reference_verb": "plant",
+    "candidate_verb": "plant",
     "label": "match",
     "note": "Same escalation, same mechanism."
   },
@@ -3776,6 +4304,8 @@
       "entity:reader",
       "store:cdn-bucket"
     ],
+    "reference_verb": "plant",
+    "candidate_verb": "plant",
     "label": "match",
     "note": "Coarser phrasing of the same escalation."
   },
@@ -3789,6 +4319,8 @@
     ],
     "candidate_claim": "An attacker uses the planted script to steal the admin's database credentials.",
     "candidate_element_ids": null,
+    "reference_verb": "plant",
+    "candidate_verb": null,
     "label": "no-match",
     "note": "Unsupported: the admin never uses the site, so nothing in the model connects browser execution to that credential."
   },
@@ -3805,6 +4337,8 @@
       "entity:colleague",
       "flow:colleague-to-scheduling-web-app:view-shifts"
     ],
+    "reference_verb": "impersonate",
+    "candidate_verb": "impersonate",
     "label": "match",
     "note": "Same action, same target; the reference states the unknown that makes it possible and the candidate states the outcome."
   },
@@ -3818,6 +4352,8 @@
     ],
     "candidate_claim": "An attacker signs in as a colleague and changes their own availability to get better shifts.",
     "candidate_element_ids": null,
+    "reference_verb": "impersonate",
+    "candidate_verb": null,
     "label": "no-match",
     "note": "Hard negative: same element, same lane, and the initial action is the same, but the claim is a write where the reference's is a read."
   },
@@ -3834,6 +4370,8 @@
       "entity:store-manager",
       "flow:store-manager-to-scheduling-web-app:build-rota"
     ],
+    "reference_verb": "impersonate",
+    "candidate_verb": "impersonate",
     "label": "match",
     "note": "Same action, same target."
   },
@@ -3847,6 +4385,8 @@
     ],
     "candidate_claim": "An attacker signs in to the app as a colleague and reads their shifts.",
     "candidate_element_ids": null,
+    "reference_verb": "impersonate",
+    "candidate_verb": null,
     "label": "no-match",
     "note": "Hard negative: the same lane and the same app, but the reference is specifically the manager identity, and the colleague claim is its own entry."
   },
@@ -3863,6 +4403,8 @@
       "flow:payroll-system-to-file-share:collect-payroll-export",
       "store:file-share"
     ],
+    "reference_verb": "impersonate",
+    "candidate_verb": "impersonate",
     "label": "match",
     "note": "Same action, same flow."
   },
@@ -3876,6 +4418,8 @@
     ],
     "candidate_claim": "An attacker reads the payroll export from the file share because it is stored unencrypted.",
     "candidate_element_ids": null,
+    "reference_verb": "impersonate",
+    "candidate_verb": null,
     "label": "no-match",
     "note": "Asserts a fact the model does not support \u2014 encryption at rest is unknown, not absent \u2014 so this is unsupported rather than a match."
   },
@@ -3891,6 +4435,8 @@
       "flow:scheduling-web-app-to-scheduling-service:rota-requests",
       "process:scheduling-service"
     ],
+    "reference_verb": "impersonate",
+    "candidate_verb": "impersonate",
     "label": "match",
     "note": "Same action against the same flow; the candidate cites the service where the reference cites the flow, which is element agreement, not a claim difference."
   },
@@ -3906,6 +4452,8 @@
     "candidate_element_ids": [
       "store:file-share"
     ],
+    "reference_verb": "alter",
+    "candidate_verb": "alter",
     "label": "match",
     "note": "Same action, same target, same consequence."
   },
@@ -3919,6 +4467,8 @@
     ],
     "candidate_claim": "An attacker deletes the payroll export from the share so it is never collected.",
     "candidate_element_ids": null,
+    "reference_verb": "alter",
+    "candidate_verb": null,
     "label": "no-match",
     "note": "Hard negative: same element and lane, but destruction is a distinct action from alteration, and the corpus files the missing export under denial of service."
   },
@@ -3934,6 +4484,8 @@
     "candidate_element_ids": [
       "store:rota-database"
     ],
+    "reference_verb": "alter",
+    "candidate_verb": "alter",
     "label": "match",
     "note": "Same action, same target."
   },
@@ -3948,6 +4500,8 @@
     "candidate_element_ids": [
       "flow:store-manager-to-scheduling-web-app:build-rota"
     ],
+    "reference_verb": "alter-in-transit",
+    "candidate_verb": "alter-in-transit",
     "label": "match",
     "note": "Same action, same flow."
   },
@@ -3960,6 +4514,8 @@
     ],
     "candidate_claim": "An attacker intercepts a manager's session and reads the rota in transit.",
     "candidate_element_ids": null,
+    "reference_verb": "alter-in-transit",
+    "candidate_verb": null,
     "label": "no-match",
     "note": "Hard negative on the same flow: reading and modifying are two claims, and the corpus carries the read separately."
   },
@@ -3976,6 +4532,8 @@
       "flow:store-manager-to-scheduling-web-app:build-rota",
       "store:rota-database"
     ],
+    "reference_verb": "unattributable",
+    "candidate_verb": "unattributable",
     "label": "match",
     "note": "Paraphrase with the same mechanism."
   },
@@ -3989,6 +4547,8 @@
     ],
     "candidate_claim": "An attacker deletes the audit records of a rota change to hide it.",
     "candidate_element_ids": null,
+    "reference_verb": "unattributable",
+    "candidate_verb": null,
     "label": "no-match",
     "note": "Unsupported: the model has no audit store to delete from, which is the reference's own point."
   },
@@ -4005,6 +4565,8 @@
       "flow:payroll-system-to-file-share:collect-payroll-export",
       "store:file-share"
     ],
+    "reference_verb": "unattributable",
+    "candidate_verb": "unattributable",
     "label": "match",
     "note": "Same claim stated as the condition rather than the dispute."
   },
@@ -4019,6 +4581,8 @@
     "candidate_element_ids": [
       "store:rota-database"
     ],
+    "reference_verb": "read",
+    "candidate_verb": "read",
     "label": "match",
     "note": "Same read action against the same target."
   },
@@ -4031,6 +4595,8 @@
     ],
     "candidate_claim": "An attacker reads colleague contact details from the rota database, which is classified confidential and unencrypted.",
     "candidate_element_ids": null,
+    "reference_verb": "read",
+    "candidate_verb": null,
     "label": "no-match",
     "note": "Unsupported on two counts: data classification is unknown and encryption at rest is unknown, so both asserted facts are invented."
   },
@@ -4046,6 +4612,8 @@
     "candidate_element_ids": [
       "store:file-share"
     ],
+    "reference_verb": "read",
+    "candidate_verb": "read",
     "label": "match",
     "note": "Same action, same target."
   },
@@ -4060,6 +4628,8 @@
     "candidate_element_ids": [
       "process:scheduling-web-app"
     ],
+    "reference_verb": "flood",
+    "candidate_verb": "flood",
     "label": "match",
     "note": "Same action, same target."
   },
@@ -4076,6 +4646,8 @@
       "flow:scheduling-service-to-file-share:write-payroll-export",
       "store:file-share"
     ],
+    "reference_verb": "disable",
+    "candidate_verb": "disable",
     "label": "match",
     "note": "Same action, same consequence."
   },
@@ -4092,6 +4664,8 @@
       "flow:colleague-to-scheduling-web-app:view-shifts",
       "process:scheduling-web-app"
     ],
+    "reference_verb": "abuse-grant",
+    "candidate_verb": "abuse-grant",
     "label": "match",
     "note": "Same escalation, same mechanism."
   },
@@ -4105,6 +4679,8 @@
     ],
     "candidate_claim": "A colleague exploits a flaw in the app's role checks to become an administrator.",
     "candidate_element_ids": null,
+    "reference_verb": "abuse-grant",
+    "candidate_verb": null,
     "label": "no-match",
     "note": "Hard negative: the model states no role-check implementation and no administrator role, so the claim asserts machinery that does not exist."
   },
@@ -4121,6 +4697,8 @@
       "flow:scheduling-web-app-to-scheduling-service:rota-requests",
       "process:scheduling-service"
     ],
+    "reference_verb": "escalate",
+    "candidate_verb": "escalate",
     "label": "match",
     "note": "Same escalation, same route."
   },
@@ -4137,6 +4715,8 @@
       "entity:supplier",
       "flow:supplier-to-supplier-portal:upload-documents"
     ],
+    "reference_verb": "impersonate",
+    "candidate_verb": "impersonate",
     "label": "match",
     "note": "Same action, same target; sign-in is the one control the source states, and both phrasings rest on it."
   },
@@ -4150,6 +4730,8 @@
     ],
     "candidate_claim": "An attacker signs in as a supplier because the portal enforces no multi-factor authentication.",
     "candidate_element_ids": null,
+    "reference_verb": "impersonate",
+    "candidate_verb": null,
     "label": "no-match",
     "note": "Unsupported: the source states a username and password and never states that nothing else is required, so the asserted absence is invented."
   },
@@ -4166,6 +4748,8 @@
       "entity:category-manager",
       "flow:category-manager-to-supplier-portal:review-documents"
     ],
+    "reference_verb": "impersonate",
+    "candidate_verb": "impersonate",
     "label": "match",
     "note": "Same action, same target."
   },
@@ -4179,6 +4763,8 @@
     ],
     "candidate_claim": "An attacker signs in as a category manager, which the platform prevents because all access is fully authenticated.",
     "candidate_element_ids": null,
+    "reference_verb": "impersonate",
+    "candidate_verb": null,
     "label": "no-match",
     "note": "Treats the vendor's datasheet phrasing as a control in the model; the authentication attribute on that flow is unknown."
   },
@@ -4195,6 +4781,8 @@
       "flow:portal-vendor-to-landing-bucket:push-nightly-extract",
       "store:landing-bucket"
     ],
+    "reference_verb": "plant",
+    "candidate_verb": "plant",
     "label": "match",
     "note": "Same action, same target."
   },
@@ -4208,6 +4796,8 @@
     ],
     "candidate_claim": "An attacker reads the nightly extract out of the landing bucket.",
     "candidate_element_ids": null,
+    "reference_verb": "plant",
+    "candidate_verb": null,
     "label": "no-match",
     "note": "Hard negative: same element, same file, but reading is the information-disclosure entry and writing is this one."
   },
@@ -4224,6 +4814,8 @@
       "flow:supplier-master-service-to-landing-bucket:load-extract",
       "store:landing-bucket"
     ],
+    "reference_verb": "alter",
+    "candidate_verb": "alter",
     "label": "match",
     "note": "Same action, same target; picked up as-is is stated in the source and both phrasings rely on it."
   },
@@ -4237,6 +4829,8 @@
     ],
     "candidate_claim": "An attacker alters the extract while the vendor is transferring it.",
     "candidate_element_ids": null,
+    "reference_verb": "alter",
+    "candidate_verb": null,
     "label": "no-match",
     "note": "Hard negative: tampering at rest in the bucket and tampering in transit are two entries in this case, deliberately kept apart."
   },
@@ -4251,6 +4845,8 @@
     "candidate_element_ids": [
       "flow:portal-vendor-to-landing-bucket:push-nightly-extract"
     ],
+    "reference_verb": "alter-in-transit",
+    "candidate_verb": "alter-in-transit",
     "label": "match",
     "note": "Same action, same flow, and the candidate names the same unresolved conflict."
   },
@@ -4263,6 +4859,8 @@
     ],
     "candidate_claim": "An attacker on the path of the nightly transfer modifies the extract, which is sent unencrypted.",
     "candidate_element_ids": null,
+    "reference_verb": "alter-in-transit",
+    "candidate_verb": null,
     "label": "no-match",
     "note": "Unsupported: encryption in transit is unknown because the source contradicts itself, and resolving the contradiction into a stated absence is the error this case exists to catch."
   },
@@ -4278,6 +4876,8 @@
     "candidate_element_ids": [
       "store:document-store"
     ],
+    "reference_verb": "alter",
+    "candidate_verb": "alter",
     "label": "match",
     "note": "Same action, same target."
   },
@@ -4291,6 +4891,8 @@
     ],
     "candidate_claim": "An attacker alters a compliance document in the vendor's platform, which stores documents without encryption.",
     "candidate_element_ids": null,
+    "reference_verb": "alter",
+    "candidate_verb": null,
     "label": "no-match",
     "note": "Unsupported: encryption at rest on the document store is unknown, and enterprise-grade encryption throughout is a marketing claim rather than a stated property either way."
   },
@@ -4307,6 +4909,8 @@
       "flow:category-manager-to-supplier-portal:review-documents",
       "process:supplier-portal"
     ],
+    "reference_verb": "unattributable",
+    "candidate_verb": "unattributable",
     "label": "match",
     "note": "Paraphrase with the same mechanism."
   },
@@ -4320,6 +4924,8 @@
     ],
     "candidate_claim": "A category manager disputes an approval, and the platform's audit log shows the wrong actor.",
     "candidate_element_ids": null,
+    "reference_verb": "unattributable",
+    "candidate_verb": null,
     "label": "no-match",
     "note": "Unsupported: there is no audit log element in the model, which is precisely the reference's claim."
   },
@@ -4336,6 +4942,8 @@
       "flow:portal-vendor-to-landing-bucket:push-nightly-extract",
       "store:landing-bucket"
     ],
+    "reference_verb": "unattributable",
+    "candidate_verb": "unattributable",
     "label": "match",
     "note": "Same claim, same boundary."
   },
@@ -4350,6 +4958,8 @@
     "candidate_element_ids": [
       "store:landing-bucket"
     ],
+    "reference_verb": "read",
+    "candidate_verb": "read",
     "label": "match",
     "note": "Same read action, same target."
   },
@@ -4365,6 +4975,8 @@
     "candidate_element_ids": [
       "store:document-store"
     ],
+    "reference_verb": "read",
+    "candidate_verb": "read",
     "label": "match",
     "note": "Same action, same target."
   },
@@ -4379,6 +4991,8 @@
     "candidate_element_ids": [
       "flow:supplier-to-supplier-portal:upload-documents"
     ],
+    "reference_verb": "intercept",
+    "candidate_verb": "intercept",
     "label": "match",
     "note": "Same action, same flow."
   },
@@ -4395,6 +5009,8 @@
       "flow:supplier-to-supplier-portal:upload-documents",
       "process:supplier-portal"
     ],
+    "reference_verb": "disable",
+    "candidate_verb": "disable",
     "label": "match",
     "note": "Same claim; availability of a system we do not run is still an exposure worth reporting."
   },
@@ -4411,6 +5027,8 @@
       "flow:supplier-master-service-to-landing-bucket:load-extract",
       "store:supplier-database"
     ],
+    "reference_verb": "disable",
+    "candidate_verb": "disable",
     "label": "match",
     "note": "Same action, same silent-staleness consequence."
   },
@@ -4424,6 +5042,8 @@
     ],
     "candidate_claim": "An attacker floods the supplier master service so it cannot process the extract.",
     "candidate_element_ids": null,
+    "reference_verb": "disable",
+    "candidate_verb": null,
     "label": "no-match",
     "note": "Hard negative: same element and lane, but flooding a process is a different action from the missing nightly load the reference claims."
   },
@@ -4440,6 +5060,8 @@
       "process:supplier-portal",
       "store:document-store"
     ],
+    "reference_verb": "abuse-grant",
+    "candidate_verb": "abuse-grant",
     "label": "match",
     "note": "Same escalation, same target."
   },
@@ -4453,6 +5075,8 @@
     ],
     "candidate_claim": "A supplier escalates to a category manager role in the portal.",
     "candidate_element_ids": null,
+    "reference_verb": "abuse-grant",
+    "candidate_verb": null,
     "label": "no-match",
     "note": "Hard negative: cross-tenant access and vertical role escalation are different claims, and only the former is in the corpus."
   },
@@ -4469,6 +5093,8 @@
       "flow:supplier-master-service-to-landing-bucket:load-extract",
       "process:supplier-master-service"
     ],
+    "reference_verb": "inject",
+    "candidate_verb": "inject",
     "label": "match",
     "note": "Same escalation, same mechanism."
   },
@@ -4486,6 +5112,8 @@
       "flow:schedule-importer-to-dispatch-api:post-work-orders",
       "process:dispatch-api"
     ],
+    "reference_verb": "use-credential",
+    "candidate_verb": "use-credential",
     "label": "match",
     "note": "Pure paraphrase: same action, same flow, same stated credential."
   },
@@ -4500,6 +5128,8 @@
     ],
     "candidate_claim": "An attacker guesses the importer's API token, which is too short to resist it.",
     "candidate_element_ids": null,
+    "reference_verb": "use-credential",
+    "candidate_verb": null,
     "label": "no-match",
     "note": "Unsupported, and a different action: the source states the token was never rotated and states nothing about its length."
   },
@@ -4516,6 +5146,8 @@
       "flow:dispatch-console-to-dispatch-api:live-job-status",
       "process:dispatch-api"
     ],
+    "reference_verb": "impersonate",
+    "candidate_verb": "impersonate",
     "label": "match",
     "note": "Same action, same flow; hedged phrasing does not change the claim."
   },
@@ -4529,6 +5161,8 @@
     ],
     "candidate_claim": "An attacker steals a duty engineer's session token out of the browser and opens the socket with it.",
     "candidate_element_ids": null,
+    "reference_verb": "impersonate",
+    "candidate_verb": null,
     "label": "no-match",
     "note": "Hard negative: recovering a session and opening an unauthenticated handshake are different actions, and the corpus carries only the second."
   },
@@ -4546,6 +5180,8 @@
       "entity:scheduling-partner",
       "flow:schedule-importer-to-scheduling-partner:pull-schedule-feed"
     ],
+    "reference_verb": "impersonate",
+    "candidate_verb": "impersonate",
     "label": "match",
     "note": "Same action, same flow."
   },
@@ -4559,6 +5195,8 @@
     ],
     "candidate_claim": "An attacker signs in to the console as a duty engineer because no multi-factor authentication is enforced.",
     "candidate_element_ids": null,
+    "reference_verb": "impersonate",
+    "candidate_verb": null,
     "label": "no-match",
     "note": "Unsupported: the source states nobody wrote the sign-in down, so an asserted absence of a second factor is invented rather than read."
   },
@@ -4576,6 +5214,8 @@
       "flow:schedule-importer-to-scheduling-partner:pull-schedule-feed",
       "process:schedule-importer"
     ],
+    "reference_verb": "forge",
+    "candidate_verb": "forge",
     "label": "match",
     "note": "Same action and the same path into the control plane; the candidate names the consequence the reference's notes give."
   },
@@ -4590,6 +5230,8 @@
     ],
     "candidate_claim": "An attacker modifies the partner's XML document while it is in transit to the importer.",
     "candidate_element_ids": null,
+    "reference_verb": "forge",
+    "candidate_verb": null,
     "label": "no-match",
     "note": "Hard negative: the reference's action is answering the pull, and in-transit modification is a distinct claim the corpus does not carry on a flow stated to run over HTTPS."
   },
@@ -4605,6 +5247,8 @@
     "candidate_element_ids": [
       "flow:dispatch-console-to-dispatch-api:dispatch-requests"
     ],
+    "reference_verb": "alter-in-transit",
+    "candidate_verb": "alter-in-transit",
     "label": "match",
     "note": "Same action, same flow."
   },
@@ -4618,6 +5262,8 @@
     ],
     "candidate_claim": "An attacker on the corporate network reads a dispatch request in flight.",
     "candidate_element_ids": null,
+    "reference_verb": "alter-in-transit",
+    "candidate_verb": null,
     "label": "no-match",
     "note": "Hard negative: reading and altering the same flow are two lanes, and the corpus keeps them apart deliberately."
   },
@@ -4633,6 +5279,8 @@
     "candidate_element_ids": [
       "store:dispatch-database"
     ],
+    "reference_verb": "forge",
+    "candidate_verb": "alter",
     "label": "match",
     "note": "Same action, same target."
   },
@@ -4646,6 +5294,8 @@
     ],
     "candidate_claim": "An attacker deletes documents from the schedule archive so no copy of the day's work survives.",
     "candidate_element_ids": null,
+    "reference_verb": "alter",
+    "candidate_verb": null,
     "label": "no-match",
     "note": "Destruction rather than alteration, and the corpus does not carry it."
   },
@@ -4662,6 +5312,8 @@
       "flow:dispatch-console-to-dispatch-api:dispatch-requests",
       "store:dispatch-database"
     ],
+    "reference_verb": "unattributable",
+    "candidate_verb": "unattributable",
     "label": "match",
     "note": "Same claim stated as the condition rather than the dispute."
   },
@@ -4675,6 +5327,8 @@
     ],
     "candidate_claim": "A duty engineer disputes a crew move and the dispatch API's audit log names the wrong actor.",
     "candidate_element_ids": null,
+    "reference_verb": "unattributable",
+    "candidate_verb": null,
     "label": "no-match",
     "note": "Unsupported: there is no log element in the model, and the reference's claim is precisely that the job order carries no person."
   },
@@ -4689,6 +5343,8 @@
     "candidate_element_ids": [
       "flow:dispatch-console-to-dispatch-api:live-job-status"
     ],
+    "reference_verb": "intercept",
+    "candidate_verb": "intercept",
     "label": "match",
     "note": "Same read action, same flow."
   },
@@ -4703,6 +5359,8 @@
     "candidate_element_ids": [
       "store:dispatch-database"
     ],
+    "reference_verb": "read",
+    "candidate_verb": "read",
     "label": "match",
     "note": "A backup is a narrower instance of obtaining a copy; same action, same target."
   },
@@ -4715,6 +5373,8 @@
     ],
     "candidate_claim": "An attacker reads crew names out of the schedule archive.",
     "candidate_element_ids": null,
+    "reference_verb": "read",
+    "candidate_verb": null,
     "label": "no-match",
     "note": "Unsupported: the archive holds the partner's schedule documents, and the model puts no crew details in it."
   },
@@ -4731,6 +5391,8 @@
       "flow:schedule-importer-to-scheduling-partner:pull-schedule-feed",
       "process:schedule-importer"
     ],
+    "reference_verb": "elicit",
+    "candidate_verb": "elicit",
     "label": "match",
     "note": "Same action, same mechanism."
   },
@@ -4746,6 +5408,8 @@
     "candidate_element_ids": [
       "store:schedule-archive"
     ],
+    "reference_verb": "read",
+    "candidate_verb": "read",
     "label": "match",
     "note": "Same action, same target."
   },
@@ -4762,6 +5426,8 @@
       "flow:dispatch-console-to-dispatch-api:live-job-status",
       "process:dispatch-api"
     ],
+    "reference_verb": "flood",
+    "candidate_verb": "flood",
     "label": "match",
     "note": "Same action, same target."
   },
@@ -4778,6 +5444,8 @@
       "flow:schedule-importer-to-scheduling-partner:pull-schedule-feed",
       "process:schedule-importer"
     ],
+    "reference_verb": "flood",
+    "candidate_verb": "flood",
     "label": "match",
     "note": "A narrower instance of the same action and the same silent-staleness consequence."
   },
@@ -4795,6 +5463,8 @@
       "flow:schedule-importer-to-dispatch-api:post-work-orders",
       "process:dispatch-api"
     ],
+    "reference_verb": "escalate",
+    "candidate_verb": "escalate",
     "label": "match",
     "note": "Same escalation, same mechanism."
   },
@@ -4809,6 +5479,8 @@
     ],
     "candidate_claim": "An attacker who takes the dispatch API gains rights across the corporate network.",
     "candidate_element_ids": null,
+    "reference_verb": "escalate",
+    "candidate_verb": null,
     "label": "no-match",
     "note": "Hard negative and the wrong direction: the authority sits in the control plane, so a move out of it is not the escalation the reference claims."
   },
@@ -4825,6 +5497,8 @@
       "flow:dispatch-console-to-dispatch-api:dispatch-requests",
       "process:dispatch-api"
     ],
+    "reference_verb": "ride-session",
+    "candidate_verb": "ride-session",
     "label": "match",
     "note": "Same action, same flow."
   },
@@ -4838,6 +5512,8 @@
     ],
     "candidate_claim": "An attacker calls the dispatch API from their own origin, which the API allows because its policy permits any origin.",
     "candidate_element_ids": null,
+    "reference_verb": "ride-session",
+    "candidate_verb": null,
     "label": "no-match",
     "note": "Unsupported: the source states the allowed origins were never recorded, and reading that as a permissive policy invents a value."
   },
@@ -4854,6 +5530,8 @@
       "flow:dispatch-console-to-dispatch-api:dispatch-requests",
       "process:dispatch-console"
     ],
+    "reference_verb": "inject",
+    "candidate_verb": "inject",
     "label": "match",
     "note": "Same action, same mechanism."
   }

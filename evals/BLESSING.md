@@ -239,8 +239,9 @@ Assign it here rather than deriving it later. Later means re-running the
 decision with less context, and getting a different answer on exactly the claims
 where the difference matters.
 
-`tests/test_verb_coverage.py` counts what is still unassigned, per case. The
-count only moves when somebody does this step.
+`tests/test_verb_coverage.py` fails on a claim that carries no verb, and on a
+verb outside the vocabulary. Every one of the corpus's 243 claims has one, so a
+new case that skips this step is the only way that test goes red.
 
 ### 5. Label the judge-calibration pairs
 
@@ -250,7 +251,10 @@ claim-equivalence judgement and contributes no pair — that is settled design
 ([#167](https://github.com/mstarks01/work-agent/issues/167)), not an omission.
 
 In the same sitting, label candidate threat pairs as match / no-match in
-`build_pairs.py`. These are what the **≥90% judge–label agreement bar** scores
+`build_pairs.py`. A pair that carries candidate element IDs carries a candidate
+**verb** beside them, assigned from the candidate sentence's own words — never
+by reading the reference's, which would make every pair agree by construction
+and the measurement worthless. These are what the **≥90% judge–label agreement bar** scores
 against, and they're what lets the scorer be tested with no live calls at all.
 They are not ground truth: a person has read 30 of the 339, in review sitting
 01, so the bar says the judge reproduces what an agent wrote and says almost
