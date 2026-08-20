@@ -14,12 +14,14 @@ import pytest
 
 from evals.harness.fingerprint import (
     DEFAULT_VERSION,
+    LANE_FIELD,
     SUPPORTED_VERSIONS,
     VERSION_FOR,
     Components,
     FingerprintError,
     components_for,
     fingerprint,
+    lane_field,
     version_for,
     version_of,
 )
@@ -95,6 +97,22 @@ def test_an_undeclared_framework_raises_rather_than_defaulting():
     """A package quietly keyed under the weaker rule is a ledger nobody can read."""
     with pytest.raises(FingerprintError, match="no fingerprint version"):
         version_for("nothing-declares-this")
+
+
+def test_the_lane_table_covers_every_package():
+    """The other half of a key, and the same rule: a table, checked."""
+    assert set(LANE_FIELD) == set(PACKAGES)
+
+
+def test_a_package_with_no_declared_lane_field_raises():
+    """A fallback would key every finding of one package under one lane."""
+    with pytest.raises(FingerprintError, match="no lane field"):
+        lane_field("nothing-declares-this")
+
+
+def test_each_package_names_its_lane_in_its_own_terms():
+    """STRIDE reaches a claim in a category, ASVS in a chapter."""
+    assert (lane_field("stride"), lane_field("asvs")) == ("category", "chapter")
 
 
 def test_the_declared_versions_follow_from_what_a_claim_carries():

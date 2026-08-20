@@ -99,7 +99,8 @@ evals/
 | `harness/identity.py` | Claim identity from the fields a claim carries. `SubsetVerbIdentity` scores 185/200 against the recorded labels, over the 90% bar, with no model call. |
 | `harness/fingerprint.py` | A **Claim**'s identity as a versioned value code computes. No model call. |
 | `harness/ledger.py` | The append-only record of what a **person** decided about a finding. |
-| `harness/queue.py` | Which findings a reviewer is asked about, and in what order. Blind to the configuration. |
+| `harness/queue.py` | Which findings a reviewer is asked about, and in what order. Blind to the configuration. Several sweeps of one configuration are merged here, which is where a finding's run count comes from. |
+| `harness/writing.py` | What reviewers said about how a finding reads, per case and framework. The one number a style down-vote moves, and it moves no other. |
 | `harness/provenance.py` | What each node execution actually ran on — tier, requested route, served build, fingerprint — written into the artifact and read back by a promotion. |
 | `harness/certify.py` | Promoting a winning configuration: rewrites `config/sampling.toml` and records its fingerprints as blessed. The certification check itself lives in the service (`stride_service.certification`), which this imports. |
 | `harness/modes.py` | The three run modes over the shipped graph, and the extraction score: element agreement, the derived crossings, and the attributes a Candidate rule reads. |

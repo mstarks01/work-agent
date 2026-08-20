@@ -20,6 +20,10 @@ tuning loop that consumes these numbers, read [TUNING.md](TUNING.md).
 - **A finished sweep**, written with `run --out artifact.json`, together with
   the `artifact.json.reports/` directory beside it. The queue reads the reports,
   because the reports hold the claims and the artifact holds only the totals.
+- **Every sweep of that configuration, if you ran more than one.** Both
+  commands below take one artifact per sweep. The counts that follow — which
+  findings every run produced, and which only some did — exist only when you
+  name them all.
 - **A name to vote under.** The ledger is never anonymous.
 - **`uv sync`.** The review app needs FastAPI and uvicorn.
 
@@ -29,15 +33,15 @@ calls a model.
 ## Step 1 — See what waits for you
 
 ```sh
-python -m evals.harness.run review artifact.json --voter ada
+python -m evals.harness.run review baseline-1.json baseline-2.json --voter ada
 ```
 
 It prints how many findings wait for you, broken out per case, and what the
 ledger already holds:
 
 ```text
-412 findings waiting for ada
-  0 found in some runs and not others
+412 findings waiting for ada, over 5 sweep(s)
+  37 found in some runs and not others
     01-payments-checkout               38
     02-iot-fleet-telemetry             41
     ...
@@ -48,13 +52,19 @@ ledger: 0 votes by nobody; 0 findings in the pool; 0 answered twice
 Read the per-case counts first. A sitting is usually one case, so the useful
 question is which case you can finish in the time you have.
 
+The second line is the one worth the most. A finding some runs produced and
+others did not splits a recall number two ways, and your answer settles it.
+Over a single artifact that line reads `0`, which is the honest reading of one
+run.
+
 The command answers for **you**. A finding another person voted on still waits
 for you, which is how a second opinion happens.
 
 ## Step 2 — Hold the sitting
 
 ```sh
-uv run python webapp/review.py --voter ada --artifact artifact.json
+uv run python webapp/review.py --voter ada \
+  --artifact baseline-1.json --artifact baseline-2.json
 ```
 
 The app binds to `127.0.0.1:8010` and nothing else. Open
@@ -115,9 +125,9 @@ inflate one by liking a sentence. That split is code
 (`Vote.counts_against_analysis` and `Vote.joins_the_pool`), not a request in a
 guide.
 
-Today a style rejection records your objection and moves nothing else: no
-command computes a writing score yet. Record it anyway. The vote keeps its
-reason, so a score added later reads the sitting you held today.
+A style rejection lands in the **writing** block of the next sweep's artifact,
+per case and per framework, with the reasons counted. It moves nothing else, and
+that is the point of the split.
 
 ## Step 3 — Read what the votes did
 
@@ -141,6 +151,17 @@ the artifact counts them per case:
 
 Two reviewers can disagree, and then `rejected` wins over `pooled`. A tool must
 not score itself on the answer that flatters it most.
+
+Your style rejections land beside the standings, under `writing`:
+
+```sh
+jq '.writing_aggregate' after-votes.json
+```
+
+`objection_rate` is the share of the findings **somebody answered** that drew a
+style reason. The denominator is answers rather than findings, so a sweep that
+writes more findings cannot read as better written. `by_reason` says which
+objection people made most.
 
 Over a cold ledger `rejected_rate` reads `0.0`, beside an `unvoted` count that
 says how much of the answer still waits on a person. Read the pair. A `0.0`
@@ -175,10 +196,11 @@ that applies wins, and the reasons never add up.
 | `unmatched` | 20 | No reference set carries it, so nothing scores it until somebody says whether it is real. |
 | `new` | 10 | Nobody has answered it, so it counts in no number. |
 
-One gap to know about: the app reads one sweep, and it does not count how many
-runs produced each finding. So no finding is marked `volatile` today, and the
-queue orders by the other two reasons. The rule is in place, and the reader that
-would fill it is not.
+`volatile` needs more than one sweep to exist, which is why both commands take
+an artifact per sweep. A finding every run produced is settled, and a finding
+two runs of five produced is the question one click settles. Over a single
+artifact every count is 1 of 1, nothing is volatile, and the queue orders by the
+other two reasons.
 
 The queue skips what **you** answered, never what anybody answered. Point a
 second reviewer at the same artifact under their own name to get a second
