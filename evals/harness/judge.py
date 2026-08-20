@@ -39,6 +39,7 @@ from typing import Any, Literal, Protocol, TypeVar
 
 from pydantic import BaseModel, ConfigDict, Field, ValidationError
 
+from stride_service.binding import check_temperature
 from stride_service.frameworks.stride.record import StrideCategory
 from stride_service.markdown_loader import MarkdownLoader
 from stride_service.model_gate import (
@@ -112,6 +113,14 @@ class JudgeConfig(BaseModel):
         validate_model_string(self.model, self.vendor, source="judge.model")
         check_supported(
             vendor, self.model, {"temperature": self.temperature}, source="judge"
+        )
+        # The rules check_supported cannot reach, because it answers from
+        # LiteLLM's pinned cost map and a candidate judge is usually a model
+        # newer than it. Without this the gate above passes gpt-5.6 at
+        # temperature 0.0 and the provider rejects pair one of the sweep, which
+        # is the surprise this whole method exists to prevent.
+        check_temperature(
+            self.model, self.temperature, "judge.model", "this judge config"
         )
         # Every ruling is parsed back into a pydantic model, so a judge whose
         # model treats a response schema as a hint would fail per-call, deep

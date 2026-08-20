@@ -102,12 +102,16 @@ def test_a_candidate_judge_loads_on_every_supported_vendor(tmp_path):
     the calibration rather than show up as a bad number.
 
     Each pair also clears the load-time gates every tier clears: the pinned-form
-    rule, greedy decoding under the supported-param check, and native structured
-    output.
+    rule, greedy decoding under the supported-param check and the model-keyed
+    temperature rules, and native structured output.
+
+    OpenAI's candidate is its **base** reference, because greedy decoding and
+    its reasoning family are mutually exclusive — see the test below. That is a
+    capability difference the comparison has to state, not a gap in this test.
     """
     candidates = {
         "anthropic": "claude-sonnet-4-6",
-        "openai": "gpt-5.6",
+        "openai": "gpt-4o",
         "vertex": "gemini-2.5-pro",
     }
     for vendor, model in candidates.items():
@@ -137,6 +141,30 @@ def test_a_judge_requiring_greedy_decoding_refuses_an_o_series_model(tmp_path):
     )
 
     with pytest.raises(ValueError):
+        load_judge_config(path)
+
+
+def test_a_judge_on_a_model_newer_than_the_cost_map_is_refused(tmp_path):
+    """The gap the first calibration sweep walked into, pinned so it stays shut.
+
+    ``check_supported`` answers from LiteLLM's pinned cost map, so a model
+    released after that copy falls through to the provider's base config and
+    passes. ``gpt-5.6`` is that model today: it loaded as a candidate judge and
+    the OpenAI API rejected pair one with "does not support 0.0 with this
+    model", which is the mid-sweep surprise the load-time gate exists to
+    prevent.
+
+    A tier never had this gap — :func:`stride_service.binding.check_temperature`
+    covered it — and the judge ran a strictly weaker gate than every tier until
+    it called the same function.
+    """
+    path = tmp_path / "judge.toml"
+    path.write_text(
+        'version = 3\nvendor = "openai"\nmodel = "gpt-5.6"\n'
+        "temperature = 0.0\norder_seed = 20260721\n"
+    )
+
+    with pytest.raises(ValueError, match="only at its default"):
         load_judge_config(path)
 
 
