@@ -35,9 +35,9 @@ import tomllib
 from collections.abc import Callable, Mapping
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Any, Literal, Protocol, TypeVar
+from typing import Annotated, Any, Literal, Protocol, TypeVar
 
-from pydantic import BaseModel, ConfigDict, Field, ValidationError
+from pydantic import BaseModel, BeforeValidator, ConfigDict, Field, ValidationError
 
 from stride_service.binding import check_temperature
 from stride_service.frameworks.stride.record import StrideCategory
@@ -198,13 +198,34 @@ class ClaimPair:
     candidate_verb: str | None = None
 
 
+# A rationale is diagnostic: it is printed in a disagreement report and no
+# metric reads it. So an over-long one is not worth what raising on it costs —
+# the first calibration sweep died on pair one of 339 because a judge wrote two
+# sentences where the prompt asks for one, and every paid call before it was
+# lost. The bound still holds on everything that reaches a report; it is
+# enforced by clipping rather than by refusing the whole ruling.
+#
+# ``match`` and ``bucket`` stay strictly validated, and that is the split that
+# matters: the fields a metric reads must be exactly what the schema says
+# (LLM05), while a bounded free-text field is bounded either way.
+RATIONALE_LIMIT = 400
+
+
+def _clip(value: object) -> object:
+    """Cut a rationale to the limit, leaving anything else to pydantic."""
+    return value[:RATIONALE_LIMIT] if isinstance(value, str) else value
+
+
+Rationale = Annotated[str, BeforeValidator(_clip), Field(min_length=1)]
+
+
 class ClaimRuling(BaseModel):
     """The judge's answer on one pair: same attacker action, same target?"""
 
     model_config = ConfigDict(extra="forbid", frozen=True)
 
     match: bool
-    rationale: str = Field(min_length=1, max_length=400)
+    rationale: Rationale
 
 
 class BucketRuling(BaseModel):
@@ -213,7 +234,7 @@ class BucketRuling(BaseModel):
     model_config = ConfigDict(extra="forbid", frozen=True)
 
     bucket: Bucket
-    rationale: str = Field(min_length=1, max_length=400)
+    rationale: Rationale
 
 
 @dataclass(frozen=True)

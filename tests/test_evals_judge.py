@@ -17,6 +17,7 @@ from pydantic import BaseModel
 from evals.harness.judge import (
     ADJUDICATION_PROMPT_NAME,
     CLAIM_PROMPT_NAME,
+    RATIONALE_LIMIT,
     ClaimPair,
     ClaimRuling,
     JudgeConfigError,
@@ -251,6 +252,29 @@ def test_ruling_is_validated_before_it_reaches_a_metric():
 
     assert isinstance(ruling, ClaimRuling)
     assert ruling.match is True
+
+
+def test_an_over_long_rationale_is_clipped_rather_than_losing_the_sweep():
+    """The pair that killed the first calibration run, and what it cost.
+
+    The prompt asks for one sentence and a judge wrote two, so a 400-character
+    cap refused the ruling and the sweep died on pair one of 339 — every paid
+    call before it lost. A rationale is printed in a disagreement report and no
+    metric reads it, so the bound is enforced by clipping.
+    """
+    long_rationale = "s" * (RATIONALE_LIMIT + 200)
+
+    ruling = judge(json.dumps({"match": True, "rationale": long_rationale})).equivalent(
+        PAIR
+    )
+
+    assert len(ruling.rationale) == RATIONALE_LIMIT
+
+
+def test_an_empty_rationale_is_still_refused():
+    """Clipping bounds a rationale; it does not accept the absence of one."""
+    with pytest.raises(JudgeError):
+        judge(json.dumps({"match": True, "rationale": ""})).equivalent(PAIR)
 
 
 def test_unusable_judge_output_raises_rather_than_scoring():
