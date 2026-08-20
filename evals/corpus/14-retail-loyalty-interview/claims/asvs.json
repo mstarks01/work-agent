@@ -1,0 +1,75 @@
+[
+  {
+    "chapter": "authentication",
+    "requirement": "V6.2.1",
+    "affected_element_ids": [
+      "flow:customer-to-points-api:collect-and-redeem-points",
+      "process:points-api"
+    ],
+    "claim": "What the points API requires of a caller before acting on a balance is hedged, never stated.",
+    "tier": "must-find",
+    "notes": "The hedge lands here as well as in STRIDE: the requirement applies and the input shows nothing satisfied."
+  },
+  {
+    "chapter": "session-management",
+    "requirement": "V7.2.1",
+    "affected_element_ids": [
+      "process:points-api"
+    ],
+    "claim": "A token the app gets at sign-in is mentioned once, as a guess, and nothing describes how it is generated or what it contains.",
+    "tier": "expected",
+    "notes": "The one mention is inside a hedge, which is what makes this an applicability ruling and not evidence either way."
+  },
+  {
+    "chapter": "secure-communication",
+    "requirement": "V12.2.1",
+    "affected_element_ids": [
+      "flow:customer-to-points-api:collect-and-redeem-points"
+    ],
+    "claim": "Nothing states whether the connection between the app and the points API is encrypted in transit.",
+    "tier": "must-find",
+    "notes": "REST and JSON are stated; the wire scheme never is, and the exposure dispute makes the path this rides even less certain."
+  },
+  {
+    "chapter": "authorization",
+    "requirement": "V8.2.1",
+    "affected_element_ids": [
+      "flow:support-agent-to-points-api:adjust-points-by-hand",
+      "process:points-api"
+    ],
+    "claim": "The adjustments page acts for one shared identity, so no per-user authorization decision can exist on it.",
+    "tier": "must-find",
+    "notes": "Stated outright rather than unknown: one login, no re-ask, history without a person."
+  },
+  {
+    "chapter": "authorization",
+    "requirement": "V8.1.1",
+    "affected_element_ids": [
+      "process:points-api"
+    ],
+    "claim": "No documented authorization rules exist for who may adjust, collect or spend points.",
+    "tier": "expected",
+    "notes": "A documentation requirement; needs-info by construction, as with its counterpart in the control case."
+  },
+  {
+    "chapter": "validation-and-business-logic",
+    "requirement": "V2.2.2",
+    "affected_element_ids": [
+      "flow:store-kiosk-to-points-api:submit-scanned-receipts",
+      "process:points-api"
+    ],
+    "claim": "Nothing says which side validates a scanned receipt before it becomes points.",
+    "tier": "must-find",
+    "notes": "The forged-receipt threat's ASVS shape: a paper artifact enters the system and no stated control examines it."
+  },
+  {
+    "chapter": "data-protection",
+    "requirement": "V14.2.1",
+    "affected_element_ids": [
+      "store:points-database"
+    ],
+    "claim": "The points database holds names, email addresses and full purchase-linked history, and no protection for that data is described.",
+    "tier": "expected",
+    "notes": "The store's classification and at-rest protection are both unknown."
+  }
+]
