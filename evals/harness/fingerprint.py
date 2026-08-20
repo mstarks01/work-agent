@@ -75,6 +75,22 @@ VERSION_FOR: dict[FrameworkName, int] = {
     "asvs": 1,
 }
 
+#: Which field on a claim names the lane it was reached in. **Keyed, never
+#: branched**, and checked against ``PACKAGES`` by
+#: ``tests/test_framework_neutrality.py``.
+#:
+#: A package names its lane in its own terms — STRIDE reaches a claim in a
+#: category, ASVS reaches one in a chapter — and both are the graph's fact
+#: rather than anything an agent spelled. A reader that fell back to the
+#: framework name keyed every one of a package's findings under one lane, which
+#: made two findings in two chapters one fingerprint and let one vote answer
+#: for both.
+LANE_FIELD: dict[FrameworkName, str] = {
+    "stride": "category",
+    "asvs": "chapter",
+}
+
+
 #: Every version this module can compute. A key missing here raises rather than
 #: falling back — a fingerprint quietly computed under the wrong rule is a vote
 #: silently attached to the wrong finding.
@@ -123,6 +139,24 @@ class Components:
             )
         except (KeyError, TypeError) as exc:
             raise FingerprintError(f"malformed components: {exc}") from exc
+
+
+def lane_field(framework: FrameworkName) -> str:
+    """Which field of this package's claim carries its lane.
+
+    Raises on a package the table does not name, for the same reason
+    :func:`version_for` does: a claim whose lane cannot be read is a claim that
+    would key under a constant, and every finding of that package would share
+    one fingerprint per place.
+    """
+    try:
+        return LANE_FIELD[framework]
+    except KeyError:
+        raise FingerprintError(
+            f"no lane field is declared for {framework!r};"
+            " add it to LANE_FIELD — the field its claim carries the lane in,"
+            " which the graph stamps rather than an agent"
+        ) from None
 
 
 def version_for(framework: FrameworkName) -> int:

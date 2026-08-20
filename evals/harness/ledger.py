@@ -22,7 +22,8 @@ model-scored history does.
 reviewer who dislikes a finding's writing and a reviewer who says it is not a
 threat are reporting two different facts, and averaging them would let taste
 move a recall number. :data:`SUBSTANCE_REASONS` counts against the analysis;
-:data:`STYLE_REASONS` never does. That split is the whole control for personal
+:data:`STYLE_REASONS` never does, and lands in
+:mod:`evals.harness.writing` instead. That split is the whole control for personal
 preference, and it is mechanical rather than a request in a guide.
 
 Security: this file is the supply chain of every quality number the tool
@@ -74,8 +75,9 @@ SUBSTANCE_REASONS: frozenset[str] = frozenset(
 )
 
 #: Reasons that speak to how the finding is *written*. A ``down`` carrying one
-#: of these leaves every analysis metric untouched and lands in the writing
-#: score instead. This is what stops a reviewer's taste moving recall.
+#: of these leaves every analysis metric untouched and is counted by
+#: :mod:`evals.harness.writing` instead. This is what stops a reviewer's taste
+#: moving recall.
 STYLE_REASONS: frozenset[str] = frozenset(
     {
         "too-vague",
@@ -160,8 +162,9 @@ class Vote:
         """Does this vote move a recall or precision number?
 
         Only a ``down`` carrying a substance reason does. A style ``down``
-        leaves the finding in the reference pool and moves the writing score
-        instead; ``unsure`` and ``needs-evidence`` move nothing at all.
+        leaves the finding in the reference pool and moves the writing
+        instrument's numbers instead; ``unsure`` and ``needs-evidence`` move
+        nothing at all.
         """
         return self.verdict == "down" and self.reason in SUBSTANCE_REASONS
 
@@ -273,6 +276,18 @@ class Ledger:
         for vote in self.votes:
             live[(vote.fingerprint, vote.voter)] = vote
         return live
+
+    def current_by_finding(self) -> dict[str, list[Vote]]:
+        """Every finding's live verdicts, keyed by fingerprint, in one pass.
+
+        What a reader of many findings wants: filtering :meth:`current` per
+        finding walks the whole ledger once per question, and both the scorer
+        and the writing instrument ask it of every claim in a sweep.
+        """
+        by_finding: dict[str, list[Vote]] = {}
+        for (value, _), vote in self.current().items():
+            by_finding.setdefault(value, []).append(vote)
+        return by_finding
 
     def voted_fingerprints(self) -> frozenset[str]:
         """Every fingerprint anybody has answered, for the queue to skip."""

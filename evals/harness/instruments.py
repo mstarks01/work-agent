@@ -3,7 +3,7 @@
 ## Why a table
 
 An **instrument** is one reading over a finished sweep: a per-case row, a fold
-over those rows, a rendering, and the artifact keys it owns. Seven of them
+over those rows, a rendering, and the artifact keys it owns. Eight of them
 exist, and each one already had all four parts — but nothing named the shape,
 so each was wired by hand into four places in :mod:`evals.harness.run`: a field
 on ``ModeRun``, an accumulator in ``_run_mode``, a ``_print_*`` function, and a
@@ -41,13 +41,22 @@ from collections.abc import Callable, Mapping, Sequence
 from dataclasses import dataclass
 from typing import Any
 
-from evals.harness import applicability, coverage, critic_yield, grounds, modes, scorer
+from evals.harness import (
+    applicability,
+    coverage,
+    critic_yield,
+    grounds,
+    modes,
+    scorer,
+    writing,
+)
 from evals.harness.coverage import LaneCoverage, TaggedRow
 from evals.harness.critic_yield import CriticYield
 from evals.harness.grounds import CaseGrounds, GroundsFailure
 from evals.harness.provenance import RunProvenance
 from evals.harness.reference import GoldenCase
 from evals.harness.scorer import CaseScore
+from evals.harness.writing import CaseWriting
 from stride_service.report import (
     FrameworkAnalysis,
     FrameworkName,
@@ -151,6 +160,10 @@ class Sweep:
     run: ModeRun
     scores: tuple[CaseScore, ...] = ()
     yields: tuple[CriticYield, ...] = ()
+    #: What reviewers said about the prose, read out of the vote ledger. Its
+    #: own field rather than a row on ``run`` because it reads the ledger, and
+    #: the ledger is only loaded on the scored pass.
+    writing: tuple[CaseWriting, ...] = ()
 
     def rows(self, instrument: str) -> tuple[Any, ...]:
         """The per-case rows this instrument's scorers produced, if any.
@@ -255,6 +268,12 @@ INSTRUMENTS: dict[str, Instrument] = {
         frameworks=("stride",),
         scored=True,
         keys=("critic_yield", "critic_yield_aggregate"),
+    ),
+    "writing": Instrument(
+        render=lambda sweep: writing.render(sweep.writing),
+        artifact=lambda sweep: writing.artifact(sweep.writing),
+        scored=True,
+        keys=("writing", "writing_aggregate"),
     ),
 }
 

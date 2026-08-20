@@ -145,8 +145,12 @@ the tool against records an agent wrote. The review loop is what adds a human
 judgement, and it costs no credentials:
 
 ```sh
-uv run python webapp/review.py --voter <your-name> --artifact baseline-1.json
+uv run python webapp/review.py --voter <your-name> \
+  --artifact baseline-1.json --artifact baseline-2.json  # ...one per run
 ```
+
+Name every run of the arm. The queue then asks first about the findings those
+runs disagree on, which is where one answer settles the most.
 
 [VOTING.md](VOTING.md) is the whole procedure — what each answer moves, and
 what the four standings do to a number. When tuning, watch two of them, and read
@@ -156,6 +160,7 @@ them the way you read critic yield — as a pair:
 | --- | --- | --- |
 | **`rejected_rate`** (per case) | falls, or holds | A style down-vote is not this number. `poorly-written` leaves the finding in the pool, so a config that writes worse cannot flatter this one. |
 | **`pooled`** against **`unvoted`** | `pooled` rises while `unvoted` falls | `rejected_rate` reads 0.0 over a cold ledger. A low number beside a large `unvoted` count means nobody has looked, not that the tool is right. |
+| **`writing_aggregate.objection_rate`** | falls, or holds | Where a style objection lands, and the only number it moves. It is a rate over the findings people answered, so read `answered` beside it. |
 
 The votes reach the numbers on the **next** sweep: the scorer reads the ledger
 while it scores a run, so re-run the arm after a sitting.

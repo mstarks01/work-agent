@@ -24,8 +24,9 @@ disagreements. That is the whole economic argument for the fingerprint.
 
 from __future__ import annotations
 
-from collections.abc import Iterable, Mapping, Sequence
-from dataclasses import dataclass
+from collections import Counter
+from collections.abc import Iterable, Iterator, Mapping, Sequence
+from dataclasses import dataclass, replace
 from typing import Any
 
 from evals.harness.fingerprint import (
@@ -171,12 +172,8 @@ def build(
 
     Deduplicated by fingerprint, keeping the first occurrence. Two runs
     producing one finding is the normal case and is one question, not two.
-
-    **Each finding is keyed by its own framework's rule**, from
-    :data:`~evals.harness.fingerprint.VERSION_FOR`, rather than by one version
-    chosen for the whole queue. A sweep carries both packages' findings and they
-    do not compose identity the same way; one version over both would key an
-    ASVS claim under a rule that reads a verb it never has.
+    :func:`_keyed` is where a finding gets its fingerprint, under its own
+    framework's rule.
     """
     if voter:
         answered = frozenset(key[0] for key in ledger.current() if key[1] == voter)
@@ -184,17 +181,7 @@ def build(
         answered = ledger.voted_fingerprints()
 
     items: dict[str, QueueItem] = {}
-    for finding in findings:
-        flows = flows_by_case.get(finding.case, {})
-        version = version_for(finding.framework)
-        components = components_for(
-            finding.framework,
-            finding.lane,
-            finding.element_ids,
-            flows,
-            verb=finding.verb if version >= 2 else None,
-        )
-        value = fingerprint(components, version=version)
+    for value, components, finding in _keyed(findings, flows_by_case):
         if value in answered or value in items:
             continue
         weight, why = priority_of(finding, value in reference_pool)
@@ -213,6 +200,66 @@ def build(
         items.values(),
         key=lambda item: (-item.priority, item.finding.case, item.finding.title),
     )
+
+
+def _keyed(
+    findings: Iterable[Finding],
+    flows_by_case: Mapping[str, FlowMap],
+) -> Iterator[tuple[str, Components, Finding]]:
+    """Each finding with its fingerprint, under its own framework's rule.
+
+    One spelling of the keying, because the queue and the merge below have to
+    agree on it exactly: a finding counted under one key and asked about under
+    another would carry a run count from a different finding.
+
+    **Each finding is keyed by its own framework's rule**, from
+    :data:`~evals.harness.fingerprint.VERSION_FOR`, rather than by one version
+    chosen for the whole queue. A sweep carries both packages' findings and they
+    do not compose identity the same way; one version over both would key an
+    ASVS claim under a rule that reads a verb it never has.
+    """
+    for finding in findings:
+        version = version_for(finding.framework)
+        components = components_for(
+            finding.framework,
+            finding.lane,
+            finding.element_ids,
+            flows_by_case.get(finding.case, {}),
+            verb=finding.verb if version >= 2 else None,
+        )
+        yield fingerprint(components, version=version), components, finding
+
+
+def merge_runs(
+    runs: Sequence[Sequence[Finding]],
+    flows_by_case: Mapping[str, FlowMap],
+) -> list[Finding]:
+    """One finding per identity, carrying how many runs produced it.
+
+    The reading :attr:`QueueItem.volatile` rests on, and the reason the review
+    app takes several artifacts rather than one: a finding every sweep of one
+    configuration produced is settled, and a finding two sweeps of five
+    produced is where a reviewer's click buys the most. Over a single artifact
+    every count is 1 of 1 and nothing is volatile, which is the honest reading
+    of one run rather than a missing measurement.
+
+    **A run that names one identity twice counts once.** The denominator is
+    runs, so a lane repeating itself inside one report is a different question
+    from a sweep disagreeing with itself.
+    """
+    produced_in: Counter[str] = Counter()
+    first: dict[str, Finding] = {}
+    for findings in runs:
+        in_run: dict[str, Finding] = {}
+        for value, _, finding in _keyed(findings, flows_by_case):
+            in_run.setdefault(value, finding)
+        produced_in.update(in_run.keys())
+        for value, finding in in_run.items():
+            first.setdefault(value, finding)
+    return [
+        replace(finding, seen_in=produced_in[value], runs=len(runs))
+        for value, finding in first.items()
+    ]
 
 
 def summarise(items: Sequence[QueueItem], ledger: Ledger) -> dict[str, Any]:

@@ -42,7 +42,7 @@ from dataclasses import replace
 from pathlib import Path
 from typing import Any
 
-from evals.harness import fingerprint, ledger, modes, queue
+from evals.harness import fingerprint, ledger, modes, queue, writing
 from evals.harness.artifact import EvalArtifact, load_artifact
 from evals.harness.artifact import build as build_artifact
 from evals.harness.calibration import (
@@ -433,6 +433,7 @@ def command_run(args: argparse.Namespace) -> int:
 
     scores: tuple[CaseScore, ...] = ()
     yields: tuple[CriticYield, ...] = ()
+    rated: tuple[writing.CaseWriting, ...] = ()
     if mode_run.runs:
         # Claim matching is the identity rule and standing comes from the vote
         # ledger; both are offline, so a sweep is always scored. What a person
@@ -440,13 +441,17 @@ def command_run(args: argparse.Namespace) -> int:
         matcher = SubsetVerbIdentity(_flows_by_case(cases))
         votes = ledger.load(Path(args.ledger))
         scores, yields = _score_runs(cases, mode_run.runs, matcher, votes)
+        rated = writing.measure(
+            cases, {case: run.report for case, run in mode_run.runs.items()}, votes
+        )
         unvoted = sum(score.unvoted_count for score in scores)
         if unvoted:
             print(
                 f"{unvoted} unlisted finding(s) have no vote; run"
-                " `python -m evals.harness.run queue` to review them"
+                " `python -m evals.harness.run review <artifact> --voter <you>`"
+                " to see them"
             )
-    sweep = replace(sweep, scores=scores, yields=yields)
+    sweep = replace(sweep, scores=scores, yields=yields, writing=rated)
     render_all(sweep, scored=True)
 
     artifact = build_artifact(
@@ -638,14 +643,17 @@ def command_review(args: argparse.Namespace) -> int:
     Prints per case, never one total: a sitting is usually one case, and a
     reviewer with fifteen minutes needs to know which one they can finish.
     """
-    from webapp.review import build_session, findings_from_artifact
+    from webapp.review import build_session, findings_from_artifacts
 
-    findings, _ = findings_from_artifact(Path(args.artifact))
-    session = build_session(findings, args.voter, Path(args.ledger))
+    runs, _ = findings_from_artifacts([Path(path) for path in args.artifact])
+    session = build_session(runs, args.voter, Path(args.ledger))
     waiting = session.remaining()
     summary = queue.summarise(waiting, ledger.load(Path(args.ledger)))
 
-    print(f"{summary['waiting']} findings waiting for {args.voter}")
+    print(
+        f"{summary['waiting']} findings waiting for {args.voter},"
+        f" over {len(runs)} sweep(s)"
+    )
     print(f"  {summary['volatile']} found in some runs and not others")
     for case_id, count in summary["by_case"].items():
         print(f"    {case_id:<34} {count}")
@@ -657,10 +665,8 @@ def command_review(args: argparse.Namespace) -> int:
     )
     if waiting:
         print("\nrecord answers with:")
-        print(
-            f"  uv run python webapp/review.py --voter {args.voter}"
-            f" --artifact {args.artifact}"
-        )
+        artifacts = " ".join(f"--artifact {path}" for path in args.artifact)
+        print(f"  uv run python webapp/review.py --voter {args.voter} {artifacts}")
     return 0
 
 
@@ -952,7 +958,13 @@ def main(argv: Sequence[str] | None = None) -> int:
     review_parser = subparsers.add_parser(
         "review", help="what a reviewer has waiting over a finished sweep"
     )
-    review_parser.add_argument("artifact", help="a sweep artifact with a .reports/ dir")
+    review_parser.add_argument(
+        "artifact",
+        nargs="+",
+        help="one or more sweep artifacts, each with a .reports/ dir. Several"
+        " sweeps of one configuration are what make a finding's run count"
+        " readable, and the queue asks first about what they disagree on",
+    )
     review_parser.add_argument(
         "--voter",
         required=True,
