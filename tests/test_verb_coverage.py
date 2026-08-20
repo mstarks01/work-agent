@@ -1,6 +1,6 @@
 """Every reference claim carries an action verb, and a new one must too.
 
-This started as a debt list. The debt is paid: all 243 claims across all 13
+This started as a debt list. The debt is paid: all 254 claims across all 14
 cases carry a verb, so what is left is the guard that stops it coming back. A
 case that arrives without verbs fails here rather than quietly weakening
 :class:`~evals.harness.identity.SubsetVerbIdentity` on the case nobody checked.
@@ -37,6 +37,7 @@ CLAIMS_PER_CASE: dict[str, int] = {
     "11-sparse-shift-scheduling": 16,
     "12-overclaiming-supplier-portal": 15,
     "13-dispatch-control-plane": 19,
+    "14-retail-loyalty-interview": 11,
 }
 
 
@@ -110,7 +111,7 @@ def test_every_verb_is_used_or_exempted_with_a_reason():
     """A verb no claim uses is a distinction the corpus cannot show is real.
 
     Not a failure of the corpus — a question for the vocabulary. A verb that
-    earns no place in 243 claims is one to justify or to remove, and this is
+    earns no place in 254 claims is one to justify or to remove, and this is
     where that gets noticed rather than in a review two years from now.
     """
     corpus = load_corpus(verify_corpus.CORPUS_DIR)

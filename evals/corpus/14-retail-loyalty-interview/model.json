@@ -1,0 +1,188 @@
+{
+  "external_entities": [
+    {
+      "id": "entity:customer",
+      "name": "customer",
+      "description": "A loyalty scheme member who collects and spends points through the mobile app, or scans paper receipts at a store kiosk.",
+      "assets": [
+        "pii"
+      ],
+      "source_excerpt": "Customers collect and spend loyalty points through our mobile app.",
+      "source_label": "Loyalty platform note",
+      "kind": "human",
+      "trust_zone": "boundary:public-internet"
+    },
+    {
+      "id": "entity:support-agent",
+      "name": "support agent",
+      "description": "A member of the support team who adjusts customer balances by hand through the adjustments page.",
+      "assets": [],
+      "source_excerpt": "Support can adjust a customer's balance by hand when something goes wrong, through an adjustments page the points API serves.",
+      "source_label": "Loyalty platform note",
+      "kind": "human",
+      "trust_zone": "boundary:office-network"
+    }
+  ],
+  "processes": [
+    {
+      "id": "process:points-api",
+      "name": "points API",
+      "description": "The one service that computes, records and adjusts points; also serves the support adjustments page.",
+      "assets": [
+        "pii",
+        "business-critical-data"
+      ],
+      "source_excerpt": "The points API is a plain REST service and it is the only way anything touches points.",
+      "source_label": "Loyalty platform note",
+      "technology": "a plain REST service, JSON in and JSON out",
+      "trust_zone": "boundary:core-network",
+      "exposure": "unknown",
+      "interface_kind": "web",
+      "notes": "The two sources disagree on exposure and the value is flattened to unknown with both claims kept. Loyalty platform note: \"The points API is internal-only; the mobile app reaches it through the group's shared gateway.\" Interview transcript, Priya: \"The phones talk straight to the points API over the internet. The gateway went away last year\". The transcript is stated to be more recent, but recency is not adjudication."
+    },
+    {
+      "id": "process:store-kiosk",
+      "name": "store kiosk",
+      "description": "Self-service kiosk in each store where a customer who paid cash scans a paper receipt to claim its points.",
+      "assets": [
+        "business-critical-data"
+      ],
+      "source_excerpt": "Stores have self-service kiosks where a customer who paid cash can scan a paper receipt to claim the points on it.",
+      "source_label": "Loyalty platform note",
+      "technology": "unknown",
+      "trust_zone": "boundary:store-network",
+      "exposure": "unknown",
+      "interface_kind": "unknown",
+      "notes": "What the kiosks talk to was probed and not answered. Dan asked whether the kiosks still write straight into the points database; Priya: \"The kiosks are Dev's team's area. I couldn't tell you what they talk to these days.\" The fact inside the question is not recorded as a fact: no kiosk-to-database flow exists in this model."
+    }
+  ],
+  "data_stores": [
+    {
+      "id": "store:points-database",
+      "name": "points database",
+      "description": "Holds customer names, email addresses, balances and the full collect-and-redeem history. The old offers database was merged into it.",
+      "assets": [
+        "pii",
+        "business-critical-data"
+      ],
+      "source_excerpt": "Names, email addresses, balances and the full history of every collect and redeem live in the points database.",
+      "source_label": "Interview transcript",
+      "source_speaker": "Priya",
+      "technology": "unknown",
+      "trust_zone": "boundary:core-network",
+      "data_classification": "unknown",
+      "encryption_at_rest": "unknown",
+      "notes": "Priya corrected herself mid-sentence: \"It writes to the two databases\u2014 actually, no. We merged those in the spring. It's one points database now.\" The corrected statement stands; no second database exists in this model."
+    }
+  ],
+  "data_flows": [
+    {
+      "id": "flow:customer-to-points-api:collect-and-redeem-points",
+      "name": "collect and redeem points",
+      "description": "The mobile app sends what the customer bought and asks to spend points against a basket; the response rides the same interaction.",
+      "assets": [
+        "pii",
+        "business-critical-data"
+      ],
+      "source_excerpt": "The app on their phone calls the points API.",
+      "source_label": "Interview transcript",
+      "source_speaker": "Priya",
+      "source": "entity:customer",
+      "destination": "process:points-api",
+      "protocol": "unknown",
+      "authentication": "unknown",
+      "data_description": "what the customer bought, and collect and redeem requests against their balance",
+      "encryption_in_transit": "unknown",
+      "notes": "Authentication was probed and answered with a hedge, so it stays unknown. Priya: \"I think it checks a token the app gets at sign-in, but I'd have to look.\" and \"Honestly I could not tell you today what it accepts\". A hedge is a speaker talking about a fact, not stating one."
+    },
+    {
+      "id": "flow:store-kiosk-to-points-api:submit-scanned-receipts",
+      "name": "submit scanned receipts",
+      "description": "Each paper receipt is sent to the points API as it is scanned at the kiosk.",
+      "assets": [
+        "business-critical-data"
+      ],
+      "source_excerpt": "The kiosks are in every store and they send each receipt to the points API as it is scanned.",
+      "source_label": "Interview transcript",
+      "source_speaker": "Priya",
+      "source": "process:store-kiosk",
+      "destination": "process:points-api",
+      "protocol": "unknown",
+      "authentication": "unknown",
+      "data_description": "scanned paper receipts claiming points for cash purchases",
+      "encryption_in_transit": "unknown"
+    },
+    {
+      "id": "flow:points-api-to-points-database:read-and-write-points",
+      "name": "read and write points",
+      "description": "The points API reads and writes balances and history; it is the only thing that touches the database.",
+      "assets": [
+        "pii",
+        "business-critical-data"
+      ],
+      "source_excerpt": "The API is the only thing that reads or writes it.",
+      "source_label": "Interview transcript",
+      "source_speaker": "Priya",
+      "source": "process:points-api",
+      "destination": "store:points-database",
+      "protocol": "unknown",
+      "authentication": "unknown",
+      "data_description": "balances and the collect-and-redeem history",
+      "encryption_in_transit": "unknown"
+    },
+    {
+      "id": "flow:support-agent-to-points-api:adjust-points-by-hand",
+      "name": "adjust points by hand",
+      "description": "A support agent opens the adjustments page and adds or removes points on a customer's balance.",
+      "assets": [
+        "business-critical-data"
+      ],
+      "source_excerpt": "When a customer complains, someone on support opens the adjustments page and adds or removes points by hand.",
+      "source_label": "Interview transcript",
+      "source_speaker": "Priya",
+      "source": "entity:support-agent",
+      "destination": "process:points-api",
+      "protocol": "unknown",
+      "authentication": "a single login shared by everyone on support; the page records that an adjustment happened, not who made it",
+      "data_description": "manual balance adjustments",
+      "encryption_in_transit": "unknown"
+    }
+  ],
+  "trust_boundaries": [
+    {
+      "id": "boundary:public-internet",
+      "name": "public internet",
+      "description": "Where customers and their phones sit.",
+      "source_excerpt": "The phones talk straight to the points API over the internet.",
+      "source_label": "Interview transcript",
+      "source_speaker": "Priya",
+      "kind": "network"
+    },
+    {
+      "id": "boundary:store-network",
+      "name": "store network",
+      "description": "The network the kiosks sit on, in every store.",
+      "source_excerpt": "The kiosks sit on the store network.",
+      "source_label": "Loyalty platform note",
+      "kind": "network"
+    },
+    {
+      "id": "boundary:core-network",
+      "name": "core network",
+      "description": "Where the points API and the points database run.",
+      "source_excerpt": "The points API and the points database run on the core network.",
+      "source_label": "Loyalty platform note",
+      "kind": "network"
+    },
+    {
+      "id": "boundary:office-network",
+      "name": "office network",
+      "description": "The Leeds office network support work from.",
+      "source_excerpt": "Leeds office, on the office network like everyone else there.",
+      "source_label": "Interview transcript",
+      "source_speaker": "Priya",
+      "kind": "network"
+    }
+  ],
+  "assumptions": []
+}

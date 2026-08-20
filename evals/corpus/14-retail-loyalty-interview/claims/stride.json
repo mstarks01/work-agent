@@ -1,0 +1,164 @@
+[
+  {
+    "category": "spoofing",
+    "affected_element_ids": [
+      "flow:customer-to-points-api:collect-and-redeem-points",
+      "entity:customer"
+    ],
+    "claim": "An attacker calls the points API as another customer and collects or spends that customer's points, because what the API checks on a call from the app is unverified.",
+    "tier": "must-find",
+    "severity": {
+      "likelihood": "medium",
+      "impact": "high"
+    },
+    "notes": "The hedge threat this case exists for: Priya's answer is a hedge, so authentication is unknown and needs-info is the right verdict. An extraction that records the hedged token as a value suppresses exactly this finding.",
+    "verb": "impersonate"
+  },
+  {
+    "category": "spoofing",
+    "affected_element_ids": [
+      "flow:store-kiosk-to-points-api:submit-scanned-receipts",
+      "process:store-kiosk"
+    ],
+    "claim": "An attacker presents itself to the points API as a store kiosk and submits receipt claims, because how a kiosk is identified to the API is unverified.",
+    "tier": "expected",
+    "severity": {
+      "likelihood": "medium",
+      "impact": "medium"
+    },
+    "notes": "Nothing states how the API tells a kiosk from anything else on the store network, or off it.",
+    "verb": "impersonate"
+  },
+  {
+    "category": "tampering",
+    "affected_element_ids": [
+      "flow:store-kiosk-to-points-api:submit-scanned-receipts",
+      "process:store-kiosk"
+    ],
+    "claim": "An attacker scans forged or copied paper receipts at a kiosk and credits points for purchases that never happened.",
+    "tier": "must-find",
+    "severity": {
+      "likelihood": "high",
+      "impact": "medium"
+    },
+    "notes": "The kiosk exists for cash customers, so the input is a paper artifact the platform cannot verify against a till record by anything either source states.",
+    "verb": "forge"
+  },
+  {
+    "category": "tampering",
+    "affected_element_ids": [
+      "store:points-database",
+      "flow:points-api-to-points-database:read-and-write-points"
+    ],
+    "claim": "An attacker who reaches the points database alters balances or rewrites history directly, bypassing the API's arithmetic.",
+    "tier": "expected",
+    "severity": {
+      "likelihood": "low",
+      "impact": "high"
+    },
+    "notes": "How the API authenticates to the database is unknown, and nothing else is stated to touch the store \u2014 which is exactly why direct access is the tampering path worth naming.",
+    "verb": "alter"
+  },
+  {
+    "category": "repudiation",
+    "affected_element_ids": [
+      "flow:support-agent-to-points-api:adjust-points-by-hand",
+      "entity:support-agent"
+    ],
+    "claim": "A balance adjustment cannot be attributed to a person, because everyone on support shares one login and the history records only that an adjustment happened.",
+    "tier": "must-find",
+    "severity": {
+      "likelihood": "high",
+      "impact": "medium"
+    },
+    "notes": "Stated outright, twice: the shared login, and that the history does not say who. The strongest-grounded finding in the case.",
+    "verb": "unattributable"
+  },
+  {
+    "category": "repudiation",
+    "affected_element_ids": [
+      "flow:customer-to-points-api:collect-and-redeem-points",
+      "entity:customer"
+    ],
+    "claim": "A customer denies a redemption and nothing can contradict them, because what the API verifies about the caller is unverified.",
+    "tier": "expected",
+    "severity": {
+      "likelihood": "medium",
+      "impact": "low"
+    },
+    "notes": "Follows from the same unknown as the spoofing must-find; kept separate because the harmed party and the question differ.",
+    "verb": "unattributable"
+  },
+  {
+    "category": "information-disclosure",
+    "affected_element_ids": [
+      "store:points-database"
+    ],
+    "claim": "An attacker who reaches the points database or its backups reads names, email addresses, balances and the full transaction history, because protection at rest is unverified.",
+    "tier": "must-find",
+    "severity": {
+      "likelihood": "medium",
+      "impact": "high"
+    },
+    "notes": "encryption_at_rest is unknown on a store holding pii and the scheme's whole history.",
+    "verb": "read"
+  },
+  {
+    "category": "information-disclosure",
+    "affected_element_ids": [
+      "flow:customer-to-points-api:collect-and-redeem-points"
+    ],
+    "claim": "An attacker positioned on the path between the app and the points API reads what customers buy and their balances, because transport protection is unverified.",
+    "tier": "expected",
+    "severity": {
+      "likelihood": "medium",
+      "impact": "medium"
+    },
+    "notes": "Purchase contents ride this flow and nothing states TLS; the exposure dispute makes the path itself uncertain, which widens rather than narrows who could sit on it.",
+    "verb": "intercept"
+  },
+  {
+    "category": "denial-of-service",
+    "affected_element_ids": [
+      "process:points-api",
+      "flow:customer-to-points-api:collect-and-redeem-points"
+    ],
+    "claim": "An attacker floods the points API and no customer can collect or spend points, since it is one service with no queue in front of it.",
+    "tier": "must-find",
+    "severity": {
+      "likelihood": "high",
+      "impact": "medium"
+    },
+    "notes": "The source states the failure mode has already happened twice this year under legitimate load alone.",
+    "verb": "flood"
+  },
+  {
+    "category": "elevation-of-privilege",
+    "affected_element_ids": [
+      "flow:support-agent-to-points-api:adjust-points-by-hand",
+      "store:points-database"
+    ],
+    "claim": "Anyone holding the shared support login adjusts any customer's balance at will, because nothing scopes what the adjustments page allows or reviews what it did.",
+    "tier": "must-find",
+    "severity": {
+      "likelihood": "medium",
+      "impact": "high"
+    },
+    "notes": "The credential is stated to move on sticky notes; the grant is the whole balance table and the control on it is one password.",
+    "verb": "abuse-grant"
+  },
+  {
+    "category": "elevation-of-privilege",
+    "affected_element_ids": [
+      "process:points-api"
+    ],
+    "claim": "An attacker on the internet reaches the points API directly and drives it from outside every interior network, because whether the API is exposed to the internet is contradicted between the sources.",
+    "tier": "must-find",
+    "severity": {
+      "likelihood": "medium",
+      "impact": "high"
+    },
+    "notes": "The conflict threat this case exists for: the note says internal-only, the transcript says direct over the internet, and exposure is flattened to unknown. A tool that silently believes either source misses either this finding or the truth.",
+    "verb": "escalate"
+  }
+]

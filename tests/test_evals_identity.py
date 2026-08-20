@@ -56,11 +56,11 @@ MEASURED = {
 
 #: The frontier, both errors at once. ``splits`` counts the ``match`` pairs a
 #: rule calls different; ``merges`` counts the reference-claim pairs a rule calls
-#: the same, over the 287 within-lane pairs the corpus holds — and every one of
+#: the same, over the 292 within-lane pairs the corpus holds — and every one of
 #: those is a pair the corpus records as a distinct claim, so every merge is an error.
 #:
 #: Read down the table: no rule here is usable. The tightest loses 89 of 200
-#: paraphrases; the loosest destroys 126 findings. **The interesting row is
+#: paraphrases; the loosest destroys 130 findings. **The interesting row is
 #: endpoint subset**, which clears the 90% bar on splits and is the only row
 #: whose merges are few enough to enumerate and design against — which is what
 #: #201's ``mechanism`` has to separate.
@@ -73,9 +73,9 @@ FRONTIER = {
     "endpoint subset + verb": {"splits": 15, "merges": 3},
     "endpoint equality": {"splits": 60, "merges": 6},
     "subset": {"splits": 41, "merges": 7},
-    "endpoint subset": {"splits": 14, "merges": 23},
+    "endpoint subset": {"splits": 14, "merges": 24},
     "overlap": {"splits": 4, "merges": 34},
-    "endpoint overlap": {"splits": 1, "merges": 126},
+    "endpoint overlap": {"splits": 1, "merges": 130},
 }
 
 
@@ -239,9 +239,9 @@ def test_a_candidate_with_no_assigned_elements_is_refused():
 #: ``subset`` is what ``endpoint subset`` merges on these cases; ``subset_verb``
 #: is what survives the verb. The gap between them is what the verb buys.
 VERB_MEASURED = {
-    "cases": 13,
-    "within_lane_pairs": 287,
-    "subset": 23,
+    "cases": 14,
+    "within_lane_pairs": 292,
+    "subset": 24,
     "subset_verb": 3,
 }
 

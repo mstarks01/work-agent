@@ -37,19 +37,19 @@ differently and one finding becomes two.
 
 Elements alone cannot separate a read from a write against one store. The
 frontier in `tests/test_evals_identity.py` prices every rule on both errors at
-once — false splits over the 200 labelled match pairs, false merges over the 287
+once — false splits over the 200 labelled match pairs, false merges over the 292
 within-lane reference pairs:
 
-| Rule | False splits (of 200) | False merges (of 287) |
+| Rule | False splits (of 200) | False merges (of 292) |
 |---|---|---|
 | equality | 89 | 1 |
-| endpoint subset | 14 | 23 |
+| endpoint subset | 14 | 24 |
 | **endpoint subset + verb** | **15** | **3** |
 | overlap | 4 | 34 |
-| endpoint overlap | 1 | 126 |
+| endpoint overlap | 1 | 130 |
 
 No element-only row is usable: the tightest loses 89 paraphrases and the loosest
-destroys 126 findings. **The verb row is the first one that is.** One more split
+destroys 130 findings. **The verb row is the first one that is.** One more split
 buys twenty fewer merges.
 
 Scored on the shared scoreboard, through `measure_agreement`:
@@ -76,7 +76,7 @@ calls those `forge` and `alter`. That is a label worth a reading session rather
 than a rule to loosen.
 
 **All of it is agent-authored and unreviewed**, like everything under `evals/`.
-243 reference verbs and 200 candidate verbs, assigned by an agent. The candidate
+254 reference verbs and 200 candidate verbs, assigned by an agent. The candidate
 side was assigned from each candidate's own wording rather than by copying the
 reference's, for the reason `build_pairs.py` gives about element IDs: reading the
 answer first makes every pair agree by construction and the measurement
@@ -173,7 +173,7 @@ quietly as the `if` it replaced.
 The rule is the only matcher a scored sweep has. A `match` is a recall hit; a
 `no-match` leaves the finding unmatched, and its fingerprint is looked up in
 the vote ledger — `rejected`, `pooled`, `open` or `unvoted`. Nothing asks a
-model. The rule's known error costs are the record above: 3 of 287 reference
+model. The rule's known error costs are the record above: 3 of 292 reference
 pairs merged, 15 of 200 labelled matches split, and a split surfaces as an
 unvoted finding in the queue rather than vanishing.
 

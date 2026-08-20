@@ -1,0 +1,37 @@
+{
+  "id": "14-retail-loyalty-interview",
+  "title": "Retail loyalty points platform, from a written note and a fresher interview that contradicts it",
+  "domain": "retail-loyalty",
+  "provenance": "Synthetic system authored for this corpus (issue #64). Not derived from, or sanitized from, any real system or any real conversation: there is nothing to leak by omission. The transcript's form follows the properties measured from real exports in #51 — attribution by participant name, no uncertainty markers, cleaned turns — with invented content.",
+  "bootstrap": "agent-stand-in",
+  "sources": [
+    {
+      "kind": "description",
+      "label": "Loyalty platform note",
+      "file": "source.md",
+      "sha256": "800217db8811b114f34362fcdc55a5875671e1e22004a7827eae57e76deae53d"
+    },
+    {
+      "kind": "transcript",
+      "label": "Interview transcript",
+      "file": "transcript.md",
+      "sha256": "350a3f3e164c938afe163c8ca9538fe831e811505949ebde66b50f48cef0304d"
+    }
+  ],
+  "source_sha256": "a62dd568038662ef2d74203047036b11eec79ab5183f1bba69b1e9974b0de434",
+  "frameworks": [
+    {
+      "name": "asvs",
+      "options": {
+        "level": 1
+      },
+      "exemplar_proximity": "far"
+    },
+    {
+      "name": "stride",
+      "options": {},
+      "exemplar_proximity": "far"
+    }
+  ],
+  "notes": "Authored for issue #64: the corpus's first two-source case and first transcript, built to grade the conversational rules (#53) and the two-source conflict rule (#55), which no other case exercises. Four traps, each recorded as a correction: a hedge that must stay unknown (the spoofing must-find rests on it), a fact inside a question that must produce no flow, a mid-turn self-correction and a hypothetical that must produce no elements (element-level, because score_extraction is attribute-blind), and an exposure the two sources contradict, which flattens to unknown and carries an elevation-of-privilege must-find. Domain picked for clear air per #64: no ordering, no workforce, no supplier, no device estate, and no card data."
+}
