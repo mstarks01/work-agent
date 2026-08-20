@@ -19,6 +19,7 @@ Note the phrasing. "The login flow lacks MFA" is a control observation and would
     "flow:customer-to-web-api:submit-payment",
     "store:accounts-db"
   ],
+  "verb": "guess-credential",
   "evidence_refs": [
     "crossing:flow:customer-to-web-api:submit-payment"
   ],
@@ -62,6 +63,7 @@ Written against exemplar system B, to show the same reasoning on an event-driven
     "process:stream-processor",
     "store:telemetry-store"
   ],
+  "verb": "impersonate",
   "evidence_refs": [
     "crossing:flow:sensor-gateway-to-mqtt-broker:publish-telemetry"
   ],
@@ -103,6 +105,7 @@ Written against exemplar system B, to show the same reasoning on an event-driven
     "process:web-api",
     "flow:payments-provider-to-web-api:settlement-webhook"
   ],
+  "verb": "forge",
   "evidence_refs": [
     "crossing:flow:payments-provider-to-web-api:settlement-webhook",
     "unknown:flow:payments-provider-to-web-api:settlement-webhook:authentication"

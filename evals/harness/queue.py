@@ -29,10 +29,10 @@ from dataclasses import dataclass
 from typing import Any
 
 from evals.harness.fingerprint import (
-    DEFAULT_VERSION,
     Components,
     components_for,
     fingerprint,
+    version_for,
 )
 from evals.harness.identity import FlowMap
 from evals.harness.ledger import Ledger
@@ -162,7 +162,6 @@ def build(
     ledger: Ledger,
     reference_pool: frozenset[str] = frozenset(),
     voter: str = "",
-    version: int = DEFAULT_VERSION,
 ) -> list[QueueItem]:
     """The queue: unanswered findings, most informative first.
 
@@ -172,6 +171,12 @@ def build(
 
     Deduplicated by fingerprint, keeping the first occurrence. Two runs
     producing one finding is the normal case and is one question, not two.
+
+    **Each finding is keyed by its own framework's rule**, from
+    :data:`~evals.harness.fingerprint.VERSION_FOR`, rather than by one version
+    chosen for the whole queue. A sweep carries both packages' findings and they
+    do not compose identity the same way; one version over both would key an
+    ASVS claim under a rule that reads a verb it never has.
     """
     if voter:
         answered = frozenset(key[0] for key in ledger.current() if key[1] == voter)
@@ -181,6 +186,7 @@ def build(
     items: dict[str, QueueItem] = {}
     for finding in findings:
         flows = flows_by_case.get(finding.case, {})
+        version = version_for(finding.framework)
         components = components_for(
             finding.framework,
             finding.lane,

@@ -29,6 +29,7 @@ def findings():
             title="Session replay against the storefront",
             description="An attacker replays a stolen cookie.",
             element_ids=("entity:shopper",),
+            verb="replay",
             quotes=("Shoppers sign in with email and password",),
         ),
         review_queue.Finding(
@@ -38,6 +39,7 @@ def findings():
             title="Order price rewritten in the database",
             description="An attacker edits stored prices.",
             element_ids=("store:orders-db",),
+            verb="alter",
             seen_in=2,
             runs=5,
         ),

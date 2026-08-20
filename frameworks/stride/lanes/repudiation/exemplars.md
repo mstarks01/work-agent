@@ -19,6 +19,7 @@ The lane test: the harm here is not that someone impersonated a customer (spoofi
     "store:audit-log",
     "flow:ledger-service-to-audit-log:append-transfer-record"
   ],
+  "verb": "unattributable",
   "evidence_refs": [
     "crossing:flow:customer-to-web-api:submit-payment"
   ],
@@ -61,6 +62,7 @@ Written against exemplar system B. Repudiation does not require anyone to tamper
     "flow:sensor-gateway-to-mqtt-broker:publish-telemetry",
     "store:telemetry-store"
   ],
+  "verb": "unattributable",
   "evidence_refs": [
     "crossing:flow:sensor-gateway-to-mqtt-broker:publish-telemetry"
   ],
@@ -106,6 +108,7 @@ Written against exemplar system B. Repudiation does not require anyone to tamper
     "process:web-api",
     "flow:payments-provider-to-web-api:settlement-webhook"
   ],
+  "verb": "unattributable",
   "evidence_refs": [
     "crossing:flow:payments-provider-to-web-api:settlement-webhook",
     "unknown:flow:payments-provider-to-web-api:settlement-webhook:authentication"

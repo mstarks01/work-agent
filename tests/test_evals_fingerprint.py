@@ -15,13 +15,16 @@ import pytest
 from evals.harness.fingerprint import (
     DEFAULT_VERSION,
     SUPPORTED_VERSIONS,
+    VERSION_FOR,
     Components,
     FingerprintError,
     components_for,
     fingerprint,
+    version_for,
     version_of,
 )
 from evals.harness.verbs import VerbError
+from stride_service.frameworks import PACKAGES
 
 FLOWS = {
     "flow:shopper-to-storefront-api:place-order": (
@@ -33,18 +36,26 @@ FLOWS = {
 
 def test_element_order_does_not_change_the_value():
     """``affected_element_ids`` is a list whose order no rule reads."""
-    one = Components("stride", "spoofing", ("process:a", "store:b"))
-    other = Components("stride", "spoofing", ("store:b", "process:a"))
+    one = Components("stride", "spoofing", ("process:a", "store:b"), verb="read")
+    other = Components("stride", "spoofing", ("store:b", "process:a"), verb="read")
     assert fingerprint(one) == fingerprint(other)
 
 
 def test_a_flow_and_its_endpoints_fingerprint_alike():
     """The corpus carries one finding cited both ways; both must recognise."""
     as_flow = components_for(
-        "stride", "spoofing", ["flow:shopper-to-storefront-api:place-order"], FLOWS
+        "stride",
+        "spoofing",
+        ["flow:shopper-to-storefront-api:place-order"],
+        FLOWS,
+        verb="replay",
     )
     as_endpoints = components_for(
-        "stride", "spoofing", ["entity:shopper", "process:storefront-api"], FLOWS
+        "stride",
+        "spoofing",
+        ["entity:shopper", "process:storefront-api"],
+        FLOWS,
+        verb="replay",
     )
     assert fingerprint(as_flow) == fingerprint(as_endpoints)
 
@@ -52,23 +63,44 @@ def test_a_flow_and_its_endpoints_fingerprint_alike():
 def test_a_trust_boundary_citation_is_dropped():
     """A zone is the context a claim sits in, not the thing it is about."""
     with_zone = components_for(
-        "stride", "spoofing", ["process:a", "boundary:dmz"], FLOWS
+        "stride", "spoofing", ["process:a", "boundary:dmz"], FLOWS, verb="read"
     )
-    without = components_for("stride", "spoofing", ["process:a"], FLOWS)
+    without = components_for("stride", "spoofing", ["process:a"], FLOWS, verb="read")
     assert fingerprint(with_zone) == fingerprint(without)
 
 
 def test_a_different_lane_target_or_framework_is_a_different_finding():
-    base = Components("stride", "spoofing", ("process:a",))
+    base = Components("stride", "spoofing", ("process:a",), verb="read")
     assert fingerprint(base) != fingerprint(
-        Components("stride", "tampering", ("process:a",))
+        Components("stride", "tampering", ("process:a",), verb="read")
     )
     assert fingerprint(base) != fingerprint(
-        Components("stride", "spoofing", ("process:b",))
+        Components("stride", "spoofing", ("process:b",), verb="read")
     )
     assert fingerprint(base) != fingerprint(
-        Components("asvs", "spoofing", ("process:a",))
+        Components("asvs", "spoofing", ("process:a",), verb="read")
     )
+    assert fingerprint(base) != fingerprint(
+        Components("stride", "spoofing", ("process:a",), verb="alter")
+    ), "the verb is what version 2 adds; two actions are two findings"
+
+
+def test_the_version_table_covers_every_package():
+    """A table nobody compares to its registry fails as quietly as an ``if``."""
+    assert set(VERSION_FOR) == set(PACKAGES)
+    assert all(version in SUPPORTED_VERSIONS for version in VERSION_FOR.values())
+
+
+def test_an_undeclared_framework_raises_rather_than_defaulting():
+    """A package quietly keyed under the weaker rule is a ledger nobody can read."""
+    with pytest.raises(FingerprintError, match="no fingerprint version"):
+        version_for("nothing-declares-this")
+
+
+def test_the_declared_versions_follow_from_what_a_claim_carries():
+    """STRIDE composes an identity; ASVS's claims already carry one."""
+    assert version_for("stride") == 2
+    assert version_for("asvs") == 1
 
 
 def test_version_one_ignores_the_verb_and_version_two_reads_it():

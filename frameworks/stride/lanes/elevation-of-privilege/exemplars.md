@@ -19,6 +19,7 @@ Lane contrast: being accepted *as* the web API is spoofing. Directing an honest,
     "flow:ledger-service-to-accounts-db:read-write-balances",
     "store:accounts-db"
   ],
+  "verb": "abuse-grant",
   "evidence_refs": [],
   "quotes": [
     {
@@ -60,6 +61,7 @@ Written against exemplar system B. Escalation does not need a privilege bug when
     "flow:stream-processor-to-telemetry-store:write-readings",
     "store:telemetry-store"
   ],
+  "verb": "escalate",
   "evidence_refs": [
     "crossing:flow:sensor-gateway-to-mqtt-broker:publish-telemetry"
   ],
@@ -105,6 +107,7 @@ Written against exemplar system B. Escalation does not need a privilege bug when
     "flow:web-api-to-ledger-service:post-transfer",
     "store:accounts-db"
   ],
+  "verb": "escalate",
   "evidence_refs": [
     "unknown:process:ledger-service:exposure"
   ],

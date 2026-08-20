@@ -24,14 +24,14 @@ costs one more false split and removes twenty of the 23 false merges, and
 :class:`~evals.harness.identity.SubsetVerbIdentity` scores 185/200 against the
 recorded labels where element agreement alone scores 111.
 
-It is selectable and it is **not** the default, and the reason is no longer the
-corpus — every reference claim carries a verb now. It is the *produced* claim
-that does not: :class:`~stride_service.report.Claim` has no verb field, so a
-finding coming out of a live run cannot be fingerprinted at version 2. Moving
-the default needs that field, the six lane prompts that would fill it, and the
-same answer for every other package in ``PACKAGES``. Until then a queue built
-over real findings runs at version 1, and a bump would fail closed rather than
-silently fingerprint over an absent verb.
+It is the default. :class:`~stride_service.report.Claim` carries the verb and
+:class:`~stride_service.frameworks.stride.record.DraftThreat` requires it, so a
+finding out of a live run fingerprints at version 2 like a reference claim does.
+
+**Version 1 stays computable, and that is not a compatibility shim.** A package
+whose claims carry a catalog identifier composes no verb, so version 1 is the
+rule its findings are keyed under — and any ledger row written before the field
+existed re-keys to version 2 by recomputation rather than by a re-vote.
 """
 
 from __future__ import annotations
@@ -45,10 +45,34 @@ from evals.harness.identity import FlowMap, endpoint_form
 from evals.harness.verbs import check_verb
 from stride_service.report import FrameworkName
 
-#: The version a caller gets when it does not choose. Version 1 until the corpus
-#: carries verbs; bumping this is a re-keying event, so it is a reviewed edit
-#: rather than a default that drifts.
-DEFAULT_VERSION = 1
+#: The version a caller gets when it does not choose. Bumping it is a re-keying
+#: event, so it is a reviewed edit rather than a default that drifts — and a
+#: cheap one, because :func:`~evals.harness.ledger.rekey` recomputes the whole
+#: ledger from stored components with no re-vote and no provider.
+#:
+#: **Version 2 since the record carried the field.** Version 1 was the default
+#: only while :class:`~stride_service.report.Claim` had no verb, which made a
+#: finding out of a live run unfingerprintable at version 2. It has one now, so
+#: the default is the rule that measures better.
+DEFAULT_VERSION = 2
+
+#: Which rule keys each framework's findings. **Keyed, never branched**, and
+#: checked against ``PACKAGES`` by ``tests/test_evals_fingerprint.py`` — a table
+#: nobody compares to its registry fails as quietly as the ``if`` it replaced.
+#:
+#: The entries are not a preference. They follow from what a package's claims
+#: are: an open claim set has no identifier behind it, so the action is half of
+#: what makes two claims one finding and the rule must read it. A claim carrying
+#: a catalog requirement identifier already *is* identified, composes no verb,
+#: and version 1 is not a lesser rule for it but the whole of the right one.
+#:
+#: So a package added to ``PACKAGES`` and missing here raises at the first
+#: finding it produces, which is the question its author should answer: does
+#: this package's claim carry its own identity, or compose one?
+VERSION_FOR: dict[FrameworkName, int] = {
+    "stride": 2,
+    "asvs": 1,
+}
 
 #: Every version this module can compute. A key missing here raises rather than
 #: falling back — a fingerprint quietly computed under the wrong rule is a vote
@@ -98,6 +122,24 @@ class Components:
             )
         except (KeyError, TypeError) as exc:
             raise FingerprintError(f"malformed components: {exc}") from exc
+
+
+def version_for(framework: FrameworkName) -> int:
+    """Which fingerprint version keys this framework's findings.
+
+    Raises on a framework the table does not name, rather than falling back to
+    :data:`DEFAULT_VERSION` — a package quietly keyed under the weaker rule
+    would produce a ledger whose rows nobody could tell apart from the stronger
+    one's, and the version in the value would say the wrong thing.
+    """
+    try:
+        return VERSION_FOR[framework]
+    except KeyError:
+        raise FingerprintError(
+            f"no fingerprint version is declared for {framework!r};"
+            " add it to VERSION_FOR — 2 if its claims compose an identity from"
+            " an action and a place, 1 if they carry a catalog identifier"
+        ) from None
 
 
 def components_for(

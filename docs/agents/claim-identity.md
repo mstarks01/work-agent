@@ -17,7 +17,13 @@ what?**
 | framework | the block | v1, v2 |
 | lane | the block | v1, v2 |
 | targets | `affected_element_ids`, endpoint-resolved | v1, v2 |
-| action verb | `evals/harness/verbs.py`, a closed set | v2 only |
+| action verb | `stride_service.actions`, a closed set of 20 | v2 only |
+
+`Claim` carries `verb` and `DraftThreat` requires it, so a finding out of a live
+run keys the same way a reference claim does. The vocabulary is **service-side**
+rather than eval-side for that reason: a vocabulary that validates a shipped
+model has to ship with it. `evals/harness/verbs.py` adds only what a measurement
+needs — which verbs count as one action, and what the rule cannot separate.
 
 `evals/harness/fingerprint.py` hashes those into `v<version>:<16 hex>`.
 
@@ -86,16 +92,19 @@ This is the property the judge design could not offer. `evals/config/judge.toml`
 records the problem in its own header: a judge upgrade silently re-scores every
 historical number. Here the re-score is explicit, total, offline and free.
 
-`DEFAULT_VERSION` is 1, and the reason is no longer the corpus — every reference
-claim carries a verb, and `tests/test_verb_coverage.py` guards that. It is the
-**produced** claim that does not: `Claim` in `src/stride_service/report.py` has
-no verb field, so a finding from a live run cannot be fingerprinted at version 2.
+**The version is not one global default.** It is `VERSION_FOR`, a table keyed by
+framework, checked against `PACKAGES` and declared in
+`tests/test_framework_neutrality.py`:
 
-Moving the default needs three things: the field on the record, the six STRIDE
-lane prompts that would fill it from the closed vocabulary, and an answer for
-every other package in `PACKAGES`. Until then a queue built over real findings
-runs at version 1, and asking for version 2 without a verb fails closed rather
-than hashing over an absent one.
+| Package | Version | Why |
+|---|---|---|
+| `stride` | 2 | an open claim set, so the action is half of what makes two claims one finding |
+| `asvs` | 1 | its claims carry a catalog requirement identifier and already have an identity |
+
+Those entries follow from what a package's claims *are*, not from preference —
+so version 1 is not a lesser rule for ASVS, it is the whole of the right one. A
+package added to `PACKAGES` and missing from the table raises at its first
+finding, which is the question its author has to answer.
 
 ## The vote
 

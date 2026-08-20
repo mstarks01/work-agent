@@ -145,10 +145,17 @@ def test_double_voted_findings_are_the_agreement_sample(tmp_path):
 
 
 def test_a_rekey_needs_no_revote(tmp_path):
-    """The property that stops this ledger expiring when the rule improves."""
+    """The property that stops this ledger expiring when the rule changes.
+
+    Cast at version 1 and re-keyed to the current default, which is the shape a
+    row written before :class:`~stride_service.report.Claim` carried a verb
+    takes today: the components were stored, so the new key is a recomputation
+    rather than a re-vote.
+    """
     path = tmp_path / "votes.jsonl"
-    append(cast(components(), "01", "up", "sam"), path)
+    append(cast(components(), "01", "up", "sam", version=1), path)
     original = load(path)
+    assert original.votes[0].fingerprint.startswith("v1:")
 
     moved = rekey(original.votes, version=2)
     assert [vote.fingerprint for vote in moved] != [

@@ -86,6 +86,9 @@ def scripted_proposal(case, category) -> dict:
         "title": reference.claim,
         "description": f"{reference.claim} Scripted for the offline mode test.",
         "affected_element_ids": list(reference.affected_element_ids),
+        # Taken from the reference the scripted draft is standing in for, so a
+        # mode test grades the pipeline rather than this file's verb-picking.
+        "verb": reference.verb,
         "evidence_refs": [unknown_ref(case)],
         "severity": Severity(
             likelihood=reference.severity.likelihood,
