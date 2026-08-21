@@ -402,6 +402,40 @@ def _score_runs(
     )
 
 
+def _scored_sweep(
+    sweep: Sweep,
+    cases: Sequence[GoldenCase],
+    runs: dict[str, modes.AnalysisRun],
+    ledger_path: Path,
+) -> tuple[Sweep, ledger.Ledger]:
+    """Every reading that needs the vote ledger, folded onto ``sweep``.
+
+    One spelling for the two commands that compute these numbers: ``run``,
+    which scores the sweep it just produced, and ``score``, which re-scores a
+    finished one against the ledger as it stands now. Both read the same four
+    inputs and fill the same three fields, so an instrument added to the scored
+    half had to be found in two places. ``INSTRUMENTS`` already made the
+    printing and the artifact one table; this is the computing half of the same
+    argument.
+
+    Claim matching is the identity rule and a standing comes from the vote
+    ledger. Both are offline, so these readings cost no provider and a sweep is
+    always scored — what nobody has voted on yet is counted, printed, and
+    served by :mod:`evals.harness.queue`.
+
+    The ledger comes back beside the sweep because it is loaded here and a
+    caller reports how many votes it read. Loading it twice would let one
+    command print a count the other's numbers were not computed from.
+    """
+    votes = ledger.load(ledger_path)
+    matcher = SubsetVerbIdentity(_flows_by_case(cases))
+    scores, yields = _score_runs(cases, runs, matcher, votes)
+    rated = writing.measure(
+        cases, {case: run.report for case, run in runs.items()}, votes
+    )
+    return replace(sweep, scores=scores, yields=yields, writing=rated), votes
+
+
 def _models_record(deployment: Deployment) -> dict[str, Any]:
     """What this run asked its providers for.
 
@@ -456,27 +490,18 @@ def command_run(args: argparse.Namespace) -> int:
     sweep = Sweep(run=mode_run)
     render_all(sweep, scored=False)
 
-    scores: tuple[CaseScore, ...] = ()
-    yields: tuple[CriticYield, ...] = ()
-    rated: tuple[writing.CaseWriting, ...] = ()
+    # A mode that produced no run has nothing to score, and ``Sweep`` already
+    # defaults every scored field to empty — which is a sweep that measured
+    # nothing rather than one whose numbers were all zero.
     if mode_run.runs:
-        # Claim matching is the identity rule and standing comes from the vote
-        # ledger; both are offline, so a sweep is always scored. What a person
-        # has not voted on yet is counted, printed, and served by ``queue``.
-        matcher = SubsetVerbIdentity(_flows_by_case(cases))
-        votes = ledger.load(Path(args.ledger))
-        scores, yields = _score_runs(cases, mode_run.runs, matcher, votes)
-        rated = writing.measure(
-            cases, {case: run.report for case, run in mode_run.runs.items()}, votes
-        )
-        unvoted = sum(score.unvoted_count for score in scores)
+        sweep, _ = _scored_sweep(sweep, cases, mode_run.runs, Path(args.ledger))
+        unvoted = sum(score.unvoted_count for score in sweep.scores)
         if unvoted:
             print(
                 f"{unvoted} unlisted finding(s) have no vote; run"
                 " `python -m evals.harness.run review <artifact> --voter <you>`"
                 " to see them"
             )
-    sweep = replace(sweep, scores=scores, yields=yields, writing=rated)
     render_all(sweep, scored=True)
 
     artifact = build_artifact(
@@ -759,23 +784,13 @@ def command_score(args: argparse.Namespace) -> int:
         return 1
 
     runs = _runs_from_reports(path, cases)
-    votes = ledger.load(Path(args.ledger))
-    matcher = SubsetVerbIdentity(_flows_by_case(cases))
-    scores, yields = _score_runs(cases, runs, matcher, votes)
-    rated = writing.measure(
-        cases, {case: run.report for case, run in runs.items()}, votes
-    )
-
     frameworks = tuple(
         sorted(
             {block.framework for run in runs.values() for block in run.report.analyses}
         )
     )
-    sweep = Sweep(
-        run=ModeRun.empty(frameworks),
-        scores=scores,
-        yields=yields,
-        writing=rated,
+    sweep, votes = _scored_sweep(
+        Sweep(run=ModeRun.empty(frameworks)), cases, runs, Path(args.ledger)
     )
     render_all(sweep, scored=True)
 
