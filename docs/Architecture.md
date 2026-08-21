@@ -118,7 +118,10 @@ Three terms, defined once and used throughout:
 
 - **Served build** — the model identifier the provider says actually answered a
   request, prefixed with its vendor (`vertex_ai/gemini-2.5-pro-002`). Not
-  necessarily the one you asked for.
+  necessarily the one you asked for. Gemini is the worked example here because
+  one had to be. It is also the one profiled family whose served build differs
+  from the route you asked for, which is the distinction these three terms
+  exist to draw. On Claude, both model fields hold the same string.
 - **Fingerprint** (also *generation identity*) — `sha256` of the served route
   plus that tier's resolved decoding parameters. One value that identifies
   exactly how a node produced its output.
