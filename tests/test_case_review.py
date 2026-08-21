@@ -43,12 +43,14 @@ UNREVIEWED: dict[str, str] = {
         "The control case, and the only one carrying both frameworks in quantity. "
         "Every far-domain recall number in the suite is a delta against this one, "
         "so an error in its 21 STRIDE claims moves every comparison the corpus "
-        "exists to make. Its 17 ASVS records are scored by nothing at all "
-        "(#200). Reviewed first: REVIEW-02."
+        "exists to make. Its 17 ASVS records feed the applicability matrix, so "
+        "an error in those moves a number too. Neither instrument can ask "
+        "whether either set is complete. Reviewed first: REVIEW-02."
     ),
     "02-iot-fleet-telemetry": (
-        "18 STRIDE claims and 8 ASVS records, unread. The ASVS records are also "
-        "scored by nothing (#200)."
+        "18 STRIDE claims and 8 ASVS records, unread. The ASVS records feed the "
+        "applicability matrix, which scores whether a requirement applies and "
+        "never whether the set is complete."
     ),
     "03-batch-data-pipeline": "17 STRIDE claims, unread. Declares STRIDE only.",
     "04-ml-inference-service": (
@@ -58,8 +60,9 @@ UNREVIEWED: dict[str, str] = {
         "reading the case, so the rest of both sets is still unread."
     ),
     "05-cookbook-queue-webapp": (
-        "17 STRIDE claims and 7 ASVS records, unread. The ASVS records are also "
-        "scored by nothing (#200)."
+        "17 STRIDE claims and 7 ASVS records, unread. The ASVS records feed the "
+        "applicability matrix, which scores whether a requirement applies and "
+        "never whether the set is complete."
     ),
     "06-cookbook-online-game": (
         "18 STRIDE claims and 6 ASVS records. Review sitting 01 relabelled a "
@@ -74,12 +77,14 @@ UNREVIEWED: dict[str, str] = {
         "a source nobody has read against its model."
     ),
     "09-cookbook-sokify-retail": (
-        "20 STRIDE claims and 7 ASVS records, unread. The ASVS records are also "
-        "scored by nothing (#200)."
+        "20 STRIDE claims and 7 ASVS records, unread. The ASVS records feed the "
+        "applicability matrix, which scores whether a requirement applies and "
+        "never whether the set is complete."
     ),
     "10-cookbook-generic-cms": (
-        "17 STRIDE claims and 8 ASVS records, unread. The ASVS records are also "
-        "scored by nothing (#200)."
+        "17 STRIDE claims and 8 ASVS records, unread. The ASVS records feed the "
+        "applicability matrix, which scores whether a requirement applies and "
+        "never whether the set is complete."
     ),
     "11-sparse-shift-scheduling": (
         "16 STRIDE claims and 8 ASVS records, unread. The sparsest source in the "
@@ -91,8 +96,9 @@ UNREVIEWED: dict[str, str] = {
         "separate the claim from the fact on every record."
     ),
     "13-dispatch-control-plane": (
-        "19 STRIDE claims and 6 ASVS records, unread. The ASVS records are also "
-        "scored by nothing (#200)."
+        "19 STRIDE claims and 6 ASVS records, unread. The ASVS records feed the "
+        "applicability matrix, which scores whether a requirement applies and "
+        "never whether the set is complete."
     ),
 }
 
