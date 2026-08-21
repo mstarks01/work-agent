@@ -58,11 +58,15 @@ CASE_TOKEN_CAP = 700
 #: it vacuously". Recorded so a reader knows the silence is the contract and not
 #: a lint that stopped running.
 #:
-#: **ASVS is here on purpose.** Its lane skills carry the published requirement
-#: text for the whole chapter — 47 verbatim requirements in the authentication
-#: lane, with the chapter's scope and applicability beside them — so a note
-#: restating a requirement would put the catalog in a second place to drift.
-EMPTY_CORPUS = {"asvs"}
+#: **Empty today.** ASVS sat here while its corpus was unwritten, and the reason
+#: given was a real one: its lane skills already carry the published requirement
+#: text for the whole chapter, so a note restating a requirement would put the
+#: catalog in a second place to drift. That risk did not go away when the corpus
+#: was written — it is now held off by
+#: :func:`test_a_note_does_not_restate_the_catalog` instead of by the absence of
+#: any notes at all. A package added here later needs its own reason, in this
+#: comment, in the same shape.
+EMPTY_CORPUS: set[str] = set()
 
 
 def documents(framework: str, kind: str) -> list[str]:

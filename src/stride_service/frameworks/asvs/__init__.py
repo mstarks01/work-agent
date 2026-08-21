@@ -44,6 +44,86 @@ from stride_service.frameworks.asvs.rules import RULES, asvs_precondition
 __all__ = ["ASVS", "AsvsOptions"]
 
 
+# One note per recurring applicability question, against the rules that select
+# it. Document-to-rules like STRIDE's, and for the same reason: what a
+# maintainer edits is a document and what it applies to.
+#
+# **Every rule appears.** Leaving the empty corpus put all 17 under
+# ``test_every_rule_can_retrieve_something``, which is the stated cost of
+# starting one. A rule with a lead and nothing behind it is a gap.
+NOTES: dict[str, tuple[str, ...]] = {
+    "injection-sinks-and-context": (
+        "encoding-and-sanitization-database",
+        "encoding-and-sanitization-rich-text-input",
+    ),
+    "xml-and-parser-surface": ("encoding-and-sanitization-xml-parser",),
+    "where-the-rule-is-enforced": (
+        "validation-and-business-logic-client-side-code",
+        "validation-and-business-logic-multi-step-flow",
+    ),
+    "browser-delivered-controls": (
+        "web-frontend-security-browser-frontend",
+        "web-frontend-security-cookies",
+    ),
+    "cross-origin-and-handshake": (
+        "web-frontend-security-cors",
+        "api-and-web-service-websocket",
+    ),
+    "untrusted-file-intake": ("file-handling-file-upload",),
+    "proving-identity": (
+        "authentication-authentication",
+        "authentication-password-auth",
+    ),
+    "session-and-token-lifetime": (
+        "session-management-sessions",
+        "self-contained-tokens-self-contained-tokens",
+    ),
+    "delegated-authorization": ("oauth-and-oidc-oauth",),
+    "algorithms-and-key-custody": ("cryptography-encryption",),
+    "sensitive-data-in-the-client": ("data-protection-browser-frontend",),
+}
+
+# The worked cases. These teach **this framework's own judgement**, which is
+# what separates them from STRIDE's: every one turns on ruling applicability
+# rather than on grading harm, and three of the six exist to keep a reader from
+# reporting a pass this service cannot reach.
+#
+# Selected across lanes on purpose. "A stated control is not a verification" is
+# not a property of cryptography, and the agent that needs it is whichever
+# lane's rule fired.
+CASES: dict[str, tuple[str, ...]] = {
+    "applies-and-the-input-cannot-settle-it": (
+        "authentication-password-auth",
+        "session-management-sessions",
+        "encoding-and-sanitization-database",
+    ),
+    "a-stated-control-is-not-a-verification": (
+        "cryptography-encryption",
+        "authentication-authentication",
+        "self-contained-tokens-self-contained-tokens",
+    ),
+    "the-chapter-does-not-reach-this-system": (
+        "web-frontend-security-browser-frontend",
+        "web-frontend-security-cors",
+        "api-and-web-service-websocket",
+    ),
+    "the-neighbouring-chapters-requirement": (
+        "oauth-and-oidc-oauth",
+        "validation-and-business-logic-client-side-code",
+    ),
+    "the-requirement-that-asks-for-a-document": (
+        "file-handling-file-upload",
+        "validation-and-business-logic-multi-step-flow",
+        "encoding-and-sanitization-rich-text-input",
+    ),
+    "one-fact-two-chapters": (
+        "web-frontend-security-cookies",
+        "data-protection-browser-frontend",
+        "encoding-and-sanitization-xml-parser",
+    ),
+}
+
+
 ASVS = FrameworkPackage(
     name="asvs",
     version=ASVS_VERSION,
@@ -66,8 +146,7 @@ ASVS = FrameworkPackage(
     ),
     options=AsvsOptions,
     precondition=asvs_precondition,
-    # Both tables ship empty, which the contract makes a written statement rather
-    # than an omission: this package carries no **Reference Note** and no
-    # **Worked Case** yet, and the gate passes it vacuously.
-    knowledge=KnowledgeTables(notes=MappingProxyType({}), cases=MappingProxyType({})),
+    knowledge=KnowledgeTables(
+        notes=MappingProxyType(NOTES), cases=MappingProxyType(CASES)
+    ),
 )
