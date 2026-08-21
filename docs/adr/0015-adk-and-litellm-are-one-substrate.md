@@ -143,8 +143,9 @@ exactly as long as nobody has run a sanctioned sweep — and the run that ends
 that is also the run that gives someone a reason to care. Deferral is free here
 in a way it genuinely was not there.
 
-**The research that settled the substrate is reachable from one clone.** Five
-commits hold it, and none is an ancestor of `origin/main` or on any remote ref:
+**The research that settled the substrate is now on `main`.** When this ADR was
+written, five commits held it and none was an ancestor of `origin/main` or on
+any remote ref:
 
 | Commit | Document |
 | --- | --- |
@@ -154,10 +155,12 @@ commits hold it, and none is an ancestor of `origin/main` or on any remote ref:
 | `24047f0` | the `get_optional_params` gate probe (#13) |
 | `47d3c82` | the `reasoning_effort` surface probe (#15) |
 
-They survive today only because this working copy has not been garbage
-collected. Recording the SHAs here makes this ADR the recovery path, which is
-weaker than the documents themselves being on `main`. Restoring them is a
-separate change and is not made here.
+They survived only because one working copy had not been garbage collected. The
+documents now live in `docs/research/`, restored at their latest content along
+with three unrelated research records that were stranded the same way. The SHAs
+stay listed because they are the provenance of each file, and
+`docs/research/README.md` carries the staleness a reader needs: four of the five
+were probed against `litellm==1.93.0`, and this repo pins `1.97.0`.
 
 **Nothing in the code changes.** This ADR ratifies what `binding.py`,
 `model_gate.py` and `tests/test_conformance.py` already do. The decidable half
