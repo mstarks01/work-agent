@@ -10,6 +10,15 @@ Issues live as GitHub issues on `mstarks01/work-agent`, driven through the `gh` 
 wayfinder maps use native sub-issues and issue dependencies. Completed local-markdown
 maps under `.wayfinder/` are archived history, not live. See `docs/agents/issue-tracker.md`.
 
+### Code review checkpoints
+
+A finished code review ends in an annotated `reviewed/<date>` tag on the commit
+it covered. Start the next one from `git tag -l 'reviewed/*' --sort=-creatordate
+| head -1` rather than asking for a fixed point. The tag message carries what the
+diff cannot: which axes ran, where each finding was fixed, and **what was left
+open by decision** — read that before reporting a finding, so a settled question
+is not re-raised as a new one. See `docs/agents/code-review.md`.
+
 ### Triage labels
 
 The five canonical roles, each label string equal to its name: `needs-triage`, `needs-info`,
