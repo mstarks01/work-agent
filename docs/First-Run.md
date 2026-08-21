@@ -76,7 +76,7 @@ model = "claude-sonnet-4-6"
 
 [tiers.strong]
 vendor = "anthropic"
-model = "claude-opus-4-6"
+model = "claude-opus-5"
 ```
 
 ```sh
@@ -156,9 +156,11 @@ Do not create a service-account key for this. CI does not use one either — it
 federates short-lived credentials from GitHub's OIDC token, a separate one-time
 setup described in [WORKLOAD_IDENTITY](../.github/WORKLOAD_IDENTITY.md).
 
-Vertex also serves Claude, spelled with the identical model ID — `vendor =
-"vertex"` with `model = "claude-opus-4-6"` is a valid pair, and it is a
-*different* generation identity from the same model reached through
+Vertex also serves Claude, spelled with the identical model ID, and the same
+model reached through the two vendors is a *different* generation identity. It
+is not currently a pair you can select, though: the pinned provider library
+emulates schema constraint for Vertex-hosted Claude rather than sending the
+schema natively, so the build refuses it. Reach Claude through
 `vendor = "anthropic"`.
 
 ### Checking a pair before you commit to it

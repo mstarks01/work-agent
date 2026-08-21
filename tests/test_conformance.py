@@ -419,7 +419,7 @@ class TestProvenanceIsProviderIndependent:
         that the vendor stops being recorded.
         """
         sampling = load_sampling(CONFIG / "sampling.toml", env={}).for_tier("strong")
-        model = "claude-opus-4-6"
+        model = "claude-opus-5"
         direct = sampling_fingerprint(
             join_served(vendor_for("anthropic").route(model), model), sampling
         )

@@ -42,7 +42,7 @@ model = "gemini-2.5-flash"
 
 [tiers.strong]
 vendor = "anthropic"
-model = "claude-opus-4-6"
+model = "claude-opus-5"
 ```
 
 Supported vendors are `vertex`, `anthropic` and `openai`. Every one is reached
@@ -373,7 +373,7 @@ Differences the matrix shows today, none of them defects:
 - `reasoning_effort` reaches Gemini, Claude and the OpenAI reasoning models, and
   is rejected by `gpt-4o`.
 - Output ceilings differ by roughly eight times across the profiled pairs
-  (16,384 on `gpt-4o`; 128,000 on `gpt-5.6` and `claude-opus-4-6`).
+  (16,384 on `gpt-4o`; 128,000 on `gpt-5.6` and `claude-opus-5`).
 
 None of these fails conformance. What conformance requires is that the
 *application* behaves identically given the same capability: the same
