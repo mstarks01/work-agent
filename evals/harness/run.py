@@ -18,16 +18,18 @@ directory :func:`reports_dir` names. The artifact answers the questions the
 metric set anticipated; the reports answer the rest, offline and for free
 ([#180](https://github.com/mstarks01/work-agent/issues/180)).
 
-``run`` and ``calibrate`` need live provider credentials, so neither runs on a
-PR. The credential-free lane is ``evals/verify_corpus.py``, which is what CI
-exercises; the live sweep runs on the weekly schedule in
-``.github/workflows/evals-live.yml``.
+``run`` is the one command here that needs live provider credentials, so it does
+not run on a PR. Every other command — ``score``, ``calibrate``, ``review``,
+``rekey``, ``stability`` and ``promote`` — reads finished artifacts, the corpus
+and the vote ledger, so all of them run offline and free. The credential-free
+lane CI exercises is ``evals/verify_corpus.py``; the live sweep is dispatched by
+hand from ``.github/workflows/evals-live.yml``, which carries no schedule.
 
-``promote`` needs **no** credentials: it works from a finished artifact, whose
-``provenance`` block records what each node execution actually ran on. That is
-the point of recording it — the served builds are observations, made once
-during the sweep, and rediscovering them afterwards is not something an
-operator should have to do
+``promote`` is offline for a reason worth naming on its own: it works from a
+finished artifact, whose ``provenance`` block records what each node execution
+actually ran on. That is the point of recording it — the served builds are
+observations, made once during the sweep, and rediscovering them afterwards is
+not something an operator should have to do
 ([#117](https://github.com/mstarks01/work-agent/issues/117)).
 """
 

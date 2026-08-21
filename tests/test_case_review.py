@@ -43,8 +43,8 @@ UNREVIEWED: dict[str, str] = {
         "The control case, and the only one carrying both frameworks in quantity. "
         "Every far-domain recall number in the suite is a delta against this one, "
         "so an error in its 21 STRIDE claims moves every comparison the corpus "
-        "exists to make. Its 17 ASVS records are scored by nothing at all (#200)."
-        "Reviewed first: REVIEW-02."
+        "exists to make. Its 17 ASVS records are scored by nothing at all "
+        "(#200). Reviewed first: REVIEW-02."
     ),
     "02-iot-fleet-telemetry": (
         "18 STRIDE claims and 8 ASVS records, unread. The ASVS records are also "

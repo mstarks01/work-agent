@@ -85,7 +85,7 @@ VERSION_FOR: dict[FrameworkName, int] = {
 
 #: Which field on a claim names the lane it was reached in. **Keyed, never
 #: branched**, and checked against ``PACKAGES`` by
-#: ``tests/test_framework_neutrality.py``.
+#: ``tests/test_evals_fingerprint.py``.
 #:
 #: A package names its lane in its own terms — STRIDE reaches a claim in a
 #: category, ASVS reaches one in a chapter — and both are the graph's fact
@@ -101,7 +101,7 @@ LANE_FIELD: dict[FrameworkName, str] = {
 
 #: How a package's claim names its catalog identifier, read off the claim ID.
 #: **Keyed, never branched**, and checked against ``PACKAGES`` by
-#: ``tests/test_framework_neutrality.py``.
+#: ``tests/test_evals_fingerprint.py``.
 #:
 #: ``None`` is a declaration and not a hole: it says this package's claims carry
 #: no identifier, so its findings compose one from an action and a place. The
