@@ -32,6 +32,7 @@ from stride_service.frameworks.asvs.catalog import (
     ASVS_VERSION,
     CHAPTER_NUMBERS,
     LANES,
+    is_published_requirement,
 )
 from stride_service.frameworks.asvs.record import (
     ASVS_ID_FORMAT,
@@ -57,6 +58,11 @@ ASVS = FrameworkPackage(
         template=ASVS_ID_FORMAT,
         prefix=CHAPTER_NUMBERS,
         lane_field="chapter",
+        # The one thing the key's shape cannot say. ``99.99`` is as well-formed
+        # as ``2.1``, so without this the service composes the standard's own
+        # version-safe reference for a requirement the standard does not
+        # publish. STRIDE declares no predicate because it mints its own IDs.
+        known=is_published_requirement,
     ),
     options=AsvsOptions,
     precondition=asvs_precondition,
