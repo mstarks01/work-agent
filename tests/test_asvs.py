@@ -329,30 +329,25 @@ def test_the_corpus_covers_every_rule_and_names_no_other():
 
 
 def test_which_lanes_carry_no_candidate_rule_is_pinned():
-    """A lead-less lane is allowed, but not silently.
+    """Every lane carries a rule, and losing one is a decision, not a drift.
 
-    ``rules.py`` authors presence tests for the level 1 requirements first, so a
-    chapter whose level 1 set no rule reads reaches its agent with no candidate.
-    That is deliberate and #193 settled that a **Candidate** is a lead and not a
-    gate — a lane agent analyses its chapter either way.
+    Six lanes had none while the rules were authored against the level 1
+    requirements first. #193 settled that this was allowed — a **Candidate** is
+    a lead and not a gate, and a lane agent analyses its chapter either way —
+    but the six were not harmless: retrieval is keyed by *fired rule*, so a lane
+    with no rule also received no reference note and no worked case, whatever
+    the knowledge tables held.
 
-    What was missing is a record of *which* lanes those are. Without one the set
-    can grow by accident, and the difference between "the rules found nothing
-    here" and "nothing was ever asked here" is invisible in the report. Pinning
-    it makes a new lead-less lane a decision somebody writes down.
+    Closing the set is what makes the corpus reach every chapter. The assertion
+    stays as an empty list rather than being deleted, so a lane that loses its
+    last rule fails here instead of quietly going dark.
     """
     ruleless = sorted(set(ASVS.lanes) - {rule.lane for rule in ASVS.rules})
 
-    assert ruleless == [
-        "authorization",
-        "configuration",
-        "secure-coding-and-architecture",
-        "secure-communication",
-        "security-logging-and-error-handling",
-        "webrtc",
-    ], (
-        "the set of ASVS lanes with no candidate rule changed. If a lane gained"
-        " a rule, shorten this list. If one lost its last rule, say why here."
+    assert ruleless == [], (
+        "an ASVS lane lost its last candidate rule. A lane with no rule reaches"
+        " its agent with no deterministic lead and retrieves nothing, because"
+        " retrieval is keyed by fired rule. Say why here, or give it a rule."
     )
     # STRIDE's contrast, which is the parity question this pins: every STRIDE
     # lane carries a rule, because its rules read structure every model has.

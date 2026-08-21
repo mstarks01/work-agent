@@ -81,6 +81,12 @@ NOTES: dict[str, tuple[str, ...]] = {
     "delegated-authorization": ("oauth-and-oidc-oauth",),
     "algorithms-and-key-custody": ("cryptography-encryption",),
     "sensitive-data-in-the-client": ("data-protection-browser-frontend",),
+    "who-may-reach-what": ("authorization-privileged-role",),
+    "the-channel-itself": ("secure-communication-transport",),
+    "where-the-secret-lives": ("configuration-secret-material",),
+    "code-you-did-not-write": ("secure-coding-and-architecture-third-party-component",),
+    "what-reaches-the-log": ("security-logging-and-error-handling-log-or-audit-trail",),
+    "real-time-media-and-signalling": ("webrtc-real-time-media",),
 }
 
 # The worked cases. These teach **this framework's own judgement**, which is
@@ -101,25 +107,41 @@ CASES: dict[str, tuple[str, ...]] = {
         "cryptography-encryption",
         "authentication-authentication",
         "self-contained-tokens-self-contained-tokens",
+        # The case's own example is "all traffic is TLS 1.3", which is this
+        # lane's subject stated in the submitter's own words.
+        "secure-communication-transport",
     ),
     "the-chapter-does-not-reach-this-system": (
         "web-frontend-security-browser-frontend",
         "web-frontend-security-cors",
         "api-and-web-service-websocket",
+        # The chapter most systems genuinely do not have, which is what this
+        # case is about.
+        "webrtc-real-time-media",
     ),
     "the-neighbouring-chapters-requirement": (
         "oauth-and-oidc-oauth",
         "validation-and-business-logic-client-side-code",
+        # The case's worked example is a ruling that belongs to authorization
+        # and was nearly filed under authentication.
+        "authorization-privileged-role",
     ),
     "the-requirement-that-asks-for-a-document": (
         "file-handling-file-upload",
         "validation-and-business-logic-multi-step-flow",
         "encoding-and-sanitization-rich-text-input",
+        # Both chapters open with a documentation requirement, which is what
+        # this case exists to stop an agent skipping.
+        "configuration-secret-material",
+        "secure-coding-and-architecture-third-party-component",
     ),
     "one-fact-two-chapters": (
         "web-frontend-security-cookies",
         "data-protection-browser-frontend",
         "encoding-and-sanitization-xml-parser",
+        # A shared account is one fact that rules in two chapters: where the
+        # secret lives, and why the log cannot attribute the action.
+        "security-logging-and-error-handling-log-or-audit-trail",
     ),
 }
 
