@@ -38,6 +38,7 @@ from pydantic import BaseModel, ConfigDict, Field
 
 from stride_service.frameworks.asvs.catalog import (
     ASVS_VERSION,
+    CHAPTER_NUMBERS,
     LANES,
     AsvsLevel,
     requirements_for,
@@ -335,6 +336,7 @@ class AsvsAnalysis(FrameworkAnalysis):
         return [
             *super().block_issues(known_element_ids),
             *self._summary_breakdown_issues(),
+            *self._chapter_agreement_issues(),
             *self._level_coverage_issues(),
         ]
 
@@ -344,6 +346,49 @@ class AsvsAnalysis(FrameworkAnalysis):
         if self.summary.by_chapter == recount.by_chapter:
             return []
         return ["summary.by_chapter does not match the asvs analysis's own contents"]
+
+    def _chapter_agreement_issues(self) -> list[str]:
+        """A claim's ID and its ``chapter`` field name the same chapter.
+
+        **Fatal because it is the service's own, and it is the one this block
+        can be sure of.** Both values come from one call:
+        :func:`~stride_service.evidence.resolve_proposals` composes the ID from
+        the lane's chapter number and stamps ``chapter`` from the same lane, so
+        an agent cannot separate them and a disagreement here can only mean this
+        code got it wrong. That is exactly the standing
+        :meth:`block_issues` requires, and it is why this sits beside the
+        coverage check rather than being dropped and marked like an unknown
+        requirement is.
+
+        Worth checking rather than trusting, because a report payload is
+        validated from outside this build too: the package's own comment says
+        the chapter appears in the ID, in the lane and in the record "from one
+        call, so the three cannot disagree", and until now nothing read that
+        back. A claim whose ID says chapter 11 and whose record says
+        ``authentication`` files a cryptography ruling under the wrong lane's
+        summary and the wrong chapter's coverage.
+
+        A claim whose ID does not resolve at all is left alone; that is what
+        ``_level_coverage_issues`` and the identity checks above already see.
+        """
+        issues = []
+        for claim in (*self.claims, *self.rejected_claims):
+            requirement = requirement_of(claim.id)
+            if not requirement:
+                continue
+            expected = CHAPTER_NUMBERS.get(claim.chapter)
+            if expected is None:
+                issues.append(
+                    f"claim {claim.id!r} names chapter {claim.chapter!r},"
+                    " which this package does not declare"
+                )
+                continue
+            if requirement.split(".")[0] != f"V{expected}":
+                issues.append(
+                    f"claim {claim.id!r} resolves to {requirement} but its"
+                    f" chapter field says {claim.chapter!r} (V{expected})"
+                )
+        return issues
 
     def _level_coverage_issues(self) -> list[str]:
         """Every requirement in the level appears once, and ``scope`` holds no other.
