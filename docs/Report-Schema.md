@@ -680,7 +680,9 @@ class TokenUsage:
 - **`model`** is what *answered* — the build the provider reported, joined to its
   vendor prefix, e.g. `vertex_ai/gemini-2.5-pro-002`.
 - **`requested_model`** is what was *asked for* — the configured route, e.g.
-  `vertex_ai/gemini-2.5-pro`.
+  `vertex_ai/gemini-2.5-pro`. Gemini is the example because one had to be, and
+  because it is the one profiled family whose two values differ. On Claude,
+  both fields hold the same string.
 - **`sampling_fingerprint`** is a hash of the served route plus those parameters
   — one value identifying exactly how a node generated its output. It can be
   recomputed from the node's `model` and its tier's entry in `sampling`, so

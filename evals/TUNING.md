@@ -339,6 +339,10 @@ STRONG
     792c8e41...
 ```
 
+Gemini is the example because one had to be. It is the one profiled family
+whose served build differs from the requested route, which is what this preview
+exists to show. On Claude, both lines hold the same string.
+
 `--yes` rewrites `config/sampling.toml` in place (keeping its comments) and adds
 the fingerprints to `config/blessed-fingerprints.toml`, keyed by tier. Commit
 both. Blessing is additive — an existing blessed build stays blessed, and
