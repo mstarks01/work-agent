@@ -15,11 +15,22 @@ from __future__ import annotations
 
 import json
 import re
+import shutil
+import subprocess
+import tempfile
+from collections.abc import Sequence
+from typing import get_args
 
 import pytest
 from fastapi.testclient import TestClient
 
-from stride_service import Source, SourceLimits, StrideEngine, StubPipelineRunner
+from stride_service import (
+    FrameworkName,
+    Source,
+    SourceLimits,
+    StrideEngine,
+    StubPipelineRunner,
+)
 from stride_service.deployment import Deployment
 from stride_service.vendors import ProviderAuthError
 from tests.factories import TEST_TIER_ENV, sample_selection
@@ -38,16 +49,43 @@ def tiers():
     return Deployment.from_env(env=TEST_TIER_ENV).tiers
 
 
+# What the offline lane's install "carries", and so what its picker offers and
+# its allow-list admits. Both packages, because one of them declares a required
+# option and the other declares none — which is the whole of what the picker
+# has to tell apart.
+CARRIED: tuple[FrameworkName, ...] = ("stride", "asvs")
+
+# The complete option set for each carried package, for a test that needs a
+# submission to be accepted rather than to be about the options. Keyed by
+# framework and not branched on: a package added to CARRIED without an entry
+# here raises rather than quietly submitting without its options.
+COMPLETE_OPTIONS: dict[FrameworkName, dict] = {"stride": {}, "asvs": {"level": 2}}
+
+
+def stub_engine_for(selection):
+    """Build a stub engine for one selection, as ``build_startup``'s factory does.
+
+    The real factory is ``partial(StrideEngine.from_deployment, deployment)``,
+    which composes a graph and binds credentials. This is the same signature
+    over a stub runner, so the whole selection path — allow-list, options
+    validation, one report block per picked framework — runs with no model and
+    no cost. The engine's own constructor is what refuses a missing option, so
+    that refusal is exercised here rather than mocked out.
+    """
+    return StrideEngine(
+        StubPipelineRunner(),
+        limits=WEBAPP_LIMITS,
+        deadline_seconds=TEST_DEADLINE,
+        frameworks=selection,
+    )
+
+
 @pytest.fixture
 def client(tiers):
     """The app wired to a stub runner — no models, no credentials, no cost."""
     startup = Startup(
-        engine=StrideEngine(
-            StubPipelineRunner(),
-            limits=WEBAPP_LIMITS,
-            deadline_seconds=TEST_DEADLINE,
-            frameworks=sample_selection(),
-        ),
+        engine_for=stub_engine_for,
+        frameworks=CARRIED,
         tiers=tiers,
         error=None,
     )
@@ -58,7 +96,8 @@ def client(tiers):
 def broken_client(tiers):
     """The app as it comes up when the vendor's credentials are missing."""
     startup = Startup(
-        engine=None,
+        engine_for=None,
+        frameworks=(),
         tiers=tiers,
         error=ProviderAuthError(
             "vendor 'vertex' needs STRIDE_VERTEX_PROJECT; it is unset or empty"
@@ -76,12 +115,20 @@ WEBAPP_LIMITS = SourceLimits(max_total_bytes=100 * 1024, max_sources=10)
 TEST_DEADLINE = 30.0
 
 
-def posted(text: str) -> dict:
-    """The body the app's own page sends."""
+def posted(text: str, frameworks: Sequence[FrameworkName] = CARRIED) -> dict:
+    """The body the app's own page sends: the textarea, and the ticked boxes.
+
+    Every carried framework by default, which is the state the form ships in.
+    Each one carries the complete options for its package, so a body from here
+    is one the allow-list and the options models both accept.
+    """
     return {
         "sources": [
             {"kind": "description", "label": "Pasted description", "text": text}
-        ]
+        ],
+        "frameworks": [
+            {"name": name, "options": COMPLETE_OPTIONS[name]} for name in frameworks
+        ],
     }
 
 
@@ -100,11 +147,35 @@ def test_the_form_page_shows_the_resolved_tiers_read_only(client, tiers):
     page = client.get("/").text
     for tier, selection in tiers.tiers.items():
         assert f"<b>{tier}</b> → {selection.vendor} / {selection.model}" in page
-    # Selection is config-only: the page reflects it, and offers no input that
-    # could influence it. The only form control is the description.
-    assert "<select" not in page
-    assert page.count("<input") == 0
+
+
+def test_no_form_control_can_influence_which_model_runs(client, tiers):
+    """The picker chooses what is analysed; nothing chooses what analyses it.
+
+    Model identity stays config-only (A01, LLM10). The page prints the resolved
+    tier, vendor and model, so this cannot assert those strings are absent —
+    it asserts that no *control* carries one, which is the property that would
+    actually be lost if a model field were ever added.
+    """
+    controls = re.findall(r"<(?:input|select|textarea)\b[^>]*>", client.get("/").text)
+    named = {tier for tier in tiers.tiers}
+    named |= {selection.vendor for selection in tiers.tiers.values()}
+    named |= {selection.model for selection in tiers.tiers.values()}
+
+    assert controls, "the form page should carry controls"
+    for control in controls:
+        assert not any(name in control for name in named), control
+
+
+def test_the_only_controls_are_the_picker_and_the_description(client):
+    """One textarea, one checkbox per carried framework, one select per option."""
+    page = client.get("/").text
+
     assert page.count("<textarea") == 1
+    assert page.count('type="checkbox"') == len(CARRIED)
+    # ASVS declares a level and STRIDE declares nothing, so exactly one select.
+    assert page.count("<select") == 1
+    assert 'data-option="level"' in page
 
 
 def test_load_example_serves_the_same_file_the_examples_run(client):
@@ -149,6 +220,214 @@ def test_the_run_gate_admits_one_at_a_time():
     assert second.id != first.id
 
 
+def report_of(client, run_id: str) -> dict:
+    """The report the viewer was handed, read back out of its JSON block."""
+    page = client.get(f"/report/{run_id}").text
+    block = re.search(
+        r'<script type="application/json" id="report"[^>]*>(.*?)</script>',
+        page,
+        re.DOTALL,
+    )
+    assert block is not None, "the report page carried no injected JSON block"
+    return json.loads(block.group(1))
+
+
+def frameworks_of(client, body: dict) -> list[str]:
+    """Submit ``body``, run it out, and return the report's blocks in order."""
+    started = client.post("/analyze", json=body, headers=SAME_ORIGIN)
+    assert started.status_code == 200, started.text
+    run_id = started.json()["run"]
+    assert "event: done" in client.get(f"/events/{run_id}").text
+    return [block["framework"] for block in report_of(client, run_id)["analyses"]]
+
+
+def test_the_offline_lanes_tables_cover_the_whole_registry():
+    """``CARRIED`` and ``COMPLETE_OPTIONS`` are checked against ``PACKAGES``.
+
+    Both are tables keyed by framework, and a table nobody compares to the
+    registry fails as quietly as the branch it replaced: a package registered
+    later would leave this lane testing the picker against a set that no longer
+    matches what an install can carry. Comparing here is what makes that a
+    failure at the next run rather than a gap nobody sees.
+    """
+    from stride_service.frameworks import PACKAGES
+
+    assert set(CARRIED) == set(PACKAGES), (
+        "PACKAGES has changed. Widen CARRIED so this lane still exercises the"
+        " picker against everything an install can carry."
+    )
+    assert set(COMPLETE_OPTIONS) == set(PACKAGES), (
+        "PACKAGES has changed. Give the new package a complete option set here,"
+        " read off its own options model."
+    )
+
+
+def test_every_complete_option_set_really_is_complete():
+    """Each entry satisfies its own package's options model, not this lane's idea of it.
+
+    Validated against the model rather than eyeballed, so an entry that stops
+    being complete — a package that adds a required field — fails here instead
+    of turning every submission in this file into a 400.
+    """
+    from stride_service.frameworks import package_for
+
+    for name, options in COMPLETE_OPTIONS.items():
+        package_for(name).options.model_validate(options)
+
+
+def test_the_picker_offers_every_framework_this_install_carries(client):
+    """The rows come from the carried list, so a package added gets a row."""
+    page = client.get("/").text
+    for name in CARRIED:
+        assert f'name="framework" value="{name}"' in page
+
+
+def test_a_package_that_declares_an_option_gets_a_control_for_it(client):
+    """The choices offered are the choices its own options model declares.
+
+    Read off the package rather than spelled here, so this asks the question of
+    whichever package declares a closed-set option rather than of one by name.
+    """
+    from stride_service.frameworks import package_for
+    from webapp.main import _option_fields
+
+    page = client.get("/").text
+    for name in CARRIED:
+        for field, annotation in _option_fields(name):
+            assert f'data-framework="{name}" data-option="{field}"' in page
+            for choice in get_args(annotation):
+                assert f'<option value="{json.dumps(choice)}">' in page
+        assert package_for(name).options is not None
+
+
+def test_picking_both_frameworks_returns_one_report_with_both_blocks(client):
+    """The whole point: two frameworks, one submission, one shared model."""
+    assert frameworks_of(client, posted("A web app talks to a database.")) == [
+        "stride",
+        "asvs",
+    ]
+
+
+@pytest.mark.parametrize("name", CARRIED)
+def test_picking_one_framework_runs_only_that_one(client, name):
+    """Unticking a box costs its nodes, so it must actually leave it out."""
+    body = posted("A web app talks to a database.", frameworks=[name])
+    assert frameworks_of(client, body) == [name]
+
+
+def test_the_block_order_is_the_installs_order_not_the_pages(client):
+    """A reordered post is normalised, not honoured: block order is config's."""
+    body = posted("A web app talks to a database.", frameworks=reversed(CARRIED))
+    assert frameworks_of(client, body) == list(CARRIED)
+
+
+def test_a_framework_named_twice_runs_once(client):
+    """Otherwise a page could double its own cost and break the envelope."""
+    body = posted("A web app talks to a database.", frameworks=["asvs", "asvs"])
+    assert frameworks_of(client, body) == ["asvs"]
+
+
+def test_a_framework_this_install_does_not_carry_is_refused(tiers):
+    """The allow-list's real job, which the closed type does not do for it.
+
+    A name this repo cannot spell is refused by ``FrameworkName`` before this
+    app sees it. A name it *can* spell, on an install that does not carry it,
+    reaches the allow-list — and only the allow-list refuses it. So this drives
+    an install narrowed to one package and posts the other.
+    """
+    narrow, withheld = CARRIED[0], CARRIED[1]
+    client = TestClient(
+        create_app(
+            Startup(
+                engine_for=stub_engine_for,
+                frameworks=(narrow,),
+                tiers=tiers,
+                error=None,
+            )
+        )
+    )
+
+    def submit(*names):
+        return client.post(
+            "/analyze",
+            json=posted("A web app talks to a database.", frameworks=names),
+            headers=SAME_ORIGIN,
+        )
+
+    assert f'value="{withheld}"' not in client.get("/").text, (
+        "the picker offered a framework this install cannot run"
+    )
+    assert submit(withheld).status_code == 400
+
+    # The decisive one. Dropping the check rather than refusing on it leaves
+    # this a 200 that quietly runs `narrow` alone — a submission answered by a
+    # selection nobody made, which is the failure the allow-list exists to stop.
+    assert submit(narrow, withheld).status_code == 400
+
+
+@pytest.mark.parametrize(
+    "frameworks",
+    [
+        pytest.param([{"name": "stride"}, {"name": "nope"}], id="not-a-framework"),
+        pytest.param([], id="nothing-ticked"),
+        pytest.param("stride", id="not-a-list-of-selections"),
+        pytest.param([{"level": 2}], id="no-name"),
+    ],
+)
+def test_a_submission_this_install_cannot_serve_is_refused(client, frameworks):
+    """Deny by default (A01): the allow-list runs before an engine exists."""
+    body = posted("A web app talks to a database.")
+    body["frameworks"] = frameworks
+
+    refused = client.post("/analyze", json=body, headers=SAME_ORIGIN)
+
+    assert refused.status_code == 400, refused.text
+
+
+def test_a_submission_missing_a_required_option_is_refused_by_name(client):
+    """The package's own options model refuses it, and says which field.
+
+    Not the app's check and not a name spelled here: the engine's constructor
+    validates against the package's model, so the message names the field that
+    package declares.
+    """
+    body = posted("A web app talks to a database.")
+    body["frameworks"] = [{"name": "asvs", "options": {}}]
+
+    refused = client.post("/analyze", json=body, headers=SAME_ORIGIN)
+
+    assert refused.status_code == 400
+    assert "asvs" in refused.json()["message"]
+    assert "level" in refused.json()["message"]
+
+
+def test_an_option_outside_its_declared_set_is_refused(client):
+    """A page can post any number; the closed set is what decides."""
+    body = posted("A web app talks to a database.")
+    body["frameworks"] = [{"name": "asvs", "options": {"level": 9}}]
+
+    refused = client.post("/analyze", json=body, headers=SAME_ORIGIN)
+
+    assert refused.status_code == 400
+
+
+def test_a_refused_selection_leaves_the_gate_open_for_the_next_submitter(client):
+    """The engine is built before the gate is claimed, so a 400 locks nobody out."""
+    body = posted("A web app talks to a database.")
+    body["frameworks"] = [{"name": "asvs", "options": {}}]
+    assert client.post("/analyze", json=body, headers=SAME_ORIGIN).status_code == 400
+
+    run_to_completion(client)
+
+
+def test_an_option_that_is_not_a_closed_set_fails_loudly(client):
+    """A control that cannot be filled in is a defect, not a blank field."""
+    from webapp.main import _option_control
+
+    with pytest.raises(RuntimeError, match="closed set"):
+        _option_control("stride", "budget", int)
+
+
 def test_the_registry_evicts_oldest_first_and_stays_bounded():
     """Untrusted prose and its report never accumulate without bound."""
     analyses = Analyses(max_runs=3)
@@ -166,12 +445,8 @@ def test_a_second_submission_is_refused_while_one_is_running(tiers):
     """LLM10, at the HTTP surface: refused with a message, not held open."""
     analyses = Analyses()
     startup = Startup(
-        engine=StrideEngine(
-            StubPipelineRunner(),
-            limits=WEBAPP_LIMITS,
-            deadline_seconds=TEST_DEADLINE,
-            frameworks=sample_selection(),
-        ),
+        engine_for=stub_engine_for,
+        frameworks=CARRIED,
         tiers=tiers,
         error=None,
     )
@@ -584,6 +859,58 @@ def test_the_form_page_has_no_html_string_sink(sink):
     )
 
 
+def test_the_form_page_javascript_parses():
+    """A syntax error here serves a page whose Analyze button silently does nothing.
+
+    The block is served as text and never compiled by anything in this lane, so
+    without this the first thing to run it is a browser. Skipped rather than
+    failed where ``node`` is absent: the check is worth having in CI and on a
+    developer's machine, and it is not worth making the suite depend on a
+    JavaScript runtime.
+    """
+    node = shutil.which("node")
+    if node is None:
+        pytest.skip("no node on PATH to parse the form's script block")
+
+    from webapp.main import _FORM_PAGE
+
+    body = _FORM_PAGE.split('<script nonce="__CSP_NONCE__">')[-1].split("</script>")[0]
+    with tempfile.NamedTemporaryFile("w", suffix=".js") as handle:
+        handle.write(body)
+        handle.flush()
+        checked = subprocess.run(
+            [node, "--check", handle.name],
+            capture_output=True,
+            text=True,
+            check=False,
+        )
+
+    assert checked.returncode == 0, checked.stderr
+
+
+def test_the_page_posts_the_selection_it_built_from_the_checkboxes():
+    """The picker has to reach the body, or every submission runs the default set.
+
+    A source-level check, which is what this lane can decide about JavaScript
+    it does not execute. What the *server* does with the posted selection is
+    covered for real, above, through the app.
+    """
+    javascript = form_javascript()
+
+    assert "frameworks: selection()" in javascript
+    assert 'querySelectorAll("input[name=framework]")' in javascript
+
+
+def test_an_options_value_is_parsed_as_json_not_read_as_text():
+    """A level is ``Literal[1, 2, 3]``, so posting the string "1" is a 400.
+
+    The control carries each choice's JSON and the page parses it back. This is
+    the line that keeps a filled-in form from being refused, and it is one
+    ``JSON.parse`` away from being wrong in a way no server-side test sees.
+    """
+    assert "JSON.parse(s.value)" in form_javascript()
+
+
 def test_the_form_page_carries_no_escape_helper():
     """The corollary, the viewer's rule applied here.
 
@@ -662,7 +989,12 @@ def test_a_config_error_spelling_the_placeholder_is_not_substituted(tiers):
     from webapp.main import diagnostic_page
 
     page = diagnostic_page(
-        Startup(engine=None, tiers=tiers, error=ConfigError("__CSP_NONCE__"))
+        Startup(
+            engine_for=None,
+            frameworks=(),
+            tiers=tiers,
+            error=ConfigError("__CSP_NONCE__"),
+        )
     )
 
     nonce = re.search(r"'nonce-([^']+)'", page.csp).group(1)
