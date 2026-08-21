@@ -145,7 +145,8 @@ Confirmed against Vertex list pricing (standard tier, July 2026) for the models
 | Gemini 2.5 Flash | $0.30 / 1M | $2.50 / 1M |
 
 A full `end-to-end` sweep is thirteen cases × (one `base` extraction + six
-`strong` category agents + one `strong` critic), plus the judge's calls during scoring.
+`strong` category agents + one `strong` critic). Scoring adds nothing to that:
+claim matching is the identity rule, which is code, and no model is asked.
 Output tokens dominate at $10/1M, and the eight-way `strong` fan-out is the
 whole bill. The original "~$0.30/case" estimate is the right order of magnitude
 for a run that stays inside the corpus's 8–20 element sizing, but it is an
@@ -168,15 +169,18 @@ first run after the setup above:
 
 1. `gh workflow run "Evals (live Vertex)" -f mode=extraction` — exercises the
    `base` tier through the `extract` node.
-2. `gh workflow run "Evals (live Vertex)" -f calibrate=true` — exercises the
-   judge's own model and is the first execution of the ≥90% judge–label
-   agreement bar.
-3. Read `models.judge_served` in the run artifact. That is the provider's own
-   report of which build answered. An empty list means it stopped returning a
-   served build, which silently removes the record that makes a result
+2. Read the `provenance` block in the run artifact. Each node execution
+   records a `served_model` — the provider's own report of which build
+   answered. An execution with no served build carries no generation
+   fingerprint either, which silently removes the record that makes a result
    reproducible.
 
-A `404 Publisher Model not found` in step 1 or 2 is a config bug, not a CI bug.
+The ≥90% agreement bar is **not** part of this checklist. It prices the identity
+rule against the recorded labels, and `python -m evals.harness.run calibrate`
+runs it offline against the repository: no workflow, no provider, no
+credentials.
+
+A `404 Publisher Model not found` in step 1 is a config bug, not a CI bug.
 
 **Deadline:** Gemini 2.5 retires on Vertex **2026-10-16**. The 3.x models were
 still preview-stage as of 2026-07-21 and so fail the pin rule. Moving generation
