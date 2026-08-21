@@ -401,17 +401,46 @@ max_output_tokens = 8192
 max_output_tokens = 8192
 """
 
+# A stated temperature, which the shipped file no longer carries. The gate is
+# about a *param*, so nothing it does is reachable until a deployment sets one,
+# and the env override is the ordinary way that happens.
+BASE_TEMPERATURE_VAR = "STRIDE_SAMPLING_BASE_TEMPERATURE"
+GREEDY_BASE = {BASE_TEMPERATURE_VAR: "0.0"}
+
 
 def test_a_claude_that_removed_temperature_fails_the_build():
-    """The shipped sampling pins temperature = 0.0, which 4.7+ rejects outright."""
+    """A deployment that states 0.0 on a 4.7+ Claude fails the build, not node one."""
     with pytest.raises(ModelGateError) as excinfo:
-        Deployment.from_env(env=ANTHROPIC_ENV).pipeline(DEFAULT_FRAMEWORKS)
+        Deployment.from_env(env=ANTHROPIC_ENV | GREEDY_BASE).pipeline(
+            DEFAULT_FRAMEWORKS
+        )
 
     message = str(excinfo.value)
     assert "tiers.base" in message
     assert "temperature" in message
-    # The message has to name the file to edit; this is a first-run wall.
+    # The message has to name where the value actually lives, and an override
+    # is not a line anyone can delete from the file.
     assert "config/sampling.toml" in message
+    assert BASE_TEMPERATURE_VAR in message
+
+
+def test_the_shipped_sampling_builds_on_a_claude_that_removed_temperature():
+    """The same selection, with nothing stated: no param, so no gate to fail.
+
+    The pair this service ships for is a current Claude on the shipped file,
+    and that pair has to build. It did not while the file pinned a temperature
+    — every Anthropic deployment naming a model newer than the pinned LiteLLM
+    map died here — so this is the regression the pin left behind.
+    """
+    pipeline = Deployment.from_env(
+        env=ANTHROPIC_ENV
+        | {
+            "STRIDE_MODEL_BASE_MODEL": CLAUDE_NATIVE,
+            "STRIDE_MODEL_STRONG_MODEL": CLAUDE_NATIVE,
+        }
+    ).pipeline(DEFAULT_FRAMEWORKS)
+
+    assert pipeline.node_models[CRITIC_NODE] == f"anthropic/{CLAUDE_NATIVE}"
 
 
 def test_the_temperature_gate_is_keyed_on_the_model_not_the_vendor():
@@ -420,10 +449,14 @@ def test_the_temperature_gate_is_keyed_on_the_model_not_the_vendor():
     A vendor-keyed rule would pass exactly the configuration the check exists
     to stop, so the selection here is deliberately `vertex` + a Claude.
     """
-    env = VERTEX_ENV | {
-        "STRIDE_MODEL_BASE_VENDOR": "vertex",
-        "STRIDE_MODEL_BASE_MODEL": CLAUDE_5,
-    }
+    env = (
+        VERTEX_ENV
+        | GREEDY_BASE
+        | {
+            "STRIDE_MODEL_BASE_VENDOR": "vertex",
+            "STRIDE_MODEL_BASE_MODEL": CLAUDE_5,
+        }
+    )
 
     with pytest.raises(ModelGateError, match="temperature"):
         Deployment.from_env(env=env).pipeline(DEFAULT_FRAMEWORKS)
@@ -615,16 +648,20 @@ def test_the_schema_gate_is_scoped_to_tiers_that_send_a_schema(tmp_path):
     assert pipeline.node_models[graph.EXTRACT_NODE] == f"anthropic/{CLAUDE_5}"
 
 
-def test_claude_4_6_keeps_the_pinned_temperature():
-    """The floor is 4.7, not the service's own 4.6 minimum.
+def test_claude_4_6_still_accepts_a_stated_temperature():
+    """The floor is 4.7, and it is a floor rather than a ban on the family.
 
-    4.6 still accepts the param, so pinned greedy decoding survives there
-    rather than being swept up by a vendor-wide ban.
+    4.6 serves the param, so a deployment that states one keeps it there. A
+    vendor-wide rule would take it away and would be wrong about the model.
     """
-    env = ANTHROPIC_ENV | {
-        "STRIDE_MODEL_BASE_MODEL": "claude-sonnet-4-6",
-        "STRIDE_MODEL_STRONG_MODEL": "claude-sonnet-4-6",
-    }
+    env = (
+        ANTHROPIC_ENV
+        | GREEDY_BASE
+        | {
+            "STRIDE_MODEL_BASE_MODEL": "claude-sonnet-4-6",
+            "STRIDE_MODEL_STRONG_MODEL": "claude-sonnet-4-6",
+        }
+    )
 
     pipeline = Deployment.from_env(env=env).pipeline(DEFAULT_FRAMEWORKS)
 
