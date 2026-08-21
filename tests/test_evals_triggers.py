@@ -42,6 +42,12 @@ CORPUS = Path(__file__).resolve().parents[1] / "evals" / "corpus"
 #: by a third moves the measurement for a reason unrelated to rule quality, and
 #: a floor chasing each re-measurement stops being able to catch the collapse it
 #: is for.
+#:
+#: Measured 2026-08-21 at **0.48 / 0.42** when the six ASVS chapters with no
+#: rule got one. Unlike the two readings above, this one moved for a reason that
+#: *is* rule quality, so the argument for holding the floor is weaker here — but
+#: it is one measurement, and raising a floor is a policy decision rather than a
+#: consequence of a change. Recorded, not chased.
 TRIGGER_FLOORS: dict[str, dict[str, float]] = {
     "stride": {"must_find_recall": 0.70, "recall": 0.65},
     "asvs": {"must_find_recall": 0.27, "recall": 0.23},
@@ -56,14 +62,17 @@ TRIGGER_FLOORS: dict[str, dict[str, float]] = {
 #: empty exemption list, so every one of these rules does fire on some blessed
 #: model. They fire somewhere and not on the elements the reference records
 #: name, which is the sharper finding and the one only this module can make.
+#: **Four lanes left this list** when the six chapters that had no rule at all
+#: got one: ``authorization``, ``configuration``, ``secure-communication`` and
+#: ``security-logging-and-error-handling`` now draw leads on their own reference
+#: records. ``secure-coding-and-architecture`` and ``webrtc`` gained a rule and
+#: stayed, which is the distinction this module exists to make — the first fires
+#: on models but not on the elements its records name, and the second fires
+#: nowhere at all and says so in ``UNEXERCISED``.
 UNTRIGGERED_LANES: dict[str, str] = dict.fromkeys(
     (
-        "authorization",
-        "configuration",
         "cryptography",
         "secure-coding-and-architecture",
-        "secure-communication",
-        "security-logging-and-error-handling",
         "self-contained-tokens",
         "validation-and-business-logic",
         "webrtc",
@@ -74,13 +83,13 @@ UNTRIGGERED_LANES: dict[str, str] = dict.fromkeys(
 
 #: Cases where a package's whole reference set draws no structural lead. Debt on
 #: the same terms.
-UNLED_CASES: dict[tuple[str, str], str] = {
-    ("asvs", "04-ml-inference-service"): (
-        "None of its 10 records draws a lead. The case is a model-inference"
-        " service, so most of its requirements land in chapters whose rules are"
-        " presence tests over web shapes this model does not carry."
-    ),
-}
+#:
+#: **Empty.** ``04-ml-inference-service`` was the one entry: none of its ten
+#: ASVS records drew a lead, because the case is a model-inference service whose
+#: requirements land in chapters that had no rule at all. Giving those chapters
+#: rules is what emptied this list, which is the clearest evidence the six were
+#: worth writing — a whole case moved from drawing nothing to drawing leads.
+UNLED_CASES: dict[tuple[str, str], str] = {}
 
 
 @pytest.fixture(scope="module")

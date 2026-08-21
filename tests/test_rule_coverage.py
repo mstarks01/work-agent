@@ -32,7 +32,20 @@ CORPUS_DIR = Path(__file__).resolve().parents[1] / "evals" / "corpus"
 #: describes the shape — so every one is a gap in the corpus rather than in the
 #: rule. A rule whose predicate cannot match what extraction produces does not
 #: belong here; it belongs fixed.
-UNEXERCISED: dict[str, str] = {}
+UNEXERCISED: dict[str, str] = {
+    "webrtc-real-time-media": (
+        "No corpus case carries real-time media. Checked with synonyms wider"
+        " than the rule's own terms — webrtc, stun, turn, sdp, peer, media,"
+        " video, voice, audio, call, conference, stream, screen, rtc, sip,"
+        " rtp — and the only hits are API callbacks ('calls back on"
+        " settlement', 'calling service') and a display ('job status on"
+        " screen'). Neither is this chapter's subject, so the shape is"
+        " genuinely absent rather than mis-worded. This is the first reading:"
+        " the rule is right and the corpus lacks the shape, so the remedy is a"
+        " Golden Case carrying a call or screen-share feature, which is a"
+        " reviewed human step under evals/BLESSING.md."
+    ),
+}
 
 
 @pytest.fixture(scope="module")
