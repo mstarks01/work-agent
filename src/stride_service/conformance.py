@@ -101,7 +101,7 @@ PROBED_PARAMS: dict[str, Any] = {
 # vendors is alphabetical, deliberately: any other order here is a ranking, and
 # the vendors are alphabetical everywhere a reader might infer one.
 REFERENCE_MODELS: dict[str, tuple[str, ...]] = {
-    "anthropic": ("claude-sonnet-4-6", "claude-opus-4-6"),
+    "anthropic": ("claude-sonnet-4-6", "claude-opus-5"),
     "openai": ("gpt-4o", "gpt-5.6"),
     "vertex": ("gemini-2.5-flash", "gemini-2.5-pro"),
 }
