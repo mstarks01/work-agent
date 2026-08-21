@@ -153,6 +153,17 @@ from stride_service.system_model import BoundaryCrossing, SystemModel
 # consumer switching over the three kinds it knew now meets a fourth. It rides
 # this one instead because 3.0 has never shipped, and two hard cutovers for one
 # release is a cost paid twice for nothing.
+# 3.0 also carries ``unknown_claim_identities``, a seventh list of
+# service-owned marks: a claim naming an identifier its framework's own catalog
+# does not hold. It rides 3.0 for the same reason ``absent-attribute`` does —
+# 3.0 has never shipped — and it would have been additive and minor on its own.
+#
+# What moves beside it is again a *behaviour*. Such a claim used to reach the
+# report and cite the standard's version-safe reference format for a
+# requirement the standard does not contain; it is now dropped and marked, on
+# the rule 2.9 already set for a citation that resolves to nothing. Only a
+# framework carrying a catalog it did not author can produce one, so the list
+# is empty for STRIDE by construction rather than by accident.
 SCHEMA_VERSION = "3.0"
 
 # The envelope's disclaimer, which is about the *service* rather than about any
@@ -1183,6 +1194,49 @@ class UnresolvedEvidence(BaseModel):
     reference: str = Field(min_length=1, max_length=REFERENCE_MAX_CHARS)
 
 
+class UnknownClaimIdentity(BaseModel):
+    """A claim naming an identifier its own framework does not recognise.
+
+    The sibling of :class:`UnresolvedEvidence`, one level up. That mark records
+    a claim citing a *fact* the job's catalog does not hold; this one records a
+    claim naming a *requirement* its framework's catalog does not hold. Both are
+    the same failure — an agent composing a well-formed reference to something
+    that does not exist — and #138 already settled what it costs: the entry, not
+    the run.
+
+    **Only a framework that owns a catalog can produce one.** A package whose
+    identifiers are its own to mint — STRIDE's ``S-01`` is a lane and a counter
+    — recognises every well-formed key by construction, so its
+    :class:`~stride_service.frameworks.IdRule` declares no
+    :attr:`~stride_service.frameworks.IdRule.known` predicate and this list stays
+    empty. That is a written statement rather than an omission, exactly as the
+    empty knowledge tables are.
+
+    ASVS is the case it exists for. A lane agent supplies a
+    ``<section>.<requirement>`` key, the service composes
+    ``v5.0.0-<chapter>.<key>`` from it, and nothing in the shape of ``99.99``
+    marks it as absent from the 345 the standard publishes. Left unchecked, the
+    report cites the standard's own version-safe reference format for a
+    requirement the standard does not contain — which is worse than a missing
+    finding, because the citation reads as verifiable.
+
+    **Not a** :data:`ClaimMark`. Those three name a claim that *survived*, so
+    one check confirms each names a real one. This names a claim that was
+    dropped, so its ``claim_id`` is deliberately absent from the block's claims
+    and the same check would invert. ``title`` carries what the agent called the
+    finding, because unlike an unresolved reference there is no surviving claim
+    for a reader to look at.
+
+    Service-owned rather than a field on the record, for the reason every mark
+    here is: an agent must not report on its own accuracy.
+    """
+
+    model_config = ConfigDict(extra="forbid")
+
+    claim_id: str = Field(min_length=1, max_length=CLAIM_ID_MAX_CHARS)
+    title: str = Field(min_length=1, max_length=200)
+
+
 class MissingMitigation(BaseModel):
     """A threat offering no countermeasure, and no reason for offering none.
 
@@ -1288,6 +1342,7 @@ class AnalysisMarks(BaseModel):
     unverified_grounds: list[UnverifiedGround] = Field(default_factory=list)
     unresolved_mentions: list[UnresolvedMention] = Field(default_factory=list)
     unresolved_evidence: list[UnresolvedEvidence] = Field(default_factory=list)
+    unknown_claim_identities: list[UnknownClaimIdentity] = Field(default_factory=list)
     missing_mitigations: list[MissingMitigation] = Field(default_factory=list)
     shared_element_names: list[SharedElementName] = Field(default_factory=list)
 
@@ -1594,6 +1649,7 @@ class FrameworkAnalysis(BaseModel):
     unverified_grounds: list[UnverifiedGround] = Field(default_factory=list)
     unresolved_mentions: list[UnresolvedMention] = Field(default_factory=list)
     unresolved_evidence: list[UnresolvedEvidence] = Field(default_factory=list)
+    unknown_claim_identities: list[UnknownClaimIdentity] = Field(default_factory=list)
     fired_rules: list[str] = Field(default_factory=list)
     knowledge_docs: list[str] = Field(default_factory=list)
     summary: SerializeAsAny[BlockSummary]

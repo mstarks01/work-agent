@@ -204,14 +204,40 @@ class IdRule:
         The record field the lane is stamped into, or ``None`` where the record
         carries no lane. The agent never spells it: the lane is the graph's
         fact, filled in before any model runs.
+    ``known``
+        Whether a ``(lane, key)`` pair names something this framework actually
+        has, or ``None`` where every well-formed key does. **The rule that
+        composes an identifier is the one thing that can say whether a
+        composition is real**, which is why this is a fourth part here rather
+        than a tenth member on the package: it asks about the framework's
+        identifiers, and it never names a catalog. A package that mints its own
+        identifiers — STRIDE's ``S-01`` is a lane letter and a counter —
+        declares ``None``, because there is nothing for a key to fail to be. A
+        package restating a catalog it did not author answers from that catalog,
+        privately, in its own module.
+
+        The predicate does not raise and does not explain. A false answer costs
+        the claim its place and earns a
+        :class:`~stride_service.report.UnknownClaimIdentity` mark; see
+        :func:`~stride_service.evidence.resolve_proposals`.
     """
 
     template: str
     prefix: Mapping[str, str]
     lane_field: str | None
+    known: Callable[[str, object], bool] | None = None
 
     def compose(self, lane: str, key: object) -> str:
         return self.template.format(prefix=self.prefix[lane], key=key)
+
+    def knows(self, lane: str, key: object) -> bool:
+        """Whether this pair names something the framework has.
+
+        ``True`` when no predicate is declared, which is the honest answer for a
+        package whose identifiers are its own to mint: there is no roster for a
+        key to be absent from, so absence is not a state its keys can be in.
+        """
+        return True if self.known is None else self.known(lane, key)
 
 
 @dataclass(frozen=True)
