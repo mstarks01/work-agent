@@ -10,7 +10,7 @@ unless this repo writes it.
 the 70 level 1 requirements, and all 16 ask whether the application *has* a thing
 — a browser frontend, cookies, a database, OAuth, a file upload, a session. Not
 one reads an element type, a trust zone, a boundary crossing or a count. That is
-the sharpest contrast with STRIDE's 12 rules, which read exactly those things.
+the sharpest contrast with STRIDE's 11 rules, which read exactly those things.
 
 **Each rule reads free text by string match**, because no attribute in the
 **System Model** is a closed enum an ASVS predicate can test. #162 ruled that

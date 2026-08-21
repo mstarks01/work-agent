@@ -14,6 +14,7 @@ a maintainer would notice.
 from __future__ import annotations
 
 import json
+from collections import Counter
 from collections.abc import Sequence
 from pathlib import Path
 
@@ -59,6 +60,7 @@ from stride_service.system_model import SystemModel
 from tests.factories import PROJECT_ROOT, valid_model
 
 ASVS = PACKAGES["asvs"]
+STRIDE = PACKAGES["stride"]
 ASVS_ROOT = PROJECT_ROOT / "frameworks" / "asvs"
 CORPUS_DIR = PROJECT_ROOT / "evals" / "corpus"
 
@@ -171,6 +173,110 @@ def test_each_lane_skill_publishes_its_chapters_whole_requirement_set(lane):
     skill = package_loader.load(lane_skill_doc(lane))
     for requirement in requirements_for(3, lane):
         assert f"**{requirement.id}** (L{requirement.level})" in skill
+
+
+@pytest.mark.parametrize("lane", LANES)
+def test_each_lane_skill_quotes_the_catalogs_own_requirement_text(lane):
+    """The roster is the catalog's words, not a paraphrase of them.
+
+    The identifier and the level were already checked. The *text* was not, and
+    it is the part the agent actually rules against: a skill carrying the right
+    number beside drifted wording asks for a ruling on something the standard
+    does not say, and every catalog-derived check downstream still passes,
+    because they all key on the identifier.
+
+    One copy of the standard's prose would be better than two. Until the skills
+    are generated from the catalog, this is what keeps the second copy honest.
+    """
+    skill = package_loader.load(lane_skill_doc(lane))
+    for requirement in requirements_for(3, lane):
+        line = f"- **{requirement.id}** (L{requirement.level}) — {requirement.text}"
+        assert line in skill, (
+            f"{lane}/skill.md states {requirement.id} with text that is not the"
+            " catalog's. Copy the catalog's wording, or regenerate the roster."
+        )
+
+
+def test_each_level_carries_the_share_the_standard_states():
+    """70 / 183 / 92. The standard states L1's share as "20%" of 345 in prose.
+
+    ``test_the_catalog_is_the_published_standard`` checks the cumulative totals.
+    This checks the split behind them, which is what a catalog from another
+    release would get wrong while still summing to 345.
+    """
+    assert dict(Counter(req.level for req in REQUIREMENTS)) == {1: 70, 2: 183, 3: 92}
+
+
+def test_the_chapters_are_5_0s_own_and_carry_no_4_x_survivor():
+    """V1..V17 as 5.0 numbers them, which is not how 4.x did.
+
+    5.0 removed the 4.x ``V1 Architecture, Design & Threat Modeling`` chapter
+    and renumbered the rest, so a catalog carrying it — or carrying 4.x names
+    like ``Stored Cryptography`` — is a previous release wearing this one's
+    version string.
+    """
+    assert [chapter.name for chapter in CHAPTERS] == [
+        "Encoding and Sanitization",
+        "Validation and Business Logic",
+        "Web Frontend Security",
+        "API and Web Service",
+        "File Handling",
+        "Authentication",
+        "Session Management",
+        "Authorization",
+        "Self-contained Tokens",
+        "OAuth and OIDC",
+        "Cryptography",
+        "Secure Communication",
+        "Configuration",
+        "Data Protection",
+        "Secure Coding and Architecture",
+        "Security Logging and Error Handling",
+        "WebRTC",
+    ]
+
+
+def test_no_claim_id_of_another_asvs_release_resolves():
+    """The version in a claim ID is a gate, not decoration.
+
+    ``requirement_of`` returns the empty string for anything not prefixed with
+    this build's version, so a 4.x citation and a future 5.x one both fail to
+    resolve rather than being read as this release's.
+    """
+    assert requirement_of("v5.0.0-6.2.1") == "V6.2.1"
+    for foreign in ("v4.0.3-2.1.1", "v5.1.0-6.2.1", "V6.2.1", "6.2.1", ""):
+        assert requirement_of(foreign) == "", foreign
+
+
+def test_which_lanes_carry_no_candidate_rule_is_pinned():
+    """A lead-less lane is allowed, but not silently.
+
+    ``rules.py`` authors presence tests for the level 1 requirements first, so a
+    chapter whose level 1 set no rule reads reaches its agent with no candidate.
+    That is deliberate and #193 settled that a **Candidate** is a lead and not a
+    gate — a lane agent analyses its chapter either way.
+
+    What was missing is a record of *which* lanes those are. Without one the set
+    can grow by accident, and the difference between "the rules found nothing
+    here" and "nothing was ever asked here" is invisible in the report. Pinning
+    it makes a new lead-less lane a decision somebody writes down.
+    """
+    ruleless = sorted(set(ASVS.lanes) - {rule.lane for rule in ASVS.rules})
+
+    assert ruleless == [
+        "authorization",
+        "configuration",
+        "secure-coding-and-architecture",
+        "secure-communication",
+        "security-logging-and-error-handling",
+        "webrtc",
+    ], (
+        "the set of ASVS lanes with no candidate rule changed. If a lane gained"
+        " a rule, shorten this list. If one lost its last rule, say why here."
+    )
+    # STRIDE's contrast, which is the parity question this pins: every STRIDE
+    # lane carries a rule, because its rules read structure every model has.
+    assert not set(STRIDE.lanes) - {rule.lane for rule in STRIDE.rules}
 
 
 def test_the_claim_id_is_the_standards_own_version_safe_reference():
