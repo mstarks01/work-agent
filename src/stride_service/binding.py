@@ -36,7 +36,8 @@ than dying on node one of a paid-for job:
   documented blind spot on Claude;
 * the **pinned-``temperature`` check** below, which covers the same blind spot
   on OpenAI's reasoning families, where the parameter survives but only at its
-  own default;
+  own default. Both are inert under the shipped sampling, which sets no
+  temperature at all, and fire for a deployment that states one;
 * the **native-structured-output check** below. Every LLM node binds an
   ``output_schema``, and a model the provider library cannot constrain natively
   gets that constraint *emulated* — which sends an unresolved schema and fails
@@ -79,6 +80,7 @@ from stride_service.sampling import (
     SamplingConfig,
     SamplingResolver,
     TierSampling,
+    env_var_for,
     make_resolve_sampling,
 )
 from stride_service.vendors import (
@@ -118,22 +120,24 @@ _NUM_RETRIES_KWARG = "num_retries"
 # knows this, and ``check_supported`` does catch it — but only for models
 # already in the pinned copy's model-cost map. A Claude released after that copy
 # falls back to the provider's base config and passes, which is the residual
-# ``model_gate`` documents ("not a de-facto existence check"). Since the shipped
-# sampling pins ``temperature = 0.0``, that residual is not theoretical: it is
-# every Anthropic deployment naming a model newer than the pin, dying on node
-# one of a paid-for job.
+# ``model_gate`` documents ("not a de-facto existence check"). This check covers
+# that residual for the deployment that states a temperature: unset, no request
+# carries the param and nothing here can fire.
+#
+# **It gates a param, not a model.** Nothing in this service refuses to run a
+# Claude generation; what fails is the pair of a generation and a value it
+# rejects, and the message names the value as the thing to remove.
 #
 # Deliberately a **generation floor, not a support table**. Decision #12 removed
 # the per-``(vendor, model)`` sampling set from the registry because mirroring
 # what LiteLLM computes forks a subsystem that drifts; a floor does not fork it,
 # and when LiteLLM's map catches up this check becomes redundant rather than
-# contradictory. 4.6 still accepts ``temperature`` and is deliberately left
-# alone, so the floor is 4.7 rather than the service's own 4.6 minimum.
+# contradictory. 4.6 still accepts ``temperature``, so the floor is 4.7.
 _TEMPERATURE_REMOVED_FROM = (4, 7)
 
 
 def _check_temperature_unset(
-    model: str, temperature: float | None, source: str, config_file: str
+    model: str, temperature: float | None, source: str, knobs: str
 ) -> None:
     """Fail closed when a Claude generation that removed ``temperature`` is sent one.
 
@@ -149,19 +153,18 @@ def _check_temperature_unset(
         removed = ".".join(str(part) for part in _TEMPERATURE_REMOVED_FROM)
         raise ModelGateError(
             f"{source}: Claude {removed} and later do not accept 'temperature',"
-            f" and {model!r} would reject the request; remove the temperature"
-            f" line in {config_file}. Unsetting it leaves"
-            " the model's own default, which is the only value these"
-            " generations serve."
+            f" and {model!r} would reject the request. Remove it — {knobs}."
+            " An unset temperature leaves the model's own default, which is the"
+            " only value these generations serve, and is what this service"
+            " ships."
         )
 
 
 # OpenAI's reasoning families serve ``temperature`` at exactly 1 and reject
 # every other value. Same shape as the Claude floor above, same residual behind
-# it, and the second time this residual has bitten rather than the first: the
-# shipped sampling pins ``temperature = 0.0``, LiteLLM's pinned cost map does
-# not know a model released after it, ``check_supported`` falls through to the
-# provider's base config, and the build passes a configuration the provider
+# it, and the second family this residual has bitten: LiteLLM's pinned cost map
+# does not know a model released after it, ``check_supported`` falls through to
+# the provider's base config, and the build passes a temperature the provider
 # rejects on node one.
 #
 # ONE is permitted rather than only-unset, which is where this differs from the
@@ -174,7 +177,7 @@ _REASONING_TEMPERATURE = 1.0
 
 
 def _check_reasoning_temperature(
-    model: str, temperature: float | None, source: str, config_file: str
+    model: str, temperature: float | None, source: str, knobs: str
 ) -> None:
     """Fail closed when an OpenAI reasoning family is sent a temperature it pins.
 
@@ -191,31 +194,41 @@ def _check_reasoning_temperature(
             f"{source}: {model!r} is an OpenAI reasoning model and serves"
             f" 'temperature' only at its default of {_REASONING_TEMPERATURE:g};"
             f" {temperature:g} would be rejected on the first request."
-            f" Set it to 1 in {config_file}, or unset it — and note that"
-            " either way this model is no longer decoding greedily, so its runs"
-            " are no longer reproducible."
+            f" Set it to 1, or remove it — {knobs}. Either way this model"
+            " does not decode greedily."
         )
 
 
 def check_temperature(
-    model: str, temperature: float | None, source: str, config_file: str
+    model: str, temperature: float | None, tier: TierName, config_file: str
 ) -> None:
     """Every temperature rule keyed on the model rather than on the vendor.
 
     :func:`check_supported` asks LiteLLM, so it answers only for models the
     pinned cost map already knows; both rules below cover a model newer than
-    that map, which is the case the shipped ``temperature = 0.0`` walks into.
+    that map. A ``temperature`` of ``None`` reaches neither rule, so a tier that
+    states no temperature — which is what this service ships — passes here by
+    having nothing to check.
 
-    Public because two gates need the same answer and they read the parameter
-    from different files. A caller that ran only :func:`check_supported` would
-    load a configuration the provider rejects on its first request — which is
-    what a calibration sweep hit before this existed: the config loaded, and
-    the provider refused pair one.
-    ``config_file`` is the file the caller read the value from, so the message
-    names somewhere the reader can edit.
+    A caller that ran only :func:`check_supported` would load a configuration
+    the provider rejects on its first request — which is what a calibration
+    sweep hit before this existed: the config loaded, and the provider refused
+    pair one.
+
+    Takes the ``tier`` rather than a pre-composed source string because the
+    message has to name **both** places the value can come from: ``config_file``
+    is where the caller read it, and the tier gives the env var that overrides
+    it. Naming only the file sent a reader to a line that is not there, since
+    the shipped file sets no temperature and an override is the ordinary way one
+    arrives.
     """
-    _check_temperature_unset(model, temperature, source, config_file)
-    _check_reasoning_temperature(model, temperature, source, config_file)
+    knobs = (
+        f"this tier's temperature is set in {config_file},"
+        f" or by {env_var_for(tier, 'temperature')}"
+    )
+    source = f"tiers.{tier}"
+    _check_temperature_unset(model, temperature, source, knobs)
+    _check_reasoning_temperature(model, temperature, source, knobs)
 
 
 def _check_output_ceiling(
@@ -327,7 +340,7 @@ def build_tier_adapters(
         check_temperature(
             selection.model,
             tier_sampling.temperature,
-            source,
+            tier,
             "config/sampling.toml",
         )
         _check_output_ceiling(vendor, selection.model, tier_sampling, source)

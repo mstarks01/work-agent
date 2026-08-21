@@ -169,13 +169,17 @@ class TestPinnedFormRule:
 
     @pytest.mark.parametrize("name", ["anthropic", "vertex"])
     @pytest.mark.parametrize("model", ["claude-haiku-4-5", "claude-opus-4-1"])
-    def test_a_supported_shape_below_the_floor_is_rejected_as_a_generation(
-        self, name, model
-    ):
-        # The identifier is well-formed; what fails is its generation, so the
-        # message says which one it read rather than calling it unpinned.
-        with pytest.raises(ValueError, match="supports 4.6 and later"):
-            vendor_for(name).validate_model(model, source="t")
+    def test_an_older_generation_in_the_pinned_form_is_accepted(self, name, model):
+        """No generation is too old to name: the rule reads shape, not version.
+
+        These two are the case that decides it. Both are well-formed dateless
+        IDs and both are older than the generation this service once floored
+        at, so a rule that read the version would reject them and a rule that
+        reads the shape takes them. Which model a deployment can afford to run
+        is its own call, and the vendor serving the build is the authority on
+        whether it still exists.
+        """
+        assert vendor_for(name).validate_model(model, source="t") == model
 
     def test_openai_has_no_canonical_form_to_require(self):
         assert vendor_for("openai").validate_model("o3", source="t") == "o3"

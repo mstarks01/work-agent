@@ -214,30 +214,19 @@ jobs:
       fail-fast: false
       matrix:
         include:
+          # Every leg runs the shipped sampling, unadjusted. That is worth
+          # stating because it did not hold while the file pinned a
+          # `temperature`: OpenAI's reasoning families serve that parameter
+          # only at their own default, so the OpenAI leg had to strip the line
+          # before it could bind, and the smoke measured a file nobody ships.
           - vendor: anthropic
             secret_name: STRIDE_ANTHROPIC_API_KEY
             base_model: claude-sonnet-4-6
             strong_model: claude-opus-4-6
-            # The shipped sampling binds this pair as it ships.
-            unset_temperature: false
           - vendor: openai
             secret_name: STRIDE_OPENAI_API_KEY
             base_model: gpt-4o
             strong_model: gpt-5.6
-            # It does not bind this one, and that is a known finding rather
-            # than a workaround invented here:
-            # tests/test_conformance.py::test_the_shipped_temperature_cannot_bind_openais_strong_reference_model
-            # pins it. config/sampling.toml sets `temperature = 0.0` for greedy
-            # decoding; OpenAI's reasoning families serve that parameter only at
-            # their own default, so the build refuses the pair. The file itself
-            # prescribes the deployment answer -- "UNSET THE TEMPERATURE LINE
-            # for any tier running one" -- and this lane does exactly that, in
-            # the same way the offline suite's `_bindable_sampling` does.
-            #
-            # What is given up is real and is visible in the result: this lane's
-            # sampling check prints the params it actually ran, so a reader sees
-            # that greedy decoding was not among them.
-            unset_temperature: true
 
     env:
       STRIDE_MODEL_BASE_VENDOR: ${{ matrix.vendor }}
@@ -301,17 +290,6 @@ jobs:
           } >>"$GITHUB_STEP_SUMMARY"
 
           echo "::warning::${VENDOR} smoke unexercised -- ${SECRET_NAME} is not set."
-
-      # Only for the leg whose model requires it; see the matrix note. grep
-      # rather than an in-place edit, so config/sampling.toml in the checkout
-      # stays the shipped file and the redirect is visible in STRIDE_SAMPLING.
-      - name: Unset the pinned temperature for a reasoning model
-        if: steps.preflight.outputs.configured == 'true' && matrix.unset_temperature
-        shell: bash
-        run: |
-          set -euo pipefail
-          grep -v '^temperature' config/sampling.toml >"$RUNNER_TEMP/sampling.toml"
-          echo "STRIDE_SAMPLING=$RUNNER_TEMP/sampling.toml" >>"$GITHUB_ENV"
 
       # The key is exported under the vendor-scoped name the registry reads,
       # inside this step, from this leg's own secret. `secrets[matrix.secret_name]`

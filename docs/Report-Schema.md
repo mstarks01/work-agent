@@ -671,8 +671,9 @@ class TokenUsage:
 ```
 
 - **`sampling`** lists the decoding parameters each tier actually used, once per
-  tier: `{"base": {"temperature": 0.0, ...}, "strong": {...}}`. A parameter left
-  to the model's default shows as `null`. Values are whatever the param resolves
+  tier: `{"base": {"temperature": null, "max_output_tokens": 16384, ...},
+  "strong": {...}}`. A parameter left to the model's default shows as `null`,
+  which is what the shipped `temperature` looks like here. Values are whatever the param resolves
   to — a number, a count, a boolean, or a string for `thinking`, whose values are
   `"low"`, `"medium"` and `"high"` — so a consumer reading this block must not
   assume numbers.

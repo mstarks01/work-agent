@@ -58,7 +58,6 @@ from stride_service.vendors import (
     VENDOR_NAMES,
     ProviderAuthError,
     join_served,
-    openai_reasoning_model,
     vendor_for,
 )
 from tests.factories import (
@@ -201,25 +200,14 @@ class TestTheMatrixItself:
             assert name in table
 
 
-def _bindable_sampling(vendor: str, tmp_path):
-    """The shipped sampling, with ``temperature`` unset where a model pins it.
+def _shipped_sampling():
+    """The shipped sampling, unadjusted, on every vendor.
 
-    Reasoning families serve ``temperature`` only at their own default, so a
-    tier running one cannot also decode greedily. Unsetting rather than stating
-    1 keeps the choice with the deployment.
+    It takes no argument, and that is the finding: while the file pinned a
+    temperature this had to be a per-vendor fixture that stripped the line for
+    reasoning families, because no one value was legal everywhere.
     """
-    shipped = (CONFIG / "sampling.toml").read_text()
-    if not any(openai_reasoning_model(m) for m in REFERENCE_MODELS[vendor]):
-        return load_sampling(CONFIG / "sampling.toml", env={})
-    adjusted = tmp_path / "sampling.toml"
-    adjusted.write_text(
-        "\n".join(
-            line
-            for line in shipped.splitlines()
-            if not line.strip().startswith("temperature")
-        )
-    )
-    return load_sampling(adjusted, env={})
+    return load_sampling(CONFIG / "sampling.toml", env={})
 
 
 class TestModelsCanBeBound:
@@ -234,19 +222,17 @@ class TestModelsCanBeBound:
         supported vendor. A vendor the configuration cannot bind is not
         supported in any useful sense, however many code paths mention it.
 
-        **It is no longer the *shipped* sampling on every vendor, and that is a
-        finding rather than a concession.** ``config/sampling.toml`` pins
-        ``temperature = 0.0`` for greedy decoding, and OpenAI's reference strong
-        model is a reasoning family that serves the parameter only at its own
-        default — so the two cannot both hold. The pin is per *tier* and the
-        model is per *deployment*, so no single shipped value satisfies every
-        vendor. What binds here is the shipped config with that one parameter
-        adjusted where the model requires it; the test below pins the
-        incompatibility itself so it cannot be forgotten.
+        **It is the shipped sampling on every vendor, unadjusted.** That holds
+        because the file states no ``temperature``: the pin was per *tier* while
+        the model it must suit is per *deployment*, so no single value satisfied
+        every vendor — Claude 4.7 and later reject the param and OpenAI's
+        reasoning families take only their own default. Leaving it unset is what
+        lets one shipped file bind all three. The test below keeps the
+        incompatibility itself pinned, as the cost of *stating* a value.
         """
         adapters = build_tier_adapters(
             tiers_for(vendor),
-            _bindable_sampling(vendor, tmp_path),
+            _shipped_sampling(),
             load_resilience(CONFIG / "resilience.toml", env={}),
             env=FAKE_ENV,
         )
@@ -284,7 +270,7 @@ class TestModelsCanBeBound:
         for vendor in sorted(REFERENCE_MODELS):
             adapters = build_tier_adapters(
                 tiers_for(vendor),
-                _bindable_sampling(vendor, tmp_path),
+                _shipped_sampling(),
                 load_resilience(CONFIG / "resilience.toml", env={}),
                 env=FAKE_ENV,
             )
@@ -524,23 +510,31 @@ class TestProfileShape:
             entry.model = "something-else"
 
 
-def test_the_shipped_temperature_cannot_bind_openais_strong_reference_model():
-    """The incompatibility the reasoning floor surfaced, pinned so it stays known.
+def test_a_stated_temperature_cannot_bind_openais_strong_reference_model(tmp_path):
+    """The incompatibility, pinned so it stays known — now as an opt-in cost.
 
-    ``config/sampling.toml`` pins ``temperature = 0.0``; OpenAI's reference
-    strong model serves that parameter only at its own default of 1. Before the
-    floor existed this bound cleanly and died on the first live request, which
-    is the shape the build-time gates exist to prevent.
+    OpenAI's reference strong model serves ``temperature`` only at its own
+    default of 1, so a deployment that states 0.0 cannot run it. Before this
+    gate existed such a configuration bound cleanly and died on the first live
+    request, which is the shape the build-time gates exist to prevent.
 
-    Asserted rather than fixed, because fixing it is a choice between two
-    things this test cannot make: give up greedy decoding on the strong tier
-    for every vendor, or accept that one shipped sampling file cannot serve
-    every supported model.
+    What changed is who pays: the shipped file states nothing, so this is the
+    price of a deployment stating a value rather than a wall every OpenAI
+    deployment meets. Asserted rather than fixed, because the choice between
+    greedy decoding and this model belongs to whoever states the value.
     """
+    stated = tmp_path / "sampling.toml"
+    stated.write_text(
+        (CONFIG / "sampling.toml")
+        .read_text(encoding="utf-8")
+        .replace("[tiers.strong]", "[tiers.strong]\ntemperature = 0.0"),
+        encoding="utf-8",
+    )
+
     with pytest.raises(ModelGateError, match="only at its default"):
         build_tier_adapters(
             tiers_for("openai"),
-            load_sampling(CONFIG / "sampling.toml", env={}),
+            load_sampling(stated, env={}),
             load_resilience(CONFIG / "resilience.toml", env={}),
             env=FAKE_ENV,
         )

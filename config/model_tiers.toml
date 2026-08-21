@@ -100,13 +100,13 @@ version = 5
 #   openai      base "gpt-4o"                strong "gpt-5.6"
 #   vertex      base "gemini-2.5-flash"      strong "gemini-2.5-pro"
 #
-# The Anthropic pin is 4.6 on both tiers and is NOT free choice: this service
-# floors at Claude 4.6, and Claude 4.7 onward no longer accepts `temperature`,
-# which config/sampling.toml pins at 0.0. Floor and ceiling meet, so 4.6 is the
-# only generation that binds under the shipped sampling. Naming a newer Claude
-# means unsetting that tier's temperature first, which re-baselines its sampling
-# fingerprint. Run `uv run python -m stride_service.conformance` to see what each
-# pair supports before choosing.
+# The Anthropic pin is 4.6 on both tiers because that is the pair this project
+# has profiled, and it is free choice: no generation is refused here, and a
+# newer Claude is a one-line edit. What a generation still decides is which
+# params it accepts — 4.7 onward rejects `temperature`, which the shipped
+# sampling does not set — so read config/sampling.toml before stating one. Run
+# `uv run python -m stride_service.conformance` to see what each pair supports
+# before choosing.
 #
 # The two tiers select independently, so a mixed pair — a cheap workhorse from
 # one vendor, judgement from another — is ordinary rather than a special case.

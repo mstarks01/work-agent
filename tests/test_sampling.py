@@ -61,11 +61,19 @@ class TestShippedConfig:
         assert config.version == SUPPORTED_VERSION
         assert set(config.tiers) == {"base", "strong"}
 
-    def test_defaults_to_greedy_decoding(self):
+    def test_pins_no_decoding_value_it_cannot_pin_for_every_model(self):
+        """The shipped file states a cap and a count, and no decoding value.
+
+        ``temperature`` is unset with the rest: no single value is legal on
+        every model a deployment may select — Claude 4.7 and later reject the
+        param outright, and OpenAI's reasoning families take only their own
+        default — so pinning one here would decide which models this service
+        can run.
+        """
         config = load_sampling(SAMPLING_PATH, env={})
         for tier in ("base", "strong"):
             sampling = config.for_tier(tier)
-            assert sampling.temperature == 0.0
+            assert sampling.temperature is None
             assert sampling.candidate_count == 1
             # Everything with no verified per-tier constant stays unset.
             assert sampling.top_p is None
