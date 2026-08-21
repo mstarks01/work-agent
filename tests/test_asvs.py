@@ -14,6 +14,7 @@ a maintainer would notice.
 from __future__ import annotations
 
 import json
+import re
 from collections import Counter
 from collections.abc import Sequence
 from pathlib import Path
@@ -247,6 +248,84 @@ def test_no_claim_id_of_another_asvs_release_resolves():
     assert requirement_of("v5.0.0-6.2.1") == "V6.2.1"
     for foreign in ("v4.0.3-2.1.1", "v5.1.0-6.2.1", "V6.2.1", "6.2.1", ""):
         assert requirement_of(foreign) == "", foreign
+
+
+CORPUS_DOCUMENTS = [
+    (kind, name)
+    for kind, table in (
+        ("notes", ASVS.knowledge.notes),
+        ("cases", ASVS.knowledge.cases),
+    )
+    for name in table
+]
+
+
+def _shingles(text: str, length: int = 8) -> set[str]:
+    """Every ``length``-word lowercase run in ``text``, for overlap detection."""
+    words = re.findall(r"[a-z]+", text.lower())
+    return {
+        " ".join(words[index : index + length])
+        for index in range(len(words) - length + 1)
+    }
+
+
+@pytest.mark.parametrize("kind,name", CORPUS_DOCUMENTS, ids=lambda v: str(v))
+def test_no_corpus_document_restates_the_catalog(kind, name):
+    """A note teaches how to rule. It does not carry a second roster.
+
+    This is the reason ASVS shipped no corpus for as long as it did, kept as a
+    check now that it ships one. Its lane skills already state every requirement
+    of their chapter verbatim, so a note repeating one would put the standard in
+    a second place — and the copy nobody generates is the copy that drifts.
+
+    Two things are refused. A **requirement identifier**, because a citation is
+    something the service composes onto a claim, never something a prompt
+    document spells. And a **long verbatim span** of published text, which is
+    the same duplication wearing different words.
+
+    A document needs neither. The whole roster is already in the prompt directly
+    beside it, so what is left for a note to add is which question the chapter
+    asks and how to tell whether it reaches this system.
+    """
+    text = package_loader.load(f"{kind}/{name}")
+
+    cited = re.findall(r"\bV\d+\.\d+\.\d+\b", text)
+    assert not cited, (
+        f"{kind}/{name} cites {sorted(set(cited))}. The chapter's roster carries"
+        " the requirements; naming one here is a second copy of the catalog."
+    )
+
+    published = {
+        shingle
+        for requirement in REQUIREMENTS
+        for shingle in _shingles(requirement.text)
+    }
+    shared = _shingles(text) & published
+    assert not shared, (
+        f"{kind}/{name} repeats published requirement text: {sorted(shared)[:2]}"
+    )
+
+
+def test_the_corpus_covers_every_rule_and_names_no_other():
+    """Leaving the empty corpus put all 17 rules under the retrieval check.
+
+    ``test_every_rule_can_retrieve_something`` in the neutral lints already says
+    this for whichever packages have a corpus. Asserted here too because the
+    number is the point: ASVS declares 17 rules, and a corpus that covered 16 of
+    them would leave one lane with a lead and nothing behind it.
+    """
+    rule_ids = {rule.rule_id for rule in ASVS.rules}
+    covered = {
+        rule_id
+        for table in (ASVS.knowledge.notes, ASVS.knowledge.cases)
+        for rules in table.values()
+        for rule_id in rules
+    }
+
+    assert covered == rule_ids, (
+        f"uncovered: {sorted(rule_ids - covered)};"
+        f" unknown: {sorted(covered - rule_ids)}"
+    )
 
 
 def test_which_lanes_carry_no_candidate_rule_is_pinned():
@@ -702,6 +781,10 @@ def test_the_package_root_carries_no_stray_markdown():
             for lane in LANES
             for doc in ("skill", "exemplars")
         ),
+        # Derived from the knowledge tables rather than listed, so a document
+        # on disk that no table indexes shows up here as a stray file — which
+        # is what it is: unreachable text no rule can retrieve.
+        *(Path(f"{document}.md") for document in ASVS.knowledge.documents()),
     }
     found = {path.relative_to(ASVS_ROOT) for path in ASVS_ROOT.rglob("*.md")}
 
