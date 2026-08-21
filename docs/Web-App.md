@@ -38,7 +38,7 @@ selected in step 2 of [First-Run](First-Run.md), since nothing is selected by
 default:
 
 ```
-base   → openai / gpt-4.1-mini
+base   → openai / gpt-4o
 strong → vertex / gemini-2.5-pro
 ```
 
@@ -79,7 +79,8 @@ analysis can run on a model nobody chose.
 Where the config itself read cleanly — the credential and sampling cases — the
 page names the vendor your config selects and lists **every** environment
 variable that vendor needs, marking the ones that are unset. It reports presence
-only and never prints a value. For Vertex that is:
+only and never prints a value. Vertex is shown because it needs the most
+variables of the three vendors, which is what makes the next point visible:
 
 ```
 STRIDE_VERTEX_PROJECT           NOT SET

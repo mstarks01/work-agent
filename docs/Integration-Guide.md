@@ -41,11 +41,14 @@ reads paths and overrides from the environment; pass `env=` to override that
 engine = StrideEngine.from_config(
     ["stride"],
     env={
-        "STRIDE_MODEL_STRONG_VENDOR": "vertex",
-        "STRIDE_MODEL_STRONG_MODEL": "gemini-2.5-pro",
+        "STRIDE_MODEL_STRONG_VENDOR": "anthropic",
+        "STRIDE_MODEL_STRONG_MODEL": "claude-opus-5",
     },
 )
 ```
+
+The pair above is arbitrary: `vertex`, `anthropic` and `openai` all go here,
+and this service prefers none of them.
 
 `_MODEL` on its own retunes a tier whose vendor the file already names. Nothing
 is selected by default, so where the file names none — as it ships — both halves
