@@ -192,3 +192,8 @@ lanes that would exercise it do not run.
   survives every future run. The caveat this list used to carry — that no
   "model A beats model B" conclusion be quoted without noting the judge's
   vendor — is retired with it: no vendor participates in any scored number.
+- **This audit covers one axis of two.** Every term it classified names a model
+  provider or an identity provider, so no term could find a dependency that is
+  neutral about providers and singular about everything else. `google-adk` and
+  `litellm` are both. See [ADR 0015](0015-adk-and-litellm-are-one-substrate.md),
+  which states that boundary and does not move it.
