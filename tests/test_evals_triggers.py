@@ -44,13 +44,23 @@ CORPUS = Path(__file__).resolve().parents[1] / "evals" / "corpus"
 #: is for.
 #:
 #: Measured 2026-08-21 at **0.48 / 0.42** when the six ASVS chapters with no
-#: rule got one. Unlike the two readings above, this one moved for a reason that
-#: *is* rule quality, so the argument for holding the floor is weaker here — but
-#: it is one measurement, and raising a floor is a policy decision rather than a
-#: consequence of a change. Recorded, not chased.
+#: rule got one, and ASVS's floors were raised to 0.40 / 0.34 against it. That
+#: is not chasing the measurement: the two readings above moved because the
+#: *corpus* grew, which says nothing about rule quality, and this one moved
+#: because the *rules* did.
+#:
+#: **The size of the raise is STRIDE's convention, not a new one.** STRIDE's
+#: floors sit at 0.84 and 0.81 of what it measures; ASVS's sat at 0.56 and 0.55,
+#: because they were set against 0.34 / 0.32 and never moved. 0.40 / 0.34 puts
+#: ASVS at 0.83 and 0.81 — the same distance below its own reading, so both
+#: packages now tolerate the same proportional slide before failing.
+#:
+#: The margin is for corpus growth, not for noise. This measurement is
+#: deterministic: it runs the rules over blessed models with no provider call,
+#: so an unchanged tree gives an identical number every time.
 TRIGGER_FLOORS: dict[str, dict[str, float]] = {
     "stride": {"must_find_recall": 0.70, "recall": 0.65},
-    "asvs": {"must_find_recall": 0.27, "recall": 0.23},
+    "asvs": {"must_find_recall": 0.40, "recall": 0.34},
 }
 
 #: Lanes whose rules fire on no reference claim anywhere in the corpus, with the
