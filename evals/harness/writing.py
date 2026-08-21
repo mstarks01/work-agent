@@ -32,13 +32,7 @@ from collections.abc import Iterable, Mapping, Sequence
 from dataclasses import dataclass, field
 from typing import Any
 
-from evals.harness.fingerprint import (
-    components_for,
-    fingerprint,
-    identifier_of,
-    lane_field,
-    version_for,
-)
+from evals.harness.fingerprint import identifier_of, key_claim, lane_field
 from evals.harness.identity import FlowMap
 from evals.harness.ledger import STYLE_REASONS, Ledger
 from evals.harness.reference import GoldenCase
@@ -92,7 +86,6 @@ def measure_case(
     finding of one place alike.
     """
     lane_of = lane_field(framework)
-    version = version_for(framework)
     live = votes.current_by_finding()
     produced = 0
     answered = 0
@@ -101,15 +94,15 @@ def measure_case(
 
     for claim in claims:
         produced += 1
-        components = components_for(
+        value, _ = key_claim(
             framework,
             getattr(claim, lane_of),
             tuple(claim.affected_element_ids),
             flows,
-            verb=claim.verb if version == 2 else None,
-            identifier=identifier_of(framework, claim.id) if version == 3 else None,
+            verb=claim.verb,
+            identifier=identifier_of(framework, claim.id),
         )
-        current = live.get(fingerprint(components, version=version), ())
+        current = live.get(value, ())
         if not current:
             continue
         answered += 1

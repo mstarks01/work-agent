@@ -29,12 +29,7 @@ from collections.abc import Iterable, Iterator, Mapping, Sequence
 from dataclasses import dataclass, replace
 from typing import Any
 
-from evals.harness.fingerprint import (
-    Components,
-    components_for,
-    fingerprint,
-    version_for,
-)
+from evals.harness.fingerprint import Components, key_claim
 from evals.harness.identity import FlowMap
 from evals.harness.ledger import Ledger
 from evals.harness.verbs import GLOSS, family_of
@@ -216,23 +211,27 @@ def _keyed(
     agree on it exactly: a finding counted under one key and asked about under
     another would carry a run count from a different finding.
 
-    **Each finding is keyed by its own framework's rule**, from
-    :data:`~evals.harness.fingerprint.VERSION_FOR`, rather than by one version
-    chosen for the whole queue. A sweep carries both packages' findings and they
-    do not compose identity the same way; one version over both would key an
-    ASVS claim under a rule that reads a verb it never has.
+    **Each finding is keyed by its own framework's rule.**
+    :func:`~evals.harness.fingerprint.key_claim` reads
+    :data:`~evals.harness.fingerprint.VERSION_FOR` per finding, rather than one
+    version being chosen for the whole queue. A sweep carries both packages'
+    findings and they do not compose identity the same way; one version over
+    both would key an ASVS claim under a rule that reads a verb it never has.
+
+    Both components are offered on every finding and the version keeps what it
+    reads, so this loop states no rule of its own about which version wants
+    which field.
     """
     for finding in findings:
-        version = version_for(finding.framework)
-        components = components_for(
+        value, components = key_claim(
             finding.framework,
             finding.lane,
             finding.element_ids,
             flows_by_case.get(finding.case, {}),
-            verb=finding.verb if version == 2 else None,
-            identifier=finding.identifier if version == 3 else None,
+            verb=finding.verb,
+            identifier=finding.identifier,
         )
-        yield fingerprint(components, version=version), components, finding
+        yield value, components, finding
 
 
 def merge_runs(
