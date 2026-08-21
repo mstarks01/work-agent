@@ -17,7 +17,7 @@ from __future__ import annotations
 import pytest
 
 from evals.harness import writing
-from evals.harness.fingerprint import components_for, fingerprint, version_for
+from evals.harness.fingerprint import key_claim
 from evals.harness.ledger import Ledger, Vote
 from stride_service.frameworks.stride.record import StrideCategory
 from stride_service.report import FrameworkName
@@ -41,17 +41,11 @@ def vote(
     element_ids: tuple[str, ...] = ("entity:customer",),
 ) -> Vote:
     """One vote on the finding the same components would key."""
-    version = version_for(framework)
-    components = components_for(
-        framework,
-        lane,
-        element_ids,
-        FLOWS,
-        verb=verb if version == 2 else None,
-        identifier=identifier if version == 3 else None,
+    value, components = key_claim(
+        framework, lane, element_ids, FLOWS, verb=verb, identifier=identifier
     )
     return Vote(
-        fingerprint=fingerprint(components, version=version),
+        fingerprint=value,
         components=components,
         case="01-payments-checkout",
         verdict=verdict,  # type: ignore[arg-type]
