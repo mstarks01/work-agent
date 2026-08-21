@@ -25,7 +25,11 @@ from stride_service.deployment import (
 from stride_service.errors import ConfigError
 from stride_service.graph import FrameworkNodes
 from stride_service.jobs import InMemoryJobStore
-from stride_service.model_gate import ModelGateError, output_ceiling
+from stride_service.model_gate import (
+    ModelGateError,
+    emulates_structured_output,
+    output_ceiling,
+)
 from stride_service.model_tiers import LLM_NODES, ModelConfigError
 from stride_service.vendors import ProviderAuthError, vendor_for
 from tests.factories import DEFAULT_FRAMEWORKS, PROJECT_ROOT
@@ -376,13 +380,22 @@ def test_an_offline_resolver_short_circuits_the_credential_check():
 # the first gate fires and this one is never reached.
 CLAUDE_5 = "claude-opus-5"
 
-# A Claude the pinned LiteLLM sends down its *emulated* structured-output path.
-# Its own capability lookup answers "unknown" for this model while its cost map
-# says the model supports native schema output, so the request would carry a
-# synthesised tool and an unresolved `$defs`. That disagreement is upstream's,
-# and the gate reads the call rather than the map precisely so it sees what the
-# request will actually carry.
-CLAUDE_EMULATED = "claude-sonnet-5"
+# The pair the pinned LiteLLM sends down its *emulated* structured-output path:
+# a Claude reached through **Vertex**. The same model reached through Anthropic
+# takes the native path, so what decides this is the vendor rather than the
+# model — `supports_native_structured_output` is absent from every
+# `vertex_ai/claude-*` entry in the library's map, while the `anthropic` entry
+# carries it.
+#
+# Chosen for that reason. A per-model gap closes when the library learns one
+# model, and the fixture then stops exercising the gate without anything
+# saying so; this one closes only when the library learns the whole
+# Vertex-hosted Claude family. `test_the_emulated_fixture_still_emulates`
+# below asserts the property outright, so neither kind of fix can pass quietly.
+#
+# It is also a real refusal a reader can hit: `docs/First-Run.md` documents
+# this exact pair as one the build declines.
+EMULATED_MODEL = "claude-opus-5"
 
 # A Claude that clears *every* gate: generation >= 4.7 so the temperature floor
 # still applies to it, and on the pinned litellm's native structured-output
@@ -416,9 +429,9 @@ max_output_tokens = 8192
 BASE_TEMPERATURE_VAR = "STRIDE_SAMPLING_BASE_TEMPERATURE"
 STATED_BASE = {BASE_TEMPERATURE_VAR: "1"}
 
-EMULATED_ENV = ANTHROPIC_ENV | {
-    "STRIDE_MODEL_BASE_MODEL": CLAUDE_EMULATED,
-    "STRIDE_MODEL_STRONG_MODEL": CLAUDE_EMULATED,
+EMULATED_ENV = VERTEX_ENV | {
+    "STRIDE_MODEL_BASE_MODEL": EMULATED_MODEL,
+    "STRIDE_MODEL_STRONG_MODEL": EMULATED_MODEL,
 }
 
 
@@ -556,6 +569,26 @@ def test_a_value_exactly_at_the_ceiling_still_builds():
     assert pipeline.tier_sampling["strong"].max_output_tokens == 65535
 
 
+def test_the_emulated_fixture_still_emulates():
+    """The property the two tests below are built on, asserted in its own right.
+
+    They do not fail silently without this — if the library learns to constrain
+    Vertex-hosted Claude natively they both fail, because the build they expect
+    to be refused succeeds. What they fail *as* is the problem: `DID NOT RAISE
+    ModelGateError` reads as a broken gate and sends the reader to `binding.py`,
+    which is the wrong file. Nothing there changed; the fixture stopped
+    demonstrating the gate.
+
+    So this asserts the property directly and says so in its message. Its value
+    is the diagnosis, not the detection.
+    """
+    assert emulates_structured_output(vendor_for("vertex"), EMULATED_MODEL), (
+        f"vertex/{EMULATED_MODEL} now takes the native structured-output path,"
+        " so it no longer exercises the schema gate. Pick another"
+        " (vendor, model) the pinned litellm emulates and repoint EMULATED_MODEL."
+    )
+
+
 def test_a_model_without_native_schema_support_fails_the_build(tmp_path):
     """The expensive failure shape: well-formed request, well-formed response.
 
@@ -644,8 +677,8 @@ def test_a_constrained_tier_leaves_the_derived_schema_alone():
 def test_the_schema_gate_is_scoped_to_tiers_that_send_a_schema(tmp_path):
     """The narrowing: a model rejected while constrained is fine unconstrained.
 
-    `claude-sonnet-5` takes the emulated path, so the gate stops it — but only
-    because a schema would be sent. Turn that off and there is no emulated
+    Vertex-hosted Claude takes the emulated path, so the gate stops it — but
+    only because a schema would be sent. Turn that off and there is no emulated
     request to object to, so the same selection must build.
     """
     # Both legs run without temperature so the 4.7 floor cannot fire first and
@@ -664,7 +697,7 @@ def test_the_schema_gate_is_scoped_to_tiers_that_send_a_schema(tmp_path):
         env=EMULATED_ENV | {"STRIDE_SAMPLING": str(path)}
     ).pipeline(DEFAULT_FRAMEWORKS)
 
-    assert pipeline.node_models[graph.EXTRACT_NODE] == f"anthropic/{CLAUDE_EMULATED}"
+    assert pipeline.node_models[graph.EXTRACT_NODE] == f"vertex_ai/{EMULATED_MODEL}"
 
 
 def test_claude_4_6_still_accepts_a_stated_temperature():
