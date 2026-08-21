@@ -199,7 +199,8 @@ class SubsetVerbIdentity:
         return ClaimRuling(
             match=elements and action,
             rationale=(
-                f"elements {'overlap' if elements else 'disjoint'};"
+                f"{'one' if elements else 'neither'} element set contains"
+                f" the other;"
                 f" {pair.reference_verb} vs {pair.candidate_verb}"
                 f" {'is one action' if action else 'are two actions'}"
             ),

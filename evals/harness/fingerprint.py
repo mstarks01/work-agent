@@ -118,6 +118,24 @@ IDENTIFIER_OF: dict[FrameworkName, Callable[[str], str] | None] = {
 #: silently attached to the wrong finding.
 SUPPORTED_VERSIONS = (1, 2, 3)
 
+#: Which component each version reads on top of the framework, lane and targets
+#: every version hashes. ``None`` says this version reads those three alone.
+#:
+#: **Keyed, never branched.** This fact used to be an ``if version == 2`` beside
+#: an ``if version == 3`` at every site that composed a claim, which is three
+#: copies of one table and a fourth version that would have to find all of them.
+#: :func:`key_claim` reads this instead, so a caller offers everything its claim
+#: carries and the version decides what is kept.
+#:
+#: ``test_every_supported_version_declares_what_it_reads`` checks it against
+#: :data:`SUPPORTED_VERSIONS` in both directions, because a table nobody
+#: compares to its registry fails as quietly as the ``if`` it replaced.
+EXTRA_COMPONENT: dict[int, str | None] = {
+    1: None,
+    2: "verb",
+    3: "identifier",
+}
+
 
 class FingerprintError(ValueError):
     """The components cannot be fingerprinted under the version asked for."""
@@ -298,6 +316,46 @@ def fingerprint(components: Components, version: int = DEFAULT_VERSION) -> str:
     # can impersonate a boundary between two others.
     digest = hashlib.sha256("\0".join(parts).encode("utf-8")).hexdigest()
     return f"v{version}:{digest[:16]}"
+
+
+def key_claim(
+    framework: FrameworkName,
+    lane: str,
+    element_ids: Iterable[str],
+    flows: FlowMap,
+    verb: str | None = None,
+    identifier: str | None = None,
+) -> tuple[str, Components]:
+    """One claim's fingerprint and components, under its own framework's rule.
+
+    The single spelling of "which version keys this package, and which
+    component that version reads". Every site that keys a produced claim goes
+    through here — the review queue, the writing instrument and the tests that
+    stand in for both — so a finding counted under one key and asked about
+    under another cannot happen by one site being edited and another missed.
+
+    **Offer everything the claim carries.** ``verb`` and ``identifier`` are
+    both taken and :data:`EXTRA_COMPONENT` drops whichever the version does not
+    read, rather than each caller deciding. A caller that guessed would compose
+    a verb into an ASVS key, and the ledger would hold two spellings of one
+    finding with nothing to say which was right.
+
+    Returns the fingerprint first because every caller wants it, and the
+    components beside it because the queue stores them on the vote — that is
+    what lets :func:`~evals.harness.ledger.rekey` recompute the whole ledger
+    under a new version with no re-vote.
+    """
+    version = version_for(framework)
+    reads = EXTRA_COMPONENT[version]
+    components = components_for(
+        framework,
+        lane,
+        element_ids,
+        flows,
+        verb=verb if reads == "verb" else None,
+        identifier=identifier if reads == "identifier" else None,
+    )
+    return fingerprint(components, version=version), components
 
 
 def version_of(value: str) -> int:
