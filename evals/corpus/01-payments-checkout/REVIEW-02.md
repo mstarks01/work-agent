@@ -20,15 +20,14 @@ Model**, and the property being established — that a set is exhaustive against
 that model — is not something you can check for one framework and infer for the
 other. Reviewing them apart is what step 6 forbids.
 
-**The ASVS half carries an extra weight.** Nothing anywhere scores those 17
-records. Both blocks are now scored by a sweep:
+**Both sets are scored, and neither scoring asks this sitting's question.**
 `evals/harness/instruments.py` maps `asvs` to `applicability.score_case` in
 `PACKAGE_SCORERS`, which closed
-[#200](https://github.com/mstarks01/work-agent/issues/200), and the ASVS half
-comes back as a confusion matrix over the catalog, matched by string. So both
-sets get exercised eventually. What no sweep can do is ask whether a set is
-*exhaustive* — a requirement nobody wrote down is one the matrix scores nothing
-for missing. **That question is this sitting's alone.**
+[#200](https://github.com/mstarks01/work-agent/issues/200), so the ASVS half
+comes back as a confusion matrix over the catalog, matched by string. STRIDE's
+half is scored through the identity rule. What neither can do is ask whether a
+set is *exhaustive* — a threat nobody wrote down is one no matrix scores
+anything for missing. **That question is this sitting's alone.**
 
 ## The one rule
 
@@ -528,10 +527,12 @@ Part 2 and in Part 3, and how many of your own items are missing from either.
   Recall is measured against the STRIDE list, so the tool has been scoring full
   marks for a gap nobody could see. The reference set needs extending, and every
   recall figure quoted so far needs re-deriving.
-- **A requirement missing from Part 3, or one that does not apply.** No number
-  moves, because nothing scores this set yet. It matters anyway: #200 will build
-  the applicability matrix *against this list*, so an error here becomes a wrong
-  number the moment that lands rather than a wrong number today.
+- **A requirement missing from Part 3, or one that does not apply.** A number
+  moves. `applicability.score_case` builds a confusion matrix against this list,
+  so a record that should not apply is a wrong number in the next sweep, not a
+  latent one. What the matrix cannot ask is whether a requirement nobody wrote
+  down is missing — it scores nothing for a gap. That half is this sitting's
+  alone.
 - **Several doubts.** The list overstates. That inflates the recall denominator
   and makes the tool look worse than it is, which is the cheaper direction but
   still wrong.
@@ -550,7 +551,8 @@ which is what `tests/test_case_review.py` reads:
 
 Then remove `01-payments-checkout` from `UNREVIEWED` in
 `tests/test_case_review.py`. The test fails until you do, which is deliberate —
-the debt list is only honest if it shrinks when the debt is paid.
+that list names the cases nobody has read, so it is only accurate while a
+reviewed case comes off it.
 
 `tests/test_case_review.py` checks that `read` covers every framework the case
 declares, so both entries are required — a `read` list naming `claims/stride.json`
