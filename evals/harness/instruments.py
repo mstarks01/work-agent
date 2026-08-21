@@ -352,11 +352,13 @@ def artifact_blocks(sweep: Sweep) -> dict[str, Any]:
 #: the ``if`` it replaced dispatched to one package by name and would have gone
 #: on scoring nothing for a third, quietly.
 #:
-#: ``None`` is a declaration, not a hole. It says grounds and coverage are the
-#: whole of what this package's record can be measured with mechanically —
-#: which is true of a package whose per-case numbers pool rather than fold,
-#: as STRIDE's do. ``test_every_package_declares_a_scorer``
-#: is what keeps it a decision.
+#: ``None`` is a declaration, not a hole. It says this package earns no
+#: *per-case* scorer, which is true of a package whose numbers pool rather than
+#: fold, as STRIDE's do. It does not say the package goes unmeasured: the
+#: neutral instruments read every block, and a sweep-level instrument may still
+#: name the package on its ``frameworks`` — ``scores`` and ``critic_yield``
+#: both name STRIDE. ``test_every_package_declares_a_scorer`` is what keeps
+#: this entry a decision.
 PACKAGE_SCORERS: dict[FrameworkName, CaseScorer | None] = {
     "stride": None,
     "asvs": applicability.score_case,

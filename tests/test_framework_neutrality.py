@@ -96,13 +96,15 @@ DECLARED: dict[str, str] = {
         " every neutral reader goes through `references[framework]`."
     ),
     "evals/harness/fingerprint.py": (
-        "VERSION_FOR and LANE_FIELD are tables keyed by framework."
-        " Self-completing — a package missing from either raises at"
-        " `version_for` or `lane_field` on its first finding. VERSION_FOR's"
-        " entries follow from what a package's claims are rather than from"
-        " preference: an open claim set composes an identity from an action and"
-        " a place (2), a claim carrying a catalog identifier already has one (1)."
-        " LANE_FIELD's follow from the field the graph stamps the lane in."
+        "VERSION_FOR, LANE_FIELD and IDENTIFIER_OF are tables keyed by"
+        " framework. Self-completing — a package missing from any of them"
+        " raises at `version_for`, `lane_field` or `identifier_of` on its first"
+        " finding. VERSION_FOR's entries follow from what a package's claims"
+        " are rather than from preference: an open claim set composes an"
+        " identity from an action and a place (2), a claim carrying a catalog"
+        " identifier is keyed by that identifier and the place (3)."
+        " LANE_FIELD's follow from the field the graph stamps the lane in, and"
+        " IDENTIFIER_OF's from whether the package owns a catalog to read."
     ),
     "evals/harness/scorer.py": (
         "This code is STRIDE's. It reads a category and two rated severity axes,"
