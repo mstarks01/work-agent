@@ -358,7 +358,7 @@ class AsvsAnalysis(FrameworkAnalysis):
         its own: the prompt asks it to rule on its chapter at the level the scope
         line names, and an agent that reaches one requirement further has filed a
         real ruling about a real requirement. Failing the report would throw away
-        that finding and the other 22 lanes' work with it, to enforce a boundary
+        that finding and the other 16 lanes' work with it, to enforce a boundary
         the reader can already see — ``level`` is on the block and the selection
         is on the job. So the claim rides, and the level still says what was
         asked for.
