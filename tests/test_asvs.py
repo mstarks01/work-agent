@@ -48,6 +48,7 @@ from stride_service.frameworks.asvs.record import (
     RequirementRuling,
     requirement_of,
 )
+from stride_service.frameworks.asvs.roster import replace_roster, roster_block
 from stride_service.markdown_loader import MarkdownLoader, split_sections
 from stride_service.report import (
     FrameworkSelection,
@@ -175,6 +176,46 @@ def test_each_lane_skill_publishes_its_chapters_whole_requirement_set(lane):
     skill = package_loader.load(lane_skill_doc(lane))
     for requirement in requirements_for(3, lane):
         assert f"**{requirement.id}** (L{requirement.level})" in skill
+
+
+@pytest.mark.parametrize("lane", LANES)
+def test_each_lane_skill_carries_the_roster_the_catalog_composes(lane):
+    """The roster on disk is what ``roster.py`` builds, byte for byte.
+
+    The two checks below this one each caught a *wrong* roster: a missing
+    requirement, a drifted level, a paraphrased description. This makes a
+    divergent roster unrepresentable instead, which is the difference between
+    policing a second copy of the standard and not having one.
+
+    What it does not touch is the rest of the skill. Scope, applicability,
+    threat patterns, guardrails and mitigations are judgement, none of it is
+    derivable, and all of it stays hand-written — the generator replaces one H3
+    and leaves the file around it alone.
+    """
+    skill = package_loader.load(lane_skill_doc(lane))
+
+    assert roster_block(lane) in skill, (
+        f"{lane}/skill.md's roster is not what the catalog composes. Do not"
+        " edit it by hand — run"
+        " `python -m stride_service.frameworks.asvs.roster`."
+    )
+
+
+@pytest.mark.parametrize("lane", LANES)
+def test_regenerating_a_skill_would_change_nothing(lane):
+    """The whole file round-trips, not only the block inside it.
+
+    The check above asserts the roster's own bytes. This asserts the *seam*:
+    that replacing the block reproduces the file exactly, so the generator
+    cannot quietly eat the blank line before the next section or grow one.
+
+    Pure on purpose. Answering this by running the writer would repair the tree
+    it was meant to report on, and then pass on the re-run.
+    """
+    path = ASVS_ROOT / "lanes" / lane / "skill.md"
+    skill = path.read_text(encoding="utf-8")
+
+    assert replace_roster(skill, roster_block(lane)) == skill
 
 
 @pytest.mark.parametrize("lane", LANES)
