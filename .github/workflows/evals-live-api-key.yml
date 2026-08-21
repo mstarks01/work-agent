@@ -125,7 +125,7 @@ jobs:
           - vendor: anthropic
             secret_name: STRIDE_ANTHROPIC_API_KEY
             base_model: claude-sonnet-4-6
-            strong_model: claude-opus-4-6
+            strong_model: claude-opus-5
           - vendor: openai
             secret_name: STRIDE_OPENAI_API_KEY
             base_model: gpt-4o

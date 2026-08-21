@@ -369,13 +369,20 @@ def test_an_offline_resolver_short_circuits_the_credential_check():
 
 # --- The removed-temperature gate -------------------------------------------
 
-# Anthropic removed `temperature` from Claude 4.7 onward. `claude-opus-5` is the
-# case that matters: the pinned LiteLLM carries no entry for it, so
-# `check_supported` falls back to the provider's base config and *passes* — the
-# residual `model_gate` documents, and the whole reason the second check exists.
-# `claude-sonnet-5` is in that map and LiteLLM rejects it itself, which is why it
-# is deliberately not the model under test.
+# Anthropic removed `temperature` from Claude 4.7 onward. The pinned LiteLLM
+# knows `claude-opus-5` and rejects `temperature=0.0` for it itself — but it
+# accepts `temperature=1`, which Anthropic does not, so the value under test
+# below is 1 rather than 0. That is what keeps this a test of *our* rule: at 0
+# the first gate fires and this one is never reached.
 CLAUDE_5 = "claude-opus-5"
+
+# A Claude the pinned LiteLLM sends down its *emulated* structured-output path.
+# Its own capability lookup answers "unknown" for this model while its cost map
+# says the model supports native schema output, so the request would carry a
+# synthesised tool and an unresolved `$defs`. That disagreement is upstream's,
+# and the gate reads the call rather than the map precisely so it sees what the
+# request will actually carry.
+CLAUDE_EMULATED = "claude-sonnet-5"
 
 # A Claude that clears *every* gate: generation >= 4.7 so the temperature floor
 # still applies to it, and on the pinned litellm's native structured-output
@@ -403,21 +410,33 @@ max_output_tokens = 8192
 
 # A stated temperature, which the shipped file no longer carries. The gate is
 # about a *param*, so nothing it does is reachable until a deployment sets one,
-# and the env override is the ordinary way that happens.
+# and the env override is the ordinary way that happens. The value is 1: the
+# provider library rejects 0 on these models by itself, so 1 is the value that
+# reaches our rule and proves it is load-bearing rather than redundant.
 BASE_TEMPERATURE_VAR = "STRIDE_SAMPLING_BASE_TEMPERATURE"
-GREEDY_BASE = {BASE_TEMPERATURE_VAR: "0.0"}
+STATED_BASE = {BASE_TEMPERATURE_VAR: "1"}
+
+EMULATED_ENV = ANTHROPIC_ENV | {
+    "STRIDE_MODEL_BASE_MODEL": CLAUDE_EMULATED,
+    "STRIDE_MODEL_STRONG_MODEL": CLAUDE_EMULATED,
+}
 
 
 def test_a_claude_that_removed_temperature_fails_the_build():
-    """A deployment that states 0.0 on a 4.7+ Claude fails the build, not node one."""
+    """A deployment that states a temperature on a 4.7+ Claude fails the build.
+
+    At a value the provider library already refuses this would prove nothing —
+    the first gate would fire. The value here is one the library accepts and
+    the model does not, so what stops the build is this service's own rule.
+    """
     with pytest.raises(ModelGateError) as excinfo:
-        Deployment.from_env(env=ANTHROPIC_ENV | GREEDY_BASE).pipeline(
+        Deployment.from_env(env=ANTHROPIC_ENV | STATED_BASE).pipeline(
             DEFAULT_FRAMEWORKS
         )
 
     message = str(excinfo.value)
     assert "tiers.base" in message
-    assert "temperature" in message
+    assert "Claude 4.7 and later do not accept 'temperature'" in message
     # The message has to name where the value actually lives, and an override
     # is not a line anyone can delete from the file.
     assert "config/sampling.toml" in message
@@ -451,7 +470,7 @@ def test_the_temperature_gate_is_keyed_on_the_model_not_the_vendor():
     """
     env = (
         VERTEX_ENV
-        | GREEDY_BASE
+        | STATED_BASE
         | {
             "STRIDE_MODEL_BASE_VENDOR": "vertex",
             "STRIDE_MODEL_BASE_MODEL": CLAUDE_5,
@@ -509,7 +528,7 @@ def test_the_shipped_caps_clear_the_ceilings_of_a_selectable_model():
     [
         ("vertex", "gemini-2.5-pro"),
         ("anthropic", "claude-sonnet-4-6"),
-        ("anthropic", "claude-opus-4-6"),
+        ("anthropic", "claude-opus-5"),
         ("openai", "gpt-5.6"),
     ],
 )
@@ -543,16 +562,16 @@ def test_a_model_without_native_schema_support_fails_the_build(tmp_path):
     Where a provider cannot constrain output to a schema directly, the library
     emulates it with a synthesised tool and forwards the schema's `$defs`
     unresolved. Nothing rejects the request, so without this gate the job dies
-    at output validation on node one. Temperature is unset here so the floor
-    does not fire first and mask which check is under test.
+    at output validation on node one. Temperature is unset here so the 4.7 rule
+    cannot fire first and mask which check is under test.
     """
     path = tmp_path / "sampling.toml"
     path.write_text(NO_TEMPERATURE, encoding="utf-8")
 
     with pytest.raises(ModelGateError) as excinfo:
-        Deployment.from_env(
-            env=ANTHROPIC_ENV | {"STRIDE_SAMPLING": str(path)}
-        ).pipeline(DEFAULT_FRAMEWORKS)
+        Deployment.from_env(env=EMULATED_ENV | {"STRIDE_SAMPLING": str(path)}).pipeline(
+            DEFAULT_FRAMEWORKS
+        )
 
     message = str(excinfo.value)
     assert "tiers.base" in message
@@ -625,7 +644,7 @@ def test_a_constrained_tier_leaves_the_derived_schema_alone():
 def test_the_schema_gate_is_scoped_to_tiers_that_send_a_schema(tmp_path):
     """The narrowing: a model rejected while constrained is fine unconstrained.
 
-    `claude-opus-5` takes the emulated path, so the gate stops it — but only
+    `claude-sonnet-5` takes the emulated path, so the gate stops it — but only
     because a schema would be sent. Turn that off and there is no emulated
     request to object to, so the same selection must build.
     """
@@ -638,14 +657,14 @@ def test_the_schema_gate_is_scoped_to_tiers_that_send_a_schema(tmp_path):
 
     with pytest.raises(ModelGateError, match=r"\$defs"):
         Deployment.from_env(
-            env=ANTHROPIC_ENV | {"STRIDE_SAMPLING": str(constrained)}
+            env=EMULATED_ENV | {"STRIDE_SAMPLING": str(constrained)}
         ).pipeline(DEFAULT_FRAMEWORKS)
 
     pipeline = Deployment.from_env(
-        env=ANTHROPIC_ENV | {"STRIDE_SAMPLING": str(path)}
+        env=EMULATED_ENV | {"STRIDE_SAMPLING": str(path)}
     ).pipeline(DEFAULT_FRAMEWORKS)
 
-    assert pipeline.node_models[graph.EXTRACT_NODE] == f"anthropic/{CLAUDE_5}"
+    assert pipeline.node_models[graph.EXTRACT_NODE] == f"anthropic/{CLAUDE_EMULATED}"
 
 
 def test_claude_4_6_still_accepts_a_stated_temperature():
@@ -656,7 +675,7 @@ def test_claude_4_6_still_accepts_a_stated_temperature():
     """
     env = (
         ANTHROPIC_ENV
-        | GREEDY_BASE
+        | STATED_BASE
         | {
             "STRIDE_MODEL_BASE_MODEL": "claude-sonnet-4-6",
             "STRIDE_MODEL_STRONG_MODEL": "claude-sonnet-4-6",
