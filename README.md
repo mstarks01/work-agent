@@ -143,9 +143,10 @@ are worth stating separately, because they are different kinds of claim:
   that a report came from the exact model builds and sampling parameters your
   deployment blessed, so the project can never ship a certified pair on your
   behalf. An empty list is the correct shipped state, not missing work.
-- **Per-tier sampling is an open tuning loop.** The shipped decoding default is
-  `temperature = 0`. Improving the per-tier values is a measured process against
-  the golden corpus — see [evals/TUNING.md](evals/TUNING.md).
+- **Per-tier sampling is an open tuning loop.** The shipped file states no
+  decoding value it cannot state for every model, so each tier runs at its
+  model's own default. Improving the per-tier values is a measured process
+  against the golden corpus — see [evals/TUNING.md](evals/TUNING.md).
 - **No provider has served a request in CI.** Two kinds of live lane exist and
   neither has run: the per-vendor [provider smoke](docs/Configuration.md#checking-that-a-provider-actually-serves-the-graph),
   which asks whether a vendor serves this graph at all, and the golden-corpus

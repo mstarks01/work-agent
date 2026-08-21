@@ -167,8 +167,8 @@ loader rejects, never a silent fallback.
 
 | Param | Shipped state | Notes |
 | --- | --- | --- |
-| `temperature` | pinned `0.0` | Greedy decoding; the model's own default is `1.0`. **Must be unset on a tier running Claude 4.7 or later** — see below. |
-| `max_output_tokens` | pinned `16384` base / `32768` strong | Must be pinned: silence means a *vendor-derived* cap. Sized against measured output — see below. |
+| `temperature` | **unset** | No value is legal on every model: Claude 4.7+ rejects the parameter, and OpenAI's reasoning families take only their own default of `1`. Set one per tier if you want a stated value — see below. |
+| `max_output_tokens` | pinned `16384` base / `64000` strong | Must be pinned: silence means a *vendor-derived* cap. Sized against measured output — see below. |
 | `candidate_count` | pinned `1` | Reserved; the loader **rejects any value ≠ 1**. |
 | `constrain_output` | pinned `true` | Send this tier's node schema to the provider. Set `false` where the provider's schema compiler won't take it — see below. |
 | `top_p`, `presence_penalty`, `frequency_penalty` | **unset** | No verified per-tier constant to pin. |
@@ -241,20 +241,23 @@ pinned copy is unknown to it and falls back to the provider's *base* config,
 where anything the provider generally accepts passes. That is usually harmless
 — it is a name check, not an existence check — but one case is not. Anthropic
 removed `temperature` from **Claude 4.7 onward**: only the model's own default
-is accepted, and a request carrying the parameter is rejected. Since the shipped
-sampling pins `temperature = 0.0`, a tier naming a Claude newer than the pinned
-library would sail through startup and die on the first node of a paid job.
+is accepted, and a request carrying the parameter is rejected. A tier that
+states a temperature on a Claude newer than the pinned library would sail
+through startup and die on the first node of a paid job.
 
 So a second startup check runs beside the first: a tier on Claude 4.7 or later
-with `temperature` set is a startup error naming the tier and the file to edit.
-Two deliberate limits on it:
+with `temperature` set is a startup error naming the tier and both knobs that
+hold the value. Three deliberate limits on it:
 
+- **It gates the parameter, never the model.** The shipped sampling states no
+  temperature, so this check has nothing to fire on until a deployment sets
+  one. Every Claude generation runs here; what a generation decides is which
+  parameters it accepts.
 - It keys on the **model**, not the vendor. Vertex-hosted Claude is the same
   model under the same removal, and `vendor = "vertex"` must not be a way around
   it.
-- The floor is **4.7, not 4.6**. Claude 4.6 still accepts `temperature`, so
-  pinned greedy decoding survives there rather than being swept up by a
-  vendor-wide ban.
+- The floor is **4.7, not 4.6**. Claude 4.6 still accepts `temperature`, so a
+  stated value survives there rather than being swept up by a vendor-wide ban.
 
 Unset the parameter for that tier and the model runs on its own default, which
 is the only value these generations serve. This is a floor, not a re-introduced

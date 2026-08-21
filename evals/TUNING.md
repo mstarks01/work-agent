@@ -217,7 +217,7 @@ without editing the file, use an environment override (see
 what a sweep does:
 
 ```sh
-# Try a warmer temperature on the strong-tier category agents for one run:
+# Try a stated temperature on the strong-tier category agents for one run:
 STRIDE_SAMPLING_STRONG_TEMPERATURE=0.4 \
   python -m evals.harness.run run --mode analysis --out warm-strong.json
 ```
@@ -225,14 +225,21 @@ STRIDE_SAMPLING_STRONG_TEMPERATURE=0.4 \
 The canonical sampling experiment is three arms on the same corpus, **decided
 by the far-domain cases**:
 
-1. **`temperature = 0`** — the shipped default (greedy).
-2. **the model's own default** — a warmer temperature (`STRIDE_SAMPLING_*_TEMPERATURE`).
+1. **the model's own default** — the shipped state, which sets no temperature.
+2. **`temperature = 0`** — greedy (`STRIDE_SAMPLING_*_TEMPERATURE=0`).
 3. **k-of-n sampling** — draw several candidates and union them (higher recall,
    but several times the cost, so it has to clearly earn it).
 
 Run each arm five times, compare each to the baseline band, and read the near/far
-delta *per arm*: temperature 0 may be flattering the near-domain cases while
+delta *per arm*: temperature 0 may be flatter on the near-domain cases while
 costing recall on the far ones, which is the whole reason to test it.
+
+**Arm 2 costs you models, and that is part of what it has to earn.** A tier that
+states a temperature cannot run Claude 4.7 or later, which rejects the parameter,
+and takes only `1` on an OpenAI reasoning family. Arm 1 runs anywhere. If arm 2
+wins, `promote` will refuse it — the file leaves `temperature` unset with a
+rationale, and pinning a param the file deliberately leaves unset is a human
+decision that owes a replacement rationale, not a silent sweep write.
 
 ### Prompts and exemplars
 
@@ -323,7 +330,7 @@ STRONG
   served:    vertex_ai/gemini-2.5-pro-002
   nodes:     analyze_spoofing, analyze_tampering, critic
 
-  temperature:         0.0
+  temperature:         unset
   top_p:               unset
   max_output_tokens:   64000
   ...
@@ -405,6 +412,7 @@ Not every metric stops the world. The gating is deliberately staged:
 | **Token usage and latency** | No — printed and recorded | Cost and wall-clock per node. What they inform is a budget decision, not a correctness one. |
 | **Stability** | No — and it is not part of a run at all | It needs two finished sweeps, so it is its own command over their artifacts. |
 
-The shipped default remains `temperature = 0`. Tuning the per-tier values to
-something better is exactly the loop above — run it once you have live
-credentials and the baselines to measure against.
+The shipped file still states no temperature, so each tier decodes at its
+model's own default. Tuning the per-tier values to something better is exactly
+the loop above — run it once you have live credentials and the baselines to
+measure against.
