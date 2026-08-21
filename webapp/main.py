@@ -13,17 +13,17 @@ works, then get out of the way; the library is what they actually embed.
 Two pages, three data endpoints:
 
 ======================  ========================================================
-``GET  /``              form page: the resolved tiers, a textarea, Analyze
+``GET  /``              form page: the tiers, the framework picker, a textarea
 ``GET  /report/{run}``  ``report_view.html`` with this run's JSON injected
 ``GET  /example``       ``examples/orders.md``, for **Load example**
-``POST /analyze``       start a run, return its id
+``POST /analyze``       start a run on a selection, return its id
 ``GET  /events/{run}``  server-sent per-node progress
 ======================  ========================================================
 
 **Deliberately unbloated.** One module, no template engine, no JS framework, no
 build step, no CSS framework, no bundler. HTML comes from f-strings and the
-only client-side JavaScript is the SSE listener, the Load-example fill, and the
-redirect.
+only client-side JavaScript is the SSE listener, the Load-example fill, the
+picker's show-and-hide, and the redirect.
 
 Security posture, all of it deliberate:
 
@@ -33,7 +33,17 @@ Security posture, all of it deliberate:
   access is exactly what ``/v1`` already exists for.
 * **No HTTP input touches model identity.** Tier, vendor, model and sampling
   come from ``config/`` alone. A form field selecting a model would be
-  unauthenticated control over what runs and what it costs (A01, LLM10).
+  unauthenticated control over what runs and what it costs (A01, LLM10). The
+  framework picker is a different thing: it selects which framework analyses
+  the text, not which model does the analysing. It does change what a
+  submission can spend, because each selected framework runs its own nodes.
+  The one-run-at-a-time gate and the loopback bind are what bound that.
+* **The picker is an allow-list, checked server-side** (A01). A submitted name
+  must be one this install carries and a submitted option must satisfy that
+  package's own options model, both before an engine exists. The form's
+  checkboxes decide nothing: :func:`_selection` re-derives the selection from
+  the carried list, so an invented name, a repeated one and a reordered pair
+  are refused or normalised rather than reaching the graph.
 * **The injection point is the whole trust boundary.** A report carries the
   submitter's own prose, so every ``<`` is escaped to ``\\u003c`` before the
   JSON enters the viewer's ``<script>`` block — otherwise a description
@@ -80,9 +90,11 @@ import logging
 import os
 import re
 import secrets
-from collections.abc import AsyncIterator, Mapping
+from collections.abc import AsyncIterator, Callable, Mapping, Sequence
 from dataclasses import dataclass, field
+from functools import partial
 from pathlib import Path
+from typing import get_args
 
 from fastapi import FastAPI, Request
 from fastapi.responses import (
@@ -100,16 +112,15 @@ from stride_service import (
     ConfigError,
     EngineDeadlineError,
     EngineInputError,
+    FrameworkName,
+    FrameworkSelection,
     PipelineCompleted,
     Report,
     Source,
     StrideEngine,
 )
 from stride_service.deployment import Deployment
-from stride_service.frameworks import (
-    FrameworkPackageError,
-    selectable_without_options,
-)
+from stride_service.frameworks import package_for
 from stride_service.model_tiers import ModelTierConfig
 from stride_service.vendors import vendor_for
 
@@ -243,60 +254,74 @@ class Analyses:
         return self._runs.get(run_id)
 
 
+#: Builds the engine for one submission's selection. A factory rather than a
+#: built engine, because an engine is built *for* a selection and the selection
+#: is now the submitter's: the options a package needs ride on it, and they are
+#: known only once a form has been filled in.
+EngineFactory = Callable[[Sequence[FrameworkSelection]], StrideEngine]
+
+
 @dataclass(frozen=True)
 class Startup:
-    """What building the engine produced: a working pair, or the failure.
+    """What starting up produced: what the app can offer, or the failure.
 
     The app serves either way. If construction raised, every route that would
     run a model is replaced by the diagnostic page, so no analysis can run on a
     model nobody chose — fail-closed, but explained.
+
+    ``frameworks`` is what this install carries, which is what the picker
+    offers and what :func:`_selection` allow-lists against. It is not itself a
+    selection and it is never used as one: a submission names its own, and the
+    form ships with every box ticked rather than with a default nobody chose.
     """
 
-    engine: StrideEngine | None
+    engine_for: EngineFactory | None
+    frameworks: tuple[FrameworkName, ...]
     tiers: ModelTierConfig | None
     error: ConfigError | None
 
     @property
     def ok(self) -> bool:
-        return self.engine is not None
+        return self.engine_for is not None
 
 
 def build_startup(env: Mapping[str, str] | None = None) -> Startup:
-    """Build the engine once, converting a config failure into a page.
+    """Resolve the config and prove the credentials, or convert the failure to a page.
 
     Two stages, and the split is the whole content of the diagnostic. Resolving
     the :class:`~stride_service.deployment.Deployment` reads the config files;
-    building the engine off it resolves the vendor's credentials and runs every
+    building a runner off it resolves the vendor's credentials and runs every
     tier's ``(vendor, model, sampling)`` through LiteLLM's own check. So a
     *config* failure leaves no tiers to report, while a *credential* failure
     can still name the vendor the config selected — which is the case a first
     run overwhelmingly hits. One read either way: the tiers the page prints are
-    the tiers the engine was built from, not a second load of the same file.
+    the tiers the runner was built from, not a second load of the same file.
+
+    **Building the runner is the credential check, because binding the tier
+    adapters is what resolves the credentials.** Binding does not depend on
+    which frameworks a submission picks, so any selection proves the same
+    thing. The probe names the whole carried set for a second reason: that is
+    the selection the form ships ticked, so the most common submission finds
+    its graph already composed.
+    :meth:`~stride_service.deployment.Deployment.runner` memoizes per
+    selection, so a narrower pick composes its own graph once and no
+    submission binds the adapters twice.
     """
     env = os.environ if env is None else env
     deployment = None
     try:
         deployment = Deployment.from_env(env)
-        # The frameworks this install carries that a caller with nobody to ask
-        # can select. The first-run app has no selection UI and no business
-        # inventing a default the service itself refuses to have: what it offers
-        # is "run what this install is configured for", minus any framework
-        # whose options carry a required field. ASVS is the first such
-        # framework — its level is a choice an organization makes, and this app
-        # cannot make it on their behalf.
-        selection = selectable_without_options(deployment.frameworks)
-        if not selection:
-            raise FrameworkPackageError(
-                "every framework this install carries needs a job option this app"
-                f" cannot supply: {list(deployment.frameworks)}; submit a job"
-                " through the /v1 API instead"
-            )
-        engine = StrideEngine.from_deployment(deployment, selection)
+        deployment.runner(deployment.frameworks)
     except ConfigError as exc:
         logger.error("config error at startup: %s", exc)
         tiers = deployment.tiers if deployment is not None else None
-        return Startup(engine=None, tiers=tiers, error=exc)
-    return Startup(engine=engine, tiers=deployment.tiers, error=None)
+        return Startup(engine_for=None, frameworks=(), tiers=tiers, error=exc)
+    return Startup(
+        engine_for=partial(StrideEngine.from_deployment, deployment),
+        frameworks=deployment.frameworks,
+        tiers=deployment.tiers,
+        error=None,
+    )
 
 
 @dataclass(frozen=True)
@@ -365,7 +390,14 @@ def create_app(
     async def form_page() -> Response:
         if not state.ok:
             return _html(diagnostic_page(state), status_code=503)
-        return _html(_page(_FORM_PAGE, _FORM_CSP, tiers=_tier_lines(state.tiers)))
+        return _html(
+            _page(
+                _FORM_PAGE,
+                _FORM_CSP,
+                tiers=_tier_lines(state.tiers),
+                frameworks=_framework_fields(state.frameworks),
+            )
+        )
 
     @app.get("/example", response_class=PlainTextResponse)
     async def example() -> Response:
@@ -380,17 +412,41 @@ def create_app(
                 {"message": "This request did not come from the app's own page."},
                 status_code=403,
             )
-        if not state.ok or state.engine is None:
+        if not state.ok or state.engine_for is None:
             return JSONResponse({"message": str(state.error)}, status_code=503)
 
         try:
             body = await request.json()
             sources = [Source.model_validate(source) for source in body["sources"]]
+            selection = _selection(state.frameworks, body["frameworks"])
         except (ValidationError, ValueError, KeyError, TypeError):
             return JSONResponse(
-                {"message": "Expected a JSON body with a 'sources' list."},
+                {
+                    "message": "Expected a JSON body with a 'sources' list and a"
+                    " 'frameworks' list naming frameworks this install carries."
+                },
                 status_code=400,
             )
+
+        # Built here rather than at startup, and before the gate is claimed: an
+        # engine is built for one selection, and its constructor is where a
+        # package's options model refuses a submission missing a value it needs.
+        # Refusing before the gate is claimed keeps a bad option from locking
+        # out the next submitter, and refusing before any node runs is what
+        # stops the failure landing after the run has been paid for.
+        try:
+            engine = state.engine_for(selection)
+        except EngineInputError as exc:
+            # Names the framework and the field it wanted, and nothing about
+            # this deployment. Safe to show, and it is the only way a submitter
+            # learns which option they left out.
+            return JSONResponse({"message": str(exc)}, status_code=400)
+        except ConfigError as exc:
+            # The names passed the allow-list, so this is not the caller's: the
+            # config or the credentials went bad after startup proved them. Log
+            # it and answer as the diagnostic would.
+            logger.error("could not build an engine for %s: %s", selection, exc)
+            return JSONResponse({"message": str(exc)}, status_code=503)
 
         run = analyses.claim()
         if run is None:
@@ -399,7 +455,7 @@ def create_app(
                 status_code=409,
             )
         # Held on the run so the task is not garbage-collected mid-flight.
-        run.task = asyncio.create_task(_drive(state.engine, analyses, run, sources))
+        run.task = asyncio.create_task(_drive(engine, analyses, run, sources))
         return JSONResponse({"run": run.id})
 
     @app.get("/events/{run_id}")
@@ -421,6 +477,114 @@ def create_app(
         return _html(render_report(run.report))
 
     return app
+
+
+def _selection(
+    carried: Sequence[FrameworkName], requested: object
+) -> list[FrameworkSelection]:
+    """One submission's selection: allow-listed, de-duplicated, in carried order.
+
+    **The checkboxes decide nothing.** What arrives is a list of names and
+    options from a page the submitter controls, so this re-derives the selection
+    from ``carried`` rather than trusting the order or the membership of what
+    was sent. Three things fall out of deriving it that way rather than
+    filtering in place: a name this install does not carry is refused instead of
+    reaching :meth:`~stride_service.deployment.Deployment.selection` as a
+    sentence about configuration, a name sent twice runs once instead of
+    building a graph with two blocks of it, and the block order of every report
+    is ``config/frameworks.toml`` order rather than whatever the page posted.
+
+    Options ride through untouched and are *not* checked here. Each package
+    declares its own options model and the engine's constructor is where it
+    runs, so this stays the one thing this app can decide — which frameworks
+    exist — and names no framework and no option to decide it.
+
+    Raises ``TypeError`` for a body whose ``frameworks`` is not a list,
+    ``ValueError`` for an empty or non-carried selection, and
+    ``ValidationError`` for an entry that is not a
+    :class:`~stride_service.report.FrameworkSelection`. The route answers all
+    three as one 400.
+    """
+    if not isinstance(requested, list):
+        raise TypeError("'frameworks' must be a list of framework selections")
+    picked = {
+        selection.name: selection
+        for selection in (
+            FrameworkSelection.model_validate(entry) for entry in requested
+        )
+    }
+    unknown = sorted(name for name in picked if name not in carried)
+    if unknown:
+        raise ValueError(f"this install does not carry {unknown}")
+    if not picked:
+        raise ValueError("a submission must select at least one framework")
+    return [picked[name] for name in carried if name in picked]
+
+
+def _framework_fields(frameworks: Sequence[FrameworkName]) -> str:
+    """The picker: a checkbox per carried framework, and a control per option.
+
+    **Nothing here names a framework or an option.** The rows come from what
+    this install carries and the controls from each package's own options
+    model, so a package registered later gets its controls without an edit
+    here — and a package that needs no options gets a bare checkbox, because
+    an empty options model has no fields to walk.
+
+    Every box ships ticked. That is the form's starting state, not a default
+    the app invented: a submission still has to say what it selected, and the
+    :func:`_selection` allow-list is what rules on the answer.
+    """
+    rows = []
+    for name in frameworks:
+        options = "".join(
+            _option_control(name, field, annotation)
+            for field, annotation in _option_fields(name)
+        )
+        rows.append(
+            f'<div class="pick"><label><input type="checkbox" name="framework"'
+            f' value="{_escape(name)}" checked> <b>{_escape(name)}</b></label>'
+            f'<span class="opts">{options}</span></div>'
+        )
+    return "\n".join(rows)
+
+
+def _option_fields(name: FrameworkName) -> list[tuple[str, object]]:
+    """One ``(field, annotation)`` per option the named package declares."""
+    return [
+        (field, spec.annotation)
+        for field, spec in package_for(name).options.model_fields.items()
+    ]
+
+
+def _option_control(name: FrameworkName, field: str, annotation: object) -> str:
+    """One option's ``<select>``, its choices read off the field's own type.
+
+    **A closed set is the only option this app can render.** A package declares
+    its options as a Pydantic model and this walks the declaration, so the
+    choices offered and the choices accepted are one source rather than two
+    that drift. A field annotated as anything but a ``Literal`` raises rather
+    than rendering a control that cannot be filled in — the same fail-loud
+    :func:`render_report` takes when its template has no block to inject into.
+
+    Each choice carries its **JSON** in ``value``, and the page parses it back
+    before posting. A level is ``Literal[1, 2, 3]``, so a control posting the
+    string ``"1"`` would hand the options model a value of the wrong type and
+    turn a filled-in form into a 400.
+    """
+    choices = get_args(annotation)
+    if not choices:
+        raise RuntimeError(
+            f"framework {name!r} declares option {field!r} as {annotation!r},"
+            " which is not a closed set of choices this form can offer"
+        )
+    rendered = "".join(
+        f'<option value="{_escape(json.dumps(choice))}">{_escape(str(choice))}</option>'
+        for choice in choices
+    )
+    return (
+        f'<label> {_escape(field)} <select data-framework="{_escape(name)}"'
+        f' data-option="{_escape(field)}">{rendered}</select></label>'
+    )
 
 
 def _html(page: RenderedPage, status_code: int = 200) -> HTMLResponse:
@@ -641,6 +805,10 @@ _STYLE = """
   #ticks li { opacity: .55; }
   .not { color: #c00; font-weight: 600; }
   .set { opacity: .6; }
+  .pick { margin: .15rem 0; }
+  .pick b { font-family: ui-monospace, monospace; font-weight: 600; }
+  .opts { margin-left: .75rem; font-size: .85rem; opacity: .8; }
+  .opts[hidden] { display: none; }
 """
 
 _FORM_PAGE = (
@@ -654,6 +822,10 @@ _FORM_PAGE = (
 <p class="sub">Running in process, on real models.</p>
 <!--tiers-->
 <form id="analyze">
+  <fieldset id="frameworks">
+    <legend>Frameworks</legend>
+    <!--frameworks-->
+  </fieldset>
   <p><textarea id="description" name="description"
      placeholder="Describe your system..."></textarea></p>
   <p>
@@ -669,6 +841,38 @@ _FORM_PAGE = (
   const ticks = document.getElementById("ticks");
   const problem = document.getElementById("problem");
   const go = document.getElementById("go");
+
+  // The picker. A checkbox reaches its own option controls through the row
+  // that contains them, never through a selector built from its value: the
+  // DOM already says which controls belong to which framework, and reading
+  // that beats keeping a second copy of the mapping on this page.
+  const boxes = [...document.querySelectorAll("input[name=framework]")];
+  const optionsOf = (checkbox) => [
+    ...checkbox.closest(".pick").querySelectorAll("select"),
+  ];
+
+  // An unticked framework's options are hidden rather than removed, so
+  // re-ticking it restores what was chosen instead of resetting it.
+  const sync = (checkbox) => {
+    checkbox.closest(".pick").querySelector(".opts").hidden = !checkbox.checked;
+  };
+  for (const checkbox of boxes) {
+    checkbox.addEventListener("change", () => sync(checkbox));
+    sync(checkbox);
+  }
+
+  // What the server allow-lists. Each choice's value is the JSON of the choice
+  // itself, so a level posts as the number its options model declares rather
+  // than as the string a form control would otherwise send.
+  const selection = () =>
+    boxes
+      .filter((checkbox) => checkbox.checked)
+      .map((checkbox) => ({
+        name: checkbox.value,
+        options: Object.fromEntries(
+          optionsOf(checkbox).map((s) => [s.dataset.option, JSON.parse(s.value)]),
+        ),
+      }));
 
   document.getElementById("load").addEventListener("click", async () => {
     box.value = await (await fetch("/example")).text();
@@ -699,6 +903,7 @@ _FORM_PAGE = (
         sources: [
           { kind: "description", label: "Pasted description", text: box.value },
         ],
+        frameworks: selection(),
       }),
     });
     if (!started.ok) {

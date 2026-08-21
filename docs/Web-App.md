@@ -31,6 +31,28 @@ default. Dependency groups never enter the built distribution, so if you embed
 the engine you inherit none of this — your dependency surface stays `fastapi`,
 `google-adk`, `litellm`, `pydantic` and `pyjwt[crypto]`.
 
+## What you select
+
+**The frameworks to run**, one checkbox per framework this install carries. The
+carried set comes from [`config/frameworks.toml`](../config/frameworks.toml).
+Every box starts ticked, so **Analyze** runs them all unless you untick one. Each
+framework you leave ticked costs its own nodes, so untick what you do not need.
+
+A framework that needs a job option gets a control beside its checkbox. ASVS
+needs a level, because ASVS 5.0 tells your organization to choose one and no
+description implies it. So the ASVS row carries a level select, and STRIDE, which
+needs no options, carries none.
+
+One submission gives you one report. Each framework you selected writes its own
+block in it, and every block reads the same extracted model. So STRIDE threats
+and ASVS requirement rulings arrive together, against one system, from one run.
+
+The server decides what runs, not the page. A submission naming a framework this
+install does not carry is refused, a framework named twice runs once, and the
+block order is the config file's order rather than the page's. A submission that
+leaves out an option its framework needs is refused before any model runs, with a
+message naming the field.
+
 ## What it shows you
 
 **The models it is about to use**, one line per tier — whichever pair you
@@ -43,7 +65,9 @@ strong → vertex / gemini-2.5-pro
 ```
 
 Read-only. **No input to this app can influence which model runs** — not a form
-field, not a query parameter, not a header. Model selection lives in
+field, not a query parameter, not a header. The framework picker is not an
+exception to this: it chooses what the app analyses, never what analyses it.
+Model selection lives in
 [`config/model_tiers.toml`](../config/model_tiers.toml) and the `STRIDE_MODEL_*`
 overrides, and it stays there: the app has no authentication, so a model selector
 would be unauthenticated control over what runs and what it costs. To change
@@ -54,17 +78,19 @@ credential check passed — and it does not show sampling parameters. The
 **served** model build that actually answered each node is different information,
 and the report itself carries it.
 
-**Progress, per node.** A run takes around 40 seconds. The page streams **every**
-graph node as it finishes — the model calls (`extract`, the six `analyze_*`
-nodes, `critic`) and the deterministic ones between them (`validate`, `prepare`,
-`merge`, `router`, `assemble`) alike — rather than showing you a blank tab. Node
-names appear exactly as the graph emits them, which is why a category agent reads
-`analyze_denial_of_service` rather than the `analyze/denial-of-service` that
+**Progress, per node.** A STRIDE run takes around 40 seconds, and each further
+framework adds its own lane nodes to that. The page streams **every** graph node
+as it finishes — the model calls and the deterministic ones between them
+(`validate`, `prepare`, `merge`, `router`, `assemble`) alike — rather than
+showing you a blank tab. Node names appear exactly as the graph emits them, which
+is why a STRIDE category agent reads `analyze_denial_of_service` rather than the
+`analyze/denial-of-service` that
 [`config/model_tiers.toml`](../config/model_tiers.toml) keys on: graph node names
 must be Python identifiers.
 
-**The report** — threat cards, a severity summary, the extracted DFD, and the
-served-build provenance for every LLM node. Each card carries the threat's
+**The report** — one block per framework you selected, a summary, the extracted
+DFD, and the served-build provenance for every LLM node. STRIDE contributes
+threat cards; ASVS contributes requirement rulings. Each card carries its
 **grounds** under the analysis: the quotes, unknown attributes and boundary
 crossings the agent raised it on, with a quote the service could not find in its
 source marked as such rather than hidden.
