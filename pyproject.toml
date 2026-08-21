@@ -83,6 +83,20 @@ packages = ["src/stride_service"]
 # naming families here would enable far more than it pins. What holds it stable
 # is the exact `ruff` pin in uv.lock, which CI installs with `uv sync --locked`.
 target-version = "py311"
+# The research probes are frozen artifacts, so neither check nor format may
+# touch them. Each one is cited by an ADR as the evidence for a decision, and
+# its value is being exactly the script that produced the recorded output -- a
+# lint that rewrites it destroys the thing the directory exists to keep. They
+# are excluded rather than fixed for that reason, not because the finding
+# (a blind `except Exception`) is wrong. `docs/research/README.md` says so
+# where an editor will be standing. Nothing here is imported by the package,
+# and `[tool.mypy]`'s `files` never named `docs`.
+#
+# `extend-exclude` rather than `exclude`, and that is load-bearing: a
+# command-line `--exclude` REPLACES `exclude`, and both CI and `.githooks/`
+# run `ruff format --check . --exclude '*.md'`. Under `exclude` these three
+# files would be checked in exactly the two places that matter.
+extend-exclude = ["docs/research"]
 
 [tool.mypy]
 # Every Python file in the repository, not just the shipped package. The eval
