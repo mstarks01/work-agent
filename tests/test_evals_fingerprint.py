@@ -10,10 +10,13 @@ Deterministic and free of provider calls, so it gates on every PR.
 
 from __future__ import annotations
 
+from dataclasses import replace
+
 import pytest
 
 from evals.harness.fingerprint import (
     DEFAULT_VERSION,
+    EXTRA_COMPONENT,
     IDENTIFIER_OF,
     LANE_FIELD,
     SUPPORTED_VERSIONS,
@@ -93,6 +96,38 @@ def test_the_version_table_covers_every_package():
     """A table nobody compares to its registry fails as quietly as an ``if``."""
     assert set(VERSION_FOR) == set(PACKAGES)
     assert all(version in SUPPORTED_VERSIONS for version in VERSION_FOR.values())
+
+
+def test_every_supported_version_declares_what_it_reads():
+    """The table against its registry, both directions.
+
+    A version this build computes and does not appear in ``EXTRA_COMPONENT``
+    would raise a ``KeyError`` inside ``key_claim`` rather than compose
+    anything; a version declared here and absent from ``SUPPORTED_VERSIONS``
+    is a rule nothing can hash. Either way the entry has to be added in both
+    places or in neither.
+    """
+    assert set(EXTRA_COMPONENT) == set(SUPPORTED_VERSIONS)
+
+
+@pytest.mark.parametrize("version", SUPPORTED_VERSIONS)
+def test_the_table_and_the_hash_agree_about_what_a_version_reads(version):
+    """``EXTRA_COMPONENT`` says what ``fingerprint`` refuses to hash without.
+
+    The table decides what ``key_claim`` composes and ``fingerprint`` decides
+    what it will not hash. Those are two spellings of one fact, so a version
+    whose entry names a component the hash does not require — or omits one it
+    does — is the drift this pins.
+    """
+    without = Components("stride", "spoofing", ("process:a",))
+    reads = EXTRA_COMPONENT[version]
+    if reads is None:
+        assert fingerprint(without, version=version)
+        return
+    with pytest.raises(FingerprintError):
+        fingerprint(without, version=version)
+    supplied = replace(without, **{reads: "read" if reads == "verb" else "V6.2.1"})
+    assert fingerprint(supplied, version=version)
 
 
 def test_an_undeclared_framework_raises_rather_than_defaulting():
