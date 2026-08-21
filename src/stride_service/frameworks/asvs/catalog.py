@@ -42,6 +42,7 @@ __all__ = [
     "AsvsLevel",
     "Chapter",
     "Requirement",
+    "is_published_requirement",
     "requirement_id",
     "requirements_for",
 ]
@@ -161,6 +162,35 @@ def requirement_id(lane: str, key: object) -> str:
     requirement_of` reads the same pair back off a composed claim ID.
     """
     return f"V{CHAPTER_NUMBERS[lane]}.{key}"
+
+
+_REQUIREMENT_IDS: frozenset[str] = frozenset(req.id for req in REQUIREMENTS)
+
+
+def is_published_requirement(lane: str, key: object) -> bool:
+    """Whether this lane and key name one of the 345 requirements 5.0.0 publishes.
+
+    **The check the shape of a key cannot make.** A lane agent supplies a
+    ``<section>.<requirement>`` pair, and ``99.99`` is as well-formed as
+    ``2.1``: both match the pattern, and the service composes an identifier from
+    either without noticing. Only the catalog knows which of them the standard
+    contains.
+
+    What rests on it is the citation. This package composes the standard's own
+    version-safe reference, so an unchecked key puts ``v5.0.0-6.99.99`` in a
+    report — a citation that reads as verifiable and resolves to nothing. A
+    missing finding is a gap; an invented requirement is a false statement about
+    the standard, and the second is worse.
+
+    Reads the same ``lane``-to-chapter table :func:`requirement_id` composes
+    from, so what counts as published here and what gets composed there cannot
+    disagree. An unknown lane answers ``False`` rather than raising: this is
+    reached with an agent's value on one side, and the caller's remedy is to
+    drop the claim either way.
+    """
+    if lane not in CHAPTER_NUMBERS:
+        return False
+    return requirement_id(lane, key) in _REQUIREMENT_IDS
 
 
 def _catalog_issues() -> list[str]:

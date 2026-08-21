@@ -63,6 +63,7 @@ from stride_service.report import (
     Claim,
     Ground,
     Proposal,
+    UnknownClaimIdentity,
     UnresolvedEvidence,
 )
 from stride_service.system_model import Element, SystemModel, attribute_names
@@ -359,9 +360,21 @@ def resolve_proposals(
     carried = _RESOLVED_AWAY | {key_field}
     drafts: list[Claim] = []
     unresolved_evidence: list[UnresolvedEvidence] = []
+    unknown_identities: list[UnknownClaimIdentity] = []
     groundless: list[str] = []
     for proposal in proposals:
-        claim_id = package.compose_id(lane, getattr(proposal, key_field))
+        key = getattr(proposal, key_field)
+        claim_id = package.compose_id(lane, key)
+        # Before the evidence, because a claim naming a requirement its own
+        # framework does not have is not a claim whose grounds are worth
+        # resolving. Dropped and marked on the #138 rule: an agent composing a
+        # well-formed reference to something absent costs its entry, never the
+        # run. A package that mints its own IDs answers ``True`` here always.
+        if not package.id_rule.knows(lane, key):
+            unknown_identities.append(
+                UnknownClaimIdentity(claim_id=claim_id, title=proposal.title)
+            )
+            continue
         grounds, unresolved = _grounds_of(proposal, catalog)
         unresolved_evidence += [
             UnresolvedEvidence(claim_id=claim_id, reference=ref[:REFERENCE_MAX_CHARS])
@@ -393,4 +406,10 @@ def resolve_proposals(
         )
     if groundless:
         raise EvidenceResolutionError("; ".join(groundless))
-    return Resolution(drafts, AnalysisMarks(unresolved_evidence=unresolved_evidence))
+    return Resolution(
+        drafts,
+        AnalysisMarks(
+            unresolved_evidence=unresolved_evidence,
+            unknown_claim_identities=unknown_identities,
+        ),
+    )

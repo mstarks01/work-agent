@@ -94,6 +94,14 @@
   .disclaimer-block { color: var(--ink-2); font-size: 0.82rem; margin: 0 0 16px;
     padding-left: 12px; border-left: 2px solid var(--border); }
 
+  /* Rulings the service discarded. Set apart from the disclaimer because it
+     reports on this run rather than on the method, and kept quiet because it
+     is a note about what is missing, not a finding. */
+  .dropped { color: var(--ink-2); font-size: 0.82rem; margin: 0 0 16px;
+    padding-left: 12px; border-left: 2px solid var(--sev-medium); }
+  .dropped ul { margin: 4px 0 0; padding-left: 18px; }
+  .dropped code { font-family: ui-monospace, SFMono-Regular, Menlo, monospace; }
+
   /* stat tiles */
   .tiles { display: grid; grid-template-columns: repeat(4, 1fr); gap: 12px; }
   .tile { background: var(--surface); border: 1px solid var(--border); border-radius: 12px; padding: 16px; }
@@ -298,7 +306,13 @@
     // such mark, so this is empty for it rather than absent — the same shape
     // either way.
     const unmitigated = new Set((block.missing_mitigations || []).map(m => m.claim_id));
-    return { unverified, mentions, composed, unmitigated };
+    // Claims the service dropped because they named an identifier this
+    // framework does not have -- an ASVS requirement number the standard does
+    // not publish. Unlike every mark above, these do NOT key to a surviving
+    // claim: the claim is gone, which is why they render as a block-level note
+    // rather than on a card. The title is the only trace of what was lost.
+    const unknown = (block.unknown_claim_identities || []);
+    return { unverified, mentions, composed, unmitigated, unknown };
   }
 
   const SEV = { critical: ["Critical","--sev-critical"], high: ["High","--sev-high"], medium: ["Medium","--sev-medium"], low: ["Low","--sev-low"] };
@@ -516,6 +530,24 @@
       const tail = ruledOut ? ` (${ruledOut} ruled out)` : "";
       section.append(el("div", "meta",
         `${block.scope.length} units considered with no claim raised${tail}`));
+    }
+
+    // What the service dropped for naming something this framework does not
+    // have. There is no card to hang these on, so they are listed here: a
+    // reader who is told "23 requirements considered" deserves to know that a
+    // 24th ruling was discarded for citing a requirement that does not exist.
+    if (marks.unknown.length) {
+      const note = el("div", "dropped");
+      note.append(el("b", null,
+        `${marks.unknown.length} ruling(s) dropped for naming an unpublished identifier`));
+      const list = el("ul");
+      marks.unknown.forEach(m => {
+        const item = el("li");
+        item.append(code(m.claim_id), " \u2014 ", document.createTextNode(m.title));
+        list.append(item);
+      });
+      note.append(list);
+      section.append(note);
     }
 
     // The severity mix, only for a framework that grades harm. One that does

@@ -22,6 +22,7 @@ import pytest
 from pydantic import ValidationError
 
 from stride_service.engine import EngineInputError, StrideEngine
+from stride_service.evidence import evidence_catalog, resolve_proposals
 from stride_service.frameworks import (
     PACKAGES,
     SCHEMAS,
@@ -277,6 +278,78 @@ def test_which_lanes_carry_no_candidate_rule_is_pinned():
     # STRIDE's contrast, which is the parity question this pins: every STRIDE
     # lane carries a rule, because its rules read structure every model has.
     assert not set(STRIDE.lanes) - {rule.lane for rule in STRIDE.rules}
+
+
+def test_a_claim_naming_an_unpublished_requirement_is_dropped_and_marked():
+    """An invented requirement number costs its entry, never the run (#138's rule).
+
+    ``99.99`` is as well-formed as ``2.1``: both match the key pattern, and the
+    service composes ``v5.0.0-6.99.99`` from either. Only the catalog knows
+    which one the standard publishes. Unchecked, the report cites the standard's
+    own version-safe reference format for a requirement that does not exist —
+    a citation that reads as verifiable and resolves to nothing.
+    """
+    model = valid_model()
+    catalog = evidence_catalog(model)
+    reference = next(iter(catalog))
+    proposals = [
+        RequirementProposal(
+            requirement="2.1",
+            title="A real requirement",
+            description="d",
+            evidence_refs=[reference],
+        ),
+        RequirementProposal(
+            requirement="99.99",
+            title="An invented requirement",
+            description="d",
+            evidence_refs=[reference],
+        ),
+    ]
+
+    resolution = resolve_proposals(proposals, catalog, ASVS, "authentication")
+
+    assert [draft.id for draft in resolution.drafts] == ["v5.0.0-6.2.1"]
+    assert [
+        (mark.claim_id, mark.title)
+        for mark in resolution.marks.unknown_claim_identities
+    ] == [("v5.0.0-6.99.99", "An invented requirement")]
+
+
+def test_a_framework_that_mints_its_own_ids_marks_nothing_unknown():
+    """STRIDE declares no ``known`` predicate, so no key of its can be absent.
+
+    The empty list is a written statement rather than an omission: ``S-01`` is a
+    lane letter and a counter, so there is no roster for a key to be missing
+    from. Asserted rather than assumed, because a predicate added to the neutral
+    resolver by mistake would start dropping STRIDE's claims silently.
+    """
+    assert STRIDE.id_rule.known is None
+    for key in (1, 99, 999):
+        assert STRIDE.id_rule.knows("spoofing", key)
+
+
+def test_a_claims_id_and_its_chapter_field_must_agree():
+    """The service composes both from one lane, so a disagreement is its own defect.
+
+    Fatal rather than dropped, which is the split this package's two new checks
+    sit either side of: an agent can invent a requirement number, so that costs
+    the entry; an agent cannot separate the ID from the chapter, so this costs
+    the run and says so.
+    """
+    crossed = _block(1, [sample_asvs_claim("v5.0.0-11.1.1", "authentication")])
+
+    issues = crossed.block_issues(set())
+
+    assert any("chapter field says 'authentication'" in issue for issue in issues)
+    assert any("V11.1.1" in issue for issue in issues)
+
+
+def test_a_claim_whose_chapter_and_id_agree_raises_no_chapter_issue():
+    """The ordinary case, so the check above cannot be passing vacuously."""
+    block = _block(1, [sample_asvs_claim("v5.0.0-6.2.1", "authentication")])
+
+    assert not [issue for issue in block.block_issues(set()) if "chapter" in issue]
 
 
 def test_the_claim_id_is_the_standards_own_version_safe_reference():
