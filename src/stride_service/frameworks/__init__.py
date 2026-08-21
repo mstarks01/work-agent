@@ -451,10 +451,13 @@ def selectable_without_options(
     caller that supplied one on the operator's behalf would put a decision in the
     report that nobody made.
 
-    Two callers ask exactly this, and both are unattended by construction: the
-    **Provider Smoke** run, which asks whether the application works here, and
-    the first-run app, which offers "run what this install is configured for"
-    and has no selection UI. Each states what it left out rather than hiding it.
+    One caller asks this, and it is unattended by construction: the **Provider
+    Smoke** run, which asks whether the application works here and has nobody
+    to put the question to. It states what it left out rather than hiding it.
+
+    An attended caller has somebody to ask, so it asks rather than calling this:
+    the first-run app offers every carried framework and a control for each
+    required option, and refuses a submission that leaves one out.
     """
     return tuple(
         name

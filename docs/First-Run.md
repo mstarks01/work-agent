@@ -229,12 +229,19 @@ page names exactly which variables are still unset.
 
 ## 4. Load the example and analyze
 
-Click **Load example**, then **Analyze**. No typing.
+Click **Load example**, pick your frameworks, then **Analyze**. No typing.
 
-That loads [`examples/orders.md`](../examples/orders.md), a small e-commerce
-system described the way the extractor expects. The run takes roughly 40 seconds
-and streams each node as it finishes — extraction, six parallel category agents,
-then the grounding critic. When it completes you get the full report.
+The form lists every framework this install carries, with all of them ticked. A
+framework that needs a job option gets a control beside it: ASVS carries a level
+select, because ASVS 5.0 tells your organization to choose the level. Untick what
+you do not want, because each framework you leave ticked costs its own nodes.
+
+**Load example** loads [`examples/orders.md`](../examples/orders.md), a small
+e-commerce system described the way the extractor expects. A STRIDE run takes
+roughly 40 seconds, and each further framework adds its own lane nodes. The page
+streams each node as it finishes — extraction first, then each framework's lanes
+and critic. When it completes you get one report, with a block per framework you
+selected.
 
 What to look at first:
 
