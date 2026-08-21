@@ -143,8 +143,10 @@ def _promote_setup(tmp_path):
 def test_promote_reprints_values_in_place_and_writes_the_manifest(tmp_path):
     sampling_copy, manifest_copy = _promote_setup(tmp_path)
     winner = load_sampling(SAMPLING_PATH)
-    hot_base = winner.for_tier("base").model_copy(update={"temperature": 0.2})
-    winner = winner.model_copy(update={"tiers": {**winner.tiers, "base": hot_base}})
+    # A param the file pins, since those are the only ones promotion may
+    # rewrite: an unset one raises rather than being quietly uncommented.
+    roomier = winner.for_tier("base").model_copy(update={"max_output_tokens": 12288})
+    winner = winner.model_copy(update={"tiers": {**winner.tiers, "base": roomier}})
 
     manifest = promote(
         winner,
@@ -154,15 +156,43 @@ def test_promote_reprints_values_in_place_and_writes_the_manifest(tmp_path):
     )
 
     rewritten = sampling_copy.read_text(encoding="utf-8")
-    assert "temperature = 0.2" in rewritten
-    # Comments survive the in-place edit — the file's whole value is its record.
-    assert "pinned greedy decoding" in rewritten
+    assert "max_output_tokens = 12288" in rewritten
+    # The rewritten line keeps its own comment — the file's whole value is its
+    # record, and the edited line is where losing one would matter most.
+    assert "pinned: silence means a vendor-derived cap" in rewritten
     assert "# top_p" in rewritten  # unset lines untouched
     # The manifest reloads and its fingerprints are single-sourced from `winner`.
     reloaded = load_manifest(manifest_copy)
     assert reloaded.blessed_for("base") == manifest.blessed_for("base")
     assert reloaded.blessed_for("base")
     assert reloaded.blessed_for("strong")
+
+
+def test_promoting_a_param_the_file_leaves_unset_raises(tmp_path):
+    """The workflow a temperature sweep now lands on.
+
+    ``temperature`` is unset in the shipped file, so a sweep that measured one
+    is asking to *pin* a param rather than to re-pin it. That owes a rationale
+    in the file, which a sweep cannot write, so promotion stops and says so
+    instead of uncommenting the line.
+    """
+    sampling_copy, manifest_copy = _promote_setup(tmp_path)
+    winner = load_sampling(SAMPLING_PATH)
+    hot = winner.for_tier("strong").model_copy(update={"temperature": 0.7})
+    winner = winner.model_copy(update={"tiers": {**winner.tiers, "strong": hot}})
+    before = sampling_copy.read_text(encoding="utf-8")
+
+    with pytest.raises(CertificationError, match="tiers.strong.temperature"):
+        promote(
+            winner,
+            {"base": "build-001", "strong": "build-001"},
+            sampling_path=sampling_copy,
+            manifest_path=manifest_copy,
+        )
+
+    # Nothing written on either path: a refused promotion is not a partial one.
+    assert sampling_copy.read_text(encoding="utf-8") == before
+    assert not manifest_copy.exists()
 
 
 def test_promoting_one_tier_leaves_the_other_unblessed(tmp_path):

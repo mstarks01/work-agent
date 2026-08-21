@@ -83,13 +83,14 @@ model = "claude-opus-4-6"
 export STRIDE_ANTHROPIC_API_KEY=sk-ant-...   # the full key, not a prefix
 ```
 
-**Claude 4.6 is the only generation that binds here, and it is worth knowing
-why before you reach for a newer one.** This service floors at 4.6, and Anthropic
-removed `temperature` from 4.7 onward while `config/sampling.toml` pins it at
-`0.0` — so a floor and a ceiling meet on a single generation. A tier naming
-`claude-opus-5` is refused at startup, by name, rather than failing on the first
-node of a paid-for job. Moving to a newer Claude means unsetting that tier's
-`temperature` first, which re-baselines its sampling fingerprint.
+**Any Claude generation binds here.** Name the pinned identifier — the
+dateless `claude-<name>-<major>[-<minor>]` form, such as `claude-opus-5` — and
+this service runs it. Two things still stop a startup, and both are about a
+parameter rather than a generation: a tier that states a `temperature` cannot
+run Claude 4.7 or later, which rejects the parameter outright, and a model whose
+provider cannot constrain output to a schema natively is refused because every
+node here binds one. Both are refused at startup, by name, rather than failing
+on the first node of a paid-for job.
 
 ### OpenAI
 
@@ -111,8 +112,9 @@ export STRIDE_OPENAI_API_KEY=sk-...          # the full key, not a prefix
 
 `gpt-4o` publishes an output ceiling of exactly 16,384 tokens, which is what the
 `base` tier asks for and why it cannot serve `strong` — that tier asks for
-64,000. An o-series model cannot serve either tier: they constrain `temperature`
-to exactly `1`, and the shipped sampling pins `0.0`.
+64,000. An o-series model serves `temperature` only at exactly `1`, so it runs
+here on the shipped sampling, which states none, and is refused at startup if
+you state any other value.
 
 ### Vertex
 

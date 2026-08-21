@@ -62,10 +62,13 @@ class Capability(StrEnum):
 # name, because some of these constraints are on the **value** rather than the
 # parameter: o-series ``temperature`` must be exactly ``1``, so "does this model
 # support temperature" has no vendor-neutral answer and only "would this model
-# accept temperature=0.0" does. The values are this service's own — greedy
-# decoding, one candidate, the uniform reasoning surface — so a cell reads as
-# *this deployment could ask for that*, which is the only reading a conformance
-# matrix can act on.
+# accept temperature=0.0" does. The values are ones this deployment may ask for
+# — the offered sampling surface, at a representative value per param — so a
+# cell reads as *this deployment could ask for that*, which is the only reading
+# a conformance matrix can act on. Representative rather than shipped, and that
+# distinction is the point: `temperature`, `top_p` and `seed` are all unset in
+# `config/sampling.toml`, so a matrix keyed on the shipped values would report
+# nothing about the params an operator is most likely to reach for.
 #
 # ``max_output_tokens`` is deliberately absent: every vendor accepts the
 # parameter and only the serving model objects to the value, so it is reported

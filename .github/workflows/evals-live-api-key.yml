@@ -110,16 +110,13 @@ jobs:
           # Both pairs were chosen against the build-time gates rather than for
           # capability, and each pin is load-bearing:
           #
-          #   * Anthropic is pinned to Claude 4.6 exactly, and there is no
-          #     choice about that. The service floors at 4.6 ("this service
-          #     supports 4.6 and later" -- model_tiers rejects 4.5 and earlier
-          #     outright), while binding.py fails the build when a Claude >= 4.7
-          #     is sent a `temperature`, and config/sampling.toml pins
-          #     `temperature = 0.0` on both tiers. Floor and ceiling meet: 4.6 is
-          #     the only admissible generation. claude-haiku-4-5 fails the floor
-          #     and claude-opus-4-8 fails the ceiling; both were tried. Widening
-          #     this means unsetting temperature for that tier first, and that
-          #     re-baselines the tier's sampling fingerprint.
+          #   * Anthropic is pinned to Claude 4.6 because that is the pair this
+          #     project has profiled, not because the service refuses a newer
+          #     one. No generation is refused: the shipped sampling states no
+          #     `temperature`, so the rule that fails a build on Claude >= 4.7
+          #     has nothing to fire on. Changing this pin is a re-baseline
+          #     decision about which models the corpus numbers describe, and a
+          #     sweep on a different generation is a different baseline.
           #   * Both models must clear their tier's pinned `max_output_tokens`
           #     (16,384 base / 64,000 strong) and support native structured
           #     output, since every LLM node binds an output schema and an

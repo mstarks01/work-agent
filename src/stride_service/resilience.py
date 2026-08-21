@@ -42,9 +42,8 @@ permits, and it would let the service blame one source for a budget the whole
 submission overspent.
 
 Unlike :mod:`stride_service.sampling`, every value here **is** env-overridable.
-The split that settles it: sampling is pinned because temperature changes *what*
-the model produces, so an eval-only value is how a suite goes green while
-production drifts. Nothing in this file can move an eval score — attempts and
+The split that settles it: sampling decides *what* the model produces, so an
+eval-only value there is how a suite goes green while production drifts. Nothing in this file can move an eval score — attempts and
 timeout change only *how hard we try*, and the input bounds decide only whether
 a submission is accepted at all, never which answer it gets — so these are
 exactly the knobs to turn down mid-incident without a redeploy.

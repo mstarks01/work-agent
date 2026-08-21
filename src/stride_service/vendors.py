@@ -40,8 +40,9 @@ VENDOR_NAMES: tuple[VendorName, ...] = ("vertex", "anthropic", "openai")
 # The one reasoning knob, uniform across vendors: LiteLLM maps it to adaptive
 # ``thinking`` plus ``output_config.effort`` on Anthropic (identically via
 # Vertex), to ``thinkingConfig`` on Gemini, and passes it through on OpenAI
-# o-series. Anthropic's half was ``budget_tokens`` before Claude 4.6, which is
-# the generation this service now floors at — see :data:`MINIMUM_CLAUDE_GENERATION`.
+# o-series. Anthropic's half was ``budget_tokens`` before Claude 4.6 and
+# ``output_config.effort`` from 4.6 on; LiteLLM reads the model string and picks
+# the half, so this service names the knob once and runs either generation.
 REASONING_KWARG = "reasoning_effort"
 
 _API_KEY_TEMPLATE = "STRIDE_{vendor}_API_KEY"
@@ -87,15 +88,17 @@ class _FormRule:
     vendor documents one — Claude's dateless ``claude-{name}-{major}[-{minor}]``.
     Where a family's most specific stable identifier is the bare name (Gemini 2.5
     and later ship no numbered builds), ``pinned`` is ``None`` and only the
-    denylist applies. ``minimum_generation`` is the oldest ``(major, minor)`` this
-    service will run; it is meaningful only for the Claude rule, whose pattern is
-    the one that carries the version.
+    denylist applies.
+
+    **A rule constrains an identifier's shape, never its version.** This service
+    runs any generation a vendor serves. The one place a version is read is
+    :func:`~stride_service.binding.check_temperature`, and what it decides there
+    is whether a *sampling param* may be sent, not whether the model may run.
     """
 
     family: str
     pinned: re.Pattern[str] | None
     hint: str
-    minimum_generation: tuple[int, int] | None = None
 
 
 # Floating forms, rejected for every vendor and family. This half stays an
@@ -118,13 +121,12 @@ _PRE_GA_MARKERS = ("-preview", "-exp")
 # Matching a shape rather than enumerating builds is what keeps this from
 # repeating the retired-allowlist failure: a Claude model released tomorrow
 # already satisfies it.
+#
+# The pattern still rejects a dated pre-4.6 identifier such as
+# ``claude-3-5-sonnet-20241022``, and that rejection is about its *shape* rather
+# than its age: in that era the bare name was itself a floating alias, so the
+# dated form cannot be told apart from the aliases this rule exists to reject.
 _CLAUDE_ID = re.compile(r"claude-[a-z]+-(?P<major>\d+)(?:-(?P<minor>\d+))?")
-
-# The oldest Claude generation this service runs. 4.6 is a deliberate floor and
-# also the exact point where the identifier became self-describing, so the
-# pattern that pins is the same one that reads the generation. Everything below
-# it is rejected as a generation rather than as a typo.
-MINIMUM_CLAUDE_GENERATION = (4, 6)
 
 _CLAUDE_RULE = _FormRule(
     family="claude-",
@@ -133,7 +135,6 @@ _CLAUDE_RULE = _FormRule(
         "a Claude model ID is 'claude-<name>-<major>[-<minor>]',"
         " e.g. 'claude-opus-5' or 'claude-sonnet-4-6'"
     ),
-    minimum_generation=MINIMUM_CLAUDE_GENERATION,
 )
 
 # Gemini on Vertex, and every OpenAI model: no canonical form to require, so
@@ -154,10 +155,11 @@ def claude_generation(model: str) -> tuple[int, int] | None:
     A major-version release omits the minor segment (``claude-opus-5``), so an
     absent group reads as ``.0`` rather than as a parse failure.
 
-    Public because two callers need it, and neither can key on the *vendor*:
-    this module's own floor check, and the build-time sampling rule in
-    :mod:`stride_service.binding`, which has to know which Claude generation it
-    is binding whether that Claude arrives direct or via Vertex.
+    Public because its one caller cannot key on the *vendor*: the build-time
+    sampling rule in :mod:`stride_service.binding` has to know which Claude
+    generation it is binding, whether that Claude arrives direct or via Vertex.
+    A generation decides which params a model accepts, never whether this
+    service will run it.
     """
     match = _CLAUDE_ID.fullmatch(model)
     if match is None:
@@ -194,18 +196,6 @@ def openai_reasoning_model(model: str) -> bool:
     return match is not None and int(match["major"]) >= _REASONING_FROM_GPT_MAJOR
 
 
-def _check_generation(model: str, minimum: tuple[int, int], source: str) -> None:
-    """Reject an identifier older than the minimum supported generation."""
-    generation = claude_generation(model)
-    if generation is not None and generation < minimum:
-        found = ".".join(str(part) for part in generation)
-        wanted = ".".join(str(part) for part in minimum)
-        raise ValueError(
-            f"{source}: {model!r} is generation {found};"
-            f" this service supports {wanted} and later"
-        )
-
-
 @dataclass(frozen=True)
 class Vendor:
     """One provider's registry entry."""
@@ -240,7 +230,10 @@ class Vendor:
         return f"{self.prefix}{model}"
 
     def validate_model(self, model: str, source: str) -> str:
-        """Reject a floating or unsupported identifier; return the pinned one.
+        """Reject a floating identifier; return the pinned one.
+
+        A **shape** check only: no generation is too old to name here, so a
+        build a vendor still serves is one this service will still run.
 
         ``source`` names where the string came from (a config key or an env var)
         so the error points ops at the knob to turn.
@@ -259,11 +252,8 @@ class Vendor:
                 " use the pinned model identifier"
             )
         rule = self._rule_for(model)
-        if rule.pinned is not None:
-            if rule.pinned.fullmatch(model) is None:
-                raise ValueError(f"{source}: {model!r} is not pinned — {rule.hint}")
-            if rule.minimum_generation is not None:
-                _check_generation(model, rule.minimum_generation, source)
+        if rule.pinned is not None and rule.pinned.fullmatch(model) is None:
+            raise ValueError(f"{source}: {model!r} is not pinned — {rule.hint}")
         return model
 
     def _rule_for(self, model: str) -> _FormRule:

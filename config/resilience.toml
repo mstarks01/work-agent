@@ -11,8 +11,7 @@
 # (STRIDE_RETRY_ATTEMPTS, STRIDE_TIMEOUT_MS, STRIDE_MAX_SOURCE_BYTES,
 # STRIDE_MAX_SOURCES, STRIDE_JOB_DEADLINE_MS, STRIDE_RETRY_BUDGET_RATIO,
 # STRIDE_MAX_ACTIVE_JOBS).
-# Sampling is pinned because temperature changes WHAT the model produces;
-# nothing in this file can. Attempts, timeout and the budget change only HOW
+# Sampling decides WHAT the model produces; nothing in this file can. Attempts, timeout and the budget change only HOW
 # HARD we try; the input bounds and the concurrency ceiling decide only whether
 # a submission is accepted at all, and the deadline only whether an answer
 # arrives in time — never which answer it is. So none of these can move an eval

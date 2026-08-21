@@ -294,16 +294,22 @@ class TestPinValidation:
             with pytest.raises(ModelConfigError, match="not pinned"):
                 validate_model_string(value, vendor, source="t")
 
-    def test_a_claude_below_the_floor_is_rejected_as_a_generation(self):
-        # Well-formed, just too old: the message names the generation it read.
-        with pytest.raises(ModelConfigError, match="supports 4.6 and later"):
+    def test_an_older_generation_in_the_pinned_form_is_accepted(self):
+        # Well-formed and older than the generation this service once floored
+        # at. The rule reads the identifier's shape, never its version, so
+        # which model is worth running stays the deployment's call.
+        assert (
             validate_model_string("claude-haiku-4-5", "anthropic", source="t")
+            == "claude-haiku-4-5"
+        )
 
     def test_the_vertex_rule_branches_on_model_family(self):
-        # One vendor entry, two families: vertex_ai/ is not one provider.
+        # One vendor entry, two families: vertex_ai/ is not one provider. The
+        # dated Claude is the case that proves the branch — under the
+        # catch-all it would pass, since it is neither an alias nor pre-GA.
         assert validate_model_string("gemini-2.5-pro", "vertex", source="t")
-        with pytest.raises(ModelConfigError):
-            validate_model_string("claude-sonnet-4-5", "vertex", source="t")
+        with pytest.raises(ModelConfigError, match="not pinned"):
+            validate_model_string("claude-sonnet-4-5-20250929", "vertex", source="t")
 
     def test_openai_has_no_canonical_form_to_require(self):
         # The o-series ships none at all, so only the shared denylist applies.

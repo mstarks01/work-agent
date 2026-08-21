@@ -531,11 +531,13 @@ class TestPromoteCommand:
     ):
         """The values promoted are the ones measured, not the file's current ones."""
         sampling_copy, _ = promotion_env
+        # A param the file pins: promotion re-pins those, and refuses to pin one
+        # the file deliberately leaves unset.
         measured = load_sampling(
-            SAMPLING_PATH, env={"STRIDE_SAMPLING_BASE_TEMPERATURE": "0.4"}
+            SAMPLING_PATH, env={"STRIDE_SAMPLING_BASE_MAX_OUTPUT_TOKENS": "12288"}
         )
         artifact = write_artifact(tmp_path, provenance(measured))
 
         assert main(["promote", str(artifact), "--yes"]) == 0
 
-        assert "temperature = 0.4" in sampling_copy.read_text(encoding="utf-8")
+        assert "max_output_tokens = 12288" in sampling_copy.read_text(encoding="utf-8")

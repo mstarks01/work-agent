@@ -65,17 +65,25 @@
 # `constrain_output = false` is for, per tier. It is not derived from the vendor
 # because it is not a fact about the vendor.
 #
-# WHAT THE GATE CANNOT CHECK, AND THE ONE RULE THAT COVERS IT: litellm answers
+# TEMPERATURE IS UNSET ON BOTH TIERS, so each tier decodes at its model's own
+# default. It is offered rather than pinned: a deployment that wants a stated
+# value sets one here or by env var, and the gates below then apply to it.
+#
+# WHY IT IS NOT PINNED: a pinned value has to be legal on every model an
+# operator may select, and no value is. Anthropic removed `temperature` from
+# CLAUDE 4.7 ONWARD, so those generations reject any value at all, while
+# OpenAI's reasoning families serve it only at their own default of 1. A file
+# pinning 0.0 therefore chose which models this service could run, which is a
+# choice that belongs to the deployment.
+#
+# WHAT THE GATE CANNOT CHECK, AND THE TWO RULES THAT COVER IT: litellm answers
 # from the model data in the installed copy, so a model released after that copy
 # is unknown to it and falls back to the provider's base config, where anything
-# generally accepted passes. Anthropic removed `temperature` from CLAUDE 4.7
-# ONWARD — only the model's own default is accepted — so a tier naming a Claude
-# newer than the pin would pass the gate carrying the pinned 0.0 below and die
-# on node one. binding.py adds a generation floor for exactly that case: Claude
-# >= 4.7 with temperature set fails the build. UNSET THE TEMPERATURE LINE for
-# any tier running one. It keys on the model, not the vendor (Vertex-hosted
-# Claude is the same model), and the floor is 4.7 rather than 4.6, which still
-# accepts the param.
+# generally accepted passes. binding.py adds two model-keyed rules for exactly
+# that case, and both are inert while temperature is unset: a tier that SETS a
+# temperature fails the build on a Claude >= 4.7, and on an OpenAI reasoning
+# family at any value but 1. Each keys on the model, not the vendor, because
+# Vertex-hosted Claude is the same model under the same removal.
 #
 # `constrain_output = false` IS NOT A WORKING ANSWER to a schema the provider
 # will not compile, despite reading like one. Measured live against Claude
@@ -145,13 +153,17 @@ version = 4
 # been observed to truncate.
 
 [tiers.base]
-temperature = 0.0        # pinned greedy decoding; the model's own default is 1.0.
-                         # Unset this line if this tier runs Claude >= 4.7.
 max_output_tokens = 16384 # pinned: silence means a vendor-derived cap (see above)
 candidate_count = 1      # reserved Self-MoA lever; loader rejects != 1
 constrain_output = true  # send this tier's node schema to the provider.
                          # Leave it true: setting it false is not currently a
                          # working configuration -- see the note above.
+# temperature       unset -> the model's own default. Set a value to state one;
+#                   a tier that does cannot then run Claude >= 4.7, which
+#                   rejects the param, and an OpenAI reasoning family accepts
+#                   only 1. Greedy decoding narrows variation; it never bought
+#                   reproducibility, which rests on the served build read back
+#                   from every response.
 # top_p             unset -> model default; no published per-tier constant
 # seed              unset -> no numeric default; buys consistency, not
 #                   reproducibility, and is unavailable on Anthropic at all
@@ -161,13 +173,17 @@ constrain_output = true  # send this tier's node schema to the provider.
 #                   "high"; the wire value each becomes is the vendor's business
 
 [tiers.strong]
-temperature = 0.0        # pinned greedy decoding; the model's own default is 1.0.
-                         # Unset this line if this tier runs Claude >= 4.7.
 max_output_tokens = 64000 # pinned: silence means a vendor-derived cap (see above)
 candidate_count = 1      # reserved Self-MoA lever; loader rejects != 1
 constrain_output = true  # send this tier's node schema to the provider.
                          # Leave it true: setting it false is not currently a
                          # working configuration -- see the note above.
+# temperature       unset -> the model's own default. Set a value to state one;
+#                   a tier that does cannot then run Claude >= 4.7, which
+#                   rejects the param, and an OpenAI reasoning family accepts
+#                   only 1. Greedy decoding narrows variation; it never bought
+#                   reproducibility, which rests on the served build read back
+#                   from every response.
 # top_p             unset -> model default; no published per-tier constant
 # seed              unset -> no numeric default; buys consistency, not
 #                   reproducibility, and is unavailable on Anthropic at all

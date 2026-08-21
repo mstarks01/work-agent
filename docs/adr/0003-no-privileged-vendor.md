@@ -96,9 +96,11 @@ as though it closed that gap.
 
 It caught a defect on its first run. `docs/First-Run.md` and
 `docs/Configuration.md` both recommended `claude-opus-5` on the `strong` tier;
-under the shipped `config/sampling.toml` that pair is refused at startup by two
-independent gates — Claude 4.7+ no longer accepts `temperature`, and the model
-would get *emulated* rather than native schema constraint. The documented
+under the `config/sampling.toml` shipped at the time, that pair was refused at
+startup by two independent gates — Claude 4.7+ does not accept `temperature`,
+which that file then pinned, and the model would get *emulated* rather than
+native schema constraint. The sampling file no longer pins a temperature, so
+the first gate is now inert by default and the second still refuses the pair. The documented
 first-run configuration for one of three vendors could not start the service.
 `.github/workflows/evals-live-api-key.yml` had the constraint right, in a comment,
 which is precisely the kind of knowledge a suite exists to hold instead.
