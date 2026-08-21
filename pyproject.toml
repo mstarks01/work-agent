@@ -15,7 +15,17 @@ dependencies = [
     # gate, and it is not a documented public API, so a version bump must
     # re-run the probe in tests/test_model_gate.py rather than be taken as a
     # routine dependency update.
-    "litellm==1.93.0",
+    #
+    # 1.97.0 over 1.93.0 for what it does with `response_format` on Anthropic.
+    # 1.93.0 chose the native path from a hardcoded set of model-name
+    # substrings, so every model released after that copy fell to the emulated
+    # path and was refused by binding.py's schema gate. 1.97.0 reads a model-map
+    # capability flag instead, which is why `claude-opus-5` is selectable at all.
+    # The flag is not a promise: its own lookup still answers "unknown" for
+    # `claude-sonnet-5` while the map says otherwise, so that model is refused —
+    # the gate asks for the mapped params rather than reading the flag, and so
+    # sees what the request would actually carry.
+    "litellm==1.97.0",
     "pydantic>=2.7",
     "pyjwt[crypto]>=2.9",
 ]

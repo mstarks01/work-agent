@@ -96,7 +96,7 @@ version = 5
 # detailed, and every one of them is a real pair the offline conformance suite
 # profiles (src/stride_service/conformance.py):
 #
-#   anthropic   base "claude-sonnet-4-6"     strong "claude-opus-4-6"
+#   anthropic   base "claude-sonnet-4-6"     strong "claude-opus-5"
 #   openai      base "gpt-4o"                strong "gpt-5.6"
 #   vertex      base "gemini-2.5-flash"      strong "gemini-2.5-pro"
 #
