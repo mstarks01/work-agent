@@ -8,9 +8,11 @@ unless this repo writes it.
 
 **Every rule is a presence test.** The #160 research derived 16 predicates across
 the 70 level 1 requirements, and all 16 ask whether the application *has* a thing
-— a browser frontend, cookies, a database, OAuth, a file upload, a session. Not
-one reads an element type, a trust zone, a boundary crossing or a count. That is
-the sharpest contrast with STRIDE's 11 rules, which read exactly those things.
+— a browser frontend, cookies, a database, OAuth, a file upload, a session. Six
+more were added afterwards to reach the six chapters that had none, and they ask
+the same shape of question. Not one reads an element type, a trust zone, a
+boundary crossing or a count. That is the sharpest contrast with STRIDE's 11
+rules, which read exactly those things.
 
 **Each rule reads free text by string match**, because no attribute in the
 **System Model** is a closed enum an ASVS predicate can test. #162 ruled that
@@ -20,6 +22,18 @@ A **Candidate** is a lead rather than a gate: a lane agent still analyses its
 chapter when no rule fires. Rules are authored for the level 1 requirements
 first, so a requirement at level 2 or 3 with no rule reaches its lane agent
 without a candidate, which is a weaker lead and not an absent one.
+
+**Every lane carries at least one rule, and that is load-bearing beyond the
+lead.** Retrieval is keyed by *fired rule*, so a lane with no rule received no
+reference note and no worked case either, whatever the knowledge tables held.
+The six chapters that had no rule were therefore the six the corpus could not
+reach.
+
+**A term is chosen against what a submitter writes, and checked for what it
+also matches.** #189 found the OAuth terms were product names where submitters
+write "SSO". The opposite failure is as easy: bare ``log`` matches ``login``,
+bare ``audit`` matches a food safety audit, and bare ``build`` matches building
+a weekly rota. Where a single word is ambiguous the term here is the phrase.
 
 **A term table rather than 17 functions.** STRIDE writes one function per rule
 because each reads a different structure. Every rule here runs one matcher over
@@ -115,10 +129,11 @@ def _rule_of(test: PresenceTest) -> Rule:
     )
 
 
-# The 16 predicates the #160 research derived, as 17 rules. ``tech:browser
-# frontend`` appears twice because it leads requirements in two chapters, and a
-# rule belongs to exactly one lane; the two carry the same terms and put a
-# different question.
+# 23 rules over 17 lanes. The first 17 are the #160 research's 16 predicates —
+# ``tech:browser frontend`` appears twice because it leads requirements in two
+# chapters, and a rule belongs to exactly one lane, so the two carry the same
+# terms and put a different question. The last six close the chapters that had
+# no rule, and so no retrieval either.
 PRESENCE_TESTS: tuple[PresenceTest, ...] = (
     PresenceTest(
         predicate="database",
@@ -383,6 +398,139 @@ PRESENCE_TESTS: tuple[PresenceTest, ...] = (
             "react",
             "angular",
             "vue",
+        ),
+    ),
+    PresenceTest(
+        predicate="privileged-role",
+        lane="authorization",
+        question=(
+            "This system distinguishes one kind of caller from another. What"
+            " decides which functions and which records each may reach?"
+        ),
+        terms=(
+            "admin",
+            "administrator",
+            "role",
+            "permission",
+            "rbac",
+            "entitlement",
+            "tenant",
+            "privileged",
+            "moderator",
+            "back-office",
+            "superuser",
+        ),
+    ),
+    PresenceTest(
+        predicate="transport",
+        lane="secure-communication",
+        question=(
+            "This system speaks over a network. What protects the channel, and"
+            " which party's certificate is verified?"
+        ),
+        # The wire attributes and nothing else, on the rule this table already
+        # states: a process *named* "tls terminator" is not a flow that speaks
+        # TLS. Reading the free text here would fire on every mention of a
+        # certificate as a business document -- the corpus carries insurance
+        # certificates -- and the chapter is about the channel.
+        terms=("http", "tls", "ssl", "mtls", "certificate", "wss"),
+        attributes=("protocol", "encryption_in_transit"),
+    ),
+    PresenceTest(
+        predicate="secret-material",
+        lane="configuration",
+        question=(
+            "This system holds configuration or a secret. Where does it live,"
+            " who can read it, and how is it rotated?"
+        ),
+        # Not bare "config" or "deploy". Both are ordinary English in a system
+        # description -- the corpus has a "deployed sensor" and "device
+        # configuration and diagnostics" -- and neither is this chapter's
+        # subject. The terms below name the thing itself.
+        terms=(
+            "secret",
+            "credential",
+            "environment variable",
+            "env var",
+            "vault",
+            "feature flag",
+            "api key",
+            "access key",
+            "iam role",
+            "service account",
+            "application config",
+        ),
+    ),
+    PresenceTest(
+        predicate="third-party-component",
+        lane="secure-coding-and-architecture",
+        question=(
+            "This system runs code or trusts a component it did not author."
+            " What fixes the version, and what checks it before it runs?"
+        ),
+        # Not bare "build": the corpus "builds the weekly rota for a store",
+        # which is a business verb and not a release pipeline.
+        terms=(
+            "dependency",
+            "dependencies",
+            "lockfile",
+            "package registry",
+            "container image",
+            "third-party",
+            "third party",
+            "open source",
+            "sbom",
+            "artifact",
+            "ci/cd",
+            "build pipeline",
+            "npm",
+            "pypi",
+            "maven",
+        ),
+    ),
+    PresenceTest(
+        predicate="log-or-audit-trail",
+        lane="security-logging-and-error-handling",
+        question=(
+            "This system records what happened. What reaches the log, what is"
+            " kept out of it, and who is alerted?"
+        ),
+        # Not bare "log", which is a substring of "login", and not bare "audit",
+        # which the corpus uses for food safety audits.
+        terms=(
+            "logging",
+            "logs",
+            "log file",
+            "log record",
+            "audit log",
+            "audit trail",
+            "siem",
+            "alerting",
+            "telemetry",
+            "stack trace",
+            "error handling",
+        ),
+    ),
+    PresenceTest(
+        predicate="real-time-media",
+        lane="webrtc",
+        question=(
+            "This system carries real-time media or a peer connection. What"
+            " authenticates the signalling, and what encrypts the media?"
+        ),
+        # Multi-word on purpose. "turn" and "stun" are ordinary words; the
+        # server roles they name are not.
+        terms=(
+            "webrtc",
+            "stun server",
+            "turn server",
+            "sdp",
+            "peer connection",
+            "peer-to-peer",
+            "video call",
+            "voice call",
+            "screen share",
+            "data channel",
         ),
     ),
 )
