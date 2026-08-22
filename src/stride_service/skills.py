@@ -33,7 +33,8 @@ asking a model to disregard it is worse than not sending it. The lint over
 Loading itself lives in :mod:`stride_service.markdown_loader`, shared with
 prompt loading. The fixed section headings are checked by the package gate
 (:func:`~stride_service.frameworks.validate_package`) because the code reads
-them; the token caps stay CI lints, because a cap is a budget.
+them; the token caps stay CI lints, because a cap is a drift alarm rather
+than a thing the service reads. They live in :mod:`stride_service.token_caps`.
 """
 
 from __future__ import annotations
@@ -54,10 +55,7 @@ from stride_service.markdown_loader import (
 )
 
 __all__ = [
-    "DOMAIN_PACK_TOKEN_CAP",
     "LANE_SECTION_HEADINGS",
-    "LANE_SKILL_TOKEN_CAP",
-    "SEVERITY_RUBRIC_TOKEN_CAP",
     "compose_critic_skills",
     "compose_domain_skills",
     "compose_lane_skills",
@@ -67,22 +65,6 @@ __all__ = [
     "lane_skill_doc",
     "split_sections",
 ]
-
-# Token caps per skill kind, checked in CI by the lint tests.
-#
-# Raised from 3000 for the second framework package, and the reason is what a
-# lane skill *is* under each. A STRIDE lane states a method — six of them sit
-# near 1000 tokens and the old cap never bound them. An ASVS lane states a
-# chapter of a published standard, and the requirements of that chapter are its
-# subject rather than an illustration of it: the authentication chapter carries
-# 47 of them and reaches ~3200. Holding the old number would mean cutting
-# published requirement text out of the one place an agent can read it.
-#
-# Still a budget rather than an entitlement: 3500 leaves the largest chapter
-# ~250 tokens of room, which is an ordinary edit and not a fourth exemplar.
-LANE_SKILL_TOKEN_CAP = 3500
-SEVERITY_RUBRIC_TOKEN_CAP = 1000
-DOMAIN_PACK_TOKEN_CAP = 2000
 
 
 def lane_skill_doc(lane: str) -> str:
