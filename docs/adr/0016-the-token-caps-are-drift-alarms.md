@@ -144,6 +144,21 @@ reads prompt size, so a raise that improves findings and a deletion that costs
 findings look alike to the sweep. Until an instrument measures it, a cap states
 how far the text has moved and claims nothing about how well it works.
 
+> **The instrument now exists** — `evals/harness/instruction.py`, added by
+> [#278](https://github.com/mstarks01/work-agent/issues/278). It records each
+> node's built instruction size and digest beside the scores in the same
+> artifact, so two sweeps either side of a cap raise answer *which node moved,
+> by how much, and what the numbers did*. Reading a trend out of that still
+> needs sweeps on both sides; the reading is now possible, which it was not.
+>
+> **It also settled the envelope's last claim by measuring it.** The comments
+> this ADR retired put the worst composed lane instruction at "~7.4K against a
+> 6-8K envelope". The built number is **8,338 tokens** — `analyze_stride_repudiation`
+> — and every one of STRIDE's six lane agents is above 7,900. The comments were
+> adding a "~2.2K skill text" figure that stopped being true when the rubric and
+> the lane skills grew. So the envelope was not merely circular: nothing had
+> been inside it for some time, and no reading existed that would have said so.
+
 **What was considered and rejected: keeping a hand-argued number per file.** It
 is what produced the comment history above each constant, and that history is
 the most careful writing in the repo. It also produced 28 tokens of room on

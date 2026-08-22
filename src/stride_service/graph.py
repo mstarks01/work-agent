@@ -150,7 +150,7 @@ from stride_service.knowledge import (
     compose_notes,
     select_documents,
 )
-from stride_service.markdown_loader import MarkdownLoader
+from stride_service.markdown_loader import MarkdownLoader, estimate_tokens
 from stride_service.model_tiers import TierName
 from stride_service.prompts import (
     compose_analyze_prompt,
@@ -1852,6 +1852,10 @@ class Pipeline:
     tier_sampling: dict[TierName, TierSampling]
     node_sampling: dict[str, TierSampling]
     instruction_sha256: str
+    #: What each LLM node was told, per node: its size and its own digest. The
+    #: hash above says a prompt edit happened; this says which node moved and by
+    #: how much, which is what a reader comparing two sweeps needs.
+    node_instructions: dict[str, InstructionSize]
     #: The selection this graph was built for, in block order. A driver needs it
     #: to stamp the job's own ``frameworks`` list, and the envelope checks the two
     #: agree — so it rides with the built graph rather than being passed beside it.
@@ -2171,6 +2175,7 @@ def build_pipeline(
             tier_sampling=dict(binding.tier_sampling),
             node_sampling=_node_sampling([extract], resolve_sampling, tier_nodes),
             instruction_sha256=instruction_digest([extract]),
+            node_instructions=instruction_sizes([extract]),
             frameworks=tuple(frameworks),
             tier_nodes=tier_nodes,
         )
@@ -2258,6 +2263,7 @@ def build_pipeline(
         tier_sampling=dict(binding.tier_sampling),
         node_sampling=_node_sampling(llm_nodes, resolve_sampling, tier_nodes),
         instruction_sha256=instruction_digest(llm_nodes),
+        node_instructions=instruction_sizes(llm_nodes),
         frameworks=tuple(frameworks),
         tier_nodes=tier_nodes,
     )
@@ -2307,6 +2313,53 @@ def _assemble_node_func(
 def _model_name(model: str | BaseLlm) -> str:
     """The model string to record, however the node was bound to it."""
     return model if isinstance(model, str) else model.model
+
+
+@dataclass(frozen=True)
+class InstructionSize:
+    """What one LLM node was told, as a size and its own digest.
+
+    The pipeline-wide :func:`instruction_digest` answers *did anything change*.
+    This answers *which node, and by how much* — the two questions a reader
+    comparing two sweeps across a prompt edit actually has, and the second one
+    no hash can answer.
+
+    ``tokens`` uses the same coarse estimator the caps are written in
+    (:func:`~stride_service.markdown_loader.estimate_tokens`), so a number here
+    and a number in ``TOKEN_CAPS`` are in one unit. It is the *composed* node
+    instruction — skills then prompt, placeholders unexpanded — so it is larger
+    than any one file's cap and is not compared against one.
+    """
+
+    tokens: int
+    sha256: str
+
+    def to_json(self) -> dict[str, Any]:
+        return {"tokens": self.tokens, "sha256": self.sha256}
+
+
+def instruction_sizes(llm_nodes: Sequence[LlmAgent]) -> dict[str, InstructionSize]:
+    """Every LLM node's instruction, measured and digested, keyed by node name.
+
+    Folded here, off the same ``llm_nodes`` list :func:`instruction_digest`
+    hashes, so the per-node record and the pipeline-wide hash cannot describe
+    different text. Build time, with the job-varying ``{placeholders}`` still
+    unexpanded, so it carries no submitter bytes for the same reason the digest
+    carries none.
+    """
+    sizes: dict[str, InstructionSize] = {}
+    for node in llm_nodes:
+        if not isinstance(node.instruction, str):
+            # ADK also accepts a callable that composes the instruction per
+            # request. Nothing here builds one, and measuring a node that did
+            # would silently report the size of no text at all, so this refuses
+            # rather than returns a number that means nothing.
+            raise TypeError(f"node {node.name!r} carries a computed instruction")
+        sizes[node.name] = InstructionSize(
+            tokens=estimate_tokens(node.instruction),
+            sha256=hashlib.sha256(node.instruction.encode("utf-8")).hexdigest(),
+        )
+    return sizes
 
 
 def instruction_digest(llm_nodes: Sequence[LlmAgent]) -> str:
