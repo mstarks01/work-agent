@@ -13,8 +13,8 @@ tier map puts ``critic/<framework>`` and ``recritic/<framework>`` both on
 ``strong`` (the tier loader *requires* that pairing), ``extract`` and ``repair``
 both on ``base``, and every one of a framework's lane agents on its single
 ``analyze/<framework>`` key. So a framework's recritic presents a
-*byte-identical* hash to its critic, and its six lane agents present one hash
-between them; per-node keying would call the same hash blessed under one key and
+*byte-identical* hash to its critic, and its lane agents present one hash
+between them however many it declares; per-node keying would call the same hash blessed under one key and
 unblessed under another, reporting the production revise path uncertified on a
 technicality.
 
