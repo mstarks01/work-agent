@@ -41,13 +41,21 @@ allowed. A new one fails until it is declared, which makes the parity rule in
 ``docs/agents/framework-parity.md`` a check rather than a habit for the one part
 of it that is mechanically decidable.
 
-**Test files are out of scope on purpose.** A test naming the package it is
-testing is the ordinary case, and linting them would produce an exemption list
-longer than the thing it protects.
+**Most test files are out of scope on purpose.** A test naming the package it
+is testing is the ordinary case, and linting them all would produce an exemption
+list longer than the thing it protects.
+
+**One kind of test is in scope**, and the second half of this module is where.
+A *lint* asserts a property of shipped text or config, and those properties are
+almost always claims about what an artifact is rather than about which framework
+wrote it. #276 and #280 were both a lint scoped to one package, and both passed
+while checking half the tree. That set is seven files with an empty exemption
+list, so the reasoning above does not reach it.
 """
 
 from __future__ import annotations
 
+import ast
 import re
 from pathlib import Path
 
@@ -309,3 +317,94 @@ def test_no_scorer_names_a_package_this_build_does_not_carry():
     assert not unknown, (
         f"PACKAGE_SCORERS names frameworks this build does not carry: {unknown}"
     )
+
+
+# ---------------------------------------------------------------------------
+# The lints, which the scan above puts out of scope.
+#
+# The module docstring says test files are excluded on purpose, and for tests in
+# general that is right: a test naming the package it tests is the ordinary case.
+# It is not right for one kind of test. A **lint** asserts a property of shipped
+# text or config, and those properties are almost always claims about what an
+# artifact *is* rather than about which framework wrote it — so a lint scoped to
+# one package checks half the tree and reports a smaller, plausible pass.
+#
+# Two bugs made the case. #276: the token-cap lints walked ``frameworks/stride``,
+# so ASVS's 17 lane skills and 17 exemplar files had no token lint at all. #280:
+# twelve exemplar lints parametrized over ``STRIDE_CATEGORIES``, so the same 17
+# exemplar files were checked for nothing else either — no reference resolution,
+# no quote verification, no catalog membership. Neither raised. Both passed.
+#
+# **The signal is an import, not a literal.** Both bugs reached one package
+# through ``from stride_service.frameworks.stride...``, and the literal scan
+# above would have caught only the directory half of the first one. So this asks
+# a different question of a smaller set of files, and asks it of the syntax tree
+# rather than the text, because a docstring naming a framework is prose.
+LINT_MODULES = sorted((REPO_ROOT / "tests").glob("test_*lints*.py"))
+
+#: A lint importing one package's own module, and why that is right.
+#:
+#: **Empty, and that is the finding rather than an accident.** Every rule these
+#: files assert turned out to be a rule about what an artifact is: a skill has
+#: five non-empty sections, an exemplar's quotes verify, a cap alarms on drift.
+#: None of them needed a package's own module once asked.
+#:
+#: An entry here is legitimate when the *rule itself* is one framework's — say,
+#: a check over a field only one package's record declares. Write the reason as
+#: a property of the framework, never as its name, exactly as ``DECLARED`` does.
+DECLARED_LINT_IMPORTS: dict[str, str] = {}
+
+
+def _package_imports(source: Path) -> list[str]:
+    """Every ``stride_service.frameworks.<package>`` module ``source`` imports.
+
+    Parsed rather than grepped. These files argue about frameworks by name in
+    almost every docstring — the reasons #276 and #280 happened are written in
+    them — and a text scan would drown the signal in its own explanation.
+    """
+    tree = ast.parse(source.read_text(encoding="utf-8"))
+    return sorted(
+        {
+            node.module
+            for node in ast.walk(tree)
+            if isinstance(node, ast.ImportFrom) and node.module
+            for name in PACKAGES
+            if node.module.startswith(f"stride_service.frameworks.{name}")
+        }
+    )
+
+
+def test_there_are_lint_modules_to_check():
+    """Guards the guard: a glob that matches nothing agrees with anything."""
+    assert len(LINT_MODULES) >= 5
+
+
+@pytest.mark.parametrize("module", LINT_MODULES, ids=lambda path: path.name)
+def test_a_lint_reads_no_single_packages_module(module):
+    """A lint asserts what an artifact is, so it runs over every package.
+
+    Failing here is not a demand to delete the import. It asks which of two
+    things is true, and both have a home:
+
+    * the rule holds for every package, so parametrize over ``PACKAGES`` and the
+      import goes away — which is what #276 and #280 both turned out to be; or
+    * the rule is genuinely one framework's, so declare it in
+      :data:`DECLARED_LINT_IMPORTS` with the reason stated as a property of the
+      framework rather than as its name.
+    """
+    relative = module.relative_to(REPO_ROOT).as_posix()
+    imports = _package_imports(module)
+
+    assert not imports or relative in DECLARED_LINT_IMPORTS, (
+        f"{relative} imports {imports}, so it checks one package's tree. Either"
+        f" parametrize it over PACKAGES, or declare it in"
+        f" DECLARED_LINT_IMPORTS with the reason."
+    )
+
+
+def test_the_lint_declaration_does_not_rot():
+    """A declaration for a lint that stopped importing a package is stale."""
+    stale = [
+        name for name in DECLARED_LINT_IMPORTS if not _package_imports(REPO_ROOT / name)
+    ]
+    assert not stale, f"declared but no longer package-scoped: {stale}"

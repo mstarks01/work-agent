@@ -20,8 +20,6 @@ import pytest
 
 from stride_service.domains import DETECTORS
 from stride_service.frameworks import LANE_SECTION_HEADINGS, PACKAGES
-from stride_service.frameworks.stride import STRIDE
-from stride_service.frameworks.stride.record import STRIDE_CATEGORIES
 from stride_service.markdown_loader import MarkdownLoader
 from stride_service.skills import (
     estimate_tokens,
@@ -33,7 +31,6 @@ from stride_service.token_caps import TOKEN_CAPS, covered_assets
 
 PROJECT_ROOT = Path(__file__).resolve().parents[1]
 FRAMEWORKS_DIR = PROJECT_ROOT / "frameworks"
-PACKAGE_DIR = FRAMEWORKS_DIR / "stride"
 DOMAINS_DIR = PROJECT_ROOT / "domains"
 
 # Every capped file of every registered package, resolved to its cap's key.
@@ -43,31 +40,58 @@ DOMAINS_DIR = PROJECT_ROOT / "domains"
 # below walked ``frameworks/stride`` alone.
 PACKAGE_ASSETS = sorted(covered_assets(FRAMEWORKS_DIR))
 
+#: One loader per registered package, and every ``(framework, lane)`` pair whose
+#: skill ships. What the lane lints below parametrize over.
+#:
+#: **The same widening #280 made to the exemplar lints.** A lane skill states one
+#: package's subject, but every rule below is a rule about what a *skill* may be —
+#: its section shape, its non-emptiness, what it may tell a model about its own
+#: input — and those hold for every package that ships one.
+PACKAGE_LOADERS = {name: MarkdownLoader(FRAMEWORKS_DIR / name) for name in PACKAGES}
+LANE_SKILLS = [
+    (name, lane) for name, package in PACKAGES.items() for lane in package.lanes
+]
+
 # A domain pack's three fixed H2 sections, in order. Fewer than a lane skill's
 # five because a pack does not define a lane or a rating — it says when it
 # applies, what to ask, and what it may not be used for.
 PACK_SECTION_HEADINGS = ("When this applies", "What to look for", "Guardrails")
 
-package_loader = MarkdownLoader(PACKAGE_DIR)
 domain_loader = MarkdownLoader(DOMAINS_DIR)
 domain_packs = sorted(domain_loader.names())
 
 
-def test_lane_directories_match_the_packages_declared_lanes():
+@pytest.mark.parametrize("framework", sorted(PACKAGES))
+def test_lane_directories_match_the_packages_declared_lanes(framework):
     """The tree and the declaration are one list, in one order."""
-    dirs = sorted(path.name for path in (PACKAGE_DIR / "lanes").iterdir())
-    assert dirs == sorted(STRIDE.lanes) == sorted(STRIDE_CATEGORIES)
+    dirs = sorted(
+        path.name for path in (FRAMEWORKS_DIR / framework / "lanes").iterdir()
+    )
+    assert dirs == sorted(PACKAGES[framework].lanes)
 
 
-@pytest.mark.parametrize("lane", STRIDE_CATEGORIES)
-def test_lane_skill_has_exact_fixed_headings_in_order(lane):
-    sections = split_sections(package_loader.load(lane_skill_doc(lane)))
+@pytest.mark.parametrize("framework,lane", LANE_SKILLS)
+def test_lane_skill_has_exact_fixed_headings_in_order(framework, lane):
+    """Duplicate of the package gate's own check, and kept deliberately.
+
+    :func:`~stride_service.frameworks.validate_package` refuses a package whose
+    lane headings have drifted, so this cannot fail alone. What it buys is that
+    the failure names the lane at collection time rather than at deployment
+    construction, which is where a maintainer editing a skill is looking.
+    """
+    sections = split_sections(PACKAGE_LOADERS[framework].load(lane_skill_doc(lane)))
     assert list(sections) == list(LANE_SECTION_HEADINGS)
 
 
-@pytest.mark.parametrize("lane", STRIDE_CATEGORIES)
-def test_lane_skill_sections_are_nonempty(lane):
-    sections = split_sections(package_loader.load(lane_skill_doc(lane)))
+@pytest.mark.parametrize("framework,lane", LANE_SKILLS)
+def test_lane_skill_sections_are_nonempty(framework, lane):
+    """The half the gate does not reach.
+
+    The gate compares the *headings* and stops. A section with the right
+    heading and no body under it passes every check the deployment runs, and
+    ships a lane whose ``## Mitigations`` tells its agent nothing.
+    """
+    sections = split_sections(PACKAGE_LOADERS[framework].load(lane_skill_doc(lane)))
     empty = [heading for heading, body in sections.items() if not body]
     assert not empty
 
@@ -164,7 +188,14 @@ def test_boundary_digest_assembles_within_cap(name):
 # the whole System Model, and ``## Applicability`` scopes only where a claim may
 # be *filed*. A skill that claims its input was filtered is telling the model
 # something false about what it is looking at.
-@pytest.mark.parametrize("lane", STRIDE_CATEGORIES)
-def test_applicability_does_not_claim_a_filtered_element_view(lane):
-    sections = split_sections(package_loader.load(lane_skill_doc(lane)))
+@pytest.mark.parametrize("framework,lane", LANE_SKILLS)
+def test_applicability_does_not_claim_a_filtered_element_view(framework, lane):
+    """Every package's, because the fact it protects is the graph's.
+
+    That a lane agent receives the whole System Model is a property of how the
+    fan-out is built, not of the framework being fanned out — so a skill making
+    the opposite claim is telling its model something false whichever package
+    wrote it.
+    """
+    sections = split_sections(PACKAGE_LOADERS[framework].load(lane_skill_doc(lane)))
     assert "pre-filter" not in sections["Applicability"].lower()
