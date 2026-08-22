@@ -44,6 +44,7 @@ knowing about.
 import json
 import re
 from pathlib import Path
+from typing import get_args
 
 import pytest
 from pydantic import ValidationError
@@ -56,7 +57,8 @@ from stride_service.evidence import (
     UNKNOWN_PREFIX,
     render_catalog,
 )
-from stride_service.frameworks.stride.record import STRIDE_CATEGORIES, ThreatProposal
+from stride_service.frameworks import PACKAGES, schemas_for
+from stride_service.frameworks.stride.record import STRIDE_CATEGORIES
 from stride_service.grounding import verify_quote
 from stride_service.markdown_loader import MarkdownLoader, split_sections
 from stride_service.prompts import (
@@ -75,13 +77,32 @@ from stride_service.token_caps import (
 )
 
 PROMPTS_DIR = Path(__file__).resolve().parents[1] / "prompts"
+FRAMEWORKS_DIR = Path(__file__).resolve().parents[1] / "frameworks"
 # The exemplars moved with the package that owns them: a worked draft is written
 # in one framework's record shape, so it lives under that framework's root while
 # the body that frames it stays shared (ADR 0011).
-PACKAGE_DIR = Path(__file__).resolve().parents[1] / "frameworks" / "stride"
+PACKAGE_DIR = FRAMEWORKS_DIR / "stride"
 
 loader = MarkdownLoader(PROMPTS_DIR)
 package_loader = MarkdownLoader(PACKAGE_DIR)
+#: One loader per registered package, so an exemplar lint reads whichever
+#: package's text it was parametrized for rather than the one that arrived
+#: first. Built from ``PACKAGES``, so a framework added to the registry is a
+#: framework these lints start running over with no edit here.
+PACKAGE_LOADERS = {name: MarkdownLoader(FRAMEWORKS_DIR / name) for name in PACKAGES}
+
+#: Every ``(framework, lane)`` pair whose exemplar file ships. The parametrize
+#: argument for every lint below that reads a worked draft.
+#:
+#: **This is what #280 was.** These lints ran over ``STRIDE_CATEGORIES`` against
+#: one package's loader, so ASVS's 17 exemplar files — the text 17 lane agents
+#: learn their record's shape from — were checked by none of them. A lint that
+#: names a package is the shape ``docs/agents/framework-parity.md`` exists to
+#: catch, and ``tests/test_framework_neutrality.py`` cannot catch this one
+#: because it puts test files out of scope on purpose.
+EXEMPLAR_LANES = [
+    (name, lane) for name, package in PACKAGES.items() for lane in package.lanes
+]
 
 
 JSON_BLOCK_RE = re.compile(r"^```json\n(.*?)^```", re.MULTILINE | re.DOTALL)
@@ -108,8 +129,9 @@ def json_blocks(text):
     return JSON_BLOCK_RE.findall(text)
 
 
-def exemplar_sections(lane):
-    return split_sections(package_loader.load(lane_exemplars_doc(lane)))
+def exemplar_sections(framework, lane):
+    """One package's worked drafts for one lane, split into its H2 sections."""
+    return split_sections(PACKAGE_LOADERS[framework].load(lane_exemplars_doc(lane)))
 
 
 def exemplar_systems():
@@ -187,23 +209,61 @@ def owning_system(proposal):
     so a draft that reached across the two — citing payments elements while
     quoting the telemetry source — fails here rather than passing a union that
     would let it teach exactly the mixing the prompt forbids.
+
+    **A draft that cites nothing has no owner, and that is a legal shape.** A
+    framework ruling on whether a requirement applies files a claim saying it
+    does not, and there is no element for such a claim to point at — ASVS ships
+    ``V5.2.1 — This system accepts no uploaded file`` with an empty list. The
+    empty set is a subset of both systems, so the assertion below would read
+    "ambiguous" where the truth is "nothing was cited". Callers get ``None`` and
+    skip the resolution checks, which have nothing to resolve.
     """
     cited = set(proposal.affected_element_ids)
+    if not cited:
+        return None
     owners = [
         name for name, body in exemplar_systems().items() if cited <= system_ids(body)
     ]
     assert len(owners) == 1, (
-        f"{proposal.id} cites {sorted(cited)}, which no single exemplar system "
+        f"cites {sorted(cited)}, which no single exemplar system "
         f"covers (matched {owners}) — a draft argues about one system"
     )
     return exemplar_systems()[owners[0]]
 
 
-def exemplar_proposals(category):
-    """Every proposal in one exemplar file, parsed."""
+def system_for_label(label):
+    """The exemplar system whose source block declares ``label``, or ``None``.
+
+    A quote names its source by label, exactly as a real draft's
+    ``source_label`` picks one of the job's sources. Resolving that way rather
+    than through the draft's cited elements is what lets these lints check a
+    draft that cites nothing — a ruling that a requirement does not apply has
+    no element to point at and still rests on the submitter's own words.
+    """
+    for body in exemplar_systems().values():
+        if source_block(body)[0] == label:
+            return body
+    return None
+
+
+def proposal_type(framework):
+    """The record one package's lane agent actually emits a claim as.
+
+    A table lookup through ``schemas_for`` rather than a name, so an exemplar is
+    parsed against its own framework's shape: STRIDE's carries ``sequence`` and
+    ``severity``, ASVS's carries ``requirement``, and parsing either against the
+    other's record is how a worked example of a dead run ships.
+    """
+    claims = schemas_for(framework).proposals.model_fields["claims"]
+    return get_args(claims.annotation)[0]
+
+
+def exemplar_proposals(framework, lane):
+    """Every proposal in one package's exemplar file, parsed as its own record."""
+    record = proposal_type(framework)
     return [
-        ThreatProposal.model_validate(json.loads(block))
-        for body in exemplar_sections(category).values()
+        record.model_validate(json.loads(block))
+        for body in exemplar_sections(framework, lane).values()
         for block in json_blocks(body)
     ]
 
@@ -289,99 +349,140 @@ def test_every_prompt_body_has_a_cap():
     assert keyed == set(PROMPT_BODY_NAMES)
 
 
-def test_exemplar_files_match_stride_categories_exactly():
-    lanes = sorted(path.name for path in (PACKAGE_DIR / "lanes").iterdir())
-    assert lanes == sorted(STRIDE_CATEGORIES)
+@pytest.mark.parametrize("framework", sorted(PACKAGES))
+def test_exemplar_files_match_the_packages_declared_lanes(framework):
+    """The tree and the declaration are one list, for every package."""
+    root = FRAMEWORKS_DIR / framework / "lanes"
+    lanes = sorted(path.name for path in root.iterdir())
+
+    assert lanes == sorted(PACKAGES[framework].lanes)
     for lane in lanes:
-        assert (PACKAGE_DIR / "lanes" / lane / "exemplars.md").is_file()
+        assert (root / lane / "exemplars.md").is_file()
 
 
-@pytest.mark.parametrize("category", STRIDE_CATEGORIES)
-def test_exemplar_file_has_at_least_three_sections(category):
-    assert len(exemplar_sections(category)) >= 3
+@pytest.mark.parametrize("framework,lane", EXEMPLAR_LANES)
+def test_exemplar_file_works_at_least_two_drafts(framework, lane):
+    """A file with one draft teaches a case; two teach a distinction.
+
+    Two rather than three, because three is STRIDE's choice rather than a rule
+    about exemplars: its files work three or more, and ASVS's work two. What no
+    framework can do is ship one, since every one of these files exists to show
+    where a judgement goes one way and where it goes the other.
+    """
+    assert len(exemplar_sections(framework, lane)) >= 2
 
 
-@pytest.mark.parametrize("category", STRIDE_CATEGORIES)
-def test_each_exemplar_section_holds_exactly_one_json_block(category):
+@pytest.mark.parametrize("framework,lane", EXEMPLAR_LANES)
+def test_each_exemplar_section_holds_exactly_one_json_block(framework, lane):
     counts = {
         heading: len(json_blocks(body))
-        for heading, body in exemplar_sections(category).items()
+        for heading, body in exemplar_sections(framework, lane).items()
     }
     assert set(counts.values()) == {1}, counts
 
 
-@pytest.mark.parametrize("category", STRIDE_CATEGORIES)
-def test_every_exemplar_block_parses_as_a_threat_proposal(category):
+@pytest.mark.parametrize("framework,lane", EXEMPLAR_LANES)
+def test_every_exemplar_block_parses_as_its_packages_proposal(framework, lane):
     """The exemplars are parsed against the schema the agent emits, not the one
     the service resolves it into — an exemplar the node's own output schema
     would reject is a worked example of a dead run.
+
+    **Against its own package's record**, resolved through ``schemas_for``. A
+    worked draft is written in one framework's record shape (ADR 0011), so
+    parsing ASVS's against STRIDE's would fail on every file and parsing it
+    against nothing is what shipped until #280.
 
     ``extra="forbid"`` is doing real work here: an exemplar spelling out an
     ``id`` or a ``category`` would be teaching an agent to emit two fields the
     lane already determines, and it fails this parse rather than being read as
     harmless decoration."""
-    for heading, body in exemplar_sections(category).items():
+    record = proposal_type(framework)
+    for heading, body in exemplar_sections(framework, lane).items():
         for block in json_blocks(body):
             try:
-                proposal = ThreatProposal.model_validate(json.loads(block))
+                record.model_validate(json.loads(block))
             except (ValidationError, json.JSONDecodeError) as exc:
-                pytest.fail(f"{category} '## {heading}': {exc}")
-            assert proposal.sequence >= 1
+                pytest.fail(f"{framework} {lane} '## {heading}': {exc}")
 
 
-@pytest.mark.parametrize("category", STRIDE_CATEGORIES)
-def test_exemplar_references_resolve_in_the_exemplar_system(category):
+@pytest.mark.parametrize("framework,lane", EXEMPLAR_LANES)
+def test_exemplar_drafts_are_numbered_from_01_without_gaps(framework, lane):
+    """The numbering rule the prompt states, demonstrated by its own drafts.
+
+    Asserted on ``sequence``, which is what an agent supplies and therefore what
+    it can get wrong. ``numbering_gaps`` asks the same question one seam later,
+    of the composed IDs the service builds out of these numbers.
+
+    **Keyed to the field, not to a framework name.** A package whose claims
+    compose an identity from an action and a place numbers its drafts, and one
+    whose claims name a catalog requirement heads them with that identifier
+    instead — so the rule runs exactly where the record carries ``sequence``,
+    and a package that does not carry it is skipped rather than exempted by
+    name.
+    """
+    if "sequence" not in proposal_type(framework).model_fields:
+        pytest.skip(f"{framework} claims carry no sequence to number")
+    sequences = sorted(p.sequence for p in exemplar_proposals(framework, lane))
+    assert sequences == list(range(1, len(sequences) + 1))
+
+
+@pytest.mark.parametrize("framework,lane", EXEMPLAR_LANES)
+def test_exemplar_references_resolve_in_the_exemplar_system(framework, lane):
     """Every cited element exists, and all of them in the same worked system."""
-    for proposal in exemplar_proposals(category):
-        known_ids = system_ids(owning_system(proposal))
-        unknown = set(proposal.affected_element_ids) - known_ids
-        assert not unknown, f"{proposal.id} cites {sorted(unknown)}"
+    for proposal in exemplar_proposals(framework, lane):
+        system = owning_system(proposal)
+        if system is None:
+            continue
+        unknown = set(proposal.affected_element_ids) - system_ids(system)
+        assert not unknown, f"{framework} {lane} cites {sorted(unknown)}"
 
 
-@pytest.mark.parametrize("category", STRIDE_CATEGORIES)
-def test_exemplar_descriptions_cite_only_ids_the_exemplar_system_has(category):
+@pytest.mark.parametrize("framework,lane", EXEMPLAR_LANES)
+def test_exemplar_descriptions_cite_only_ids_the_exemplar_system_has(framework, lane):
     """The prose half, through the extractor the service marks reports with.
 
     An exemplar naming an element its own worked system does not contain would
     be teaching the very thing ``UnresolvedMention`` exists to catch, in the
-    six prompts that demonstrate what a good description looks like.
+    files that demonstrate what a good description looks like.
     """
-    for proposal in exemplar_proposals(category):
-        known_ids = system_ids(owning_system(proposal))
+    for proposal in exemplar_proposals(framework, lane):
+        system = owning_system(proposal)
+        if system is None:
+            continue
+        known_ids = system_ids(system)
         unknown = [
             mention
             for mention in mentioned_ids(proposal.description)
             if mention not in known_ids
         ]
-        assert not unknown, f"{proposal.id} description cites {sorted(unknown)}"
+        assert not unknown, f"{framework} {lane} description cites {sorted(unknown)}"
 
 
-@pytest.mark.parametrize("category", STRIDE_CATEGORIES)
-def test_exemplar_drafts_carry_a_mitigation_or_the_unknown_that_excuses_one(category):
-    """An exemplar must not model the shape the service marks as incomplete."""
-    for proposal in exemplar_proposals(category):
+@pytest.mark.parametrize("framework,lane", EXEMPLAR_LANES)
+def test_exemplar_drafts_carry_a_mitigation_or_the_unknown_that_excuses_one(
+    framework, lane
+):
+    """An exemplar must not model the shape the service marks as incomplete.
+
+    **Keyed to the field, like the numbering rule.** ``MissingMitigation`` marks
+    a claim that recommends nothing and rests on no unknown, which is a judgement
+    only a record carrying ``mitigations`` can fail. A framework whose claims rule
+    on whether a requirement applies recommends nothing by construction, so it is
+    skipped for carrying no such field rather than exempted by name.
+    """
+    if "mitigations" not in proposal_type(framework).model_fields:
+        pytest.skip(f"{framework} claims carry no mitigations to require")
+    for proposal in exemplar_proposals(framework, lane):
         licensed = any(
             ref.startswith(f"{UNKNOWN_PREFIX}:") for ref in proposal.evidence_refs
         )
         assert proposal.mitigations or licensed, (
-            f"{proposal.id} offers no mitigation and no unknown-attribute evidence"
+            f"{framework} {lane} offers no mitigation and no unknown-attribute evidence"
         )
 
 
-@pytest.mark.parametrize("category", STRIDE_CATEGORIES)
-def test_exemplar_drafts_are_numbered_from_01_without_gaps(category):
-    """The numbering rule the prompt states, demonstrated by its own drafts.
-
-    Asserted on ``sequence``, which is what an agent now supplies and therefore
-    what it can get wrong. ``numbering_gaps`` asks the same question one seam
-    later, of the composed IDs the service builds out of these numbers.
-    """
-    sequences = sorted(p.sequence for p in exemplar_proposals(category))
-    assert sequences == list(range(1, len(sequences) + 1))
-
-
-@pytest.mark.parametrize("category", STRIDE_CATEGORIES)
-def test_exemplar_quotes_verify_against_block(category):
+@pytest.mark.parametrize("framework,lane", EXEMPLAR_LANES)
+def test_exemplar_quotes_verify_against_block(framework, lane):
     """Every exemplar quote is really in the block the prompt shows.
 
     Through the shipped ladder, imported — the exemplars are held to the exact
@@ -390,33 +491,48 @@ def test_exemplar_quotes_verify_against_block(category):
     one thing this whole feature exists to prevent.
     """
     unfindable = [
-        (proposal.id, quote.text)
-        for proposal in exemplar_proposals(category)
+        (lane, quote.text)
+        for proposal in exemplar_proposals(framework, lane)
         for quote in proposal.quotes
-        if not verify_quote(quote.text, source_block(owning_system(proposal))[1])
+        if (system := system_for_label(quote.source_label)) is not None
+        and not verify_quote(quote.text, source_block(system)[1])
     ]
     assert not unfindable
 
 
-@pytest.mark.parametrize("category", STRIDE_CATEGORIES)
-def test_exemplar_quote_labels_match_the_block(category):
+@pytest.mark.parametrize("framework,lane", EXEMPLAR_LANES)
+def test_exemplar_quote_labels_match_the_block(framework, lane):
     """A quote resolves to a source, which here is the block's declared label.
 
     With two worked systems the label is load-bearing rather than decorative:
     it is what picks the block the quote above is verified against, exactly as
     a real draft's ``source_label`` picks one of the job's sources.
+
+    Two things, because a label can be wrong in two ways. It may name no
+    shipped block at all, and — when the draft cites elements — it may name the
+    *other* system's block, which is the cross-system mixing ``owning_system``
+    exists to forbid arriving through the quote instead of the IDs.
     """
-    mislabelled = [
-        (proposal.id, quote.source_label)
-        for proposal in exemplar_proposals(category)
+    unknown = [
+        (lane, quote.source_label)
+        for proposal in exemplar_proposals(framework, lane)
         for quote in proposal.quotes
-        if quote.source_label != source_block(owning_system(proposal))[0]
+        if system_for_label(quote.source_label) is None
     ]
-    assert not mislabelled
+    assert not unknown
+
+    crossed = [
+        (lane, quote.source_label)
+        for proposal in exemplar_proposals(framework, lane)
+        if (owner := owning_system(proposal)) is not None
+        for quote in proposal.quotes
+        if system_for_label(quote.source_label) != owner
+    ]
+    assert not crossed
 
 
-@pytest.mark.parametrize("category", STRIDE_CATEGORIES)
-def test_exemplar_evidence_refs_are_in_the_exemplar_catalog(category):
+@pytest.mark.parametrize("framework,lane", EXEMPLAR_LANES)
+def test_exemplar_evidence_refs_are_in_the_exemplar_catalog(framework, lane):
     """Every ID an exemplar cites is one its own worked system offers.
 
     Membership, exactly as the resolver asks it. The reference lint beside this
@@ -426,12 +542,23 @@ def test_exemplar_evidence_refs_are_in_the_exemplar_catalog(category):
     where that fails the whole lane.
     """
     dangling = [
-        (proposal.id, ref)
-        for proposal in exemplar_proposals(category)
+        (lane, ref)
+        for proposal in exemplar_proposals(framework, lane)
+        if (owner := owning_system(proposal)) is not None
         for ref in proposal.evidence_refs
-        if ref not in set(catalog(owning_system(proposal)))
+        if ref not in set(catalog(owner))
     ]
     assert not dangling
+
+    # A draft citing no element cannot name a system, so a reference on one has
+    # nothing to be checked against. None ship, and one arriving would be a
+    # draft resting on a fact about a system it never identified.
+    uncited = [
+        (lane, proposal.evidence_refs)
+        for proposal in exemplar_proposals(framework, lane)
+        if owning_system(proposal) is None and proposal.evidence_refs
+    ]
+    assert not uncited
 
 
 @pytest.mark.parametrize("name", sorted(exemplar_systems()))
@@ -503,17 +630,17 @@ def test_every_exemplar_system_is_worked_by_some_category():
     """
     worked = {
         owning_system(proposal)
-        for category in STRIDE_CATEGORIES
-        for proposal in exemplar_proposals(category)
+        for framework, lane in EXEMPLAR_LANES
+        for proposal in exemplar_proposals(framework, lane)
     }
     unworked = [name for name, body in exemplar_systems().items() if body not in worked]
     assert not unworked, f"exemplar systems {unworked} are shown but never worked"
 
 
-@pytest.mark.parametrize("category", STRIDE_CATEGORIES)
-def test_exemplar_file_within_token_cap(category):
-    tokens = estimate_tokens(package_loader.load(lane_exemplars_doc(category)))
-    assert tokens <= TOKEN_CAPS["package/lane_exemplars"]
+@pytest.mark.parametrize("framework,lane", EXEMPLAR_LANES)
+def test_exemplar_file_within_token_cap(framework, lane):
+    text = PACKAGE_LOADERS[framework].load(lane_exemplars_doc(lane))
+    assert estimate_tokens(text) <= TOKEN_CAPS["package/lane_exemplars"]
 
 
 def test_no_stray_prompt_files():
