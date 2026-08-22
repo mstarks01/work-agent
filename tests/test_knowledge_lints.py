@@ -11,12 +11,13 @@ So both directions are checked here, along with the structure the composition
 depends on and the token caps that keep parallel lanes affordable.
 
 **Over :data:`~stride_service.frameworks.PACKAGES`, not over one directory.**
-Only STRIDE ships a corpus today, so most of this is vacuous for ASVS — which
-is exactly the shape :class:`~stride_service.frameworks.KnowledgeTables`
-describes, where a package shipping none writes two empty tables and the gate
-passes it vacuously. What the registry buys is that the moment any package adds
-a single note, every check below already covers it. Naming one package's
-directory meant a second package's first document would ship unlinted.
+Both packages ship a corpus and every check below runs over both. That is what
+the registry bought: ASVS's 11 notes and 6 cases arrived in #272 already
+linted, with no edit here. A package shipping none is still covered — it writes
+two empty tables and the gate passes it vacuously, which is the shape
+:class:`~stride_service.frameworks.KnowledgeTables` describes. Naming one
+package's directory would have meant a second package's first document shipped
+unlinted.
 """
 
 from __future__ import annotations

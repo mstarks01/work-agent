@@ -75,7 +75,8 @@ on:
     # top-level package -- is invisible until someone dispatches a run by hand.
     paths:
       - "prompts/**"
-      - "skills/**"
+      - "frameworks/**"
+      - "domains/**"
       - "config/**"
       - "src/stride_service/**"
       - "!src/stride_service/api.py"

@@ -48,7 +48,8 @@ on:
     # whose whole selling point is that it is cheap.
     paths:
       - "prompts/**"
-      - "skills/**"
+      - "frameworks/**"
+      - "domains/**"
       - "config/**"
       - "src/stride_service/**"
       - ".github/workflows/provider-smoke.yml"
