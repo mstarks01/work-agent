@@ -2,8 +2,8 @@
 
 LiteLLM retries beneath the adapter, and that is the problem. Its ``num_retries``
 sets the provider SDK's own ``max_retries`` on the way to the client, so the
-worst case is ``2 * attempts - 1`` requests per node — thirty in the seconds the
-six category agents fan out — and none of it is visible above
+worst case is ``2 * attempts - 1`` requests per node — five times the fan-out in
+the seconds the lane agents go out together — and none of it is visible above
 ``generate_content_async``. Nothing above can pace it, count it, or decide it
 has gone on long enough, because by the time the call returns the requests have
 already been made. ``tests/test_model_gate.py`` probes that coupling; it is a
@@ -21,7 +21,7 @@ two bounds become expressible that could not exist below:
   the service stops retrying instead of multiplying one outage by five. When a
   single call fails in isolation the bucket is full and nothing changes.
 
-* **Decorrelated timing.** Six category agents that start together fail together and,
+* **Decorrelated timing.** Lane agents that start together fail together and,
   on any fixed backoff curve, retry together — reconverging on the quota they
   just tripped. Full jitter (:func:`_backoff_seconds`, a uniform draw over the
   whole interval rather than a fixed delay plus noise) spreads them out. This is
@@ -223,7 +223,7 @@ def _backoff_seconds(attempt: int) -> float:
     """Full jitter: a uniform draw over the whole interval, not a delay plus noise.
 
     ``attempt`` is 1-based, so the first retry draws from [0, base]. Drawing
-    across the entire window is what actually decorrelates six category agents that
+    across the entire window is what actually decorrelates the lane agents that
     failed at the same instant; an exponential delay with a jitter *added* keeps
     them clustered around the same point on the curve, which is the shape that
     reconverges on the quota it just tripped.
