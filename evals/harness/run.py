@@ -44,7 +44,15 @@ from dataclasses import replace
 from pathlib import Path
 from typing import Any
 
-from evals.harness import fingerprint, instruction, ledger, modes, queue, writing
+from evals.harness import (
+    fingerprint,
+    instruction,
+    instruction_delta,
+    ledger,
+    modes,
+    queue,
+    writing,
+)
 from evals.harness.artifact import EvalArtifact, load_artifact
 from evals.harness.artifact import build as build_artifact
 from evals.harness.calibration import (
@@ -857,6 +865,34 @@ def command_rekey(args: argparse.Namespace) -> int:
     return 0
 
 
+def command_compare(args: argparse.Namespace) -> int:
+    """What one prompt edit did, read off the sweeps either side of it.
+
+    Credential-free, like ``stability`` and ``promote``: both artifacts already
+    hold what their nodes were told and what their scores were, so this is
+    arithmetic over records. Nothing here gates, and nothing here concludes —
+    it prints the instruction change and the measurements that moved beside it,
+    which is what ADR 0016 said no reading could do.
+    """
+    try:
+        before = load_artifact(args.before)
+        after = load_artifact(args.after)
+    except (ProvenanceError, ValueError) as error:
+        print(f"cannot compare: {error}", file=sys.stderr)
+        return 1
+
+    nodes = instruction_delta.node_deltas(before, after)
+    measurements = instruction_delta.measurement_deltas(before, after)
+    instruction_delta.render(nodes, measurements)
+    if args.out:
+        record = instruction_delta.artifact(nodes, measurements)
+        record["before"] = str(before.path)
+        record["after"] = str(after.path)
+        Path(args.out).write_text(json.dumps(record, indent=2), encoding="utf-8")
+        print(f"wrote {args.out}")
+    return 0
+
+
 def command_stability(args: argparse.Namespace) -> int:
     """Compare two or more finished sweeps for run-to-run stability.
 
@@ -1153,6 +1189,16 @@ def main(argv: Sequence[str] | None = None) -> int:
     )
     stability_parser.add_argument("--out", help="where to write the stability report")
     stability_parser.set_defaults(func=command_stability)
+
+    compare_parser = subparsers.add_parser(
+        "compare",
+        help="what a prompt edit did: instruction delta beside score delta"
+        " (no credentials)",
+    )
+    compare_parser.add_argument("before", help="the sweep from before the edit")
+    compare_parser.add_argument("after", help="the sweep from after it")
+    compare_parser.add_argument("--out", help="where to write the comparison")
+    compare_parser.set_defaults(func=command_compare)
 
     args = parser.parse_args(argv)
     return args.func(args)
