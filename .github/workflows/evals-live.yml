@@ -83,6 +83,7 @@ on:
       - "!src/stride_service/conformance.py"
       - "!src/stride_service/engine.py"
       - "!src/stride_service/smoke.py"
+      - "!src/stride_service/token_caps.py"
       - ".github/workflows/evals-live.yml"
   # NO `schedule`. There was a Monday 06:00 UTC backstop sweep here until
   # federation went unconfigured indefinitely. A scheduled run fails closed when
