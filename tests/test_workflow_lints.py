@@ -17,10 +17,20 @@ from __future__ import annotations
 import ast
 from pathlib import Path
 
+import pytest
+
 REPO_ROOT = Path(__file__).resolve().parents[1]
 PACKAGE = REPO_ROOT / "src" / "stride_service"
 WORKFLOW = REPO_ROOT / ".github" / "workflows" / "evals-live.yml"
 PACKAGE_GLOB = "src/stride_service/**"
+
+#: Every workflow whose ``pull_request`` trigger is path-filtered to the agentic
+#: surface. Both name the same text trees, and both went wrong the same way, so
+#: the lint below reads them as a list rather than naming one.
+FILTERED_WORKFLOWS = (
+    WORKFLOW,
+    REPO_ROOT / ".github" / "workflows" / "provider-smoke.yml",
+)
 
 
 def _package_modules() -> set[str]:
@@ -59,11 +69,11 @@ def _reachable_from_evals() -> set[str]:
     return reached
 
 
-def _filter_paths() -> list[str]:
+def _filter_paths(workflow: Path = WORKFLOW) -> list[str]:
     """The ``paths:`` entries of the ``pull_request`` trigger, in order."""
     entries = []
     in_block = False
-    for line in WORKFLOW.read_text(encoding="utf-8").splitlines():
+    for line in workflow.read_text(encoding="utf-8").splitlines():
         stripped = line.strip()
         if stripped == "paths:":
             in_block = True
@@ -104,3 +114,35 @@ def test_the_closure_is_not_vacuously_empty():
     """Guards the guard: an import walk that finds nothing would agree with anything."""
     reachable = _reachable_from_evals()
     assert {"graph", "report", "sampling", "grounding"} <= reachable
+
+
+@pytest.mark.parametrize("workflow", FILTERED_WORKFLOWS, ids=lambda path: path.name)
+def test_every_swept_path_still_exists(workflow):
+    """A filter naming a directory the repo no longer has sweeps nothing.
+
+    **This is what the frameworks cutover left behind.** Both filters named
+    ``skills/**`` until #280. That tree became ``frameworks/<name>/lanes/`` and
+    ``domains/`` (ADR 0011), so every lane skill, exemplar file, output
+    contract, critic text, severity rubric, note and case stopped matching any
+    path — the text an agent actually reasons from, on a lane whose entire job
+    is to check what happens when that text changes.
+
+    Nothing was missed, because no commit has yet touched those trees without
+    also touching ``src/``, which matched on its own. A glob that resolves to
+    nothing does not fail; it quietly narrows what fires, and it stays quiet
+    until the one PR that needed it.
+
+    The negations are not checked. ``!src/stride_service/token_caps.py``
+    subtracts a real file today, and the test above already holds the exclusion
+    list to ``evals/``'s import closure.
+    """
+    missing = [
+        entry
+        for entry in _filter_paths(workflow)
+        if not entry.startswith("!") and not any(REPO_ROOT.glob(entry))
+    ]
+
+    assert not missing, (
+        f"{workflow.name} filters on paths that match nothing: {missing}. "
+        f"A glob over a tree that moved silently narrows what the sweep fires on."
+    )
