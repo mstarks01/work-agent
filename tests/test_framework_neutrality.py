@@ -153,6 +153,27 @@ DECLARED: dict[str, str] = {
         " `applicability` is ASVS's — because the two carry different"
         " identifiers. A third package adds a block and a reader here."
     ),
+    "evals/harness/identity.py": (
+        "This code is STRIDE's, and carries no literal — it reaches the package"
+        " through `StrideCategory` on `ClaimPair`. The rule asks whether two"
+        " claims name the same attacker action against the same target, which"
+        " is the identity an open claim set composes. A framework whose claims"
+        " name a catalog requirement is keyed by that requirement instead, and"
+        " its matcher is the confusion matrix in `applicability.py`."
+    ),
+    "evals/harness/calibration.py": (
+        "This code is STRIDE's, through `ClaimPair` for the same reason"
+        " `identity.py` is: it prices a candidate matcher against recorded"
+        " labels over composed identities. A package whose claims carry a"
+        " catalog identifier needs no such matcher to price."
+    ),
+    "evals/harness/critic_yield.py": (
+        "This code is STRIDE's, through `DraftThreat` and a category. Yield is"
+        " the pair of counts over drafts a critic killed and references it"
+        " destroyed, which only a package whose lane agents propose an open"
+        " claim set has. `INSTRUMENTS` already declares the instrument"
+        ' `frameworks=("stride",)`; this is the module behind it.'
+    ),
     "evals/verify_corpus.py": (
         "Five tables keyed by framework (record fields, record checks, lane"
         " accessor, ASVS-only chapter check, calibration-fixture input). All"
@@ -182,9 +203,55 @@ def framework_literals() -> dict[str, list[tuple[int, str]]]:
     return found
 
 
+def package_importers() -> dict[str, list[str]]:
+    """Every non-test module outside a package that imports that package's own.
+
+    **The other half of the signal**, and the half `LITERAL` cannot see. A
+    module reaches one framework either by naming it or by importing its
+    record, and three modules did the second with no literal at all —
+    `identity.py`, `calibration.py` and `critic_yield.py` were correct and
+    undeclared, which is a reason nobody had written down.
+
+    It is the same signal `test_a_lint_reads_no_single_packages_module` reads
+    over the lints, asked here of the code the sweep already covers. Parsed
+    rather than grepped, for the reason given there.
+    """
+    found: dict[str, list[str]] = {}
+    for root in SEARCHED:
+        for path in sorted((REPO_ROOT / root).rglob("*.py")):
+            relative = path.relative_to(REPO_ROOT).as_posix()
+            if any(f"/frameworks/{name}/" in relative for name in PACKAGES):
+                continue
+            imports = _package_imports(path)
+            if imports:
+                found[relative] = imports
+    return found
+
+
 @pytest.fixture(scope="module")
 def literals():
     return framework_literals()
+
+
+def test_a_module_reaching_one_package_by_import_is_declared():
+    """Naming a framework and importing one are the same commitment.
+
+    ``DECLARED`` answers both, because the question a reader has is the same:
+    this module is not neutral, so why is that right? A module that reaches a
+    package through its record and says nothing is the shape #276 and #280
+    took one directory over.
+    """
+    undeclared = {
+        name: imports
+        for name, imports in package_importers().items()
+        if name not in DECLARED
+    }
+
+    assert not undeclared, (
+        f"these modules import one package's own module and are not declared: "
+        f"{undeclared}. Add an entry to DECLARED saying why, as a property of "
+        f"the framework rather than as its name."
+    )
 
 
 def test_a_new_framework_literal_is_declared(literals):
@@ -199,11 +266,18 @@ def test_a_new_framework_literal_is_declared(literals):
 
 
 def test_the_declaration_does_not_rot(literals):
-    """A file that stops naming a framework has to leave the list."""
-    stale = sorted(set(DECLARED) - set(literals))
+    """A file that stops reaching one framework has to leave the list.
+
+    Either way of reaching one keeps it here. A module can name a package or
+    import its record, and a declaration is stale only when it does neither —
+    otherwise removing a literal from a module that still imports the record
+    would drop the reason and the entry together.
+    """
+    reaching = set(literals) | set(package_importers())
+    stale = sorted(set(DECLARED) - reaching)
     assert not stale, (
-        f"these files no longer name a framework and are still declared:"
-        f" {stale}. Remove them."
+        f"these files no longer name or import a framework and are still"
+        f" declared: {stale}. Remove them."
     )
 
 
