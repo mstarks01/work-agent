@@ -46,6 +46,7 @@ from evals.harness import (
     coverage,
     critic_yield,
     grounds,
+    instruction,
     modes,
     scorer,
     writing,
@@ -53,6 +54,7 @@ from evals.harness import (
 from evals.harness.coverage import LaneCoverage, TaggedRow
 from evals.harness.critic_yield import CriticYield
 from evals.harness.grounds import CaseGrounds, GroundsFailure
+from evals.harness.instruction import NodeInstruction
 from evals.harness.provenance import RunProvenance
 from evals.harness.reference import GoldenCase
 from evals.harness.scorer import CaseScore
@@ -129,6 +131,10 @@ class ModeRun:
     grounds: list[CaseGrounds]
     grounds_failures: list[GroundsFailure]
     coverage: list[TaggedRow]
+    #: What each LLM node was told, one row per node across every graph the
+    #: sweep built. Collected from the built pipelines rather than recomposed,
+    #: so the size reported is the size of the text that actually ran.
+    instructions: list[NodeInstruction]
     #: The frameworks this sweep's graphs were built for, so the coverage table
     #: can report a package whose every lane went silent rather than drop it.
     frameworks: tuple[FrameworkName, ...]
@@ -165,6 +171,7 @@ class ModeRun:
             grounds=[],
             grounds_failures=[],
             coverage=[],
+            instructions=[],
             frameworks=frameworks,
             extractions=[],
             rows={},
@@ -263,6 +270,11 @@ INSTRUMENTS: dict[str, Instrument] = {
         ),
         artifact=lambda sweep: coverage.artifact(sweep.lanes),
         keys=("coverage", "coverage_totals"),
+    ),
+    "instruction": Instrument(
+        render=lambda sweep: instruction.render(sweep.run.instructions),
+        artifact=lambda sweep: instruction.artifact(sweep.run.instructions),
+        keys=("instruction", "instruction_totals"),
     ),
     "applicability": Instrument(
         render=lambda sweep: applicability.render(sweep.rows("applicability")),
