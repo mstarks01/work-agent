@@ -64,6 +64,7 @@ __all__ = [
     "schemas_for",
     "selectable_without_options",
     "validate_package",
+    "widest_fan_out",
 ]
 
 #: What a package's **Precondition** can answer about a **Valid System Model**.
@@ -464,6 +465,28 @@ def package_for(name: FrameworkName) -> FrameworkPackage:
     refused by :func:`validate_package` before anything binds.
     """
     return PACKAGES[name]
+
+
+def widest_fan_out() -> int:
+    """Lane agents one job fires at once when it names every carried framework.
+
+    **The burst a provider quota actually sees**, and the number every bound in
+    ``config/resilience.toml`` is sized against: one ``strong``-tier request per
+    lane of every framework a job selects, all fired together at the barrier.
+
+    Derived rather than written down, because it was written down once and went
+    wrong. Six was the whole fan-out while STRIDE was the only package, and
+    stayed in the prose behind the concurrency ceiling, the retry budget and the
+    jitter policy after ASVS made it 23
+    ([#199](https://github.com/mstarks01/work-agent/issues/199) fixed the
+    ceiling's own comment and not the four modules reasoning from the same
+    number). A function over ``PACKAGES`` cannot go stale that way: a package
+    registered tomorrow moves it with no edit anywhere.
+
+    Every framework, not the widest single one, because a job may name them all
+    and the ceiling has to hold for the job a caller is allowed to submit.
+    """
+    return sum(len(package.lanes) for package in PACKAGES.values())
 
 
 def selectable_without_options(

@@ -22,9 +22,9 @@ number written down.
 and the other six are why it has to exist. Every one of them is per-job, so a
 caller who respects all six and simply submits a thousand submissions is inside
 the contract while spending the service's whole provider quota: each accepted
-job fans six category agents out on the ``strong`` tier, so ten concurrent
-submissions is sixty concurrent ``strong``-tier requests against one shared
-per-minute quota. Per-job budgets are not a per-caller budget, and the
+job fans one lane agent per lane of every framework it names out on the
+``strong`` tier — :func:`~stride_service.frameworks.widest_fan_out` — so ten
+concurrent submissions is ten times that against one shared per-minute quota. Per-job budgets are not a per-caller budget, and the
 unbounded-consumption half of OWASP LLM10 is the latter.
 
 It bounds jobs *in flight*, not jobs per interval. A ceiling on concurrency is
@@ -54,7 +54,8 @@ it is now literally the request count per node. It did not used to be. LiteLLM's
 provider SDK's own ``max_retries`` **from** that same value on the way to the
 client — so the first attempt carried its own SDK-level retries underneath, and
 the worst case per node was ``2 * attempts - 1`` requests: five at the shipped
-three, and up to thirty in the seconds the six category agents fan out. Against a
+three, and five times the fan-out in the seconds the lane agents go out
+together. Against a
 per-minute quota that burst is what turns one 429 into a run spending its budget
 on retried 429s (OWASP LLM10). Passing ``max_retries`` did not close it —
 ``num_retries`` overwrites it on the way to the client — which is what
