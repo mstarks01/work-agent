@@ -129,7 +129,7 @@ class TestTheTableCoversTheArtifact:
                 owners[key] = name
 
     def test_the_instrument_keys_are_the_ones_the_artifact_carried(self):
-        """The 19 keys a sweep writes, pinned one by one.
+        """The 21 keys a sweep writes, pinned one by one.
 
         Pinned as a literal because this is the one place a silent loss would
         not show up as a failing fold: an instrument dropped from the table
@@ -143,6 +143,8 @@ class TestTheTableCoversTheArtifact:
             "grounds_aggregate",
             "coverage",
             "coverage_totals",
+            "instruction",
+            "instruction_totals",
             "applicability",
             "applicability_aggregate",
             "applicability_exemplar_delta",

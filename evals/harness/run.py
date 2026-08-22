@@ -44,7 +44,7 @@ from dataclasses import replace
 from pathlib import Path
 from typing import Any
 
-from evals.harness import fingerprint, ledger, modes, queue, writing
+from evals.harness import fingerprint, instruction, ledger, modes, queue, writing
 from evals.harness.artifact import EvalArtifact, load_artifact
 from evals.harness.artifact import build as build_artifact
 from evals.harness.calibration import (
@@ -337,6 +337,11 @@ async def _run_mode(
         grounds=grounds,
         grounds_failures=grounds_failures,
         coverage=coverage,
+        # From the built graphs, for the same reason ``expected_nodes`` is: the
+        # instruction a node actually carries is a property of what was built,
+        # and recomposing it here would be a second answer to a question the
+        # graph already answered.
+        instructions=instruction.collect(pipelines.values()),
         # Read off the graphs that were built, never off the keys they were
         # requested under. The two differ wherever a caller substitutes a
         # pipeline, and the coverage table has to report the lanes that actually
