@@ -151,6 +151,16 @@ how far the text has moved and claims nothing about how well it works.
 > by how much, and what the numbers did*. Reading a trend out of that still
 > needs sweeps on both sides; the reading is now possible, which it was not.
 >
+> **The comparison is now a command**, added by
+> [#288](https://github.com/mstarks01/work-agent/issues/288):
+> `harness compare <before> <after>` prints which node's instruction moved and
+> by how much, then every instrument number that moved beside it. It is
+> credential-free — both artifacts already hold what their nodes were told —
+> and it concludes nothing. A score change smaller than the run-to-run spread
+> `harness stability` measures is noise, so the answer still needs sweeps on
+> both sides of an edit and more than one pair. What no longer stands in the
+> way is the reading.
+>
 > **It also settled the envelope's last claim by measuring it.** The comments
 > this ADR retired put the worst composed lane instruction at "~7.4K against a
 > 6-8K envelope". The built number is **8,338 tokens** — `analyze_stride_repudiation`
