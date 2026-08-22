@@ -19,23 +19,29 @@ from pathlib import Path
 import pytest
 
 from stride_service.domains import DETECTORS
-from stride_service.frameworks import LANE_SECTION_HEADINGS
+from stride_service.frameworks import LANE_SECTION_HEADINGS, PACKAGES
 from stride_service.frameworks.stride import STRIDE
 from stride_service.frameworks.stride.record import STRIDE_CATEGORIES
 from stride_service.markdown_loader import MarkdownLoader
 from stride_service.skills import (
-    DOMAIN_PACK_TOKEN_CAP,
-    LANE_SKILL_TOKEN_CAP,
-    SEVERITY_RUBRIC_TOKEN_CAP,
     estimate_tokens,
     lane_boundary_digest,
     lane_skill_doc,
     split_sections,
 )
+from stride_service.token_caps import TOKEN_CAPS, covered_assets
 
 PROJECT_ROOT = Path(__file__).resolve().parents[1]
-PACKAGE_DIR = PROJECT_ROOT / "frameworks" / "stride"
+FRAMEWORKS_DIR = PROJECT_ROOT / "frameworks"
+PACKAGE_DIR = FRAMEWORKS_DIR / "stride"
 DOMAINS_DIR = PROJECT_ROOT / "domains"
+
+# Every capped file of every registered package, resolved to its cap's key.
+# Collected once, and parametrized over, so a package ``PACKAGES`` names cannot
+# have text no lint reads — which is exactly what ASVS's seventeen lane skills
+# and its lane digest had while the caps were a constant per kind and the lints
+# below walked ``frameworks/stride`` alone.
+PACKAGE_ASSETS = sorted(covered_assets(FRAMEWORKS_DIR))
 
 # A domain pack's three fixed H2 sections, in order. Fewer than a lane skill's
 # five because a pack does not define a lane or a rating — it says when it
@@ -66,20 +72,39 @@ def test_lane_skill_sections_are_nonempty(lane):
     assert not empty
 
 
-@pytest.mark.parametrize("lane", STRIDE_CATEGORIES)
-def test_lane_skill_within_token_cap(lane):
-    tokens = estimate_tokens(package_loader.load(lane_skill_doc(lane)))
-    assert tokens <= LANE_SKILL_TOKEN_CAP
+@pytest.mark.parametrize("path,key", PACKAGE_ASSETS, ids=lambda value: str(value))
+def test_package_asset_within_token_cap(path, key):
+    """The alarm, over every registered package's static text.
+
+    Every framework's, not STRIDE's: a lane skill states one package's subject,
+    and how long a chapter of a published standard runs is a fact about that
+    package rather than about the framework that happened to arrive first.
+    """
+    assert estimate_tokens(path.read_text(encoding="utf-8")) <= TOKEN_CAPS[key]
 
 
-def test_severity_rubric_within_token_cap():
-    tokens = estimate_tokens(package_loader.load("severity_rubric"))
-    assert tokens <= SEVERITY_RUBRIC_TOKEN_CAP
+def test_every_package_asset_cap_still_alarms():
+    """A cap more than twice the largest file it watches measures nothing.
+
+    Checked over the largest asset of each kind rather than per file, because a
+    cap covers a kind: STRIDE's 62-token disclaimer must not force down the cap
+    that also has to fit ASVS's.
+    """
+    largest: dict[str, int] = {}
+    for path, key in PACKAGE_ASSETS:
+        tokens = estimate_tokens(path.read_text(encoding="utf-8"))
+        largest[key] = max(largest.get(key, 0), tokens)
+    dead = {
+        key: TOKEN_CAPS[key]
+        for key, size in largest.items()
+        if TOKEN_CAPS[key] > 2 * size
+    }
+    assert not dead
 
 
 @pytest.mark.parametrize("pack", domain_packs)
 def test_domain_pack_within_token_cap(pack):
-    assert estimate_tokens(domain_loader.load(pack)) <= DOMAIN_PACK_TOKEN_CAP
+    assert estimate_tokens(domain_loader.load(pack)) <= TOKEN_CAPS["domain/pack"]
 
 
 @pytest.mark.parametrize("pack", domain_packs)
@@ -119,14 +144,20 @@ def test_the_shared_domains_root_carries_nothing_but_packs():
     assert all(path.suffix == ".md" for path in entries)
 
 
-# The critic's digest runs ~1-1.5K tokens and the shipped skills come in just
-# under 1.6K. Guard against runaway Scope growth at 2K.
-DIGEST_TOKEN_BUDGET = 2000
+@pytest.mark.parametrize("name", sorted(PACKAGES))
+def test_boundary_digest_assembles_within_cap(name):
+    """The digest is assembled, so no file's own cap bounds it.
 
-
-def test_boundary_digest_assembles_within_budget():
-    digest = lane_boundary_digest(package_loader, STRIDE)
-    assert estimate_tokens(digest) <= DIGEST_TOKEN_BUDGET
+    One ``## Scope`` section growing is invisible to the lane-skill alarm — the
+    skill has room — and lands here, on the text every one of that package's
+    critics reads. Parametrized over ``PACKAGES`` because a digest is one per
+    package and its size follows how many lanes that package declares: ASVS's
+    seventeen lanes make a digest ASVS's own alarm has to watch.
+    """
+    package = PACKAGES[name]
+    loader = MarkdownLoader(FRAMEWORKS_DIR / name)
+    digest = lane_boundary_digest(loader, package)
+    assert estimate_tokens(digest) <= TOKEN_CAPS["package/lane_digest"]
 
 
 # There is no mechanically-pre-filtered element view: every lane agent receives

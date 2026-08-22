@@ -97,6 +97,11 @@ the System Model until something says it is not a fact about this system, and a
 case ending in a rejection reads like an instruction to reject until something
 says it is somebody else's reasoning.
 
+> **Amended by [ADR 0016](0016-the-token-caps-are-drift-alarms.md).** The
+> constant named here is now the `prompts/analyze` entry of `TOKEN_CAPS`, and the
+> 6-8K envelope it was argued against is retired. A cap states how far the
+> text has drifted and rations nothing.
+
 **Whether any of this improves an analysis is unmeasured, and stays unmeasured
 until a sweep runs.** The tests here establish that the right documents arrive
 and that they cannot become evidence, and stop exactly there. Retrieval

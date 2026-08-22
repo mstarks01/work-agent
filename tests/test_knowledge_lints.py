@@ -46,11 +46,19 @@ NOTE_SECTION_HEADINGS = ("When this applies", "What to look for", "Guardrails")
 # last on purpose — a reader who stops after two sections has the answer.
 CASE_SECTION_HEADINGS = ("Pattern", "Considered", "Ruling", "Why", "What decided it")
 
-# Per document. Lanes retrieve independently, so a note's cost is paid once per
-# lane that selects it; these caps and MAX_NOTES/MAX_CASES are the two halves of
-# the same budget.
+# Per document, and deliberately not in ``stride_service.token_caps``. That
+# table alarms on drift over the *static* instruction, where a file growing is
+# only a thing to look at. These two are a real ceiling: a note rides in the
+# job-varying block, lanes retrieve independently, and what one job sends is
+# this number times MAX_NOTES times the lanes that fired. The two halves bound
+# one retrieval, so they belong beside each other and answer to ADR 0008.
 NOTE_TOKEN_CAP = 700
 CASE_TOKEN_CAP = 700
+
+# What one lane may add to its instruction by retrieving, at every cap at once.
+# Room above today's 2100 so the corpus can grow a document without a CI fight,
+# and low enough that raising MAX_NOTES is a decision somebody makes here.
+RETRIEVED_CORPUS_CEILING = 4000
 
 #: Packages shipping no corpus at all. Vacuous rather than exempt: every check
 #: below runs and finds nothing to check, which is what
@@ -243,17 +251,18 @@ class TestBudget:
         text = loader_for(framework).load(f"cases/{name}")
         assert estimate_tokens(text) <= CASE_TOKEN_CAP
 
-    def test_the_worst_lane_stays_under_the_domain_pack_block(self):
-        """The size argument, in the units the prompt budget is argued in.
+    def test_the_worst_lane_retrieves_under_the_ceiling(self):
+        """What one lane's retrieved corpus can carry, at every cap at once.
 
-        Retrieval is capped per lane rather than per corpus, so what a job
-        actually pays is this — and it is deliberately no larger than the
-        domain-pack block that already rides beside it (2 x 2000). A corpus
-        that grew past that would be arguing for a share of the envelope
-        against material already there.
+        Retrieval is capped per lane rather than per corpus, so this is the real
+        number: two notes and one case, each at its own cap. The ceiling is
+        stated here rather than derived from the domain-pack cap it was once
+        compared against — that cap is a drift alarm now (ADR 0016) and moves
+        when a pack is edited, which is not a reason for a retrieval ceiling to
+        move.
 
         Per lane, so it does not move when a package declares more lanes: ASVS's
-        17 lanes each pay this ceiling and none of them pays it 17 times.
+        17 lanes each carry this ceiling and none of them carries it 17 times.
         """
         worst = MAX_NOTES * NOTE_TOKEN_CAP + MAX_CASES * CASE_TOKEN_CAP
-        assert worst <= 4000
+        assert worst <= RETRIEVED_CORPUS_CEILING
