@@ -17,7 +17,15 @@ That gap is not cheap to leave open. Each accepted job runs five LLM stages on
 the graph's longest path, and the widest of them fans the six category agents
 out in parallel on the `strong` tier. Ten concurrent submissions is sixty
 concurrent `strong`-tier requests against one shared per-minute quota — from one
-valid token, without breaking a single documented bound. The byte cap already
+valid token, without breaking a single documented bound.
+
+> **Amended by [#286](https://github.com/mstarks01/work-agent/issues/286).** Six
+> was the whole fan-out when this was written. It is now one `strong`-tier
+> request per lane of every framework a job names —
+> `stride_service.frameworks.widest_fan_out`, 23 today — so the burst this ADR
+> sizes against is larger than the number above. The decision it argues for is
+> unchanged and the arithmetic behind it moved, which is the reason that
+> function exists rather than a number in prose. The byte cap already
 cites OWASP LLM10; the unbounded-consumption half of LLM10 is the per-caller
 budget, and that was the missing half.
 

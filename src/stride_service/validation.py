@@ -50,7 +50,7 @@ IssueCode = Literal[
 
 # Admission cap on model size. Deliberately loose: it is a
 # blast-radius guard, not a quality threshold. Every artifact downstream
-# scales with element count — six category agents each read the whole model, and the
+# scales with element count — every lane agent reads the whole model, and the
 # critic reads every draft they produce in one pass — so an unbounded model
 # means unbounded spend and a critic dedupeing hundreds of drafts with no
 # error anywhere. Rejecting here costs one ``len()`` and happens before any

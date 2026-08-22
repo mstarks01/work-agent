@@ -48,8 +48,8 @@
 # count per node. It was not before, and that gap was the 429 storm. LiteLLM's
 # num_retries counts retries AFTER the first try AND sets the provider SDK's own
 # max_retries from the same value, so the first attempt retried underneath and
-# the worst case was 2 * attempts - 1 requests: five here, and up to thirty in
-# the seconds the six category agents fan out. That burst is what trips a per-minute
+# the worst case was 2 * attempts - 1 requests: five here, and five times the
+# fan-out in the seconds the lane agents go out. That burst is what trips a per-minute
 # request quota. Passing max_retries on the adapter did not close it, since
 # num_retries overwrites it on the way to the client.
 #
@@ -101,8 +101,8 @@ job_deadline_ms = 900000
 # node, and that distinction is the whole mechanism.
 #
 # A per-node count is what produced the storm. Every node got its full allowance
-# regardless of what the other five were seeing, so a provider-wide 429 became
-# six category agents x five requests in the seconds they fan out — the failure
+# regardless of what its siblings were seeing, so a provider-wide 429 became the
+# whole fan-out x five requests in the seconds the lane agents go out — the failure
 # that is by definition correlated got the retry policy designed for isolated ones.
 # Under a shared budget the first few failures spend it and the rest fail fast,
 # which is the correct response to "the provider is down": stop asking.
@@ -160,7 +160,10 @@ max_sources = 10
 # `strong`-tier request per lane of every framework it runs, all fired together
 # at the barrier, and a package's lane count is its own: STRIDE declares 6, ASVS
 # declares 17, so a job naming both is 23 and three of them are 69 concurrent
-# `strong`-tier requests. That is the burst a per-minute request quota actually
+# `strong`-tier requests. Those three numbers are checked against the registry
+# by `tests/test_fan_out_lints.py` rather than trusted, because the same
+# arithmetic sat stale in four modules until #286 — see
+# `stride_service.frameworks.widest_fan_out`. That is the burst a per-minute request quota actually
 # sees. Turn it UP only with a quota that has been checked against the new
 # number times the widest framework selection this deployment offers; turn it
 # DOWN to shed load mid-incident. 1 is legal and makes the service strictly
