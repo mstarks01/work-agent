@@ -58,7 +58,6 @@ from stride_service.evidence import (
     render_catalog,
 )
 from stride_service.frameworks import PACKAGES, schemas_for
-from stride_service.frameworks.stride.record import STRIDE_CATEGORIES
 from stride_service.grounding import verify_quote
 from stride_service.markdown_loader import MarkdownLoader, split_sections
 from stride_service.prompts import (
@@ -78,13 +77,13 @@ from stride_service.token_caps import (
 
 PROMPTS_DIR = Path(__file__).resolve().parents[1] / "prompts"
 FRAMEWORKS_DIR = Path(__file__).resolve().parents[1] / "frameworks"
-# The exemplars moved with the package that owns them: a worked draft is written
-# in one framework's record shape, so it lives under that framework's root while
-# the body that frames it stays shared (ADR 0011).
-PACKAGE_DIR = FRAMEWORKS_DIR / "stride"
+# The one place a lint here still names a package, and the declaration in
+# ``tests/test_framework_neutrality.py`` says why: the verb menu is STRIDE's
+# vocabulary, and a framework whose claims name a catalog requirement composes
+# its identity from that requirement rather than from an action.
+STRIDE_OUTPUT_DOC = FRAMEWORKS_DIR / "stride" / "output.md"
 
 loader = MarkdownLoader(PROMPTS_DIR)
-package_loader = MarkdownLoader(PACKAGE_DIR)
 #: One loader per registered package, so an exemplar lint reads whichever
 #: package's text it was parametrized for rather than the one that arrived
 #: first. Built from ``PACKAGES``, so a framework added to the registry is a
@@ -663,8 +662,8 @@ def test_no_non_markdown_files_under_prompts():
     assert not stray
 
 
-@pytest.mark.parametrize("category", STRIDE_CATEGORIES)
-def test_composed_analyze_prompt_within_the_sum_of_its_caps(category):
+@pytest.mark.parametrize("framework,lane", EXEMPLAR_LANES)
+def test_composed_analyze_prompt_within_the_sum_of_its_caps(framework, lane):
     """Composition adds joins, not content.
 
     ``COMPOSED_ANALYZE_CAP`` is the three part caps added up, so it cannot bind
@@ -673,7 +672,7 @@ def test_composed_analyze_prompt_within_the_sum_of_its_caps(category):
     itself — a separator, a heading, a framing sentence — which no part cap
     watches because no file holds it.
     """
-    composed = compose_analyze_prompt(loader, package_loader, category)
+    composed = compose_analyze_prompt(loader, PACKAGE_LOADERS[framework], lane)
     assert estimate_tokens(composed) <= COMPOSED_ANALYZE_CAP
 
 
@@ -695,7 +694,7 @@ def test_the_verb_menu_in_the_output_contract_is_the_vocabulary():
     new verb takes. Comparing the family lines as a list catches an addition, a
     removal and a reordering alike.
     """
-    contract = (PACKAGE_DIR / "output.md").read_text(encoding="utf-8")
+    contract = STRIDE_OUTPUT_DOC.read_text(encoding="utf-8")
     # ``- *family*:`` and not ``- **`field`**``, which a ``startswith("- *")``
     # would also take: one asterisk, a word, then the colon.
     family_line = re.compile(r"^- \*[a-z-]+\*: ")
