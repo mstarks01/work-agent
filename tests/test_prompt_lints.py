@@ -61,23 +61,18 @@ from stride_service.grounding import verify_quote
 from stride_service.markdown_loader import MarkdownLoader, split_sections
 from stride_service.prompts import (
     ANALYZE_PROMPT_NAME,
-    ANALYZE_PROMPT_TOKEN_CAP,
-    CRITIC_PROMPT_NAME,
-    CRITIC_PROMPT_TOKEN_CAP,
-    EXEMPLAR_TOKEN_CAP,
-    EXTRACT_PROMPT_NAME,
-    EXTRACT_PROMPT_TOKEN_CAP,
     PROMPT_BODY_NAMES,
     PROMPT_SECTION_HEADINGS,
-    RECRITIC_PROMPT_NAME,
-    RECRITIC_PROMPT_TOKEN_CAP,
-    REPAIR_PROMPT_NAME,
-    REPAIR_PROMPT_TOKEN_CAP,
     compose_analyze_prompt,
     lane_exemplars_doc,
 )
 from stride_service.report import Ground
 from stride_service.skills import estimate_tokens
+from stride_service.token_caps import (
+    COMPOSED_ANALYZE_CAP,
+    TOKEN_CAPS,
+    prompt_key,
+)
 
 PROMPTS_DIR = Path(__file__).resolve().parents[1] / "prompts"
 # The exemplars moved with the package that owns them: a worked draft is written
@@ -88,13 +83,6 @@ PACKAGE_DIR = Path(__file__).resolve().parents[1] / "frameworks" / "stride"
 loader = MarkdownLoader(PROMPTS_DIR)
 package_loader = MarkdownLoader(PACKAGE_DIR)
 
-BODY_TOKEN_CAPS = {
-    ANALYZE_PROMPT_NAME: ANALYZE_PROMPT_TOKEN_CAP,
-    CRITIC_PROMPT_NAME: CRITIC_PROMPT_TOKEN_CAP,
-    RECRITIC_PROMPT_NAME: RECRITIC_PROMPT_TOKEN_CAP,
-    EXTRACT_PROMPT_NAME: EXTRACT_PROMPT_TOKEN_CAP,
-    REPAIR_PROMPT_NAME: REPAIR_PROMPT_TOKEN_CAP,
-}
 
 JSON_BLOCK_RE = re.compile(r"^```json\n(.*?)^```", re.MULTILINE | re.DOTALL)
 # The exemplar system's rendered source: a fence, the `label:` line, the `----`
@@ -270,7 +258,35 @@ def test_prompt_output_section_carries_no_fenced_block(name):
 
 @pytest.mark.parametrize("name", PROMPT_BODY_NAMES)
 def test_prompt_body_within_token_cap(name):
-    assert estimate_tokens(loader.load(name)) <= BODY_TOKEN_CAPS[name]
+    """The alarm: this body has not grown past what its cap allows.
+
+    Failing here is not a verdict on the edit. Call ``alarm_at`` over the new
+    size, write the answer into ``TOKEN_CAPS``, and say what the text buys.
+    """
+    assert estimate_tokens(loader.load(name)) <= TOKEN_CAPS[prompt_key(name)]
+
+
+@pytest.mark.parametrize("name", PROMPT_BODY_NAMES)
+def test_prompt_body_cap_still_alarms(name):
+    """The other half of a drift alarm: a cap far above its file catches nothing.
+
+    A cap more than twice its body has stopped measuring anything. Shrinking a
+    body therefore costs one line here, which is the price of the alarm staying
+    proportional to what it watches.
+    """
+    tokens = estimate_tokens(loader.load(name))
+    assert TOKEN_CAPS[prompt_key(name)] <= 2 * tokens
+
+
+def test_every_prompt_body_has_a_cap():
+    """The table answers the registry, with nothing left over.
+
+    A body with no key would raise on lookup, which the parametrized alarms
+    already catch. The direction this adds is the quiet one: a key for a body
+    that no longer exists, which reads as coverage and checks nothing.
+    """
+    keyed = {key.split("/", 1)[1] for key in TOKEN_CAPS if key.startswith("prompts/")}
+    assert keyed == set(PROMPT_BODY_NAMES)
 
 
 def test_exemplar_files_match_stride_categories_exactly():
@@ -497,7 +513,7 @@ def test_every_exemplar_system_is_worked_by_some_category():
 @pytest.mark.parametrize("category", STRIDE_CATEGORIES)
 def test_exemplar_file_within_token_cap(category):
     tokens = estimate_tokens(package_loader.load(lane_exemplars_doc(category)))
-    assert tokens <= EXEMPLAR_TOKEN_CAP
+    assert tokens <= TOKEN_CAPS["package/lane_exemplars"]
 
 
 def test_no_stray_prompt_files():
@@ -520,83 +536,18 @@ def test_no_non_markdown_files_under_prompts():
     assert not stray
 
 
-# Worst-case category-agent instruction is skill text (~2.2K) plus this, against
-# a 6-8K envelope. At this number the worst case sits around 7K, which is inside
-# the envelope and no longer comfortably so — the second exemplar system spent
-# most of the room that used to be here. The next thing that wants space in a
-# category agent's *static* instruction should be weighed against deleting
-# something, not against this line.
-#
-# Moves with the body cap, and has to: the composed budget binds first, so a
-# body cap the composed budget cannot accommodate is a cap nothing can reach.
-#
-# What the envelope now also carries, and what this number does not: the
-# job-varying block grew by up to two domain packs (~1.4K at the
-# ``DOMAIN_PACK_TOKEN_CAP``) plus one lane's candidates, the evidence catalog,
-# and — for a lane whose rules fired — up to two retrieved notes and one case
-# (~1.1K at their own caps). Those are runtime values rather than prompt text,
-# capped where they are produced; this budget governs the static instruction
-# only, and it moves with the body cap it has to accommodate — by 100 for the
-# retrieved corpus, then by 300 for the evidence catalog becoming a table
-# (#138), and now by 200 for that catalog learning to say "stated absent"
-# (#171), each argued at ``ANALYZE_PROMPT_TOKEN_CAP`` rather than restated
-# here.
-#
-# The worst lane sits at ~5.4K of the 5.5K, and the worst case is now ~7.2K
-# against the 6-8K envelope. The paragraph above already said the next thing
-# wanting static room should be weighed against deleting something; #171 was
-# weighed that way and one deletion came with it — the canonical tampering
-# draft dropped the quote it used as a workaround for the rows this ticket
-# adds. That is the shape the next raise needs, and there is no longer room
-# for one that does not have it.
-#
-# The catalog's *runtime* rendering grew too, by roughly one short clause per
-# entry. It is job-varying so it does not land in this number, but it is not
-# free: a large model pays it per lane, which is the trade for jobs that no
-# longer die on a composed reference.
-# RAISED BY 200 FOR THE SECOND PACKAGE'S OUTPUT CONTRACT, and the paragraph
-# above asked for a deletion to come with a raise. One did: the eight-field list
-# and the two rating steps left ``analyze.md`` for ``frameworks/<name>/
-# output.md``, so the shared body no longer names ``severity``, ``sequence`` or
-# ``mitigations`` at all. That is what a framework grading nothing needed —
-# reading a field list for fields its record does not declare is worse than
-# reading a longer prompt.
-#
-# The net on a STRIDE lane is +124 on the worst of the six, because the moved
-# text came back with a heading and a sentence fixing what one claim is. The
-# worst lane now sits at ~5.6K of the 5.7K and the worst case at ~7.3K against
-# the 6-8K envelope. The rule stands unchanged for the next raise.
-# RAISED BY 100 FOR THE ACTION VERB, and the rule above was met: two deletions
-# came with it, both of them things the new field now says better.
-#
-# `verb` is a required field on every STRIDE claim, so its cost is a floor
-# rather than a choice — three exemplars per composed prompt each carry one, and
-# an agent that is not told the families picks the first verb that reads
-# plausibly. What kept the raise to 100 is that the vocabulary is enforced by the
-# response schema (`constrain_output = true` on both tiers), so `actions.menu()`
-# emits the seven family lines and not twenty glosses: the prompt supplies the
-# shape of the choice and the schema supplies the strings.
-#
-# The two deletions:
-#
-#   - The `title` rule told the agent to "name the attacker action and its
-#     target" with an observation/threat example. That is what `verb` now is,
-#     in a field, and a rule restated in prose beside the field that carries it
-#     is the drift `docs/agents/provenance.md` is about.
-#   - "One threat per distinct attacker action against a distinct element" came
-#     back as "one threat per `verb` and `affected_element_ids` pair" — the same
-#     rule, shorter, and pointing at the two fields that now decide it rather
-#     than describing them.
-#
-# The worst lane sits at ~5.73K of the 5.8K and the worst case at ~7.4K against
-# the 6-8K envelope. The rule stands unchanged for the next raise.
-COMPOSED_ANALYZE_TOKEN_BUDGET = 5800
-
-
 @pytest.mark.parametrize("category", STRIDE_CATEGORIES)
-def test_composed_analyze_prompt_within_budget(category):
+def test_composed_analyze_prompt_within_the_sum_of_its_caps(category):
+    """Composition adds joins, not content.
+
+    ``COMPOSED_ANALYZE_CAP`` is the three part caps added up, so it cannot bind
+    before any of them and no part cap can be one this makes unreachable. What
+    is left for it to catch is text :func:`compose_analyze_prompt` introduces
+    itself — a separator, a heading, a framing sentence — which no part cap
+    watches because no file holds it.
+    """
     composed = compose_analyze_prompt(loader, package_loader, category)
-    assert estimate_tokens(composed) <= COMPOSED_ANALYZE_TOKEN_BUDGET
+    assert estimate_tokens(composed) <= COMPOSED_ANALYZE_CAP
 
 
 def test_the_verb_menu_in_the_output_contract_is_the_vocabulary():

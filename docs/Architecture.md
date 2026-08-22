@@ -103,8 +103,8 @@ not for any vendor's product line:
 
 [`config/model_tiers.toml`](Configuration.md) maps nodes to tiers and each tier
 to a `(vendor, model)` pair. Deterministic `FunctionNode`s carry no model. The
-`strong` tier is where the token budget goes — the six-way category fan-out plus
-the critic and its re-ask.
+`strong` tier does most of a job's model work — the six-way category fan-out
+plus the critic and its re-ask.
 
 The two tiers choose their vendor **independently**, so `base` and `strong` can
 run different vendors at the same time. Every vendor is reached through one

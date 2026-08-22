@@ -105,6 +105,13 @@ The file's own rule — the next thing wanting static room is weighed against
 deleting something — was applied here and produced one deletion, and there is
 no longer room for a raise that does not come with one.
 
+> **Amended by [ADR 0016](0016-the-token-caps-are-drift-alarms.md).** The cap
+> named here is now the `prompts/analyze` entry of `TOKEN_CAPS`, the composed
+> budget is derived from its parts, and the 6-8K envelope is retired. The rule
+> this paragraph applies — that a raise comes with a deletion — is withdrawn.
+> The deletion it records still stands on its own merits: the tampering draft
+> cites the rows rather than re-quoting the sentence behind them.
+
 **An `absent-attribute` ground does not license an empty `mitigations` list.**
 `MissingMitigation` reads `unknown-attribute` only, and deliberately: the
 prompt licenses an empty list where nothing can be recommended before a fact is

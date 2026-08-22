@@ -71,6 +71,11 @@ bought is not: the first contrasting system breaks a monoculture, the fifth
 mostly restates it. `ANALYZE_PROMPT_TOKEN_CAP` moves 2950 → 3450 to pay for
 one, and the cap stays sized so a third has to be argued for rather than added.
 
+> **Amended by [ADR 0016](0016-the-token-caps-are-drift-alarms.md).** The
+> constant named here is now the `prompts/analyze` entry of `TOKEN_CAPS`, and the
+> 6-8K envelope it was argued against is retired. A cap states how far the
+> text has drifted and rations nothing.
+
 **"Near" stays a bit, not a scale.** It now means "an architecture one of the
 worked systems is written in", which is a property that survives the exemplar
 set growing. Each system gets one corpus control, and the pairing is
