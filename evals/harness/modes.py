@@ -263,6 +263,9 @@ class ExtractionScore:
     extra: tuple[str, ...]
     crossings_match: bool
     attributes: tuple[AttributeCheck, ...]
+    #: The blessed model's pure initiators — elements that only ever start an
+    #: interaction. Carried so the reading below needs no second model walk.
+    blessed_initiators: tuple[str, ...] = ()
     #: The blessed crossings and the extraction's, each as endpoint-pair keys.
     #: ``extracted_crossings`` is ``None`` where derivation raised — a model
     #: whose endpoints are not zoned has said nothing, not "nothing crosses".
@@ -278,6 +281,25 @@ class ExtractionScore:
     def precision(self) -> float:
         total = len(self.matched) + len(self.extra)
         return len(self.matched) / total if total else 0.0
+
+    @property
+    def initiators_missing(self) -> frozenset[str]:
+        """Pure initiators the blessed model holds and the extraction dropped."""
+        return frozenset(self.blessed_initiators) & frozenset(self.missing)
+
+    @property
+    def initiator_recall(self) -> float:
+        """Of the blessed model's pure initiators, the share the extraction kept.
+
+        Read beside the overall element recall rather than instead of it: the
+        two together say whether an extraction is uniformly thin or is dropping
+        one *kind* of element. A case with no pure initiator reads 0.0, for the
+        reason every other empty denominator here does.
+        """
+        if not self.blessed_initiators:
+            return 0.0
+        kept = len(self.blessed_initiators) - len(self.initiators_missing)
+        return kept / len(self.blessed_initiators)
 
     @property
     def crossings_found(self) -> frozenset[str]:
@@ -353,6 +375,8 @@ class ExtractionScore:
             "endpoint_recall": round(self.endpoint_recall, 3),
             "endpoint_missing": sorted(self.endpoint_missing),
             "endpoint_extra": sorted(self.endpoint_extra),
+            "initiator_recall": round(self.initiator_recall, 3),
+            "initiators_missing": sorted(self.initiators_missing),
             "crossings_match": self.crossings_match,
             "crossings_recall": round(self.crossings_recall, 3),
             "crossings_derivable": self.crossings_derivable,
@@ -580,6 +604,7 @@ def score_extraction(case: GoldenCase, result: ExtractionResult) -> ExtractionSc
         extra=tuple(sorted(extracted_ids - blessed_ids)),
         crossings_match=crossings_match,
         attributes=_check_attributes(case.model, result.extracted),
+        blessed_initiators=tuple(sorted(pure_initiators(case.model))),
         blessed_crossings=crossing_keys(case.model) or (),
         extracted_crossings=crossing_keys(result.extracted),
     )
@@ -640,6 +665,32 @@ def _crossings_match(blessed: SystemModel, extracted: SystemModel | None) -> boo
         return extracted.boundary_crossings() == blessed.boundary_crossings()
     except ValueError:
         return False
+
+
+def pure_initiators(model: SystemModel) -> frozenset[str]:
+    """Elements that only ever start an interaction, never receive one.
+
+    **The failure mode this isolates.** Across five gpt-4o runs on an unchanged
+    config, these were recalled at 0.421 against 0.600 for every other non-flow
+    element — lower in all five, a gap of 0.179. 16 of the 19 distinct dangling
+    endpoints in those runs were flow *sources*, and the repeated offenders are
+    exactly these: `process:store-server`, `entity:developer`,
+    `entity:duty-engineer`.
+
+    In case 07 the extraction writes ``flow source 'process:store-server'`` —
+    the exact ID the blessed model uses — and never declares the element. So
+    this is neither naming drift nor a conceptual error, but an
+    inventory-completeness failure at the elements a source text describes by
+    what they *do* rather than by where they sit: "a developer writes a change",
+    "every store server asks the deploy controller once a minute".
+
+    Measured against total Tier 1 failures the effect is invisible — that count
+    has an sd of 3.27 on an unchanged config. Measured here it is roughly five
+    standard deviations of headroom, which is why this reading exists.
+    """
+    sources = {flow.source for flow in model.data_flows}
+    destinations = {flow.destination for flow in model.data_flows}
+    return frozenset(sources - destinations)
 
 
 def crossing_keys(model: SystemModel | None) -> tuple[str, ...] | None:
@@ -798,6 +849,12 @@ def render_extraction(scores: Sequence[ExtractionScore]) -> None:
     print(
         f"recall: {strict:.2f} strict, {endpoint:.2f} folding the flow label"
         f" — the gap is naming, not extraction (instrument, non-gating)"
+    )
+    initiator = sum(s.initiator_recall for s in scores) / len(scores)
+    dropped = sum(len(s.initiators_missing) for s in scores)
+    print(
+        f"initiators: {initiator:.2f} recall, {dropped} dropped — an element the"
+        f" text describes by what it does rather than where it sits"
     )
     undrivable = [s.case_id for s in scores if not s.crossings_derivable]
     crossings = sum(s.crossings_recall for s in scores) / len(scores)
