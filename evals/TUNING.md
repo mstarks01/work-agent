@@ -120,7 +120,12 @@ after it. A rate-limited run spends real money and produces nothing.
 ## Step 2 — Establish a baseline (and its spread)
 
 You can't tell a real gain from luck without knowing how much the numbers move
-when *nothing* changes. Run the full suite five times on the current config:
+when *nothing* changes. **This is not a formality.** Five `gpt-4o` extraction
+runs on an unchanged config, 2026-08-23, gave failed-case counts of **2, 2, 5,
+5, 10** — a five-fold spread from chance alone. Three findings reported off
+single runs that week had to be withdrawn once that was known.
+
+Run the full suite five times on the current config:
 
 ```sh
 for i in 1 2 3 4 5; do
@@ -272,6 +277,66 @@ lever on recall — and the *cause* of the near/far gap, since all the examples
 come from one domain (payments). Editing an exemplar or adding one from a
 different domain is the most direct way to move that gap. Measure it exactly like
 a sampling change.
+
+### What extraction actually does, and what a prompt edit reaches
+
+Ten `gpt-4o` extraction runs and three `luna` ones over the 13-case corpus,
+2026-08-23. Read this before writing a prompt rule, because two of the three
+written that week did nothing.
+
+**Models rename everything.** Both models find the same architecture and label
+it differently: the corpus says `entity:shopper`, both write `entity:shoppers`;
+the corpus says a flow is `settlement-webhook`, luna writes `payment-webhook`
+and gpt-4o writes `post-webhook` for the same two endpoints. Roughly a third of
+what reads as "missed one element, invented another" is one element under two
+names, charged on both sides. #293 folds the flow label out of the score for
+this reason and folds nothing else, because nothing else has a structural key.
+
+**Models drop the elements that only ever act.** An element that initiates a
+flow and never receives one is kept about 42% of the time, against 60% for
+everything else — lower in every run of both sets. The telling part is that the
+extraction writes `flow source 'process:store-server'`, the exact ID the corpus
+uses, and never declares the store server. It is not a naming problem and not a
+misunderstanding. A source describes an initiator by what it does — "every store
+server asks the deploy controller once a minute" — so it reads as behaviour and
+never reaches an inventory of structure. `initiator_recall` is the reading that
+isolates it.
+
+**Models follow a contradiction rather than resolving it.** `extract.md` said
+"write `unknown` where the text is silent" a dozen times, then gave `assets` a
+closed vocabulary that rejects `unknown` and said nothing about the exception.
+gpt-4o wrote `unknown`, which fails the whole model. It was following the
+instruction into the one place it does not apply. **Check a new rule against
+every closed vocabulary before shipping it** —
+`test_every_extraction_failure_mode_is_declared` is that check.
+
+**A prompt edit may simply not land, and you cannot tell which kind you have
+written.** Closing the `unknown` contradiction worked: that failure appeared
+once in 13 case-runs before and never in 65 after. Two edits asking for more
+complete inventories did not, at either step — neither where the model notices a
+dangling endpoint nor where the omission happens. Both were explicit and gave
+examples. Neither moved the number at all.
+
+So budget for a null result. An edit that removes a contradiction is a different
+kind of change from one that asks for more thoroughness, and only the first has
+worked here.
+
+**Reading is strong; judgement is weak.** Same models, same documents:
+`store.encryption_at_rest` agrees 100%, `boundary.kind` around 90%,
+`process.assets` **4-15%**. The split is whether the answer sits in the text or
+needs a judgement call — and `extract.md` gives the asset vocabulary without
+ever saying what a tag denotes. Expect any attribute that asks "what matters
+here" to score like `assets` until something scopes it.
+
+**Price does not buy extraction quality.** `gpt-4o` costs about five times
+`gpt-5.6-luna` and scored the same on element recall, worse on attributes, and
+produced 8 structurally invalid models where luna produced none. One task on one
+corpus, so do not generalise it — but do not assume the pricier model extracts
+better either.
+
+**Models emit structurally broken references.** One luna lane agent produced
+`flow:a-to-b:label:label`, its own label glued on twice. No instruction
+anticipates that; the fail-closed join is what catches it.
 
 ### The corpus
 
