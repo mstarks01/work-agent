@@ -316,6 +316,19 @@ async def _run_mode(
                 if mode == "analysis"
                 else await modes.run_end_to_end(case, pipeline)
             )
+        except modes.EvalRunError as error:
+            # The graph refused this case's model. In `end-to-end` that is
+            # extraction and its one `repair` pass both failing, which is a
+            # measurement — and the mode where a refused model is most expected
+            # is also the most expensive per case, so losing the sweep over one
+            # costs every case that already ran.
+            #
+            # Not routed through `classify_failure`: that reads draft-level
+            # faults off the fan-in, and a refused model never produced drafts.
+            # The message already carries the case id.
+            failures.append(str(error))
+            payloads.append({"case": case.id, "run_failure": str(error)})
+            continue
         except CAUGHT as error:
             failure = classify_failure(case.id, error)
             grounds_failures.append(failure)
