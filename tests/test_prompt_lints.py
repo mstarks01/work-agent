@@ -44,7 +44,7 @@ knowing about.
 import json
 import re
 from pathlib import Path
-from typing import get_args
+from typing import Literal, get_args, get_origin
 
 import pytest
 from pydantic import ValidationError
@@ -62,6 +62,7 @@ from stride_service.grounding import verify_quote
 from stride_service.markdown_loader import MarkdownLoader, split_sections
 from stride_service.prompts import (
     ANALYZE_PROMPT_NAME,
+    EXTRACT_PROMPT_NAME,
     PROMPT_BODY_NAMES,
     PROMPT_SECTION_HEADINGS,
     compose_analyze_prompt,
@@ -702,4 +703,87 @@ def test_the_verb_menu_in_the_output_contract_is_the_vocabulary():
     assert in_contract == menu().splitlines(), (
         "the verb menu in frameworks/stride/output.md is not what"
         " stride_service.actions.menu() emits. Regenerate it:\n\n" + menu()
+    )
+
+
+# ---------------------------------------------------------------------------
+# `unknown` is a value some attributes hold, not a word for uncertainty.
+#
+# `extract.md` states as its **controlling rule** that "`unknown` is the
+# default, not the fallback", and repeats the word a dozen times. It then hands
+# the model `assets`, a closed vocabulary of eight tags that does not contain it
+# and cannot — and, before #295, said nothing about that anywhere. A model
+# following the prompt faithfully writes `unknown` into `assets`, which is
+# `illegal-asset-tag`: a Tier 1 failure that kills the job and spends its one
+# repair pass.
+#
+# `gpt-4o` did exactly that on `04-ml-inference-service` in the 2026-08-23
+# sweep. `gpt-5.6-luna` did not, on the same corpus and prompt, which is the
+# usual shape of a prompt defect: it fires on some models and not others, so no
+# single run proves the prompt is fine.
+#
+# The check below is against the **schema**, not the prose. Every closed
+# vocabulary either admits `unknown` or does not, `model_fields` says which, and
+# a vocabulary that does not admit it has to be one the prompt warns about.
+CLOSED_VOCABULARIES = "closed vocabularies that reject `unknown`"
+
+
+def _literal_vocabularies():
+    """Every `Literal` field on an element type, with the values it admits."""
+    from stride_service.system_model import (
+        DataFlow,
+        DataStore,
+        ExternalEntity,
+        Process,
+        TrustBoundary,
+    )
+
+    for model in (ExternalEntity, Process, DataStore, DataFlow, TrustBoundary):
+        for name, field in model.model_fields.items():
+            if get_origin(field.annotation) is Literal:
+                yield f"{model.__name__}.{name}", set(get_args(field.annotation))
+
+
+def test_the_asset_vocabulary_still_rejects_unknown():
+    """The schema half of the trap, pinned so the prose below stays necessary."""
+    from stride_service.system_model import CORE_ASSET_TAGS
+
+    assert "unknown" not in CORE_ASSET_TAGS
+
+
+def test_the_prompt_says_assets_takes_no_unknown():
+    """The one sentence `extract.md` cannot be shipped without.
+
+    Wording is the author's; carrying the claim is not optional. Without it the
+    prompt's own controlling rule points a model straight at a Tier 1 failure.
+    """
+    body = loader.load(EXTRACT_PROMPT_NAME).lower()
+    assets_rule = body.split("**assets.**", 1)[1].split("\n")[0]
+
+    assert "unknown" in assets_rule, (
+        "extract.md's assets rule does not mention `unknown`. The controlling "
+        "rule tells the model to write it where the text is silent, and this "
+        "vocabulary rejects it — see #295."
+    )
+
+
+@pytest.mark.parametrize("field,values", sorted(_literal_vocabularies()))
+def test_a_vocabulary_that_rejects_unknown_is_named_in_the_prompt(field, values):
+    """Every closed vocabulary the model must not write `unknown` into is named.
+
+    Self-completing against the schema: a `Literal` added tomorrow that omits
+    `unknown` fails here until the prompt accounts for it. A vocabulary that
+    *does* admit `unknown` needs no warning and is skipped.
+
+    The attribute's own name is what the prompt must carry, because that is what
+    a model reads it as — `kind`, not `ExternalEntity.kind`.
+    """
+    if "unknown" in values:
+        pytest.skip(f"{field} admits `unknown`, so the controlling rule reaches it")
+    attribute = field.split(".")[1]
+    body = loader.load(EXTRACT_PROMPT_NAME)
+
+    assert f"`{attribute}`" in body, (
+        f"{field} rejects `unknown` and the prompt never names {attribute!r}. "
+        f"A model applying the controlling rule to it emits an illegal value."
     )
