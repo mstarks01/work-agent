@@ -19,6 +19,7 @@ from stride_service.evidence import (
     crossing_evidence_ref,
     evidence_catalog,
     render_catalog,
+    render_element_roster,
     resolve_proposals,
     unknown_evidence_ref,
 )
@@ -566,3 +567,63 @@ class TestTheMisShapeIsUnreachable:
         """``grounds``' ``min_length=1``, expressed over the pair of lists."""
         with pytest.raises(ValidationError, match="at least one evidence"):
             sample_proposal("S-01", evidence_refs=[], quotes=[])
+
+
+class TestTheElementRoster:
+    """Every ID a claim may name, as a table to select from (#306).
+
+    `render_catalog` records why this shape exists: a reference set rendered as
+    a specimen of the format invites an agent to *compose* a well-formed member
+    instead of copying one, and a composed reference that resolves to nothing
+    fails its whole job (#138, ADR 0012). `affected_element_ids` had only the
+    constraint — "every one of them present in the System Model" — and the model
+    as fenced JSON to read it out of.
+
+    On a live end-to-end sweep a lane agent produced
+    ``flow:a-to-b:label:label``, its own label concatenated twice: well-formed,
+    plausible, absent from the set.
+    """
+
+    def test_every_element_appears_exactly_once(self):
+        model = valid_model()
+        roster = render_element_roster(model)
+
+        for element in model.elements():
+            assert roster.count(f"| `{element.id}` |") == 1
+
+    def test_it_says_the_set_is_closed(self):
+        """The sentence that makes it a roster rather than an excerpt."""
+        model = valid_model()
+        roster = render_element_roster(model)
+
+        assert f"{len(list(model.elements()))} elements" in roster
+        assert "this table is all of them" in roster
+
+    def test_a_flow_reads_as_its_endpoints_not_a_zone(self):
+        """A flow has no `trust_zone`, and endpoints are what distinguishes two."""
+        model = valid_model()
+        roster = render_element_roster(model)
+        flow = model.data_flows[0]
+
+        row = next(
+            line for line in roster.splitlines() if line.startswith(f"| `{flow.id}` |")
+        )
+        assert f"`{flow.source}`" in row and f"`{flow.destination}`" in row
+
+    def test_the_gloss_carries_no_attribute_values(self):
+        """Those are in the System Model, and this is paid per lane per framework.
+
+        Repeating them would buy nothing and cost the most expensive block in
+        the job-varying half.
+        """
+        model = valid_model()
+        roster = render_element_roster(model)
+
+        for store in model.data_stores:
+            assert store.data_classification not in roster
+
+    def test_the_order_is_the_models_own(self):
+        """One System Model renders one table, so a rerun is byte-identical."""
+        model = valid_model()
+
+        assert render_element_roster(model) == render_element_roster(model)
