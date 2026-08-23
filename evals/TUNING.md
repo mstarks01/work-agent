@@ -94,6 +94,29 @@ with no re-vote. The retired LLM judge could not offer that, which is half of
 why it is gone; the other half is that a human vote answers the question the
 judge was guessing at.
 
+## The fan-out is what a provider quota sees
+
+**One job fires one `strong`-tier request per lane of every framework it names,
+all together at the barrier.** That is
+`stride_service.frameworks.widest_fan_out()` — 23 today — and at roughly 14K
+input per lane it is a **~322K token burst from a single job**.
+
+Against a 200,000 tokens-per-minute quota that job cannot complete, and no
+ceiling in `config/resilience.toml` helps: `max_active_jobs` bounds *jobs*, and
+this is one job. The failure is a provider `RateLimitError` after the configured
+`attempts` are spent, mid-sweep, with no artifact written.
+
+Two levers, in order of preference:
+
+1. **Raise the quota.** The only route that sweeps every framework at once.
+2. **`--framework stride`** — narrow the selection. Six lanes is a ~72K burst
+   and fits under 200K. It is a pure selection: it names no option and changes
+   no reference set, so a narrowed sweep measures the same cases the same way
+   and simply measures fewer frameworks per case. It prints the cases it skips.
+
+Check the arithmetic against your own quota before a long sweep rather than
+after it. A rate-limited run spends real money and produces nothing.
+
 ## Step 2 — Establish a baseline (and its spread)
 
 You can't tell a real gain from luck without knowing how much the numbers move
@@ -420,3 +443,81 @@ The shipped file still states no temperature, so each tier decodes at its
 model's own default. Tuning the per-tier values to something better is exactly
 the loop above — run it once you have live credentials and the baselines to
 measure against.
+
+## Choosing a model to sweep with
+
+A sweep costs money and a cheap model costs less of it. What a cheap model can
+answer is a narrower question than it first appears, and the two sweeps recorded
+below are what the distinction rests on.
+
+**Use the tier you would ship for any number about quality.** Recall, precision,
+groundedness, critic yield and anything derived from them are facts about the
+model that produced them. They do not transfer down the capability range, and a
+number taken on a cheap model describes a deployment nobody runs.
+
+**A cheap model is the right instrument for a different class of question**:
+does the harness work end to end, can this shape occur, does a gate hold, what
+does a sweep cost. Every one of those is a question about machinery rather than
+judgement, and the machinery is the same whoever is behind it.
+
+### What two vendors showed
+
+`claude-opus-4-6` on 2026-08-14 (12 cases) and `gpt-5.6-luna` on 2026-08-23 (13
+cases), both `analysis` mode, STRIDE only. **The two differ by vendor,
+capability, corpus size and eight days of prompt edits at once**, so read them as
+two observations rather than a controlled comparison.
+
+The mechanical layer did not move:
+
+| | opus | luna |
+| --- | ---: | ---: |
+| mis-shape at `merge_drafts` | 0 | 0 |
+| structural failures | 0 | 0 |
+| unverified-quote rate | 2.0% | 3.4% |
+
+Judgement moved a great deal:
+
+| | opus | luna |
+| --- | ---: | ---: |
+| grounds per threat | 3.34 | 2.73 |
+| **quoteless threats** | **13%** | **44%** |
+
+**The branch mix is the capability tell.** Luna's 914 grounds were
+`unknown-attribute` 408, `quote` 264, `derived-fact` 216, `absent-attribute` 26.
+Naming an unknown attribute costs no reading; finding the submitter's own words
+and quoting them does. A weak model takes the cheap branch, and `quoteless_rate`
+is where that shows up first — before recall does, and without a reference set.
+Watch it when you change tier.
+
+**A weak critic destroys signal.** On luna the critic killed 12% of drafts,
+caught 0% of the ones the reference set marks rejected, and destroyed 10% of
+real findings. The critic seat is the last place to economise.
+
+### The stress-test argument, and its limit
+
+For a *can this fail* question a cheap model is a stronger instrument than a
+capable one: if the model most likely to emit a malformed draft emits none, the
+residual is not being hit. That is why the zero mis-shape rate above is worth
+more from luna than it would be from opus.
+
+**The argument weakens wherever the weak model avoids the risky path.** Luna
+quoted on 56% of its threats against opus's 87%, so it exercised the quote
+ladder less per threat, and its 3.4% rests on 9 failures out of 264. A zero from
+a model that never took the branch is not evidence about the branch.
+
+### Two things that are not model comparisons
+
+- **The fired half of coverage is deterministic.** `116/143 rule evaluations
+  fired` against a previous `104/144` is a fact about the corpus and the rules,
+  not about the model. Only the *cited* half moves with the model.
+- **`extraction` mode grades a different tier.** `analysis` seeds the blessed
+  model at `prepare`, so a poor extraction does not reach the lane agents. Luna
+  extracted badly — 63% attribute agreement, 0.19-0.50 recall — and the analysis
+  numbers above are unaffected by it.
+
+### Cheap per token is not cheap per answer
+
+Luna billed reasoning tokens at 39% of completion on the analysis sweep and 33%
+on extraction, and its mean lane latency was 21-43 seconds — no faster than a
+frontier model. The saving is real and the wall-clock is not, so a cheap tier
+buys budget rather than time.
