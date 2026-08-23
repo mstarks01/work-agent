@@ -235,7 +235,10 @@ def _write_reports(out: str, mode: str, runs: Mapping[str, modes.AnalysisRun]) -
 
 
 async def _run_mode(
-    cases: Sequence[GoldenCase], mode: str, deployment: Deployment
+    cases: Sequence[GoldenCase],
+    mode: str,
+    deployment: Deployment,
+    only: Sequence[FrameworkName] = (),
 ) -> ModeRun:
     """Run one mode over the selected cases, collecting Tier 1 failures.
 
@@ -264,7 +267,7 @@ async def _run_mode(
     pipelines: dict[tuple[FrameworkName, ...], Pipeline] = {}
 
     def pipeline_for(case: GoldenCase) -> Pipeline:
-        frameworks = modes.case_frameworks(case)
+        frameworks = modes.select_frameworks(case, only)
         if frameworks not in pipelines:
             pipelines[frameworks] = modes.build_eval_pipeline(
                 modes.MODE_ENTRIES[mode], deployment=deployment, frameworks=frameworks
@@ -283,8 +286,16 @@ async def _run_mode(
     coverage: list[TaggedRow] = []
     extractions: list[modes.ExtractionScore] = []
     rows: dict[str, list[Any]] = {}
+    skipped: list[str] = []
 
     for case in cases:
+        if not modes.select_frameworks(case, only):
+            # Not a failure: --framework asked for packages this case does not
+            # declare, so there is nothing here to measure. Named rather than
+            # dropped, because a case absent from a sweep and a case that
+            # scored nothing are different facts.
+            skipped.append(case.id)
+            continue
         pipeline = pipeline_for(case)
         if mode == "extraction":
             result = await modes.run_extraction(case, pipeline)
@@ -322,6 +333,14 @@ async def _run_mode(
         for name, row in measured.rows.items():
             rows.setdefault(name, []).append(row)
         payloads.append(measured.payload)
+
+    if skipped:
+        # Printed, never silent: a narrowed sweep that quietly measured 9 of 13
+        # cases reads exactly like a full one to whoever quotes its numbers.
+        print(
+            f"--framework {','.join(only)} skipped {len(skipped)} case(s)"
+            f" declaring none of it: {', '.join(skipped)}"
+        )
 
     return ModeRun(
         payloads=payloads,
@@ -478,7 +497,9 @@ def command_run(args: argparse.Namespace) -> int:
     # is certified against are then one configuration rather than two reads
     # that could disagree.
     deployment = Deployment.from_env()
-    mode_run = asyncio.run(_run_mode(cases, args.mode, deployment))
+    mode_run = asyncio.run(
+        _run_mode(cases, args.mode, deployment, tuple(args.framework))
+    )
     failures = mode_run.failures
 
     # Never silently trust: the verdict is always computed and surfaced, so an
@@ -1059,6 +1080,15 @@ def main(argv: Sequence[str] | None = None) -> int:
     run_parser = subparsers.add_parser("run", help="run one eval mode over the corpus")
     run_parser.add_argument("--mode", choices=sorted(modes.MODE_ENTRIES), required=True)
     run_parser.add_argument("--case", action="append", default=[])
+    run_parser.add_argument(
+        "--framework",
+        action="append",
+        default=[],
+        choices=sorted(PACKAGES),
+        help="narrow each case to these frameworks. A pure selection: it names"
+        " no option and changes no reference set. Default is every framework a"
+        " case declares.",
+    )
     run_parser.add_argument("--corpus", default=DEFAULT_CORPUS_DIR)
     run_parser.add_argument(
         "--ledger",
