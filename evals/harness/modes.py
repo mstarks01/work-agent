@@ -263,6 +263,11 @@ class ExtractionScore:
     extra: tuple[str, ...]
     crossings_match: bool
     attributes: tuple[AttributeCheck, ...]
+    #: The blessed crossings and the extraction's, each as endpoint-pair keys.
+    #: ``extracted_crossings`` is ``None`` where derivation raised — a model
+    #: whose endpoints are not zoned has said nothing, not "nothing crosses".
+    blessed_crossings: tuple[str, ...] = ()
+    extracted_crossings: tuple[str, ...] | None = None
 
     @property
     def recall(self) -> float:
@@ -273,6 +278,31 @@ class ExtractionScore:
     def precision(self) -> float:
         total = len(self.matched) + len(self.extra)
         return len(self.matched) / total if total else 0.0
+
+    @property
+    def crossings_found(self) -> frozenset[str]:
+        """Blessed crossings the extraction also separated, by endpoint pair."""
+        return frozenset(self.blessed_crossings) & frozenset(
+            self.extracted_crossings or ()
+        )
+
+    @property
+    def crossings_recall(self) -> float:
+        """Of the blessed crossings, the share the extraction also derived.
+
+        Names dropped, so this is the reading ``crossings_match`` cannot give.
+        It is still bounded by what the extraction found at all: a crossing
+        whose flow was never emitted cannot be separated, however it is
+        compared. On the 2026-08-23 sweeps that ceiling was 40% and 55%.
+        """
+        if not self.blessed_crossings:
+            return 0.0
+        return len(self.crossings_found) / len(self.blessed_crossings)
+
+    @property
+    def crossings_derivable(self) -> bool:
+        """Whether the extraction was well-formed enough to derive crossings."""
+        return self.extracted_crossings is not None
 
     @property
     def endpoint_matched(self) -> frozenset[str]:
@@ -324,6 +354,11 @@ class ExtractionScore:
             "endpoint_missing": sorted(self.endpoint_missing),
             "endpoint_extra": sorted(self.endpoint_extra),
             "crossings_match": self.crossings_match,
+            "crossings_recall": round(self.crossings_recall, 3),
+            "crossings_derivable": self.crossings_derivable,
+            "crossings_missing": sorted(
+                frozenset(self.blessed_crossings) - self.crossings_found
+            ),
             "missing": list(self.missing),
             "extra": list(self.extra),
             "attribute_agreement": round(self.attribute_agreement, 3),
@@ -545,6 +580,8 @@ def score_extraction(case: GoldenCase, result: ExtractionResult) -> ExtractionSc
         extra=tuple(sorted(extracted_ids - blessed_ids)),
         crossings_match=crossings_match,
         attributes=_check_attributes(case.model, result.extracted),
+        blessed_crossings=crossing_keys(case.model) or (),
+        extracted_crossings=crossing_keys(result.extracted),
     )
 
 
@@ -590,6 +627,12 @@ def _crossings_match(blessed: SystemModel, extracted: SystemModel | None) -> boo
     elements, which is precisely the kind of extraction this mode exists to
     catch — so a model that cannot derive crossings scores as disagreeing
     rather than crashing the sweep.
+
+    **Compares names, and that is the reading it is for.** A
+    :class:`~stride_service.report.BoundaryCrossing` carries ``flow_id`` and two
+    zones, and both zones hold a boundary *ID*. A reader of the report sees
+    those strings, so a crossing naming a zone they do not hold is wrong for
+    them. :func:`crossing_keys` is the other reading — see #297.
     """
     if extracted is None:
         return False
@@ -597,6 +640,35 @@ def _crossings_match(blessed: SystemModel, extracted: SystemModel | None) -> boo
         return extracted.boundary_crossings() == blessed.boundary_crossings()
     except ValueError:
         return False
+
+
+def crossing_keys(model: SystemModel | None) -> tuple[str, ...] | None:
+    """Each crossing as its flow's endpoint pair, or ``None`` if underivable.
+
+    **A crossing means "this interaction has its two endpoints in different
+    zones", and that sentence contains no zone name.** Two extractions can
+    partition the same elements identically and name the partitions
+    differently; compared as lists of
+    :class:`~stride_service.report.BoundaryCrossing`, that reads as total
+    disagreement, and on the 2026-08-23 sweeps it did — ``crossings DIFFER`` on
+    13 of 13 cases for two models five times apart in price.
+
+    So the zones drop out entirely and membership survives as *set membership*:
+    a flow is in this set exactly when the model separated its endpoints. The
+    flow itself is keyed by :func:`_endpoint_key`, for the reason #293 gives.
+
+    ``None`` rather than an empty tuple where derivation raises, because a model
+    whose flow endpoints are not zoned elements has not said that nothing
+    crosses — it has said nothing at all, and scoring that as perfect agreement
+    with an empty blessed set would reward the worst extraction in the sweep.
+    """
+    if model is None:
+        return None
+    try:
+        crossings = model.boundary_crossings()
+    except ValueError:
+        return None
+    return tuple(sorted({_endpoint_key(one.flow_id) for one in crossings}))
 
 
 async def run_analysis(case: GoldenCase, pipeline: Pipeline) -> AnalysisRun:
@@ -713,6 +785,7 @@ def render_extraction(scores: Sequence[ExtractionScore]) -> None:
             f"  endpoint {score.endpoint_recall:.2f}"
             f"  precision {score.precision:.2f}"
             f"  crossings {'match' if score.crossings_match else 'DIFFER'}"
+            f"/{score.crossings_recall:.2f}"
             f"  attributes {agreed}/{len(score.attributes)}"
         )
     if not scores:
@@ -725,6 +798,13 @@ def render_extraction(scores: Sequence[ExtractionScore]) -> None:
     print(
         f"recall: {strict:.2f} strict, {endpoint:.2f} folding the flow label"
         f" — the gap is naming, not extraction (instrument, non-gating)"
+    )
+    undrivable = [s.case_id for s in scores if not s.crossings_derivable]
+    crossings = sum(s.crossings_recall for s in scores) / len(scores)
+    print(
+        f"crossings: {sum(s.crossings_match for s in scores)}/{len(scores)} match"
+        f" by name, {crossings:.2f} recall by endpoint pair"
+        + (f"; underivable on {len(undrivable)}" if undrivable else "")
     )
     totals = aggregate_attributes(scores)
     print(
