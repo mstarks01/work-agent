@@ -83,7 +83,7 @@ TOKEN_CAPS: dict[str, int] = {
     "prompts/analyze": 4100,
     "prompts/critic": 1700,
     "prompts/recritic": 1100,
-    "prompts/extract": 2700,
+    "prompts/extract": 2900,
     "prompts/repair": 700,
     # One package's own text, under ``frameworks/<name>/``.
     f"package/{CRITIC_DOC}": 700,
