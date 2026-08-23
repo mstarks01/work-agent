@@ -125,6 +125,8 @@ The System Model, already validated; its boundary crossings; then the evidence c
 
 **Select from the table; never compose.** It is closed and complete: an ID you did not copy out of it names nothing, however well-formed it looks, and it is dropped — the claim stands on what else it cited, and one citing nothing at all fails. If a fact you want to rest on has no row, that is the table telling you the input described a control that is *there*, so what you have is either a quote or a claim you should be resting on something else.
 
+An **element roster** follows the model: every ID a claim may name, and nothing else. `affected_element_ids` is selected out of it, never composed — an ID you assemble from an element's name is well-formed, plausible and resolves to nothing, and a claim carrying one kills the whole lane.
+
 Then this lane's candidates, any domain reference material, any notes and cases retrieved for them, and the sources — the standing of each is set above.
 
 A **scope** line opens the input: how many elements, crossings and unstated controls this model holds, and how many of your lane's rules fired. Those are your denominators, counted in code. They tell you when you have looked at everything, so that filing nothing can mean *examined and cleared* rather than *never looked* — **they are not a quota.** No number there is a target, none of them says how many claims exist, and a lane with seventeen elements and one real claim files one.
@@ -132,6 +134,10 @@ A **scope** line opens the input: how many elements, crossings and unstated cont
 {scope}
 
 {system_model}
+
+```
+{element_roster}
+```
 
 ```
 {boundary_crossings}
