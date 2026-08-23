@@ -760,3 +760,85 @@ class TestTheEndpointReadingOfAnExtraction:
     def test_an_empty_score_reads_zero_on_both(self):
         assert self.score().recall == 0.0
         assert self.score().endpoint_recall == 0.0
+
+
+class TestTheNameFreeReadingOfCrossings:
+    """A crossing means the endpoints are in different zones (#297).
+
+    That sentence contains no zone name. ``crossings_match`` compares
+    ``BoundaryCrossing`` lists, and both zone fields hold a boundary *ID*, so an
+    extraction that partitions the elements identically and names a zone
+    ``boundary:internet`` where the corpus says ``boundary:public-internet``
+    fails every crossing in the case. On the 2026-08-23 sweeps that read as
+    ``crossings DIFFER`` on 13 of 13 cases for both models.
+    """
+
+    def score(self, blessed=(), extracted=None, match=False):
+        return modes.ExtractionScore(
+            case_id="x",
+            matched=(),
+            missing=(),
+            extra=(),
+            crossings_match=match,
+            attributes=(),
+            blessed_crossings=tuple(blessed),
+            extracted_crossings=extracted,
+        )
+
+    def test_the_same_partition_under_another_zone_name_scores_full(self):
+        """The defect at its smallest: identical separation, different labels."""
+        s = self.score(blessed=("flow:a-to-b",), extracted=("flow:a-to-b",))
+
+        assert s.crossings_match is False
+        assert s.crossings_recall == 1.0
+
+    def test_a_flow_the_model_did_not_separate_is_missed(self):
+        """Set membership *is* the boolean: not separated means not present."""
+        s = self.score(
+            blessed=("flow:a-to-b", "flow:c-to-d"), extracted=("flow:a-to-b",)
+        )
+
+        assert s.crossings_recall == 0.5
+
+    def test_an_underivable_extraction_scores_zero_not_perfect(self):
+        """``None`` is "said nothing", which must not read as "nothing crosses".
+
+        A model whose flow endpoints are not zoned elements is the worst
+        extraction in a sweep. Scoring it as agreeing with an empty blessed set
+        would make it the best.
+        """
+        s = self.score(blessed=("flow:a-to-b",), extracted=None)
+
+        assert s.crossings_derivable is False
+        assert s.crossings_recall == 0.0
+
+    def test_a_case_with_no_blessed_crossing_reads_zero(self):
+        """No denominator, so no rate — never a silent 1.0."""
+        assert self.score(blessed=(), extracted=()).crossings_recall == 0.0
+
+    def test_the_flow_label_is_folded_here_too(self):
+        """Keyed by ``_endpoint_key``, so #293's fold reaches crossings.
+
+        Driven over a real blessed model rather than a fixture: the whole point
+        is that the key drops the descriptive third segment a live extraction
+        gets wrong, and a hand-built flow ID would not prove the corpus's do.
+        """
+        keys = modes.crossing_keys(load_case(CORPUS / "01-payments-checkout").model)
+
+        assert keys
+        assert all(key.count(":") == 1 for key in keys), keys
+        assert all(key.startswith("flow:") for key in keys)
+
+    def test_a_model_with_no_zones_is_underivable_rather_than_empty(self):
+        """``None`` comes from the raise, not from a guess about the input."""
+        assert modes.crossing_keys(None) is None
+
+    def test_both_readings_are_serialised(self):
+        """The strict one is not replaced — a report reader sees zone names."""
+        record = self.score(
+            blessed=("flow:a-to-b",), extracted=("flow:a-to-b",), match=False
+        ).to_json()
+
+        assert record["crossings_match"] is False
+        assert record["crossings_recall"] == 1.0
+        assert record["crossings_missing"] == []
