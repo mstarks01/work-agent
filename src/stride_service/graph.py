@@ -131,6 +131,7 @@ from stride_service.domains import select_domain_packs
 from stride_service.evidence import (
     evidence_catalog,
     render_catalog,
+    render_element_roster,
     resolve_proposals,
 )
 from stride_service.frameworks import (
@@ -527,6 +528,7 @@ STATE_SOURCE_TEXTS = "source_texts"
 STATE_SYSTEM_MODEL = "system_model"
 STATE_BOUNDARY_CROSSINGS = "boundary_crossings"
 STATE_EVIDENCE_CATALOG = "evidence_catalog"
+STATE_ELEMENT_ROSTER = "element_roster"
 # The domain packs this job's model earned, already composed to text. One key
 # for every lane of every framework, because the selection is a fact about the
 # model rather than about a lane — or about a framework.
@@ -594,6 +596,7 @@ SHARED_RENDERED_KEYS: frozenset[str] = frozenset(
         STATE_SYSTEM_MODEL,
         STATE_BOUNDARY_CROSSINGS,
         STATE_EVIDENCE_CATALOG,
+        STATE_ELEMENT_ROSTER,
         STATE_DOMAIN_SKILLS,
         STATE_PREVIOUS_MODEL,
         STATE_VALIDATION_ISSUES,
@@ -1194,6 +1197,11 @@ def prepare_analysis(
         render([crossing.model_dump(mode="json") for crossing in crossings]),
     )
     state.prompt(STATE_EVIDENCE_CATALOG, render_catalog(catalog))
+    # Beside the model rather than instead of it: a lane agent reasons over the
+    # whole model and *selects* out of this. Neutral by construction — the roster
+    # enumerates the one shared model, so every framework's lanes read the same
+    # table and a package registered tomorrow inherits it.
+    state.prompt(STATE_ELEMENT_ROSTER, render_element_roster(model))
     state.prompt(STATE_DOMAIN_SKILLS, compose_domain_skills(domain_loader, packs))
     state.put(STATE_DOMAIN_PACKS, list(packs))
 

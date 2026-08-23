@@ -66,7 +66,13 @@ from stride_service.report import (
     UnknownClaimIdentity,
     UnresolvedEvidence,
 )
-from stride_service.system_model import Element, SystemModel, attribute_names
+from stride_service.system_model import (
+    DataFlow,
+    Element,
+    SystemModel,
+    TrustBoundary,
+    attribute_names,
+)
 
 #: An evidence catalog: each reference, in a stable order, against the ground
 #: it resolves to. A plain mapping on purpose — ``list(catalog)`` is what the
@@ -224,6 +230,58 @@ def render_catalog(catalog: Mapping[str, Ground]) -> str:
         "| cite this exactly | what it says |\n| --- | --- |\n"
         f"{rows}\n"
     )
+
+
+def render_element_roster(model: SystemModel) -> str:
+    """Every element ID a claim may name, as a table to select from.
+
+    **The same fix as :func:`render_catalog`, at the seam it was never applied
+    to.** That docstring records why: rendered as a specimen of the format, a
+    reference set invites an agent to *compose* a well-formed member instead of
+    copying one, and a composed reference that resolves to nothing fails its
+    whole job (#138, ADR 0012).
+
+    ``affected_element_ids`` had only the constraint — "every one of them
+    present in the System Model" — and the model as fenced JSON to read it out
+    of. On a live end-to-end sweep a lane agent produced
+    ``flow:a-to-b:label:label``, its own label concatenated twice: well-formed,
+    plausible, absent from the set. It never appears in ``analysis`` mode, whose
+    seeded blessed model has clean IDs to copy (#306).
+
+    **The gloss is type and place, never the attributes.** Those are in the
+    System Model already and this table is paid for on every lane agent of every
+    framework; repeating them would buy nothing and cost the most expensive
+    block in the job-varying half. What a row has to carry is enough for an
+    agent to recognise the element it means without reconstructing the ID —
+    which is what the left column is for.
+
+    Order is the model's own, so one System Model renders one table every run.
+    """
+    rows = "\n".join(
+        f"| `{element.id}` | {_element_gloss(element)} |"
+        for element in model.elements()
+    )
+    return (
+        f"{len(list(model.elements()))} elements, and this table is all of them."
+        " Name one exactly as it appears here.\n\n"
+        "| cite this exactly | what it is |\n| --- | --- |\n"
+        f"{rows}\n"
+    )
+
+
+def _element_gloss(element: Element) -> str:
+    """One element's type and where it sits, in the fewest words that identify it.
+
+    A flow reads as its endpoints rather than its zone: a flow has no
+    ``trust_zone`` of its own, and its endpoints are the thing an agent is
+    choosing between when two flows share a source.
+    """
+    if isinstance(element, DataFlow):
+        return f"flow, `{element.source}` to `{element.destination}`"
+    if isinstance(element, TrustBoundary):
+        return "trust boundary"
+    kind = element.id.partition(":")[0]
+    return f"{kind} in `{element.trust_zone}`"
 
 
 def _gloss(ground: Ground) -> str:
