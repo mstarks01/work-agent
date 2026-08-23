@@ -842,3 +842,77 @@ class TestTheNameFreeReadingOfCrossings:
         assert record["crossings_match"] is False
         assert record["crossings_recall"] == 1.0
         assert record["crossings_missing"] == []
+
+
+class TestTheInitiatorReadingOfAnExtraction:
+    """Pure initiators are dropped more than other elements (#295).
+
+    Measured over five gpt-4o runs on an unchanged config: **0.421 recall
+    against 0.600** for every other non-flow element, lower in all five, a gap
+    of 0.179. 16 of the 19 distinct dangling endpoints in those runs were flow
+    *sources*, and the repeat offenders are exactly these elements.
+
+    Total Tier 1 failures cannot see it — that count has an sd of 3.27 on an
+    unchanged config, so a fix removing most of these would move it by less than
+    two standard deviations. This reading is where the effect concentrates.
+    """
+
+    def model(self, flows):
+        """A blessed model carrying only what the reading walks: its flows."""
+        from stride_service.system_model import SystemModel
+
+        case = load_case(CORPUS / "07-cicd-store-deploy")
+        return SystemModel.model_validate(
+            case.model.model_dump(mode="json") | {"data_flows": flows}
+        )
+
+    def test_an_element_that_only_ever_sends_is_an_initiator(self):
+        real = load_case(CORPUS / "07-cicd-store-deploy").model
+
+        assert modes.pure_initiators(real) == frozenset(
+            {"entity:developer", "process:store-server"}
+        )
+
+    def test_an_element_that_also_receives_is_not(self):
+        """`process:build-runner` sends four flows and receives one."""
+        real = load_case(CORPUS / "07-cicd-store-deploy").model
+
+        assert "process:build-runner" not in modes.pure_initiators(real)
+
+    def test_dropping_an_initiator_shows_here_and_barely_moves_recall(self):
+        """The whole reason for a second reading.
+
+        One dropped initiator of two is half the initiator recall, and one
+        missing element out of nineteen is a rounding error on the overall one.
+        """
+        score = modes.ExtractionScore(
+            case_id="07",
+            matched=(),
+            missing=("process:store-server",),
+            extra=(),
+            crossings_match=False,
+            attributes=(),
+            blessed_initiators=("entity:developer", "process:store-server"),
+        )
+
+        assert score.initiator_recall == 0.5
+        assert score.initiators_missing == frozenset({"process:store-server"})
+
+    def test_a_case_with_no_initiator_reads_zero(self):
+        """An empty denominator is never a silent 1.00, as everywhere else here."""
+        score = modes.ExtractionScore(
+            case_id="x",
+            matched=(),
+            missing=(),
+            extra=(),
+            crossings_match=True,
+            attributes=(),
+        )
+
+        assert score.initiator_recall == 0.0
+
+    def test_every_corpus_case_has_an_initiator_to_measure(self):
+        """Guards the guard: a metric with no denominator anywhere measures nothing."""
+        for path in sorted(p for p in CORPUS.iterdir() if p.is_dir()):
+            model = load_case(path).model
+            assert modes.pure_initiators(model), path.name
