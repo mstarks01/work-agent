@@ -696,3 +696,67 @@ class TestNarrowingASweepToOneFramework:
         assert set(modes.case_framework_options(case)) == set(
             modes.case_frameworks(case)
         )
+
+
+class TestTheEndpointReadingOfAnExtraction:
+    """A flow's identity is its endpoints; its label describes it (#293).
+
+    Two models on the same corpus both missed
+    ``flow:card-processor-to-storefront-api:settlement-webhook`` and both
+    emitted those exact endpoints under another label. Strictly that is a miss
+    *and* an invention for one flow that was found. The strict reading is right
+    for a report reader — an ID that does not resolve does not resolve — and
+    wrong for a question about extraction, so both are reported.
+    """
+
+    def score(self, matched=(), missing=(), extra=()):
+        return modes.ExtractionScore(
+            case_id="x",
+            matched=tuple(matched),
+            missing=tuple(missing),
+            extra=tuple(extra),
+            crossings_match=True,
+            attributes=(),
+        )
+
+    def test_a_relabelled_flow_stops_being_both_a_miss_and_an_invention(self):
+        """The defect the reading exists for, at its smallest."""
+        s = self.score(
+            missing=("flow:a-to-b:settlement-webhook",),
+            extra=("flow:a-to-b:payment-webhook",),
+        )
+
+        assert s.recall == 0.0
+        assert s.endpoint_recall == 1.0
+        assert s.endpoint_missing == frozenset()
+        assert s.endpoint_extra == frozenset()
+
+    def test_a_genuinely_missed_flow_stays_missed(self):
+        """Folding the label must not forgive an endpoint pair nobody emitted."""
+        s = self.score(missing=("flow:a-to-b:x",), extra=("flow:c-to-d:y",))
+
+        assert s.endpoint_missing == frozenset({"flow:a-to-b"})
+        assert s.endpoint_extra == frozenset({"flow:c-to-d"})
+        assert s.endpoint_recall == 0.0
+
+    def test_nothing_but_flows_is_folded(self):
+        """An entity has no structural key behind its name, so it is not folded.
+
+        ``entity:shopper`` against ``entity:shoppers`` is the same architecture
+        by eye and there is no mechanical way to say so. Folding it would be a
+        fuzzy match wearing a mechanical number's clothes.
+        """
+        s = self.score(missing=("entity:shopper",), extra=("entity:shoppers",))
+
+        assert s.endpoint_missing == frozenset({"entity:shopper"})
+        assert s.endpoint_extra == frozenset({"entity:shoppers"})
+
+    def test_the_two_readings_agree_when_no_flow_was_relabelled(self):
+        """The reading adds nothing where naming did not drift, which is the point."""
+        s = self.score(matched=("process:a", "flow:a-to-b:x"), missing=("store:c",))
+
+        assert s.recall == s.endpoint_recall
+
+    def test_an_empty_score_reads_zero_on_both(self):
+        assert self.score().recall == 0.0
+        assert self.score().endpoint_recall == 0.0
