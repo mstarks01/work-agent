@@ -27,7 +27,7 @@ take plain data.
 from __future__ import annotations
 
 from collections import Counter
-from collections.abc import Callable, Mapping, Sequence
+from collections.abc import Callable, Iterable, Mapping, Sequence
 from dataclasses import dataclass, replace
 from datetime import UTC, datetime
 from typing import Any
@@ -202,15 +202,49 @@ class AttributeCheck:
         }
 
 
+def _endpoint_key(element_id: str) -> str:
+    """One element ID reduced to what identifies it structurally.
+
+    A flow is ``flow:<source>-to-<target>:<label>`` and the label is the
+    describing half, so it drops. Every other type is returned unchanged: there
+    is no structural key behind an entity's or a boundary's name.
+    """
+    parts = element_id.split(":")
+    if parts[0] == "flow" and len(parts) > 2:
+        return ":".join(parts[:2])
+    return element_id
+
+
+def _endpoint_keys(ids: Iterable[str]) -> frozenset[str]:
+    return frozenset(_endpoint_key(element_id) for element_id in ids)
+
+
 @dataclass(frozen=True)
 class ExtractionScore:
     """Agreement between an extraction and the blessed model.
 
     Purely mechanical — element IDs are typed slugs, so set arithmetic answers
     this mechanically. Element *naming* drift shows up as a miss plus a
-    spurious element, which is the honest reading: a threat filed against
-    ``process:auth-svc`` does not resolve for a reader holding
-    ``process:auth-service``.
+    spurious element, which is the honest reading for a **report reader**: a
+    threat filed against ``process:auth-svc`` does not resolve for someone
+    holding ``process:auth-service``.
+
+    It is the wrong reading for a question about **extraction**, and #293 is
+    what showed the difference. Two models on the same corpus both missed
+    ``flow:card-processor-to-storefront-api:settlement-webhook`` and both
+    emitted the same endpoints under another label — ``payment-webhook`` and
+    ``post-webhook``. Identical architecture, one word apart, charged once as a
+    miss and again as an invention. Measured over 13 cases, folding the flow
+    label alone recovers 24-39% of both.
+
+    So ``endpoint_*`` carries the second reading beside the strict one, and
+    neither replaces the other. **A flow's identity is its endpoints; its label
+    is descriptive** — the same principle
+    :func:`~evals.harness.identity.endpoint_form` applies to a claim, for the
+    same reason. Nothing else is folded: an entity, process, store or boundary
+    has no structural key behind its name, so ``entity:shopper`` against
+    ``entity:shoppers`` stays a miss and a spurious element. Guessing there
+    would be a fuzzy match wearing a mechanical number's clothes.
 
     ``attributes`` carries the second half, on the elements both models hold:
     the values a Candidate rule reads. Without it an extraction that types
@@ -241,6 +275,37 @@ class ExtractionScore:
         return len(self.matched) / total if total else 0.0
 
     @property
+    def endpoint_matched(self) -> frozenset[str]:
+        """The matched set with every flow reduced to its endpoint pair."""
+        return _endpoint_keys(self.matched)
+
+    @property
+    def endpoint_missing(self) -> frozenset[str]:
+        """Missed under endpoint folding: not matched, and not emitted elsewhere.
+
+        Subtracting the emitted keys is what makes this a second *reading*
+        rather than a second count. A flow the model produced under another
+        label is in ``extra`` strictly and in ``endpoint_matched`` here, so it
+        must leave the missing set too or one flow is charged on both sides.
+        """
+        emitted = self.endpoint_matched | _endpoint_keys(self.extra)
+        return _endpoint_keys(self.missing) - emitted
+
+    @property
+    def endpoint_extra(self) -> frozenset[str]:
+        """Spurious under endpoint folding."""
+        blessed = self.endpoint_matched | _endpoint_keys(self.missing)
+        return _endpoint_keys(self.extra) - blessed
+
+    @property
+    def endpoint_recall(self) -> float:
+        found = len(self.endpoint_matched) + len(
+            _endpoint_keys(self.extra) & _endpoint_keys(self.missing)
+        )
+        total = found + len(self.endpoint_missing)
+        return found / total if total else 0.0
+
+    @property
     def differing(self) -> tuple[AttributeCheck, ...]:
         """The checks the two models answered differently, in model order."""
         return tuple(check for check in self.attributes if not check.agrees)
@@ -255,6 +320,9 @@ class ExtractionScore:
             "case": self.case_id,
             "recall": round(self.recall, 3),
             "precision": round(self.precision, 3),
+            "endpoint_recall": round(self.endpoint_recall, 3),
+            "endpoint_missing": sorted(self.endpoint_missing),
+            "endpoint_extra": sorted(self.endpoint_extra),
             "crossings_match": self.crossings_match,
             "missing": list(self.missing),
             "extra": list(self.extra),
@@ -642,12 +710,22 @@ def render_extraction(scores: Sequence[ExtractionScore]) -> None:
         agreed = len(score.attributes) - len(score.differing)
         print(
             f"{score.case_id:<26} extraction recall {score.recall:.2f}"
+            f"  endpoint {score.endpoint_recall:.2f}"
             f"  precision {score.precision:.2f}"
             f"  crossings {'match' if score.crossings_match else 'DIFFER'}"
             f"  attributes {agreed}/{len(score.attributes)}"
         )
     if not scores:
         return
+    # Both readings, because the gap between them is the reading. A wide gap is
+    # naming drift over the right architecture; a narrow one at a low number is
+    # an extraction that found different things.
+    strict = sum(score.recall for score in scores) / len(scores)
+    endpoint = sum(score.endpoint_recall for score in scores) / len(scores)
+    print(
+        f"recall: {strict:.2f} strict, {endpoint:.2f} folding the flow label"
+        f" — the gap is naming, not extraction (instrument, non-gating)"
+    )
     totals = aggregate_attributes(scores)
     print(
         f"attributes: {totals['agreed']}/{totals['compared']} agree"
