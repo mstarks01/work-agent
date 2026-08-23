@@ -16,7 +16,7 @@ These follow step 7 of the procedure above and belong to this framework alone.
     - the requirement applies to this system, and the input does not show it satisfied — write the claim plainly;
     - the requirement applies, and the input does not settle it — write it conditionally and name the element and attribute it hangs on, so the critic can mark it needs-info;
     - the requirement does not apply to a system of this shape — write the claim and say which fact of the model rules it out, so the critic can reject it. A rejected claim is an answer, not a gap.
-9. **Say which position in the graph, or none.** Most requirements in this standard address a coding practice with no position in the System Model. Where yours does, name the elements. Where it does not, leave `affected_element_ids` empty rather than reaching for the nearest element — a requirement about output encoding is not about the web process just because one exists.
+9. **Say which position in the graph, or none.** Most requirements in this standard address a coding practice with no position in the System Model. Where yours does, name the elements — each **copied from the element roster** rather than assembled from a name. Where it does not, leave `affected_element_ids` empty rather than reaching for the nearest element — a requirement about output encoding is not about the web process just because one exists.
 
 ## Your fields
 
