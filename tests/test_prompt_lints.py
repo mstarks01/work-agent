@@ -787,3 +787,64 @@ def test_a_vocabulary_that_rejects_unknown_is_named_in_the_prompt(field, values)
         f"{field} rejects `unknown` and the prompt never names {attribute!r}. "
         f"A model applying the controlling rule to it emits an illegal value."
     )
+
+
+# ---------------------------------------------------------------------------
+# Every way an extraction can fail the gate is a rule the prompt has to carry.
+#
+# `validation.IssueCode` is the closed set of ways a model's output is refused.
+# Each one kills the job — `repair` gets a single pass — so each is a failure
+# the prompt is responsible for preventing, and the two the 2026-08-23 sweeps
+# actually hit were both cases where it did not.
+#
+# `illegal-asset-tag` (#295, #296): the prompt named `unknown` a dozen times as
+# the sentinel and handed the model a vocabulary that rejects it.
+#
+# `invalid-reference` (#295 item 2): rule 4 said "Both endpoints must be zoned
+# elements you have already created" — the right rule with no remedy. A model
+# that wants a flow to something it did not inventory can drop the interaction
+# or write the dangling endpoint, and the prompt said which to prefer nowhere.
+# gpt-4o wrote the dangling endpoint on 4 of 13 cases.
+#
+# The table is the decidable half. A code added to `IssueCode` fails here until
+# somebody says what the prompt does about it — which is the point, because the
+# alternative is finding out from a dead job on a live sweep.
+EXTRACTION_FAILURE_RULES: dict[str, str] = {
+    "schema": "Your output is validated mechanically",
+    "duplicate-id": "Two elements sharing a name share an ID",
+    "id-mismatch": "IDs are recomputed from the names you give",
+    "invalid-reference": "go back and create it",
+    "no-trust-zones": "create one that covers the system as described",
+    "illegal-asset-tag": "`unknown` is not one of them",
+    "too-many-elements": "",  # a size ceiling no wording prevents; see below
+    "unverifiable-excerpt": "a short verbatim quote",
+}
+
+
+def test_every_extraction_failure_mode_is_declared():
+    """The table answers `IssueCode`, with nothing left over.
+
+    Self-completing against the enum: a new way to refuse an extraction fails
+    here until the prompt accounts for it, or until somebody declares — as
+    ``too-many-elements`` is declared — that no wording prevents it.
+    """
+    from stride_service.validation import IssueCode
+
+    assert set(EXTRACTION_FAILURE_RULES) == set(get_args(IssueCode))
+
+
+@pytest.mark.parametrize("code,phrase", sorted(EXTRACTION_FAILURE_RULES.items()))
+def test_the_prompt_carries_the_rule_that_prevents_each_failure(code, phrase):
+    """The rule that keeps a job alive is in the prompt the job reads.
+
+    ``too-many-elements`` carries an empty phrase deliberately: it is an
+    admission cap on model *size*, and no instruction stops a genuinely large
+    system from being large. Every other code is a mistake wording can prevent.
+    """
+    if not phrase:
+        pytest.skip(f"{code} is a size ceiling rather than a rule a model can follow")
+
+    assert phrase in loader.load(EXTRACT_PROMPT_NAME), (
+        f"extract.md carries no rule against {code!r}. A model that trips it "
+        f"kills the job and spends its one repair pass."
+    )
