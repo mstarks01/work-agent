@@ -43,6 +43,7 @@ from stride_service.graph import (
     ENTRY_EXTRACT_ONLY,
     ENTRY_PREPARE,
     STATE_EXTRACTED_MODEL,
+    STATE_FRAMEWORK_OPTIONS,
     STATE_VALID_MODEL,
     Entry,
     FrameworkNodes,
@@ -301,6 +302,59 @@ def aggregate_attributes(scores: Sequence[ExtractionScore]) -> dict[str, Any]:
 EVAL_FRAMEWORKS: tuple[FrameworkName, ...] = ("stride",)
 
 
+def case_framework_options(case: GoldenCase) -> dict[str, dict[str, Any]]:
+    """The job-level options this case declares, in the shape the graph seeds.
+
+    **The harness is a driver, and a driver seeds these.** ``prepare_analysis``
+    validates every selected framework's options against that package's own
+    model and raises ``MissingFrameworkOptions`` when one is absent, because no
+    package field carries a default. ``AdkPipelineRunner`` builds this map from
+    the job's ``frameworks`` list; this builds the same map from the case's,
+    which is where a corpus case has always declared them.
+
+    Missing until #290, and it made ``analysis`` and ``end-to-end`` unrunnable
+    for any package with a required option. It went unnoticed because STRIDE
+    declares none, so the omission was invisible for as long as STRIDE was the
+    only package — and ``tests/test_graph.py`` seeds ``ASVS_OPTIONS`` by hand,
+    so no offline test drove the path that omits them.
+    """
+    return {
+        declaration.name: dict(declaration.options)
+        for declaration in case.meta.frameworks
+    }
+
+
+def select_frameworks(
+    case: GoldenCase, only: Sequence[FrameworkName] = ()
+) -> tuple[FrameworkName, ...]:
+    """This case's frameworks, narrowed to ``only`` when a sweep asks for it.
+
+    **A pure selection: it names no option and changes no reference set.** A
+    case still declares what it is graded for and still carries the options for
+    it; this only decides which of those declarations one sweep builds a graph
+    for. So a narrowed sweep and a full one measure the same cases the same way
+    — the narrowed one just measures fewer frameworks per case.
+
+    Empty ``only`` means every framework the case declares, which is what every
+    sweep did before this existed.
+
+    **Why it exists is capacity, not preference.** One job fans out one
+    ``strong``-tier request per lane of every framework it names, all at the
+    barrier — :func:`~stride_service.frameworks.widest_fan_out`, 23 today. On a
+    200,000 token-per-minute quota that burst is over budget on a single job,
+    and no per-caller ceiling helps: ``max_active_jobs`` bounds jobs, and this
+    is one job. Narrowing the selection is the only lever inside the harness.
+
+    A case that declares none of ``only`` yields an empty tuple and its caller
+    skips it, which is a case the sweep did not measure rather than one that
+    measured nothing.
+    """
+    declared = case_frameworks(case)
+    if not only:
+        return declared
+    return tuple(name for name in declared if name in set(only))
+
+
 def case_frameworks(case: GoldenCase) -> tuple[FrameworkName, ...]:
     """The frameworks to build this case's graph for: the ones it declares.
 
@@ -486,14 +540,19 @@ async def run_analysis(case: GoldenCase, pipeline: Pipeline) -> AnalysisRun:
     graph_run = await run_graph(
         pipeline,
         case.sources,
-        {STATE_VALID_MODEL: case.model.model_dump(mode="json")},
+        {
+            STATE_VALID_MODEL: case.model.model_dump(mode="json"),
+            STATE_FRAMEWORK_OPTIONS: case_framework_options(case),
+        },
     )
     return _run_from_graph(case, graph_run, pipeline)
 
 
 async def run_end_to_end(case: GoldenCase, pipeline: Pipeline) -> AnalysisRun:
     """Mode 3: text in, report out — the integration smoke test."""
-    graph_run = await run_graph(pipeline, case.sources)
+    graph_run = await run_graph(
+        pipeline, case.sources, {STATE_FRAMEWORK_OPTIONS: case_framework_options(case)}
+    )
     return _run_from_graph(case, graph_run, pipeline)
 
 

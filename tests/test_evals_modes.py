@@ -21,8 +21,11 @@ from pydantic import Field
 from evals.harness import modes
 from evals.harness.reference import load_case
 from evals.harness.structural import report_issues
+
+CORPUS = Path(__file__).resolve().parents[1] / "evals" / "corpus"
 from stride_service.certification import fingerprints_of
 from stride_service.evidence import evidence_catalog
+from stride_service.frameworks import package_for
 from stride_service.frameworks.stride.record import (
     CATEGORY_LETTERS,
     STRIDE_CATEGORIES,
@@ -589,3 +592,107 @@ def test_every_mode_maps_to_a_graph_entry():
         "analysis": ENTRY_PREPARE,
         "end-to-end": ENTRY_EXTRACT,
     }
+
+
+class TestTheHarnessSeedsFrameworkOptions:
+    """The driver's half of the options contract, which #290 found missing.
+
+    ``prepare_analysis`` validates every selected framework's options and raises
+    when one is absent, since no package field carries a default.
+    ``AdkPipelineRunner`` seeds them from the job; the harness has to seed them
+    from the case, and did not.
+
+    **Why no offline test caught it.** ``tests/test_graph.py`` seeds
+    ``ASVS_OPTIONS`` by hand, so every test of the graph supplied what the
+    harness omits. The gap lived in the one seam nothing drove end to end, and a
+    live sweep found it on the first case — for no money, because
+    ``prepare_analysis`` is a deterministic node ahead of the fan-out.
+    """
+
+    def test_a_declared_option_reaches_the_seeded_state(self):
+        """Read off the case, in the shape ``prepare_analysis`` validates."""
+        case = load_case(CORPUS / "01-payments-checkout")
+
+        options = modes.case_framework_options(case)
+
+        assert options["asvs"] == {"level": 2}
+        assert options["stride"] == {}
+
+    def test_every_declared_framework_gets_an_entry(self):
+        """A framework the case names and the map omits is the raise.
+
+        Over the whole corpus rather than one case, because the defect was a
+        package with a *required* option arriving beside one with none — so a
+        fixture built from either alone would have passed.
+        """
+        for path in sorted(p for p in CORPUS.iterdir() if p.is_dir()):
+            case = load_case(path)
+            options = modes.case_framework_options(case)
+            assert set(options) == set(modes.case_frameworks(case)), path.name
+
+    def test_the_options_satisfy_every_packages_own_model(self):
+        """The check ``prepare_analysis`` runs, run here where it costs nothing.
+
+        This is the assertion that would have failed before the fix, and it
+        fails for any package that later declares a required option its corpus
+        cases do not carry.
+        """
+        for path in sorted(p for p in CORPUS.iterdir() if p.is_dir()):
+            case = load_case(path)
+            options = modes.case_framework_options(case)
+            for name in modes.case_frameworks(case):
+                package_for(name).options.model_validate(options.get(name) or {})
+
+
+class TestNarrowingASweepToOneFramework:
+    """``--framework`` is a pure selection, added by #291 for capacity.
+
+    One job fans out one ``strong``-tier request per lane of every framework it
+    names, all at the barrier — 23 today. Against a 200,000 token-per-minute
+    quota that burst is over budget on a single job, and ``max_active_jobs``
+    does not help because it bounds *jobs*. Narrowing the selection is the only
+    lever inside the harness, and a live sweep is what found that out.
+    """
+
+    def test_no_narrowing_runs_every_declared_framework(self):
+        """The default is what every sweep did before this existed."""
+        case = load_case(CORPUS / "01-payments-checkout")
+
+        assert modes.select_frameworks(case) == modes.case_frameworks(case)
+
+    def test_narrowing_keeps_only_what_was_asked_for(self):
+        case = load_case(CORPUS / "01-payments-checkout")
+
+        assert modes.select_frameworks(case, ("stride",)) == ("stride",)
+        assert modes.select_frameworks(case, ("asvs",)) == ("asvs",)
+
+    def test_narrowing_preserves_the_packages_declared_order(self):
+        """Order is the report's block order, so a selection must not reorder it."""
+        case = load_case(CORPUS / "01-payments-checkout")
+        declared = modes.case_frameworks(case)
+
+        assert modes.select_frameworks(case, tuple(reversed(declared))) == declared
+
+    def test_a_case_declaring_none_of_the_selection_yields_empty(self):
+        """Empty is a case the sweep did not measure, and the caller skips it.
+
+        Case 03 declares STRIDE alone, so an ASVS-only sweep has nothing to run
+        on it. That is different from a case that ran and scored zero, and the
+        sweep prints the skipped list rather than dropping it.
+        """
+        case = load_case(CORPUS / "03-batch-data-pipeline")
+
+        assert modes.select_frameworks(case, ("asvs",)) == ()
+
+    def test_narrowing_does_not_touch_the_options(self):
+        """A pure selection names no option and changes no reference set.
+
+        The options map still answers for every framework the *case* declares,
+        because narrowing decides what a sweep builds rather than what a case
+        is graded for.
+        """
+        case = load_case(CORPUS / "01-payments-checkout")
+
+        assert set(modes.case_framework_options(case)) == set(
+            modes.case_frameworks(case)
+        )
