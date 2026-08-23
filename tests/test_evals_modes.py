@@ -916,3 +916,60 @@ class TestTheInitiatorReadingOfAnExtraction:
         for path in sorted(p for p in CORPUS.iterdir() if p.is_dir()):
             model = load_case(path).model
             assert modes.pure_initiators(model), path.name
+
+
+class TestASweepSurvivesARefusedModel:
+    """One case's model being refused costs that case, not the sweep (#303).
+
+    A live `--mode end-to-end` run died on case 09 and produced no artifact,
+    losing the eight cases that had already run:
+
+        EvalRunError: 09-cookbook-sokify-retail: the graph rejected the model:
+        unverifiable-excerpt: source_excerpt '...' is not found in the source
+
+    `_run_mode`'s docstring already states the rule — a case the fan-in rejects
+    is "counted and survived rather than allowed to abort the sweep" — and it
+    held for two failure classes out of three. The same event is a recorded
+    measurement in `extraction` mode and an aborted run in `end-to-end`, which
+    is the mode where a refused model is most expected and most expensive.
+    """
+
+    def test_routing_it_through_the_draft_classifier_would_miscount_it(self):
+        """`classify_failure` accepts it and files it as a *grounds* failure.
+
+        It does not raise — it returns kind ``other`` with ``draft_count=0`` —
+        and that is the argument for the separate branch rather than against it.
+        `GroundsFailure` feeds the grounds instrument, whose subject is what a
+        case's drafts did. A case whose model was refused produced no drafts, so
+        counting it there inflates a grounds number with a non-grounds event.
+        """
+        from evals.harness.grounds import classify_failure
+
+        filed = classify_failure(
+            "09", modes.EvalRunError("09: the graph rejected the model")
+        )
+
+        assert filed.kind == "other"
+        assert filed.draft_count == 0
+        assert filed.threat_ids == ()
+
+    def test_the_message_already_names_its_case(self):
+        """So the sweep records `str(error)` rather than prefixing it twice."""
+        error = modes.EvalRunError("09-cookbook-sokify-retail: the graph rejected")
+
+        assert str(error).startswith("09-cookbook-sokify-retail: ")
+
+    def test_the_sweep_catches_it_before_the_fan_in_classes(self):
+        """Order matters: `EvalRunError` is a `RuntimeError`, not a `DraftJoinError`.
+
+        Reading the source rather than driving a live graph, because reaching
+        this branch for real needs a provider and a model that fails validation
+        — which is what cost the sweep that found it.
+        """
+        source = (
+            Path(__file__).resolve().parents[1] / "evals" / "harness" / "run.py"
+        ).read_text(encoding="utf-8")
+        body = source.split("else await modes.run_end_to_end(case, pipeline)", 1)[1]
+
+        assert body.index("except modes.EvalRunError") < body.index("except CAUGHT")
+        assert "continue" in body[: body.index("except CAUGHT")]
