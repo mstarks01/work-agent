@@ -28,6 +28,17 @@ wrote down. That includes the 90% bar. A rule at 92.5% agrees with an agent's
 opinions 92.5% of the time, and sitting 01 is the only evidence anywhere that
 any of those opinions are right.
 
+**Two live sweeps exist, and neither is a quality standard.** The service has
+been swept live twice: `claude-opus-4-6` on 2026-08-14 (12 cases) and
+`gpt-5.6-luna` on 2026-08-23 (13 cases), both STRIDE only and both
+`analysis` mode. The second used the cheapest model its vendor sells,
+deliberately — it was measuring whether the *machinery* holds, not how well the
+service analyses. Its recall and groundedness figures describe luna and nothing
+else. What the pair does establish is that the mechanical gates held on both:
+zero mis-shaped grounds, zero structural failures, and an unverified-quote rate
+of 2.0% and 3.4%. [`TUNING.md`](TUNING.md#choosing-a-model-to-sweep-with) says
+which questions a cheap model may answer and which it may not.
+
 **There is no model judge.** Claim matching is `SubsetVerbIdentity`, a rule in
 `harness/identity.py`; it scores 185/200 against the recorded labels
 (`python -m evals.harness.run calibrate`), over the 90% bar, with no provider
