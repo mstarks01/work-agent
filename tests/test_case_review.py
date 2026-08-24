@@ -39,14 +39,6 @@ from evals.harness.reference import CLAIMS_DIR, load_corpus
 #: acceptable. They are the cases that shipped before step 6 was enforced, and
 #: the list is meant to shrink to nothing.
 UNREVIEWED: dict[str, str] = {
-    "01-payments-checkout": (
-        "The control case, and the only one carrying both frameworks in quantity. "
-        "Every far-domain recall number in the suite is a delta against this one, "
-        "so an error in its 21 STRIDE claims moves every comparison the corpus "
-        "exists to make. Its 17 ASVS records feed the applicability matrix, so "
-        "an error in those moves a number too. Neither instrument can ask "
-        "whether either set is complete. Reviewed first: REVIEW-02."
-    ),
     "02-iot-fleet-telemetry": (
         "18 STRIDE claims and 8 ASVS records, unread. The ASVS records feed the "
         "applicability matrix, which scores whether a requirement applies and "
