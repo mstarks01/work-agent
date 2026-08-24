@@ -352,18 +352,27 @@ Three properties make the record worth keeping:
 
 ## The corpus
 
-Thirteen cases, each sized so a human can enumerate its threats exhaustively
-(roughly 8–20 elements). Case `01` is the **control** and is not optional: every
-worked example in the shipped prompts is drawn from one payments system, and
-that can bias the tool toward payments-shaped threats. You can't see that bias as
-an absolute score — only as the **gap** between recall on the near-domain case
-(`01`) and the far-domain cases (everything else). Without `01` there's nothing
-to compare against. That gap is tracked and watched, but never fails a build.
+Thirteen cases, each sized so a person can enumerate its threats exhaustively
+(roughly 8–20 elements).
+
+The shipped prompts teach by example, and every lane's `exemplars.md` works its
+threats against one of **two** systems: a payments system, and an event-driven
+sensor fleet the exemplars call system B. A tool shown an architecture may find
+that architecture's threats more easily. You cannot read that bias off an
+absolute score — only off the **gap** between recall on the near cases and
+recall on the far ones.
+
+So the corpus carries one control per exemplar system: `01` for payments and
+`02` for the fleet. Neither is optional. Drop either and the near side loses a
+system to compare against. `exemplar_proximity` sits on the (case, framework)
+pair, because each framework writes its own exemplars — a case near STRIDE's
+payments system is near nothing of ASVS's unless ASVS demonstrates that shape
+too. The gap is tracked and watched, but never fails a build.
 
 | Case | Domain | Proximity | Source |
 |---|---|---|---|
 | `01-payments-checkout` | payments | **near** | synthetic |
-| `02-iot-fleet-telemetry` | IoT fleet | far | synthetic |
+| `02-iot-fleet-telemetry` | IoT fleet | **near** | synthetic |
 | `03-batch-data-pipeline` | batch data | far | synthetic |
 | `04-ml-inference-service` | ML serving | far | synthetic |
 | `05-cookbook-queue-webapp` | web app + queue | far | OWASP Threat Model Cookbook |
