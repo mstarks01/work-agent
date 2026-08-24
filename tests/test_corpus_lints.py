@@ -289,3 +289,72 @@ def test_the_harness_table_names_every_module():
         f" {sorted(documented - actual)}. A module added to the harness needs a"
         " row saying what it owns."
     )
+
+
+#: The corpus table's fourth column, beside the proximity one.
+SOURCE_ROW = re.compile(
+    r"^\| `(?P<case>[0-9]{2}-[a-z0-9-]+)` \| [^|]+ \| [^|]+ \| (?P<source>[^|]+?) \|",
+    re.MULTILINE,
+)
+
+#: The upstream corpus this repository borrows cases from, and the licence
+#: those cases carry. A case whose ``provenance`` opens with this attribution
+#: is borrowed; everything else is written here.
+COOKBOOK = "OWASP Threat Model Cookbook"
+COOKBOOK_LICENCE = "CC-BY 4.0"
+
+
+def _documented_source() -> dict[str, str]:
+    return {
+        match["case"]: match["source"]
+        for match in SOURCE_ROW.finditer(README.read_text(encoding="utf-8"))
+    }
+
+
+@pytest.mark.parametrize(
+    "case_dir", verify_corpus.case_dirs(), ids=lambda path: path.name
+)
+def test_the_readme_attributes_a_borrowed_case_to_its_source(case_dir):
+    """Whether a case is borrowed is a licence fact, so the table must not drift.
+
+    The other columns describe a case. This one attributes it. A borrowed case
+    whose row reads ``synthetic`` is a missing attribution in a published
+    document, not a stale label, which is why this is checked where the
+    ``Domain`` column beside it is not.
+
+    A rule rather than a mapping: the provenance decides, so a fifth borrowed
+    case is covered on the day it lands.
+    """
+    provenance = json.loads((case_dir / "case.json").read_text(encoding="utf-8"))[
+        "provenance"
+    ]
+    documented = _documented_source()[case_dir.name]
+    borrowed = provenance.startswith(COOKBOOK)
+
+    if borrowed:
+        assert documented == COOKBOOK, (
+            f"{case_dir.name} is borrowed from the {COOKBOOK} and its README row"
+            f" says {documented!r}. The row is the attribution."
+        )
+    else:
+        assert documented.startswith("synthetic"), (
+            f"{case_dir.name} was written for this corpus and its README row says"
+            f" {documented!r}, which claims a source it does not have."
+        )
+
+
+@pytest.mark.parametrize(
+    "case_dir", verify_corpus.case_dirs(), ids=lambda path: path.name
+)
+def test_a_borrowed_case_names_the_licence_it_carries(case_dir):
+    """Attribution without a licence is half a citation."""
+    provenance = json.loads((case_dir / "case.json").read_text(encoding="utf-8"))[
+        "provenance"
+    ]
+    if not provenance.startswith(COOKBOOK):
+        pytest.skip("written for this corpus, so it carries no upstream licence")
+
+    assert COOKBOOK_LICENCE in provenance, (
+        f"{case_dir.name} cites the {COOKBOOK} and never names its licence."
+        f" Record {COOKBOOK_LICENCE} in case.json's provenance."
+    )
