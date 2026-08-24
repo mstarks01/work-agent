@@ -120,9 +120,11 @@ Write what could go wrong. Anything: an attack, a missing control, a question th
 text does not answer. Bullet points, in any order, no need to sort by category.
 
 ```
--
--
--
+- a whole class of attacks related to the session cookie: session fixation, replaying the cookie, stealing it, etc.
+- a whole class of attacks related to password misuse due to the lack of 2FA: leaked passwords from a breach, easily guessable passwords, password reuse, etc.
+- If there is no auth on the gRPC call then it is a weak trust relationship and unauthenticated callers may be able to place orders and potentially steal customer information.
+- The application account on the db may be over privileged.
+- If the callback is not authenticated then there is potential for spoofing. A malicious actor may post a callback of their own appearing to have come from the payment processor as if an order was paid for when it was not.
 ```
 
 ---
@@ -149,7 +151,7 @@ of them. That is the finding this sitting exists for.
 - tier: must-find · severity: high/high
 - recorded note: Single-factor session with no MFA on an internet-facing endpoint; the canonical finding for this flow.
 
-> mark:
+> mark: agree 
 
 **2.** An attacker POSTs a forged settlement webhook to the storefront API, impersonating the card processor to mark an unpaid order as paid.
 
@@ -157,7 +159,7 @@ of them. That is the finding this sitting exists for.
 - tier: must-find · severity: high/high
 - recorded note: Callback authentication is unknown on an internet-facing endpoint; must be reported as unverified, not assumed present.
 
-> mark:
+> mark: agree 
 
 **3.** Any workload that can reach the order service impersonates the storefront API on the unauthenticated gRPC channel and submits orders.
 
@@ -165,7 +167,7 @@ of them. That is the finding this sitting exists for.
 - tier: must-find · severity: medium/high
 - recorded note: Authentication is stated as none, accepted by network position — a stated absence, not an unknown.
 
-> mark:
+> mark: agree
 
 **4.** An attacker holding the shared application password connects to orders-db as the order service.
 
@@ -173,7 +175,7 @@ of them. That is the finding this sitting exists for.
 - tier: expected · severity: medium/high
 - recorded note: Static shared secret from an environment variable; identity is the password.
 
-> mark:
+> mark: agree
 
 ### tampering
 
@@ -183,7 +185,7 @@ of them. That is the finding this sitting exists for.
 - tier: must-find · severity: medium/high
 - recorded note: Crosses dmz to core with authentication none and encryption_in_transit unknown.
 
-> mark:
+> mark: agree 
 
 **6.** An attacker with the shared full read/write database account alters order rows, changing prices or payment status directly.
 
@@ -191,7 +193,7 @@ of them. That is the finding this sitting exists for.
 - tier: must-find · severity: medium/high
 - recorded note: No least privilege: the same credential that reads can rewrite every row.
 
-> mark:
+> mark: agree 
 
 **7.** An attacker replays or edits a settlement callback to flip the recorded payment state of an order they do not own.
 
@@ -199,7 +201,7 @@ of them. That is the finding this sitting exists for.
 - tier: expected · severity: medium/high
 - recorded note: Distinct from the spoofing entry: the target is the persisted order state, not the sender identity.
 
-> mark:
+> mark: agree 
 
 **8.** An attacker holding the order service's service account overwrites or deletes archived receipts to erase evidence of an order.
 
@@ -207,7 +209,7 @@ of them. That is the finding this sitting exists for.
 - tier: expected · severity: low/medium
 - recorded note: The model states CMEK encryption but says nothing about object immutability or retention locks.
 
-> mark:
+> mark: agree 
 
 ### repudiation
 
@@ -217,7 +219,7 @@ of them. That is the finding this sitting exists for.
 - tier: must-find · severity: medium/medium
 - recorded note: The one audit record in the system carries the service identity, never the authenticated shopper.
 
-> mark:
+> mark: agree 
 
 **10.** The processor disputes a settlement the storefront recorded, and no verifiable sender identity on the webhook lets either side prove who sent it.
 
@@ -225,7 +227,7 @@ of them. That is the finding this sitting exists for.
 - tier: expected · severity: medium/medium
 - recorded note: Follows from unknown callback authentication; a financial dispute path.
 
-> mark:
+> mark: agree 
 
 **11.** An operator makes a change through the shared application account and no record attributes that change to a person.
 
@@ -233,7 +235,7 @@ of them. That is the finding this sitting exists for.
 - tier: expected · severity: medium/medium
 - recorded note: Shared credential collapses every actor into one database identity.
 
-> mark:
+> mark: agree 
 
 ### information-disclosure
 
@@ -243,7 +245,7 @@ of them. That is the finding this sitting exists for.
 - tier: must-find · severity: medium/high
 - recorded note: encryption_at_rest is unknown on a store tagged pii and financial — report as unverified, and a needs-info verdict is acceptable here.
 
-> mark:
+> mark: agree 
 
 **13.** An attacker with access to the internal network reads order contents and shopper identifiers off the gRPC channel, whose encryption is unverified.
 
@@ -251,7 +253,7 @@ of them. That is the finding this sitting exists for.
 - tier: must-find · severity: medium/high
 - recorded note: Same flow as the tampering entry; the lane difference is read versus modify.
 
-> mark:
+> mark: agree 
 
 **14.** An attacker observing the database connection reads PII in transit because transport encryption on it is unverified.
 
@@ -259,7 +261,7 @@ of them. That is the finding this sitting exists for.
 - tier: expected · severity: medium/high
 - recorded note: Intra-zone flow, so lower exposure than the crossing above, but the same unknown.
 
-> mark:
+> mark: agree 
 
 **15.** An attacker who can read the order service's process environment, crash dumps or logs recovers the database password held in an environment variable.
 
@@ -267,7 +269,7 @@ of them. That is the finding this sitting exists for.
 - tier: expected · severity: medium/high
 - recorded note: The credential's storage location is stated in the model, so this is grounded rather than speculative.
 
-> mark:
+> mark: agree 
 
 ### denial-of-service
 
@@ -277,7 +279,7 @@ of them. That is the finding this sitting exists for.
 - tier: must-find · severity: medium/medium
 - recorded note: An internet-facing endpoint with no verified caller identity is the cheapest flood target in the model.
 
-> mark:
+> mark: agree 
 
 **17.** An attacker drives enough order submissions to exhaust the order service's database connections and halt order capture.
 
@@ -285,7 +287,7 @@ of them. That is the finding this sitting exists for.
 - tier: expected · severity: medium/high
 - recorded note: Order service is tagged availability-critical and has one datastore dependency.
 
-> mark:
+> mark: agree 
 
 **18.** An attacker floods the checkout path from the public internet and prevents shoppers from placing orders.
 
@@ -293,7 +295,7 @@ of them. That is the finding this sitting exists for.
 - tier: expected · severity: medium/medium
 - recorded note: Generic but grounded: the storefront API is the single internet-facing component.
 
-> mark:
+> mark: agree 
 
 ### elevation-of-privilege
 
@@ -303,7 +305,7 @@ of them. That is the finding this sitting exists for.
 - tier: must-find · severity: high/high
 - recorded note: The boundary crossing plus authentication none is the highest-signal fact in this model.
 
-> mark:
+> mark: agree 
 
 **20.** An attacker who compromises the order service inherits full read/write over every order record, because the service holds one unscoped database account.
 
@@ -311,7 +313,7 @@ of them. That is the finding this sitting exists for.
 - tier: must-find · severity: medium/high
 - recorded note: Blast radius of a single compromise; distinct from the tampering entry, which assumes the credential is already held.
 
-> mark:
+> mark: agree 
 
 **21.** An attacker who compromises the internet-facing storefront API pivots from the DMZ into the core zone.
 
@@ -319,7 +321,7 @@ of them. That is the finding this sitting exists for.
 - tier: expected · severity: medium/high
 - recorded note: The pivot itself, stated against the two processes rather than the flow between them.
 
-> mark:
+> mark: agree 
 
 ---
 
@@ -348,7 +350,7 @@ not be raised.
 - tier: expected
 - recorded note: An HTTP surface exists on two flows; the header policy is unstated.
 
-> mark:
+> mark: agree 
 
 ### authentication
 
@@ -358,7 +360,7 @@ not be raised.
 - tier: must-find
 - recorded note: feature:password-auth fires. The mechanism is named and no parameter of it is.
 
-> mark:
+> mark: agree 
 
 **A3.** `V6.3.1` — The shopper login carries no second factor and no stated anti-automation control.
 
@@ -366,7 +368,7 @@ not be raised.
 - tier: must-find
 - recorded note: The submitter states there is no MFA, so this half is settled rather than open.
 
-> mark:
+> mark: agree 
 
 ### authorization
 
@@ -376,7 +378,7 @@ not be raised.
 - tier: must-find
 - recorded note: Stated outright, so the ruling is plain rather than conditional.
 
-> mark:
+> mark: agree 
 
 ### configuration
 
@@ -386,7 +388,7 @@ not be raised.
 - tier: must-find
 - recorded note: Stated outright by the submitter.
 
-> mark:
+> mark: agree 
 
 ### cryptography
 
@@ -396,7 +398,7 @@ not be raised.
 - tier: must-find
 - recorded note: encryption_at_rest is unknown: an open question, not a missing control.
 
-> mark:
+> mark: agree 
 
 ### data-protection
 
@@ -406,7 +408,7 @@ not be raised.
 - tier: expected
 - recorded note: The model answers the classification half and nothing answers the controls half.
 
-> mark:
+> mark: agree 
 
 ### encoding-and-sanitization
 
@@ -416,7 +418,7 @@ not be raised.
 - tier: must-find
 - recorded note: tech:database fires on store:orders-db. The requirement applies and no fact settles it.
 
-> mark:
+> mark: agree 
 
 ### secure-coding-and-architecture
 
@@ -426,7 +428,7 @@ not be raised.
 - tier: expected
 - recorded note: A code-practice requirement: the input carries prose rather than a dependency inventory.
 
-> mark:
+> mark: agree
 
 ### secure-communication
 
@@ -436,7 +438,7 @@ not be raised.
 - tier: must-find
 - recorded note: A derived crossing with encryption_in_transit unknown; the internal scope is not an exemption.
 
-> mark:
+> mark: agree 
 
 ### security-logging-and-error-handling
 
@@ -446,7 +448,7 @@ not be raised.
 - tier: must-find
 - recorded note: The submitter states the record's content, so the ruling is plain.
 
-> mark:
+> mark: agree 
 
 **A12.** `V16.5.1` — Nothing describes what the storefront API returns to a caller when an order fails.
 
@@ -454,7 +456,7 @@ not be raised.
 - tier: expected
 - recorded note: Applies to every internet-facing surface and is unstated here.
 
-> mark:
+> mark: agree 
 
 ### session-management
 
@@ -464,7 +466,7 @@ not be raised.
 - tier: must-find
 - recorded note: A session cookie exists, so the chapter applies; termination is unstated.
 
-> mark:
+> mark: agree 
 
 **A14.** `V7.2.3` — The session token's generation and entropy are never described.
 
@@ -472,7 +474,7 @@ not be raised.
 - tier: expected
 - recorded note: A framework default is not evidence about the token.
 
-> mark:
+> mark: agree 
 
 ### validation-and-business-logic
 
@@ -482,7 +484,7 @@ not be raised.
 - tier: expected
 - recorded note: A documentation requirement: the subject is outside the running system, so needs-info by construction.
 
-> mark:
+> mark: agree 
 
 **A16.** `V2.2.2` — Nothing says which side enforces validation of the order the shopper submits.
 
@@ -490,7 +492,7 @@ not be raised.
 - tier: must-find
 - recorded note: The crossing from the public zone is the fact that makes the requirement apply.
 
-> mark:
+> mark: agree 
 
 ### web-frontend-security
 
@@ -500,7 +502,7 @@ not be raised.
 - tier: must-find
 - recorded note: A browser-delivered credential puts this system in the chapter; the attributes are the requirement.
 
-> mark:
+> mark: agree 
 
 ---
 
@@ -509,7 +511,7 @@ not be raised.
 The point of the sitting. One line each, and say which set you expected it in.
 
 ```
--
+- Everything I stated was on the list.
 -
 ```
 
