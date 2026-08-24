@@ -264,3 +264,28 @@ def test_the_readme_table_agrees_with_the_case(case_dir):
         " disagree cannot be described by one column — give the table a column"
         " per framework."
     )
+
+
+#: ``evals/README.md``'s harness table: one row per module, keyed by path.
+HARNESS_ROW = re.compile(r"^\| `harness/(?P<module>[a-z_]+\.py)` \|", re.MULTILINE)
+HARNESS_DIR = verify_corpus.CORPUS_DIR.parent / "harness"
+
+
+def test_the_harness_table_names_every_module():
+    """The table grew an entry per module, so it is a table and must be keyed.
+
+    The failure this exists for: six modules — ``applicability``, ``artifact``,
+    ``instruction``, ``instruction_delta``, ``instruments`` and ``triggers`` —
+    were on disk and in no row. A reference check cannot see that, because
+    every path the table *did* name resolved. An incomplete table is invisible
+    to anything that only asks whether named things exist.
+    """
+    documented = set(HARNESS_ROW.findall(README.read_text(encoding="utf-8")))
+    actual = {path.name for path in HARNESS_DIR.glob("*.py")} - {"__init__.py"}
+
+    assert documented == actual, (
+        "evals/README.md's harness table and evals/harness/ disagree: undocumented"
+        f" {sorted(actual - documented)}, named but absent"
+        f" {sorted(documented - actual)}. A module added to the harness needs a"
+        " row saying what it owns."
+    )
