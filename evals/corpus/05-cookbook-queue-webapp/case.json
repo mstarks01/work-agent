@@ -1,7 +1,7 @@
 {
   "id": "05-cookbook-queue-webapp",
   "title": "Web application with queue-decoupled background worker",
-  "domain": "web-application",
+  "domain": "web-app-and-queue",
   "provenance": "OWASP Threat Model Cookbook, \"Demo Threat Model\" (Flow Diagram/webapp-threat-dragon/webapp-threat-dragon.json), https://github.com/OWASP/threat-model-cookbook — textual and graphical representations CC-BY 4.0. Converted to submitted-text form for this corpus; the original OWASP Threat Dragon model carries its own threat annotations, which were deliberately NOT copied into threats.json (see notes).",
   "bootstrap": "agent-stand-in",
   "sources": [

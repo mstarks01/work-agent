@@ -2,7 +2,7 @@
 
 `evals/BLESSING.md` step 6, over `evals/corpus/07-cicd-store-deploy`.
 
-**Build and deploy pipeline pushing container images to a 1,200-store estate** — domain `ci-cd-release-engineering`.
+**Build and deploy pipeline pushing container images to a 1,200-store estate** — domain `ci-cd-release`.
 
 **What you are checking.** Not whether two write-ups are the same threat — the
 identity rule decides that mechanically. This asks the question underneath:

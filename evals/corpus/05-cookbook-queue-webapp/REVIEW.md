@@ -2,7 +2,7 @@
 
 `evals/BLESSING.md` step 6, over `evals/corpus/05-cookbook-queue-webapp`.
 
-**Web application with queue-decoupled background worker** — domain `web-application`.
+**Web application with queue-decoupled background worker** — domain `web-app-and-queue`.
 
 **What you are checking.** Not whether two write-ups are the same threat — the
 identity rule decides that mechanically. This asks the question underneath:
