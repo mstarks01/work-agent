@@ -111,6 +111,8 @@ def write_artifact(tmp_path, record, **overrides) -> Path:
         "cases": ["01-payments-checkout"],
         "trusted": True,
         "structural_failures": [],
+        "repo_commit": {"commit": "0" * 40, "clean": True},
+        "corpus_digest": "0" * 64,
         "provenance": record.to_json(),
     } | overrides
     path = tmp_path / "artifact.json"

@@ -250,7 +250,7 @@ class TestTheDeclaredKeysAreTheWrittenKeys:
 
     def test_a_sweep_writes_exactly_the_declared_set(self, tmp_path):
         """``build`` produces the keys the loader is told to expect."""
-        from evals.harness.artifact import DECLARED_KEYS, build
+        from evals.harness.artifact import DECLARED_KEYS, RepoCommit, build
         from stride_service.certification import CertifyResult
 
         run = empty_run(tuple(PACKAGES))
@@ -266,6 +266,8 @@ class TestTheDeclaredKeysAreTheWrittenKeys:
             payloads=[],
             trusted=True,
             sweep=Sweep(run=run),
+            commit=RepoCommit(commit="0" * 40, clean=True),
+            corpus="0" * 64,
         )
         assert set(artifact) == DECLARED_KEYS
 
@@ -274,7 +276,7 @@ class TestReadingABlockFailsClosed:
     """``EvalArtifact.block`` over an artifact that lost one."""
 
     def loaded(self, raw):
-        from evals.harness.artifact import EvalArtifact
+        from evals.harness.artifact import EvalArtifact, RepoCommit
 
         return EvalArtifact(
             path=Path("sweep.json"),
@@ -283,6 +285,8 @@ class TestReadingABlockFailsClosed:
             trusted=True,
             structural_failures=(),
             provenance=empty_run(()).provenance,
+            commit=RepoCommit(commit="0" * 40, clean=True),
+            corpus_digest="0" * 64,
             raw=raw,
         )
 
