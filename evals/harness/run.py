@@ -53,7 +53,12 @@ from evals.harness import (
     queue,
     writing,
 )
-from evals.harness.artifact import EvalArtifact, load_artifact
+from evals.harness.artifact import (
+    EvalArtifact,
+    corpus_digest,
+    load_artifact,
+    repo_commit,
+)
 from evals.harness.artifact import build as build_artifact
 from evals.harness.calibration import (
     AGREEMENT_BAR,
@@ -506,6 +511,10 @@ def _models_record(deployment: Deployment) -> dict[str, Any]:
 
 def command_run(args: argparse.Namespace) -> int:
     cases = _select(load_corpus(args.corpus), args.case)
+    # Before anything is spent. Both answers are free and the sweep is not, so
+    # a repository that cannot say what it is about to run stops here rather
+    # than 90 minutes later holding an artifact that cannot name its prompts.
+    commit, corpus = repo_commit(), corpus_digest()
     # One deployment for the whole sweep: the graph it runs and the manifest it
     # is certified against are then one configuration rather than two reads
     # that could disagree.
@@ -562,6 +571,8 @@ def command_run(args: argparse.Namespace) -> int:
         structural_failures=failures,
         payloads=mode_run.payloads,
         trusted=trusted,
+        commit=commit,
+        corpus=corpus,
         sweep=sweep,
     )
     if args.out:

@@ -147,6 +147,32 @@ is recoverable from the configured tier strings. The block carries an
 `artifact_version` beside it at the artifact's root; a promotion refuses any
 version it does not know rather than interpreting it best-effort.
 
+**And which repository state produced it.** `provenance` says which models
+answered. `repo_commit` and `corpus_digest` say what they were asked — the
+prompts, the reference sets and the tiers a sweep ran against. Without the
+pair, two sweeps can differ by vendor, prompt edits and corpus size at once
+and the artifact cannot tell you which, so a comparison between them is not a
+model comparison and nothing in the file says so.
+
+Both are resolved before the sweep starts. A repository that cannot name what
+it is about to run stops in the first second rather than 90 minutes later,
+holding an artifact that cannot name its own prompts.
+
+`repo_commit` carries `clean` beside the commit, because running a sweep over
+uncommitted prompt edits is the ordinary tuning loop rather than a mistake —
+[TUNING.md](TUNING.md) step 3 asks for exactly that. The artifact records that
+the tree did not match the commit instead of pretending it did.
+
+`corpus_digest` covers every corpus file a number is computed from, by
+subtraction: a file added to a case counts until somebody rules it out. Only
+`corrections.md` and the reading documents are outside it, since no number
+reads them.
+
+An artifact taken before this was recorded carries `unrecorded` in both, which
+is a required field honestly stating a deficient provenance — the design
+`bootstrap` uses on `case.json`. A commit inferred from a run's date would be a
+guess, and indistinguishable from an observation once written down.
+
 ## Running
 
 Offline — no credentials, safe on every change:
