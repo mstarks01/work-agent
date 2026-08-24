@@ -1,7 +1,7 @@
 {
   "id": "03-batch-data-pipeline",
   "title": "Nightly partner claims ingest pipeline",
-  "domain": "data-pipeline",
+  "domain": "batch-data",
   "provenance": "internal-system (synthetic, sanitized)",
   "bootstrap": "agent-stand-in",
   "sources": [
