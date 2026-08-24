@@ -350,3 +350,45 @@ class TestOneCaseMeasuredAlone:
 
         assert measured.rows == {}
         assert [entry.framework for entry in measured.grounds] == ["stride"]
+
+
+#: The evals guides, which together describe what a sweep reports.
+GUIDES = sorted((Path(__file__).resolve().parents[1] / "evals").glob("*.md"))
+
+
+def test_every_instrument_is_described_in_the_guides():
+    """An instrument nobody documents is a number nobody can interpret.
+
+    The registry grew an entry per measurement, and the prose beside it is a
+    hand-kept enumeration of the same set — the shape that left
+    ``evals/README.md``'s harness table six modules short. So the enumeration
+    is keyed to the registry rather than remembered.
+
+    **Either spelling counts.** Code names a reading with an identifier and
+    prose names it in words: ``applicability_yield`` is written "applicability
+    yield" in ``TUNING.md``, and both are the same instrument. Holding the
+    guides to the identifier would be a style rule wearing a lint's clothes.
+
+    This decides that an instrument is *mentioned*, never that the sentence
+    around it is right. Nothing mechanical can decide the second — see
+    ``tests/test_doc_reference_lints.py``.
+    """
+    prose = "\n".join(guide.read_text(encoding="utf-8") for guide in GUIDES)
+    undocumented = sorted(
+        name
+        for name in INSTRUMENTS
+        if name not in prose and name.replace("_", " ") not in prose
+    )
+
+    assert not undocumented, (
+        f"these instruments are described in no evals guide: {undocumented}."
+        " A sweep reports every entry in INSTRUMENTS, so a reader meets a"
+        " number the documentation never names. Describe it in README.md's"
+        " metrics section, or in TUNING.md if it is a tuning lever."
+    )
+
+
+def test_the_guides_are_actually_read():
+    """Guards the guard: an empty glob would pass the test above vacuously."""
+    assert len(GUIDES) >= 4, f"only found {[g.name for g in GUIDES]}"
+    assert INSTRUMENTS, "the registry is empty"
