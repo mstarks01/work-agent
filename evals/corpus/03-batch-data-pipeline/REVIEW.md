@@ -2,7 +2,7 @@
 
 `evals/BLESSING.md` step 6, over `evals/corpus/03-batch-data-pipeline`.
 
-**Nightly partner claims ingest pipeline** — domain `data-pipeline`.
+**Nightly partner claims ingest pipeline** — domain `batch-data`.
 
 **What you are checking.** Not whether two write-ups are the same threat — the
 identity rule decides that mechanically. This asks the question underneath:

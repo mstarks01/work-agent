@@ -358,3 +358,57 @@ def test_a_borrowed_case_names_the_licence_it_carries(case_dir):
         f"{case_dir.name} cites the {COOKBOOK} and never names its licence."
         f" Record {COOKBOOK_LICENCE} in case.json's provenance."
     )
+
+
+#: The corpus table's second column, beside the case it names.
+DOMAIN_ROW = re.compile(
+    r"^\| `(?P<case>[0-9]{2}-[a-z0-9-]+)` \| (?P<domain>[^|]+?) \| ", re.MULTILINE
+)
+
+
+def _same_domain(slug: str, prose: str) -> bool:
+    """Whether a slug and a table cell name the same domain.
+
+    Not string equality. ``case.json`` holds a slug because
+    ``build_review_docs.py`` renders it as code at the top of a sitting
+    document; the table holds prose because a reader scans the whole corpus
+    there. Both are the domain, written for their own reader, so the comparison
+    normalises the three ways they differ: letter case, word separators, and
+    the conjunction symbols a table uses where a slug must spell the word.
+
+    Nothing else is folded. A normaliser that did more would start hiding the
+    disagreements this exists to find.
+    """
+
+    def normalise(text: str) -> list[str]:
+        for symbol in ("&", "+"):
+            text = text.replace(symbol, " and ")
+        return text.lower().replace("-", " ").replace("/", " ").split()
+
+    return normalise(slug) == normalise(prose)
+
+
+@pytest.mark.parametrize(
+    "case_dir", verify_corpus.case_dirs(), ids=lambda path: path.name
+)
+def test_the_readme_table_names_the_case_s_own_domain(case_dir):
+    """One domain per case, however the two readers see it written.
+
+    A reviewer meets ``domain `iot-fleet``` at the top of ``REVIEW.md`` and
+    "IoT fleet" in this table. Those must be one fact. Four cases said
+    otherwise — ``iot`` against "IoT fleet", ``data-pipeline`` against "batch
+    data" — and the slugs were corrected to the prose rather than the reverse,
+    because both places are read by people.
+    """
+    slug = json.loads((case_dir / "case.json").read_text(encoding="utf-8"))["domain"]
+    documented = {
+        match["case"]: match["domain"]
+        for match in DOMAIN_ROW.finditer(README.read_text(encoding="utf-8"))
+    }[case_dir.name]
+
+    assert _same_domain(slug, documented), (
+        f"{case_dir.name} declares domain {slug!r} and its README row says"
+        f" {documented!r}. The two are read by different people and must still"
+        " name one domain — correct whichever is wrong, then re-run"
+        " 'python evals/build_review_docs.py'."
+    )

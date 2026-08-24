@@ -2,7 +2,7 @@
 
 `evals/BLESSING.md` step 6, over `evals/corpus/02-iot-fleet-telemetry`.
 
-**Sensor fleet telemetry and firmware distribution** — domain `iot`.
+**Sensor fleet telemetry and firmware distribution** — domain `iot-fleet`.
 
 **What you are checking.** Not whether two write-ups are the same threat — the
 identity rule decides that mechanically. This asks the question underneath:

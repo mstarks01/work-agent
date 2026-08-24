@@ -1,7 +1,7 @@
 {
   "id": "02-iot-fleet-telemetry",
   "title": "Sensor fleet telemetry and firmware distribution",
-  "domain": "iot",
+  "domain": "iot-fleet",
   "provenance": "internal-system (synthetic, sanitized)",
   "bootstrap": "agent-stand-in",
   "sources": [
