@@ -1,7 +1,7 @@
 {
   "id": "07-cicd-store-deploy",
   "title": "Build and deploy pipeline pushing container images to a 1,200-store estate",
-  "domain": "ci-cd-release-engineering",
+  "domain": "ci-cd-release",
   "provenance": "Synthetic system authored for this corpus (wayfinder ticket 029). Not derived from, or sanitized from, any real system: there is nothing to leak by omission.",
   "bootstrap": "agent-stand-in",
   "sources": [
