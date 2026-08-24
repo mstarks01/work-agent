@@ -104,10 +104,12 @@ evals/
 | `harness/reference.py` | The `ReferenceThreat` type and the fail-closed corpus loader. |
 | `harness/structural.py` | The structural gates — the only checks that fail a run. |
 | `harness/scorer.py` | The scoring pipeline: prefilter → rule → match → standing → severity. |
+| `harness/applicability.py` | ASVS's scorer: a confusion matrix over a finite catalog, matched by requirement ID. A closed claim set needs no composed identity, so no rule runs here. |
 | `harness/critic_yield.py` | What the critic added and removed, scored on both sides. |
 | `harness/grounds.py` | What the category agents did with `grounds` — the branch mix, the padding number and the unverified-quote rate — plus the two failures the grounding path kills a case with. |
 | `harness/coverage.py` | What each category agent was offered and how much of it its drafts cite, pooled over the sweep. |
 | `harness/stability.py` | Run-to-run stability: which references two or more finished sweeps agree on. Reads artifacts rather than re-running. |
+| `harness/triggers.py` | Candidate-trigger recall: whether `stride_service.candidates` fired a rule in a reference claim's own lane, on an element that claim names. Costs no provider call. |
 | `harness/calibration.py` | Rule-vs-label agreement over the labelled fixtures — the scoreboard any rule change must clear. |
 | `harness/verbs.py` | The closed vocabulary of attacker actions, and what counts as one action. |
 | `harness/identity.py` | Claim identity from the fields a claim carries. `SubsetVerbIdentity` scores 185/200 against the recorded labels, over the 90% bar, with no model call. |
@@ -115,9 +117,13 @@ evals/
 | `harness/ledger.py` | The append-only record of what a **person** decided about a finding. |
 | `harness/queue.py` | Which findings a reviewer is asked about, and in what order. Blind to the configuration. Several sweeps of one configuration are merged here, which is where a finding's run count comes from. |
 | `harness/writing.py` | What reviewers said about how a finding reads, per case and framework. The one number a style down-vote moves, and it moves no other. |
+| `harness/instruction.py` | How much instruction each node was given, per framework, per sweep. The drift alarms of ADR 0016, read as a measurement. |
+| `harness/instruction_delta.py` | What one prompt edit did: which node's instruction moved, and what moved with it. |
 | `harness/provenance.py` | What each node execution actually ran on — tier, requested route, served build, fingerprint — written into the artifact and read back by a promotion. |
 | `harness/certify.py` | Promoting a winning configuration: rewrites `config/sampling.toml` and records its fingerprints as blessed. The certification check itself lives in the service (`stride_service.certification`), which this imports. |
 | `harness/modes.py` | The three run modes over the shipped graph, and the extraction score: element agreement, the derived crossings, and the attributes a Candidate rule reads. |
+| `harness/instruments.py` | Every measurement a sweep reports, as one table keyed by instrument — the per-case row, the fold, the rendering, and the artifact keys each one owns. |
+| `harness/artifact.py` | The sweep artifact: one declared shape, written once by `build` and read back through `load_artifact`, which refuses a file missing any declared key. |
 | `harness/run.py` | The command-line entry point. `score` re-reads the ledger over a finished sweep's saved reports, so a vote reaches the numbers without a second sweep. |
 
 Sampling parameters are **not** here: the harness reads `config/sampling.toml`
