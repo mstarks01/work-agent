@@ -7,6 +7,12 @@ name = "stride-service"
 version = "0.1.0"
 description = "Agentic STRIDE threat-modeling service"
 requires-python = ">=3.11"
+# Apache-2.0 covers the code. It does not cover every file the wheel ships:
+# `frameworks/asvs/catalog.json` reproduces OWASP ASVS 5.0.0, which is
+# CC BY-SA 4.0, so the wheel carries both texts and the NOTICE that says which
+# file each one governs. `license-files` is what puts them beside the metadata.
+license = "Apache-2.0"
+license-files = ["LICENSE", "LICENSE-CC-BY-SA-4.0.txt", "NOTICE"]
 dependencies = [
     "fastapi>=0.115",
     "google-adk==2.5.0",
