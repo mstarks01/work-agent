@@ -65,6 +65,24 @@ human vote is the only ground truth on whether an unmatched finding is real —
 its reason code decides whether it moves an analysis number or a writing one.
 See `docs/agents/claim-identity.md`.
 
+### Licensing
+
+Apache-2.0 covers the code. It does not cover the **ASVS** package's text:
+`catalog.json` and the 17 lane skill files reproduce ASVS 5.0.0, which OWASP
+publishes under CC BY-SA 4.0, so those 18 files carry ShareAlike.
+
+**Never copy a sentence out of a governed file into a file that is not governed.**
+Write the point in your own words. A requirement sentence reads like ordinary
+prompt text, which is exactly why this is easy to do and invisible in review;
+`tests/test_license_lints.py` fingerprints the upstream words and finds them
+whatever formatting they arrive in. Citing a standard by identifier carries no
+obligation — a short identifier is not the expression it points at.
+
+A package that quotes a published standard inherits that standard's licence, so
+it needs a `CONTENT_LICENSE` entry, a `THIRD_PARTY` entry and a `NOTICE`
+section. A corpus case converted from somebody else's model records the source
+**and the licence** in `provenance`. See `docs/agents/licensing.md`.
+
 ### Domain docs
 
 Single-context: one `CONTEXT.md` glossary at the repo root, ADRs in `docs/adr/`.
