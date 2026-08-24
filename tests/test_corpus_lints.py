@@ -7,6 +7,9 @@ deterministic and credential-free, which is what lets it run on every PR.
 
 from __future__ import annotations
 
+import json
+import re
+
 import pytest
 
 from evals import verify_corpus
@@ -207,3 +210,57 @@ def test_a_source_declared_with_no_readable_text_skips_the_excerpt_half():
         "processes": [{"id": "process:x", "source_excerpt": "q", "source_label": "Doc"}]
     }
     assert list(verify_corpus._check_citations(model, {"Doc": ""})) == []
+
+
+#: The corpus table in ``evals/README.md``: one row per case, and a single
+#: proximity column. ``exemplar_proximity`` is declared per (case, framework),
+#: so the column is only writable while a case's frameworks agree.
+README = verify_corpus.CORPUS_DIR.parent / "README.md"
+TABLE_ROW = re.compile(
+    r"^\| `(?P<case>[0-9]{2}-[a-z0-9-]+)` \| [^|]+ \| \*{0,2}(?P<proximity>near|far)\*{0,2} \|",
+    re.MULTILINE,
+)
+
+
+def _documented_proximity() -> dict[str, str]:
+    return {
+        match["case"]: match["proximity"]
+        for match in TABLE_ROW.finditer(README.read_text(encoding="utf-8"))
+    }
+
+
+def test_the_readme_table_names_every_case():
+    """A case absent from the table is one the table silently stops describing."""
+    documented = set(_documented_proximity())
+    actual = {case_dir.name for case_dir in verify_corpus.case_dirs()}
+
+    assert documented == actual, (
+        f"evals/README.md's corpus table and evals/corpus/ disagree: only in the"
+        f" table {sorted(documented - actual)}, only on disk {sorted(actual - documented)}"
+    )
+
+
+@pytest.mark.parametrize(
+    "case_dir", verify_corpus.case_dirs(), ids=lambda path: path.name
+)
+def test_the_readme_table_agrees_with_the_case(case_dir):
+    """The one column is prose; ``case.json`` is what ``exemplar_delta`` reads.
+
+    The failure this exists for: the table called ``02-iot-fleet-telemetry``
+    far while its ``case.json`` declared it near for both frameworks, so the
+    document described a one-system near side and the code computed a
+    two-system one.
+    """
+    meta = json.loads((case_dir / "case.json").read_text(encoding="utf-8"))
+    declared = {
+        framework["name"]: framework["exemplar_proximity"]
+        for framework in meta["frameworks"]
+    }
+    documented = _documented_proximity()[case_dir.name]
+
+    assert set(declared.values()) == {documented}, (
+        f"evals/README.md's corpus table says {case_dir.name} is {documented!r},"
+        f" and its case.json declares {declared}. A case whose frameworks"
+        " disagree cannot be described by one column — give the table a column"
+        " per framework."
+    )
