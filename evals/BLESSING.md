@@ -6,14 +6,13 @@ This is a one-time, offline authoring task — nothing here runs during a live
 analysis. The whole point of the document is **step 3**; everything else is
 bookkeeping around it.
 
-> **Nobody has ever run this document.** All 13 cases in `evals/corpus/` were
-> written by an agent, and no person has read a `model.json`, a reference set or
-> a labelled pair. The `corrections.md` files record what an agent changed
-> against the source text, not what a reviewer caught. Steps 3 and 6 below
-> describe what *should* happen and what has not happened yet, so treat this as
-> a procedure waiting for its first run rather than a record of one. Every
-> number the suite reports carries that provenance — see the top of
-> [README.md](README.md).
+> **Step 6 has run once, and no other step ever has.** All 13 cases in
+> `evals/corpus/` were written by an agent. A person has now read case
+> `01-payments-checkout` whole — source, model and both reference sets — and
+> signed it off in `case.json`. Nobody has read the other twelve, and nobody has
+> run step 3 on any case: the `corrections.md` files record what an agent changed
+> against the source text, not what a reviewer caught. Every number the suite
+> reports carries that provenance — see the top of [README.md](README.md).
 
 ## What a case is
 
@@ -317,9 +316,9 @@ property that the threat set is exhaustive *against that model*.
 ```
 
 `tests/test_case_review.py` fails on a new case that arrives without that block,
-and names every case still waiting in its `UNREVIEWED` list. The 13 cases that
-shipped before this was enforced are on that list; it is debt, not an exemption,
-and it is meant to shrink to nothing.
+and names every case still waiting in its `UNREVIEWED` list. Twelve of the 13
+cases that shipped before this was enforced are still on that list; it is debt,
+not an exemption, and it is meant to shrink to nothing.
 
 **Why it cannot be replaced by a lint.** Review sitting 01 found a reference claim
 asserting the model emits training data in a case with no training pipeline. A
