@@ -29,3 +29,12 @@
   ],
   "notes": "The control case for the exemplar-domain-bias delta (ticket 009 decision 6). Deliberately near-identical in shape to analyst.md's shared exemplar system: three network zones, an internet-facing API in a DMZ, a core worker, a PII/financial datastore with unverified at-rest protection, an append-only-ish archive, and an unauthenticated third-party payment callback. It is not a copy — names, technologies and flow labels differ — but nothing structural is far from the exemplar, which is the point: far-domain recall is only meaningful as a delta against this."
 }
+
+```json
+  "review": {
+    "reviewer": "Michael Starks",
+    "date": "<2026-08-23>",
+    "read": ["source.md", "model.json", "claims/stride.json", "claims/asvs.json"],
+    "notes": "the corpus represents the attacks very well"
+  },
+```
