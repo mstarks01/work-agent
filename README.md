@@ -156,3 +156,25 @@ are worth stating separately, because they are different kinds of claim:
 
 Persistent job and session backends are left as seams — the in-memory defaults
 are enough to get a report in process.
+
+## Licence
+
+The code is [Apache-2.0](LICENSE).
+
+The ASVS package's text is not. `src/stride_service/frameworks/asvs/catalog.json`
+and the 17 files at `frameworks/asvs/lanes/*/skill.md` reproduce the 345
+requirement sentences of OWASP ASVS 5.0.0, which OWASP publishes under
+[CC BY-SA 4.0](LICENSE-CC-BY-SA-4.0.txt). Those files carry that licence and its
+ShareAlike condition. The Python that reads the catalog collects it rather than
+adapts it, so the rest of the tree stays Apache-2.0.
+
+Four evaluation cases are prose conversions of OWASP Threat Model Cookbook
+models, which are CC BY 4.0 or Apache-2.0 upstream. Attribution only, no
+ShareAlike; each case names its source model in the `provenance` field of its
+`case.json`.
+
+[NOTICE](NOTICE) is the authoritative list: it names every third-party work,
+every file the work governs, and what changed. `CONTENT_LICENSE` in
+`src/stride_service/frameworks/__init__.py` keys the same fact by framework, so
+a new package that quotes a standard cannot ship without an entry and a NOTICE
+line.
