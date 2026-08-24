@@ -22,26 +22,129 @@ the claims, which is why no instrument owns them.
 
 from __future__ import annotations
 
+import hashlib
 import json
+import subprocess
 from collections.abc import Mapping, Sequence
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
 
-from pydantic import ValidationError
+from pydantic import BaseModel, ConfigDict, Field, ValidationError, model_validator
 
 from evals.harness.instruments import INSTRUMENTS, Sweep, artifact_blocks
 from evals.harness.provenance import ProvenanceError, RunProvenance
 from stride_service.certification import CertifyResult
 from stride_service.report import NodeLatency, TokenUsage
 
-# The eval artifact's schema version. Version 1 is the first artifact that
-# records served identities at all, and so the first one promotable: every
-# earlier artifact is unversioned, and there is no shim that would let one be
-# read as this shape. Bump it for any change to the ``provenance`` block, and
+REPO_ROOT = Path(__file__).resolve().parents[2]
+CORPUS_DIR = REPO_ROOT / "evals" / "corpus"
+
+# The eval artifact's schema version. Version 2 adds the two keys that say
+# which *repository state* produced a sweep, beside the ``provenance`` block
+# that already said which models did. Bump it for any change to either, and
 # promotion will reject the older files by name rather than half-understanding
 # them.
-ARTIFACT_VERSION = 1
+ARTIFACT_VERSION = 2
+
+#: What a recorded artifact carries where the fact was never captured. Only
+#: the sweeps taken before version 2 hold it: :func:`build` computes both keys
+#: or raises, so a new artifact can never claim it.
+#:
+#: A required field that honestly records a deficient provenance, which is the
+#: ``bootstrap`` field's design on ``case.json`` — that one stayed true for a
+#: year because nothing could omit it. Backfilling a commit inferred from a
+#: run's date would be the opposite: a guess at what produced a number,
+#: indistinguishable afterwards from an observation.
+UNRECORDED = "unrecorded"
+
+
+#: Files in a case directory that no number is computed from. Everything else
+#: is graded against, so the digest is taken by **subtraction**: a file added
+#: to a case counts until somebody rules it out, and the cost of being wrong is
+#: a digest that moves too often rather than one that misses a changed
+#: reference set.
+UNGRADED = ("corrections.md",)
+
+
+def _ungraded(name: str) -> bool:
+    return name in UNGRADED or name.startswith("REVIEW")
+
+
+class RepoCommit(BaseModel):
+    """Which commit the sweep ran from, and whether the tree matched it.
+
+    ``clean`` is not a formality. A sweep run over uncommitted prompt edits is
+    the ordinary tuning loop — ``TUNING.md`` step 3 asks for exactly that — so
+    refusing one would break the workflow this key exists to describe. Naming a
+    commit the working tree did not match, without saying so, would be worse:
+    the artifact would look reproducible and not be.
+    """
+
+    model_config = ConfigDict(extra="forbid", frozen=True)
+
+    commit: str = Field(min_length=1)
+    #: ``None`` exactly when the commit was never recorded. A recorded sweep
+    #: always knows, so a missing answer and "the tree was clean" stay distinct.
+    clean: bool | None = None
+
+    @model_validator(mode="after")
+    def _clean_is_known_iff_the_commit_is(self) -> RepoCommit:
+        if (self.commit == UNRECORDED) != (self.clean is None):
+            raise ValueError(
+                f"commit={self.commit!r} and clean={self.clean!r} disagree about"
+                f" whether this sweep's repository state was recorded; {UNRECORDED!r}"
+                " takes clean=None and nothing else does"
+            )
+        return self
+
+
+def repo_commit() -> RepoCommit:
+    """The commit this tree is on, and whether it has uncommitted changes.
+
+    Raises rather than falling back to :data:`UNRECORDED`. A sweep costs money
+    and the answer is free, so a repository that cannot say what it is running
+    should stop before it spends rather than write an artifact that cannot say
+    what produced it.
+    """
+    try:
+        commit = subprocess.run(
+            ["git", "rev-parse", "HEAD"],
+            cwd=REPO_ROOT,
+            capture_output=True,
+            text=True,
+            check=True,
+        ).stdout.strip()
+        status = subprocess.run(
+            ["git", "status", "--porcelain"],
+            cwd=REPO_ROOT,
+            capture_output=True,
+            text=True,
+            check=True,
+        ).stdout
+    except (OSError, subprocess.CalledProcessError) as exc:
+        raise ProvenanceError(
+            f"cannot read the commit this sweep would run from: {exc}. An"
+            " artifact that cannot name the prompts and reference sets behind"
+            " its numbers is not worth what the sweep costs."
+        ) from exc
+    return RepoCommit(commit=commit, clean=not status.strip())
+
+
+def corpus_digest() -> str:
+    """One digest over every corpus file a number is computed from.
+
+    Keyed on the path as well as the bytes, so a case renamed to another case's
+    content moves the digest. Sorted, so it does not depend on how the
+    filesystem happened to walk.
+    """
+    digest = hashlib.sha256()
+    for path in sorted(CORPUS_DIR.rglob("*")):
+        if not path.is_file() or _ungraded(path.name):
+            continue
+        digest.update(path.relative_to(CORPUS_DIR).as_posix().encode("utf-8"))
+        digest.update(hashlib.sha256(path.read_bytes()).digest())
+    return digest.hexdigest()
 
 
 @dataclass(frozen=True)
@@ -70,6 +173,8 @@ class EvalArtifact:
     trusted: bool
     structural_failures: tuple[str, ...]
     provenance: RunProvenance
+    commit: RepoCommit
+    corpus_digest: str
     raw: dict[str, Any]
 
     def block(self, key: str) -> Any:
@@ -161,8 +266,18 @@ def load_artifact(path: Path | str) -> EvalArtifact:
             str(failure) for failure in raw.get("structural_failures", ())
         ),
         provenance=provenance,
+        commit=_commit_of(path, raw),
+        corpus_digest=str(raw.get("corpus_digest", UNRECORDED)),
         raw=raw,
     )
+
+
+def _commit_of(path: Path, raw: Mapping[str, Any]) -> RepoCommit:
+    """The artifact's repository state, or a refusal naming the file."""
+    try:
+        return RepoCommit(**raw.get("repo_commit", {}))
+    except ValidationError as exc:
+        raise ProvenanceError(f"{path}: malformed repo_commit: {exc}") from exc
 
 
 #: The sweep's own facts, as opposed to a reading over its claims. One writer,
@@ -180,6 +295,8 @@ ENVELOPE_KEYS: tuple[str, ...] = (
     "structural_failures",
     "mode_output",
     "trusted",
+    "repo_commit",
+    "corpus_digest",
 )
 
 #: Every key an artifact of this version carries. The envelope's, plus each
@@ -203,6 +320,8 @@ def build(
     payloads: Sequence[Mapping[str, Any]],
     trusted: bool,
     sweep: Sweep,
+    commit: RepoCommit,
+    corpus: str,
 ) -> dict[str, Any]:
     """The whole artifact: the sweep's envelope, plus every instrument's keys.
 
@@ -214,6 +333,11 @@ def build(
 
     ``trusted`` rides beside the aggregates so nothing downstream folds an
     uncertified run into a trusted number unaware.
+
+    ``commit`` and ``corpus`` are passed in rather than computed here, because
+    a sweep that cannot name its own repository state should stop before it
+    spends the money — ``command_run`` resolves both in its first second. By
+    the time this runs, the answer has already been paid for.
     """
     artifact = {
         "artifact_version": ARTIFACT_VERSION,
@@ -231,6 +355,8 @@ def build(
         "structural_failures": list(structural_failures),
         "mode_output": list(payloads),
         "trusted": trusted,
+        "repo_commit": commit.model_dump(),
+        "corpus_digest": corpus,
         # Every instrument's own keys, from the table that also printed them.
         # One source for the printed line and the written number is what stops
         # the two disagreeing.

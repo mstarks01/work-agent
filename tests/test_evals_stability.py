@@ -48,6 +48,8 @@ def write_run(tmp_path, name, record, scores, **overrides) -> Path:
         "cases": sorted({entry["case"] for entry in scores}),
         "trusted": True,
         "structural_failures": [],
+        "repo_commit": {"commit": "0" * 40, "clean": True},
+        "corpus_digest": "0" * 64,
         "provenance": record.to_json(),
         "models": {"tiers": {"strong": "openai/gpt-4.1"}, "tiers_config_version": "3"},
         "scores": scores,

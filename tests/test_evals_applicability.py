@@ -305,7 +305,7 @@ def test_stability_reads_the_applicability_block_too():
     ASVS matches by requirement ID with no model call, so a sweep of
     ASVS-only cases still carries a comparable half where STRIDE's is absent.
     """
-    from evals.harness.artifact import DECLARED_KEYS, EvalArtifact
+    from evals.harness.artifact import DECLARED_KEYS, EvalArtifact, RepoCommit
     from evals.harness.provenance import RunProvenance
     from evals.harness.stability import read_run
 
@@ -321,6 +321,8 @@ def test_stability_reads_the_applicability_block_too():
             sampling={},
             node_runs={},
         ),
+        commit=RepoCommit(commit="0" * 40, clean=True),
+        corpus_digest="0" * 64,
         raw={
             # Every declared key, as a sweep writes them. An instrument that
             # measured nothing writes an empty block rather than dropping one.

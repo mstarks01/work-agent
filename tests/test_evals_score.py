@@ -44,6 +44,8 @@ def swept(monkeypatch, case, tmp_path):
                 "cases": [case.id, "case-second"],
                 "trusted": True,
                 "structural_failures": [],
+                "repo_commit": {"commit": "0" * 40, "clean": True},
+                "corpus_digest": "0" * 64,
                 # A run-level block, to prove a re-score leaves it alone.
                 "grounds_aggregate": {"grounds_per_threat": 1.5},
                 "provenance": run.provenance.to_json(),
