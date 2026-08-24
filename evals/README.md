@@ -15,12 +15,15 @@ by an agent. One review sitting has happened:
 `unclear`, and it changed two things — a wrong label, and a reference claim in
 case 04 that asserted a fact its own model does not hold.
 
-**No case has been through `BLESSING.md` step 6.** That is the reading session
-over a case's source, model and reference sets together, and it is what would
-catch the case-04 defect anywhere else. A case that has had one carries a
-`review` block in its `case.json`; none of the 13 does.
-`tests/test_case_review.py` names every one as debt and fails a new case that
-arrives without a block.
+**One case has been through `BLESSING.md` step 6, and twelve have not.** That is
+the reading session over a case's source, model and reference sets together, and
+it is what would catch the case-04 defect anywhere else. A case that has had one
+carries a `review` block in its `case.json`. Case `01-payments-checkout`, the
+control, carries one dated 2026-08-23: the reader agreed with all 21 STRIDE
+claims and all 17 ASVS records, and changed none of them
+([`REVIEW-02.md`](corpus/01-payments-checkout/REVIEW-02.md)).
+`tests/test_case_review.py` names the other twelve as debt and fails a new case
+that arrives without a block.
 
 So every agreement figure the suite produces is **self-consistency, not
 accuracy**: it measures how closely a rule reproduces what an earlier agent

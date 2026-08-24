@@ -83,6 +83,11 @@ CASE_FIELDS = frozenset(
         "notes",
     )
 )
+#: Allowed on a case, and absent until somebody holds the sitting: the
+#: ``BLESSING.md`` step 6 sign-off. ``tests/test_case_review.py`` is what makes
+#: its absence countable, and ``CaseReview`` in ``harness/reference.py`` is what
+#: checks its shape — this set decides only that the field may appear.
+OPTIONAL_CASE_FIELDS = frozenset(("review",))
 CASE_FRAMEWORK_FIELDS = frozenset(("name", "options", "exemplar_proximity"))
 #: What every framework's reference record carries, whatever it grades with.
 CLAIM_FIELDS = frozenset(("claim", "tier", "affected_element_ids", "notes"))
@@ -387,7 +392,7 @@ def _check_citations(model: object, sources: dict[str, str]) -> Iterator[str]:
 
 def _check_case_metadata(case_dir: Path, meta: dict) -> Iterator[str]:
     missing = CASE_FIELDS - meta.keys()
-    unexpected = meta.keys() - CASE_FIELDS
+    unexpected = meta.keys() - CASE_FIELDS - OPTIONAL_CASE_FIELDS
     if missing:
         yield f"case.json is missing fields: {sorted(missing)}"
     if unexpected:
