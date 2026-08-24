@@ -27,8 +27,9 @@ in `[tool.uv] default-groups`, so `uv sync` installs it and no `--with uvicorn`
 is needed; passing it anyway is harmless.
 Set the env vars **before** importing `stride_service.api`.
 
-`create_app()` now defaults to the real ADK graph
-(`stride_service.pipeline.default_pipeline_runner`), so a submitted job calls
+`create_app()` defaults to the real ADK graph — the **Deployment** builds a
+`stride_service.pipeline.AdkPipelineRunner` per framework selection
+(`stride_service.deployment.Deployment.runner_for`) — so a submitted job calls
 Vertex and fails without credentials. To drive the HTTP surface offline, pass
 `create_app(runner=StubPipelineRunner())`; to exercise the real graph with
 canned model output, build a pipeline with a `resolve_model` returning a
