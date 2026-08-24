@@ -1,0 +1,78 @@
+stride-service
+Copyright 2026 Michael Starks
+
+This product is licensed under the Apache License, Version 2.0. See LICENSE.
+
+Some files carry text that another project wrote. The licence of that project
+applies to those files, instead of or in addition to the Apache License. This
+file names every one of them.
+
+
+-------------------------------------------------------------------------------
+1. OWASP Application Security Verification Standard (ASVS) 5.0.0
+-------------------------------------------------------------------------------
+
+   https://github.com/OWASP/ASVS
+   Copyright (c) The OWASP Foundation.
+   Licensed under Creative Commons Attribution-ShareAlike 4.0 International
+   (CC BY-SA 4.0). The full text is in LICENSE-CC-BY-SA-4.0.txt.
+
+   The files below reproduce the 345 requirement texts of ASVS 5.0.0. They are
+   adaptations of a ShareAlike work, so they carry CC BY-SA 4.0 rather than the
+   Apache License:
+
+     src/stride_service/frameworks/asvs/catalog.json
+     frameworks/asvs/lanes/api-and-web-service/skill.md
+     frameworks/asvs/lanes/authentication/skill.md
+     frameworks/asvs/lanes/authorization/skill.md
+     frameworks/asvs/lanes/configuration/skill.md
+     frameworks/asvs/lanes/cryptography/skill.md
+     frameworks/asvs/lanes/data-protection/skill.md
+     frameworks/asvs/lanes/encoding-and-sanitization/skill.md
+     frameworks/asvs/lanes/file-handling/skill.md
+     frameworks/asvs/lanes/oauth-and-oidc/skill.md
+     frameworks/asvs/lanes/secure-coding-and-architecture/skill.md
+     frameworks/asvs/lanes/secure-communication/skill.md
+     frameworks/asvs/lanes/security-logging-and-error-handling/skill.md
+     frameworks/asvs/lanes/self-contained-tokens/skill.md
+     frameworks/asvs/lanes/session-management/skill.md
+     frameworks/asvs/lanes/validation-and-business-logic/skill.md
+     frameworks/asvs/lanes/web-frontend-security/skill.md
+     frameworks/asvs/lanes/webrtc/skill.md
+
+   Changes made to the ASVS text: the requirements are regrouped by lane rather
+   than by chapter order alone, each one is tagged with its level, and original
+   guidance written for this project surrounds them. The requirement sentences
+   themselves are unaltered.
+
+   This does not make the rest of the repository ShareAlike. The Python that
+   reads catalog.json is a separate work that collects the catalog; it is not an
+   adaptation of it, and it stays under the Apache License.
+
+
+-------------------------------------------------------------------------------
+2. OWASP Threat Model Cookbook
+-------------------------------------------------------------------------------
+
+   https://github.com/OWASP/threat-model-cookbook
+   Copyright (c) The OWASP Foundation.
+   That project licenses its models as text or graphics under Creative
+   Commons Attribution 4.0 International (CC BY 4.0), and its models as code
+   under the Apache License, Version 2.0. CC BY 4.0 asks for attribution and
+   adds no ShareAlike condition.
+
+   Four evaluation cases are prose conversions of Cookbook models:
+
+     evals/corpus/05-cookbook-queue-webapp/    from a Threat Dragon model
+     evals/corpus/06-cookbook-online-game/     from a pytm model (code)
+     evals/corpus/09-cookbook-sokify-retail/   from a Threat Dragon model
+     evals/corpus/10-cookbook-generic-cms/     from a pytm model (code)
+
+   Both Cookbook licences ask for attribution and permit an adaptation under
+   other terms, so these cases carry the Apache License with the attribution
+   preserved. Each case names its exact source model in the `provenance` field
+   of its case.json.
+
+   Changes made: each diagram or model file is rewritten as the semi-structured
+   prose a user of this service would submit. The threat annotations some source
+   models carry are deliberately not copied.

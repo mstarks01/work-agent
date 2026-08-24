@@ -62,7 +62,7 @@ from pathlib import Path
 import pytest
 
 from evals.harness.instruments import INSTRUMENTS, PACKAGE_SCORERS
-from stride_service.frameworks import PACKAGES
+from stride_service.frameworks import CONTENT_LICENSE, PACKAGES
 
 REPO_ROOT = Path(__file__).resolve().parents[1]
 SEARCHED = ("src", "evals")
@@ -482,3 +482,50 @@ def test_the_lint_declaration_does_not_rot():
         name for name in DECLARED_LINT_IMPORTS if not _package_imports(REPO_ROOT / name)
     ]
     assert not stale, f"declared but no longer package-scoped: {stale}"
+
+
+def test_every_package_declares_a_content_license():
+    """No package ships text without saying which licence governs it.
+
+    A package that quotes a published standard inherits that standard's licence.
+    Nothing in the tree makes that visible: the requirement sentences read like
+    any other prompt text, and a wheel that ships them under the wrong licence
+    builds and passes. So the table is the record, and a missing key is the only
+    thing that can raise.
+    """
+    missing = sorted(set(PACKAGES) - set(CONTENT_LICENSE))
+
+    assert not missing, (
+        f"{missing} is registered and declares no content licence. Add an entry"
+        " to CONTENT_LICENSE: the repo licence if the package's text is written"
+        " here, or the standard's licence if it reproduces one."
+    )
+
+
+def test_the_content_license_table_names_no_package_this_build_lacks():
+    """And a key for a package that left is stale rather than harmless."""
+    stale = sorted(set(CONTENT_LICENSE) - set(PACKAGES))
+
+    assert not stale, f"declared a content licence for unregistered: {stale}"
+
+
+def test_notice_names_every_package_licensed_apart_from_the_repo():
+    """A licence the repo's own does not cover needs its attribution shipped.
+
+    CC BY-SA and CC BY both ask for attribution, and ``NOTICE`` is where this
+    distribution carries it -- ``pyproject.toml`` puts that file in the wheel.
+    A package whose text arrives under a different licence with no NOTICE entry
+    is a distribution that breaks the terms it was given.
+    """
+    notice = (REPO_ROOT / "NOTICE").read_text()
+    unattributed = sorted(
+        name
+        for name, license_id in CONTENT_LICENSE.items()
+        if license_id != "Apache-2.0" and license_id not in notice
+    )
+
+    assert not unattributed, (
+        f"{unattributed} ships text under a licence NOTICE does not name."
+        " Add the upstream project, its copyright, its licence and the files"
+        " it governs."
+    )

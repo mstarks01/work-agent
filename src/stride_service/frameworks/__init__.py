@@ -49,6 +49,7 @@ from stride_service.report import (
 from stride_service.system_model import SystemModel
 
 __all__ = [
+    "CONTENT_LICENSE",
     "OUTPUT_DOC",
     "PACKAGES",
     "PRECONDITION_RESULTS",
@@ -427,6 +428,24 @@ PACKAGES: Mapping[FrameworkName, FrameworkPackage] = MappingProxyType(
 #: it.
 SCHEMAS: Mapping[FrameworkName, FrameworkSchemas] = MappingProxyType(
     {"asvs": _asvs_schemas(), "stride": _stride_schemas()}
+)
+
+#: The licence governing each package's *text*, as an SPDX identifier, keyed the
+#: same way and filled in the same edit.
+#:
+#: A package that reproduces a published catalog inherits that catalog's licence,
+#: whatever the repo's own licence says; a package whose text is written here
+#: carries the repo licence. That is a property of the package rather than a fact
+#: about any one framework, so it answers for packages nobody has written yet: an
+#: author who copies requirement sentences out of a standard must say so here,
+#: and ``tests/test_framework_neutrality.py`` fails until the entry exists and
+#: ``NOTICE`` names it.
+#:
+#: This is a table for the reason every other framework table is one. A default
+#: of ``"Apache-2.0"`` would be silently right for STRIDE and silently wrong for
+#: the next package that quotes a standard, and nothing would raise.
+CONTENT_LICENSE: Mapping[FrameworkName, str] = MappingProxyType(
+    {"asvs": "CC-BY-SA-4.0", "stride": "Apache-2.0"}
 )
 
 
