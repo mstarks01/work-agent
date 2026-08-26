@@ -83,11 +83,12 @@ CASE_FIELDS = frozenset(
         "notes",
     )
 )
-#: Allowed on a case, and absent until somebody holds the sitting: the
-#: ``BLESSING.md`` step 6 sign-off. ``tests/test_case_review.py`` is what makes
-#: its absence countable, and ``CaseReview`` in ``harness/reference.py`` is what
-#: checks its shape — this set decides only that the field may appear.
-OPTIONAL_CASE_FIELDS = frozenset(("review",))
+#: Allowed on a case, and empty until somebody holds a sitting: the
+#: ``BLESSING.md`` step 6 sign-offs, append-only. ``tests/test_case_review.py``
+#: is what makes their absence countable, and ``CaseSitting`` in
+#: ``harness/reference.py`` is what checks each entry's shape — this set
+#: decides only that the field may appear.
+OPTIONAL_CASE_FIELDS = frozenset(("reviews",))
 CASE_FRAMEWORK_FIELDS = frozenset(("name", "options", "exemplar_proximity"))
 #: What every framework's reference record carries, whatever it grades with.
 CLAIM_FIELDS = frozenset(("claim", "tier", "affected_element_ids", "notes"))

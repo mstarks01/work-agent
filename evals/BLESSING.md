@@ -304,21 +304,40 @@ One reading session, one pull request, one approval. The reviewer signs off on
 **together** — they're one artifact, and reviewing them separately loses the
 property that the threat set is exhaustive *against that model*.
 
-**This step is now enforced.** Record the session in `case.json`:
+**This step is now enforced.** The act is a **Case Sitting** (see
+`CONTEXT.md`), and it is recorded as an entry appended to `reviews` in
+`case.json`:
 
 ```json
-  "review": {
-    "reviewer": "<name or handle>",
-    "date": "<YYYY-MM-DD>",
-    "read": ["source.md", "model.json", "claims/stride.json"],
-    "notes": "<counts, and anything you changed>"
-  },
+  "reviews": [
+    {
+      "reviewer": "<your GitHub login>",
+      "date": "<YYYY-MM-DD>",
+      "read": [
+        {"file": "source.md", "sha256": "<the file's digest>"},
+        {"file": "model.json", "sha256": "<the file's digest>"},
+        {"file": "claims/stride.json", "sha256": "<the file's digest>"}
+      ],
+      "document": "REVIEW-<your GitHub login>.md",
+      "notes": "<counts, and anything you changed>"
+    }
+  ],
 ```
 
-`tests/test_case_review.py` fails on a new case that arrives without that block,
-and names every case still waiting in its `UNREVIEWED` list. Twelve of the 13
-cases that shipped before this was enforced are still on that list; it is debt,
-not an exemption, and it is meant to shrink to nothing.
+`reviewer` is the GitHub login of the account whose PR carries the sitting,
+and the reviewer needs a line in `evals/review/voters.toml` — a first-timer
+adds their own, standing `contributor`. `read` pins the bytes the sitting
+covered: a later PR that edits a read file re-opens the debt fail-closed.
+`document` names the filled copy, committed beside the case, because only the
+filled copy shows the method ran. The generated `REVIEW.md` carries this
+entry pre-filled with the current digests.
+`python -m evals.harness.run submit sitting` opens the PR.
+
+`tests/test_case_review.py` fails on a new case that arrives without a
+clearing sitting, and names every case still waiting in its `UNREVIEWED`
+list. Twelve of the 13 cases that shipped before this was enforced are still
+on that list; it is debt, not an exemption, and it is meant to shrink to
+nothing.
 
 **Why it cannot be replaced by a lint.** Review sitting 01 found a reference claim
 asserting the model emits training data in a case with no training pipeline. A
