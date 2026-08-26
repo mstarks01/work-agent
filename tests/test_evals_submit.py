@@ -79,6 +79,7 @@ def repo(tmp_path):
     )
     git(clone, "config", "user.email", "test@example.test")
     git(clone, "config", "user.name", "A Test")
+    (clone / ".gitignore").write_text("evals/runs/\n", encoding="utf-8")
     review = clone / "evals" / "review"
     review.mkdir(parents=True)
     (review / "voters.toml").write_text(ROSTER_BASE, encoding="utf-8")
@@ -380,6 +381,44 @@ class TestTheCommand:
         assert main(["submit", "vote"]) == 0
         assert git(self.repo, "rev-parse", "HEAD") == head_before
         assert (self.repo / "evals" / "review" / "votes" / "ada.jsonl").exists()
+
+    def test_a_baseline_runs_end_to_end(self, fake_gh, capsys, monkeypatch):
+        from evals.harness import baseline
+        from evals.harness.prices import UnitPrices
+        from tests.test_evals_baseline import payload, write_sweep
+
+        monkeypatch.setattr(
+            baseline,
+            "unit_prices",
+            lambda model: UnitPrices(model, 1e-6, 4e-6, 1e-7),
+        )
+        runs = self.repo / "evals" / "runs"
+        runs.mkdir(parents=True)
+        source = write_sweep(runs, payload(), "art")
+        (self.repo / "evals" / "review" / "voters.toml").write_text(
+            ROSTER_WITH_ADA, encoding="utf-8"
+        )
+
+        assert main(["submit", "baseline", "--artifact", str(source)]) == 0
+        out = capsys.readouterr().out
+        assert "https://example.test/pr/1" in out
+        assert "standings behind its Baseline" in out
+
+        assembled = list((self.repo / "evals" / "baselines").iterdir())
+        assert len(assembled) == 1
+        name = assembled[0].name
+        date = datetime.now(UTC).date().isoformat()
+        branch = f"submit/baseline/ada-{date}"
+        manifest = json.loads(
+            git(
+                self.repo,
+                "show",
+                f"origin/{branch}:evals/baselines/{name}/baseline.json",
+            )
+        )
+        assert manifest["name"] == name
+        assert manifest["sweeps"][0]["submitted_by"] == "ada"
+        assert f"Baseline: {name}" in fake_gh.read_text(encoding="utf-8")
 
     def test_a_sitting_runs_end_to_end(self, fake_gh, capsys):
         prepare_sitting(self.repo)

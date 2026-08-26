@@ -99,6 +99,8 @@ evals/
   harness/                      the scorer and the eval runner
   review/voters.toml            the roster: voter → standing, the only place standing lives
   review/votes/                 the vote ledger, one file per voter — the only human record here
+  baselines/<derived-name>/     merged Baselines: up to ten sweeps with their reports, per configuration
+  runs/                         local sweeps (gitignored) — the private scratch area
 ```
 
 ## The harness
@@ -120,6 +122,8 @@ evals/
 | `harness/fingerprint.py` | A **Claim**'s identity as a versioned value code computes. No model call. |
 | `harness/ledger.py` | The append-only record of what a **person** decided about a finding. One file per voter, named by the GitHub login. |
 | `harness/roster.py` | Voter → standing, read from `review/voters.toml` — the only place a standing lives. Refuses an unrostered voter rather than defaulting one. |
+| `harness/baseline.py` | A **Baseline**: one directory under `baselines/`, one configuration, up to ten sweeps. Computes the five-part identity and the derived name, assembles the directory, and verifies that everything recomputes — never that a model ran. |
+| `harness/prices.py` | Unit prices from litellm's offline map, and the one cost rule submit and CI both run. A model the map misses prices at `None`, never at zero. |
 | `harness/queue.py` | Which findings a reviewer is asked about, and in what order. Blind to the configuration. Several sweeps of one configuration are merged here, which is where a finding's run count comes from. |
 | `harness/writing.py` | What reviewers said about how a finding reads, per case and framework. The one number a style down-vote moves, and it moves no other. |
 | `harness/instruction.py` | How much instruction each node was given, per framework, per sweep. The drift alarms of ADR 0016, read as a measurement. |
@@ -130,7 +134,7 @@ evals/
 | `harness/instruments.py` | Every measurement a sweep reports, as one table keyed by instrument — the per-case row, the fold, the rendering, and the artifact keys each one owns. |
 | `harness/artifact.py` | The sweep artifact: one declared shape, written once by `build` and read back through `load_artifact`, which refuses a file missing any declared key. |
 | `harness/run.py` | The command-line entry point. `score` re-reads the ledger over a finished sweep's saved reports, so a vote reaches the numbers without a second sweep. |
-| `harness/submit.py` | `submit <kind>`: runs a contribution's CI checks locally as a checklist, then packages the kind's allowlist on a fresh branch and opens the PR through `gh`. Kinds live in a table; `vote` and `sitting` are in, `baseline` arrives with #337 step 4. |
+| `harness/submit.py` | `submit <kind>`: runs a contribution's CI checks locally as a checklist, then packages the kind's allowlist on a fresh branch and opens the PR through `gh`. Kinds live in a table: `vote`, `sitting`, `baseline`. |
 
 Sampling parameters are **not** here: the harness reads `config/sampling.toml`
 at the repo root, the exact same file production reads. Grading a configuration
