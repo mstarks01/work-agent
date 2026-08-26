@@ -62,12 +62,15 @@ baseline sweeps, each as a pull request. Eight tickets: seven grilling, one
 research. The research ticket
 ([#324, the price data for a pre-run estimate](https://github.com/mstarks01/work-agent/issues/324))
 resolved at charting time; findings sit on `research/contribution-price-data`
-@ `890bc93`. [#320, the identity ticket](https://github.com/mstarks01/work-agent/issues/320)
-resolved 2026-08-26: the voter name is the GitHub login, and standing lives in
-a checked-in roster rather than on the vote row. That unblocks the promotion
-rule and the outsider sitting. The frontier holds the baseline home, the
-ledger layout, the CI-check ticket, the promotion rule and the outsider
-sitting; the submit command still waits on two of them.
+@ `890bc93`. The map grew to twelve tickets: two more surfaced from resolutions,
+and the two fog patches graduated. Eleven are resolved, and the map's
+Decisions-so-far index holds a one-line gist of each. The last resolution is
+[#335, the document surface](https://github.com/mstarks01/work-agent/issues/335):
+a short root `CONTRIBUTING.md` routes by resource to `evals/VOTING.md`,
+`evals/BLESSING.md` and a new `evals/BASELINES.md`, and prose never restates
+what `submit --dry-run` prints. The fog is empty. One ticket stays open:
+[#334, the spend ceiling](https://github.com/mstarks01/work-agent/issues/334),
+claimed and in progress. The map completes when it closes.
 
 ### Completed efforts
 
