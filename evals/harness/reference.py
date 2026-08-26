@@ -259,27 +259,47 @@ class CaseSource(BaseModel):
     sha256: str = Field(pattern=r"^[0-9a-f]{64}$")
 
 
-class CaseReview(BaseModel):
-    """Who read this case, when, and what they read.
+class ReadRecord(BaseModel):
+    """One file a sitting read, pinned to the bytes that were read.
 
-    ``evals/BLESSING.md`` step 6 is one reading session over ``source.md``, the
-    model and every reference set together. Until this block exists on a case,
-    nobody has done it — and the corpus shipped 13 cases in that state, which is
-    how a reference claim asserting a fact its own model does not hold survived
-    to review sitting 01. ``tests/test_case_review.py`` names every case still
-    waiting and fails on a new one that arrives without a block.
-
-    ``read`` is the artefacts the session covered, because a session that read
-    only the model says nothing about the reference set and the two are
-    reviewable apart even though step 6 asks for them together.
+    The digest is what makes staleness mechanical (#327): a later PR that
+    edits a read file no longer matches, so the debt re-opens fail-closed in
+    the PR that caused it — a person re-reads, or names the debt by putting
+    the case back in ``UNREVIEWED``.
     """
 
     model_config = ConfigDict(extra="forbid", frozen=True)
 
-    reviewer: str = Field(min_length=1)
-    #: ISO date. A review is a dated event; the reference set moves under it.
+    file: str = Field(min_length=1)
+    sha256: str = Field(pattern=r"^[0-9a-f]{64}$")
+
+
+class CaseSitting(BaseModel):
+    """One **Case Sitting**: who read this case, when, which bytes, and the evidence.
+
+    ``evals/BLESSING.md`` step 6 is one reading session over ``source.md``, the
+    model and every reference set together. Until an entry exists on a case,
+    nobody has done it — and the corpus shipped 13 cases in that state, which is
+    how a reference claim asserting a fact its own model does not hold survived
+    to review sitting 01. ``tests/test_case_review.py`` names every case still
+    waiting and fails on a new one that arrives without an entry.
+
+    ``reviewer`` is the GitHub login of the account whose PR carries the
+    sitting — the same binding a vote uses (#320), checked by CI. ``document``
+    names the filled ``REVIEW-<login>.md`` committed beside the case, because
+    only the filled copy shows the method ran; the generated ``REVIEW.md``
+    stays derived and unfilled.
+    """
+
+    model_config = ConfigDict(extra="forbid", frozen=True)
+
+    #: The GitHub login shape, as ledger.GITHUB_LOGIN spells it — but pydantic's
+    #: regex engine has no look-ahead, so the length rides on ``max_length``.
+    reviewer: str = Field(pattern=r"^[A-Za-z0-9](?:-?[A-Za-z0-9])*$", max_length=39)
+    #: ISO date. A sitting is a dated event; the reference set moves under it.
     date: str = Field(pattern=r"^\d{4}-\d{2}-\d{2}$")
-    read: list[str] = Field(min_length=1)
+    read: list[ReadRecord] = Field(min_length=1)
+    document: str = Field(min_length=1)
     notes: str = ""
 
 
@@ -299,10 +319,12 @@ class CaseMetadata(BaseModel):
     # Non-empty: a case no framework grades is a case that scores nothing, and
     # a corpus quietly carrying one lowers no denominator visibly.
     frameworks: list[CaseFramework] = Field(min_length=1)
-    #: Absent until a person reads the case. Optional on the model rather than
-    #: required, because the 13 cases that shipped without one are real and a
-    #: required field would make them unloadable rather than visibly unreviewed.
-    review: CaseReview | None = None
+    #: Every Case Sitting this case has had, oldest first, append-only — a
+    #: re-read is a new entry, never an edit (#327). Empty until a person
+    #: reads the case: the 13 cases that shipped unread are real, and a
+    #: required entry would make them unloadable rather than visibly
+    #: unreviewed.
+    reviews: list[CaseSitting] = Field(default_factory=list)
     notes: str = ""
 
 

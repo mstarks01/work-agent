@@ -17,13 +17,16 @@ case 04 that asserted a fact its own model does not hold.
 
 **One case has been through `BLESSING.md` step 6, and twelve have not.** That is
 the reading session over a case's source, model and reference sets together, and
-it is what would catch the case-04 defect anywhere else. A case that has had one
-carries a `review` block in its `case.json`. Case `01-payments-checkout`, the
-control, carries one dated 2026-08-23: the reader agreed with all 21 STRIDE
-claims and all 17 ASVS records, and changed none of them
+it is what would catch the case-04 defect anywhere else. That act is a **Case
+Sitting**, recorded as an entry in the `reviews` list in the case's
+`case.json` — who read it, the digest of each file they read, and the filled
+document as evidence. Case `01-payments-checkout`, the control, carries one
+dated 2026-08-23: the reader agreed with all 21 STRIDE claims and all 17 ASVS
+records, and changed none of them
 ([`REVIEW-02.md`](corpus/01-payments-checkout/REVIEW-02.md)).
-`tests/test_case_review.py` names the other twelve as debt and fails a new case
-that arrives without a block.
+`tests/test_case_review.py` names the other twelve as debt, fails a new case
+that arrives without a sitting, and fails a read file that changes under its
+recorded digest.
 
 So every agreement figure the suite produces is **self-consistency, not
 accuracy**: it measures how closely a rule reproduces what an earlier agent
@@ -127,7 +130,7 @@ evals/
 | `harness/instruments.py` | Every measurement a sweep reports, as one table keyed by instrument — the per-case row, the fold, the rendering, and the artifact keys each one owns. |
 | `harness/artifact.py` | The sweep artifact: one declared shape, written once by `build` and read back through `load_artifact`, which refuses a file missing any declared key. |
 | `harness/run.py` | The command-line entry point. `score` re-reads the ledger over a finished sweep's saved reports, so a vote reaches the numbers without a second sweep. |
-| `harness/submit.py` | `submit <kind>`: runs a contribution's CI checks locally as a checklist, then packages the kind's allowlist on a fresh branch and opens the PR through `gh`. Kinds live in a table; `vote` is the first. |
+| `harness/submit.py` | `submit <kind>`: runs a contribution's CI checks locally as a checklist, then packages the kind's allowlist on a fresh branch and opens the PR through `gh`. Kinds live in a table; `vote` and `sitting` are in, `baseline` arrives with #337 step 4. |
 
 Sampling parameters are **not** here: the harness reads `config/sampling.toml`
 at the repo root, the exact same file production reads. Grading a configuration

@@ -431,23 +431,41 @@ per part, and how many of your own items are missing from either set.
 - **Several doubts** — the sets overstate, inflating the denominator. Cheaper
   direction, still wrong.
 
-**Then record the sign-off.** Add this to
-`evals/corpus/04-ml-inference-service/case.json`, which is what
+**Then record the sitting.** Save this filled document as
+`REVIEW-<your GitHub login>.md` beside the original — the filled copy is the
+evidence, and the generated `REVIEW.md` stays derived and unfilled. Append
+this entry to `reviews` in `evals/corpus/04-ml-inference-service/case.json`, which is what
 `tests/test_case_review.py` reads:
 
 ```json
-  "review": {
-    "reviewer": "<your name or handle>",
-    "date": "<YYYY-MM-DD>",
-    "read": ["source.md", "model.json", "claims/asvs.json", "claims/stride.json"],
-    "notes": "<counts, and anything you changed>"
-  },
+  "reviews": [
+    {
+      "reviewer": "<your GitHub login>",
+      "date": "<YYYY-MM-DD>",
+      "read": [
+        {"file": "source.md", "sha256": "3da14d8d61e45baa73b0a7ee2b6935b0da3c1d47c62fdf9cb30ef4a09d6c67b6"},
+        {"file": "model.json", "sha256": "a2caf6af61c17bacd18af48713668edbefac6099699fedee477edb78f8f204e2"},
+        {"file": "claims/asvs.json", "sha256": "6317540bc9a0e28111098cd3677d09baf8c0631936b234ba4f08e7ba1f570562"},
+        {"file": "claims/stride.json", "sha256": "219c4116a56305055f1ff4ce543c246ab37e0bb5e3082e83523044d56d5fb94d"}
+      ],
+      "document": "REVIEW-<your GitHub login>.md",
+      "notes": "<counts, and anything you changed>"
+    }
+  ],
 ```
+
+The digests above are the files as they were when this document was
+generated. If the sitting changed a file — a claim edit is a normal outcome —
+recompute that file's digest (`sha256sum <file>`) before you commit: the
+entry signs the bytes that merge.
 
 If this case is named in `UNREVIEWED` in `tests/test_case_review.py`, delete
 its line. That list names the cases nobody has read, so it is only accurate
 while a reviewed case comes off it. A case not named there is new, and merges
-with this block from the start.
+with this entry from the start.
 
-`tests/test_case_review.py` checks that `read` covers every framework the case
-declares, so every claims file above is required.
+`tests/test_case_review.py` checks that `read` covers every framework the
+case declares, that every digest matches, that the `document` file exists,
+and that the reviewer has a line in `evals/review/voters.toml` — a first-time
+contributor adds their own, standing `contributor`. Then
+`python -m evals.harness.run submit sitting` opens the PR.
