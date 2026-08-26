@@ -7,10 +7,10 @@ open the PR through ``gh``. ``--dry-run`` stops after the checklist, which is
 the contributor's local CI — a red PR should be rare because the same checks
 already ran on their machine.
 
-**Which kinds exist is a table**, :data:`KINDS`, never a branch: the sitting
-and baseline kinds arrive by adding an entry (#337), and the CLI offers
-exactly the table's keys. A kind that is not in the table is not a choice,
-rather than a stub that refuses.
+**Which kinds exist is a table**, :data:`KINDS`, never a branch: the baseline
+kind arrives by adding an entry (#337), and the CLI offers exactly the
+table's keys. A kind that is not in the table is not a choice, rather than a
+stub that refuses.
 
 **The binding is strict — no proxy** (#320). The vote kind refuses to open a
 PR whose ledger delta names any voter other than the authenticated login, and
@@ -28,6 +28,7 @@ checkout carries beyond the allowlist can ride into the PR.
 from __future__ import annotations
 
 import argparse
+import hashlib
 import json
 import subprocess
 import tomllib
@@ -37,7 +38,10 @@ from datetime import UTC, datetime
 from pathlib import Path
 from tempfile import TemporaryDirectory
 
+from pydantic import ValidationError
+
 from evals.harness import ledger, roster
+from evals.harness.reference import CaseSitting
 
 REPO_ROOT = Path(__file__).resolve().parents[2]
 
@@ -271,14 +275,223 @@ def _vote_closing(root: Path, author: str) -> str:
     )
 
 
-#: Every submission kind the CLI offers. The sitting and baseline kinds are
-#: #337's later steps; they arrive as entries here, never as branches below.
+# --- the sitting kind ---------------------------------------------------------
+
+#: Where the debt list lives; a sitting PR deletes its case's line from it.
+CASE_REVIEW_TEST = "tests/test_case_review.py"
+
+
+def _sitting_case(root: Path) -> str | None:
+    """The one case this submission touches, or None when it is not one."""
+    cases = {
+        rel.split("/")[2]
+        for rel in _changed_paths(root)
+        if rel.startswith("evals/corpus/") and rel.count("/") >= 3
+    }
+    return cases.pop() if len(cases) == 1 else None
+
+
+def _sitting_allowlist(root: Path, author: str) -> list[str]:
+    case = _sitting_case(root)
+    changed = [
+        rel
+        for rel in _changed_paths(root)
+        if case is not None and rel.startswith(f"evals/corpus/{case}/")
+    ]
+    return [*changed, CASE_REVIEW_TEST, "evals/review/voters.toml"]
+
+
+def _new_sittings(root: Path, case: str) -> tuple[list[dict], list[str]]:
+    """The entries this PR appends, and what is wrong with the append.
+
+    ``reviews`` is append-only (#327): the base ref's entries must survive as
+    an exact prefix, and only what follows them is this submission's.
+    """
+    raw = json.loads(
+        (root / "evals" / "corpus" / case / "case.json").read_text(encoding="utf-8")
+    )
+    reviews = raw.get("reviews", [])
+    base_raw = _base_text(root, f"evals/corpus/{case}/case.json")
+    base_reviews = json.loads(base_raw).get("reviews", []) if base_raw else []
+    if reviews[: len(base_reviews)] != base_reviews:
+        return [], [
+            (
+                f"{case}/case.json rewrites recorded sittings; `reviews` is"
+                " append-only, and a correction is a new entry"
+            )
+        ]
+    new = reviews[len(base_reviews) :]
+    if not new:
+        return [], [f"{case}/case.json appends no sitting entry"]
+    return new, []
+
+
+def _check_one_case(root: Path, author: str) -> Check:
+    case = _sitting_case(root)
+    return _check(
+        "the change is one case directory",
+        [] if case else ["a sitting PR touches exactly one case under evals/corpus/"],
+    )
+
+
+def _check_sitting_scope(root: Path, author: str) -> Check:
+    allowed = set(_sitting_allowlist(root, author))
+    strays = [rel for rel in _changed_paths(root) if rel not in allowed]
+    return _check(
+        "nothing outside this kind's allowlist changed",
+        [f"{rel} is changed but not part of a sitting" for rel in strays],
+    )
+
+
+def _check_sitting_is_yours(root: Path, author: str) -> Check:
+    """#327 check 1, failed early: every appended entry names the author."""
+    case = _sitting_case(root)
+    if case is None:
+        return _check("every appended sitting names you", [])
+    new, problems = _new_sittings(root, case)
+    for entry in new:
+        try:
+            sitting = CaseSitting.model_validate(entry)
+        except ValidationError as exc:
+            problems.append(f"{case}/case.json: an appended entry is malformed: {exc}")
+            continue
+        if sitting.reviewer != author:
+            problems.append(
+                f"an appended entry names {sitting.reviewer!r}; you are"
+                f" {author!r}, and a sitting only enters through its own"
+                " reviewer's PR (#320)"
+            )
+    return _check("every appended sitting names you", problems)
+
+
+def _check_sitting_evidence(root: Path, author: str) -> Check:
+    """The digests match the tree, and the filled document is committed."""
+    case = _sitting_case(root)
+    if case is None:
+        return _check("the digests and the document hold", [])
+    case_dir = root / "evals" / "corpus" / case
+    new, problems = _new_sittings(root, case)
+    for entry in new:
+        try:
+            sitting = CaseSitting.model_validate(entry)
+        except ValidationError:
+            continue  # named by the naming check; one problem, one message
+        for record in sitting.read:
+            target = case_dir / record.file
+            if not target.is_file():
+                problems.append(f"{record.file}: read but not in the case directory")
+            elif hashlib.sha256(target.read_bytes()).hexdigest() != record.sha256:
+                problems.append(
+                    f"{record.file}: the digest does not match the file; the"
+                    " entry signs the bytes that merge, so recompute it"
+                )
+        if not (case_dir / sitting.document).is_file():
+            problems.append(
+                f"{sitting.document}: the filled document is the evidence,"
+                " and it is not committed beside the case"
+            )
+    return _check("the digests and the document hold", problems)
+
+
+def _check_sitting_covers(root: Path, author: str) -> Check:
+    """#327's derived rule: the read covers every framework the case declares."""
+    case = _sitting_case(root)
+    if case is None:
+        return _check("the sitting covers every declared framework", [])
+    raw = json.loads(
+        (root / "evals" / "corpus" / case / "case.json").read_text(encoding="utf-8")
+    )
+    required = {"source.md", "model.json"} | {
+        f"claims/{declared['name']}.json" for declared in raw.get("frameworks", [])
+    }
+    new, problems = _new_sittings(root, case)
+    read = {
+        record.get("file")
+        for entry in new
+        if isinstance(entry, dict)
+        for record in entry.get("read", [])
+        if isinstance(record, dict)
+    }
+    if new and (gap := sorted(required - read)):
+        problems.append(
+            f"the appended sitting leaves {gap} unread; one sitting signs the"
+            " model and every declared framework's reference set together"
+        )
+    return _check("the sitting covers every declared framework", problems)
+
+
+def _check_sitting_clears_debt(root: Path, author: str) -> Check:
+    case = _sitting_case(root)
+    if case is None:
+        return _check("the case's UNREVIEWED line is gone", [])
+    text = (root / CASE_REVIEW_TEST).read_text(encoding="utf-8")
+    return _check(
+        "the case's UNREVIEWED line is gone",
+        [f'delete the "{case}" line from UNREVIEWED in {CASE_REVIEW_TEST}']
+        if f'"{case}":' in text
+        else [],
+    )
+
+
+def _check_author_rostered(root: Path, author: str) -> Check:
+    problems = []
+    try:
+        if author not in roster.load(root / "evals" / "review" / "voters.toml"):
+            problems.append(
+                f"{author!r} has no roster line; add yourself to"
+                ' evals/review/voters.toml with standing "contributor"'
+            )
+    except roster.RosterError as exc:
+        problems.append(str(exc))
+    return _check("you have a roster line", problems)
+
+
+def _sitting_preflight(root: Path, author: str) -> list[Check]:
+    return [
+        check(root, author)
+        for check in (
+            _check_one_case,
+            _check_sitting_scope,
+            _check_sitting_is_yours,
+            _check_sitting_evidence,
+            _check_sitting_covers,
+            _check_sitting_clears_debt,
+            _check_author_rostered,
+            _check_no_self_raise,
+        )
+    ]
+
+
+def _sitting_title(root: Path, author: str) -> str:
+    return f"Sitting: {_sitting_case(root)} by {author}"
+
+
+def _sitting_closing(root: Path, author: str) -> str:
+    standing = roster.load(root / "evals" / "review" / "voters.toml").standing_of(
+        author
+    )
+    return (
+        "A maintainer reviews every line before this merges. This sitting"
+        f" clears the case from UNREVIEWED, and standing {standing!r} labels"
+        " the read — the debt means nobody read it, and a labelled read"
+        " answers that."
+    )
+
+
+#: Every submission kind the CLI offers. The baseline kind is #337's step 4;
+#: it arrives as an entry here, never as a branch below.
 KINDS: dict[str, Kind] = {
     "vote": Kind(
         preflight=_vote_preflight,
         allowlist=_vote_allowlist,
         title=_vote_title,
         closing=_vote_closing,
+    ),
+    "sitting": Kind(
+        preflight=_sitting_preflight,
+        allowlist=_sitting_allowlist,
+        title=_sitting_title,
+        closing=_sitting_closing,
     ),
 }
 

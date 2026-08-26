@@ -8,12 +8,13 @@ words the system description never uses. So the reading session is not
 belt-and-braces on top of the lints — it is the only instrument for a whole class
 of defect, and the corpus shipped 13 cases without it.
 
-This makes the debt countable and stops it growing. A case carrying a
-``review`` block in ``case.json`` has been read. Every case that has not is named
-in :data:`UNREVIEWED` with what it is still exposed to, and a **new** case that
-arrives without a block fails.
+This makes the debt countable and stops it growing. A case whose ``reviews``
+list holds a clearing **Case Sitting** — a rostered reviewer, every required
+file read, every recorded digest still matching — has been read. Every case
+that has not is named in :data:`UNREVIEWED` with what it is still exposed to,
+and a **new** case that arrives without one fails.
 
-**A review must cover every framework the case carries.** Step 6 asks the reader
+**A sitting must cover every framework the case carries.** Step 6 asks the reader
 to sign off on the reference sets *together*, because the property being
 established — that the set is exhaustive against that model — is not
 framework-local: one shared **System Model** feeds N reference sets, and a
@@ -28,10 +29,14 @@ gates on every PR.
 
 from __future__ import annotations
 
+import hashlib
+
 import pytest
 
 from evals import verify_corpus
 from evals.harness.reference import CLAIMS_DIR, load_corpus
+from evals.harness.roster import DEFAULT_ROSTER_PATH
+from evals.harness.roster import load as load_roster
 
 #: Cases nobody has read, each with what that leaves unchecked. Every entry is
 #: debt rather than an exemption: unlike the lists in ``test_rule_coverage.py``
@@ -101,17 +106,49 @@ def corpus():
 
 
 @pytest.fixture(scope="module")
-def reviewed_by_case(corpus):
-    """Whether each case carries a step 6 sign-off covering all of its frameworks."""
+def roster():
+    return load_roster(DEFAULT_ROSTER_PATH)
+
+
+@pytest.fixture(scope="module")
+def reviewed_by_case(corpus, roster):
+    """Whether any of each case's sittings clears its debt.
+
+    A sitting clears when a **rostered** person read every required file and
+    the recorded digests still match the tree (#327). A drifted digest stops
+    clearing, so a PR that edits a read file re-opens the debt fail-closed:
+    it carries a fresh sitting, or it puts the case's line back in
+    ``UNREVIEWED`` — a person always names the debt, in the PR that caused it.
+    """
     return {
-        case.meta.id: case.meta.review is not None
-        and not required_reading(case) - set(case.meta.review.read)
+        case.meta.id: any(
+            _clears(case, sitting, roster) for sitting in case.meta.reviews
+        )
         for case in corpus
     }
 
 
+def _clears(case, sitting, roster) -> bool:
+    covered = not required_reading(case) - {record.file for record in sitting.read}
+    return covered and sitting.reviewer in roster and not _drifted(case, sitting)
+
+
+def _drifted(case, sitting) -> list[str]:
+    """The read files whose bytes no longer match the sitting's digests."""
+    case_dir = verify_corpus.CORPUS_DIR / case.meta.id
+    stale = []
+    for record in sitting.read:
+        target = case_dir / record.file
+        if (
+            not target.is_file()
+            or hashlib.sha256(target.read_bytes()).hexdigest() != record.sha256
+        ):
+            stale.append(record.file)
+    return stale
+
+
 def required_reading(case) -> set[str]:
-    """What a complete step 6 session reads for this case.
+    """What a complete Case Sitting reads for this case.
 
     The shared artefacts, plus one reference set per framework the case declares.
     Derived from the declaration rather than listed, so a case that gains a third
@@ -122,17 +159,20 @@ def required_reading(case) -> set[str]:
     }
 
 
-def test_a_new_case_carries_a_review(reviewed_by_case):
+def test_a_new_case_carries_a_sitting(reviewed_by_case):
     undeclared = sorted(
         case_id
         for case_id, reviewed in reviewed_by_case.items()
         if not reviewed and case_id not in UNREVIEWED
     )
     assert not undeclared, (
-        f"these cases carry no `review` block in case.json: {undeclared}. Run"
-        " evals/BLESSING.md step 6 and record who read it, when, and what they"
-        " read. A case merged unread cannot be caught later by any lint — that"
-        " is what this module's docstring is about."
+        f"these cases have no Case Sitting that clears them: {undeclared}."
+        " Either no `reviews` entry covers every required file, its reviewer"
+        " has no roster line, or a read file changed under its digests. Hold"
+        " a sitting (evals/BLESSING.md step 6) and append the entry, or name"
+        " the debt by adding the case's line to UNREVIEWED. A case merged"
+        " unread cannot be caught later by any lint — that is what this"
+        " module's docstring is about."
     )
 
 
@@ -153,22 +193,56 @@ def test_every_listed_case_exists(reviewed_by_case):
     assert not missing, f"UNREVIEWED names cases that do not exist: {missing}"
 
 
-def test_a_review_covers_every_framework_the_case_carries(corpus):
-    """A session that read one framework's set has not reviewed the case.
+def test_no_recorded_digest_has_drifted(corpus):
+    """A sitting signs specific bytes; a silent edit under it must be loud.
 
-    The failure this exists for: case 01 declares both frameworks, so a `read`
-    list naming ``claims/stride.json`` alone leaves 17 ASVS records unread while
-    the case reads as signed off.
+    The failure this exists for: a PR that improves a reviewed case's
+    ``claims/stride.json`` would leave the sitting's sign-off pointing at
+    words the reviewer never read. The digest names the drifted file here, in
+    the PR that caused it, and the author answers with a fresh sitting or a
+    re-opened debt line.
     """
-    partial = {
-        case.meta.id: sorted(required_reading(case) - set(case.meta.review.read))
+    drifted = {
+        f"{case.meta.id}[{index}]": stale
         for case in corpus
-        if case.meta.review is not None
+        for index, sitting in enumerate(case.meta.reviews)
+        if (stale := _drifted(case, sitting))
     }
-    incomplete = {case_id: gap for case_id, gap in partial.items() if gap}
-    assert not incomplete, (
-        f"these cases carry a review that did not cover everything: {incomplete}."
-        " Step 6 signs off on the model and every framework's reference set"
-        " together; read what is missing and extend the `read` list, or the case"
-        " belongs back in UNREVIEWED."
+    assert not drifted, (
+        f"these sittings' read files changed under their digests: {drifted}."
+        " Hold a fresh sitting over the changed files and append its entry,"
+        " or put the case's line back in UNREVIEWED — and either way, a"
+        " person names the debt in this PR."
+    )
+
+
+def test_every_sitting_names_an_existing_document(corpus):
+    """Only the filled ``REVIEW-<login>.md`` shows the method ran (#327)."""
+    missing = [
+        f"{case.meta.id}: {sitting.document}"
+        for case in corpus
+        for sitting in case.meta.reviews
+        if not (verify_corpus.CORPUS_DIR / case.meta.id / sitting.document).is_file()
+    ]
+    assert not missing, (
+        f"these sittings name evidence documents that do not exist: {missing}."
+        " Commit the filled copy beside the case; the entry's `document`"
+        " field is what makes the sitting auditable."
+    )
+
+
+def test_every_reviewer_has_a_roster_line(corpus, roster):
+    """Standing labels the read, and the one roster is where standing lives."""
+    unrostered = sorted(
+        {
+            sitting.reviewer
+            for case in corpus
+            for sitting in case.meta.reviews
+            if sitting.reviewer not in roster
+        }
+    )
+    assert not unrostered, (
+        f"these reviewers have no line in evals/review/voters.toml:"
+        f" {unrostered}. A sitting by an unrostered person clears nothing,"
+        " because no published number could state the standing behind it."
     )
