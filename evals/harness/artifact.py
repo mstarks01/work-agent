@@ -40,12 +40,15 @@ from stride_service.report import NodeLatency, TokenUsage
 REPO_ROOT = Path(__file__).resolve().parents[2]
 CORPUS_DIR = REPO_ROOT / "evals" / "corpus"
 
-# The eval artifact's schema version. Version 2 adds the two keys that say
-# which *repository state* produced a sweep, beside the ``provenance`` block
-# that already said which models did. Bump it for any change to either, and
-# promotion will reject the older files by name rather than half-understanding
-# them.
-ARTIFACT_VERSION = 2
+# The eval artifact's schema version. Version 3 adds ``frameworks`` — the
+# selection the sweep actually ran, which is one of a Baseline's five identity
+# parts (#321) and was recoverable before only by inference over blocks that
+# write their keys whether or not a framework ran. Version 2 added the two
+# keys that say which *repository state* produced a sweep, beside the
+# ``provenance`` block that already said which models did. Bump it for any
+# change to any of these, and promotion will reject the older files by name
+# rather than half-understanding them.
+ARTIFACT_VERSION = 3
 
 #: What a recorded artifact carries where the fact was never captured. Only
 #: the sweeps taken before version 2 hold it: :func:`build` computes both keys
@@ -297,6 +300,7 @@ ENVELOPE_KEYS: tuple[str, ...] = (
     "trusted",
     "repo_commit",
     "corpus_digest",
+    "frameworks",
 )
 
 #: Every key an artifact of this version carries. The envelope's, plus each
@@ -357,6 +361,10 @@ def build(
         "trusted": trusted,
         "repo_commit": commit.model_dump(),
         "corpus_digest": corpus,
+        # The selection that ran, off the graphs that were built — one of a
+        # Baseline's five identity parts (#321), so it is a field the code
+        # reads rather than an inference over per-framework blocks.
+        "frameworks": sorted(sweep.run.frameworks),
         # Every instrument's own keys, from the table that also printed them.
         # One source for the printed line and the written number is what stops
         # the two disagreeing.

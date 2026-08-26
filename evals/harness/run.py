@@ -1269,6 +1269,13 @@ def main(argv: Sequence[str] | None = None) -> int:
         action="store_true",
         help="stop after the checklist and stage nothing",
     )
+    submit_parser.add_argument(
+        "--artifact",
+        action="append",
+        default=[],
+        help="a sweep artifact to assemble into the Baseline before the"
+        " checks run (baseline kind only; repeat per sweep)",
+    )
     submit_parser.set_defaults(func=submit.command_submit)
 
     args = parser.parse_args(argv)
