@@ -40,7 +40,8 @@ from tempfile import TemporaryDirectory
 
 from pydantic import ValidationError
 
-from evals.harness import ledger, roster
+from evals.harness import baseline, ledger, roster
+from evals.harness.artifact import ProvenanceError
 from evals.harness.reference import CaseSitting
 
 REPO_ROOT = Path(__file__).resolve().parents[2]
@@ -72,12 +73,19 @@ class Check:
 
 @dataclass(frozen=True)
 class Kind:
-    """One submission kind: what it proves, stages, and says on the PR."""
+    """One submission kind: what it proves, stages, and says on the PR.
+
+    ``prepare`` is the one pre-checklist step a kind may own — the baseline
+    kind assembles its directory from ``--artifact`` paths there, so the
+    checks then read an ordinary tree. It is a convenience, never a trust
+    point: everything it writes recomputes in the checks and again in CI.
+    """
 
     preflight: Callable[[Path, str], list[Check]]
     allowlist: Callable[[Path, str], list[str]]
     title: Callable[[Path, str], str]
     closing: Callable[[Path, str], str]
+    prepare: Callable[[Path, str, argparse.Namespace], None] | None = None
 
 
 def _run(args: Sequence[str], cwd: Path) -> str:
@@ -478,8 +486,153 @@ def _sitting_closing(root: Path, author: str) -> str:
     )
 
 
-#: Every submission kind the CLI offers. The baseline kind is #337's step 4;
-#: it arrives as an entry here, never as a branch below.
+# --- the baseline kind ---------------------------------------------------------
+
+
+def _baseline_prepare(root: Path, author: str, args: argparse.Namespace) -> None:
+    """Assemble ``--artifact`` sweeps into their Baseline directory first."""
+    paths = [Path(raw) for raw in getattr(args, "artifact", None) or []]
+    if paths:
+        baseline.assemble(root, author, paths)
+
+
+def _baseline_dir(root: Path) -> str | None:
+    """The one Baseline this submission touches, or None when it is not one."""
+    names = {
+        rel.split("/")[2]
+        for rel in _changed_paths(root)
+        if rel.startswith("evals/baselines/") and rel.count("/") >= 3
+    }
+    return names.pop() if len(names) == 1 else None
+
+
+def _baseline_allowlist(root: Path, author: str) -> list[str]:
+    name = _baseline_dir(root)
+    changed = [
+        rel
+        for rel in _changed_paths(root)
+        if name is not None and rel.startswith(f"evals/baselines/{name}/")
+    ]
+    return [*changed, "evals/review/voters.toml"]
+
+
+def _check_one_baseline(root: Path, author: str) -> Check:
+    return _check(
+        "the change is one Baseline directory",
+        []
+        if _baseline_dir(root)
+        else ["a baseline PR touches exactly one directory under evals/baselines/"],
+    )
+
+
+def _check_baseline_scope(root: Path, author: str) -> Check:
+    allowed = set(_baseline_allowlist(root, author))
+    strays = [rel for rel in _changed_paths(root) if rel not in allowed]
+    return _check(
+        "nothing outside this kind's allowlist changed",
+        [f"{rel} is changed but not part of a baseline submission" for rel in strays],
+    )
+
+
+def _check_baseline_verifies(root: Path, author: str) -> Check:
+    """#323's artifact-consistency checks, failed at the contributor's machine."""
+    name = _baseline_dir(root)
+    if name is None:
+        return _check("the Baseline recomputes: identity, name, digests, cost", [])
+    problems = baseline.verify(
+        root / "evals" / "baselines" / name, root=root, base_ref=BASE_REF
+    )
+    return _check("the Baseline recomputes: identity, name, digests, cost", problems)
+
+
+def _check_baseline_sweeps_are_yours(root: Path, author: str) -> Check:
+    """#323's label: every sweep this PR adds is stamped with your login."""
+    name = _baseline_dir(root)
+    if name is None:
+        return _check("every added sweep is stamped with your login", [])
+    manifest_rel = f"evals/baselines/{name}/baseline.json"
+    problems: list[str] = []
+    try:
+        manifest = json.loads((root / manifest_rel).read_text(encoding="utf-8"))
+        base_raw = _base_text(root, manifest_rel)
+        known = {
+            str(entry.get("artifact"))
+            for entry in (json.loads(base_raw).get("sweeps", []) if base_raw else [])
+        }
+        for entry in manifest.get("sweeps", []):
+            if str(entry.get("artifact")) in known:
+                continue
+            if entry.get("submitted_by") != author:
+                problems.append(
+                    f"{entry.get('artifact')}: stamped"
+                    f" {entry.get('submitted_by')!r}; you are {author!r}, and"
+                    " the label is the disclosure (#323)"
+                )
+    except (OSError, json.JSONDecodeError) as exc:
+        problems.append(f"{manifest_rel}: cannot be read: {exc}")
+    return _check("every added sweep is stamped with your login", problems)
+
+
+def _baseline_preflight(root: Path, author: str) -> list[Check]:
+    return [
+        check(root, author)
+        for check in (
+            _check_one_baseline,
+            _check_baseline_scope,
+            _check_baseline_verifies,
+            _check_baseline_sweeps_are_yours,
+            _check_author_rostered,
+            _check_no_self_raise,
+        )
+    ]
+
+
+def _baseline_manifest(root: Path) -> dict:
+    name = _baseline_dir(root)
+    return json.loads(
+        (root / "evals" / "baselines" / str(name) / "baseline.json").read_text(
+            encoding="utf-8"
+        )
+    )
+
+
+def _baseline_title(root: Path, author: str) -> str:
+    return f"Baseline: {_baseline_dir(root)}"
+
+
+def _baseline_closing(root: Path, author: str) -> str:
+    """The review aid #325 asks for; every checked fact stays in the files."""
+    manifest = _baseline_manifest(root)
+    identity = manifest.get("identity", {})
+    sweeps = manifest.get("sweeps", [])
+    models = ", ".join(
+        f"{tier}: {model}" for tier, model in sorted(identity.get("models", {}).items())
+    )
+    costs = [entry.get("cost", {}) for entry in sweeps]
+    total = sum(float(cost.get("actual_usd", 0.0)) for cost in costs)
+    unpriced = sorted({model for cost in costs for model in cost.get("unpriced", ())})
+    standing = roster.load(root / "evals" / "review" / "voters.toml").standing_of(
+        author
+    )
+    lines = [
+        (
+            f"{len(sweeps)} sweep(s) at commit {identity.get('repo_commit', '')[:12]},"
+            f" frameworks {', '.join(identity.get('frameworks', ()))}; {models}."
+        ),
+        f"Recorded actual cost across the directory: ${total:.2f}"
+        + (f"; unpriced models: {', '.join(unpriced)}" if unpriced else "")
+        + ".",
+        (
+            "A maintainer reviews every line before this merges. Standing"
+            f" {standing!r} labels the submission; every published number"
+            " states the standings behind its Baseline."
+        ),
+    ]
+    return "\n".join(lines)
+
+
+#: Every submission kind the CLI offers. A new kind arrives as an entry here,
+#: never as a branch in the spine.
 KINDS: dict[str, Kind] = {
     "vote": Kind(
         preflight=_vote_preflight,
@@ -492,6 +645,13 @@ KINDS: dict[str, Kind] = {
         allowlist=_sitting_allowlist,
         title=_sitting_title,
         closing=_sitting_closing,
+    ),
+    "baseline": Kind(
+        preflight=_baseline_preflight,
+        allowlist=_baseline_allowlist,
+        title=_baseline_title,
+        closing=_baseline_closing,
+        prepare=_baseline_prepare,
     ),
 }
 
@@ -594,7 +754,14 @@ def command_submit(args: argparse.Namespace) -> int:
 
     print(f"submitting as {author}\n")
     _run(["git", "fetch", "origin"], root)
-    checks = KINDS[args.kind].preflight(root, author)
+    kind = KINDS[args.kind]
+    if kind.prepare is not None:
+        try:
+            kind.prepare(root, author, args)
+        except (SubmitError, ProvenanceError, baseline.BaselineError) as exc:
+            print(f"cannot assemble the submission: {exc}")
+            return 1
+    checks = kind.preflight(root, author)
     for check in checks:
         mark = "ok  " if check.passed else "FAIL"
         print(f"  {mark}  {check.name}")
