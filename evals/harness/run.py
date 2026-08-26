@@ -51,6 +51,7 @@ from evals.harness import (
     ledger,
     modes,
     queue,
+    submit,
     writing,
 )
 from evals.harness.artifact import (
@@ -1253,6 +1254,22 @@ def main(argv: Sequence[str] | None = None) -> int:
     compare_parser.add_argument("after", help="the sweep from after it")
     compare_parser.add_argument("--out", help="where to write the comparison")
     compare_parser.set_defaults(func=command_compare)
+
+    submit_parser = subparsers.add_parser(
+        "submit",
+        help="open a contribution PR through gh, after running its CI checks locally",
+    )
+    submit_parser.add_argument(
+        "kind",
+        choices=sorted(submit.KINDS),
+        help="what this PR carries; one kind per PR",
+    )
+    submit_parser.add_argument(
+        "--dry-run",
+        action="store_true",
+        help="stop after the checklist and stage nothing",
+    )
+    submit_parser.set_defaults(func=submit.command_submit)
 
     args = parser.parse_args(argv)
     return args.func(args)
