@@ -128,6 +128,10 @@ DELIBERATE: dict[tuple[str, str], str] = {
         "evals/BASELINES.md",
     ): "same spec, same tracking issue.",
     (
+        "evals/harness/baseline.py",
+        "baseline.json",
+    ): "each merged Baseline's manifest; none is merged yet.",
+    (
         "tests/test_doc_reference_lints.py",
         "CONTEXT-MAP.md",
     ): "this module's own docstring, quoting the exception above it.",
