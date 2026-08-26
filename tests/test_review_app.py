@@ -59,7 +59,7 @@ def client(runs, tmp_path):
     session = build_session(
         runs,
         voter="ada",
-        ledger_path=tmp_path / "votes.jsonl",
+        ledger_path=tmp_path / "votes",
         configs={"01-payments-checkout": "engine-1.2.3"},
     )
     return TestClient(create_app(session)), session

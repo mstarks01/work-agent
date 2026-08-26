@@ -120,21 +120,13 @@ DELIBERATE: dict[tuple[str, str], str] = {
         "docs/example-report.html",
     ): "same block, same marking.",
     (
-        "evals/VOTING.md",
-        "evals/review/votes.jsonl",
-    ): "the vote ledger, appended at review time. Absent until somebody votes.",
+        "docs/agents/issue-tracker.md",
+        "CONTRIBUTING.md",
+    ): "specified by map #319's document-surface ticket; #337 tracks writing it.",
     (
-        "evals/review/README.md",
-        "votes.jsonl",
-    ): "the same ledger, named relative to its own directory.",
-    (
-        "evals/harness/run.py",
-        "evals/review/votes.jsonl",
-    ): "the same ledger, named from the module that reads it.",
-    (
-        "webapp/review.py",
-        "evals/review/votes.jsonl",
-    ): "the same ledger, named from the app that appends to it.",
+        "docs/agents/issue-tracker.md",
+        "evals/BASELINES.md",
+    ): "same spec, same tracking issue.",
     (
         "tests/test_doc_reference_lints.py",
         "CONTEXT-MAP.md",

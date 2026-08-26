@@ -743,7 +743,7 @@ def command_review(args: argparse.Namespace) -> int:
     """What a reviewer has waiting, and what the ledger already holds.
 
     Credential-free, like ``promote`` and ``stability``: it reads a finished
-    sweep's reports and ``evals/review/votes.jsonl`` and calls nothing. This is
+    sweep's reports and ``evals/review/votes/`` and calls nothing. This is
     the read-only half of the loop — ``webapp/review.py`` is where an answer is
     recorded, because a vote wants the source text beside the finding and a
     terminal is the wrong place to read 1,400 characters of prose.
@@ -875,9 +875,9 @@ def command_rekey(args: argparse.Namespace) -> int:
 
     Refuses to write anything unless ``--yes`` is given, like ``promote``: this
     rewrites the only human record in the repository, and a preview that also
-    edited would be a preview nobody could trust. The old file is replaced by an
-    atomic rename, so an interrupted re-key leaves it whole rather than half of
-    a new one.
+    edited would be a preview nobody could trust. Each voter's file is replaced
+    by an atomic rename, so an interrupted re-key leaves every file whole —
+    old or new — rather than half of a new one.
     """
     path = Path(args.ledger)
     current = ledger.load(path)
