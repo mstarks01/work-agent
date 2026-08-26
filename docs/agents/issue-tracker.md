@@ -55,8 +55,16 @@ gh api --method POST repos/mstarks01/work-agent/issues/<child>/dependencies/bloc
 
 ### The live map
 
-**None.** [#158](https://github.com/mstarks01/work-agent/issues/158) completed 2026-08-13 and has
-moved to Completed efforts below. Chart a new one only against the bar at the end of this file.
+[#319 — Map: contributions arrive as pull requests — votes, sittings and baselines](https://github.com/mstarks01/work-agent/issues/319),
+charted 2026-08-26. A **planning** map: it finds the spec for the contribution
+path — how an outsider submits review votes, case review sittings and model
+baseline sweeps, each as a pull request. Eight tickets: seven grilling, one
+research. The research ticket
+([#324, the price data for a pre-run estimate](https://github.com/mstarks01/work-agent/issues/324))
+resolved at charting time; findings sit on `research/contribution-price-data`
+@ `890bc93`. The frontier holds the identity ticket, the baseline home, the
+ledger layout and the CI-check ticket; the submit command, the promotion rule
+and the outsider sitting wait on them through native dependencies.
 
 ### Completed efforts
 
