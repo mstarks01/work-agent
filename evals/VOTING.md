@@ -6,9 +6,9 @@ set, and a match is a recall hit. The rule stops there. It cannot say whether a
 finding that matches nothing is a real threat or noise. That question is about
 the system, and the rule only compares two claims.
 
-**A person answers it, one finding at a time.** The answer goes into
-`evals/review/votes.jsonl`, the vote ledger. Nothing else in this repository
-holds a human judgement, and no model has a vote.
+**A person answers it, one finding at a time.** The answer goes into the vote
+ledger — `evals/review/votes/`, one file per voter. Nothing else in this
+repository holds a human judgement, and no model has a vote.
 
 This guide is the procedure: how to hold a review sitting, what each answer
 moves, and what to do when the rule itself changes. For the design behind it,
@@ -212,24 +212,32 @@ opinion, and `run review` reports how many findings two people answered.
 
 ## The ledger
 
-`evals/review/votes.jsonl` is one JSON object per line, and it is checked in on
-purpose: it is the evidence behind every quality number, so each change should
-be a reviewed diff with an author and a date.
+The ledger is a directory: `evals/review/votes/`, one `<login>.jsonl` file per
+voter, one JSON object per line. The filename is the voter's GitHub login, and
+the loader refuses a row filed under another person's name. It is checked in
+on purpose: it is the evidence behind every quality number, so each change
+should be a reviewed diff with an author and a date. The split means two
+voters' PRs never conflict with each other.
 
 **Never edit a line, and never delete one.** A reviewer who changes their mind
 appends a new vote, and the latest vote for a `(fingerprint, voter)` pair is the
 live one. That is what lets a number computed last month be recomputed to the
 same digit today, by ignoring the events after it.
 
+Every voter also has a line in `evals/review/voters.toml`, the roster. The
+roster holds each voter's **standing** (`maintainer` or `contributor`), and it
+is the only place a standing lives — a promotion is one roster edit, and it
+re-classes the voter's whole history at once.
+
 Write through `webapp/review.py`, which validates every field against a closed
-set. `evals/harness/ledger.py` reads. The file does not exist until the first
-sitting, and the loader returns an empty ledger until then.
+set. `evals/harness/ledger.py` reads. The directory does not exist until the
+first sitting, and the loader returns an empty ledger until then.
 
 ## When the match rule changes
 
 A vote hangs on a **fingerprint**, and a better rule changes every fingerprint.
 That would expire the ledger, so a vote stores the fields its key was computed
-from. A rule change is then arithmetic over the file.
+from. A rule change is then arithmetic over the ledger's files.
 
 1. **Measure the new rule** against the recorded labels. It must reach 90%:
 

@@ -94,7 +94,8 @@ evals/
     build_pairs.py              the match fixtures and their labels (edit this)
     pairs.json                  generated from build_pairs.py (never hand-edit)
   harness/                      the scorer and the eval runner
-  review/votes.jsonl            the vote ledger — the only human record here
+  review/voters.toml            the roster: voter → standing, the only place standing lives
+  review/votes/                 the vote ledger, one file per voter — the only human record here
 ```
 
 ## The harness
@@ -114,7 +115,8 @@ evals/
 | `harness/verbs.py` | The closed vocabulary of attacker actions, and what counts as one action. |
 | `harness/identity.py` | Claim identity from the fields a claim carries. `SubsetVerbIdentity` scores 185/200 against the recorded labels, over the 90% bar, with no model call. |
 | `harness/fingerprint.py` | A **Claim**'s identity as a versioned value code computes. No model call. |
-| `harness/ledger.py` | The append-only record of what a **person** decided about a finding. |
+| `harness/ledger.py` | The append-only record of what a **person** decided about a finding. One file per voter, named by the GitHub login. |
+| `harness/roster.py` | Voter → standing, read from `review/voters.toml` — the only place a standing lives. Refuses an unrostered voter rather than defaulting one. |
 | `harness/queue.py` | Which findings a reviewer is asked about, and in what order. Blind to the configuration. Several sweeps of one configuration are merged here, which is where a finding's run count comes from. |
 | `harness/writing.py` | What reviewers said about how a finding reads, per case and framework. The one number a style down-vote moves, and it moves no other. |
 | `harness/instruction.py` | How much instruction each node was given, per framework, per sweep. The drift alarms of ADR 0016, read as a measurement. |

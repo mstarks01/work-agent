@@ -96,7 +96,7 @@ def test_an_invented_verdict_is_refused():
 
 def test_a_correction_is_a_new_event_and_the_old_one_survives(tmp_path):
     """Append-only: history stays reconstructible at any past date."""
-    path = tmp_path / "votes.jsonl"
+    path = tmp_path / "votes"
     append(cast(components(), "01", "up", "sam"), path)
     append(cast(components(), "01", "down", "sam", reason="not-a-threat"), path)
 
@@ -109,7 +109,7 @@ def test_a_correction_is_a_new_event_and_the_old_one_survives(tmp_path):
 
 def test_the_pool_is_derived_from_the_live_verdicts(tmp_path):
     """Never stored, so it cannot disagree with the ledger it came from."""
-    path = tmp_path / "votes.jsonl"
+    path = tmp_path / "votes"
     append(cast(components("process:a"), "01", "up", "sam"), path)
     append(cast(components("process:b"), "01", "down", "sam", reason="too-vague"), path)
     append(
@@ -123,7 +123,7 @@ def test_the_pool_is_derived_from_the_live_verdicts(tmp_path):
 
 
 def test_a_retracted_upvote_leaves_the_pool(tmp_path):
-    path = tmp_path / "votes.jsonl"
+    path = tmp_path / "votes"
     append(cast(components(), "01", "up", "sam"), path)
     assert load(path).pool()
 
@@ -132,7 +132,7 @@ def test_a_retracted_upvote_leaves_the_pool(tmp_path):
 
 
 def test_double_voted_findings_are_the_agreement_sample(tmp_path):
-    path = tmp_path / "votes.jsonl"
+    path = tmp_path / "votes"
     append(cast(components("process:a"), "01", "up", "sam"), path)
     append(
         cast(components("process:a"), "01", "down", "ada", reason="not-a-threat"), path
@@ -152,7 +152,7 @@ def test_a_rekey_needs_no_revote(tmp_path):
     takes today: the components were stored, so the new key is a recomputation
     rather than a re-vote.
     """
-    path = tmp_path / "votes.jsonl"
+    path = tmp_path / "votes"
     append(cast(components(), "01", "up", "sam", version=1), path)
     original = load(path)
     assert original.votes[0].fingerprint.startswith("v1:")
@@ -170,16 +170,16 @@ def test_a_rekey_needs_no_revote(tmp_path):
 
 def test_a_missing_ledger_is_empty_rather_than_an_error(tmp_path):
     """Before the first sitting there are no votes; that is a start, not a fault."""
-    ledger = load(tmp_path / "nothing-here.jsonl")
+    ledger = load(tmp_path / "nothing-here")
     assert len(ledger) == 0
     assert ledger.pool() == frozenset()
 
 
 def test_a_malformed_row_fails_closed_and_names_its_line(tmp_path):
     """A row nobody can read is worse than a missing one: it counts in a denominator."""
-    path = tmp_path / "votes.jsonl"
+    path = tmp_path / "votes"
     append(cast(components(), "01", "up", "sam"), path)
-    with path.open("a", encoding="utf-8") as handle:
+    with (path / "sam.jsonl").open("a", encoding="utf-8") as handle:
         handle.write('{"fingerprint": "v1:aa"}\n')
 
     with pytest.raises(LedgerError, match=r":2: malformed vote"):
@@ -187,19 +187,57 @@ def test_a_malformed_row_fails_closed_and_names_its_line(tmp_path):
 
 
 def test_a_row_that_is_not_json_names_its_line(tmp_path):
-    path = tmp_path / "votes.jsonl"
-    path.write_text("not json at all\n", encoding="utf-8")
+    path = tmp_path / "votes"
+    path.mkdir()
+    (path / "sam.jsonl").write_text("not json at all\n", encoding="utf-8")
     with pytest.raises(LedgerError, match=r":1: invalid JSON"):
         load(path)
 
 
 def test_blank_lines_are_tolerated(tmp_path):
-    path = tmp_path / "votes.jsonl"
+    path = tmp_path / "votes"
+    path.mkdir()
     vote = cast(components(), "01", "up", "sam")
-    path.write_text(
+    (path / "sam.jsonl").write_text(
         "\n" + json.dumps(vote.to_json(), sort_keys=True) + "\n\n", encoding="utf-8"
     )
     assert len(load(path)) == 1
+
+
+def test_a_row_in_the_wrong_voters_file_fails_closed(tmp_path):
+    """The filename is the binding: one voter's history lives in one file."""
+    path = tmp_path / "votes"
+    path.mkdir()
+    vote = cast(components(), "01", "up", "ada")
+    (path / "sam.jsonl").write_text(
+        json.dumps(vote.to_json(), sort_keys=True) + "\n", encoding="utf-8"
+    )
+    with pytest.raises(LedgerError, match="one voter's history lives in one file"):
+        load(path)
+
+
+def test_a_single_file_ledger_is_refused(tmp_path):
+    """The one-file shape is dropped, and reading it as empty would eat votes."""
+    path = tmp_path / "votes.jsonl"
+    vote = cast(components(), "01", "up", "sam")
+    path.write_text(json.dumps(vote.to_json(), sort_keys=True) + "\n", encoding="utf-8")
+    with pytest.raises(LedgerError, match="not a shape this loader reads"):
+        load(path)
+
+
+def test_files_load_in_filename_order(tmp_path):
+    """Order between voters carries no meaning, so it must at least be stable."""
+    path = tmp_path / "votes"
+    append(cast(components(), "01", "up", "sam"), path)
+    append(cast(components(), "01", "up", "ada"), path)
+    assert [vote.voter for vote in load(path)] == ["ada", "sam"]
+
+
+def test_a_voter_that_is_not_a_login_is_refused():
+    """The voter names this voter's file, so a voter must never carry a path."""
+    for voter in ("../sam", "sam smith", "sam/", "-sam", "sam--i-am"):
+        with pytest.raises(LedgerError, match="is not a GitHub login"):
+            cast(components(), "01", "up", voter)
 
 
 def test_an_empty_ledger_answers_every_question(tmp_path):

@@ -33,13 +33,13 @@ def seed(path, *, version=1):
 
 def test_rekey_previews_without_writing(tmp_path, capsys):
     """A preview that also edited would be a preview nobody could trust."""
-    led = tmp_path / "votes.jsonl"
+    led = tmp_path / "votes"
     seed(led)
-    before = led.read_text(encoding="utf-8")
+    before = (led / "ada.jsonl").read_text(encoding="utf-8")
 
     assert main(["rekey", "--to-version", "2", "--ledger", str(led)]) == 0
 
-    assert led.read_text(encoding="utf-8") == before
+    assert (led / "ada.jsonl").read_text(encoding="utf-8") == before
     out = capsys.readouterr().out
     assert "2 fingerprints move" in out
     assert "nothing written" in out
@@ -47,7 +47,7 @@ def test_rekey_previews_without_writing(tmp_path, capsys):
 
 def test_rekey_moves_every_key_and_keeps_every_vote(tmp_path):
     """The property: no re-vote, no provider, and the verdicts survive."""
-    led = tmp_path / "votes.jsonl"
+    led = tmp_path / "votes"
     seed(led)
     original = load(led)
 
@@ -63,7 +63,7 @@ def test_rekey_moves_every_key_and_keeps_every_vote(tmp_path):
 
 def test_rekey_refuses_a_move_the_components_cannot_satisfy(tmp_path, capsys):
     """Fail-closed, so a partial re-key is impossible."""
-    led = tmp_path / "votes.jsonl"
+    led = tmp_path / "votes"
     append(
         cast(
             Components("asvs", "V1", ("process:a",)),
@@ -74,11 +74,13 @@ def test_rekey_refuses_a_move_the_components_cannot_satisfy(tmp_path, capsys):
         ),
         led,
     )
-    before = led.read_text(encoding="utf-8")
+    before = (led / "ada.jsonl").read_text(encoding="utf-8")
 
     assert main(["rekey", "--to-version", "2", "--ledger", str(led), "--yes"]) == 1
 
-    assert led.read_text(encoding="utf-8") == before, "a refusal must not write"
+    assert (led / "ada.jsonl").read_text(encoding="utf-8") == before, (
+        "a refusal must not write"
+    )
     assert "cannot re-key" in capsys.readouterr().out
 
 
@@ -124,7 +126,7 @@ def _sweep(tmp_path, name="artifact.json", claims=None):
 
 def test_review_reports_what_is_waiting(tmp_path, capsys):
     artifact = _sweep(tmp_path)
-    led = tmp_path / "votes.jsonl"
+    led = tmp_path / "votes"
 
     assert main(["review", str(artifact), "--voter", "ada", "--ledger", str(led)]) == 0
 
@@ -142,7 +144,7 @@ def test_review_over_several_sweeps_counts_what_they_disagree_on(tmp_path, capsy
         "two.json",
         claims=[_claim(), _claim("A second finding", "tampering")],
     )
-    led = tmp_path / "votes.jsonl"
+    led = tmp_path / "votes"
 
     code = main(
         ["review", str(steady), str(both), "--voter", "ada", "--ledger", str(led)]
@@ -158,7 +160,7 @@ def test_review_over_several_sweeps_counts_what_they_disagree_on(tmp_path, capsy
 def test_review_writes_nothing(tmp_path):
     """Read-only, like ``promote`` and ``stability``."""
     artifact = _sweep(tmp_path)
-    led = tmp_path / "votes.jsonl"
+    led = tmp_path / "votes"
 
     main(["review", str(artifact), "--voter", "ada", "--ledger", str(led)])
 
