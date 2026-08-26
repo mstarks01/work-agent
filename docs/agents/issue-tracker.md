@@ -55,12 +55,63 @@ gh api --method POST repos/mstarks01/work-agent/issues/<child>/dependencies/bloc
 
 ### The live map
 
-**None.** [#158](https://github.com/mstarks01/work-agent/issues/158) completed 2026-08-13 and has
+**None.** [#319](https://github.com/mstarks01/work-agent/issues/319) completed 2026-08-26 and has
 moved to Completed efforts below. Chart a new one only against the bar at the end of this file.
 
 ### Completed efforts
 
 Completed on GitHub Issues (canonical):
+
+- [#319 — Map: contributions arrive as pull requests — votes, sittings and baselines](https://github.com/mstarks01/work-agent/issues/319)
+  — 12 tickets, charted and completed 2026-08-26. A **planning** map: it settled the spec for the
+  contribution path — how an outsider submits review votes, case review sittings and model baseline
+  sweeps, each as a pull request — and stopped at the spec. The implementation is ordinary follow-up
+  work, and no issue carries it yet. The map's Decisions-so-far index holds a one-line gist per
+  ticket; each line links the ticket that holds the detail.
+
+  The route in one pass. **A vote binds to the GitHub account that submits it**
+  ([#320](https://github.com/mstarks01/work-agent/issues/320)): the voter name is the login,
+  standing lives in the checked-in roster `evals/review/voters.toml`, and CI checks author = voter.
+  **The ledger splits one file per voter**
+  ([#322](https://github.com/mstarks01/work-agent/issues/322)), so two vote PRs merge without
+  conflict. **A Baseline lives at `evals/baselines/<derived-name>/`**
+  ([#321](https://github.com/mstarks01/work-agent/issues/321)), named by five identity parts that
+  CI recomputes; the case set must be the full corpus. **CI proves an artifact agrees with itself
+  and with the repository, never that a model ran**
+  ([#323](https://github.com/mstarks01/work-agent/issues/323)): five PR checks plus a
+  usage-completeness lint, and a provenance label stands in for replication. **litellm's offline
+  price map prices a sweep** ([#324](https://github.com/mstarks01/work-agent/issues/324), research):
+  a recorded sweep costs $0.60, and a suffixed served build misses the map and needs a stated
+  fallback. **Promotion is a roster flip**
+  ([#326](https://github.com/mstarks01/work-agent/issues/326)), informed by a pairwise agreement
+  report; `score` always writes a maintainer-only block and an all-standings block. **A Case
+  Sitting is free and offline** ([#327](https://github.com/mstarks01/work-agent/issues/327)): the
+  committed `REVIEW.md` carries everything, and a drifted digest re-opens the debt fail-closed.
+  **One `submit` subcommand opens every PR**
+  ([#325](https://github.com/mstarks01/work-agent/issues/325)), with a per-kind allowlist and a
+  local run of CI's checks. **The comparison table is generated**
+  ([#330](https://github.com/mstarks01/work-agent/issues/330)), and a stale copy fails CI. **The
+  price map gets no drift alarm** ([#331](https://github.com/mstarks01/work-agent/issues/331)) —
+  one disclosure line when a unit price changed since the calibrating Baseline ran. **The document
+  surface is four files** ([#335](https://github.com/mstarks01/work-agent/issues/335)): a short
+  root `CONTRIBUTING.md` routes by resource; `evals/VOTING.md`, `evals/BLESSING.md` and a new
+  `evals/BASELINES.md` own the procedures, and prose never restates what `submit --dry-run` prints.
+  **There is no spend ceiling** ([#334](https://github.com/mstarks01/work-agent/issues/334)): the
+  gate is informed, affirmative consent — every amount carries one of three labels (`recorded` /
+  `estimated` / `unpriced`), acceptance is typing the amount back, a script states
+  `--accept-cost <usd|unknown>`, and a run that outspends the accepted figure re-prompts
+  interactively or stops.
+
+  Corrections worth knowing: #327 named the act — a **Case Sitting**, defined in `CONTEXT.md` by
+  PR [#333](https://github.com/mstarks01/work-agent/pull/333), distinct from the Review Sitting
+  that produces votes. #334 amended #325 twice: `--yes` and `--allow-unpriced` die on the estimate
+  gate, replaced by `--accept-cost`. #335 ruled the place for the ceiling text before #334 ruled
+  its content.
+
+  Research findings sit at `archive/research/contribution-price-data` @ `890bc93`, per the tag
+  convention below. **Out of scope and not graduating**: calibration pair labels and new golden
+  cases (both are ordinary PRs), any merge gate that reads contributed data, baselines over
+  private off-corpus cases, and a hosted submission service.
 
 - [#158 — Map: one validated system representation, many security frameworks](https://github.com/mstarks01/work-agent/issues/158)
   — 11 tickets, charted 2026-08-12 from [#139](https://github.com/mstarks01/work-agent/issues/139) and
