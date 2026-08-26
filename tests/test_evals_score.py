@@ -126,9 +126,7 @@ class TestAVoteReachesTheNumbersWithoutASweep:
     ):
         make_one_finding_unlisted(swept, case)
 
-        assert (
-            main(["score", str(swept), "--ledger", str(tmp_path / "none.jsonl")]) == 0
-        )
+        assert main(["score", str(swept), "--ledger", str(tmp_path / "none")]) == 0
 
         payload = scored(swept)
         standings = {entry["standing"] for entry in unlisted_of(payload)}
@@ -141,7 +139,7 @@ class TestAVoteReachesTheNumbersWithoutASweep:
         self, swept, tmp_path, case
     ):
         make_one_finding_unlisted(swept, case)
-        ledger_path = tmp_path / "votes.jsonl"
+        ledger_path = tmp_path / "votes"
         main(["score", str(swept), "--ledger", str(ledger_path)])
         first = unlisted_of(scored(swept))
         assert first, "the re-filed claim matches no reference, so it is unlisted"
@@ -157,7 +155,7 @@ class TestAVoteReachesTheNumbersWithoutASweep:
 
     def test_a_style_objection_reaches_the_writing_numbers(self, swept, tmp_path, case):
         """The other instrument a vote moves, and it needs no unmatched finding."""
-        ledger_path = tmp_path / "votes.jsonl"
+        ledger_path = tmp_path / "votes"
         main(["score", str(swept), "--ledger", str(ledger_path)])
         assert scored(swept)["writing_aggregate"]["objections"] == 0
 
@@ -196,7 +194,7 @@ class TestWhatARescoreTouches:
 
     def test_a_run_level_block_survives_untouched(self, swept, tmp_path):
         """Grounds, coverage and provenance are facts no later vote changes."""
-        main(["score", str(swept), "--ledger", str(tmp_path / "none.jsonl")])
+        main(["score", str(swept), "--ledger", str(tmp_path / "none")])
 
         payload = scored(swept)
         assert payload["grounds_aggregate"] == {"grounds_per_threat": 1.5}
@@ -204,7 +202,7 @@ class TestWhatARescoreTouches:
         assert payload["cases"] == ["01-payments-checkout", "case-second"]
 
     def test_every_scored_instrument_writes_its_keys(self, swept, tmp_path):
-        main(["score", str(swept), "--ledger", str(tmp_path / "none.jsonl")])
+        main(["score", str(swept), "--ledger", str(tmp_path / "none")])
 
         payload = scored(swept)
         for key in ("scores", "critic_yield", "writing", "writing_aggregate"):
@@ -234,7 +232,7 @@ class TestItRefusesRatherThanScoringHalf:
         (reports_dir(swept) / f"{case.id}.drafts.json").unlink()
 
         with pytest.raises(Exception, match="Re-run the sweep"):
-            main(["score", str(swept), "--ledger", str(tmp_path / "none.jsonl")])
+            main(["score", str(swept), "--ledger", str(tmp_path / "none")])
 
     def test_an_artifact_with_no_reports_directory_is_refused(self, swept, tmp_path):
         for path in reports_dir(swept).iterdir():
@@ -242,4 +240,4 @@ class TestItRefusesRatherThanScoringHalf:
         reports_dir(swept).rmdir()
 
         with pytest.raises(Exception, match="does not exist"):
-            main(["score", str(swept), "--ledger", str(tmp_path / "none.jsonl")])
+            main(["score", str(swept), "--ledger", str(tmp_path / "none")])

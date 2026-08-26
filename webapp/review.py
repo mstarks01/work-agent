@@ -5,8 +5,8 @@ Start it from a clone, with no credentials of any kind::
     uv run python webapp/review.py --voter ada
 
 It is **eval-side tooling and not the product**. ``webapp/main.py`` embeds the
-engine and runs real models against real prose; this reads two files —
-a sweep's artifact and ``evals/review/votes.jsonl`` — and writes one line per
+engine and runs real models against real prose; this reads a sweep's artifact
+and the vote ledger under ``evals/review/votes/``, and writes one line per
 click. Nothing here can start a job, spend a token, or reach a provider. That is
 why it needs no auth story beyond the loopback bind: there is no credential
 behind it to protect and nothing it can be made to buy.

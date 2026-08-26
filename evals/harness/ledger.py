@@ -2,8 +2,17 @@
 
 This is the only place in the repository where a **human** judgement is the
 datum. Everything else under ``evals/`` is agent-authored — ``evals/README.md``
-says so once for the whole directory — and this is the file that changes that,
-one line at a time.
+says so once for the whole directory — and this is the directory that changes
+that, one line at a time.
+
+**One file per voter: ``evals/review/votes/<login>.jsonl``.** The filename is
+the GitHub login of the account that submits the votes, and the loader refuses
+a row whose ``voter`` differs from its filename — one voter's history lives in
+one file. Two voters' PRs then merge without conflict, and two PRs from one
+voter may still conflict, by design: one person sequences their own PRs. Order
+between voters carries no meaning; :meth:`Ledger.current` keys by
+``(fingerprint, voter)``, so position is chronology only inside one file,
+which is exactly where the layout keeps it.
 
 **Append-only, and a correction is a new event.** No row is ever updated or
 removed. The current verdict for a ``(fingerprint, voter)`` pair is its latest
@@ -14,9 +23,9 @@ the whole defensibility argument rests on it.
 
 **A vote stores its components, not just its key.** A fingerprint improves, and
 improving it changes every key — see :mod:`evals.harness.fingerprint`. Storing
-what the key was computed *from* makes a version bump a pure recompute over this
-file rather than a re-vote, which is what stops the ledger expiring the way a
-model-scored history does.
+what the key was computed *from* makes a version bump a pure recompute over
+these files rather than a re-vote, which is what stops the ledger expiring the
+way a model-scored history does.
 
 **One reason code, from a closed set, and it decides where the vote lands.** A
 reviewer who dislikes a finding's writing and a reviewer who says it is not a
@@ -26,16 +35,19 @@ move a recall number. :data:`SUBSTANCE_REASONS` counts against the analysis;
 :mod:`evals.harness.writing` instead. That split is the whole control for personal
 preference, and it is mechanical rather than a request in a guide.
 
-Security: this file is the supply chain of every quality number the tool
+Security: these files are the supply chain of every quality number the tool
 publishes, so ``voter`` is required, is never anonymous, and is recorded on
-every event (A09). Nothing here is deleted, so a bad actor's votes are
-identifiable and reversible by appending, never by rewriting (A08).
+every event (A09). It must also hold the GitHub login shape, because the login
+names this voter's file and an unvalidated voter would be a path (A01).
+Nothing here is deleted, so a bad actor's votes are identifiable and
+reversible by appending, never by rewriting (A08).
 """
 
 from __future__ import annotations
 
 import json
 import os
+import re
 from collections.abc import Iterable, Iterator, Mapping, Sequence
 from dataclasses import dataclass, field, replace
 from datetime import UTC, datetime
@@ -50,7 +62,14 @@ from evals.harness.fingerprint import (
 )
 
 EVALS_ROOT = Path(__file__).resolve().parents[1]
-DEFAULT_LEDGER_PATH = EVALS_ROOT / "review" / "votes.jsonl"
+DEFAULT_LEDGER_PATH = EVALS_ROOT / "review" / "votes"
+
+#: The shape of a GitHub login: alphanumeric with single inner hyphens, at
+#: most 39 characters. #320 makes the login the voter's one name, and the
+#: login names the voter's file under :data:`DEFAULT_LEDGER_PATH` — so this
+#: check is also what keeps a ``voter`` from carrying a path (A01: the value
+#: reaches a filesystem join in :func:`append` and :func:`write_all`).
+GITHUB_LOGIN = re.compile(r"(?=.{1,39}\Z)[A-Za-z0-9](?:-?[A-Za-z0-9])*\Z")
 
 #: What a reviewer can answer. ``unsure`` is a real answer and is counted as
 #: one: review sitting 01 answered ``unclear`` on 4 of 30 pairs, and that
@@ -146,6 +165,12 @@ class Vote:
             raise LedgerError(f"{self.verdict!r} is not a verdict")
         if not self.voter.strip():
             raise LedgerError("a vote carries no voter; this ledger is never anonymous")
+        if not GITHUB_LOGIN.match(self.voter):
+            raise LedgerError(
+                f"{self.voter!r} is not a GitHub login; the voter is the"
+                " account that opens the PR (#320), and the login names this"
+                " voter's file in the ledger directory"
+            )
         if self.verdict == "down" and self.reason is None:
             raise LedgerError(
                 "a down-vote needs a reason, because the reason is what decides"
@@ -251,9 +276,10 @@ class Ledger:
     """Every vote ever cast, in the order it was cast.
 
     Loaded whole. At a corpus of thirteen cases and a few hundred findings the
-    file is small enough that streaming would buy nothing and cost the ability
-    to answer a question about the whole history in one pass. When it stops
-    being small the answer is a different store, not a lazier reader.
+    files are small enough that streaming would buy nothing and cost the
+    ability to answer a question about the whole history in one pass. When
+    they stop being small the answer is a different store, not a lazier
+    reader.
     """
 
     votes: list[Vote] = field(default_factory=list)
@@ -326,21 +352,38 @@ class Ledger:
 
 
 def load(path: Path | str = DEFAULT_LEDGER_PATH) -> Ledger:
-    """Read the ledger, failing closed on any row that will not parse.
+    """Read every voter's file in filename order, failing closed on any row.
 
-    A missing file is an empty ledger rather than an error: before the first
-    sitting there are no votes, and that is a starting state and not a fault.
+    ``path`` is the ledger *directory*, one ``<login>.jsonl`` per voter. A
+    missing directory is an empty ledger rather than an error: before the
+    first sitting there are no votes, and that is a starting state and not a
+    fault. A single ledger file is refused outright — the one-file shape was
+    dropped by #322, and reading it as empty would silently discard votes.
     """
     path = Path(path)
+    if path.is_file():
+        raise LedgerError(
+            f"{path}: the ledger is a directory of <login>.jsonl files, one"
+            " per voter; a single ledger file is not a shape this loader reads"
+        )
     if not path.exists():
         return Ledger(votes=[], path=path)
 
-    votes = []
+    votes: list[Vote] = []
+    for file in sorted(path.glob("*.jsonl")):
+        votes.extend(_read_voter_file(file))
+    return Ledger(votes=votes, path=path)
+
+
+def _read_voter_file(path: Path) -> list[Vote]:
+    """One voter's history, every row checked against the filename it lives in."""
+    login = path.stem
     try:
         text = path.read_text(encoding="utf-8")
     except OSError as exc:
         raise LedgerError(f"{path}: cannot be read: {exc}") from exc
 
+    votes: list[Vote] = []
     for number, line in enumerate(text.splitlines(), start=1):
         if not line.strip():
             continue
@@ -349,46 +392,63 @@ def load(path: Path | str = DEFAULT_LEDGER_PATH) -> Ledger:
         except json.JSONDecodeError as exc:
             raise LedgerError(f"{path}:{number}: invalid JSON: {exc}") from exc
         try:
-            votes.append(Vote.from_json(raw))
+            vote = Vote.from_json(raw)
         except LedgerError as exc:
             raise LedgerError(f"{path}:{number}: {exc}") from exc
-    return Ledger(votes=votes, path=path)
+        if vote.voter != login:
+            raise LedgerError(
+                f"{path}:{number}: names voter {vote.voter!r}, but this file"
+                f" is {login!r}'s; one voter's history lives in one file"
+            )
+        votes.append(vote)
+    return votes
 
 
 def append(vote: Vote, path: Path | str = DEFAULT_LEDGER_PATH) -> Vote:
-    """Add one vote to the end of the ledger, and never touch what is there.
+    """Add one vote to the end of its voter's file, and never touch what is there.
 
-    Opened in append mode with one ``write`` of one line, so a crash mid-sitting
-    truncates at a row boundary rather than corrupting the row before it. The
-    parent directory is created because a first sitting should not fail on a
-    missing folder.
+    ``path`` is the ledger directory; the vote routes to
+    ``<path>/<voter>.jsonl``, which is safe because :class:`Vote` refused any
+    voter that does not hold the GitHub login shape. Opened in append mode
+    with one ``write`` of one line, so a crash mid-sitting truncates at a row
+    boundary rather than corrupting the row before it. The directory is
+    created because a first sitting should not fail on a missing folder.
     """
-    path = Path(path)
-    path.parent.mkdir(parents=True, exist_ok=True)
+    directory = Path(path)
+    directory.mkdir(parents=True, exist_ok=True)
+    target = directory / f"{vote.voter}.jsonl"
     line = json.dumps(vote.to_json(), ensure_ascii=False, sort_keys=True)
     try:
-        with path.open("a", encoding="utf-8") as handle:
+        with target.open("a", encoding="utf-8") as handle:
             handle.write(line + "\n")
             handle.flush()
             os.fsync(handle.fileno())
     except OSError as exc:
-        raise LedgerError(f"{path}: cannot be written: {exc}") from exc
+        raise LedgerError(f"{target}: cannot be written: {exc}") from exc
     return vote
 
 
 def write_all(votes: Sequence[Vote], path: Path | str) -> None:
-    """Write a whole ledger atomically. For tests and for a re-key, never for a vote.
+    """Write a whole ledger atomically per file. For a re-key and for tests, never for a vote.
 
-    A re-key under a new fingerprint version rewrites every row from its stored
-    components. That is the one legitimate whole-file write, and it goes through
-    a temporary file and a rename so an interrupted re-key leaves the old ledger
-    intact rather than half of a new one.
+    A re-key under a new fingerprint version rewrites every row from its
+    stored components. That is the one legitimate whole-ledger write. Every
+    line serialises before the first byte lands, so a row that cannot
+    serialise raises while the old files are still whole; each file then goes
+    through a temporary sibling and a rename, so an interruption between two
+    files leaves every file whole — old or new — and git covers that window.
     """
-    path = Path(path)
-    path.parent.mkdir(parents=True, exist_ok=True)
-    lines = [
-        json.dumps(vote.to_json(), ensure_ascii=False, sort_keys=True) for vote in votes
-    ]
+    directory = Path(path)
+    lines_by_voter: dict[str, list[str]] = {}
+    for vote in votes:
+        line = json.dumps(vote.to_json(), ensure_ascii=False, sort_keys=True)
+        lines_by_voter.setdefault(vote.voter, []).append(line)
+    directory.mkdir(parents=True, exist_ok=True)
+    for login, lines in sorted(lines_by_voter.items()):
+        _replace_voter_file(directory / f"{login}.jsonl", lines)
+
+
+def _replace_voter_file(path: Path, lines: list[str]) -> None:
     # A temporary file in the *same* directory, so the rename below is atomic:
     # ``os.replace`` is only atomic within one filesystem, and the system
     # temporary directory is often a different one.
@@ -408,7 +468,7 @@ def rekey(votes: Iterable[Vote], version: int) -> list[Vote]:
     """Recompute every fingerprint under ``version``, from stored components.
 
     The operation that makes a better recogniser affordable: no re-vote, no
-    provider, no credentials, and the answer is a pure function of this file.
+    provider, no credentials, and the answer is a pure function of the ledger.
     A vote whose components cannot satisfy the new version — no verb, under
     version 2 — raises, so a partial re-key is impossible.
     """

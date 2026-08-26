@@ -1,0 +1,24 @@
+# The one roster: every person who votes, holds a sitting or submits a sweep
+# has a line here, and this line is the only place their standing lives
+# (#320). Standing never sits on a vote row — a promotion is one edit here,
+# and it re-classes the voter's whole history at once (#326).
+#
+# A first-time contributor adds their own line, standing "contributor", in
+# the same PR as their first submission. CI refuses a PR that raises its own
+# author's standing, so a "maintainer" line is legitimate only because a
+# maintainer merged it.
+#
+# A renamed account keeps one series: the old login goes into `aliases`, and
+# the old rows stay under the old name in evals/review/votes/. Example:
+#
+#   [voters.new-login]
+#   standing = "contributor"
+#   aliases = ["old-login"]
+#
+# evals/harness/roster.py is the reader, and it fails closed on any key,
+# standing or alias shape it does not recognise.
+
+version = 1
+
+[voters.mstarks01]
+standing = "maintainer"
