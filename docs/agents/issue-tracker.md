@@ -62,9 +62,12 @@ baseline sweeps, each as a pull request. Eight tickets: seven grilling, one
 research. The research ticket
 ([#324, the price data for a pre-run estimate](https://github.com/mstarks01/work-agent/issues/324))
 resolved at charting time; findings sit on `research/contribution-price-data`
-@ `890bc93`. The frontier holds the identity ticket, the baseline home, the
-ledger layout and the CI-check ticket; the submit command, the promotion rule
-and the outsider sitting wait on them through native dependencies.
+@ `890bc93`. [#320, the identity ticket](https://github.com/mstarks01/work-agent/issues/320)
+resolved 2026-08-26: the voter name is the GitHub login, and standing lives in
+a checked-in roster rather than on the vote row. That unblocks the promotion
+rule and the outsider sitting. The frontier holds the baseline home, the
+ledger layout, the CI-check ticket, the promotion rule and the outsider
+sitting; the submit command still waits on two of them.
 
 ### Completed efforts
 
