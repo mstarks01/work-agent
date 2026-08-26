@@ -127,6 +127,7 @@ evals/
 | `harness/instruments.py` | Every measurement a sweep reports, as one table keyed by instrument — the per-case row, the fold, the rendering, and the artifact keys each one owns. |
 | `harness/artifact.py` | The sweep artifact: one declared shape, written once by `build` and read back through `load_artifact`, which refuses a file missing any declared key. |
 | `harness/run.py` | The command-line entry point. `score` re-reads the ledger over a finished sweep's saved reports, so a vote reaches the numbers without a second sweep. |
+| `harness/submit.py` | `submit <kind>`: runs a contribution's CI checks locally as a checklist, then packages the kind's allowlist on a fresh branch and opens the PR through `gh`. Kinds live in a table; `vote` is the first. |
 
 Sampling parameters are **not** here: the harness reads `config/sampling.toml`
 at the repo root, the exact same file production reads. Grading a configuration
