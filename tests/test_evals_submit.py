@@ -53,9 +53,20 @@ def vote_line(target: str = "process:a", voter: str = "ada") -> str:
     return json.dumps(vote.to_json(), ensure_ascii=False, sort_keys=True) + "\n"
 
 
+CASE = "99-test-case"
+DEBT_LINE = f'    "{CASE}": "unread",\n'
+
+
+def digest(path: Path) -> str:
+    import hashlib
+
+    return hashlib.sha256(path.read_bytes()).hexdigest()
+
+
 @pytest.fixture
 def repo(tmp_path):
-    """A clone with an origin whose main holds the roster and no votes."""
+    """A clone with an origin whose main holds the roster, one unread case
+    under evals/corpus/, the debt-list stub, and no votes."""
     origin = tmp_path / "origin.git"
     subprocess.run(
         ["git", "init", "--bare", "-b", "main", str(origin)],
@@ -71,10 +82,66 @@ def repo(tmp_path):
     review = clone / "evals" / "review"
     review.mkdir(parents=True)
     (review / "voters.toml").write_text(ROSTER_BASE, encoding="utf-8")
+    case_dir = clone / "evals" / "corpus" / CASE
+    (case_dir / "claims").mkdir(parents=True)
+    (case_dir / "source.md").write_text("a system\n", encoding="utf-8")
+    (case_dir / "model.json").write_text("{}\n", encoding="utf-8")
+    (case_dir / "claims" / "stride.json").write_text("[]\n", encoding="utf-8")
+    (case_dir / "case.json").write_text(
+        json.dumps(
+            {"id": CASE, "frameworks": [{"name": "stride"}], "reviews": []}, indent=2
+        )
+        + "\n",
+        encoding="utf-8",
+    )
+    (clone / "tests").mkdir()
+    (clone / "tests" / "test_case_review.py").write_text(
+        "UNREVIEWED = {\n" + DEBT_LINE + "}\n", encoding="utf-8"
+    )
     git(clone, "add", "-A")
     git(clone, "commit", "-m", "seed")
     git(clone, "push", "-u", "origin", "main")
     return clone
+
+
+def prepare_sitting(
+    clone: Path,
+    reviewer: str = "ada",
+    read: list[str] | None = None,
+    document: str = "REVIEW-ada.md",
+    write_document: bool = True,
+    clear_debt: bool = True,
+) -> Path:
+    """Ada's working state after a sitting: entry, evidence, debt line gone."""
+    case_dir = clone / "evals" / "corpus" / CASE
+    files = (
+        read if read is not None else ["source.md", "model.json", "claims/stride.json"]
+    )
+    meta = json.loads((case_dir / "case.json").read_text(encoding="utf-8"))
+    meta["reviews"].append(
+        {
+            "reviewer": reviewer,
+            "date": "2026-08-26",
+            "read": [
+                {"file": name, "sha256": digest(case_dir / name)} for name in files
+            ],
+            "document": document,
+            "notes": "",
+        }
+    )
+    (case_dir / "case.json").write_text(
+        json.dumps(meta, indent=2) + "\n", encoding="utf-8"
+    )
+    if write_document:
+        (case_dir / document).write_text("the filled copy\n", encoding="utf-8")
+    if clear_debt:
+        (clone / "tests" / "test_case_review.py").write_text(
+            "UNREVIEWED = {\n}\n", encoding="utf-8"
+        )
+    (clone / "evals" / "review" / "voters.toml").write_text(
+        ROSTER_WITH_ADA, encoding="utf-8"
+    )
+    return case_dir
 
 
 @pytest.fixture
@@ -174,6 +241,90 @@ class TestTheVoteChecks:
         assert submit._vote_title(repo, "ada") == "Vote: ada, 2 votes over 1 cases"
 
 
+class TestTheSittingChecks:
+    def test_a_clean_sitting_passes_every_check(self, repo):
+        prepare_sitting(repo)
+        git(repo, "fetch", "origin")
+        checks = submit._sitting_preflight(repo, "ada")
+        failed = [check.name for check in checks if not check.passed]
+        assert not failed
+
+    def test_an_entry_naming_someone_else_is_refused(self, repo):
+        prepare_sitting(repo, reviewer="sam")
+        git(repo, "fetch", "origin")
+        check = submit._check_sitting_is_yours(repo, "ada")
+        assert not check.passed
+        assert "'sam'" in check.problems[0]
+
+    def test_a_drifted_digest_is_refused_by_filename(self, repo):
+        case_dir = prepare_sitting(repo)
+        (case_dir / "source.md").write_text("edited after the read\n", encoding="utf-8")
+        git(repo, "fetch", "origin")
+        check = submit._check_sitting_evidence(repo, "ada")
+        assert not check.passed
+        assert "source.md" in check.problems[0]
+
+    def test_a_missing_document_is_refused(self, repo):
+        prepare_sitting(repo, write_document=False)
+        git(repo, "fetch", "origin")
+        check = submit._check_sitting_evidence(repo, "ada")
+        assert not check.passed
+        assert "REVIEW-ada.md" in check.problems[0]
+
+    def test_a_rewritten_history_is_refused(self, repo):
+        """`reviews` is append-only; the base entries must survive as a prefix."""
+        case_dir = repo / "evals" / "corpus" / CASE
+        meta = json.loads((case_dir / "case.json").read_text(encoding="utf-8"))
+        meta["reviews"] = [
+            {
+                "reviewer": "mstarks01",
+                "date": "2026-08-20",
+                "read": [{"file": "source.md", "sha256": "0" * 64}],
+                "document": "REVIEW-mstarks01.md",
+                "notes": "",
+            }
+        ]
+        (case_dir / "case.json").write_text(
+            json.dumps(meta, indent=2) + "\n", encoding="utf-8"
+        )
+        git(repo, "add", "-A")
+        git(repo, "commit", "-m", "an earlier sitting")
+        git(repo, "push", "origin", "main")
+
+        meta["reviews"] = []
+        (case_dir / "case.json").write_text(
+            json.dumps(meta, indent=2) + "\n", encoding="utf-8"
+        )
+        prepare_sitting(repo)
+        git(repo, "fetch", "origin")
+        check = submit._check_sitting_is_yours(repo, "ada")
+        assert not check.passed
+        assert "append-only" in check.problems[0]
+
+    def test_a_partial_read_is_refused(self, repo):
+        prepare_sitting(repo, read=["source.md", "model.json"])
+        git(repo, "fetch", "origin")
+        check = submit._check_sitting_covers(repo, "ada")
+        assert not check.passed
+        assert "claims/stride.json" in check.problems[0]
+
+    def test_a_surviving_debt_line_is_refused(self, repo):
+        prepare_sitting(repo, clear_debt=False)
+        git(repo, "fetch", "origin")
+        check = submit._check_sitting_clears_debt(repo, "ada")
+        assert not check.passed
+        assert "UNREVIEWED" in check.problems[0]
+
+    def test_two_case_directories_are_refused(self, repo):
+        prepare_sitting(repo)
+        other = repo / "evals" / "corpus" / "98-other-case"
+        other.mkdir(parents=True)
+        (other / "source.md").write_text("another\n", encoding="utf-8")
+        git(repo, "fetch", "origin")
+        check = submit._check_one_case(repo, "ada")
+        assert not check.passed
+
+
 class TestTheCommand:
     @pytest.fixture(autouse=True)
     def rooted(self, repo, monkeypatch):
@@ -229,3 +380,22 @@ class TestTheCommand:
         assert main(["submit", "vote"]) == 0
         assert git(self.repo, "rev-parse", "HEAD") == head_before
         assert (self.repo / "evals" / "review" / "votes" / "ada.jsonl").exists()
+
+    def test_a_sitting_runs_end_to_end(self, fake_gh, capsys):
+        prepare_sitting(self.repo)
+        assert main(["submit", "sitting"]) == 0
+        out = capsys.readouterr().out
+        assert "https://example.test/pr/1" in out
+        assert "clears the case from UNREVIEWED" in out
+
+        date = datetime.now(UTC).date().isoformat()
+        branch = f"submit/sitting/ada-{date}"
+        assert branch in git(self.repo, "ls-remote", "origin", "refs/heads/submit/*")
+        staged = json.loads(
+            git(self.repo, "show", f"origin/{branch}:evals/corpus/{CASE}/case.json")
+        )
+        assert staged["reviews"][0]["reviewer"] == "ada"
+        debt = git(self.repo, "show", f"origin/{branch}:tests/test_case_review.py")
+        assert CASE not in debt
+        log = fake_gh.read_text(encoding="utf-8")
+        assert f"Sitting: {CASE} by ada" in log
