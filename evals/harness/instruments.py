@@ -145,6 +145,10 @@ class ModeRun:
     #: are what one package's own record earned, so they arrive under a key
     #: rather than as a field somebody has to add.
     rows: Mapping[str, tuple[Any, ...]]
+    #: Cases the estimate gate's hold stopped before, never attempted (#334).
+    #: Empty on a sweep that ran to the end, which is what makes a stopped
+    #: sweep a visibly partial record rather than one claiming to be whole.
+    stopped_before: tuple[str, ...] = ()
 
     @classmethod
     def empty(cls, frameworks: tuple[FrameworkName, ...] = ()) -> ModeRun:
