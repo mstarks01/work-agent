@@ -6,6 +6,10 @@ This is a one-time, offline authoring task — nothing here runs during a live
 analysis. The whole point of the document is **step 3**; everything else is
 bookkeeping around it.
 
+> For **case authors, and for anyone holding a Case Sitting** — step 6, which
+> is free, offline, and open to outside contributors. New here? Start at
+> [`../CONTRIBUTING.md`](../CONTRIBUTING.md).
+
 > **Step 6 has run once, and no other step ever has.** All 13 cases in
 > `evals/corpus/` were written by an agent. A person has now read case
 > `01-payments-checkout` whole — source, model and both reference sets — and
