@@ -1864,6 +1864,94 @@ def test_an_early_assemble_run_reads_an_unaccepted_framework_as_unfinished(
     assert [claim.id for claim in final.analyses[1].claims] == ["S-01"]
 
 
+# Which node writes each per-framework structured key, in the order the nodes
+# run. Every prefix of this order is a state an early ``assemble`` run can see.
+FRAMEWORK_KEY_WRITERS: tuple[tuple[str, dict[str, Any]], ...] = (
+    (
+        "merge",
+        {
+            "drafts": [sample_draft("S-01").model_dump(mode="json")],
+            "coverage": [
+                {
+                    "lane": "spoofing",
+                    "drafts": 1,
+                    "rules": 2,
+                    "rules_fired": 0,
+                    "candidates": 0,
+                    "candidates_cited": 0,
+                    "elements": 7,
+                    "elements_cited": 2,
+                    "boundary_crossings": 1,
+                    "boundary_crossings_cited": 1,
+                    "unknown_controls": 2,
+                    "unknown_controls_cited": 1,
+                }
+            ],
+            "marks": {"missing_mitigations": [{"claim_id": "S-01"}]},
+        },
+    ),
+    (
+        "critic",
+        {"reviewed": {"claims": [sample_ruling("S-01").model_dump(mode="json")]}},
+    ),
+    ("router", {"accepted": True}),
+)
+
+
+def test_the_key_writer_table_covers_every_framework_structured_key(domain_loader):
+    """The table is checked against the registry, so a new key fails here.
+
+    ``prepare`` writes its keys before any subgraph runs, so the table starts
+    after it; its two keys are read off the state ``prepare`` leaves.
+    """
+    ctx = FakeContext(**ASVS_OPTIONS)
+    graph.prepare_analysis(
+        valid_model().model_dump(mode="json"),
+        ctx,
+        BOTH_KEYS,
+        BOTH,
+        domain_loader,
+        repo_package_loaders(BOTH),
+    )
+    prepared = {
+        artifact
+        for artifact in graph.FRAMEWORK_STRUCTURED_ARTIFACTS
+        if NODES.key(artifact) in ctx.state
+    }
+    tabled = {key for _, keys in FRAMEWORK_KEY_WRITERS for key in keys}
+
+    assert prepared | tabled == set(graph.FRAMEWORK_STRUCTURED_ARTIFACTS)
+    assert not prepared & tabled
+
+
+@pytest.mark.parametrize("finished", range(len(FRAMEWORK_KEY_WRITERS) + 1))
+def test_assemble_survives_every_partial_state_a_framework_can_be_seen_in(
+    domain_loader, finished
+):
+    """One row per prefix of the writer order: no prefix raises.
+
+    An early ``assemble`` run sees another framework after any of its writer
+    nodes and before the next. Only the whole order carries the framework's
+    claims; every shorter prefix reads it as unfinished and builds an empty
+    block that the last run overwrites.
+    """
+    model = valid_model().model_dump(mode="json")
+    ctx = FakeContext(**ASVS_OPTIONS)
+    graph.prepare_analysis(
+        model, ctx, BOTH_KEYS, BOTH, domain_loader, repo_package_loaders(BOTH)
+    )
+    for _, keys in FRAMEWORK_KEY_WRITERS[:finished]:
+        for artifact, value in keys.items():
+            ctx.state[NODES.key(artifact)] = value
+
+    graph.assemble_report(model, ctx, BOTH_KEYS, BOTH, BOTH_DISCLAIMERS)
+    analysis = graph.Analysis.from_state(ctx.state[graph.STATE_ANALYSIS])
+
+    whole = finished == len(FRAMEWORK_KEY_WRITERS)
+    stride_block = analysis.analyses[1]
+    assert [claim.id for claim in stride_block.claims] == (["S-01"] if whole else [])
+
+
 def test_prepare_refuses_a_selection_whose_options_are_missing(domain_loader):
     """Refused before the lane agents run, not after.
 
