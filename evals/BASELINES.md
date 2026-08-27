@@ -35,7 +35,8 @@ provider rather than a second Baseline.
 
 - **Commit everything first.** A sweep run over uncommitted edits cannot become
   a Baseline: the identity names a commit so a reader can open the prompts
-  behind the numbers, and a dirty tree makes that name a lie. The sweep still
+  behind the numbers, and a dirty tree makes that name a lie. `run` tells you
+  this in the cost block, before it spends anything. The sweep still
   runs and is still useful locally — it just cannot be contributed.
 - **Push the commit, or work from one already on `main`.** The identity's
   commit has to be an ancestor of the default branch, for the same reason.
