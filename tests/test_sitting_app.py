@@ -27,6 +27,11 @@ from webapp.sitting import build_session, create_app
 LOOPBACK = "http://127.0.0.1:8020"
 CASE = "02-iot-fleet-telemetry"
 
+#: What a browser puts on every request this page makes. Every writing endpoint
+#: refuses without it, so the clients carry it and the tests that care about
+#: its absence set their own.
+SAME_ORIGIN = {"Sec-Fetch-Site": "same-origin"}
+
 
 @pytest.fixture
 def tree(tmp_path):
@@ -56,7 +61,8 @@ def tree(tmp_path):
 @pytest.fixture
 def client(tree):
     session = build_session(CASE, "ada", tree)
-    return TestClient(create_app(session), base_url=LOOPBACK), session, tree
+    app = TestClient(create_app(session), base_url=LOOPBACK, headers=SAME_ORIGIN)
+    return app, session, tree
 
 
 class TestTheOwnListRuleIsEnforced:
@@ -204,6 +210,86 @@ class TestThePosture:
         assert "Content-Security-Policy" in page.headers
         assert "default-src 'none'" in page.headers["Content-Security-Policy"]
 
+    def test_the_page_cannot_be_framed(self, client):
+        """The control the submit button's other four rest on.
+
+        A press inside somebody else's frame arrives same-origin and carries
+        the page token, because the page it comes from really is this one. So
+        framing beats the header check and the token together, and only this
+        directive stops it. It does not fall back to ``default-src``.
+        """
+        app, _, _ = client
+        csp = app.get("/").headers["Content-Security-Policy"]
+        assert "frame-ancestors 'none'" in csp
+
+    def test_every_writing_endpoint_refuses_a_cross_site_request(self, client):
+        """Not only ``/api/submit``.
+
+        ``/api/finish`` writes the document, appends to ``case.json`` and sets
+        the flag ``/api/submit`` tests, so a foreign page that reaches it
+        decides what a later press publishes. ``/api/own-list`` satisfies the
+        method's one rule, so a foreign page that reaches it opens the recorded
+        sets for whoever asks next.
+        """
+        app, session, tree = client
+        writes = {
+            "/api/own-list": {"items": ["a spoofed device"]},
+            "/api/finish": {"marks": {}, "missing": [], "notes": "not mine"},
+        }
+        for path, body in writes.items():
+            for site in ("cross-site", "same-site", "none"):
+                refused = app.post(path, json=body, headers={"Sec-Fetch-Site": site})
+                assert refused.status_code == 403, f"{path} accepted a {site} request"
+
+        assert session.own_list is None, "a refused request set the own list"
+        assert session.recorded is False, "a refused request recorded the sitting"
+        assert not (tree / "evals" / "corpus" / CASE / "REVIEW-ada.md").exists()
+
+    def test_a_bare_post_is_refused_too(self, tree):
+        """No header at all is not the same as ``same-origin``.
+
+        The check admits exactly one value rather than rejecting a list, so
+        anything that sends nothing is refused too. This builds its own client
+        because the shared one carries the header on every request.
+        """
+        session = build_session(CASE, "ada", tree)
+        app = TestClient(create_app(session), base_url=LOOPBACK)
+        assert app.post("/api/own-list", json={"items": []}).status_code == 403
+        assert session.own_list is None
+
+    def test_the_page_token_is_a_javascript_literal(self, client):
+        """A ``<script>`` block does not decode HTML entities.
+
+        So ``html.escape`` is the wrong escape for a value that lands in one,
+        and the page carries these two as JSON. Nothing breaks today — a token
+        and a boolean spell no quote — but the escape being right is a
+        property of the page rather than of the values passing through it.
+        """
+        app, session, _ = client
+        page = app.get("/").text
+        assert f'const TOKEN = "{session.token}";' in page
+        assert "const CAN_SUBMIT = false;" in page
+        assert "&quot;" not in page.split("<script")[-1]
+
+    def test_a_line_longer_than_the_cap_is_refused(self, client):
+        """A cap on the list bounds how many lines arrive, not how long one is.
+
+        Every one of them is written into the reading document, which the
+        submit allow-list then carries into a pull request.
+        """
+        app, _, _ = client
+        long_line = "x" * 501
+        assert app.post("/api/own-list", json={"items": [long_line]}).status_code == 422
+
+        app.post("/api/own-list", json={"items": ["a spoofed device"]})
+        for body in (
+            {"marks": {}, "missing": [long_line], "notes": ""},
+            {"marks": {"stride:1": long_line}, "missing": [], "notes": ""},
+            {"marks": {long_line: "ok"}, "missing": [], "notes": ""},
+            {"marks": {str(n): "ok" for n in range(201)}, "missing": [], "notes": ""},
+        ):
+            assert app.post("/api/finish", json=body).status_code == 422
+
 
 class TestTheSubmitButton:
     """The one endpoint in any app here that can act on GitHub as the operator.
@@ -217,7 +303,7 @@ class TestTheSubmitButton:
 
     def sat(self, tree, can_submit=True):
         session = build_session(CASE, "ada", tree, can_submit=can_submit)
-        app = TestClient(create_app(session), base_url=LOOPBACK)
+        app = TestClient(create_app(session), base_url=LOOPBACK, headers=SAME_ORIGIN)
         app.post("/api/own-list", json={"items": ["a stolen key"]})
         app.get("/api/part-two")
         app.post("/api/finish", json={"marks": {}, "missing": [], "notes": ""})

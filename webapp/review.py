@@ -33,6 +33,10 @@ Security posture, all of it deliberate and all of it inherited from
 * **Loopback only**, hard-bound with no flag (A01). The ledger is the supply
   chain of every published quality number, so a writable endpoint reachable off
   the host is an unauthenticated way to forge that record.
+* **``POST /api/vote`` refuses a request that is not same-origin, and no page
+  here can be framed** (A01). Both, because either alone is a way to the same
+  forged row: a fingerprint is not a secret, so a foreign page can name a real
+  finding, and a framed page votes with the operator's own origin.
 * **The voter comes from the command line, never from the request** (A01). A
   browser field naming the voter would let one reviewer file votes as another,
   and the double-vote agreement measure rests on the name being true.
@@ -57,7 +61,7 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import get_args
 
-from fastapi import FastAPI, HTTPException
+from fastapi import FastAPI, HTTPException, Request
 from fastapi.responses import HTMLResponse, JSONResponse
 from pydantic import BaseModel, ConfigDict, Field
 from starlette.middleware.trustedhost import TrustedHostMiddleware
@@ -81,7 +85,7 @@ from evals.harness.ledger import (
     load,
 )
 from evals.harness.reference import load_corpus
-from webapp.main import LOOPBACK_HOSTS, SecurityHeaders
+from webapp.main import LOOPBACK_HOSTS, SecurityHeaders, refuse_cross_origin
 
 HOST = "127.0.0.1"
 PORT = 8010
@@ -95,9 +99,18 @@ _NONCE_PLACEHOLDER = "__CSP_NONCE__"
 #: No network origin at all: every asset is inline and nonce-authorised, and
 #: ``connect-src 'self'`` is the one grant the page needs — it calls its own
 #: three endpoints and nothing else.
+#:
+#: ``frame-ancestors 'none'`` is load-bearing rather than tidy. A vote button
+#: pressed inside somebody else's frame sends a request this app cannot tell
+#: from a real one: it is same-origin, because it genuinely comes from this
+#: page. So framing is the way past every check on the write path, and refusing
+#: to be framed is the check. It is spelled out because ``frame-ancestors`` does
+#: not fall back to ``default-src``, exactly as ``base-uri`` and ``form-action``
+#: beside it do not.
 _CSP = (
     "default-src 'none'; style-src 'nonce-{nonce}'; script-src 'nonce-{nonce}';"
-    " connect-src 'self'; base-uri 'none'; form-action 'none'"
+    " connect-src 'self'; base-uri 'none'; form-action 'none';"
+    " frame-ancestors 'none'"
 )
 
 
@@ -228,7 +241,12 @@ def create_app(session: Session) -> FastAPI:
         return JSONResponse(payload)
 
     @app.post("/api/vote")
-    def vote(body: VoteBody) -> JSONResponse:
+    def vote(request: Request, body: VoteBody) -> JSONResponse:
+        # The one endpoint here that writes, so it is the one that is checked.
+        # A fingerprint is not a secret — the ledger is committed — so a
+        # foreign page can name a real finding, and the only thing standing
+        # between it and a forged row under this voter's name is this line.
+        refuse_cross_origin(request)
         item = session.find(body.fingerprint)
         # Narrowed here rather than trusted from the body: ``Vote`` refuses an
         # unknown verdict at construction anyway, and checking against the same
