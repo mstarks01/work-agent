@@ -123,7 +123,7 @@ Its evidence catalog:
 
 The System Model, already validated; its boundary crossings; then the evidence catalog — a table of every fact in that model you may cite. The left column is the ID; the right says what that ID asserts. The service derived every row, so a row is a fact rather than a claim, and copying its ID verbatim is how you cite it.
 
-**Select from the table; never compose.** It is closed and complete: an ID you did not copy out of it names nothing, however well-formed it looks, and it is dropped — the claim stands on what else it cited, and one citing nothing at all fails. If a fact you want to rest on has no row, that is the table telling you the input described a control that is *there*, so what you have is either a quote or a claim you should be resting on something else.
+**Select from the table; never compose.** It is closed and complete: an ID you did not copy out of it names nothing, however well-formed it looks, and it is dropped — the claim stands on what else it cited, and one left citing nothing at all is dropped and listed on the report as lost. If a fact you want to rest on has no row, that is the table telling you the input described a control that is *there*, so what you have is either a quote or a claim you should be resting on something else.
 
 An **element roster** follows the model: every ID a claim may name, and nothing else. `affected_element_ids` is selected out of it, never composed — an ID you assemble from an element's name is well-formed, plausible and resolves to nothing, and a claim carrying one kills the whole lane.
 
@@ -171,7 +171,7 @@ Work in this order, over the whole model before you write anything. Your framewo
     An attribute reading `none` is the opposite case: the submitter answered the question and the control is not there. Write that claim plainly rather than conditionally, because nothing has to be learned first. The catalog's right column tells the two apart — `never stated` against `stated absent`.
 7. **Ground.** Name the facts your claim rests on. Each is either an entry in the evidence catalog — copy its ID verbatim into `evidence_refs` — or words the submitter wrote, which go in `quotes`. A crossing from step 2 and either state of an attribute from step 6 are all catalogued; **you never state which kind of ground a fact is, because the catalog already carries that.** A candidate is never one of them: cite the crossing or the attribute the rule read, never the rule. A claim resting only on catalogued facts quotes nothing, and that is correct, not a gap. One entry per load-bearing fact — a claim commonly rests on two — and no padding: evidence supporting nothing in your description is noise.
 
-    An ID that is not in the catalog above does not exist. There is no near match and no repair: one invented ID fails every draft in your lane. If the fact you want has no row, it is neither a derived crossing nor an attribute the input left open or ruled out — quote it, or drop the claim.
+    An ID that is not in the catalog above does not exist. There is no near match and no repair: an invented ID is dropped, and a claim left with none costs itself. If the fact you want has no row, it is neither a derived crossing nor an attribute the input left open or ruled out — quote it, or drop the claim.
 
     Where a row carries the fact, cite the row rather than quoting the sentence it came from: a quote saying a link is unencrypted and an `absent:` row for `encryption_in_transit` are one fact, and the row is the half that resolves against the model.
 
