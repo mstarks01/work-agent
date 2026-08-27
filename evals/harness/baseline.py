@@ -157,7 +157,13 @@ class SweepCost:
         }
 
 
-def _usage_of(artifact: EvalArtifact) -> dict[str, TokenUsage]:
+def usage_of(artifact: EvalArtifact) -> dict[str, TokenUsage]:
+    """One sweep's recorded token usage per node.
+
+    Public because the estimate gate reprices these same counts at another
+    run's rates (#324), and two readers of one block are two chances to
+    disagree about its shape.
+    """
     return {
         node: TokenUsage(**fields)
         for node, fields in artifact.block("node_usage").items()
@@ -179,7 +185,7 @@ def _node_model(artifact: EvalArtifact, node: str) -> tuple[str, str]:
 def _calls(artifact: EvalArtifact) -> list[tuple[str, str, TokenUsage]]:
     """The sweep's billable calls as ``(served, requested, usage)`` triples."""
     calls = []
-    for node, usage in sorted(_usage_of(artifact).items()):
+    for node, usage in sorted(usage_of(artifact).items()):
         served, requested = _node_model(artifact, node)
         calls.append((served, requested, usage))
     return calls

@@ -313,8 +313,17 @@ async def _run_mode(
         if position and accepted is not None:
             remaining = [later.id for later in cases[position:]]
             try:
+                # `position` counts every case the loop reached; a skipped one
+                # spent nothing, so counting it would divide the spend by a
+                # larger number and project low. `remaining` over-counts the
+                # same way and is left alone, because that pushes the figure
+                # up — the safe direction for a gate somebody consents to.
                 accepted = consent.hold(
-                    accepted, executions, remaining, ask, ran=position
+                    accepted,
+                    executions,
+                    remaining,
+                    ask,
+                    ran=position - len(skipped),
                 )
             except consent.Refused as refusal:
                 # Not an exception out of the sweep: everything already run is

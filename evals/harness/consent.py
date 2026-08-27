@@ -40,7 +40,9 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Any, Literal
 
-from evals.harness.prices import price_calls, unit_prices
+from evals.harness import baseline
+from evals.harness.artifact import load_artifact
+from evals.harness.prices import UnitPrices, price_calls, unit_prices
 from stride_service.report import NodeRun, TokenUsage
 
 Label = Literal["recorded", "estimated", "unpriced"]
@@ -91,15 +93,23 @@ def spent(executions: Sequence[NodeRun]) -> float:
     return price_calls(_calls_of(executions)).total_usd
 
 
-def _merged_baselines(root: Path) -> list[dict[str, Any]]:
+def _merged_baselines(root: Path) -> list[tuple[Path, dict[str, Any]]]:
+    """Each merged Baseline as ``(directory, manifest)``.
+
+    The directory travels with the manifest because borrowing reads the
+    sweeps' own artifacts, which sit beside it — the manifest records what a
+    sweep cost, never how many tokens bought it.
+    """
     directory = root / "evals" / "baselines"
-    manifests = []
-    for manifest in sorted(directory.glob("*/baseline.json")):
+    baselines = []
+    for path in sorted(directory.glob("*/baseline.json")):
         try:
-            manifests.append(json.loads(manifest.read_text(encoding="utf-8")))
+            baselines.append(
+                (path.parent, json.loads(path.read_text(encoding="utf-8")))
+            )
         except (OSError, json.JSONDecodeError):
             continue  # verify() is what refuses a broken Baseline, not the gate
-    return manifests
+    return baselines
 
 
 def _recorded_actual(manifest: dict[str, Any]) -> float | None:
@@ -124,9 +134,9 @@ def estimate(
     is a ``recorded`` number; any other Baseline lends its per-tier token
     counts, repriced with this run's models, for an ``estimated`` one.
     """
-    manifests = _merged_baselines(root)
+    baselines = _merged_baselines(root)
     lines: list[str] = []
-    for manifest in manifests:
+    for _, manifest in baselines:
         if manifest.get("identity") == identity:
             actual = _recorded_actual(manifest)
             if actual is not None:
@@ -153,7 +163,7 @@ def estimate(
     if missing:
         return Estimate(label="unpriced", amount_usd=None, lines=tuple(lines))
 
-    borrowed = _borrow(manifests, routes)
+    borrowed = _borrow(baselines, routes)
     if borrowed is None:
         lines.append(
             "no merged Baseline to calibrate token counts from, so no amount"
@@ -161,67 +171,80 @@ def estimate(
         )
         return Estimate(label="unpriced", amount_usd=None, lines=tuple(lines))
     amount, source = borrowed
-    lines.append(f"token counts borrowed from {source}, repriced for this run")
+    lines.append(
+        f"token counts borrowed from {source}, each node repriced at this"
+        " run's route for its tier"
+    )
     return Estimate(label="estimated", amount_usd=amount, lines=tuple(lines))
 
 
 def _borrow(
-    manifests: Sequence[dict[str, Any]], routes: dict[str, str]
+    baselines: Sequence[tuple[Path, dict[str, Any]]], routes: dict[str, str]
 ) -> tuple[float, str] | None:
-    """Another Baseline's token counts, repriced with this run's models.
+    """Another Baseline's recorded token counts, at this run's prices.
 
-    Scales that Baseline's recorded actual by the ratio of this run's unit
-    prices to the ones it recorded — the arithmetic is crude on purpose,
-    because the label already says the number is a guess and a more elaborate
-    model would only make the guess look better than it is.
+    **The counts are borrowed, not the total.** Each of the lender's nodes
+    ran on some tier; this run has its own route for that tier; so the node's
+    recorded usage is priced at that route's rates and the sweep's cost falls
+    out of :func:`~evals.harness.prices.price_calls` — the one costing path
+    the recorded actual and CI's re-check already go through.
 
-    **Both sides of the ratio count one rate per distinct model.** That is the
-    invariant, and it is the whole of the correctness here: the lent actual is
-    a mean over the Baseline's sweeps, so a divisor that grew with the sweep
-    count divided a per-sweep number by a per-directory one. A ten-sweep
-    Baseline then lent a tenth of its own cost, and the contributor consented
-    to that. Deduplicating by model keeps the ratio a property of the two
-    configurations rather than of how many times somebody ran one of them.
+    What this replaces was a ratio: the lender's dollar total scaled by the
+    summed unit prices of this run's models over the lender's. That ignored
+    the token mix, so swapping a base-tier model moved the guess as much as
+    swapping the strong-tier one, though the strong tier carries most of the
+    spend. It also had to be told not to divide by the sweep count. Pricing
+    the counts directly needs neither correction and is less arithmetic, not
+    more — which is why the docstring's old case for crudeness does not argue
+    against it. A model of the cost would be elaborate; this is the
+    subtraction and multiplication the recorded number already used.
+
+    The mean across the lender's sweeps, because one sweep is one sample and
+    ``TUNING.md`` records what single-run numbers cost this project before.
     """
-    for manifest in manifests:
-        actual = _recorded_actual(manifest)
-        sweeps = manifest.get("sweeps", [])
-        if actual is None or not sweeps:
-            continue
-        theirs = sum(_recorded_rates(sweeps).values())
-        ours = sum(_route_rates(routes).values())
-        if theirs <= 0 or ours <= 0:
-            continue
-        return actual * (ours / theirs), str(manifest.get("name"))
+    for directory, manifest in baselines:
+        priced = [
+            amount
+            for entry in manifest.get("sweeps", [])
+            if (amount := _reprice(directory / str(entry.get("artifact", "")), routes))
+            is not None
+        ]
+        if priced:
+            return sum(priced) / len(priced), str(manifest.get("name"))
     return None
 
 
-def _recorded_rates(sweeps: Sequence[dict[str, Any]]) -> dict[str, float]:
-    """The lending Baseline's output rate per model, across all its sweeps.
+def _reprice(path: Path, routes: dict[str, str]) -> float | None:
+    """One recorded sweep's usage, as if this run's models had served it.
 
-    Every sweep of one Baseline priced the same models, so the entries repeat
-    once per sweep. Keying by model is what collapses them back to the one
-    rate each model actually has.
+    ``None`` rather than a number whenever the answer would rest on a guess:
+    an artifact that will not load, a node provenance never recorded, a tier
+    this run does not route, or a route the price map misses. The caller
+    tries the next Baseline, and states ``unpriced`` when none answers —
+    never a zero, which is the one outcome #334 forbids outright.
     """
-    return {
-        str(entry.get("model")): float(entry.get("output_per_token", 0.0))
-        for sweep in sweeps
-        for entry in sweep.get("cost", {}).get("unit_prices", [])
-    }
+    try:
+        artifact = load_artifact(path)
+    except (OSError, ValueError):
+        return None
 
-
-def _route_rates(routes: dict[str, str]) -> dict[str, float]:
-    """This run's output rate per model, keyed the same way as the lender's.
-
-    Keyed by model rather than by tier, because two tiers may resolve to one
-    model and the other side of the ratio counts that model once. Sorted so a
-    consented amount is reproducible down to the floating-point addition.
-    """
-    return {
-        route: prices.output_per_token
-        for route in sorted(set(routes.values()))
-        if (prices := unit_prices(route)) is not None
-    }
+    calls: list[tuple[str, str, TokenUsage]] = []
+    rates: dict[str, UnitPrices] = {}
+    for node, usage in sorted(baseline.usage_of(artifact).items()):
+        executions = artifact.provenance.node_runs.get(node)
+        if not executions:
+            return None
+        route = routes.get(executions[-1].tier)
+        if route is None:
+            return None
+        prices = unit_prices(route)
+        if prices is None:
+            return None
+        rates[route] = prices
+        # The route stands where the served model would: in the hypothetical
+        # this prices, the route is what serves the call.
+        calls.append((route, route, usage))
+    return price_calls(calls, rates=rates).total_usd if calls else None
 
 
 def _render(estimate: Estimate) -> str:
