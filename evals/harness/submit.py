@@ -830,6 +830,34 @@ def command_verify(args: argparse.Namespace) -> int:
     return 1
 
 
+def _register(root: Path, author: str) -> bool:
+    """Add the author's roster line when they have none. Returns whether it wrote.
+
+    Self-registration is the decision (#320): a first-time contributor's own
+    PR carries their line, standing ``contributor``, and nobody waits for
+    provisioning. The command knows the login and knows the line is missing,
+    so failing a checklist over it would be the tool asking a person to do
+    the one thing it could do itself.
+
+    Never an upgrade: this only ever appends a ``contributor`` line for
+    somebody the roster does not name. Raising a standing stays a
+    maintainer's edit, and :func:`_check_no_self_raise` still refuses one.
+    """
+    path = root / "evals" / "review" / "voters.toml"
+    if author in roster.load(path):
+        return False
+    text = path.read_text(encoding="utf-8").rstrip("\n")
+    path.write_text(
+        f'{text}\n\n[voters.{author}]\nstanding = "contributor"\n', encoding="utf-8"
+    )
+    print(
+        "added your roster line to evals/review/voters.toml as a contributor."
+        " It rides along with this submission, and a maintainer reviews it"
+        " with the rest.\n"
+    )
+    return True
+
+
 def command_submit(args: argparse.Namespace) -> int:
     """The four steps, in order, stopping at the first that fails."""
     root = REPO_ROOT
@@ -841,6 +869,11 @@ def command_submit(args: argparse.Namespace) -> int:
 
     print(f"submitting as {author}\n")
     _run(["git", "fetch", "origin"], root)
+    try:
+        _register(root, author)
+    except (OSError, roster.RosterError) as exc:
+        print(f"cannot add your roster line: {exc}")
+        return 1
     kind = KINDS[args.kind]
     if kind.prepare is not None:
         try:
@@ -858,7 +891,7 @@ def command_submit(args: argparse.Namespace) -> int:
         print("\nnothing opened; fix the failures above and re-run.")
         return 1
     if args.dry_run:
-        print("\ndry run: the checklist passed and nothing was staged.")
+        print("\ndry run: the checklist passed. No branch, no PR.")
         return 0
 
     try:

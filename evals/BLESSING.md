@@ -329,8 +329,8 @@ property that the threat set is exhaustive *against that model*.
 ```
 
 `reviewer` is the GitHub login of the account whose PR carries the sitting,
-and the reviewer needs a line in `evals/review/voters.toml` — a first-timer
-adds their own, standing `contributor`. `read` pins the bytes the sitting
+and the reviewer needs a line in `evals/review/voters.toml`, which `submit`
+adds for a first-timer with standing `contributor`. `read` pins the bytes the sitting
 covered: a later PR that edits a read file re-opens the debt fail-closed.
 `document` names the filled copy, committed beside the case, because only the
 filled copy shows the method ran. The generated `REVIEW.md` carries this
