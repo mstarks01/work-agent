@@ -291,6 +291,13 @@
     );
     // Every element ID a description cites that the embedded model does not
     // contain, gathered under the claim that cites it.
+    // Element IDs a claim named structurally that the model does not contain.
+    // Dropped from the claim and listed here, the way a prose mention is.
+    const references = new Map();
+    (block.unresolved_references || []).forEach(m => {
+      if (!references.has(m.claim_id)) references.set(m.claim_id, []);
+      references.get(m.claim_id).push(m.element_id);
+    });
     const mentions = new Map();
     (block.unresolved_mentions || []).forEach(m => {
       if (!mentions.has(m.claim_id)) mentions.set(m.claim_id, []);
@@ -321,8 +328,8 @@
     // a quote the source does not contain, or a reference the catalog does
     // not hold. Dropped the same way, listed the same way, and the reason
     // carries the lost quote or reference so a reader can judge the loss.
-    const groundless = (block.groundless_claims || []);
-    return { unverified, repaired, mentions, composed, unmitigated, unknown, groundless };
+    const groundless = (block.dropped_claims || []);
+    return { unverified, repaired, references, mentions, composed, unmitigated, unknown, groundless };
   }
 
   const SEV = { critical: ["Critical","--sev-critical"], high: ["High","--sev-high"], medium: ["Medium","--sev-medium"], low: ["Low","--sev-low"] };
@@ -448,6 +455,13 @@
     // Directly under the argument it qualifies. The prose above cites an
     // element this report does not describe, which a reader following the ID
     // into the model table below would otherwise discover by finding nothing.
+    const references = marks.references.get(t.id);
+    if (references && references.length) {
+      const note = el("div", "caveat");
+      note.append("\u26a0 Named as affected but not in the system model, so dropped from this claim: ");
+      references.forEach((m, i) => { if (i) note.append(", "); note.append(code(m)); });
+      card.append(note);
+    }
     const mentions = marks.mentions.get(t.id);
     if (mentions && mentions.length) {
       const note = el("div", "caveat");
@@ -569,7 +583,7 @@
     if (marks.groundless.length) {
       const note = el("div", "dropped");
       note.append(el("b", null,
-        `${marks.groundless.length} finding(s) dropped because no ground verified`));
+        `${marks.groundless.length} finding(s) dropped for a fault in one entry`));
       const list = el("ul");
       marks.groundless.forEach(m => {
         const item = el("li");

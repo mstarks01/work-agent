@@ -37,7 +37,9 @@ from pydantic import (
     BeforeValidator,
     ConfigDict,
     Field,
+    ModelWrapValidatorHandler,
     SerializeAsAny,
+    ValidationError,
     field_validator,
     model_validator,
 )
@@ -165,15 +167,16 @@ from stride_service.system_model import BoundaryCrossing, SystemModel
 # framework carrying a catalog it did not author can produce one, so the list
 # is empty for STRIDE by construction rather than by accident.
 #
-# 3.0 also carries ``groundless_claims``, an eighth list of service-owned
+# 3.0 also carries ``dropped_claims``, an eighth list of service-owned
 # marks: a claim that lost every ground it cited, at evidence resolution or at
 # the quote check. It rides 3.0 for the same reason the two before it do.
 #
-# What moves beside it is the last whole-job failure on the grounding path.
-# Such a claim used to fail the job; it is now dropped and marked, with the
-# reason each ground was lost. A claim carrying one quote and nothing else is
-# the common shape of a framework whose catalog rarely holds the fact a
-# requirement turns on, so one misquote there cost every lane's work.
+# What moves beside it is every whole-job failure one entry of one claim could
+# cause: a proposal that fails its own schema, a claim that lost every ground,
+# every element it named, or its ID to an earlier draft. Each is now dropped
+# and marked with its reason. ``unresolved_references``, a tenth list, records
+# an element ID dropped from ``affected_element_ids`` the way
+# ``unresolved_mentions`` records one dropped from prose.
 #
 # 3.0 also carries ``repaired_quotes``, a ninth list: a quote ground the
 # ladder refused and the service rewrote to the source's own nearest span. The
@@ -756,6 +759,45 @@ class Proposal(BaseModel):
         return self
 
 
+# How many top-level fields an invalid proposal keeps as text. A proposal has
+# under ten; the bound is against an emission that is not a proposal at all.
+SCALARS_MAX = 20
+
+
+class InvalidProposal(BaseModel):
+    """One proposal a lane emitted that failed its own schema, kept by the batch.
+
+    Enough to name the claim the agent meant and say what was wrong, and no
+    more: the item itself is agent text of unbounded size and is not carried.
+    ``scalars`` holds the item's top-level scalar fields, strings bounded and
+    numbers as they came, so the resolver can read whichever field its
+    package's ID rule keys on — this model names no package's key, and a key
+    keeps the type the rule composes from — and the title; ``error`` is the
+    first fault pydantic reported, in its own words.
+    """
+
+    model_config = ConfigDict(extra="forbid")
+
+    index: int = Field(ge=0)
+    scalars: dict[str, str | int | float | bool] = Field(
+        default_factory=dict, max_length=SCALARS_MAX
+    )
+    error: str = Field(min_length=1, max_length=500)
+
+    @classmethod
+    def of(cls, index: int, item: Any, error: ValidationError) -> InvalidProposal:
+        fields = item if isinstance(item, dict) else {}
+        scalars = {
+            str(name)[:100]: value[:200] if isinstance(value, str) else value
+            for name, value in list(fields.items())[:SCALARS_MAX]
+            if isinstance(value, str | int | float | bool)
+        }
+        first = error.errors()[0]
+        location = ".".join(str(loc) for loc in first["loc"])
+        message = f"{location}: {first['msg']}" if location else first["msg"]
+        return cls(index=index, scalars=scalars, error=message[:500])
+
+
 class ProposalBatch(BaseModel):
     """What a lane agent node emits: an object wrapping its list of proposals.
 
@@ -777,11 +819,44 @@ class ProposalBatch(BaseModel):
 
     Nothing downstream sees the wrapper: the graph unwraps at the node boundary,
     so the domain keeps working in lists.
+
+    **A batch validates by salvaging.** The node validates its emission against
+    this model before anything else runs, so one proposal with a verb outside
+    the closed set, a severity value the enum does not hold, or neither a
+    reference nor a quote used to fail the node and the job. The wrap validator
+    validates each item on its own: the ones that pass fill ``claims``, and the
+    ones that fail fill ``invalid``, keyed enough to name the claim the agent
+    meant. ``invalid`` is kept out of the JSON schema, so the provider is still
+    asked for exactly the strict shape and never told there is a slot for a
+    bad one. A payload that already carries ``invalid`` is a batch read back
+    from state and is validated as it stands.
     """
 
     model_config = ConfigDict(extra="forbid")
 
     claims: list[Proposal]
+    invalid: SkipJsonSchema[list[InvalidProposal]] = Field(default_factory=list)
+
+    @model_validator(mode="wrap")
+    @classmethod
+    def _salvage(cls, data: Any, handler: ModelWrapValidatorHandler[Any]) -> Any:
+        if (
+            not isinstance(data, dict)
+            or not isinstance(data.get("claims"), list)
+            or "invalid" in data
+        ):
+            return handler(data)
+        (item_type,) = get_args(cls.model_fields["claims"].annotation)
+        kept: list[Any] = []
+        invalid: list[InvalidProposal] = []
+        for index, item in enumerate(data["claims"]):
+            try:
+                item_type.model_validate(item)
+            except ValidationError as error:
+                invalid.append(InvalidProposal.of(index, item, error))
+            else:
+                kept.append(item)
+        return handler({**data, "claims": kept, "invalid": invalid})
 
 
 class Ruling(BaseModel):
@@ -1123,7 +1198,7 @@ class UnverifiedGround(BaseModel):
     Marked per entry, dropped per claim: a claim with one bad quote beside good
     ones is still justified, and :func:`~stride_service.critic.join_drafts`
     drops a claim only where *no* ground on it verifies at all, recording it as
-    a :class:`GroundlessClaim`.
+    a :class:`DroppedClaim`.
     """
 
     model_config = ConfigDict(extra="forbid")
@@ -1160,6 +1235,26 @@ class RepairedQuote(BaseModel):
     index: int = Field(ge=0)
     written: str = Field(min_length=1, max_length=1000)  # Ground.text's bound
     similarity: float = Field(ge=0.0, le=1.0)
+
+
+class UnresolvedReference(BaseModel):
+    """An element ID a claim named in ``affected_element_ids`` that the model does
+    not contain.
+
+    The structural twin of :class:`UnresolvedMention`. That mark is an ID in
+    prose; this is an ID in the field the claim's identity is computed from.
+    The reference is dropped from the claim and recorded here, and the claim
+    stands on the elements that did resolve — the rule every other citation
+    already had. A claim that named elements and lost every one is dropped as
+    a :class:`DroppedClaim`, because a claim about nothing is not a finding.
+
+    A :data:`ClaimMark`: it names a claim the block carries.
+    """
+
+    model_config = ConfigDict(extra="forbid")
+
+    claim_id: str = Field(min_length=1, max_length=CLAIM_ID_MAX_CHARS)
+    element_id: str = Field(min_length=1, max_length=300)
 
 
 class UnresolvedMention(BaseModel):
@@ -1220,7 +1315,7 @@ class UnresolvedEvidence(BaseModel):
     justified by the two that resolve; a threat whose evidence resolves to
     nothing at all has no justification left, and
     :func:`~stride_service.evidence.resolve_proposals` drops it as a
-    :class:`GroundlessClaim`, because a finding with no grounds is the one
+    :class:`DroppedClaim`, because a finding with no grounds is the one
     thing this schema does not permit.
 
     This replaced a whole-job failure (#138). Agents compose well-formed
@@ -1285,34 +1380,34 @@ class UnknownClaimIdentity(BaseModel):
 
 # How much of a lost quote a groundless mark carries. A quote is agent text
 # bounded only by its own field, so the reason that repeats it must cut it.
-GROUNDLESS_REASON_MAX_CHARS = 500
+DROPPED_REASON_MAX_CHARS = 500
 
 
-class GroundlessClaim(BaseModel):
-    """A claim dropped because every ground it cited was lost.
+class DroppedClaim(BaseModel):
+    """A claim the service dropped for a fault in one entry of it.
 
     The sibling of :class:`UnknownClaimIdentity`: a claim the service dropped,
     so its ``claim_id`` is deliberately absent from the block's claims and
-    ``title`` is the only trace of what the agent found. Two producers write
-    it. :func:`~stride_service.evidence.resolve_proposals` writes one when a
-    claim cited only references the catalog does not hold, and
-    :func:`~stride_service.critic.join_drafts` writes one when a claim's only
-    grounds are quotes the source it names does not contain.
+    ``title`` is the only trace of what the agent found. One list for every
+    reason, and ``reason`` says which, in the agent's own words up to
+    :data:`DROPPED_REASON_MAX_CHARS`:
 
-    ``reason`` says what was lost, in the agent's own words up to
-    :data:`GROUNDLESS_REASON_MAX_CHARS`, so a reader can see the quote the
-    ladder could not find or the reference nothing resolved. Without it the
-    next such drop is a guess, because nothing else persists the draft.
+    * the proposal failed its own schema — a verb outside the closed set, a
+      severity value the enum does not hold, neither a reference nor a quote
+      (:func:`~stride_service.evidence.validate_proposals`);
+    * every reference it cited is outside the catalog
+      (:func:`~stride_service.evidence.resolve_proposals`);
+    * every element it named is absent from the model, its ID duplicates an
+      earlier draft's, or its only grounds are quotes the source it names does
+      not contain (:func:`~stride_service.critic.join_drafts`).
 
-    This replaced the last whole-job failure on the grounding path. ``grounds``
-    is ``min_length=1``, so such a claim cannot be represented and no critic
-    could rule on it. It used to fail the job on the argument that a finding
-    deleted for a reason recorded in a list is a silent removal — but
-    :class:`UnknownClaimIdentity` already drops a claim on the same terms, the
-    viewer already renders that list as a block-level note, and a framework
-    whose catalog rarely holds the fact a requirement turns on writes claims
-    that carry one quote and nothing else. One misquote there cost every lane's
-    work. The drop is visible; the dead job was not.
+    Each of these used to fail the whole job. The argument was that a finding
+    deleted for a reason recorded in a list is a silent removal, and a dead
+    job at least tells someone — but :class:`UnknownClaimIdentity` already
+    drops a claim on the same terms, the viewer renders the list as a
+    block-level note, and one entry's fault discarded every lane's work. The
+    drop is visible; the dead job was not. Nothing else persists a draft, so
+    the reason carries what was wrong.
 
     Service-owned rather than a field on the record, for the reason every mark
     here is: an agent must not report on its own accuracy.
@@ -1322,7 +1417,7 @@ class GroundlessClaim(BaseModel):
 
     claim_id: str = Field(min_length=1, max_length=CLAIM_ID_MAX_CHARS)
     title: str = Field(min_length=1, max_length=200)
-    reason: str = Field(min_length=1, max_length=GROUNDLESS_REASON_MAX_CHARS)
+    reason: str = Field(min_length=1, max_length=DROPPED_REASON_MAX_CHARS)
 
 
 class MissingMitigation(BaseModel):
@@ -1359,7 +1454,9 @@ class MissingMitigation(BaseModel):
 # :class:`SharedElementName` is absent because it annotates the model rather
 # than a claim — which is also why it is the one mark that stays on the
 # envelope while these ride in the block whose claims they annotate.
-ClaimMark = UnresolvedMention | UnresolvedEvidence | MissingMitigation
+ClaimMark = (
+    UnresolvedReference | UnresolvedMention | UnresolvedEvidence | MissingMitigation
+)
 
 
 class SharedElementName(BaseModel):
@@ -1429,10 +1526,11 @@ class AnalysisMarks(BaseModel):
 
     unverified_grounds: list[UnverifiedGround] = Field(default_factory=list)
     repaired_quotes: list[RepairedQuote] = Field(default_factory=list)
+    unresolved_references: list[UnresolvedReference] = Field(default_factory=list)
     unresolved_mentions: list[UnresolvedMention] = Field(default_factory=list)
     unresolved_evidence: list[UnresolvedEvidence] = Field(default_factory=list)
     unknown_claim_identities: list[UnknownClaimIdentity] = Field(default_factory=list)
-    groundless_claims: list[GroundlessClaim] = Field(default_factory=list)
+    dropped_claims: list[DroppedClaim] = Field(default_factory=list)
     missing_mitigations: list[MissingMitigation] = Field(default_factory=list)
     shared_element_names: list[SharedElementName] = Field(default_factory=list)
 
@@ -1738,10 +1836,11 @@ class FrameworkAnalysis(BaseModel):
     coverage: list[LaneCoverage] = Field(default_factory=list)
     unverified_grounds: list[UnverifiedGround] = Field(default_factory=list)
     repaired_quotes: list[RepairedQuote] = Field(default_factory=list)
+    unresolved_references: list[UnresolvedReference] = Field(default_factory=list)
     unresolved_mentions: list[UnresolvedMention] = Field(default_factory=list)
     unresolved_evidence: list[UnresolvedEvidence] = Field(default_factory=list)
     unknown_claim_identities: list[UnknownClaimIdentity] = Field(default_factory=list)
-    groundless_claims: list[GroundlessClaim] = Field(default_factory=list)
+    dropped_claims: list[DroppedClaim] = Field(default_factory=list)
     fired_rules: list[str] = Field(default_factory=list)
     knowledge_docs: list[str] = Field(default_factory=list)
     summary: SerializeAsAny[BlockSummary]
@@ -1816,6 +1915,9 @@ class FrameworkAnalysis(BaseModel):
             *self._reference_issues(known_element_ids),
             *self._identity_issues(),
             *self._unverified_mark_issues(),
+            *self._claim_mark_issues(
+                self.unresolved_references, "unresolved reference"
+            ),
             *self._claim_mark_issues(self.unresolved_mentions, "unresolved mention"),
             *self._claim_mark_issues(self.unresolved_evidence, "unresolved evidence"),
             *self._summary_issues(),

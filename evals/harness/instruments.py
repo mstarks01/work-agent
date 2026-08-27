@@ -497,7 +497,7 @@ def measure_case(
                 block.framework,
                 run.drafts.get(block.framework, ()),
                 block.unverified_grounds,
-                block.groundless_claims,
+                block.dropped_claims,
                 block.repaired_quotes,
             )
         )

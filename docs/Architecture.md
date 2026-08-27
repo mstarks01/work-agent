@@ -77,7 +77,7 @@ run's three outcomes.
   ([`repaired_quotes`](Report-Schema.md#repaired_quotes--quotes-rewritten-to-the-sources-own-span)).
   An unverifiable quote is marked and still renders; a claim where *nothing*
   verifies is dropped and marked as a
-  [`groundless_claims`](Report-Schema.md#groundless_claims--claims-that-lost-every-ground)
+  [`dropped_claims`](Report-Schema.md#dropped_claims--claims-the-service-dropped-for-a-fault-in-one-entry)
   entry. It also computes the per-lane
   [`coverage`](Report-Schema.md#coverage--what-each-lane-was-offered) account
   over the drafts.

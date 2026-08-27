@@ -26,7 +26,7 @@ policy the service does not run.
   the ladder refused and :func:`~stride_service.grounding.repair_quote` then
   rewrote to the source's nearest span. This is the number that moves
   :data:`~stride_service.grounding.REPAIR_THRESHOLD`.
-* **A claim that lost every ground** — read :attr:`CaseGrounds.groundless_count`,
+* **A claim that lost every ground** — read :attr:`CaseGrounds.dropped_count`,
   the claims the service dropped and marked because nothing they cited held:
   every quote absent from its source, or every reference outside the catalog.
 
@@ -57,15 +57,15 @@ from stride_service.critic import DraftJoinError
 from stride_service.frameworks import PACKAGES
 from stride_service.report import (
     Claim,
+    DroppedClaim,
     FrameworkName,
     GroundKind,
-    GroundlessClaim,
     RepairedQuote,
     UnverifiedGround,
 )
 
 # Why the fan-in killed a case. A claim that lost every ground no longer kills
-# one — it is dropped and marked, and :attr:`CaseGrounds.groundless_count`
+# one — it is dropped and marked, and :attr:`CaseGrounds.dropped_count`
 # reads it off the report — so what is left is ``other``: every way the fan-in
 # still rejects a set of drafts (a dangling element reference, a duplicate ID,
 # an unresolvable label), kept as its own kind so no measured rate quietly
@@ -145,7 +145,7 @@ class CaseGrounds:
     threats: tuple[ThreatGrounds, ...]
     #: The claims this block dropped for losing every ground, as the report
     #: marks them. Not in ``threats``: a dropped claim never reached the critic.
-    groundless: tuple[GroundlessClaim, ...] = ()
+    dropped: tuple[DroppedClaim, ...] = ()
 
     # --- measurement 1: how many grounds, and of which branch ------------
 
@@ -208,17 +208,17 @@ class CaseGrounds:
 
     # --- measurement 3: claims dropped for losing every ground -----------
     @property
-    def groundless_count(self) -> int:
-        return len(self.groundless)
+    def dropped_count(self) -> int:
+        return len(self.dropped)
 
     @property
-    def groundless_rate(self) -> float:
+    def dropped_rate(self) -> float:
         """Of every claim the lanes drafted, the share the service dropped.
 
         Denominated in drafts plus drops: a dropped claim is not in ``threats``,
         so the population is what the agents wrote rather than what survived.
         """
-        return ratio(self.groundless_count, self.threat_count + self.groundless_count)
+        return ratio(self.dropped_count, self.threat_count + self.dropped_count)
 
     def to_json(self) -> dict[str, Any]:
         return {
@@ -230,7 +230,7 @@ class CaseGrounds:
                 "quoteless_threats": self.quoteless_count,
                 "unverified_quotes": self.unverified_count,
                 "repaired_quotes": self.repaired_count,
-                "groundless_claims": self.groundless_count,
+                "dropped_claims": self.dropped_count,
                 **self.kind_counts,
             },
             "metrics": {
@@ -238,10 +238,10 @@ class CaseGrounds:
                 "quoteless_rate": round(self.quoteless_rate, 3),
                 "unverified_rate": round(self.unverified_rate, 3),
                 "repaired_rate": round(self.repaired_rate, 3),
-                "groundless_rate": round(self.groundless_rate, 3),
+                "dropped_rate": round(self.dropped_rate, 3),
             },
             "threats": [entry.to_json() for entry in self.threats],
-            "groundless": [mark.model_dump(mode="json") for mark in self.groundless],
+            "dropped": [mark.model_dump(mode="json") for mark in self.dropped],
         }
 
 
@@ -302,7 +302,7 @@ def measure_grounds(
     framework: FrameworkName,
     drafts: Sequence[Claim],
     unverified: Iterable[UnverifiedGround],
-    groundless: Iterable[GroundlessClaim] = (),
+    dropped: Iterable[DroppedClaim] = (),
     repaired: Iterable[RepairedQuote] = (),
 ) -> CaseGrounds:
     """Fold one framework's drafts and its unverified marks into one measurement.
@@ -341,7 +341,7 @@ def measure_grounds(
             )
             for draft in drafts
         ),
-        groundless=tuple(groundless),
+        dropped=tuple(dropped),
     )
 
 
@@ -417,7 +417,7 @@ def aggregate_grounds(
     unverified = sum(entry.unverified_count for entry in measurements)
     repaired = sum(entry.repaired_count for entry in measurements)
     quoteless = sum(entry.quoteless_count for entry in measurements)
-    groundless = sum(entry.groundless_count for entry in measurements)
+    dropped = sum(entry.dropped_count for entry in measurements)
     kinds: Counter[str] = Counter()
     for entry in measurements:
         kinds.update(entry.kind_counts)
@@ -428,13 +428,13 @@ def aggregate_grounds(
         "quoteless_threats": quoteless,
         "unverified_quotes": unverified,
         "repaired_quotes": repaired,
-        "groundless_claims": groundless,
+        "dropped_claims": dropped,
         **{kind: kinds.get(kind, 0) for kind in _KINDS},
         "grounds_per_threat": round(ratio(grounds, threats), 3),
         "quoteless_rate": round(ratio(quoteless, threats), 3),
         "unverified_rate": round(ratio(unverified, quotes), 3),
         "repaired_rate": round(ratio(repaired, quotes), 3),
-        "groundless_rate": round(ratio(groundless, threats + groundless), 3),
+        "dropped_rate": round(ratio(dropped, threats + dropped), 3),
         "failed_cases": len(failures),
     }
 
@@ -459,7 +459,7 @@ def render(
             f"  quoteless {entry.quoteless_rate:.0%}"
             f"  unverified {entry.unverified_count}/{entry.quote_count}"
             f"  repaired {entry.repaired_count}"
-            f"  groundless {entry.groundless_count}"
+            f"  dropped {entry.dropped_count}"
         )
     for failure in failures:
         print(f"{failure.case_id:<26} grounds FAILED ({failure.kind})")
@@ -470,7 +470,7 @@ def render(
             f" quoteless {totals['quoteless_rate']:.0%},"
             f" unverified {totals['unverified_rate']:.1%},"
             f" repaired {totals['repaired_rate']:.1%},"
-            f" groundless {totals['groundless_rate']:.1%},"
+            f" dropped {totals['dropped_rate']:.1%},"
             f" failed cases {totals['failed_cases']}"
             " (instrument, non-gating)"
         )
