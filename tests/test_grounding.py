@@ -9,7 +9,12 @@ contains.
 
 import pytest
 
-from stride_service.grounding import normalize, verify_quote
+from stride_service.grounding import (
+    REPAIR_THRESHOLD,
+    normalize,
+    repair_quote,
+    verify_quote,
+)
 
 # Hard-wrapped at ~72 characters, the way the corpus sources are. This is what
 # makes the whitespace rung carry the entire result: a quote of two consecutive
@@ -99,3 +104,47 @@ class TestTheTranscriptShape:
 def test_normalization_is_applied_to_both_sides():
     """A rung applied to one side compares two dialects of the same string."""
     assert normalize("  The   `LEDGER`  service ") == "the ledger service"
+
+
+class TestTheRepairRung:
+    """Runs after the ladder refused; hands back the source's own words."""
+
+    def test_a_tidied_quote_is_replaced_by_the_span_it_came_from(self):
+        """A changed preposition. The span returned is the submitter's, and the
+        ladder accepts it without help."""
+        repair = repair_quote(
+            "a single shared password from an environment variable", SOURCE
+        )
+
+        assert repair is not None
+        span, similarity = repair
+        assert span == "a single shared password out of an environment variable,"
+        assert similarity >= REPAIR_THRESHOLD
+        assert verify_quote(span, SOURCE)
+
+    def test_a_dropped_word_is_repaired(self):
+        """Six characters on forty-six are inside the threshold. The same drop
+        on a quote half as long is not — a short quote has less slack."""
+        repair = repair_quote("and that account has full read/write on table", SOURCE)
+        assert repair is not None
+        assert repair[0] == "and that account has full read/write on every table."
+        assert repair_quote("has full read/write on table", SOURCE) is None
+
+    def test_the_stitched_sentence_is_still_refused(self):
+        """The corpus's one true fabrication. Every fragment is present, and
+        the span it was cut from is thirteen words longer than the quote, so
+        no candidate window comes near it."""
+        assert repair_quote("a single shared password on every table", SOURCE) is None
+
+    def test_a_quote_marking_a_cut_is_not_repaired(self):
+        """Each fragment is its own span; one nearest window for the whole is a
+        span the quote never claimed."""
+        assert repair_quote("a single shared … every tables", SOURCE) is None
+
+    def test_a_different_sentence_is_refused(self):
+        assert (
+            repair_quote("the accounts database is encrypted at rest", SOURCE) is None
+        )
+
+    def test_an_empty_quote_is_refused(self):
+        assert repair_quote("   ", SOURCE) is None

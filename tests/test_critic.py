@@ -459,6 +459,24 @@ class TestQuoteVerification:
         ]
         assert LABEL in joined.marks.unverified_grounds[0].reason
 
+    def test_a_refused_quote_near_the_source_is_repaired_and_marked(self, model):
+        """The ground now carries the submitter's words, and the mark carries
+        the agent's, so the substitution is on the record. A repaired quote
+        verifies, so it is never also marked unverified, and a claim resting on
+        it alone is not groundless."""
+        drafts = self.quoting("Customers log in to the web app which stores orders")
+
+        joined = join_drafts(drafts, STRIDE, model, SOURCES)
+
+        (draft,) = joined.drafts
+        assert draft.grounds[0].text == SOURCES[LABEL]
+        (mark,) = joined.marks.repaired_quotes
+        assert (mark.claim_id, mark.index) == ("S-01", 0)
+        assert mark.written == "Customers log in to the web app which stores orders"
+        assert 0.9 <= mark.similarity <= 1.0
+        assert joined.marks.unverified_grounds == []
+        assert joined.marks.groundless_claims == []
+
     def test_a_claim_whose_every_ground_fails_is_dropped_and_marked(self, model):
         """The claim, not the job: one misquote on a claim that carries nothing
         else must not discard every other lane's work. The mark keeps the
