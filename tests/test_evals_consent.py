@@ -45,36 +45,37 @@ def priced(monkeypatch):
     return rates
 
 
-def merged(root, name, identity, actual, output_rate=8e-6):
-    """One merged Baseline on disk, priced as its manifest records."""
+def merged(root, name, identity, actual, output_rate=8e-6, sweeps=1):
+    """A merged Baseline on disk, priced as its manifest records.
+
+    ``sweeps`` repeats the entry, which is what a Baseline gaining runs looks
+    like: every sweep of one configuration prices the same models, so the
+    price rows repeat and the recorded actual stays a per-sweep figure.
+    """
     directory = root / "evals" / "baselines" / name
     directory.mkdir(parents=True)
-    (directory / "baseline.json").write_text(
-        json.dumps(
-            {
-                "name": name,
-                "identity": identity,
-                "sweeps": [
+    entries = [
+        {
+            "artifact": f"ada-{index:04d}.json",
+            "submitted_by": "ada",
+            "cost": {
+                "actual_usd": actual,
+                "unit_prices": [
                     {
-                        "artifact": "ada-0000.json",
-                        "submitted_by": "ada",
-                        "cost": {
-                            "actual_usd": actual,
-                            "unit_prices": [
-                                {
-                                    "model": "openai/gpt-5.6",
-                                    "input_per_token": 2e-6,
-                                    "output_per_token": output_rate,
-                                    "cache_read_per_token": 2e-7,
-                                }
-                            ],
-                            "unpriced": [],
-                            "fallbacks": {},
-                        },
+                        "model": "openai/gpt-5.6",
+                        "input_per_token": 2e-6,
+                        "output_per_token": output_rate,
+                        "cache_read_per_token": 2e-7,
                     }
                 ],
-            }
-        ),
+                "unpriced": [],
+                "fallbacks": {},
+            },
+        }
+        for index in range(sweeps)
+    ]
+    (directory / "baseline.json").write_text(
+        json.dumps({"name": name, "identity": identity, "sweeps": entries}),
         encoding="utf-8",
     )
     return directory
@@ -104,6 +105,31 @@ class TestTheEstimate:
         assert estimate.label == "estimated"
         assert estimate.amount_usd is not None
         assert "borrowed" in " ".join(estimate.lines)
+
+    def test_the_borrowed_guess_does_not_move_with_the_lender_sweep_count(
+        self, tmp_path, priced
+    ):
+        """The ratio is a property of the two configurations, not of run count.
+
+        A lent actual is a mean over the lender's sweeps, so a divisor that
+        counted every sweep's price rows divided a per-sweep number by a
+        per-directory one: a ten-sweep Baseline lent a tenth of its own cost,
+        and the contributor consented to that.
+        """
+        amounts = []
+        for sweeps in (1, 2, 5, 10):
+            root = tmp_path / f"root-{sweeps}"
+            merged(
+                root,
+                "other",
+                {**IDENTITY, "repo_commit": "e" * 40},
+                actual=0.60,
+                sweeps=sweeps,
+            )
+            amounts.append(consent.estimate(IDENTITY, ROUTES, root).amount_usd)
+
+        assert amounts[0] is not None
+        assert all(amount == pytest.approx(amounts[0]) for amount in amounts)
 
     def test_a_dearer_model_makes_the_borrowed_guess_dearer(self, tmp_path, priced):
         merged(
@@ -203,15 +229,15 @@ class TestTheScriptFlag:
 
 class TestTheHold:
     def test_a_run_inside_what_was_accepted_continues(self, priced):
-        assert hold(10.0, [node(completion=1000)], ["02"], None) == 10.0
+        assert hold(10.0, [node(completion=1000)], ["02"], None, ran=1) == 10.0
 
     def test_a_script_that_outspends_its_acceptance_stops(self, priced):
         with pytest.raises(Refused, match="no hand here"):
-            hold(0.001, [node(completion=1_000_000)], ["02", "03"], None)
+            hold(0.001, [node(completion=1_000_000)], ["02", "03"], None, ran=1)
 
     def test_the_stop_names_the_spend_and_the_cases_not_run(self, priced, capsys):
         with pytest.raises(Refused):
-            hold(0.001, [node(completion=1_000_000)], ["02", "03"], None)
+            hold(0.001, [node(completion=1_000_000)], ["02", "03"], None, ran=1)
         printed = capsys.readouterr().out
         assert "02, 03" in printed
         assert "2 case(s) have not run" in printed
@@ -219,16 +245,46 @@ class TestTheHold:
     def test_a_person_may_accept_the_larger_amount_and_continue(self, priced):
         executions = [node(completion=1_000_000)]
         so_far = consent.spent(executions)
-        accepted = hold(0.001, executions, ["02"], lambda _: f"{so_far:.2f}")
-        assert accepted == pytest.approx(so_far)
+        projected = so_far * 2  # one case ran, one remains, at the same rate
+        accepted = hold(0.001, executions, ["02"], lambda _: f"{projected:.2f}", ran=1)
+        assert accepted == pytest.approx(projected)
 
     def test_a_person_who_declines_stops_the_sweep(self, priced):
         with pytest.raises(Refused):
-            hold(0.001, [node(completion=1_000_000)], ["02"], lambda _: "")
+            hold(0.001, [node(completion=1_000_000)], ["02"], lambda _: "", ran=1)
 
     def test_an_accepted_unknown_has_nothing_to_measure_against(self, priced):
         """Accepting ``unknown`` is a real acceptance, so the hold never fires."""
-        assert hold(None, [node(completion=1_000_000)], ["02"], None) is None
+        assert hold(None, [node(completion=1_000_000)], ["02"], None, ran=1) is None
+
+    def test_the_re_prompt_offers_the_whole_sweep_and_not_the_sunk_spend(self, priced):
+        """One overrun costs one prompt, not one at every case that follows.
+
+        Accepting what is already spent puts the run over its own figure again
+        on the very next case. The offer is the projection instead, so the
+        amount in force covers the cases still to run.
+        """
+        executions = [node(completion=1_000_000)]
+        so_far = consent.spent(executions)
+        offered: list[str] = []
+
+        def answer(prompt: str) -> str:
+            offered.append(prompt)
+            return prompt.split("(")[1].split(")")[0]
+
+        accepted = hold(0.001, executions, ["02", "03", "04"], answer, ran=1)
+
+        assert accepted == pytest.approx(so_far * 4)
+        assert accepted is not None and accepted > so_far
+        # The next boundary, at the same rate, is inside the new figure.
+        assert hold(accepted, executions * 2, ["03", "04"], None, ran=2) == accepted
+
+    def test_a_run_with_nothing_recorded_yet_offers_what_it_spent(self, priced):
+        """``ran`` at zero has no rate to project from, so the spend stands."""
+        executions = [node(completion=1_000_000)]
+        so_far = consent.spent(executions)
+        accepted = hold(0.001, executions, ["02"], lambda _: f"{so_far:.2f}", ran=0)
+        assert accepted == pytest.approx(so_far)
 
 
 class TestADirtyTreeIsNamedBeforeTheSpend:

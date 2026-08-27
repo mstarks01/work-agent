@@ -257,12 +257,12 @@ def render_element_roster(model: SystemModel) -> str:
 
     Order is the model's own, so one System Model renders one table every run.
     """
+    elements = list(model.elements())
     rows = "\n".join(
-        f"| `{element.id}` | {_element_gloss(element)} |"
-        for element in model.elements()
+        f"| `{element.id}` | {_element_gloss(element)} |" for element in elements
     )
     return (
-        f"{len(list(model.elements()))} elements, and this table is all of them."
+        f"{len(elements)} elements, and this table is all of them."
         " Name one exactly as it appears here.\n\n"
         "| cite this exactly | what it is |\n| --- | --- |\n"
         f"{rows}\n"

@@ -50,13 +50,34 @@ from evals.harness.calibration import (
 from evals.harness.identity import SubsetVerbIdentity
 from evals.harness.reference import load_corpus
 from evals.harness.run import _flows_by_case
+from evals.harness.sitting import cases_in_debt
 from stride_service.frameworks import widest_fan_out
 
-EVALS = Path(__file__).resolve().parents[1] / "evals"
+REPO_ROOT = Path(__file__).resolve().parents[1]
 
 #: Small numbers as the prose writes them. Only the counts a guide spells out
 #: need an entry; a figure written in digits everywhere needs none.
-WORDS = {13: "Thirteen", 14: "Fourteen", 15: "Fifteen"}
+#:
+#: The range runs down to zero as well as up, because the debt count below is
+#: a figure this repository is actively trying to shrink.
+WORDS = {
+    0: "None",
+    1: "One",
+    2: "Two",
+    3: "Three",
+    4: "Four",
+    5: "Five",
+    6: "Six",
+    7: "Seven",
+    8: "Eight",
+    9: "Nine",
+    10: "Ten",
+    11: "Eleven",
+    12: "Twelve",
+    13: "Thirteen",
+    14: "Fourteen",
+    15: "Fifteen",
+}
 
 
 @dataclass(frozen=True)
@@ -100,36 +121,60 @@ def _corpus() -> Mapping[str, object]:
     return {"value": count, "word": WORDS.get(count, str(count))}
 
 
+def _unreviewed() -> Mapping[str, object]:
+    """Cases nobody has sat with, beside the corpus size the prose pairs it to.
+
+    Both halves in one figure because both sentences state the pair, and a
+    guide saying "12 of the 13" goes wrong when either number moves. This is
+    the figure the contribution path exists to change: every merged sitting
+    PR clears a line, so it is the most likely of all of them to go stale.
+    """
+    count = len(cases_in_debt(REPO_ROOT))
+    return {
+        "value": count,
+        "word": WORDS.get(count, str(count)),
+        "corpus": len(verify_corpus.case_dirs()),
+    }
+
+
 FIGURES: tuple[Figure, ...] = (
     Figure(
         name="the widest framework fan-out",
         compute=lambda: {"value": widest_fan_out()},
-        claims=(("TUNING.md", "{value} today", 1),),
+        claims=(("evals/TUNING.md", "{value} today", 1),),
     ),
     Figure(
         name="the corpus size",
         compute=_corpus,
         claims=(
-            ("README.md", "{word} cases", 1),
-            ("BLESSING.md", "All {value} cases", 1),
+            ("evals/README.md", "{word} cases", 1),
+            ("evals/BLESSING.md", "All {value} cases", 1),
+        ),
+    ),
+    Figure(
+        name="the cases nobody has sat with",
+        compute=_unreviewed,
+        claims=(
+            ("CONTRIBUTING.md", "{value} of the {corpus} cases", 1),
+            ("evals/BLESSING.md", "{word} of the {corpus} cases", 1),
         ),
     ),
     Figure(
         name="the identity rule's agreement with the labels",
         compute=_calibration,
         claims=(
-            ("README.md", "scores {agreed}/{total}", 2),
-            ("README.md", "A rule at {percent}%", 1),
-            ("TUNING.md", "{percent}%", 1),
+            ("evals/README.md", "scores {agreed}/{total}", 2),
+            ("evals/README.md", "A rule at {percent}%", 1),
+            ("evals/TUNING.md", "{percent}%", 1),
         ),
     ),
     Figure(
         name="the labelled match fixtures",
         compute=lambda: {"value": len(load_pairs())},
         claims=(
-            ("README.md", "of the {value} match labels", 1),
-            ("TUNING.md", "of the {value}", 1),
-            ("BLESSING.md", "of the {value}", 1),
+            ("evals/README.md", "of the {value} match labels", 1),
+            ("evals/TUNING.md", "of the {value}", 1),
+            ("evals/BLESSING.md", "of the {value}", 1),
         ),
     ),
     Figure(
@@ -139,14 +184,14 @@ FIGURES: tuple[Figure, ...] = (
             "max": verify_corpus.MAX_ELEMENTS,
         },
         claims=(
-            ("README.md", "{min}–{max} elements", 1),
-            ("BLESSING.md", "{min}–{max} elements", 1),
+            ("evals/README.md", "{min}–{max} elements", 1),
+            ("evals/BLESSING.md", "{min}–{max} elements", 1),
         ),
     ),
     Figure(
         name="the rule-label agreement bar",
         compute=lambda: {"percent": round(AGREEMENT_BAR * 100)},
-        claims=(("README.md", "{percent}% bar", 4),),
+        claims=(("evals/README.md", "{percent}% bar", 4),),
     ),
 )
 
@@ -164,10 +209,10 @@ def test_the_prose_states_the_current_figure(figure, document, template, count):
     """Every sentence stating this figure names the number the code produces."""
     values = figure.compute()
     expected = template.format(**values)
-    found = (EVALS / document).read_text(encoding="utf-8").count(expected)
+    found = (REPO_ROOT / document).read_text(encoding="utf-8").count(expected)
 
     assert found == count, (
-        f"evals/{document} states {expected!r} {found} time(s) and this figure"
+        f"{document} states {expected!r} {found} time(s) and this figure"
         f" declares {count}. The computed values for {figure.name} are"
         f" {dict(values)}. Either a mention went stale while its twin stayed"
         " current, or a new mention landed and the count needs raising."
