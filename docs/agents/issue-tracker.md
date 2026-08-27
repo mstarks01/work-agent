@@ -113,6 +113,17 @@ Completed on GitHub Issues (canonical):
   cases (both are ordinary PRs), any merge gate that reads contributed data, baselines over
   private off-corpus cases, and a hosted submission service.
 
+  **One decision here was reversed by the maintainer and is not the current state.** The map
+  ruled that "the web app never gains a network write", beside ruling out a hosted service. On
+  2026-08-27 `webapp/sitting.py` gained a button that opens the pull request through the
+  operator's own authenticated `gh`. The hosted half of that line still stands — nothing is
+  hosted, no credential is held, and the app still binds to loopback — but the app does now
+  reach the network on a click. The endpoint carries four controls in exchange (a checked
+  `Host`, `Sec-Fetch-Site`, a per-process page token, and no request-controlled arguments), and
+  it is off when `gh` holds no login or when `--no-submit` is passed. Read the module docstring
+  for what each control stops. The CLI path is unchanged and remains the only way to submit a
+  vote or a baseline.
+
 - [#158 — Map: one validated system representation, many security frameworks](https://github.com/mstarks01/work-agent/issues/158)
   — 11 tickets, charted 2026-08-12 from [#139](https://github.com/mstarks01/work-agent/issues/139) and
   completed 2026-08-13. A **planning** map: it settled the spec for a framework-neutral analysis layer —

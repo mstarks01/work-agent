@@ -205,6 +205,114 @@ class TestThePosture:
         assert "default-src 'none'" in page.headers["Content-Security-Policy"]
 
 
+class TestTheSubmitButton:
+    """The one endpoint in any app here that can act on GitHub as the operator.
+
+    Four controls, and each is tested for refusing on its own: the Host check
+    (#350), ``Sec-Fetch-Site``, the per-process page token, and the rule that
+    the endpoint takes no arguments at all. Nothing here reaches GitHub — a
+    refusal is asserted before the spine is ever called, and the one accepting
+    test stubs the spine.
+    """
+
+    def sat(self, tree, can_submit=True):
+        session = build_session(CASE, "ada", tree, can_submit=can_submit)
+        app = TestClient(create_app(session), base_url=LOOPBACK)
+        app.post("/api/own-list", json={"items": ["a stolen key"]})
+        app.get("/api/part-two")
+        app.post("/api/finish", json={"marks": {}, "missing": [], "notes": ""})
+        return app, session
+
+    def headers(self, session):
+        return {"Sec-Fetch-Site": "same-origin", "X-Sitting-Token": session.token}
+
+    def test_a_cross_site_request_is_refused(self, tree):
+        app, session = self.sat(tree)
+        refused = app.post(
+            "/api/submit",
+            headers={"Sec-Fetch-Site": "cross-site", "X-Sitting-Token": session.token},
+        )
+        assert refused.status_code == 403
+
+    def test_a_request_without_the_page_token_is_refused(self, tree):
+        """A page that never read this one cannot have the token."""
+        app, _ = self.sat(tree)
+        assert (
+            app.post(
+                "/api/submit", headers={"Sec-Fetch-Site": "same-origin"}
+            ).status_code
+            == 403
+        )
+
+    def test_a_wrong_token_is_refused(self, tree):
+        app, _ = self.sat(tree)
+        refused = app.post(
+            "/api/submit",
+            headers={"Sec-Fetch-Site": "same-origin", "X-Sitting-Token": "guessed"},
+        )
+        assert refused.status_code == 403
+
+    def test_a_rebound_host_is_refused_here_too(self, tree):
+        session = build_session(CASE, "ada", tree, can_submit=True)
+        app = TestClient(create_app(session), base_url="http://attacker.example")
+        assert app.post("/api/submit", headers=self.headers(session)).status_code == 400
+
+    def test_submitting_before_recording_is_refused(self, tree):
+        session = build_session(CASE, "ada", tree, can_submit=True)
+        app = TestClient(create_app(session), base_url=LOOPBACK)
+        refused = app.post("/api/submit", headers=self.headers(session))
+        assert refused.status_code == 409
+        assert "record the sitting" in refused.json()["detail"]
+
+    def test_without_a_gh_login_the_endpoint_is_closed(self, tree):
+        app, session = self.sat(tree, can_submit=False)
+        refused = app.post("/api/submit", headers=self.headers(session))
+        assert refused.status_code == 409
+        assert "nothing to" in refused.json()["detail"]
+
+    def test_it_runs_the_same_spine_and_takes_no_arguments(self, tree, monkeypatch):
+        """The submission is what the session recorded; the request steers nothing."""
+        from evals.harness import submit as spine
+
+        seen = {}
+
+        def fake(root, kind, **kwargs):
+            seen["root"], seen["kind"], seen["kwargs"] = root, kind, kwargs
+            return spine.Outcome(
+                author="ada",
+                url="https://example.test/pr/9",
+                closing="a maintainer reviews every line",
+            )
+
+        monkeypatch.setattr(spine, "submission", fake)
+        app, session = self.sat(tree)
+        answer = app.post(
+            "/api/submit",
+            headers=self.headers(session),
+            json={"kind": "baseline", "path": "/etc/passwd"},
+        )
+        assert answer.status_code == 200
+        assert seen["kind"] == "sitting", "the request cannot choose the kind"
+        assert seen["root"] == tree
+        assert answer.json()["url"] == "https://example.test/pr/9"
+
+    def test_a_failed_checklist_comes_back_as_the_checklist(self, tree, monkeypatch):
+        from evals.harness import submit as spine
+
+        monkeypatch.setattr(
+            spine,
+            "submission",
+            lambda root, kind, **kw: spine.Outcome(
+                author="ada",
+                checks=(spine.Check(name="the digests hold", problems=("source.md",)),),
+            ),
+        )
+        app, session = self.sat(tree)
+        answer = app.post("/api/submit", headers=self.headers(session))
+        assert answer.status_code == 409
+        assert answer.json()["checks"][0]["problems"] == ["source.md"]
+
+
 class TestTheDebtHelper:
     """The debt list is a Python literal, so removing a line is worth testing."""
 
