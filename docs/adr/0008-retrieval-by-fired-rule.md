@@ -34,6 +34,13 @@ this repository has ever run**, so whether retrieved text improves an analysis
 cannot be answered here. What can be answered is whether the right documents
 arrive, deterministically, and whether they can leak into evidence.
 
+> **Corrected 2026-08-27.** The premise above was true on this ADR's date and
+> is not true now: sweeps have run, the first on 2026-08-14. `evals/README.md`
+> states which ones and what they establish. The decision below is unaffected —
+> it was argued from determinism and from caller text selecting nothing, not
+> from the absence of a measurement — but do not repeat the sentence above as
+> a fact about today.
+
 ## Decision
 
 **Retrieval is a set intersection against the rules that fired, and that is the
@@ -106,6 +113,17 @@ says it is somebody else's reasoning.
 until a sweep runs.** The tests here establish that the right documents arrive
 and that they cannot become evidence, and stop exactly there. Retrieval
 usefulness, as #127 defines it, needs the live lane that has never executed.
+
+> **Corrected 2026-08-27.** The conclusion holds and its reason has changed.
+> Sweeps have run, so "until a sweep runs" is no longer the barrier — and a
+> sweep alone was never enough. Usefulness is a comparison, and nobody has run
+> this corpus with retrieval off against the same corpus with it on.
+>
+> What a sweep did settle is the arrival half, which is now a measurement
+> rather than only a unit test: on the 2026-08-23 `gpt-5.6-luna` analysis
+> sweep, 116 of 143 rules fired across 13 cases and the lane agents cited 252
+> of the 334 candidates they were offered. That says the documents arrive and
+> get read. It says nothing about whether the analysis is better for them.
 
 **What was considered and rejected: embedding the corpus and searching it.**
 It buys recall over documents no rule points at, and costs determinism, offline
