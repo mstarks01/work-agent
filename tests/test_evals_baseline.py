@@ -27,6 +27,7 @@ from evals.harness.baseline import (
 )
 from evals.harness.prices import UnitPrices
 from evals.harness.provenance import RunProvenance
+from stride_service.report import TokenUsage
 from stride_service.sampling import TierSampling, sampling_fingerprint
 
 COMMIT = "c" * 40
@@ -327,3 +328,47 @@ def test_the_corpus_digest_at_head_matches_the_live_computation():
     if head is None or (status or "").strip():
         pytest.skip("the corpus working tree does not match HEAD here")
     assert baseline.corpus_digest_at(head.strip(), REPO_ROOT) == corpus_digest()
+
+
+class TestAnUnknownCacheDiscount:
+    """A missing cache-read rate is ``None``, and bills as no discount.
+
+    ``prices.py`` says it never writes a silent zero, and most of litellm's
+    map states no cache-read rate at all: 1820 of its 3212 entries price
+    input and output and say nothing about cached reads. Zeroing that billed
+    a 90%-cached call at a seventh of a plausible cost, which understates a
+    number somebody consents to spend against.
+    """
+
+    HEAVILY_CACHED = TokenUsage(
+        prompt_tokens=100_000, cached_prompt_tokens=90_000, completion_tokens=1_000
+    )
+
+    def test_a_stated_rate_is_used(self):
+        stated = UnitPrices(
+            "m", input_per_token=2e-6, output_per_token=8e-6, cache_read_per_token=2e-7
+        )
+        assert stated.cached_rate == 2e-7
+        assert stated.cost(self.HEAVILY_CACHED) == pytest.approx(
+            10_000 * 2e-6 + 90_000 * 2e-7 + 1_000 * 8e-6
+        )
+
+    def test_an_absent_rate_bills_the_full_input_price(self):
+        unknown = UnitPrices(
+            "m", input_per_token=2e-6, output_per_token=8e-6, cache_read_per_token=None
+        )
+        assert unknown.cached_rate == 2e-6
+        assert unknown.cost(self.HEAVILY_CACHED) == pytest.approx(
+            100_000 * 2e-6 + 1_000 * 8e-6
+        )
+
+    def test_the_absent_rate_never_reads_as_a_discount(self):
+        """The whole point: unknown must never be cheaper than known-expensive."""
+        unknown = UnitPrices("m", 2e-6, 8e-6, None)
+        zeroed = UnitPrices("m", 2e-6, 8e-6, 0.0)
+        assert unknown.cost(self.HEAVILY_CACHED) > zeroed.cost(self.HEAVILY_CACHED)
+
+    def test_none_survives_the_json_round_trip(self):
+        """A manifest records what was known, so the hole travels with it."""
+        unknown = UnitPrices("m", 2e-6, 8e-6, None)
+        assert UnitPrices.from_json(unknown.to_json()) == unknown
