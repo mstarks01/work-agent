@@ -2,7 +2,9 @@
 
 > For **anyone scoring findings**, maintainer or outside contributor. It is
 > free and offline: a merged **Baseline** keeps its reports in this repository,
-> so voting needs no provider key and spends nothing. New here? Start at
+> so voting needs no provider key and spends nothing. What there is to score is
+> what [`baselines/README.md`](baselines/README.md) lists, which is generated
+> from the merged Baselines. New here? Start at
 > [`../CONTRIBUTING.md`](../CONTRIBUTING.md).
 
 A sweep produces findings. The identity rule
