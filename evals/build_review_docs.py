@@ -357,19 +357,16 @@ contributor adds their own, standing `contributor`. Then
 """
 
 
-def build_doc(case_dir: Path) -> str:
+def part_one(case_dir: Path) -> str:
+    """The system as the reader meets it: every source, then the model.
+
+    Split out so a surface can show this and withhold the recorded sets until
+    the reader's own list is written — the one rule the method has. The
+    generated document and `webapp/sitting.py` compose the same text.
+    """
     meta = load_meta(case_dir / "case.json")
     model = load_meta(case_dir / "model.json")
-    frameworks = [fw["name"] for fw in meta["frameworks"]]
-
-    lines = [
-        f"# Review sitting — is `{meta['id']}`'s reference list right?\n",
-        f"`evals/BLESSING.md` step 6, over `evals/corpus/{meta['id']}`.",
-        f"\n**{meta['title']}** — domain `{meta['domain']}`.\n",
-        PREAMBLE,
-        "---\n",
-        "## Part 1 — the system, and your own list\n",
-    ]
+    lines = ["## Part 1 — the system\n"]
     for source in meta["sources"]:
         text = (case_dir / source["file"]).read_text(encoding="utf-8")
         lines.append(f"### {source['label']} ({source['kind']})\n")
@@ -382,16 +379,40 @@ def build_doc(case_dir: Path) -> str:
         " need them.\n"
     )
     lines.append(model_tables(model))
-    lines.append("")
-    lines.append(OWN_LIST)
-    lines.append("---\n")
+    return "\n".join(lines)
 
-    part = 2
-    for name in frameworks:
+
+def parts_after(case_dir: Path) -> dict[str, str]:
+    """The recorded set per declared framework, rendered through RENDERERS.
+
+    Keyed by framework rather than concatenated, so a caller can show one at a
+    time and so a package that joins `PACKAGES` arrives here through its own
+    renderer entry with no edit.
+    """
+    meta = load_meta(case_dir / "case.json")
+    rendered = {}
+    for part, declared in enumerate(meta["frameworks"], start=2):
+        name = declared["name"]
         claims = load_records(case_dir / "claims" / f"{name}.json")
-        lines.append(RENDERERS[name](claims, part))
-        part += 1
+        rendered[name] = RENDERERS[name](claims, part)
+    return rendered
 
+
+def build_doc(case_dir: Path) -> str:
+    meta = load_meta(case_dir / "case.json")
+
+    lines = [
+        f"# Review sitting — is `{meta['id']}`'s reference list right?\n",
+        f"`evals/BLESSING.md` step 6, over `evals/corpus/{meta['id']}`.",
+        f"\n**{meta['title']}** — domain `{meta['domain']}`.\n",
+        PREAMBLE,
+        "---\n",
+        part_one(case_dir),
+        "",
+        OWN_LIST,
+        "---\n",
+    ]
+    lines += list(parts_after(case_dir).values())
     lines.append(MISSING)
     lines.append(closing(meta["id"], meta))
     return "\n".join(lines)
