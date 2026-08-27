@@ -21,10 +21,12 @@ import pytest
 from google.adk.models.base_llm import BaseLlm
 from pydantic import Field
 
+import stride_service.graph as graph_module
 from evals.harness import modes
 from evals.harness.coverage import aggregate_coverage, coverage_totals
 from evals.harness.reference import load_case
 from evals.harness.run import _run_mode
+from stride_service.critic import DraftJoinError
 from stride_service.deployment import Deployment
 from stride_service.evidence import evidence_catalog
 from stride_service.frameworks.stride.record import STRIDE_CATEGORIES
@@ -133,9 +135,9 @@ FABRICATED = {
 # The successor to the mis-shaped ``Ground``. An agent selects from a closed
 # set, so the only way its evidence can fail is by naming something outside it.
 INVENTED = {"evidence_refs": ["crossing:flow:not-a-flow-in-this-model"]}
-# What still kills a case: an emission the proposal schema refuses, which the
-# fan-in raises on rather than marks.
-DEAD = {"verb": "not-a-verb-in-the-closed-set"}
+# A sentinel for the one way a case still dies: the fan-in raising on a fault
+# no agent can produce any more. ``sweep`` makes the first join raise it.
+DEAD: dict[str, Any] = {"dead": True}
 
 
 def sweep(monkeypatch, case, spoofing_first: dict[str, Any] | None) -> Any:
@@ -146,6 +148,18 @@ def sweep(monkeypatch, case, spoofing_first: dict[str, Any] | None) -> Any:
     """
     label = case.sources[0].label
     first = spoofing_first
+    if first is DEAD:
+        first = None
+        real_join = graph_module.join_drafts
+        calls: list[int] = []
+
+        def join_once_dead(*args: Any, **kwargs: Any) -> Any:
+            calls.append(1)
+            if len(calls) == 1:
+                raise DraftJoinError("draft 'S-01' cites something no agent can")
+            return real_join(*args, **kwargs)
+
+        monkeypatch.setattr(graph_module, "join_drafts", join_once_dead)
     if first is not None and "quotes" in first:
         first = first | {
             "quotes": [{**quote, "source_label": label} for quote in first["quotes"]]
@@ -197,7 +211,7 @@ def _critic_first(graph_node: str, first: dict[str, Any] | None) -> list[str]:
     ``S-01`` before the critic sees it, and a ruling on it would be a ruling on
     a claim nobody drafted.
     """
-    if graph_node != "critic_stride" or first is None or first == DEAD:
+    if graph_node != "critic_stride" or first is None:
         return []
     rulings = [
         scripted_ruling(category)
@@ -267,10 +281,10 @@ def test_a_claim_that_lost_every_ground_is_dropped_and_the_case_still_measures(
     assert run.grounds_failures == []
     assert [entry.case_id for entry in run.grounds] == [case.id, "case-second"]
     first, second = run.grounds
-    assert [mark.claim_id for mark in first.groundless] == ["S-01"]
+    assert [mark.claim_id for mark in first.dropped] == ["S-01"]
     assert first.threat_count == len(STRIDE_CATEGORIES) - 1
-    assert second.groundless == ()
-    assert run.payloads[0]["grounds"][0]["counts"]["groundless_claims"] == 1
+    assert second.dropped == ()
+    assert run.payloads[0]["grounds"][0]["counts"]["dropped_claims"] == 1
 
 
 def test_the_sweep_collects_every_case_s_coverage_rows(monkeypatch, case):
@@ -285,9 +299,9 @@ def test_the_sweep_collects_every_case_s_coverage_rows(monkeypatch, case):
 
 
 def test_a_dead_case_is_counted_and_the_sweep_continues(monkeypatch, case):
-    """The fan-in still refuses a draft naming an element the model does not
-    contain. That is counted as a failure, named in the failure list so the
-    run exits non-zero, and the next case still runs."""
+    """The fan-in still raises on a fault no agent can produce — a catalogued
+    ground the service built wrongly. That is counted as a failure, named in
+    the failure list so the run exits non-zero, and the next case still runs."""
     run = sweep(monkeypatch, case, DEAD)
 
     assert [f.kind for f in run.grounds_failures] == ["other"]

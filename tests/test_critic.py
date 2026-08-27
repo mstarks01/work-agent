@@ -72,24 +72,38 @@ class TestJoinDrafts:
     def test_empty_analysis_is_legal(self, model):
         assert join_drafts({}, STRIDE, model).drafts == []
 
-    def test_unresolvable_element_reference_fails_closed(self, model):
+    def test_a_claim_naming_only_absent_elements_is_dropped_and_marked(self, model):
+        """A finding about nothing is not a finding. It costs the claim, never
+        the job, and the mark names what was cited."""
         drafts = {
             "spoofing": [sample_draft(affected_element_ids=["process:does-not-exist"])]
         }
-        with pytest.raises(DraftJoinError, match="not in the system model"):
-            join_drafts(drafts, STRIDE, model)
 
-    def test_every_bad_reference_is_reported_at_once(self, model):
+        joined = join_drafts(drafts, STRIDE, model)
+
+        assert joined.drafts == []
+        (mark,) = joined.marks.dropped_claims
+        assert mark.claim_id == "S-01"
+        assert "process:does-not-exist" in mark.reason
+        assert joined.marks.unresolved_references == []
+
+    def test_an_absent_element_beside_a_real_one_costs_only_itself(self, model):
+        """The rule every other citation has: the reference is dropped and
+        marked, and the claim stands on the elements that resolved."""
         drafts = {
-            "spoofing": [sample_draft("S-01", affected_element_ids=["process:ghost"])],
-            "tampering": [
-                sample_draft("T-01", "tampering", affected_element_ids=["store:ghost"])
-            ],
+            "spoofing": [
+                sample_draft(affected_element_ids=["process:web-app", "process:ghost"])
+            ]
         }
-        with pytest.raises(DraftJoinError) as excinfo:
-            join_drafts(drafts, STRIDE, model)
-        assert "process:ghost" in str(excinfo.value)
-        assert "store:ghost" in str(excinfo.value)
+
+        joined = join_drafts(drafts, STRIDE, model)
+
+        (draft,) = joined.drafts
+        assert draft.affected_element_ids == ["process:web-app"]
+        assert [
+            (m.claim_id, m.element_id) for m in joined.marks.unresolved_references
+        ] == [("S-01", "process:ghost")]
+        assert joined.marks.dropped_claims == []
 
     def test_a_respelled_element_reference_resolves_and_is_canonicalized(self, model):
         """The fold runs before the check, and the report carries the job's ID."""
@@ -97,10 +111,22 @@ class TestJoinDrafts:
         [joined] = join_drafts(drafts, STRIDE, model).drafts
         assert joined.affected_element_ids == ["process:web-app"]
 
-    def test_duplicate_threat_ids_fail_closed(self, model):
-        drafts = {"spoofing": [sample_draft("S-01"), sample_draft("S-01")]}
-        with pytest.raises(DraftJoinError, match="used by 2 drafts"):
-            join_drafts(drafts, STRIDE, model)
+    def test_a_duplicate_id_keeps_the_first_draft_and_drops_the_rest(self, model):
+        """Deterministic: the lane order is the package's own, so the same
+        draft survives on every run."""
+        drafts = {
+            "spoofing": [
+                sample_draft("S-01", title="first"),
+                sample_draft("S-01", title="second"),
+            ]
+        }
+
+        joined = join_drafts(drafts, STRIDE, model)
+
+        assert [draft.title for draft in joined.drafts] == ["first"]
+        (mark,) = joined.marks.dropped_claims
+        assert (mark.claim_id, mark.title) == ("S-01", "second")
+        assert "repeats the ID" in mark.reason
 
     def test_a_lane_and_its_drafts_cannot_disagree_about_the_category(self, model):
         """There is nothing left here to check, and that is the point.
@@ -128,12 +154,20 @@ class TestGroundReferences:
     def grounded(self, *grounds, threat_id="S-01"):
         return {"spoofing": [sample_draft(threat_id, grounds=list(grounds))]}
 
-    def test_a_quote_naming_a_source_the_job_never_carried(self, model):
+    def test_a_quote_naming_a_source_the_job_never_carried_is_unverified(self, model):
+        """The label is the agent's, so a label naming nothing is a quote that
+        cannot be found — marked, and groundless if it stood alone."""
         drafts = self.grounded(
-            Ground(kind="quote", text="anything", source_label="Never submitted")
+            Ground(kind="quote", text="anything", source_label="Never submitted"),
+            Ground(kind="derived-fact", flow_id=CROSSING),
         )
-        with pytest.raises(DraftJoinError, match="not one of this job's sources"):
-            join_drafts(drafts, STRIDE, model, SOURCES)
+
+        joined = join_drafts(drafts, STRIDE, model, SOURCES)
+
+        (mark,) = joined.marks.unverified_grounds
+        assert "not one of this job's sources" in mark.reason
+        assert "Never submitted" in mark.reason
+        assert len(joined.drafts) == 1
 
     def test_an_unknown_attribute_on_an_element_that_does_not_exist(self, model):
         drafts = self.grounded(
@@ -475,7 +509,7 @@ class TestQuoteVerification:
         assert mark.written == "Customers log in to the web app which stores orders"
         assert 0.9 <= mark.similarity <= 1.0
         assert joined.marks.unverified_grounds == []
-        assert joined.marks.groundless_claims == []
+        assert joined.marks.dropped_claims == []
 
     def test_a_claim_whose_every_ground_fails_is_dropped_and_marked(self, model):
         """The claim, not the job: one misquote on a claim that carries nothing
@@ -489,22 +523,25 @@ class TestQuoteVerification:
         joined = join_drafts(drafts, STRIDE, model, SOURCES)
 
         assert [draft.id for draft in joined.drafts] == ["T-01"]
-        (mark,) = joined.marks.groundless_claims
+        (mark,) = joined.marks.dropped_claims
         assert mark.claim_id == "S-01"
         assert mark.title == drafts["spoofing"][0].title
         assert "a sentence the submitter never wrote" in mark.reason
         assert LABEL in mark.reason
         assert joined.marks.unverified_grounds == []
 
-    def test_an_unresolvable_label_still_fails_the_join(self, model):
+    def test_an_unresolvable_label_on_a_lone_quote_drops_the_claim(self, model):
         """A draft citing a source that does not exist and a draft quoting one
-        that does wrongly are different faults: only the second is evidence
-        about fabricated spans, and only the first is a shape error."""
+        that does wrongly are different faults, and the mark's reason tells
+        them apart — but both leave the claim with nothing that verifies."""
         drafts = self.quoting("log in to the web app")
         drafts["spoofing"][0].grounds[0].source_label = "no-such-source"
 
-        with pytest.raises(DraftJoinError, match="no-such-source"):
-            join_drafts(drafts, STRIDE, model, SOURCES)
+        joined = join_drafts(drafts, STRIDE, model, SOURCES)
+
+        assert joined.drafts == []
+        (mark,) = joined.marks.dropped_claims
+        assert "no-such-source" in mark.reason
 
     def test_the_text_check_does_not_run_without_sources(self, model):
         joined = join_drafts(self.quoting("never written anywhere"), STRIDE, model)

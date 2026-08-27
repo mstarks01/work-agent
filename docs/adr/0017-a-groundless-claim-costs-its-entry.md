@@ -6,6 +6,8 @@
   one whole-job failure on the grounding path, and
   [ADR 0002](0002-finding-level-attribution.md), which set it.
 - **Relates to**: [ADR 0004](0004-evidence-references.md).
+- **Amended by**: [ADR 0019](0019-one-entry-never-costs-the-job.md), which
+  renames the mark `DroppedClaim` and gives it every remaining reason.
 
 ## Context
 
@@ -31,7 +33,7 @@ quote, and nothing persists a draft, so the next failure was a guess.
 ## Decision
 
 **A claim that loses every ground is dropped and marked.** Both producers write
-the same mark, `GroundlessClaim`: evidence resolution, for a claim whose every
+the same mark, `DroppedClaim`: evidence resolution, for a claim whose every
 reference is outside the catalog, and the quote check at the fan-in, for a claim
 whose every quote is absent from the source it names. The mark carries the
 claim ID, the title, and a `reason` that repeats the lost quotes or the cited
@@ -47,7 +49,7 @@ a dangling element reference, a duplicate ID and an unresolvable source label,
 which are shape errors and not citation errors.
 
 **The eval sweep counts the drop.** `fail-closed` and `unresolved-evidence`
-were failure kinds read off the exceptions. They are now a `groundless_rate`
+were failure kinds read off the exceptions. They are now a `dropped_rate`
 read off the report's marks, denominated in drafts plus drops.
 
 ## Consequences

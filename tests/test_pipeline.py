@@ -335,7 +335,7 @@ def test_a_threat_no_ground_supports_is_dropped_and_the_report_says_so():
 
     assert isinstance(outcome, PipelineCompleted)
     assert block(outcome.report).claims == []
-    (mark,) = block(outcome.report).groundless_claims
+    (mark,) = block(outcome.report).dropped_claims
     assert mark.claim_id == "S-01"
     assert "we never got round to MFA" in mark.reason
 
@@ -483,16 +483,21 @@ def test_a_model_that_fails_twice_is_rejected_with_its_issues():
     assert not set(ANALYZE_NODES) & set(visited)
 
 
-def test_a_hallucinated_element_reference_fails_the_job_loudly():
-    """The merge seam refuses drafts the System Model cannot account for."""
+def test_a_hallucinated_element_reference_costs_the_claim_not_the_job():
+    """The merge seam drops a draft the System Model cannot account for, and
+    the report says which and why."""
     replies = happy_replies()
     replies[graph.analyze_node_name("stride", "spoofing")] = claims_json(
         sample_proposal("S-01", affected_element_ids=["process:invented"])
     )
+    replies[CRITIC] = claims_json()
     pipeline, _ = build(replies)
 
-    with pytest.raises(Exception, match="process:invented"):
-        run(pipeline, job())
+    outcome, _ = run(pipeline, job())
+
+    assert isinstance(outcome, PipelineCompleted)
+    (mark,) = block(outcome.report).dropped_claims
+    assert "process:invented" in mark.reason
 
 
 def test_a_malformed_critic_output_is_re_asked_once_and_then_assembled():

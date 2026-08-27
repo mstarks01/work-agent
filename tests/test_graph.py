@@ -20,7 +20,7 @@ from google.adk.workflow import FunctionNode, JoinNode
 
 from stride_service import graph
 from stride_service.binding import NodeBinding
-from stride_service.critic import CriticOutputError, DraftJoinError
+from stride_service.critic import CriticOutputError
 from stride_service.frameworks import PreconditionError, package_for
 from stride_service.frameworks.stride import STRIDE
 from stride_service.frameworks.stride.record import (
@@ -1073,11 +1073,32 @@ def test_merge_fails_closed_when_a_category_agent_emitted_nothing():
     assert "max_output_tokens" in message
 
 
-def test_merge_fails_closed_on_a_hallucinated_element():
+def test_merge_drops_and_marks_a_claim_about_a_hallucinated_element():
     proposal = sample_proposal("S-01", affected_element_ids=["process:invented"])
     ctx = FakeContext(**analyze_state(spoofing=[proposal]))
-    with pytest.raises(DraftJoinError, match="process:invented"):
-        graph.merge_drafts(valid_model().model_dump(mode="json"), ctx, KEYS, NODES)
+
+    output = graph.merge_drafts(valid_model().model_dump(mode="json"), ctx, KEYS, NODES)
+
+    assert output["draft_count"] == 0
+    marks = ctx.state[NODES.key("marks")]
+    assert "process:invented" in marks["dropped_claims"][0]["reason"]
+
+
+def test_merge_drops_and_marks_a_proposal_that_fails_its_schema():
+    """The node's own schema salvages: a verb outside the closed set costs
+    that proposal, and the mark names the claim the agent meant."""
+    state = analyze_state(spoofing=[sample_proposal("S-01"), sample_proposal("S-02")])
+    state[graph.Lane("stride", "spoofing").drafts_key]["claims"][0]["verb"] = (
+        "not-a-verb"
+    )
+    ctx = FakeContext(**state)
+
+    output = graph.merge_drafts(valid_model().model_dump(mode="json"), ctx, KEYS, NODES)
+
+    assert output["draft_count"] == 1
+    (mark,) = ctx.state[NODES.key("marks")]["dropped_claims"]
+    assert mark["claim_id"] == "S-01"
+    assert "verb" in mark["reason"]
 
 
 def test_router_accepts_well_formed_critic_output():

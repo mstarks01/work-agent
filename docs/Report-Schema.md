@@ -81,7 +81,7 @@ class FrameworkAnalysis:
     unresolved_mentions: list[UnresolvedMention]
     unresolved_evidence: list[UnresolvedEvidence]
     unknown_claim_identities: list[UnknownClaimIdentity]
-    groundless_claims: list[GroundlessClaim]
+    dropped_claims: list[DroppedClaim]
     fired_rules: list[str]  # this package's deterministic rules that matched
     knowledge_docs: list[str]  # local-corpus documents those rules retrieved
     summary: BlockSummary
@@ -340,7 +340,7 @@ class UnverifiedGround:
 A quote that could not be found is **marked, not removed**: the entry still
 renders, and `unverified_grounds` points at it by claim and index. A claim
 where *nothing* verified is dropped and recorded in
-[`groundless_claims`](#groundless_claims--claims-that-lost-every-ground)
+[`dropped_claims`](#dropped_claims--claims-the-service-dropped-for-a-fault-in-one-entry)
 instead. So an entry in this list means "one citation on an otherwise justified
 finding did not match", which is worth showing a reader and is not grounds for
 hiding the finding. The list is also empty when no source text was available to
@@ -365,7 +365,7 @@ is the only trace.
 **Marked per reference, dropped per claim.** A threat citing three facts, one
 of them composed, is still justified by the two that resolve. A threat whose
 evidence resolves to *nothing at all* has no justification left and is dropped
-into [`groundless_claims`](#groundless_claims--claims-that-lost-every-ground),
+into [`dropped_claims`](#dropped_claims--claims-the-service-dropped-for-a-fault-in-one-entry),
 because `grounds` is `min_length=1` and a finding resting on nothing is what
 this schema refuses to represent. A dropped claim gets no entry here: this list
 names a claim the block carries, and the groundless mark names the references
@@ -402,30 +402,48 @@ is a replacement that says something different from what the claim rests on.
 The critic reads the replaced span, and the mark shows the difference to a
 reader. See [ADR 0018](adr/0018-the-repair-rung.md).
 
-## `groundless_claims` — claims that lost every ground
+## `dropped_claims` — claims the service dropped for a fault in one entry
 
 ```python
-class GroundlessClaim:
+class DroppedClaim:
     claim_id: str  # the claim the service dropped
     title: str  # what the agent called the finding
-    reason: str  # what was lost: the quotes not found, or the references not held
+    reason: str  # which fault, in the agent's own words
 ```
 
-A claim the service dropped because nothing it cited held: every quote was
-absent from the source it names, or every reference was outside the catalog.
-`grounds` is `min_length=1`, so such a claim cannot be represented and no critic
-could rule on it. Like `unknown_claim_identities`, the `claim_id` is deliberately
-absent from `claims` and `rejected_claims`, and `title` is the only trace of what
-was found.
+One list for every reason a claim is dropped. `reason` says which, bounded to
+500 characters, and repeats what was wrong — the quote not found, the references
+not held, the element IDs not in the model, the schema error — because nothing
+else persists a draft:
 
-`reason` repeats the lost quote or the cited references, bounded to 500
-characters. Nothing else persists a draft, so without it a reader cannot tell a
-cosmetic mismatch from a fabricated span.
+- the proposal failed its own schema: a verb outside the closed set, a severity
+  value the enum does not hold, neither a reference nor a quote;
+- every reference it cited is outside the catalog;
+- its only grounds are quotes the source it names does not contain, or names a
+  source the job does not carry;
+- every element it named in `affected_element_ids` is absent from the model;
+- its ID repeats an earlier draft's in the same framework.
 
-This replaced the last whole-job failure on the grounding path. A claim in a
-framework whose catalog rarely holds the fact a requirement turns on carries one
-quote and nothing else, so one misquote there cost every lane's work. See
-[ADR 0017](adr/0017-a-groundless-claim-costs-its-entry.md).
+Like `unknown_claim_identities`, the `claim_id` is deliberately absent from
+`claims` and `rejected_claims`, and `title` is the only trace of what was found.
+A proposal whose ID key was unreadable is keyed `<framework>:<lane>:proposal-<n>`.
+
+Each of these used to fail the whole job. See
+[ADR 0017](adr/0017-a-groundless-claim-costs-its-entry.md) and
+[ADR 0019](adr/0019-one-entry-never-costs-the-job.md).
+
+## `unresolved_references` — element IDs a claim named that do not exist
+
+```python
+class UnresolvedReference:
+    claim_id: str  # the claim that named it
+    element_id: str  # the ID as written, e.g. "process:web-api"
+```
+
+The structural twin of `unresolved_mentions`: an ID in `affected_element_ids`
+rather than in prose. The reference is dropped from the claim and recorded here,
+and the claim stands on the elements that resolved. A claim that named elements
+and lost every one is in `dropped_claims` instead.
 
 ## `unresolved_mentions` — IDs the prose cites that do not exist
 
@@ -440,11 +458,11 @@ class UnresolvedMention:
     mention: str  # the ID as written, e.g. "process:web-api"
 ```
 
-A structural reference that does not resolve **fails the job** — it is the
-threat's claim about what it acts on, and a claim about a missing element is
-not a finding. The same ID written into the argument is **marked** instead, for
-the reason an unfindable quote is: merge has no re-ask path, and a whole report
-is too much to trade for a mistyped ID in a sentence.
+A structural reference that does not resolve is dropped from the claim and
+recorded in `unresolved_references`; a claim left naming nothing is dropped. The
+same ID written into the argument is **marked** here, for the reason an
+unfindable quote is: merge has no re-ask path, and a whole report is too much to
+trade for a mistyped ID in a sentence.
 
 The mark is worth more than typo-catching. The analyze prompt is built around a
 single worked exemplar system and spends a section telling the agent never to
@@ -814,11 +832,13 @@ class TokenUsage:
 >   `elements_analyzed` left on the envelope.
 > - The `StrideReport` type is now `Report`, and `analyses` is an ordered list
 >   rather than a map.
-> - Each block carries `unknown_claim_identities` and `groundless_claims`, two
+> - Each block carries `unknown_claim_identities` and `dropped_claims`, two
 >   further lists of service-owned marks. Each records a claim the service
 >   *dropped*, so unlike the marks before them their `claim_id` names no claim
->   in the block. What moved beside `groundless_claims` is a behaviour: a claim
->   that lost every ground used to fail the job.
+>   in the block. What moved beside `dropped_claims` is a behaviour: a claim
+>   that lost every ground, every element, its ID to an earlier draft, or its
+>   own schema used to fail the job. `unresolved_references` records an
+>   element ID dropped from `affected_element_ids`.
 > - Each block carries `repaired_quotes`. A quote ground's `text` is no longer
 >   always what the agent wrote: where the ladder refused it and the source
 >   held a near span, the text is that span and this list carries the agent's.
