@@ -1755,8 +1755,18 @@ def _framework_block(
     """
     schemas = nodes.schemas
     package = nodes.package
-    drafts = _drafts_of(state.get(nodes.key("drafts")), package)
-    rulings = _rulings_of(_claims_of(state.get(nodes.key("reviewed"))), schemas)
+    # An earlier trigger of ``assemble`` (see :func:`assemble_report`) can
+    # arrive after this framework's ``merge`` parked its drafts and before its
+    # critic wrote a ruling: the framework has not finished, and reading its
+    # drafts against no rulings would fail the whole job as a critic that
+    # dropped every draft. An unwritten ``reviewed`` key therefore reads the
+    # drafts as unwritten too; a critic that truly emitted nothing is caught
+    # on its own router, which routes to ``critic_failed`` and raises there.
+    reviewed = state.get(nodes.key("reviewed"))
+    drafts = _drafts_of(
+        state.get(nodes.key("drafts")) if reviewed is not None else None, package
+    )
+    rulings = _rulings_of(_claims_of(reviewed), schemas)
     claims, rejected = assemble_claims(drafts, rulings, model, schemas)
     marks = AnalysisMarks.model_validate(state.get(nodes.key("marks")) or {})
     retrieved = state.get(nodes.key("retrieved")) or {}

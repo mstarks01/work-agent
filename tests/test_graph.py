@@ -1816,6 +1816,35 @@ def test_assemble_runs_once_per_framework_and_the_last_run_is_the_whole_report(
     assert [claim.id for claim in final.analyses[1].claims] == ["S-01"]
 
 
+def test_an_early_assemble_run_skips_a_framework_whose_critic_has_not_ruled(
+    domain_loader,
+):
+    """The earlier trigger can land between a framework's ``merge`` and its critic.
+
+    Its drafts are parked and its ``reviewed`` key is not written yet. Reading
+    the two together would raise ``CriticOutputError`` for every draft and fail
+    a job whose critic was still running. The unfinished framework reads as
+    unfinished, and the later run builds its block.
+    """
+    model = valid_model().model_dump(mode="json")
+    ctx = FakeContext(**ASVS_OPTIONS)
+    graph.prepare_analysis(
+        model, ctx, BOTH_KEYS, BOTH, domain_loader, repo_package_loaders(BOTH)
+    )
+    _park(ctx, [sample_draft("S-01").model_dump(mode="json")], None)
+
+    graph.assemble_report(model, ctx, BOTH_KEYS, BOTH, BOTH_DISCLAIMERS)
+    early = graph.Analysis.from_state(ctx.state[graph.STATE_ANALYSIS])
+    assert early.analyses[1].claims == []
+
+    ctx.state[NODES.key("reviewed")] = {
+        "claims": [sample_ruling("S-01").model_dump(mode="json")]
+    }
+    graph.assemble_report(model, ctx, BOTH_KEYS, BOTH, BOTH_DISCLAIMERS)
+    final = graph.Analysis.from_state(ctx.state[graph.STATE_ANALYSIS])
+    assert [claim.id for claim in final.analyses[1].claims] == ["S-01"]
+
+
 def test_prepare_refuses_a_selection_whose_options_are_missing(domain_loader):
     """Refused before the lane agents run, not after.
 
