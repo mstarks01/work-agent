@@ -194,6 +194,34 @@ class TestAssembleAndVerify:
         assert [entry["submitted_by"] for entry in manifest["sweeps"]] == ["ada", "sam"]
         assert verify(first, root=tmp_path) == []
 
+    def test_re_assembling_one_sweep_replaces_it_rather_than_adding_it(
+        self, tmp_path, priced
+    ):
+        """A sweep is keyed by its own bytes, so the same file is one sweep.
+
+        Re-running ``submit baseline`` over an artifact already laid down used
+        to append a second entry that every check passed: the digests and the
+        cost recompute per entry, so a duplicate agrees with itself.
+        """
+        source = write_sweep(tmp_path, payload())
+        assemble(tmp_path, "ada", [source])
+        directory = assemble(tmp_path, "ada", [source])
+
+        manifest = json.loads((directory / "baseline.json").read_text("utf-8"))
+        assert len(manifest["sweeps"]) == 1
+        assert verify(directory, root=tmp_path) == []
+
+    def test_a_manifest_naming_one_sweep_twice_is_refused(self, tmp_path, priced):
+        """The writer keys them; the verifier still refuses a hand-edited one."""
+        directory = assemble(tmp_path, "ada", [write_sweep(tmp_path, payload())])
+        path = directory / "baseline.json"
+        manifest = json.loads(path.read_text("utf-8"))
+        manifest["sweeps"] = manifest["sweeps"] * 2
+        path.write_text(json.dumps(manifest, indent=2), encoding="utf-8")
+
+        problems = verify(directory, root=tmp_path)
+        assert any("more than one sweep entry" in problem for problem in problems)
+
     def test_a_renamed_directory_is_refused(self, tmp_path, priced):
         directory = assemble(tmp_path, "ada", [write_sweep(tmp_path, payload())])
         renamed = directory.with_name("7c3a007-hand-typed-00000000")

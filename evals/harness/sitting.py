@@ -21,9 +21,9 @@ whole path is free.
 
 from __future__ import annotations
 
+import ast
 import hashlib
 import json
-import re
 from dataclasses import dataclass
 from datetime import UTC, datetime
 from pathlib import Path
@@ -172,36 +172,73 @@ def record(
     return entry
 
 
+def _debt_entries(source: str) -> list[tuple[str, int, int]]:
+    """Each ``UNREVIEWED`` entry as ``(case id, first line, last line)``.
+
+    Read through :mod:`ast` rather than by matching text, because the debt
+    prose is arbitrary English: counting brackets to find where an entry ends
+    works only while no reason writes one, and the reasons cite issues. The
+    parser knows where every entry starts, so an entry runs to the line before
+    the next one — which is what carries the trailing comma, the closing
+    parenthesis and any comment with it, whatever shape they were written in.
+
+    Line numbers are 0-based and the end is exclusive, ready to slice.
+    """
+    tree = ast.parse(source)
+    table = next(
+        (
+            node.value
+            for node in ast.walk(tree)
+            if isinstance(node, ast.AnnAssign | ast.Assign)
+            and isinstance(node.value, ast.Dict)
+            and any(
+                isinstance(target, ast.Name) and target.id == "UNREVIEWED"
+                for target in (
+                    [node.target] if isinstance(node, ast.AnnAssign) else node.targets
+                )
+            )
+        ),
+        None,
+    )
+    if not isinstance(table, ast.Dict):
+        raise SittingError(f"{DEBT_FILE}: no UNREVIEWED table to read")
+
+    starts = [
+        (key.value, key.lineno - 1)
+        for key in table.keys
+        if isinstance(key, ast.Constant) and isinstance(key.value, str)
+    ]
+    if len(starts) != len(table.keys):
+        raise SittingError(f"{DEBT_FILE}: UNREVIEWED holds a key that is not a string")
+    # The closing brace bounds the last entry; every other one ends where the
+    # next begins. `end_lineno` on the value would stop before the `),`.
+    bounds = [line for _, line in starts[1:]] + [(table.end_lineno or 0) - 1]
+    return [
+        (case, start, end) for (case, start), end in zip(starts, bounds, strict=True)
+    ]
+
+
 def clear_debt(root: Path, case_id: str) -> bool:
     """Remove this case's entry from ``UNREVIEWED``. Returns whether it wrote.
 
     The list names the cases nobody has read, so it is only accurate while a
-    case that gets read comes off it. Entries are written in two shapes — a
-    bare string and a parenthesised concatenation — so the end of one is found
-    by counting brackets rather than by matching either shape.
+    case that gets read comes off it.
     """
     path = root / DEBT_FILE
-    lines = path.read_text(encoding="utf-8").splitlines(keepends=True)
-    start = next(
-        (i for i, line in enumerate(lines) if line.startswith(f'    "{case_id}":')),
+    source = path.read_text(encoding="utf-8")
+    span = next(
+        ((start, end) for case, start, end in _debt_entries(source) if case == case_id),
         None,
     )
-    if start is None:
+    if span is None:
         return False
-    depth = 0
-    for end in range(start, len(lines)):
-        depth += lines[end].count("(") - lines[end].count(")")
-        if depth == 0 and lines[end].rstrip().endswith(","):
-            path.write_text("".join(lines[:start] + lines[end + 1 :]), encoding="utf-8")
-            return True
-    raise SittingError(
-        f"{DEBT_FILE}: {case_id}'s UNREVIEWED entry does not close; delete it by hand"
-    )
+    start, end = span
+    lines = source.splitlines(keepends=True)
+    path.write_text("".join(lines[:start] + lines[end:]), encoding="utf-8")
+    return True
 
 
 def cases_in_debt(root: Path) -> list[str]:
     """Every case the debt list still names, in file order."""
-    path = root / DEBT_FILE
-    return re.findall(
-        r'^    "([^"]+)":', path.read_text(encoding="utf-8"), re.MULTILINE
-    )
+    source = (root / DEBT_FILE).read_text(encoding="utf-8")
+    return [case for case, _, _ in _debt_entries(source)]

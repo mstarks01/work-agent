@@ -32,9 +32,11 @@ import hashlib
 import json
 import subprocess
 import tomllib
-from collections.abc import Callable, Sequence
+from collections.abc import Callable, Iterator, Sequence
+from contextlib import contextmanager
 from dataclasses import dataclass
 from datetime import UTC, datetime
+from functools import partial
 from pathlib import Path
 from tempfile import TemporaryDirectory
 from typing import Any
@@ -54,6 +56,10 @@ BASE_REF = "origin/main"
 #: How much a standing may claim for its own author: nothing above what the
 #: base ref already grants. Promotion exists — as a maintainer's edit (#326).
 _RANK = {"contributor": 0, "maintainer": 1}
+
+#: The roster, which every kind may carry so a first-timer registers in the
+#: same PR as their first submission.
+ROSTER_FILE = "evals/review/voters.toml"
 
 
 class SubmitError(RuntimeError):
@@ -88,8 +94,18 @@ class Kind:
     closing: Callable[[Path, str], str]
     #: The path prefix that identifies this kind in a diff. What
     #: :func:`detect_kind` reads, so CI recognises a submission by the same
-    #: table the CLI offers rather than by a second list somebody maintains.
+    #: table the CLI offers rather than by a second list somebody maintains —
+    #: and what the shared scope checks read, so the prefix is spelled once
+    #: for the whole module.
     prefix: str = ""
+    #: What one submission of this kind is called, in a checklist sentence.
+    #: Beside the prefix because the checks that read one read the other.
+    noun: str = ""
+    #: What one directory under :attr:`prefix` holds. Separate from ``noun``
+    #: because the two answer different questions: a stray file is not part of
+    #: a *baseline submission*, and the directory it strayed from holds a
+    #: *Baseline*. One word doing both jobs reads wrong at one of them.
+    subject: str = ""
     prepare: Callable[[Path, str, argparse.Namespace], None] | None = None
 
 
@@ -112,18 +128,51 @@ def gh_login(root: Path) -> str:
     return _run(["gh", "api", "user", "--jq", ".login"], root).strip()
 
 
+#: The delta, held for the length of one checklist pass. A key present means
+#: a pass is open for that root; its value is the delta once something has
+#: read it. Empty outside a pass, so no read here can answer from a tree that
+#: has since moved.
+_DELTA: dict[Path, list[str] | None] = {}
+
+
+@contextmanager
+def _delta_cache(root: Path) -> Iterator[None]:
+    """Read the working-tree delta once for one pass of the checks.
+
+    A checklist runs six or seven checks and most of them read the delta, so
+    an uncached pass spends a dozen ``git`` subprocesses answering the same
+    question. The cache is **scoped rather than global** on purpose: this
+    module writes to the tree before the checks run — ``_register`` adds a
+    roster line and the baseline kind assembles a whole directory — and a
+    memo that outlived those writes would let a check pass against a tree
+    that no longer exists. Entering after the writes and leaving before the
+    branch is packaged is what makes that unspellable.
+    """
+    _DELTA[root] = None
+    try:
+        yield
+    finally:
+        _DELTA.pop(root, None)
+
+
 def _changed_paths(root: Path) -> list[str]:
     """Everything different from BASE_REF, tracked or not, repo-relative.
 
     The caller fetched once already; fetching here would make every check
     that reads the delta pay a network round trip.
     """
+    cached = _DELTA.get(root)
+    if cached is not None:
+        return cached
     tracked = _run(["git", "diff", "--name-only", BASE_REF], root).splitlines()
     porcelain = _run(
         ["git", "status", "--porcelain", "--untracked-files=all"], root
     ).splitlines()
     untracked = [line[3:] for line in porcelain if line.startswith("?? ")]
-    return sorted(set(tracked) | set(untracked))
+    delta = sorted(set(tracked) | set(untracked))
+    if root in _DELTA:
+        _DELTA[root] = delta
+    return delta
 
 
 def _base_text(root: Path, rel: str) -> str | None:
@@ -138,7 +187,7 @@ def _base_text(root: Path, rel: str) -> str | None:
 
 
 def _vote_allowlist(root: Path, author: str) -> list[str]:
-    return [f"evals/review/votes/{author}.jsonl", "evals/review/voters.toml"]
+    return [f"{KINDS['vote'].prefix}{author}.jsonl", ROSTER_FILE]
 
 
 def _vote_rows(root: Path, author: str) -> list[ledger.Vote]:
@@ -160,6 +209,70 @@ def _check(name: str, problems: list[str]) -> Check:
     return Check(name=name, problems=tuple(problems))
 
 
+# --- the checks every kind shares --------------------------------------------
+#
+# Each of these reads its kind out of :data:`KINDS` and is bound to one by
+# ``partial`` in that kind's preflight. Written once because the three kinds
+# differed only in a path prefix and a noun, and both of those already live on
+# the :class:`Kind` — which is what ``CLAUDE.md`` means by keying machinery
+# that grows an entry per anything. A fourth kind adds a table row and no
+# check.
+
+
+def _one_subdir(root: Path, prefix: str) -> str | None:
+    """The one directory under ``prefix`` this submission touches, or None.
+
+    ``None`` covers both "no directory" and "more than one", because a
+    submission carries exactly one and either miss is the same refusal.
+    """
+    names = {
+        rest.split("/")[0]
+        for rel in _changed_paths(root)
+        if rel.startswith(prefix) and "/" in (rest := rel[len(prefix) :])
+    }
+    return names.pop() if len(names) == 1 else None
+
+
+def _check_one_directory(root: Path, author: str, kind_name: str) -> Check:
+    kind = KINDS[kind_name]
+    return _check(
+        f"the change is one {kind.subject} directory",
+        []
+        if _one_subdir(root, kind.prefix)
+        else [
+            (
+                f"a {kind_name} PR touches exactly one {kind.subject} directory"
+                f" under {kind.prefix}"
+            )
+        ],
+    )
+
+
+def _check_scope(root: Path, author: str, kind_name: str) -> Check:
+    """Nothing outside the kind's allowlist changed — a dirty tree included.
+
+    The delta covers untracked files too, so a scratch file anywhere in the
+    checkout fails this rather than riding into the pull request.
+    """
+    kind = KINDS[kind_name]
+    allowed = set(kind.allowlist(root, author))
+    strays = [rel for rel in _changed_paths(root) if rel not in allowed]
+    return _check(
+        "nothing outside this kind's allowlist changed",
+        [f"{rel} is changed but not part of a {kind.noun}" for rel in strays],
+    )
+
+
+def _standing_of(root: Path, author: str) -> str:
+    """The author's standing, for the sentence each kind closes its PR with."""
+    return roster.load(root / ROSTER_FILE).standing_of(author)
+
+
+#: The one sentence every kind's PR body opens with. Spelled once because it
+#: is a fact about how this repository merges, not about any one kind.
+REVIEW_SENTENCE = "A maintainer reviews every line before this merges."
+
+
 def _check_ledger_loads(root: Path, author: str) -> Check:
     problems = []
     try:
@@ -172,7 +285,7 @@ def _check_ledger_loads(root: Path, author: str) -> Check:
 def _check_roster_covers(root: Path, author: str) -> Check:
     problems = []
     try:
-        table = roster.load(root / "evals" / "review" / "voters.toml")
+        table = roster.load(root / ROSTER_FILE)
         votes = ledger.load(root / "evals" / "review" / "votes")
         problems += [
             f"{voter!r} has no roster line"
@@ -182,20 +295,11 @@ def _check_roster_covers(root: Path, author: str) -> Check:
         if author not in table:
             problems.append(
                 f"{author!r} has no roster line; add yourself to"
-                ' evals/review/voters.toml with standing "contributor"'
+                f' {ROSTER_FILE} with standing "contributor"'
             )
     except roster.RosterError as exc:
         problems.append(str(exc))
     return _check("every voter has a roster line, including you", problems)
-
-
-def _check_only_the_allowlist_changed(root: Path, author: str) -> Check:
-    allowed = set(_vote_allowlist(root, author))
-    strays = [rel for rel in _changed_paths(root) if rel not in allowed]
-    return _check(
-        "nothing outside this kind's allowlist changed",
-        [f"{rel} is changed but not part of a vote submission" for rel in strays],
-    )
 
 
 def _check_the_delta_is_yours(root: Path, author: str) -> Check:
@@ -232,8 +336,8 @@ def _check_your_file_appends(root: Path, author: str) -> Check:
 def _check_no_self_raise(root: Path, author: str) -> Check:
     """#320's one dangerous edit: nobody raises their own standing."""
     problems = []
-    base_raw = _base_text(root, "evals/review/voters.toml")
-    live = root / "evals" / "review" / "voters.toml"
+    base_raw = _base_text(root, ROSTER_FILE)
+    live = root / ROSTER_FILE
     try:
         now = roster.load(live).standing_of(author) if live.exists() else None
         was = None
@@ -263,7 +367,7 @@ def _vote_preflight(root: Path, author: str) -> list[Check]:
         for check in (
             _check_ledger_loads,
             _check_roster_covers,
-            _check_only_the_allowlist_changed,
+            partial(_check_scope, kind_name="vote"),
             _check_the_delta_is_yours,
             _check_your_file_appends,
             _check_no_self_raise,
@@ -278,13 +382,10 @@ def _vote_title(root: Path, author: str) -> str:
 
 
 def _vote_closing(root: Path, author: str) -> str:
-    standing = roster.load(root / "evals" / "review" / "voters.toml").standing_of(
-        author
-    )
+    standing = _standing_of(root, author)
     return (
-        "A maintainer reviews every line before this merges. These votes join"
-        f" the {standing} series; every published number states the standings"
-        " it includes."
+        f"{REVIEW_SENTENCE} These votes join the {standing} series; every"
+        " published number states the standings it includes."
     )
 
 
@@ -296,22 +397,18 @@ CASE_REVIEW_TEST = "tests/test_case_review.py"
 
 def _sitting_case(root: Path) -> str | None:
     """The one case this submission touches, or None when it is not one."""
-    cases = {
-        rel.split("/")[2]
-        for rel in _changed_paths(root)
-        if rel.startswith("evals/corpus/") and rel.count("/") >= 3
-    }
-    return cases.pop() if len(cases) == 1 else None
+    return _one_subdir(root, KINDS["sitting"].prefix)
 
 
 def _sitting_allowlist(root: Path, author: str) -> list[str]:
     case = _sitting_case(root)
+    prefix = f"{KINDS['sitting'].prefix}{case}/"
     changed = [
         rel
         for rel in _changed_paths(root)
-        if case is not None and rel.startswith(f"evals/corpus/{case}/")
+        if case is not None and rel.startswith(prefix)
     ]
-    return [*changed, CASE_REVIEW_TEST, "evals/review/voters.toml"]
+    return [*changed, CASE_REVIEW_TEST, ROSTER_FILE]
 
 
 def _new_sittings(root: Path, case: str) -> tuple[list[dict], list[str]]:
@@ -337,23 +434,6 @@ def _new_sittings(root: Path, case: str) -> tuple[list[dict], list[str]]:
     if not new:
         return [], [f"{case}/case.json appends no sitting entry"]
     return new, []
-
-
-def _check_one_case(root: Path, author: str) -> Check:
-    case = _sitting_case(root)
-    return _check(
-        "the change is one case directory",
-        [] if case else ["a sitting PR touches exactly one case under evals/corpus/"],
-    )
-
-
-def _check_sitting_scope(root: Path, author: str) -> Check:
-    allowed = set(_sitting_allowlist(root, author))
-    strays = [rel for rel in _changed_paths(root) if rel not in allowed]
-    return _check(
-        "nothing outside this kind's allowlist changed",
-        [f"{rel} is changed but not part of a sitting" for rel in strays],
-    )
 
 
 def _check_sitting_is_yours(root: Path, author: str) -> Check:
@@ -449,10 +529,10 @@ def _check_sitting_clears_debt(root: Path, author: str) -> Check:
 def _check_author_rostered(root: Path, author: str) -> Check:
     problems = []
     try:
-        if author not in roster.load(root / "evals" / "review" / "voters.toml"):
+        if author not in roster.load(root / ROSTER_FILE):
             problems.append(
                 f"{author!r} has no roster line; add yourself to"
-                ' evals/review/voters.toml with standing "contributor"'
+                f' {ROSTER_FILE} with standing "contributor"'
             )
     except roster.RosterError as exc:
         problems.append(str(exc))
@@ -463,8 +543,8 @@ def _sitting_preflight(root: Path, author: str) -> list[Check]:
     return [
         check(root, author)
         for check in (
-            _check_one_case,
-            _check_sitting_scope,
+            partial(_check_one_directory, kind_name="sitting"),
+            partial(_check_scope, kind_name="sitting"),
             _check_sitting_is_yours,
             _check_sitting_evidence,
             _check_sitting_covers,
@@ -480,14 +560,11 @@ def _sitting_title(root: Path, author: str) -> str:
 
 
 def _sitting_closing(root: Path, author: str) -> str:
-    standing = roster.load(root / "evals" / "review" / "voters.toml").standing_of(
-        author
-    )
+    standing = _standing_of(root, author)
     return (
-        "A maintainer reviews every line before this merges. This sitting"
-        f" clears the case from UNREVIEWED, and standing {standing!r} labels"
-        " the read — the debt means nobody read it, and a labelled read"
-        " answers that."
+        f"{REVIEW_SENTENCE} This sitting clears the case from UNREVIEWED, and"
+        f" standing {standing!r} labels the read — the debt means nobody read"
+        " it, and a labelled read answers that."
     )
 
 
@@ -510,43 +587,21 @@ def _baseline_prepare(root: Path, author: str, args: argparse.Namespace) -> None
 
 def _baseline_dir(root: Path) -> str | None:
     """The one Baseline this submission touches, or None when it is not one."""
-    names = {
-        rel.split("/")[2]
-        for rel in _changed_paths(root)
-        if rel.startswith("evals/baselines/") and rel.count("/") >= 3
-    }
-    return names.pop() if len(names) == 1 else None
+    return _one_subdir(root, KINDS["baseline"].prefix)
 
 
 def _baseline_allowlist(root: Path, author: str) -> list[str]:
     name = _baseline_dir(root)
+    prefix = f"{KINDS['baseline'].prefix}{name}/"
     changed = [
         rel
         for rel in _changed_paths(root)
-        if name is not None and rel.startswith(f"evals/baselines/{name}/")
+        if name is not None and rel.startswith(prefix)
     ]
     # The generated comparison moves whenever a Baseline lands, and
     # ``_baseline_prepare`` has already rebuilt it (#330), so it travels with
     # the submission rather than failing the PR as a stray.
-    return [*changed, "evals/baselines/README.md", "evals/review/voters.toml"]
-
-
-def _check_one_baseline(root: Path, author: str) -> Check:
-    return _check(
-        "the change is one Baseline directory",
-        []
-        if _baseline_dir(root)
-        else ["a baseline PR touches exactly one directory under evals/baselines/"],
-    )
-
-
-def _check_baseline_scope(root: Path, author: str) -> Check:
-    allowed = set(_baseline_allowlist(root, author))
-    strays = [rel for rel in _changed_paths(root) if rel not in allowed]
-    return _check(
-        "nothing outside this kind's allowlist changed",
-        [f"{rel} is changed but not part of a baseline submission" for rel in strays],
-    )
+    return [*changed, "evals/baselines/README.md", ROSTER_FILE]
 
 
 def _check_baseline_verifies(root: Path, author: str) -> Check:
@@ -592,8 +647,8 @@ def _baseline_preflight(root: Path, author: str) -> list[Check]:
     return [
         check(root, author)
         for check in (
-            _check_one_baseline,
-            _check_baseline_scope,
+            partial(_check_one_directory, kind_name="baseline"),
+            partial(_check_scope, kind_name="baseline"),
             _check_baseline_verifies,
             _check_baseline_sweeps_are_yours,
             _check_author_rostered,
@@ -626,9 +681,7 @@ def _baseline_closing(root: Path, author: str) -> str:
     costs = [entry.get("cost", {}) for entry in sweeps]
     total = sum(float(cost.get("actual_usd", 0.0)) for cost in costs)
     unpriced = sorted({model for cost in costs for model in cost.get("unpriced", ())})
-    standing = roster.load(root / "evals" / "review" / "voters.toml").standing_of(
-        author
-    )
+    standing = _standing_of(root, author)
     lines = [
         (
             f"{len(sweeps)} sweep(s) at commit {identity.get('repo_commit', '')[:12]},"
@@ -638,9 +691,8 @@ def _baseline_closing(root: Path, author: str) -> str:
         + (f"; unpriced models: {', '.join(unpriced)}" if unpriced else "")
         + ".",
         (
-            "A maintainer reviews every line before this merges. Standing"
-            f" {standing!r} labels the submission; every published number"
-            " states the standings behind its Baseline."
+            f"{REVIEW_SENTENCE} Standing {standing!r} labels the submission;"
+            " every published number states the standings behind its Baseline."
         ),
     ]
     return "\n".join(lines)
@@ -651,6 +703,7 @@ def _baseline_closing(root: Path, author: str) -> str:
 KINDS: dict[str, Kind] = {
     "vote": Kind(
         prefix="evals/review/votes/",
+        noun="vote submission",
         preflight=_vote_preflight,
         allowlist=_vote_allowlist,
         title=_vote_title,
@@ -658,6 +711,8 @@ KINDS: dict[str, Kind] = {
     ),
     "sitting": Kind(
         prefix="evals/corpus/",
+        noun="sitting",
+        subject="case",
         preflight=_sitting_preflight,
         allowlist=_sitting_allowlist,
         title=_sitting_title,
@@ -665,6 +720,8 @@ KINDS: dict[str, Kind] = {
     ),
     "baseline": Kind(
         prefix="evals/baselines/",
+        noun="baseline submission",
+        subject="Baseline",
         preflight=_baseline_preflight,
         allowlist=_baseline_allowlist,
         title=_baseline_title,
@@ -807,11 +864,12 @@ def command_verify(args: argparse.Namespace) -> int:
         print(f"FAIL  {exc}")
         return 1
 
-    checks = list(KINDS[kind].preflight(root, author)) if kind else []
+    with _delta_cache(root):
+        checks = list(KINDS[kind].preflight(root, author)) if kind else []
     if kind is None:
         # A roster line with no submission behind it still may not raise its
         # own author's standing — the one edit that is dangerous alone.
-        if "evals/review/voters.toml" in _changed_paths(root):
+        if ROSTER_FILE in _changed_paths(root):
             checks = [_check_no_self_raise(root, author)]
         else:
             print("no contribution in this diff; nothing to check")
@@ -844,7 +902,7 @@ def _register(root: Path, author: str) -> bool:
     somebody the roster does not name. Raising a standing stays a
     maintainer's edit, and :func:`_check_no_self_raise` still refuses one.
     """
-    path = root / "evals" / "review" / "voters.toml"
+    path = root / ROSTER_FILE
     if author in roster.load(path):
         return False
     text = path.read_text(encoding="utf-8").rstrip("\n")
@@ -852,7 +910,7 @@ def _register(root: Path, author: str) -> bool:
         f'{text}\n\n[voters.{author}]\nstanding = "contributor"\n', encoding="utf-8"
     )
     print(
-        "added your roster line to evals/review/voters.toml as a contributor."
+        f"added your roster line to {ROSTER_FILE} as a contributor."
         " It rides along with this submission, and a maintainer reviews it"
         " with the rest.\n"
     )
@@ -929,7 +987,10 @@ def submission(
                 author=author, error=f"cannot assemble the submission: {exc}"
             )
 
-    checks = tuple(kind.preflight(root, author))
+    # Opened here, after every write this function makes: the checks read one
+    # snapshot of the tree, and the packaging below reads a fresh one.
+    with _delta_cache(root):
+        checks = tuple(kind.preflight(root, author))
     if not all(check.passed for check in checks) or dry_run:
         return Outcome(author=author, checks=checks)
 
