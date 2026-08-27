@@ -85,6 +85,10 @@ class Kind:
     allowlist: Callable[[Path, str], list[str]]
     title: Callable[[Path, str], str]
     closing: Callable[[Path, str], str]
+    #: The path prefix that identifies this kind in a diff. What
+    #: :func:`detect_kind` reads, so CI recognises a submission by the same
+    #: table the CLI offers rather than by a second list somebody maintains.
+    prefix: str = ""
     prepare: Callable[[Path, str, argparse.Namespace], None] | None = None
 
 
@@ -635,18 +639,21 @@ def _baseline_closing(root: Path, author: str) -> str:
 #: never as a branch in the spine.
 KINDS: dict[str, Kind] = {
     "vote": Kind(
+        prefix="evals/review/votes/",
         preflight=_vote_preflight,
         allowlist=_vote_allowlist,
         title=_vote_title,
         closing=_vote_closing,
     ),
     "sitting": Kind(
+        prefix="evals/corpus/",
         preflight=_sitting_preflight,
         allowlist=_sitting_allowlist,
         title=_sitting_title,
         closing=_sitting_closing,
     ),
     "baseline": Kind(
+        prefix="evals/baselines/",
         preflight=_baseline_preflight,
         allowlist=_baseline_allowlist,
         title=_baseline_title,
@@ -741,6 +748,76 @@ def open_pr(root: Path, kind_name: str, author: str) -> str:
         ],
         root,
     ).strip()
+
+
+# --- the CI side --------------------------------------------------------------
+
+
+def detect_kind(root: Path) -> str | None:
+    """Which kind this diff carries, read off the :data:`KINDS` table.
+
+    ``None`` when the diff touches no kind's tree — an ordinary code PR, or a
+    roster line on its own. Raises when it touches two, because one kind per
+    PR is the rule the forced merge order rests on (#325).
+    """
+    changed = _changed_paths(root)
+    found = sorted(
+        name
+        for name, kind in KINDS.items()
+        if any(rel.startswith(kind.prefix) for rel in changed)
+    )
+    if len(found) > 1:
+        raise SubmitError(
+            f"this PR carries {' and '.join(found)} changes; one kind per PR,"
+            " so split it — and the order matters, because a vote over a"
+            " merged Baseline stamps that Baseline's identity"
+        )
+    return found[0] if found else None
+
+
+def command_verify(args: argparse.Namespace) -> int:
+    """Run a contribution's checks against the PR author. What CI calls.
+
+    The same functions the contributor already ran through ``submit
+    --dry-run``, against the login GitHub says opened the PR rather than the
+    one ``gh`` is signed in as. That equality is the whole binding (#320): a
+    submission enters only through its own author's PR, and nothing here
+    trusts a name the diff supplies.
+    """
+    root = REPO_ROOT
+    author = args.author.strip()
+    if not author:
+        print("no PR author given; the binding cannot be checked")
+        return 1
+
+    try:
+        kind = detect_kind(root)
+    except SubmitError as exc:
+        print(f"FAIL  {exc}")
+        return 1
+
+    checks = list(KINDS[kind].preflight(root, author)) if kind else []
+    if kind is None:
+        # A roster line with no submission behind it still may not raise its
+        # own author's standing — the one edit that is dangerous alone.
+        if "evals/review/voters.toml" in _changed_paths(root):
+            checks = [_check_no_self_raise(root, author)]
+        else:
+            print("no contribution in this diff; nothing to check")
+            return 0
+
+    print(f"checking this {kind or 'roster'} PR as {author}\n")
+    for check in checks:
+        print(f"  {'ok  ' if check.passed else 'FAIL'}  {check.name}")
+        for problem in check.problems:
+            print(f"        {problem}")
+    if all(check.passed for check in checks):
+        return 0
+    print(
+        "\nThe contributor's own `submit --dry-run` runs these same checks,"
+        " so a red result here usually means the branch moved under them."
+    )
+    return 1
 
 
 def command_submit(args: argparse.Namespace) -> int:

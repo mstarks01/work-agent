@@ -1383,6 +1383,17 @@ def main(argv: Sequence[str] | None = None) -> int:
     )
     submit_parser.set_defaults(func=submit.command_submit)
 
+    verify_parser = subparsers.add_parser(
+        "verify-contribution",
+        help="run a contribution PR's checks against its author (what CI runs)",
+    )
+    verify_parser.add_argument(
+        "--author",
+        required=True,
+        help="the GitHub login that opened the PR",
+    )
+    verify_parser.set_defaults(func=submit.command_verify)
+
     args = parser.parse_args(argv)
     return args.func(args)
 

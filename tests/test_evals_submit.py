@@ -326,6 +326,71 @@ class TestTheSittingChecks:
         assert not check.passed
 
 
+class TestWhatCIRuns:
+    """``verify-contribution``: the same checks, against the PR's author."""
+
+    @pytest.fixture(autouse=True)
+    def rooted(self, repo, monkeypatch):
+        monkeypatch.setattr(submit, "REPO_ROOT", repo)
+        self.repo = repo
+
+    def verify(self, author):
+        git(self.repo, "fetch", "origin")
+        return main(["verify-contribution", "--author", author])
+
+    def test_a_clean_vote_pr_passes_as_its_author(self, capsys):
+        prepare_vote(self.repo)
+        assert self.verify("ada") == 0
+        assert "checking this vote PR as ada" in capsys.readouterr().out
+
+    def test_the_same_pr_fails_under_another_login(self, capsys):
+        """The binding: a submission enters only through its own author's PR."""
+        prepare_vote(self.repo)
+        assert self.verify("sam") == 1
+        assert "FAIL" in capsys.readouterr().out
+
+    def test_a_clean_sitting_pr_passes_as_its_reviewer(self, capsys):
+        prepare_sitting(self.repo)
+        assert self.verify("ada") == 0
+        assert "checking this sitting PR as ada" in capsys.readouterr().out
+
+    def test_a_sitting_naming_someone_else_fails(self):
+        prepare_sitting(self.repo, reviewer="sam")
+        assert self.verify("ada") == 1
+
+    def test_two_kinds_in_one_pr_are_refused(self, capsys):
+        prepare_vote(self.repo)
+        prepare_sitting(self.repo)
+        assert self.verify("ada") == 1
+        assert "one kind per PR" in capsys.readouterr().out
+
+    def test_an_ordinary_code_pr_has_nothing_to_check(self, capsys):
+        (self.repo / "README.md").write_text("a docs fix\n", encoding="utf-8")
+        assert self.verify("ada") == 0
+        assert "nothing to check" in capsys.readouterr().out
+
+    def test_a_roster_line_alone_still_may_not_raise_its_own_standing(self, capsys):
+        """The one edit that is dangerous with no submission behind it."""
+        (self.repo / "evals" / "review" / "voters.toml").write_text(
+            ROSTER_BASE + '\n[voters.ada]\nstanding = "maintainer"\n', encoding="utf-8"
+        )
+        assert self.verify("ada") == 1
+        out = capsys.readouterr().out
+        assert "roster PR as ada" in out
+        assert "FAIL" in out
+
+    def test_a_first_contributor_line_alone_is_fine(self):
+        (self.repo / "evals" / "review" / "voters.toml").write_text(
+            ROSTER_WITH_ADA, encoding="utf-8"
+        )
+        assert self.verify("ada") == 0
+
+    def test_an_empty_author_is_refused_rather_than_passed(self, capsys):
+        prepare_vote(self.repo)
+        assert self.verify("   ") == 1
+        assert "the binding cannot be checked" in capsys.readouterr().out
+
+
 class TestTheCommand:
     @pytest.fixture(autouse=True)
     def rooted(self, repo, monkeypatch):

@@ -146,3 +146,43 @@ def test_every_swept_path_still_exists(workflow):
         f"{workflow.name} filters on paths that match nothing: {missing}. "
         f"A glob over a tree that moved silently narrows what the sweep fires on."
     )
+
+
+CONTRIBUTION = REPO_ROOT / ".github" / "workflows" / "contribution.yml"
+
+
+def test_the_contribution_filter_covers_every_submission_kind():
+    """The author bindings must fire on every kind, including a future one.
+
+    ``contribution.yml`` is path-filtered, so a kind whose tree no filter
+    entry covers is a submission whose author nobody checks — and it fails
+    the way an unfiltered path always fails, by being silently absent rather
+    than red. So the filter is held to :data:`~evals.harness.submit.KINDS`
+    itself: add a kind, and this fails until the workflow sees it.
+    """
+    from evals.harness.submit import KINDS
+
+    entries = _filter_paths(CONTRIBUTION)
+    uncovered = sorted(
+        f"{name} ({kind.prefix})"
+        for name, kind in KINDS.items()
+        if not any(
+            kind.prefix.startswith(entry.removesuffix("**").removesuffix("/") + "/")
+            for entry in entries
+        )
+    )
+    assert not uncovered, (
+        f"{CONTRIBUTION.name}'s paths filter covers no tree for: {uncovered}."
+        " A submission kind the filter misses is one whose author binding"
+        " never runs."
+    )
+
+
+def test_the_contribution_filter_covers_the_roster():
+    """The roster carries standing, and a self-raise is dangerous alone."""
+    entries = _filter_paths(CONTRIBUTION)
+    roster = "evals/review/voters.toml"
+    assert any(
+        roster.startswith(entry.removesuffix("**").removesuffix("/") + "/")
+        for entry in entries
+    ), f"{CONTRIBUTION.name} does not fire on {roster}"
