@@ -222,6 +222,26 @@ class Sweep:
 
 
 @dataclass(frozen=True)
+class Column:
+    """One column an instrument contributes to the published comparison table.
+
+    ``read`` takes one sweep's artifact blocks and the framework whose block
+    is being printed, and answers ``None`` where the sweep measured nothing.
+    The reader lives in the module that owns the block's shape, so the
+    generator names no framework and no column — it walks this table.
+
+    ``needs_votes`` marks a number that reads zero on a cold ledger rather
+    than being measured. #330: a zero reads as a measured failure, and an
+    absent vote is not a measurement, so the table prints "no votes yet"
+    instead.
+    """
+
+    label: str
+    read: Callable[[Mapping[str, Any], FrameworkName], float | None]
+    needs_votes: bool = False
+
+
+@dataclass(frozen=True)
 class Instrument:
     """One reading over a finished sweep: what it prints, what it writes.
 
@@ -244,6 +264,11 @@ class Instrument:
     frameworks: tuple[FrameworkName, ...] = ()
     #: Whether the reading needs the sweep's scores rather than only its runs.
     scored: bool = False
+    #: What this instrument publishes in ``evals/baselines/README.md`` (#330).
+    #: Empty means it publishes nothing there. A package that adds an
+    #: instrument with columns gets them printed with no edit to the
+    #: generator.
+    published: tuple[Column, ...] = ()
 
     def applies_to(self, ran: Sequence[FrameworkName]) -> bool:
         """Whether a sweep that ran ``ran`` has anything for this instrument."""
@@ -290,6 +315,15 @@ INSTRUMENTS: dict[str, Instrument] = {
             "applicability_exemplar_delta",
             "over_applied_for_promotion",
         ),
+        published=(
+            Column(
+                "recall", lambda blocks, _: applicability.published(blocks, "recall")
+            ),
+            Column(
+                "precision",
+                lambda blocks, _: applicability.published(blocks, "precision"),
+            ),
+        ),
     ),
     "applicability_yield": Instrument(
         render=lambda sweep: applicability.render_yield(
@@ -307,6 +341,18 @@ INSTRUMENTS: dict[str, Instrument] = {
         frameworks=("stride",),
         scored=True,
         keys=("scores", "exemplar_delta", "unlisted_for_promotion"),
+        published=(
+            Column("recall", lambda blocks, _: scorer.published(blocks, "recall")),
+            Column(
+                "must-find recall",
+                lambda blocks, _: scorer.published(blocks, "must_find_recall"),
+            ),
+            Column(
+                "rejected rate",
+                lambda blocks, _: scorer.published(blocks, "rejected_rate"),
+                needs_votes=True,
+            ),
+        ),
     ),
     "critic_yield": Instrument(
         render=lambda sweep: critic_yield.render(sweep.yields),
@@ -320,6 +366,13 @@ INSTRUMENTS: dict[str, Instrument] = {
         artifact=lambda sweep: writing.artifact(sweep.writing),
         scored=True,
         keys=("writing", "writing_aggregate"),
+        published=(
+            Column(
+                "writing objections",
+                lambda blocks, framework: writing.published(blocks, framework),
+                needs_votes=True,
+            ),
+        ),
     ),
 }
 

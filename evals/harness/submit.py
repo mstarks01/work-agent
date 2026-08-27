@@ -40,7 +40,7 @@ from tempfile import TemporaryDirectory
 
 from pydantic import ValidationError
 
-from evals.harness import baseline, ledger, roster
+from evals.harness import baseline, comparison, ledger, roster
 from evals.harness.artifact import ProvenanceError
 from evals.harness.reference import CaseSitting
 
@@ -494,10 +494,17 @@ def _sitting_closing(root: Path, author: str) -> str:
 
 
 def _baseline_prepare(root: Path, author: str, args: argparse.Namespace) -> None:
-    """Assemble ``--artifact`` sweeps into their Baseline directory first."""
+    """Assemble the sweeps, then rebuild the published comparison.
+
+    The rebuild is here so a contributor never learns the step exists (#330):
+    the table is generated from the Baselines they just laid down, and the
+    staleness test would otherwise fail their PR for a file they had never
+    heard of.
+    """
     paths = [Path(raw) for raw in getattr(args, "artifact", None) or []]
     if paths:
         baseline.assemble(root, author, paths)
+    comparison.write(root)
 
 
 def _baseline_dir(root: Path) -> str | None:
@@ -517,7 +524,10 @@ def _baseline_allowlist(root: Path, author: str) -> list[str]:
         for rel in _changed_paths(root)
         if name is not None and rel.startswith(f"evals/baselines/{name}/")
     ]
-    return [*changed, "evals/review/voters.toml"]
+    # The generated comparison moves whenever a Baseline lands, and
+    # ``_baseline_prepare`` has already rebuilt it (#330), so it travels with
+    # the submission rather than failing the PR as a stray.
+    return [*changed, "evals/baselines/README.md", "evals/review/voters.toml"]
 
 
 def _check_one_baseline(root: Path, author: str) -> Check:

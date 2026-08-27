@@ -49,7 +49,7 @@ set nobody has ruled on yet.
 from __future__ import annotations
 
 from collections import Counter
-from collections.abc import Iterable, Sequence
+from collections.abc import Iterable, Mapping, Sequence
 from dataclasses import dataclass, field
 from typing import Any, Literal
 
@@ -730,6 +730,34 @@ def render(scores: Sequence[CaseScore]) -> None:
             f" vs far {delta['far_recall']:.2f}"
             f" = {delta['delta']:+.2f} (tracked, non-gating)"
         )
+
+
+def published(blocks: Mapping[str, Any], metric: str) -> float | None:
+    """One metric's mean across this sweep's cases, for the comparison table.
+
+    The knowledge that a STRIDE number lives at ``scores[].metrics`` stays
+    here rather than in the generator, so a change to the block's shape is one
+    edit in the module that owns it.
+    """
+    rows = blocks.get("scores") or []
+    values = [
+        row["metrics"][metric]
+        for row in rows
+        if isinstance(row, Mapping) and metric in row.get("metrics", {})
+    ]
+    return sum(values) / len(values) if values else None
+
+
+def vote_coverage(blocks: Mapping[str, Any]) -> tuple[int, int]:
+    """(answered, total) unmatched findings, so a reader can weigh the row."""
+    rows = blocks.get("scores") or []
+    total = answered = 0
+    for row in rows:
+        counts = row.get("counts", {}) if isinstance(row, Mapping) else {}
+        here = sum(counts.get(name, 0) for name in ("rejected", "pooled", "open"))
+        total += here + counts.get("unvoted", 0)
+        answered += here
+    return answered, total
 
 
 def artifact(scores: Sequence[CaseScore]) -> dict[str, Any]:
