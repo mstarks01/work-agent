@@ -17,16 +17,26 @@ maintainer's instruction and recorded in ``docs/agents/issue-tracker.md``.
 It is not a hosted service: nothing is hosted, no credential is held here, and
 the app still binds to loopback. What it does mean is that a request reaching
 :func:`create_app`'s submit endpoint can act on GitHub as you, so that one
-endpoint carries four controls rather than the app's usual none:
+endpoint carries five controls rather than the app's usual none:
 
 * the **Host** check every loopback app here runs, which is what stops DNS
   rebinding making an attacker's page same-origin with this one;
-* **``Sec-Fetch-Site: same-origin``**, the check ``webapp/main.py`` already
-  uses on its own write endpoint;
+* **``frame-ancestors 'none'``**, which is what makes the next two mean
+  anything. A press inside somebody else's frame arrives same-origin and
+  carries the page token, because the page it comes from really is this one.
+  So framing is the way past both, and refusing to be framed is the answer;
+* **``Sec-Fetch-Site: same-origin``**, the check ``webapp/main.py`` uses on its
+  own write endpoint, through the ``refuse_cross_origin`` both apps share;
 * a **one-time token** minted per process and embedded in the page, so a
   request that never read the page cannot carry it;
 * **no request-controlled arguments at all** — the endpoint opens the one
   submission this session prepared, and takes neither a kind nor a path.
+
+**Every writing endpoint carries the origin check, not only the submit one.**
+``/api/finish`` writes the reading document, appends to ``case.json`` and sets
+the flag ``/api/submit`` tests, so a foreign page that reaches it decides what
+a later press publishes. ``/api/own-list`` satisfies the method's one rule, so
+a foreign page that reaches it opens the recorded sets for whoever asks next.
 
 **The own list comes first, and the server enforces it.** ``/api/part-two``
 refuses until the reader has posted their own threat list, so the recorded
@@ -55,10 +65,13 @@ Security posture, inherited from ``webapp/review.py`` rather than re-derived:
 from __future__ import annotations
 
 import argparse
+import html
+import json
 import secrets
 import sys
 from dataclasses import dataclass, field
 from pathlib import Path
+from typing import Annotated
 
 from fastapi import FastAPI, HTTPException, Request
 from fastapi.responses import HTMLResponse, JSONResponse
@@ -69,16 +82,33 @@ sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
 from evals.harness import sitting as sittings
 from evals.harness import submit as submit_spine
-from webapp.main import LOOPBACK_HOSTS, SecurityHeaders
+from webapp.main import LOOPBACK_HOSTS, SecurityHeaders, refuse_cross_origin
 
 HOST = "127.0.0.1"
 PORT = 8020
 
 _NONCE_PLACEHOLDER = "__CSP_NONCE__"
+
+#: ``frame-ancestors 'none'`` is the fifth control on the submit path, and it
+#: is what makes the other four mean anything. A press inside somebody else's
+#: frame reaches this app as same-origin and carries the page token, because
+#: the page it comes from really is this one — so framing beats the header
+#: check and the token together. The directive is spelled out because it does
+#: not fall back to ``default-src``, as ``base-uri`` and ``form-action`` beside
+#: it do not.
 _CSP = (
     "default-src 'none'; style-src 'nonce-{nonce}'; script-src 'nonce-{nonce}';"
-    " connect-src 'self'; base-uri 'none'; form-action 'none'"
+    " connect-src 'self'; base-uri 'none'; form-action 'none';"
+    " frame-ancestors 'none'"
 )
+
+
+#: One written line, wherever this app takes a list of them. A cap on the list
+#: alone bounds how many lines arrive and not how long one is, so 200 items of
+#: no stated length is no bound at all — and every one of them is written into
+#: the reading document, which the submit allow-list then carries into a pull
+#: request. Generous for a line somebody types, and finite.
+Line = Annotated[str, Field(max_length=500)]
 
 
 class OwnList(BaseModel):
@@ -86,7 +116,7 @@ class OwnList(BaseModel):
 
     model_config = ConfigDict(extra="forbid")
 
-    items: list[str] = Field(default_factory=list, max_length=200)
+    items: list[Line] = Field(default_factory=list, max_length=200)
 
 
 class Finish(BaseModel):
@@ -94,8 +124,11 @@ class Finish(BaseModel):
 
     model_config = ConfigDict(extra="forbid")
 
-    marks: dict[str, str] = Field(default_factory=dict)
-    missing: list[str] = Field(default_factory=list, max_length=200)
+    #: Keyed by framework-prefixed identifier, which is why the keys are bounded
+    #: too: :func:`evals.harness.sitting.document` selects on the key and writes
+    #: it beside its value.
+    marks: dict[Line, Line] = Field(default_factory=dict, max_length=200)
+    missing: list[Line] = Field(default_factory=list, max_length=200)
     notes: str = Field(default="", max_length=4000)
 
 
@@ -137,8 +170,8 @@ def create_app(session: Session) -> FastAPI:
                 case=_escape(session.prepared.case_id),
                 title=_escape(session.prepared.title),
                 reviewer=_escape(session.reviewer),
-                token=_escape(session.token),
-                cansubmit="yes" if session.can_submit else "no",
+                token=_js_literal(session.token),
+                cansubmit=_js_literal(session.can_submit),
             )
         )
 
@@ -155,7 +188,11 @@ def create_app(session: Session) -> FastAPI:
         )
 
     @app.post("/api/own-list")
-    def own_list(body: OwnList) -> JSONResponse:
+    def own_list(request: Request, body: OwnList) -> JSONResponse:
+        # A foreign page that posts this decides the reader saw nothing, and
+        # the sets open for whoever asks next. The rule is the method, so the
+        # endpoint that satisfies it is a write like any other.
+        refuse_cross_origin(request)
         # Recorded before part two is reachable. An empty list is allowed —
         # "I saw nothing" is an answer — but it has to be given.
         session.own_list = [item.strip() for item in body.items if item.strip()]
@@ -174,7 +211,12 @@ def create_app(session: Session) -> FastAPI:
         return JSONResponse({"frameworks": session.prepared.part_two})
 
     @app.post("/api/finish")
-    def finish(body: Finish) -> JSONResponse:
+    def finish(request: Request, body: Finish) -> JSONResponse:
+        # This writes the reading document, appends to `case.json` and clears
+        # the debt line — and it is what sets `recorded`, which `/api/submit`
+        # tests. Everything the allow-list then carries into a pull request
+        # passes through here, so it is checked like the endpoint it feeds.
+        refuse_cross_origin(request)
         if session.own_list is None:
             raise HTTPException(status_code=409, detail="no own list was written")
         try:
@@ -229,10 +271,7 @@ def create_app(session: Session) -> FastAPI:
                 detail="no authenticated gh login, so there is nothing to"
                 " submit as. Run the printed command yourself.",
             )
-        if request.headers.get("sec-fetch-site") != "same-origin":
-            raise HTTPException(
-                status_code=403, detail="this request did not come from the app's page"
-            )
+        refuse_cross_origin(request)
         if not secrets.compare_digest(
             request.headers.get("x-sitting-token", ""), session.token
         ):
@@ -262,9 +301,33 @@ def _paste(session: Session, files_read: int) -> str:
 
 
 def _escape(text: str) -> str:
-    import html
+    """Escape for the page's **markup**, where the value lands in element text.
 
+    Not for the ``<script>`` block: a script block does not decode HTML
+    entities, so this is the wrong escape there and :func:`_js_literal` is the
+    right one. Which of the two a field wants is decided by where its
+    placeholder sits in :data:`_PAGE`.
+    """
     return html.escape(text)
+
+
+def _js_literal(value: object) -> str:
+    """A value as a JavaScript literal, for a placeholder inside ``<script>``.
+
+    Two things have to be true and neither is HTML escaping. The value has to
+    survive as a JavaScript literal, which is what :func:`json.dumps` gives —
+    ``html.escape`` would deliver the characters ``&quot;`` where a quote was,
+    because nothing decodes entities in a script block. And it must not close
+    the block: a value spelling ``</script>`` ends it and the rest of the page
+    parses as HTML, so every ``<`` goes out as ``\\u003c``. That is the same
+    escape, for the same reason, as the report payload in
+    :func:`webapp.main.render_report`.
+
+    The two values this carries today are a token and a boolean, and neither
+    can spell either character. It is written this way so that stays a fact
+    about the page rather than a condition the next field has to re-satisfy.
+    """
+    return json.dumps(value).replace("<", "\\u003c")
 
 
 def _page(template: str, **fields: str) -> tuple[str, str]:
@@ -364,8 +427,8 @@ $("lock").addEventListener("click", async () => {
   $("two").scrollIntoView({behavior: "smooth"});
 });
 
-const TOKEN = "<!--token-->";
-const CAN_SUBMIT = "<!--cansubmit-->" === "yes";
+const TOKEN = <!--token-->;
+const CAN_SUBMIT = <!--cansubmit-->;
 
 $("finish").addEventListener("click", async () => {
   const res = await fetch("/api/finish", {

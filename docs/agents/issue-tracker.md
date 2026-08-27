@@ -118,10 +118,12 @@ Completed on GitHub Issues (canonical):
   2026-08-27 `webapp/sitting.py` gained a button that opens the pull request through the
   operator's own authenticated `gh`. The hosted half of that line still stands — nothing is
   hosted, no credential is held, and the app still binds to loopback — but the app does now
-  reach the network on a click. The endpoint carries four controls in exchange (a checked
-  `Host`, `Sec-Fetch-Site`, a per-process page token, and no request-controlled arguments), and
-  it is off when `gh` holds no login or when `--no-submit` is passed. Read the module docstring
-  for what each control stops. The CLI path is unchanged and remains the only way to submit a
+  reach the network on a click. The endpoint carries five controls in exchange (a checked
+  `Host`, `frame-ancestors 'none'`, `Sec-Fetch-Site`, a per-process page token, and no
+  request-controlled arguments), and it is off when `gh` holds no login or when `--no-submit`
+  is passed. Read the module docstring for what each control stops — in particular why the
+  frame refusal is what makes the header check and the token mean anything, rather than a
+  third opinion beside them. The CLI path is unchanged and remains the only way to submit a
   vote or a baseline.
 
 - [#158 — Map: one validated system representation, many security frameworks](https://github.com/mstarks01/work-agent/issues/158)
