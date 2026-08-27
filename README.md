@@ -67,7 +67,7 @@ stub runner need none of it.
 | `skills/` | The per-category STRIDE skill Markdown baked into the image. |
 | `docs/` | User-facing documentation (see below). |
 | `examples/` | Runnable embedding examples and the shared sample source. The source of truth for every code block in the docs. |
-| `webapp/` | The lite first-run web app. **Never ships** in the wheel; run from a clone. |
+| `webapp/` | The lite first-run web app, plus the loopback review and case-sitting apps. **Never ships** in the wheel; run from a clone. |
 | `evals/` | Golden-case corpus, scorer, and the [eval harness](evals/README.md). **Never ships** in the image. |
 | `tests/` | Offline test suite (no credentials required). |
 
