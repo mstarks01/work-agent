@@ -13,6 +13,12 @@ the estimate gate refuses without an explicit acceptance (#334). A suffixed
 served build (``gpt-5.6-luna``) is the expected miss; the stated fallback is
 its requested route, and the manifest shows which model each price came from.
 
+That rule reaches the **cache-read rate** too, which is absent from most of
+the map. It is carried as ``None`` rather than zero, and
+:attr:`UnitPrices.cached_rate` bills those tokens at the full input rate —
+an unknown discount priced as no discount, which over-states rather than
+under-states.
+
 The cost rule, spelled once so submit and CI compute the same number:
 uncached prompt tokens at the input rate, cached prompt tokens at the
 cache-read rate, completion tokens at the output rate. Reasoning tokens are
@@ -38,14 +44,35 @@ class UnitPrices:
     model: str
     input_per_token: float
     output_per_token: float
-    cache_read_per_token: float
+    #: ``None`` where the map states no cache-read rate, which is most of it:
+    #: 1820 of litellm's 3212 entries price input and output and say nothing
+    #: about cached reads. A zero there would be a silent zero — the one thing
+    #: this module says it never writes — and it bills a 90%-cached call at a
+    #: seventh of a plausible cost.
+    cache_read_per_token: float | None
+
+    @property
+    def cached_rate(self) -> float:
+        """What a cached prompt token costs: the stated rate, or the full one.
+
+        **An unknown discount is priced as no discount.** A provider that
+        publishes no cache-read rate is one this repository cannot show a
+        saving for, so the cached tokens bill at the input rate. That
+        over-states rather than under-states, which is the only safe
+        direction for a number somebody consents to spend against — and it is
+        the honest reading, because a provider with no published cache price
+        most likely applies no discount.
+        """
+        if self.cache_read_per_token is None:
+            return self.input_per_token
+        return self.cache_read_per_token
 
     def cost(self, usage: TokenUsage) -> float:
         """The one cost rule; see the module docstring for what it excludes."""
         uncached = max(usage.prompt_tokens - usage.cached_prompt_tokens, 0)
         return (
             uncached * self.input_per_token
-            + usage.cached_prompt_tokens * self.cache_read_per_token
+            + usage.cached_prompt_tokens * self.cached_rate
             + usage.completion_tokens * self.output_per_token
         )
 
@@ -63,7 +90,11 @@ class UnitPrices:
             model=str(raw["model"]),
             input_per_token=float(raw["input_per_token"]),
             output_per_token=float(raw["output_per_token"]),
-            cache_read_per_token=float(raw["cache_read_per_token"]),
+            cache_read_per_token=(
+                None
+                if raw.get("cache_read_per_token") is None
+                else float(raw["cache_read_per_token"])
+            ),
         )
 
 
@@ -138,5 +169,9 @@ def unit_prices(model: str) -> UnitPrices | None:
         model=model,
         input_per_token=float(input_rate),
         output_per_token=float(output_rate),
-        cache_read_per_token=float(entry.get("cache_read_input_token_cost") or 0.0),
+        cache_read_per_token=(
+            None
+            if (cached := entry.get("cache_read_input_token_cost")) is None
+            else float(cached)
+        ),
     )

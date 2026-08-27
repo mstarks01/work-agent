@@ -16,6 +16,15 @@ that number is, and accept it in a way a rote hand cannot.
     No number exists — because a tier's model is absent from the price map,
     or because no merged Baseline exists to calibrate from. Never a zero.
 
+**The estimate says which Baseline it read and what it does not know.** A
+borrowed number rests on somebody else's token counts, so the lender is
+chosen for what it ran rather than for where it sorts (:data:`COMPARABLE_ON`),
+and whatever it still does not share with this run is printed beside the
+figure. Where the price map now disagrees with what that Baseline recorded,
+one line names the model and both prices — #331's whole alarm, and the only
+one, because the repository pins litellm exactly and a CI check would fail
+honest history the day after somebody bumps the pin.
+
 **Acceptance is typing the amount back.** An enter or a ``y`` never proceeds.
 The mechanism is rote-proof because the number changes with the
 configuration. A script states its own number with ``--accept-cost <usd>``,
@@ -112,6 +121,126 @@ def _merged_baselines(root: Path) -> list[tuple[Path, dict[str, Any]]]:
     return baselines
 
 
+#: What a Baseline must share with this run for its token counts to mean
+#: anything here, in the order a reader should care about.
+#:
+#: A table rather than a chain of ``if``s, so a sixth identity component is a
+#: row. Each entry is a component of the Baseline identity and the sentence
+#: that says what differing about it does to the counts.
+COMPARABLE_ON: tuple[tuple[str, str], ...] = (
+    (
+        "frameworks",
+        (
+            "ran a different framework selection, and a selection decides how"
+            " many lane agents each case fires"
+        ),
+    ),
+    (
+        "corpus_digest",
+        (
+            "ran a different corpus, and the corpus decides how many cases run"
+            " and how long each one is"
+        ),
+    ),
+    (
+        "repo_commit",
+        "ran different prompt text, which moves every node's input size",
+    ),
+)
+
+
+def _differences(identity: dict[str, Any], lender: dict[str, Any]) -> tuple[str, ...]:
+    """Which of :data:`COMPARABLE_ON` this lender does not share with the run."""
+    return tuple(
+        reason
+        for (field, reason), differs in zip(
+            COMPARABLE_ON, _mismatches(identity, lender), strict=True
+        )
+        if differs
+    )
+
+
+def _mismatches(identity: dict[str, Any], lender: dict[str, Any]) -> tuple[bool, ...]:
+    """One flag per :data:`COMPARABLE_ON` row, in the table's own order.
+
+    Sorted on directly, so the **order of the table is the precedence**: a
+    lender that shares the framework selection beats one that does not,
+    whatever else it differs on. Counting the flags instead would make a
+    mismatched selection trade against a mismatched commit, and those are not
+    worth the same — the selection decides how many agents run, the commit
+    only how long their instructions are.
+    """
+    return tuple(
+        _normalised(lender.get(field)) != _normalised(identity.get(field))
+        for field, _ in COMPARABLE_ON
+    )
+
+
+def _normalised(value: object) -> object:
+    """A list compares as a set: block order is not a difference in workload."""
+    return sorted(str(item) for item in value) if isinstance(value, list) else value
+
+
+@dataclass(frozen=True)
+class Borrowed:
+    """One lender's repriced counts, and what it did not share with this run."""
+
+    amount_usd: float
+    source: str
+    differs: tuple[str, ...] = ()
+
+
+def _recorded_prices(manifest: dict[str, Any]) -> dict[str, UnitPrices]:
+    """The unit prices the calibrating Baseline recorded, one entry per model.
+
+    Every sweep of one Baseline priced the same models, so the rows repeat
+    once per sweep and keying by model collapses them back.
+    """
+    return {
+        str(entry["model"]): UnitPrices.from_json(entry)
+        for sweep in manifest.get("sweeps", [])
+        for entry in sweep.get("cost", {}).get("unit_prices", [])
+        if entry.get("model")
+    }
+
+
+def _price_drift(manifest: dict[str, Any]) -> tuple[str, ...]:
+    """Where the price map now disagrees with what this Baseline recorded.
+
+    #331's whole alarm, and deliberately the only one: the repo pins litellm
+    exactly, so the map moves when somebody bumps the pin and then every
+    older Baseline drifts at once. A CI check would fail honest history the
+    day after a bump, so the drift is disclosed at the one moment it matters
+    — to the person about to accept a number calibrated from that Baseline.
+
+    The repricing already keeps drift out of the arithmetic. What the line
+    answers is why the figure differs from the recorded cost sitting in the
+    Baseline the contributor can go and read.
+    """
+    lines = []
+    for model, recorded in sorted(_recorded_prices(manifest).items()):
+        current = unit_prices(model)
+        if current is None or _same_rates(recorded, current):
+            continue
+        lines.append(
+            f"{model}: this Baseline recorded"
+            f" ${recorded.input_per_token * 1e6:.2f} in /"
+            f" ${recorded.output_per_token * 1e6:.2f} out; the price map now"
+            f" says ${current.input_per_token * 1e6:.2f} in /"
+            f" ${current.output_per_token * 1e6:.2f} out, per million tokens"
+        )
+    return tuple(lines)
+
+
+def _same_rates(one: UnitPrices, other: UnitPrices) -> bool:
+    """Whether two price sets agree on every rate, cache-read included."""
+    return (
+        one.input_per_token == other.input_per_token
+        and one.output_per_token == other.output_per_token
+        and one.cache_read_per_token == other.cache_read_per_token
+    )
+
+
 def _recorded_actual(manifest: dict[str, Any]) -> float | None:
     """A Baseline's mean recorded actual across its sweeps."""
     actuals = [
@@ -144,6 +273,7 @@ def estimate(
                     f"calibrated from {manifest.get('name')}, which ran this"
                     " exact configuration"
                 )
+                lines += _price_drift(manifest)
                 return Estimate(label="recorded", amount_usd=actual, lines=tuple(lines))
 
     missing = sorted(
@@ -163,25 +293,42 @@ def estimate(
     if missing:
         return Estimate(label="unpriced", amount_usd=None, lines=tuple(lines))
 
-    borrowed = _borrow(baselines, routes)
+    borrowed = _borrow(baselines, routes, identity)
     if borrowed is None:
         lines.append(
             "no merged Baseline to calibrate token counts from, so no amount"
             " can be stated"
         )
         return Estimate(label="unpriced", amount_usd=None, lines=tuple(lines))
-    amount, source = borrowed
     lines.append(
-        f"token counts borrowed from {source}, each node repriced at this"
-        " run's route for its tier"
+        f"token counts borrowed from {borrowed.source}, each node repriced at"
+        " this run's route for its tier"
     )
-    return Estimate(label="estimated", amount_usd=amount, lines=tuple(lines))
+    lines += [
+        f"the closest Baseline is not this configuration: {borrowed.source} {reason}"
+        for reason in borrowed.differs
+    ]
+    lines += _price_drift(_manifest_named(baselines, borrowed.source))
+    return Estimate(
+        label="estimated", amount_usd=borrowed.amount_usd, lines=tuple(lines)
+    )
+
+
+def _manifest_named(
+    baselines: Sequence[tuple[Path, dict[str, Any]]], name: str
+) -> dict[str, Any]:
+    """The manifest the borrowing chose, for the lines that describe it."""
+    return next(
+        (manifest for _, manifest in baselines if manifest.get("name") == name), {}
+    )
 
 
 def _borrow(
-    baselines: Sequence[tuple[Path, dict[str, Any]]], routes: dict[str, str]
-) -> tuple[float, str] | None:
-    """Another Baseline's recorded token counts, at this run's prices.
+    baselines: Sequence[tuple[Path, dict[str, Any]]],
+    routes: dict[str, str],
+    identity: dict[str, Any],
+) -> Borrowed | None:
+    """The most comparable Baseline's recorded token counts, at this run's prices.
 
     **The counts are borrowed, not the total.** Each of the lender's nodes
     ran on some tier; this run has its own route for that tier; so the node's
@@ -189,28 +336,40 @@ def _borrow(
     out of :func:`~evals.harness.prices.price_calls` — the one costing path
     the recorded actual and CI's re-check already go through.
 
-    What this replaces was a ratio: the lender's dollar total scaled by the
-    summed unit prices of this run's models over the lender's. That ignored
-    the token mix, so swapping a base-tier model moved the guess as much as
-    swapping the strong-tier one, though the strong tier carries most of the
-    spend. It also had to be told not to divide by the sweep count. Pricing
-    the counts directly needs neither correction and is less arithmetic, not
-    more — which is why the docstring's old case for crudeness does not argue
-    against it. A model of the cost would be elaborate; this is the
-    subtraction and multiplication the recorded number already used.
+    **Which Baseline lends is a decision, not the directory order.** Token
+    counts are counts of work, so a lender that ran a different framework
+    selection or a different corpus did a different amount of it: a selection
+    naming fewer packages fires a lane agent for fewer lanes on every case,
+    and lending its counts understates by about that ratio. So the candidates
+    are ranked by :data:`COMPARABLE_ON` and the best one lends — and whatever
+    it still does not share is returned, because a number the contributor
+    cannot see the caveat on is a number they cannot weigh.
 
-    The mean across the lender's sweeps, because one sweep is one sample and
-    ``TUNING.md`` records what single-run numbers cost this project before.
+    Ties break on the Baseline name, so one tree gives one answer.
+
+    The mean across the chosen lender's sweeps, because one sweep is one
+    sample and ``TUNING.md`` records what single-run numbers cost this
+    project before.
     """
-    for directory, manifest in baselines:
-        priced = [
-            amount
-            for entry in manifest.get("sweeps", [])
-            if (amount := _reprice(directory / str(entry.get("artifact", "")), routes))
-            is not None
-        ]
+    ranked = sorted(
+        baselines,
+        key=lambda pair: (
+            _mismatches(identity, pair[1].get("identity", {})),
+            str(pair[1].get("name")),
+        ),
+    )
+    for directory, manifest in ranked:
+        priced = []
+        for entry in manifest.get("sweeps", []):
+            amount = _reprice(directory / str(entry.get("artifact", "")), routes)
+            if amount is not None:
+                priced.append(amount)
         if priced:
-            return sum(priced) / len(priced), str(manifest.get("name"))
+            return Borrowed(
+                amount_usd=sum(priced) / len(priced),
+                source=str(manifest.get("name")),
+                differs=_differences(identity, manifest.get("identity", {})),
+            )
     return None
 
 
