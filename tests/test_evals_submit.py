@@ -383,12 +383,12 @@ class TestTheCommand:
         assert (self.repo / "evals" / "review" / "votes" / "ada.jsonl").exists()
 
     def test_a_baseline_runs_end_to_end(self, fake_gh, capsys, monkeypatch):
-        from evals.harness import baseline
+        from evals.harness import prices
         from evals.harness.prices import UnitPrices
         from tests.test_evals_baseline import payload, write_sweep
 
         monkeypatch.setattr(
-            baseline,
+            prices,
             "unit_prices",
             lambda model: UnitPrices(model, 1e-6, 4e-6, 1e-7),
         )
