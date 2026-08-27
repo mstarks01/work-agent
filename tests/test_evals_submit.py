@@ -469,7 +469,11 @@ class TestTheCommand:
         assert "https://example.test/pr/1" in out
         assert "standings behind its Baseline" in out
 
-        assembled = list((self.repo / "evals" / "baselines").iterdir())
+        assembled = [
+            path
+            for path in (self.repo / "evals" / "baselines").iterdir()
+            if path.is_dir()
+        ]
         assert len(assembled) == 1
         name = assembled[0].name
         date = datetime.now(UTC).date().isoformat()

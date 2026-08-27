@@ -45,6 +45,7 @@ from pathlib import Path
 from typing import Any
 
 from evals.harness import (
+    comparison,
     consent,
     fingerprint,
     instruction,
@@ -1002,6 +1003,18 @@ def _runs_from_reports(artifact: Path, cases: Sequence[GoldenCase]) -> dict[str,
     return runs
 
 
+def command_comparison(args: argparse.Namespace) -> int:
+    """Rebuild the published comparison over the merged Baselines.
+
+    A person runs this and commits the result; a test recomputes it and fails
+    on a stale copy, so CI never needs to push (#330). ``submit baseline``
+    calls it during staging, so a contributor never learns it exists.
+    """
+    path = comparison.write(REPO_ROOT)
+    print(f"{path} rebuilt from {comparison.BASELINES_DIR}")
+    return 0
+
+
 def command_agreement(args: argparse.Namespace) -> int:
     """How far two voters agree — what a maintainer reads before promoting.
 
@@ -1525,6 +1538,13 @@ def main(argv: Sequence[str] | None = None) -> int:
         help="the standing roster",
     )
     agreement_parser.set_defaults(func=command_agreement)
+
+    comparison_parser = subparsers.add_parser(
+        "comparison",
+        help="rebuild evals/baselines/README.md from the merged Baselines"
+        " (no credentials)",
+    )
+    comparison_parser.set_defaults(func=command_comparison)
 
     args = parser.parse_args(argv)
     return args.func(args)
