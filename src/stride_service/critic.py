@@ -42,7 +42,7 @@ from types import MappingProxyType
 from typing import NamedTuple, get_args
 
 from stride_service.frameworks import FrameworkPackage, FrameworkSchemas
-from stride_service.grounding import normalize, verify_normalized
+from stride_service.grounding import normalize, repair_quote, verify_normalized
 from stride_service.references import canonical, snap
 from stride_service.report import (
     GROUNDLESS_REASON_MAX_CHARS,
@@ -50,6 +50,7 @@ from stride_service.report import (
     Claim,
     Ground,
     GroundlessClaim,
+    RepairedQuote,
     RuledClaim,
     Ruling,
     SeverityLevel,
@@ -492,13 +493,24 @@ def _one_ground_issues(
     return [issue] if issue else []
 
 
-def _verify_quotes(
-    claims: Sequence[Claim], sources: Mapping[str, str]
-) -> tuple[list[UnverifiedGround], list[GroundlessClaim]]:
+class _QuoteCheck(NamedTuple):
+    """What the quote check produced: the drafts as they now read, and marks."""
+
+    drafts: list[Claim]
+    unverified: list[UnverifiedGround]
+    repaired: list[RepairedQuote]
+    groundless: list[GroundlessClaim]
+
+
+def _verify_quotes(claims: Sequence[Claim], sources: Mapping[str, str]) -> _QuoteCheck:
     """Check every quote ground against the source it names.
 
-    Two outcomes, at two different scopes, and the split is the whole policy.
-    **Per entry**, an unverifiable quote is *marked* and still renders: 0
+    Three outcomes, at two different scopes, and the split is the whole policy.
+    **Per entry**, a quote the ladder refused is offered to
+    :func:`~stride_service.grounding.repair_quote` first: where the source holds
+    a span near enough, the ground is rewritten to that span — the submitter's
+    words, never the model's — and a :class:`~stride_service.report.RepairedQuote`
+    keeps what the agent wrote. Otherwise the quote is *marked* and still renders: 0
     failures in 206 measured excerpts is not evidence of zero, and the Rule of
     Three puts the 95% bound at 1.46% per quote — which at the corpus mean of
     18.7 claims per job is a 24% chance that some job dies on a single
@@ -514,26 +526,44 @@ def _verify_quotes(
     framework whose catalog rarely holds the fact a requirement turns on, and
     the reason the drop costs the claim rather than the job.
 
-    Nothing is filtered here: the caller removes the groundless claims.
+    Returns the drafts as they now read — a repaired ground is a new ground —
+    with the groundless ones already removed.
     """
     # Each source folded once rather than once per quote. The ladder normalizes
     # every character of the haystack, and a job runs ~19 claims per framework
     # against the same few submissions, so the per-quote form would re-fold whole
     # documents to reach the same answer.
     folded = {label: normalize(text) for label, text in sources.items()}
+    drafts: list[Claim] = []
     marks: list[UnverifiedGround] = []
+    repaired: list[RepairedQuote] = []
     groundless: list[GroundlessClaim] = []
     for claim in claims:
-        unverified = [
-            index
-            for index, ground in enumerate(claim.grounds)
-            if ground.kind == "quote"
-            and not verify_normalized(ground.text, folded.get(ground.source_label, ""))
-        ]
-        if len(unverified) == len(claim.grounds):
+        grounds = list(claim.grounds)
+        unverified: list[int] = []
+        repairs: list[RepairedQuote] = []
+        for index, ground in enumerate(grounds):
+            if ground.kind != "quote":
+                continue
+            if verify_normalized(ground.text, folded.get(ground.source_label, "")):
+                continue
+            repair = repair_quote(ground.text, sources.get(ground.source_label, ""))
+            if repair is None:
+                unverified.append(index)
+                continue
+            span, similarity = repair
+            grounds[index] = ground.model_copy(update={"text": span})
+            repairs.append(
+                RepairedQuote(
+                    claim_id=claim.id,
+                    index=index,
+                    written=ground.text,
+                    similarity=round(similarity, 3),
+                )
+            )
+        if len(unverified) == len(grounds):
             lost = "; ".join(
-                f"{claim.grounds[index].text!r} not found in"
-                f" {claim.grounds[index].source_label!r}"
+                f"{grounds[index].text!r} not found in {grounds[index].source_label!r}"
                 for index in unverified
             )
             groundless.append(
@@ -544,15 +574,19 @@ def _verify_quotes(
                 )
             )
             continue
+        drafts.append(
+            claim.model_copy(update={"grounds": grounds}) if repairs else claim
+        )
+        repaired += repairs
         marks += [
             UnverifiedGround(
                 claim_id=claim.id,
                 index=index,
-                reason=f"not found in {claim.grounds[index].source_label!r}",
+                reason=f"not found in {grounds[index].source_label!r}",
             )
             for index in unverified
         ]
-    return marks, groundless
+    return _QuoteCheck(drafts, marks, repaired, groundless)
 
 
 def join_drafts(
@@ -628,15 +662,19 @@ def join_drafts(
     # Only once the references resolve: a quote naming a source the job never
     # carried has already failed above, and matching its text against the empty
     # string would report the same defect a second time in worse words.
-    unverified, groundless = _verify_quotes(merged, sources) if sources else ([], [])
-    dropped = {mark.claim_id for mark in groundless}
-    kept = [draft for draft in merged if draft.id not in dropped]
+    checked = (
+        _verify_quotes(merged, sources)
+        if sources
+        else _QuoteCheck(list(merged), [], [], [])
+    )
+    kept = checked.drafts
     return JoinedDrafts(
         drafts=kept,
         marks=AnalysisMarks(
-            unverified_grounds=unverified,
+            unverified_grounds=checked.unverified,
+            repaired_quotes=checked.repaired,
             unresolved_mentions=_unresolved_mentions(kept, known_ids),
-            groundless_claims=groundless,
+            groundless_claims=checked.groundless,
         ).merged_with(package.record.claim_marks(kept)),
     )
 

@@ -77,6 +77,7 @@ class FrameworkAnalysis:
     scope: list[ScopeEntry]  # units this framework considered and raised nothing about
     coverage: list[LaneCoverage]  # per-lane account of what each agent was offered
     unverified_grounds: list[UnverifiedGround]
+    repaired_quotes: list[RepairedQuote]
     unresolved_mentions: list[UnresolvedMention]
     unresolved_evidence: list[UnresolvedEvidence]
     unknown_claim_identities: list[UnknownClaimIdentity]
@@ -378,6 +379,28 @@ refused to make. See [ADR 0009](adr/0009-a-bad-reference-costs-its-entry.md).
 
 A consumer that read "the job returned" as "every citation resolved" was relying
 on an absence; this list is where that guarantee now lives.
+
+## `repaired_quotes` — quotes rewritten to the source's own span
+
+```python
+class RepairedQuote:
+    claim_id: str  # the claim carrying it
+    index: int  # position in that claim's `grounds` list
+    written: str  # what the agent wrote
+    similarity: float  # the ratio that licensed the replacement
+```
+
+The ladder refused what the agent wrote, and the repair rung
+(`stride_service.grounding.repair_quote`) found a window of the named source
+near enough to hand back. The ground now carries that window — the submitter's
+words, whitespace collapsed — and this mark carries the agent's, so the
+substitution is on the record. A repaired quote verifies, so an entry here is
+never also in `unverified_grounds`.
+
+The rung never accepts the agent's words: it replaces them. What can go wrong
+is a replacement that says something different from what the claim rests on.
+The critic reads the replaced span, and the mark shows the difference to a
+reader. See [ADR 0018](adr/0018-the-repair-rung.md).
 
 ## `groundless_claims` — claims that lost every ground
 
@@ -796,6 +819,9 @@ class TokenUsage:
 >   *dropped*, so unlike the marks before them their `claim_id` names no claim
 >   in the block. What moved beside `groundless_claims` is a behaviour: a claim
 >   that lost every ground used to fail the job.
+> - Each block carries `repaired_quotes`. A quote ground's `text` is no longer
+>   always what the agent wrote: where the ladder refused it and the source
+>   held a near span, the text is that span and this list carries the agent's.
 >
 > **There is no version gate and none is needed.** `Report` forbids unknown
 > fields, so a 2.10 payload carrying `threats` at the top level is refused by

@@ -17,6 +17,7 @@ from stride_service.report import (
     LaneCoverage,
     MissingMitigation,
     ProposedVerdict,
+    RepairedQuote,
     Report,
     Severity,
     UnknownRef,
@@ -596,3 +597,33 @@ class TestSerialization:
         payload["extra"] = True
         with pytest.raises(ValidationError):
             Report.model_validate(payload)
+
+
+class TestRepairedQuoteMarks:
+    def test_a_mark_on_an_entry_the_block_carries_is_accepted(self):
+        report = sample_report(
+            [sample_threat("S-01")],
+            repaired_quotes=[
+                RepairedQuote(claim_id="S-01", index=0, written="w", similarity=0.95)
+            ],
+        )
+        assert report.analyses[0].repaired_quotes[0].written == "w"
+
+    @pytest.mark.parametrize(
+        ("claim_id", "index", "message"),
+        [
+            ("S-99", 0, "repaired quote names claim 'S-99'"),
+            ("S-01", 9, "repaired quote names index 9"),
+        ],
+    )
+    def test_a_mark_on_nothing_is_refused(self, claim_id, index, message):
+        """The agent's words would otherwise be shown beside the wrong entry."""
+        with pytest.raises(ValidationError, match=message):
+            sample_report(
+                [sample_threat("S-01")],
+                repaired_quotes=[
+                    RepairedQuote(
+                        claim_id=claim_id, index=index, written="w", similarity=0.95
+                    )
+                ],
+            )

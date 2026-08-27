@@ -54,6 +54,17 @@ pick by intuition (0.90, 0.95) accepts the fabricated stitch. A deterministic
 ladder is also explainable to a submitter — "this word is not in your document"
 — and a threshold is not.
 
+THE REPAIR RUNG IS A DIFFERENT THING. :func:`repair_quote` runs only after the
+ladder refused a quote, and it does not accept the quote: it finds the source's
+own span nearest to it and hands that span back, so what the report carries is
+the submitter's words and never the model's. The agent's words survive beside
+it as a mark. Its candidates are windows of the source whose word count is
+the quote's or up to two more, which is what keeps the fabricated stitch out —
+a stitch is short and the span it was cut from is long, so the two are never
+compared. The threshold, :data:`REPAIR_THRESHOLD`, decides only how far a
+window may differ from the quote before the rung gives up and the quote stays
+unverified.
+
 False acceptance is not a problem at these lengths: every corpus quote matched
 against all 11 sources it did *not* come from gave 0 spurious matches in 2,266
 wrong-source pairs. Quotes run 29-229 characters, median 80 — long enough that
@@ -65,6 +76,21 @@ from __future__ import annotations
 
 import re
 import unicodedata
+from difflib import SequenceMatcher
+
+#: How alike a source window and a refused quote must be, as a
+#: :class:`difflib.SequenceMatcher` ratio over their normalized forms, for the
+#: rung to hand the window back. At the corpus median of 80 characters this is
+#: at most eight characters of difference: a dropped article, a changed
+#: preposition, a tidied plural. It is not fitted to a measurement yet. The
+#: eval sweep's repaired count is the number that moves it.
+REPAIR_THRESHOLD = 0.9
+
+#: How many words longer than the quote a candidate window may be. Never
+#: shorter: a tidy drops or swaps words, so the span it came from is as long
+#: or longer, and a shorter window that wins on ratio has cut a word the quote
+#: carried.
+_REPAIR_WIDTH_SLACK = 2
 
 #: Characters a model routinely substitutes for their ASCII originals when it
 #: believes it is quoting verbatim. NFKC folds most of the width and ligature
@@ -148,3 +174,42 @@ def verify_normalized(quote: str, haystack: str) -> bool:
         cursor = found + len(fragment)
         matched = True
     return matched
+
+
+def repair_quote(quote: str, source: str) -> tuple[str, float] | None:
+    """The source's own span nearest a refused quote, or ``None``.
+
+    Run only after :func:`verify_quote` said no. The answer is a span cut from
+    ``source`` as written — the submitter's words, whitespace collapsed — that
+    :func:`verify_quote` accepts by construction, plus the similarity that
+    earned it. A caller replaces the quote with it and records the replacement.
+
+    Candidates are every run of whole words whose count is the quote's, up to
+    ``_REPAIR_WIDTH_SLACK`` more, compared under :func:`normalize` on
+    both sides so the rungs the ladder already forgives cost nothing here. The
+    best candidate wins if it reaches :data:`REPAIR_THRESHOLD`.
+
+    A quote marking a cut with ``…`` is not repaired: each fragment is a span of
+    its own, and one nearest window for the whole is a span the quote never
+    claimed.
+    """
+    if _ELLIPSIS.search(quote):
+        return None
+    needle = normalize(quote)
+    if not needle:
+        return None
+    words = source.split()
+    width = len(quote.split())
+    best: tuple[str, float] | None = None
+    matcher = SequenceMatcher(autojunk=False)
+    matcher.set_seq2(needle)
+    for count in range(width, width + _REPAIR_WIDTH_SLACK + 1):
+        for start in range(len(words) - count + 1):
+            span = " ".join(words[start : start + count])
+            matcher.set_seq1(normalize(span))
+            if matcher.quick_ratio() < REPAIR_THRESHOLD:
+                continue
+            ratio = matcher.ratio()
+            if ratio >= REPAIR_THRESHOLD and (best is None or ratio > best[1]):
+                best = (span, ratio)
+    return best

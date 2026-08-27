@@ -498,6 +498,7 @@ def measure_case(
                 run.drafts.get(block.framework, ()),
                 block.unverified_grounds,
                 block.groundless_claims,
+                block.repaired_quotes,
             )
         )
     scored = score_blocks(case, run.report, run.drafts)
