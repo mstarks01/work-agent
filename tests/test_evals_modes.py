@@ -937,8 +937,8 @@ class TestASweepSurvivesARefusedModel:
     def test_routing_it_through_the_draft_classifier_would_miscount_it(self):
         """`classify_failure` accepts it and files it as a *grounds* failure.
 
-        It does not raise — it returns kind ``other`` with ``draft_count=0`` —
-        and that is the argument for the separate branch rather than against it.
+        It does not raise — it returns kind ``other`` — and that is the
+        argument for the separate branch rather than against it.
         `GroundsFailure` feeds the grounds instrument, whose subject is what a
         case's drafts did. A case whose model was refused produced no drafts, so
         counting it there inflates a grounds number with a non-grounds event.
@@ -950,8 +950,6 @@ class TestASweepSurvivesARefusedModel:
         )
 
         assert filed.kind == "other"
-        assert filed.draft_count == 0
-        assert filed.threat_ids == ()
 
     def test_the_message_already_names_its_case(self):
         """So the sweep records `str(error)` rather than prefixing it twice."""

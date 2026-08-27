@@ -311,8 +311,9 @@ def test_a_lane_that_skips_a_number_is_logged_and_not_renumbered(caplog):
     assert any("not 01..02" in message for message in caplog.messages)
 
 
-def test_a_threat_no_ground_supports_fails_the_job():
-    """The per-threat half: nothing holds, so nothing ships."""
+def test_a_threat_no_ground_supports_is_dropped_and_the_report_says_so():
+    """The per-claim half: nothing holds, so the claim does not ship — and the
+    job does, with the drop and the lost quote recorded in the block."""
     proposal = sample_proposal(
         "S-01",
         "spoofing",
@@ -325,12 +326,18 @@ def test_a_threat_no_ground_supports_fails_the_job():
         evidence_refs=[],
     )
     replies = happy_replies() | {
-        graph.analyze_node_name("stride", "spoofing"): claims_json(proposal)
+        graph.analyze_node_name("stride", "spoofing"): claims_json(proposal),
+        CRITIC: claims_json(),
     }
     pipeline, _ = build(replies)
 
-    with pytest.raises(Exception, match="no ground that verifies"):
-        run(pipeline, job())
+    outcome, _ = run(pipeline, job())
+
+    assert isinstance(outcome, PipelineCompleted)
+    assert block(outcome.report).claims == []
+    (mark,) = block(outcome.report).groundless_claims
+    assert mark.claim_id == "S-01"
+    assert "we never got round to MFA" in mark.reason
 
 
 def test_the_report_carries_the_graph_runs_node_stamps():

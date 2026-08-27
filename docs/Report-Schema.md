@@ -79,6 +79,8 @@ class FrameworkAnalysis:
     unverified_grounds: list[UnverifiedGround]
     unresolved_mentions: list[UnresolvedMention]
     unresolved_evidence: list[UnresolvedEvidence]
+    unknown_claim_identities: list[UnknownClaimIdentity]
+    groundless_claims: list[GroundlessClaim]
     fired_rules: list[str]  # this package's deterministic rules that matched
     knowledge_docs: list[str]  # local-corpus documents those rules retrieved
     summary: BlockSummary
@@ -336,7 +338,8 @@ class UnverifiedGround:
 
 A quote that could not be found is **marked, not removed**: the entry still
 renders, and `unverified_grounds` points at it by claim and index. A claim
-where *nothing* verified never reaches the report at all — the job fails
+where *nothing* verified is dropped and recorded in
+[`groundless_claims`](#groundless_claims--claims-that-lost-every-ground)
 instead. So an entry in this list means "one citation on an otherwise justified
 finding did not match", which is worth showing a reader and is not grounds for
 hiding the finding. The list is also empty when no source text was available to
@@ -358,11 +361,14 @@ quote is a real ground whose text the service could not find, and it still
 renders. Here there is nothing to render, so the entry is dropped and this mark
 is the only trace.
 
-**Marked per reference, failed closed per threat.** A threat citing three facts,
-one of them composed, is still justified by the two that resolve. A threat whose
-evidence resolves to *nothing at all* has no justification left and fails the
-job, because `grounds` is `min_length=1` and a finding resting on nothing is
-what this schema refuses to represent.
+**Marked per reference, dropped per claim.** A threat citing three facts, one
+of them composed, is still justified by the two that resolve. A threat whose
+evidence resolves to *nothing at all* has no justification left and is dropped
+into [`groundless_claims`](#groundless_claims--claims-that-lost-every-ground),
+because `grounds` is `min_length=1` and a finding resting on nothing is what
+this schema refuses to represent. A dropped claim gets no entry here: this list
+names a claim the block carries, and the groundless mark names the references
+instead.
 
 This narrowed a whole-job failure in 2.9. Agents compose well-formed references
 — correct grammar, plausible element IDs, absent from the set — and a live sweep
@@ -372,6 +378,31 @@ refused to make. See [ADR 0009](adr/0009-a-bad-reference-costs-its-entry.md).
 
 A consumer that read "the job returned" as "every citation resolved" was relying
 on an absence; this list is where that guarantee now lives.
+
+## `groundless_claims` — claims that lost every ground
+
+```python
+class GroundlessClaim:
+    claim_id: str  # the claim the service dropped
+    title: str  # what the agent called the finding
+    reason: str  # what was lost: the quotes not found, or the references not held
+```
+
+A claim the service dropped because nothing it cited held: every quote was
+absent from the source it names, or every reference was outside the catalog.
+`grounds` is `min_length=1`, so such a claim cannot be represented and no critic
+could rule on it. Like `unknown_claim_identities`, the `claim_id` is deliberately
+absent from `claims` and `rejected_claims`, and `title` is the only trace of what
+was found.
+
+`reason` repeats the lost quote or the cited references, bounded to 500
+characters. Nothing else persists a draft, so without it a reader cannot tell a
+cosmetic mismatch from a fabricated span.
+
+This replaced the last whole-job failure on the grounding path. A claim in a
+framework whose catalog rarely holds the fact a requirement turns on carries one
+quote and nothing else, so one misquote there cost every lane's work. See
+[ADR 0017](adr/0017-a-groundless-claim-costs-its-entry.md).
 
 ## `unresolved_mentions` — IDs the prose cites that do not exist
 
@@ -760,6 +791,11 @@ class TokenUsage:
 >   `elements_analyzed` left on the envelope.
 > - The `StrideReport` type is now `Report`, and `analyses` is an ordered list
 >   rather than a map.
+> - Each block carries `unknown_claim_identities` and `groundless_claims`, two
+>   further lists of service-owned marks. Each records a claim the service
+>   *dropped*, so unlike the marks before them their `claim_id` names no claim
+>   in the block. What moved beside `groundless_claims` is a behaviour: a claim
+>   that lost every ground used to fail the job.
 >
 > **There is no version gate and none is needed.** `Report` forbids unknown
 > fields, so a 2.10 payload carrying `threats` at the top level is refused by

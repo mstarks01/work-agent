@@ -70,6 +70,10 @@ instead of copying one.
 > dropped and marked rather than fatal; only a threat left with no grounds at
 > all still raises `EvidenceResolutionError`. The closed set and the resolution
 > seam below are unchanged.
+>
+> **Amended again by [ADR 0017](0017-a-groundless-claim-costs-its-entry.md).**
+> The groundless threat is now dropped and marked too, and
+> `EvidenceResolutionError` no longer exists.
 
 **No repair, and no fuzzy matching.** An unresolvable reference is reported as
 itself. Inferring which fact an agent *meant* — reading a `derived-fact`

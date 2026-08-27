@@ -312,7 +312,12 @@
     // claim: the claim is gone, which is why they render as a block-level note
     // rather than on a card. The title is the only trace of what was lost.
     const unknown = (block.unknown_claim_identities || []);
-    return { unverified, mentions, composed, unmitigated, unknown };
+    // Claims the service dropped because every ground they cited was lost --
+    // a quote the source does not contain, or a reference the catalog does
+    // not hold. Dropped the same way, listed the same way, and the reason
+    // carries the lost quote or reference so a reader can judge the loss.
+    const groundless = (block.groundless_claims || []);
+    return { unverified, mentions, composed, unmitigated, unknown, groundless };
   }
 
   const SEV = { critical: ["Critical","--sev-critical"], high: ["High","--sev-high"], medium: ["Medium","--sev-medium"], low: ["Low","--sev-low"] };
@@ -544,6 +549,20 @@
       marks.unknown.forEach(m => {
         const item = el("li");
         item.append(code(m.claim_id), " \u2014 ", document.createTextNode(m.title));
+        list.append(item);
+      });
+      note.append(list);
+      section.append(note);
+    }
+    if (marks.groundless.length) {
+      const note = el("div", "dropped");
+      note.append(el("b", null,
+        `${marks.groundless.length} finding(s) dropped because no ground verified`));
+      const list = el("ul");
+      marks.groundless.forEach(m => {
+        const item = el("li");
+        item.append(code(m.claim_id), " \u2014 ", document.createTextNode(m.title),
+          " (", document.createTextNode(m.reason), ")");
         list.append(item);
       });
       note.append(list);
