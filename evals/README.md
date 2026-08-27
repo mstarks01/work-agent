@@ -5,6 +5,10 @@ compares the service's output against them, a deterministic identity rule that
 decides when two threats describe the same thing, and a vote ledger that holds
 what a person decided about each finding.
 
+> For **anyone reading or quoting these numbers**. It explains what the harness
+> measures and what each number does not mean; it is not a procedure. To
+> contribute one, start at [`../CONTRIBUTING.md`](../CONTRIBUTING.md).
+
 ## Read this before you quote a number
 
 **An agent wrote all of it, and a person has read 30 of the 339 match labels.**
