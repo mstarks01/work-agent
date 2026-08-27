@@ -16,10 +16,12 @@ import json
 import pytest
 
 from evals.harness import consent, prices
-from evals.harness.artifact import RepoCommit
+from evals.harness.artifact import ARTIFACT_VERSION, RepoCommit
 from evals.harness.consent import UNKNOWN, Estimate, Refused, gate, hold
 from evals.harness.prices import UnitPrices
+from evals.harness.provenance import RunProvenance
 from stride_service.report import NodeRun, TokenUsage
+from stride_service.sampling import TierSampling, sampling_fingerprint
 
 ARTIFACT_COMMIT = RepoCommit(commit="c" * 40, clean=True)
 
@@ -45,35 +47,97 @@ def priced(monkeypatch):
     return rates
 
 
-def merged(root, name, identity, actual, output_rate=8e-6, sweeps=1):
-    """A merged Baseline on disk, priced as its manifest records.
+#: One node per tier, so a test can weight the tiers against each other. The
+#: estimate reprices these counts, so what they are matters and the recorded
+#: cost beside them does not.
+TIER_NODES = {"extract": "base", "critic": "strong"}
 
-    ``sweeps`` repeats the entry, which is what a Baseline gaining runs looks
-    like: every sweep of one configuration prices the same models, so the
-    price rows repeat and the recorded actual stays a per-sweep figure.
+
+def artifact_document(usage, seed=1):
+    """One admissible artifact whose nodes carry the tiers ``ROUTES`` names.
+
+    ``usage`` is ``{node: (prompt, cached, completion)}``. The borrowed
+    estimate prices exactly these counts, so they are the whole point of the
+    fixture — the recorded actual is no longer read for a guess.
+    """
+    tiers = {tier: TierSampling(temperature=0.2, seed=7) for tier in ROUTES}
+    node_runs = {
+        node: [
+            {
+                "node": node,
+                "tier": tier,
+                "requested_model": ROUTES[tier],
+                "served_model": ROUTES[tier],
+                "generation_fingerprint": sampling_fingerprint(
+                    ROUTES[tier], tiers[tier]
+                ),
+            }
+        ]
+        for node, tier in TIER_NODES.items()
+        if node in usage
+    }
+    provenance = RunProvenance.model_validate(
+        {
+            "sampling_config_version": 1,
+            "tiers_config_version": 1,
+            "sampling": tiers,
+            "node_runs": node_runs,
+        }
+    )
+    return {
+        "artifact_version": ARTIFACT_VERSION,
+        "mode": "end-to-end",
+        "cases": ["01-a-case"],
+        "trusted": False,
+        "structural_failures": [],
+        "repo_commit": {"commit": "c" * 40, "clean": True},
+        "corpus_digest": "d" * 64,
+        "frameworks": ["stride"],
+        "certification": {"verdict": "uncertified", "seed": seed},
+        "node_usage": {
+            node: {
+                "prompt_tokens": prompt,
+                "cached_prompt_tokens": cached,
+                "completion_tokens": completion,
+            }
+            for node, (prompt, cached, completion) in usage.items()
+        },
+        "provenance": provenance.to_json(),
+    }
+
+
+#: Even weight across the two tiers, which most tests do not care about.
+EVEN_USAGE = {"extract": (1000, 200, 300), "critic": (1000, 200, 300)}
+
+
+def merged(root, name, identity, actual, sweeps=1, usage=None):
+    """A merged Baseline on disk: the manifest, and one artifact per sweep.
+
+    The artifacts are what a borrowed estimate reads; the manifest's recorded
+    actual answers only an exact-identity match. ``sweeps`` repeats the pair,
+    which is what a Baseline gaining runs looks like.
     """
     directory = root / "evals" / "baselines" / name
     directory.mkdir(parents=True)
-    entries = [
-        {
-            "artifact": f"ada-{index:04d}.json",
-            "submitted_by": "ada",
-            "cost": {
-                "actual_usd": actual,
-                "unit_prices": [
-                    {
-                        "model": "openai/gpt-5.6",
-                        "input_per_token": 2e-6,
-                        "output_per_token": output_rate,
-                        "cache_read_per_token": 2e-7,
-                    }
-                ],
-                "unpriced": [],
-                "fallbacks": {},
-            },
-        }
-        for index in range(sweeps)
-    ]
+    entries = []
+    for index in range(sweeps):
+        filename = f"ada-{index:04d}.json"
+        (directory / filename).write_text(
+            json.dumps(artifact_document(usage or EVEN_USAGE, seed=index)),
+            encoding="utf-8",
+        )
+        entries.append(
+            {
+                "artifact": filename,
+                "submitted_by": "ada",
+                "cost": {
+                    "actual_usd": actual,
+                    "unit_prices": [],
+                    "unpriced": [],
+                    "fallbacks": {},
+                },
+            }
+        )
     (directory / "baseline.json").write_text(
         json.dumps({"name": name, "identity": identity, "sweeps": entries}),
         encoding="utf-8",
@@ -131,19 +195,65 @@ class TestTheEstimate:
         assert amounts[0] is not None
         assert all(amount == pytest.approx(amounts[0]) for amount in amounts)
 
-    def test_a_dearer_model_makes_the_borrowed_guess_dearer(self, tmp_path, priced):
+    def test_a_dearer_route_for_this_run_makes_the_guess_dearer(
+        self, tmp_path, priced, monkeypatch
+    ):
+        """The lender supplies counts; this run's own routes supply the prices."""
+        merged(tmp_path, "other", {**IDENTITY, "repo_commit": "e" * 40}, actual=0.60)
+        before = consent.estimate(IDENTITY, ROUTES, tmp_path).amount_usd
+
+        dearer = {
+            **priced,
+            "openai/gpt-5.6": UnitPrices("openai/gpt-5.6", 4e-6, 1.6e-5, 4e-7),
+        }
+        monkeypatch.setattr(consent, "unit_prices", dearer.get)
+        after = consent.estimate(IDENTITY, ROUTES, tmp_path).amount_usd
+
+        assert before is not None and after is not None
+        assert after > before
+
+    def test_the_guess_follows_the_tier_that_carries_the_tokens(
+        self, tmp_path, monkeypatch
+    ):
+        """Token mix decides the guess, which a ratio over unit prices cannot.
+
+        The lender's base tier is dearer **per token** while its strong tier
+        ran a thousand times as many. Making each route ten times dearer in
+        turn must therefore move the estimate more for the strong one, because
+        that is where the tokens are.
+
+        The ratio this replaced summed one rate per model and divided, so it
+        answered the opposite way round: it moved by +5.35 for the base route
+        and +0.05 for the strong. The two implementations disagree on the
+        sign here, which is what makes this a test rather than a restatement.
+        """
+        usage = {"extract": (0, 0, 100), "critic": (0, 0, 100_000)}
         merged(
             tmp_path,
             "other",
             {**IDENTITY, "repo_commit": "e" * 40},
             actual=0.60,
-            output_rate=4e-6,
+            usage=usage,
         )
-        estimate = consent.estimate(IDENTITY, ROUTES, tmp_path)
-        # Their sweep recorded a 4e-6 output rate; this run's models total
-        # 1.2e-5, so the guess scales up rather than repeating their number.
-        assert estimate.amount_usd is not None
-        assert estimate.amount_usd > 0.60
+
+        def amount_at(base_out: float, strong_out: float) -> float:
+            rates = {
+                "openai/gpt-base": UnitPrices("openai/gpt-base", 0.0, base_out, 0.0),
+                "openai/gpt-5.6": UnitPrices("openai/gpt-5.6", 0.0, strong_out, 0.0),
+            }
+            monkeypatch.setattr(consent, "unit_prices", rates.get)
+            got = consent.estimate(IDENTITY, ROUTES, tmp_path).amount_usd
+            assert got is not None
+            return got
+
+        flat = amount_at(1e-4, 1e-6)
+        dear_base = amount_at(1e-3, 1e-6)
+        dear_strong = amount_at(1e-4, 1e-5)
+
+        assert flat == pytest.approx(0.11)
+        assert dear_strong - flat == pytest.approx(0.90)
+        assert dear_base - flat == pytest.approx(0.09)
+        assert dear_strong - flat > dear_base - flat
 
     def test_no_merged_baseline_states_no_amount(self, tmp_path, priced):
         estimate = consent.estimate(IDENTITY, ROUTES, tmp_path)
@@ -278,6 +388,27 @@ class TestTheHold:
         assert accepted is not None and accepted > so_far
         # The next boundary, at the same rate, is inside the new figure.
         assert hold(accepted, executions * 2, ["03", "04"], None, ran=2) == accepted
+
+    def test_a_bigger_denominator_projects_a_smaller_amount(self, priced):
+        """Why a skipped case must never count toward ``ran``.
+
+        The rate is the spend over the cases that produced it. Counting a case
+        that spent nothing divides by a larger number and offers less than the
+        sweep will cost — the one direction a consent gate must not err in. The
+        sweep loop therefore passes ``position - len(skipped)``.
+        """
+        executions = [node(completion=1_000_000)]
+        offered: list[float] = []
+
+        def answer(prompt: str) -> str:
+            typed = prompt.split("(")[1].split(")")[0]
+            offered.append(float(typed))
+            return typed
+
+        hold(0.001, executions, ["02", "03"], answer, ran=1)
+        hold(0.001, executions, ["02", "03"], answer, ran=2)
+
+        assert offered[0] > offered[1]
 
     def test_a_run_with_nothing_recorded_yet_offers_what_it_spent(self, priced):
         """``ran`` at zero has no rate to project from, so the spend stands."""
