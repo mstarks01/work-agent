@@ -20,6 +20,10 @@ from evals.harness import queue as review_queue
 from evals.harness.ledger import load
 from webapp.review import build_session, create_app, findings_from_artifacts
 
+#: What a browser puts on every request this page makes. The vote endpoint
+#: refuses without it.
+SAME_ORIGIN = {"Sec-Fetch-Site": "same-origin"}
+
 #: Found by every run of the sweep.
 STEADY = review_queue.Finding(
     case="01-payments-checkout",
@@ -64,7 +68,17 @@ def client(runs, tmp_path):
     )
     # A loopback base URL, because the app now refuses any other Host: the
     # default ``testserver`` is exactly the shape a DNS-rebound request wears.
-    return TestClient(create_app(session), base_url="http://127.0.0.1:8010"), session
+    # The same-origin header rides on the client for the same reason — a real
+    # browser sets it on every request the page makes, and the tests that care
+    # about its absence set their own.
+    return (
+        TestClient(
+            create_app(session),
+            base_url="http://127.0.0.1:8010",
+            headers=SAME_ORIGIN,
+        ),
+        session,
+    )
 
 
 def test_the_queue_page_names_the_reviewer(client):
@@ -355,6 +369,39 @@ def test_a_rebound_host_is_refused_before_it_can_forge_a_vote(runs, tmp_path):
         == 400
     )
     assert not (tmp_path / "votes").exists(), "a refused request wrote nothing"
+
+
+def test_a_cross_site_vote_is_refused(runs, tmp_path):
+    """A foreign page can name a real finding, because a fingerprint is public.
+
+    The ledger is committed, so knowing a fingerprint proves nothing about who
+    is asking. Only the browser-set header does, and this is the endpoint where
+    it decides whether a row enters under the reviewer's name.
+    """
+    session = build_session(runs, voter="ada", ledger_path=tmp_path / "votes")
+    client = TestClient(create_app(session), base_url="http://127.0.0.1:8010")
+    real = client.get("/api/next").json()["fingerprint"]
+
+    for headers in ({}, {"Sec-Fetch-Site": "cross-site"}, {"Sec-Fetch-Site": "none"}):
+        refused = client.post(
+            "/api/vote", json={"fingerprint": real, "verdict": "up"}, headers=headers
+        )
+        assert refused.status_code == 403
+
+    assert not (tmp_path / "votes").exists(), "a refused vote wrote nothing"
+
+
+def test_neither_page_can_be_framed(client):
+    """A vote pressed inside somebody else's frame arrives same-origin.
+
+    So the header check above cannot see it, and refusing the frame is the
+    control that does. ``frame-ancestors`` does not fall back to
+    ``default-src``, which is why it is asserted rather than assumed.
+    """
+    app, _ = client
+    for path in ("/", "/review"):
+        csp = app.get(path).headers["Content-Security-Policy"]
+        assert "frame-ancestors 'none'" in csp, f"{path} can be framed"
 
 
 def test_localhost_is_allowed_beside_the_numeric_loopback(runs, tmp_path):
