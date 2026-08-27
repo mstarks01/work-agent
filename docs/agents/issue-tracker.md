@@ -184,8 +184,15 @@ Completed on GitHub Issues (canonical):
 
   **Certified but unmeasured** is the gap this map names rather than papers over: one `strong` fingerprint
   covers both frameworks, so a run of a framework nobody measured can be certified today. Nothing on this
-  route is measured at all, because **no live eval sweep ever ran in this repository**. Every cost figure the
-  eleven tickets carry is a count from the tree or a token estimate, never an observation of a run.
+  route was measured while the map ran, because **no live eval sweep had run in this repository by
+  2026-08-13**. Every cost figure the eleven tickets carry is a count from the tree or a token estimate,
+  never an observation of a run.
+
+  **That last sentence expired the next day, and this entry is not where to check it.** The first live
+  sweep landed 2026-08-14 and others followed; `evals/README.md` states which sweeps exist, what they
+  measured and what they do not establish, and it is the only place that number is maintained. Read it
+  before repeating anything here about what has been measured — the paragraph above is a record of what
+  this map faced, not a claim about today.
 
   **Out of scope and not graduating**: the content of the ASVS requirements, external plugin loading, semantic
   claim identity (#139 folded it in and it deserved its own issue, now
