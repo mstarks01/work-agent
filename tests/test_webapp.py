@@ -656,6 +656,115 @@ def test_the_viewer_carries_no_escape_helper():
     assert "esc(" not in viewer_javascript()
 
 
+# Enough DOM to run the viewer's helper block under ``node``: a node carries a
+# tag and a list of children, ``textContent`` reads back the text a person sees,
+# and ``codes`` reads back the identifiers that reached a `code` element.
+VIEWER_DOM_SHIM = """
+class Node {
+  constructor(tag) { this.tag = tag; this.children = []; }
+  append(...kids) { kids.forEach(k => this.children.push(k)); }
+  set textContent(t) { this.children = [t]; }
+  get textContent() {
+    return this.children.map(k => (k instanceof Node ? k.textContent : k)).join("");
+  }
+  get codes() {
+    return this.children.flatMap(k => k instanceof Node
+      ? (k.tag === "code" ? [k.textContent] : k.codes) : []);
+  }
+}
+globalThis.document = {
+  getElementById: () => Object.assign(new Node("script"), { children: ["{}"] }),
+  createElement: (tag) => new Node(tag),
+  createDocumentFragment: () => new Node("#fragment"),
+  createTextNode: (t) => Object.assign(new Node("#text"), { children: [t] }),
+};
+"""
+
+# The viewer's helpers run before this constant, and nothing before it touches
+# the page. Splitting here is what lets the test drive the real source rather
+# than a copy of it.
+FIRST_VIEWER_CONSTANT = "const GROUND_KIND"
+
+
+def run_viewer_helpers(script: str):
+    """The viewer's helper block plus ``script``, run under ``node``.
+
+    Skipped where ``node`` is absent, like the form page's parse check: the
+    suite is worth keeping free of a JavaScript runtime.
+    """
+    node = shutil.which("node")
+    if node is None:
+        pytest.skip("no node on PATH to run the viewer's helpers")
+
+    javascript = viewer_javascript()
+    assert FIRST_VIEWER_CONSTANT in javascript, (
+        f"{FIRST_VIEWER_CONSTANT} is gone, so this test no longer knows where"
+        " the viewer's helper block ends."
+    )
+    helpers = javascript.split(FIRST_VIEWER_CONSTANT)[0]
+    with tempfile.NamedTemporaryFile("w", suffix=".mjs") as handle:
+        handle.write(VIEWER_DOM_SHIM + helpers + script)
+        handle.flush()
+        run = subprocess.run(
+            [node, handle.name], capture_output=True, text=True, check=False
+        )
+    assert run.returncode == 0, run.stderr
+    return json.loads(run.stdout)
+
+
+def test_the_viewer_renders_a_backticked_identifier_as_code():
+    """A model writes `process:web-api`, and a reader must not see the ticks.
+
+    The prompt hands identifiers to the lane agent in backticks and the agent
+    writes them back the same way, so every description, rationale and
+    mitigation carries them. The page showed them as characters until `prose`
+    turned each span into a `code` element.
+    """
+    written = "The `encryption_in_transit` state of `flow:a-to-b:sync` is unknown."
+    rendered = run_viewer_helpers(
+        f'const n = proseEl("div", null, {json.dumps(written)});'
+        "console.log(JSON.stringify({ text: n.textContent, codes: n.codes }));"
+    )
+
+    assert "`" not in rendered["text"]
+    assert rendered["text"] == (
+        "The encryption_in_transit state of flow:a-to-b:sync is unknown."
+    )
+    assert rendered["codes"] == ["encryption_in_transit", "flow:a-to-b:sync"]
+
+
+def test_the_viewer_leaves_an_unpaired_backtick_alone():
+    """The half-written case renders as itself rather than as a swallowed line.
+
+    A model that opens a span and never closes it is writing a stray character,
+    not markup, and a reader is better served by the character than by the rest
+    of the sentence disappearing into a `code` element.
+    """
+    written = "The cost is 3 ` per unit"
+    rendered = run_viewer_helpers(
+        f'const n = proseEl("div", null, {json.dumps(written)});'
+        "console.log(JSON.stringify({ text: n.textContent, codes: n.codes }));"
+    )
+
+    assert rendered["text"] == written
+    assert rendered["codes"] == []
+
+
+def test_the_viewer_renders_a_span_as_text_not_as_markup():
+    """`prose` is new text handling, so it gets #86's payload too.
+
+    A code span is still built as a `code` element with its content set as
+    text. The payload must come back as the characters a reader sees, which is
+    what says it never became markup.
+    """
+    rendered = run_viewer_helpers(
+        f'const n = proseEl("div", null, {json.dumps(f"a `{MARKUP_PAYLOAD}` span")});'
+        "console.log(JSON.stringify({ text: n.textContent, codes: n.codes }));"
+    )
+
+    assert rendered["codes"] == [MARKUP_PAYLOAD]
+
+
 def model_with_markup_everywhere():
     """A System Model whose every free-text field carries the payload.
 

@@ -124,6 +124,10 @@
   .tid { font-family: ui-monospace, SFMono-Regular, Menlo, monospace; color: var(--muted); font-size: 0.82rem; }
   .cat { font-size: 0.72rem; text-transform: uppercase; letter-spacing: 0.06em; color: var(--ink-2); }
   .desc { margin: 10px 0 12px; color: var(--ink-2); font-size: 0.92rem; }
+  /* An identifier inside model prose. Sized in `em` so it tracks whatever the
+     surrounding block sets, from a card heading down to a mitigation. */
+  .card h3 code, .desc code, .field code, ul.mits code {
+    font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: 0.9em; }
 
   .badges { display: flex; gap: 8px; flex-wrap: wrap; align-items: center; margin-top: 10px; }
   .chip { display: inline-flex; align-items: center; gap: 6px; font-size: 0.75rem; font-weight: 600;
@@ -256,6 +260,37 @@
     return n;
   };
   const code = (text) => el("code", null, text);
+  // A model writes an identifier the way the prompt hands it over: in
+  // backticks. Each of those spans becomes a `code` element here, so a
+  // description names `process:web-api` in the same face the element table
+  // below shows it in, rather than printing the delimiters as characters.
+  //
+  // A pair of backticks around a non-empty span is the entire grammar. No
+  // other Markdown is read, and an unpaired backtick stays a backtick: this
+  // renders one sentence of prose, and half an emphasis rule reads worse than
+  // the raw character does.
+  //
+  // Still no string that becomes markup — the pieces are text nodes and `code`
+  // elements, appended. A quote never comes through here. Its text is the
+  // submitter's own words, and a backtick among them is one of those words.
+  const CODE_SPAN = /`([^`\n]+)`/g;
+  const prose = (text) => {
+    const line = String(text);
+    const frag = document.createDocumentFragment();
+    let end = 0;
+    for (const span of line.matchAll(CODE_SPAN)) {
+      frag.append(line.slice(end, span.index), code(span[1]));
+      end = span.index + span[0].length;
+    }
+    frag.append(line.slice(end));
+    return frag;
+  };
+  // `el`, for the fields a model wrote rather than the ones this page words.
+  const proseEl = (tag, cls, text) => {
+    const n = el(tag, cls);
+    n.append(prose(text));
+    return n;
+  };
   const lbl = (text) => el("span", "lbl", text);
   const cell = (...kids) => { const n = el("td"); n.append(...kids); return n; };
 
@@ -422,7 +457,7 @@
   function claimCard(marks, t, rejected) {
     const card = el("div", "card" + (rejected ? " rejected" : ""));
     const head = el("div","card-head");
-    head.append(el("h3", null, t.title), el("span","tid", t.id));
+    head.append(proseEl("h3", null, t.title), el("span","tid", t.id));
     card.append(head);
     // The lane, where the framework stamps one. Each package names the field
     // itself — STRIDE's is its category, ASVS's is its chapter — so this reads
@@ -450,7 +485,7 @@
     }
     card.append(badges);
 
-    card.append(el("div","desc", t.description));
+    card.append(proseEl("div","desc", t.description));
 
     // Directly under the argument it qualifies. The prose above cites an
     // element this report does not describe, which a reader following the ID
@@ -483,7 +518,7 @@
 
     if (t.severity) {
       const rationale = el("div","field");
-      rationale.append(lbl("Severity rationale"), el("br"), t.severity.justification);
+      rationale.append(lbl("Severity rationale"), el("br"), prose(t.severity.justification));
       card.append(rationale);
     }
 
@@ -504,7 +539,7 @@
     // says who justified what.
     if (t.verdict.status === "needs-info" && t.verdict.related_unknowns.length) {
       const u = el("div","unknown");
-      u.append(el("b", null, "Needs info."), ` ${t.verdict.reason} Unknown: `);
+      u.append(el("b", null, "Needs info."), " ", prose(t.verdict.reason), " Unknown: ");
       t.verdict.related_unknowns.forEach((r, i) => {
         if (i) u.append(", ");
         u.append(code(r.element_id), " \u2192 ", code(r.attribute));
@@ -513,11 +548,11 @@
     }
     if (t.verdict.status === "rejected") {
       const why = el("div","field");
-      why.append(lbl("Reason dismissed"), el("br"), t.verdict.reason);
+      why.append(lbl("Reason dismissed"), el("br"), prose(t.verdict.reason));
       card.append(why);
     }
     if (t.mitigations && t.mitigations.length) {
-      const list = el("ul","mits"); t.mitigations.forEach(m => list.append(el("li", null, m.summary)));
+      const list = el("ul","mits"); t.mitigations.forEach(m => list.append(proseEl("li", null, m.summary)));
       const wrap = el("div","field"); wrap.append(el("div","lbl","Mitigations"), list); card.append(wrap);
     } else if (marks.unmitigated.has(t.id)) {
       // Where the Mitigations block would have been, so its absence is stated
@@ -574,7 +609,7 @@
       const list = el("ul");
       marks.unknown.forEach(m => {
         const item = el("li");
-        item.append(code(m.claim_id), " \u2014 ", document.createTextNode(m.title));
+        item.append(code(m.claim_id), " \u2014 ", prose(m.title));
         list.append(item);
       });
       note.append(list);
@@ -587,8 +622,8 @@
       const list = el("ul");
       marks.groundless.forEach(m => {
         const item = el("li");
-        item.append(code(m.claim_id), " \u2014 ", document.createTextNode(m.title),
-          " (", document.createTextNode(m.reason), ")");
+        item.append(code(m.claim_id), " \u2014 ", prose(m.title),
+          " (", prose(m.reason), ")");
         list.append(item);
       });
       note.append(list);
