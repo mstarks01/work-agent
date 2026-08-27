@@ -7,9 +7,26 @@ Run it from a clone, with no credentials of any kind::
 It is **eval-side tooling and not the product**, and it is the browser half of
 a path that also works entirely from the shell: everything it writes is what
 ``evals/BLESSING.md`` step 6 asks a person to write by hand, and
-``submit sitting`` checks the result the same way either way. Nothing here
-opens a pull request or reaches a network — it prepares your working tree and
-hands you the one command, or the text to paste.
+``submit sitting`` checks the result the same way either way. It prepares your
+working tree, and then offers three ways out — run the command yourself, paste
+the text into a pull request you open, or press the button.
+
+**The button opens a pull request, through your own authenticated ``gh``.**
+That reverses map #319's "the web app never gains a network write", on the
+maintainer's instruction and recorded in ``docs/agents/issue-tracker.md``.
+It is not a hosted service: nothing is hosted, no credential is held here, and
+the app still binds to loopback. What it does mean is that a request reaching
+:func:`create_app`'s submit endpoint can act on GitHub as you, so that one
+endpoint carries four controls rather than the app's usual none:
+
+* the **Host** check every loopback app here runs, which is what stops DNS
+  rebinding making an attacker's page same-origin with this one;
+* **``Sec-Fetch-Site: same-origin``**, the check ``webapp/main.py`` already
+  uses on its own write endpoint;
+* a **one-time token** minted per process and embedded in the page, so a
+  request that never read the page cannot carry it;
+* **no request-controlled arguments at all** — the endpoint opens the one
+  submission this session prepared, and takes neither a kind nor a path.
 
 **The own list comes first, and the server enforces it.** ``/api/part-two``
 refuses until the reader has posted their own threat list, so the recorded
@@ -31,6 +48,8 @@ Security posture, inherited from ``webapp/review.py`` rather than re-derived:
   injected as one JSON blob the client renders through ``textContent``.
 * **Every write lands inside the one case directory** the command named
   (A01), plus the debt list. There is no path in the request at all.
+* **The submit endpoint is off unless ``gh`` is authenticated** — with no
+  login there is nothing to act as, so the button is never offered.
 """
 
 from __future__ import annotations
@@ -41,7 +60,7 @@ import sys
 from dataclasses import dataclass, field
 from pathlib import Path
 
-from fastapi import FastAPI, HTTPException
+from fastapi import FastAPI, HTTPException, Request
 from fastapi.responses import HTMLResponse, JSONResponse
 from pydantic import BaseModel, ConfigDict, Field
 from starlette.middleware.trustedhost import TrustedHostMiddleware
@@ -49,6 +68,7 @@ from starlette.middleware.trustedhost import TrustedHostMiddleware
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
 from evals.harness import sitting as sittings
+from evals.harness import submit as submit_spine
 from webapp.main import LOOPBACK_HOSTS, SecurityHeaders
 
 HOST = "127.0.0.1"
@@ -88,6 +108,15 @@ class Session:
     prepared: sittings.Prepared
     root: Path
     own_list: list[str] | None = field(default=None)
+    #: Minted per process and embedded in the page. The submit endpoint
+    #: requires it, so a request that never read the page cannot carry it —
+    #: and reading the page cross-origin is what the Host and Sec-Fetch-Site
+    #: checks already refuse.
+    token: str = field(default_factory=lambda: secrets.token_urlsafe(24))
+    #: Whether a `gh` login is available to act as. With none there is nothing
+    #: to submit with, so the button is never offered.
+    can_submit: bool = False
+    recorded: bool = False
 
     @property
     def document_name(self) -> str:
@@ -108,6 +137,8 @@ def create_app(session: Session) -> FastAPI:
                 case=_escape(session.prepared.case_id),
                 title=_escape(session.prepared.title),
                 reviewer=_escape(session.reviewer),
+                token=_escape(session.token),
+                cansubmit="yes" if session.can_submit else "no",
             )
         )
 
@@ -164,6 +195,7 @@ def create_app(session: Session) -> FastAPI:
             cleared = sittings.clear_debt(session.root, session.prepared.case_id)
         except sittings.SittingError as exc:
             raise HTTPException(status_code=409, detail=str(exc)) from exc
+        session.recorded = True
         return JSONResponse(
             {
                 "written": [
@@ -173,8 +205,44 @@ def create_app(session: Session) -> FastAPI:
                 ],
                 "command": "python -m evals.harness.run submit sitting",
                 "paste": _paste(session, len(read)),
+                "can_submit": session.can_submit,
             }
         )
+
+    @app.post("/api/submit")
+    def open_the_pr(request: Request) -> JSONResponse:
+        """Open the pull request, through the operator's own `gh`.
+
+        The four controls this endpoint carries are in the module docstring,
+        and they are all here rather than spread about because this is the
+        only place in any app in this repository that can act on GitHub as
+        the person running it.
+
+        It takes no arguments. The submission is whatever this session already
+        recorded into the working tree, so there is nothing in the request for
+        an attacker to steer — and nothing to steer it with, since a request
+        that did not read the page has no token.
+        """
+        if not session.can_submit:
+            raise HTTPException(
+                status_code=409,
+                detail="no authenticated gh login, so there is nothing to"
+                " submit as. Run the printed command yourself.",
+            )
+        if request.headers.get("sec-fetch-site") != "same-origin":
+            raise HTTPException(
+                status_code=403, detail="this request did not come from the app's page"
+            )
+        if not secrets.compare_digest(
+            request.headers.get("x-sitting-token", ""), session.token
+        ):
+            raise HTTPException(status_code=403, detail="wrong or missing page token")
+        if not session.recorded:
+            raise HTTPException(
+                status_code=409, detail="record the sitting before submitting it"
+            )
+        outcome = submit_spine.submission(session.root, "sitting")
+        return JSONResponse(outcome.to_json(), status_code=200 if outcome.ok else 409)
 
     return app
 
@@ -265,6 +333,13 @@ _PAGE = """<!doctype html>
   <pre id="command"></pre>
   <p>Or paste this into one you open yourself:</p>
   <pre id="paste"></pre>
+  <div id="submitBox" class="hidden">
+    <p class="note">Or let this open it for you, through the
+    <code>gh</code> you are already signed in to. It runs the same checks
+    first, pushes to your fork, and opens the pull request as you.</p>
+    <p><button id="submit">Open the pull request as <!--reviewer--></button></p>
+    <pre id="result" class="hidden"></pre>
+  </div>
 </section>
 
 <script nonce="__CSP_NONCE__">
@@ -289,6 +364,9 @@ $("lock").addEventListener("click", async () => {
   $("two").scrollIntoView({behavior: "smooth"});
 });
 
+const TOKEN = "<!--token-->";
+const CAN_SUBMIT = "<!--cansubmit-->" === "yes";
+
 $("finish").addEventListener("click", async () => {
   const res = await fetch("/api/finish", {
     method: "POST", headers: {"Content-Type": "application/json"},
@@ -301,13 +379,33 @@ $("finish").addEventListener("click", async () => {
   $("paste").textContent = d.paste;
   $("two").classList.add("hidden");
   $("done").classList.remove("hidden");
+  if (CAN_SUBMIT && d.can_submit) $("submitBox").classList.remove("hidden");
+});
+
+$("submit").addEventListener("click", async () => {
+  $("submit").disabled = true;
+  $("result").classList.remove("hidden");
+  $("result").textContent = "running the checks…";
+  const res = await fetch("/api/submit", {
+    method: "POST",
+    headers: {"Content-Type": "application/json", "X-Sitting-Token": TOKEN},
+  });
+  const d = await res.json();
+  if (d.detail) { $("result").textContent = d.detail; $("submit").disabled = false; return; }
+  const lines = (d.checks || []).map(c => (c.passed ? "ok   " : "FAIL ") + c.name
+    + (c.problems.length ? "\n       " + c.problems.join("\n       ") : ""));
+  if (d.ok) { lines.push("", d.url, "", d.closing); }
+  else { lines.push("", d.error || "nothing opened; fix the failures above."); $("submit").disabled = false; }
+  $("result").textContent = lines.join("\n");
 });
 </script>
 </body></html>
 """
 
 
-def build_session(case_id: str, reviewer: str, root: Path) -> Session:
+def build_session(
+    case_id: str, reviewer: str, root: Path, can_submit: bool = False
+) -> Session:
     case_dir = root / "evals" / "corpus" / case_id
     if not (case_dir / "case.json").is_file():
         raise SystemExit(f"no case {case_id!r} under evals/corpus/")
@@ -316,6 +414,7 @@ def build_session(case_id: str, reviewer: str, root: Path) -> Session:
         reviewer=reviewer,
         prepared=sittings.prepare(case_dir),
         root=root,
+        can_submit=can_submit,
     )
 
 
@@ -328,6 +427,12 @@ def main(argv: list[str] | None = None) -> int:
         " because it is the name the record carries either way.",
     )
     parser.add_argument("--list", action="store_true", help="print the cases in debt")
+    parser.add_argument(
+        "--no-submit",
+        action="store_true",
+        help="hide the button that opens the pull request, leaving the printed"
+        " command and the paste text as the only ways out",
+    )
     args = parser.parse_args(argv)
 
     root = Path(__file__).resolve().parents[1]
@@ -335,22 +440,34 @@ def main(argv: list[str] | None = None) -> int:
         print("\n".join(sittings.cases_in_debt(root)))
         return 0
 
-    reviewer = args.reviewer
+    # One read of the login, answering two questions: what name the record
+    # carries, and whether there is an account to open a pull request as. A
+    # tree with no `gh` still works — it just ends at the command rather than
+    # the button.
+    try:
+        login = submit_spine.gh_login(root)
+    except submit_spine.SubmitError:
+        login = ""
+
+    reviewer = args.reviewer or login
     if not reviewer:
-        from evals.harness.submit import SubmitError, gh_login
+        print(
+            "cannot read your gh login, so pass --reviewer with the login the"
+            " record should carry",
+            file=sys.stderr,
+        )
+        return 1
 
-        try:
-            reviewer = gh_login(root)
-        except SubmitError as exc:
-            print(
-                f"cannot read your gh login ({exc}); pass --reviewer", file=sys.stderr
-            )
-            return 1
-
-    session = build_session(args.case, reviewer, root)
+    # Only ever as yourself. A submission opened under a name `gh` does not
+    # hold would fail #320's binding in CI, so offering the button would be
+    # inviting a red PR.
+    can_submit = bool(login) and login == reviewer and not args.no_submit
+    session = build_session(args.case, reviewer, root, can_submit)
     import uvicorn
 
     print(f"sitting with {args.case} as {reviewer}")
+    if can_submit:
+        print("the page can open the pull request as you; --no-submit hides it")
     print(f"open http://{HOST}:{PORT}/")
     uvicorn.run(create_app(session), host=HOST, port=PORT, log_level="warning")
     return 0
