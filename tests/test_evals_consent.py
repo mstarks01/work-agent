@@ -11,11 +11,13 @@ refusals are asserted one by one: an enter, a ``y``, a nearly-right number.
 
 from __future__ import annotations
 
+import asyncio
 import json
+from types import SimpleNamespace
 
 import pytest
 
-from evals.harness import consent, prices
+from evals.harness import consent, modes, prices, run
 from evals.harness.artifact import ARTIFACT_VERSION, RepoCommit
 from evals.harness.consent import UNKNOWN, Estimate, Refused, gate, hold
 from evals.harness.prices import UnitPrices
@@ -639,3 +641,90 @@ class TestAStoppedSweepSaysSo:
         # And the cases it claims are only the ones that ran, which is what
         # makes it fail the Baseline full-corpus rule rather than pass it.
         assert artifact["cases"] == ["01"]
+
+
+class TestTheSweepLoopPassesTheCasesThatRan:
+    """The call site of :func:`hold`, driven with no provider.
+
+    ``_run_mode`` reaches its seams through the ``modes`` module, so a sweep
+    runs offline with those stubbed. What is under test is one expression:
+    the loop passes ``position - len(skipped)``, because a case skipped under
+    ``--framework`` spent nothing, and counting it divides the spend by a
+    larger number and offers less than the sweep will cost.
+    """
+
+    class Stop(Exception):
+        """Ends the sweep at the prompt; the tail is not what this tests."""
+
+    def offer_at_the_hold(self, monkeypatch, selected):
+        """Sweep cases that run or skip per ``selected``; return what was offered.
+
+        Every case that runs spends the same amount, so the projection the
+        hold offers is a plain multiple of one case and the arithmetic under
+        test is legible in the assertion.
+        """
+        cases = [SimpleNamespace(id=f"{index:02d}") for index in range(len(selected))]
+
+        monkeypatch.setattr(
+            modes,
+            "select_frameworks",
+            lambda case, only=(): ("stride",) if selected[int(case.id)] else (),
+        )
+        monkeypatch.setattr(
+            modes, "build_eval_pipeline", lambda *args, **kwargs: SimpleNamespace()
+        )
+        monkeypatch.setattr(
+            modes,
+            "score_extraction",
+            lambda case, result: SimpleNamespace(to_json=dict),
+        )
+
+        async def one_extraction(case, pipeline):
+            return modes.ExtractionResult(
+                case_id=case.id,
+                extracted=None,
+                issues=(),
+                node_runs=(node(completion=1_000_000),),
+            )
+
+        monkeypatch.setattr(modes, "run_extraction", one_extraction)
+
+        prompts: list[str] = []
+
+        def ask(prompt: str) -> str:
+            prompts.append(prompt)
+            raise self.Stop
+
+        with pytest.raises(self.Stop):
+            asyncio.run(
+                run._run_mode(
+                    cases,
+                    "extraction",
+                    deployment=SimpleNamespace(),
+                    accepted=0.0001,
+                    ask=ask,
+                )
+            )
+        return float(prompts[-1].split("(")[1].split(")")[0])
+
+    def test_a_skipped_case_does_not_dilute_the_rate(self, priced, monkeypatch):
+        """Two cases skipped, then one that spends, with one still to run.
+
+        One case produced the spend, so the offer is that spend plus one more
+        case at the same rate. Counting the two skipped cases would divide by
+        three and offer a third of a case instead.
+        """
+        one_case = consent.spent([node(completion=1_000_000)])
+
+        offered = self.offer_at_the_hold(monkeypatch, [False, False, True, True])
+
+        assert offered == pytest.approx(one_case * 2, rel=1e-3)
+        assert offered > one_case * (1 + 1 / 3)  # what the diluted rate gave
+
+    def test_no_skipped_case_leaves_the_rate_alone(self, priced, monkeypatch):
+        """The subtraction is a no-op when the selection skips nothing."""
+        one_case = consent.spent([node(completion=1_000_000)])
+
+        offered = self.offer_at_the_hold(monkeypatch, [True, True, True])
+
+        assert offered == pytest.approx(one_case * 3, rel=1e-3)
