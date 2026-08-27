@@ -62,7 +62,9 @@ def client(runs, tmp_path):
         ledger_path=tmp_path / "votes",
         configs={"01-payments-checkout": "engine-1.2.3"},
     )
-    return TestClient(create_app(session)), session
+    # A loopback base URL, because the app now refuses any other Host: the
+    # default ``testserver`` is exactly the shape a DNS-rebound request wears.
+    return TestClient(create_app(session), base_url="http://127.0.0.1:8010"), session
 
 
 def test_the_queue_page_names_the_reviewer(client):
@@ -332,3 +334,31 @@ class TestReadingSeveralSweeps:
         _, configs = findings_from_artifacts([first, second])
 
         assert configs["01-payments-checkout"] == "engine-1, engine-2"
+
+
+def test_a_rebound_host_is_refused_before_it_can_forge_a_vote(runs, tmp_path):
+    """Binding to 127.0.0.1 does not stop a page in the operator's own browser.
+
+    DNS rebinding makes an attacker's domain resolve to 127.0.0.1, which makes
+    their page same-origin with this app — no CORS preflight, and a write
+    endpoint reachable from any page the reviewer happens to be visiting. The
+    rebound request still carries the attacker's name in ``Host``, and that is
+    what this refuses. The ledger is the supply chain of every published
+    quality number, so a forged row here would be laundered into a real PR
+    under the reviewer's own name.
+    """
+    session = build_session(runs, voter="ada", ledger_path=tmp_path / "votes")
+    client = TestClient(create_app(session), base_url="http://attacker.example")
+    assert client.get("/").status_code == 400
+    assert (
+        client.post("/api/vote", json={"fingerprint": "x", "verdict": "up"}).status_code
+        == 400
+    )
+    assert not (tmp_path / "votes").exists(), "a refused request wrote nothing"
+
+
+def test_localhost_is_allowed_beside_the_numeric_loopback(runs, tmp_path):
+    """Both spellings a person types, and nothing else."""
+    session = build_session(runs, voter="ada", ledger_path=tmp_path / "votes")
+    client = TestClient(create_app(session), base_url="http://localhost:8010")
+    assert client.get("/").status_code == 200

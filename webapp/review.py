@@ -60,6 +60,7 @@ from typing import get_args
 from fastapi import FastAPI, HTTPException
 from fastapi.responses import HTMLResponse, JSONResponse
 from pydantic import BaseModel, ConfigDict, Field
+from starlette.middleware.trustedhost import TrustedHostMiddleware
 
 REPO_ROOT = Path(__file__).resolve().parents[1]
 if str(REPO_ROOT) not in sys.path:
@@ -80,7 +81,7 @@ from evals.harness.ledger import (
     load,
 )
 from evals.harness.reference import load_corpus
-from webapp.main import SecurityHeaders
+from webapp.main import LOOPBACK_HOSTS, SecurityHeaders
 
 HOST = "127.0.0.1"
 PORT = 8010
@@ -192,6 +193,10 @@ def build_session(
 def create_app(session: Session) -> FastAPI:
     """The review app over one prepared sitting."""
     app = FastAPI(title="STRIDE review", docs_url=None, redoc_url=None)
+    # Before anything else, so a rebound request is refused rather than
+    # reaching the one endpoint in this repository that writes a human
+    # judgement. See LOOPBACK_HOSTS for what binding alone does not stop.
+    app.add_middleware(TrustedHostMiddleware, allowed_hosts=LOOPBACK_HOSTS)
     app.add_middleware(SecurityHeaders)
 
     @app.get("/", response_class=HTMLResponse)
