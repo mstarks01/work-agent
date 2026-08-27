@@ -55,13 +55,14 @@ from collections.abc import Iterable, Mapping
 from typing import Any, NamedTuple
 
 from stride_service.analysis import CONTROL_ATTRIBUTES, control_state
-from stride_service.critic import DraftJoinError
 from stride_service.frameworks import FrameworkPackage, schemas_for
 from stride_service.report import (
+    GROUNDLESS_REASON_MAX_CHARS,
     REFERENCE_MAX_CHARS,
     AnalysisMarks,
     Claim,
     Ground,
+    GroundlessClaim,
     Proposal,
     UnknownClaimIdentity,
     UnresolvedEvidence,
@@ -84,24 +85,6 @@ EvidenceCatalog = dict[str, Ground]
 UNKNOWN_PREFIX = "unknown"
 ABSENT_PREFIX = "absent"
 CROSSING_PREFIX = "crossing"
-
-
-class EvidenceResolutionError(DraftJoinError):
-    """A proposal's evidence resolves to nothing at all, leaving it groundless.
-
-    Narrower than it was. A *single* reference the catalog does not contain is
-    dropped and marked (:class:`~stride_service.report.UnresolvedEvidence`), so
-    this no longer fires for a claim that cited one composed fact beside real
-    ones — that cost 2 of 12 jobs on a live sweep for citation errors (#138).
-    What still raises is a claim with **no grounds left**, which the schema
-    cannot represent and no critic could rule on.
-
-    A :class:`~stride_service.critic.DraftJoinError` because it is one: a draft
-    resting on nothing is the same fault as a draft naming an element that does
-    not exist, discovered at the same seam, with the same consequence. Callers
-    that already handle the fan-in refusing a set of drafts handle this without
-    knowing it exists.
-    """
 
 
 def unknown_evidence_ref(element_id: str, attribute: str) -> str:
@@ -403,23 +386,21 @@ def resolve_proposals(
     unresolvable reference is dropped and marked, and the claim stands on
     whatever else it cited.
 
-    The line is *no grounds at all*. A claim whose every ground evaporates has
-    nothing supporting it, and a finding with empty ``grounds`` is the one
-    thing this schema refuses to represent — so that, and only that, still
-    raises. It is the same rule :func:`~stride_service.critic.join_drafts`
-    applies to unverified quotes: marked per entry, failed closed per claim.
-
-    Every such claim across the whole batch is reported together, rather than
-    the first one aborting the pass. An agent that misread the catalog usually
-    misread it more than once, and a fan-in with no re-ask path gets one chance
-    to say what was wrong.
+    A claim whose every ground evaporates has nothing supporting it, and a
+    finding with empty ``grounds`` is the one thing this schema refuses to
+    represent — so the claim is dropped and recorded as a
+    :class:`~stride_service.report.GroundlessClaim`, with the references it
+    cited in the reason. It is the same rule
+    :func:`~stride_service.critic.join_drafts` applies to unverified quotes:
+    marked per entry, dropped per claim. Nothing here raises on what an agent
+    cited.
     """
     key_field = schemas_for(package.name).key_field
     carried = _RESOLVED_AWAY | {key_field}
     drafts: list[Claim] = []
     unresolved_evidence: list[UnresolvedEvidence] = []
     unknown_identities: list[UnknownClaimIdentity] = []
-    groundless: list[str] = []
+    groundless: list[GroundlessClaim] = []
     for proposal in proposals:
         key = getattr(proposal, key_field)
         claim_id = package.compose_id(lane, key)
@@ -434,17 +415,25 @@ def resolve_proposals(
             )
             continue
         grounds, unresolved = _grounds_of(proposal, catalog)
+        # A per-reference mark names a claim the block carries, so a claim that
+        # is dropped gets none: its groundless mark names the references instead.
+        if not grounds:
+            cited = ", ".join(repr(ref) for ref in unresolved)
+            groundless.append(
+                GroundlessClaim(
+                    claim_id=claim_id,
+                    title=proposal.title,
+                    reason=(
+                        "cites only evidence this job's catalog does not"
+                        f" contain ({cited})"
+                    )[:GROUNDLESS_REASON_MAX_CHARS],
+                )
+            )
+            continue
         unresolved_evidence += [
             UnresolvedEvidence(claim_id=claim_id, reference=ref[:REFERENCE_MAX_CHARS])
             for ref in unresolved
         ]
-        if not grounds:
-            groundless.append(
-                f"claim {claim_id!r} cites only evidence this job's catalog"
-                f" does not contain ({', '.join(repr(ref) for ref in unresolved)}),"
-                " so nothing is left to justify it"
-            )
-            continue
         # The agent's own fields plus the lane the graph stamped, as one mapping:
         # what a package's record declares beyond :class:`Claim` is the package's
         # business, so this is deliberately untyped here and validated by the
@@ -462,12 +451,11 @@ def resolve_proposals(
                 **agent_fields,
             )
         )
-    if groundless:
-        raise EvidenceResolutionError("; ".join(groundless))
     return Resolution(
         drafts,
         AnalysisMarks(
             unresolved_evidence=unresolved_evidence,
             unknown_claim_identities=unknown_identities,
+            groundless_claims=groundless,
         ),
     )

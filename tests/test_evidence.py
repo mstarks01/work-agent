@@ -14,7 +14,6 @@ import pytest
 from pydantic import ValidationError
 
 from stride_service.evidence import (
-    EvidenceResolutionError,
     absent_evidence_ref,
     crossing_evidence_ref,
     evidence_catalog,
@@ -281,13 +280,12 @@ class TestRenderCatalog:
 
 
 class TestABadReferenceCostsItsEntryNotTheJob:
-    """The fail-closed policy #138 narrowed.
+    """The policy #138 narrowed, and the groundless drop that finished it.
 
     Agents compose well-formed references to facts the catalog does not hold,
     and failing the whole analysis over one discarded six lanes of work to
     punish a citation error — 2 of 12 jobs on a live sweep. The rule is now the
-    one unverified quotes already had: marked per entry, failed closed per
-    threat.
+    one unverified quotes have: marked per entry, dropped per claim.
     """
 
     def test_a_threat_survives_on_the_references_that_did_resolve(self):
@@ -337,39 +335,38 @@ class TestABadReferenceCostsItsEntryNotTheJob:
         assert len(resolution.drafts) == 1
         assert len(resolution.marks.unresolved_evidence) == 1
 
-    def test_a_threat_left_with_no_grounds_at_all_still_fails_the_job(self):
-        """Where the line is, and why it is there.
-
-        ``grounds`` is ``min_length=1``: a finding resting on nothing is the one
-        thing this schema refuses to represent, and no critic could rule on it.
-        Dropping the threat instead would delete a finding silently, which is
-        the worst outcome a security tool has available.
+    def test_a_threat_left_with_no_grounds_at_all_is_dropped_and_marked(self):
+        """``grounds`` is ``min_length=1``: a finding resting on nothing is the
+        one thing this schema refuses to represent, and no critic could rule
+        on it. It costs its entry, and the mark names the title and every
+        reference it cited, so the drop is visible rather than silent.
         """
         catalog = evidence_catalog(valid_model())
         proposal = sample_proposal(
             "S-01", evidence_refs=["crossing:flow:ghost"], quotes=[]
         )
 
-        with pytest.raises(EvidenceResolutionError, match="nothing is left"):
-            resolve_proposals([proposal], catalog, STRIDE, "spoofing")
+        resolution = resolve_proposals([proposal], catalog, STRIDE, "spoofing")
+
+        assert resolution.drafts == []
+        (mark,) = resolution.marks.groundless_claims
+        assert mark.claim_id == "S-01"
+        assert mark.title == proposal.title
+        assert "crossing:flow:ghost" in mark.reason
+        # No per-reference mark: it would name a claim the block does not carry.
+        assert resolution.marks.unresolved_evidence == []
 
     def test_one_groundless_threat_does_not_take_its_lane_down_with_it(self):
-        """Only the threat that cannot stand fails, and it fails the job.
-
-        The batch still reports together, so a run that dies says everything
-        that was wrong rather than the first thing.
-        """
         catalog = evidence_catalog(valid_model())
         proposals = [
             sample_proposal("S-01", evidence_refs=[ENCRYPTION_REF], quotes=[]),
             sample_proposal("S-02", evidence_refs=["crossing:flow:ghost"], quotes=[]),
         ]
 
-        with pytest.raises(EvidenceResolutionError) as excinfo:
-            resolve_proposals(proposals, catalog, STRIDE, "spoofing")
+        resolution = resolve_proposals(proposals, catalog, STRIDE, "spoofing")
 
-        assert "'S-02'" in str(excinfo.value)
-        assert "'S-01'" not in str(excinfo.value)
+        assert [draft.id for draft in resolution.drafts] == ["S-01"]
+        assert [m.claim_id for m in resolution.marks.groundless_claims] == ["S-02"]
 
     def test_a_clean_lane_records_no_marks(self):
         catalog = evidence_catalog(valid_model())
@@ -439,31 +436,38 @@ class TestResolveProposals:
             proposals, catalog, STRIDE, "spoofing"
         ) == resolve_proposals(proposals, catalog, STRIDE, "spoofing")
 
-    def test_a_reference_naming_nothing_fails_deterministically(self):
-        """Reported as itself. There is no near match and no repair: inferring
-        which fact was *meant* is the guess this design removes."""
+    def test_a_reference_naming_nothing_is_reported_as_itself(self):
+        """There is no near match and no repair: inferring which fact was
+        *meant* is the guess this design removes."""
         catalog = evidence_catalog(valid_model())
         proposal = sample_proposal(
             "S-01", evidence_refs=["crossing:flow:not-real"], quotes=[]
         )
 
-        with pytest.raises(EvidenceResolutionError, match="crossing:flow:not-real"):
-            resolve_proposals([proposal], catalog, STRIDE, "spoofing")
+        resolution = resolve_proposals([proposal], catalog, STRIDE, "spoofing")
 
-    def test_every_bad_reference_in_the_batch_is_reported_at_once(self):
-        """The fan-in has no re-ask path, so it gets one chance to say what was
-        wrong — and an agent that misread the catalog usually did so twice."""
+        assert resolution.drafts == []
+        assert "crossing:flow:not-real" in resolution.marks.groundless_claims[0].reason
+
+    def test_every_bad_reference_in_the_batch_is_marked(self):
         catalog = evidence_catalog(valid_model())
         proposals = [
             sample_proposal("S-01", evidence_refs=["crossing:flow:ghost"], quotes=[]),
             sample_proposal("S-02", evidence_refs=["unknown:store:ghost:x"], quotes=[]),
         ]
 
-        with pytest.raises(EvidenceResolutionError) as excinfo:
-            resolve_proposals(proposals, catalog, STRIDE, "spoofing")
+        resolution = resolve_proposals(proposals, catalog, STRIDE, "spoofing")
 
-        assert "crossing:flow:ghost" in str(excinfo.value)
-        assert "unknown:store:ghost:x" in str(excinfo.value)
+        assert [(m.claim_id, m.reason) for m in resolution.marks.groundless_claims] == [
+            (
+                "S-01",
+                "cites only evidence this job's catalog does not contain ('crossing:flow:ghost')",
+            ),
+            (
+                "S-02",
+                "cites only evidence this job's catalog does not contain ('unknown:store:ghost:x')",
+            ),
+        ]
 
     def test_surrounding_whitespace_on_a_reference_is_not_a_defect(self):
         """Which spelling of a name arrived is mechanical; settled here rather

@@ -74,7 +74,9 @@ run's three outcomes.
   fan-in: every reference resolves, no two lanes reused a claim ID, and every
   quote ground is matched against the bytes of the source it names. An
   unverifiable quote is marked and still renders; a claim where *nothing*
-  verifies fails the job. It also computes the per-lane
+  verifies is dropped and marked as a
+  [`groundless_claims`](Report-Schema.md#groundless_claims--claims-that-lost-every-ground)
+  entry. It also computes the per-lane
   [`coverage`](Report-Schema.md#coverage--what-each-lane-was-offered) account
   over the drafts.
   Then that framework's **critic** rules on all of them in one pass — verdicts,

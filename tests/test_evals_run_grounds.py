@@ -65,6 +65,9 @@ class QueuedLlm(ScriptedLlm):
 
     lane_replies: dict[str, str] = Field(default_factory=dict)
     queued: dict[str, list[str]] = Field(default_factory=dict)
+    #: Replies for a node that is not a lane, consumed in order — the critic's
+    #: ruling on the first case, when that case drops a draft.
+    first_replies: list[str] = Field(default_factory=list)
 
     async def generate_content_async(self, llm_request, stream: bool = False):
         instruction = llm_request.config.system_instruction or ""
@@ -79,7 +82,7 @@ class QueuedLlm(ScriptedLlm):
     def _next_reply(self, instruction: str, default: str) -> str:
         lane = lane_of(instruction, self.lane_replies or self.queued)
         if lane is None:
-            return default
+            return self.first_replies.pop(0) if self.first_replies else default
         pending = self.queued.get(lane)
         if pending:
             return pending.pop(0)
@@ -130,6 +133,9 @@ FABRICATED = {
 # The successor to the mis-shaped ``Ground``. An agent selects from a closed
 # set, so the only way its evidence can fail is by naming something outside it.
 INVENTED = {"evidence_refs": ["crossing:flow:not-a-flow-in-this-model"]}
+# What still kills a case: an emission the proposal schema refuses, which the
+# fan-in raises on rather than marks.
+DEAD = {"verb": "not-a-verb-in-the-closed-set"}
 
 
 def sweep(monkeypatch, case, spoofing_first: dict[str, Any] | None) -> Any:
@@ -154,6 +160,7 @@ def sweep(monkeypatch, case, spoofing_first: dict[str, Any] | None) -> Any:
             reply=_reply_for(case, graph_node),
             lane_replies=_lane_replies(case, graph_node),
             queued=_queued_for(case, graph_node, first),
+            first_replies=_critic_first(graph_node, first),
         )
 
     pipeline = modes.build_eval_pipeline(
@@ -181,6 +188,23 @@ def _reply_for(case, graph_node: str) -> str:
                 {"claims": [proposal(case, category, sound_evidence(case))]}
             )
     return '{"claims": []}'
+
+
+def _critic_first(graph_node: str, first: dict[str, Any] | None) -> list[str]:
+    """The critic's ruling on a first case whose spoofing draft was dropped.
+
+    A broken spoofing emission loses its only ground, so the service drops
+    ``S-01`` before the critic sees it, and a ruling on it would be a ruling on
+    a claim nobody drafted.
+    """
+    if graph_node != "critic_stride" or first is None or first == DEAD:
+        return []
+    rulings = [
+        scripted_ruling(category)
+        for category in STRIDE_CATEGORIES
+        if category != "spoofing"
+    ]
+    return [json.dumps({"claims": rulings})]
 
 
 def _lane_replies(case, graph_node: str) -> dict[str, str]:
@@ -232,42 +256,21 @@ def test_the_measurement_rides_in_the_case_payload(monkeypatch, case):
     assert stride["metrics"]["grounds_per_threat"] == 1.0
 
 
-def test_a_fail_closed_case_is_counted_and_the_sweep_continues(monkeypatch, case):
-    run = sweep(monkeypatch, case, FABRICATED)
-
-    assert [f.kind for f in run.grounds_failures] == ["fail-closed"]
-    assert run.grounds_failures[0].threat_ids == ("S-01",)
-    assert run.grounds_failures[0].draft_count == len(STRIDE_CATEGORIES)
-    # The next case still ran, which is the whole point.
-    assert [entry.case_id for entry in run.grounds] == ["case-second"]
-
-
-def test_an_invented_reference_is_counted_and_the_sweep_continues(monkeypatch, case):
-    """An agent cannot mis-shape a ``Ground`` — it never writes one — so this is
-    the whole of what its evidence selection can get wrong, and it must be
-    counted as its own kind rather than pooled with unrelated join faults."""
-    run = sweep(monkeypatch, case, INVENTED)
-
-    assert [f.kind for f in run.grounds_failures] == ["unresolved-evidence"]
-    assert [entry.case_id for entry in run.grounds] == ["case-second"]
-
-
 @pytest.mark.parametrize("broken", [FABRICATED, INVENTED])
-def test_a_counted_case_is_still_a_tier_1_failure(monkeypatch, case, broken):
-    """Surviving the failure must not turn it green — the run still exits
-    non-zero, and the case is named in the failure list."""
+def test_a_claim_that_lost_every_ground_is_dropped_and_the_case_still_measures(
+    monkeypatch, case, broken
+):
+    """A fabricated quote and an invented reference both cost the claim, never
+    the case: the report is built, the drop is counted, and the sweep goes on."""
     run = sweep(monkeypatch, case, broken)
 
-    assert any(failure.startswith(f"{case.id}:") for failure in run.failures)
-
-
-def test_a_failed_case_names_its_kind_in_the_payload(monkeypatch, case):
-    run = sweep(monkeypatch, case, FABRICATED)
-
-    payload = run.payloads[0]
-    assert payload["case"] == case.id
-    assert payload["grounds_failure"]["kind"] == "fail-closed"
-    assert "grounds" not in payload
+    assert run.grounds_failures == []
+    assert [entry.case_id for entry in run.grounds] == [case.id, "case-second"]
+    first, second = run.grounds
+    assert [mark.claim_id for mark in first.groundless] == ["S-01"]
+    assert first.threat_count == len(STRIDE_CATEGORIES) - 1
+    assert second.groundless == ()
+    assert run.payloads[0]["grounds"][0]["counts"]["groundless_claims"] == 1
 
 
 def test_the_sweep_collects_every_case_s_coverage_rows(monkeypatch, case):
@@ -281,9 +284,22 @@ def test_the_sweep_collects_every_case_s_coverage_rows(monkeypatch, case):
     assert coverage_totals(lanes)["drafts"] == 2 * len(STRIDE_CATEGORIES)
 
 
+def test_a_dead_case_is_counted_and_the_sweep_continues(monkeypatch, case):
+    """The fan-in still refuses a draft naming an element the model does not
+    contain. That is counted as a failure, named in the failure list so the
+    run exits non-zero, and the next case still runs."""
+    run = sweep(monkeypatch, case, DEAD)
+
+    assert [f.kind for f in run.grounds_failures] == ["other"]
+    assert any(failure.startswith(f"{case.id}:") for failure in run.failures)
+    assert run.payloads[0]["grounds_failure"]["kind"] == "other"
+    assert "grounds" not in run.payloads[0]
+    assert [entry.case_id for entry in run.grounds] == ["case-second"]
+
+
 def test_a_failed_case_contributes_no_coverage(monkeypatch, case):
     """No report, no accounting — a lane cannot be credited for a dead case."""
-    run = sweep(monkeypatch, case, FABRICATED)
+    run = sweep(monkeypatch, case, DEAD)
 
     assert len(run.coverage) == len(STRIDE_CATEGORIES)
 

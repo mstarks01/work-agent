@@ -17,10 +17,9 @@ from evals.harness.grounds import (
     classify_failure,
     measure_grounds,
 )
-from stride_service.critic import DraftJoinError, GroundsUnverifiedError
-from stride_service.evidence import EvidenceResolutionError
+from stride_service.critic import DraftJoinError
 from stride_service.frameworks.stride.record import STRIDE_VERSION, DraftThreat
-from stride_service.report import Ground, UnverifiedGround
+from stride_service.report import Ground, GroundlessClaim, UnverifiedGround
 from tests.eval_factories import draft_threat
 
 LABEL = "design-doc"
@@ -141,20 +140,24 @@ class TestMeasureGrounds:
         assert measurement.to_json()["counts"]["threats"] == 0
 
 
-class TestClassifyFailure:
-    def test_a_threat_that_lost_every_ground_is_fail_closed(self):
-        error = GroundsUnverifiedError(
-            "threat 'S-01' has no ground that verifies",
-            claim_ids=["S-01"],
-            draft_count=4,
+class TestGroundlessClaims:
+    def test_a_dropped_claim_is_counted_against_what_the_agents_wrote(self):
+        """A dropped claim never reached the critic, so it is not a threat here
+        — but it is a draft the lanes produced, and the rate says so."""
+        dropped = GroundlessClaim(claim_id="S-02", title="t", reason="r")
+
+        measurement = measure_grounds(
+            "case-a", "stride", [grounded(1, quote())], [], [dropped]
         )
 
-        failure = classify_failure("case-a", error)
+        assert measurement.threat_count == 1
+        assert measurement.groundless_count == 1
+        assert measurement.groundless_rate == 0.5
+        assert measurement.to_json()["counts"]["groundless_claims"] == 1
+        assert measurement.to_json()["groundless"][0]["claim_id"] == "S-02"
 
-        assert failure.kind == "fail-closed"
-        assert failure.threat_ids == ("S-01",)
-        assert failure.fail_closed_rate == 0.25
 
+class TestClassifyFailure:
     def test_a_mis_shaped_ground_ends_the_sweep_rather_than_scoring_it(self):
         """The one fault here that is not an agent behaviour, so not a rate.
 
@@ -204,22 +207,6 @@ class TestClassifyFailure:
         with pytest.raises(GroundMisShape):
             classify_failure("case-a", excinfo.value)
 
-    def test_an_invented_evidence_reference_is_its_own_kind(self):
-        """The one way an agent's evidence selection can fail.
-
-        It is a ``DraftJoinError`` subclass, so it would otherwise pool into
-        ``other`` beside dangling element IDs and duplicate threat IDs — and
-        the number worth watching after the cutover is exactly this one."""
-        failure = classify_failure(
-            "case-a",
-            EvidenceResolutionError(
-                "threat 'S-01' cites evidence 'crossing:flow:not-real'"
-            ),
-        )
-
-        assert failure.kind == "unresolved-evidence"
-        assert "crossing:flow:not-real" in failure.detail
-
     def test_a_ground_missing_its_branch_fields_trips_it_too(self):
         """The other half of ``_check_shape``: a branch that carries none of
         what it requires."""
@@ -244,7 +231,6 @@ class TestClassifyFailure:
         )
 
         assert failure.kind == "other"
-        assert failure.threat_ids == ()
 
 
 class TestAggregate:
@@ -275,18 +261,19 @@ class TestAggregate:
     def test_failed_cases_are_counted_by_kind_never_folded_into_a_rate(self):
         """A dead case contributed no denominator, so pooling it into a
         per-threat rate would divide by a population the run does not have."""
-        failures = [
-            classify_failure(
-                "case-a",
-                GroundsUnverifiedError("x", claim_ids=["S-01", "T-02"], draft_count=9),
-            ),
-            classify_failure("case-b", DraftJoinError("unrelated")),
-        ]
+        failures = [classify_failure("case-b", DraftJoinError("unrelated"))]
 
         totals = aggregate_grounds([], failures)
 
-        assert totals["failed_cases"] == 2
-        assert totals["fail_closed_cases"] == 1
-        assert totals["other_failed_cases"] == 1
-        assert totals["fail_closed_threats"] == 2
+        assert totals["failed_cases"] == 1
         assert totals["threats"] == 0
+
+    def test_groundless_claims_pool_into_one_rate(self):
+        dropped = GroundlessClaim(claim_id="S-02", title="t", reason="r")
+        kept = measure_grounds("a", "stride", [grounded(1, quote())], [], [dropped])
+        clean = measure_grounds("b", "stride", [grounded(1, quote())], [])
+
+        totals = aggregate_grounds([kept, clean], [])
+
+        assert totals["groundless_claims"] == 1
+        assert totals["groundless_rate"] == round(1 / 3, 3)

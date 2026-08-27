@@ -1379,12 +1379,13 @@ def merge_drafts(
 
     Then the mechanical half of the fan-in: :func:`join_drafts` fails closed if
     a draft cites an element the model does not contain, if two agents reused a
-    claim ID, if a grounds reference does not resolve, or if no ground on a
-    claim verifies at all — so the critic spends judgement on evidence, lanes
-    and whether a verbatim quote actually supports what it was filed under.
+    claim ID, or if a grounds reference does not resolve — so the critic spends
+    judgement on evidence, lanes and whether a verbatim quote actually supports
+    what it was filed under.
 
     It also returns what it could *not* verify: quote grounds absent from the
-    source they name are marked rather than dropped. Those marks join the ones
+    source they name are marked rather than dropped, and a claim on which no
+    ground verifies is dropped and marked. Those marks join the ones
     the evidence resolution produced as a single
     :class:`~stride_service.report.AnalysisMarks` under this framework's own
     key, which is what :func:`assemble_report` carries into this framework's

@@ -22,12 +22,16 @@ marks it counts are the ones :func:`~stride_service.critic.join_drafts` already
 produced with the *shipped* checker, so a sweep cannot grade a normalization
 policy the service does not run.
 
-**Some of the numbers only exist on the failure path**, which is why
-:class:`GroundsFailure` sits beside the measurement rather than in it. A threat
-that loses every ground and an invented evidence reference both kill the job
-where they are found, so neither reaches a report — measuring them means
-surviving them per case and counting. Both stay Tier 1 failures: a counted case
-is still a failed case, and the sweep still exits non-zero.
+* **A claim that lost every ground** — read :attr:`CaseGrounds.groundless_count`,
+  the claims the service dropped and marked because nothing they cited held:
+  every quote absent from its source, or every reference outside the catalog.
+
+**One number still exists only on the failure path**, which is why
+:class:`GroundsFailure` sits beside the measurement rather than in it. The
+fan-in still kills a job over a dangling element reference, a duplicate ID or
+an unresolvable source label, so measuring those means surviving them per case
+and counting. A counted case is still a failed case, and the sweep still exits
+non-zero.
 
 A mis-shaped ``Ground`` is the one thing here that is **not** measured, because
 it is not an agent behaviour any more (:class:`GroundMisShape`).
@@ -45,27 +49,26 @@ from typing import Any, Literal
 
 from pydantic import ValidationError
 
-from stride_service.critic import DraftJoinError, GroundsUnverifiedError
-from stride_service.evidence import EvidenceResolutionError
+from stride_service.critic import DraftJoinError
 from stride_service.frameworks import PACKAGES
 from stride_service.report import (
     Claim,
     FrameworkName,
     GroundKind,
+    GroundlessClaim,
     UnverifiedGround,
 )
 
-# Why the grounding path killed a case, where the cause is an *agent's* doing.
-# ``fail-closed`` is one of the two #91 asks for by name; ``unresolved-evidence``
-# is an agent naming a catalog entry that does not exist, which is the only way
-# its evidence selection can fail; ``other`` is every remaining way the fan-in
-# can reject a set of drafts — a dangling element reference, a duplicate ID, an
-# unresolvable label — kept distinct so no measured rate quietly absorbs a
-# defect that is not about grounds at all.
+# Why the fan-in killed a case. A claim that lost every ground no longer kills
+# one — it is dropped and marked, and :attr:`CaseGrounds.groundless_count`
+# reads it off the report — so what is left is ``other``: every way the fan-in
+# still rejects a set of drafts (a dangling element reference, a duplicate ID,
+# an unresolvable label), kept as its own kind so no measured rate quietly
+# absorbs a defect that is not about grounds at all.
 #
 # A mis-shaped ``Ground`` is deliberately **not** among them: see
 # :class:`GroundMisShape`.
-FailureKind = Literal["fail-closed", "unresolved-evidence", "other"]
+FailureKind = Literal["other"]
 
 _KINDS: tuple[GroundKind, ...] = (
     "quote",
@@ -132,6 +135,9 @@ class CaseGrounds:
     case_id: str
     framework: FrameworkName
     threats: tuple[ThreatGrounds, ...]
+    #: The claims this block dropped for losing every ground, as the report
+    #: marks them. Not in ``threats``: a dropped claim never reached the critic.
+    groundless: tuple[GroundlessClaim, ...] = ()
 
     # --- measurement 1: how many grounds, and of which branch ------------
 
@@ -183,6 +189,20 @@ class CaseGrounds:
         """
         return ratio(self.unverified_count, self.quote_count)
 
+    # --- measurement 3: claims dropped for losing every ground -----------
+    @property
+    def groundless_count(self) -> int:
+        return len(self.groundless)
+
+    @property
+    def groundless_rate(self) -> float:
+        """Of every claim the lanes drafted, the share the service dropped.
+
+        Denominated in drafts plus drops: a dropped claim is not in ``threats``,
+        so the population is what the agents wrote rather than what survived.
+        """
+        return ratio(self.groundless_count, self.threat_count + self.groundless_count)
+
     def to_json(self) -> dict[str, Any]:
         return {
             "case": self.case_id,
@@ -192,14 +212,17 @@ class CaseGrounds:
                 "grounds": self.ground_count,
                 "quoteless_threats": self.quoteless_count,
                 "unverified_quotes": self.unverified_count,
+                "groundless_claims": self.groundless_count,
                 **self.kind_counts,
             },
             "metrics": {
                 "grounds_per_threat": round(self.grounds_per_threat, 3),
                 "quoteless_rate": round(self.quoteless_rate, 3),
                 "unverified_rate": round(self.unverified_rate, 3),
+                "groundless_rate": round(self.groundless_rate, 3),
             },
             "threats": [entry.to_json() for entry in self.threats],
+            "groundless": [mark.model_dump(mode="json") for mark in self.groundless],
         }
 
 
@@ -224,35 +247,18 @@ class GroundMisShape(RuntimeError):
 
 @dataclass(frozen=True)
 class GroundsFailure:
-    """A case the grounding path killed, recorded as a number rather than a crash.
+    """A case the fan-in killed, recorded as a number rather than a crash.
 
-    ``threat_ids`` and ``draft_count`` are populated only for ``fail-closed``,
-    where :class:`~stride_service.critic.GroundsUnverifiedError` carries both
-    halves of the rate off the raise site. The other kinds have no comparable
-    population — the batch never became drafts, so there is nothing to count
-    them against — and each is reported as an occurrence per case.
+    The batch never became drafts, so there is no population to count it
+    against; it is reported as an occurrence per case.
     """
 
     case_id: str
     kind: FailureKind
     detail: str
-    threat_ids: tuple[str, ...] = ()
-    draft_count: int = 0
-
-    @property
-    def fail_closed_rate(self) -> float:
-        """Share of this case's drafts that lost every ground. 0.0 otherwise."""
-        return ratio(len(self.threat_ids), self.draft_count)
 
     def to_json(self) -> dict[str, Any]:
-        return {
-            "case": self.case_id,
-            "kind": self.kind,
-            "detail": self.detail,
-            "threat_ids": list(self.threat_ids),
-            "draft_count": self.draft_count,
-            "fail_closed_rate": round(self.fail_closed_rate, 3),
-        }
+        return {"case": self.case_id, "kind": self.kind, "detail": self.detail}
 
 
 def ratio(numerator: float, denominator: float) -> float:
@@ -277,6 +283,7 @@ def measure_grounds(
     framework: FrameworkName,
     drafts: Sequence[Claim],
     unverified: Iterable[UnverifiedGround],
+    groundless: Iterable[GroundlessClaim] = (),
 ) -> CaseGrounds:
     """Fold one framework's drafts and its unverified marks into one measurement.
 
@@ -310,6 +317,7 @@ def measure_grounds(
             )
             for draft in drafts
         ),
+        groundless=tuple(groundless),
     )
 
 
@@ -317,11 +325,8 @@ def classify_failure(case_id: str, error: Exception) -> GroundsFailure:
     """Name what the fan-in rejected, without pattern-matching its prose.
 
     Structural signals only, all type checks or ``loc`` shapes rather than
-    message prose. A fail-closed threat arrives as
-    :class:`~stride_service.critic.GroundsUnverifiedError`; an invented
-    reference as :class:`~stride_service.evidence.EvidenceResolutionError`,
-    which is checked first because it is the narrower of two ``DraftJoinError``
-    subclasses' siblings.
+    message prose. A claim that lost every ground is not a failure any more —
+    it is dropped and marked, and :func:`measure_grounds` counts it.
 
     **Raises rather than classifies** on a mis-shaped ``Ground``, recognised as
     a :class:`pydantic.ValidationError` whose ``loc`` **ends** in
@@ -332,12 +337,7 @@ def classify_failure(case_id: str, error: Exception) -> GroundsFailure:
     revalidated wherever it is read back out of session state, which nests the
     same fault at different depths.
 
-    ``unresolved-evidence`` is where an agent's evidence selection actually
-    fails, and it is the number to read against how legible the catalog is: an
-    agent can only pick from the closed set it was shown or name something that
-    is not in it.
-
-    A *missing* or empty ``grounds`` list is deliberately neither: its error
+    A *missing* or empty ``grounds`` list is deliberately not a mis-shape: its error
     sits on the list rather than on an entry, it is reachable from a proposal
     that named no evidence, and it is a different defect from a nonsense field
     combination.
@@ -346,18 +346,6 @@ def classify_failure(case_id: str, error: Exception) -> GroundsFailure:
     a measured rate would make these numbers report faults the grounding path
     never caused.
     """
-    if isinstance(error, GroundsUnverifiedError):
-        return GroundsFailure(
-            case_id=case_id,
-            kind="fail-closed",
-            detail=str(error),
-            threat_ids=error.claim_ids,
-            draft_count=error.draft_count,
-        )
-    if isinstance(error, EvidenceResolutionError):
-        return GroundsFailure(
-            case_id=case_id, kind="unresolved-evidence", detail=str(error)
-        )
     if isinstance(error, ValidationError) and _is_ground_mis_shape(error):
         raise GroundMisShape(
             "a Ground reached validation mis-shaped, which no agent can cause:"
@@ -378,9 +366,8 @@ def _is_ground_mis_shape(error: ValidationError) -> bool:
 
 
 # What ``_run_mode`` catches per case: the two exception types a grounds fault
-# can arrive as. ``DraftJoinError`` is the fan-in's, and covers evidence
-# resolution through :class:`~stride_service.evidence.EvidenceResolutionError`;
-# ``ValidationError`` is every schema check the run passes through, including
+# can arrive as. ``DraftJoinError`` is the fan-in's; ``ValidationError`` is
+# every schema check the run passes through, including
 # the ``output_schema`` ADK applies at each category agent node. Anything else
 # still aborts the sweep loudly: a provider timeout is not a measurement.
 CAUGHT: tuple[type[Exception], ...] = (DraftJoinError, ValidationError)
@@ -395,40 +382,33 @@ def aggregate_grounds(
     case, and a mean of per-case rates would let a case that drafted three
     threats outweigh one that drafted forty.
 
-    The two failure counts are deliberately **cases, not rates**. A case that
-    died contributed no denominator to anything — its drafts never reached a
-    report — so pooling it into a per-threat rate would divide by a population
-    the run does not have. ``fail_closed_threats`` is the one number the raise
-    site could preserve, and it is reported as a count beside the cases.
+    The failure count is deliberately **cases, not a rate**. A case that died
+    contributed no denominator to anything — its drafts never reached a report
+    — so pooling it into a per-threat rate would divide by a population the run
+    does not have.
     """
     threats = sum(entry.threat_count for entry in measurements)
     grounds = sum(entry.ground_count for entry in measurements)
     quotes = sum(entry.quote_count for entry in measurements)
     unverified = sum(entry.unverified_count for entry in measurements)
     quoteless = sum(entry.quoteless_count for entry in measurements)
+    groundless = sum(entry.groundless_count for entry in measurements)
     kinds: Counter[str] = Counter()
     for entry in measurements:
         kinds.update(entry.kind_counts)
-    by_kind = Counter(failure.kind for failure in failures)
     return {
         "cases": len(measurements),
         "threats": threats,
         "grounds": grounds,
         "quoteless_threats": quoteless,
         "unverified_quotes": unverified,
+        "groundless_claims": groundless,
         **{kind: kinds.get(kind, 0) for kind in _KINDS},
         "grounds_per_threat": round(ratio(grounds, threats), 3),
         "quoteless_rate": round(ratio(quoteless, threats), 3),
         "unverified_rate": round(ratio(unverified, quotes), 3),
+        "groundless_rate": round(ratio(groundless, threats + groundless), 3),
         "failed_cases": len(failures),
-        "fail_closed_cases": by_kind.get("fail-closed", 0),
-        "unresolved_evidence_cases": by_kind.get("unresolved-evidence", 0),
-        "other_failed_cases": by_kind.get("other", 0),
-        "fail_closed_threats": sum(
-            len(failure.threat_ids)
-            for failure in failures
-            if failure.kind == "fail-closed"
-        ),
     }
 
 
@@ -451,23 +431,18 @@ def render(
             f"/{counts['absent-attribute']}/{counts['derived-fact']}"
             f"  quoteless {entry.quoteless_rate:.0%}"
             f"  unverified {entry.unverified_count}/{entry.quote_count}"
+            f"  groundless {entry.groundless_count}"
         )
     for failure in failures:
-        scope = (
-            f": {len(failure.threat_ids)}/{failure.draft_count} threats"
-            if failure.kind == "fail-closed"
-            else ""
-        )
-        print(f"{failure.case_id:<26} grounds FAILED ({failure.kind}{scope})")
+        print(f"{failure.case_id:<26} grounds FAILED ({failure.kind})")
     if measurements or failures:
         totals = aggregate_grounds(measurements, failures)
         print(
             f"grounds: {totals['grounds_per_threat']:.2f} per threat,"
             f" quoteless {totals['quoteless_rate']:.0%},"
             f" unverified {totals['unverified_rate']:.1%},"
+            f" groundless {totals['groundless_rate']:.1%},"
             f" failed cases {totals['failed_cases']}"
-            f" (fail-closed {totals['fail_closed_cases']},"
-            f" other {totals['other_failed_cases']})"
             " (instrument, non-gating)"
         )
 

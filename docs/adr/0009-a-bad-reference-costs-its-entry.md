@@ -6,6 +6,8 @@
   unchanged and whose fail-closed consequence is narrowed here.
 - **Relates to**: [ADR 0002](0002-finding-level-attribution.md), which established
   marking beside a threat rather than failing on it.
+- **Amended by**: [ADR 0017](0017-a-groundless-claim-costs-its-entry.md), which
+  drops and marks the groundless threat this ADR still failed the job on.
 
 ## Context
 
