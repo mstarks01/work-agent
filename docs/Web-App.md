@@ -151,6 +151,13 @@ dependencies. The app reads it, substitutes your run's JSON into its
 It holds no report of its own, so opening it from disk shows nothing. It is a
 template belonging to this app, not a sample to look at.
 
+An agent writes an element ID in backticks, because that is how the prompt hands
+it over. The page reads a pair of backticks around a non-empty span as a `code`
+element and renders no other Markdown, so a description names
+`flow:web-api-to-store:write` in the same face the element table does. A quote is
+excluded: its text is the submitter's own words, and a backtick among them is one
+of those words.
+
 ## How the pages are protected
 
 Two rules, held over all three pages rather than only the report page.
