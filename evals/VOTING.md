@@ -1,5 +1,10 @@
 # The vote: how a person scores a finding
 
+> For **anyone scoring findings**, maintainer or outside contributor. It is
+> free and offline: a merged **Baseline** keeps its reports in this repository,
+> so voting needs no provider key and spends nothing. New here? Start at
+> [`../CONTRIBUTING.md`](../CONTRIBUTING.md).
+
 A sweep produces findings. The identity rule
 (`evals/harness/identity.py`) matches a finding against the case's reference
 set, and a match is a recall hit. The rule stops there. It cannot say whether a

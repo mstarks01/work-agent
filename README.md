@@ -91,6 +91,8 @@ redirect any of them, in either layout.
 Measuring the analysis, for contributors changing prompts, sampling or the
 corpus:
 
+- [CONTRIBUTING](CONTRIBUTING.md) — **start here.** What you can contribute
+  with time alone, and what needs a provider key.
 - [evals/README](evals/README.md) — what the harness measures, and what every
   number does and does not mean.
 - [evals/TUNING](evals/TUNING.md) — change one lever, measure it against the
@@ -99,6 +101,8 @@ corpus:
   moves, and how a vote reaches the numbers.
 - [evals/BLESSING](evals/BLESSING.md) — author a golden case and its reference
   set, per framework.
+- [evals/BASELINES](evals/BASELINES.md) — run the corpus through your own
+  models and contribute the result.
 
 
 ## Development

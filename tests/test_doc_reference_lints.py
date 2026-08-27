@@ -120,14 +120,6 @@ DELIBERATE: dict[tuple[str, str], str] = {
         "docs/example-report.html",
     ): "same block, same marking.",
     (
-        "docs/agents/issue-tracker.md",
-        "CONTRIBUTING.md",
-    ): "specified by map #319's document-surface ticket; #337 tracks writing it.",
-    (
-        "docs/agents/issue-tracker.md",
-        "evals/BASELINES.md",
-    ): "same spec, same tracking issue.",
-    (
         "evals/harness/baseline.py",
         "baseline.json",
     ): "each merged Baseline's manifest; none is merged yet.",
