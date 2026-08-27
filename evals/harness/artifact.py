@@ -44,6 +44,10 @@ CORPUS_DIR = REPO_ROOT / "evals" / "corpus"
 # keys, and promotion will reject the older files by name rather than
 # half-understanding them.
 #
+# * Version 5 adds ``series``: which standings each published series reads,
+#   and the scored blocks for every series but the primary one (#326). The
+#   top-level scored keys are the primary series — maintainer votes only —
+#   where before they read every vote regardless of standing.
 # * Version 4 adds ``stopped``: the cases the estimate gate's hold prevented,
 #   empty on a sweep that ran to the end (#334). A partial sweep that could
 #   not say so would read as a whole one.
@@ -52,7 +56,7 @@ CORPUS_DIR = REPO_ROOT / "evals" / "corpus"
 #   inference over blocks that write their keys whether or not a framework ran.
 # * Version 2 adds the two keys that say which *repository state* produced a
 #   sweep, beside the ``provenance`` block that already said which models did.
-ARTIFACT_VERSION = 4
+ARTIFACT_VERSION = 5
 
 #: What a recorded artifact carries where the fact was never captured. Only
 #: the sweeps taken before version 2 hold it: :func:`build` computes both keys
@@ -306,6 +310,7 @@ ENVELOPE_KEYS: tuple[str, ...] = (
     "corpus_digest",
     "frameworks",
     "stopped",
+    "series",
 )
 
 #: Every key an artifact of this version carries. The envelope's, plus each
@@ -331,6 +336,7 @@ def build(
     sweep: Sweep,
     commit: RepoCommit,
     corpus: str,
+    series: Mapping[str, Any] | None = None,
 ) -> dict[str, Any]:
     """The whole artifact: the sweep's envelope, plus every instrument's keys.
 
@@ -375,6 +381,10 @@ def build(
         # reading as a whole one, and it fails the Baseline full-corpus rule
         # by construction.
         "stopped": list(sweep.run.stopped_before),
+        # Which standings each series reads, and the non-primary series'
+        # numbers. ``None`` from a mode that scored nothing, which is a sweep
+        # with no series rather than a sweep whose series were empty.
+        "series": dict(series) if series is not None else {},
         # Every instrument's own keys, from the table that also printed them.
         # One source for the printed line and the written number is what stops
         # the two disagreeing.

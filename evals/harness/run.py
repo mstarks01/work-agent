@@ -52,6 +52,8 @@ from evals.harness import (
     ledger,
     modes,
     queue,
+    roster,
+    standings,
     submit,
     writing,
 )
@@ -483,7 +485,8 @@ def _scored_sweep(
     cases: Sequence[GoldenCase],
     runs: dict[str, modes.AnalysisRun],
     ledger_path: Path,
-) -> tuple[Sweep, ledger.Ledger]:
+    roster_path: Path = roster.DEFAULT_ROSTER_PATH,
+) -> tuple[dict[str, Sweep], ledger.Ledger]:
     """Every reading that needs the vote ledger, folded onto ``sweep``.
 
     One spelling for the two commands that compute these numbers: ``run``,
@@ -502,14 +505,87 @@ def _scored_sweep(
     The ledger comes back beside the sweep because it is loaded here and a
     caller reports how many votes it read. Loading it twice would let one
     command print a count the other's numbers were not computed from.
+
+    **Every series in one pass** (#326). Standing selects which votes a series
+    reads, so each entry in :data:`~evals.harness.standings.SERIES` is the
+    same three readings over a narrowed ledger. The returned sweep carries the
+    primary series — maintainer votes only — and the others come back beside
+    it, so no flag exists that could quietly move a published number.
     """
     votes = ledger.load(ledger_path)
+    table = roster.load(roster_path)
+    # Named, never dropped in silence. CI refuses a ledger naming somebody the
+    # roster does not (#320), so this is a mid-edit tree or a hand-written
+    # row — and a vote that moves nothing should say so rather than look cast.
+    unrostered = sorted({vote.voter for vote in votes if vote.voter not in table})
+    if unrostered:
+        print(
+            f"{len(unrostered)} voter(s) have no roster line and no series"
+            f" reads them: {', '.join(unrostered)}"
+        )
     matcher = SubsetVerbIdentity(_flows_by_case(cases))
-    scores, yields = _score_runs(cases, runs, matcher, votes)
-    rated = writing.measure(
-        cases, {case: run.report for case, run in runs.items()}, votes
-    )
-    return replace(sweep, scores=scores, yields=yields, writing=rated), votes
+    reports = {case: run.report for case, run in runs.items()}
+
+    by_series = {}
+    for name, included in standings.SERIES.items():
+        read = standings.narrow(votes, table, included)
+        scores, yields = _score_runs(cases, runs, matcher, read)
+        by_series[name] = replace(
+            sweep,
+            scores=scores,
+            yields=yields,
+            writing=writing.measure(cases, reports, read),
+        )
+    return by_series, votes
+
+
+def _scored_keys(sweep: Sweep) -> dict[str, Any]:
+    """Just the blocks that read the ledger — one series' worth."""
+    keys: dict[str, Any] = {}
+    for instrument in INSTRUMENTS.values():
+        if instrument.scored:
+            keys |= instrument.artifact(sweep)
+    return keys
+
+
+def _series_record(by_series: dict[str, Sweep]) -> dict[str, Any]:
+    """Which standings each series reads, and the non-primary series' numbers.
+
+    The primary series' blocks are the artifact's top-level scored keys and
+    are **not** repeated here: two copies of one number is the shape where a
+    reader can quote the stale one. What this adds is the statement every
+    published number needs — which standings produced it — plus the second
+    series, so a maintainer can see what contributor votes would move.
+    """
+    return {
+        "primary": standings.PRIMARY,
+        "standings": {
+            name: list(included) for name, included in standings.SERIES.items()
+        },
+        "blocks": {
+            name: _scored_keys(sweep)
+            for name, sweep in by_series.items()
+            if name != standings.PRIMARY
+        },
+    }
+
+
+def _print_series(by_series: dict[str, Sweep]) -> None:
+    """Say which standings the printed numbers read, and what the others say."""
+    included = ", ".join(standings.SERIES[standings.PRIMARY])
+    print(f"\nThe scored numbers above read {included} votes only.")
+    for name, sweep in by_series.items():
+        if name == standings.PRIMARY:
+            continue
+        counts: dict[str, int] = {}
+        for score in sweep.scores:
+            for standing, count in score.standing_counts.items():
+                counts[standing] = counts.get(standing, 0) + count
+        summary = ", ".join(f"{count} {standing}" for standing, count in counts.items())
+        print(
+            f"  series {name!r} ({', '.join(standings.SERIES[name])}):"
+            f" {summary or 'nothing scored'}"
+        )
 
 
 def _models_record(deployment: Deployment) -> dict[str, Any]:
@@ -645,8 +721,12 @@ def command_run(args: argparse.Namespace) -> int:
     # A mode that produced no run has nothing to score, and ``Sweep`` already
     # defaults every scored field to empty — which is a sweep that measured
     # nothing rather than one whose numbers were all zero.
+    by_series: dict[str, Sweep] = {}
     if mode_run.runs:
-        sweep, _ = _scored_sweep(sweep, ran, mode_run.runs, Path(args.ledger))
+        by_series, _ = _scored_sweep(
+            sweep, ran, mode_run.runs, Path(args.ledger), Path(args.roster)
+        )
+        sweep = by_series[standings.PRIMARY]
         unvoted = sum(score.unvoted_count for score in sweep.scores)
         if unvoted:
             print(
@@ -655,6 +735,8 @@ def command_run(args: argparse.Namespace) -> int:
                 " to see them"
             )
     render_all(sweep, scored=True)
+    if by_series:
+        _print_series(by_series)
 
     artifact = build_artifact(
         mode=args.mode,
@@ -672,6 +754,7 @@ def command_run(args: argparse.Namespace) -> int:
         commit=commit,
         corpus=corpus,
         sweep=sweep,
+        series=_series_record(by_series) if by_series else None,
     )
     if args.out:
         Path(args.out).write_text(json.dumps(artifact, indent=2) + "\n", "utf-8")
@@ -919,6 +1002,25 @@ def _runs_from_reports(artifact: Path, cases: Sequence[GoldenCase]) -> dict[str,
     return runs
 
 
+def command_agreement(args: argparse.Namespace) -> int:
+    """How far two voters agree — what a maintainer reads before promoting.
+
+    Read-only and credential-free, like ``review`` beside it. It decides
+    nothing: a promotion is a line in the roster flipped to ``maintainer``, in
+    a PR a maintainer merges (#326). An agreement threshold in code would
+    promote on noise whenever the overlap is thin, which is exactly when the
+    figure needs a person's judgement rather than a comparison.
+    """
+    votes = ledger.load(Path(args.ledger))
+    try:
+        table = roster.load(Path(args.roster))
+    except roster.RosterError as exc:
+        print(exc, file=sys.stderr)
+        return 1
+    print(standings.render(standings.agreement(votes, table)))
+    return 0
+
+
 def command_score(args: argparse.Namespace) -> int:
     """Re-score a finished sweep against the ledger as it stands now.
 
@@ -945,15 +1047,20 @@ def command_score(args: argparse.Namespace) -> int:
             {block.framework for run in runs.values() for block in run.report.analyses}
         )
     )
-    sweep, votes = _scored_sweep(
-        Sweep(run=ModeRun.empty(frameworks)), cases, runs, Path(args.ledger)
+    by_series, votes = _scored_sweep(
+        Sweep(run=ModeRun.empty(frameworks)),
+        cases,
+        runs,
+        Path(args.ledger),
+        Path(args.roster),
     )
+    sweep = by_series[standings.PRIMARY]
     render_all(sweep, scored=True)
+    _print_series(by_series)
 
     raw = dict(loaded.raw)
-    for instrument in INSTRUMENTS.values():
-        if instrument.scored:
-            raw |= instrument.artifact(sweep)
+    raw |= _scored_keys(sweep)
+    raw["series"] = _series_record(by_series)
 
     out = Path(args.out) if args.out else path
     out.write_text(json.dumps(raw, indent=2) + "\n", "utf-8")
@@ -1213,6 +1320,11 @@ def main(argv: Sequence[str] | None = None) -> int:
     )
     run_parser.add_argument("--corpus", default=DEFAULT_CORPUS_DIR)
     run_parser.add_argument(
+        "--roster",
+        default=str(roster.DEFAULT_ROSTER_PATH),
+        help="the standing roster the scored series are split by",
+    )
+    run_parser.add_argument(
         "--accept-cost",
         metavar="USD|unknown",
         help="accept this many dollars without a prompt, for scripts. The run"
@@ -1283,6 +1395,11 @@ def main(argv: Sequence[str] | None = None) -> int:
         "--ledger",
         default=str(ledger.DEFAULT_LEDGER_PATH),
         help="the vote ledger the standings are read from",
+    )
+    score_parser.add_argument(
+        "--roster",
+        default=str(roster.DEFAULT_ROSTER_PATH),
+        help="the standing roster the scored series are split by",
     )
     score_parser.add_argument(
         "--corpus",
@@ -1393,6 +1510,21 @@ def main(argv: Sequence[str] | None = None) -> int:
         help="the GitHub login that opened the PR",
     )
     verify_parser.set_defaults(func=submit.command_verify)
+
+    agreement_parser = subparsers.add_parser(
+        "agreement",
+        help="how far each pair of voters agrees, for a promotion decision"
+        " (no credentials)",
+    )
+    agreement_parser.add_argument(
+        "--ledger", default=str(ledger.DEFAULT_LEDGER_PATH), help="the vote ledger"
+    )
+    agreement_parser.add_argument(
+        "--roster",
+        default=str(roster.DEFAULT_ROSTER_PATH),
+        help="the standing roster",
+    )
+    agreement_parser.set_defaults(func=command_agreement)
 
     args = parser.parse_args(argv)
     return args.func(args)

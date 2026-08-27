@@ -238,6 +238,45 @@ Write through `webapp/review.py`, which validates every field against a closed
 set. `evals/harness/ledger.py` reads. The directory does not exist until the
 first sitting, and the loader returns an empty ledger until then.
 
+## What your standing does to a number
+
+**It selects which series reads your vote. It never weighs it.** Inside any
+series a substance rejection still wins over a pooled finding, whoever cast
+it.
+
+Every `score` computes two series in one pass, and no flag selects between
+them:
+
+| Series | Reads | Where it lands |
+| --- | --- | --- |
+| `maintainer` | maintainer votes only | The artifact's scored blocks — the published numbers. |
+| `all` | maintainer and contributor votes | `series.blocks.all` in the artifact. |
+
+So a contributor's vote is visible immediately and published only after a
+promotion — and a promotion re-classes their whole history at once, with no
+re-vote and no re-run. A voter with **no** roster line is read by no series at
+all, and `score` names them rather than dropping them quietly.
+
+### Deciding a promotion
+
+```bash
+python -m evals.harness.run agreement
+```
+
+For each pair of voters, this prints the findings both answered, how many were
+excluded because one of them left the answer open, and how far the two agreed
+on the rest. A pair marked `*` crosses the standing line, which is the
+comparison a promotion rests on.
+
+**It promotes nobody, and there is no threshold in the code.** An agreement
+figure over a thin overlap is noise, and a number that promotes on noise is
+worse than no number. About 30 compared answers — the size of the first
+sitting — is where the figure starts being worth reading, and the report
+prints the sample size beside every rate so you can weigh it yourself. The
+promotion itself is a line in `evals/review/voters.toml` flipped to
+`maintainer`, in a pull request a maintainer merges. A demotion is the same
+edit reversed.
+
 ## When the match rule changes
 
 A vote hangs on a **fingerprint**, and a better rule changes every fingerprint.
