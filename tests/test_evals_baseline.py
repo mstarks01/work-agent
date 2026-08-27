@@ -16,7 +16,7 @@ from pathlib import Path
 
 import pytest
 
-from evals.harness import baseline
+from evals.harness import baseline, prices
 from evals.harness.artifact import ARTIFACT_VERSION, load_artifact
 from evals.harness.baseline import (
     BaselineError,
@@ -122,7 +122,7 @@ def priced(monkeypatch):
         }
         return rates.get(model)
 
-    monkeypatch.setattr(baseline, "unit_prices", fake)
+    monkeypatch.setattr(prices, "unit_prices", fake)
     return fake
 
 

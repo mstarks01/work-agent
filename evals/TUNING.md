@@ -27,6 +27,44 @@ sentence with the commands filled in.
 - **Dependencies installed:** `uv sync`.
 - **A clean corpus:** `python evals/verify_corpus.py` should be green.
 
+## The money: what `run` asks before it spends
+
+`run` is the one command here that spends. Before the first request, it
+prints what the sweep is expected to cost and waits for you to accept it.
+
+There is **no ceiling**. You may accept any amount — it is your money, and
+the gate exists so you know what you are accepting, not to cap it.
+
+Every amount carries one of three labels, and the label says how good the
+number is:
+
+| Label | What it means |
+| --- | --- |
+| `recorded` | A merged Baseline ran this exact configuration and cost this. A real number. |
+| `estimated` | Another Baseline's token counts, repriced for your models. A best guess. |
+| `unpriced` | No number exists — a tier's model is absent from the price map, or no merged Baseline exists to calibrate from. Never a zero. |
+
+**Accepting means typing the amount back.** An enter or a `y` never proceeds,
+because a habit should not be able to spend money for you. Where no amount can
+be stated, type `unknown` — that is a real acceptance of a cost nobody can
+state.
+
+For a script, pass the number you accept:
+
+```bash
+python -m evals.harness.run run --mode analysis --out sweep.json --accept-cost 5.00
+```
+
+The run refuses if the estimate is higher than that; raise the flag and mean
+it. `--accept-cost unknown` accepts an unstatable cost the same way.
+
+**The run holds you to what you accepted.** Between cases — never inside one —
+it compares the spend so far to your accepted amount. At a terminal it shows
+the new number and asks you to accept it again; under `--accept-cost` nobody
+is there to ask, so the sweep stops. A stopped sweep keeps every report it
+already paid for, and its artifact records the cases it never ran, so it
+reads as the partial record it is.
+
 ## The workflow at a glance
 
 ```mermaid

@@ -48,7 +48,7 @@ from evals.harness.artifact import (
     _ungraded,
     load_artifact,
 )
-from evals.harness.prices import UnitPrices, unit_prices
+from evals.harness.prices import UnitPrices, price_calls
 from stride_service.model_tiers import TIER_NAMES
 from stride_service.report import TokenUsage
 
@@ -176,36 +176,27 @@ def _node_model(artifact: EvalArtifact, node: str) -> tuple[str, str]:
     return last.served_model, last.requested_model
 
 
-def price_sweep(artifact: EvalArtifact) -> SweepCost:
-    """One sweep's cost under the one rule in :mod:`evals.harness.prices`.
-
-    Priced by the served build; where the map misses it — the suffixed build
-    is the expected miss (#324) — the requested route is the stated fallback,
-    and a model neither answers for lands in ``unpriced``. Never a silent
-    zero: an unpriced model is named, and the total covers only what is
-    priced.
-    """
-    priced: dict[str, UnitPrices] = {}
-    unpriced: set[str] = set()
-    fallbacks: dict[str, str] = {}
-    total = 0.0
+def _calls(artifact: EvalArtifact) -> list[tuple[str, str, TokenUsage]]:
+    """The sweep's billable calls as ``(served, requested, usage)`` triples."""
+    calls = []
     for node, usage in sorted(_usage_of(artifact).items()):
         served, requested = _node_model(artifact, node)
-        prices = unit_prices(served)
-        if prices is None:
-            prices = unit_prices(requested)
-            if prices is not None:
-                fallbacks[served] = requested
-        if prices is None:
-            unpriced.add(served)
-            continue
-        priced[prices.model] = prices
-        total += prices.cost(usage)
+        calls.append((served, requested, usage))
+    return calls
+
+
+def price_sweep(artifact: EvalArtifact) -> SweepCost:
+    """One sweep's cost, through :func:`evals.harness.prices.price_calls`.
+
+    Never a silent zero: an unpriced model is named, and the total covers
+    only what is priced.
+    """
+    priced = price_calls(_calls(artifact))
     return SweepCost(
-        unit_prices=tuple(priced[model] for model in sorted(priced)),
-        unpriced=tuple(sorted(unpriced)),
-        fallbacks=tuple(sorted(fallbacks.items())),
-        actual_usd=total,
+        unit_prices=priced.unit_prices,
+        unpriced=priced.unpriced,
+        fallbacks=priced.fallbacks,
+        actual_usd=priced.total_usd,
     )
 
 
@@ -215,22 +206,18 @@ def _recomputed_cost(artifact: EvalArtifact, recorded: dict[str, Any]) -> float:
         entry["model"]: UnitPrices.from_json(entry)
         for entry in recorded.get("unit_prices", ())
     }
-    fallbacks = dict(recorded.get("fallbacks", {}))
+    for served, requested in dict(recorded.get("fallbacks", {})).items():
+        if requested in rates:
+            rates.setdefault(served, rates[requested])
     unpriced = set(recorded.get("unpriced", ()))
-    total = 0.0
-    for node, usage in sorted(_usage_of(artifact).items()):
-        served, requested = _node_model(artifact, node)
-        if served in unpriced:
-            continue
-        model = served if served in rates else fallbacks.get(served, requested)
-        prices = rates.get(model) or rates.get(served)
-        if prices is None:
-            raise BaselineError(
-                f"{artifact.path}: {served!r} is neither priced nor listed"
-                " unpriced; a silent zero is never admissible"
-            )
-        total += prices.cost(usage)
-    return total
+    calls = [call for call in _calls(artifact) if call[0] not in unpriced]
+    stranded = sorted({served for served, requested, _ in calls if served not in rates})
+    if stranded:
+        raise BaselineError(
+            f"{artifact.path}: {stranded} is neither priced nor listed"
+            " unpriced; a silent zero is never admissible"
+        )
+    return price_calls(calls, rates=rates).total_usd
 
 
 def _file_digests(directory: Path, sweep_stem: str) -> dict[str, str]:

@@ -24,6 +24,7 @@ is a floor, and it says so here rather than pretending otherwise.
 
 from __future__ import annotations
 
+from collections.abc import Iterable
 from dataclasses import dataclass
 from typing import Any
 
@@ -64,6 +65,57 @@ class UnitPrices:
             output_per_token=float(raw["output_per_token"]),
             cache_read_per_token=float(raw["cache_read_per_token"]),
         )
+
+
+@dataclass(frozen=True)
+class Priced:
+    """What a set of calls cost, with every hole in the pricing named."""
+
+    unit_prices: tuple[UnitPrices, ...]
+    unpriced: tuple[str, ...]
+    fallbacks: tuple[tuple[str, str], ...]
+    total_usd: float
+
+
+def price_calls(
+    calls: Iterable[tuple[str, str, TokenUsage]],
+    rates: dict[str, UnitPrices] | None = None,
+) -> Priced:
+    """Price ``(served, requested, usage)`` triples — the one costing path.
+
+    The Baseline's recorded actual, CI's re-check and the pre-run estimate all
+    come through here, so a disagreement between them is impossible by
+    construction rather than by three matching edits.
+
+    Priced by the served build; where the map misses it — a suffixed build
+    like ``gpt-5.6-luna`` is the expected miss (#324) — the requested route is
+    the stated fallback, and a model neither answers for lands in
+    ``unpriced``. Pass ``rates`` to price against recorded unit prices instead
+    of the live map, which is what keeps CI's arithmetic from rotting when the
+    package updates its prices (#323).
+    """
+    lookup = (lambda model: rates.get(model)) if rates is not None else unit_prices
+    priced: dict[str, UnitPrices] = {}
+    unpriced: set[str] = set()
+    fallbacks: dict[str, str] = {}
+    total = 0.0
+    for served, requested, usage in calls:
+        prices = lookup(served)
+        if prices is None:
+            prices = lookup(requested)
+            if prices is not None:
+                fallbacks[served] = requested
+        if prices is None:
+            unpriced.add(served)
+            continue
+        priced[prices.model] = prices
+        total += prices.cost(usage)
+    return Priced(
+        unit_prices=tuple(priced[model] for model in sorted(priced)),
+        unpriced=tuple(sorted(unpriced)),
+        fallbacks=tuple(sorted(fallbacks.items())),
+        total_usd=total,
+    )
 
 
 def unit_prices(model: str) -> UnitPrices | None:

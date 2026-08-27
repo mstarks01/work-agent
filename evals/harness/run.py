@@ -39,12 +39,13 @@ import argparse
 import asyncio
 import json
 import sys
-from collections.abc import Mapping, Sequence
+from collections.abc import Callable, Mapping, Sequence
 from dataclasses import replace
 from pathlib import Path
 from typing import Any
 
 from evals.harness import (
+    consent,
     fingerprint,
     instruction,
     instruction_delta,
@@ -55,6 +56,7 @@ from evals.harness import (
     writing,
 )
 from evals.harness.artifact import (
+    REPO_ROOT,
     EvalArtifact,
     corpus_digest,
     load_artifact,
@@ -245,6 +247,8 @@ async def _run_mode(
     mode: str,
     deployment: Deployment,
     only: Sequence[FrameworkName] = (),
+    accepted: float | None = None,
+    ask: Callable[[str], str] | None = None,
 ) -> ModeRun:
     """Run one mode over the selected cases, collecting Tier 1 failures.
 
@@ -262,6 +266,13 @@ async def _run_mode(
     a provider timeout is not a measurement and still ends the sweep, and
     neither is a :class:`~evals.harness.grounds.GroundMisShape`, which is this
     service assembling its own record wrongly rather than anything a model did.
+
+    ``accepted`` is the amount the estimate gate took consent for, and the
+    hold runs **between cases, never inside one**: a case that has started has
+    already committed its spend, and interrupting it would pay for a
+    measurement nobody could read. ``None`` means the contributor accepted
+    ``unknown``, so there is nothing to measure against and the hold never
+    fires.
     """
     # One graph per distinct framework set rather than one for the sweep. A case
     # declares the frameworks whose **Precondition** allows it and whose records
@@ -293,8 +304,21 @@ async def _run_mode(
     extractions: list[modes.ExtractionScore] = []
     rows: dict[str, list[Any]] = {}
     skipped: list[str] = []
+    stopped_before: tuple[str, ...] = ()
 
-    for case in cases:
+    for position, case in enumerate(cases):
+        if position and accepted is not None:
+            remaining = [later.id for later in cases[position:]]
+            try:
+                accepted = consent.hold(accepted, executions, remaining, ask)
+            except consent.Refused as refusal:
+                # Not an exception out of the sweep: everything already run is
+                # paid for, so the caller still writes the artifact and the
+                # reports. ``stopped_before`` is what stops the partial record
+                # reading as a whole one.
+                print(refusal)
+                stopped_before = tuple(remaining)
+                break
         if not modes.select_frameworks(case, only):
             # Not a failure: --framework asked for packages this case does not
             # declare, so there is nothing here to measure. Named rather than
@@ -397,6 +421,7 @@ async def _run_mode(
         ),
         extractions=extractions,
         rows={name: tuple(collected) for name, collected in rows.items()},
+        stopped_before=stopped_before,
     )
 
 
@@ -510,6 +535,55 @@ def _models_record(deployment: Deployment) -> dict[str, Any]:
     }
 
 
+def _prompt(question: str) -> str:
+    """Ask at the terminal. Seamed so the gate's tests never block on stdin."""
+    return input(question)
+
+
+def _tier_routes(deployment: Deployment) -> dict[str, str]:
+    """The requested route per tier — what the price map is asked about.
+
+    Composed through ``Vendor.route``, the one join that also forms the vendor
+    half of a fingerprint, rather than re-spelled here: a second spelling of a
+    route is a second answer to what this run asked for.
+    """
+    return {
+        tier: selection.vendor_entry.route(selection.model)
+        for tier, selection in deployment.tiers.tiers.items()
+    }
+
+
+def _would_be_identity(
+    cases: Sequence[GoldenCase],
+    deployment: Deployment,
+    commit: Any,
+    corpus: str,
+    args: argparse.Namespace,
+) -> dict[str, Any]:
+    """The Baseline identity this sweep would carry, before it runs.
+
+    Shaped to compare equal to a merged Baseline's stored identity, so the
+    estimate can tell "somebody already ran exactly this" from "somebody ran
+    something like it". A dirty tree matches nothing, which is correct: no
+    Baseline can carry one.
+    """
+    frameworks = {
+        name
+        for case in cases
+        for name in modes.select_frameworks(case, tuple(args.framework))
+    }
+    return {
+        "repo_commit": commit.commit,
+        "corpus_digest": corpus,
+        "models": _tier_routes(deployment),
+        "sampling": {
+            tier: block.model_dump()
+            for tier, block in deployment.sampling.tiers.items()
+        },
+        "frameworks": sorted(frameworks),
+    }
+
+
 def command_run(args: argparse.Namespace) -> int:
     cases = _select(load_corpus(args.corpus), args.case)
     # Before anything is spent. Both answers are free and the sweep is not, so
@@ -520,10 +594,31 @@ def command_run(args: argparse.Namespace) -> int:
     # is certified against are then one configuration rather than two reads
     # that could disagree.
     deployment = Deployment.from_env()
+
+    # Informed, affirmative consent, before the first request spends anything
+    # (#334). There is no ceiling: the contributor may accept any amount, and
+    # the gate's job is that they see it, see how good the number is, and
+    # accept it in a way a rote hand cannot.
+    ask = None if args.accept_cost is not None else _prompt
+    try:
+        accepted = consent.gate(
+            consent.estimate(
+                _would_be_identity(cases, deployment, commit, corpus, args),
+                _tier_routes(deployment),
+                REPO_ROOT,
+            ),
+            args.accept_cost,
+            ask,
+        )
+    except consent.Refused as refusal:
+        print(refusal, file=sys.stderr)
+        return 1
+
     mode_run = asyncio.run(
-        _run_mode(cases, args.mode, deployment, tuple(args.framework))
+        _run_mode(cases, args.mode, deployment, tuple(args.framework), accepted, ask)
     )
     failures = mode_run.failures
+    ran = [case for case in cases if case.id not in mode_run.stopped_before]
 
     # Never silently trust: the verdict is always computed and surfaced, so an
     # aggregate can never be read without knowing whether the generation
@@ -551,7 +646,7 @@ def command_run(args: argparse.Namespace) -> int:
     # defaults every scored field to empty — which is a sweep that measured
     # nothing rather than one whose numbers were all zero.
     if mode_run.runs:
-        sweep, _ = _scored_sweep(sweep, cases, mode_run.runs, Path(args.ledger))
+        sweep, _ = _scored_sweep(sweep, ran, mode_run.runs, Path(args.ledger))
         unvoted = sum(score.unvoted_count for score in sweep.scores)
         if unvoted:
             print(
@@ -563,7 +658,9 @@ def command_run(args: argparse.Namespace) -> int:
 
     artifact = build_artifact(
         mode=args.mode,
-        cases=[case.id for case in cases],
+        # The cases that ran, never the ones selected: a sweep the hold
+        # stopped must not claim the cases it never attempted.
+        cases=[case.id for case in ran],
         models=_models_record(deployment),
         certification=certification,
         provenance=mode_run.provenance,
@@ -1115,6 +1212,14 @@ def main(argv: Sequence[str] | None = None) -> int:
         " case declares.",
     )
     run_parser.add_argument("--corpus", default=DEFAULT_CORPUS_DIR)
+    run_parser.add_argument(
+        "--accept-cost",
+        metavar="USD|unknown",
+        help="accept this many dollars without a prompt, for scripts. The run"
+        " refuses when the estimate is higher. Pass 'unknown' to accept a cost"
+        " nobody can state. Omit it and the terminal asks you to type the"
+        " amount back — an enter never proceeds.",
+    )
     run_parser.add_argument(
         "--ledger",
         default=str(ledger.DEFAULT_LEDGER_PATH),
