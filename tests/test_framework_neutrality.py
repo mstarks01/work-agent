@@ -63,6 +63,7 @@ import pytest
 
 from evals.harness.instruments import INSTRUMENTS, PACKAGE_SCORERS
 from stride_service.frameworks import CONTENT_LICENSE, PACKAGES
+from tests.factories import SCRIPTED_FRAMEWORKS
 
 REPO_ROOT = Path(__file__).resolve().parents[1]
 SEARCHED = ("src", "evals")
@@ -328,6 +329,19 @@ def test_the_pattern_covers_the_whole_registry():
         "PACKAGES has changed. Widen LITERAL and the parametrize above it, then"
         " re-read DECLARED: every entry reading 'this code is that framework's'"
         " is a dispatch a third package may need adding to."
+    )
+
+
+def test_every_package_has_a_scripted_fixture():
+    """The offline run of the real graph covers every pair of packages.
+
+    ``tests.factories.SCRIPTED_FRAMEWORKS`` is the table that run reads, so a
+    package missing from it is a package the scheduler test never runs, and
+    the timing windows between two frameworks go unexercised for it.
+    """
+    assert set(SCRIPTED_FRAMEWORKS) == set(PACKAGES), (
+        "SCRIPTED_FRAMEWORKS and PACKAGES disagree: add one ScriptedFramework"
+        " per carried package to tests/factories.py, and carry no other."
     )
 
 

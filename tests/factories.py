@@ -21,8 +21,8 @@ provenance defect stay invisible to the eval lane.
 
 import asyncio
 import json
-from collections.abc import AsyncGenerator, Sequence
-from dataclasses import replace
+from collections.abc import AsyncGenerator, Mapping, Sequence
+from dataclasses import dataclass, replace
 from datetime import UTC, datetime
 from pathlib import Path
 from types import MappingProxyType
@@ -37,6 +37,10 @@ from pydantic import BaseModel, Field
 from stride_service import frameworks as framework_registry
 from stride_service.binding import NodeBinding
 from stride_service.frameworks import PACKAGES, FrameworkName, FrameworkPackage
+from stride_service.frameworks.asvs.record import (
+    RequirementProposal,
+    RequirementRulingProposal,
+)
 from stride_service.frameworks.stride.record import (
     STRIDE_VERSION,
     DraftThreat,
@@ -751,3 +755,56 @@ def scripted_pipeline(
     for name, model in models.items():
         model.reply = replies.get(name, EMPTY_CLAIMS)
     return pipeline, models
+
+
+@dataclass(frozen=True)
+class ScriptedFramework:
+    """One package's scripted answers for a run of the real graph.
+
+    ``lane`` names the one lane agent that drafts; ``proposal`` is that agent's
+    whole emission and ``ruling`` is the critic's, both in the package's own
+    node schema. ``claim_id`` is the ID the graph composes for that draft, so a
+    test can find it on the finished block. ``options`` is a complete selection
+    for the package.
+    """
+
+    lane: str
+    options: Mapping[str, Any]
+    claim_id: str
+    proposal: str
+    ruling: str
+
+
+#: One scripted fixture per package, keyed by framework and checked against
+#: :data:`~stride_service.frameworks.PACKAGES` in ``test_framework_neutrality``.
+#: A test that runs the real graph over every pair reads this rather than
+#: naming a package, so a new package joins the run by adding an entry.
+SCRIPTED_FRAMEWORKS: Mapping[FrameworkName, ScriptedFramework] = MappingProxyType(
+    {
+        "stride": ScriptedFramework(
+            lane="spoofing",
+            options={},
+            claim_id="S-01",
+            proposal=claims_json(sample_proposal("S-01", "spoofing")),
+            ruling=claims_json(sample_ruling("S-01")),
+        ),
+        "asvs": ScriptedFramework(
+            lane="authentication",
+            options={"level": 1},
+            claim_id="v5.0.0-6.2.1",
+            proposal=claims_json(
+                RequirementProposal(
+                    requirement="2.1",
+                    title="No password length policy is stated",
+                    description="The requirement applies and the input does not settle it.",
+                    evidence_refs=["crossing:flow:customer-to-web-app:login"],
+                )
+            ),
+            ruling=claims_json(
+                RequirementRulingProposal.model_validate(
+                    {"id": "v5.0.0-6.2.1", "verdict": {"status": "confirmed"}}
+                )
+            ),
+        ),
+    }
+)
