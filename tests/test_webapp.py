@@ -38,6 +38,11 @@ from webapp.main import Analyses, Startup, create_app, render_report
 
 SAME_ORIGIN = {"Sec-Fetch-Site": "same-origin"}
 
+#: The app refuses any other Host, so the client has to wear one it accepts.
+#: ``testserver``, the TestClient default, is the shape a DNS-rebound request
+#: arrives in — see ``webapp.main.LOOPBACK_HOSTS``.
+LOOPBACK = "http://127.0.0.1:8000"
+
 # The payload that breaks a naive injection: it closes the JSON block and the
 # rest of the page parses as HTML.
 BREAKOUT = "</script><img src=x onerror=alert(1)>"
@@ -89,7 +94,7 @@ def client(tiers):
         tiers=tiers,
         error=None,
     )
-    return TestClient(create_app(startup))
+    return TestClient(create_app(startup), base_url=LOOPBACK)
 
 
 @pytest.fixture
@@ -103,7 +108,7 @@ def broken_client(tiers):
             "vendor 'vertex' needs STRIDE_VERTEX_PROJECT; it is unset or empty"
         ),
     )
-    return TestClient(create_app(startup))
+    return TestClient(create_app(startup), base_url=LOOPBACK)
 
 
 # The demo app has one textarea, so it posts one description-kind source. Its
@@ -337,14 +342,15 @@ def test_a_framework_this_install_does_not_carry_is_refused(tiers):
     """
     narrow, withheld = CARRIED[0], CARRIED[1]
     client = TestClient(
-        create_app(
+        base_url=LOOPBACK,
+        app=create_app(
             Startup(
                 engine_for=stub_engine_for,
                 frameworks=(narrow,),
                 tiers=tiers,
                 error=None,
             )
-        )
+        ),
     )
 
     def submit(*names):
@@ -450,7 +456,7 @@ def test_a_second_submission_is_refused_while_one_is_running(tiers):
         tiers=tiers,
         error=None,
     )
-    client = TestClient(create_app(startup, analyses))
+    client = TestClient(create_app(startup, analyses), base_url=LOOPBACK)
 
     analyses.claim()  # stand in for a run already in flight
     response = client.post("/analyze", json=posted("B"), headers=SAME_ORIGIN)
