@@ -16,8 +16,10 @@ is any good. Two kinds:
   system, or noise? [`evals/VOTING.md`](evals/VOTING.md) is the procedure.
 - A **Case Sitting** — you read one golden case whole (its sources, its model,
   every framework's reference set) and say whether the recorded set describes
-  what could actually go wrong. [`evals/BLESSING.md`](evals/BLESSING.md) step 6
-  is the procedure, and 12 of the 13 cases are still waiting for one.
+  what could actually go wrong. Run `uv run python webapp/sitting.py --case
+  <case-id>` and do it in a browser; [`evals/BLESSING.md`](evals/BLESSING.md)
+  step 6 explains the method and the by-hand path. 12 of the 13 cases are
+  still waiting for one.
 
 Both are **free and offline**, because everything they read is already in this
 repository: a merged **Baseline** keeps the reports its findings came from, and

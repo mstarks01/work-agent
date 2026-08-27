@@ -21,7 +21,7 @@ Roughly an hour.
 
 ---
 
-## Part 1 — the system, and your own list
+## Part 1 — the system
 
 ### System description (description)
 

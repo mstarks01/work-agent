@@ -308,6 +308,23 @@ One reading session, one pull request, one approval. The reviewer signs off on
 **together** — they're one artifact, and reviewing them separately loses the
 property that the threat set is exhaustive *against that model*.
 
+**There is a browser path, and it is the shorter one.**
+
+```sh
+uv run python webapp/sitting.py --case <case-id>
+```
+
+It shows you the sources and the model, takes your own threat list, and only
+*then* reveals the recorded sets — the one rule this method has, enforced by
+the server rather than by asking. When you finish it writes everything below
+into your working tree and hands you the submit command, or text to paste into
+a pull request you open yourself. It is loopback-only and needs no credentials.
+`--list` prints the cases still in debt.
+
+The rest of this section is what it writes, and what you write by hand if you
+would rather. Both paths end in the same files, and the checks cannot tell
+them apart.
+
 **This step is now enforced.** The act is a **Case Sitting** (see
 `CONTEXT.md`), and it is recorded as an entry appended to `reviews` in
 `case.json`:
