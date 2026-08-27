@@ -51,18 +51,19 @@ reported as itself, because the alternative — inferring which fact an agent
 
 from __future__ import annotations
 
-from collections.abc import Iterable, Mapping
+from collections.abc import Iterable, Mapping, Sequence
 from typing import Any, NamedTuple
 
 from stride_service.analysis import CONTROL_ATTRIBUTES, control_state
 from stride_service.frameworks import FrameworkPackage, schemas_for
 from stride_service.report import (
-    GROUNDLESS_REASON_MAX_CHARS,
+    DROPPED_REASON_MAX_CHARS,
     REFERENCE_MAX_CHARS,
     AnalysisMarks,
     Claim,
+    DroppedClaim,
     Ground,
-    GroundlessClaim,
+    InvalidProposal,
     Proposal,
     UnknownClaimIdentity,
     UnresolvedEvidence,
@@ -389,7 +390,7 @@ def resolve_proposals(
     A claim whose every ground evaporates has nothing supporting it, and a
     finding with empty ``grounds`` is the one thing this schema refuses to
     represent — so the claim is dropped and recorded as a
-    :class:`~stride_service.report.GroundlessClaim`, with the references it
+    :class:`~stride_service.report.DroppedClaim`, with the references it
     cited in the reason. It is the same rule
     :func:`~stride_service.critic.join_drafts` applies to unverified quotes:
     marked per entry, dropped per claim. Nothing here raises on what an agent
@@ -400,7 +401,7 @@ def resolve_proposals(
     drafts: list[Claim] = []
     unresolved_evidence: list[UnresolvedEvidence] = []
     unknown_identities: list[UnknownClaimIdentity] = []
-    groundless: list[GroundlessClaim] = []
+    groundless: list[DroppedClaim] = []
     for proposal in proposals:
         key = getattr(proposal, key_field)
         claim_id = package.compose_id(lane, key)
@@ -420,13 +421,13 @@ def resolve_proposals(
         if not grounds:
             cited = ", ".join(repr(ref) for ref in unresolved)
             groundless.append(
-                GroundlessClaim(
+                DroppedClaim(
                     claim_id=claim_id,
                     title=proposal.title,
                     reason=(
                         "cites only evidence this job's catalog does not"
                         f" contain ({cited})"
-                    )[:GROUNDLESS_REASON_MAX_CHARS],
+                    )[:DROPPED_REASON_MAX_CHARS],
                 )
             )
             continue
@@ -456,6 +457,39 @@ def resolve_proposals(
         AnalysisMarks(
             unresolved_evidence=unresolved_evidence,
             unknown_claim_identities=unknown_identities,
-            groundless_claims=groundless,
+            dropped_claims=groundless,
         ),
     )
+
+
+def invalid_proposal_marks(
+    invalid: Sequence[InvalidProposal], package: FrameworkPackage, lane: str
+) -> AnalysisMarks:
+    """The marks for the proposals a lane's batch could not validate.
+
+    A schema fault is a fault in one entry, so it costs that entry: the batch
+    already dropped it (:class:`~stride_service.report.ProposalBatch`), and
+    this records it as a :class:`~stride_service.report.DroppedClaim` with
+    the first error pydantic reported. The ID is composed from the package's
+    rule where the key is readable, so the mark names the claim the agent
+    meant; where it is not, the mark is keyed by the lane and the position,
+    which is the only identity left.
+    """
+    key_field = schemas_for(package.name).key_field
+    dropped: list[DroppedClaim] = []
+    for entry in invalid:
+        key = entry.scalars.get(key_field)
+        try:
+            claim_id = package.compose_id(lane, key) if key is not None else ""
+        except (TypeError, ValueError, KeyError):
+            claim_id = ""
+        dropped.append(
+            DroppedClaim(
+                claim_id=claim_id or f"{package.name}:{lane}:proposal-{entry.index}",
+                title=str(entry.scalars.get("title") or "(untitled)"),
+                reason=f"fails the proposal schema at {entry.error}"[
+                    :DROPPED_REASON_MAX_CHARS
+                ],
+            )
+        )
+    return AnalysisMarks(dropped_claims=dropped)

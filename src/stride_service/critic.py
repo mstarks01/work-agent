@@ -45,16 +45,17 @@ from stride_service.frameworks import FrameworkPackage, FrameworkSchemas
 from stride_service.grounding import normalize, repair_quote, verify_normalized
 from stride_service.references import canonical, snap
 from stride_service.report import (
-    GROUNDLESS_REASON_MAX_CHARS,
+    DROPPED_REASON_MAX_CHARS,
     AnalysisMarks,
     Claim,
+    DroppedClaim,
     Ground,
-    GroundlessClaim,
     RepairedQuote,
     RuledClaim,
     Ruling,
     SeverityLevel,
     UnresolvedMention,
+    UnresolvedReference,
     UnverifiedGround,
     Verdict,
 )
@@ -248,17 +249,78 @@ def snap_rulings(
     ]
 
 
-def _unresolved_reference_issues(
-    claims: Iterable[Claim], system_model: SystemModel
-) -> list[str]:
-    known_ids = {element.id for element in system_model.elements()}
-    return [
-        f"claim {claim.id!r} references element {ref!r}, which is not in the"
-        " system model"
-        for claim in claims
-        for ref in claim.affected_element_ids
-        if ref not in known_ids
-    ]
+class _ReferenceCheck(NamedTuple):
+    drafts: list[Claim]
+    unresolved: list[UnresolvedReference]
+    dropped: list[DroppedClaim]
+
+
+def _resolve_element_references(
+    claims: Iterable[Claim], known_ids: Collection[str]
+) -> _ReferenceCheck:
+    """Drop every element reference the model does not contain, and mark it.
+
+    The rule every other citation already has. A reference an agent composed
+    — well-formed, plausible, absent — costs itself, and the claim stands on
+    the elements that resolved. A claim that named elements and lost every one
+    is dropped: a finding about nothing is not a finding. A claim that named
+    none is a package's own business (ASVS leaves the list empty on a claim
+    about the system as a whole) and passes untouched.
+    """
+    drafts: list[Claim] = []
+    unresolved: list[UnresolvedReference] = []
+    dropped: list[DroppedClaim] = []
+    for claim in claims:
+        kept = [ref for ref in claim.affected_element_ids if ref in known_ids]
+        lost = [ref for ref in claim.affected_element_ids if ref not in known_ids]
+        if not lost:
+            drafts.append(claim)
+            continue
+        if not kept:
+            dropped.append(
+                DroppedClaim(
+                    claim_id=claim.id,
+                    title=claim.title,
+                    reason=(
+                        "names only elements the system model does not contain"
+                        f" ({', '.join(repr(ref) for ref in lost)})"
+                    )[:DROPPED_REASON_MAX_CHARS],
+                )
+            )
+            continue
+        unresolved += [
+            UnresolvedReference(claim_id=claim.id, element_id=ref[:300]) for ref in lost
+        ]
+        drafts.append(claim.model_copy(update={"affected_element_ids": kept}))
+    return _ReferenceCheck(drafts, unresolved, dropped)
+
+
+def _drop_duplicate_ids(
+    claims: Iterable[Claim],
+) -> tuple[list[Claim], list[DroppedClaim]]:
+    """Keep the first draft under each ID; drop and mark every later one.
+
+    An agent that numbered two drafts alike, or filed one requirement twice,
+    made a fault in one entry. The first is kept because the lane order is the
+    package's own declared order, so the choice is deterministic and the same
+    on every run.
+    """
+    seen: set[str] = set()
+    kept: list[Claim] = []
+    dropped: list[DroppedClaim] = []
+    for claim in claims:
+        if claim.id in seen:
+            dropped.append(
+                DroppedClaim(
+                    claim_id=claim.id,
+                    title=claim.title,
+                    reason="repeats the ID of an earlier draft in this framework",
+                )
+            )
+            continue
+        seen.add(claim.id)
+        kept.append(claim)
+    return kept, dropped
 
 
 def _attribute_names(element: Element) -> frozenset[str]:
@@ -418,31 +480,24 @@ def _duplicate_id_issues(entries: Iterable[Claim | Ruling]) -> list[str]:
 
 
 def _ground_reference_issues(
-    claims: Iterable[Claim],
-    system_model: SystemModel,
-    source_labels: Collection[str],
+    claims: Iterable[Claim], system_model: SystemModel
 ) -> list[str]:
-    """Every grounds entry whose reference does not resolve.
+    """Every catalogued grounds entry whose reference does not resolve.
 
-    Set membership, one branch at a time: a quote's ``source_label`` against
-    the job's labels, either attribute branch's ``element_id`` and
-    ``attribute`` against the model, a derived-fact's ``flow_id`` against the
-    crossings derived from that same model. The gate's own stated principle is
-    what puts it here — *set membership is mechanical, so it belongs in code
-    rather than in a prompt* — and it inherits that rule's escape: where a job
-    supplies no labels, the label half does not run, so a hand-authored model
-    driven through the in-process engine is not failed on a citation that is
-    not wrong.
+    Set membership, one branch at a time: either attribute branch's
+    ``element_id`` and ``attribute`` against the model, a derived-fact's
+    ``flow_id`` against the crossings derived from that same model. Every such
+    ground is built by the service out of a catalog entry, so a failure here
+    is this service's own defect and stays fatal. A quote's ``source_label`` is
+    deliberately not here: that is the agent's, and a label naming no source is
+    a quote that cannot be found, which :func:`_verify_quotes` marks.
     """
     by_id = {element.id: element for element in system_model.elements()}
     crossing_ids = {crossing.flow_id for crossing in system_model.boundary_crossings()}
-    legal_labels = frozenset(source_labels)
     issues = []
     for claim in claims:
         for ground in claim.grounds:
-            issues += _one_ground_issues(
-                claim.id, ground, by_id, crossing_ids, legal_labels
-            )
+            issues += _one_ground_issues(claim.id, ground, by_id, crossing_ids)
     return issues
 
 
@@ -451,18 +506,12 @@ def _one_ground_issues(
     ground: Ground,
     by_id: Mapping[str, Element],
     crossing_ids: Collection[str],
-    legal_labels: Collection[str],
 ) -> list[str]:
-    """The reference failure of one grounds entry, by branch, or nothing."""
+    """The reference failure of one catalogued grounds entry, or nothing."""
     issue = ""
     if ground.kind == "quote":
-        if legal_labels and ground.source_label not in legal_labels:
-            issue = (
-                f"claim {claim_id!r} grounds a quote in source"
-                f" {ground.source_label!r}, which is not one of this job's"
-                f" sources {sorted(legal_labels)}"
-            )
-    elif ground.kind == "derived-fact":
+        return []
+    if ground.kind == "derived-fact":
         if ground.flow_id not in crossing_ids:
             issue = (
                 f"claim {claim_id!r} grounds a derived fact in flow"
@@ -499,7 +548,7 @@ class _QuoteCheck(NamedTuple):
     drafts: list[Claim]
     unverified: list[UnverifiedGround]
     repaired: list[RepairedQuote]
-    groundless: list[GroundlessClaim]
+    groundless: list[DroppedClaim]
 
 
 def _verify_quotes(claims: Sequence[Claim], sources: Mapping[str, str]) -> _QuoteCheck:
@@ -517,7 +566,7 @@ def _verify_quotes(claims: Sequence[Claim], sources: Mapping[str, str]) -> _Quot
     cosmetic mismatch. That is not enough evidence to license killing a job.
 
     **Per claim**, if *no* ground verifies at all, the claim is dropped and
-    recorded as a :class:`~stride_service.report.GroundlessClaim` whose reason
+    recorded as a :class:`~stride_service.report.DroppedClaim` whose reason
     carries the quotes that were not found. A claim with one bad quote beside
     good ones is still justified; a claim where nothing holds is a finding with
     no machine-checkable justification. Every catalogued ground verifies by set
@@ -537,7 +586,7 @@ def _verify_quotes(claims: Sequence[Claim], sources: Mapping[str, str]) -> _Quot
     drafts: list[Claim] = []
     marks: list[UnverifiedGround] = []
     repaired: list[RepairedQuote] = []
-    groundless: list[GroundlessClaim] = []
+    groundless: list[DroppedClaim] = []
     for claim in claims:
         grounds = list(claim.grounds)
         unverified: list[int] = []
@@ -547,7 +596,10 @@ def _verify_quotes(claims: Sequence[Claim], sources: Mapping[str, str]) -> _Quot
                 continue
             if verify_normalized(ground.text, folded.get(ground.source_label, "")):
                 continue
-            repair = repair_quote(ground.text, sources.get(ground.source_label, ""))
+            if ground.source_label not in sources:
+                unverified.append(index)
+                continue
+            repair = repair_quote(ground.text, sources[ground.source_label])
             if repair is None:
                 unverified.append(index)
                 continue
@@ -567,10 +619,10 @@ def _verify_quotes(claims: Sequence[Claim], sources: Mapping[str, str]) -> _Quot
                 for index in unverified
             )
             groundless.append(
-                GroundlessClaim(
+                DroppedClaim(
                     claim_id=claim.id,
                     title=claim.title,
-                    reason=f"no ground verifies: {lost}"[:GROUNDLESS_REASON_MAX_CHARS],
+                    reason=f"no ground verifies: {lost}"[:DROPPED_REASON_MAX_CHARS],
                 )
             )
             continue
@@ -582,7 +634,12 @@ def _verify_quotes(claims: Sequence[Claim], sources: Mapping[str, str]) -> _Quot
             UnverifiedGround(
                 claim_id=claim.id,
                 index=index,
-                reason=f"not found in {grounds[index].source_label!r}",
+                reason=(
+                    f"not found in {grounds[index].source_label!r}"
+                    if grounds[index].source_label in sources
+                    else f"names source {grounds[index].source_label!r}, which is"
+                    " not one of this job's sources"
+                ),
             )
             for index in unverified
         ]
@@ -624,7 +681,7 @@ def join_drafts(
     prose that the model does not contain
     (:class:`~stride_service.report.UnresolvedMention`). A claim whose every
     ground is such a quote is *dropped* and marked
-    (:class:`~stride_service.report.GroundlessClaim`), on the same trade. A
+    (:class:`~stride_service.report.DroppedClaim`), on the same trade. A
     package's record adds whatever else its own judgement fields earn
     (:meth:`~stride_service.report.Claim.claim_marks`).
 
@@ -647,25 +704,20 @@ def join_drafts(
     quote is marked and no claim is dropped on one.
     """
     known_ids = {element.id for element in system_model.elements()}
-    merged = snap_drafts(
+    snapped = snap_drafts(
         [draft for lane in package.lanes for draft in drafts_by_lane.get(lane, ())],
         known_ids,
         sources.keys(),
     )
-    issues = (
-        _duplicate_id_issues(merged)
-        + _unresolved_reference_issues(merged, system_model)
-        + _ground_reference_issues(merged, system_model, sources)
-    )
+    unique, duplicates = _drop_duplicate_ids(snapped)
+    referenced = _resolve_element_references(unique, known_ids)
+    issues = _ground_reference_issues(referenced.drafts, system_model)
     if issues:
         raise DraftJoinError("; ".join(issues))
-    # Only once the references resolve: a quote naming a source the job never
-    # carried has already failed above, and matching its text against the empty
-    # string would report the same defect a second time in worse words.
     checked = (
-        _verify_quotes(merged, sources)
+        _verify_quotes(referenced.drafts, sources)
         if sources
-        else _QuoteCheck(list(merged), [], [], [])
+        else _QuoteCheck(list(referenced.drafts), [], [], [])
     )
     kept = checked.drafts
     return JoinedDrafts(
@@ -673,8 +725,9 @@ def join_drafts(
         marks=AnalysisMarks(
             unverified_grounds=checked.unverified,
             repaired_quotes=checked.repaired,
+            unresolved_references=referenced.unresolved,
             unresolved_mentions=_unresolved_mentions(kept, known_ids),
-            groundless_claims=checked.groundless,
+            dropped_claims=[*duplicates, *referenced.dropped, *checked.groundless],
         ).merged_with(package.record.claim_marks(kept)),
     )
 
