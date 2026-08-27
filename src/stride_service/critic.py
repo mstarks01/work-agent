@@ -45,9 +45,11 @@ from stride_service.frameworks import FrameworkPackage, FrameworkSchemas
 from stride_service.grounding import normalize, verify_normalized
 from stride_service.references import canonical, snap
 from stride_service.report import (
+    GROUNDLESS_REASON_MAX_CHARS,
     AnalysisMarks,
     Claim,
     Ground,
+    GroundlessClaim,
     RuledClaim,
     Ruling,
     SeverityLevel,
@@ -66,32 +68,6 @@ SEVERITY_ORDER: tuple[SeverityLevel, ...] = ("critical", "high", "medium", "low"
 
 class DraftJoinError(ValueError):
     """One framework's merged lane agents' drafts fail a mechanical check."""
-
-
-class GroundsUnverifiedError(DraftJoinError):
-    """Claims on which *no* ground verified — the fail-closed half of the
-    grounding policy.
-
-    A subclass rather than a distinctive message, because the faults it has to
-    be told apart from are genuinely different faults. A dangling element
-    reference or an unresolvable ``source_label`` is a draft citing something
-    that does not exist; this is a draft citing something that does exist and
-    quoting it wrongly. Only the second says anything about how often a model
-    fabricates a span, and a reader that has to pattern-match the prose to tell
-    them apart is guessing rather than measuring.
-
-    Both halves of that rate ride on the exception, because the raise is the
-    only moment they coexist: ``claim_ids`` are the claims that lost every
-    ground, and ``draft_count`` is the population they came from. Nothing
-    downstream of here sees either — the job is over.
-    """
-
-    def __init__(
-        self, message: str, *, claim_ids: Sequence[str], draft_count: int
-    ) -> None:
-        super().__init__(message)
-        self.claim_ids = tuple(claim_ids)
-        self.draft_count = draft_count
 
 
 class CriticOutputError(ValueError):
@@ -518,7 +494,7 @@ def _one_ground_issues(
 
 def _verify_quotes(
     claims: Sequence[Claim], sources: Mapping[str, str]
-) -> list[UnverifiedGround]:
+) -> tuple[list[UnverifiedGround], list[GroundlessClaim]]:
     """Check every quote ground against the source it names.
 
     Two outcomes, at two different scopes, and the split is the whole policy.
@@ -528,16 +504,17 @@ def _verify_quotes(
     18.7 claims per job is a 24% chance that some job dies on a single
     cosmetic mismatch. That is not enough evidence to license killing a job.
 
-    **Per claim**, if *no* ground verifies at all, the caller fails closed. A
-    claim with one bad quote beside good ones is still justified; a claim
-    where nothing holds is a finding with no machine-checkable justification.
-    That total loss is rarer than it sounds — every catalogued ground verifies
-    by set membership, which is deterministic and always available, so a claim
-    can only lose every ground if every one of them is a quote and every quote
-    is bad.
+    **Per claim**, if *no* ground verifies at all, the claim is dropped and
+    recorded as a :class:`~stride_service.report.GroundlessClaim` whose reason
+    carries the quotes that were not found. A claim with one bad quote beside
+    good ones is still justified; a claim where nothing holds is a finding with
+    no machine-checkable justification. Every catalogued ground verifies by set
+    membership, so a claim can only lose every ground if every one of them is a
+    quote and every quote is bad — which is the common shape of a claim in a
+    framework whose catalog rarely holds the fact a requirement turns on, and
+    the reason the drop costs the claim rather than the job.
 
-    Nothing is filtered: this marks and it fails, and it removes neither an
-    entry nor a claim from anything.
+    Nothing is filtered here: the caller removes the groundless claims.
     """
     # Each source folded once rather than once per quote. The ladder normalizes
     # every character of the haystack, and a job runs ~19 claims per framework
@@ -545,8 +522,7 @@ def _verify_quotes(
     # documents to reach the same answer.
     folded = {label: normalize(text) for label, text in sources.items()}
     marks: list[UnverifiedGround] = []
-    issues: list[str] = []
-    failed: list[str] = []
+    groundless: list[GroundlessClaim] = []
     for claim in claims:
         unverified = [
             index
@@ -555,11 +531,17 @@ def _verify_quotes(
             and not verify_normalized(ground.text, folded.get(ground.source_label, ""))
         ]
         if len(unverified) == len(claim.grounds):
-            failed.append(claim.id)
-            issues.append(
-                f"claim {claim.id!r} has no ground that verifies: all"
-                f" {len(unverified)} of its quotes are absent from the sources"
-                " they name"
+            lost = "; ".join(
+                f"{claim.grounds[index].text!r} not found in"
+                f" {claim.grounds[index].source_label!r}"
+                for index in unverified
+            )
+            groundless.append(
+                GroundlessClaim(
+                    claim_id=claim.id,
+                    title=claim.title,
+                    reason=f"no ground verifies: {lost}"[:GROUNDLESS_REASON_MAX_CHARS],
+                )
             )
             continue
         marks += [
@@ -570,11 +552,7 @@ def _verify_quotes(
             )
             for index in unverified
         ]
-    if issues:
-        raise GroundsUnverifiedError(
-            "; ".join(issues), claim_ids=failed, draft_count=len(claims)
-        )
-    return marks
+    return marks, groundless
 
 
 def join_drafts(
@@ -610,8 +588,10 @@ def join_drafts(
     re-ask path and a whole report is too much to trade for either: a quote
     absent from the source it names, and an element ID a description cites in
     prose that the model does not contain
-    (:class:`~stride_service.report.UnresolvedMention`). A package's record adds
-    whatever else its own judgement fields earn
+    (:class:`~stride_service.report.UnresolvedMention`). A claim whose every
+    ground is such a quote is *dropped* and marked
+    (:class:`~stride_service.report.GroundlessClaim`), on the same trade. A
+    package's record adds whatever else its own judgement fields earn
     (:meth:`~stride_service.report.Claim.claim_marks`).
 
     References are snapped to their canonical spelling first
@@ -630,7 +610,7 @@ def join_drafts(
     parameter: a hand-authored model driven through the in-process engine has
     no sources to check against, and inventing a set would fail it on a
     citation that is not wrong. Empty means the text check does not run — no
-    quote is marked and no claim fails on one.
+    quote is marked and no claim is dropped on one.
     """
     known_ids = {element.id for element in system_model.elements()}
     merged = snap_drafts(
@@ -648,13 +628,16 @@ def join_drafts(
     # Only once the references resolve: a quote naming a source the job never
     # carried has already failed above, and matching its text against the empty
     # string would report the same defect a second time in worse words.
-    unverified = _verify_quotes(merged, sources) if sources else []
+    unverified, groundless = _verify_quotes(merged, sources) if sources else ([], [])
+    dropped = {mark.claim_id for mark in groundless}
+    kept = [draft for draft in merged if draft.id not in dropped]
     return JoinedDrafts(
-        drafts=merged,
+        drafts=kept,
         marks=AnalysisMarks(
             unverified_grounds=unverified,
-            unresolved_mentions=_unresolved_mentions(merged, known_ids),
-        ).merged_with(package.record.claim_marks(merged)),
+            unresolved_mentions=_unresolved_mentions(kept, known_ids),
+            groundless_claims=groundless,
+        ).merged_with(package.record.claim_marks(kept)),
     )
 
 

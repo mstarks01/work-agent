@@ -20,7 +20,7 @@ import pytest
 from evals.harness.reference import load_case
 from evals.harness.run import _write_reports, reports_dir
 from stride_service.report import Report
-from tests.test_evals_run_grounds import CASE_DIR, FABRICATED, sweep
+from tests.test_evals_run_grounds import CASE_DIR, DEAD, sweep
 
 
 @pytest.fixture(scope="module")
@@ -69,7 +69,7 @@ def test_a_persisted_report_carries_what_the_artifact_cannot(
 def test_a_case_that_died_leaves_no_report(monkeypatch, case, tmp_path):
     """No report, nothing to persist — an empty file would read as a finished
     case that found nothing."""
-    run = sweep(monkeypatch, case, FABRICATED)
+    run = sweep(monkeypatch, case, DEAD)
     out = tmp_path / "artifact.json"
 
     _write_reports(str(out), "analysis", run.runs)
