@@ -110,12 +110,14 @@ def artifact_document(usage, seed=1):
 EVEN_USAGE = {"extract": (1000, 200, 300), "critic": (1000, 200, 300)}
 
 
-def merged(root, name, identity, actual, sweeps=1, usage=None):
+def merged(root, name, identity, actual, sweeps=1, usage=None, recorded_prices=()):
     """A merged Baseline on disk: the manifest, and one artifact per sweep.
 
     The artifacts are what a borrowed estimate reads; the manifest's recorded
     actual answers only an exact-identity match. ``sweeps`` repeats the pair,
-    which is what a Baseline gaining runs looks like.
+    which is what a Baseline gaining runs looks like. ``recorded_prices`` is
+    what this Baseline was priced at when it ran, which the drift disclosure
+    compares against the map of today.
     """
     directory = root / "evals" / "baselines" / name
     directory.mkdir(parents=True)
@@ -132,7 +134,7 @@ def merged(root, name, identity, actual, sweeps=1, usage=None):
                 "submitted_by": "ada",
                 "cost": {
                     "actual_usd": actual,
-                    "unit_prices": [],
+                    "unit_prices": [prices.to_json() for prices in recorded_prices],
                     "unpriced": [],
                     "fallbacks": {},
                 },
@@ -255,6 +257,93 @@ class TestTheEstimate:
         assert dear_base - flat == pytest.approx(0.09)
         assert dear_strong - flat > dear_base - flat
 
+    def test_the_lender_is_chosen_for_what_it_ran_not_the_directory_order(
+        self, tmp_path, priced
+    ):
+        """Token counts are counts of work, so the workload has to match.
+
+        A selection naming fewer packages fires a lane agent for fewer lanes on
+        every case. Lending its counts to a run that selected more understates
+        by about that ratio, and sorting by directory name picks the lender by
+        an accident of the commit hash its directory is named for.
+        """
+        mine = {**IDENTITY, "frameworks": ["stride", "asvs"]}
+        merged(
+            tmp_path,
+            "aaa-stride-only",
+            {**IDENTITY, "frameworks": ["stride"]},
+            actual=0.10,
+            usage={"extract": (0, 0, 1_000), "critic": (0, 0, 1_000)},
+        )
+        merged(
+            tmp_path,
+            "zzz-both",
+            {**mine, "repo_commit": "e" * 40},
+            actual=10.0,
+            usage={"extract": (0, 0, 100_000), "critic": (0, 0, 100_000)},
+        )
+
+        estimate = consent.estimate(mine, ROUTES, tmp_path)
+
+        assert "borrowed from zzz-both" in " ".join(estimate.lines)
+        assert estimate.amount_usd == pytest.approx(1.2)
+
+    def test_the_table_order_is_the_precedence_not_the_count(self, tmp_path, priced):
+        """A mismatched selection never trades against a mismatched commit.
+
+        Both candidates differ on exactly one component, so counting them ties
+        and the name breaks it. The framework selection decides how many agents
+        run and the commit only how long their instructions are, so the tie is
+        wrong and ``COMPARABLE_ON``'s order settles it.
+        """
+        mine = {**IDENTITY, "frameworks": ["stride", "asvs"]}
+        wrong_selection = {**IDENTITY, "frameworks": ["stride"]}
+        wrong_commit = {**mine, "repo_commit": "e" * 40}
+
+        by_selection = consent._mismatches(mine, wrong_selection)
+        by_commit = consent._mismatches(mine, wrong_commit)
+
+        # Counting ties them, which is the reading that got this wrong.
+        assert sum(by_selection) == sum(by_commit) == 1
+        # The table's order does not: sharing the selection wins outright.
+        assert by_commit < by_selection
+
+    def test_a_block_reordering_is_not_a_difference(self, tmp_path, priced):
+        """``frameworks`` is a selection; its order is the report's, not work."""
+        mine = {**IDENTITY, "frameworks": ["stride", "asvs"]}
+        reordered = {**IDENTITY, "frameworks": ["asvs", "stride"]}
+
+        assert consent._differences(mine, reordered) == ()
+
+    def test_a_borrowed_number_names_what_the_lender_did_not_share(
+        self, tmp_path, priced
+    ):
+        merged(
+            tmp_path,
+            "other",
+            {**IDENTITY, "corpus_digest": "f" * 64},
+            actual=0.60,
+        )
+        estimate = consent.estimate(IDENTITY, ROUTES, tmp_path)
+
+        joined = " ".join(estimate.lines)
+        assert "not this configuration" in joined
+        assert "different corpus" in joined
+
+    def test_no_caveat_when_the_lender_shares_everything_that_matters(
+        self, tmp_path, priced
+    ):
+        """Only the models differ, and the repricing is what answers for those."""
+        merged(
+            tmp_path,
+            "other",
+            {**IDENTITY, "models": {"base": "old/base", "strong": "old/strong"}},
+            actual=0.60,
+        )
+        estimate = consent.estimate(IDENTITY, ROUTES, tmp_path)
+
+        assert "not this configuration" not in " ".join(estimate.lines)
+
     def test_no_merged_baseline_states_no_amount(self, tmp_path, priced):
         estimate = consent.estimate(IDENTITY, ROUTES, tmp_path)
         assert estimate.label == "unpriced"
@@ -274,6 +363,59 @@ class TestTheEstimate:
             Estimate(label="unpriced", amount_usd=0.0, lines=())
         with pytest.raises(ValueError, match="disagree"):
             Estimate(label="estimated", amount_usd=None, lines=())
+
+
+class TestTheDriftDisclosure:
+    """#331: the estimate names a price that moved since the Baseline ran.
+
+    The repo pins litellm exactly, so the map moves when somebody bumps the
+    pin and every older Baseline drifts at once. A CI check would fail honest
+    history the day after; this is disclosed to the one person it bears on.
+    """
+
+    RECORDED = (UnitPrices("openai/gpt-5.6", 1e-6, 4e-6, 1e-7),)
+
+    def test_a_moved_price_is_named_with_both_figures(self, tmp_path, priced):
+        merged(
+            tmp_path,
+            "one",
+            IDENTITY,
+            actual=0.60,
+            recorded_prices=self.RECORDED,
+        )
+        estimate = consent.estimate(IDENTITY, ROUTES, tmp_path)
+
+        drift = [line for line in estimate.lines if "the price map now says" in line]
+        assert len(drift) == 1
+        assert "openai/gpt-5.6" in drift[0]
+        assert "$1.00 in / $4.00 out" in drift[0]  # what the Baseline recorded
+        assert "$2.00 in / $8.00 out" in drift[0]  # what the map says today
+
+    def test_an_unmoved_price_says_nothing(self, tmp_path, priced):
+        merged(
+            tmp_path,
+            "one",
+            IDENTITY,
+            actual=0.60,
+            recorded_prices=(priced["openai/gpt-5.6"],),
+        )
+        estimate = consent.estimate(IDENTITY, ROUTES, tmp_path)
+
+        assert not [line for line in estimate.lines if "price map now" in line]
+
+    def test_the_borrowed_path_discloses_its_lender_drift_too(self, tmp_path, priced):
+        """The line names the Baseline it calibrated from, whichever path found it."""
+        merged(
+            tmp_path,
+            "other",
+            {**IDENTITY, "repo_commit": "e" * 40},
+            actual=0.60,
+            recorded_prices=self.RECORDED,
+        )
+        estimate = consent.estimate(IDENTITY, ROUTES, tmp_path)
+
+        assert estimate.label == "estimated"
+        assert any("the price map now says" in line for line in estimate.lines)
 
 
 class TestTypedAcceptance:
