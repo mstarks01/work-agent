@@ -32,6 +32,8 @@ from __future__ import annotations
 
 import logging
 import os
+import time
+import unicodedata
 from collections.abc import Callable, Mapping
 from typing import Any, Protocol
 
@@ -100,6 +102,19 @@ _CANONICAL_ALGORITHMS = {name.upper(): name for name in ALLOWED_ALGORITHMS}
 # rather than inherited: the number belongs to this service's latency budget,
 # not to the library's.
 JWKS_TIMEOUT_SECONDS = 5.0
+
+# The shortest interval between two JWKS re-fetches. PyJWKClient re-fetches the
+# whole key set on any `kid` it has not cached, and reads that `kid` from the
+# token's UNVERIFIED header — so without this an unauthenticated caller sending a
+# fresh random `kid` per request forces one outbound fetch each time, defeating
+# the key cache. This caps re-fetches to one per interval: a `kid` missing from
+# the cached set fails fast while the cooldown holds.
+JWKS_REFRESH_COOLDOWN_SECONDS = 60.0
+
+# Unicode general categories refused in a token subject: ``Cc`` the C0/C1
+# control characters (a newline here forges a log record), ``Cf`` the invisible
+# formatting ones. Matches the rule the source label already applies.
+_SUBJECT_REJECTED_CATEGORIES = frozenset({"Cc", "Cf"})
 
 
 class AuthConfigError(ValueError):
@@ -239,10 +254,70 @@ def _parse_algorithms(raw: str) -> tuple[str, ...] | None:
     return tuple(_CANONICAL_ALGORITHMS.get(name.upper(), name) for name in names)
 
 
+def _clean_subject(subject: str) -> str:
+    """Return the subject, or reject one that cannot key an owner safely.
+
+    ``require: ["sub"]`` only proves the claim is present, so PyJWT accepts an
+    empty or whitespace ``sub``. That is the sole ownership key, with no RBAC
+    above it, so two callers issued a blank ``sub`` would collapse into one
+    owner. A control character is rejected for a second reason: the subject
+    reaches a log line, and a newline would forge a second record there
+    (CWE-117).
+    """
+    if not subject.strip():
+        raise AuthenticationError("token subject is empty")
+    if any(
+        unicodedata.category(char) in _SUBJECT_REJECTED_CATEGORIES for char in subject
+    ):
+        raise AuthenticationError("token subject contains a control character")
+    return subject
+
+
 class SigningKeyClient(Protocol):
     """The slice of :class:`jwt.PyJWKClient` the verifier needs."""
 
     def get_signing_key_from_jwt(self, token: str) -> jwt.PyJWK: ...
+
+
+class _CooldownSigningKeyClient:
+    """Wrap :class:`jwt.PyJWKClient` so an unknown ``kid`` cannot force a fetch.
+
+    The bare client re-fetches the whole key set on any ``kid`` it has not
+    cached, reading that ``kid`` from the token's unverified header — so an
+    unauthenticated caller sending a fresh random ``kid`` per request forces one
+    outbound JWKS fetch each time. This resolves against the cached set first,
+    and re-fetches at most once per :data:`JWKS_REFRESH_COOLDOWN_SECONDS`: an
+    unknown ``kid`` fails fast while the cooldown holds, so a genuine key
+    rotation still resolves on the next refresh, but a random-``kid`` flood no
+    longer reaches the network.
+    """
+
+    def __init__(self, client: jwt.PyJWKClient, *, cooldown_seconds: float) -> None:
+        self._client = client
+        self._cooldown_seconds = cooldown_seconds
+        self._last_refresh = float("-inf")
+
+    def get_signing_key_from_jwt(self, token: str) -> jwt.PyJWK:
+        kid = jwt.get_unverified_header(token).get("kid")
+        key = self._match(kid, refresh=False)
+        if key is not None:
+            return key
+        now = time.monotonic()
+        if now - self._last_refresh < self._cooldown_seconds:
+            raise jwt.PyJWKClientError(
+                "no signing key matches the token's kid and JWKS refresh is on cooldown"
+            )
+        self._last_refresh = now
+        key = self._match(kid, refresh=True)
+        if key is None:
+            raise jwt.PyJWKClientError(f"no signing key matches kid {kid!r}")
+        return key
+
+    def _match(self, kid: str | None, *, refresh: bool) -> jwt.PyJWK | None:
+        keys = list(self._client.get_jwk_set(refresh=refresh).keys)
+        if kid is None:
+            return keys[0] if len(keys) == 1 else None
+        return next((key for key in keys if key.key_id == kid), None)
 
 
 class OidcJwtVerifier:
@@ -252,8 +327,9 @@ class OidcJwtVerifier:
         self, settings: OidcSettings, jwks_client: SigningKeyClient | None = None
     ) -> None:
         self._settings = settings
-        self._jwks_client = jwks_client or jwt.PyJWKClient(
-            settings.jwks_url, timeout=JWKS_TIMEOUT_SECONDS
+        self._jwks_client = jwks_client or _CooldownSigningKeyClient(
+            jwt.PyJWKClient(settings.jwks_url, timeout=JWKS_TIMEOUT_SECONDS),
+            cooldown_seconds=JWKS_REFRESH_COOLDOWN_SECONDS,
         )
 
     def verify(self, token: str) -> str:
@@ -271,7 +347,7 @@ class OidcJwtVerifier:
         except jwt.PyJWTError as exc:
             logger.info("rejected bearer token: %s", exc)
             raise AuthenticationError("invalid or expired credentials") from exc
-        return claims["sub"]
+        return _clean_subject(claims["sub"])
 
 
 VerifierFactory = Callable[[Mapping[str, str]], TokenVerifier]
