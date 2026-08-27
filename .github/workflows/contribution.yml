@@ -1,0 +1,83 @@
+# The contribution bindings: is this submission really its author's?
+#
+# Anyone may open a submission PR, and a maintainer merges every line. The
+# defence is review plus mechanical checks, never authentication — so what
+# this job proves is narrow and worth stating exactly: the names inside the
+# diff match the account GitHub says opened it, and nothing in the diff
+# raises its own author's standing.
+#
+# It cannot prove a model ran, and does not try (#323). A fabricator can
+# compute correct hashes for a fabrication; the `submitted_by` label is the
+# disclosure, and a sitting reviews the report text whatever produced it.
+#
+# `pull_request`, never `pull_request_target`: this checks out a stranger's
+# branch and runs this repository's code over it, so it must hold the
+# read-only token and no secrets. The offline/live split in ci.yml is the same
+# boundary, for the same reason.
+name: Contribution
+
+on:
+  pull_request:
+    paths:
+      - "evals/review/**"
+      - "evals/corpus/**"
+      - "evals/baselines/**"
+
+permissions: {}
+
+concurrency:
+  group: contribution-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  bindings:
+    name: Author bindings (no credentials)
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    permissions:
+      contents: read
+
+    steps:
+      # Third-party actions are pinned by commit SHA, not tag: a tag is
+      # mutable and a moved tag runs attacker code with this job's token.
+      #
+      # Full history, because every check reads the delta against
+      # `origin/main` — the diff, the append-only shapes, and the base-ref
+      # content each submission is measured against. A shallow clone has no
+      # merge base to measure from.
+      - name: Check out
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+
+      - name: Set up uv and Python
+        uses: astral-sh/setup-uv@11f9893b081a58869d3b5fccaea48c9e9e46f990 # v8.3.2
+        with:
+          python-version: "3.12"
+          enable-cache: true
+
+      - name: Install dependencies
+        run: uv sync --locked
+
+      # The author arrives as an environment variable rather than inlined into
+      # the script: a `${{ }}` expansion inside a `run:` block is substituted
+      # before the shell sees it, which is the standard injection seam even
+      # where the value's own format looks harmless.
+      #
+      # These are the same checks the contributor already ran locally through
+      # `submit --dry-run`. Running them again here is what makes them a gate
+      # rather than a courtesy: the local run is advice, and this is the copy
+      # nobody can skip.
+      - name: Check the author bindings
+        env:
+          PR_AUTHOR: ${{ github.event.pull_request.user.login }}
+        run: uv run python -m evals.harness.run verify-contribution --author "$PR_AUTHOR"
+
+      # Every merged Baseline still recomputes, and every case sitting's
+      # digests still match. These run over the whole tree rather than the
+      # diff, so a PR that edits a file some *other* case's sitting signed
+      # fails here — which is the point: a person names the debt in the PR
+      # that caused it.
+      - name: Check the corpus and the merged baselines
+        run: uv run pytest -q tests/test_case_review.py tests/test_evals_baseline.py
