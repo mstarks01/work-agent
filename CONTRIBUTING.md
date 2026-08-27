@@ -21,10 +21,13 @@ is any good. Two kinds:
   [`evals/BLESSING.md`](evals/BLESSING.md) step 6 explains the method and the
   by-hand path. 12 of the 13 cases are still waiting for one.
 
-Both are **free and offline**, because everything they read is already in this
-repository: a merged **Baseline** keeps the reports its findings came from, and
-a golden case carries its own sources, model and reference sets. Neither needs
-a provider key, and neither spends anything.
+Both are **free and offline**, and neither needs a provider key. A golden case
+carries its own sources, model and reference sets, so a Case Sitting is open
+whatever else the repository holds. A vote reads the reports a merged
+**Baseline** keeps, so how much there is to vote on is whatever
+[`evals/baselines/README.md`](evals/baselines/README.md) lists — that table is
+generated from the merged Baselines, which is why it answers this and a
+sentence here does not.
 
 **If you have time and a provider key.** You can also run the corpus through
 live models and contribute the result as a **Baseline**, so the published
