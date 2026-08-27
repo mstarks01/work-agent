@@ -586,6 +586,7 @@ FRAMEWORK_STRUCTURED_ARTIFACTS: tuple[str, ...] = (
     "precondition",
     "retrieved",
     "reviewed",
+    "accepted",
 )
 
 #: Keys holding bytes a model reads and Python does not. Written once by the
@@ -1553,6 +1554,10 @@ def route_review(
             ),
         )
         return _routed(ROUTE_REVISE, {"issue_count": len(problems.messages)})
+    # The marker ``assemble`` reads a framework as finished by. ``reviewed``
+    # alone cannot say so: it holds the first critic's malformed rulings for
+    # as long as the re-ask runs.
+    state.put(nodes.key("accepted"), True)
     return _routed(ROUTE_ACCEPT, {"reviewed_count": len(rulings)})
 
 
@@ -1633,7 +1638,8 @@ def assemble_report(
     **This node runs once per incoming trigger, so a two-framework job runs it
     twice.** ADK schedules a ``FunctionNode`` on each trigger rather than on all
     of its predecessors, and the earlier run builds the block of whichever
-    framework has not finished from keys nothing wrote. The final state is right
+    framework has not finished as empty: a framework reads as finished only once
+    its own router wrote its ``accepted`` marker. The final state is right
     by construction — the last run is the one that follows the last subgraph, so
     it sees every framework's artifacts — and it overwrites what the earlier run
     left.
@@ -1756,17 +1762,18 @@ def _framework_block(
     schemas = nodes.schemas
     package = nodes.package
     # An earlier trigger of ``assemble`` (see :func:`assemble_report`) can
-    # arrive after this framework's ``merge`` parked its drafts and before its
-    # critic wrote a ruling: the framework has not finished, and reading its
-    # drafts against no rulings would fail the whole job as a critic that
-    # dropped every draft. An unwritten ``reviewed`` key therefore reads the
-    # drafts as unwritten too; a critic that truly emitted nothing is caught
-    # on its own router, which routes to ``critic_failed`` and raises there.
-    reviewed = state.get(nodes.key("reviewed"))
-    drafts = _drafts_of(
-        state.get(nodes.key("drafts")) if reviewed is not None else None, package
+    # arrive while this framework is still running: after ``merge`` parked its
+    # drafts and before its critic ruled, or while a re-ask is replacing a
+    # malformed first ruling still sitting on ``reviewed``. Either way reading
+    # the drafts against those rulings would fail the whole job as a critic
+    # that dropped every draft. A framework whose router did not accept
+    # therefore reads as unfinished: no drafts, no rulings. A critic that never
+    # reconciles is caught on its own router, which raises in ``critic_failed``.
+    accepted = state.get(nodes.key("accepted"))
+    drafts = _drafts_of(state.get(nodes.key("drafts")) if accepted else None, package)
+    rulings = _rulings_of(
+        _claims_of(state.get(nodes.key("reviewed")) if accepted else None), schemas
     )
-    rulings = _rulings_of(_claims_of(reviewed), schemas)
     claims, rejected = assemble_claims(drafts, rulings, model, schemas)
     marks = AnalysisMarks.model_validate(state.get(nodes.key("marks")) or {})
     retrieved = state.get(nodes.key("retrieved")) or {}

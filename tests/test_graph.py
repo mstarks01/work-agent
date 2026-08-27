@@ -197,10 +197,15 @@ DISCLAIMERS = {"stride": "AI-generated STRIDE threat model."}
 def _park(
     ctx, drafts=None, reviewed_threats=None, marks=None, coverage=None, retrieved=None
 ):
-    """Park one framework's artifacts where its own nodes read them."""
+    """Park one framework's artifacts where its own nodes read them.
+
+    A parked ruling set stands for a critic the router accepted, so the
+    router's own marker is parked beside it.
+    """
     for artifact, value in (
         ("drafts", drafts),
         ("reviewed", reviewed_threats),
+        ("accepted", reviewed_threats is not None or None),
         ("marks", marks),
         ("coverage", coverage),
         ("retrieved", retrieved),
@@ -1744,10 +1749,11 @@ def test_a_refusal_does_not_cost_the_other_framework_its_answer(domain_loader):
     graph.prepare_analysis(
         model, ctx, BOTH_KEYS, BOTH, domain_loader, repo_package_loaders(BOTH)
     )
-    _park(ctx, [sample_draft("S-01").model_dump(mode="json")], None)
-    ctx.state[NODES.key("reviewed")] = {
-        "claims": [sample_ruling("S-01").model_dump(mode="json")]
-    }
+    _park(
+        ctx,
+        [sample_draft("S-01").model_dump(mode="json")],
+        {"claims": [sample_ruling("S-01").model_dump(mode="json")]},
+    )
     graph.assemble_report(model, ctx, BOTH_KEYS, BOTH, BOTH_DISCLAIMERS)
 
     analysis = graph.Analysis.from_state(ctx.state[graph.STATE_ANALYSIS])
@@ -1806,9 +1812,10 @@ def test_assemble_runs_once_per_framework_and_the_last_run_is_the_whole_report(
 
     # The second: every framework's artifacts are parked, so this is the report.
     _park(ctx, [sample_draft("S-01").model_dump(mode="json")], None)
-    ctx.state[NODES.key("reviewed")] = {
-        "claims": [sample_ruling("S-01").model_dump(mode="json")]
-    }
+    _park(
+        ctx,
+        reviewed_threats={"claims": [sample_ruling("S-01").model_dump(mode="json")]},
+    )
     graph.assemble_report(model, ctx, BOTH_KEYS, BOTH, BOTH_DISCLAIMERS)
     final = graph.Analysis.from_state(ctx.state[graph.STATE_ANALYSIS])
 
@@ -1816,30 +1823,42 @@ def test_assemble_runs_once_per_framework_and_the_last_run_is_the_whole_report(
     assert [claim.id for claim in final.analyses[1].claims] == ["S-01"]
 
 
-def test_an_early_assemble_run_skips_a_framework_whose_critic_has_not_ruled(
-    domain_loader,
+@pytest.mark.parametrize(
+    "reviewed",
+    [
+        pytest.param(None, id="critic-still-running"),
+        pytest.param({"claims": []}, id="re-ask-replacing-a-malformed-ruling"),
+    ],
+)
+def test_an_early_assemble_run_reads_an_unaccepted_framework_as_unfinished(
+    domain_loader, reviewed
 ):
-    """The earlier trigger can land between a framework's ``merge`` and its critic.
+    """The earlier trigger can land while a framework is still running.
 
-    Its drafts are parked and its ``reviewed`` key is not written yet. Reading
-    the two together would raise ``CriticOutputError`` for every draft and fail
-    a job whose critic was still running. The unfinished framework reads as
-    unfinished, and the later run builds its block.
+    Two windows: its drafts are parked and its critic has not written
+    ``reviewed`` yet, or the critic wrote a malformed ruling set that the router
+    sent to the re-ask, and ``reviewed`` still holds it. Reading the drafts
+    against either would raise ``CriticOutputError`` for every draft and fail
+    a job whose critic was still running. A framework its own router did not
+    accept reads as unfinished, and the later run builds its block.
     """
     model = valid_model().model_dump(mode="json")
     ctx = FakeContext(**ASVS_OPTIONS)
     graph.prepare_analysis(
         model, ctx, BOTH_KEYS, BOTH, domain_loader, repo_package_loaders(BOTH)
     )
-    _park(ctx, [sample_draft("S-01").model_dump(mode="json")], None)
+    ctx.state[NODES.key("drafts")] = [sample_draft("S-01").model_dump(mode="json")]
+    if reviewed is not None:
+        ctx.state[NODES.key("reviewed")] = reviewed
 
     graph.assemble_report(model, ctx, BOTH_KEYS, BOTH, BOTH_DISCLAIMERS)
     early = graph.Analysis.from_state(ctx.state[graph.STATE_ANALYSIS])
     assert early.analyses[1].claims == []
 
-    ctx.state[NODES.key("reviewed")] = {
-        "claims": [sample_ruling("S-01").model_dump(mode="json")]
-    }
+    event = route(
+        model, None, ctx, {"claims": [sample_ruling("S-01").model_dump(mode="json")]}
+    )
+    assert event.actions.route == graph.ROUTE_ACCEPT
     graph.assemble_report(model, ctx, BOTH_KEYS, BOTH, BOTH_DISCLAIMERS)
     final = graph.Analysis.from_state(ctx.state[graph.STATE_ANALYSIS])
     assert [claim.id for claim in final.analyses[1].claims] == ["S-01"]
