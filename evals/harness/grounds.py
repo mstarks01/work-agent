@@ -22,6 +22,10 @@ marks it counts are the ones :func:`~stride_service.critic.join_drafts` already
 produced with the *shipped* checker, so a sweep cannot grade a normalization
 policy the service does not run.
 
+* **The repair rung** — read :attr:`CaseGrounds.repaired_count`, the quotes
+  the ladder refused and :func:`~stride_service.grounding.repair_quote` then
+  rewrote to the source's nearest span. This is the number that moves
+  :data:`~stride_service.grounding.REPAIR_THRESHOLD`.
 * **A claim that lost every ground** — read :attr:`CaseGrounds.groundless_count`,
   the claims the service dropped and marked because nothing they cited held:
   every quote absent from its source, or every reference outside the catalog.
@@ -56,6 +60,7 @@ from stride_service.report import (
     FrameworkName,
     GroundKind,
     GroundlessClaim,
+    RepairedQuote,
     UnverifiedGround,
 )
 
@@ -96,6 +101,8 @@ class ThreatGrounds:
     lane: str
     kinds: tuple[GroundKind, ...]
     unverified: tuple[int, ...]
+    #: Indices of quote grounds the repair rung rewrote, the same way.
+    repaired: tuple[int, ...] = ()
 
     @property
     def total(self) -> int:
@@ -117,6 +124,7 @@ class ThreatGrounds:
             "total": self.total,
             "kinds": list(self.kinds),
             "unverified": list(self.unverified),
+            "repaired": list(self.repaired),
         }
 
 
@@ -189,6 +197,15 @@ class CaseGrounds:
         """
         return ratio(self.unverified_count, self.quote_count)
 
+    @property
+    def repaired_count(self) -> int:
+        return sum(len(entry.repaired) for entry in self.threats)
+
+    @property
+    def repaired_rate(self) -> float:
+        """Of the quotes the agents wrote, the share the repair rung rewrote."""
+        return ratio(self.repaired_count, self.quote_count)
+
     # --- measurement 3: claims dropped for losing every ground -----------
     @property
     def groundless_count(self) -> int:
@@ -212,6 +229,7 @@ class CaseGrounds:
                 "grounds": self.ground_count,
                 "quoteless_threats": self.quoteless_count,
                 "unverified_quotes": self.unverified_count,
+                "repaired_quotes": self.repaired_count,
                 "groundless_claims": self.groundless_count,
                 **self.kind_counts,
             },
@@ -219,6 +237,7 @@ class CaseGrounds:
                 "grounds_per_threat": round(self.grounds_per_threat, 3),
                 "quoteless_rate": round(self.quoteless_rate, 3),
                 "unverified_rate": round(self.unverified_rate, 3),
+                "repaired_rate": round(self.repaired_rate, 3),
                 "groundless_rate": round(self.groundless_rate, 3),
             },
             "threats": [entry.to_json() for entry in self.threats],
@@ -284,6 +303,7 @@ def measure_grounds(
     drafts: Sequence[Claim],
     unverified: Iterable[UnverifiedGround],
     groundless: Iterable[GroundlessClaim] = (),
+    repaired: Iterable[RepairedQuote] = (),
 ) -> CaseGrounds:
     """Fold one framework's drafts and its unverified marks into one measurement.
 
@@ -304,6 +324,9 @@ def measure_grounds(
     marked: dict[str, set[int]] = {}
     for mark in unverified:
         marked.setdefault(mark.claim_id, set()).add(mark.index)
+    rewritten: dict[str, set[int]] = {}
+    for repair in repaired:
+        rewritten.setdefault(repair.claim_id, set()).add(repair.index)
     return CaseGrounds(
         case_id=case_id,
         framework=framework,
@@ -314,6 +337,7 @@ def measure_grounds(
                 lane=lane_of(framework, draft),
                 kinds=tuple(ground.kind for ground in draft.grounds),
                 unverified=tuple(sorted(marked.get(draft.id, ()))),
+                repaired=tuple(sorted(rewritten.get(draft.id, ()))),
             )
             for draft in drafts
         ),
@@ -391,6 +415,7 @@ def aggregate_grounds(
     grounds = sum(entry.ground_count for entry in measurements)
     quotes = sum(entry.quote_count for entry in measurements)
     unverified = sum(entry.unverified_count for entry in measurements)
+    repaired = sum(entry.repaired_count for entry in measurements)
     quoteless = sum(entry.quoteless_count for entry in measurements)
     groundless = sum(entry.groundless_count for entry in measurements)
     kinds: Counter[str] = Counter()
@@ -402,11 +427,13 @@ def aggregate_grounds(
         "grounds": grounds,
         "quoteless_threats": quoteless,
         "unverified_quotes": unverified,
+        "repaired_quotes": repaired,
         "groundless_claims": groundless,
         **{kind: kinds.get(kind, 0) for kind in _KINDS},
         "grounds_per_threat": round(ratio(grounds, threats), 3),
         "quoteless_rate": round(ratio(quoteless, threats), 3),
         "unverified_rate": round(ratio(unverified, quotes), 3),
+        "repaired_rate": round(ratio(repaired, quotes), 3),
         "groundless_rate": round(ratio(groundless, threats + groundless), 3),
         "failed_cases": len(failures),
     }
@@ -431,6 +458,7 @@ def render(
             f"/{counts['absent-attribute']}/{counts['derived-fact']}"
             f"  quoteless {entry.quoteless_rate:.0%}"
             f"  unverified {entry.unverified_count}/{entry.quote_count}"
+            f"  repaired {entry.repaired_count}"
             f"  groundless {entry.groundless_count}"
         )
     for failure in failures:
@@ -441,6 +469,7 @@ def render(
             f"grounds: {totals['grounds_per_threat']:.2f} per threat,"
             f" quoteless {totals['quoteless_rate']:.0%},"
             f" unverified {totals['unverified_rate']:.1%},"
+            f" repaired {totals['repaired_rate']:.1%},"
             f" groundless {totals['groundless_rate']:.1%},"
             f" failed cases {totals['failed_cases']}"
             " (instrument, non-gating)"

@@ -284,6 +284,11 @@
     const unverified = new Map(
       (block.unverified_grounds || []).map(u => [`${u.claim_id}#${u.index}`, u])
     );
+    // Quotes the service rewrote to the source's own nearest span. The ground
+    // shows the submitter's words; this carries what the agent wrote.
+    const repaired = new Map(
+      (block.repaired_quotes || []).map(r => [`${r.claim_id}#${r.index}`, r])
+    );
     // Every element ID a description cites that the embedded model does not
     // contain, gathered under the claim that cites it.
     const mentions = new Map();
@@ -317,7 +322,7 @@
     // not hold. Dropped the same way, listed the same way, and the reason
     // carries the lost quote or reference so a reader can judge the loss.
     const groundless = (block.groundless_claims || []);
-    return { unverified, mentions, composed, unmitigated, unknown, groundless };
+    return { unverified, repaired, mentions, composed, unmitigated, unknown, groundless };
   }
 
   const SEV = { critical: ["Critical","--sev-critical"], high: ["High","--sev-high"], medium: ["Medium","--sev-medium"], low: ["Low","--sev-low"] };
@@ -371,6 +376,13 @@
       cite.append(unverified ? `\u26a0 not found in ${ground.source_label}`
                              : `\u2014 ${ground.source_label}`);
       row.append(cite);
+      const repaired = marks.repaired.get(`${claimId}#${index}`);
+      if (repaired) {
+        const note = el("div", "cite unverified");
+        note.append(`\u270e replaced the agent's wording (similarity ${repaired.similarity}): `);
+        note.append(document.createTextNode(repaired.written));
+        row.append(note);
+      }
       return row;
     }
     if (ground.kind === "unknown-attribute" || ground.kind === "absent-attribute") {

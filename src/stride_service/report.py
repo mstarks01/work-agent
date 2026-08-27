@@ -174,6 +174,12 @@ from stride_service.system_model import BoundaryCrossing, SystemModel
 # reason each ground was lost. A claim carrying one quote and nothing else is
 # the common shape of a framework whose catalog rarely holds the fact a
 # requirement turns on, so one misquote there cost every lane's work.
+#
+# 3.0 also carries ``repaired_quotes``, a ninth list: a quote ground the
+# ladder refused and the service rewrote to the source's own nearest span. The
+# ground carries the submitter's words after that, and the mark carries the
+# agent's, so a consumer reading a quote as "what the agent wrote" must read
+# this list too.
 SCHEMA_VERSION = "3.0"
 
 # The envelope's disclaimer, which is about the *service* rather than about any
@@ -1127,6 +1133,35 @@ class UnverifiedGround(BaseModel):
     reason: str = Field(min_length=1, max_length=500)
 
 
+class RepairedQuote(BaseModel):
+    """A quote ground whose text the service replaced with the source's own span.
+
+    The ladder refused what the agent wrote, and
+    :func:`~stride_service.grounding.repair_quote` found a window of the named
+    source near enough to hand back. The ground now carries that window — the
+    submitter's words — and this mark carries what the agent wrote, so the
+    substitution is on the record rather than silent. ``similarity`` is the
+    ratio that licensed it.
+
+    A reference like :class:`UnverifiedGround`: the claim's ``id`` plus the
+    index of the entry in its ``grounds`` list, checked the same way. The two
+    are exclusive for one entry — a repaired quote verifies, so it is never
+    also marked unverified.
+
+    Service-owned and outside :class:`Ground`, for the reason every mark here
+    is: an agent must not report on its own accuracy, and a field that said
+    "this was repaired" on the ground itself would ride into the provider
+    schemas as one the agent could set.
+    """
+
+    model_config = ConfigDict(extra="forbid")
+
+    claim_id: str = Field(min_length=1, max_length=CLAIM_ID_MAX_CHARS)
+    index: int = Field(ge=0)
+    written: str = Field(min_length=1, max_length=1000)  # Ground.text's bound
+    similarity: float = Field(ge=0.0, le=1.0)
+
+
 class UnresolvedMention(BaseModel):
     """An element ID a description names in prose that the model does not contain.
 
@@ -1393,6 +1428,7 @@ class AnalysisMarks(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
     unverified_grounds: list[UnverifiedGround] = Field(default_factory=list)
+    repaired_quotes: list[RepairedQuote] = Field(default_factory=list)
     unresolved_mentions: list[UnresolvedMention] = Field(default_factory=list)
     unresolved_evidence: list[UnresolvedEvidence] = Field(default_factory=list)
     unknown_claim_identities: list[UnknownClaimIdentity] = Field(default_factory=list)
@@ -1701,6 +1737,7 @@ class FrameworkAnalysis(BaseModel):
     scope: list[ScopeEntry] = Field(default_factory=list)
     coverage: list[LaneCoverage] = Field(default_factory=list)
     unverified_grounds: list[UnverifiedGround] = Field(default_factory=list)
+    repaired_quotes: list[RepairedQuote] = Field(default_factory=list)
     unresolved_mentions: list[UnresolvedMention] = Field(default_factory=list)
     unresolved_evidence: list[UnresolvedEvidence] = Field(default_factory=list)
     unknown_claim_identities: list[UnknownClaimIdentity] = Field(default_factory=list)
@@ -1851,24 +1888,30 @@ class FrameworkAnalysis(BaseModel):
         return issues
 
     def _unverified_mark_issues(self) -> list[str]:
-        """Every unverified mark points at a grounds entry this block carries.
+        """Every indexed mark points at a grounds entry this block carries.
 
         A mark naming a claim or an index that is not here is worse than no
         mark: the viewer drops the quotation marks off nothing, and the entry
         the service actually failed to verify renders as though it had passed.
+        A repaired quote is checked the same way, for the same reason: the
+        agent's words would be shown beside the wrong entry.
         """
         grounds_count = {claim.id: len(claim.grounds) for claim in self.all_claims()}
         issues = []
-        for mark in self.unverified_grounds:
+        indexed: list[tuple[str, UnverifiedGround | RepairedQuote]] = [
+            *(("unverified ground", m) for m in self.unverified_grounds),
+            *(("repaired quote", m) for m in self.repaired_quotes),
+        ]
+        for what, mark in indexed:
             count = grounds_count.get(mark.claim_id)
             if count is None:
                 issues.append(
-                    f"unverified ground names claim {mark.claim_id!r}, which"
+                    f"{what} names claim {mark.claim_id!r}, which"
                     f" is not in the {self.framework} analysis"
                 )
             elif mark.index >= count:
                 issues.append(
-                    f"unverified ground names index {mark.index} on claim"
+                    f"{what} names index {mark.index} on claim"
                     f" {mark.claim_id!r}, which carries {count} grounds"
                 )
         return issues
