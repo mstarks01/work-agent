@@ -670,3 +670,72 @@ class TestEvents:
         frames = parse_sse(response.text)
         assert [int(f["id"]) for f in frames] == list(range(4, 4 + len(frames)))
         assert frames[-1]["data"]["status"] == "completed"
+
+
+class TestFrameworksListIsBounded:
+    """A frameworks list longer than the registry is refused before route work.
+
+    The list had no upper bound, and the route de-duplicated it with an O(n^2)
+    scan, so a large body stalled the event loop before any job record existed.
+    The schema bound refuses it up front; a valid selection names each framework
+    at most once, so no legitimate request is affected.
+    """
+
+    def test_a_frameworks_list_longer_than_the_registry_is_refused(self):
+        client, _ = make_client()
+        over_long = [{"name": "stride"}, {"name": "asvs"}, {"name": "stride"}]
+        response = client.post(
+            "/v1/jobs", json=submission(frameworks=over_long), headers=auth()
+        )
+        assert response.status_code == 422
+
+
+class TestBodyCapUnderRootPath:
+    """The raw-body cap must hold when the app is mounted under a root_path.
+
+    The guard compared the raw ASGI path against ``/v1/jobs`` while the router
+    matched the root_path-stripped path, so under a path-prefixing proxy the
+    router routed the submission while the guard waved the unbounded body
+    through. It now compares the routed path, like the router.
+    """
+
+    @staticmethod
+    def _status_for(root_path: str, path: str, body: bytes) -> int:
+        from stride_service.api import BodyLimitMiddleware
+
+        async def inner(scope, receive, send):
+            while True:
+                message = await receive()
+                if not message.get("more_body", False):
+                    break
+            await send({"type": "http.response.start", "status": 201, "headers": []})
+            await send({"type": "http.response.body", "body": b""})
+
+        middleware = BodyLimitMiddleware(inner, max_bytes=16)
+        scope = {
+            "type": "http",
+            "method": "POST",
+            "path": path,
+            "root_path": root_path,
+            "headers": [],
+        }
+        sent: list[dict] = []
+
+        async def receive():
+            return {"type": "http.request", "body": body, "more_body": False}
+
+        async def send(message):
+            sent.append(message)
+
+        asyncio.run(middleware(scope, receive, send))
+        start = next(m for m in sent if m["type"] == "http.response.start")
+        return start["status"]
+
+    def test_body_cap_applies_under_a_root_path_prefix(self):
+        assert self._status_for("/api", "/api/v1/jobs", b"x" * 64) == 413
+
+    def test_body_cap_still_applies_without_a_prefix(self):
+        assert self._status_for("", "/v1/jobs", b"x" * 64) == 413
+
+    def test_a_non_submission_path_is_not_capped(self):
+        assert self._status_for("", "/v1/other", b"x" * 64) == 201

@@ -107,9 +107,15 @@ caller's reaching a terminal state, not the passage of time.
 
 ## Consequences
 
-- One token can no longer spend the whole deployment's provider quota. The
+- One token can no longer run more than `max_active_jobs` jobs **at once**. The
   bound is the deployment's to set and is visible in its config rather than
-  implied by its infrastructure.
+  implied by its infrastructure. It bounds concurrency, not cumulative spend: a
+  caller who submits serially, letting one job finish before the next, stays
+  inside the ceiling while spending without limit over time. The unbounded-
+  consumption half of OWASP LLM10 is therefore **not** closed here and remains
+  the integrator's to close, with a per-caller rate limit at the edge — see
+  `docs/Integration-Guide.md`. `stride_service.resilience`'s module docstring
+  states the same boundary.
 - **The ceiling is only as shared as the configured store.** With the shipped
   `memory` backend behind more than one instance, the effective ceiling is the
   sum across instances. This is stated in `config/resilience.toml` and in

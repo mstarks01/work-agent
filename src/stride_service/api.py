@@ -24,17 +24,20 @@ from __future__ import annotations
 
 import asyncio
 import logging
+from collections import Counter
 from collections.abc import Mapping, Sequence
 from datetime import datetime
 from http import HTTPStatus
 from typing import Annotated, Any, cast
 from uuid import uuid4
 
+import anyio.to_thread
 from fastapi import BackgroundTasks, Depends, FastAPI, HTTPException, Request
 from fastapi.exceptions import RequestValidationError
 from fastapi.responses import JSONResponse, StreamingResponse
 from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
 from pydantic import BaseModel, ConfigDict, Field, ValidationError
+from starlette._utils import get_route_path
 from starlette.exceptions import HTTPException as StarletteHTTPException
 
 from stride_service.auth import (
@@ -44,7 +47,7 @@ from stride_service.auth import (
 )
 from stride_service.deployment import Deployment
 from stride_service.errors import ConfigError
-from stride_service.frameworks import package_for
+from stride_service.frameworks import PACKAGES, package_for
 from stride_service.jobs import (
     TERMINAL_STATUSES,
     JobRecord,
@@ -118,10 +121,15 @@ class BodyLimitMiddleware:
         self._path = path
 
     async def __call__(self, scope, receive, send) -> None:
+        # Match the path the router matches: get_route_path strips any ASGI
+        # root_path first, while raw scope["path"] keeps it. Comparing the raw
+        # path meant that under a path-prefixing proxy (uvicorn --root-path) the
+        # router still routed POST /prefix/v1/jobs here while this guard saw a
+        # mismatch and waved the unbounded body through.
         if (
             scope["type"] != "http"
             or scope["method"] != "POST"
-            or scope["path"] != self._path
+            or get_route_path(scope) != self._path
         ):
             await self._app(scope, receive, send)
             return
@@ -221,7 +229,12 @@ class JobSubmission(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
     sources: list[Source]
-    frameworks: list[FrameworkRequest] = Field(min_length=1)
+    # Bounded by the number of frameworks this build knows: a valid selection
+    # names each at most once (a repeat is refused downstream), so no legitimate
+    # request exceeds it, and the schema refuses an over-long list before the
+    # route's per-name work runs. The bound tracks the registry, so a new
+    # package raises it with no edit here.
+    frameworks: list[FrameworkRequest] = Field(min_length=1, max_length=len(PACKAGES))
     system_name: str | None = Field(default=None, min_length=1, max_length=200)
 
 
@@ -264,7 +277,7 @@ def _resolve_selection(
     moved one layer earlier.
     """
     names = [entry.name for entry in requested]
-    repeated = sorted({name for name in names if names.count(name) > 1})
+    repeated = sorted(name for name, count in Counter(names).items() if count > 1)
     if repeated:
         raise HTTPException(
             status_code=422,
@@ -363,12 +376,18 @@ async def require_subject(
         HTTPAuthorizationCredentials | None, Depends(_bearer_scheme)
     ],
 ) -> str:
-    """FastAPI dependency: verify the bearer token, return its subject."""
+    """FastAPI dependency: verify the bearer token, return its subject.
+
+    ``verify`` is synchronous and may reach the network to fetch JWKS. Run it in
+    a worker thread rather than inline: a blocking call on the event loop would
+    stall every other in-flight request for the fetch, so one unverified token
+    could freeze the whole worker (OWASP LLM10).
+    """
     if credentials is None:
         raise _unauthorized()
     verifier: TokenVerifier = request.app.state.verifier
     try:
-        return verifier.verify(credentials.credentials)
+        return await anyio.to_thread.run_sync(verifier.verify, credentials.credentials)
     except AuthenticationError:
         raise _unauthorized() from None
 

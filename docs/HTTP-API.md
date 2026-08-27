@@ -186,6 +186,14 @@ time — poll or subscribe to the jobs you have, then resubmit. The count is not
 a rate: nothing accrues over a window, and finishing a job immediately buys the
 next one. See [ADR 0007](adr/0007-per-caller-concurrency-ceiling.md).
 
+**Because the count is not a rate, this service does not bound a caller's spend
+over time — you must.** One token that submits serially, letting each job finish
+before the next, stays under the ceiling while running an unbounded number of
+paid jobs. Place a per-caller rate limit (requests or cost per window) at your
+edge or gateway in front of `/v1`; the concurrency ceiling is the backstop
+behind it, not a substitute for it. This is the unbounded-consumption half of
+OWASP LLM10, and it is the integrator's to close.
+
 ## Bearer auth
 
 These apply to the `/v1` API only; the in-process engine uses none of them.
