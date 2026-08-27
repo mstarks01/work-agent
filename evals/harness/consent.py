@@ -174,27 +174,54 @@ def _borrow(
     prices to the ones it recorded — the arithmetic is crude on purpose,
     because the label already says the number is a guess and a more elaborate
     model would only make the guess look better than it is.
+
+    **Both sides of the ratio count one rate per distinct model.** That is the
+    invariant, and it is the whole of the correctness here: the lent actual is
+    a mean over the Baseline's sweeps, so a divisor that grew with the sweep
+    count divided a per-sweep number by a per-directory one. A ten-sweep
+    Baseline then lent a tenth of its own cost, and the contributor consented
+    to that. Deduplicating by model keeps the ratio a property of the two
+    configurations rather than of how many times somebody ran one of them.
     """
     for manifest in manifests:
         actual = _recorded_actual(manifest)
         sweeps = manifest.get("sweeps", [])
         if actual is None or not sweeps:
             continue
-        recorded = [
-            entry
-            for sweep in sweeps
-            for entry in sweep.get("cost", {}).get("unit_prices", [])
-        ]
-        theirs = sum(float(entry.get("output_per_token", 0.0)) for entry in recorded)
-        ours = sum(
-            prices.output_per_token
-            for route in routes.values()
-            if (prices := unit_prices(route)) is not None
-        )
+        theirs = sum(_recorded_rates(sweeps).values())
+        ours = sum(_route_rates(routes).values())
         if theirs <= 0 or ours <= 0:
             continue
         return actual * (ours / theirs), str(manifest.get("name"))
     return None
+
+
+def _recorded_rates(sweeps: Sequence[dict[str, Any]]) -> dict[str, float]:
+    """The lending Baseline's output rate per model, across all its sweeps.
+
+    Every sweep of one Baseline priced the same models, so the entries repeat
+    once per sweep. Keying by model is what collapses them back to the one
+    rate each model actually has.
+    """
+    return {
+        str(entry.get("model")): float(entry.get("output_per_token", 0.0))
+        for sweep in sweeps
+        for entry in sweep.get("cost", {}).get("unit_prices", [])
+    }
+
+
+def _route_rates(routes: dict[str, str]) -> dict[str, float]:
+    """This run's output rate per model, keyed the same way as the lender's.
+
+    Keyed by model rather than by tier, because two tiers may resolve to one
+    model and the other side of the ratio counts that model once. Sorted so a
+    consented amount is reproducible down to the floating-point addition.
+    """
+    return {
+        route: prices.output_per_token
+        for route in sorted(set(routes.values()))
+        if (prices := unit_prices(route)) is not None
+    }
 
 
 def _render(estimate: Estimate) -> str:
@@ -276,12 +303,23 @@ def hold(
     executions: Sequence[NodeRun],
     remaining: Sequence[str],
     ask: Callable[[str], str] | None,
+    *,
+    ran: int,
 ) -> float | None:
     """Between cases: is the run still inside what was accepted?
 
     Returns the amount now in force — the same one, or a freshly accepted
     larger one. Raises :class:`Refused` to stop the sweep, which the caller
     turns into a written artifact rather than a lost one.
+
+    **The re-prompt offers the whole sweep, never the sunk spend.** Accepting
+    what is already spent puts the run over its own figure again on the very
+    next case, so a single overrun became a prompt at every remaining case
+    boundary. What the contributor is asked for instead is the projection —
+    the spend so far, plus the same per-case rate over the cases still to run
+    — so one overrun costs one prompt and the next one means the rate moved
+    again. ``ran`` is how many cases produced ``executions``, which is what
+    turns a total into a rate.
     """
     if accepted is None:
         return None  # accepted ``unknown``: there is nothing to measure against
@@ -297,11 +335,17 @@ def hold(
             f"stopping: ${so_far:.2f} spent against ${accepted:.2f} accepted,"
             " and --accept-cost leaves no hand here to accept more"
         )
+    projected = so_far + (so_far / ran) * len(remaining) if ran > 0 else so_far
     return _accept_by_typing(
         Estimate(
-            label="recorded",
-            amount_usd=so_far,
-            lines=("this is what the run has already spent",),
+            label="estimated",
+            amount_usd=projected,
+            lines=(
+                (
+                    f"${so_far:.2f} spent over {ran} case(s), and"
+                    f" {len(remaining)} to run at the same rate"
+                ),
+            ),
         ),
         ask,
     )

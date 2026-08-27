@@ -239,6 +239,15 @@ def assemble(root: Path, author: str, artifact_paths: list[Path]) -> Path:
     nothing here is a trust point. Adding sweeps to an existing Baseline is
     the same call — the identity decides the directory, and the cap is
     checked where the directory is verified.
+
+    **A sweep is keyed by its own bytes, so re-assembling one replaces it.**
+    The stem is a digest of the artifact, which makes re-running ``submit
+    baseline`` over the same file the same sweep rather than a second one.
+    Appending it twice was invisible to :func:`verify` — the file digests and
+    the cost arithmetic both recompute per entry and a duplicate agrees with
+    itself — and it doubled the directory's recorded cost, spent one of the
+    ten cap slots, and printed a range across two identical values, which is
+    the fake spread ``comparison.py`` exists to prevent.
     """
     artifacts = [load_artifact(path) for path in artifact_paths]
     identities = {BaselineIdentity.from_artifact(artifact) for artifact in artifacts}
@@ -257,7 +266,11 @@ def assemble(root: Path, author: str, artifact_paths: list[Path]) -> Path:
         if manifest_path.exists()
         else {"name": identity.name, "identity": identity.to_json(), "sweeps": []}
     )
-    entries: list[dict[str, Any]] = list(manifest.get("sweeps", []))
+    # Keyed by artifact filename rather than a list, so a sweep already in the
+    # manifest keeps its place and is rewritten instead of appended again.
+    entries: dict[str, dict[str, Any]] = {
+        str(entry.get("artifact", "")): entry for entry in manifest.get("sweeps", [])
+    }
 
     for source, artifact in zip(artifact_paths, artifacts, strict=True):
         payload = source.read_bytes()
@@ -277,17 +290,15 @@ def assemble(root: Path, author: str, artifact_paths: list[Path]) -> Path:
                 target = target_reports / file.relative_to(reports)
                 target.parent.mkdir(parents=True, exist_ok=True)
                 target.write_bytes(file.read_bytes())
-        entries.append(
-            {
-                "artifact": f"{stem}.json",
-                "submitted_by": author,
-                "certification": artifact.block("certification"),
-                "files": _file_digests(directory, stem),
-                "cost": price_sweep(artifact).to_json(),
-            }
-        )
+        entries[f"{stem}.json"] = {
+            "artifact": f"{stem}.json",
+            "submitted_by": author,
+            "certification": artifact.block("certification"),
+            "files": _file_digests(directory, stem),
+            "cost": price_sweep(artifact).to_json(),
+        }
 
-    manifest["sweeps"] = entries
+    manifest["sweeps"] = list(entries.values())
     manifest_path.write_text(
         json.dumps(manifest, ensure_ascii=False, indent=2, sort_keys=True) + "\n",
         encoding="utf-8",
@@ -365,6 +376,18 @@ def verify(
         problems.append(
             f"{directory.name}: holds {len(sweeps)} sweeps; the cap is"
             f" {SWEEP_CAP} (#321)"
+        )
+    # One entry per sweep. A repeated filename is one sweep counted twice, and
+    # every other check here passes it: the digests and the cost recompute per
+    # entry, so a duplicate agrees with itself while doubling the directory's
+    # cost and the run count the published spread rests on.
+    filenames = [str(entry.get("artifact", "")) for entry in sweeps]
+    repeated = sorted({name for name in filenames if filenames.count(name) > 1})
+    if repeated:
+        problems.append(
+            f"{directory.name}: {repeated} named by more than one sweep entry;"
+            " a sweep is keyed by its own bytes, so the same artifact is one"
+            " sweep and not two"
         )
 
     identities = set()

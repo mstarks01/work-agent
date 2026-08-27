@@ -313,7 +313,9 @@ async def _run_mode(
         if position and accepted is not None:
             remaining = [later.id for later in cases[position:]]
             try:
-                accepted = consent.hold(accepted, executions, remaining, ask)
+                accepted = consent.hold(
+                    accepted, executions, remaining, ask, ran=position
+                )
             except consent.Refused as refusal:
                 # Not an exception out of the sweep: everything already run is
                 # paid for, so the caller still writes the artifact and the
@@ -1028,7 +1030,7 @@ def command_comparison(args: argparse.Namespace) -> int:
     calls it during staging, so a contributor never learns it exists.
     """
     path = comparison.write(REPO_ROOT)
-    print(f"{path} rebuilt from {comparison.BASELINES_DIR}")
+    print(f"{path} rebuilt from {REPO_ROOT / comparison.TABLE_REL.parent}")
     return 0
 
 

@@ -190,7 +190,7 @@ class TestTheVoteChecks:
         prepare_vote(repo)
         (repo / "README.md").write_text("drift\n", encoding="utf-8")
         git(repo, "fetch", "origin")
-        check = submit._check_only_the_allowlist_changed(repo, "ada")
+        check = submit._check_scope(repo, "ada", kind_name="vote")
         assert not check.passed
         assert "README.md" in check.problems[0]
 
@@ -322,7 +322,7 @@ class TestTheSittingChecks:
         other.mkdir(parents=True)
         (other / "source.md").write_text("another\n", encoding="utf-8")
         git(repo, "fetch", "origin")
-        check = submit._check_one_case(repo, "ada")
+        check = submit._check_one_directory(repo, "ada", kind_name="sitting")
         assert not check.passed
 
 
@@ -547,3 +547,36 @@ class TestTheCommand:
         assert CASE not in debt
         log = fake_gh.read_text(encoding="utf-8")
         assert f"Sitting: {CASE} by ada" in log
+
+
+class TestTheDeltaCache:
+    """The delta is read once per checklist pass, and never held past one."""
+
+    def test_a_pass_reads_the_tree_once(self, repo, monkeypatch):
+        reads = []
+        real = submit._run
+
+        def counted(args, cwd):
+            if args[:3] == ["git", "diff", "--name-only"]:
+                reads.append(args)
+            return real(args, cwd)
+
+        monkeypatch.setattr(submit, "_run", counted)
+        prepare_vote(repo)
+        git(repo, "fetch", "origin")
+        with submit._delta_cache(repo):
+            submit._vote_preflight(repo, "ada")
+        assert len(reads) == 1
+
+    def test_the_cache_does_not_outlive_its_pass(self, repo):
+        """A write between passes is seen, which is why the scope is narrow."""
+        git(repo, "fetch", "origin")
+        with submit._delta_cache(repo):
+            before = submit._changed_paths(repo)
+        (repo / "stray.txt").write_text("written between passes\n", encoding="utf-8")
+        with submit._delta_cache(repo):
+            after = submit._changed_paths(repo)
+
+        assert "stray.txt" not in before
+        assert "stray.txt" in after
+        assert submit._DELTA == {}

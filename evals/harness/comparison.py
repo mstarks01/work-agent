@@ -39,13 +39,15 @@ from typing import Any
 
 from evals.harness import standings
 from evals.harness.artifact import REPO_ROOT
-from evals.harness.baseline import BASELINES_DIR
 from evals.harness.instruments import INSTRUMENTS, Column
 from evals.harness.scorer import vote_coverage
 from stride_service.report import FrameworkName
 
-#: Where the generated table lives, beside the Baselines it reads.
-TABLE_PATH = BASELINES_DIR / "README.md"
+#: Where the generated table lives, beside the Baselines it reads. Relative,
+#: because every reader here takes a ``root`` — the repo's own tree in CI, a
+#: temporary one under test — and an absolute constant would answer for only
+#: the first of them.
+TABLE_REL = Path("evals") / "baselines" / "README.md"
 
 #: What a cell says when the number would be zero only because nobody has
 #: voted. A zero reads as a measured failure; an absent vote is not a
@@ -293,14 +295,14 @@ def _render_row(row: Row) -> str:
 
 def is_stale(root: Path = REPO_ROOT) -> bool:
     """Whether the committed file disagrees with what the data says today."""
-    path = root / "evals" / "baselines" / "README.md"
+    path = root / TABLE_REL
     current = path.read_text(encoding="utf-8") if path.is_file() else ""
     return current != build(root)
 
 
 def write(root: Path = REPO_ROOT) -> Path:
     """Rebuild the file. What ``submit baseline`` and the command both call."""
-    path = root / "evals" / "baselines" / "README.md"
+    path = root / TABLE_REL
     path.parent.mkdir(parents=True, exist_ok=True)
     path.write_text(build(root), encoding="utf-8")
     return path
