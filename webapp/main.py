@@ -106,6 +106,7 @@ from fastapi.responses import (
 )
 from pydantic import ValidationError
 from starlette.datastructures import MutableHeaders
+from starlette.middleware.trustedhost import TrustedHostMiddleware
 from starlette.types import ASGIApp, Message, Receive, Scope, Send
 
 from stride_service import (
@@ -132,6 +133,16 @@ SAMPLE = REPO_ROOT / "examples" / "orders.md"
 
 HOST = "127.0.0.1"
 PORT = 8000
+
+#: The only ``Host`` values a loopback app answers to. Binding to 127.0.0.1
+#: stops a request arriving off the host; it does **not** stop a page in the
+#: operator's own browser reaching the app, because DNS rebinding makes an
+#: attacker's domain resolve to 127.0.0.1 and become same-origin with it. Then
+#: no CORS preflight applies and a write endpoint is reachable from any page
+#: the operator happens to visit. Checking the header the rebound request
+#: still carries is the defence, and it is why this is not decoration: the
+#: vote ledger is the supply chain of every published quality number (A01).
+LOOPBACK_HOSTS = ["127.0.0.1", "localhost"]
 
 # The registry is a demo surface, not a job store — /v1 already is one. It holds
 # untrusted prose and its report, in memory, per process, never persisted, and
@@ -384,6 +395,7 @@ def create_app(
     state = build_startup() if startup is None else startup
     analyses = Analyses() if analyses is None else analyses
     app = FastAPI(title="STRIDE first run", docs_url=None, redoc_url=None)
+    app.add_middleware(TrustedHostMiddleware, allowed_hosts=LOOPBACK_HOSTS)
     app.add_middleware(SecurityHeaders)
 
     @app.get("/", response_class=HTMLResponse)
