@@ -26,9 +26,7 @@ The validation issues, each naming an element ID, a field, and a code:
 
 The original submitted text:
 
-```
 {input_text}
-```
 
 ## Procedure
 
