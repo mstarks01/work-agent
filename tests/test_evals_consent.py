@@ -231,6 +231,49 @@ class TestTheHold:
         assert hold(None, [node(completion=1_000_000)], ["02"], None) is None
 
 
+class TestADirtyTreeIsNamedBeforeTheSpend:
+    """A sweep over uncommitted edits is legitimate, and cannot be contributed.
+
+    ``TUNING.md``'s ordinary loop sweeps over uncommitted prompt edits, so the
+    run must not refuse one. What it must not do either is let the money go and
+    leave the contributor to discover at ``submit`` that the artifact can never
+    become a Baseline — the identity needs a clean commit. So the fact rides in
+    the block being accepted.
+    """
+
+    def gate_lines(self, clean, capsys):
+        from dataclasses import replace
+
+        estimate = Estimate(label="estimated", amount_usd=1.0, lines=("a line",))
+        if clean is not True:
+            estimate = replace(
+                estimate, lines=(*estimate.lines, "never contributed as a Baseline")
+            )
+        gate(estimate, "1.00")
+        return capsys.readouterr().out
+
+    def test_a_dirty_tree_says_so_in_the_accepted_block(self, capsys):
+        assert "never contributed as a Baseline" in self.gate_lines(False, capsys)
+
+    def test_a_clean_tree_says_nothing_extra(self, capsys):
+        assert "never contributed as a Baseline" not in self.gate_lines(True, capsys)
+
+    def test_the_note_is_a_seam_the_gate_reads(self):
+        """The real wiring, not a grep: what command_run folds into the block."""
+        from evals.harness.artifact import UNRECORDED, RepoCommit
+        from evals.harness.run import _contribution_note
+
+        clean = RepoCommit(commit="c" * 40, clean=True)
+        dirty = RepoCommit(commit="c" * 40, clean=False)
+        unrecorded = RepoCommit(commit=UNRECORDED, clean=None)
+
+        assert _contribution_note(clean) == ()
+        assert "never contributed as a Baseline" in _contribution_note(dirty)[0]
+        assert _contribution_note(unrecorded), (
+            "a sweep that cannot name its commit cannot be contributed either"
+        )
+
+
 class TestAStoppedSweepSaysSo:
     """A partial record must not read as a whole one (#334)."""
 

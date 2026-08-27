@@ -326,6 +326,46 @@ class TestTheSittingChecks:
         assert not check.passed
 
 
+class TestSelfRegistration:
+    """A first-timer's roster line writes itself (#320's self-registration)."""
+
+    @pytest.fixture(autouse=True)
+    def rooted(self, repo, monkeypatch):
+        monkeypatch.setattr(submit, "REPO_ROOT", repo)
+        self.repo = repo
+
+    def roster(self):
+        return (self.repo / "evals" / "review" / "voters.toml").read_text("utf-8")
+
+    def test_a_first_timer_is_added_as_a_contributor(self, fake_gh, capsys):
+        """The command knows the login and knows the line is missing."""
+        votes = self.repo / "evals" / "review" / "votes"
+        votes.mkdir()
+        (votes / "ada.jsonl").write_text(vote_line(), encoding="utf-8")
+
+        assert main(["submit", "vote", "--dry-run"]) == 0
+        assert 'standing = "contributor"' in self.roster()
+        assert "[voters.ada]" in self.roster()
+        assert "added your roster line" in capsys.readouterr().out
+
+    def test_somebody_already_rostered_is_left_alone(self, fake_gh, capsys):
+        prepare_vote(self.repo)
+        before = self.roster()
+        assert main(["submit", "vote", "--dry-run"]) == 0
+        assert self.roster() == before
+        assert "added your roster line" not in capsys.readouterr().out
+
+    def test_it_never_raises_a_standing(self, fake_gh):
+        """Self-registration only ever appends a contributor line."""
+        votes = self.repo / "evals" / "review" / "votes"
+        votes.mkdir()
+        (votes / "ada.jsonl").write_text(vote_line(), encoding="utf-8")
+        main(["submit", "vote", "--dry-run"])
+        assert self.roster().count("maintainer") == 1, (
+            "only the pre-existing maintainer line may say maintainer"
+        )
+
+
 class TestWhatCIRuns:
     """``verify-contribution``: the same checks, against the PR's author."""
 

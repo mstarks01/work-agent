@@ -612,6 +612,25 @@ def _models_record(deployment: Deployment) -> dict[str, Any]:
     }
 
 
+def _contribution_note(commit: Any) -> tuple[str, ...]:
+    """What to say about this sweep's contributability, before the money goes.
+
+    A sweep over uncommitted edits is legitimate — it is ``TUNING.md``'s
+    ordinary loop — so this informs and never refuses. What it prevents is the
+    contributor discovering at ``submit``, after the spend, that a Baseline
+    identity needs a clean commit and this artifact has none.
+    """
+    if commit.clean is True:
+        return ()
+    return (
+        (
+            "this tree does not match its commit, so this sweep can be measured"
+            " but never contributed as a Baseline. Commit first if you meant to"
+            " contribute it."
+        ),
+    )
+
+
 def _prompt(question: str) -> str:
     """Ask at the terminal. Seamed so the gate's tests never block on stdin."""
     return input(question)
@@ -677,16 +696,14 @@ def command_run(args: argparse.Namespace) -> int:
     # the gate's job is that they see it, see how good the number is, and
     # accept it in a way a rote hand cannot.
     ask = None if args.accept_cost is not None else _prompt
+    estimate = consent.estimate(
+        _would_be_identity(cases, deployment, commit, corpus, args),
+        _tier_routes(deployment),
+        REPO_ROOT,
+    )
+    estimate = replace(estimate, lines=(*estimate.lines, *_contribution_note(commit)))
     try:
-        accepted = consent.gate(
-            consent.estimate(
-                _would_be_identity(cases, deployment, commit, corpus, args),
-                _tier_routes(deployment),
-                REPO_ROOT,
-            ),
-            args.accept_cost,
-            ask,
-        )
+        accepted = consent.gate(estimate, args.accept_cost, ask)
     except consent.Refused as refusal:
         print(refusal, file=sys.stderr)
         return 1
@@ -1502,7 +1519,9 @@ def main(argv: Sequence[str] | None = None) -> int:
     submit_parser.add_argument(
         "--dry-run",
         action="store_true",
-        help="stop after the checklist and stage nothing",
+        help="stop after the checklist, before any branch or PR is made."
+        " Your roster line is still added if you have none, because you need"
+        " it either way.",
     )
     submit_parser.add_argument(
         "--artifact",
