@@ -17,6 +17,7 @@ from stride_service.auth import (
     AuthenticationError,
     OidcJwtVerifier,
     OidcSettings,
+    _CooldownSigningKeyClient,
     build_verifier,
 )
 
@@ -81,6 +82,23 @@ class TestOidcJwtVerifier:
     def test_missing_subject_rejected(self):
         with pytest.raises(AuthenticationError):
             verifier().verify(make_token(sub=None))
+
+    def test_empty_subject_rejected(self):
+        # ``require: ["sub"]`` only proves presence, so an empty subject passes
+        # PyJWT. It is the sole ownership key, so two callers issued a blank sub
+        # would collapse into one owner.
+        with pytest.raises(AuthenticationError):
+            verifier().verify(make_token(sub=""))
+
+    def test_whitespace_subject_rejected(self):
+        with pytest.raises(AuthenticationError):
+            verifier().verify(make_token(sub="   "))
+
+    def test_control_character_subject_rejected(self):
+        # A newline in the subject would forge a second record on the log line
+        # the subject reaches (CWE-117).
+        with pytest.raises(AuthenticationError):
+            verifier().verify(make_token(sub="alice\nCRITICAL forged"))
 
     def test_hs256_token_rejected(self):
         claims = {
@@ -291,7 +309,62 @@ class TestJwksTransport:
 
     def test_the_jwks_fetch_carries_this_services_timeout(self):
         # Stated rather than inherited: PyJWKClient's own default is 30s, which
-        # is a request-path stall an unreachable provider can impose.
+        # is a request-path stall an unreachable provider can impose. The client
+        # is wrapped by the refresh-cooldown guard, so the timeout sits on the
+        # PyJWKClient it holds.
         verifier = OidcJwtVerifier(settings())
 
-        assert verifier._jwks_client.timeout == JWKS_TIMEOUT_SECONDS
+        assert verifier._jwks_client._client.timeout == JWKS_TIMEOUT_SECONDS
+
+
+class _FakeKey:
+    def __init__(self, kid: str):
+        self.key_id = kid
+        self.key = _PUBLIC_KEY
+
+
+class _FakeJwkSet:
+    def __init__(self, keys):
+        self.keys = keys
+
+
+class _CountingJwkClient:
+    """A PyJWKClient stand-in that counts only the refreshing fetches."""
+
+    timeout = JWKS_TIMEOUT_SECONDS
+
+    def __init__(self, kids):
+        self._kids = list(kids)
+        self.refreshes = 0
+
+    def get_jwk_set(self, refresh: bool = False) -> _FakeJwkSet:
+        if refresh:
+            self.refreshes += 1
+        return _FakeJwkSet([_FakeKey(kid) for kid in self._kids])
+
+
+class TestRefreshCooldown:
+    """An unknown kid cannot force a JWKS refetch on every request."""
+
+    @staticmethod
+    def _token(kid: str) -> str:
+        return jwt.encode(
+            {"sub": "alice"}, _PRIVATE_PEM, algorithm="RS256", headers={"kid": kid}
+        )
+
+    def test_unknown_kid_refetches_at_most_once_per_cooldown(self):
+        client = _CooldownSigningKeyClient(
+            _CountingJwkClient(["known"]), cooldown_seconds=3600.0
+        )
+        with pytest.raises(jwt.PyJWKClientError):
+            client.get_signing_key_from_jwt(self._token("random-1"))
+        with pytest.raises(jwt.PyJWKClientError):
+            client.get_signing_key_from_jwt(self._token("random-2"))
+        assert client._client.refreshes == 1
+
+    def test_known_kid_resolves_from_the_cached_set(self):
+        counting = _CountingJwkClient(["known"])
+        client = _CooldownSigningKeyClient(counting, cooldown_seconds=3600.0)
+        key = client.get_signing_key_from_jwt(self._token("known"))
+        assert key.key_id == "known"
+        assert counting.refreshes == 0
