@@ -785,6 +785,27 @@ def test_the_report_page_ships_a_strict_nonce_csp(client):
     assert "__CSP_NONCE__" not in response.text
 
 
+def test_no_page_can_be_framed(client, broken_client):
+    """``frame-ancestors`` is why the CSRF check on ``/analyze`` means anything.
+
+    A press inside somebody else's frame reaches this app as same-origin,
+    because it genuinely comes from this app's own page — so framing walks past
+    the header check, and refusing to be framed is what closes it. The
+    directive is asserted per page rather than once, because it does **not**
+    fall back to ``default-src``: a policy can read as total, pass every other
+    check in this file, and still leave the page framable.
+    """
+    run_id = run_to_completion(client)
+    served = {
+        "form": client.get("/"),
+        "report": client.get(f"/report/{run_id}"),
+        "diagnostic": broken_client.get("/"),
+    }
+    for page, response in served.items():
+        csp = response.headers["Content-Security-Policy"]
+        assert "frame-ancestors 'none'" in csp, f"the {page} page can be framed"
+
+
 def test_every_render_gets_a_fresh_nonce(client):
     """A nonce reused across responses is not a nonce."""
     run_id = run_to_completion(client)

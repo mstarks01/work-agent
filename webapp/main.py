@@ -60,7 +60,15 @@ Security posture, all of it deliberate:
   of whether the escape is adequate.
 * **CSRF.** ``POST /analyze`` requires ``Sec-Fetch-Site: same-origin``. The
   header is browser-set and unspoofable from script, and it is checked before
-  anything else so a cross-origin caller cannot even start a run.
+  anything else so a cross-origin caller cannot even start a run. The check is
+  :func:`is_same_origin`, which the two eval-side apps share through
+  :func:`refuse_cross_origin` — one spelling of the header name and the
+  accepted value, rather than one per endpoint.
+* **No page here can be framed.** Each policy closes ``frame-ancestors``,
+  which does not fall back to ``default-src`` however total the rest of the
+  policy reads. It is the control the origin check rests on rather than a
+  second opinion about it: a press inside somebody else's frame reaches the
+  app as same-origin, because it really does come from the app's own page.
 * **One run at a time** (LLM10). A second submission is refused with a message,
   not queued and held open.
 * **A strict nonce CSP on every page.** ``default-src 'none'`` with a
@@ -96,7 +104,7 @@ from functools import partial
 from pathlib import Path
 from typing import get_args
 
-from fastapi import FastAPI, Request
+from fastapi import FastAPI, HTTPException, Request
 from fastapi.responses import (
     HTMLResponse,
     JSONResponse,
@@ -144,6 +152,40 @@ PORT = 8000
 #: vote ledger is the supply chain of every published quality number (A01).
 LOOPBACK_HOSTS = ["127.0.0.1", "localhost"]
 
+
+def is_same_origin(request: Request) -> bool:
+    """Whether the browser marked this request as sent from the app's own page.
+
+    The header is browser-set and script cannot spoof it, so this is the check
+    every writing endpoint in every app here runs before it does anything. It
+    is one function rather than one line repeated at each endpoint because the
+    header name and the accepted value are the whole of the check: spelled
+    four times, they are four chances to accept ``same-site`` by typo.
+
+    **It is necessary and not sufficient.** A page framed by somebody else
+    sends requests this returns ``True`` for, because they really do come from
+    this app's own page. ``frame-ancestors 'none'`` in each policy is what
+    closes that, and neither control replaces the other.
+
+    Callers answer a refusal in their own shape — this app owes its form page
+    a ``message`` and the other two raise ``HTTPException`` — so this decides
+    and does not respond.
+    """
+    return request.headers.get("sec-fetch-site") == "same-origin"
+
+
+def refuse_cross_origin(request: Request) -> None:
+    """:func:`is_same_origin`, as the 403 the two eval-side apps answer with.
+
+    They both want the same refusal from every writing endpoint, so the status
+    and the sentence live here once rather than at each of the four.
+    """
+    if not is_same_origin(request):
+        raise HTTPException(
+            status_code=403, detail="this request did not come from the app's page"
+        )
+
+
 # The registry is a demo surface, not a job store — /v1 already is one. It holds
 # untrusted prose and its report, in memory, per process, never persisted, and
 # oldest-first evicted. A restart loses history, which is correct here.
@@ -163,11 +205,14 @@ _PAYLOAD_BLOCK = re.compile(
 _NONCE_PLACEHOLDER = "__CSP_NONCE__"
 
 # ``default-src 'none'`` and no ``'unsafe-inline'``: the viewer loads nothing
-# external, so everything it needs is the nonce. ``base-uri`` and
-# ``form-action`` are closed because neither has any use on a report page.
+# external, so everything it needs is the nonce. ``base-uri``, ``form-action``
+# and ``frame-ancestors`` are closed because none of the three has any use on a
+# report page — and because none of the three falls back to ``default-src``.
+# That last one is the whole reason they are spelled: a policy can read as
+# total and still leave a page framable.
 _CSP = (
     "default-src 'none'; script-src 'nonce-{nonce}'; style-src 'nonce-{nonce}'; "
-    "base-uri 'none'; form-action 'none'"
+    "base-uri 'none'; form-action 'none'; frame-ancestors 'none'"
 )
 
 # The form page's policy differs from the report page's by exactly what the page
@@ -178,7 +223,7 @@ _CSP = (
 # this form is something going wrong.
 _FORM_CSP = (
     "default-src 'none'; script-src 'nonce-{nonce}'; style-src 'nonce-{nonce}'; "
-    "connect-src 'self'; base-uri 'none'; form-action 'none'"
+    "connect-src 'self'; base-uri 'none'; form-action 'none'; frame-ancestors 'none'"
 )
 
 # The diagnostic page runs no script and makes no request: it is one style block
@@ -186,7 +231,8 @@ _FORM_CSP = (
 # and both fall through to ``default-src 'none'`` — a page that has nothing to
 # authorise should not carry the grant that would authorise one.
 _DIAGNOSTIC_CSP = (
-    "default-src 'none'; style-src 'nonce-{nonce}'; base-uri 'none'; form-action 'none'"
+    "default-src 'none'; style-src 'nonce-{nonce}'; base-uri 'none';"
+    " form-action 'none'; frame-ancestors 'none'"
 )
 
 
@@ -418,7 +464,7 @@ def create_app(
 
     @app.post("/analyze")
     async def analyze(request: Request) -> Response:
-        if request.headers.get("sec-fetch-site") != "same-origin":
+        if not is_same_origin(request):
             logger.warning("refused a POST /analyze that was not same-origin")
             return JSONResponse(
                 {"message": "This request did not come from the app's own page."},
