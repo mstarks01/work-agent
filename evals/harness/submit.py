@@ -37,6 +37,7 @@ from dataclasses import dataclass
 from datetime import UTC, datetime
 from pathlib import Path
 from tempfile import TemporaryDirectory
+from typing import Any
 
 from pydantic import ValidationError
 
@@ -858,47 +859,107 @@ def _register(root: Path, author: str) -> bool:
     return True
 
 
-def command_submit(args: argparse.Namespace) -> int:
-    """The four steps, in order, stopping at the first that fails."""
-    root = REPO_ROOT
+@dataclass(frozen=True)
+class Outcome:
+    """What a submission attempt did. One shape for every caller.
+
+    The CLI prints it and the sitting app returns it as JSON, so a rule can
+    never hold on one surface and not the other — the reason this is a value
+    rather than a pile of prints.
+    """
+
+    author: str
+    checks: tuple[Check, ...] = ()
+    url: str = ""
+    closing: str = ""
+    error: str = ""
+
+    @property
+    def ok(self) -> bool:
+        return not self.error and all(check.passed for check in self.checks)
+
+    def to_json(self) -> dict[str, Any]:
+        return {
+            "author": self.author,
+            "checks": [
+                {
+                    "name": check.name,
+                    "passed": check.passed,
+                    "problems": list(check.problems),
+                }
+                for check in self.checks
+            ],
+            "url": self.url,
+            "closing": self.closing,
+            "error": self.error,
+            "ok": self.ok,
+        }
+
+
+def submission(
+    root: Path,
+    kind_name: str,
+    *,
+    dry_run: bool = False,
+    args: argparse.Namespace | None = None,
+) -> Outcome:
+    """The spine: bind, register, prepare, check, and open unless asked not to.
+
+    Every caller runs exactly this, so the checklist a contributor sees
+    locally, the one the sitting app shows, and the rules CI re-runs are one
+    implementation rather than three that agree today.
+    """
     try:
         author = gh_login(root)
     except SubmitError as exc:
-        print(f"cannot read the gh login: {exc}")
-        return 1
+        return Outcome(author="", error=f"cannot read the gh login: {exc}")
 
-    print(f"submitting as {author}\n")
-    _run(["git", "fetch", "origin"], root)
     try:
+        _run(["git", "fetch", "origin"], root)
         _register(root, author)
-    except (OSError, roster.RosterError) as exc:
-        print(f"cannot add your roster line: {exc}")
-        return 1
-    kind = KINDS[args.kind]
+    except (OSError, SubmitError, roster.RosterError) as exc:
+        return Outcome(author=author, error=str(exc))
+
+    kind = KINDS[kind_name]
     if kind.prepare is not None:
         try:
-            kind.prepare(root, author, args)
+            kind.prepare(root, author, args or argparse.Namespace())
         except (SubmitError, ProvenanceError, baseline.BaselineError) as exc:
-            print(f"cannot assemble the submission: {exc}")
-            return 1
-    checks = kind.preflight(root, author)
-    for check in checks:
-        mark = "ok  " if check.passed else "FAIL"
-        print(f"  {mark}  {check.name}")
-        for problem in check.problems:
-            print(f"        {problem}")
-    if not all(check.passed for check in checks):
-        print("\nnothing opened; fix the failures above and re-run.")
-        return 1
-    if args.dry_run:
-        print("\ndry run: the checklist passed. No branch, no PR.")
-        return 0
+            return Outcome(
+                author=author, error=f"cannot assemble the submission: {exc}"
+            )
+
+    checks = tuple(kind.preflight(root, author))
+    if not all(check.passed for check in checks) or dry_run:
+        return Outcome(author=author, checks=checks)
 
     try:
-        url = open_pr(root, args.kind, author)
+        url = open_pr(root, kind_name, author)
     except SubmitError as exc:
-        print(f"cannot open the PR: {exc}")
+        return Outcome(author=author, checks=checks, error=f"cannot open the PR: {exc}")
+    return Outcome(
+        author=author, checks=checks, url=url, closing=kind.closing(root, author)
+    )
+
+
+def command_submit(args: argparse.Namespace) -> int:
+    """The four steps, in order, stopping at the first that fails."""
+    outcome = submission(REPO_ROOT, args.kind, dry_run=args.dry_run, args=args)
+    if outcome.author:
+        print(f"submitting as {outcome.author}\n")
+    for check in outcome.checks:
+        print(f"  {'ok  ' if check.passed else 'FAIL'}  {check.name}")
+        for problem in check.problems:
+            print(f"        {problem}")
+    if outcome.error:
+        print(outcome.error)
         return 1
-    print(f"\n{url}")
-    print(KINDS[args.kind].closing(root, author))
+    if not outcome.ok:
+        print("\nnothing opened; fix the failures above and re-run.")
+        return 1
+    if not outcome.url:
+        print("\ndry run: the checklist passed. No branch, no PR.")
+        return 0
+    print(f"\n{outcome.url}")
+    print(outcome.closing)
     return 0
