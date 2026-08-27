@@ -11,17 +11,15 @@ from __future__ import annotations
 
 import asyncio
 import json
-from collections.abc import AsyncGenerator
+from collections.abc import AsyncGenerator, Sequence
+from itertools import permutations
 
 import pytest
 from google.adk.models import LlmResponse
 
 from stride_service import graph
 from stride_service.api import create_app
-from stride_service.frameworks.asvs.record import (
-    RequirementProposal,
-    RequirementRulingProposal,
-)
+from stride_service.frameworks import PACKAGES, FrameworkName
 from stride_service.frameworks.stride.record import STRIDE_CATEGORIES
 from stride_service.jobs import (
     InMemoryJobStore,
@@ -40,6 +38,7 @@ from tests.factories import (
     DESCRIPTION_TEXT,
     EMPTY_CLAIMS,
     PROJECT_ROOT,
+    SCRIPTED_FRAMEWORKS,
     ScriptedLlm,
     claims_json,
     repo_tiers,
@@ -755,11 +754,6 @@ def test_nothing_turns_the_context_into_evidence():
 
 # --- Two frameworks under the real scheduler ---------------------------------
 
-ASVS_NODES = graph.FrameworkNodes("asvs")
-ASVS_CRITIC = ASVS_NODES.node(graph.CRITIC_ROLE)
-ASVS_RECRITIC = ASVS_NODES.node(graph.RECRITIC_ROLE)
-ASVS_CLAIM_ID = "v5.0.0-6.2.1"
-
 
 class HeldLlm(ScriptedLlm):
     """A stand-in that answers only once its gate opens.
@@ -782,61 +776,58 @@ class HeldLlm(ScriptedLlm):
             yield response
 
 
-def both_frameworks_job() -> JobRecord:
+def pair_job(pair: Sequence[FrameworkName]) -> JobRecord:
     record = JobRecord.create(
         owner_subject="idp|user-1",
         sources=[Source.description(DESCRIPTION_TEXT)],
         system_name="Order Service",
         frameworks=[
-            FrameworkSelection(name="asvs", options={"level": 1}),
-            FrameworkSelection(name="stride"),
+            FrameworkSelection(
+                name=name, options=dict(SCRIPTED_FRAMEWORKS[name].options)
+            )
+            for name in pair
         ],
     )
     record.transition("running")
     return record
 
 
-def asvs_proposal_json() -> str:
-    return claims_json(
-        RequirementProposal(
-            requirement="2.1",
-            title="No password length policy is stated",
-            description="The requirement applies and the input does not settle it.",
-            evidence_refs=["crossing:flow:customer-to-web-app:login"],
-        )
-    )
-
-
-def asvs_ruling_json() -> str:
-    return claims_json(
-        RequirementRulingProposal.model_validate(
-            {"id": ASVS_CLAIM_ID, "verdict": {"status": "confirmed"}}
-        )
-    )
-
-
+@pytest.mark.parametrize("window", ["critic-still-running", "re-ask-still-running"])
 @pytest.mark.parametrize(
-    ("first_reply", "held_node"),
+    ("first", "held"),
     [
-        pytest.param(asvs_ruling_json(), ASVS_CRITIC, id="critic-still-running"),
-        pytest.param(EMPTY_CLAIMS, ASVS_RECRITIC, id="re-ask-still-running"),
+        pytest.param(first, held, id=f"{first}-finishes-before-{held}")
+        for first, held in permutations(PACKAGES, 2)
     ],
 )
-def test_one_framework_finishing_first_does_not_fail_the_other(first_reply, held_node):
-    """The real two-framework graph, with STRIDE forced to finish first.
+def test_one_framework_finishing_first_does_not_fail_the_other(first, held, window):
+    """The real two-framework graph, over every ordered pair of packages.
 
-    ``assemble`` fires once per framework that accepts. Holding one ASVS node
-    until STRIDE's ``assemble`` has run puts the early run in the window where
-    ASVS's drafts are parked and its rulings are absent, or where its
-    ``reviewed`` key still holds the malformed first ruling its re-ask is
-    replacing. Either window used to raise ``CriticOutputError`` for every ASVS
-    draft and fail the job. The last run carries both blocks.
+    ``assemble`` fires once per framework that accepts. Holding one node of
+    ``held`` until ``first``'s ``assemble`` has run puts the early run in the
+    window where ``held``'s drafts are parked and its rulings are absent, or
+    where its ``reviewed`` key still holds the malformed first ruling its
+    re-ask is replacing. Either window used to raise ``CriticOutputError`` for
+    every draft and fail the job. The last run carries both blocks.
+
+    The pairs come from ``PACKAGES`` and the answers from
+    ``SCRIPTED_FRAMEWORKS``, so a new package runs here once it has a fixture.
     """
-    replies = happy_replies()
-    replies[graph.analyze_node_name("asvs", "authentication")] = asvs_proposal_json()
-    replies[ASVS_CRITIC] = first_reply
-    replies[ASVS_RECRITIC] = asvs_ruling_json()
-    pipeline, models = build(replies, frameworks=("asvs", "stride"), llm_class=HeldLlm)
+    held_nodes = graph.FrameworkNodes(held)
+    held_critic = held_nodes.node(graph.CRITIC_ROLE)
+    held_recritic = held_nodes.node(graph.RECRITIC_ROLE)
+    replies = {"extract": valid_model().model_dump_json()}
+    for name in (first, held):
+        fixture = SCRIPTED_FRAMEWORKS[name]
+        replies[graph.analyze_node_name(name, fixture.lane)] = fixture.proposal
+        replies[graph.FrameworkNodes(name).node(graph.CRITIC_ROLE)] = fixture.ruling
+    if window == "re-ask-still-running":
+        replies[held_critic] = EMPTY_CLAIMS
+        replies[held_recritic] = SCRIPTED_FRAMEWORKS[held].ruling
+        held_node = held_recritic
+    else:
+        held_node = held_critic
+    pipeline, models = build(replies, frameworks=(first, held), llm_class=HeldLlm)
     gate = asyncio.Event()
     models[held_node].gate = gate
     visited: list[str] = []
@@ -848,13 +839,14 @@ def test_one_framework_finishing_first_does_not_fail_the_other(first_reply, held
 
     async def scenario():
         runner = AdkPipelineRunner(pipeline)
-        return await asyncio.wait_for(runner.run(both_frameworks_job(), on_node), 30)
+        return await asyncio.wait_for(runner.run(pair_job((first, held)), on_node), 30)
 
     outcome = asyncio.run(scenario())
 
     assert isinstance(outcome, PipelineCompleted)
-    asvs_block, stride_block = outcome.report.analyses
-    assert [claim.id for claim in stride_block.claims] == ["S-01"]
-    assert [claim.id for claim in asvs_block.claims] == [ASVS_CLAIM_ID]
+    blocks = {block.framework: block for block in outcome.report.analyses}
+    for name in (first, held):
+        expected = [SCRIPTED_FRAMEWORKS[name].claim_id]
+        assert [claim.id for claim in blocks[name].claims] == expected
     assert visited.count(graph.ASSEMBLE_NODE) == 2
     assert visited.index(graph.ASSEMBLE_NODE) < visited.index(held_node)
