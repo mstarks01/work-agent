@@ -570,6 +570,25 @@ reads the same files, and promoting a sweep winner re-pins the same
 everything follows it — which is what makes grading a configuration you do not
 run impossible rather than merely discouraged.
 
+**Keep a local edit outside the repository.** Every file in the table is
+tracked, so an edit to `config/model_tiers.toml` in a clone blocks the next
+`git pull` until it is stashed or reverted. Copy the file to a path outside
+the checkout, point the variable at that path, and restore the tracked file:
+
+```bash
+cp config/model_tiers.toml ~/.config/stride/model_tiers.toml
+git checkout -- config/model_tiers.toml
+export STRIDE_TIERS_FILE=~/.config/stride/model_tiers.toml
+```
+
+Set the variable in whatever starts the process: the shell profile, the
+service unit, the container environment. Outside the checkout rather than an
+ignored file inside it, because a `git clean` deletes an ignored file and a
+`.gitignore` line for one machine does not belong in a shared file. The cost
+is that an upstream change to the tracked file no longer reaches the copy:
+after a pull, diff the tracked file against the copy and carry over what you
+want. The same pattern covers `sampling.toml` and `resilience.toml`.
+
 ### Model overrides (deploy-time, no image rebuild)
 
 | Variable | Effect |
