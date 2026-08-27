@@ -23,6 +23,7 @@ from stride_service.report import (
     UnknownRef,
     UnresolvedEvidence,
     UnresolvedMention,
+    UnresolvedReference,
     Verdict,
     derive_severity_level,
 )
@@ -389,6 +390,11 @@ class TestEveryClaimMarkPointsAtAThreat:
         ("field", "mark", "what"),
         [
             (
+                "unresolved_references",
+                UnresolvedReference(claim_id="S-09", element_id="process:ghost"),
+                "unresolved reference",
+            ),
+            (
                 "unresolved_mentions",
                 UnresolvedMention(claim_id="S-09", mention="process:ghost"),
                 "unresolved mention",
@@ -413,7 +419,12 @@ class TestEveryClaimMarkPointsAtAThreat:
 
     def test_every_mark_type_is_covered_by_the_check(self):
         """The parametrization above is the whole of ``ClaimMark``."""
-        covered = {UnresolvedMention, UnresolvedEvidence, MissingMitigation}
+        covered = {
+            UnresolvedReference,
+            UnresolvedMention,
+            UnresolvedEvidence,
+            MissingMitigation,
+        }
         assert set(get_args(ClaimMark)) == covered
 
 

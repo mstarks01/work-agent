@@ -316,10 +316,11 @@ mechanically:
 - **unverified rate** — of the quotes the agents wrote, the share the shipped
   ladder (`stride_service.grounding`) could not find in the source they name.
   Denominated in quotes, never in grounds.
-- **groundless rate** — of every claim the lanes drafted, the share the service
-  dropped because nothing it cited held: every quote absent from its source, or
-  every reference outside the catalog. Read off the report's `groundless_claims`
-  marks, so a dropped claim is counted, never a dead case.
+- **dropped rate** — of every claim the lanes drafted, the share the service
+  dropped for a fault in one entry: a proposal that failed its schema, every
+  quote absent from its source, every reference outside the catalog, every
+  element absent from the model, or an ID repeated. Read off the report's
+  `dropped_claims` marks, so a dropped claim is counted, never a dead case.
 - **failed cases** — the ways the fan-in still kills a case, counted rather than
   allowed to abort the sweep: a dangling element reference, a duplicate ID, an
   unresolvable source label. These remain structural failures, so a run that

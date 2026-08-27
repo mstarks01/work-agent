@@ -20,8 +20,8 @@ from evals.harness.grounds import (
 from stride_service.critic import DraftJoinError
 from stride_service.frameworks.stride.record import STRIDE_VERSION, DraftThreat
 from stride_service.report import (
+    DroppedClaim,
     Ground,
-    GroundlessClaim,
     RepairedQuote,
     UnverifiedGround,
 )
@@ -145,21 +145,21 @@ class TestMeasureGrounds:
         assert measurement.to_json()["counts"]["threats"] == 0
 
 
-class TestGroundlessClaims:
+class TestDroppedClaims:
     def test_a_dropped_claim_is_counted_against_what_the_agents_wrote(self):
         """A dropped claim never reached the critic, so it is not a threat here
         — but it is a draft the lanes produced, and the rate says so."""
-        dropped = GroundlessClaim(claim_id="S-02", title="t", reason="r")
+        dropped = DroppedClaim(claim_id="S-02", title="t", reason="r")
 
         measurement = measure_grounds(
             "case-a", "stride", [grounded(1, quote())], [], [dropped]
         )
 
         assert measurement.threat_count == 1
-        assert measurement.groundless_count == 1
-        assert measurement.groundless_rate == 0.5
-        assert measurement.to_json()["counts"]["groundless_claims"] == 1
-        assert measurement.to_json()["groundless"][0]["claim_id"] == "S-02"
+        assert measurement.dropped_count == 1
+        assert measurement.dropped_rate == 0.5
+        assert measurement.to_json()["counts"]["dropped_claims"] == 1
+        assert measurement.to_json()["dropped"][0]["claim_id"] == "S-02"
 
 
 class TestRepairedQuotes:
@@ -291,12 +291,12 @@ class TestAggregate:
         assert totals["failed_cases"] == 1
         assert totals["threats"] == 0
 
-    def test_groundless_claims_pool_into_one_rate(self):
-        dropped = GroundlessClaim(claim_id="S-02", title="t", reason="r")
+    def test_dropped_claims_pool_into_one_rate(self):
+        dropped = DroppedClaim(claim_id="S-02", title="t", reason="r")
         kept = measure_grounds("a", "stride", [grounded(1, quote())], [], [dropped])
         clean = measure_grounds("b", "stride", [grounded(1, quote())], [])
 
         totals = aggregate_grounds([kept, clean], [])
 
-        assert totals["groundless_claims"] == 1
-        assert totals["groundless_rate"] == round(1 / 3, 3)
+        assert totals["dropped_claims"] == 1
+        assert totals["dropped_rate"] == round(1 / 3, 3)

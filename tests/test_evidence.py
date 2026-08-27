@@ -349,7 +349,7 @@ class TestABadReferenceCostsItsEntryNotTheJob:
         resolution = resolve_proposals([proposal], catalog, STRIDE, "spoofing")
 
         assert resolution.drafts == []
-        (mark,) = resolution.marks.groundless_claims
+        (mark,) = resolution.marks.dropped_claims
         assert mark.claim_id == "S-01"
         assert mark.title == proposal.title
         assert "crossing:flow:ghost" in mark.reason
@@ -366,7 +366,7 @@ class TestABadReferenceCostsItsEntryNotTheJob:
         resolution = resolve_proposals(proposals, catalog, STRIDE, "spoofing")
 
         assert [draft.id for draft in resolution.drafts] == ["S-01"]
-        assert [m.claim_id for m in resolution.marks.groundless_claims] == ["S-02"]
+        assert [m.claim_id for m in resolution.marks.dropped_claims] == ["S-02"]
 
     def test_a_clean_lane_records_no_marks(self):
         catalog = evidence_catalog(valid_model())
@@ -447,7 +447,7 @@ class TestResolveProposals:
         resolution = resolve_proposals([proposal], catalog, STRIDE, "spoofing")
 
         assert resolution.drafts == []
-        assert "crossing:flow:not-real" in resolution.marks.groundless_claims[0].reason
+        assert "crossing:flow:not-real" in resolution.marks.dropped_claims[0].reason
 
     def test_every_bad_reference_in_the_batch_is_marked(self):
         catalog = evidence_catalog(valid_model())
@@ -458,7 +458,7 @@ class TestResolveProposals:
 
         resolution = resolve_proposals(proposals, catalog, STRIDE, "spoofing")
 
-        assert [(m.claim_id, m.reason) for m in resolution.marks.groundless_claims] == [
+        assert [(m.claim_id, m.reason) for m in resolution.marks.dropped_claims] == [
             (
                 "S-01",
                 "cites only evidence this job's catalog does not contain ('crossing:flow:ghost')",

@@ -130,6 +130,7 @@ from stride_service.critic import (
 from stride_service.domains import select_domain_packs
 from stride_service.evidence import (
     evidence_catalog,
+    invalid_proposal_marks,
     render_catalog,
     render_element_roster,
     resolve_proposals,
@@ -1336,6 +1337,17 @@ def _claims_of(payload: object) -> list[Any]:
     return claims if isinstance(claims, list) else []
 
 
+def _batch_of(payload: object) -> dict[str, Any]:
+    """A lane node's emission as the batch its schema validated, or an empty one.
+
+    The node already validated and dumped the batch, so state holds both its
+    lists, and re-validating the whole payload keeps the invalid entries the
+    node salvaged. Anything else reads as a batch of nothing, the same absence
+    :func:`_claims_of` reads for the review nodes.
+    """
+    return payload if isinstance(payload, dict) else {"claims": []}
+
+
 def _model_marks(model: SystemModel) -> AnalysisMarks:
     """The marks that are about the model rather than about a threat.
 
@@ -1428,16 +1440,17 @@ def merge_drafts(
     proposal_batch = schemas.proposals
     model = SystemModel.model_validate(valid_model)
     catalog = evidence_catalog(model)
-    resolutions = {
-        lane.lane: resolve_proposals(
-            proposal_batch.model_validate(
-                {"claims": _claims_of(state.get(lane.drafts_key))}
-            ).claims,
-            catalog,
-            package,
-            lane.lane,
-        )
+    batches = {
+        lane.lane: proposal_batch.model_validate(_batch_of(state.get(lane.drafts_key)))
         for lane in lanes
+    }
+    invalid = {
+        lane: invalid_proposal_marks(batch.invalid, package, lane)
+        for lane, batch in batches.items()
+    }
+    resolutions = {
+        lane: resolve_proposals(batch.claims, catalog, package, lane)
+        for lane, batch in batches.items()
     }
     drafts_by_lane = {
         lane: resolution.drafts for lane, resolution in resolutions.items()
@@ -1450,8 +1463,8 @@ def merge_drafts(
     # rather than parked separately — they share an owner, a standing and a
     # policy, so one key carries them and ``assemble`` reads one parameter.
     marks = joined.marks
-    for resolution in resolutions.values():
-        marks = marks.merged_with(resolution.marks)
+    for lane, resolution in resolutions.items():
+        marks = marks.merged_with(invalid[lane]).merged_with(resolution.marks)
     state.put(nodes.key("marks"), marks.model_dump(mode="json"))
     # Logged rather than reported, and the package decides what is worth saying:
     # a STRIDE lane that numbered its drafts 01, 02, 05 broke nothing a reader
