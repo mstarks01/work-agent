@@ -19,7 +19,12 @@ from evals.harness.grounds import (
 )
 from stride_service.critic import DraftJoinError
 from stride_service.frameworks.stride.record import STRIDE_VERSION, DraftThreat
-from stride_service.report import Ground, GroundlessClaim, UnverifiedGround
+from stride_service.report import (
+    Ground,
+    GroundlessClaim,
+    RepairedQuote,
+    UnverifiedGround,
+)
 from tests.eval_factories import draft_threat
 
 LABEL = "design-doc"
@@ -155,6 +160,24 @@ class TestGroundlessClaims:
         assert measurement.groundless_rate == 0.5
         assert measurement.to_json()["counts"]["groundless_claims"] == 1
         assert measurement.to_json()["groundless"][0]["claim_id"] == "S-02"
+
+
+class TestRepairedQuotes:
+    def test_a_repaired_quote_is_counted_against_the_quotes_written(self):
+        measurement = measure_grounds(
+            "case-a",
+            "stride",
+            [grounded(1, quote(), quote("b"))],
+            [],
+            [],
+            [RepairedQuote(claim_id="S-01", index=1, written="w", similarity=0.9)],
+        )
+
+        assert measurement.repaired_count == 1
+        assert measurement.repaired_rate == 0.5
+        assert measurement.threats[0].repaired == (1,)
+        assert measurement.to_json()["counts"]["repaired_quotes"] == 1
+        assert aggregate_grounds([measurement], [])["repaired_rate"] == 0.5
 
 
 class TestClassifyFailure:
