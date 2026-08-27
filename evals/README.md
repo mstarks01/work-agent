@@ -103,6 +103,7 @@ evals/
   harness/                      the scorer and the eval runner
   review/voters.toml            the roster: voter → standing, the only place standing lives
   review/votes/                 the vote ledger, one file per voter — the only human record here
+  baselines/README.md           the published comparison over every merged Baseline (generated)
   baselines/<derived-name>/     merged Baselines: up to ten sweeps with their reports, per configuration
   runs/                         local sweeps (gitignored) — the private scratch area
 ```
@@ -128,6 +129,7 @@ evals/
 | `harness/roster.py` | Voter → standing, read from `review/voters.toml` — the only place a standing lives. Refuses an unrostered voter rather than defaulting one. |
 | `harness/baseline.py` | A **Baseline**: one directory under `baselines/`, one configuration, up to ten sweeps. Computes the five-part identity and the derived name, assembles the directory, and verifies that everything recomputes — never that a model ran. |
 | `harness/prices.py` | Unit prices from litellm's offline map, and the one cost rule submit and CI both run. A model the map misses prices at `None`, never at zero. |
+| `harness/comparison.py` | The published comparison over the merged Baselines, generated into `baselines/README.md`. Walks the instruments table for its columns, so it names no framework and no column. A test fails a stale copy. |
 | `harness/standings.py` | What a **Standing** does to a number: the series table, the ledger narrowing each series reads, and the pairwise agreement report a maintainer reads before a promotion. It promotes nobody. |
 | `harness/consent.py` | The estimate gate: what a sweep is expected to cost, labelled `recorded` / `estimated` / `unpriced`, and the affirmative acceptance that lets it spend. Holds the run to the accepted amount between cases. |
 | `harness/queue.py` | Which findings a reviewer is asked about, and in what order. Blind to the configuration. Several sweeps of one configuration are merged here, which is where a finding's run count comes from. |
