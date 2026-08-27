@@ -121,5 +121,14 @@ break the trail behind numbers that were already published. A maintainer
 revisits that when `evals/baselines/` outgrows its space, and the decision is
 theirs to make in the open rather than an automatic deletion.
 
+Your merged Baseline also appears in
+[`baselines/README.md`](baselines/README.md), the published comparison over
+every configuration this repository has measured. That file is generated —
+`submit` rebuilds it as part of staging, and a test fails a stale copy — so
+you never edit it by hand. Rows there are grouped by the commit and corpus
+they ran against, because numbers across those groups measure the corpus
+change rather than the model, and they are sorted by merge date rather than by
+score.
+
 Your merged Baseline is then something anybody can vote over without a provider
 key — see [VOTING.md](VOTING.md).

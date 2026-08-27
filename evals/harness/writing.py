@@ -151,6 +151,15 @@ def measure(
     return tuple(rows)
 
 
+def published(blocks: Mapping[str, Any], framework: str) -> float | None:
+    """This framework's objection count, for the comparison table."""
+    aggregate = blocks.get("writing_aggregate")
+    if not isinstance(aggregate, Mapping):
+        return None
+    totals = aggregate.get("by_framework", {}).get(framework)
+    return float(totals["objections"]) if isinstance(totals, Mapping) else None
+
+
 def aggregate(rows: Sequence[CaseWriting]) -> dict[str, Any]:
     """The sweep's totals, per framework and over all of them."""
     by_framework: dict[str, dict[str, int]] = {}

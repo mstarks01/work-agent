@@ -220,6 +220,15 @@ def score_applicability(
     )
 
 
+def published(blocks: Mapping[str, Any], metric: str) -> float | None:
+    """One pooled ASVS number, for the comparison table."""
+    aggregate = blocks.get("applicability_aggregate")
+    if not isinstance(aggregate, Mapping):
+        return None
+    value = aggregate.get(metric)
+    return float(value) if isinstance(value, int | float) else None
+
+
 def pooled(scores: Sequence[ApplicabilityScore]) -> Mapping[str, Any]:
     """The corpus-wide figures, pooled over claims rather than averaged per case.
 
