@@ -5,7 +5,6 @@ import pytest
 from stride_service.critic import (
     CriticOutputError,
     DraftJoinError,
-    GroundsUnverifiedError,
     assemble_claims,
     join_drafts,
     mentioned_ids,
@@ -460,34 +459,34 @@ class TestQuoteVerification:
         ]
         assert LABEL in joined.marks.unverified_grounds[0].reason
 
-    def test_a_threat_whose_every_ground_fails_kills_the_job(self, model):
-        drafts = self.quoting("a sentence the submitter never wrote")
-        with pytest.raises(DraftJoinError, match="no ground that verifies"):
-            join_drafts(drafts, STRIDE, model, SOURCES)
-
-    def test_the_fail_closed_error_carries_both_halves_of_the_rate(self, model):
-        """The raise site is the only moment the numerator and denominator
-        coexist — the job is over, so nothing downstream can recover them."""
+    def test_a_claim_whose_every_ground_fails_is_dropped_and_marked(self, model):
+        """The claim, not the job: one misquote on a claim that carries nothing
+        else must not discard every other lane's work. The mark keeps the
+        title and the quote the ladder could not find, because nothing else
+        persists the draft and the next such drop would otherwise be a guess.
+        """
         drafts = self.quoting("a sentence the submitter never wrote")
         drafts["tampering"] = [sample_draft("T-01", "tampering")]
 
-        with pytest.raises(GroundsUnverifiedError) as excinfo:
-            join_drafts(drafts, STRIDE, model, SOURCES)
+        joined = join_drafts(drafts, STRIDE, model, SOURCES)
 
-        assert excinfo.value.claim_ids == ("S-01",)
-        assert excinfo.value.draft_count == 2
+        assert [draft.id for draft in joined.drafts] == ["T-01"]
+        (mark,) = joined.marks.groundless_claims
+        assert mark.claim_id == "S-01"
+        assert mark.title == drafts["spoofing"][0].title
+        assert "a sentence the submitter never wrote" in mark.reason
+        assert LABEL in mark.reason
+        assert joined.marks.unverified_grounds == []
 
-    def test_an_unresolvable_label_is_not_a_fail_closed_error(self, model):
+    def test_an_unresolvable_label_still_fails_the_join(self, model):
         """A draft citing a source that does not exist and a draft quoting one
-        that does wrongly are different faults, and only the second is evidence
-        about fabricated spans."""
+        that does wrongly are different faults: only the second is evidence
+        about fabricated spans, and only the first is a shape error."""
         drafts = self.quoting("log in to the web app")
         drafts["spoofing"][0].grounds[0].source_label = "no-such-source"
 
-        with pytest.raises(DraftJoinError) as excinfo:
+        with pytest.raises(DraftJoinError, match="no-such-source"):
             join_drafts(drafts, STRIDE, model, SOURCES)
-
-        assert not isinstance(excinfo.value, GroundsUnverifiedError)
 
     def test_the_text_check_does_not_run_without_sources(self, model):
         joined = join_drafts(self.quoting("never written anywhere"), STRIDE, model)

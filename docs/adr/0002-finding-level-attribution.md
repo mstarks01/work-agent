@@ -69,6 +69,10 @@ So an unverifiable quote renders, marked. A threat where *nothing* verifies
 still fails the job: that is a finding with no machine-checkable justification
 at all, which is a different thing from one citation of several not matching.
 
+> **Amended by [ADR 0017](0017-a-groundless-claim-costs-its-entry.md).** A
+> claim where nothing verifies is now dropped and marked as a groundless claim.
+> The per-entry mark above is unchanged.
+
 The marks live on `StrideReport` as references, deliberately outside `Ground`:
 a verification field on an agent-owned model is a field the agent could set
 about its own honesty.

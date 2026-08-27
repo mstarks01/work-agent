@@ -164,6 +164,16 @@ from stride_service.system_model import BoundaryCrossing, SystemModel
 # the rule 2.9 already set for a citation that resolves to nothing. Only a
 # framework carrying a catalog it did not author can produce one, so the list
 # is empty for STRIDE by construction rather than by accident.
+#
+# 3.0 also carries ``groundless_claims``, an eighth list of service-owned
+# marks: a claim that lost every ground it cited, at evidence resolution or at
+# the quote check. It rides 3.0 for the same reason the two before it do.
+#
+# What moves beside it is the last whole-job failure on the grounding path.
+# Such a claim used to fail the job; it is now dropped and marked, with the
+# reason each ground was lost. A claim carrying one quote and nothing else is
+# the common shape of a framework whose catalog rarely holds the fact a
+# requirement turns on, so one misquote there cost every lane's work.
 SCHEMA_VERSION = "3.0"
 
 # The envelope's disclaimer, which is about the *service* rather than about any
@@ -1104,10 +1114,10 @@ class UnverifiedGround(BaseModel):
     last one would either produce an invalid draft or delete the finding, and
     silently removing a threat is the worst outcome a security tool can have.
 
-    Marked per entry, failed closed per threat: a threat with one bad quote
-    beside good ones is still justified, and
-    :func:`~stride_service.critic.join_drafts` fails the job only where *no*
-    ground on a threat verifies at all.
+    Marked per entry, dropped per claim: a claim with one bad quote beside good
+    ones is still justified, and :func:`~stride_service.critic.join_drafts`
+    drops a claim only where *no* ground on it verifies at all, recording it as
+    a :class:`GroundlessClaim`.
     """
 
     model_config = ConfigDict(extra="forbid")
@@ -1170,12 +1180,13 @@ class UnresolvedEvidence(BaseModel):
     is long enough that it is evidence of a malfunctioning agent rather than of
     a fact anyone meant to cite.
 
-    **Marked per reference, failed closed per threat**, exactly as an
-    unverified quote is. A threat citing three facts, one of them composed, is
-    still justified by the two that resolve; a threat whose evidence resolves to
-    nothing at all has no justification left and fails the job at
-    :func:`~stride_service.evidence.resolve_proposals`, because a finding with
-    no grounds is the one thing this schema does not permit.
+    **Marked per reference, dropped per claim**, exactly as an unverified
+    quote is. A threat citing three facts, one of them composed, is still
+    justified by the two that resolve; a threat whose evidence resolves to
+    nothing at all has no justification left, and
+    :func:`~stride_service.evidence.resolve_proposals` drops it as a
+    :class:`GroundlessClaim`, because a finding with no grounds is the one
+    thing this schema does not permit.
 
     This replaced a whole-job failure (#138). Agents compose well-formed
     references — correct grammar, plausible element IDs, absent from the set —
@@ -1235,6 +1246,48 @@ class UnknownClaimIdentity(BaseModel):
 
     claim_id: str = Field(min_length=1, max_length=CLAIM_ID_MAX_CHARS)
     title: str = Field(min_length=1, max_length=200)
+
+
+# How much of a lost quote a groundless mark carries. A quote is agent text
+# bounded only by its own field, so the reason that repeats it must cut it.
+GROUNDLESS_REASON_MAX_CHARS = 500
+
+
+class GroundlessClaim(BaseModel):
+    """A claim dropped because every ground it cited was lost.
+
+    The sibling of :class:`UnknownClaimIdentity`: a claim the service dropped,
+    so its ``claim_id`` is deliberately absent from the block's claims and
+    ``title`` is the only trace of what the agent found. Two producers write
+    it. :func:`~stride_service.evidence.resolve_proposals` writes one when a
+    claim cited only references the catalog does not hold, and
+    :func:`~stride_service.critic.join_drafts` writes one when a claim's only
+    grounds are quotes the source it names does not contain.
+
+    ``reason`` says what was lost, in the agent's own words up to
+    :data:`GROUNDLESS_REASON_MAX_CHARS`, so a reader can see the quote the
+    ladder could not find or the reference nothing resolved. Without it the
+    next such drop is a guess, because nothing else persists the draft.
+
+    This replaced the last whole-job failure on the grounding path. ``grounds``
+    is ``min_length=1``, so such a claim cannot be represented and no critic
+    could rule on it. It used to fail the job on the argument that a finding
+    deleted for a reason recorded in a list is a silent removal — but
+    :class:`UnknownClaimIdentity` already drops a claim on the same terms, the
+    viewer already renders that list as a block-level note, and a framework
+    whose catalog rarely holds the fact a requirement turns on writes claims
+    that carry one quote and nothing else. One misquote there cost every lane's
+    work. The drop is visible; the dead job was not.
+
+    Service-owned rather than a field on the record, for the reason every mark
+    here is: an agent must not report on its own accuracy.
+    """
+
+    model_config = ConfigDict(extra="forbid")
+
+    claim_id: str = Field(min_length=1, max_length=CLAIM_ID_MAX_CHARS)
+    title: str = Field(min_length=1, max_length=200)
+    reason: str = Field(min_length=1, max_length=GROUNDLESS_REASON_MAX_CHARS)
 
 
 class MissingMitigation(BaseModel):
@@ -1343,6 +1396,7 @@ class AnalysisMarks(BaseModel):
     unresolved_mentions: list[UnresolvedMention] = Field(default_factory=list)
     unresolved_evidence: list[UnresolvedEvidence] = Field(default_factory=list)
     unknown_claim_identities: list[UnknownClaimIdentity] = Field(default_factory=list)
+    groundless_claims: list[GroundlessClaim] = Field(default_factory=list)
     missing_mitigations: list[MissingMitigation] = Field(default_factory=list)
     shared_element_names: list[SharedElementName] = Field(default_factory=list)
 
@@ -1650,6 +1704,7 @@ class FrameworkAnalysis(BaseModel):
     unresolved_mentions: list[UnresolvedMention] = Field(default_factory=list)
     unresolved_evidence: list[UnresolvedEvidence] = Field(default_factory=list)
     unknown_claim_identities: list[UnknownClaimIdentity] = Field(default_factory=list)
+    groundless_claims: list[GroundlessClaim] = Field(default_factory=list)
     fired_rules: list[str] = Field(default_factory=list)
     knowledge_docs: list[str] = Field(default_factory=list)
     summary: SerializeAsAny[BlockSummary]

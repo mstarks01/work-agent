@@ -316,11 +316,14 @@ mechanically:
 - **unverified rate** — of the quotes the agents wrote, the share the shipped
   ladder (`stride_service.grounding`) could not find in the source they name.
   Denominated in quotes, never in grounds.
-- **failed cases** — the two ways the grounding path kills a case, counted
-  rather than allowed to abort the sweep: `mis-shape` (a `Ground` carrying a
-  combination of fields no branch permits) and `fail-closed` (a threat on which
-  no ground verified at all). Both remain structural failures, so a run that
-  hits either still exits non-zero.
+- **groundless rate** — of every claim the lanes drafted, the share the service
+  dropped because nothing it cited held: every quote absent from its source, or
+  every reference outside the catalog. Read off the report's `groundless_claims`
+  marks, so a dropped claim is counted, never a dead case.
+- **failed cases** — the ways the fan-in still kills a case, counted rather than
+  allowed to abort the sweep: a dangling element reference, a duplicate ID, an
+  unresolvable source label. These remain structural failures, so a run that
+  hits one still exits non-zero.
 
 **Coverage** is a rate over the whole sweep rather than a
 per-case number: it counts what deterministic code offered each lane —
