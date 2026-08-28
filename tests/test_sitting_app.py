@@ -140,7 +140,9 @@ class TestWhatASittingWrites:
         assert entry["reviewer"] == "ada"
         assert entry["document"] == "REVIEW-ada.md"
         read = {item["file"]: item["sha256"] for item in entry["read"]}
-        assert set(read) == set(sittings.required_files(case_dir))
+        declared = json.loads((case_dir / "case.json").read_text("utf-8"))["frameworks"]
+        required = sittings.required_files(item["name"] for item in declared)
+        assert set(read) == set(required)
         for name, digest in read.items():
             actual = hashlib.sha256((case_dir / name).read_bytes()).hexdigest()
             assert digest == actual, f"{name}'s digest does not match the bytes"
@@ -149,8 +151,8 @@ class TestWhatASittingWrites:
         """A case that gains a package requires its set read, with no table edit."""
         _, _, tree = client
         case_dir = tree / "evals" / "corpus" / CASE
-        files = sittings.required_files(case_dir)
         declared = json.loads((case_dir / "case.json").read_text("utf-8"))["frameworks"]
+        files = sittings.required_files(item["name"] for item in declared)
         for framework in declared:
             assert f"claims/{framework['name']}.json" in files
 
