@@ -88,7 +88,7 @@ precondition and carry no ASVS records. They are named in
 newly satisfies and is not listed, and fails a listed case that has since
 declared the framework. Writing those four sets is a reading session over each
 `source.md` (`evals/BLESSING.md` step 3), not a mechanical edit, which is why the
-mechanism ships with the debt named rather than with four agent-authored sets
+mechanism ships with the gap named rather than with four agent-authored sets
 nobody has read.
 
 **Every ASVS number in the suite still measures 7 cases.** The reference sets are

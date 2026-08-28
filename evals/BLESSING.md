@@ -321,7 +321,7 @@ into your working tree and offers three ways out: run the printed command,
 paste the text into a pull request you open, or press the button and let it
 open the pull request through the `gh` you are already signed in to. It binds
 to loopback and holds no credential of its own; `--no-submit` hides the button.
-`--list` prints the cases still in debt.
+`--list` prints the cases nobody has read.
 
 The rest of this section is what it writes, and what you write by hand if you
 would rather. Both paths end in the same files, and the checks cannot tell
@@ -350,7 +350,8 @@ them apart.
 `reviewer` is the GitHub login of the account whose PR carries the sitting,
 and the reviewer needs a line in `evals/review/voters.toml`, which `submit`
 adds for a first-timer with standing `contributor`. `read` pins the bytes the sitting
-covered: a later PR that edits a read file re-opens the debt fail-closed.
+covered: a later PR that edits a read file puts the case back on the list
+fail-closed.
 `document` names the filled copy, committed beside the case, because only the
 filled copy shows the method ran. The generated `REVIEW.md` carries this
 entry pre-filled with the current digests.
@@ -359,8 +360,8 @@ entry pre-filled with the current digests.
 `tests/test_case_review.py` fails on a new case that arrives without a
 clearing sitting, and names every case still waiting in its `UNREVIEWED`
 list. Twelve of the 13 cases that shipped before this was enforced are still
-on that list; it is debt, not an exemption, and it is meant to shrink to
-nothing.
+on that list. It names work nobody has done, not an exemption, and it is
+meant to shrink to nothing.
 
 **Why it cannot be replaced by a lint.** Review sitting 01 found a reference claim
 asserting the model emits training data in a case with no training pipeline. A

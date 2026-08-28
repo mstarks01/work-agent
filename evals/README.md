@@ -28,7 +28,7 @@ document as evidence. Case `01-payments-checkout`, the control, carries one
 dated 2026-08-23: the reader agreed with all 21 STRIDE claims and all 17 ASVS
 records, and changed none of them
 ([`REVIEW-02.md`](corpus/01-payments-checkout/REVIEW-02.md)).
-`tests/test_case_review.py` names the other twelve as debt, fails a new case
+`tests/test_case_review.py` names the other twelve as unread, fails a new case
 that arrives without a sitting, and fails a read file that changes under its
 recorded digest.
 
@@ -129,7 +129,7 @@ evals/
 | `harness/roster.py` | Voter → standing, read from `review/voters.toml` — the only place a standing lives. Refuses an unrostered voter rather than defaulting one. |
 | `harness/baseline.py` | A **Baseline**: one directory under `baselines/`, one configuration, up to ten sweeps. Computes the five-part identity and the derived name, assembles the directory, and verifies that everything recomputes — never that a model ran. |
 | `harness/prices.py` | Unit prices from litellm's offline map, and the one cost rule submit and CI both run. A model the map misses prices at `None`, never at zero. |
-| `harness/sitting.py` | Holding a **Case Sitting**: which files it must read, the digest of each, the append-only entry that records it, and the debt line it clears. `webapp/sitting.py` is one surface over it; the shell path writes the same files. |
+| `harness/sitting.py` | Holding a **Case Sitting**: which files it must read, the digest of each, the append-only entry that records it, and the line it clears in the unreviewed list. `webapp/sitting.py` is one surface over it; the shell path writes the same files. |
 | `harness/comparison.py` | The published comparison over the merged Baselines, generated into `baselines/README.md`. Walks the instruments table for its columns, so it names no framework and no column. A test fails a stale copy. |
 | `harness/standings.py` | What a **Standing** does to a number: the series table, the ledger narrowing each series reads, and the pairwise agreement report a maintainer reads before a promotion. It promotes nobody. |
 | `harness/consent.py` | The estimate gate: what a sweep is expected to cost, labelled `recorded` / `estimated` / `unpriced`, and the affirmative acceptance that lets it spend. Holds the run to the accepted amount between cases. |

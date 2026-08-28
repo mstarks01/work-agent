@@ -48,7 +48,7 @@ because a table nobody compares to `PACKAGES` fails as quietly as the branch it 
 A fact about how an artifact was made belongs in a **field the code reads**, never a
 sentence in a guide: `bootstrap` on `case.json` stayed true for a year, while the same
 file's prose about a reviewer drifted the moment nobody was one. When a design names a
-role, ship the field and its debt list before the artifact. Write guides in the
+role, ship the field and the list of what nobody has done before the artifact. Write guides in the
 imperative, never the past tense. See `docs/agents/provenance.md`.
 
 ### Claim identity

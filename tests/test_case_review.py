@@ -8,7 +8,7 @@ words the system description never uses. So the reading session is not
 belt-and-braces on top of the lints — it is the only instrument for a whole class
 of defect, and the corpus shipped 13 cases without it.
 
-This makes the debt countable and stops it growing. A case whose ``reviews``
+This makes the gap countable and stops it growing. A case whose ``reviews``
 list holds a clearing **Case Sitting** — a rostered reviewer, every required
 file read, every recorded digest still matching — has been read. Every case
 that has not is named in :data:`UNREVIEWED` with what it is still exposed to,
@@ -21,7 +21,7 @@ framework-local: one shared **System Model** feeds N reference sets, and a
 session that read STRIDE's 21 claims says nothing about the 17 ASVS records
 beside them. So the ``read`` list is checked against the case's declared
 frameworks rather than merely being present, and a case reviewed for one
-framework stays debt for the other.
+framework stays unread for the other.
 
 Deterministic over ``case.json`` and free of provider calls, which is why it
 gates on every PR.
@@ -39,7 +39,8 @@ from evals.harness.roster import DEFAULT_ROSTER_PATH
 from evals.harness.roster import load as load_roster
 
 #: Cases nobody has read, each with what that leaves unchecked. Every entry is
-#: debt rather than an exemption: unlike the lists in ``test_rule_coverage.py``
+#: a case nobody read rather than an exemption: unlike the lists in
+#: ``test_rule_coverage.py``
 #: and ``test_vocabulary_coverage.py``, no reason here says the omission is
 #: acceptable. They are the cases that shipped before step 6 was enforced, and
 #: the list is meant to shrink to nothing.
@@ -112,13 +113,14 @@ def roster():
 
 @pytest.fixture(scope="module")
 def reviewed_by_case(corpus, roster):
-    """Whether any of each case's sittings clears its debt.
+    """Whether any of each case's sittings takes it off the list.
 
     A sitting clears when a **rostered** person read every required file and
     the recorded digests still match the tree (#327). A drifted digest stops
-    clearing, so a PR that edits a read file re-opens the debt fail-closed:
-    it carries a fresh sitting, or it puts the case's line back in
-    ``UNREVIEWED`` — a person always names the debt, in the PR that caused it.
+    clearing, so a PR that edits a read file puts the case back on the list
+    fail-closed: it carries a fresh sitting, or it puts the case's line back
+    in ``UNREVIEWED`` — a person always names the unread case, in the PR that
+    caused it.
     """
     return {
         case.meta.id: any(
@@ -170,19 +172,20 @@ def test_a_new_case_carries_a_sitting(reviewed_by_case):
         " Either no `reviews` entry covers every required file, its reviewer"
         " has no roster line, or a read file changed under its digests. Hold"
         " a sitting (evals/BLESSING.md step 6) and append the entry, or name"
-        " the debt by adding the case's line to UNREVIEWED. A case merged"
+        " the case as unread by adding its line to UNREVIEWED. A case merged"
         " unread cannot be caught later by any lint — that is what this"
         " module's docstring is about."
     )
 
 
-def test_the_debt_list_does_not_rot(reviewed_by_case):
+def test_the_unreviewed_list_does_not_rot(reviewed_by_case):
     """A case that gets read has to leave the list, or the count is a lie."""
     stale = sorted(
         case_id for case_id in UNREVIEWED if reviewed_by_case.get(case_id, False)
     )
     assert not stale, (
-        f"these cases now carry a review and are still listed as debt: {stale}."
+        f"these cases now carry a review and are still listed as unread:"
+        f" {stale}."
         " Remove them from UNREVIEWED."
     )
 
@@ -200,7 +203,7 @@ def test_no_recorded_digest_has_drifted(corpus):
     ``claims/stride.json`` would leave the sitting's sign-off pointing at
     words the reviewer never read. The digest names the drifted file here, in
     the PR that caused it, and the author answers with a fresh sitting or a
-    re-opened debt line.
+    re-opened UNREVIEWED line.
     """
     drifted = {
         f"{case.meta.id}[{index}]": stale
@@ -212,7 +215,7 @@ def test_no_recorded_digest_has_drifted(corpus):
         f"these sittings' read files changed under their digests: {drifted}."
         " Hold a fresh sitting over the changed files and append its entry,"
         " or put the case's line back in UNREVIEWED — and either way, a"
-        " person names the debt in this PR."
+        " person names the unread case in this PR."
     )
 
 

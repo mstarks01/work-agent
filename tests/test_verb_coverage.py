@@ -1,7 +1,7 @@
 """Every reference claim carries an action verb, and a new one must too.
 
-This started as a debt list. The debt is paid: all 243 claims across all 13
-cases carry a verb, so what is left is the guard that stops it coming back. A
+This started as a list of what was missing. Nothing is missing now: all 243
+claims across all 13 cases carry a verb, so what is left is the guard that stops it coming back. A
 case that arrives without verbs fails here rather than quietly weakening
 :class:`~evals.harness.identity.SubsetVerbIdentity` on the case nobody checked.
 
@@ -49,7 +49,7 @@ def _stride_claims(case):
 
 
 def test_every_reference_claim_carries_a_verb():
-    """The end state of the debt this file used to count.
+    """The end state of the gap this file used to count.
 
     A case with an unassigned claim is named, with the claim, because "12 of 13"
     tells nobody which sentence to go and read.
@@ -93,7 +93,7 @@ def test_every_assigned_verb_is_in_the_vocabulary():
 
 #: Verbs no reference claim uses, each with why it stays. An exemption with a
 #: reason, in the shape ``test_rule_coverage.py`` already uses here — unlike a
-#: debt list, an entry here says the omission is understood.
+#: list of work nobody has done, an entry here says the omission is understood.
 UNUSED_BUT_KEPT: dict[str, str] = {
     "guess-credential": (
         "No reference claim describes guessing a credential, and five"

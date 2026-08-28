@@ -57,7 +57,7 @@ Security posture, inherited from ``webapp/review.py`` rather than re-derived:
 * **Case prose reaches the page as data** (LLM05, A05). The document is
   injected as one JSON blob the client renders through ``textContent``.
 * **Every write lands inside the one case directory** the command named
-  (A01), plus the debt list. There is no path in the request at all.
+  (A01), plus the unreviewed list. There is no path in the request at all.
 * **The submit endpoint is off unless ``gh`` is authenticated** — with no
   login there is nothing to act as, so the button is never offered.
 """
@@ -213,9 +213,10 @@ def create_app(session: Session) -> FastAPI:
     @app.post("/api/finish")
     def finish(request: Request, body: Finish) -> JSONResponse:
         # This writes the reading document, appends to `case.json` and clears
-        # the debt line — and it is what sets `recorded`, which `/api/submit`
-        # tests. Everything the allow-list then carries into a pull request
-        # passes through here, so it is checked like the endpoint it feeds.
+        # the UNREVIEWED line — and it is what sets `recorded`, which
+        # `/api/submit` tests. Everything the allow-list then carries into a
+        # pull request passes through here, so it is checked like the endpoint
+        # it feeds.
         refuse_cross_origin(request)
         if session.own_list is None:
             raise HTTPException(status_code=409, detail="no own list was written")
@@ -234,7 +235,7 @@ def create_app(session: Session) -> FastAPI:
                 session.document_name,
                 body.notes,
             )
-            cleared = sittings.clear_debt(session.root, session.prepared.case_id)
+            cleared = sittings.clear_unreviewed(session.root, session.prepared.case_id)
         except sittings.SittingError as exc:
             raise HTTPException(status_code=409, detail=str(exc)) from exc
         session.recorded = True
@@ -243,7 +244,7 @@ def create_app(session: Session) -> FastAPI:
                 "written": [
                     f"evals/corpus/{session.prepared.case_id}/{session.document_name}",
                     f"evals/corpus/{session.prepared.case_id}/case.json",
-                    *([sittings.DEBT_FILE] if cleared else []),
+                    *([sittings.UNREVIEWED_FILE] if cleared else []),
                 ],
                 "command": "python -m evals.harness.run submit sitting",
                 "paste": _paste(session, len(read)),
@@ -295,8 +296,8 @@ def _paste(session: Session, files_read: int) -> str:
         " before the recorded sets were opened; the filled document is"
         f" committed as `{session.document_name}`.\n\n"
         "The `reviews` entry in `case.json` records the digest of each file as"
-        " it stands in this PR, so a later edit to any of them re-opens the"
-        " debt."
+        " it stands in this PR, so a later edit to any of them puts the case"
+        " back on the list."
     )
 
 
@@ -489,7 +490,9 @@ def main(argv: list[str] | None = None) -> int:
         help="your GitHub login. Read from the authenticated `gh` when omitted,"
         " because it is the name the record carries either way.",
     )
-    parser.add_argument("--list", action="store_true", help="print the cases in debt")
+    parser.add_argument(
+        "--list", action="store_true", help="print the cases nobody has read"
+    )
     parser.add_argument(
         "--no-submit",
         action="store_true",
@@ -500,7 +503,7 @@ def main(argv: list[str] | None = None) -> int:
 
     root = Path(__file__).resolve().parents[1]
     if args.list:
-        print("\n".join(sittings.cases_in_debt(root)))
+        print("\n".join(sittings.unreviewed_cases(root)))
         return 0
 
     # One read of the login, answering two questions: what name the record

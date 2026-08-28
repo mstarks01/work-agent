@@ -64,7 +64,8 @@ TRIGGER_FLOORS: dict[str, dict[str, float]] = {
 }
 
 #: Lanes whose rules fire on no reference claim anywhere in the corpus, with the
-#: reason. **Debt, not an exemption** — the way ``tests/test_case_review.py``
+#: reason. **Work nobody has done, not an exemption** — the way
+#: ``tests/test_case_review.py``
 #: frames its list, and unlike ``UNEXERCISED`` in ``test_rule_coverage.py``,
 #: where an entry says the omission is right.
 #:
@@ -91,8 +92,8 @@ UNTRIGGERED_LANES: dict[str, str] = dict.fromkeys(
     " its own reference records names. Tracked by #218.",
 )
 
-#: Cases where a package's whole reference set draws no structural lead. Debt on
-#: the same terms.
+#: Cases where a package's whole reference set draws no structural lead. Work
+#: nobody has done, on the same terms.
 #:
 #: **Empty.** ``04-ml-inference-service`` was the one entry: none of its ten
 #: ASVS records drew a lead, because the case is a model-inference service whose
@@ -163,7 +164,7 @@ def test_every_lane_is_triggered_somewhere_in_the_corpus(results):
     assert not silent, f"no reference claim in these lanes draws a lead: {silent}"
 
 
-def test_the_debt_lists_do_not_rot(results):
+def test_the_lists_do_not_rot(results):
     """A lane or a case that starts drawing leads has to leave its list."""
     triggered = {
         (result.framework, hit.lane)
