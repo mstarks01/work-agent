@@ -55,8 +55,13 @@ gh api --method POST repos/mstarks01/work-agent/issues/<child>/dependencies/bloc
 
 ### The live map
 
-**None.** [#319](https://github.com/mstarks01/work-agent/issues/319) completed 2026-08-26 and has
-moved to Completed efforts below. Chart a new one only against the bar at the end of this file.
+[**#369 — Map: the sitting app walks many cases in one session**](https://github.com/mstarks01/work-agent/issues/369),
+charted 2026-08-28. A **planning** map over `webapp/sitting.py`: a reader picks corpus cases in the
+page, walks them with next and previous, stays blind to each case's recorded sets until they write
+their own list for that case, resumes later, and submits every finished case as one pull request.
+Six tickets. The frontier is [#370](https://github.com/mstarks01/work-agent/issues/370) (the
+draft), [#371](https://github.com/mstarks01/work-agent/issues/371) (the submission) and
+[#372](https://github.com/mstarks01/work-agent/issues/372) (the screens).
 
 ### Completed efforts
 
