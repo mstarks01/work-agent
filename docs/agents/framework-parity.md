@@ -194,9 +194,10 @@ one-package assumption survived:
   **Precondition** carry a reference set for it? The merge bar checks that every
   lane of every carried package has a `must-find` record somewhere, so a package
   with no records anywhere fails it — that one is mechanical.
-- **Review coverage.** Already generalised: `required_reading` in
-  `tests/test_case_review.py` derives from `case.meta.frameworks`, so a case that
-  gains a reference set re-opens its own review with no edit here.
+- **Review coverage.** Already generalised: `required_files` in
+  `evals/harness/sitting.py` derives from the case's own `frameworks`
+  declaration, so a case that gains a reference set re-opens its own review with
+  no edit here.
 - **Certification.** A new package's lanes ride an existing tier, so they
   certify against fingerprints blessed before the package existed.
 
