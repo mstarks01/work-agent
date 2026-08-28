@@ -6,7 +6,8 @@ the server, not by asking, so it is tested the way the review app's
 configuration-blindness is — by checking the payload cannot carry it.
 
 The rest is what a sitting writes: the filled document, the append-only entry
-with a digest per file read, and the debt line. Everything a person doing this
+with a digest per file read, and the UNREVIEWED line. Everything a person
+doing this
 by hand would write, so ``submit sitting`` cannot tell the two paths apart.
 
 Deterministic, offline and credential-free, like the act itself.
@@ -35,7 +36,7 @@ SAME_ORIGIN = {"Sec-Fetch-Site": "same-origin"}
 
 @pytest.fixture
 def tree(tmp_path):
-    """A throwaway repo holding one real corpus case and a debt list."""
+    """A throwaway repo holding one real corpus case and an unreviewed list."""
     root = Path(__file__).resolve().parents[1]
     case_dir = tmp_path / "evals" / "corpus" / CASE
     case_dir.parent.mkdir(parents=True)
@@ -153,12 +154,12 @@ class TestWhatASittingWrites:
         for framework in declared:
             assert f"claims/{framework['name']}.json" in files
 
-    def test_the_debt_line_is_cleared_and_the_others_are_not(self, client):
+    def test_the_unreviewed_line_is_cleared_and_the_others_are_not(self, client):
         app, _, tree = client
         self.finish(app)
-        debt = (tree / "tests" / "test_case_review.py").read_text("utf-8")
-        assert CASE not in debt
-        assert "03-batch-data-pipeline" in debt, "only this case comes off the list"
+        listing = (tree / "tests" / "test_case_review.py").read_text("utf-8")
+        assert CASE not in listing
+        assert "03-batch-data-pipeline" in listing, "only this case comes off the list"
 
     def test_the_reviews_list_is_append_only(self, client):
         app, _, tree = client
@@ -399,20 +400,20 @@ class TestTheSubmitButton:
         assert answer.json()["checks"][0]["problems"] == ["source.md"]
 
 
-class TestTheDebtHelper:
-    """The debt list is a Python literal, so removing a line is worth testing."""
+class TestTheUnreviewedHelper:
+    """The list is a Python literal, so removing a line is worth testing."""
 
     def test_both_entry_shapes_are_removed(self, tree):
-        assert sittings.clear_debt(tree, CASE) is True
-        assert sittings.clear_debt(tree, "03-batch-data-pipeline") is True
+        assert sittings.clear_unreviewed(tree, CASE) is True
+        assert sittings.clear_unreviewed(tree, "03-batch-data-pipeline") is True
         text = (tree / "tests" / "test_case_review.py").read_text("utf-8")
         assert text.count('": ') == 0
         assert text.endswith("}\n"), "the dict is still a dict"
 
     def test_a_case_not_listed_writes_nothing(self, tree):
         before = (tree / "tests" / "test_case_review.py").read_text("utf-8")
-        assert sittings.clear_debt(tree, "99-not-a-case") is False
+        assert sittings.clear_unreviewed(tree, "99-not-a-case") is False
         assert (tree / "tests" / "test_case_review.py").read_text("utf-8") == before
 
-    def test_the_cases_in_debt_are_listed_in_file_order(self, tree):
-        assert sittings.cases_in_debt(tree) == [CASE, "03-batch-data-pipeline"]
+    def test_the_unreviewed_cases_are_listed_in_file_order(self, tree):
+        assert sittings.unreviewed_cases(tree) == [CASE, "03-batch-data-pipeline"]

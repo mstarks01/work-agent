@@ -50,7 +50,7 @@ from evals.harness.calibration import (
 from evals.harness.identity import SubsetVerbIdentity
 from evals.harness.reference import load_corpus
 from evals.harness.run import _flows_by_case
-from evals.harness.sitting import cases_in_debt
+from evals.harness.sitting import unreviewed_cases
 from stride_service.frameworks import widest_fan_out
 
 REPO_ROOT = Path(__file__).resolve().parents[1]
@@ -58,8 +58,8 @@ REPO_ROOT = Path(__file__).resolve().parents[1]
 #: Small numbers as the prose writes them. Only the counts a guide spells out
 #: need an entry; a figure written in digits everywhere needs none.
 #:
-#: The range runs down to zero as well as up, because the debt count below is
-#: a figure this repository is actively trying to shrink.
+#: The range runs down to zero as well as up, because the unread count below
+#: is a figure this repository is actively trying to shrink.
 WORDS = {
     0: "None",
     1: "One",
@@ -129,7 +129,7 @@ def _unreviewed() -> Mapping[str, object]:
     the figure the contribution path exists to change: every merged sitting
     PR clears a line, so it is the most likely of all of them to go stale.
     """
-    count = len(cases_in_debt(REPO_ROOT))
+    count = len(unreviewed_cases(REPO_ROOT))
     return {
         "value": count,
         "word": WORDS.get(count, str(count)),

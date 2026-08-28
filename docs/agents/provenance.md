@@ -71,7 +71,7 @@ because it was never something a person had to remember to write.
 ## The rule
 
 **When a design names a role — reviewer, SME, operator, approver — ship the field
-and its debt list before the artifact.** Then "nobody has done this" is a value
+and the list of what nobody has done before the artifact.** Then "nobody has done this" is a value
 the code can count, and the guide describing the role is a procedure rather than
 a claim.
 
@@ -86,8 +86,8 @@ Two habits fall out:
 
 ## The pattern this repo reaches for
 
-The debt list, and it now exists in five places written independently before
-anyone noticed they were the same thing:
+A list of what nobody has done, and it now exists in five places written
+independently before anyone noticed they were the same thing:
 
 | list | what it counts |
 |---|---|
@@ -102,8 +102,8 @@ applying also fails.** The second half is what stops the list becoming a place
 where things go to be forgotten.
 
 One distinction the entries have to make, and `UNREVIEWED` states it: `UNEXERCISED`
-means *the omission is correct*, while `UNREVIEWED` means *this is owed*. A list
-that blurred the two would excuse the debt it exists to count.
+means *the omission is correct*, while `UNREVIEWED` means *nobody has read this
+yet*. A list that blurred the two would excuse the gap it exists to count.
 
 ## There is no lint here, and there cannot be
 
@@ -114,5 +114,5 @@ description never uses. Narrowing it to the asset vocabulary fails too.
 
 "A document written in the past tense about a process nobody ran" is the same
 class of prose analysis and will fail the same way. What is mechanically
-checkable is the *field*: whether it is present, and whether the debt list naming
+checkable is the *field*: whether it is present, and whether the list naming
 its absence is honest. That is the half to build.

@@ -391,7 +391,8 @@ def _vote_closing(root: Path, author: str) -> str:
 
 # --- the sitting kind ---------------------------------------------------------
 
-#: Where the debt list lives; a sitting PR deletes its case's line from it.
+#: Where the unreviewed list lives; a sitting PR deletes its case's line
+#: from it.
 CASE_REVIEW_TEST = "tests/test_case_review.py"
 
 
@@ -513,7 +514,7 @@ def _check_sitting_covers(root: Path, author: str) -> Check:
     return _check("the sitting covers every declared framework", problems)
 
 
-def _check_sitting_clears_debt(root: Path, author: str) -> Check:
+def _check_sitting_clears_unreviewed(root: Path, author: str) -> Check:
     case = _sitting_case(root)
     if case is None:
         return _check("the case's UNREVIEWED line is gone", [])
@@ -548,7 +549,7 @@ def _sitting_preflight(root: Path, author: str) -> list[Check]:
             _check_sitting_is_yours,
             _check_sitting_evidence,
             _check_sitting_covers,
-            _check_sitting_clears_debt,
+            _check_sitting_clears_unreviewed,
             _check_author_rostered,
             _check_no_self_raise,
         )
@@ -563,8 +564,8 @@ def _sitting_closing(root: Path, author: str) -> str:
     standing = _standing_of(root, author)
     return (
         f"{REVIEW_SENTENCE} This sitting clears the case from UNREVIEWED, and"
-        f" standing {standing!r} labels the read — the debt means nobody read"
-        " it, and a labelled read answers that."
+        f" standing {standing!r} labels the read — the UNREVIEWED line means"
+        " nobody read it, and a labelled read answers that."
     )
 
 

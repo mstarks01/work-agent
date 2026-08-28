@@ -232,7 +232,7 @@ def test_a_candidate_with_no_assigned_elements_is_refused():
 
 
 #: The verb half, measured over the cases that carry verbs — which is case 01
-#: today, and grows as ``tests/test_verb_coverage.py``'s debt shrinks. Both
+#: today, and grows as ``tests/test_verb_coverage.py`` covers more. Both
 #: columns, for the reason ``FRONTIER`` carries both: the merge count alone
 #: would make the tightest possible rule look best.
 #:
