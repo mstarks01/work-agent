@@ -55,18 +55,63 @@ gh api --method POST repos/mstarks01/work-agent/issues/<child>/dependencies/bloc
 
 ### The live map
 
-[**#369 — Map: the sitting app walks many cases in one session**](https://github.com/mstarks01/work-agent/issues/369),
-charted 2026-08-28. A **planning** map over `webapp/sitting.py`: a reader picks corpus cases in the
-page, walks them with next and previous, stays blind to each case's recorded sets until they write
-their own list for that case, resumes later, and submits every finished case as one pull request.
-Eight tickets, five closed. The frontier is
-[#375](https://github.com/mstarks01/work-agent/issues/375) (the ADR),
-[#376](https://github.com/mstarks01/work-agent/issues/376) (the CONTEXT.md term) and
-[#378](https://github.com/mstarks01/work-agent/issues/378) (sitting a case somebody else signed).
+**None.** [#369](https://github.com/mstarks01/work-agent/issues/369) completed 2026-08-28 and has
+moved to Completed efforts below. Chart a new one only against the bar at the end of this file.
 
 ### Completed efforts
 
 Completed on GitHub Issues (canonical):
+
+- [#369 — Map: the sitting app walks many cases in one session](https://github.com/mstarks01/work-agent/issues/369)
+  — 8 tickets, charted and completed 2026-08-28. A **planning** map over `webapp/sitting.py`: it
+  settled the spec for a multi-case **Case Sitting** flow — a reader picks corpus cases in the page,
+  walks them with next and previous, stays blind to each case's recorded sets until they write their
+  own list for that case, resumes later, and submits every finished case as one pull request — and
+  stopped at the spec. The build is ordinary follow-up work, and no issue carries it yet. Two
+  tickets shipped code inside the map, because their product was a document: ADR 0020 (PR #381) and
+  the **Draft Sitting** glossary entry (PR #382).
+
+  The route in one pass. **A part-finished sitting lives in a Draft Sitting outside the repository**
+  ([#370](https://github.com/mstarks01/work-agent/issues/370)), at
+  `~/.local/state/work-agent/sittings/<login>/<case-id>.json`; the own list creates it, not opening
+  the case, and marks are the closed set `agree` / `doubt` / `dup` keyed by `key_claim`'s
+  fingerprint. It never merges, and a successful submit deletes it. **Cardinality lives on the
+  `KINDS` table** ([#371](https://github.com/mstarks01/work-agent/issues/371)) as one `Kind` field,
+  `subjects`, so `_check_one_directory` becomes `_check_subject_count`; the four per-case checks loop
+  and the checklist stays eight lines whatever N is, every problem string starts with the case id,
+  and `_new_sittings`' "appends no sitting entry" replaces the lost cardinality gate. **The screens
+  are a rail and a stage** ([#372](https://github.com/mstarks01/work-agent/issues/372)): the rail
+  lists every case with a status dot and never leaves, a pinned footer `Submit — N cases ready` is
+  both the count and the way to the submit stage, and the submit stage lists each finished draft with
+  a **Drop**. **The own-list gate protects the evidence in the filled document**
+  ([#373](https://github.com/mstarks01/work-agent/issues/373)), never the reader — an empty list
+  already passes — so one rule covers the walk: a case's sets open once that case's own list exists.
+  A hand-edited draft costs nothing the project can price; an unreadable draft refuses its case,
+  names the file and changes nothing on disk. `/api/own-list` gains the page token, and blindness is
+  asserted over the whole walk by one looping test. **The command line launches the app, names the
+  reader and prints what is left** ([#374](https://github.com/mstarks01/work-agent/issues/374));
+  `--case` preselects one case and is not repeatable, `--list` is unchanged, and **the terminal never
+  reads a draft**, because a second reader of the draft file is a second surface over the rules.
+  **A case that carries a clearing signature is not pressable**
+  ([#378](https://github.com/mstarks01/work-agent/issues/378)): the rail row is dead, #373's
+  offered-list rule *is* the refusal, and the blindness, numbers and disclosure questions all dissolve
+  because the case never opens.
+
+  Three findings are worth carrying. **The draft, not the login, decides what re-opens** — a case
+  with a clearing signature and no live draft is dead in the rail whoever signed it, which amended
+  #372's `signed by somebody else` to `signed by <login>`. **The clearing rule decides a rail row,
+  never the presence of a `reviews` entry**: a drifted digest leaves an entry that clears nothing, so
+  `_clears`, `_drifted` and `required_reading` move from `tests/test_case_review.py` into
+  `evals/harness/sitting.py` and the test imports them, while the `UNREVIEWED` table stays in the
+  test file because CI compares the two. And **the word "debt" now appears nowhere in the
+  repository** (PR #379) — a case that waits for a sitting reads `to do`.
+
+  The prototype tip is preserved as `archive/prototype/sitting-screens` @ `23b496e`, per the tag
+  convention below. **Out of scope and not graduating**: hosting the app or any network write beyond
+  the `gh` submit path; changing what a Case Sitting is; `webapp/review.py`, which keeps no draft; a
+  sitting PR editing the case sources it signs, filed as
+  [#377](https://github.com/mstarks01/work-agent/issues/377) because the hole exists today at one
+  case per PR; and a second sitting on an already-signed case, which no measurement reads.
 
 - [#319 — Map: contributions arrive as pull requests — votes, sittings and baselines](https://github.com/mstarks01/work-agent/issues/319)
   — 12 tickets, charted and completed 2026-08-26. A **planning** map: it settled the spec for the
