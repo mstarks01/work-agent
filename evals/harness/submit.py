@@ -107,6 +107,12 @@ class Kind:
     #: a *baseline submission*, and the directory it strayed from holds a
     #: *Baseline*. One word doing both jobs reads wrong at one of them.
     subject: str = ""
+    #: How many :attr:`subject` directories one submission of this kind
+    #: holds — a key of :data:`_SUBJECTS`. The sitting kind carries a
+    #: reader's whole session, so it says ``"many"`` (ADR 0020); every other
+    #: kind keeps the default. A field rather than a check that reads the
+    #: kind's name, so a fourth kind still arrives as a table row.
+    subjects: str = "one"
     prepare: Callable[[Path, str, argparse.Namespace], None] | None = None
 
 
@@ -214,38 +220,70 @@ def _check(name: str, problems: list[str]) -> Check:
 #
 # Each of these reads its kind out of :data:`KINDS` and is bound to one by
 # ``partial`` in that kind's preflight. Written once because the three kinds
-# differed only in a path prefix and a noun, and both of those already live on
-# the :class:`Kind` — which is what ``CLAUDE.md`` means by keying machinery
-# that grows an entry per anything. A fourth kind adds a table row and no
-# check.
+# differ only in a path prefix, a noun and a count, and all three of those
+# already live on the :class:`Kind` — which is what ``CLAUDE.md`` means by
+# keying machinery that grows an entry per anything. A fourth kind adds a
+# table row and no check.
+
+
+def _subdirs(root: Path, prefix: str) -> list[str]:
+    """Every directory under ``prefix`` this submission touches, sorted."""
+    return sorted(
+        {
+            rest.split("/")[0]
+            for rel in _changed_paths(root)
+            if rel.startswith(prefix) and "/" in (rest := rel[len(prefix) :])
+        }
+    )
 
 
 def _one_subdir(root: Path, prefix: str) -> str | None:
     """The one directory under ``prefix`` this submission touches, or None.
 
-    ``None`` covers both "no directory" and "more than one", because a
-    submission carries exactly one and either miss is the same refusal.
+    ``None`` covers both "no directory" and "more than one", because a kind
+    that carries exactly one treats either miss as the same refusal.
     """
-    names = {
-        rest.split("/")[0]
-        for rel in _changed_paths(root)
-        if rel.startswith(prefix) and "/" in (rest := rel[len(prefix) :])
-    }
-    return names.pop() if len(names) == 1 else None
+    names = _subdirs(root, prefix)
+    return names[0] if len(names) == 1 else None
 
 
-def _check_one_directory(root: Path, author: str, kind_name: str) -> Check:
+@dataclass(frozen=True)
+class _Cardinality:
+    """One answer to "how many subject directories", and what it refuses."""
+
+    #: The checklist line and the problem, each formatted with the kind's
+    #: name, subject noun and prefix.
+    line: str
+    problem: str
+    holds: Callable[[int], bool]
+
+
+#: What :attr:`Kind.subjects` may say. A table keyed by the field's value, so
+#: the count a kind carries is data rather than an ``if`` on a kind name.
+#: ``tests/test_evals_submit.py`` checks it against :data:`KINDS`.
+_SUBJECTS: dict[str, _Cardinality] = {
+    "one": _Cardinality(
+        line="the change is one {subject} directory",
+        problem="a {kind} PR touches exactly one {subject} directory under {prefix}",
+        holds=lambda count: count == 1,
+    ),
+    "many": _Cardinality(
+        line="the change is at least one {subject} directory",
+        problem="a {kind} PR touches at least one {subject} directory under {prefix}",
+        holds=lambda count: count > 0,
+    ),
+}
+
+
+def _check_subject_count(root: Path, author: str, kind_name: str) -> Check:
     kind = KINDS[kind_name]
+    rule = _SUBJECTS[kind.subjects]
+    words = {"kind": kind_name, "subject": kind.subject, "prefix": kind.prefix}
     return _check(
-        f"the change is one {kind.subject} directory",
+        rule.line.format(**words),
         []
-        if _one_subdir(root, kind.prefix)
-        else [
-            (
-                f"a {kind_name} PR touches exactly one {kind.subject} directory"
-                f" under {kind.prefix}"
-            )
-        ],
+        if rule.holds(len(_subdirs(root, kind.prefix)))
+        else [rule.problem.format(**words)],
     )
 
 
@@ -397,19 +435,16 @@ def _vote_closing(root: Path, author: str) -> str:
 CASE_REVIEW_TEST = "tests/test_case_review.py"
 
 
-def _sitting_case(root: Path) -> str | None:
-    """The one case this submission touches, or None when it is not one."""
-    return _one_subdir(root, KINDS["sitting"].prefix)
+def _sitting_cases(root: Path) -> list[str]:
+    """Every case this submission touches, sorted. One session, one PR."""
+    return _subdirs(root, KINDS["sitting"].prefix)
 
 
 def _sitting_allowlist(root: Path, author: str) -> list[str]:
-    case = _sitting_case(root)
-    prefix = f"{KINDS['sitting'].prefix}{case}/"
-    changed = [
-        rel
-        for rel in _changed_paths(root)
-        if case is not None and rel.startswith(prefix)
-    ]
+    prefixes = tuple(
+        f"{KINDS['sitting'].prefix}{case}/" for case in _sitting_cases(root)
+    )
+    changed = [rel for rel in _changed_paths(root) if rel.startswith(prefixes)]
     return [*changed, CASE_REVIEW_TEST, ROSTER_FILE]
 
 
@@ -419,11 +454,13 @@ def _new_sittings(root: Path, case: str) -> tuple[list[dict], list[str]]:
     ``reviews`` is append-only (#327): the base ref's entries must survive as
     an exact prefix, and only what follows them is this submission's.
     """
-    raw = json.loads(
-        (root / "evals" / "corpus" / case / "case.json").read_text(encoding="utf-8")
-    )
+    rel = f"evals/corpus/{case}/case.json"
+    try:
+        raw = json.loads((root / rel).read_text(encoding="utf-8"))
+    except (OSError, json.JSONDecodeError) as exc:
+        return [], [f"{case}/case.json: cannot be read: {exc}"]
     reviews = raw.get("reviews", [])
-    base_raw = _base_text(root, f"evals/corpus/{case}/case.json")
+    base_raw = _base_text(root, rel)
     base_reviews = json.loads(base_raw).get("reviews", []) if base_raw else []
     if reviews[: len(base_reviews)] != base_reviews:
         return [], [
@@ -438,93 +475,114 @@ def _new_sittings(root: Path, case: str) -> tuple[list[dict], list[str]]:
     return new, []
 
 
+def _appended(root: Path, case: str) -> list[dict]:
+    """The entries this PR appends to one case, without what refuses them.
+
+    :func:`_check_sitting_is_yours` prints every problem :func:`_new_sittings`
+    finds, so the checks that only read the entries stay quiet about them:
+    one problem, one message, whatever N is.
+    """
+    new, _ = _new_sittings(root, case)
+    return new
+
+
 def _check_sitting_is_yours(root: Path, author: str) -> Check:
-    """#327 check 1, failed early: every appended entry names the author."""
-    case = _sitting_case(root)
-    if case is None:
-        return _check("every appended sitting names you", [])
-    new, problems = _new_sittings(root, case)
-    for entry in new:
-        try:
-            sitting = CaseSitting.model_validate(entry)
-        except ValidationError as exc:
-            problems.append(f"{case}/case.json: an appended entry is malformed: {exc}")
-            continue
-        if sitting.reviewer != author:
-            problems.append(
-                f"an appended entry names {sitting.reviewer!r}; you are"
-                f" {author!r}, and a sitting only enters through its own"
-                " reviewer's PR (#320)"
-            )
+    """#327 check 1, failed early: every appended entry names the author.
+
+    This also carries the gate ADR 0020 took off the cardinality check: a case
+    directory in the diff whose metadata appends nothing refuses the whole
+    submission, so a reader cannot carry a case they did not sit.
+    """
+    problems: list[str] = []
+    for case in _sitting_cases(root):
+        new, refusals = _new_sittings(root, case)
+        problems += refusals
+        for entry in new:
+            try:
+                sitting = CaseSitting.model_validate(entry)
+            except ValidationError as exc:
+                problems.append(
+                    f"{case}/case.json: an appended entry is malformed: {exc}"
+                )
+                continue
+            if sitting.reviewer != author:
+                problems.append(
+                    f"{case}: an appended entry names {sitting.reviewer!r}; you"
+                    f" are {author!r}, and a sitting only enters through its"
+                    " own reviewer's PR (#320)"
+                )
     return _check("every appended sitting names you", problems)
 
 
 def _check_sitting_evidence(root: Path, author: str) -> Check:
     """The digests match the tree, and the filled document is committed."""
-    case = _sitting_case(root)
-    if case is None:
-        return _check("the digests and the document hold", [])
-    case_dir = root / "evals" / "corpus" / case
-    new, problems = _new_sittings(root, case)
-    for entry in new:
-        try:
-            sitting = CaseSitting.model_validate(entry)
-        except ValidationError:
-            continue  # named by the naming check; one problem, one message
-        for record in sitting.read:
-            target = case_dir / record.file
-            if not target.is_file():
-                problems.append(f"{record.file}: read but not in the case directory")
-            elif hashlib.sha256(target.read_bytes()).hexdigest() != record.sha256:
+    problems: list[str] = []
+    for case in _sitting_cases(root):
+        case_dir = root / "evals" / "corpus" / case
+        for entry in _appended(root, case):
+            try:
+                sitting = CaseSitting.model_validate(entry)
+            except ValidationError:
+                continue  # named by the naming check; one problem, one message
+            for record in sitting.read:
+                target = case_dir / record.file
+                if not target.is_file():
+                    problems.append(
+                        f"{case}/{record.file}: read but not in the case directory"
+                    )
+                elif hashlib.sha256(target.read_bytes()).hexdigest() != record.sha256:
+                    problems.append(
+                        f"{case}/{record.file}: the digest does not match the"
+                        " file; the entry signs the bytes that merge, so"
+                        " recompute it"
+                    )
+            if not (case_dir / sitting.document).is_file():
                 problems.append(
-                    f"{record.file}: the digest does not match the file; the"
-                    " entry signs the bytes that merge, so recompute it"
+                    f"{case}/{sitting.document}: the filled document is the"
+                    " evidence, and it is not committed beside the case"
                 )
-        if not (case_dir / sitting.document).is_file():
-            problems.append(
-                f"{sitting.document}: the filled document is the evidence,"
-                " and it is not committed beside the case"
-            )
     return _check("the digests and the document hold", problems)
 
 
 def _check_sitting_covers(root: Path, author: str) -> Check:
     """#327's derived rule: the read covers every framework the case declares."""
-    case = _sitting_case(root)
-    if case is None:
-        return _check("the sitting covers every declared framework", [])
-    raw = json.loads(
-        (root / "evals" / "corpus" / case / "case.json").read_text(encoding="utf-8")
-    )
-    required = set(
-        required_files(declared["name"] for declared in raw.get("frameworks", []))
-    )
-    new, problems = _new_sittings(root, case)
-    read = {
-        record.get("file")
-        for entry in new
-        if isinstance(entry, dict)
-        for record in entry.get("read", [])
-        if isinstance(record, dict)
-    }
-    if new and (gap := sorted(required - read)):
-        problems.append(
-            f"the appended sitting leaves {gap} unread; one sitting signs the"
-            " model and every declared framework's reference set together"
+    problems: list[str] = []
+    for case in _sitting_cases(root):
+        new = _appended(root, case)
+        if not new:
+            continue  # the naming check refuses a case that appends nothing
+        raw = json.loads(
+            (root / "evals" / "corpus" / case / "case.json").read_text(encoding="utf-8")
         )
+        required = set(
+            required_files(declared["name"] for declared in raw.get("frameworks", []))
+        )
+        read = {
+            record.get("file")
+            for entry in new
+            if isinstance(entry, dict)
+            for record in entry.get("read", [])
+            if isinstance(record, dict)
+        }
+        if gap := sorted(required - read):
+            problems.append(
+                f"{case}: the appended sitting leaves {gap} unread; one sitting"
+                " signs the model and every declared framework's reference set"
+                " together"
+            )
     return _check("the sitting covers every declared framework", problems)
 
 
 def _check_sitting_clears_unreviewed(root: Path, author: str) -> Check:
-    case = _sitting_case(root)
-    if case is None:
-        return _check("the case's UNREVIEWED line is gone", [])
-    text = (root / CASE_REVIEW_TEST).read_text(encoding="utf-8")
+    cases = _sitting_cases(root)
+    listing = (root / CASE_REVIEW_TEST).read_text(encoding="utf-8") if cases else ""
     return _check(
-        "the case's UNREVIEWED line is gone",
-        [f'delete the "{case}" line from UNREVIEWED in {CASE_REVIEW_TEST}']
-        if f'"{case}":' in text
-        else [],
+        "every case's UNREVIEWED line is gone",
+        [
+            f"{case}: delete its line from UNREVIEWED in {CASE_REVIEW_TEST}"
+            for case in cases
+            if f'"{case}":' in listing
+        ],
     )
 
 
@@ -545,7 +603,7 @@ def _sitting_preflight(root: Path, author: str) -> list[Check]:
     return [
         check(root, author)
         for check in (
-            partial(_check_one_directory, kind_name="sitting"),
+            partial(_check_subject_count, kind_name="sitting"),
             partial(_check_scope, kind_name="sitting"),
             _check_sitting_is_yours,
             _check_sitting_evidence,
@@ -558,15 +616,23 @@ def _sitting_preflight(root: Path, author: str) -> list[Check]:
 
 
 def _sitting_title(root: Path, author: str) -> str:
-    return f"Sitting: {_sitting_case(root)} by {author}"
+    """``Sitting: <author>, <n> cases``, the vote kind's shape.
+
+    Its plural agreement too: the count reads for itself, and a branch on a
+    count is the thing this repository does not write.
+    """
+    return f"Sitting: {author}, {len(_sitting_cases(root))} cases"
 
 
 def _sitting_closing(root: Path, author: str) -> str:
     standing = _standing_of(root, author)
+    cases = "\n".join(f"- {case}" for case in _sitting_cases(root))
     return (
-        f"{REVIEW_SENTENCE} This sitting clears the case from UNREVIEWED, and"
-        f" standing {standing!r} labels the read — the UNREVIEWED line means"
-        " nobody read it, and a labelled read answers that."
+        f"{cases}\n\n"
+        f"{REVIEW_SENTENCE} Each sitting above clears its case from"
+        f" UNREVIEWED, and standing {standing!r} labels the read — the"
+        " UNREVIEWED line means nobody read it, and a labelled read answers"
+        " that."
     )
 
 
@@ -649,7 +715,7 @@ def _baseline_preflight(root: Path, author: str) -> list[Check]:
     return [
         check(root, author)
         for check in (
-            partial(_check_one_directory, kind_name="baseline"),
+            partial(_check_subject_count, kind_name="baseline"),
             partial(_check_scope, kind_name="baseline"),
             _check_baseline_verifies,
             _check_baseline_sweeps_are_yours,
@@ -715,6 +781,7 @@ KINDS: dict[str, Kind] = {
         prefix="evals/corpus/",
         noun="sitting",
         subject="case",
+        subjects="many",
         preflight=_sitting_preflight,
         allowlist=_sitting_allowlist,
         title=_sitting_title,
