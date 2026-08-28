@@ -1,0 +1,471 @@
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8">
+<title>PROTOTYPE — the three screens</title>
+<!--
+  THROWAWAY PROTOTYPE — issue #372, map #369. Not production code, not tested,
+  no server, no persistence. Open this file in a browser.
+
+  Three variants of the whole three-screen road (picker, walk, submit),
+  switchable via ?variant=A|B|C and the bar at the bottom.
+
+    A — Three pages.     A full-page case list, a full-page walk, a full-page submit.
+    B — Rail and stage.  A permanent case rail on the left; the walk fills the stage.
+    C — Queue and strip. You choose a queue first, then a stepper walks it.
+
+  The data is stubbed. The blind rule is real: part two is only handed over by
+  `serverPartTwo` after the own list is saved, the way the endpoint would.
+-->
+<style>
+:root {
+  color-scheme: light dark;
+  --line: #8884; --dim: #7a7a7a; --fill: #8881; --fill2: #8882;
+  --debt: #d08a2e; --prog: #3d8bd4; --done: #3aa06a; --signed: #8a8a8a;
+}
+* { box-sizing: border-box; }
+body { font: 16px/1.55 system-ui, sans-serif; margin: 0; padding: 0 0 5rem; }
+h1 { font-size: 1.3rem; margin: 0 0 .2rem; }
+h2 { font-size: 1.05rem; margin: 1.6rem 0 .5rem; }
+p { margin: .5rem 0; }
+a { color: inherit; }
+.sub { color: var(--dim); margin-top: 0; font-size: .92rem; }
+pre { background: var(--fill); padding: .9rem; overflow-x: auto; white-space: pre-wrap;
+      border-radius: 6px; font-size: .85rem; margin: .4rem 0; }
+textarea { width: 100%; min-height: 7rem; font: inherit; padding: .6rem;
+           border: 1px solid var(--line); border-radius: 6px; background: transparent;
+           color: inherit; }
+textarea[readonly] { background: var(--fill); color: var(--dim); }
+button { font: inherit; padding: .45rem .9rem; border-radius: 6px;
+         border: 1px solid var(--line); background: var(--fill2); cursor: pointer;
+         color: inherit; }
+button:disabled { opacity: .45; cursor: not-allowed; }
+button.primary { background: #3d8bd4; color: #fff; border-color: #3d8bd4; }
+button.small { padding: .2rem .55rem; font-size: .82rem; }
+.note { background: var(--fill); padding: .7rem .9rem; border-radius: 6px;
+        font-size: .9rem; }
+.wrap { max-width: 46rem; margin: 0 auto; padding: 1.6rem 1rem; }
+.pill { display: inline-block; font-size: .78rem; padding: .1rem .5rem; border-radius: 99px;
+        border: 1px solid var(--line); white-space: nowrap; }
+.dot { display: inline-block; width: .6rem; height: .6rem; border-radius: 99px;
+       background: var(--signed); flex: none; }
+.s-debt { background: var(--debt); } .s-progress { background: var(--prog); }
+.s-finished { background: var(--done); } .s-you, .s-other { background: var(--signed); }
+.pill.s-debt { background: transparent; border-color: var(--debt); color: var(--debt); }
+.pill.s-progress { background: transparent; border-color: var(--prog); color: var(--prog); }
+.pill.s-finished { background: transparent; border-color: var(--done); color: var(--done); }
+.pill.s-you, .pill.s-other { background: transparent; color: var(--dim); }
+.rowbtn { display: block; width: 100%; text-align: left; background: none; border: 0;
+          border-bottom: 1px solid var(--line); padding: .7rem .4rem; cursor: pointer; }
+.rowbtn:hover { background: var(--fill); }
+.mono { font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: .88rem; }
+.blind { border: 1px dashed var(--line); border-radius: 6px; padding: 1.2rem;
+         color: var(--dim); text-align: center; font-size: .9rem; }
+
+/* A */
+.a-top { border-bottom: 1px solid var(--line); }
+.a-top .wrap { display: flex; align-items: center; gap: 1rem; padding: .9rem 1rem; }
+.a-top .grow { flex: 1; }
+.a-foot { position: fixed; left: 0; right: 0; bottom: 3.4rem; border-top: 1px solid var(--line);
+          background: Canvas; }
+.a-foot .wrap { display: flex; gap: .6rem; align-items: center; padding: .7rem 1rem; }
+
+/* B */
+.b-shell { display: flex; min-height: 100vh; }
+.b-rail { width: 18rem; flex: none; border-right: 1px solid var(--line);
+          display: flex; flex-direction: column; position: sticky; top: 0; height: 100vh; }
+.b-rail-head { padding: 1rem .9rem; border-bottom: 1px solid var(--line); }
+.b-rail-list { flex: 1; overflow-y: auto; }
+.b-rail-foot { border-top: 1px solid var(--line); padding: .8rem .9rem; }
+.b-item { display: flex; gap: .55rem; align-items: center; width: 100%; text-align: left;
+          background: none; border: 0; padding: .55rem .9rem; cursor: pointer;
+          font-size: .9rem; color: inherit; }
+.b-item:hover { background: var(--fill); }
+.b-item[aria-current="true"] { background: var(--fill2); font-weight: 600; }
+.b-item .t { flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.b-stage { flex: 1; min-width: 0; }
+.b-stage-head { display: flex; align-items: center; gap: .6rem;
+                border-bottom: 1px solid var(--line); padding: .8rem 1.4rem; }
+.b-stage-head .grow { flex: 1; }
+
+/* C */
+.c-strip { display: flex; gap: .35rem; align-items: center; flex-wrap: wrap;
+           padding: .9rem 0; }
+.c-step { width: 1.9rem; height: 1.9rem; border-radius: 99px; border: 1px solid var(--line);
+          background: transparent; cursor: pointer; font-size: .8rem; color: inherit;
+          display: grid; place-items: center; }
+.c-step[aria-current="true"] { outline: 2px solid #3d8bd4; outline-offset: 2px; }
+.c-step.done { border-color: var(--done); color: var(--done); }
+.c-step.open { border-color: var(--prog); color: var(--prog); }
+.c-bar { height: 3px; background: var(--fill2); border-radius: 99px; margin-bottom: .2rem; }
+.c-bar > i { display: block; height: 100%; background: var(--done); border-radius: 99px; }
+.c-pick { display: flex; gap: .7rem; align-items: center; padding: .55rem .3rem;
+          border-bottom: 1px solid var(--line); }
+
+/* switcher */
+#bar { position: fixed; left: 50%; transform: translateX(-50%); bottom: .8rem; z-index: 50;
+       display: flex; gap: .5rem; align-items: center; background: #111; color: #eee;
+       border-radius: 99px; padding: .35rem .5rem; box-shadow: 0 4px 18px #0006;
+       font-size: .85rem; }
+#bar button { background: #333; color: #eee; border-color: #555; padding: .15rem .5rem; }
+#bar .lbl { padding: 0 .5rem; white-space: nowrap; }
+#stateBox { position: fixed; right: .8rem; bottom: 4.2rem; z-index: 50; max-width: 26rem;
+            max-height: 55vh; overflow: auto; background: #111; color: #9fe; padding: .8rem;
+            border-radius: 8px; font-size: .72rem; white-space: pre-wrap; display: none; }
+</style></head>
+<body>
+<div id="app"></div>
+<pre id="stateBox"></pre>
+<div id="bar">
+  <button data-bar="prev">←</button>
+  <span class="lbl" id="barLabel"></span>
+  <button data-bar="next">→</button>
+  <button data-bar="state">state</button>
+  <button data-bar="reset">reset</button>
+</div>
+<script>
+/* ---------------------------------------------------------------- stub data */
+const CASES = [
+  {id:"01-payments-checkout",        title:"Payments checkout",         signed:"ravi"},
+  {id:"02-iot-fleet-telemetry",      title:"IoT fleet telemetry"},
+  {id:"03-batch-data-pipeline",      title:"Batch data pipeline"},
+  {id:"04-ml-inference-service",     title:"ML inference service"},
+  {id:"05-cookbook-queue-webapp",    title:"Queue-backed web app"},
+  {id:"06-cookbook-online-game",     title:"Online game backend"},
+  {id:"07-cicd-store-deploy",        title:"CI/CD store deploy"},
+  {id:"08-sso-identity-broker",      title:"SSO identity broker"},
+  {id:"09-cookbook-sokify-retail",   title:"Sokify retail",             signed:"you"},
+  {id:"10-cookbook-generic-cms",     title:"Generic CMS"},
+  {id:"11-sparse-shift-scheduling",  title:"Shift scheduling"},
+  {id:"12-overclaiming-supplier-portal", title:"Supplier portal"},
+  {id:"13-dispatch-control-plane",   title:"Dispatch control plane"},
+];
+const ME = "you";
+const byId = (id) => CASES.find(c => c.id === id);
+
+function partOne(c) {
+  return `# ${c.title}\n\n## Sources\n`
+    + `source.md — 1,400 words of prose. Two diagrams.\n\n`
+    + `## System model (blessed)\n`
+    + `Elements: browser, edge, api, worker, store, queue, admin console.\n`
+    + `Trust boundaries: internet→edge, api→store, operator→admin console.\n`
+    + `Endpoints: 11. Data flows: 18.\n\n`
+    + `[PROTOTYPE stub text for ${c.id}]`;
+}
+/* The blind rule, made real: nothing calls this until the own list is saved. */
+function serverPartTwo(c) {
+  return `STRIDE — 14 claims\n`
+    + `  spoof the admin console session ................ admin console\n`
+    + `  tamper with a queued job payload ............... queue\n`
+    + `  … 12 more\n\n`
+    + `ASVS — 9 claims\n`
+    + `  V2.1.1 session token binding ................... api\n`
+    + `  V5.3.3 output encoding on the report view ...... browser\n`
+    + `  … 7 more\n\n`
+    + `[PROTOTYPE stub sets for ${c.id}]`;
+}
+
+/* ---------------------------------------------------------------- state */
+const FRESH = () => ({ screen: "picker", current: null, queue: [], drafts: {}, dropped: {} });
+let S = FRESH();
+
+function draft(id) {
+  if (!S.drafts[id]) S.drafts[id] = { own: "", missing: "", notes: "", sets: null, finished: false };
+  return S.drafts[id];
+}
+function statusOf(id) {
+  const c = byId(id);
+  if (c.signed) return c.signed === ME ? "you" : "other";
+  const d = S.drafts[id];
+  if (d && d.finished && !S.dropped[id]) return "finished";
+  if (d) return "progress";
+  return "debt";
+}
+const STATUS_TEXT = {
+  debt: "in debt", progress: "draft in progress", finished: "finished, not submitted",
+  you: "signed by you", other: "signed by somebody else",
+};
+const openable = (id) => !byId(id).signed;
+const finishedIds = () => CASES.filter(c => statusOf(c.id) === "finished").map(c => c.id);
+function counts() {
+  const n = { debt:0, progress:0, finished:0, you:0, other:0 };
+  CASES.forEach(c => n[statusOf(c.id)]++);
+  return n;
+}
+function summaryLine() {
+  const n = counts();
+  return `${n.finished} finished and waiting · ${n.progress} in progress · ${n.debt} in debt`;
+}
+/* The walk order: variants A and B walk every openable case; C walks the queue. */
+function walkList() { return VARIANT === "C" ? S.queue : CASES.filter(c => openable(c.id)).map(c => c.id); }
+function walkIndex() { return walkList().indexOf(S.current); }
+
+/* ---------------------------------------------------------------- shared bits */
+function esc(s) { return String(s).replace(/[&<>"]/g, ch => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[ch])); }
+
+/* Part one + the own list. Every variant shows this the same way, blind or not. */
+function caseBody(id) {
+  const c = byId(id), d = draft(id);
+  const locked = d.sets !== null;
+  let h = `<h2>Part 1 — the system</h2><pre>${esc(partOne(c))}</pre>`;
+  h += `<h2>Your list, written first</h2>`;
+  h += locked
+    ? `<p class="note">Locked — the recorded sets are open. <b>Ticket #373 decides</b>
+         whether a re-opened case may still edit this.</p>`
+    : `<p class="note">Write what could go wrong. One per line. The recorded sets are
+         not in this page until you save — that is the whole method.</p>`;
+  h += `<textarea data-field="own" ${locked ? "readonly" : ""}
+         placeholder="one per line">${esc(d.own)}</textarea>`;
+  if (!locked) {
+    h += `<p><button class="primary" data-act="lock" ${d.own.trim() ? "" : "disabled"}>
+            Save my list and show the recorded sets</button></p>`;
+    h += `<div class="blind">Part 2 opens here. Nothing about the recorded sets
+            has reached this page.</div>`;
+    return h;
+  }
+  h += `<h2>Part 2 — what is recorded</h2><pre>${esc(d.sets)}</pre>`;
+  h += `<h2>On your list and not on theirs</h2>
+        <textarea data-field="missing" placeholder="one per line">${esc(d.missing)}</textarea>
+        <h2>Notes</h2>
+        <textarea data-field="notes" placeholder="counts, and anything you changed">${esc(d.notes)}</textarea>
+        <p><button class="primary" data-act="finish">${d.finished ? "Re-record this sitting" : "Record this sitting"}</button>
+        ${d.finished ? `<span class="pill s-finished">finished — this case is in the submission</span>` : ""}</p>`;
+  return h;
+}
+
+/* The submission list. Every variant renders it; the chrome around it differs. */
+function submitBody() {
+  const ids = finishedIds();
+  const held = Object.keys(S.dropped).filter(id => S.drafts[id] && S.drafts[id].finished);
+  let h = `<h2>${ids.length} case${ids.length === 1 ? "" : "s"} in this pull request</h2>`;
+  if (!ids.length) h += `<p class="note">Nothing is finished yet. Record a case first.</p>`;
+  ids.forEach(id => {
+    h += `<div class="c-pick"><span class="dot s-finished"></span>
+      <span class="grow" style="flex:1"><span class="mono">${id}</span> — ${esc(byId(id).title)}</span>
+      <button class="small" data-act="drop" data-id="${id}">Drop</button></div>`;
+  });
+  held.forEach(id => {
+    h += `<div class="c-pick" style="opacity:.55"><span class="dot s-progress"></span>
+      <span style="flex:1"><span class="mono">${id}</span> — held back, stays a draft</span>
+      <button class="small" data-act="undrop" data-id="${id}">Put back</button></div>`;
+  });
+  if (ids.length) {
+    h += `<h2>Written into your working tree</h2><pre>${ids.map(id =>
+      `evals/corpus/${id}/reading.md\nevals/corpus/${id}/case.json`).join("\n")}\nevals/DEBT.md</pre>`;
+    h += `<h2>Open the pull request</h2><pre>uv run python -m evals.harness.submit sitting</pre>`;
+    h += `<h2>Or paste this into one you open yourself</h2>
+      <pre>Sitting: you, ${ids.length} case${ids.length === 1 ? "" : "s"}\n\n`
+      + esc(ids.map(id => `- ${id}`).join("\n")) + `</pre>`;
+    h += `<p><button class="primary" data-act="press">Open the pull request as you</button></p>`;
+  }
+  return h;
+}
+
+/* ---------------------------------------------------------------- variant A */
+function renderA() {
+  const n = counts();
+  if (S.screen === "picker") {
+    return `<div class="a-top"><div class="wrap">
+        <div class="grow"><h1>Case sitting</h1><p class="sub">${summaryLine()}</p></div>
+        <button ${n.finished ? "" : "disabled"} data-act="go-submit">Submit ${n.finished} finished</button>
+      </div></div>
+      <div class="wrap">` + CASES.map(c => {
+        const st = statusOf(c.id);
+        return `<button class="rowbtn" data-act="open" data-id="${c.id}" ${openable(c.id) ? "" : "disabled"}>
+          <span class="mono">${c.id}</span> — ${esc(c.title)}
+          <span class="pill s-${st}" style="float:right">${STATUS_TEXT[st]}</span></button>`;
+      }).join("") + `</div>`;
+  }
+  if (S.screen === "submit") {
+    return `<div class="a-top"><div class="wrap">
+        <button data-act="go-picker">← All cases</button>
+        <div class="grow"><h1>Submit</h1><p class="sub">${summaryLine()}</p></div>
+      </div></div><div class="wrap">${submitBody()}</div>`;
+  }
+  const list = walkList(), i = walkIndex();
+  return `<div class="a-top"><div class="wrap">
+      <button data-act="go-picker">← All cases</button>
+      <div class="grow"><h1>${esc(byId(S.current).title)}</h1>
+        <p class="sub"><span class="mono">${S.current}</span> · case ${i + 1} of ${list.length}
+        · ${summaryLine()}</p></div>
+    </div></div>
+    <div class="wrap">${caseBody(S.current)}</div>
+    <div class="a-foot"><div class="wrap">
+      <button data-act="prev" ${i > 0 ? "" : "disabled"}>← Previous</button>
+      <span style="flex:1"></span>
+      <button class="primary" data-act="next">${i === list.length - 1 ? "Next → submit" : "Next →"}</button>
+    </div></div>`;
+}
+
+/* ---------------------------------------------------------------- variant B */
+function renderB() {
+  const n = counts();
+  const rail = CASES.map(c => {
+    const st = statusOf(c.id);
+    return `<button class="b-item" data-act="open" data-id="${c.id}"
+        aria-current="${S.current === c.id && S.screen === "walk"}"
+        ${openable(c.id) ? "" : "disabled"} title="${STATUS_TEXT[st]}">
+        <span class="dot s-${st}"></span>
+        <span class="t"><span class="mono">${c.id.slice(0, 2)}</span> ${esc(c.title)}</span></button>`;
+  }).join("");
+  let stage;
+  if (S.screen === "submit") {
+    stage = `<div class="b-stage-head"><h1 class="grow">Submit</h1></div>
+      <div class="wrap">${submitBody()}</div>`;
+  } else if (S.screen === "walk") {
+    const list = walkList(), i = walkIndex();
+    stage = `<div class="b-stage-head">
+        <div class="grow"><h1>${esc(byId(S.current).title)}</h1>
+          <p class="sub mono">${S.current}</p></div>
+        <button data-act="prev" ${i > 0 ? "" : "disabled"}>← Previous</button>
+        <button data-act="next">${i === list.length - 1 ? "Next → submit" : "Next →"}</button>
+      </div><div class="wrap">${caseBody(S.current)}</div>`;
+  } else {
+    stage = `<div class="b-stage-head"><h1 class="grow">Case sitting</h1></div>
+      <div class="wrap"><p class="note">Pick a case from the rail. The rail never
+      leaves, so there is no way back to find — it is always there.</p>
+      <p><button class="primary" data-act="open"
+         data-id="${(CASES.find(c => statusOf(c.id) === "debt") || CASES.find(c => openable(c.id))).id}">Start with the first case in debt</button></p></div>`;
+  }
+  return `<div class="b-shell">
+    <div class="b-rail">
+      <div class="b-rail-head"><b>Case sitting</b>
+        <p class="sub" style="margin:.2rem 0 0">${n.debt} in debt · ${n.progress} open</p></div>
+      <div class="b-rail-list">${rail}</div>
+      <div class="b-rail-foot">
+        <button style="width:100%" class="${n.finished ? "primary" : ""}"
+          ${n.finished ? "" : "disabled"} data-act="go-submit">
+          Submit — ${n.finished} case${n.finished === 1 ? "" : "s"} ready</button></div>
+    </div>
+    <div class="b-stage">${stage}</div></div>`;
+}
+
+/* ---------------------------------------------------------------- variant C */
+function renderC() {
+  if (S.screen === "picker") {
+    const n = counts();
+    return `<div class="wrap"><h1>Build your queue</h1>
+      <p class="sub">${summaryLine()}. Tick the cases you will sit in this session.</p>`
+      + CASES.map(c => {
+        const st = statusOf(c.id), on = S.queue.includes(c.id);
+        return `<label class="c-pick" style="${openable(c.id) ? "" : "opacity:.5"}">
+          <input type="checkbox" data-act="queue" data-id="${c.id}" ${on ? "checked" : ""}
+            ${openable(c.id) ? "" : "disabled"}>
+          <span style="flex:1"><span class="mono">${c.id}</span> — ${esc(c.title)}</span>
+          <span class="pill s-${st}">${STATUS_TEXT[st]}</span></label>`;
+      }).join("")
+      + `<p style="margin-top:1.2rem"><button class="primary" data-act="start"
+           ${S.queue.length ? "" : "disabled"}>Sit ${S.queue.length} case${S.queue.length === 1 ? "" : "s"} →</button>
+         ${n.finished ? `<button data-act="go-submit">Skip to submit (${n.finished} ready)</button>` : ""}</p>
+      </div>`;
+  }
+  const list = S.queue, done = list.filter(id => statusOf(id) === "finished").length;
+  const atSubmit = S.screen === "submit";
+  const strip = list.map((id, i) => {
+    const st = statusOf(id), cls = st === "finished" ? "done" : (S.drafts[id] ? "open" : "");
+    return `<button class="c-step ${cls}" data-act="jump" data-id="${id}"
+       aria-current="${!atSubmit && S.current === id}" title="${id} — ${STATUS_TEXT[st]}">${i + 1}</button>`;
+  }).join("") + `<button class="c-step ${done ? "done" : ""}" data-act="go-submit"
+       aria-current="${atSubmit}" title="submit">✓</button>`;
+  const head = `<div class="wrap" style="padding-bottom:0">
+      <div class="c-bar"><i style="width:${Math.round(100 * done / list.length)}%"></i></div>
+      <div class="c-strip">${strip}
+        <span style="flex:1"></span>
+        <span class="sub">${done} of ${list.length} finished</span>
+        <button class="small" data-act="go-picker">Change my queue</button></div></div>`;
+  if (atSubmit) return head + `<div class="wrap" style="padding-top:0">${submitBody()}</div>`;
+  const i = walkIndex();
+  return head + `<div class="wrap" style="padding-top:.5rem">
+      <h1>${esc(byId(S.current).title)}</h1>
+      <p class="sub mono">${S.current} · step ${i + 1} of ${list.length}</p>
+      ${caseBody(S.current)}
+      <p style="margin-top:1.6rem;display:flex;gap:.6rem">
+        <button data-act="prev" ${i > 0 ? "" : "disabled"}>← Previous</button>
+        <span style="flex:1"></span>
+        <button class="primary" data-act="next">${i === list.length - 1 ? "Next → submit" : "Next →"}</button>
+      </p></div>`;
+}
+
+/* ---------------------------------------------------------------- switcher */
+const VARIANTS = { A: ["A", "Three pages", renderA], B: ["B", "Rail and stage", renderB],
+                   C: ["C", "Queue and strip", renderC] };
+let VARIANT = (new URLSearchParams(location.search).get("variant") || "A").toUpperCase();
+if (!VARIANTS[VARIANT]) VARIANT = "A";
+
+function setVariant(v) {
+  VARIANT = v;
+  const u = new URL(location.href); u.searchParams.set("variant", v);
+  history.replaceState(null, "", u);
+  if (v === "C" && !S.queue.length) S.screen = "picker";
+  render();
+}
+
+function render() {
+  document.getElementById("app").innerHTML = VARIANTS[VARIANT][2]();
+  document.getElementById("barLabel").textContent = `${VARIANT} — ${VARIANTS[VARIANT][1]}`;
+  const box = document.getElementById("stateBox");
+  if (box.style.display === "block") box.textContent = JSON.stringify(S, null, 2);
+}
+
+/* ---------------------------------------------------------------- actions */
+document.addEventListener("input", e => {
+  const f = e.target.dataset.field;
+  if (!f) return;
+  draft(S.current)[f] = e.target.value;
+  if (f === "own") render();          /* the save button turns on with the first line */
+});
+
+document.addEventListener("click", e => {
+  const bar = e.target.closest("[data-bar]");
+  if (bar) {
+    const keys = Object.keys(VARIANTS), i = keys.indexOf(VARIANT);
+    if (bar.dataset.bar === "prev") setVariant(keys[(i + keys.length - 1) % keys.length]);
+    if (bar.dataset.bar === "next") setVariant(keys[(i + 1) % keys.length]);
+    if (bar.dataset.bar === "reset") { S = FRESH(); render(); }
+    if (bar.dataset.bar === "state") {
+      const box = document.getElementById("stateBox");
+      box.style.display = box.style.display === "block" ? "none" : "block";
+      box.textContent = JSON.stringify(S, null, 2);
+    }
+    return;
+  }
+  const el = e.target.closest("[data-act]");
+  if (!el) return;
+  const id = el.dataset.id, list = walkList(), i = walkIndex();
+  switch (el.dataset.act) {
+    case "open": case "jump":
+      S.current = id; S.screen = "walk"; break;
+    case "queue": {
+      const on = el.checked;
+      S.queue = on ? [...S.queue, id].sort() : S.queue.filter(x => x !== id);
+      break;
+    }
+    case "start": S.current = S.queue[0]; S.screen = "walk"; break;
+    case "go-picker": S.screen = "picker"; break;
+    case "go-submit": S.screen = "submit"; break;
+    case "prev": if (i > 0) S.current = list[i - 1]; break;
+    case "next":
+      if (i === list.length - 1) S.screen = "submit";
+      else S.current = list[i + 1];
+      break;
+    case "lock": {
+      const d = draft(S.current);
+      d.sets = serverPartTwo(byId(S.current));   /* the one call the gate guards */
+      break;
+    }
+    case "finish": draft(S.current).finished = true; delete S.dropped[S.current]; break;
+    case "drop": S.dropped[id] = true; break;
+    case "undrop": delete S.dropped[id]; break;
+    case "press": alert("PROTOTYPE — this is where the checks run and the PR opens."); return;
+  }
+  render();
+});
+
+document.addEventListener("keydown", e => {
+  if (/^(INPUT|TEXTAREA)$/.test(e.target.tagName) || e.target.isContentEditable) return;
+  const keys = Object.keys(VARIANTS), i = keys.indexOf(VARIANT);
+  if (e.key === "ArrowLeft") setVariant(keys[(i + keys.length - 1) % keys.length]);
+  if (e.key === "ArrowRight") setVariant(keys[(i + 1) % keys.length]);
+});
+
+render();
+</script>
+</body></html>
