@@ -59,9 +59,10 @@ gh api --method POST repos/mstarks01/work-agent/issues/<child>/dependencies/bloc
 charted 2026-08-28. A **planning** map over `webapp/sitting.py`: a reader picks corpus cases in the
 page, walks them with next and previous, stays blind to each case's recorded sets until they write
 their own list for that case, resumes later, and submits every finished case as one pull request.
-Six tickets. The frontier is [#370](https://github.com/mstarks01/work-agent/issues/370) (the
-draft), [#371](https://github.com/mstarks01/work-agent/issues/371) (the submission) and
-[#372](https://github.com/mstarks01/work-agent/issues/372) (the screens).
+Eight tickets, five closed. The frontier is
+[#375](https://github.com/mstarks01/work-agent/issues/375) (the ADR),
+[#376](https://github.com/mstarks01/work-agent/issues/376) (the CONTEXT.md term) and
+[#378](https://github.com/mstarks01/work-agent/issues/378) (sitting a case somebody else signed).
 
 ### Completed efforts
 
