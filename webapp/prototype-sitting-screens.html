@@ -9,8 +9,12 @@
   switchable via ?variant=A|B|C and the bar at the bottom.
 
     A — Three pages.     A full-page case list, a full-page walk, a full-page submit.
-    B — Rail and stage.  A permanent case rail on the left; the walk fills the stage.
+    B — Rail and stage.  A permanent case rail on the left; the walk fills the stage.  <-- WINNER
     C — Queue and strip. You choose a queue first, then a stepper walks it.
+
+  B won. A and C stay here because the branch is the record of what B was chosen
+  over. The reader never reads the word "debt": a case waiting for a sitting is
+  "to do". The code keeps its own names.
 
   The data is stubbed. The blind rule is real: part two is only handed over by
   `serverPartTwo` after the own list is saved, the way the endpoint would.
@@ -180,7 +184,7 @@ function statusOf(id) {
   return "debt";
 }
 const STATUS_TEXT = {
-  debt: "in debt", progress: "draft in progress", finished: "finished, not submitted",
+  debt: "to do", progress: "draft in progress", finished: "finished, not submitted",
   you: "signed by you", other: "signed by somebody else",
 };
 const openable = (id) => !byId(id).signed;
@@ -192,7 +196,7 @@ function counts() {
 }
 function summaryLine() {
   const n = counts();
-  return `${n.finished} finished and waiting · ${n.progress} in progress · ${n.debt} in debt`;
+  return `${n.finished} finished and waiting · ${n.progress} in progress · ${n.debt} to do`;
 }
 /* The walk order: variants A and B walk every openable case; C walks the queue. */
 function walkList() { return VARIANT === "C" ? S.queue : CASES.filter(c => openable(c.id)).map(c => c.id); }
@@ -323,12 +327,12 @@ function renderB() {
       <div class="wrap"><p class="note">Pick a case from the rail. The rail never
       leaves, so there is no way back to find — it is always there.</p>
       <p><button class="primary" data-act="open"
-         data-id="${(CASES.find(c => statusOf(c.id) === "debt") || CASES.find(c => openable(c.id))).id}">Start with the first case in debt</button></p></div>`;
+         data-id="${(CASES.find(c => statusOf(c.id) === "debt") || CASES.find(c => openable(c.id))).id}">Start with the first case to do</button></p></div>`;
   }
   return `<div class="b-shell">
     <div class="b-rail">
       <div class="b-rail-head"><b>Case sitting</b>
-        <p class="sub" style="margin:.2rem 0 0">${n.debt} in debt · ${n.progress} open</p></div>
+        <p class="sub" style="margin:.2rem 0 0">${n.debt} to do · ${n.progress} open</p></div>
       <div class="b-rail-list">${rail}</div>
       <div class="b-rail-foot">
         <button style="width:100%" class="${n.finished ? "primary" : ""}"
