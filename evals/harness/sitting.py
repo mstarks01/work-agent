@@ -3,7 +3,8 @@
 The act is #327's, and ``evals/BLESSING.md`` step 6 is the method. This module
 is the part a front end does not get to reinvent: which files a sitting must
 read, the digest of each as it stood, the append-only entry that records it,
-and the debt line it clears. ``webapp/sitting.py`` is one surface over this;
+and the line it clears in the unreviewed list. ``webapp/sitting.py`` is one
+surface over this;
 the CLI path writes the same files by hand and the checks cannot tell them
 apart, which is the point — one implementation of the rules.
 
@@ -35,9 +36,9 @@ from evals.harness.reference import CLAIMS_DIR, ReadRecord
 REPO_ROOT = Path(__file__).resolve().parents[2]
 CORPUS_DIR = REPO_ROOT / "evals" / "corpus"
 
-#: Where the debt list lives. A sitting that does not clear its line leaves
-#: the count a lie, so ``submit sitting`` refuses one that has not.
-DEBT_FILE = "tests/test_case_review.py"
+#: Where the unreviewed list lives. A sitting that does not clear its line
+#: leaves the count a lie, so ``submit sitting`` refuses one that has not.
+UNREVIEWED_FILE = "tests/test_case_review.py"
 
 
 class SittingError(ValueError):
@@ -61,7 +62,8 @@ def read_records(case_dir: Path, files: list[str]) -> list[ReadRecord]:
     """Each file pinned to the bytes it holds now.
 
     Taken at the moment the sitting is recorded, so the entry signs what will
-    merge. A later edit to any of them moves the digest and re-opens the debt.
+    merge. A later edit to any of them moves the digest and puts the case
+    back on the unreviewed list.
     """
     records = []
     for name in files:
@@ -172,10 +174,10 @@ def record(
     return entry
 
 
-def _debt_entries(source: str) -> list[tuple[str, int, int]]:
+def _unreviewed_entries(source: str) -> list[tuple[str, int, int]]:
     """Each ``UNREVIEWED`` entry as ``(case id, first line, last line)``.
 
-    Read through :mod:`ast` rather than by matching text, because the debt
+    Read through :mod:`ast` rather than by matching text, because the entry
     prose is arbitrary English: counting brackets to find where an entry ends
     works only while no reason writes one, and the reasons cite issues. The
     parser knows where every entry starts, so an entry runs to the line before
@@ -201,7 +203,7 @@ def _debt_entries(source: str) -> list[tuple[str, int, int]]:
         None,
     )
     if not isinstance(table, ast.Dict):
-        raise SittingError(f"{DEBT_FILE}: no UNREVIEWED table to read")
+        raise SittingError(f"{UNREVIEWED_FILE}: no UNREVIEWED table to read")
 
     starts = [
         (key.value, key.lineno - 1)
@@ -209,7 +211,9 @@ def _debt_entries(source: str) -> list[tuple[str, int, int]]:
         if isinstance(key, ast.Constant) and isinstance(key.value, str)
     ]
     if len(starts) != len(table.keys):
-        raise SittingError(f"{DEBT_FILE}: UNREVIEWED holds a key that is not a string")
+        raise SittingError(
+            f"{UNREVIEWED_FILE}: UNREVIEWED holds a key that is not a string"
+        )
     # The closing brace bounds the last entry; every other one ends where the
     # next begins. `end_lineno` on the value would stop before the `),`.
     bounds = [line for _, line in starts[1:]] + [(table.end_lineno or 0) - 1]
@@ -218,16 +222,20 @@ def _debt_entries(source: str) -> list[tuple[str, int, int]]:
     ]
 
 
-def clear_debt(root: Path, case_id: str) -> bool:
+def clear_unreviewed(root: Path, case_id: str) -> bool:
     """Remove this case's entry from ``UNREVIEWED``. Returns whether it wrote.
 
     The list names the cases nobody has read, so it is only accurate while a
     case that gets read comes off it.
     """
-    path = root / DEBT_FILE
+    path = root / UNREVIEWED_FILE
     source = path.read_text(encoding="utf-8")
     span = next(
-        ((start, end) for case, start, end in _debt_entries(source) if case == case_id),
+        (
+            (start, end)
+            for case, start, end in _unreviewed_entries(source)
+            if case == case_id
+        ),
         None,
     )
     if span is None:
@@ -238,7 +246,7 @@ def clear_debt(root: Path, case_id: str) -> bool:
     return True
 
 
-def cases_in_debt(root: Path) -> list[str]:
-    """Every case the debt list still names, in file order."""
-    source = (root / DEBT_FILE).read_text(encoding="utf-8")
-    return [case for case, _, _ in _debt_entries(source)]
+def unreviewed_cases(root: Path) -> list[str]:
+    """Every case the unreviewed list still names, in file order."""
+    source = (root / UNREVIEWED_FILE).read_text(encoding="utf-8")
+    return [case for case, _, _ in _unreviewed_entries(source)]

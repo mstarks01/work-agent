@@ -84,7 +84,7 @@ LITERAL = re.compile(r'"(?:stride|asvs)"')
 #: its own package. Legitimate, and the thing to check when a third package
 #: lands is whether the *dispatch to it* is a table or a branch.
 #:
-#: An entry that is neither is debt. There are none today; if one appears, say
+#: An entry that is neither is a gap. There are none today; if one appears, say
 #: so in the reason rather than filing it beside the legitimate ones.
 DECLARED: dict[str, str] = {
     "src/stride_service/report.py": (

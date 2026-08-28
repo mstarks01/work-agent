@@ -263,9 +263,9 @@ class ReadRecord(BaseModel):
     """One file a sitting read, pinned to the bytes that were read.
 
     The digest is what makes staleness mechanical (#327): a later PR that
-    edits a read file no longer matches, so the debt re-opens fail-closed in
-    the PR that caused it — a person re-reads, or names the debt by putting
-    the case back in ``UNREVIEWED``.
+    edits a read file no longer matches, so the case goes back on the list
+    fail-closed in the PR that caused it — a person re-reads, or names the
+    case as unread by putting it back in ``UNREVIEWED``.
     """
 
     model_config = ConfigDict(extra="forbid", frozen=True)

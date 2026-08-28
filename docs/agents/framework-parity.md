@@ -222,7 +222,7 @@ Four mechanical instances, each for a narrow question:
   only while something compares it to `PACKAGES`.
 - **`tests/test_case_review.py`** — a step 6 sign-off is checked against every
   framework the case declares, so a review that read one package's reference set
-  leaves the case in debt.
+  leaves the case on the unreviewed list.
 - **The merge bar in `verify_corpus.py`** — every lane of every carried package
   has a `must-find` record somewhere in the corpus.
 
