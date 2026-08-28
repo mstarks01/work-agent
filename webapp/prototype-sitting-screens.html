@@ -13,8 +13,8 @@
     C — Queue and strip. You choose a queue first, then a stepper walks it.
 
   B won. A and C stay here because the branch is the record of what B was chosen
-  over. The reader never reads the word "debt": a case waiting for a sitting is
-  "to do". The code keeps its own names.
+  over. A case waiting for a sitting is "to do" on the page, and the code that
+  holds the list says "unreviewed".
 
   The data is stubbed. The blind rule is real: part two is only handed over by
   `serverPartTwo` after the own list is saved, the way the endpoint would.
@@ -23,7 +23,7 @@
 :root {
   color-scheme: light dark;
   --line: #8884; --dim: #7a7a7a; --fill: #8881; --fill2: #8882;
-  --debt: #d08a2e; --prog: #3d8bd4; --done: #3aa06a; --signed: #8a8a8a;
+  --todo: #d08a2e; --prog: #3d8bd4; --done: #3aa06a; --signed: #8a8a8a;
 }
 * { box-sizing: border-box; }
 body { font: 16px/1.55 system-ui, sans-serif; margin: 0; padding: 0 0 5rem; }
@@ -51,9 +51,9 @@ button.small { padding: .2rem .55rem; font-size: .82rem; }
         border: 1px solid var(--line); white-space: nowrap; }
 .dot { display: inline-block; width: .6rem; height: .6rem; border-radius: 99px;
        background: var(--signed); flex: none; }
-.s-debt { background: var(--debt); } .s-progress { background: var(--prog); }
+.s-todo { background: var(--todo); } .s-progress { background: var(--prog); }
 .s-finished { background: var(--done); } .s-you, .s-other { background: var(--signed); }
-.pill.s-debt { background: transparent; border-color: var(--debt); color: var(--debt); }
+.pill.s-todo { background: transparent; border-color: var(--todo); color: var(--todo); }
 .pill.s-progress { background: transparent; border-color: var(--prog); color: var(--prog); }
 .pill.s-finished { background: transparent; border-color: var(--done); color: var(--done); }
 .pill.s-you, .pill.s-other { background: transparent; color: var(--dim); }
@@ -181,22 +181,22 @@ function statusOf(id) {
   const d = S.drafts[id];
   if (d && d.finished && !S.dropped[id]) return "finished";
   if (d) return "progress";
-  return "debt";
+  return "todo";
 }
 const STATUS_TEXT = {
-  debt: "to do", progress: "draft in progress", finished: "finished, not submitted",
+  todo: "to do", progress: "draft in progress", finished: "finished, not submitted",
   you: "signed by you", other: "signed by somebody else",
 };
 const openable = (id) => !byId(id).signed;
 const finishedIds = () => CASES.filter(c => statusOf(c.id) === "finished").map(c => c.id);
 function counts() {
-  const n = { debt:0, progress:0, finished:0, you:0, other:0 };
+  const n = { todo:0, progress:0, finished:0, you:0, other:0 };
   CASES.forEach(c => n[statusOf(c.id)]++);
   return n;
 }
 function summaryLine() {
   const n = counts();
-  return `${n.finished} finished and waiting · ${n.progress} in progress · ${n.debt} to do`;
+  return `${n.finished} finished and waiting · ${n.progress} in progress · ${n.todo} to do`;
 }
 /* The walk order: variants A and B walk every openable case; C walks the queue. */
 function walkList() { return VARIANT === "C" ? S.queue : CASES.filter(c => openable(c.id)).map(c => c.id); }
@@ -253,7 +253,7 @@ function submitBody() {
   });
   if (ids.length) {
     h += `<h2>Written into your working tree</h2><pre>${ids.map(id =>
-      `evals/corpus/${id}/reading.md\nevals/corpus/${id}/case.json`).join("\n")}\nevals/DEBT.md</pre>`;
+      `evals/corpus/${id}/reading.md\nevals/corpus/${id}/case.json`).join("\n")}\ntests/test_case_review.py</pre>`;
     h += `<h2>Open the pull request</h2><pre>uv run python -m evals.harness.submit sitting</pre>`;
     h += `<h2>Or paste this into one you open yourself</h2>
       <pre>Sitting: you, ${ids.length} case${ids.length === 1 ? "" : "s"}\n\n`
@@ -327,12 +327,12 @@ function renderB() {
       <div class="wrap"><p class="note">Pick a case from the rail. The rail never
       leaves, so there is no way back to find — it is always there.</p>
       <p><button class="primary" data-act="open"
-         data-id="${(CASES.find(c => statusOf(c.id) === "debt") || CASES.find(c => openable(c.id))).id}">Start with the first case to do</button></p></div>`;
+         data-id="${(CASES.find(c => statusOf(c.id) === "todo") || CASES.find(c => openable(c.id))).id}">Start with the first case to do</button></p></div>`;
   }
   return `<div class="b-shell">
     <div class="b-rail">
       <div class="b-rail-head"><b>Case sitting</b>
-        <p class="sub" style="margin:.2rem 0 0">${n.debt} to do · ${n.progress} open</p></div>
+        <p class="sub" style="margin:.2rem 0 0">${n.todo} to do · ${n.progress} open</p></div>
       <div class="b-rail-list">${rail}</div>
       <div class="b-rail-foot">
         <button style="width:100%" class="${n.finished ? "primary" : ""}"
