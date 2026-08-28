@@ -307,8 +307,8 @@ def _standing_of(root: Path, author: str) -> str:
     return roster.load(root / ROSTER_FILE).standing_of(author)
 
 
-#: The one sentence every kind's PR body opens with. Spelled once because it
-#: is a fact about how this repository merges, not about any one kind.
+#: The one sentence every kind's PR body carries. Spelled once because it is
+#: a fact about how this repository merges, not about any one kind.
 REVIEW_SENTENCE = "A maintainer reviews every line before this merges."
 
 
@@ -457,11 +457,16 @@ def _new_sittings(root: Path, case: str) -> tuple[list[dict], list[str]]:
     rel = f"evals/corpus/{case}/case.json"
     try:
         raw = json.loads((root / rel).read_text(encoding="utf-8"))
+        base_raw = _base_text(root, rel)
+        base = json.loads(base_raw) if base_raw else {}
     except (OSError, json.JSONDecodeError) as exc:
         return [], [f"{case}/case.json: cannot be read: {exc}"]
-    reviews = raw.get("reviews", [])
-    base_raw = _base_text(root, rel)
-    base_reviews = json.loads(base_raw).get("reviews", []) if base_raw else []
+    reviews = raw.get("reviews", []) if isinstance(raw, dict) else None
+    base_reviews = base.get("reviews", []) if isinstance(base, dict) else None
+    # Shape first: one malformed case refuses its own case, and every other
+    # one still reports. A slice of the wrong type raises out of the pass.
+    if not isinstance(reviews, list) or not isinstance(base_reviews, list):
+        return [], [f"{case}/case.json: no `reviews` list to append to"]
     if reviews[: len(base_reviews)] != base_reviews:
         return [], [
             (

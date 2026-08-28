@@ -290,8 +290,7 @@ def create_app(session: Session) -> FastAPI:
 def _paste(session: Session, files_read: int) -> str:
     """The copy-paste alternative, for somebody not opening the PR from here."""
     return (
-        f"Sitting: {session.reviewer}, 1 cases\n\n"
-        f"- {session.prepared.case_id}\n\n"
+        f"Sitting: {session.prepared.case_id} by {session.reviewer}\n\n"
         f"Held over {files_read} file(s) — the sources, the model and every"
         " declared framework's reference set. My own threat list was written"
         " before the recorded sets were opened; the filled document is"

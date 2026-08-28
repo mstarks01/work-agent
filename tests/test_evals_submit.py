@@ -408,6 +408,17 @@ class TestASittingCarriesNCases:
         assert not check.passed
         assert check.problems == (f"{OTHER}/case.json appends no sitting entry",)
 
+    def test_malformed_metadata_refuses_only_its_own_case(self, repo):
+        """A refusal, not a traceback: the other cases still report."""
+        prepare_sitting(repo)
+        broken = repo / "evals" / "corpus" / OTHER / "case.json"
+        broken.write_text("[]\n", encoding="utf-8")
+        git(repo, "fetch", "origin")
+        check = submit._check_sitting_is_yours(repo, "ada")
+        assert not check.passed
+        refusal = f"{OTHER}/case.json: no `reviews` list to append to"
+        assert check.problems == (refusal,)
+
     def test_every_problem_starts_with_its_case_id(self, repo):
         prepare_sitting(repo, reviewer="sam", read=["source.md"])
         prepare_sitting(repo, case=OTHER, write_document=False, clear_unreviewed=False)
