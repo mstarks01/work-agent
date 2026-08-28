@@ -29,14 +29,13 @@ gates on every PR.
 
 from __future__ import annotations
 
-import hashlib
-
 import pytest
 
 from evals import verify_corpus
-from evals.harness.reference import CLAIMS_DIR, load_corpus
+from evals.harness.reference import load_corpus
 from evals.harness.roster import DEFAULT_ROSTER_PATH
 from evals.harness.roster import load as load_roster
+from evals.harness.sitting import clears, drifted
 
 #: Cases nobody has read, each with what that leaves unchecked. Every entry is
 #: a case nobody read rather than an exemption: unlike the lists in
@@ -124,40 +123,10 @@ def reviewed_by_case(corpus, roster):
     """
     return {
         case.meta.id: any(
-            _clears(case, sitting, roster) for sitting in case.meta.reviews
+            clears(case, sitting, roster, verify_corpus.CORPUS_DIR)
+            for sitting in case.meta.reviews
         )
         for case in corpus
-    }
-
-
-def _clears(case, sitting, roster) -> bool:
-    covered = not required_reading(case) - {record.file for record in sitting.read}
-    return covered and sitting.reviewer in roster and not _drifted(case, sitting)
-
-
-def _drifted(case, sitting) -> list[str]:
-    """The read files whose bytes no longer match the sitting's digests."""
-    case_dir = verify_corpus.CORPUS_DIR / case.meta.id
-    stale = []
-    for record in sitting.read:
-        target = case_dir / record.file
-        if (
-            not target.is_file()
-            or hashlib.sha256(target.read_bytes()).hexdigest() != record.sha256
-        ):
-            stale.append(record.file)
-    return stale
-
-
-def required_reading(case) -> set[str]:
-    """What a complete Case Sitting reads for this case.
-
-    The shared artefacts, plus one reference set per framework the case declares.
-    Derived from the declaration rather than listed, so a case that gains a third
-    framework's reference set re-opens its review by construction.
-    """
-    return {"source.md", "model.json"} | {
-        f"{CLAIMS_DIR}/{declared.name}.json" for declared in case.meta.frameworks
     }
 
 
@@ -205,14 +174,14 @@ def test_no_recorded_digest_has_drifted(corpus):
     the PR that caused it, and the author answers with a fresh sitting or a
     re-opened UNREVIEWED line.
     """
-    drifted = {
+    stale_files = {
         f"{case.meta.id}[{index}]": stale
         for case in corpus
         for index, sitting in enumerate(case.meta.reviews)
-        if (stale := _drifted(case, sitting))
+        if (stale := drifted(case, sitting, verify_corpus.CORPUS_DIR))
     }
-    assert not drifted, (
-        f"these sittings' read files changed under their digests: {drifted}."
+    assert not stale_files, (
+        f"these sittings' read files changed under their digests: {stale_files}."
         " Hold a fresh sitting over the changed files and append its entry,"
         " or put the case's line back in UNREVIEWED — and either way, a"
         " person names the unread case in this PR."

@@ -101,9 +101,8 @@ Completed on GitHub Issues (canonical):
   with a clearing signature and no live draft is dead in the rail whoever signed it, which amended
   #372's `signed by somebody else` to `signed by <login>`. **The clearing rule decides a rail row,
   never the presence of a `reviews` entry**: a drifted digest leaves an entry that clears nothing, so
-  `_clears`, `_drifted` and `required_reading` move from `tests/test_case_review.py` into
-  `evals/harness/sitting.py` and the test imports them, while the `UNREVIEWED` table stays in the
-  test file because CI compares the two. And **the word "debt" now appears nowhere in the
+  `clears`, `drifted` and `required_files` live in `evals/harness/sitting.py` and the test imports
+  them, while the `UNREVIEWED` table stays in the test file because CI compares the two. And **the word "debt" now appears nowhere in the
   repository** (PR #379) — a case that waits for a sitting reads `to do`.
 
   The prototype tip is preserved as `archive/prototype/sitting-screens` @ `23b496e`, per the tag

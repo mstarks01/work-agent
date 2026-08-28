@@ -3,10 +3,12 @@
 The act is #327's, and ``evals/BLESSING.md`` step 6 is the method. This module
 is the part a front end does not get to reinvent: which files a sitting must
 read, the digest of each as it stood, the append-only entry that records it,
-and the line it clears in the unreviewed list. ``webapp/sitting.py`` is one
-surface over this;
+the line it clears in the unreviewed list, and whether a recorded sitting
+clears its case at all. ``webapp/sitting.py`` is one surface over this;
 the CLI path writes the same files by hand and the checks cannot tell them
-apart, which is the point — one implementation of the rules.
+apart, which is the point — one implementation of the rules. CI reads
+:func:`clears` through ``tests/test_case_review.py``, so no surface can call a
+case read while CI still asks somebody to read it.
 
 **The own list comes first, and that is a property rather than an
 instruction.** A reader who opens the recorded sets first finds them
@@ -25,13 +27,15 @@ from __future__ import annotations
 import ast
 import hashlib
 import json
+from collections.abc import Iterable
 from dataclasses import dataclass
 from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any
 
 from evals import build_review_docs as docs
-from evals.harness.reference import CLAIMS_DIR, ReadRecord
+from evals.harness.reference import CLAIMS_DIR, CaseSitting, GoldenCase, ReadRecord
+from evals.harness.roster import Roster
 
 REPO_ROOT = Path(__file__).resolve().parents[2]
 CORPUS_DIR = REPO_ROOT / "evals" / "corpus"
@@ -45,17 +49,57 @@ class SittingError(ValueError):
     """The sitting cannot be recorded; the message says what stops it."""
 
 
-def required_files(case_dir: Path) -> list[str]:
+def required_files(frameworks: Iterable[str]) -> list[str]:
     """What a complete sitting reads, derived from the case's own declaration.
 
     The shared artefacts plus one reference set per declared framework, so a
     case that gains a package requires its set read by construction and no
-    table here needs editing.
+    table here needs editing. The caller passes the declared names, because
+    the declaration reaches this module as raw JSON on one path and as a
+    loaded :class:`~evals.harness.reference.CaseMetadata` on the other.
     """
-    meta = docs.load_meta(case_dir / "case.json")
     return ["source.md", "model.json"] + [
-        f"{CLAIMS_DIR}/{declared['name']}.json" for declared in meta["frameworks"]
+        f"{CLAIMS_DIR}/{name}.json" for name in frameworks
     ]
+
+
+def drifted(case: GoldenCase, sitting: CaseSitting, corpus_dir: Path) -> list[str]:
+    """The read files whose bytes no longer match the sitting's digests.
+
+    The corpus directory is passed rather than defaulted, because a caller
+    that means a temporary tree must not silently read the shipped one.
+    """
+    case_dir = corpus_dir / case.meta.id
+    stale = []
+    for record in sitting.read:
+        target = case_dir / record.file
+        if (
+            not target.is_file()
+            or hashlib.sha256(target.read_bytes()).hexdigest() != record.sha256
+        ):
+            stale.append(record.file)
+    return stale
+
+
+def clears(
+    case: GoldenCase, sitting: CaseSitting, roster: Roster, corpus_dir: Path
+) -> bool:
+    """Whether this sitting takes its case off the unreviewed list.
+
+    A sitting clears when a rostered person read every required file and the
+    digests it recorded still match the tree (#327). This is a different
+    question from whether the case carries an entry: a drifted digest leaves
+    an entry that clears nothing, and the case is unread again. Every surface
+    that greys a case asks this one, so no page can call a case read while CI
+    still asks somebody to read it.
+    """
+    required = set(required_files(declared.name for declared in case.meta.frameworks))
+    covered = not required - {record.file for record in sitting.read}
+    return (
+        covered
+        and sitting.reviewer in roster
+        and not drifted(case, sitting, corpus_dir)
+    )
 
 
 def read_records(case_dir: Path, files: list[str]) -> list[ReadRecord]:
@@ -99,7 +143,7 @@ def prepare(case_dir: Path) -> Prepared:
         title=meta["title"],
         part_one=docs.part_one(case_dir),
         part_two=docs.parts_after(case_dir),
-        files=required_files(case_dir),
+        files=required_files(declared["name"] for declared in meta["frameworks"]),
     )
 
 

@@ -46,6 +46,7 @@ from pydantic import ValidationError
 from evals.harness import baseline, comparison, ledger, roster
 from evals.harness.artifact import ProvenanceError
 from evals.harness.reference import CaseSitting
+from evals.harness.sitting import required_files
 
 REPO_ROOT = Path(__file__).resolve().parents[2]
 
@@ -495,9 +496,9 @@ def _check_sitting_covers(root: Path, author: str) -> Check:
     raw = json.loads(
         (root / "evals" / "corpus" / case / "case.json").read_text(encoding="utf-8")
     )
-    required = {"source.md", "model.json"} | {
-        f"claims/{declared['name']}.json" for declared in raw.get("frameworks", [])
-    }
+    required = set(
+        required_files(declared["name"] for declared in raw.get("frameworks", []))
+    )
     new, problems = _new_sittings(root, case)
     read = {
         record.get("file")
