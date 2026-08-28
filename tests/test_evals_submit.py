@@ -54,7 +54,7 @@ def vote_line(target: str = "process:a", voter: str = "ada") -> str:
 
 
 CASE = "99-test-case"
-DEBT_LINE = f'    "{CASE}": "unread",\n'
+UNREVIEWED_LINE = f'    "{CASE}": "unread",\n'
 
 
 def digest(path: Path) -> str:
@@ -66,7 +66,7 @@ def digest(path: Path) -> str:
 @pytest.fixture
 def repo(tmp_path):
     """A clone with an origin whose main holds the roster, one unread case
-    under evals/corpus/, the debt-list stub, and no votes."""
+    under evals/corpus/, the unreviewed-list stub, and no votes."""
     origin = tmp_path / "origin.git"
     subprocess.run(
         ["git", "init", "--bare", "-b", "main", str(origin)],
@@ -97,7 +97,7 @@ def repo(tmp_path):
     )
     (clone / "tests").mkdir()
     (clone / "tests" / "test_case_review.py").write_text(
-        "UNREVIEWED = {\n" + DEBT_LINE + "}\n", encoding="utf-8"
+        "UNREVIEWED = {\n" + UNREVIEWED_LINE + "}\n", encoding="utf-8"
     )
     git(clone, "add", "-A")
     git(clone, "commit", "-m", "seed")
@@ -111,9 +111,9 @@ def prepare_sitting(
     read: list[str] | None = None,
     document: str = "REVIEW-ada.md",
     write_document: bool = True,
-    clear_debt: bool = True,
+    clear_unreviewed: bool = True,
 ) -> Path:
-    """Ada's working state after a sitting: entry, evidence, debt line gone."""
+    """Ada's working state after a sitting: entry, evidence, the line gone."""
     case_dir = clone / "evals" / "corpus" / CASE
     files = (
         read if read is not None else ["source.md", "model.json", "claims/stride.json"]
@@ -135,7 +135,7 @@ def prepare_sitting(
     )
     if write_document:
         (case_dir / document).write_text("the filled copy\n", encoding="utf-8")
-    if clear_debt:
+    if clear_unreviewed:
         (clone / "tests" / "test_case_review.py").write_text(
             "UNREVIEWED = {\n}\n", encoding="utf-8"
         )
@@ -309,10 +309,10 @@ class TestTheSittingChecks:
         assert not check.passed
         assert "claims/stride.json" in check.problems[0]
 
-    def test_a_surviving_debt_line_is_refused(self, repo):
-        prepare_sitting(repo, clear_debt=False)
+    def test_a_surviving_unreviewed_line_is_refused(self, repo):
+        prepare_sitting(repo, clear_unreviewed=False)
         git(repo, "fetch", "origin")
-        check = submit._check_sitting_clears_debt(repo, "ada")
+        check = submit._check_sitting_clears_unreviewed(repo, "ada")
         assert not check.passed
         assert "UNREVIEWED" in check.problems[0]
 
@@ -543,8 +543,8 @@ class TestTheCommand:
             git(self.repo, "show", f"origin/{branch}:evals/corpus/{CASE}/case.json")
         )
         assert staged["reviews"][0]["reviewer"] == "ada"
-        debt = git(self.repo, "show", f"origin/{branch}:tests/test_case_review.py")
-        assert CASE not in debt
+        listing = git(self.repo, "show", f"origin/{branch}:tests/test_case_review.py")
+        assert CASE not in listing
         log = fake_gh.read_text(encoding="utf-8")
         assert f"Sitting: {CASE} by ada" in log
 

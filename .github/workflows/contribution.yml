@@ -77,7 +77,7 @@ jobs:
       # Every merged Baseline still recomputes, and every case sitting's
       # digests still match. These run over the whole tree rather than the
       # diff, so a PR that edits a file some *other* case's sitting signed
-      # fails here — which is the point: a person names the debt in the PR
+      # fails here — which is the point: a person names the unread case in the PR
       # that caused it.
       - name: Check the corpus and the merged baselines
         run: uv run pytest -q tests/test_case_review.py tests/test_evals_baseline.py

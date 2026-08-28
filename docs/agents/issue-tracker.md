@@ -92,7 +92,8 @@ Completed on GitHub Issues (canonical):
   ([#326](https://github.com/mstarks01/work-agent/issues/326)), informed by a pairwise agreement
   report; `score` always writes a maintainer-only block and an all-standings block. **A Case
   Sitting is free and offline** ([#327](https://github.com/mstarks01/work-agent/issues/327)): the
-  committed `REVIEW.md` carries everything, and a drifted digest re-opens the debt fail-closed.
+  committed `REVIEW.md` carries everything, and a drifted digest puts the case back on the
+  unreviewed list fail-closed.
   **One `submit` subcommand opens every PR**
   ([#325](https://github.com/mstarks01/work-agent/issues/325)), with a per-kind allowlist and a
   local run of CI's checks. **The comparison table is generated**
