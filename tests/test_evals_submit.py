@@ -54,7 +54,11 @@ def vote_line(target: str = "process:a", voter: str = "ada") -> str:
 
 
 CASE = "99-test-case"
-UNREVIEWED_LINE = f'    "{CASE}": "unread",\n'
+OTHER = "98-other-case"
+
+
+def unreviewed_line(case: str) -> str:
+    return f'    "{case}": "unread",\n'
 
 
 def digest(path: Path) -> str:
@@ -63,9 +67,26 @@ def digest(path: Path) -> str:
     return hashlib.sha256(path.read_bytes()).hexdigest()
 
 
+def seed_case(clone: Path, case: str) -> Path:
+    """One unread corpus case: its sources, one claim file and its metadata."""
+    case_dir = clone / "evals" / "corpus" / case
+    (case_dir / "claims").mkdir(parents=True)
+    (case_dir / "source.md").write_text("a system\n", encoding="utf-8")
+    (case_dir / "model.json").write_text("{}\n", encoding="utf-8")
+    (case_dir / "claims" / "stride.json").write_text("[]\n", encoding="utf-8")
+    (case_dir / "case.json").write_text(
+        json.dumps(
+            {"id": case, "frameworks": [{"name": "stride"}], "reviews": []}, indent=2
+        )
+        + "\n",
+        encoding="utf-8",
+    )
+    return case_dir
+
+
 @pytest.fixture
 def repo(tmp_path):
-    """A clone with an origin whose main holds the roster, one unread case
+    """A clone with an origin whose main holds the roster, two unread cases
     under evals/corpus/, the unreviewed-list stub, and no votes."""
     origin = tmp_path / "origin.git"
     subprocess.run(
@@ -83,21 +104,14 @@ def repo(tmp_path):
     review = clone / "evals" / "review"
     review.mkdir(parents=True)
     (review / "voters.toml").write_text(ROSTER_BASE, encoding="utf-8")
-    case_dir = clone / "evals" / "corpus" / CASE
-    (case_dir / "claims").mkdir(parents=True)
-    (case_dir / "source.md").write_text("a system\n", encoding="utf-8")
-    (case_dir / "model.json").write_text("{}\n", encoding="utf-8")
-    (case_dir / "claims" / "stride.json").write_text("[]\n", encoding="utf-8")
-    (case_dir / "case.json").write_text(
-        json.dumps(
-            {"id": CASE, "frameworks": [{"name": "stride"}], "reviews": []}, indent=2
-        )
-        + "\n",
-        encoding="utf-8",
-    )
+    for case in (CASE, OTHER):
+        seed_case(clone, case)
     (clone / "tests").mkdir()
     (clone / "tests" / "test_case_review.py").write_text(
-        "UNREVIEWED = {\n" + UNREVIEWED_LINE + "}\n", encoding="utf-8"
+        "UNREVIEWED = {\n"
+        + "".join(unreviewed_line(case) for case in (CASE, OTHER))
+        + "}\n",
+        encoding="utf-8",
     )
     git(clone, "add", "-A")
     git(clone, "commit", "-m", "seed")
@@ -107,6 +121,7 @@ def repo(tmp_path):
 
 def prepare_sitting(
     clone: Path,
+    case: str = CASE,
     reviewer: str = "ada",
     read: list[str] | None = None,
     document: str = "REVIEW-ada.md",
@@ -114,7 +129,7 @@ def prepare_sitting(
     clear_unreviewed: bool = True,
 ) -> Path:
     """Ada's working state after a sitting: entry, evidence, the line gone."""
-    case_dir = clone / "evals" / "corpus" / CASE
+    case_dir = clone / "evals" / "corpus" / case
     files = (
         read if read is not None else ["source.md", "model.json", "claims/stride.json"]
     )
@@ -136,8 +151,10 @@ def prepare_sitting(
     if write_document:
         (case_dir / document).write_text("the filled copy\n", encoding="utf-8")
     if clear_unreviewed:
-        (clone / "tests" / "test_case_review.py").write_text(
-            "UNREVIEWED = {\n}\n", encoding="utf-8"
+        listing = clone / "tests" / "test_case_review.py"
+        listing.write_text(
+            listing.read_text(encoding="utf-8").replace(unreviewed_line(case), ""),
+            encoding="utf-8",
         )
     (clone / "evals" / "review" / "voters.toml").write_text(
         ROSTER_WITH_ADA, encoding="utf-8"
@@ -316,14 +333,131 @@ class TestTheSittingChecks:
         assert not check.passed
         assert "UNREVIEWED" in check.problems[0]
 
-    def test_two_case_directories_are_refused(self, repo):
+
+class TestASittingCarriesNCases:
+    """ADR 0020: one reader's session is one pull request, whatever N is."""
+
+    def test_two_cases_pass_every_check(self, repo):
         prepare_sitting(repo)
-        other = repo / "evals" / "corpus" / "98-other-case"
-        other.mkdir(parents=True)
-        (other / "source.md").write_text("another\n", encoding="utf-8")
+        prepare_sitting(repo, case=OTHER)
         git(repo, "fetch", "origin")
-        check = submit._check_one_directory(repo, "ada", kind_name="sitting")
+        checks = submit._sitting_preflight(repo, "ada")
+        failed = [check.name for check in checks if not check.passed]
+        assert not failed
+
+    def test_no_case_directory_is_refused(self, repo):
+        (repo / "evals" / "review" / "voters.toml").write_text(
+            ROSTER_WITH_ADA, encoding="utf-8"
+        )
+        git(repo, "fetch", "origin")
+        check = submit._check_subject_count(repo, "ada", kind_name="sitting")
         assert not check.passed
+        assert "at least one case directory" in check.problems[0]
+
+    def test_two_baseline_directories_are_still_refused(self, repo):
+        """The count is a field, so the baseline kind keeps today's rule."""
+        for name in ("first", "second"):
+            directory = repo / "evals" / "baselines" / name
+            directory.mkdir(parents=True)
+            (directory / "baseline.json").write_text("{}\n", encoding="utf-8")
+        git(repo, "fetch", "origin")
+        check = submit._check_subject_count(repo, "ada", kind_name="baseline")
+        assert not check.passed
+        assert "exactly one Baseline directory" in check.problems[0]
+
+    def test_every_kind_names_a_cardinality_the_table_holds(self):
+        """The table is checked against its registry, as CLAUDE.md asks."""
+        unknown = {
+            name
+            for name, kind in submit.KINDS.items()
+            if kind.subjects not in submit._SUBJECTS
+        }
+        assert not unknown
+
+    def test_the_allowlist_carries_every_touched_case(self, repo):
+        prepare_sitting(repo)
+        prepare_sitting(repo, case=OTHER)
+        git(repo, "fetch", "origin")
+        allowed = submit._sitting_allowlist(repo, "ada")
+        assert f"evals/corpus/{CASE}/case.json" in allowed
+        assert f"evals/corpus/{OTHER}/case.json" in allowed
+
+    def test_one_bad_case_refuses_the_whole_submission(self, repo):
+        prepare_sitting(repo)
+        prepare_sitting(repo, case=OTHER, write_document=False)
+        git(repo, "fetch", "origin")
+        checks = submit._sitting_preflight(repo, "ada")
+        assert not all(check.passed for check in checks)
+
+    def test_every_failure_is_reported_in_one_pass(self, repo):
+        for case in (CASE, OTHER):
+            case_dir = prepare_sitting(repo, case=case)
+            (case_dir / "source.md").write_text("edited after\n", encoding="utf-8")
+        git(repo, "fetch", "origin")
+        check = submit._check_sitting_evidence(repo, "ada")
+        assert not check.passed
+        assert {problem.split("/")[0] for problem in check.problems} == {CASE, OTHER}
+
+    def test_a_case_that_appends_no_entry_is_refused(self, repo):
+        """The gate that replaces the old cardinality check."""
+        prepare_sitting(repo)
+        claims = repo / "evals" / "corpus" / OTHER / "claims" / "stride.json"
+        claims.write_text('[{"id": "x"}]\n', encoding="utf-8")
+        git(repo, "fetch", "origin")
+        check = submit._check_sitting_is_yours(repo, "ada")
+        assert not check.passed
+        assert check.problems == (f"{OTHER}/case.json appends no sitting entry",)
+
+    def test_malformed_metadata_refuses_only_its_own_case(self, repo):
+        """A refusal, not a traceback: the other cases still report."""
+        prepare_sitting(repo)
+        broken = repo / "evals" / "corpus" / OTHER / "case.json"
+        broken.write_text("[]\n", encoding="utf-8")
+        git(repo, "fetch", "origin")
+        check = submit._check_sitting_is_yours(repo, "ada")
+        assert not check.passed
+        refusal = f"{OTHER}/case.json: no `reviews` list to append to"
+        assert check.problems == (refusal,)
+
+    def test_every_problem_starts_with_its_case_id(self, repo):
+        prepare_sitting(repo, reviewer="sam", read=["source.md"])
+        prepare_sitting(repo, case=OTHER, write_document=False, clear_unreviewed=False)
+        git(repo, "fetch", "origin")
+        problems = [
+            problem
+            for check in submit._sitting_preflight(repo, "ada")
+            for problem in check.problems
+        ]
+        assert problems
+        assert all(
+            problem.startswith((f"{CASE}/", f"{CASE}:", f"{OTHER}/", f"{OTHER}:"))
+            for problem in problems
+        ), problems
+
+    def test_the_checklist_length_does_not_move_with_n(self, repo):
+        prepare_sitting(repo)
+        git(repo, "fetch", "origin")
+        one = [check.name for check in submit._sitting_preflight(repo, "ada")]
+        prepare_sitting(repo, case=OTHER)
+        git(repo, "fetch", "origin")
+        two = [check.name for check in submit._sitting_preflight(repo, "ada")]
+        assert one == two
+        assert len(two) == 8
+
+    def test_the_title_counts_the_cases(self, repo):
+        prepare_sitting(repo)
+        prepare_sitting(repo, case=OTHER)
+        git(repo, "fetch", "origin")
+        assert submit._sitting_title(repo, "ada") == "Sitting: ada, 2 cases"
+
+    def test_the_closing_lists_the_case_ids(self, repo):
+        prepare_sitting(repo)
+        prepare_sitting(repo, case=OTHER)
+        git(repo, "fetch", "origin")
+        closing = submit._sitting_closing(repo, "ada")
+        assert f"- {CASE}" in closing
+        assert f"- {OTHER}" in closing
+        assert closing.count("standing") == 1
 
 
 class TestSelfRegistration:
@@ -397,6 +531,19 @@ class TestWhatCIRuns:
     def test_a_sitting_naming_someone_else_fails(self):
         prepare_sitting(self.repo, reviewer="sam")
         assert self.verify("ada") == 1
+
+    def test_a_two_case_sitting_pr_passes_as_its_reviewer(self, capsys):
+        """CI needs no edit: the same preflight serves both surfaces."""
+        prepare_sitting(self.repo)
+        prepare_sitting(self.repo, case=OTHER)
+        assert self.verify("ada") == 0
+        assert "checking this sitting PR as ada" in capsys.readouterr().out
+
+    def test_one_bad_case_fails_the_whole_two_case_pr(self, capsys):
+        prepare_sitting(self.repo)
+        prepare_sitting(self.repo, case=OTHER, reviewer="sam")
+        assert self.verify("ada") == 1
+        assert OTHER in capsys.readouterr().out
 
     def test_two_kinds_in_one_pr_are_refused(self, capsys):
         prepare_vote(self.repo)
@@ -529,24 +676,28 @@ class TestTheCommand:
         assert manifest["sweeps"][0]["submitted_by"] == "ada"
         assert f"Baseline: {name}" in fake_gh.read_text(encoding="utf-8")
 
-    def test_a_sitting_runs_end_to_end(self, fake_gh, capsys):
+    def test_a_sitting_over_two_cases_runs_end_to_end(self, fake_gh, capsys):
         prepare_sitting(self.repo)
+        prepare_sitting(self.repo, case=OTHER)
         assert main(["submit", "sitting"]) == 0
         out = capsys.readouterr().out
         assert "https://example.test/pr/1" in out
-        assert "clears the case from UNREVIEWED" in out
+        assert "clears its case from UNREVIEWED" in out
+        assert f"- {CASE}" in out
 
         date = datetime.now(UTC).date().isoformat()
         branch = f"submit/sitting/ada-{date}"
         assert branch in git(self.repo, "ls-remote", "origin", "refs/heads/submit/*")
-        staged = json.loads(
-            git(self.repo, "show", f"origin/{branch}:evals/corpus/{CASE}/case.json")
-        )
-        assert staged["reviews"][0]["reviewer"] == "ada"
+        for case in (CASE, OTHER):
+            staged = json.loads(
+                git(self.repo, "show", f"origin/{branch}:evals/corpus/{case}/case.json")
+            )
+            assert staged["reviews"][0]["reviewer"] == "ada"
         listing = git(self.repo, "show", f"origin/{branch}:tests/test_case_review.py")
         assert CASE not in listing
+        assert OTHER not in listing
         log = fake_gh.read_text(encoding="utf-8")
-        assert f"Sitting: {CASE} by ada" in log
+        assert "Sitting: ada, 2 cases" in log
 
 
 class TestTheDeltaCache:
