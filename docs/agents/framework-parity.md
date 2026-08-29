@@ -223,6 +223,24 @@ one-package assumption survived:
   no edit here.
 - **Certification.** A new package's lanes ride an existing tier, so they
   certify against fingerprints blessed before the package existed.
+- **The justification vocabulary.** Can this package's claims always name
+  something in the **System Model**? Every ground kind and every element-spelled
+  `related_unknowns` entry points at a thing that exists — an element, one of its
+  attributes, a flow, a quotable span. A package ruling on documents, coding
+  practices or absent components has claims that are about none of those. Two
+  defects came from exactly this, one at each surface: #410 and #412.
+- **Every required field on a claim, one at a time.** For each, ask what this
+  package will put there **when it has nothing true to say**. A field it can
+  always satisfy honestly is fine. A field whose legal values all name something
+  this package's claims are not about will be filled with whatever passes —
+  `notes` on every question, an arbitrary verified quote on every ruling — and
+  every check goes green while the output says nothing.
+
+The second is the general form of the first, and neither is decidable in
+advance. `evals/harness/filler.py` measures the symptom *after* a run, which is
+the best that can be done: the defect passes every offline check by
+construction, because the suite scripts the agents. So these two are questions
+to ask a new package, not tests that will ask them for you.
 
 ## It runs every way, not just outward from STRIDE
 
@@ -235,7 +253,7 @@ for free" is a claim to check, never one to assume.
 
 ## Where this is enforced
 
-Five mechanical instances, each for a narrow question:
+Six mechanical instances, each for a narrow question:
 
 - **`tests/test_framework_neutrality.py`** — every framework literal outside a
   package root is declared with a reason, so a new one fails until somebody says
@@ -244,6 +262,11 @@ Five mechanical instances, each for a narrow question:
   inside a word is declared or recorded as open, and no text an app puts in
   front of a person names a framework. These cover the two ways of naming one
   that carry no literal.
+- **`evals/harness/filler.py`** — whether a package's required justifications
+  say anything, over a finished sweep. It reports rather than gates, because the
+  honest threshold is unknown for every reading but one: a question pointed at
+  an attribute the evidence catalog refuses should be zero, and is 0 of 378
+  across the archived STRIDE sweeps.
 - **The registry checks in the same module** — every carried package is named by
   an instrument and declares a per-case scorer, and neither table names a package
   this build does not carry. These close the second axis: a table stays complete
