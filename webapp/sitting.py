@@ -47,8 +47,9 @@ endpoint carries five controls rather than the app's usual none:
   own write endpoint, through the ``refuse_cross_origin`` both apps share;
 * a **one-time token** minted per process and embedded in the page, so a
   request that never read the page cannot carry it;
-* **no request-controlled arguments at all** — the endpoint opens the one
-  submission this session prepared, and takes neither a kind nor a path.
+* **no request-controlled arguments at all** — the endpoint opens whatever
+  the working tree holds, and takes neither a kind nor a path. A drop is
+  what changes that, and it is a write of its own with its own controls.
 
 **Every writing endpoint carries the origin check, not only the submit one.**
 ``/api/finish`` writes the reading document, appends to ``case.json`` and sets
@@ -59,9 +60,28 @@ It carries the page token too, because it names a case: one such page would
 post an empty list for every case in the offered list and open the whole
 corpus in one pass. ``/api/draft`` and ``/api/discard`` carry both for those
 two reasons and one more: they write under ``~/.local/state/``, so their
-effect outlives the process. ``/api/part-two`` gains no token — it is a read,
-it serves only what a passed gate already opened, and the frame rule covers
-the page that would read it.
+effect outlives the process. ``/api/drop`` and ``/api/put-back`` carry both
+for all three, and for a fourth: they decide what the next press publishes.
+``/api/part-two`` gains no token — it is a read, it serves only what a passed
+gate already opened, and the frame rule covers the page that would read it.
+
+**One press submits every finished case, and the page names what stays
+behind.** A pinned rail footer reads ``Submit — N cases ready``, counts the
+finished drafts and is off at a count of zero, so the count and the way to
+the press are one control. The submit stage lists each finished draft the
+press will carry, one row each, with a **Drop** — and a dropped case moves to
+a held-back group with a **Put back**, so the drop is visible and reversible
+on the same page. The stage also says how many cases stay unfinished, which
+stops the failure a read that survives the process invites: a reader who
+believes they submitted five cases when they submitted four.
+
+**The list on the page is the submission, rather than a description of it.**
+``submit sitting`` builds itself from the working tree, so a drop takes the
+filled document, the appended entry and the cleared line back out and puts
+the case to *draft in progress*. The reader keeps every word they wrote, and
+a put back writes the same record again from the same draft. Nothing here
+reads a draft file from the terminal: a second reader of that file would be a
+second surface over these rules.
 
 **The own list comes first, and the server enforces it.** ``/api/part-two``
 refuses until the reader has posted their own threat list for that case, so
@@ -85,6 +105,9 @@ them — evidence of an order that did not happen.
 They step in the rail's order over the cases the reader may open, and the last
 Next lands on the submit stage. The rail never leaves, so the walk reloads no
 document: every arrival reads the case back from the server.
+
+**A successful submit deletes every draft it carried.** That work is in a
+pull request by then, and a store that only grows is a store nobody trusts.
 
 **A part-finished read survives the browser and the process.** It lives in a
 **Draft Sitting**, one file per case under the reader's own GitHub login,
@@ -156,7 +179,7 @@ import secrets
 import sys
 from dataclasses import dataclass, field
 from pathlib import Path
-from typing import Annotated, Any
+from typing import Annotated
 
 from fastapi import FastAPI, HTTPException, Request
 from fastapi.responses import HTMLResponse, JSONResponse
@@ -275,12 +298,12 @@ class Session:
     #: Whether a `gh` login is available to act as. With none there is nothing
     #: to submit with, so the button is never offered.
     can_submit: bool = False
-    #: The entry this session appended to ``case.json``, per case it
-    #: recorded. Re-recording a case replaces that entry rather than appending
-    #: a second one, so one reader and one case never write two entries into
-    #: one pull request. It holds what :func:`evals.harness.sitting.record`
-    #: returned, so nothing but this session's own append is ever removed.
-    recorded: dict[str, dict[str, Any]] = field(default_factory=dict)
+    #: The cases the reader recorded and then held back from this press. It
+    #: is the only thing the submit stage keeps in memory, and it keeps it
+    #: because a drop is a decision about one press: on disk a dropped case
+    #: is *draft in progress*, which is what it is, and tomorrow's session
+    #: offers it as one. What the press carries is read from the tree.
+    dropped: set[str] = field(default_factory=set)
 
     @property
     def document_name(self) -> str:
@@ -315,6 +338,17 @@ class Session:
             sittings.draft_states(self.drafts, self.reviewer),
         )
         return self.rows
+
+    def carried(self) -> list[sittings.Row]:
+        """The finished drafts, which is exactly what one press carries.
+
+        Read from the tree and the store rather than remembered, so the list
+        the reader sees before the press is the list the submission builds
+        itself from. A drop takes the record out of the working tree and
+        puts its draft back to ``open``, so it leaves this list by the same
+        rule that put it here.
+        """
+        return [row for row in self.refresh() if row.state == "finished"]
 
     def draft(self, case_id: str) -> sittings.Draft | None:
         """This reader's draft of one case, read from disk on every ask.
@@ -363,6 +397,10 @@ def create_app(session: Session) -> FastAPI:
             {
                 "reviewer": session.reviewer,
                 "todo": sum(1 for row in rows if row.state == "todo"),
+                # The pinned footer's count and its own reason to be on
+                # screen. It is the finished drafts, which is what the press
+                # carries, so the footer and the submit stage never disagree.
+                "ready": sum(1 for row in rows if row.state == "finished"),
                 "preselect": session.preselect,
                 "cases": [
                     {
@@ -548,53 +586,122 @@ def create_app(session: Session) -> FastAPI:
         # hears it here as well as at open, and their own list is untouched
         # either way.
         moved = _moved(session, prepared, held)
-        case_dir = session.corpus_dir / body.case
-        try:
-            text = sittings.document(
-                prepared, held.own_list, body.marks, body.missing, body.notes
-            )
-            (case_dir / session.document_name).write_text(text, encoding="utf-8")
-            read = sittings.read_records(case_dir, prepared.files)
-            # **A second press corrects the record rather than adding to it.**
-            # The entry this session appended comes off before the new one
-            # goes on, so the submission never carries two entries by one
-            # reader for one case. An entry this session did not write is
-            # untouchable, which is what keeps `reviews` append-only.
-            entry = sittings.record(
-                case_dir,
-                session.reviewer,
-                read,
-                session.document_name,
-                body.notes,
-                replaces=session.recorded.get(body.case),
-            )
-            cleared = sittings.clear_unreviewed(session.root, prepared.case_id)
-        except sittings.SittingError as exc:
-            raise HTTPException(status_code=409, detail=str(exc)) from exc
-        session.recorded[body.case] = entry
-        # The draft keeps what the reader wrote and says the sitting is
-        # recorded. It stays until a submit carries it: the record is in the
-        # working tree by now, and nothing is a record until it merges — so
-        # the case re-opens, and the row that carries it still presses.
-        held.marks = dict(body.marks)
-        held.missing = list(body.missing)
-        held.notes = body.notes
-        held.state = "finished"
-        _save(session, held)
+        _record(session, prepared, held, body.marks, body.missing, body.notes)
         return JSONResponse(
             {
                 "case": prepared.case_id,
-                "written": [
-                    f"evals/corpus/{prepared.case_id}/{session.document_name}",
-                    f"evals/corpus/{prepared.case_id}/case.json",
-                    *([sittings.UNREVIEWED_FILE] if cleared else []),
-                ],
+                "written": _written(session, [prepared.case_id]),
                 "moved": moved,
-                "command": "python -m evals.harness.run submit sitting",
-                "paste": _paste(session, prepared, len(read)),
-                "can_submit": session.can_submit,
+                # The count the pinned footer reads. The press and the ways
+                # out live on the submit stage: there is one of each for the
+                # whole session rather than one per case.
+                "ready": len(session.carried()),
             }
         )
+
+    @app.get("/api/stage")
+    def stage() -> JSONResponse:
+        """The end of the walk: what one press carries, and what stays behind.
+
+        The list is the finished drafts, read from the tree on every call, so
+        it is the submission the press builds rather than a description of
+        one. **The stage also names what stays behind**, which is the failure
+        a read that survives the process invites: a reader who believes they
+        submitted five cases when they submitted four.
+        """
+        rows = session.refresh()
+        carried = [row for row in rows if row.state == "finished"]
+        held_back = [
+            row
+            for row in rows
+            if row.case_id in session.dropped and row.state == "draft"
+        ]
+        cases = [row.case_id for row in carried]
+        return JSONResponse(
+            {
+                "reviewer": session.reviewer,
+                "ready": [_stage_row(row) for row in carried],
+                "held_back": [_stage_row(row) for row in held_back],
+                # Every case that is neither carried nor signed off. A signed
+                # case is done and a carried one is about to be, so what is
+                # left is what nobody has finished.
+                "unfinished": sum(
+                    1 for row in rows if row.state not in ("finished", "signed")
+                ),
+                "written": _written(session, cases),
+                "command": "python -m evals.harness.run submit sitting",
+                "paste": _paste(session, cases),
+            }
+        )
+
+    @app.post("/api/drop")
+    def drop(request: Request, body: Which) -> JSONResponse:
+        """Hold one recorded case back from this pull request.
+
+        The press takes no argument and the submission builds itself from the
+        working tree, so a drop is a change to what the press finds: the
+        filled document, the appended entry and the cleared line all come
+        back out, and the case goes back to *draft in progress*. That is what
+        makes the list on the stage exactly what the press carries.
+
+        **The reader keeps every word they wrote.** Only the two fields the
+        record set are cleared, so *Put back* writes the same record again
+        from the same draft.
+
+        It carries both controls for the reasons ``/api/discard`` carries
+        them, and one more: it decides what a later press publishes.
+        """
+        refuse_cross_origin(request)
+        _require_token(request, session)
+        prepared = _open(session, body.case)
+        held = _draft(session, body.case)
+        if held is None or held.state != "finished":
+            raise HTTPException(
+                status_code=409,
+                detail="that case is not recorded, so this press does not carry it",
+            )
+        # The entry first, because that is the one the submission reads a
+        # case directory for, and the untracked document last. A write that
+        # fails part way leaves the draft saying *finished*, so the stage
+        # still lists the case and the checklist still refuses it.
+        case_dir = session.corpus_dir / prepared.case_id
+        try:
+            if held.recorded is not None:
+                sittings.unrecord(case_dir, held.recorded)
+            if held.unreviewed_entry:
+                sittings.restore_unreviewed(
+                    session.root, prepared.case_id, held.unreviewed_entry
+                )
+            (case_dir / session.document_name).unlink(missing_ok=True)
+        except (OSError, ValueError) as exc:
+            raise HTTPException(status_code=409, detail=str(exc)) from exc
+        held.recorded = None
+        held.unreviewed_entry = ""
+        held.state = "open"
+        _save(session, held)
+        session.dropped.add(prepared.case_id)
+        return JSONResponse({"case": prepared.case_id, "state": held.state})
+
+    @app.post("/api/put-back")
+    def put_back(request: Request, body: Which) -> JSONResponse:
+        """Put a case this reader dropped back into the pull request.
+
+        It writes the record from the draft rather than from the page, so a
+        case put back carries exactly the marks, the missing list and the
+        notes the reader left on it. Only a case dropped on this page comes
+        back this way: a drop and a put back are one control read twice, and
+        every other draft is recorded on its own case stage.
+        """
+        refuse_cross_origin(request)
+        _require_token(request, session)
+        prepared = _open(session, body.case)
+        held = _draft(session, body.case)
+        if body.case not in session.dropped or held is None or held.state != "open":
+            raise HTTPException(
+                status_code=409, detail="that case is not held back from this press"
+            )
+        _record(session, prepared, held, held.marks, held.missing, held.notes)
+        return JSONResponse({"case": prepared.case_id, "state": held.state})
 
     @app.post("/api/submit")
     def open_the_pr(request: Request) -> JSONResponse:
@@ -605,10 +712,18 @@ def create_app(session: Session) -> FastAPI:
         only place in any app in this repository that can act on GitHub as
         the person running it.
 
-        It takes no arguments. The submission is whatever this session already
-        recorded into the working tree, so there is nothing in the request for
-        an attacker to steer — and nothing to steer it with, since a request
-        that did not read the page has no token.
+        It takes no arguments. The submission is whatever stands in the
+        working tree, so there is nothing in the request for an attacker to
+        steer — and nothing to steer it with, since a request that did not
+        read the page has no token. **One press carries every finished draft
+        the reader did not drop**, because a drop takes its case out of the
+        tree the submission reads.
+
+        **A successful submit deletes every draft it carried.** That work is
+        in a pull request by then, and a store that only grows is a store
+        nobody trusts. A draft that will not delete is named in the answer
+        rather than swallowed: the pull request is open either way, and the
+        reader is the only one who can clear the file.
         """
         if not session.can_submit:
             raise HTTPException(
@@ -618,12 +733,17 @@ def create_app(session: Session) -> FastAPI:
             )
         refuse_cross_origin(request)
         _require_token(request, session)
-        if not session.recorded:
+        carried = [row.case_id for row in session.carried()]
+        if not carried:
             raise HTTPException(
                 status_code=409, detail="record the sitting before submitting it"
             )
         outcome = submit_spine.submission(session.root, "sitting")
-        return JSONResponse(outcome.to_json(), status_code=200 if outcome.ok else 409)
+        kept = _delete_drafts(session, carried) if outcome.ok else []
+        return JSONResponse(
+            {**outcome.to_json(), "carried": carried, "kept": kept},
+            status_code=200 if outcome.ok else 409,
+        )
 
     return app
 
@@ -711,17 +831,124 @@ def _save(session: Session, draft: sittings.Draft) -> None:
         ) from exc
 
 
-def _paste(session: Session, prepared: sittings.Prepared, files_read: int) -> str:
-    """The copy-paste alternative, for somebody not opening the PR from here."""
+def _record(
+    session: Session,
+    prepared: sittings.Prepared,
+    held: sittings.Draft,
+    marks: dict[str, sittings.Mark],
+    missing: list[str],
+    notes: str,
+) -> None:
+    """Write one case's record, and put what it wrote into the draft.
+
+    Three files and one draft, in one place, because *Record the sitting* and
+    *Put back* write the same record by different routes — one from the page
+    and one from the draft.
+
+    **A second press corrects the record rather than adding to it.** The
+    entry this reader appended comes off before the new one goes on, so the
+    submission never carries two entries by one reader for one case. An entry
+    they did not write is untouchable, which is what keeps ``reviews``
+    append-only.
+
+    What the record left behind goes into the draft, because a drop takes
+    back exactly what a record put on and the draft is the only thing here
+    that outlives the process. A re-record clears no line — the case came off
+    the unreviewed list at the first press — so the lines the draft already
+    holds stay.
+    """
+    case_dir = session.corpus_dir / prepared.case_id
+    try:
+        text = sittings.document(prepared, held.own_list, marks, missing, notes)
+        (case_dir / session.document_name).write_text(text, encoding="utf-8")
+        read = sittings.read_records(case_dir, prepared.files)
+        entry = sittings.record(
+            case_dir,
+            session.reviewer,
+            read,
+            session.document_name,
+            notes,
+            replaces=held.recorded,
+        )
+        cleared = sittings.clear_unreviewed(session.root, prepared.case_id)
+    except (sittings.SittingError, OSError) as exc:
+        raise HTTPException(status_code=409, detail=str(exc)) from exc
+    # The draft keeps what the reader wrote and says the sitting is recorded.
+    # It stays until a submit carries it: the record is in the working tree by
+    # now, and nothing is a record until it merges — so the case re-opens, and
+    # the row that carries it still presses.
+    held.marks = dict(marks)
+    held.missing = list(missing)
+    held.notes = notes
+    held.recorded = entry
+    held.unreviewed_entry = cleared or held.unreviewed_entry
+    held.state = "finished"
+    _save(session, held)
+    session.dropped.discard(prepared.case_id)
+
+
+def _delete_drafts(session: Session, cases: list[str]) -> list[str]:
+    """Delete the drafts a submission carried, and name any that survived.
+
+    A draft that will not delete stops nothing: the pull request is open, and
+    the file is in the reader's own store where they are the only one who can
+    clear it. So it is reported rather than raised, and rather than swallowed.
+    """
+    kept = []
+    for case_id in cases:
+        try:
+            sittings.discard_draft(session.drafts, session.reviewer, case_id)
+        except (sittings.DraftError, OSError) as exc:
+            kept.append(f"{case_id}: {exc}")
+    return kept
+
+
+def _stage_row(row: sittings.Row) -> dict[str, str]:
+    """One line of the submit stage: the case, its number and its title.
+
+    The same three fields a rail row carries, and for the same reason —
+    nothing here says how many claims a case holds.
+    """
+    return {"case": row.case_id, "number": row.number, "title": row.title}
+
+
+def _written(session: Session, cases: list[str]) -> list[str]:
+    """Every path a sitting writes, over the cases named.
+
+    Two files per case and the unreviewed list once, which is the whole of
+    what a sitting pull request may change under a case prefix apart from a
+    reference set the reader corrected.
+    """
+    return [
+        *(
+            f"evals/corpus/{case}/{name}"
+            for case in cases
+            for name in (session.document_name, "case.json")
+        ),
+        *([sittings.UNREVIEWED_FILE] if cases else []),
+    ]
+
+
+def _paste(session: Session, cases: list[str]) -> str:
+    """The copy-paste alternative, for somebody not opening the PR from here.
+
+    It names every case the press carries, in the shape
+    ``evals.harness.submit`` gives the pull request it opens: a title that
+    counts the cases and a closing that lists them. Plural agreement is the
+    count's own job, because a branch on a count is what this repository does
+    not write.
+    """
+    listed = "\n".join(f"- {case}" for case in cases)
     return (
-        f"Sitting: {prepared.case_id} by {session.reviewer}\n\n"
-        f"Held over {files_read} file(s) — the sources, the model and every"
-        " declared framework's reference set. My own threat list was written"
-        " before the recorded sets were opened; the filled document is"
-        f" committed as `{session.document_name}`.\n\n"
-        "The `reviews` entry in `case.json` records the digest of each file as"
-        " it stands in this PR, so a later edit to any of them puts the case"
-        " back on the list."
+        f"Sitting: {session.reviewer}, {len(cases)} cases\n\n"
+        f"{listed}\n\n"
+        "Each case above was read whole — the sources, the model and every"
+        " declared framework's reference set. My own threat list for a case"
+        " was written before that case's recorded sets were opened, and the"
+        f" filled document is committed as `{session.document_name}`.\n\n"
+        "The `reviews` entry in each `case.json` records the digest of every"
+        " file as it stands in this PR, so a later edit to any of them puts"
+        " that case back on the list."
     )
 
 
@@ -780,8 +1007,12 @@ _PAGE = r"""<!doctype html>
   body { font: 16px/1.55 system-ui, sans-serif; margin: 0; display: flex;
          align-items: stretch; min-height: 100vh; }
   nav { flex: 0 0 19rem; border-right: 1px solid var(--line); padding: 1.4rem 1rem;
-        position: sticky; top: 0; align-self: flex-start; max-height: 100vh;
-        overflow-y: auto; }
+        position: sticky; top: 0; align-self: flex-start; height: 100vh;
+        box-sizing: border-box; display: flex; flex-direction: column; }
+  #cases { flex: 1; overflow-y: auto; }
+  .pin { flex: 0 0 auto; margin: .8rem 0 0; padding-top: .8rem;
+         border-top: 1px solid var(--line); }
+  .pin button { width: 100%; }
   main { flex: 1; padding: 2rem 1.5rem 6rem; max-width: 46rem; }
   h1 { font-size: 1.1rem; margin: 0 0 .2rem; }
   h2 { font-size: 1.2rem; }
@@ -820,15 +1051,16 @@ _PAGE = r"""<!doctype html>
            padding: 1.2rem 1rem; }
   select { font: inherit; padding: .2rem .4rem; border-radius: 6px;
            border: 1px solid var(--line); }
-  .mark { display: flex; gap: .8rem; align-items: baseline; padding: .35rem 0;
+  .line { display: flex; gap: .8rem; align-items: baseline; padding: .35rem 0;
           border-bottom: 1px solid var(--line); }
-  .mark span { flex: 1; }
+  .line span { flex: 1; }
 </style></head>
 <body>
 <nav>
   <h1>Case sitting</h1>
   <p class="sub" id="left">reading the corpus…</p>
   <ol id="cases"></ol>
+  <p class="pin"><button id="toSubmit" class="hidden"></button></p>
 </nav>
 
 <main>
@@ -896,12 +1128,9 @@ _PAGE = r"""<!doctype html>
     <h2>Recorded</h2>
     <p>Written into your working tree:</p>
     <pre id="written"></pre>
-    <p>Open the pull request:</p>
-    <pre id="command"></pre>
-    <p>Or paste this into one you open yourself:</p>
-    <pre id="paste"></pre>
     <p class="note">Next carries you to the next case. The last Next ends at
-    the submit stage, which is where the pull request is opened.</p>
+    the submit stage, where one press carries every case you recorded — and
+    where the command and the paste text are.</p>
   </section>
 </article>
 
@@ -912,7 +1141,27 @@ _PAGE = r"""<!doctype html>
   </header>
   <p class="sub">The end of the walk, read by <!--reviewer--></p>
   <p id="ready" class="note"></p>
-  <pre id="stageCommand" class="hidden"></pre>
+  <ol id="carrying"></ol>
+
+  <section id="heldBox" class="hidden">
+    <h2>Held back</h2>
+    <p class="note">These cases stay in your working tree as drafts in
+    progress, and this press does not carry them. Put one back and it is
+    recorded again, with the marks, the missing list and the notes you left
+    on it.</p>
+    <ol id="held"></ol>
+  </section>
+
+  <section id="waysOut">
+    <h2>Written into your working tree</h2>
+    <pre id="stageWritten"></pre>
+    <h2>Open the pull request</h2>
+    <p>One command carries every case above:</p>
+    <pre id="stageCommand"></pre>
+    <p>Or paste this into one you open yourself:</p>
+    <pre id="stagePaste"></pre>
+  </section>
+
   <div id="submitBox" class="hidden">
     <p class="note">Or let this open it for you, through the
     <code>gh</code> you are already signed in to. It runs the same checks
@@ -933,14 +1182,12 @@ const CAN_SUBMIT = <!--cansubmit-->;
 // The case on the stage, and the rail as the server last described it.
 let current = null;
 let rows = [];
-// The command the last record printed, which the submit stage repeats. Named
-// apart from the `command` element, because an id is a global of its own.
-let printedCommand = "";
 
-// What this session recorded. Nothing the reader writes is held here: every
-// word of it goes to the draft on the server, so a case they come back to
-// comes back as the file on disk says, and a closed browser costs nothing.
-const recorded = new Set();
+// Nothing the reader writes is held in this page, and nor is what they
+// recorded: every word of it goes to the draft on the server, and the count
+// in the footer and the list on the submit stage are both read back from the
+// tree. So a closed browser costs nothing, and the list before the press is
+// the submission the press builds.
 
 // The pending save. Every field in part two saves on a short delay, and the
 // walk flushes before it moves, so what leaves the stage is already on disk.
@@ -973,8 +1220,19 @@ async function loadRail() {
   $("left").textContent = d.todo + " to do";
   $("cases").replaceChildren(...rows.map(railRow));
   $("start").disabled = !firstToDo();
+  railFooter(d.ready);
   select(current);
   return d;
+}
+
+// The pinned footer: the count of what is ready and the way to submit it, in
+// one control. It is off at a count of zero, so it never offers a press with
+// nothing behind it. The count reads for itself, as every other count here
+// does — a branch on one is what this repository does not write. Named apart
+// from the `ready` element, because an id is a global of its own.
+function railFooter(count) {
+  $("toSubmit").textContent = "Submit — " + count + " cases ready";
+  $("toSubmit").classList.toggle("hidden", !count);
 }
 
 // A status dot, the case number and the title, with the full status as the
@@ -1099,13 +1357,65 @@ async function openSubmit() {
   $("empty").classList.add("hidden");
   $("case").classList.add("hidden");
   $("submitStage").classList.remove("hidden");
-  $("ready").textContent = recorded.size
-    ? recorded.size + " case(s) recorded into your working tree."
-    : "No case is recorded yet. Walk back and record one.";
-  $("stageCommand").textContent = printedCommand;
-  $("stageCommand").classList.toggle("hidden", !printedCommand);
-  $("submitBox").classList.toggle("hidden", !(CAN_SUBMIT && recorded.size));
+  await loadStage();
 }
+
+// What one press carries, read from the server rather than remembered. The
+// list is the finished drafts, which is the submission the press builds
+// itself from, so what the reader signs is what they read here. It also says
+// how many cases stay unfinished, which is the failure a read that survives
+// the process invites: believing you submitted five cases when you sent four.
+async function loadStage() {
+  const d = await (await fetch("/api/stage")).json();
+  $("ready").textContent = d.ready.length + " cases go into one pull request. "
+    + d.unfinished + " cases stay unfinished, and this press does not carry them.";
+  $("carrying").replaceChildren(...d.ready.map(row => stageRow(row, "Drop", drop)));
+  $("held").replaceChildren(...d.held_back.map(row => stageRow(row, "Put back", putBack)));
+  $("heldBox").classList.toggle("hidden", !d.held_back.length);
+  $("stageWritten").textContent = d.written.join("\n");
+  $("stageCommand").textContent = d.command;
+  $("stagePaste").textContent = d.paste;
+  // With nothing to carry there is no way out to offer, so the three of them
+  // go together. The count above still says what is left to do.
+  $("waysOut").classList.toggle("hidden", !d.ready.length);
+  $("submitBox").classList.toggle("hidden", !(CAN_SUBMIT && d.ready.length));
+}
+
+// One row of either list, with the control that moves it to the other one.
+// The title is case prose, so it lands through textContent like every other
+// piece of it, and the row carries no count for the same reason a rail row
+// carries none.
+function stageRow(row, label, act) {
+  const item = document.createElement("li");
+  const line = document.createElement("div");
+  line.className = "line";
+  const text = document.createElement("span");
+  text.textContent = row.number + "  " + row.title;
+  const press = document.createElement("button");
+  press.textContent = label;
+  press.addEventListener("click", () => act(row.case));
+  line.append(text, press);
+  item.appendChild(line);
+  return item;
+}
+
+// A drop takes the record out of the working tree and puts the case back to
+// *draft in progress*; a put back writes it again from the draft. Both move a
+// row between the two lists on this page, so both re-read the rail and the
+// stage — the footer's count moves with them.
+async function stageAct(path, caseId) {
+  const res = await fetch(path, {
+    method: "POST",
+    headers: {"Content-Type": "application/json", "X-Sitting-Token": TOKEN},
+    body: JSON.stringify({case: caseId}),
+  });
+  if (!res.ok) { $("ready").textContent = (await res.json()).detail; return; }
+  await loadRail();
+  await loadStage();
+}
+
+const drop = (caseId) => stageAct("/api/drop", caseId);
+const putBack = (caseId) => stageAct("/api/put-back", caseId);
 
 // The gate re-arms per case, so a case arriving on the stage arrives blind.
 function blank() {
@@ -1113,7 +1423,7 @@ function blank() {
   warn([]);
   $("partTwo").replaceChildren();
   for (const id of ["own", "missing", "notes"]) $(id).value = "";
-  for (const id of ["written", "command", "paste"]) $(id).textContent = "";
+  $("written").textContent = "";
   $("own").readOnly = false;
   $("lock").disabled = false;
   $("finish").textContent = "Record the sitting";
@@ -1164,6 +1474,7 @@ $("start").addEventListener("click", () => {
 
 $("previous").addEventListener("click", () => step(-1));
 $("next").addEventListener("click", () => step(1));
+$("toSubmit").addEventListener("click", openSubmit);
 
 // Previous off the submit stage lands on the last case the walk offers, which
 // is the case the last Next came from.
@@ -1212,7 +1523,7 @@ $("discard").addEventListener("click", async () => {
 // any markup — the same rule the rest of this page reads case prose under.
 function markRow(target, values) {
   const row = document.createElement("div");
-  row.className = "mark";
+  row.className = "line";
   const text = document.createElement("span");
   text.textContent = target.claims.join(" / ");
   const select = document.createElement("select");
@@ -1248,17 +1559,14 @@ $("finish").addEventListener("click", async () => {
   if (!res.ok) { $("written").textContent = d.detail; $("done").classList.remove("hidden"); return; }
   warn(d.moved);
   $("written").textContent = d.written.join("\n");
-  $("command").textContent = d.command;
-  $("paste").textContent = d.paste;
   // Part two stays on the stage. The reader changes a mark, a missing line or
   // a note and presses again, and the second press replaces the entry the
   // first one appended rather than adding to it.
   finishedNow(true);
   $("done").classList.remove("hidden");
-  printedCommand = d.command;
-  recorded.add(caseId);
   // The row moves to *finished, not submitted* where it stands, and it still
-  // presses — the record is in the working tree and has not merged.
+  // presses — the record is in the working tree and has not merged. The
+  // pinned footer counts one more case ready by the same read.
   await loadRail();
 });
 
@@ -1276,7 +1584,13 @@ $("submit").addEventListener("click", async () => {
     + (c.problems.length ? "\n       " + c.problems.join("\n       ") : ""));
   if (d.ok) { report.push("", d.url, "", d.closing); }
   else { report.push("", d.error || "nothing opened; fix the failures above."); $("submit").disabled = false; }
+  // A draft that survived the delete. The pull request is open either way,
+  // and the file is in a store only the reader can clear.
+  if ((d.kept || []).length) report.push("", "these drafts would not delete:", ...d.kept);
   $("result").textContent = report.join("\n");
+  // The carried drafts are gone, so their rows grey and the footer goes out.
+  await loadRail();
+  await loadStage();
 });
 
 // A preselect moves the rail. It opens the case only when the rail presses it,
