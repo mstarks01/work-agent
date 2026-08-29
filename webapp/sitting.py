@@ -12,10 +12,12 @@ waits, because either would tell the reader how long to make their own list
 before they have written it. ``--case`` preselects where the rail opens and
 grants nothing.
 
-**A case a sitting already clears is greyed, whoever signed it, and is off the
-offered list.** :func:`_open` resolves every case id that arrives in a request
-against that list, so the refusal a signed case needs is the same rule that
-refuses a case id nobody wrote. The status reads
+**A case a sitting already clears is greyed and off the offered list once no
+draft of it is left, whoever signed it.** The draft is what re-opens a case,
+so a reader who records one still presses their own row and records it again.
+:func:`_open` resolves every case id that arrives in a request against that
+list, so the refusal a signed case needs is the same rule that refuses a case
+id nobody wrote. The status reads
 :func:`evals.harness.sitting.clears` and never the presence of an entry in
 ``reviews``: a drifted digest leaves an entry that clears nothing, and a rail
 keyed on the entry would grey a case CI asks somebody to read.
@@ -154,7 +156,7 @@ import secrets
 import sys
 from dataclasses import dataclass, field
 from pathlib import Path
-from typing import Annotated
+from typing import Annotated, Any
 
 from fastapi import FastAPI, HTTPException, Request
 from fastapi.responses import HTMLResponse, JSONResponse
@@ -273,7 +275,12 @@ class Session:
     #: Whether a `gh` login is available to act as. With none there is nothing
     #: to submit with, so the button is never offered.
     can_submit: bool = False
-    recorded: set[str] = field(default_factory=set)
+    #: The entry this session appended to ``case.json``, per case it
+    #: recorded. Re-recording a case replaces that entry rather than appending
+    #: a second one, so one reader and one case never write two entries into
+    #: one pull request. It holds what :func:`evals.harness.sitting.record`
+    #: returned, so nothing but this session's own append is ever removed.
+    recorded: dict[str, dict[str, Any]] = field(default_factory=dict)
 
     @property
     def document_name(self) -> str:
@@ -298,9 +305,9 @@ class Session:
     def refresh(self) -> tuple[sittings.Row, ...]:
         """Re-read the rail from the tree and the store, and with it the offered list.
 
-        A recorded sitting greys its own case and a posted own list moves its
-        case to *draft in progress*, so the page asks for this after every
-        write as well as at load.
+        A posted own list moves its case to *draft in progress* and a record
+        moves it to *finished, not submitted*, so the page asks for this after
+        every write as well as at load.
         """
         self.rows = sittings.rail(
             self.corpus_dir,
@@ -346,16 +353,16 @@ def create_app(session: Session) -> FastAPI:
     def rail() -> JSONResponse:
         """The whole corpus, each case with the status the reader reads.
 
-        Re-read from the tree on every call, because a recorded sitting greys
-        its own case and the reader must see that without a restart. It
-        carries no claim count and no reason a case waits: a number here would
-        tell the reader how long to make their own list.
+        Re-read from the tree on every call, because a record moves its own
+        case to *finished, not submitted* and the reader must see that without
+        a restart. It carries no claim count and no reason a case waits: a
+        number here would tell the reader how long to make their own list.
         """
         rows = session.refresh()
         return JSONResponse(
             {
                 "reviewer": session.reviewer,
-                "todo": sum(1 for row in rows if row.pressable),
+                "todo": sum(1 for row in rows if row.state == "todo"),
                 "preselect": session.preselect,
                 "cases": [
                     {
@@ -399,6 +406,10 @@ def create_app(session: Session) -> FastAPI:
                 "body": prepared.part_one,
                 "files": prepared.files,
                 "own_list": held.own_list if held else None,
+                # ``None`` where the reader holds no draft, because a draft is
+                # the only thing that can say how far the read got. A finished
+                # one is what puts *Re-record this sitting* on the button.
+                "state": held.state if held else None,
                 "marks": work.marks,
                 "missing": work.missing,
                 "notes": work.notes,
@@ -532,13 +543,6 @@ def create_app(session: Session) -> FastAPI:
         held = _draft(session, body.case)
         if held is None:
             raise HTTPException(status_code=409, detail="no own list was written")
-        if body.case in session.recorded:
-            # One entry per reader per case in one pull request. This is the
-            # local half of the rule the rail states: the case is signed now,
-            # so the next reader of the rail sees it greyed either way.
-            raise HTTPException(
-                status_code=409, detail="this session already recorded that case"
-            )
         # The second half of the drift check. A file can move while the tab
         # sits open, and this is where the digest is signed — so the reader
         # hears it here as well as at open, and their own list is untouched
@@ -551,16 +555,27 @@ def create_app(session: Session) -> FastAPI:
             )
             (case_dir / session.document_name).write_text(text, encoding="utf-8")
             read = sittings.read_records(case_dir, prepared.files)
-            sittings.record(
-                case_dir, session.reviewer, read, session.document_name, body.notes
+            # **A second press corrects the record rather than adding to it.**
+            # The entry this session appended comes off before the new one
+            # goes on, so the submission never carries two entries by one
+            # reader for one case. An entry this session did not write is
+            # untouchable, which is what keeps `reviews` append-only.
+            entry = sittings.record(
+                case_dir,
+                session.reviewer,
+                read,
+                session.document_name,
+                body.notes,
+                replaces=session.recorded.get(body.case),
             )
             cleared = sittings.clear_unreviewed(session.root, prepared.case_id)
         except sittings.SittingError as exc:
             raise HTTPException(status_code=409, detail=str(exc)) from exc
-        session.recorded.add(body.case)
+        session.recorded[body.case] = entry
         # The draft keeps what the reader wrote and says the sitting is
         # recorded. It stays until a submit carries it: the record is in the
-        # working tree by now, and nothing is a record until it merges.
+        # working tree by now, and nothing is a record until it merges — so
+        # the case re-opens, and the row that carries it still presses.
         held.marks = dict(body.marks)
         held.missing = list(body.missing)
         held.notes = body.notes
@@ -957,7 +972,7 @@ async function loadRail() {
   rows = d.cases;
   $("left").textContent = d.todo + " to do";
   $("cases").replaceChildren(...rows.map(railRow));
-  $("start").disabled = !rows.some(row => row.pressable);
+  $("start").disabled = !firstToDo();
   select(current);
   return d;
 }
@@ -996,10 +1011,16 @@ function walkable() {
   return rows.filter(row => row.pressable);
 }
 
+// The first case nobody has started, which is what the start button offers.
+// A finished case presses and the walk steps over it, but it is not to do.
+function firstToDo() {
+  return rows.find(row => row.state === "todo");
+}
+
 // One step from where the reader stands, in the rail's own order, landing
 // only on a case they may open. It reads the rail rather than the walkable
-// list, because recording a case greys its row: the reader is then standing
-// on a case the walk no longer offers, and Next must still carry them
+// list, because the reader can stand on a row the walk does not offer: a
+// case somebody signed while the tab sat open. Next must still carry them
 // forward from there rather than back to the top.
 function step(delta) {
   const at = rows.findIndex(row => row.case === current);
@@ -1059,7 +1080,11 @@ async function openCase(caseId) {
   $("missing").value = d.missing.join("\n");
   $("notes").value = d.notes;
   lock();
-  $("discardBox").classList.remove("hidden");
+  // A recorded case comes back with both parts and a button that says what a
+  // second press does. It offers no discard: the record is in the working
+  // tree, so throwing the draft away here would leave it with nothing behind
+  // it, and the walk is what carries the reader on.
+  finishedNow(d.state === "finished");
   await showSets(caseId);
   if (current !== caseId) return;
   setMarks(d.marks);
@@ -1091,6 +1116,7 @@ function blank() {
   for (const id of ["written", "command", "paste"]) $(id).textContent = "";
   $("own").readOnly = false;
   $("lock").disabled = false;
+  $("finish").textContent = "Record the sitting";
   // A blind case shows the placeholder where part two will open, so the case
   // reads the same whichever way the reader arrived at it.
   $("placeholder").classList.remove("hidden");
@@ -1100,6 +1126,16 @@ function blank() {
 function lock() {
   $("own").readOnly = true;
   $("lock").disabled = true;
+}
+
+// What the case on the stage offers once it is recorded, and what it offers
+// while it is not. Spelled once, because the record and a re-opened case
+// arrive at the same two answers by different routes.
+function finishedNow(finished) {
+  $("finish").textContent = finished
+    ? "Re-record this sitting"
+    : "Record the sitting";
+  $("discardBox").classList.toggle("hidden", finished);
 }
 
 async function showSets(caseId) {
@@ -1122,7 +1158,7 @@ async function showSets(caseId) {
 }
 
 $("start").addEventListener("click", () => {
-  const first = walkable()[0];
+  const first = firstToDo();
   if (first) openCase(first.case);
 });
 
@@ -1214,14 +1250,15 @@ $("finish").addEventListener("click", async () => {
   $("written").textContent = d.written.join("\n");
   $("command").textContent = d.command;
   $("paste").textContent = d.paste;
-  $("two").classList.add("hidden");
-  // The record is in the working tree now, so this case is off the rail and
-  // the draft behind it is no longer the reader's to throw away here.
-  $("discardBox").classList.add("hidden");
+  // Part two stays on the stage. The reader changes a mark, a missing line or
+  // a note and presses again, and the second press replaces the entry the
+  // first one appended rather than adding to it.
+  finishedNow(true);
   $("done").classList.remove("hidden");
   printedCommand = d.command;
   recorded.add(caseId);
-  // The recorded entry clears the case, so its row greys where it stands.
+  // The row moves to *finished, not submitted* where it stands, and it still
+  // presses — the record is in the working tree and has not merged.
   await loadRail();
 });
 

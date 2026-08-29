@@ -524,6 +524,13 @@ class TestTheUnreviewedHelper:
         assert sittings.clear_unreviewed(tree, "99-not-a-case") is False
         assert (tree / "tests" / "test_case_review.py").read_text("utf-8") == before
 
+    def test_the_last_case_comes_off_and_leaves_an_empty_table(self, tree):
+        """The day every case is read. The table names nobody, and the reader
+        who cleared the last line gets the same answer as every other."""
+        for case in CASES:
+            sittings.clear_unreviewed(tree, case)
+        assert sittings.unreviewed_cases(tree) == []
+
     def test_the_unreviewed_cases_are_listed_in_file_order(self, tree):
         assert sittings.unreviewed_cases(tree) == [CASE, "03-batch-data-pipeline"]
 
@@ -715,6 +722,13 @@ class TestTheRail:
         sign(tree, OTHER, "sam")
         assert self.rail(app)["todo"] == len(CASES) - 1
 
+    def test_a_case_the_reader_started_is_no_longer_to_do(self, tree):
+        """The count names the cases nobody opened. A row that presses is a
+        different question, and a finished case presses."""
+        app = self.opened(tree)
+        app.post("/api/own-list", json={"case": CASE, "items": ["a spoofed device"]})
+        assert self.rail(app)["todo"] == len(CASES) - 1
+
     def test_a_signed_case_is_greyed_and_unpressable(self, tree):
         """Whoever signed it. The status names the signer, which reads both ways."""
         sign(tree, OTHER, "sam")
@@ -761,15 +775,27 @@ class TestTheRail:
         assert self.rows(app)[OTHER]["status"] == sittings.TO_DO
         assert self.rows(app)[OTHER]["pressable"] is True
 
-    def test_recording_a_sitting_greys_its_own_case(self, tree):
+    def test_recording_a_sitting_moves_its_row_to_finished(self, tree):
+        """The record is in the working tree and the draft behind it lives, so
+        the row says the record is not submitted and it still presses."""
         app = self.opened(tree)
         app.post("/api/own-list", json={"case": CASE, "items": ["a spoofed device"]})
         app.post(
             "/api/finish", json={"case": CASE, "marks": {}, "missing": [], "notes": ""}
         )
-        assert self.rows(app)[CASE]["status"] == "signed by ada"
-        assert self.rows(app)[CASE]["pressable"] is False
+        assert self.rows(app)[CASE]["status"] == "finished, not submitted"
+        assert self.rows(app)[CASE]["state"] == "finished"
+        assert self.rows(app)[CASE]["pressable"] is True
         assert self.rail(app)["todo"] == len(CASES) - 1
+
+    def test_a_signature_greys_nothing_while_a_draft_of_it_lives(self, tree):
+        """The draft is what makes a case re-openable, not the login. A case
+        dies in the rail when it carries a clearing signature and no draft."""
+        app = self.opened(tree)
+        app.post("/api/own-list", json={"case": OTHER, "items": ["a bad row"]})
+        sign(tree, OTHER, "sam")
+        assert self.rows(app)[OTHER]["status"] == "draft in progress"
+        assert self.rows(app)[OTHER]["pressable"] is True
 
     def test_the_gate_re_arms_for_each_case(self, tree):
         """One case's own list opens that case's sets and no other's."""
@@ -933,21 +959,6 @@ class TestACaseTakesOneOwnList:
         blind = app.get(f"/api/part-one?case={OTHER}").json()
         assert blind["own_list"] is None
         assert "a spoofed device" not in json.dumps(blind)
-
-    def test_recording_one_case_twice_in_one_session_is_refused(self, tree):
-        """Append-only governs the record, and one reader reading one case
-        once is one entry. A second press must not append a second."""
-        app = self.opened(tree)
-        app.post("/api/own-list", json={"case": CASE, "items": ["a spoofed device"]})
-        body = {"case": CASE, "marks": {}, "missing": [], "notes": ""}
-        assert app.post("/api/finish", json=body).status_code == 200
-        refused = app.post("/api/finish", json=body)
-        assert refused.status_code == 409
-        assert "already recorded" in refused.json()["detail"]
-        meta = json.loads(
-            (tree / "evals" / "corpus" / CASE / "case.json").read_text("utf-8")
-        )
-        assert len(meta["reviews"]) == 1
 
 
 class TestTheOwnListCarriesThePageToken:
@@ -1317,6 +1328,131 @@ class TestTheDraftSurvivesTheProcess:
         page = browser(session_for(tree, "ada")).get("/").text
         assert "/api/draft" in page, "the page saves what the reader writes"
         assert "const answers" not in page
+
+
+class TestReRecordingACase:
+    """A recorded case re-opens, and a second press replaces the first entry.
+
+    Append-only governs the record, and nothing is a record until it merges.
+    A pull request carrying two entries by one reader for one case would force
+    a strange exception into the check that reads the new entries, so the entry
+    this session appended comes off before the new one goes on.
+    """
+
+    def record(self, app, case=CASE, notes="21 agree", missing=()):
+        return app.post(
+            "/api/finish",
+            json={
+                "case": case,
+                "marks": {},
+                "missing": list(missing),
+                "notes": notes,
+            },
+        )
+
+    def read_and_record(self, app, case=CASE, notes="21 agree", missing=()):
+        """One whole sitting: the own list, then the record."""
+        app.post("/api/own-list", json={"case": case, "items": ["a spoofed device"]})
+        return self.record(app, case, notes, missing)
+
+    def reviews(self, tree, case=CASE):
+        path = tree / "evals" / "corpus" / case / "case.json"
+        return json.loads(path.read_text("utf-8"))["reviews"]
+
+    def test_a_finished_case_re_opens_with_both_parts(self, tree):
+        """The draft survives the record, so the reader comes back to the
+        case with their own list, their answers and the recorded sets."""
+        app = browser(session_for(tree, "ada"))
+        self.read_and_record(app, missing=["nothing about the fleet key"])
+        came_back = app.get(f"/api/part-one?case={CASE}").json()
+        assert came_back["own_list"] == ["a spoofed device"]
+        assert came_back["missing"] == ["nothing about the fleet key"]
+        assert came_back["state"] == "finished"
+        assert app.get(f"/api/part-two?case={CASE}").status_code == 200
+
+    def test_a_case_nobody_started_names_no_state(self, tree):
+        """The field says what the draft says, and a case without one holds
+        no draft to speak for it."""
+        app = browser(session_for(tree, "ada"))
+        assert app.get(f"/api/part-one?case={CASE}").json()["state"] is None
+
+    def test_the_page_offers_the_re_record_button(self, tree):
+        """The label is the reader's one sign that a second press corrects the
+        record rather than adding to it."""
+        page = browser(session_for(tree, "ada")).get("/").text
+        assert "Re-record this sitting" in page
+
+    def test_re_recording_replaces_the_entry_this_session_appended(self, tree):
+        app = browser(session_for(tree, "ada"))
+        self.read_and_record(app, notes="21 agree")
+        assert self.record(app, notes="22 agree, I miscounted").status_code == 200
+        entries = self.reviews(tree)
+        assert len(entries) == 1, "one reader and one case never write two entries"
+        assert entries[0]["notes"] == "22 agree, I miscounted"
+
+    def test_the_second_record_rewrites_the_filled_document(self, tree):
+        app = browser(session_for(tree, "ada"))
+        self.read_and_record(app, missing=["nothing about the fleet key"])
+        self.record(app, missing=["nobody rotates the key"])
+        text = (tree / "evals" / "corpus" / CASE / "REVIEW-ada.md").read_text("utf-8")
+        assert "nobody rotates the key" in text
+        assert "nothing about the fleet key" not in text
+
+    def test_an_entry_this_session_did_not_write_survives(self, tree):
+        """Append-only still governs the record: nothing but the entry this
+        session appended ever comes off."""
+        case_dir = tree / "evals" / "corpus" / CASE
+        meta = json.loads((case_dir / "case.json").read_text("utf-8"))
+        meta["reviews"] = [
+            {
+                "reviewer": "sam",
+                "date": "2026-08-01",
+                "read": [{"file": "source.md", "sha256": "0" * 64}],
+                "document": "REVIEW-sam.md",
+                "notes": "",
+            }
+        ]
+        (case_dir / "case.json").write_text(
+            json.dumps(meta, indent=2), encoding="utf-8"
+        )
+
+        app = browser(session_for(tree, "ada"))
+        self.read_and_record(app)
+        self.record(app, notes="again")
+        entries = self.reviews(tree)
+        assert [entry["reviewer"] for entry in entries] == ["sam", "ada"]
+        assert entries[1]["notes"] == "again"
+
+    def test_the_draft_keeps_the_answers_the_second_press_carried(self, tree):
+        app = browser(session_for(tree, "ada"))
+        self.read_and_record(app, notes="21 agree")
+        self.record(app, notes="22 agree", missing=["nobody rotates the key"])
+        held = json.loads(draft_file(tree, CASE).read_text("utf-8"))
+        assert held["state"] == "finished"
+        assert held["notes"] == "22 agree"
+        assert held["missing"] == ["nobody rotates the key"]
+
+    def test_the_unreviewed_line_stays_clear(self, tree):
+        app = browser(session_for(tree, "ada"))
+        self.read_and_record(app)
+        self.record(app, notes="again")
+        listing = (tree / "tests" / "test_case_review.py").read_text("utf-8")
+        assert CASE not in listing
+        assert OTHER in listing, "only this case comes off the list"
+
+    def test_it_records_whichever_case_is_in_the_stage(self, tree):
+        """The walk records the case the reader stands on, and a re-record
+        reaches back to a case they left."""
+        app = browser(session_for(tree, "ada"))
+        self.read_and_record(app, CASE, notes="the fleet")
+        self.read_and_record(app, OTHER, notes="the pipeline")
+        self.record(app, CASE, notes="the fleet, again")
+        assert [entry["notes"] for entry in self.reviews(tree, CASE)] == [
+            "the fleet, again"
+        ]
+        assert [entry["notes"] for entry in self.reviews(tree, OTHER)] == [
+            "the pipeline"
+        ]
 
 
 class TestTheTextMovedUnderTheRead:
