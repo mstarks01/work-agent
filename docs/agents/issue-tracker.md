@@ -102,8 +102,11 @@ Completed on GitHub Issues (canonical):
   #372's `signed by somebody else` to `signed by <login>`. **The clearing rule decides a rail row,
   never the presence of a `reviews` entry**: a drifted digest leaves an entry that clears nothing, so
   `clears`, `drifted` and `required_files` live in `evals/harness/sitting.py` and the test imports
-  them, while the `UNREVIEWED` table stays in the test file because CI compares the two. And **the word "debt" now appears nowhere in the
-  repository** (PR #379) — a case that waits for a sitting reads `to do`.
+  them, while the `UNREVIEWED` table stays in the test file because CI compares the two. And **the word "debt" is out of the code, the tests
+  and the guides** (PR #379) — a case that waits for a sitting reads `to do`. One merged reading
+  document, `evals/corpus/01-payments-checkout/REVIEW-02.md`, still carries it, and it keeps it: a
+  reader's recorded words are evidence that the method ran, and #388 puts another reader's document
+  outside what any later change may edit. A vocabulary sweep stops at that file.
 
   The prototype tip is preserved as `archive/prototype/sitting-screens` @ `23b496e`, per the tag
   convention below. **Out of scope and not graduating**: hosting the app or any network write beyond
