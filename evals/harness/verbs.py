@@ -1,7 +1,7 @@
 """What counts as **one** action, and the pairs this corpus cannot separate.
 
-The vocabulary itself is :mod:`stride_service.actions`, and it lives there
-because :class:`~stride_service.report.Claim` carries the field — a vocabulary
+The vocabulary itself is :mod:`analysis_service.actions`, and it lives there
+because :class:`~analysis_service.report.Claim` carries the field — a vocabulary
 that validates a shipped model has to ship with it. This module is the
 measurement's half: which verbs count as one action for matching, and the record
 of what the rule cannot do.
@@ -16,7 +16,7 @@ reference pairs. :class:`~evals.harness.identity.SubsetVerbIdentity` scores
 
 from __future__ import annotations
 
-from stride_service.actions import (
+from analysis_service.actions import (
     ACTION_VERBS,
     FAMILIES,
     GLOSS,

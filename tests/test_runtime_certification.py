@@ -11,14 +11,14 @@ from __future__ import annotations
 import pytest
 from fastapi.testclient import TestClient
 
-from stride_service.api import create_app
-from stride_service.certification import (
+from analysis_service.api import create_app
+from analysis_service.certification import (
     MANIFEST_VERSION,
     BlessedManifest,
     CertificationGate,
     CertifyResult,
 )
-from stride_service.jobs import (
+from analysis_service.jobs import (
     InMemoryJobStore,
     JobRecord,
     NodeCallback,
@@ -26,7 +26,7 @@ from stride_service.jobs import (
     PipelineOutcome,
     StubPipelineRunner,
 )
-from stride_service.sources import SourceLimits
+from analysis_service.sources import SourceLimits
 from tests.factories import DEFAULT_FRAMEWORKS
 from tests.test_api import FakeVerifier, auth, submit
 

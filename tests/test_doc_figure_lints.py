@@ -41,6 +41,7 @@ from pathlib import Path
 
 import pytest
 
+from analysis_service.frameworks import widest_fan_out
 from evals import verify_corpus
 from evals.harness.calibration import (
     AGREEMENT_BAR,
@@ -51,7 +52,6 @@ from evals.harness.identity import SubsetVerbIdentity
 from evals.harness.reference import load_corpus
 from evals.harness.run import _flows_by_case
 from evals.harness.sitting import unreviewed_cases
-from stride_service.frameworks import widest_fan_out
 
 REPO_ROOT = Path(__file__).resolve().parents[1]
 

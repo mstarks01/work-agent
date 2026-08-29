@@ -2500,7 +2500,7 @@ wheels = [
 ]
 
 [[package]]
-name = "stride-service"
+name = "analysis-service"
 version = "0.1.0"
 source = { editable = "." }
 dependencies = [

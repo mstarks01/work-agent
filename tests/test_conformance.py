@@ -14,7 +14,7 @@ answer, and running them together is what produced the imbalance
 
 Everything below is **credential-free**. The capability probes read the pinned
 ``litellm``'s local model-cost map, and the binding assertions hand
-:func:`~stride_service.binding.build_tier_adapters` a synthetic environment —
+:func:`~analysis_service.binding.build_tier_adapters` a synthetic environment —
 the registry checks that a credential was *declared*, never that it
 authenticates, so a placeholder builds a real adapter without a key and without
 egress. That is what lets one suite cover Vertex, Anthropic and OpenAI equally
@@ -36,8 +36,8 @@ from pathlib import Path
 import pytest
 from google.adk.models.base_llm import BaseLlm
 
-from stride_service.binding import NodeBinding, build_tier_adapters
-from stride_service.conformance import (
+from analysis_service.binding import NodeBinding, build_tier_adapters
+from analysis_service.conformance import (
     PROBED_PARAMS,
     REFERENCE_MODELS,
     Capability,
@@ -46,15 +46,15 @@ from stride_service.conformance import (
     reference_matrix,
     render_markdown,
 )
-from stride_service.frameworks.stride.record import ThreatProposals, ThreatRulings
-from stride_service.graph import Pipeline, build_pipeline
-from stride_service.markdown_loader import MarkdownLoader
-from stride_service.model_gate import ModelGateError
-from stride_service.model_tiers import ModelTierConfig, load_model_tiers
-from stride_service.resilience import load_resilience
-from stride_service.sampling import load_sampling, sampling_fingerprint
-from stride_service.system_model import SystemModel
-from stride_service.vendors import (
+from analysis_service.frameworks.stride.record import ThreatProposals, ThreatRulings
+from analysis_service.graph import Pipeline, build_pipeline
+from analysis_service.markdown_loader import MarkdownLoader
+from analysis_service.model_gate import ModelGateError
+from analysis_service.model_tiers import ModelTierConfig, load_model_tiers
+from analysis_service.resilience import load_resilience
+from analysis_service.sampling import load_sampling, sampling_fingerprint
+from analysis_service.system_model import SystemModel
+from analysis_service.vendors import (
     VENDOR_NAMES,
     ProviderAuthError,
     join_served,
@@ -77,10 +77,10 @@ CONFIG = PROJECT_ROOT / "config"
 # that only ran where one existed, which is the imbalance this file exists to
 # remove.
 FAKE_ENV = {
-    "STRIDE_ANTHROPIC_API_KEY": "sk-ant-not-a-real-key",
-    "STRIDE_OPENAI_API_KEY": "sk-not-a-real-key",
-    "STRIDE_VERTEX_PROJECT": "test-project",
-    "STRIDE_VERTEX_LOCATION": "us-central1",
+    "ANALYSIS_ANTHROPIC_API_KEY": "sk-ant-not-a-real-key",
+    "ANALYSIS_OPENAI_API_KEY": "sk-not-a-real-key",
+    "ANALYSIS_VERTEX_PROJECT": "test-project",
+    "ANALYSIS_VERTEX_LOCATION": "us-central1",
     "GOOGLE_APPLICATION_CREDENTIALS": "/nonexistent/adc.json",
 }
 
@@ -105,10 +105,10 @@ def tiers_for(vendor: str) -> ModelTierConfig:
     return load_model_tiers(
         CONFIG / "model_tiers.toml",
         env={
-            "STRIDE_MODEL_BASE_VENDOR": vendor,
-            "STRIDE_MODEL_BASE_MODEL": base,
-            "STRIDE_MODEL_STRONG_VENDOR": vendor,
-            "STRIDE_MODEL_STRONG_MODEL": strong,
+            "ANALYSIS_MODEL_BASE_VENDOR": vendor,
+            "ANALYSIS_MODEL_BASE_MODEL": base,
+            "ANALYSIS_MODEL_STRONG_VENDOR": vendor,
+            "ANALYSIS_MODEL_STRONG_MODEL": strong,
         },
     )
 
@@ -246,7 +246,7 @@ class TestModelsCanBeBound:
         """One adapter class for all three, which is the no-privileged-path claim.
 
         ADK ships a native Gemini integration and warns on every run that this
-        service declines it (:mod:`stride_service.binding` says so in its own
+        service declines it (:mod:`analysis_service.binding` says so in its own
         header). Declining it is what makes "no vendor is privileged" true, and
         prose cannot hold that: a native path reintroduced for one vendor would
         leave every other assertion here passing, because the model strings,
@@ -258,7 +258,7 @@ class TestModelsCanBeBound:
         live, so a vendor that escaped it would escape those too.
 
         The comparison is on the *ancestry* rather than the class object:
-        :func:`~stride_service.retry.retrying_llm_class` mints one subclass per
+        :func:`~analysis_service.retry.retrying_llm_class` mints one subclass per
         call, so two identically-wired adapters are never the same class. What
         must match is everything behind that subclass.
         """
@@ -321,7 +321,7 @@ class TestUnsupportedParamsAreHandledClearly:
         accepts is what is allowed to differ.
         """
         sampling = load_sampling(
-            CONFIG / "sampling.toml", env={"STRIDE_SAMPLING_BASE_SEED": "7"}
+            CONFIG / "sampling.toml", env={"ANALYSIS_SAMPLING_BASE_SEED": "7"}
         )
         with pytest.raises(ModelGateError) as raised:
             build_tier_adapters(
@@ -340,7 +340,7 @@ class TestUnsupportedParamsAreHandledClearly:
         restriction rather than reporting one.
         """
         sampling = load_sampling(
-            CONFIG / "sampling.toml", env={"STRIDE_SAMPLING_BASE_SEED": "7"}
+            CONFIG / "sampling.toml", env={"ANALYSIS_SAMPLING_BASE_SEED": "7"}
         )
         adapters = build_tier_adapters(
             tiers_for("vertex"),

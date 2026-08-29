@@ -17,13 +17,13 @@ from types import SimpleNamespace
 
 import pytest
 
+from analysis_service.report import NodeRun, TokenUsage
+from analysis_service.sampling import TierSampling, sampling_fingerprint
 from evals.harness import consent, modes, prices, run
 from evals.harness.artifact import ARTIFACT_VERSION, RepoCommit
 from evals.harness.consent import UNKNOWN, Estimate, Refused, gate, hold
 from evals.harness.prices import UnitPrices
 from evals.harness.provenance import RunProvenance
-from stride_service.report import NodeRun, TokenUsage
-from stride_service.sampling import TierSampling, sampling_fingerprint
 
 ARTIFACT_COMMIT = RepoCommit(commit="c" * 40, clean=True)
 
@@ -611,9 +611,9 @@ class TestAStoppedSweepSaysSo:
     def artifact(self, stopped, cases):
         from dataclasses import replace
 
+        from analysis_service.certification import CertifyResult
         from evals.harness.artifact import build
         from evals.harness.instruments import ModeRun, Sweep
-        from stride_service.certification import CertifyResult
 
         run = replace(ModeRun.empty(("stride",)), stopped_before=stopped)
         return build(

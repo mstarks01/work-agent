@@ -18,14 +18,14 @@ the agents follow them:
 Credential-free, like :mod:`evals.harness.scorer` and
 :mod:`evals.harness.critic_yield`: it takes plain data — the merged drafts and
 the report's marks — and computes. Nothing here re-implements the ladder; the
-marks it counts are the ones :func:`~stride_service.critic.join_drafts` already
+marks it counts are the ones :func:`~analysis_service.critic.join_drafts` already
 produced with the *shipped* checker, so a sweep cannot grade a normalization
 policy the service does not run.
 
 * **The repair rung** — read :attr:`CaseGrounds.repaired_count`, the quotes
-  the ladder refused and :func:`~stride_service.grounding.repair_quote` then
+  the ladder refused and :func:`~analysis_service.grounding.repair_quote` then
   rewrote to the source's nearest span. This is the number that moves
-  :data:`~stride_service.grounding.REPAIR_THRESHOLD`.
+  :data:`~analysis_service.grounding.REPAIR_THRESHOLD`.
 * **A claim that lost every ground** — read :attr:`CaseGrounds.dropped_count`,
   the claims the service dropped and marked because nothing they cited held:
   every quote absent from its source, or every reference outside the catalog.
@@ -53,9 +53,9 @@ from typing import Any, Literal
 
 from pydantic import ValidationError
 
-from stride_service.critic import DraftJoinError
-from stride_service.frameworks import PACKAGES
-from stride_service.report import (
+from analysis_service.critic import DraftJoinError
+from analysis_service.frameworks import PACKAGES
+from analysis_service.report import (
     Claim,
     DroppedClaim,
     FrameworkName,
@@ -90,7 +90,7 @@ class ThreatGrounds:
 
     The audit trail under the aggregates. ``unverified`` holds indices into the
     draft's own ``grounds`` list, exactly as
-    :class:`~stride_service.report.UnverifiedGround` records them, so a
+    :class:`~analysis_service.report.UnverifiedGround` records them, so a
     surprising rate can be walked back to the quote that produced it.
     """
 
@@ -137,7 +137,7 @@ class CaseGrounds:
     reasons that agree: the rules being measured are the *category agents'*, so
     a draft the critic later rejected is still evidence about how the agent
     grounded it; and the unverified marks were computed over exactly this set
-    at :func:`~stride_service.critic.join_drafts`, so numerator and denominator
+    at :func:`~analysis_service.critic.join_drafts`, so numerator and denominator
     come from one population rather than two.
     """
 
@@ -251,7 +251,7 @@ class GroundMisShape(RuntimeError):
 
     THE OTHER #91 RATE USED TO LIVE HERE, AND ITS EXPECTED VALUE IS NOW ZERO.
     No model writes a ``Ground``: a category agent selects catalog entries and
-    proposes quotes, and :func:`~stride_service.evidence.resolve_proposals`
+    proposes quotes, and :func:`~analysis_service.evidence.resolve_proposals`
     builds the record out of the entry it looked up. So a mis-shape is this
     service mis-assembling its own data structure, and there is no agent
     behaviour behind it to have a rate.
@@ -314,7 +314,7 @@ def measure_grounds(
     packages' drafts here would put one number over two populations whose agents
     were given different instructions.
 
-    Typed against the neutral :class:`~stride_service.report.Claim` because that
+    Typed against the neutral :class:`~analysis_service.report.Claim` because that
     is what carries ``grounds``. Nothing here reads a field a package declares.
 
     A mark naming a draft that is not here is dropped rather than raised on:

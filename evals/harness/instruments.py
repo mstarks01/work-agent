@@ -41,6 +41,13 @@ from collections.abc import Callable, Mapping, Sequence
 from dataclasses import dataclass
 from typing import Any
 
+from analysis_service.report import (
+    FrameworkAnalysis,
+    FrameworkName,
+    NodeLatency,
+    Report,
+    TokenUsage,
+)
 from evals.harness import (
     applicability,
     coverage,
@@ -59,13 +66,6 @@ from evals.harness.provenance import RunProvenance
 from evals.harness.reference import GoldenCase
 from evals.harness.scorer import CaseScore
 from evals.harness.writing import CaseWriting
-from stride_service.report import (
-    FrameworkAnalysis,
-    FrameworkName,
-    NodeLatency,
-    Report,
-    TokenUsage,
-)
 
 #: What a package's per-case scorer is handed, and what it gives back: the
 #: case, that package's own block off the report, and the pre-critic drafts
@@ -416,7 +416,7 @@ def artifact_blocks(sweep: Sweep) -> dict[str, Any]:
 #: framework-neutral instruments every block already gets.
 #:
 #: **Keyed, never branched.** A package added to
-#: :data:`~stride_service.frameworks.PACKAGES` and missing here raises at the
+#: :data:`~analysis_service.frameworks.PACKAGES` and missing here raises at the
 #: first case that carries its block, which is the whole reason this is a table:
 #: the ``if`` it replaced dispatched to one package by name and would have gone
 #: on scoring nothing for a third, quietly.

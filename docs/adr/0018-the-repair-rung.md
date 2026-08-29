@@ -8,7 +8,7 @@
 
 ## Context
 
-The ladder in `stride_service.grounding` decides whether a quote is present in
+The ladder in `analysis_service.grounding` decides whether a quote is present in
 the source it names. It is pinned, and its module docstring refuses a
 similarity threshold twice: a threshold accepts the one measured fabrication, a
 stitched sentence, and a threshold cannot be explained to a submitter.

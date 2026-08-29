@@ -18,19 +18,19 @@ import pytest
 from google.adk.agents import LlmAgent
 from google.adk.workflow import FunctionNode, JoinNode
 
-from stride_service import graph
-from stride_service.binding import NodeBinding
-from stride_service.critic import CriticOutputError
-from stride_service.frameworks import PreconditionError, package_for
-from stride_service.frameworks.stride import STRIDE
-from stride_service.frameworks.stride.record import (
+from analysis_service import graph
+from analysis_service.binding import NodeBinding
+from analysis_service.critic import CriticOutputError
+from analysis_service.frameworks import PreconditionError, package_for
+from analysis_service.frameworks.stride import STRIDE
+from analysis_service.frameworks.stride.record import (
     STRIDE_CATEGORIES,
     ThreatProposals,
     ThreatRulings,
 )
-from stride_service.markdown_loader import MarkdownLoader
-from stride_service.model_tiers import LLM_NODES
-from stride_service.report import (
+from analysis_service.markdown_loader import MarkdownLoader
+from analysis_service.model_tiers import LLM_NODES
+from analysis_service.report import (
     AnalysisMarks,
     FrameworkName,
     InputRef,
@@ -40,10 +40,10 @@ from stride_service.report import (
     UnknownRef,
     Verdict,
 )
-from stride_service.resilience import load_resilience
-from stride_service.sampling import load_sampling
-from stride_service.sources import Source
-from stride_service.system_model import SystemModel
+from analysis_service.resilience import load_resilience
+from analysis_service.sampling import load_sampling
+from analysis_service.sources import Source
+from analysis_service.system_model import SystemModel
 from tests.factories import (
     DEFAULT_FRAMEWORKS,
     carrying,
@@ -102,7 +102,7 @@ def analyze_state(**proposals_by_category: list) -> dict[str, object]:
     """State as STRIDE's six lane agents, all of which ran, leave it.
 
     Proposals, not drafts: a lane agent's node emits this package's own
-    :class:`~stride_service.frameworks.stride.record.ThreatProposals`, and
+    :class:`~analysis_service.frameworks.stride.record.ThreatProposals`, and
     ``merge_drafts`` resolves each proposal's references into the grounds a
     draft carries. A test seeding drafts here would be asserting against a shape
     no agent can produce.
@@ -710,7 +710,7 @@ def test_no_node_writes_session_state_directly():
     context whose ``state`` is a plain dict, so ``ctx.state[key] = value`` stays
     available and silently bypasses both family checks.
     """
-    source = (PROJECT_ROOT / "src" / "stride_service" / "graph.py").read_text()
+    source = (PROJECT_ROOT / "src" / "analysis_service" / "graph.py").read_text()
     direct = [
         line.strip()
         for line in source.splitlines()
@@ -937,7 +937,7 @@ def test_merge_parks_every_mark_kind_under_one_key():
     """One key, whatever the fan-in found.
 
     The marks have one owner, one standing and one policy, so they travel as
-    one :class:`~stride_service.report.AnalysisMarks`. A sixth kind is a field
+    one :class:`~analysis_service.report.AnalysisMarks`. A sixth kind is a field
     on that model and no new key here.
 
     The key is the *framework's*, because the fan-in that produced them is: two

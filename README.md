@@ -1,6 +1,6 @@
 **This repo is under early active development and breaking changes should be expected.** 
 
-# stride-service
+# analysis-service
 
 An agentic **security-analysis engine**: semi-structured text describing a
 system goes in, a structured JSON report comes out. Every analysis runs
@@ -34,7 +34,7 @@ the domain glossary.
 
 ## Two ways to call it
 
-- **In process** — embed `StrideEngine` and get a report back from a function
+- **In process** — embed `Engine` and get a report back from a function
   call. The path for swapping the engine in behind an existing analysis
   interface.
 - **Over HTTP** — the async [`/v1` job API](docs/HTTP-API.md), authenticated with
@@ -62,7 +62,7 @@ stub runner need none of it.
 
 | Path | What lives here |
 |---|---|
-| `src/stride_service/` | The shipped engine. Graph, agents, config loaders, report schema, HTTP API. |
+| `src/analysis_service/` | The shipped engine. Graph, agents, config loaders, report schema, HTTP API. |
 | `config/` | Versioned config that stops startup rather than falling back: `model_tiers.toml`, `sampling.toml`, `resilience.toml`, `blessed-fingerprints.toml`. |
 | `prompts/` | Agent prompts and per-category exemplars. |
 | `skills/` | The per-category STRIDE skill Markdown baked into the image. |
@@ -73,10 +73,10 @@ stub runner need none of it.
 | `tests/` | Offline test suite (no credentials required). |
 
 The wheel bundles `config/`, `prompts/` and `skills/` alongside the engine
-(under `stride_service/_bundled/`), so `pip install stride-service` elsewhere
+(under `analysis_service/_bundled/`), so `pip install analysis-service` elsewhere
 resolves them with no extra step. This checkout's own `config/`, `prompts/`
 and `skills/` stay the source of truth — edit them here, not the bundled copy,
-which only exists inside a built wheel. The `STRIDE_*_DIR` variables still
+which only exists inside a built wheel. The `ANALYSIS_*_DIR` variables still
 redirect any of them, in either layout.
 
 ## Documentation
@@ -132,7 +132,7 @@ It is a convenience guard rather than a gate — CI is authoritative, and
 Everything under `tests/` and `evals/verify_corpus.py` is credential-free and
 deterministic. So is most of the eval harness: only `run` calls a provider, and
 scoring, re-scoring, calibration and the review queue all read files. Two
-commands need configured provider credentials — `python -m stride_service.smoke`
+commands need configured provider credentials — `python -m analysis_service.smoke`
 runs one small job through the shipped graph to check that the vendor you
 selected actually serves it, and `python -m evals.harness.run run` sweeps the
 golden corpus. See [evals/TUNING.md](evals/TUNING.md) for the loop those
@@ -166,7 +166,7 @@ are enough to get a report in process.
 
 The code is [Apache-2.0](LICENSE).
 
-The ASVS package's text is not. `src/stride_service/frameworks/asvs/catalog.json`
+The ASVS package's text is not. `src/analysis_service/frameworks/asvs/catalog.json`
 and the 17 files at `frameworks/asvs/lanes/*/skill.md` reproduce the 345
 requirement sentences of OWASP ASVS 5.0.0, which OWASP publishes under
 [CC BY-SA 4.0](LICENSE-CC-BY-SA-4.0.txt). Those files carry that licence and its
@@ -180,6 +180,6 @@ ShareAlike; each case names its source model in the `provenance` field of its
 
 [NOTICE](NOTICE) is the authoritative list: it names every third-party work,
 every file the work governs, and what changed. `CONTENT_LICENSE` in
-`src/stride_service/frameworks/__init__.py` keys the same fact by framework, so
+`src/analysis_service/frameworks/__init__.py` keys the same fact by framework, so
 a new package that quotes a standard cannot ship without an entry and a NOTICE
 line.

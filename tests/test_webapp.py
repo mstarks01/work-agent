@@ -24,15 +24,15 @@ from typing import get_args
 import pytest
 from fastapi.testclient import TestClient
 
-from stride_service import (
+from analysis_service import (
+    Engine,
     FrameworkName,
     Source,
     SourceLimits,
-    StrideEngine,
     StubPipelineRunner,
 )
-from stride_service.deployment import Deployment
-from stride_service.vendors import ProviderAuthError
+from analysis_service.deployment import Deployment
+from analysis_service.vendors import ProviderAuthError
 from tests.factories import TEST_TIER_ENV, sample_selection
 from webapp.main import Analyses, Startup, create_app, render_report
 
@@ -70,14 +70,14 @@ COMPLETE_OPTIONS: dict[FrameworkName, dict] = {"stride": {}, "asvs": {"level": 2
 def stub_engine_for(selection):
     """Build a stub engine for one selection, as ``build_startup``'s factory does.
 
-    The real factory is ``partial(StrideEngine.from_deployment, deployment)``,
+    The real factory is ``partial(Engine.from_deployment, deployment)``,
     which composes a graph and binds credentials. This is the same signature
     over a stub runner, so the whole selection path — allow-list, options
     validation, one report block per picked framework — runs with no model and
     no cost. The engine's own constructor is what refuses a missing option, so
     that refusal is exercised here rather than mocked out.
     """
-    return StrideEngine(
+    return Engine(
         StubPipelineRunner(),
         limits=WEBAPP_LIMITS,
         deadline_seconds=TEST_DEADLINE,
@@ -105,7 +105,7 @@ def broken_client(tiers):
         frameworks=(),
         tiers=tiers,
         error=ProviderAuthError(
-            "vendor 'vertex' needs STRIDE_VERTEX_PROJECT; it is unset or empty"
+            "vendor 'vertex' needs ANALYSIS_VERTEX_PROJECT; it is unset or empty"
         ),
     )
     return TestClient(create_app(startup), base_url=LOOPBACK)
@@ -255,7 +255,7 @@ def test_the_offline_lanes_tables_cover_the_whole_registry():
     matches what an install can carry. Comparing here is what makes that a
     failure at the next run rather than a gap nobody sees.
     """
-    from stride_service.frameworks import PACKAGES
+    from analysis_service.frameworks import PACKAGES
 
     assert set(CARRIED) == set(PACKAGES), (
         "PACKAGES has changed. Widen CARRIED so this lane still exercises the"
@@ -274,7 +274,7 @@ def test_every_complete_option_set_really_is_complete():
     being complete — a package that adds a required field — fails here instead
     of turning every submission in this file into a 400.
     """
-    from stride_service.frameworks import package_for
+    from analysis_service.frameworks import package_for
 
     for name, options in COMPLETE_OPTIONS.items():
         package_for(name).options.model_validate(options)
@@ -293,7 +293,7 @@ def test_a_package_that_declares_an_option_gets_a_control_for_it(client):
     Read off the package rather than spelled here, so this asks the question of
     whichever package declares a closed-set option rather than of one by name.
     """
-    from stride_service.frameworks import package_for
+    from analysis_service.frameworks import package_for
     from webapp.main import _option_fields
 
     page = client.get("/").text
@@ -498,7 +498,7 @@ def test_the_injection_point_escapes_every_angle_bracket():
 
     from webapp.main import VIEWER
 
-    engine = StrideEngine(
+    engine = Engine(
         StubPipelineRunner(),
         limits=WEBAPP_LIMITS,
         deadline_seconds=TEST_DEADLINE,
@@ -534,15 +534,15 @@ def test_a_config_failure_renders_the_diagnostic_instead_of_the_form(broken_clie
     assert "<textarea" not in page
     assert "Analyze" not in page
     # The raised message, and the vendor's *whole* required set.
-    assert "STRIDE_VERTEX_PROJECT" in page
-    assert "STRIDE_VERTEX_LOCATION" in page
+    assert "ANALYSIS_VERTEX_PROJECT" in page
+    assert "ANALYSIS_VERTEX_LOCATION" in page
     assert "GOOGLE_APPLICATION_CREDENTIALS" in page
     # Recovery is always fix-then-restart; there is no retry affordance.
     assert "restart" in page.lower()
 
 
 def test_the_diagnostic_never_prints_a_credential_value(broken_client, monkeypatch):
-    monkeypatch.setenv("STRIDE_VERTEX_PROJECT", "super-secret-project-id")
+    monkeypatch.setenv("ANALYSIS_VERTEX_PROJECT", "super-secret-project-id")
     page = broken_client.get("/").text
     assert "super-secret-project-id" not in page
     assert "set" in page
@@ -621,8 +621,8 @@ def test_the_viewer_reads_every_service_mark_the_report_carries():
     """
     from typing import get_args, get_origin
 
-    from stride_service.frameworks import SCHEMAS
-    from stride_service.report import FrameworkAnalysis
+    from analysis_service.frameworks import SCHEMAS
+    from analysis_service.report import FrameworkAnalysis
 
     block_types = {FrameworkAnalysis, *(schemas.block for schemas in SCHEMAS.values())}
     marks = set()
@@ -813,7 +813,7 @@ def report_with_markup_everywhere():
     rule, and its ``source_label`` is a caller-chosen string, so the grounds
     rail is now the newest place on the page where untrusted text lands.
     """
-    from stride_service.report import Ground, Mitigation, Severity, Verdict
+    from analysis_service.report import Ground, Mitigation, Severity, Verdict
     from tests.factories import sample_report, sample_threat
 
     threat = sample_threat(
@@ -1121,7 +1121,7 @@ def test_a_config_error_spelling_the_placeholder_is_not_substituted(tiers):
     An error message is content. One that happens to spell the placeholder must
     come back as those characters rather than become a live nonce.
     """
-    from stride_service import ConfigError
+    from analysis_service import ConfigError
     from webapp.main import diagnostic_page
 
     page = diagnostic_page(

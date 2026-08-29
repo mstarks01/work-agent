@@ -11,19 +11,19 @@ from pathlib import Path
 
 import pytest
 
-from evals.harness import modes
-from evals.harness.certify import promote, promotion_paths
-from stride_service.certification import (
+from analysis_service.certification import (
     MANIFEST_VERSION,
     BlessedManifest,
     CertificationError,
     certify,
     load_manifest,
 )
-from stride_service.deployment import SAMPLING_VAR, Deployment
-from stride_service.graph import ENTRY_EXTRACT, tier_node_by_graph_node
-from stride_service.model_tiers import TierName
-from stride_service.sampling import load_sampling, sampling_fingerprint
+from analysis_service.deployment import SAMPLING_VAR, Deployment
+from analysis_service.graph import ENTRY_EXTRACT, tier_node_by_graph_node
+from analysis_service.model_tiers import TierName
+from analysis_service.sampling import load_sampling, sampling_fingerprint
+from evals.harness import modes
+from evals.harness.certify import promote, promotion_paths
 from tests.factories import DEFAULT_FRAMEWORKS, TEST_TIER_ENV, repo_tiers
 
 TIER_NODE_BY_GRAPH_NODE = tier_node_by_graph_node(DEFAULT_FRAMEWORKS)
@@ -80,7 +80,7 @@ def _build_fingerprints(sampling, served="fake-model-001"):
 def test_a_pro_override_reprints_only_pro_nodes():
     default = load_sampling(SAMPLING_PATH)
     overridden = load_sampling(
-        SAMPLING_PATH, env={"STRIDE_SAMPLING_STRONG_TEMPERATURE": "0.9"}
+        SAMPLING_PATH, env={"ANALYSIS_SAMPLING_STRONG_TEMPERATURE": "0.9"}
     )
 
     base = _build_fingerprints(default)
@@ -95,7 +95,7 @@ def test_a_pro_override_reprints_only_pro_nodes():
 def test_certify_flags_an_override_drifted_run():
     default = load_sampling(SAMPLING_PATH)
     overridden = load_sampling(
-        SAMPLING_PATH, env={"STRIDE_SAMPLING_STRONG_TEMPERATURE": "0.9"}
+        SAMPLING_PATH, env={"ANALYSIS_SAMPLING_STRONG_TEMPERATURE": "0.9"}
     )
     manifest = _blessed_from(_build_fingerprints(default))
 

@@ -6,7 +6,7 @@ from typing import ClassVar
 import pytest
 from pydantic import ValidationError
 
-from stride_service.model_tiers import (
+from analysis_service.model_tiers import (
     FRAMEWORK_NODES,
     LLM_NODES,
     SUPPORTED_VERSION,
@@ -18,8 +18,8 @@ from stride_service.model_tiers import (
     load_model_tiers,
     validate_model_string,
 )
-from stride_service.report import FRAMEWORK_NAMES
-from stride_service.vendors import VENDOR_NAMES
+from analysis_service.report import FRAMEWORK_NAMES
+from analysis_service.vendors import VENDOR_NAMES
 
 REPO_CONFIG = Path(__file__).parents[1] / "config" / "model_tiers.toml"
 
@@ -110,10 +110,10 @@ class TestRepoConfig:
     """
 
     SELECTED: ClassVar[dict[str, str]] = {
-        "STRIDE_MODEL_BASE_VENDOR": "openai",
-        "STRIDE_MODEL_BASE_MODEL": "gpt-4.1-mini",
-        "STRIDE_MODEL_STRONG_VENDOR": "anthropic",
-        "STRIDE_MODEL_STRONG_MODEL": "claude-opus-5",
+        "ANALYSIS_MODEL_BASE_VENDOR": "openai",
+        "ANALYSIS_MODEL_BASE_MODEL": "gpt-4.1-mini",
+        "ANALYSIS_MODEL_STRONG_VENDOR": "anthropic",
+        "ANALYSIS_MODEL_STRONG_MODEL": "claude-opus-5",
     }
 
     def test_shipped_config_selects_no_vendor(self):
@@ -126,7 +126,7 @@ class TestRepoConfig:
         # vendor available and both places a selection can be made.
         for vendor in VENDOR_NAMES:
             assert vendor in message
-        assert "STRIDE_MODEL_BASE_VENDOR" in message
+        assert "ANALYSIS_MODEL_BASE_VENDOR" in message
         assert "docs/First-Run.md" in message
 
     def test_shipped_config_names_no_vendor_anywhere_uncommented(self):
@@ -192,13 +192,13 @@ class TestEnvOverrides:
         assert config.resolve_model("extract").route == ("anthropic/claude-opus-5")
 
     def test_the_path_variable_can_actually_be_set(self, config_path):
-        """``STRIDE_TIERS_FILE`` points the loader at a valid file and is read.
+        """``ANALYSIS_TIERS_FILE`` points the loader at a valid file and is read.
 
         Named against a *valid* file on purpose: a nonexistent path fails the
         read before the override check, so it would pass for the wrong reason.
         """
         path = config_path(config_toml())
-        config = load_model_tiers(path, env={"STRIDE_TIERS_FILE": str(path)})
+        config = load_model_tiers(path, env={"ANALYSIS_TIERS_FILE": str(path)})
 
         assert config.resolve_model("extract").model == BASE
 
@@ -211,11 +211,11 @@ class TestEnvOverrides:
             load_model_tiers(config_path(config_toml()), env={vendor_var: "anthropic"})
 
     def test_an_unrecognised_override_is_rejected_not_ignored(self, config_path):
-        # Any STRIDE_MODEL_* name outside the four the loader knows: silently
+        # Any ANALYSIS_MODEL_* name outside the four the loader knows: silently
         # ignoring one would leave the tier quietly running the file's model.
         with pytest.raises(ModelConfigError, match="unrecognised model override"):
             load_model_tiers(
-                config_path(config_toml()), env={"STRIDE_MODEL_FLASH": BASE}
+                config_path(config_toml()), env={"ANALYSIS_MODEL_FLASH": BASE}
             )
 
     def test_env_alias_rejected(self, config_path):
@@ -240,12 +240,12 @@ class TestEnvOverrides:
 
     def test_env_var_names(self):
         assert env_vars_for("base") == (
-            "STRIDE_MODEL_BASE_VENDOR",
-            "STRIDE_MODEL_BASE_MODEL",
+            "ANALYSIS_MODEL_BASE_VENDOR",
+            "ANALYSIS_MODEL_BASE_MODEL",
         )
         assert env_vars_for("strong") == (
-            "STRIDE_MODEL_STRONG_VENDOR",
-            "STRIDE_MODEL_STRONG_MODEL",
+            "ANALYSIS_MODEL_STRONG_VENDOR",
+            "ANALYSIS_MODEL_STRONG_MODEL",
         )
 
 
@@ -384,7 +384,7 @@ class TestFileValidation:
             config.version = 2
 
     def test_os_environ_is_default_env(self, config_path, monkeypatch):
-        monkeypatch.setenv("STRIDE_MODEL_STRONG_MODEL", "gemini-3.0-pro")
+        monkeypatch.setenv("ANALYSIS_MODEL_STRONG_MODEL", "gemini-3.0-pro")
         config = load_model_tiers(config_path(config_toml()))
         assert config.resolve_model("critic/stride").model == "gemini-3.0-pro"
 

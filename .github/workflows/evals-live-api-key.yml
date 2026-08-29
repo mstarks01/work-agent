@@ -1,7 +1,7 @@
 # Live golden-case evals against the two API-key vendors: Anthropic and OpenAI.
 #
 # The model pins in the matrix below are the same pairs
-# `stride_service.conformance.REFERENCE_MODELS` profiles, and that is enforced
+# `analysis_service.conformance.REFERENCE_MODELS` profiles, and that is enforced
 # rather than remembered: `tests/test_conformance.py` fails if a model pinned
 # here is one the offline suite has never seen. A live lane sweeping an
 # unprofiled pair is how a vendor ends up "covered" by a job nobody has run.
@@ -18,7 +18,7 @@
 # credentials at all. A job that holds a long-lived third-party API key must not
 # also hold an identity it could exchange for cloud credentials, and matrix legs
 # share their job's permissions. Two files is what keeps `id-token: write` and
-# `secrets.STRIDE_*_API_KEY` in disjoint jobs. Do not merge them.
+# `secrets.ANALYSIS_*_API_KEY` in disjoint jobs. Do not merge them.
 #
 # `pull_request_target` is PROHIBITED repository-wide and the reasoning in
 # evals-live.yml applies here unchanged -- more so, since the credential here is
@@ -123,11 +123,11 @@ jobs:
           #     emulated one fails mid-job. gpt-4o publishes exactly 16,384,
           #     which is why it is the base pin and cannot be the strong one.
           - vendor: anthropic
-            secret_name: STRIDE_ANTHROPIC_API_KEY
+            secret_name: ANALYSIS_ANTHROPIC_API_KEY
             base_model: claude-sonnet-4-6
             strong_model: claude-opus-5
           - vendor: openai
-            secret_name: STRIDE_OPENAI_API_KEY
+            secret_name: ANALYSIS_OPENAI_API_KEY
             base_model: gpt-4o
             strong_model: gpt-5.6
 
@@ -138,15 +138,15 @@ jobs:
     # the steps instead. See the two step-level `if:` guards below.
 
     env:
-      # The vendor registry reads its own STRIDE_-prefixed variables and nothing
+      # The vendor registry reads its own ANALYSIS_-prefixed variables and nothing
       # else: an ambient credential this deployment did not declare must not be
       # able to authenticate a run, which is the ASI03 inherited-credential
-      # path. That is why this is STRIDE_ANTHROPIC_API_KEY rather than the
+      # path. That is why this is ANALYSIS_ANTHROPIC_API_KEY rather than the
       # ANTHROPIC_API_KEY LiteLLM would otherwise pick up on its own.
-      STRIDE_MODEL_BASE_VENDOR: ${{ matrix.vendor }}
-      STRIDE_MODEL_BASE_MODEL: ${{ matrix.base_model }}
-      STRIDE_MODEL_STRONG_VENDOR: ${{ matrix.vendor }}
-      STRIDE_MODEL_STRONG_MODEL: ${{ matrix.strong_model }}
+      ANALYSIS_MODEL_BASE_VENDOR: ${{ matrix.vendor }}
+      ANALYSIS_MODEL_BASE_MODEL: ${{ matrix.base_model }}
+      ANALYSIS_MODEL_STRONG_VENDOR: ${{ matrix.vendor }}
+      ANALYSIS_MODEL_STRONG_MODEL: ${{ matrix.strong_model }}
 
     steps:
       - name: Check out
@@ -206,7 +206,7 @@ jobs:
             echo '```'
             echo
             echo "The name is vendor-scoped on purpose: the registry reads only"
-            echo "its own STRIDE_-prefixed variables, so a plain"
+            echo "its own ANALYSIS_-prefixed variables, so a plain"
             echo "\`${VENDOR^^}_API_KEY\` will not authenticate a run."
           } >>"$GITHUB_STEP_SUMMARY"
 
@@ -225,8 +225,8 @@ jobs:
           || inputs.vendor == matrix.vendor
         env:
           EVAL_MODE: ${{ inputs.mode || 'end-to-end' }}
-          STRIDE_ANTHROPIC_API_KEY: ${{ secrets.STRIDE_ANTHROPIC_API_KEY }}
-          STRIDE_OPENAI_API_KEY: ${{ secrets.STRIDE_OPENAI_API_KEY }}
+          ANALYSIS_ANTHROPIC_API_KEY: ${{ secrets.ANALYSIS_ANTHROPIC_API_KEY }}
+          ANALYSIS_OPENAI_API_KEY: ${{ secrets.ANALYSIS_OPENAI_API_KEY }}
         run: |
           uv run python -m evals.harness.run run \
             --mode "$EVAL_MODE" \

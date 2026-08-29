@@ -12,9 +12,9 @@ import tomllib
 
 import pytest
 
-from stride_service import graph
-from stride_service.api import create_app
-from stride_service.deployment import (
+from analysis_service import graph
+from analysis_service.api import create_app
+from analysis_service.deployment import (
     BLESSED_FINGERPRINTS_VAR,
     MODEL_TIERS_VAR,
     RESILIENCE_VAR,
@@ -22,16 +22,16 @@ from stride_service.deployment import (
     ConfigPaths,
     Deployment,
 )
-from stride_service.errors import ConfigError
-from stride_service.graph import FrameworkNodes
-from stride_service.jobs import InMemoryJobStore
-from stride_service.model_gate import (
+from analysis_service.errors import ConfigError
+from analysis_service.graph import FrameworkNodes
+from analysis_service.jobs import InMemoryJobStore
+from analysis_service.model_gate import (
     ModelGateError,
     emulates_structured_output,
     output_ceiling,
 )
-from stride_service.model_tiers import LLM_NODES, ModelConfigError
-from stride_service.vendors import ProviderAuthError, vendor_for
+from analysis_service.model_tiers import LLM_NODES, ModelConfigError
+from analysis_service.vendors import ProviderAuthError, vendor_for
 from tests.factories import DEFAULT_FRAMEWORKS, PROJECT_ROOT
 
 # This install's one package's critic nodes. Named per framework now, because
@@ -49,17 +49,17 @@ RECRITIC_NODE = _STRIDE.node(graph.RECRITIC_ROLE)
 # credential resolution and Vertex's ADC mode is the three-variable case — the
 # one where getting the set wrong is worth catching.
 VERTEX_TIERS = {
-    "STRIDE_MODEL_BASE_VENDOR": "vertex",
-    "STRIDE_MODEL_BASE_MODEL": "gemini-2.5-flash",
-    "STRIDE_MODEL_STRONG_VENDOR": "vertex",
-    "STRIDE_MODEL_STRONG_MODEL": "gemini-2.5-pro",
+    "ANALYSIS_MODEL_BASE_VENDOR": "vertex",
+    "ANALYSIS_MODEL_BASE_MODEL": "gemini-2.5-flash",
+    "ANALYSIS_MODEL_STRONG_VENDOR": "vertex",
+    "ANALYSIS_MODEL_STRONG_MODEL": "gemini-2.5-pro",
 }
 
 # Building adapters for that selection needs these three present. They are names
 # of variables, never credentials: nothing here is a secret.
 VERTEX_ENV = VERTEX_TIERS | {
-    "STRIDE_VERTEX_PROJECT": "test-project",
-    "STRIDE_VERTEX_LOCATION": "us-central1",
+    "ANALYSIS_VERTEX_PROJECT": "test-project",
+    "ANALYSIS_VERTEX_LOCATION": "us-central1",
     "GOOGLE_APPLICATION_CREDENTIALS": "/nonexistent/adc.json",
 }
 
@@ -80,7 +80,7 @@ def test_from_env_resolves_the_repo_configs_without_credentials():
 
 def test_each_config_file_is_read_exactly_once(monkeypatch):
     """The duplication this replaces: model_tiers.toml was read five times."""
-    from stride_service import deployment as module
+    from analysis_service import deployment as module
 
     reads: list[str] = []
     for name in ("load_model_tiers", "load_sampling", "load_resilience"):
@@ -114,8 +114,8 @@ def test_a_path_variable_picks_the_file_and_never_layers_a_second(tmp_path):
 
 
 def test_default_dir_prefers_the_bundled_copy_when_present(tmp_path, monkeypatch):
-    """A wheel install bundles the text roots under stride_service/_bundled/."""
-    from stride_service import deployment as module
+    """A wheel install bundles the text roots under analysis_service/_bundled/."""
+    from analysis_service import deployment as module
 
     bundled_domains = tmp_path / "domains"
     bundled_domains.mkdir()
@@ -126,7 +126,7 @@ def test_default_dir_prefers_the_bundled_copy_when_present(tmp_path, monkeypatch
 
 def test_default_dir_falls_back_to_the_repo_copy_when_unbundled(tmp_path, monkeypatch):
     """An editable install has no _bundled/ -- every other test here relies on this."""
-    from stride_service import deployment as module
+    from analysis_service import deployment as module
 
     monkeypatch.setattr(module, "_BUNDLED_DIR", tmp_path / "does-not-exist")
 
@@ -163,13 +163,13 @@ def test_every_bundled_root_is_one_the_service_reads():
     """The other direction: a root bundled into every wheel and read by nothing
     is dead weight in the distribution, and the pair of these two tests is what
     keeps ``force-include`` and ``_default_dir`` describing one layout."""
-    from stride_service import deployment as module
+    from analysis_service import deployment as module
 
     manifest = tomllib.loads(
         (PROJECT_ROOT / "pyproject.toml").read_text(encoding="utf-8")
     )
     included = {
-        target.removeprefix("stride_service/_bundled/")
+        target.removeprefix("analysis_service/_bundled/")
         for target in manifest["tool"]["hatch"]["build"]["targets"]["wheel"][
             "force-include"
         ].values()
@@ -187,7 +187,7 @@ def test_every_bundled_root_is_one_the_service_reads():
 def test_default_config_path_prefers_the_bundled_copy_when_present(
     tmp_path, monkeypatch
 ):
-    from stride_service import deployment as module
+    from analysis_service import deployment as module
 
     bundled_config = tmp_path / "config"
     bundled_config.mkdir()
@@ -201,7 +201,7 @@ def test_default_config_path_prefers_the_bundled_copy_when_present(
 def test_default_config_path_falls_back_to_the_repo_copy_when_unbundled(
     tmp_path, monkeypatch
 ):
-    from stride_service import deployment as module
+    from analysis_service import deployment as module
 
     monkeypatch.setattr(module, "_BUNDLED_DIR", tmp_path / "does-not-exist")
 
@@ -235,7 +235,7 @@ def test_from_env_fails_closed_on_a_missing_resilience_config(tmp_path):
 def test_the_environment_stays_out_of_repr_and_equality():
     """OWASP A09: a deployment in a log or a traceback must not carry a key."""
     deployment = Deployment.from_env(
-        env=VERTEX_ENV | {"STRIDE_ANTHROPIC_API_KEY": "sk-secret"}
+        env=VERTEX_ENV | {"ANALYSIS_ANTHROPIC_API_KEY": "sk-secret"}
     )
 
     assert "sk-secret" not in repr(deployment)
@@ -312,7 +312,7 @@ def test_the_pipeline_binds_retry_and_timeout():
     assert isinstance(critic.model, LiteLlm)
     # Zero on purpose: the library's retry layer is off so it cannot set the
     # provider SDK's max_retries from it, and the loop runs one level up in
-    # stride_service.retry, where a shared budget can bound it.
+    # analysis_service.retry, where a shared budget can bound it.
     assert critic.model._additional_args["num_retries"] == 0
     assert critic.generate_content_config.http_options.timeout == 300000
 
@@ -326,7 +326,7 @@ def test_drop_params_is_never_set_so_litellm_stays_fail_closed():
 
 
 def test_env_overrides_the_retry_attempts_without_touching_the_model():
-    deployment = Deployment.from_env(env=VERTEX_ENV | {"STRIDE_RETRY_ATTEMPTS": "5"})
+    deployment = Deployment.from_env(env=VERTEX_ENV | {"ANALYSIS_RETRY_ATTEMPTS": "5"})
     pipeline = deployment.pipeline(DEFAULT_FRAMEWORKS)
     nodes = {node.name: node for node in pipeline.workflow.graph.nodes}
 
@@ -346,20 +346,20 @@ def test_building_the_pipeline_fails_closed_without_provider_credentials():
     """
     deployment = Deployment.from_env(env=VERTEX_TIERS)
 
-    with pytest.raises(ProviderAuthError, match="STRIDE_VERTEX_PROJECT"):
+    with pytest.raises(ProviderAuthError, match="ANALYSIS_VERTEX_PROJECT"):
         deployment.pipeline(DEFAULT_FRAMEWORKS)
 
 
 def test_a_credential_error_never_echoes_the_secret():
     # OWASP A09: a key echoed into a log or an error has leaked.
     env = VERTEX_ENV | {
-        "STRIDE_MODEL_BASE_VENDOR": "anthropic",
-        "STRIDE_MODEL_BASE_MODEL": "claude-sonnet-4-6",
+        "ANALYSIS_MODEL_BASE_VENDOR": "anthropic",
+        "ANALYSIS_MODEL_BASE_MODEL": "claude-sonnet-4-6",
     }
     with pytest.raises(ProviderAuthError) as excinfo:
         Deployment.from_env(env=env).pipeline(DEFAULT_FRAMEWORKS)
 
-    assert "STRIDE_ANTHROPIC_API_KEY" in str(excinfo.value)
+    assert "ANALYSIS_ANTHROPIC_API_KEY" in str(excinfo.value)
 
 
 def test_an_offline_resolver_short_circuits_the_credential_check():
@@ -404,13 +404,13 @@ EMULATED_MODEL = "claude-opus-5"
 CLAUDE_NATIVE = "claude-opus-4-7"
 
 ANTHROPIC_ENV = {
-    "STRIDE_MODEL_BASE_VENDOR": "anthropic",
-    "STRIDE_MODEL_BASE_MODEL": CLAUDE_5,
-    "STRIDE_MODEL_STRONG_VENDOR": "anthropic",
-    "STRIDE_MODEL_STRONG_MODEL": CLAUDE_5,
+    "ANALYSIS_MODEL_BASE_VENDOR": "anthropic",
+    "ANALYSIS_MODEL_BASE_MODEL": CLAUDE_5,
+    "ANALYSIS_MODEL_STRONG_VENDOR": "anthropic",
+    "ANALYSIS_MODEL_STRONG_MODEL": CLAUDE_5,
     # A name, not a secret: the loader checks a variable is declared, never that
     # it authenticates, and nothing here reaches a provider.
-    "STRIDE_ANTHROPIC_API_KEY": "sk-ant-not-a-real-key",
+    "ANALYSIS_ANTHROPIC_API_KEY": "sk-ant-not-a-real-key",
 }
 
 NO_TEMPERATURE = """\
@@ -426,12 +426,12 @@ max_output_tokens = 8192
 # and the env override is the ordinary way that happens. The value is 1: the
 # provider library rejects 0 on these models by itself, so 1 is the value that
 # reaches our rule and proves it is load-bearing rather than redundant.
-BASE_TEMPERATURE_VAR = "STRIDE_SAMPLING_BASE_TEMPERATURE"
+BASE_TEMPERATURE_VAR = "ANALYSIS_SAMPLING_BASE_TEMPERATURE"
 STATED_BASE = {BASE_TEMPERATURE_VAR: "1"}
 
 EMULATED_ENV = VERTEX_ENV | {
-    "STRIDE_MODEL_BASE_MODEL": EMULATED_MODEL,
-    "STRIDE_MODEL_STRONG_MODEL": EMULATED_MODEL,
+    "ANALYSIS_MODEL_BASE_MODEL": EMULATED_MODEL,
+    "ANALYSIS_MODEL_STRONG_MODEL": EMULATED_MODEL,
 }
 
 
@@ -467,8 +467,8 @@ def test_the_shipped_sampling_builds_on_a_claude_that_removed_temperature():
     pipeline = Deployment.from_env(
         env=ANTHROPIC_ENV
         | {
-            "STRIDE_MODEL_BASE_MODEL": CLAUDE_NATIVE,
-            "STRIDE_MODEL_STRONG_MODEL": CLAUDE_NATIVE,
+            "ANALYSIS_MODEL_BASE_MODEL": CLAUDE_NATIVE,
+            "ANALYSIS_MODEL_STRONG_MODEL": CLAUDE_NATIVE,
         }
     ).pipeline(DEFAULT_FRAMEWORKS)
 
@@ -485,8 +485,8 @@ def test_the_temperature_gate_is_keyed_on_the_model_not_the_vendor():
         VERTEX_ENV
         | STATED_BASE
         | {
-            "STRIDE_MODEL_BASE_VENDOR": "vertex",
-            "STRIDE_MODEL_BASE_MODEL": CLAUDE_5,
+            "ANALYSIS_MODEL_BASE_VENDOR": "vertex",
+            "ANALYSIS_MODEL_BASE_MODEL": CLAUDE_5,
         }
     )
 
@@ -499,9 +499,9 @@ def test_unsetting_temperature_lets_the_same_selection_build(tmp_path):
     path = tmp_path / "sampling.toml"
     path.write_text(NO_TEMPERATURE, encoding="utf-8")
     env = ANTHROPIC_ENV | {
-        "STRIDE_SAMPLING": str(path),
-        "STRIDE_MODEL_BASE_MODEL": CLAUDE_NATIVE,
-        "STRIDE_MODEL_STRONG_MODEL": CLAUDE_NATIVE,
+        "ANALYSIS_SAMPLING": str(path),
+        "ANALYSIS_MODEL_BASE_MODEL": CLAUDE_NATIVE,
+        "ANALYSIS_MODEL_STRONG_MODEL": CLAUDE_NATIVE,
     }
 
     pipeline = Deployment.from_env(env=env).pipeline(DEFAULT_FRAMEWORKS)
@@ -516,7 +516,7 @@ def test_asking_for_more_output_than_the_model_serves_fails_the_build():
     passes an over-ceiling value and the serving model rejects it on node one.
     Gemini 2.5 publishes 65,535, so this asks for more.
     """
-    env = VERTEX_ENV | {"STRIDE_SAMPLING_BASE_MAX_OUTPUT_TOKENS": "200000"}
+    env = VERTEX_ENV | {"ANALYSIS_SAMPLING_BASE_MAX_OUTPUT_TOKENS": "200000"}
 
     with pytest.raises(ModelGateError) as excinfo:
         Deployment.from_env(env=env).pipeline(DEFAULT_FRAMEWORKS)
@@ -562,7 +562,7 @@ def test_the_strong_cap_fits_every_model_selectable_on_that_tier(vendor, model):
 
 def test_a_value_exactly_at_the_ceiling_still_builds():
     """The gate bounds the ask at the ceiling, not below it."""
-    env = VERTEX_ENV | {"STRIDE_SAMPLING_STRONG_MAX_OUTPUT_TOKENS": "65535"}
+    env = VERTEX_ENV | {"ANALYSIS_SAMPLING_STRONG_MAX_OUTPUT_TOKENS": "65535"}
 
     pipeline = Deployment.from_env(env=env).pipeline(DEFAULT_FRAMEWORKS)
 
@@ -602,9 +602,9 @@ def test_a_model_without_native_schema_support_fails_the_build(tmp_path):
     path.write_text(NO_TEMPERATURE, encoding="utf-8")
 
     with pytest.raises(ModelGateError) as excinfo:
-        Deployment.from_env(env=EMULATED_ENV | {"STRIDE_SAMPLING": str(path)}).pipeline(
-            DEFAULT_FRAMEWORKS
-        )
+        Deployment.from_env(
+            env=EMULATED_ENV | {"ANALYSIS_SAMPLING": str(path)}
+        ).pipeline(DEFAULT_FRAMEWORKS)
 
     message = str(excinfo.value)
     assert "tiers.base" in message
@@ -618,7 +618,7 @@ def test_the_schema_gate_catches_vertex_hosted_claude_too():
     *every* generation — including ones the direct vendor serves natively. A
     rule keyed on the model would have called this configuration fine.
     """
-    env = VERTEX_ENV | {"STRIDE_MODEL_BASE_MODEL": "claude-sonnet-4-6"}
+    env = VERTEX_ENV | {"ANALYSIS_MODEL_BASE_MODEL": "claude-sonnet-4-6"}
 
     with pytest.raises(ModelGateError, match=r"\$defs"):
         Deployment.from_env(env=env).pipeline(DEFAULT_FRAMEWORKS)
@@ -651,9 +651,9 @@ def test_an_unconstrained_tier_suppresses_the_schema_on_the_adapter(tmp_path):
     path = tmp_path / "sampling.toml"
     path.write_text(UNCONSTRAINED_BASE, encoding="utf-8")
     env = ANTHROPIC_ENV | {
-        "STRIDE_SAMPLING": str(path),
-        "STRIDE_MODEL_BASE_MODEL": CLAUDE_NATIVE,
-        "STRIDE_MODEL_STRONG_MODEL": CLAUDE_NATIVE,
+        "ANALYSIS_SAMPLING": str(path),
+        "ANALYSIS_MODEL_BASE_MODEL": CLAUDE_NATIVE,
+        "ANALYSIS_MODEL_STRONG_MODEL": CLAUDE_NATIVE,
     }
 
     pipeline = Deployment.from_env(env=env).pipeline(DEFAULT_FRAMEWORKS)
@@ -690,11 +690,11 @@ def test_the_schema_gate_is_scoped_to_tiers_that_send_a_schema(tmp_path):
 
     with pytest.raises(ModelGateError, match=r"\$defs"):
         Deployment.from_env(
-            env=EMULATED_ENV | {"STRIDE_SAMPLING": str(constrained)}
+            env=EMULATED_ENV | {"ANALYSIS_SAMPLING": str(constrained)}
         ).pipeline(DEFAULT_FRAMEWORKS)
 
     pipeline = Deployment.from_env(
-        env=EMULATED_ENV | {"STRIDE_SAMPLING": str(path)}
+        env=EMULATED_ENV | {"ANALYSIS_SAMPLING": str(path)}
     ).pipeline(DEFAULT_FRAMEWORKS)
 
     assert pipeline.node_models[graph.EXTRACT_NODE] == f"vertex_ai/{EMULATED_MODEL}"
@@ -710,8 +710,8 @@ def test_claude_4_6_still_accepts_a_stated_temperature():
         ANTHROPIC_ENV
         | STATED_BASE
         | {
-            "STRIDE_MODEL_BASE_MODEL": "claude-sonnet-4-6",
-            "STRIDE_MODEL_STRONG_MODEL": "claude-sonnet-4-6",
+            "ANALYSIS_MODEL_BASE_MODEL": "claude-sonnet-4-6",
+            "ANALYSIS_MODEL_STRONG_MODEL": "claude-sonnet-4-6",
         }
     )
 
@@ -771,13 +771,13 @@ def test_the_app_enforces_the_bounds_its_deployment_configured():
 def test_require_certified_is_off_unless_explicitly_affirmative():
     assert Deployment.from_env(env=VERTEX_TIERS).gate().require_certified is False
     assert (
-        Deployment.from_env(env=VERTEX_TIERS | {"STRIDE_REQUIRE_CERTIFIED": "no"})
+        Deployment.from_env(env=VERTEX_TIERS | {"ANALYSIS_REQUIRE_CERTIFIED": "no"})
         .gate()
         .require_certified
         is False
     )
     assert (
-        Deployment.from_env(env=VERTEX_TIERS | {"STRIDE_REQUIRE_CERTIFIED": "true"})
+        Deployment.from_env(env=VERTEX_TIERS | {"ANALYSIS_REQUIRE_CERTIFIED": "true"})
         .gate()
         .require_certified
         is True
@@ -787,9 +787,9 @@ def test_require_certified_is_off_unless_explicitly_affirmative():
 def test_config_paths_are_repo_relative_by_default():
     paths = ConfigPaths.from_env({})
 
-    # Three text roots, not four: STRIDE_KNOWLEDGE_DIR is gone, the old
-    # STRIDE_SKILLS_DIR is now the shared domains root, and each package's own
-    # text hangs under STRIDE_FRAMEWORKS_DIR.
+    # Three text roots, not four: ANALYSIS_KNOWLEDGE_DIR is gone, the old
+    # ANALYSIS_SKILLS_DIR is now the shared domains root, and each package's own
+    # text hangs under ANALYSIS_FRAMEWORKS_DIR.
     assert paths.prompts == PROJECT_ROOT / "prompts"
     assert paths.domains == PROJECT_ROOT / "domains"
     assert paths.frameworks == PROJECT_ROOT / "frameworks"

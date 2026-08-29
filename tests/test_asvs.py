@@ -22,9 +22,9 @@ from pathlib import Path
 import pytest
 from pydantic import ValidationError
 
-from stride_service.engine import EngineInputError, StrideEngine
-from stride_service.evidence import evidence_catalog, resolve_proposals
-from stride_service.frameworks import (
+from analysis_service.engine import Engine, EngineInputError
+from analysis_service.evidence import evidence_catalog, resolve_proposals
+from analysis_service.frameworks import (
     PACKAGES,
     SCHEMAS,
     SEVERITY_RUBRIC_DOC,
@@ -32,7 +32,7 @@ from stride_service.frameworks import (
     selectable_without_options,
     validate_package,
 )
-from stride_service.frameworks.asvs.catalog import (
+from analysis_service.frameworks.asvs.catalog import (
     ASVS_VERSION,
     CHAPTERS,
     LANES,
@@ -40,7 +40,7 @@ from stride_service.frameworks.asvs.catalog import (
     AsvsLevel,
     requirements_for,
 )
-from stride_service.frameworks.asvs.record import (
+from analysis_service.frameworks.asvs.record import (
     AsvsAnalysis,
     AsvsChapter,
     AsvsOptions,
@@ -48,18 +48,18 @@ from stride_service.frameworks.asvs.record import (
     RequirementRuling,
     requirement_of,
 )
-from stride_service.frameworks.asvs.roster import replace_roster, roster_block
-from stride_service.markdown_loader import MarkdownLoader, split_sections
-from stride_service.report import (
+from analysis_service.frameworks.asvs.roster import replace_roster, roster_block
+from analysis_service.markdown_loader import MarkdownLoader, split_sections
+from analysis_service.report import (
     FrameworkSelection,
     Ground,
     Report,
     ScopeEntry,
     Verdict,
 )
-from stride_service.skills import lane_skill_doc
-from stride_service.sources import SourceLimits
-from stride_service.system_model import SystemModel
+from analysis_service.skills import lane_skill_doc
+from analysis_service.sources import SourceLimits
+from analysis_service.system_model import SystemModel
 from tests.factories import PROJECT_ROOT, valid_model
 
 ASVS = PACKAGES["asvs"]
@@ -130,7 +130,7 @@ def test_the_engine_refuses_a_selection_missing_an_option_it_needs():
     would otherwise fail once every node had been paid for.
     """
     with pytest.raises(EngineInputError) as caught:
-        StrideEngine(
+        Engine(
             runner=None,
             limits=SourceLimits(max_total_bytes=1, max_sources=1),
             deadline_seconds=1.0,
@@ -197,7 +197,7 @@ def test_each_lane_skill_carries_the_roster_the_catalog_composes(lane):
     assert roster_block(lane) in skill, (
         f"{lane}/skill.md's roster is not what the catalog composes. Do not"
         " edit it by hand — run"
-        " `python -m stride_service.frameworks.asvs.roster`."
+        " `python -m analysis_service.frameworks.asvs.roster`."
     )
 
 

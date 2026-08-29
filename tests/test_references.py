@@ -2,7 +2,7 @@
 
 import pytest
 
-from stride_service.references import canonical, fold
+from analysis_service.references import canonical, fold
 
 ELEMENT_IDS = frozenset(
     {"entity:customer", "process:web-app", "store:orders-db", "flow:a-to-b:x"}

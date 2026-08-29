@@ -7,7 +7,7 @@ result would change the prompt bytes two otherwise-identical jobs send.
 
 import pytest
 
-from stride_service.analysis import (
+from analysis_service.analysis import (
     CONTROL_ATTRIBUTES,
     control_state,
     cross_boundary_flows,
@@ -21,7 +21,7 @@ from stride_service.analysis import (
     unknown_controls,
     zone_kinds,
 )
-from stride_service.system_model import (
+from analysis_service.system_model import (
     DataFlow,
     DataStore,
     ExternalEntity,

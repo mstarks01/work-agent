@@ -41,6 +41,8 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
 
+from analysis_service.model_tiers import TIER_NAMES
+from analysis_service.report import TokenUsage
 from evals.harness.artifact import (
     REPO_ROOT,
     EvalArtifact,
@@ -49,8 +51,6 @@ from evals.harness.artifact import (
     load_artifact,
 )
 from evals.harness.prices import UnitPrices, price_calls
-from stride_service.model_tiers import TIER_NAMES
-from stride_service.report import TokenUsage
 
 EVALS_ROOT = Path(__file__).resolve().parents[1]
 BASELINES_DIR = EVALS_ROOT / "baselines"

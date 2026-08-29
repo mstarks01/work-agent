@@ -32,10 +32,10 @@ from typing import Any
 
 from pydantic import BaseModel, ConfigDict, Field, ValidationError, model_validator
 
+from analysis_service.certification import CertifyResult
+from analysis_service.report import NodeLatency, TokenUsage
 from evals.harness.instruments import INSTRUMENTS, Sweep, artifact_blocks
 from evals.harness.provenance import ProvenanceError, RunProvenance
-from stride_service.certification import CertifyResult
-from stride_service.report import NodeLatency, TokenUsage
 
 REPO_ROOT = Path(__file__).resolve().parents[2]
 CORPUS_DIR = REPO_ROOT / "evals" / "corpus"
@@ -217,7 +217,7 @@ def load_artifact(path: Path | str) -> EvalArtifact:
     """Read a sweep artifact's provenance, or refuse it.
 
     The version is checked before the shape, as
-    :func:`~stride_service.certification.load_manifest` does: an artifact from
+    :func:`~analysis_service.certification.load_manifest` does: an artifact from
     another schema should be named as such, not reported as a heap of stray
     keys. There is no best-effort read of an unversioned artifact — those
     predate served identities entirely, so anything recovered from one would be

@@ -1,6 +1,6 @@
 """What the lane agents were offered across a sweep, and what they cited.
 
-:class:`~stride_service.report.LaneCoverage` is computed per job and rides on
+:class:`~analysis_service.report.LaneCoverage` is computed per job and rides on
 each **Framework Analysis**, one row per lane. One job's
 rows are close to
 unreadable — an agent that examined a flow and correctly found nothing cites
@@ -34,10 +34,10 @@ from collections.abc import Iterable, Sequence
 from dataclasses import dataclass
 from typing import Any
 
+from analysis_service.frameworks import PACKAGES
+from analysis_service.report import FrameworkName
+from analysis_service.report import LaneCoverage as ReportLaneCoverage
 from evals.harness.scorer import ratio
-from stride_service.frameworks import PACKAGES
-from stride_service.report import FrameworkName
-from stride_service.report import LaneCoverage as ReportLaneCoverage
 
 # The offered/cited pairs, in the order they read on a row. Named once because
 # the fold, the rates and the printed table would otherwise each carry their
@@ -119,7 +119,7 @@ def aggregate_coverage(
     because a framework nobody ran has no silent lanes to report.
 
     The lane list itself comes from
-    :data:`~stride_service.frameworks.PACKAGES`, so a package that gains a lane
+    :data:`~analysis_service.frameworks.PACKAGES`, so a package that gains a lane
     gains a row here with no edit.
     """
     collected: dict[tuple[FrameworkName, str], list[ReportLaneCoverage]] = {}

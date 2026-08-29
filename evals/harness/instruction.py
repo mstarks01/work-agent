@@ -39,8 +39,8 @@ from collections.abc import Iterable, Sequence
 from dataclasses import dataclass
 from typing import Any
 
-from stride_service.graph import Pipeline
-from stride_service.report import FrameworkName
+from analysis_service.graph import Pipeline
+from analysis_service.report import FrameworkName
 
 #: What a node with no framework half in its tier key is filed under. A string
 #: rather than ``None`` so the artifact's rows are one shape, and one nothing

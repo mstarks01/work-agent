@@ -24,11 +24,11 @@ from __future__ import annotations
 import pytest
 from google.adk.agents import LlmAgent
 
+from analysis_service.frameworks import PACKAGES
+from analysis_service.graph import Pipeline
+from analysis_service.markdown_loader import estimate_tokens
+from analysis_service.report import FrameworkName
 from evals.harness.instruction import SHARED, NodeInstruction, artifact, collect, totals
-from stride_service.frameworks import PACKAGES
-from stride_service.graph import Pipeline
-from stride_service.markdown_loader import estimate_tokens
-from stride_service.report import FrameworkName
 from tests.factories import scripted_pipeline
 
 

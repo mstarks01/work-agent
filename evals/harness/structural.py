@@ -2,9 +2,9 @@
 
 Thresholds are split by nature; these are the absolute, per-case,
 zero-tolerance ones — a payload parses as a
-:class:`~stride_service.report.Report`, its references resolve, its claim IDs
+:class:`~analysis_service.report.Report`, its references resolve, its claim IDs
 are unique within each block, its severity bands match
-:func:`~stride_service.report.derive_severity_level`, and each block's summary
+:func:`~analysis_service.report.derive_severity_level`, and each block's summary
 counts match its own contents. They gate from day one because they are
 deterministic, free, and already enforced by shipped validators; must-find
 recall computes and reports but does not block until baselines exist.
@@ -16,7 +16,7 @@ is known to parse, and a gate that would silently weaken if someone relaxed
 once — a run artifact naming one problem per iteration wastes a live sweep.
 
 **Per block, and the framework named in every message.** A report carries one
-:class:`~stride_service.report.FrameworkAnalysis` per framework the job
+:class:`~analysis_service.report.FrameworkAnalysis` per framework the job
 selected, so a claim ID is unique only within its own block and a failure that
 did not say whose block it was in would send a reader through N of them. The
 neutral half runs over every block; the severity check is STRIDE's, and runs
@@ -36,8 +36,8 @@ from typing import Any
 
 from pydantic import ValidationError
 
-from stride_service.frameworks import package_for
-from stride_service.report import (
+from analysis_service.frameworks import package_for
+from analysis_service.report import (
     FrameworkAnalysis,
     Report,
     derive_severity_level,

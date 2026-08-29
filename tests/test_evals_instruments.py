@@ -30,6 +30,8 @@ from pathlib import Path
 
 import pytest
 
+from analysis_service.frameworks import PACKAGES
+from analysis_service.report import FrameworkName
 from evals.harness.instruments import (
     INSTRUMENTS,
     ModeRun,
@@ -39,8 +41,6 @@ from evals.harness.instruments import (
 )
 from evals.harness.ledger import Ledger
 from evals.harness.reference import load_case
-from stride_service.frameworks import PACKAGES
-from stride_service.report import FrameworkName
 from tests.factories import sample_report
 from tests.test_asvs import _block as asvs_block
 
@@ -250,8 +250,8 @@ class TestTheDeclaredKeysAreTheWrittenKeys:
 
     def test_a_sweep_writes_exactly_the_declared_set(self, tmp_path):
         """``build`` produces the keys the loader is told to expect."""
+        from analysis_service.certification import CertifyResult
         from evals.harness.artifact import DECLARED_KEYS, RepoCommit, build
-        from stride_service.certification import CertifyResult
 
         run = empty_run(tuple(PACKAGES))
         artifact = build(

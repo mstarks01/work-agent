@@ -10,7 +10,7 @@ one to watch first: it runs one small job rather than the thirteen-case corpus, 
 it answers "does Vertex serve this graph" for cents, on every pull request.
 
 This covers **Vertex only**, because that is what `evals-live.yml` selects in
-its `STRIDE_MODEL_*` block. The shipped configuration selects no vendor at all
+its `ANALYSIS_MODEL_*` block. The shipped configuration selects no vendor at all
 — see [Configuration](../docs/Configuration.md#models-and-vendors) — so the
 workflow names one, and this setup follows that choice rather than the other way
 round. Point those variables at Anthropic or OpenAI and the CI credential
@@ -88,7 +88,7 @@ the old repository trusted.
 
 ## 4. What it creates: a separate eval service account
 
-`stride-evals@<PROJECT_ID>.iam.gserviceaccount.com`, holding
+`analysis-evals@<PROJECT_ID>.iam.gserviceaccount.com`, holding
 `roles/aiplatform.user` and nothing else, impersonable only by this
 repository's federated principals via `roles/iam.workloadIdentityUser`.
 
@@ -108,7 +108,7 @@ been useful.
 | Variable | Value |
 |---|---|
 | `GCP_WORKLOAD_IDENTITY_PROVIDER` | `projects/<PROJECT_NUMBER>/locations/global/workloadIdentityPools/github/providers/github-actions` |
-| `GCP_EVAL_SERVICE_ACCOUNT` | `stride-evals@<PROJECT_ID>.iam.gserviceaccount.com` |
+| `GCP_EVAL_SERVICE_ACCOUNT` | `analysis-evals@<PROJECT_ID>.iam.gserviceaccount.com` |
 | `GCP_PROJECT_ID` | `<PROJECT_ID>` |
 | `GCP_LOCATION` | `<LOCATION>` |
 

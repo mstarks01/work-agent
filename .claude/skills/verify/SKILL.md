@@ -1,21 +1,21 @@
 ---
 name: verify
-description: Launch and drive the stride_service /v1 job API locally to verify changes at the HTTP surface.
+description: Launch and drive the analysis_service /v1 job API locally to verify changes at the HTTP surface.
 ---
 
-# Verifying stride_service
+# Verifying analysis_service
 
-The runtime surface is the FastAPI app from `stride_service.api.create_app()`.
-Production auth needs `STRIDE_AUTH_PROVIDER=oidc` plus `STRIDE_OIDC_ISSUER`,
-`STRIDE_OIDC_AUDIENCE`, and `STRIDE_OIDC_JWKS_URL`; `create_app()` fails closed
+The runtime surface is the FastAPI app from `analysis_service.api.create_app()`.
+Production auth needs `ANALYSIS_AUTH_PROVIDER=oidc` plus `ANALYSIS_OIDC_ISSUER`,
+`ANALYSIS_OIDC_AUDIENCE`, and `ANALYSIS_OIDC_JWKS_URL`; `create_app()` fails closed
 without them.
 
 ## Launch with real auth (no IdP needed)
 
 Run a throwaway JWKS: generate an RSA key, serve
 `{"keys": [jwt.algorithms.RSAAlgorithm.to_jwk(pub)]}` (add `kid`/`alg`) from a
-stdlib `HTTPServer` thread, set `STRIDE_AUTH_PROVIDER=oidc`, point
-`STRIDE_OIDC_JWKS_URL` at it, mint RS256
+stdlib `HTTPServer` thread, set `ANALYSIS_AUTH_PROVIDER=oidc`, point
+`ANALYSIS_OIDC_JWKS_URL` at it, mint RS256
 tokens with matching `kid`, `iss`, `aud`, `exp`, `sub`. Then:
 
 ```bash
@@ -25,11 +25,11 @@ uv run python <script that sets env, then uvicorn.run(create_app(), port=8470)>
 uvicorn is a `web` dependency-group member, not a wheel dependency. The group is
 in `[tool.uv] default-groups`, so `uv sync` installs it and no `--with uvicorn`
 is needed; passing it anyway is harmless.
-Set the env vars **before** importing `stride_service.api`.
+Set the env vars **before** importing `analysis_service.api`.
 
 `create_app()` defaults to the real ADK graph — the **Deployment** builds a
-`stride_service.pipeline.AdkPipelineRunner` per framework selection
-(`stride_service.deployment.Deployment.runner_for`) — so a submitted job calls
+`analysis_service.pipeline.AdkPipelineRunner` per framework selection
+(`analysis_service.deployment.Deployment.runner_for`) — so a submitted job calls
 Vertex and fails without credentials. To drive the HTTP surface offline, pass
 `create_app(runner=StubPipelineRunner())`; to exercise the real graph with
 canned model output, build a pipeline with a `resolve_model` returning a

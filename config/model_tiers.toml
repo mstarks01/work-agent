@@ -56,12 +56,12 @@
 # it broke outright when Google retired them; matching a shape rather than
 # enumerating builds is what keeps the Claude half from repeating that.
 #
-# ENV OVERRIDES are two vars per tier: STRIDE_MODEL_{BASE,STRONG}_VENDOR and
+# ENV OVERRIDES are two vars per tier: ANALYSIS_MODEL_{BASE,STRONG}_VENDOR and
 # _MODEL. `_MODEL` alone is the ops case (retune on a deployed revision without
 # an image rebuild). `_VENDOR` alone is a build-time error — a cross-vendor pair
 # like anthropic + gemini-2.5-pro passes every downstream check and would die on
-# node one of a paid-for job. Any unrecognised STRIDE_MODEL_* var also raises,
-# so a deployment still carrying v2's STRIDE_MODEL_FLASH fails loudly instead of
+# node one of a paid-for job. Any unrecognised ANALYSIS_MODEL_* var also raises,
+# so a deployment still carrying v2's ANALYSIS_MODEL_FLASH fails loudly instead of
 # being silently ignored.
 #
 # NOTHING IS SELECTED BY DEFAULT, and that is the point. Earlier versions of
@@ -75,7 +75,7 @@
 version = 5
 
 # CHOOSE A VENDOR AND MODEL FOR EACH TIER. Fill in the template below, or set
-# STRIDE_MODEL_{BASE,STRONG}_VENDOR together with the matching _MODEL — the two
+# ANALYSIS_MODEL_{BASE,STRONG}_VENDOR together with the matching _MODEL — the two
 # halves must move together, since a vendor without its model is not a usable
 # selection. Model identifiers must be pinned: no `-latest`, `-preview` or
 # `-exp`, and Claude takes its dateless 4.6+ ID. docs/First-Run.md step 2 walks
@@ -94,7 +94,7 @@ version = 5
 # made "no privileged default" true of the mechanism while the one example a
 # reader could copy said otherwise. The vendors below are alphabetical, equally
 # detailed, and every one of them is a real pair the offline conformance suite
-# profiles (src/stride_service/conformance.py):
+# profiles (src/analysis_service/conformance.py):
 #
 #   anthropic   base "claude-sonnet-4-6"     strong "claude-opus-5"
 #   openai      base "gpt-4o"                strong "gpt-5.6"
@@ -105,7 +105,7 @@ version = 5
 # newer Claude is a one-line edit. What a generation still decides is which
 # params it accepts — 4.7 onward rejects `temperature`, which the shipped
 # sampling does not set — so read config/sampling.toml before stating one. Run
-# `uv run python -m stride_service.conformance` to see what each pair supports
+# `uv run python -m analysis_service.conformance` to see what each pair supports
 # before choosing.
 #
 # The two tiers select independently, so a mixed pair — a cheap workhorse from

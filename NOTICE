@@ -1,4 +1,4 @@
-stride-service
+analysis-service
 Copyright 2026 Michael Starks
 
 This product is licensed under the Apache License, Version 2.0. See LICENSE.
@@ -21,7 +21,7 @@ file names every one of them.
    adaptations of a ShareAlike work, so they carry CC BY-SA 4.0 rather than the
    Apache License:
 
-     src/stride_service/frameworks/asvs/catalog.json
+     src/analysis_service/frameworks/asvs/catalog.json
      frameworks/asvs/lanes/api-and-web-service/skill.md
      frameworks/asvs/lanes/authentication/skill.md
      frameworks/asvs/lanes/authorization/skill.md

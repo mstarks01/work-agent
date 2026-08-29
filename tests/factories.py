@@ -7,7 +7,7 @@ one cross-boundary flow and one intra-zone flow, one recorded assumption.
 The claim-shaped factories here are **STRIDE's**, because STRIDE is the package
 this repository carries and a fixture has to build something concrete. What they
 are built *into* is neutral: :func:`sample_analysis` fills one
-:class:`~stride_service.frameworks.stride.record.StrideAnalysis` block and
+:class:`~analysis_service.frameworks.stride.record.StrideAnalysis` block and
 :func:`sample_report` wraps it in the envelope beside the job's own selection,
 so a test that means to talk about the envelope can hold a second block without
 going through here.
@@ -34,14 +34,14 @@ from google.adk.models.llm_response import LlmResponse
 from google.genai import types
 from pydantic import BaseModel, Field
 
-from stride_service import frameworks as framework_registry
-from stride_service.binding import NodeBinding
-from stride_service.frameworks import PACKAGES, FrameworkName, FrameworkPackage
-from stride_service.frameworks.asvs.record import (
+from analysis_service import frameworks as framework_registry
+from analysis_service.binding import NodeBinding
+from analysis_service.frameworks import PACKAGES, FrameworkName, FrameworkPackage
+from analysis_service.frameworks.asvs.record import (
     RequirementProposal,
     RequirementRulingProposal,
 )
-from stride_service.frameworks.stride.record import (
+from analysis_service.frameworks.stride.record import (
     STRIDE_VERSION,
     DraftThreat,
     StrideAnalysis,
@@ -49,15 +49,15 @@ from stride_service.frameworks.stride.record import (
     ThreatProposal,
     ThreatRuling,
 )
-from stride_service.graph import (
+from analysis_service.graph import (
     ENTRY_EXTRACT,
     Entry,
     Pipeline,
     build_pipeline,
 )
-from stride_service.markdown_loader import MarkdownLoader
-from stride_service.model_tiers import ModelTierConfig, load_model_tiers
-from stride_service.report import (
+from analysis_service.markdown_loader import MarkdownLoader
+from analysis_service.model_tiers import ModelTierConfig, load_model_tiers
+from analysis_service.report import (
     FrameworkSelection,
     Ground,
     InputRef,
@@ -68,9 +68,9 @@ from stride_service.report import (
     Severity,
     Verdict,
 )
-from stride_service.sampling import SamplingConfig, load_sampling
-from stride_service.sources import DEFAULT_DESCRIPTION_LABEL, Source
-from stride_service.system_model import (
+from analysis_service.sampling import SamplingConfig, load_sampling
+from analysis_service.sources import DEFAULT_DESCRIPTION_LABEL, Source
+from analysis_service.system_model import (
     Assumption,
     DataFlow,
     DataStore,
@@ -97,10 +97,10 @@ STRONG_MODEL = "fake-strong-001"
 # default did. Nothing downstream of this reaches a network; the vendors are
 # named so the binding and the gate see a realistic pair, not so a model runs.
 TEST_TIER_ENV: dict[str, str] = {
-    "STRIDE_MODEL_BASE_VENDOR": "openai",
-    "STRIDE_MODEL_BASE_MODEL": "gpt-4.1-mini",
-    "STRIDE_MODEL_STRONG_VENDOR": "vertex",
-    "STRIDE_MODEL_STRONG_MODEL": "gemini-2.5-pro",
+    "ANALYSIS_MODEL_BASE_VENDOR": "openai",
+    "ANALYSIS_MODEL_BASE_MODEL": "gpt-4.1-mini",
+    "ANALYSIS_MODEL_STRONG_VENDOR": "vertex",
+    "ANALYSIS_MODEL_STRONG_MODEL": "gemini-2.5-pro",
 }
 
 # What the selection above implies: one API key and one ADC triple, because the
@@ -109,9 +109,9 @@ TEST_TIER_ENV: dict[str, str] = {
 # no test here reaches a provider. Kept beside the selection so the two cannot
 # drift; a tier moved to a third vendor needs its variables added here too.
 TEST_CREDENTIAL_ENV: dict[str, str] = {
-    "STRIDE_OPENAI_API_KEY": "sk-not-a-real-key",
-    "STRIDE_VERTEX_PROJECT": "test-project",
-    "STRIDE_VERTEX_LOCATION": "us-central1",
+    "ANALYSIS_OPENAI_API_KEY": "sk-not-a-real-key",
+    "ANALYSIS_VERTEX_PROJECT": "test-project",
+    "ANALYSIS_VERTEX_LOCATION": "us-central1",
     "GOOGLE_APPLICATION_CREDENTIALS": "/nonexistent/adc.json",
 }
 
@@ -183,7 +183,7 @@ def carrying(monkeypatch: Any, package: FrameworkPackage) -> None:
     """Register one package under its own name for the length of a test.
 
     Patches the registry rather than the name it is read through:
-    :func:`~stride_service.frameworks.package_for` reads the module global, and
+    :func:`~analysis_service.frameworks.package_for` reads the module global, and
     the graph holds no package of its own.
     """
     monkeypatch.setattr(
@@ -198,7 +198,7 @@ def repo_package_loaders(
 ) -> dict[FrameworkName, MarkdownLoader]:
     """One loader per selected package, rooted where this repo ships its text.
 
-    The third of :func:`~stride_service.graph.build_pipeline`'s three roots, and
+    The third of :func:`~analysis_service.graph.build_pipeline`'s three roots, and
     the only one that is per framework. Built here so a test naming a selection
     does not also have to know that a package's text lives at
     ``frameworks/<name>/``.
@@ -348,7 +348,7 @@ def sample_proposal(
 
     ``framework`` and ``framework_version`` are excluded alongside ``id``: all
     three are the *service's* to stamp, composed by
-    :func:`~stride_service.evidence.resolve_proposals` from the package it is
+    :func:`~analysis_service.evidence.resolve_proposals` from the package it is
     resolving for, so a proposal carrying them would be an agent asserting its
     own provenance.
     """
@@ -549,7 +549,7 @@ def claims_json(*claims: BaseModel) -> str:
 
     The key is ``claims`` rather than ``threats`` because one shared
     ``prompts/analyze.md`` serves every registered framework's lane agents; see
-    :class:`~stride_service.report.ProposalBatch`.
+    :class:`~analysis_service.report.ProposalBatch`.
     """
     return json.dumps({"claims": [claim.model_dump(mode="json") for claim in claims]})
 
@@ -694,7 +694,7 @@ def scripted_pipeline(
     about. A node with no scripted reply emits an empty claim list.
 
     ``frameworks`` is the selection the graph is built for, since a graph is now
-    built for one (:func:`~stride_service.graph.build_pipeline`). The returned
+    built for one (:func:`~analysis_service.graph.build_pipeline`). The returned
     map covers whatever LLM nodes that selection produced.
 
     ``sampling`` substitutes another *legal* deployment's decoding params for
@@ -776,7 +776,7 @@ class ScriptedFramework:
 
 
 #: One scripted fixture per package, keyed by framework and checked against
-#: :data:`~stride_service.frameworks.PACKAGES` in ``test_framework_neutrality``.
+#: :data:`~analysis_service.frameworks.PACKAGES` in ``test_framework_neutrality``.
 #: A test that runs the real graph over every pair reads this rather than
 #: naming a package, so a new package joins the run by adding an entry.
 SCRIPTED_FRAMEWORKS: Mapping[FrameworkName, ScriptedFramework] = MappingProxyType(

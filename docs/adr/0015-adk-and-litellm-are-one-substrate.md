@@ -9,7 +9,7 @@
 ## Context
 
 A vendor-neutrality audit on 2026-08-21 re-ran ADR 0003 against the code. The
-model-provider half held. `src/stride_service/vendors.py` is the only module
+model-provider half held. `src/analysis_service/vendors.py` is the only module
 that names a vendor in executable code, the two temperature rules in
 `binding.py` key on the model family, and `tests/test_conformance.py` checks the
 reference table against the registry. No default vendor ships.

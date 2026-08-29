@@ -34,7 +34,7 @@ from collections.abc import Iterable
 from dataclasses import dataclass
 from typing import Any
 
-from stride_service.report import TokenUsage
+from analysis_service.report import TokenUsage
 
 
 @dataclass(frozen=True)

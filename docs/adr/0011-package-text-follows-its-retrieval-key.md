@@ -74,8 +74,8 @@ with no content edit — a moved file with an edited body would make the diff
 unreviewable against the prior tree. `skills/stride/` already moved under
 #164's ruling, so `knowledge/` and `skills/` both end empty; the text roots
 drop to three (`domains/`, `prompts/`, the new `frameworks/`), `skills/`
-renames to `domains/`, `STRIDE_KNOWLEDGE_DIR` is deleted, and
-`STRIDE_SKILLS_DIR` becomes `STRIDE_DOMAINS_DIR`. `CONTEXT.md`'s
+renames to `domains/`, `ANALYSIS_KNOWLEDGE_DIR` is deleted, and
+`ANALYSIS_SKILLS_DIR` becomes `ANALYSIS_DOMAINS_DIR`. `CONTEXT.md`'s
 **Deployment** entry gets its third edit across this cutover: five config
 files, three text roots.
 
@@ -88,13 +88,13 @@ deployment may not even be running.
 
 **The quietly-broken evidence-seam test is fixed ahead of the file
 moves it would have silently stopped covering.** `test_no_document_is_reachable_from_the_evidence_seam`
-in `tests/test_knowledge.py` globbed `src/stride_service/*.py` flat; once a
-package's own modules sit under `src/stride_service/frameworks/<name>/`,
+in `tests/test_knowledge.py` globbed `src/analysis_service/*.py` flat; once a
+package's own modules sit under `src/analysis_service/frameworks/<name>/`,
 that glob would stop reaching them and the assertion would keep passing
 while checking nothing. It now globs recursively, keyed by path rather than
 bare filename, and a second, direct assertion states the property without
 depending on the allowlist's shape: `evidence.py` and `critic.py` import
-nothing from `stride_service.knowledge`, checked by name rather than by
+nothing from `analysis_service.knowledge`, checked by name rather than by
 what a glob happens to enumerate.
 
 **Per-job corpus cost is now paid per (framework, lane), unmeasured.** ADR

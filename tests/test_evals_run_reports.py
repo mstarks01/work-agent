@@ -1,6 +1,6 @@
 """A finished sweep keeps its reports, not only the numbers it thought to take.
 
-The harness used to build a full :class:`~stride_service.report.Report` per
+The harness used to build a full :class:`~analysis_service.report.Report` per
 case, read four things off it and drop it. So a plain question — show me one of
 the reports — was unanswerable on a sweep that had already been paid for, and
 nothing about a sweep is deterministic enough for a re-run to answer it
@@ -17,9 +17,9 @@ from pathlib import Path
 
 import pytest
 
+from analysis_service.report import Report
 from evals.harness.reference import load_case
 from evals.harness.run import _write_reports, reports_dir
-from stride_service.report import Report
 from tests.test_evals_run_grounds import CASE_DIR, DEAD, sweep
 
 

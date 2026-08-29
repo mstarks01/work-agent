@@ -18,7 +18,7 @@ narrow:
 
 * **Module-level only.** A method is out of scope because a framework calls
   methods by name, which is the false-positive class above.
-* **Private only.** A public name is API. ``src/stride_service/__init__.py``
+* **Private only.** A public name is API. ``src/analysis_service/__init__.py``
   exports 102 of them, and whether an integrator calls one is not knowable
   from this tree.
 * **Names, not bindings.** Two modules that both define ``_clip`` share one
@@ -32,7 +32,7 @@ import ast
 from pathlib import Path
 
 REPO_ROOT = Path(__file__).resolve().parents[1]
-PACKAGE = REPO_ROOT / "src" / "stride_service"
+PACKAGE = REPO_ROOT / "src" / "analysis_service"
 # Every directory that may legitimately reach into the package, including the
 # tests: a helper exercised only by a test is covered, not dead.
 SEARCHED = ("src", "tests", "evals", "examples", "webapp")
@@ -90,7 +90,7 @@ def test_no_private_helper_in_the_package_is_unreachable():
     ]
 
     assert not dead, (
-        f"these private names in src/stride_service have no caller anywhere in "
+        f"these private names in src/analysis_service have no caller anywhere in "
         f"the repository: {dead}. A private name no one calls is dead — delete "
         f"it. If it is a seam something reaches by string, give it a caller a "
         f"reader can follow."
@@ -100,6 +100,6 @@ def test_no_private_helper_in_the_package_is_unreachable():
 def test_the_lint_covers_a_real_population():
     """Guards the guard: a scan over zero names would pass vacuously."""
     assert _private_definitions(), (
-        "no module-level private name found in src/stride_service — the lint "
+        "no module-level private name found in src/analysis_service — the lint "
         "covers nothing"
     )

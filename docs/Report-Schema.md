@@ -1,6 +1,6 @@
 # Report Schema
 
-A successful analysis returns a `Report` (from `stride_service.report`). It is
+A successful analysis returns a `Report` (from `analysis_service.report`). It is
 **self-contained**: every element a claim references resolves inside the one
 embedded system model, so a consumer needs nothing but the one payload. The
 model validators enforce that on construction — a report that does not hold
@@ -391,7 +391,7 @@ class RepairedQuote:
 ```
 
 The ladder refused what the agent wrote, and the repair rung
-(`stride_service.grounding.repair_quote`) found a window of the named source
+(`analysis_service.grounding.repair_quote`) found a window of the named source
 near enough to hand back. The ground now carries that window — the submitter's
 words, whitespace collapsed — and this mark carries the agent's, so the
 substitution is on the record. A repaired quote verifies, so an entry here is
@@ -656,7 +656,7 @@ Two things `grounds` is deliberately not:
 cannot inflate it. `justification` explains the two inputs.
 
 ```python
-from stride_service import derive_severity_level
+from analysis_service import derive_severity_level
 
 derive_severity_level("high", "high")  # "critical"
 derive_severity_level("medium", "low")  # "low"

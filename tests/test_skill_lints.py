@@ -8,7 +8,7 @@ rather than a framework and every carried framework's lanes may earn it. That
 split is ADR 0011's rule — a document's home follows its retrieval key — and
 these lints are where it is enforced against the tree rather than argued about.
 
-The package gate (:func:`~stride_service.frameworks.validate_package`) already
+The package gate (:func:`~analysis_service.frameworks.validate_package`) already
 refuses a package whose lanes are missing files or whose ``## Scope`` headings
 have drifted. What is here is what the gate does not reach: the token caps, the
 full heading set, and the shared root's own contract.
@@ -18,16 +18,16 @@ from pathlib import Path
 
 import pytest
 
-from stride_service.domains import DETECTORS
-from stride_service.frameworks import LANE_SECTION_HEADINGS, PACKAGES
-from stride_service.markdown_loader import MarkdownLoader
-from stride_service.skills import (
+from analysis_service.domains import DETECTORS
+from analysis_service.frameworks import LANE_SECTION_HEADINGS, PACKAGES
+from analysis_service.markdown_loader import MarkdownLoader
+from analysis_service.skills import (
     estimate_tokens,
     lane_boundary_digest,
     lane_skill_doc,
     split_sections,
 )
-from stride_service.token_caps import TOKEN_CAPS, covered_assets
+from analysis_service.token_caps import TOKEN_CAPS, covered_assets
 
 PROJECT_ROOT = Path(__file__).resolve().parents[1]
 FRAMEWORKS_DIR = PROJECT_ROOT / "frameworks"
@@ -74,7 +74,7 @@ def test_lane_directories_match_the_packages_declared_lanes(framework):
 def test_lane_skill_has_exact_fixed_headings_in_order(framework, lane):
     """Duplicate of the package gate's own check, and kept deliberately.
 
-    :func:`~stride_service.frameworks.validate_package` refuses a package whose
+    :func:`~analysis_service.frameworks.validate_package` refuses a package whose
     lane headings have drifted, so this cannot fail alone. What it buys is that
     the failure names the lane at collection time rather than at deployment
     construction, which is where a maintainer editing a skill is looking.

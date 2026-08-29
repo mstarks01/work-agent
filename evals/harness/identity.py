@@ -37,8 +37,8 @@ from collections.abc import Iterable, Mapping
 from dataclasses import dataclass
 from typing import Protocol
 
+from analysis_service.frameworks.stride.record import StrideCategory
 from evals.harness.verbs import same_action
-from stride_service.frameworks.stride.record import StrideCategory
 
 #: One case's **Data Flow**s as ``flow id -> (source id, destination id)``.
 FlowMap = Mapping[str, tuple[str, str]]

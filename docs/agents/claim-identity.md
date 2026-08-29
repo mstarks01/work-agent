@@ -21,7 +21,7 @@ what?**
 | framework | the block | v1, v2, v3 |
 | lane | the block, from the field its package declares (`LANE_FIELD`) | v1, v2, v3 |
 | targets | `affected_element_ids`, endpoint-resolved | v1, v2, v3 |
-| action verb | `stride_service.actions`, a closed set of 20 | v2 only |
+| action verb | `analysis_service.actions`, a closed set of 20 | v2 only |
 | catalog identifier | the claim ID, read by the package that owns the catalog (`IDENTIFIER_OF`) | v3 only |
 
 `Claim` carries `verb` and `DraftThreat` requires it, so a finding out of a live

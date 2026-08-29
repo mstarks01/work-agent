@@ -12,7 +12,7 @@
 #
 # NOT AN EVAL, and the separation is load-bearing. `evals-live.yml` and
 # `evals-live-api-key.yml` sweep the twelve-case golden corpus for *quality* and
-# cost real money per run. This runs `python -m stride_service.smoke`: one
+# cost real money per run. This runs `python -m analysis_service.smoke`: one
 # ~600-character system, once, through the shipped graph -- roughly eight model
 # calls on a tiny input. Nothing here scores a threat model, and no lane fails
 # because one vendor's threats are weaker than another's. #116 lists that
@@ -51,7 +51,7 @@ on:
       - "frameworks/**"
       - "domains/**"
       - "config/**"
-      - "src/stride_service/**"
+      - "src/analysis_service/**"
       - ".github/workflows/provider-smoke.yml"
   workflow_dispatch:
 
@@ -78,23 +78,23 @@ jobs:
     permissions:
       contents: read
       # The OIDC token exchanged for short-lived Vertex credentials. This job
-      # references no `secrets.STRIDE_*_API_KEY` and must not start to: see the
+      # references no `secrets.ANALYSIS_*_API_KEY` and must not start to: see the
       # header for why the identity and the bearer keys stay in separate jobs.
       id-token: write
 
     # Pinned here rather than read from config/model_tiers.toml, which selects
     # no vendor at all -- so a live lane has to name one. The pair is the same
-    # one `stride_service.conformance.REFERENCE_MODELS` profiles, and
+    # one `analysis_service.conformance.REFERENCE_MODELS` profiles, and
     # tests/test_conformance.py fails if this file drifts from it: a lane
     # sweeping an unprofiled pair is how a vendor ends up "covered" by a job
     # nobody has checked the capabilities of.
     env:
-      STRIDE_MODEL_BASE_VENDOR: vertex
-      STRIDE_MODEL_BASE_MODEL: gemini-2.5-flash
-      STRIDE_MODEL_STRONG_VENDOR: vertex
-      STRIDE_MODEL_STRONG_MODEL: gemini-2.5-pro
-      STRIDE_VERTEX_PROJECT: ${{ vars.GCP_PROJECT_ID }}
-      STRIDE_VERTEX_LOCATION: ${{ vars.GCP_LOCATION }}
+      ANALYSIS_MODEL_BASE_VENDOR: vertex
+      ANALYSIS_MODEL_BASE_MODEL: gemini-2.5-flash
+      ANALYSIS_MODEL_STRONG_VENDOR: vertex
+      ANALYSIS_MODEL_STRONG_MODEL: gemini-2.5-pro
+      ANALYSIS_VERTEX_PROJECT: ${{ vars.GCP_PROJECT_ID }}
+      ANALYSIS_VERTEX_LOCATION: ${{ vars.GCP_LOCATION }}
 
     steps:
       # Third-party actions are pinned by commit SHA, not tag: a moved tag runs
@@ -187,7 +187,7 @@ jobs:
           {
             echo "## Provider smoke: vertex"
             echo
-            uv run python -m stride_service.smoke --out smoke-vertex.json
+            uv run python -m analysis_service.smoke --out smoke-vertex.json
           } | tee -a "$GITHUB_STEP_SUMMARY"
 
       - name: Upload the smoke record
@@ -221,19 +221,19 @@ jobs:
           # only at their own default, so the OpenAI leg had to strip the line
           # before it could bind, and the smoke measured a file nobody ships.
           - vendor: anthropic
-            secret_name: STRIDE_ANTHROPIC_API_KEY
+            secret_name: ANALYSIS_ANTHROPIC_API_KEY
             base_model: claude-sonnet-4-6
             strong_model: claude-opus-5
           - vendor: openai
-            secret_name: STRIDE_OPENAI_API_KEY
+            secret_name: ANALYSIS_OPENAI_API_KEY
             base_model: gpt-4o
             strong_model: gpt-5.6
 
     env:
-      STRIDE_MODEL_BASE_VENDOR: ${{ matrix.vendor }}
-      STRIDE_MODEL_BASE_MODEL: ${{ matrix.base_model }}
-      STRIDE_MODEL_STRONG_VENDOR: ${{ matrix.vendor }}
-      STRIDE_MODEL_STRONG_MODEL: ${{ matrix.strong_model }}
+      ANALYSIS_MODEL_BASE_VENDOR: ${{ matrix.vendor }}
+      ANALYSIS_MODEL_BASE_MODEL: ${{ matrix.base_model }}
+      ANALYSIS_MODEL_STRONG_VENDOR: ${{ matrix.vendor }}
+      ANALYSIS_MODEL_STRONG_MODEL: ${{ matrix.strong_model }}
 
     steps:
       - name: Check out
@@ -286,7 +286,7 @@ jobs:
             echo '```'
             echo
             echo "The name is vendor-scoped on purpose: the registry reads only"
-            echo "its own STRIDE_-prefixed variables, so a plain"
+            echo "its own ANALYSIS_-prefixed variables, so a plain"
             echo "\`${VENDOR^^}_API_KEY\` will not authenticate a run."
           } >>"$GITHUB_STEP_SUMMARY"
 
@@ -309,7 +309,7 @@ jobs:
           {
             echo "## Provider smoke: ${VENDOR}"
             echo
-            uv run python -m stride_service.smoke --out "smoke-${VENDOR}.json"
+            uv run python -m analysis_service.smoke --out "smoke-${VENDOR}.json"
           } | tee -a "$GITHUB_STEP_SUMMARY"
 
       - name: Upload the smoke record

@@ -1,6 +1,6 @@
 # Framework configuration — the set of security frameworks this install carries.
 #
-# The fifth config file, located by STRIDE_FRAMEWORKS_FILE like the other four,
+# The fifth config file, located by ANALYSIS_FRAMEWORKS_FILE like the other four,
 # and failing closed on a wrong version like the other four.
 #
 # WHAT THIS FILE DECIDES, AND WHAT IT DOES NOT. It fixes what this install
@@ -17,7 +17,7 @@
 #
 # A NAME HERE MUST BE ONE THIS BUILD CARRIES. Three sets have to agree: the
 # closed `FrameworkName` literal names what the code can spell,
-# `stride_service.frameworks.PACKAGES` names what this build carries, and this
+# `analysis_service.frameworks.PACKAGES` names what this build carries, and this
 # list names what this install runs. The first two agree at import; this one
 # agrees at `Deployment.from_env`, which also checks that every carried package
 # is well-formed and present on disk before an adapter binds or an instruction

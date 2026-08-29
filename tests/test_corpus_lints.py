@@ -12,9 +12,9 @@ import re
 
 import pytest
 
+from analysis_service.report import InputRef, SourceRef
+from analysis_service.validation import parse_and_validate
 from evals import verify_corpus
-from stride_service.report import InputRef, SourceRef
-from stride_service.validation import parse_and_validate
 
 
 @pytest.mark.parametrize(

@@ -17,6 +17,10 @@ from pathlib import Path
 
 import pytest
 
+from analysis_service.frameworks import PACKAGES
+from analysis_service.frameworks.asvs.catalog import requirements_for
+from analysis_service.frameworks.asvs.record import RequirementRuling
+from analysis_service.report import Ground, UnknownRef, Verdict, VerdictStatus
 from evals import verify_corpus
 from evals.harness.applicability import (
     APPLIES,
@@ -28,10 +32,6 @@ from evals.harness.applicability import (
 )
 from evals.harness.modes import case_frameworks
 from evals.harness.reference import load_corpus
-from stride_service.frameworks import PACKAGES
-from stride_service.frameworks.asvs.catalog import requirements_for
-from stride_service.frameworks.asvs.record import RequirementRuling
-from stride_service.report import Ground, UnknownRef, Verdict, VerdictStatus
 
 CASE_ID = "01-payments-checkout"
 

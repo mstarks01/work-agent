@@ -23,13 +23,13 @@ from google.adk.models.base_llm import BaseLlm
 from google.adk.models.llm_response import LlmResponse
 from google.genai import types
 
-from stride_service import graph
-from stride_service.binding import NodeBinding
-from stride_service.jobs import JobRecord, PipelineCompleted
-from stride_service.markdown_loader import MarkdownLoader
-from stride_service.pipeline import AdkPipelineRunner
-from stride_service.sampling import load_sampling
-from stride_service.sources import Source
+from analysis_service import graph
+from analysis_service.binding import NodeBinding
+from analysis_service.jobs import JobRecord, PipelineCompleted
+from analysis_service.markdown_loader import MarkdownLoader
+from analysis_service.pipeline import AdkPipelineRunner
+from analysis_service.sampling import load_sampling
+from analysis_service.sources import Source
 from tests.factories import (
     BASE_MODEL,
     DEFAULT_FRAMEWORKS,

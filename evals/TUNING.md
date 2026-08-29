@@ -136,7 +136,7 @@ judge was guessing at.
 
 **One job fires one `strong`-tier request per lane of every framework it names,
 all together at the barrier.** That is
-`stride_service.frameworks.widest_fan_out()` — 23 today — and at roughly 14K
+`analysis_service.frameworks.widest_fan_out()` — 23 today — and at roughly 14K
 input per lane it is a **~322K token burst from a single job**.
 
 Against a 200,000 tokens-per-minute quota that job cannot complete, and no
@@ -284,7 +284,7 @@ what a sweep does:
 
 ```sh
 # Try a stated temperature on the strong-tier category agents for one run:
-STRIDE_SAMPLING_STRONG_TEMPERATURE=0.4 \
+ANALYSIS_SAMPLING_STRONG_TEMPERATURE=0.4 \
   python -m evals.harness.run run --mode analysis --out warm-strong.json
 ```
 
@@ -292,7 +292,7 @@ The canonical sampling experiment is three arms on the same corpus, **decided
 by the far-domain cases**:
 
 1. **the model's own default** — the shipped state, which sets no temperature.
-2. **`temperature = 0`** — greedy (`STRIDE_SAMPLING_*_TEMPERATURE=0`).
+2. **`temperature = 0`** — greedy (`ANALYSIS_SAMPLING_*_TEMPERATURE=0`).
 3. **k-of-n sampling** — draw several candidates and union them (higher recall,
    but several times the cost, so it has to clearly earn it).
 
@@ -504,7 +504,7 @@ Two refusals worth knowing about, both deliberate:
 
 Once promoted, a production run's fingerprints match the blessed list and the
 run reports **certified**. Until then — and for any run driven by a temporary
-`STRIDE_SAMPLING_*` override, since an override changes the fingerprint — the
+`ANALYSIS_SAMPLING_*` override, since an override changes the fingerprint — the
 run is **uncertified**, and its scores are surfaced as untrusted rather than
 folded quietly into a baseline. To make an uncertified run fail outright (in CI,
 say):
@@ -525,7 +525,7 @@ as untrusted whether or not `--require-certified` is set.
 
 The service applies the same check to jobs it completes, using the same
 `config/blessed-fingerprints.toml` — there, the equivalent switch is
-`STRIDE_REQUIRE_CERTIFIED` and it withholds the report rather than failing the
+`ANALYSIS_REQUIRE_CERTIFIED` and it withholds the report rather than failing the
 job. See
 [Architecture](../docs/Architecture.md#provenance-and-certification).
 

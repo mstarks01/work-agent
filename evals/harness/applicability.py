@@ -10,7 +10,7 @@ looks like.
 So the shape of the answer differs too. STRIDE's scorer reports recall against an
 open list and asks a person about whatever else a run produced, because "the
 corpus did not list it" cannot mean "it is wrong". Here it can: a run at level ``L`` rules on
-:func:`~stride_service.frameworks.asvs.catalog.requirements_for` and nothing
+:func:`~analysis_service.frameworks.asvs.catalog.requirements_for` and nothing
 else, so the complement of the reference set is a real negative and the four
 cells of a confusion matrix are all reachable.
 
@@ -32,15 +32,15 @@ from collections.abc import Iterable, Mapping, Sequence
 from dataclasses import dataclass
 from typing import Any
 
-from evals.harness.reference import CaseFramework, GoldenCase, ReferenceRequirement
-from stride_service.frameworks.asvs.catalog import requirements_for
-from stride_service.frameworks.asvs.record import requirement_of
-from stride_service.report import (
+from analysis_service.frameworks.asvs.catalog import requirements_for
+from analysis_service.frameworks.asvs.record import requirement_of
+from analysis_service.report import (
     Claim,
     FrameworkAnalysis,
     FrameworkName,
     RuledClaim,
 )
+from evals.harness.reference import CaseFramework, GoldenCase, ReferenceRequirement
 
 #: The verdicts that assert a requirement applies to this system. ``rejected``
 #: is the critic ruling it does not, which is the negative answer rather than a

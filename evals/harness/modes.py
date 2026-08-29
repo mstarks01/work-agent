@@ -13,7 +13,7 @@ was a category-agent failure or an element ``extract`` never produced.
 * **end-to-end** — text in, report out. The integration smoke test.
 
 All three drive the *shipped* graph via
-:func:`~stride_service.graph.build_pipeline`, differing only in its ``entry``
+:func:`~analysis_service.graph.build_pipeline`, differing only in its ``entry``
 and the state seeded into the session. Nothing about the topology, the prompts,
 the skills, the tier config or the sampling config is eval-specific — grading a
 configuration you do not ship is the failure mode this whole design rejects.
@@ -32,13 +32,12 @@ from dataclasses import dataclass, replace
 from datetime import UTC, datetime
 from typing import Any
 
-from evals.harness.reference import GoldenCase
-from stride_service.analysis import control_state
-from stride_service.deployment import Deployment
-from stride_service.execution import GraphExecutor, GraphRun
-from stride_service.frameworks import PACKAGES
-from stride_service.frameworks.stride.record import DraftThreat
-from stride_service.graph import (
+from analysis_service.analysis import control_state
+from analysis_service.deployment import Deployment
+from analysis_service.execution import GraphExecutor, GraphRun
+from analysis_service.frameworks import PACKAGES
+from analysis_service.frameworks.stride.record import DraftThreat
+from analysis_service.graph import (
     ENTRY_EXTRACT,
     ENTRY_EXTRACT_ONLY,
     ENTRY_PREPARE,
@@ -53,7 +52,7 @@ from stride_service.graph import (
     Rejected,
     result_of,
 )
-from stride_service.report import (
+from analysis_service.report import (
     Claim,
     FrameworkName,
     FrameworkSelection,
@@ -62,14 +61,15 @@ from stride_service.report import (
     NodeRun,
     Report,
 )
-from stride_service.sampling import (
+from analysis_service.sampling import (
     SamplingConfig,
 )
-from stride_service.sources import Source
-from stride_service.system_model import SystemModel
-from stride_service.validation import ValidationIssue, parse_and_validate
+from analysis_service.sources import Source
+from analysis_service.system_model import SystemModel
+from analysis_service.validation import ValidationIssue, parse_and_validate
+from evals.harness.reference import GoldenCase
 
-EVAL_APP_NAME = "stride-evals"
+EVAL_APP_NAME = "analysis-evals"
 EVAL_USER = "eval-harness"
 
 
@@ -99,12 +99,12 @@ class AnalysisRun:
 
     The drafts are read straight off each framework's ``merged_drafts`` in the
     final session state, which is where
-    :func:`~stride_service.graph.merge_drafts` parks them on the way into that
+    :func:`~analysis_service.graph.merge_drafts` parks them on the way into that
     framework's critic — so this costs one extra state key per framework here and
     no change to the production seam. Reading them back through **the package's
     own record** rather than passing the raw dicts on keeps every scorer typed
     against the shipped model, and revalidates on the way out of state exactly as
-    :func:`~stride_service.graph.assemble_report` does.
+    :func:`~analysis_service.graph.assemble_report` does.
 
     ``drafts`` is keyed by framework because the drafts are: two frameworks'
     subgraphs never touch, each has its own fan-in and its own critic, and a
@@ -139,7 +139,7 @@ def _tags(value: list[str]) -> str:
 #: **Two kinds of attribute, and nothing else.** A closed vocabulary — ``kind``,
 #: ``exposure``, the asset tags — is set arithmetic against the blessed model,
 #: exact and needs no interpretation. A free-text control is not, but
-#: :func:`~stride_service.analysis.control_state` reduces it to ``unverified`` /
+#: :func:`~analysis_service.analysis.control_state` reduces it to ``unverified`` /
 #: ``absent`` / ``stated`` by its leading token, and *that* is comparable. So
 #: this measures the state rather than the wording, which keeps interpretation out
 #: and still catches the corpus's most repeated extraction failure: a control
@@ -467,7 +467,7 @@ def select_frameworks(
 
     **Why it exists is capacity, not preference.** One job fans out one
     ``strong``-tier request per lane of every framework it names, all at the
-    barrier — :func:`~stride_service.frameworks.widest_fan_out`, 23 today. On a
+    barrier — :func:`~analysis_service.frameworks.widest_fan_out`, 23 today. On a
     200,000 token-per-minute quota that burst is over budget on a single job,
     and no per-caller ceiling helps: ``max_active_jobs`` bounds jobs, and this
     is one job. Narrowing the selection is the only lever inside the harness.
@@ -532,7 +532,7 @@ def build_eval_pipeline(
 ) -> Pipeline:
     """The shipped graph, entered where the mode needs it.
 
-    Built from a :class:`~stride_service.deployment.Deployment`, which is the
+    Built from a :class:`~analysis_service.deployment.Deployment`, which is the
     same thing the service is built from — including the retry and per-request
     timeout, so a scheduled sweep does not die on one 429 after hours of work.
     Locating config through the deployment rather than the repo root is what
@@ -558,11 +558,11 @@ async def run_graph(
 ) -> GraphRun:
     """Drive one graph to completion and hand back the Graph Run.
 
-    The shipped :class:`~stride_service.execution.GraphExecutor` drives it, so
+    The shipped :class:`~analysis_service.execution.GraphExecutor` drives it, so
     a sweep stamps each node execution exactly as the service does — the served
     build it presented and the generation-identity fingerprint that implies.
     Stamping this here rather than in the harness is what makes the eval CLI a
-    real second caller of :func:`~stride_service.certification.certify` rather
+    real second caller of :func:`~analysis_service.certification.certify` rather
     than one certifying an empty observation set.
     """
     executor = GraphExecutor(pipeline, app_name=EVAL_APP_NAME)
@@ -654,7 +654,7 @@ def _crossings_match(blessed: SystemModel, extracted: SystemModel | None) -> boo
     rather than crashing the sweep.
 
     **Compares names, and that is the reading it is for.** A
-    :class:`~stride_service.report.BoundaryCrossing` carries ``flow_id`` and two
+    :class:`~analysis_service.report.BoundaryCrossing` carries ``flow_id`` and two
     zones, and both zones hold a boundary *ID*. A reader of the report sees
     those strings, so a crossing naming a zone they do not hold is wrong for
     them. :func:`crossing_keys` is the other reading — see #297.
@@ -700,7 +700,7 @@ def crossing_keys(model: SystemModel | None) -> tuple[str, ...] | None:
     zones", and that sentence contains no zone name.** Two extractions can
     partition the same elements identically and name the partitions
     differently; compared as lists of
-    :class:`~stride_service.report.BoundaryCrossing`, that reads as total
+    :class:`~analysis_service.report.BoundaryCrossing`, that reads as total
     disagreement, and on the 2026-08-23 sweeps it did — ``crossings DIFFER`` on
     13 of 13 cases for two models five times apart in price.
 
@@ -752,8 +752,8 @@ def _run_from_graph(
 ) -> AnalysisRun:
     """Complete the graph's :class:`Analysis` into a report, as production does.
 
-    The report is built by :meth:`~stride_service.graph.Analysis.into_report`,
-    the same method :class:`~stride_service.pipeline.AdkPipelineRunner` calls,
+    The report is built by :meth:`~analysis_service.graph.Analysis.into_report`,
+    the same method :class:`~analysis_service.pipeline.AdkPipelineRunner` calls,
     so a sweep's reports carry every block a job's do. The Tier 1 gates check a
     whole ``Report`` — including the self-containment invariants — and a
     stripped-down payload would test a shape production never emits.

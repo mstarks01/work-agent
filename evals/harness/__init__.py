@@ -1,7 +1,7 @@
 """The golden-case eval harness.
 
 Nothing here ships in the production image: the wheel builds only
-``src/stride_service``.
+``src/analysis_service``.
 
 Modules, in the order a run uses them:
 
