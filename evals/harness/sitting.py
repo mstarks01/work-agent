@@ -2,8 +2,9 @@
 
 The act is #327's, and ``evals/BLESSING.md`` step 6 is the method. This module
 is the part a front end does not get to reinvent: which files a sitting must
-read, the digest of each as it stood, the append-only entry that records it,
-the line it clears in the unreviewed list, and whether a recorded sitting
+read, the digest of each as it stood, what a reader may say about one recorded
+finding and the key that mark files under, the append-only entry that records
+it, the line it clears in the unreviewed list, and whether a recorded sitting
 clears its case at all. ``webapp/sitting.py`` is one surface over this;
 the CLI path writes the same files by hand and the checks cannot tell them
 apart, which is the point — one implementation of the rules. CI reads
@@ -18,6 +19,14 @@ withhold until the reader has written their own list down. That mirrors the
 review app's configuration-blindness, which is enforced by the queue item
 having no field for it rather than by asking the reviewer not to peek.
 
+**A mark is keyed by the finding, never by its position.** The reader answers
+one recorded finding with one of :data:`MARKS`, and
+:func:`~evals.harness.fingerprint.key_claim` computes the key. An insertion
+into a claim file moves every position below it and moves no fingerprint, so a
+mark recorded today still names the same finding after somebody edits the set.
+The same key a vote is filed under, so improving the identity rule re-keys both
+by recomputation.
+
 Nothing here talks to a network or a provider. A sitting is reading, and the
 whole path is free.
 """
@@ -27,15 +36,25 @@ from __future__ import annotations
 import ast
 import hashlib
 import json
-from collections.abc import Iterable
+from collections.abc import Iterable, Mapping
 from dataclasses import dataclass
 from datetime import UTC, datetime
 from pathlib import Path
-from typing import Any
+from typing import Any, Literal, get_args
 
 from evals import build_review_docs as docs
-from evals.harness.reference import CLAIMS_DIR, CaseSitting, GoldenCase, ReadRecord
+from evals.harness.fingerprint import FingerprintError, key_claim
+from evals.harness.identity import FlowMap
+from evals.harness.reference import (
+    CLAIMS_DIR,
+    CaseSitting,
+    GoldenCase,
+    ReadRecord,
+    ReferenceClaim,
+    load_case,
+)
 from evals.harness.roster import Roster
+from stride_service.report import FrameworkName
 
 REPO_ROOT = Path(__file__).resolve().parents[2]
 CORPUS_DIR = REPO_ROOT / "evals" / "corpus"
@@ -43,6 +62,15 @@ CORPUS_DIR = REPO_ROOT / "evals" / "corpus"
 #: Where the unreviewed list lives. A sitting that does not clear its line
 #: leaves the count a lie, so ``submit sitting`` refuses one that has not.
 UNREVIEWED_FILE = "tests/test_case_review.py"
+
+#: What a reader may say about one recorded finding. The method's own closed
+#: set, which ``evals.build_review_docs.MARK_GUIDANCE`` writes out for the
+#: reader who fills the document by hand — free prose here would record less
+#: than that path does, and no count could be taken over it.
+Mark = Literal["agree", "doubt", "dup"]
+
+#: The same three, for a surface that offers them and a check that reads them.
+MARKS: tuple[Mark, ...] = get_args(Mark)
 
 
 class SittingError(ValueError):
@@ -123,6 +151,26 @@ def read_records(case_dir: Path, files: list[str]) -> list[ReadRecord]:
 
 
 @dataclass(frozen=True)
+class MarkTarget:
+    """One recorded finding a reader marks, and the key its mark files under.
+
+    A **Claim**'s identity is its fingerprint, so two recorded claims the rule
+    calls one finding are one target and take one mark. :attr:`claims` names
+    every claim the target covers, because a reader who marks one of them has
+    to see that the same mark answers the other.
+
+    **The claim sentence is what anchors a target to the text beside it**, and
+    no position rides here. Each package renders its own part and numbers it in
+    its own terms, so a number computed here would agree with one renderer and
+    read wrong under the next.
+    """
+
+    fingerprint: str
+    framework: FrameworkName
+    claims: tuple[str, ...]
+
+
+@dataclass(frozen=True)
 class Prepared:
     """One case, ready to be sat with. Part two is deliberately separate."""
 
@@ -133,24 +181,87 @@ class Prepared:
     #: surface must not send this until the reader's own list is in.
     part_two: dict[str, str]
     files: list[str]
+    #: One target per recorded finding, in the order the parts render. Part of
+    #: part two rather than part one: a target names a claim, and a count of
+    #: them is a count of the recorded set. No default, because a ``Prepared``
+    #: built without them would refuse every mark a reader made.
+    mark_targets: tuple[MarkTarget, ...]
+
+
+def mark_targets(case: GoldenCase) -> tuple[MarkTarget, ...]:
+    """Every recorded finding of one case, keyed by its own framework's rule.
+
+    Keyed through :func:`~evals.harness.fingerprint.key_claim`, which is the
+    single spelling of which version keys which package. A position would do
+    for a page and for nothing else: an insertion into a claim file moves every
+    position below it, so a mark recorded against ``stride:9`` would answer for
+    a different claim the next time the file is read.
+
+    The claim offers both an action verb and a catalog identifier, and the
+    version keeps whichever it reads — so this states no rule about which
+    package carries which, and a package that ships a new record type arrives
+    here through its own answers.
+    """
+    flows: FlowMap = {
+        flow.id: (flow.source, flow.destination) for flow in case.model.data_flows
+    }
+    grouped: dict[str, list[str]] = {}
+    frameworks: dict[str, FrameworkName] = {}
+    for framework in case.frameworks:
+        for claim in case.claims_for(framework):
+            value = _key_of(case.id, framework, claim, flows)
+            grouped.setdefault(value, []).append(claim.claim)
+            frameworks[value] = framework
+    return tuple(
+        MarkTarget(fingerprint=value, framework=frameworks[value], claims=tuple(claims))
+        for value, claims in grouped.items()
+    )
+
+
+def _key_of(
+    case_id: str, framework: FrameworkName, claim: ReferenceClaim, flows: FlowMap
+) -> str:
+    """One reference claim's fingerprint, or a refusal that names the claim.
+
+    A claim the rule cannot key is a claim nobody can mark, and the reader
+    meets it as a case that will not open. So the refusal names the case and
+    the sentence, rather than reaching the reader as the identity rule's own
+    message about a component it wanted.
+    """
+    try:
+        value, _ = key_claim(
+            framework,
+            claim.lane,
+            claim.affected_element_ids,
+            flows,
+            verb=claim.verb,
+            identifier=claim.identifier,
+        )
+    except FingerprintError as exc:
+        raise SittingError(
+            f"{case_id}: {framework} cannot key {claim.claim!r}, so no mark"
+            f" would name it — {exc}"
+        ) from exc
+    return value
 
 
 def prepare(case_dir: Path) -> Prepared:
     """Everything a sitting needs, split at the own-list boundary."""
-    meta = docs.load_meta(case_dir / "case.json")
+    case = load_case(case_dir)
     return Prepared(
-        case_id=meta["id"],
-        title=meta["title"],
+        case_id=case.id,
+        title=case.meta.title,
         part_one=docs.part_one(case_dir),
         part_two=docs.parts_after(case_dir),
-        files=required_files(declared["name"] for declared in meta["frameworks"]),
+        files=required_files(case.frameworks),
+        mark_targets=mark_targets(case),
     )
 
 
 def document(
     prepared: Prepared,
     own_list: list[str],
-    marks: dict[str, str],
+    marks: Mapping[str, Mark],
     missing: list[str],
     notes: str,
 ) -> str:
@@ -160,7 +271,20 @@ def document(
     sets were opened, which is the one thing a generated ``REVIEW.md`` cannot
     show. ``submit sitting`` checks it exists; a reader checks it means
     something.
+
+    ``marks`` is keyed by fingerprint, and a key naming no recorded finding of
+    this case refuses the whole document. It is either a page that lost its
+    targets or a request that never read one, and writing it would put a mark
+    in the evidence that answers nothing.
     """
+    unknown = sorted(
+        set(marks) - {target.fingerprint for target in prepared.mark_targets}
+    )
+    if unknown:
+        raise SittingError(
+            f"{prepared.case_id}: {', '.join(unknown)} names no recorded"
+            " finding of this case, so the mark answers nothing"
+        )
     lines = [
         f"# Case Sitting — `{prepared.case_id}`\n",
         f"\n**{prepared.title}**\n",
@@ -176,17 +300,35 @@ def document(
     for framework, body in prepared.part_two.items():
         lines.append(f"\n---\n\n## The recorded `{framework}` set\n")
         lines.append(body)
-        answered = {
-            key: value for key, value in marks.items() if key.startswith(framework)
-        }
+        # Selected off the target's framework, which the fingerprint's own
+        # components carry. A key prefix would read the identity's spelling
+        # rather than the identity.
+        answered = [
+            target
+            for target in prepared.mark_targets
+            if target.framework == framework and target.fingerprint in marks
+        ]
         if answered:
             lines.append("\n### Marks\n")
-            lines += [f"- `{key}` — {value}" for key, value in sorted(answered.items())]
+            lines += [
+                _mark_line(target, marks[target.fingerprint]) for target in answered
+            ]
     lines.append("\n---\n\n## On your list and not on theirs\n")
     lines += [f"- {item}" for item in missing] or ["- (nothing)"]
     if notes:
         lines.append(f"\n## Notes\n\n{notes}\n")
     return "\n".join(lines) + "\n"
+
+
+def _mark_line(target: MarkTarget, mark: Mark) -> str:
+    """One mark, the finding it answers, and the claim it reads against.
+
+    The fingerprint is written out because it is the identity a later reader
+    matches a vote against. The claim sentence rides beside it so the line
+    means something to a person, and it is the same sentence the part above
+    prints.
+    """
+    return f"- `{mark}` — `{target.fingerprint}` — {' / '.join(target.claims)}"
 
 
 def record(
