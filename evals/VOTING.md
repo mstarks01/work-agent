@@ -87,12 +87,16 @@ item has no field for it, and the app stamps the configuration onto your vote
 after you answer. A reviewer who sees the model can vote about the model instead
 of about the finding.
 
-The question is always the same one: could this attack happen in this system?
-You have four answers.
+**The question is the framework's own**, because the two do not rule on the
+same thing. A STRIDE finding asks *could this attack happen in this system?* An
+ASVS record asks *does this requirement apply to this system?* The page reads
+the question off the finding, so you answer each one in its own terms.
+
+You have four answers either way, and each records the same verdict.
 
 | Answer | What it means |
 | --- | --- |
-| **Yes — this is real** | The finding describes something that could happen here. |
+| **Yes** — *this is real* (STRIDE), *it applies* (ASVS) | The claim holds for this system. |
 | **No, or not as written** | You reject it. The app then asks for a reason. |
 | **Unsure** | You read it and cannot decide. This is a real answer, and it is recorded. |
 | **Needs more evidence** | The page did not show you enough to answer. It is not a verdict about the finding. |

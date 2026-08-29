@@ -370,7 +370,7 @@ class Session:
 
 def create_app(session: Session) -> FastAPI:
     """The sitting app: the rail over the whole corpus, one case on the stage."""
-    app = FastAPI(title="STRIDE case sitting", docs_url=None, redoc_url=None)
+    app = FastAPI(title="Case sitting", docs_url=None, redoc_url=None)
     app.add_middleware(TrustedHostMiddleware, allowed_hosts=LOOPBACK_HOSTS)
     app.add_middleware(SecurityHeaders)
 

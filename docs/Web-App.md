@@ -83,10 +83,12 @@ framework adds its own lane nodes to that. The page streams **every** graph node
 as it finishes — the model calls and the deterministic ones between them
 (`validate`, `prepare`, `merge`, `router`, `assemble`) alike — rather than
 showing you a blank tab. Node names appear exactly as the graph emits them, which
-is why a STRIDE category agent reads `analyze_denial_of_service` rather than the
-`analyze/denial-of-service` that
-[`config/model_tiers.toml`](../config/model_tiers.toml) keys on: graph node names
-must be Python identifiers.
+is why STRIDE's denial-of-service agent reads `analyze_stride_denial_of_service`
+rather than the `analyze/stride` that
+[`config/model_tiers.toml`](../config/model_tiers.toml) keys on. Two things
+differ. A graph node exists per framework *and* lane, while the tier config
+keys one node per framework, because a framework's lanes all run the same
+judgement on the same tier. And a graph node name must be a Python identifier.
 
 **The report** — one block per framework you selected, a summary, the extracted
 DFD, and the served-build provenance for every LLM node. STRIDE contributes

@@ -73,6 +73,27 @@ new one fails until it is. Its `DECLARED` map is also the checklist to re-read
 when a package lands — every entry reading *"this code is that framework's"* is a
 dispatch a third package may need adding to.
 
+**A literal is not the only way to name a framework, and two of the other ways
+shipped.** The scan read `.py` files under `src/` and `evals/` and matched the
+string `"stride"`. So it saw neither of these, and both were wrong for a year:
+
+- **A framework's name inside a word.** `StrideEngine` builds a graph for
+  whatever selection a caller names, and `stride_pipeline` is the workflow name
+  ADK stamps into every run's node paths. Neither is a literal.
+- **Text a person reads.** `webapp/` was not searched at all, so the first-run
+  app served the heading "STRIDE threat model" over a form that offers every
+  carried framework. A job naming ASVS alone got its answer under another
+  framework's name.
+
+The scan now covers `webapp/` too, and two further checks close those gaps. A
+framework-named class, function or value outside a package must be in a
+`DECLARED` file or in `OPEN_BY_DECISION`, which records a name somebody chose to
+keep and why. A page may not name a framework at all: the name reaches a person
+through the report, or through a table keyed by framework where the wording
+genuinely differs. `webapp/review.py`'s `QUESTIONS` is that table — STRIDE rules
+on whether an attack is credible and ASVS on whether a requirement applies, so
+one heading could not ask both.
+
 ### The rule has a second axis
 
 The shape above is about **which framework** a piece of code reads. The same
@@ -212,11 +233,15 @@ for free" is a claim to check, never one to assume.
 
 ## Where this is enforced
 
-Four mechanical instances, each for a narrow question:
+Five mechanical instances, each for a narrow question:
 
 - **`tests/test_framework_neutrality.py`** — every framework literal outside a
   package root is declared with a reason, so a new one fails until somebody says
   why it is not a table. This is the check derived from the root cause above.
+- **The identifier and page checks in the same module** — a framework's name
+  inside a word is declared or recorded as open, and no text an app puts in
+  front of a person names a framework. These cover the two ways of naming one
+  that carry no literal.
 - **The registry checks in the same module** — every carried package is named by
   an instrument and declares a per-case scorer, and neither table names a package
   this build does not carry. These close the second axis: a table stays complete
