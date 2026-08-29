@@ -394,6 +394,13 @@ record that justifies it. `model.json` and every file `sources` lists stay
 outside it — they are what you read, and a submission that edits one fails the
 scope check by name.
 
+It also carries `tests/test_case_review.py`, and there the rule is stricter
+than a path: the only change it may hold is the deletion of your cases'
+`UNREVIEWED` entries. That file is a module `pytest` imports, so a submission
+that changed anything else in it would run code nobody asked for in every
+checkout. The check compares the file to the base ref with those entries taken
+out of both sides.
+
 `tests/test_case_review.py` fails on a new case that arrives without a
 clearing sitting, and names every case still waiting in its `UNREVIEWED`
 list. Twelve of the 13 cases that shipped before this was enforced are still

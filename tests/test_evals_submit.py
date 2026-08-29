@@ -448,7 +448,58 @@ class TestASittingCarriesNCases:
         git(repo, "fetch", "origin")
         two = [check.name for check in submit._sitting_preflight(repo, "ada")]
         assert one == two
-        assert len(two) == 8
+        assert len(two) == 9
+
+    def test_a_foreign_edit_to_the_unreviewed_list_is_refused(self, repo):
+        """The one file outside a case directory a sitting may change is a
+        module `pytest` imports, so the allowlist admitting it by path is not
+        the whole check. A line the sitting did not clear is a line nobody
+        asked for, whatever it says."""
+        prepare_sitting(repo)
+        listing = repo / "tests" / "test_case_review.py"
+        listing.write_text(
+            listing.read_text(encoding="utf-8") + 'import os\nos.environ["X"] = "1"\n',
+            encoding="utf-8",
+        )
+        git(repo, "fetch", "origin")
+        check = submit._check_sitting_edits_only_the_list(repo, "ada")
+        assert not check.passed
+        assert "test_case_review.py" in check.problems[0]
+
+    def test_an_edit_to_another_case_s_entry_is_refused(self, repo):
+        """Every case this submission does not carry is on the far side of
+        the same rule."""
+        prepare_sitting(repo)
+        listing = repo / "tests" / "test_case_review.py"
+        listing.write_text(
+            listing.read_text(encoding="utf-8").replace(
+                unreviewed_line(OTHER), f'    "{OTHER}": "rewritten",\n'
+            ),
+            encoding="utf-8",
+        )
+        git(repo, "fetch", "origin")
+        assert not submit._check_sitting_edits_only_the_list(repo, "ada").passed
+
+    def test_a_list_that_will_not_parse_is_a_checklist_line(self, repo):
+        """A10. The check reads a file somebody edited, so a source that no
+        longer parses answers with a line a contributor can act on."""
+        prepare_sitting(repo)
+        listing = repo / "tests" / "test_case_review.py"
+        listing.write_text(
+            listing.read_text(encoding="utf-8") + "def broken(\n", encoding="utf-8"
+        )
+        git(repo, "fetch", "origin")
+        check = submit._check_sitting_edits_only_the_list(repo, "ada")
+        assert not check.passed
+        assert "will not parse" in check.problems[0]
+
+    def test_a_line_the_reader_has_not_cleared_yet_is_the_other_check(self, repo):
+        """One condition, one message. A forgotten clear is named by the
+        check that asks for it, and never twice."""
+        prepare_sitting(repo, clear_unreviewed=False)
+        git(repo, "fetch", "origin")
+        assert not submit._check_sitting_clears_unreviewed(repo, "ada").passed
+        assert submit._check_sitting_edits_only_the_list(repo, "ada").passed
 
     def test_the_title_counts_the_cases(self, repo):
         prepare_sitting(repo)

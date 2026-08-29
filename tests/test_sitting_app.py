@@ -355,6 +355,31 @@ class TestThePosture:
         assert not session.carried(), "a refused request recorded the sitting"
         assert not (tree / "evals" / "corpus" / CASE / "REVIEW-ada.md").exists()
 
+    def test_every_writing_endpoint_carries_the_page_token(self, tree):
+        """Not only the ones that name a case.
+
+        ``/api/finish`` writes the reading document, appends to ``case.json``
+        and puts the case on the list the press carries, and it writes the
+        draft under the reader's own store. It asks a request the same
+        question every other write does.
+        """
+        session = session_for(tree, "ada", CASE)
+        untokened = TestClient(
+            create_app(session), base_url=LOOPBACK, headers=SAME_ORIGIN
+        )
+        writes = {
+            "/api/own-list": {"case": CASE, "items": []},
+            "/api/draft": {"case": CASE, "marks": {}, "missing": [], "notes": ""},
+            "/api/discard": {"case": CASE},
+            "/api/finish": {"case": CASE, "marks": {}, "missing": [], "notes": ""},
+            "/api/drop": {"case": CASE},
+            "/api/put-back": {"case": CASE},
+        }
+        for path, body in writes.items():
+            assert untokened.post(path, json=body).status_code == 403, path
+        assert not draft_file(tree, CASE).exists()
+        assert not (tree / "evals" / "corpus" / CASE / "REVIEW-ada.md").exists()
+
     def test_a_bare_post_is_refused_too(self, tree):
         """No header at all is not the same as ``same-origin``.
 
@@ -569,8 +594,114 @@ class TestTheUnreviewedHelper:
 
     def test_a_case_the_list_already_names_is_left_alone(self, tree):
         before = (tree / "tests" / "test_case_review.py").read_text("utf-8")
-        assert sittings.restore_unreviewed(tree, CASE, "junk\n") is False
+        entry = f'    "{CASE}": "unread",\n'
+        assert sittings.restore_unreviewed(tree, CASE, entry) is False
         assert (tree / "tests" / "test_case_review.py").read_text("utf-8") == before
+
+
+class TestTheUnreviewedEntryIsChecked:
+    """The list is a module ``pytest`` imports, and the entry is not ours.
+
+    An entry travels back to the list through a **Draft Sitting** — a file
+    outside the repository that the reader owns — so text that is anything
+    but one table entry for the named case would be Python nobody wrote,
+    running in everybody's checkout. The shape is checked, never the
+    spelling.
+    """
+
+    #: Closes the table, runs a statement, and opens a second table so the
+    #: file still parses. The whole class of attack in one value.
+    INJECTION = (
+        '    "{case}": "unread",\n'
+        "}}\nimport pathlib\n"
+        'pathlib.Path("/tmp/never").write_text("ran")\n'
+        "JUNK: dict[str, str] = {{\n"
+    )
+
+    def test_text_that_closes_the_table_is_refused(self, tree):
+        listing = tree / "tests" / "test_case_review.py"
+        sittings.clear_unreviewed(tree, CASE)
+        before = listing.read_text("utf-8")
+        with pytest.raises(sittings.SittingError, match="not one table entry"):
+            sittings.restore_unreviewed(tree, CASE, self.INJECTION.format(case=CASE))
+        assert listing.read_text("utf-8") == before, "a refusal changed the file"
+
+    def test_an_entry_naming_another_case_is_refused(self, tree):
+        sittings.clear_unreviewed(tree, CASE)
+        with pytest.raises(sittings.SittingError, match="other than this case"):
+            sittings.restore_unreviewed(tree, CASE, f'    "{OTHER}": "x",\n')
+
+    def test_a_value_that_is_not_a_reason_is_refused(self, tree):
+        """A call, an f-string or a name evaluates when the module imports."""
+        sittings.clear_unreviewed(tree, CASE)
+        for value in ('__import__("os").system("id")', 'f"{1}"', "open"):
+            with pytest.raises(sittings.SittingError):
+                sittings.restore_unreviewed(tree, CASE, f'    "{CASE}": {value},\n')
+
+    def test_every_entry_the_real_list_holds_is_accepted(self):
+        """The check is over the shape, so it has to accept the shapes the
+        corpus actually writes — a plain string and a parenthesised one."""
+        root = Path(__file__).resolve().parents[1]
+        source = (root / sittings.UNREVIEWED_FILE).read_text("utf-8")
+        entries, _ = sittings._unreviewed_table(source)
+        lines = source.splitlines(keepends=True)
+        assert entries
+        for case, start, end in entries:
+            sittings._one_entry(case, "".join(lines[start:end]))
+
+
+class TestOnlyYourOwnEntryComesOff:
+    """A sitting somebody else recorded is untouchable, checked where it is
+    removed.
+
+    Both the entry a re-record replaces and the entry a drop takes off reach
+    the harness from a draft the reader owns, so the rule cannot be assumed
+    of the caller that supplied the value.
+    """
+
+    def merged(self, tree, case=CASE, reviewer="sam"):
+        """One entry by somebody else, partial so it clears nothing and the
+        case still presses."""
+        case_dir = tree / "evals" / "corpus" / case
+        read = sittings.read_records(case_dir, ["source.md"])
+        return case_dir, sittings.record(
+            case_dir, reviewer, read, f"REVIEW-{reviewer}.md", "theirs"
+        )
+
+    def reviewers(self, tree, case=CASE):
+        path = tree / "evals" / "corpus" / case / "case.json"
+        return [e["reviewer"] for e in json.loads(path.read_text("utf-8"))["reviews"]]
+
+    def test_a_record_refuses_to_replace_it(self, tree):
+        case_dir, theirs = self.merged(tree)
+        read = sittings.read_records(case_dir, ["source.md"])
+        with pytest.raises(sittings.SittingError, match="not yours to take off"):
+            sittings.record(case_dir, "ada", read, "REVIEW-ada.md", "", replaces=theirs)
+        assert self.reviewers(tree) == ["sam"]
+
+    def test_an_unrecord_refuses_to_remove_it(self, tree):
+        case_dir, theirs = self.merged(tree)
+        with pytest.raises(sittings.SittingError, match="not yours to take off"):
+            sittings.unrecord(case_dir, "ada", theirs)
+        assert self.reviewers(tree) == ["sam"]
+
+    def test_a_doctored_draft_cannot_delete_it_through_the_app(self, tree):
+        """The whole route, as a reader with a hand-edited draft would take
+        it: their own list, then a record pointed at somebody else's entry."""
+        _, theirs = self.merged(tree)
+        app = browser(session_for(tree, "ada"))
+        app.post("/api/own-list", json={"case": CASE, "items": ["mine"]})
+        path = draft_file(tree, CASE)
+        held = json.loads(path.read_text("utf-8"))
+        held["recorded"] = theirs
+        path.write_text(json.dumps(held), encoding="utf-8")
+        app.get(f"/api/part-two?case={CASE}")
+        refused = app.post(
+            "/api/finish", json={"case": CASE, "marks": {}, "missing": [], "notes": ""}
+        )
+        assert refused.status_code == 409
+        assert "not yours to take off" in refused.json()["detail"]
+        assert self.reviewers(tree) == ["sam"], "somebody else's sitting was removed"
 
     def test_the_last_case_comes_off_and_leaves_an_empty_table(self, tree):
         """The day every case is read. The table names nobody, and the reader
@@ -2089,6 +2220,27 @@ class TestDroppingACase:
         path = self.case_dir(tree) / "case.json"
         reviews = json.loads(path.read_text("utf-8"))["reviews"]
         assert [entry["reviewer"] for entry in reviews] == ["sam"]
+
+    def test_a_doctored_draft_cannot_write_python_into_the_list(self, tree):
+        """The drop puts the case back on the unreviewed list from the draft,
+        and the draft is a file the reader owns. The list is a module
+        `pytest` imports, so the entry is checked before it is written."""
+        app = browser(session_for(tree, "ada"))
+        read_and_record(app, CASE)
+        listing = tree / "tests" / "test_case_review.py"
+        before = listing.read_text("utf-8")
+        path = draft_file(tree, CASE)
+        held = json.loads(path.read_text("utf-8"))
+        held["unreviewed_entry"] = (
+            f'    "{CASE}": "unread",\n}}\nimport pathlib\n'
+            'pathlib.Path("/tmp/never").write_text("ran")\n'
+            "JUNK: dict[str, str] = {\n"
+        )
+        path.write_text(json.dumps(held), encoding="utf-8")
+        refused = app.post("/api/drop", json={"case": CASE})
+        assert refused.status_code == 409
+        assert listing.read_text("utf-8") == before, "a refusal changed the file"
+        assert (tree / "evals" / "corpus" / CASE / "REVIEW-ada.md").is_file()
 
     def test_a_case_nobody_sat_keeps_no_empty_review_list(self, tree):
         """The key `record` wrote comes off with the entry that made it.

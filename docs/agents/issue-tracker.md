@@ -78,7 +78,7 @@ Completed on GitHub Issues (canonical):
   fingerprint. It never merges, and a successful submit deletes it. **Cardinality lives on the
   `KINDS` table** ([#371](https://github.com/mstarks01/work-agent/issues/371)) as one `Kind` field,
   `subjects`, so `_check_one_directory` becomes `_check_subject_count`; the four per-case checks loop
-  and the checklist stays eight lines whatever N is, every problem string starts with the case id,
+  and the checklist length does not move with N, every problem string starts with the case id,
   and `_new_sittings`' "appends no sitting entry" replaces the lost cardinality gate. **The screens
   are a rail and a stage** ([#372](https://github.com/mstarks01/work-agent/issues/372)): the rail
   lists every case with a status dot and never leaves, a pinned footer `Submit — N cases ready` is
