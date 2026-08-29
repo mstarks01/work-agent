@@ -236,9 +236,14 @@ def snap_rulings(
                 "verdict": ruling.verdict.model_copy(
                     update={
                         "related_unknowns": [
+                            # Only the model-reference spelling has an ID to
+                            # snap. A subject names no element, so there is
+                            # nothing to snap it to.
                             ref.model_copy(
                                 update={"element_id": snap(ref.element_id, element_ids)}
                             )
+                            if ref.names_an_element
+                            else ref
                             for ref in ruling.verdict.related_unknowns
                         ]
                     }
@@ -448,6 +453,21 @@ def _unresolved_unknown_ref_issues(
     # function's return survives it.
     for ruling in snap_rulings(rulings, by_id.keys()):
         for ref in ruling.verdict.related_unknowns:
+            # A question with no place in the model is checked for saying
+            # something, and nothing else. There is no model reference to
+            # resolve, which is the whole reason the spelling exists.
+            if not ref.names_an_element:
+                if not ref.subject.strip():
+                    issues.append(
+                        CriticIssue(
+                            ruling.id,
+                            f"claim {ruling.id!r} is ruled needs-info and its"
+                            " related_unknowns entry names neither an element"
+                            " attribute nor a subject, so nothing says what has"
+                            " to be answered",
+                        )
+                    )
+                continue
             element = by_id.get(ref.element_id)
             if element is None:
                 issues.append(
@@ -459,12 +479,22 @@ def _unresolved_unknown_ref_issues(
                     )
                 )
             elif ref.attribute not in _attribute_names(element):
+                # The available set is named, not just the missing one. An
+                # attribute is a fixed field per element *type*, so a critic
+                # reaching for `exposure` on an external entity has named a real
+                # attribute of the wrong type rather than invented one. Telling
+                # the re-ask only what is wrong leaves it guessing; telling it
+                # what is there is what lets it repoint rather than fall back on
+                # whichever field resolves everywhere.
                 issues.append(
                     CriticIssue(
                         ruling.id,
                         f"claim {ruling.id!r} hangs its needs-info verdict on"
                         f" attribute {ref.attribute!r}, which element"
-                        f" {ref.element_id!r} does not have",
+                        f" {ref.element_id!r} does not have. That element has:"
+                        f" {', '.join(sorted(_attribute_names(element)))}."
+                        " Name one of those, or state the question in"
+                        " `subject` if it is not about this model at all",
                     )
                 )
     return issues
