@@ -47,7 +47,13 @@ from pydantic import ValidationError
 from evals.harness import baseline, comparison, ledger, roster
 from evals.harness.artifact import ProvenanceError
 from evals.harness.reference import CaseSitting
-from evals.harness.sitting import claim_files, document_name, required_files
+from evals.harness.sitting import (
+    SittingError,
+    claim_files,
+    document_name,
+    required_files,
+    without_unreviewed,
+)
 
 REPO_ROOT = Path(__file__).resolve().parents[2]
 
@@ -645,6 +651,48 @@ def _check_sitting_clears_unreviewed(root: Path, author: str) -> Check:
     )
 
 
+def _check_sitting_edits_only_the_list(root: Path, author: str) -> Check:
+    """The unreviewed list changed by the carried cases' lines and nothing else.
+
+    ``CASE_REVIEW_TEST`` is the one file outside a case directory that a
+    sitting may change, and it is a module ``pytest`` imports — so an
+    allowlist that admits it by path admits arbitrary Python running in
+    everybody's checkout. The scope check compares paths and cannot see that;
+    this compares content.
+
+    Both sides have the carried cases' entries taken out before they are
+    compared, so a reader who has not cleared a line yet fails
+    :func:`_check_sitting_clears_unreviewed` and not this. What is left is
+    the module's prose, its code, and every case this submission does not
+    carry.
+    """
+    cases = _sitting_cases(root)
+    if not cases:
+        return _check(_ONLY_THE_LIST, [])
+    base = _base_text(root, CASE_REVIEW_TEST)
+    if base is None:
+        return _check(
+            _ONLY_THE_LIST,
+            [f"{CASE_REVIEW_TEST}: the base ref has no such file to compare against"],
+        )
+    live = (root / CASE_REVIEW_TEST).read_text(encoding="utf-8")
+    try:
+        moved = without_unreviewed(live, cases) != without_unreviewed(base, cases)
+    except SittingError as exc:
+        # The message names the file already, so it goes out as it stands.
+        return _check(_ONLY_THE_LIST, [str(exc)])
+    refusal = (
+        f"{CASE_REVIEW_TEST} changed outside the lines this sitting clears;"
+        " a sitting deletes its cases' UNREVIEWED entries and nothing else"
+    )
+    return _check(_ONLY_THE_LIST, [refusal] if moved else [])
+
+
+#: Spelled once because the check names it twice and a checklist line is the
+#: contract a contributor reads.
+_ONLY_THE_LIST = "the unreviewed list changed only by those lines"
+
+
 def _check_author_rostered(root: Path, author: str) -> Check:
     problems = []
     try:
@@ -668,6 +716,7 @@ def _sitting_preflight(root: Path, author: str) -> list[Check]:
             _check_sitting_evidence,
             _check_sitting_covers,
             _check_sitting_clears_unreviewed,
+            _check_sitting_edits_only_the_list,
             _check_author_rostered,
             _check_no_self_raise,
         )
