@@ -320,12 +320,14 @@ on one case and takes one value; the list is how you choose the rest.
 
 It shows you the sources and the model, takes your own threat list, and only
 *then* reveals the recorded sets — the one rule this method has, enforced by
-the server rather than by asking. Each recorded finding carries a control that
-takes `agree`, `doubt` or `dup`, which is the same mark the by-hand path writes
-into a `> mark:` slot. When you finish it writes everything below
-into your working tree and offers three ways out: run the printed command,
-paste the text into a pull request you open, or press the button and let it
-open the pull request through the `gh` you are already signed in to. It binds
+the server rather than by asking. The rule holds per case: **Previous** and
+**Next** in the case header walk the list, and a case you have not written a
+list for arrives blind however you reach it. Each recorded finding carries a
+control that takes `agree`, `doubt` or `dup`, which is the same mark the
+by-hand path writes into a `> mark:` slot. When you finish a case it writes
+everything below into your working tree and prints the command and the paste
+text. The last **Next** ends at the submit stage, which is where the button
+opens the pull request through the `gh` you are already signed in to. It binds
 to loopback and holds no credential of its own; `--no-submit` hides the button.
 `--list` prints the cases nobody has read.
 
