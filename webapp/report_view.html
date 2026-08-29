@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>STRIDE Report — Orders Service</title>
+<title>Report</title>
 <style nonce="__CSP_NONCE__">
   /* Palette roles (dataviz reference instance). Status hues are fixed, never themed. */
   .viz-root {
@@ -374,6 +374,9 @@
 
   // header
   $("sysname").textContent = R.input.system_name;
+  // The static title names no system and no framework. The report names
+  // both, so the tab reads the run rather than the template.
+  document.title = R.input.system_name + " — report";
   const fmt = (t) => new Date(t).toISOString().replace("T"," ").replace(".000Z"," UTC");
   $("jobmeta").append(
     "Job ", code(R.job.id), ` · ${R.job.status} · ${fmt(R.job.completed_at)} · schema ${R.schema_version}`

@@ -2,8 +2,9 @@
 
 # stride-service
 
-An agentic **STRIDE threat-modeling engine**: semi-structured text describing a
-system goes in, a structured JSON threat report comes out. The analysis runs as
+An agentic **security-analysis engine**: semi-structured text describing a
+system goes in, a structured JSON report comes out. Every analysis runs
+under a **Framework** the job named — STRIDE and ASVS today. It runs as
 a [Google ADK](https://google.github.io/adk-docs/) multi-agent graph over
 per-tier models from any supported vendor — Vertex, Anthropic or OpenAI, with no
 privileged default.

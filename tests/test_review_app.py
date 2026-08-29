@@ -18,7 +18,13 @@ from fastapi.testclient import TestClient
 
 from evals.harness import queue as review_queue
 from evals.harness.ledger import load
-from webapp.review import build_session, create_app, findings_from_artifacts
+from stride_service.frameworks import PACKAGES
+from webapp.review import (
+    QUESTIONS,
+    build_session,
+    create_app,
+    findings_from_artifacts,
+)
 
 #: What a browser puts on every request this page makes. The vote endpoint
 #: refuses without it.
@@ -34,6 +40,18 @@ STEADY = review_queue.Finding(
     element_ids=("entity:shopper",),
     verb="replay",
     quotes=("Shoppers sign in with email and password",),
+)
+
+#: An ASVS record, which rules applicability rather than an attack. Here so a
+#: test can read the question the page asks about a claim that is not a threat.
+REQUIREMENT = review_queue.Finding(
+    case="01-payments-checkout",
+    framework="asvs",
+    lane="V6 Authentication",
+    title="Password strength is unstated",
+    description="The description never says what a password must be.",
+    element_ids=("process:storefront",),
+    identifier="6.2.1",
 )
 
 #: Found by two runs of the five, which is what makes it the first question.
@@ -409,3 +427,36 @@ def test_localhost_is_allowed_beside_the_numeric_loopback(runs, tmp_path):
     session = build_session(runs, voter="ada", ledger_path=tmp_path / "votes")
     client = TestClient(create_app(session), base_url="http://localhost:8010")
     assert client.get("/").status_code == 200
+
+
+def test_every_package_has_its_own_reviewer_question():
+    """A package missing here would be asked about in another's words.
+
+    ``webapp/review.py`` raises at import over the same set. This states the
+    property in a place a reader looks for it.
+    """
+    assert set(PACKAGES) <= set(QUESTIONS)
+    for framework, question in QUESTIONS.items():
+        assert set(question) == {"heading", "ask", "yes", "no"}, framework
+
+
+def test_the_question_is_the_finding_s_own_framework(tmp_path):
+    """One heading asked STRIDE's question over an ASVS record. It does not now."""
+    questions = {}
+    for finding in (STEADY, REQUIREMENT):
+        session = build_session(
+            [[finding]],
+            voter="ada",
+            ledger_path=tmp_path / f"votes-{finding.framework}",
+        )
+        app = TestClient(
+            create_app(session),
+            base_url="http://127.0.0.1:8010",
+            headers=SAME_ORIGIN,
+        )
+        questions[finding.framework] = app.get("/api/next").json()["question"]
+
+    assert questions["stride"] == QUESTIONS["stride"]
+    assert questions["asvs"] == QUESTIONS["asvs"]
+    assert "attack" in questions["stride"]["ask"]
+    assert "requirement" in questions["asvs"]["ask"]
