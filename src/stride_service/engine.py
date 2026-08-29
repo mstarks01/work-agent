@@ -1,7 +1,7 @@
 """In-process entry point for the analysis pipeline: text in, report out.
 
 The HTTP ``/v1`` API (:mod:`stride_service.api`) is one caller of the analysis
-pipeline; this module is the other. An application that wants to run STRIDE
+pipeline; this module is the other. An application that wants to run an
 analysis in process — swapping this pipeline in behind its own analysis-engine
 interface — reaches for :class:`StrideEngine` instead of fabricating a
 :class:`~stride_service.jobs.JobRecord`, an auth subject, and a node callback by

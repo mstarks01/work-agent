@@ -440,7 +440,7 @@ def create_app(
     """
     state = build_startup() if startup is None else startup
     analyses = Analyses() if analyses is None else analyses
-    app = FastAPI(title="STRIDE first run", docs_url=None, redoc_url=None)
+    app = FastAPI(title="First run", docs_url=None, redoc_url=None)
     app.add_middleware(TrustedHostMiddleware, allowed_hosts=LOOPBACK_HOSTS)
     app.add_middleware(SecurityHeaders)
 
@@ -872,11 +872,11 @@ _STYLE = """
 _FORM_PAGE = (
     """<!doctype html>
 <html lang="en"><head><meta charset="utf-8">
-<title>STRIDE — first run</title><style nonce="__CSP_NONCE__">"""
+<title>Analyze a system — first run</title><style nonce="__CSP_NONCE__">"""
     + _STYLE
     + """</style></head>
 <body>
-<h1>STRIDE threat model</h1>
+<h1>Analyze a system</h1>
 <p class="sub">Running in process, on real models.</p>
 <!--tiers-->
 <form id="analyze">
@@ -1007,7 +1007,7 @@ _FORM_PAGE = (
 _DIAGNOSTIC_PAGE = (
     """<!doctype html>
 <html lang="en"><head><meta charset="utf-8">
-<title>STRIDE — configuration problem</title><style nonce="__CSP_NONCE__">"""
+<title>First run — configuration problem</title><style nonce="__CSP_NONCE__">"""
     + _STYLE
     + """</style></head>
 <body>
@@ -1030,7 +1030,7 @@ if __name__ == "__main__":
     import uvicorn
 
     logging.basicConfig(level=logging.INFO, format="%(levelname)s %(message)s")
-    print(f"STRIDE first-run app on http://{HOST}:{PORT}")
+    print(f"First-run app on http://{HOST}:{PORT}")
     # Loopback is hard-bound: no flag, no env override. The no-auth posture is
     # only safe here.
     uvicorn.run(create_app(), host=HOST, port=PORT, log_level="warning")

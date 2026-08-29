@@ -85,6 +85,7 @@ from evals.harness.ledger import (
     load,
 )
 from evals.harness.reference import load_corpus
+from stride_service.frameworks import PACKAGES
 from webapp.main import LOOPBACK_HOSTS, SecurityHeaders, refuse_cross_origin
 
 HOST = "127.0.0.1"
@@ -93,6 +94,40 @@ PORT = 8010
 #: The verdicts the endpoint accepts, spelled from the type the ledger declares
 #: so the two cannot drift apart.
 VERDICTS: tuple[str, ...] = get_args(Verdict)
+
+#: What each package's records rule on, in the words the reviewer reads. A
+#: table rather than one heading, because the two packages do not ask the same
+#: thing: STRIDE rules on whether an attacker action is credible, and ASVS on
+#: whether a requirement applies. One heading asked STRIDE's question over every
+#: finding, which put an ASVS record under a question its record cannot answer.
+#:
+#: The verdict a button records is the same in both — ``up`` means the claim
+#: holds — so only the prose is keyed here and the ledger stays one closed set.
+#: ``evals/build_review_docs.py`` asks the same question per package in the
+#: reading document; these are the browser's half of that pair.
+QUESTIONS: dict[str, dict[str, str]] = {
+    "stride": {
+        "heading": "Could this happen?",
+        "ask": "Could this attack happen in this system?",
+        "yes": "Yes — this is real",
+        "no": "No, or not as written",
+    },
+    "asvs": {
+        "heading": "Does this apply?",
+        "ask": "Does this requirement apply to this system?",
+        "yes": "Yes — it applies",
+        "no": "No, or not as written",
+    },
+}
+
+#: Checked against the registry rather than left to a missing key, because a
+#: package absent here would ask another package's question rather than raise.
+_unasked = set(PACKAGES) - set(QUESTIONS)
+if _unasked:
+    raise SystemExit(
+        f"no reviewer question for {sorted(_unasked)}; add a row to QUESTIONS"
+        " so that package's findings are not asked about in another's words"
+    )
 
 _NONCE_PLACEHOLDER = "__CSP_NONCE__"
 
@@ -205,7 +240,7 @@ def build_session(
 
 def create_app(session: Session) -> FastAPI:
     """The review app over one prepared sitting."""
-    app = FastAPI(title="STRIDE review", docs_url=None, redoc_url=None)
+    app = FastAPI(title="Review", docs_url=None, redoc_url=None)
     # Before anything else, so a rebound request is refused rather than
     # reaching the one endpoint in this repository that writes a human
     # judgement. See LOOPBACK_HOSTS for what binding alone does not stop.
@@ -238,6 +273,9 @@ def create_app(session: Session) -> FastAPI:
         payload["remaining"] = len(remaining)
         payload["source"] = session.sources.get(item.finding.case, "")
         payload["reasons"] = _reason_payload()
+        # Picked here rather than in the page, so the browser holds one
+        # finding's question and never the whole table.
+        payload["question"] = QUESTIONS[item.finding.framework]
         return JSONResponse(payload)
 
     @app.post("/api/vote")
@@ -409,7 +447,7 @@ _REVIEW_PAGE = (
 <title>Review</title><style nonce="__CSP_NONCE__">"""
     + _STYLE
     + """</style></head><body>
-<h1>Could this happen?</h1>
+<h1 id="heading">Review</h1>
 <div class="bar">
   <span>Reviewer: <b><!--voter--></b></span>
   <span id="left"></span>
@@ -432,10 +470,10 @@ _REVIEW_PAGE = (
     </div>
   </div>
 
-  <p class="ask">Could this attack happen in this system?</p>
+  <p class="ask" id="ask"></p>
   <div>
-    <button class="primary" id="up">Yes — this is real</button>
-    <button class="primary" id="down">No, or not as written</button>
+    <button class="primary" id="up"></button>
+    <button class="primary" id="down"></button>
     <button id="unsure">Unsure</button>
     <button id="evidence">Needs more evidence</button>
   </div>
@@ -470,6 +508,12 @@ _REVIEW_PAGE = (
       return;
     }
     el("left").textContent = item.remaining + " left";
+    // The question is the package's, not this page's: a threat and a
+    // requirement are not ruled on in the same words.
+    el("heading").textContent = item.question.heading;
+    el("ask").textContent = item.question.ask;
+    el("up").textContent = item.question.yes;
+    el("down").textContent = item.question.no;
     el("case").textContent = item.case + " / " + item.lane;
     el("why").textContent = "You are being asked because " + item.why + ".";
     el("source").textContent = item.source;

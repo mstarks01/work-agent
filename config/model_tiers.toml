@@ -19,9 +19,9 @@
 # in the same breath, and the fix is a rename, not a merge.
 #
 # WHY THE KEYS MOVED: `Analyst` now names a human — the person reading the
-# report — so the six nodes are named for what they do. They analyse one STRIDE
-# category each, hence `analyze/<category>`. The graph's own node names are a
-# separate namespace and move in the same cutover as the report schema; see
+# report — so the nodes are named for what they do. Each one analyses a single
+# lane, hence `analyze/`. The graph's own node names are a separate namespace
+# and move in the same cutover as the report schema; see
 # `TIER_NODE_BY_GRAPH_NODE` in graph.py for the mapping between the two.
 #
 # Version 3 (wayfinder #5 / #9 / #15) was itself a hard cutover from version 2:
