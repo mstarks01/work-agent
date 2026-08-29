@@ -2036,7 +2036,15 @@ class FrameworkAnalysis(BaseModel):
         for claim in self.all_claims():
             refs = [
                 *claim.affected_element_ids,
-                *(ref.element_id for ref in claim.verdict.related_unknowns),
+                # Only the model-reference spelling names an element. A
+                # ``subject`` states a question about something the model has
+                # no slot for, so there is nothing here to resolve and an empty
+                # ``element_id`` is the shape rather than a dangling reference.
+                *(
+                    ref.element_id
+                    for ref in claim.verdict.related_unknowns
+                    if ref.names_an_element
+                ),
             ]
             issues += [
                 f"claim {claim.id!r} references element {ref!r}, which is"

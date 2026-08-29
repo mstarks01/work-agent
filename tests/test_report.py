@@ -111,6 +111,28 @@ class TestVerdictShapes:
         assert verdict.related_unknowns[0].subject
         assert not verdict.related_unknowns[0].names_an_element
 
+    def test_a_subject_only_ref_is_not_a_dangling_element_reference(self):
+        """The referential check must skip the spelling that names no element.
+
+        Found by a fixture rather than by a run: every live subject so far
+        arrived beside an element reference the critic also filled in, so the
+        pure case was never exercised. An empty ``element_id`` is the shape
+        here, not a reference to nothing.
+        """
+        report = sample_report(
+            [
+                sample_threat(
+                    verdict=Verdict(
+                        status="needs-info",
+                        reason="the input does not settle it",
+                        related_unknowns=[UnknownRef(subject="is the policy written")],
+                    )
+                )
+            ]
+        )
+
+        assert report.analyses[0].claims[0].verdict.related_unknowns[0].subject
+
     def test_needs_info_with_unknown_ref_is_accepted(self):
         verdict = Verdict(
             status="needs-info",
