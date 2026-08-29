@@ -30,6 +30,7 @@ from __future__ import annotations
 import argparse
 import hashlib
 import json
+import re
 import subprocess
 import tomllib
 from collections.abc import Callable, Iterator, Sequence
@@ -46,7 +47,7 @@ from pydantic import ValidationError
 from evals.harness import baseline, comparison, ledger, roster
 from evals.harness.artifact import ProvenanceError
 from evals.harness.reference import CaseSitting
-from evals.harness.sitting import required_files
+from evals.harness.sitting import claim_files, document_name, required_files
 
 REPO_ROOT = Path(__file__).resolve().parents[2]
 
@@ -440,12 +441,65 @@ def _sitting_cases(root: Path) -> list[str]:
     return _subdirs(root, KINDS["sitting"].prefix)
 
 
+#: The shape a declared framework name holds before it reaches a path. The
+#: allowlist derives a claim file from the case's own metadata, so a name
+#: carrying a separator would name a file outside the case's ``claims``
+#: directory (A01). A package nobody wrote yet still passes it: every package
+#: this repository ships is a lowercase slug.
+_FRAMEWORK_NAME = re.compile(r"[a-z0-9]+(?:-[a-z0-9]+)*")
+
+
+def _declared_frameworks(root: Path, case: str) -> list[str]:
+    """Every framework one case declares, in the order it declares them.
+
+    Fail-closed and quiet: a case whose metadata cannot be read, or whose
+    declaration is the wrong shape, declares nothing here. The checks that
+    read the metadata report that, and an allowlist which raised would answer
+    a scope question with a parse error.
+    """
+    path = root / KINDS["sitting"].prefix / case / "case.json"
+    try:
+        raw = json.loads(path.read_text(encoding="utf-8"))
+    except (OSError, json.JSONDecodeError):
+        return []
+    declared = raw.get("frameworks") if isinstance(raw, dict) else None
+    if not isinstance(declared, list):
+        return []
+    names = [entry.get("name") for entry in declared if isinstance(entry, dict)]
+    return [
+        name
+        for name in names
+        if isinstance(name, str) and _FRAMEWORK_NAME.fullmatch(name)
+    ]
+
+
 def _sitting_allowlist(root: Path, author: str) -> list[str]:
-    prefixes = tuple(
-        f"{KINDS['sitting'].prefix}{case}/" for case in _sitting_cases(root)
-    )
-    changed = [rel for rel in _changed_paths(root) if rel.startswith(prefixes)]
-    return [*changed, CASE_REVIEW_TEST, ROSTER_FILE]
+    """A sitting may change an answer. It may never change the question.
+
+    Under each touched case: the case metadata, this reader's own filled
+    reading document, and one claim file per framework the case declares
+    (#388). The reference sets are the answer under review, so a reader who
+    corrects one does what #327 asks for. The sources and the blessed
+    **System Model** are the question, so an edit to either falls outside
+    and fails scope — a reader who rewrites the question makes their own
+    read unfalsifiable.
+
+    The claim files come from the case's own declaration rather than a list
+    here, so a **Framework Package** nobody wrote yet is covered the moment a
+    case declares it. The document name comes from the authenticated login
+    rather than from the appended entry, so no name the diff supplies can
+    widen the list.
+    """
+    allowed = [
+        f"{KINDS['sitting'].prefix}{case}/{name}"
+        for case in _sitting_cases(root)
+        for name in [
+            "case.json",
+            document_name(author),
+            *claim_files(_declared_frameworks(root, case)),
+        ]
+    ]
+    return [*allowed, CASE_REVIEW_TEST, ROSTER_FILE]
 
 
 def _new_sittings(root: Path, case: str) -> tuple[list[dict], list[str]]:

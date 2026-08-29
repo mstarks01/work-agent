@@ -73,6 +73,14 @@ files. `_new_sittings` carries the replacement, because it already returns the p
 "appends no sitting entry": a case directory in the diff with no new `reviews` entry that
 names the author refuses the submission. A reader cannot carry a case they did not sit.
 
+> **Amended by [#388](https://github.com/mstarks01/work-agent/issues/388).** The allowlist
+> no longer builds itself from the changed paths. Under each touched case it names the case
+> metadata, the reader's own `REVIEW-<login>.md`, and one claim file per framework the case
+> declares. A sitting may change an answer, never the question it answers, so an edit to the
+> blessed **System Model** or to a declared source now fails scope. The guard this paragraph
+> describes is unchanged, and #327's rule that a claim edit travels with its record still
+> holds — a reference set is an answer.
+
 **The checklist length does not move.** Each per-case check loops and collects the problems
 of every case into one line, so the sitting checklist is eight lines whatever N is. The
 check names are the contract the reader reads, and 104 lines at thirteen cases would bury

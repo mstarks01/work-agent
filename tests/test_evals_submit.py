@@ -76,7 +76,13 @@ def seed_case(clone: Path, case: str) -> Path:
     (case_dir / "claims" / "stride.json").write_text("[]\n", encoding="utf-8")
     (case_dir / "case.json").write_text(
         json.dumps(
-            {"id": case, "frameworks": [{"name": "stride"}], "reviews": []}, indent=2
+            {
+                "id": case,
+                "sources": [{"kind": "description", "file": "source.md"}],
+                "frameworks": [{"name": "stride"}],
+                "reviews": [],
+            },
+            indent=2,
         )
         + "\n",
         encoding="utf-8",
@@ -731,3 +737,102 @@ class TestTheDeltaCache:
         assert "stray.txt" not in before
         assert "stray.txt" in after
         assert submit._DELTA == {}
+
+
+class TestASittingChangesAnAnswerNeverAQuestion:
+    """#388: the sources and the model are the question the reader answers."""
+
+    def test_a_claim_correction_passes_every_check(self, repo):
+        """#327's rule survives: the edit and the record travel together."""
+        claims = repo / "evals" / "corpus" / CASE / "claims" / "stride.json"
+        claims.write_text('[{"claim": "corrected"}]\n', encoding="utf-8")
+        prepare_sitting(repo)
+        git(repo, "fetch", "origin")
+        checks = submit._sitting_preflight(repo, "ada")
+        assert not [check.name for check in checks if not check.passed]
+
+    def test_editing_the_blessed_model_fails_scope(self, repo):
+        prepare_sitting(repo)
+        (repo / "evals" / "corpus" / CASE / "model.json").write_text(
+            '{"edited": true}\n', encoding="utf-8"
+        )
+        git(repo, "fetch", "origin")
+        check = submit._check_scope(repo, "ada", kind_name="sitting")
+        assert not check.passed
+        assert any(f"evals/corpus/{CASE}/model.json" in p for p in check.problems)
+
+    def test_editing_a_declared_source_fails_scope(self, repo):
+        prepare_sitting(repo)
+        (repo / "evals" / "corpus" / CASE / "source.md").write_text(
+            "a different system\n", encoding="utf-8"
+        )
+        git(repo, "fetch", "origin")
+        check = submit._check_scope(repo, "ada", kind_name="sitting")
+        assert not check.passed
+        assert any(f"evals/corpus/{CASE}/source.md" in p for p in check.problems)
+
+    def test_another_readers_document_fails_scope(self, repo):
+        prepare_sitting(repo)
+        (repo / "evals" / "corpus" / CASE / "REVIEW-sam.md").write_text(
+            "someone else's copy\n", encoding="utf-8"
+        )
+        git(repo, "fetch", "origin")
+        check = submit._check_scope(repo, "ada", kind_name="sitting")
+        assert not check.passed
+        assert any(f"evals/corpus/{CASE}/REVIEW-sam.md" in p for p in check.problems)
+
+    def test_the_claim_files_come_from_the_declaration(self, repo):
+        """A package nobody wrote is covered the moment a case declares it."""
+        case_dir = repo / "evals" / "corpus" / CASE
+        meta = json.loads((case_dir / "case.json").read_text(encoding="utf-8"))
+        meta["frameworks"].append({"name": "newthing"})
+        (case_dir / "case.json").write_text(
+            json.dumps(meta, indent=2) + "\n", encoding="utf-8"
+        )
+        (case_dir / "claims" / "newthing.json").write_text(
+            '[{"claim": "the new package says so"}]\n', encoding="utf-8"
+        )
+        prepare_sitting(
+            repo,
+            read=[
+                "source.md",
+                "model.json",
+                "claims/stride.json",
+                "claims/newthing.json",
+            ],
+        )
+        git(repo, "fetch", "origin")
+        assert f"evals/corpus/{CASE}/claims/newthing.json" in submit._sitting_allowlist(
+            repo, "ada"
+        )
+        checks = submit._sitting_preflight(repo, "ada")
+        assert not [check.name for check in checks if not check.passed]
+
+    def test_the_allowlist_keeps_the_shared_files(self, repo):
+        prepare_sitting(repo)
+        git(repo, "fetch", "origin")
+        allowed = submit._sitting_allowlist(repo, "ada")
+        assert submit.CASE_REVIEW_TEST in allowed
+        assert submit.ROSTER_FILE in allowed
+
+    def test_a_document_named_in_the_entry_admits_nothing(self, repo):
+        """The name is the author's own; an entry cannot widen the list."""
+        prepare_sitting(repo, document="model.json", write_document=False)
+        git(repo, "fetch", "origin")
+        assert f"evals/corpus/{CASE}/model.json" not in submit._sitting_allowlist(
+            repo, "ada"
+        )
+
+    def test_a_declared_name_never_reaches_outside_the_case(self, repo):
+        """The name reaches a path, so a separator in one names nothing."""
+        case_dir = repo / "evals" / "corpus" / CASE
+        meta = json.loads((case_dir / "case.json").read_text(encoding="utf-8"))
+        meta["frameworks"].append({"name": "../../../src/stride_service/report"})
+        (case_dir / "case.json").write_text(
+            json.dumps(meta, indent=2) + "\n", encoding="utf-8"
+        )
+        prepare_sitting(repo)
+        git(repo, "fetch", "origin")
+        allowed = submit._sitting_allowlist(repo, "ada")
+        assert all(rel.startswith(("evals/", "tests/")) for rel in allowed)
+        assert not [rel for rel in allowed if ".." in rel]
