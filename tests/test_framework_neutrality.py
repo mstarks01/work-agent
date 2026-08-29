@@ -22,7 +22,7 @@ half the system, which is why an audit found them and a test suite did not.
 Sorting the fixes by what they touched gives one usable rule:
 
 * **A table keyed by framework was always already correct.**
-  :data:`~stride_service.frameworks.PACKAGES`, ``SCHEMAS``,
+  :data:`~analysis_service.frameworks.PACKAGES`, ``SCHEMAS``,
   ``REFERENCE_TYPES``, and the five maps in ``evals/verify_corpus.py`` all
   needed no change when ASVS landed. A missing key raises ``KeyError`` at the
   first call, so the edit is forced.
@@ -61,36 +61,34 @@ from pathlib import Path
 
 import pytest
 
+from analysis_service.frameworks import CONTENT_LICENSE, PACKAGES
 from evals.harness.instruments import INSTRUMENTS, PACKAGE_SCORERS
-from stride_service.frameworks import CONTENT_LICENSE, PACKAGES
 from tests.factories import SCRIPTED_FRAMEWORKS
 
 REPO_ROOT = Path(__file__).resolve().parents[1]
 SEARCHED = ("src", "evals", "webapp")
 
 #: A string literal naming a framework. Import paths and module names are not
-#: matched — ``stride_service`` is this distribution's name, not a package
+#: matched — ``analysis_service`` is this distribution's name, not a package
 #: selection, and ``frameworks.stride.record`` is a module.
 LITERAL = re.compile(r'"(?:stride|asvs)"')
 
 #: A framework's name anywhere inside a word, which is what :data:`LITERAL`
-#: cannot see. ``StrideEngine`` and ``stride_pipeline`` are both a framework
+#: cannot see. ``Engine`` and ``analysis_pipeline`` are both a framework
 #: name on a thing that serves every framework, and neither is a string
 #: literal, so the scan above ran past them for two packages.
 IDENTIFIER = re.compile(r"[A-Za-z_][A-Za-z0-9_]*")
 
-#: This distribution's own name. Stripped before either scan, because it names
-#: the wheel rather than a package selection.
-DISTRIBUTION = re.compile(r"stride_service")
-
-#: A framework's name inside a word, once the distribution name is gone.
+#: A framework's name inside a word. Nothing has to be stripped first: the
+#: distribution, the package and the environment prefix all name what this is
+#: rather than which framework it started as, so any hit here is a real one.
 IN_WORD = re.compile(r"stride|asvs", re.IGNORECASE)
 
 #: Where a framework literal is allowed, and why. Two readings live here and the
 #: reason has to say which:
 #:
 #: **"a table keyed by framework"** — self-completing. A package added to
-#: :data:`~stride_service.frameworks.PACKAGES` and missing here raises at the
+#: :data:`~analysis_service.frameworks.PACKAGES` and missing here raises at the
 #: first call, so nothing can be silently half-done.
 #:
 #: **"this code is that framework's"** — a framework-specific instrument naming
@@ -100,15 +98,15 @@ IN_WORD = re.compile(r"stride|asvs", re.IGNORECASE)
 #: An entry that is neither is a gap. There are none today; if one appears, say
 #: so in the reason rather than filing it beside the legitimate ones.
 DECLARED: dict[str, str] = {
-    "src/stride_service/report.py": (
+    "src/analysis_service/report.py": (
         "The registry. `FrameworkName` is the closed type every other module"
         " reads, so this is the one place the names are spelled at all."
     ),
-    "src/stride_service/frameworks/__init__.py": (
+    "src/analysis_service/frameworks/__init__.py": (
         "Tables keyed by framework: PACKAGES and SCHEMAS. Self-completing — a"
         " package missing from either raises at `package_for`."
     ),
-    "src/stride_service/engine.py": (
+    "src/analysis_service/engine.py": (
         "A module-level demo entry point selecting one framework to run, the"
         " way a caller does. Not a code path any job takes."
     ),
@@ -204,30 +202,20 @@ DECLARED: dict[str, str] = {
 }
 
 
-#: A framework's name on a service-wide thing, left in place **by decision**
-#: rather than because it is right. Keyed by the name, not by the file, so one
-#: deferred decision costs one row however many modules spell it.
+#: A framework's name on a service-wide thing, kept **by decision** rather than
+#: because it is right. Keyed by the name, not by the file, so one decision
+#: costs one row however many modules spell it.
+#:
+#: **Empty, and that is the state to keep it in.** Nothing outside a package
+#: root carries a framework's name today, so the check below is absolute rather
+#: than a rule with exceptions. A row here buys time for a rename that is bigger
+#: than the pull request finding it — public surface, a recorded identifier — and
+#: it is a debt, not a permission.
 #:
 #: This is not a second exemption list for :data:`DECLARED`. An entry there says
 #: the code genuinely belongs to one framework; an entry here says the code
-#: belongs to all of them and carries one framework's name anyway. A row leaves
-#: when the rename lands, and nothing else empties it.
-OPEN_BY_DECISION: dict[str, str] = {
-    "StrideEngine": (
-        "The in-process entry point, built for whatever selection a caller"
-        " names. Renaming it breaks every embedder and the wheel's public"
-        " surface, so it moves with the distribution rather than before it."
-    ),
-    "stride_pipeline": (
-        "The graph's default workflow name, which ADK stamps into the node"
-        " paths a run reports. Renaming it changes recorded provenance, so it"
-        " moves with the distribution."
-    ),
-    "STRIDE_": (
-        "The environment-variable prefix, on all 21 names the service reads."
-        " It is one namespace and one cutover, not one decision per variable."
-    ),
-}
+#: belongs to all of them and carries one framework's name anyway.
+OPEN_BY_DECISION: dict[str, str] = {}
 
 
 def _docstrings(tree: ast.AST) -> set[int]:
@@ -279,9 +267,7 @@ def _framework_named_words(source: Path) -> set[str]:
         ):
             words.update(IDENTIFIER.findall(node.value))
     return {
-        word
-        for word in words
-        if IN_WORD.search(DISTRIBUTION.sub("", word)) and word.lower() not in PACKAGES
+        word for word in words if IN_WORD.search(word) and word.lower() not in PACKAGES
     }
 
 
@@ -447,8 +433,8 @@ def test_a_new_framework_literal_is_declared(literals):
 def test_a_framework_named_thing_is_declared_or_open(literals):
     """A class or a value may not carry a framework's name unexplained.
 
-    The half :data:`LITERAL` is blind to. ``StrideEngine`` and
-    ``stride_pipeline`` are a framework's name on something every framework
+    The half :data:`LITERAL` is blind to. ``Engine`` and
+    ``analysis_pipeline`` are a framework's name on something every framework
     uses, and neither is a string literal, so the scan above walked past both
     while two packages shipped. A name is fine here on one of two showings: its
     file is in :data:`DECLARED`, so the code is that framework's, or the name is
@@ -520,7 +506,7 @@ def test_every_declaration_gives_a_reason(literals):
 def test_the_service_carries_no_framework_selection_of_its_own():
     """`src/` is the boundary the cutover got right, and it stays right.
 
-    Everything under `src/stride_service/` outside the two package roots names a
+    Everything under `src/analysis_service/` outside the two package roots names a
     framework in exactly three places: the closed type, the two registry tables,
     and one demo entry point. A fourth is a job path choosing a framework for a
     caller, which is the caller's decision.
@@ -528,12 +514,12 @@ def test_the_service_carries_no_framework_selection_of_its_own():
     service = {
         name
         for name in framework_literals()
-        if name.startswith("src/") and name not in {"src/stride_service/engine.py"}
+        if name.startswith("src/") and name not in {"src/analysis_service/engine.py"}
     }
 
     assert service == {
-        "src/stride_service/report.py",
-        "src/stride_service/frameworks/__init__.py",
+        "src/analysis_service/report.py",
+        "src/analysis_service/frameworks/__init__.py",
     }
 
 
@@ -552,7 +538,7 @@ def test_every_registered_package_is_a_declared_name(framework):
 
 def test_the_pattern_covers_the_whole_registry():
     """And the parametrize above covers the whole registry, not a fixed pair."""
-    from stride_service.frameworks import PACKAGES
+    from analysis_service.frameworks import PACKAGES
 
     assert set(PACKAGES) == {"stride", "asvs"}, (
         "PACKAGES has changed. Widen LITERAL and the parametrize above it, then"
@@ -653,7 +639,7 @@ def test_no_scorer_names_a_package_this_build_does_not_carry():
 # no quote verification, no catalog membership. Neither raised. Both passed.
 #
 # **The signal is an import, not a literal.** Both bugs reached one package
-# through ``from stride_service.frameworks.stride...``, and the literal scan
+# through ``from analysis_service.frameworks.stride...``, and the literal scan
 # above would have caught only the directory half of the first one. So this asks
 # a different question of a smaller set of files, and asks it of the syntax tree
 # rather than the text, because a docstring naming a framework is prose.
@@ -673,7 +659,7 @@ DECLARED_LINT_IMPORTS: dict[str, str] = {}
 
 
 def _package_imports(source: Path) -> list[str]:
-    """Every ``stride_service.frameworks.<package>`` module ``source`` imports.
+    """Every ``analysis_service.frameworks.<package>`` module ``source`` imports.
 
     Parsed rather than grepped. These files argue about frameworks by name in
     almost every docstring — the reasons #276 and #280 happened are written in
@@ -686,7 +672,7 @@ def _package_imports(source: Path) -> list[str]:
             for node in ast.walk(tree)
             if isinstance(node, ast.ImportFrom) and node.module
             for name in PACKAGES
-            if node.module.startswith(f"stride_service.frameworks.{name}")
+            if node.module.startswith(f"analysis_service.frameworks.{name}")
         }
     )
 
@@ -790,8 +776,7 @@ def test_no_page_names_a_framework():
         name: [
             (number, line.strip())
             for number, line in lines
-            if IN_WORD.search(DISTRIBUTION.sub("", line))
-            and not PAGE_COMMENT.search(line)
+            if IN_WORD.search(line) and not PAGE_COMMENT.search(line)
         ]
         for name, lines in page_text().items()
     }

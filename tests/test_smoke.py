@@ -19,24 +19,24 @@ from __future__ import annotations
 import asyncio
 from pathlib import Path
 
-from stride_service import smoke
-from stride_service.deployment import Deployment
-from stride_service.engine import StrideEngine
-from stride_service.graph import (
+from analysis_service import smoke
+from analysis_service.deployment import Deployment
+from analysis_service.engine import Engine
+from analysis_service.graph import (
     ASSEMBLE_NODE,
     EXTRACT_NODE,
     tier_node_by_graph_node,
 )
-from stride_service.jobs import (
+from analysis_service.jobs import (
     JobRecord,
     NodeCallback,
     PipelineCompleted,
     PipelineOutcome,
     PipelineRejected,
 )
-from stride_service.report import NodeRun, Report
-from stride_service.sampling import sampling_fingerprint
-from stride_service.smoke import (
+from analysis_service.report import NodeRun, Report
+from analysis_service.sampling import sampling_fingerprint
+from analysis_service.smoke import (
     ANALYST,
     BINDING,
     CHECKS,
@@ -58,8 +58,8 @@ from stride_service.smoke import (
     required_nodes,
     run_smoke,
 )
-from stride_service.validation import ValidationIssue
-from stride_service.vendors import join_served
+from analysis_service.validation import ValidationIssue
+from analysis_service.vendors import join_served
 from tests.factories import (
     DEFAULT_FRAMEWORKS,
     TEST_TIER_ENV,
@@ -84,7 +84,7 @@ DEPLOYMENT = Deployment.from_env(env=TEST_TIER_ENV)
 # because each brings tier keys an operator may point at a different vendor.
 LLM_NODES = required_nodes(DEFAULT_FRAMEWORKS)
 ANALYZE_NODES = analyze_nodes(DEFAULT_FRAMEWORKS)
-(STRIDE_CRITIC_NODE,) = critic_nodes(DEFAULT_FRAMEWORKS)
+(ANALYSIS_CRITIC_NODE,) = critic_nodes(DEFAULT_FRAMEWORKS)
 #: This graph's node -> tier map, built for the selection above.
 TIER_NODES = tier_node_by_graph_node(DEFAULT_FRAMEWORKS)
 
@@ -220,7 +220,7 @@ class TestTheApplicationsFailures:
 
     def test_a_run_with_no_critic_fails_the_critic_check(self):
         report = smoke_report(
-            nodes=[node_run(node) for node in LLM_NODES if node != STRIDE_CRITIC_NODE]
+            nodes=[node_run(node) for node in LLM_NODES if node != ANALYSIS_CRITIC_NODE]
         )
         assert result_for(report)[CRITIC].result is CheckResult.FAILED
 
@@ -324,7 +324,7 @@ class TestALaneThatNeverRan:
         assert not result.exercised
         assert result.failed
         assert all(check.result is CheckResult.UNKNOWN for check in result.checks)
-        assert "STRIDE_OPENAI_API_KEY" in (result.failure or "")
+        assert "ANALYSIS_OPENAI_API_KEY" in (result.failure or "")
 
     def test_the_failure_text_carries_no_credential_value(self):
         """Provider errors can echo the request; a job summary outlives the run.
@@ -335,14 +335,14 @@ class TestALaneThatNeverRan:
         """
         key = "sk-live-do-not-log-me"
         deployment = Deployment.from_env(
-            env=TEST_TIER_ENV | {"STRIDE_OPENAI_API_KEY": key}
+            env=TEST_TIER_ENV | {"ANALYSIS_OPENAI_API_KEY": key}
         )
         redacted = _redacted(
             f"provider rejected Authorization: Bearer {key}", deployment
         )
 
         assert key not in redacted
-        assert "STRIDE_OPENAI_API_KEY" in redacted
+        assert "ANALYSIS_OPENAI_API_KEY" in redacted
 
 
 class TestDrivingTheEngine:
@@ -356,14 +356,14 @@ class TestDrivingTheEngine:
 
     def smoke_with(self, monkeypatch, outcome):
         """``run_smoke`` against a stubbed runner, with no adapters to build."""
-        engine = StrideEngine(
+        engine = Engine(
             StubRunner(outcome),
             limits=DEPLOYMENT.resilience.source_limits(),
             deadline_seconds=DEPLOYMENT.resilience.deadline_seconds(),
             frameworks=sample_selection(),
         )
         monkeypatch.setattr(
-            smoke.StrideEngine,
+            smoke.Engine,
             "from_deployment",
             # The smoke run names the selection now — every carried framework —
             # so the stand-in takes it and ignores it.
@@ -414,7 +414,8 @@ class TestDrivingTheEngine:
         assert all(check.result is CheckResult.PASSED for check in result.checks)
         assert set(result.tiers) == {"base", "strong"}
         assert (
-            result.tiers["base"]["vendor"] == TEST_TIER_ENV["STRIDE_MODEL_BASE_VENDOR"]
+            result.tiers["base"]["vendor"]
+            == TEST_TIER_ENV["ANALYSIS_MODEL_BASE_VENDOR"]
         )
 
     def test_a_rejected_input_is_an_extraction_finding_not_a_crash(self, monkeypatch):
@@ -484,11 +485,11 @@ class TestTheRenderedSummary:
                 checks=tuple(
                     Check(name, CheckResult.UNKNOWN, "nothing ran") for name in CHECKS
                 ),
-                failure="ProviderAuthError: vendor 'openai' needs STRIDE_OPENAI_API_KEY",
+                failure="ProviderAuthError: vendor 'openai' needs ANALYSIS_OPENAI_API_KEY",
             )
         )
         assert "unexercised" in rendered
-        assert "STRIDE_OPENAI_API_KEY" in rendered
+        assert "ANALYSIS_OPENAI_API_KEY" in rendered
 
 
 class TestTheFixture:

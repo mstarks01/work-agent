@@ -95,7 +95,7 @@
 # sits on the same tier, equally unconstrained, and fails the same way. See
 # sampling.py.
 #
-# Env overrides STRIDE_SAMPLING_{TIER}_{PARAM} retune the OFFERED params
+# Env overrides ANALYSIS_SAMPLING_{TIER}_{PARAM} retune the OFFERED params
 # (temperature, top_p, seed, thinking, max_output_tokens, constrain_output) at
 # deploy time,
 # validated exactly like the file value and captured by the run's fingerprint.

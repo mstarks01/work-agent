@@ -16,6 +16,8 @@ from pathlib import Path
 
 import pytest
 
+from analysis_service.report import TokenUsage
+from analysis_service.sampling import TierSampling, sampling_fingerprint
 from evals.harness import baseline, prices
 from evals.harness.artifact import ARTIFACT_VERSION, load_artifact
 from evals.harness.baseline import (
@@ -27,8 +29,6 @@ from evals.harness.baseline import (
 )
 from evals.harness.prices import UnitPrices
 from evals.harness.provenance import RunProvenance
-from stride_service.report import TokenUsage
-from stride_service.sampling import TierSampling, sampling_fingerprint
 
 COMMIT = "c" * 40
 CORPUS = "d" * 64

@@ -70,6 +70,7 @@ REPO_ROOT = Path(__file__).resolve().parents[1]
 if str(REPO_ROOT) not in sys.path:
     sys.path.insert(0, str(REPO_ROOT))
 
+from analysis_service.frameworks import PACKAGES
 from evals import verify_corpus
 from evals.harness import queue as review_queue
 from evals.harness.fingerprint import identifier_of, lane_field
@@ -85,7 +86,6 @@ from evals.harness.ledger import (
     load,
 )
 from evals.harness.reference import load_corpus
-from stride_service.frameworks import PACKAGES
 from webapp.main import LOOPBACK_HOSTS, SecurityHeaders, refuse_cross_origin
 
 HOST = "127.0.0.1"

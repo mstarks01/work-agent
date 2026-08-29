@@ -135,7 +135,7 @@ jobs:
           {
             echo "## Provider capability matrix"
             echo
-            uv run python -m stride_service.conformance
+            uv run python -m analysis_service.conformance
           } >>"$GITHUB_STEP_SUMMARY"
 
       # Says what did NOT run, in the same summary as what did.

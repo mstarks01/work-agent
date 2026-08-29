@@ -2,13 +2,13 @@
 
 import pytest
 
-from stride_service.domains import (
+from analysis_service.domains import (
     DETECTORS,
     MAX_PACKS,
     pack_evidence,
     select_domain_packs,
 )
-from stride_service.system_model import (
+from analysis_service.system_model import (
     DataFlow,
     DataStore,
     Process,

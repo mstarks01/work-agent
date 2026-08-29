@@ -3,7 +3,7 @@
 Two properties carry the whole design and both are pinned here: the catalog is
 a pure function of the validated System Model, and resolution is total over the
 catalog and refuses everything else. Together they are what makes a mis-shaped
-:class:`~stride_service.report.Ground` unreachable from an agent rather than
+:class:`~analysis_service.report.Ground` unreachable from an agent rather than
 merely rare — the last class in this module is the traceback that motivated the
 cutover, asserted to be inexpressible.
 """
@@ -13,7 +13,7 @@ from __future__ import annotations
 import pytest
 from pydantic import ValidationError
 
-from stride_service.evidence import (
+from analysis_service.evidence import (
     absent_evidence_ref,
     crossing_evidence_ref,
     evidence_catalog,
@@ -22,10 +22,10 @@ from stride_service.evidence import (
     resolve_proposals,
     unknown_evidence_ref,
 )
-from stride_service.frameworks.stride import STRIDE
-from stride_service.frameworks.stride.record import ThreatProposal, ThreatProposals
-from stride_service.report import Ground
-from stride_service.system_model import UNKNOWN, DataStore, SystemModel
+from analysis_service.frameworks.stride import STRIDE
+from analysis_service.frameworks.stride.record import ThreatProposal, ThreatProposals
+from analysis_service.report import Ground
+from analysis_service.system_model import UNKNOWN, DataStore, SystemModel
 from tests.factories import sample_draft, sample_proposal, valid_model
 
 ENCRYPTION_REF = "unknown:store:orders-db:encryption_at_rest"

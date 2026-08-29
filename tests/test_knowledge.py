@@ -16,15 +16,15 @@ from __future__ import annotations
 
 from pathlib import Path
 
-from stride_service.frameworks.stride import CASES, NOTES, STRIDE
-from stride_service.knowledge import (
+from analysis_service.frameworks.stride import CASES, NOTES, STRIDE
+from analysis_service.knowledge import (
     MAX_CASES,
     MAX_NOTES,
     compose_cases,
     compose_notes,
     select_documents,
 )
-from stride_service.markdown_loader import MarkdownLoader
+from analysis_service.markdown_loader import MarkdownLoader
 
 PROJECT_ROOT = Path(__file__).resolve().parents[1]
 # The package's own text root: a document's home follows its retrieval key,
@@ -139,11 +139,11 @@ class TestTheCorpusCannotBecomeEvidence:
         under a subpackage (``frameworks/<name>/``) must stay covered by this
         allowlist rather than escaping a flat, non-recursive glob.
         """
-        package = PROJECT_ROOT / "src" / "stride_service"
+        package = PROJECT_ROOT / "src" / "analysis_service"
         importers = {
             path.relative_to(package).as_posix()
             for path in package.rglob("*.py")
-            if "from stride_service.knowledge import" in path.read_text()
+            if "from analysis_service.knowledge import" in path.read_text()
         }
         assert importers == {"graph.py"}
 
@@ -155,10 +155,10 @@ class TestTheCorpusCannotBecomeEvidence:
         by path, so it keeps failing loud even if the allowlist test above is
         ever weakened or deleted.
         """
-        package = PROJECT_ROOT / "src" / "stride_service"
+        package = PROJECT_ROOT / "src" / "analysis_service"
         for module in ("evidence.py", "critic.py"):
             source = (package / module).read_text()
-            assert "from stride_service.knowledge import" not in source
+            assert "from analysis_service.knowledge import" not in source
 
     def test_a_document_id_is_never_an_evidence_reference(self):
         """The two ID spaces cannot collide.

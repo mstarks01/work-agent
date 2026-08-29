@@ -16,11 +16,11 @@ from __future__ import annotations
 
 import pytest
 
+from analysis_service.frameworks.stride.record import StrideCategory
+from analysis_service.report import FrameworkName
 from evals.harness import writing
 from evals.harness.fingerprint import key_claim
 from evals.harness.ledger import Ledger, Vote
-from stride_service.frameworks.stride.record import StrideCategory
-from stride_service.report import FrameworkName
 from tests.eval_factories import produced_threat
 from tests.factories import sample_report
 from tests.test_asvs import _block as asvs_block

@@ -1,6 +1,6 @@
 """The live sweep's path filter, kept honest against what ``evals/`` imports.
 
-``.github/workflows/evals-live.yml`` sweeps ``src/stride_service/**`` and
+``.github/workflows/evals-live.yml`` sweeps ``src/analysis_service/**`` and
 subtracts the modules the eval harness cannot reach. The subtraction is the
 part that rots: a module that acquires a job on the eval path stays excluded,
 and the sweep silently stops covering it. So the closure is recomputed here
@@ -20,9 +20,9 @@ from pathlib import Path
 import pytest
 
 REPO_ROOT = Path(__file__).resolve().parents[1]
-PACKAGE = REPO_ROOT / "src" / "stride_service"
+PACKAGE = REPO_ROOT / "src" / "analysis_service"
 WORKFLOW = REPO_ROOT / ".github" / "workflows" / "evals-live.yml"
-PACKAGE_GLOB = "src/stride_service/**"
+PACKAGE_GLOB = "src/analysis_service/**"
 
 #: Every workflow whose ``pull_request`` trigger is path-filtered to the agentic
 #: surface. Both name the same text trees, and both went wrong the same way, so
@@ -43,7 +43,7 @@ def _imported_modules(source: Path, modules: set[str]) -> set[str]:
     for node in ast.walk(ast.parse(source.read_text(encoding="utf-8"))):
         if isinstance(node, ast.ImportFrom):
             module = node.module or ""
-            if module.startswith("stride_service"):
+            if module.startswith("analysis_service"):
                 head = module.split(".")[1:2]
                 found |= set(head) & modules
                 if not head:
@@ -132,7 +132,7 @@ def test_every_swept_path_still_exists(workflow):
     nothing does not fail; it quietly narrows what fires, and it stays quiet
     until the one PR that needed it.
 
-    The negations are not checked. ``!src/stride_service/token_caps.py``
+    The negations are not checked. ``!src/analysis_service/token_caps.py``
     subtracts a real file today, and the test above already holds the exclusion
     list to ``evals/``'s import closure.
     """

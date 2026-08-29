@@ -7,11 +7,11 @@ candidate is a lead, and nothing downstream can turn one into a finding.
 
 import pytest
 
-from stride_service.candidates import Candidate, generate_candidates
-from stride_service.frameworks.stride import STRIDE
-from stride_service.frameworks.stride.record import STRIDE_CATEGORIES
-from stride_service.report import Ground
-from stride_service.system_model import (
+from analysis_service.candidates import Candidate, generate_candidates
+from analysis_service.frameworks.stride import STRIDE
+from analysis_service.frameworks.stride.record import STRIDE_CATEGORIES
+from analysis_service.report import Ground
+from analysis_service.system_model import (
     DataFlow,
     DataStore,
     ExternalEntity,
@@ -363,10 +363,10 @@ class TestCandidatesAreNotFindings:
         """
         from pathlib import Path
 
-        package = Path(__file__).resolve().parents[1] / "src" / "stride_service"
+        package = Path(__file__).resolve().parents[1] / "src" / "analysis_service"
         importers = {
             path.name
             for path in package.glob("*.py")
-            if "from stride_service.candidates import" in path.read_text()
+            if "from analysis_service.candidates import" in path.read_text()
         }
         assert importers == {"coverage.py", "graph.py"}

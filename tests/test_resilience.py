@@ -13,8 +13,8 @@ from pathlib import Path
 
 import pytest
 
-from stride_service.frameworks.stride.record import STRIDE_CATEGORIES
-from stride_service.resilience import (
+from analysis_service.frameworks.stride.record import STRIDE_CATEGORIES
+from analysis_service.resilience import (
     ATTEMPTS_VAR,
     JOB_DEADLINE_MS_VAR,
     MAX_ACTIVE_JOBS_VAR,
@@ -135,7 +135,7 @@ def test_http_options_carry_the_timeout():
 
 def test_the_backoff_knobs_stay_out_of_the_schema():
     # They were removed for connecting to nothing, and a curve now exists to
-    # describe — but it is pinned in stride_service.retry, because it does not
+    # describe — but it is pinned in analysis_service.retry, because it does not
     # vary by deployment. What varies is retry_budget_ratio.
     for knob in ("initial_delay", "max_delay", "exp_base", "jitter"):
         with pytest.raises(ValueError):

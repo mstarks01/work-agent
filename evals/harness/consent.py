@@ -49,10 +49,10 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Any, Literal
 
+from analysis_service.report import NodeRun, TokenUsage
 from evals.harness import baseline
 from evals.harness.artifact import load_artifact
 from evals.harness.prices import UnitPrices, price_calls, unit_prices
-from stride_service.report import NodeRun, TokenUsage
 
 Label = Literal["recorded", "estimated", "unpriced"]
 

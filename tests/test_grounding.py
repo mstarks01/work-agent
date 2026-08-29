@@ -9,7 +9,7 @@ contains.
 
 import pytest
 
-from stride_service.grounding import (
+from analysis_service.grounding import (
     REPAIR_THRESHOLD,
     normalize,
     repair_quote,

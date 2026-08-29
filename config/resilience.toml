@@ -8,9 +8,9 @@
 # parks a job in `running` forever. `attempts` and `timeout_ms` fix both.
 #
 # Unlike config/sampling.toml, every value here IS env-overridable
-# (STRIDE_RETRY_ATTEMPTS, STRIDE_TIMEOUT_MS, STRIDE_MAX_SOURCE_BYTES,
-# STRIDE_MAX_SOURCES, STRIDE_JOB_DEADLINE_MS, STRIDE_RETRY_BUDGET_RATIO,
-# STRIDE_MAX_ACTIVE_JOBS).
+# (ANALYSIS_RETRY_ATTEMPTS, ANALYSIS_TIMEOUT_MS, ANALYSIS_MAX_SOURCE_BYTES,
+# ANALYSIS_MAX_SOURCES, ANALYSIS_JOB_DEADLINE_MS, ANALYSIS_RETRY_BUDGET_RATIO,
+# ANALYSIS_MAX_ACTIVE_JOBS).
 # Sampling decides WHAT the model produces; nothing in this file can. Attempts, timeout and the budget change only HOW
 # HARD we try; the input bounds and the concurrency ceiling decide only whether
 # a submission is accepted at all, and the deadline only whether an answer
@@ -26,7 +26,7 @@
 # that was version 4's behaviour, and it is the defect.
 #
 # Version 4 (wayfinder #61) adds `job_deadline_ms` and `retry_budget_ratio`, and
-# moves the retry loop out of LiteLLM into `stride_service.retry` — see the note
+# moves the retry loop out of LiteLLM into `analysis_service.retry` — see the note
 # on each below. Hard cutover like the ones before it: a version-3 file fails the
 # check rather than inheriting defaults, because a deployment that has not chosen
 # a deadline or a retry budget is the state this version exists to end. Neither
@@ -41,8 +41,8 @@
 # initial_delay, max_delay, exp_base, jitter — because litellm picked its curve
 # internally and they connected to nothing. They stay dropped under version 4
 # even though a curve now exists to describe: it is pinned in
-# stride_service.retry because it does not vary by deployment. Their env vars
-# (STRIDE_RETRY_INITIAL_DELAY / _MAX_DELAY / _EXP_BASE / _JITTER) stay gone.
+# analysis_service.retry because it does not vary by deployment. Their env vars
+# (ANALYSIS_RETRY_INITIAL_DELAY / _MAX_DELAY / _EXP_BASE / _JITTER) stay gone.
 #
 # `attempts` is a TOTAL count, and as of version 4 it is literally the request
 # count per node. It was not before, and that gap was the 429 storm. LiteLLM's
@@ -55,7 +55,7 @@
 #
 # So the library's layer is OFF — binding.py sends num_retries = 0, which is
 # exactly one request per call — and the loop runs one level up in
-# stride_service.retry, under `retry_budget_ratio` below. Turning `attempts`
+# analysis_service.retry, under `retry_budget_ratio` below. Turning `attempts`
 # down still works and is still the blunt instrument; the budget is what makes
 # reaching for it rare.
 
@@ -152,7 +152,7 @@ max_sources = 10
 # reason it is enforced through `JobStore.active_for` rather than out of process
 # memory. Behind two instances with the per-instance `memory` store, each
 # instance enforces this number and the effective ceiling is the sum — the same
-# defect `STRIDE_JOB_STORE` fails closed over. Configure it against one
+# defect `ANALYSIS_JOB_STORE` fails closed over. Configure it against one
 # instance's share, or register a shared store and get a shared ceiling with no
 # change here.
 #
@@ -163,7 +163,7 @@ max_sources = 10
 # `strong`-tier requests. Those three numbers are checked against the registry
 # by `tests/test_fan_out_lints.py` rather than trusted, because the same
 # arithmetic sat stale in four modules until #286 — see
-# `stride_service.frameworks.widest_fan_out`. That is the burst a per-minute request quota actually
+# `analysis_service.frameworks.widest_fan_out`. That is the burst a per-minute request quota actually
 # sees. Turn it UP only with a quota that has been checked against the new
 # number times the widest framework selection this deployment offers; turn it
 # DOWN to shed load mid-incident. 1 is legal and makes the service strictly

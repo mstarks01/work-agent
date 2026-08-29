@@ -37,11 +37,11 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
 
+from analysis_service.report import FrameworkName
 from evals.harness import standings
 from evals.harness.artifact import REPO_ROOT
 from evals.harness.instruments import INSTRUMENTS, Column
 from evals.harness.scorer import vote_coverage
-from stride_service.report import FrameworkName
 
 #: Where the generated table lives, beside the Baselines it reads. Relative,
 #: because every reader here takes a ``root`` — the repo's own tree in CI, a

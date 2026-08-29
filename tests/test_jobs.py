@@ -4,7 +4,7 @@ import asyncio
 
 import pytest
 
-from stride_service.jobs import (
+from analysis_service.jobs import (
     DEADLINE_FAILURE_MESSAGE,
     GENERIC_FAILURE_MESSAGE,
     InMemoryJobStore,
@@ -19,9 +19,9 @@ from stride_service.jobs import (
     build_store,
     execute_job,
 )
-from stride_service.report import InputRef
-from stride_service.sources import Source
-from stride_service.validation import ValidationIssue
+from analysis_service.report import InputRef
+from analysis_service.sources import Source
+from analysis_service.validation import ValidationIssue
 from tests.factories import sample_selection
 
 
@@ -228,20 +228,20 @@ class TestActiveFor:
 
 class TestBuildStore:
     def test_builds_configured_backend(self):
-        store = build_store({"STRIDE_JOB_STORE": "memory"})
+        store = build_store({"ANALYSIS_JOB_STORE": "memory"})
         assert isinstance(store, InMemoryJobStore)
 
     def test_backend_selection_is_case_insensitive(self):
-        store = build_store({"STRIDE_JOB_STORE": "  Memory  "})
+        store = build_store({"ANALYSIS_JOB_STORE": "  Memory  "})
         assert isinstance(store, InMemoryJobStore)
 
     def test_unset_backend_fails_closed(self):
-        with pytest.raises(JobStoreConfigError, match="STRIDE_JOB_STORE"):
+        with pytest.raises(JobStoreConfigError, match="ANALYSIS_JOB_STORE"):
             build_store({})
 
     def test_unknown_backend_fails_closed(self):
         with pytest.raises(JobStoreConfigError, match="unknown job store 'redis'"):
-            build_store({"STRIDE_JOB_STORE": "redis"})
+            build_store({"ANALYSIS_JOB_STORE": "redis"})
 
 
 class HangingRunner:

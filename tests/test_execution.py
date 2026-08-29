@@ -1,6 +1,6 @@
 """Driving the real graph and stamping what each node execution presented.
 
-These test :class:`~stride_service.execution.GraphExecutor` at its own
+These test :class:`~analysis_service.execution.GraphExecutor` at its own
 interface, because that is where stamping now lives and both drivers — the
 service and the eval harness — cross it. No Vertex endpoint is involved: each
 LLM node is bound to a scripted stand-in that reports a ``model_version`` the
@@ -14,16 +14,16 @@ import asyncio
 
 import pytest
 
-from stride_service import graph
-from stride_service.execution import GraphExecutor, _NodeFinish
-from stride_service.frameworks.stride.record import STRIDE_CATEGORIES
-from stride_service.report import latency_by_node, usage_by_node
-from stride_service.sampling import (
+from analysis_service import graph
+from analysis_service.execution import GraphExecutor, _NodeFinish
+from analysis_service.frameworks.stride.record import STRIDE_CATEGORIES
+from analysis_service.report import latency_by_node, usage_by_node
+from analysis_service.sampling import (
     TierSampling,
     load_sampling,
     sampling_fingerprint,
 )
-from stride_service.sources import Source, render_sources
+from analysis_service.sources import Source, render_sources
 from tests.factories import (
     BASE_MODEL,
     DESCRIPTION_TEXT,

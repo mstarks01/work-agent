@@ -16,7 +16,7 @@
 # stored could be invalidated.
 #
 # DEPLOYMENT-LOCAL (wayfinder #10). This file is read by the deployment that
-# runs the service, located by STRIDE_BLESSED_FINGERPRINTS and defaulting to
+# runs the service, located by ANALYSIS_BLESSED_FINGERPRINTS and defaulting to
 # this path. The project can therefore never ship a certified pair: a repo-level
 # blessing plus a local one would have to resolve either as a silent override or
 # a silent veto, and both are worse than requiring each deployment to bless what
@@ -30,7 +30,7 @@
 # The sets ship EMPTY: no sanctioned sweep has run, so no build is blessed and
 # every real run reads as uncertified. That is the honest pre-baseline state.
 # The service annotates the job record with it either way; withholding the
-# report on an uncertified run is opt-in (STRIDE_REQUIRE_CERTIFIED), because a
+# report on an uncertified run is opt-in (ANALYSIS_REQUIRE_CERTIFIED), because a
 # gate that fires before the normal range is known just trains people to bypass
 # it. An *unexercised* tier withholds unconditionally — that one is a
 # cannot-happen assertion, not a measurement.

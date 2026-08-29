@@ -6,11 +6,11 @@ from typing import get_args
 import pytest
 from pydantic import ValidationError
 
-from stride_service.frameworks.stride.record import (
+from analysis_service.frameworks.stride.record import (
     ThreatRulings,
     build_stride_summary,
 )
-from stride_service.report import (
+from analysis_service.report import (
     AnalysisMarks,
     ClaimMark,
     Ground,
@@ -27,7 +27,7 @@ from stride_service.report import (
     Verdict,
     derive_severity_level,
 )
-from stride_service.sampling import TierSampling, sampling_fingerprint
+from analysis_service.sampling import TierSampling, sampling_fingerprint
 from tests.factories import (
     sample_report,
     sample_threat,

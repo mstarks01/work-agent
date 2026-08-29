@@ -41,7 +41,7 @@ from pathlib import Path
 
 import pytest
 
-from stride_service.frameworks import CONTENT_LICENSE
+from analysis_service.frameworks import CONTENT_LICENSE
 
 REPO_ROOT = Path(__file__).resolve().parents[1]
 
@@ -135,7 +135,7 @@ class ThirdPartyWork:
         return frozenset(found)
 
 
-ASVS_CATALOG = "src/stride_service/frameworks/asvs/catalog.json"
+ASVS_CATALOG = "src/analysis_service/frameworks/asvs/catalog.json"
 
 
 def _asvs_requirements() -> tuple[str, ...]:
@@ -433,7 +433,7 @@ def _locked_packages() -> list[str]:
     return sorted(
         package["name"]
         for package in lock["package"]
-        if package["name"] != "stride-service"
+        if package["name"] != "analysis-service"
     )
 
 

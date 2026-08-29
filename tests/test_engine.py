@@ -13,24 +13,24 @@ import asyncio
 import pytest
 from pydantic import ValidationError
 
-from stride_service.deployment import DEFAULT_RESILIENCE_PATH
-from stride_service.engine import (
+from analysis_service.deployment import DEFAULT_RESILIENCE_PATH
+from analysis_service.engine import (
     DEFAULT_CALLER,
     MAX_SYSTEM_NAME_CHARS,
+    Engine,
     EngineDeadlineError,
     EngineInputError,
-    StrideEngine,
 )
-from stride_service.jobs import (
+from analysis_service.jobs import (
     JobRecord,
     PipelineCompleted,
     PipelineOutcome,
     PipelineRejected,
     StubPipelineRunner,
 )
-from stride_service.pipeline import AdkPipelineRunner
-from stride_service.resilience import load_resilience
-from stride_service.sources import Source, SourceLimits
+from analysis_service.pipeline import AdkPipelineRunner
+from analysis_service.resilience import load_resilience
+from analysis_service.sources import Source, SourceLimits
 from tests.factories import DEFAULT_FRAMEWORKS, DESCRIPTION_TEXT, sample_selection
 from tests.test_pipeline import build, happy_replies
 
@@ -62,14 +62,14 @@ TEST_LIMITS = SourceLimits(max_total_bytes=512, max_sources=3)
 TEST_DEADLINE = 30.0
 
 
-def engine_for(runner, frameworks=None) -> StrideEngine:
+def engine_for(runner, frameworks=None) -> Engine:
     """An engine over an injected runner, with a selection it must be given.
 
     ``frameworks`` is required and non-empty on the engine as it is on every
     other path a job exists on, so a test about the deadline or the source
     ladder still states one.
     """
-    return StrideEngine(
+    return Engine(
         runner,
         limits=TEST_LIMITS,
         deadline_seconds=TEST_DEADLINE,
@@ -77,7 +77,7 @@ def engine_for(runner, frameworks=None) -> StrideEngine:
     )
 
 
-def analyze(engine: StrideEngine, text: str, **kwargs) -> PipelineOutcome:
+def analyze(engine: Engine, text: str, **kwargs) -> PipelineOutcome:
     return asyncio.run(engine.analyze([Source.description(text)], **kwargs))
 
 
@@ -265,15 +265,15 @@ def test_analyze_sync_refuses_a_running_loop():
 def test_from_config_builds_an_adk_runner():
     # Nothing is selected by default, so the vendor is named here too. Vertex's
     # credential mode is ADC, and the check is a build-time gate.
-    engine = StrideEngine.from_config(
+    engine = Engine.from_config(
         DEFAULT_FRAMEWORKS,
         env={
-            "STRIDE_MODEL_BASE_VENDOR": "vertex",
-            "STRIDE_MODEL_BASE_MODEL": "gemini-2.5-flash",
-            "STRIDE_MODEL_STRONG_VENDOR": "vertex",
-            "STRIDE_MODEL_STRONG_MODEL": "gemini-2.5-pro",
-            "STRIDE_VERTEX_PROJECT": "test-project",
-            "STRIDE_VERTEX_LOCATION": "us-central1",
+            "ANALYSIS_MODEL_BASE_VENDOR": "vertex",
+            "ANALYSIS_MODEL_BASE_MODEL": "gemini-2.5-flash",
+            "ANALYSIS_MODEL_STRONG_VENDOR": "vertex",
+            "ANALYSIS_MODEL_STRONG_MODEL": "gemini-2.5-pro",
+            "ANALYSIS_VERTEX_PROJECT": "test-project",
+            "ANALYSIS_VERTEX_LOCATION": "us-central1",
             "GOOGLE_APPLICATION_CREDENTIALS": "/nonexistent/adc.json",
         },
     )
@@ -303,7 +303,7 @@ def test_a_wedged_run_is_stopped_by_the_deployments_deadline():
     # The bound the in-process path did not used to have: ``execute_job`` wraps
     # the job route in ``asyncio.timeout`` while ``analyze`` handed straight to
     # the runner, so the first-run app and every library embedder ran unbounded.
-    engine = StrideEngine(
+    engine = Engine(
         StallingRunner(),
         limits=TEST_LIMITS,
         deadline_seconds=0.05,
@@ -326,15 +326,15 @@ def test_a_timeout_from_inside_the_graph_keeps_its_own_identity():
 
 
 def test_the_deadline_comes_from_the_deployments_resilience_config():
-    engine = StrideEngine.from_config(
+    engine = Engine.from_config(
         DEFAULT_FRAMEWORKS,
         env={
-            "STRIDE_MODEL_BASE_VENDOR": "vertex",
-            "STRIDE_MODEL_BASE_MODEL": "gemini-2.5-flash",
-            "STRIDE_MODEL_STRONG_VENDOR": "vertex",
-            "STRIDE_MODEL_STRONG_MODEL": "gemini-2.5-pro",
-            "STRIDE_VERTEX_PROJECT": "test-project",
-            "STRIDE_VERTEX_LOCATION": "us-central1",
+            "ANALYSIS_MODEL_BASE_VENDOR": "vertex",
+            "ANALYSIS_MODEL_BASE_MODEL": "gemini-2.5-flash",
+            "ANALYSIS_MODEL_STRONG_VENDOR": "vertex",
+            "ANALYSIS_MODEL_STRONG_MODEL": "gemini-2.5-pro",
+            "ANALYSIS_VERTEX_PROJECT": "test-project",
+            "ANALYSIS_VERTEX_LOCATION": "us-central1",
             "GOOGLE_APPLICATION_CREDENTIALS": "/nonexistent/adc.json",
         },
     )

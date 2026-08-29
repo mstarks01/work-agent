@@ -3,7 +3,7 @@ requires = ["hatchling"]
 build-backend = "hatchling.build"
 
 [project]
-name = "stride-service"
+name = "analysis-service"
 version = "0.1.0"
 description = "Agentic security-analysis service: many frameworks, one system model"
 requires-python = ">=3.11"
@@ -46,12 +46,12 @@ dev = [
 ]
 # The lite first-run web app's server (#32). A dependency-group, not an extra
 # and not a wheel dependency: `webapp/main.py` is a standalone driver script
-# outside `src/stride_service`, same as `examples/`, so no `pip install` path
+# outside `src/analysis_service`, same as `examples/`, so no `pip install` path
 # names it — there is no console script and no `[web]` extra. That is
 # independent of what the wheel bundles for the *engine* (see force-include
 # below): the app itself simply isn't packaged. Groups never enter the built
 # distribution either, so the integrator at route step 5 inherits none of
-# this — their dependency surface stays whatever `src/stride_service` needs.
+# this — their dependency surface stays whatever `src/analysis_service` needs.
 web = [
     "uvicorn>=0.30",
 ]
@@ -62,25 +62,25 @@ web = [
 default-groups = ["dev", "web"]
 
 [tool.hatch.build.targets.wheel]
-# `src/stride_service/py.typed` rides along inside the package, which is what
+# `src/analysis_service/py.typed` rides along inside the package, which is what
 # makes the annotations visible to an integrator's own checker -- without the
 # marker, PEP 561 says to treat an installed package as untyped however
 # thoroughly it is annotated.
-packages = ["src/stride_service"]
+packages = ["src/analysis_service"]
 
 [tool.hatch.build.targets.wheel.force-include]
 # The other half of what a run needs, alongside the engine code `packages`
 # already covers. Bundled under the package namespace rather than left at the
-# wheel root so `pip install stride-service` (or `stride-service[web]`, which
+# wheel root so `pip install analysis-service` (or `analysis-service[web]`, which
 # is still meaningless per the comment above) resolves everything from one
 # installed location with no additional fetch. The source of truth stays these
 # top-level directories -- editing a prompt or a config default still means
 # editing the file here, not something under `_bundled/`, which only exists in
 # a built wheel. See deployment.py's DEFAULT_* resolution for the read side.
-"prompts" = "stride_service/_bundled/prompts"
-"domains" = "stride_service/_bundled/domains"
-"frameworks" = "stride_service/_bundled/frameworks"
-"config" = "stride_service/_bundled/config"
+"prompts" = "analysis_service/_bundled/prompts"
+"domains" = "analysis_service/_bundled/domains"
+"frameworks" = "analysis_service/_bundled/frameworks"
+"config" = "analysis_service/_bundled/config"
 
 [tool.ruff]
 # Stated rather than inferred from `requires-python`, so raising the floor to
@@ -111,8 +111,8 @@ extend-exclude = ["docs/research"]
 # checking only `src/` would leave the checker blind to exactly the drift it
 # was added for.
 files = ["src", "tests", "evals", "examples", "webapp"]
-# `src` on the path, so `src/stride_service/api.py` is the module
-# `stride_service.api` and not also `src.stride_service.api`. With the layouts
+# `src` on the path, so `src/analysis_service/api.py` is the module
+# `analysis_service.api` and not also `src.analysis_service.api`. With the layouts
 # outside it -- `evals/` and `examples/` have no `__init__.py` -- that needs
 # each directory in `files` treated as its own package root.
 mypy_path = "src"

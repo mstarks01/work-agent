@@ -3,7 +3,7 @@
 import pytest
 from pydantic import ValidationError
 
-from stride_service.system_model import (
+from analysis_service.system_model import (
     DataFlow,
     ExternalEntity,
     Process,
@@ -15,7 +15,7 @@ from stride_service.system_model import (
     normalize_element_ids,
     normalize_name,
 )
-from stride_service.validation import validate
+from analysis_service.validation import validate
 from tests.factories import valid_model
 
 

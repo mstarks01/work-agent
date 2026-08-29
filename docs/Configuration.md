@@ -4,7 +4,7 @@ The service reads its behaviour from versioned files in `config/` and from a set
 of environment variables. Loaders **fail closed**: a missing or invalid file
 stops startup rather than silently falling back to a default model or sampling.
 
-Both [`StrideEngine.from_config(frameworks, env=...)`](Integration-Guide.md) and the
+Both [`Engine.from_config(frameworks, env=...)`](Integration-Guide.md) and the
 [HTTP app](HTTP-API.md) take the same environment; the tables below apply to both.
 
 ## Config files
@@ -63,9 +63,9 @@ key cannot be written down at all:
 
 | Vendor | Credential mode | Required environment |
 | --- | --- | --- |
-| `vertex` | ADC | `STRIDE_VERTEX_PROJECT`, `STRIDE_VERTEX_LOCATION`, `GOOGLE_APPLICATION_CREDENTIALS` |
-| `anthropic` | API key | `STRIDE_ANTHROPIC_API_KEY` |
-| `openai` | API key | `STRIDE_OPENAI_API_KEY` |
+| `vertex` | ADC | `ANALYSIS_VERTEX_PROJECT`, `ANALYSIS_VERTEX_LOCATION`, `GOOGLE_APPLICATION_CREDENTIALS` |
+| `anthropic` | API key | `ANALYSIS_ANTHROPIC_API_KEY` |
+| `openai` | API key | `ANALYSIS_OPENAI_API_KEY` |
 
 Keys are read **only** from these vendor-scoped variables. LiteLLM's ambient
 `ANTHROPIC_API_KEY` / `OPENAI_API_KEY` pickup is deliberately unused, so a
@@ -347,7 +347,7 @@ than smoothing it over. To see what a pair supports before selecting it — no
 credentials, no network:
 
 ```sh
-uv run python -m stride_service.conformance
+uv run python -m analysis_service.conformance
 ```
 
 Every cell is one of three words, and the third one is the point:
@@ -394,7 +394,7 @@ opposite — it needs credentials, and it is the only thing here that shows a
 vendor answering:
 
 ```sh
-uv run python -m stride_service.smoke
+uv run python -m analysis_service.smoke
 ```
 
 One small system, once, through the shipped graph, on whichever pair your tiers
@@ -457,7 +457,7 @@ window, no timer and no state the job store does not already hold.
 The ceiling is exactly **as shared as the job store is**, which is why it is
 enforced through `JobStore.active_for` rather than out of process memory. Behind
 two instances of the per-instance `memory` store, each instance enforces the
-number and the effective ceiling is the sum — the same defect `STRIDE_JOB_STORE`
+number and the effective ceiling is the sum — the same defect `ANALYSIS_JOB_STORE`
 [fails closed](HTTP-API.md#job-storage) over. Size it against one instance's share, or
 register a shared store and get a shared ceiling with no config change. Where
 the edge (a load balancer or API gateway) already enforces a per-caller quota,
@@ -496,7 +496,7 @@ the adapter did not close it, because the retry count LiteLLM is given overwrite
 it.
 
 So the library's retry layer is **off** (`num_retries = 0`, one request per call)
-and the loop runs a level up, in `stride_service.retry`, where it can be bounded.
+and the loop runs a level up, in `analysis_service.retry`, where it can be bounded.
 Two things become possible there that could not exist below the adapter:
 
 - **A shared budget.** `retry_budget_ratio` is one process-wide token bucket: a
@@ -513,7 +513,7 @@ Two things become possible there that could not exist below the adapter:
   not a delay with noise added — and a provider's `Retry-After` overrides the
   curve outright whenever one is sent.
 
-Lowering `STRIDE_RETRY_ATTEMPTS` still works and is still the blunt instrument.
+Lowering `ANALYSIS_RETRY_ATTEMPTS` still works and is still the blunt instrument.
 The budget is what makes reaching for it rare.
 
 `max_source_bytes` is the **total across all of a job's sources**, not a bound
@@ -535,14 +535,14 @@ inheriting a default for a contract its callers can see.
 
 | Variable | Overrides |
 | --- | --- |
-| `STRIDE_DOMAINS_DIR` | `domains/` |
-| `STRIDE_PROMPTS_DIR` | `prompts/` |
-| `STRIDE_FRAMEWORKS_DIR` | `frameworks/` |
-| `STRIDE_TIERS_FILE` | `config/model_tiers.toml` |
-| `STRIDE_SAMPLING` | `config/sampling.toml` |
-| `STRIDE_RESILIENCE` | `config/resilience.toml` |
-| `STRIDE_BLESSED_FINGERPRINTS` | `config/blessed-fingerprints.toml` |
-| `STRIDE_FRAMEWORKS_FILE` | `config/frameworks.toml` |
+| `ANALYSIS_DOMAINS_DIR` | `domains/` |
+| `ANALYSIS_PROMPTS_DIR` | `prompts/` |
+| `ANALYSIS_FRAMEWORKS_DIR` | `frameworks/` |
+| `ANALYSIS_TIERS_FILE` | `config/model_tiers.toml` |
+| `ANALYSIS_SAMPLING` | `config/sampling.toml` |
+| `ANALYSIS_RESILIENCE` | `config/resilience.toml` |
+| `ANALYSIS_BLESSED_FINGERPRINTS` | `config/blessed-fingerprints.toml` |
+| `ANALYSIS_FRAMEWORKS_FILE` | `config/frameworks.toml` |
 
 **Three text roots, not four.** `frameworks/<name>/` holds one framework
 package's text — its lanes' skills and exemplars, its critic, its disclaimer, its
@@ -552,7 +552,7 @@ what one claim is and which fields carry it, which is why it is the package's an
 not the shared `analyze.md`'s: a record that grades nothing cannot read a field
 list naming `severity`. `domains/` holds the shared domain packs,
 which stay the service's because their retrieval key reads the neutral system
-model rather than any package's rules. `STRIDE_KNOWLEDGE_DIR` is **gone**: the
+model rather than any package's rules. `ANALYSIS_KNOWLEDGE_DIR` is **gone**: the
 corpus it pointed at moved into the package whose rules select it. See
 [ADR 0011](adr/0011-package-text-follows-its-retrieval-key.md).
 
@@ -560,7 +560,7 @@ A variable **picks which file is read**; it never layers a second file over the
 first. A set-but-empty value is a deploy mistake and raises rather than
 falling back to a default. Unset, the default is this checkout's top-level
 copy when running from a clone, or the copy bundled into the wheel
-(`stride_service/_bundled/`) when installed via `pip` — whichever the
+(`analysis_service/_bundled/`) when installed via `pip` — whichever the
 installation has. Either way exactly one file exists at a resolved default
 path; nothing merges the two.
 
@@ -576,9 +576,9 @@ tracked, so an edit to `config/model_tiers.toml` in a clone blocks the next
 the checkout, point the variable at that path, and restore the tracked file:
 
 ```bash
-cp config/model_tiers.toml ~/.config/stride/model_tiers.toml
+cp config/model_tiers.toml ~/.config/analysis-service/model_tiers.toml
 git checkout -- config/model_tiers.toml
-export STRIDE_TIERS_FILE=~/.config/stride/model_tiers.toml
+export ANALYSIS_TIERS_FILE=~/.config/analysis-service/model_tiers.toml
 ```
 
 Set the variable in whatever starts the process: the shell profile, the
@@ -593,32 +593,32 @@ want. The same pattern covers `sampling.toml` and `resilience.toml`.
 
 | Variable | Effect |
 | --- | --- |
-| `STRIDE_MODEL_BASE_VENDOR` / `STRIDE_MODEL_BASE_MODEL` | Overrides the `base` tier's pair. |
-| `STRIDE_MODEL_STRONG_VENDOR` / `STRIDE_MODEL_STRONG_MODEL` | Overrides the `strong` tier's pair. |
+| `ANALYSIS_MODEL_BASE_VENDOR` / `ANALYSIS_MODEL_BASE_MODEL` | Overrides the `base` tier's pair. |
+| `ANALYSIS_MODEL_STRONG_VENDOR` / `ANALYSIS_MODEL_STRONG_MODEL` | Overrides the `strong` tier's pair. |
 
 `_MODEL` **alone** is the ordinary case — retune a tier's model on a deployed
 revision. `_VENDOR` alone is a **startup error**: a mismatched pair such as
 `anthropic` + `gemini-2.5-pro` passes every downstream check and would only die
 on the first node of a paid-for job.
 
-Any unrecognised `STRIDE_MODEL_*` variable also raises. That is deliberate: a
-deployment still carrying version 2's `STRIDE_MODEL_FLASH` must fail loudly
+Any unrecognised `ANALYSIS_MODEL_*` variable also raises. That is deliberate: a
+deployment still carrying version 2's `ANALYSIS_MODEL_FLASH` must fail loudly
 rather than have it silently ignored while the tier quietly runs the file's
 model.
 
 ### Sampling overrides
 
-`STRIDE_SAMPLING_{TIER}_{PARAM}` retunes one tier's decoding at deploy time,
+`ANALYSIS_SAMPLING_{TIER}_{PARAM}` retunes one tier's decoding at deploy time,
 validated **identically** to a file value. `{TIER}` is `BASE` or `STRONG`.
 
 | Variable | Effect |
 | --- | --- |
-| `STRIDE_SAMPLING_{TIER}_TEMPERATURE` | Overrides the tier's `temperature`. |
-| `STRIDE_SAMPLING_{TIER}_TOP_P` | Overrides the tier's `top_p`. |
-| `STRIDE_SAMPLING_{TIER}_SEED` | Overrides the tier's `seed`. |
-| `STRIDE_SAMPLING_{TIER}_THINKING` | Overrides the tier's `thinking` (`low`/`medium`/`high`). |
-| `STRIDE_SAMPLING_{TIER}_MAX_OUTPUT_TOKENS` | Overrides the tier's `max_output_tokens`. |
-| `STRIDE_SAMPLING_{TIER}_CONSTRAIN_OUTPUT` | Overrides the tier's `constrain_output`. Only the literals `true` and `false` are accepted — anything else raises. |
+| `ANALYSIS_SAMPLING_{TIER}_TEMPERATURE` | Overrides the tier's `temperature`. |
+| `ANALYSIS_SAMPLING_{TIER}_TOP_P` | Overrides the tier's `top_p`. |
+| `ANALYSIS_SAMPLING_{TIER}_SEED` | Overrides the tier's `seed`. |
+| `ANALYSIS_SAMPLING_{TIER}_THINKING` | Overrides the tier's `thinking` (`low`/`medium`/`high`). |
+| `ANALYSIS_SAMPLING_{TIER}_MAX_OUTPUT_TOKENS` | Overrides the tier's `max_output_tokens`. |
+| `ANALYSIS_SAMPLING_{TIER}_CONSTRAIN_OUTPUT` | Overrides the tier's `constrain_output`. Only the literals `true` and `false` are accepted — anything else raises. |
 
 Only these are overridable. A variable naming a reserved (`candidate_count`),
 removed (`top_k`) or forbidden param raises `not overridable`. Treat this as a
@@ -630,13 +630,13 @@ it with a measurement — see [Tuning the models](../evals/TUNING.md).
 
 | Variable | Effect |
 | --- | --- |
-| `STRIDE_RETRY_ATTEMPTS` | Total attempts per LLM call. |
-| `STRIDE_TIMEOUT_MS` | Per-request timeout, milliseconds. |
-| `STRIDE_MAX_SOURCE_BYTES` | Total UTF-8 bytes across all of a job's sources. |
-| `STRIDE_MAX_SOURCES` | How many sources one job may carry. |
-| `STRIDE_JOB_DEADLINE_MS` | Wall-clock budget for one whole job, milliseconds. Turn it down to shed load. |
-| `STRIDE_RETRY_BUDGET_RATIO` | Retries as a share of successful requests. Turn it down to give up sooner under sustained failure. |
-| `STRIDE_MAX_ACTIVE_JOBS` | Jobs one token subject may have in flight. Turn it down to shed load; raising it multiplies by the lane count of the frameworks a job names. |
+| `ANALYSIS_RETRY_ATTEMPTS` | Total attempts per LLM call. |
+| `ANALYSIS_TIMEOUT_MS` | Per-request timeout, milliseconds. |
+| `ANALYSIS_MAX_SOURCE_BYTES` | Total UTF-8 bytes across all of a job's sources. |
+| `ANALYSIS_MAX_SOURCES` | How many sources one job may carry. |
+| `ANALYSIS_JOB_DEADLINE_MS` | Wall-clock budget for one whole job, milliseconds. Turn it down to shed load. |
+| `ANALYSIS_RETRY_BUDGET_RATIO` | Retries as a share of successful requests. Turn it down to give up sooner under sustained failure. |
+| `ANALYSIS_MAX_ACTIVE_JOBS` | Jobs one token subject may have in flight. Turn it down to shed load; raising it multiplies by the lane count of the frameworks a job names. |
 
 ### How strictly each override family is checked
 
@@ -646,17 +646,17 @@ no effect.
 
 | You set | Result |
 | --- | --- |
-| `STRIDE_MODEL_BASE_MODLE` (typo) | **Startup fails**: `unrecognised model override(s)` |
-| `STRIDE_MODEL_FLASH` (stale v2 name) | **Startup fails**: same check |
-| `STRIDE_SAMPLING_BSAE_SEED` (typo'd tier) | **Startup fails**: `unknown tier 'BSAE'` |
-| `STRIDE_SAMPLING_BASE_TOP_K` (removed param) | **Startup fails**: `TOP_K is not overridable` |
-| `STRIDE_RETRY_ATEMPTS` (typo) | **Silently ignored** — the file's value stands |
-| `STRIDE_TIMEOUT_MSEC` (typo) | **Silently ignored** — the file's value stands |
+| `ANALYSIS_MODEL_BASE_MODLE` (typo) | **Startup fails**: `unrecognised model override(s)` |
+| `ANALYSIS_MODEL_FLASH` (stale v2 name) | **Startup fails**: same check |
+| `ANALYSIS_SAMPLING_BSAE_SEED` (typo'd tier) | **Startup fails**: `unknown tier 'BSAE'` |
+| `ANALYSIS_SAMPLING_BASE_TOP_K` (removed param) | **Startup fails**: `TOP_K is not overridable` |
+| `ANALYSIS_RETRY_ATEMPTS` (typo) | **Silently ignored** — the file's value stands |
+| `ANALYSIS_TIMEOUT_MSEC` (typo) | **Silently ignored** — the file's value stands |
 
-The reason is naming, not intent. `STRIDE_MODEL_*` and `STRIDE_SAMPLING_*` are
+The reason is naming, not intent. `ANALYSIS_MODEL_*` and `ANALYSIS_SAMPLING_*` are
 namespaces those two loaders own, so each can enumerate every variable it
 accepts and reject anything else in its namespace. The resilience knobs are bare
-`STRIDE_`-prefixed names, and `STRIDE_` belongs to the whole application — it
+`ANALYSIS_`-prefixed names, and `ANALYSIS_` belongs to the whole application — it
 also holds the config paths, the provider credentials and the job-store
 selector. No single loader can claim it, so the resilience loader reads the
 names it knows and cannot see that you meant another.
@@ -674,7 +674,7 @@ why the two families differ in the first place:
 
 So: **when a retry or timeout change appears to do nothing, suspect the variable
 name first.** Nothing echoes these values back, and a set-but-empty value *is*
-caught (`STRIDE_RETRY_ATTEMPTS=` raises `is set but empty`) — it is only a
+caught (`ANALYSIS_RETRY_ATTEMPTS=` raises `is set but empty`) — it is only a
 misspelled *name* that passes unnoticed.
 
 ### Provider environment

@@ -19,7 +19,7 @@ whatever you type, and every analysis costs whatever your vendor charges.
 The app lives in a top-level `webapp/` directory and **never ships in the wheel**.
 There is no `pip install` that gets you this app, no console script, and no
 `[web]` extra — deliberately. `webapp/main.py` is a standalone driver script
-outside `src/stride_service`, the same as `examples/`, so no packaging
+outside `src/analysis_service`, the same as `examples/`, so no packaging
 mechanism names it; that's independent of what the wheel bundles for the
 *engine* itself (skills, prompts, config all ship with it — see
 [Configuration](Configuration.md#config-paths-override-where-files-are-read-from)).
@@ -68,7 +68,7 @@ Read-only. **No input to this app can influence which model runs** — not a for
 field, not a query parameter, not a header. The framework picker is not an
 exception to this: it chooses what the app analyses, never what analyses it.
 Model selection lives in
-[`config/model_tiers.toml`](../config/model_tiers.toml) and the `STRIDE_MODEL_*`
+[`config/model_tiers.toml`](../config/model_tiers.toml) and the `ANALYSIS_MODEL_*`
 overrides, and it stays there: the app has no authentication, so a model selector
 would be unauthenticated control over what runs and what it costs. To change
 models, edit the config and restart.
@@ -111,8 +111,8 @@ only and never prints a value. Vertex is shown because it needs the most
 variables of the three vendors, which is what makes the next point visible:
 
 ```
-STRIDE_VERTEX_PROJECT           NOT SET
-STRIDE_VERTEX_LOCATION          NOT SET
+ANALYSIS_VERTEX_PROJECT           NOT SET
+ANALYSIS_VERTEX_LOCATION          NOT SET
 GOOGLE_APPLICATION_CREDENTIALS  NOT SET
 ```
 

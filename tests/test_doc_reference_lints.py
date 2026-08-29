@@ -78,7 +78,7 @@ PATH_REF = re.compile(
 #: Third-party names are out of scope: a lint that resolved them would fail on
 #: whatever the lockfile last moved.
 SYMBOL_REF = re.compile(
-    r"`{1,2}((?:stride_service|evals|webapp|examples)"
+    r"`{1,2}((?:analysis_service|evals|webapp|examples)"
     r"(?:\.[a-z_][a-z0-9_]*)*(?:\.[A-Za-z_][A-Za-z0-9_]*)?)`{1,2}"
 )
 

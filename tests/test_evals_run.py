@@ -1,6 +1,6 @@
 """What the eval CLI claims about a sweep it certified.
 
-``certified`` is narrow by design (see :mod:`stride_service.certification`): it
+``certified`` is narrow by design (see :mod:`analysis_service.certification`): it
 means no *observed* fingerprint went unblessed, and is therefore vacuously true
 of a sweep that observed none. Printing it alone is how a run that certified
 nothing came to announce "all node fingerprints blessed" and write
@@ -13,10 +13,10 @@ import json
 
 import pytest
 
+from analysis_service.certification import CertifyResult, UncertifiedNode
+from analysis_service.deployment import Deployment
 from evals.harness.modes import AttributeCheck, ExtractionScore, render_extraction
 from evals.harness.run import _models_record, _print_certification
-from stride_service.certification import CertifyResult, UncertifiedNode
-from stride_service.deployment import Deployment
 from tests.factories import TEST_CREDENTIAL_ENV, TEST_TIER_ENV
 
 BLESSED = "a" * 64
@@ -146,9 +146,9 @@ class TestTheArtifactCanActuallyBeWritten:
 
         assert (
             record["tiers"]["base"]["vendor"]
-            == TEST_TIER_ENV["STRIDE_MODEL_BASE_VENDOR"]
+            == TEST_TIER_ENV["ANALYSIS_MODEL_BASE_VENDOR"]
         )
         assert (
             record["tiers"]["strong"]["model"]
-            == TEST_TIER_ENV["STRIDE_MODEL_STRONG_MODEL"]
+            == TEST_TIER_ENV["ANALYSIS_MODEL_STRONG_MODEL"]
         )

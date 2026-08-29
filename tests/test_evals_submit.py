@@ -878,7 +878,7 @@ class TestASittingChangesAnAnswerNeverAQuestion:
         """The name reaches a path, so a separator in one names nothing."""
         case_dir = repo / "evals" / "corpus" / CASE
         meta = json.loads((case_dir / "case.json").read_text(encoding="utf-8"))
-        meta["frameworks"].append({"name": "../../../src/stride_service/report"})
+        meta["frameworks"].append({"name": "../../../src/analysis_service/report"})
         (case_dir / "case.json").write_text(
             json.dumps(meta, indent=2) + "\n", encoding="utf-8"
         )

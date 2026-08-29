@@ -12,14 +12,14 @@ from pathlib import Path
 
 import pytest
 
+from analysis_service.frameworks.stride.record import STRIDE_CATEGORIES
+from analysis_service.report import derive_severity_level
 from evals.harness.reference import (
     CorpusError,
     ReferenceThreat,
     load_case,
     load_corpus,
 )
-from stride_service.frameworks.stride.record import STRIDE_CATEGORIES
-from stride_service.report import derive_severity_level
 
 CORPUS_DIR = Path(__file__).resolve().parents[1] / "evals" / "corpus"
 

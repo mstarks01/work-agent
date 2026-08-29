@@ -8,7 +8,7 @@ from __future__ import annotations
 
 import pytest
 
-from stride_service.certification import (
+from analysis_service.certification import (
     MANIFEST_VERSION,
     BlessedManifest,
     CertificationError,
@@ -18,8 +18,8 @@ from stride_service.certification import (
     load_manifest,
     report_fingerprints,
 )
-from stride_service.model_tiers import TierName
-from stride_service.report import NodeRun, Report
+from analysis_service.model_tiers import TierName
+from analysis_service.report import NodeRun, Report
 from tests.factories import sample_report
 
 FP_A = "a" * 64

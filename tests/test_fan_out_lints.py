@@ -4,7 +4,7 @@
 
 How wide a job fans out stopped being a constant the day a second package
 registered. It is one ``strong``-tier request per lane of every framework the
-job names — :func:`~stride_service.frameworks.widest_fan_out`, 23 today — and it
+job names — :func:`~analysis_service.frameworks.widest_fan_out`, 23 today — and it
 was 6 for as long as STRIDE was the only package.
 
 [#199](https://github.com/mstarks01/work-agent/issues/199) corrected the
@@ -39,7 +39,7 @@ from pathlib import Path
 
 import pytest
 
-from stride_service.frameworks import PACKAGES, widest_fan_out
+from analysis_service.frameworks import PACKAGES, widest_fan_out
 
 REPO_ROOT = Path(__file__).resolve().parents[1]
 
@@ -93,7 +93,7 @@ def test_no_fixed_count_of_lane_agents_outside_a_package():
 
     Failing here does not mean deleting the sentence. State the rule instead —
     "one request per lane of every framework the job names", or point at
-    :func:`~stride_service.frameworks.widest_fan_out` — because that stays true
+    :func:`~analysis_service.frameworks.widest_fan_out` — because that stays true
     for a package nobody has written yet.
     """
     hits = [

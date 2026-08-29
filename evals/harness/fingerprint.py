@@ -25,8 +25,8 @@ costs one more false split and removes twenty of the 23 false merges, and
 :class:`~evals.harness.identity.SubsetVerbIdentity` scores 185/200 against the
 recorded labels where element agreement alone scores 111.
 
-It is the default. :class:`~stride_service.report.Claim` carries the verb and
-:class:`~stride_service.frameworks.stride.record.DraftThreat` requires it, so a
+It is the default. :class:`~analysis_service.report.Claim` carries the verb and
+:class:`~analysis_service.frameworks.stride.record.DraftThreat` requires it, so a
 finding out of a live run fingerprints at version 2 like a reference claim does.
 
 **Version 3 reads a catalog identifier instead of an action.** A package whose
@@ -49,10 +49,10 @@ from collections.abc import Callable, Iterable, Mapping
 from dataclasses import dataclass
 from typing import Any
 
+from analysis_service.frameworks.asvs.record import requirement_of
+from analysis_service.report import FrameworkName
 from evals.harness.identity import FlowMap, endpoint_form
 from evals.harness.verbs import check_verb
-from stride_service.frameworks.asvs.record import requirement_of
-from stride_service.report import FrameworkName
 
 #: The version a caller gets when it does not choose. Bumping it is a re-keying
 #: event, so it is a reviewed edit rather than a default that drifts — and a
@@ -60,7 +60,7 @@ from stride_service.report import FrameworkName
 #: ledger from stored components with no re-vote and no provider.
 #:
 #: **Version 2 since the record carried the field.** Version 1 was the default
-#: only while :class:`~stride_service.report.Claim` had no verb, which made a
+#: only while :class:`~analysis_service.report.Claim` had no verb, which made a
 #: finding out of a live run unfingerprintable at version 2. It has one now, so
 #: the default is the rule that measures better.
 DEFAULT_VERSION = 2

@@ -72,7 +72,7 @@ say "the labels" or "the reference set", read *what an agent recorded*.
 
 Nothing in this directory ships in the production image — the corpus, the
 ledger, and the scorer are test-side only, and the package build takes just
-`src/stride_service`. Three companion guides:
+`src/analysis_service`. Three companion guides:
 
 - **[BLESSING.md](BLESSING.md)** — how to author a new golden case, including a
   reference set per framework it declares.
@@ -120,7 +120,7 @@ evals/
 | `harness/grounds.py` | What the category agents did with `grounds` — the branch mix, the padding number and the unverified-quote rate — plus the two failures the grounding path kills a case with. |
 | `harness/coverage.py` | What each category agent was offered and how much of it its drafts cite, pooled over the sweep. |
 | `harness/stability.py` | Run-to-run stability: which references two or more finished sweeps agree on. Reads artifacts rather than re-running. |
-| `harness/triggers.py` | Candidate-trigger recall: whether `stride_service.candidates` fired a rule in a reference claim's own lane, on an element that claim names. Costs no provider call. |
+| `harness/triggers.py` | Candidate-trigger recall: whether `analysis_service.candidates` fired a rule in a reference claim's own lane, on an element that claim names. Costs no provider call. |
 | `harness/calibration.py` | Rule-vs-label agreement over the labelled fixtures — the scoreboard any rule change must clear. |
 | `harness/verbs.py` | The closed vocabulary of attacker actions, and what counts as one action. |
 | `harness/identity.py` | Claim identity from the fields a claim carries. `SubsetVerbIdentity` scores 185/200 against the recorded labels, over the 90% bar, with no model call. |
@@ -138,7 +138,7 @@ evals/
 | `harness/instruction.py` | How much instruction each node was given, per framework, per sweep. The drift alarms of ADR 0016, read as a measurement. |
 | `harness/instruction_delta.py` | What one prompt edit did: which node's instruction moved, and what moved with it. |
 | `harness/provenance.py` | What each node execution actually ran on — tier, requested route, served build, fingerprint — written into the artifact and read back by a promotion. |
-| `harness/certify.py` | Promoting a winning configuration: rewrites `config/sampling.toml` and records its fingerprints as blessed. The certification check itself lives in the service (`stride_service.certification`), which this imports. |
+| `harness/certify.py` | Promoting a winning configuration: rewrites `config/sampling.toml` and records its fingerprints as blessed. The certification check itself lives in the service (`analysis_service.certification`), which this imports. |
 | `harness/modes.py` | The three run modes over the shipped graph, and the extraction score: element agreement, the derived crossings, and the attributes a Candidate rule reads. |
 | `harness/instruments.py` | Every measurement a sweep reports, as one table keyed by instrument — the per-case row, the fold, the rendering, and the artifact keys each one owns. |
 | `harness/artifact.py` | The sweep artifact: one declared shape, written once by `build` and read back through `load_artifact`, which refuses a file missing any declared key. |
@@ -314,7 +314,7 @@ mechanically:
   quoteless, so read this **low with suspicion, not high**: a rate near zero is
   evidence the agents are manufacturing quotes to fill a required field.
 - **unverified rate** — of the quotes the agents wrote, the share the shipped
-  ladder (`stride_service.grounding`) could not find in the source they name.
+  ladder (`analysis_service.grounding`) could not find in the source they name.
   Denominated in quotes, never in grounds.
 - **dropped rate** — of every claim the lanes drafted, the share the service
   dropped for a fault in one entry: a proposal that failed its schema, every

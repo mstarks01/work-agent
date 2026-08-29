@@ -40,7 +40,7 @@ The repo's own canonical tampering exemplar showed the workaround: it rests on
 a flow carrying `authentication: none` and `encryption_in_transit: none`, and
 grounded itself on the crossing plus the quote *"not authenticated and not
 encrypted"*. Legal, and taught by `analyze.md` — and it spends a quote, which
-has to pass the pinned ladder in `stride_service.grounding`, where a derived
+has to pass the pinned ladder in `analysis_service.grounding`, where a derived
 fact would have resolved by set membership.
 
 ## Decision

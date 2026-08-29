@@ -8,10 +8,10 @@ from collections.abc import Sequence
 import pytest
 from fastapi.testclient import TestClient
 
-from stride_service.api import _BODY_SLACK, create_app
-from stride_service.auth import AuthenticationError
-from stride_service.errors import ConfigError
-from stride_service.jobs import (
+from analysis_service.api import _BODY_SLACK, create_app
+from analysis_service.auth import AuthenticationError
+from analysis_service.errors import ConfigError
+from analysis_service.jobs import (
     InMemoryJobStore,
     JobRecord,
     JobStatus,
@@ -20,9 +20,9 @@ from stride_service.jobs import (
     PipelineRejected,
     StubPipelineRunner,
 )
-from stride_service.report import FrameworkName, Report
-from stride_service.sources import Source, SourceLimits
-from stride_service.validation import ValidationIssue
+from analysis_service.report import FrameworkName, Report
+from analysis_service.sources import Source, SourceLimits
+from analysis_service.validation import ValidationIssue
 from tests.factories import DEFAULT_FRAMEWORKS, sample_selection
 
 TOKENS = {"alice-token": "alice", "bob-token": "bob"}
@@ -630,7 +630,7 @@ class TestConcurrencyCeiling:
         store = InMemoryJobStore()
         seed(store, "alice", "running")
         client, _ = make_client(store=store, max_active_jobs=1)
-        with caplog.at_level(logging.WARNING, logger="stride_service.api"):
+        with caplog.at_level(logging.WARNING, logger="analysis_service.api"):
             client.post("/v1/jobs", json=submission(), headers=auth())
         assert "alice" in caplog.text
         assert "concurrency ceiling" in caplog.text
@@ -701,7 +701,7 @@ class TestBodyCapUnderRootPath:
 
     @staticmethod
     def _status_for(root_path: str, path: str, body: bytes) -> int:
-        from stride_service.api import BodyLimitMiddleware
+        from analysis_service.api import BodyLimitMiddleware
 
         async def inner(scope, receive, send):
             while True:

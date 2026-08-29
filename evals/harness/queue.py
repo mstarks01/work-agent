@@ -29,18 +29,18 @@ from collections.abc import Iterable, Iterator, Mapping, Sequence
 from dataclasses import dataclass, replace
 from typing import Any
 
+from analysis_service.report import FrameworkName
 from evals.harness.fingerprint import Components, key_claim
 from evals.harness.identity import FlowMap
 from evals.harness.ledger import Ledger
 from evals.harness.verbs import GLOSS, family_of
-from stride_service.report import FrameworkName
 
 
 @dataclass(frozen=True)
 class Finding:
     """One produced claim, reduced to what a reviewer and the queue read.
 
-    Deliberately not a :class:`~stride_service.report.Claim`: a queue item must
+    Deliberately not a :class:`~analysis_service.report.Claim`: a queue item must
     not carry a field a reviewer should not see, and the cheapest way to
     guarantee that is a type that has no room for one.
     """

@@ -20,11 +20,11 @@ uv sync
 
 Everything below runs from this clone — it doubles as the fastest way to try
 the web app and to edit the prompts and skills you're about to embed. A
-`pip install`ed wheel works too and needs no `STRIDE_*_DIR` variables to find
+`pip install`ed wheel works too and needs no `ANALYSIS_*_DIR` variables to find
 its config, prompts or skills — they ship bundled with the engine — but a
 clone is still where `webapp/main.py` and `examples/` live, so it's the path
 this guide follows. See [Configuration](Configuration.md) for the
-`STRIDE_*_DIR` overrides if you want either layout to read from somewhere
+`ANALYSIS_*_DIR` overrides if you want either layout to read from somewhere
 else.
 
 ## 2. Choose a vendor and set its auth
@@ -80,7 +80,7 @@ model = "claude-opus-5"
 ```
 
 ```sh
-export STRIDE_ANTHROPIC_API_KEY=sk-ant-...   # the full key, not a prefix
+export ANALYSIS_ANTHROPIC_API_KEY=sk-ant-...   # the full key, not a prefix
 ```
 
 **Any Claude generation binds here.** Name the pinned identifier — the
@@ -107,7 +107,7 @@ model = "gpt-5.6"
 ```
 
 ```sh
-export STRIDE_OPENAI_API_KEY=sk-...          # the full key, not a prefix
+export ANALYSIS_OPENAI_API_KEY=sk-...          # the full key, not a prefix
 ```
 
 `gpt-4o` publishes an output ceiling of exactly 16,384 tokens, which is what the
@@ -140,8 +140,8 @@ gcloud services enable aiplatform.googleapis.com --project your-gcp-project
 Your account needs `roles/aiplatform.user` on that project. Then:
 
 ```sh
-export STRIDE_VERTEX_PROJECT=your-gcp-project
-export STRIDE_VERTEX_LOCATION=us-central1
+export ANALYSIS_VERTEX_PROJECT=your-gcp-project
+export ANALYSIS_VERTEX_LOCATION=us-central1
 export GOOGLE_APPLICATION_CREDENTIALS="$HOME/.config/gcloud/application_default_credentials.json"
 ```
 
@@ -173,7 +173,7 @@ does not select never authenticates anything. Model names must be pinned — no
 To see what any pair supports before choosing it, and without credentials:
 
 ```sh
-uv run python -m stride_service.conformance
+uv run python -m analysis_service.conformance
 ```
 
 That prints the capability matrix for every profiled pair — which sampling
@@ -188,7 +188,7 @@ The matrix says what a provider would accept. Once your key or your ADC is in
 place, this says whether it answers:
 
 ```sh
-uv run python -m stride_service.smoke
+uv run python -m analysis_service.smoke
 ```
 
 It runs one small system through the shipped graph on your selection — about
@@ -202,7 +202,7 @@ explains what each answer means.
 
 ### Selecting without editing the file
 
-`STRIDE_MODEL_{BASE,STRONG}_VENDOR` and the matching `_MODEL` make the same
+`ANALYSIS_MODEL_{BASE,STRONG}_VENDOR` and the matching `_MODEL` make the same
 selection from the environment, which is how a deployed revision retunes without
 an image rebuild and how CI states its own choice. They must move **together**:
 setting `_VENDOR` alone is a startup error, since a mismatched pair passes every
@@ -268,7 +268,7 @@ The web app was the demonstration. This is the thing you ship:
 
 <!-- docs-include: examples/embed.py#embed -->
 ```python
-async def main(engine: StrideEngine) -> None:
+async def main(engine: Engine) -> None:
     """Analyze one system, handling every outcome the run can have."""
     # A job takes an ordered list of sources. One written description is the
     # simplest case; add Source.transcript(...) for a recorded call, and give
@@ -306,7 +306,7 @@ async def main(engine: StrideEngine) -> None:
 
 That is [`examples/embed.py`](../examples/embed.py), included here from the file
 itself — run it with `uv run python examples/embed.py`. Build the engine once
-with `StrideEngine.from_config(["stride"])` and reuse it; construction composes a cacheable
+with `Engine.from_config(["stride"])` and reuse it; construction composes a cacheable
 shared prefix that a fresh engine per call would pay for every time.
 
 Handle all three outcomes. `analyze` returns a report, returns a rejection

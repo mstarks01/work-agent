@@ -48,6 +48,7 @@ from typing import Any, Literal, get_args
 
 from pydantic import BaseModel, ConfigDict, Field, ValidationError
 
+from analysis_service.report import FrameworkName
 from evals import build_review_docs as docs
 from evals.harness.fingerprint import FingerprintError, key_claim
 from evals.harness.identity import FlowMap
@@ -61,7 +62,6 @@ from evals.harness.reference import (
     load_corpus,
 )
 from evals.harness.roster import Roster
-from stride_service.report import FrameworkName
 
 REPO_ROOT = Path(__file__).resolve().parents[2]
 CORPUS_DIR = REPO_ROOT / "evals" / "corpus"

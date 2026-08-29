@@ -1,7 +1,7 @@
 """``ReferenceClaim``, its STRIDE narrowing, and the loader for the golden corpus.
 
 ``ReferenceClaim`` is an eval-side model, deliberately **not**
-:class:`~stride_service.report.Claim`. A produced claim carries fields that must
+:class:`~analysis_service.report.Claim`. A produced claim carries fields that must
 not be graded — a 4000-character ``description`` nobody asked the model to
 reproduce verbatim — and lacks ``tier``, the field that makes a recall threshold
 mean anything. Its ``id`` would be actively misleading: a reference ``S-01`` and
@@ -27,7 +27,7 @@ blessed model rot apart. The records split instead: ``claims/<framework>.json``,
 one file per framework the case carries records for.
 
 Loading fails closed in the shape
-:class:`~stride_service.markdown_loader.MarkdownLoader` established — a missing
+:class:`~analysis_service.markdown_loader.MarkdownLoader` established — a missing
 file, a malformed case, a model that fails the shipped validity gate, or a
 reference citing an element the blessed model does not contain raises
 :class:`CorpusError`. The last of those mirrors the exemplar lint: a reference
@@ -46,18 +46,18 @@ from typing import Literal
 
 from pydantic import BaseModel, ConfigDict, Field, ValidationError, field_validator
 
-from evals.harness.verbs import check_verb
-from stride_service.frameworks.asvs.record import AsvsChapter
-from stride_service.frameworks.stride.record import StrideCategory
-from stride_service.report import (
+from analysis_service.frameworks.asvs.record import AsvsChapter
+from analysis_service.frameworks.stride.record import StrideCategory
+from analysis_service.report import (
     FrameworkName,
     Rating,
     SeverityLevel,
     derive_severity_level,
 )
-from stride_service.sources import MAX_LABEL_CHARS, Source, SourceKind
-from stride_service.system_model import SystemModel
-from stride_service.validation import parse_and_validate
+from analysis_service.sources import MAX_LABEL_CHARS, Source, SourceKind
+from analysis_service.system_model import SystemModel
+from analysis_service.validation import parse_and_validate
+from evals.harness.verbs import check_verb
 
 # Two tiers, because one weight makes every threshold wrong. ``must-find``
 # drives the hard recall gate, ``expected`` a tracked, softer number.
@@ -144,7 +144,7 @@ class ReferenceClaim(BaseModel):
 
         Declared on the base and answered by each record, so a scorer reading a
         lane never spells ``category`` or ``chapter`` — the same separation
-        :attr:`~stride_service.frameworks.IdRule.lane_field` makes on the
+        :attr:`~analysis_service.frameworks.IdRule.lane_field` makes on the
         service side. A framework whose records carry no lane answers the empty
         string, which is legal rather than a defect.
         """
@@ -171,7 +171,7 @@ class ReferenceThreat(ReferenceClaim):
     """STRIDE's reference record: a category and a graded severity.
 
     ``affected_element_ids`` is narrowed to non-empty for the same reason
-    :class:`~stride_service.frameworks.stride.record.DraftThreat` narrows it:
+    :class:`~analysis_service.frameworks.stride.record.DraftThreat` narrows it:
     every STRIDE finding is about something in the graph, so a reference threat
     naming no element is unscoreable rather than a legal shape.
     """
@@ -217,7 +217,7 @@ class ReferenceRequirement(ReferenceClaim):
 
 
 #: The reference record each framework's corpus file validates as. Harness data
-#: keyed off the closed :data:`~stride_service.report.FrameworkName`, not a
+#: keyed off the closed :data:`~analysis_service.report.FrameworkName`, not a
 #: tenth package member: what a reference set looks like is the *eval's*
 #: business, and a package that shipped its own would be asserting how well it
 #: must be measured.

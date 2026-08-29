@@ -21,21 +21,21 @@ import pytest
 from google.adk.models.base_llm import BaseLlm
 from pydantic import Field
 
-import stride_service.graph as graph_module
-from evals.harness import modes
-from evals.harness.coverage import aggregate_coverage, coverage_totals
-from evals.harness.reference import load_case
-from evals.harness.run import _run_mode
-from stride_service.critic import DraftJoinError
-from stride_service.deployment import Deployment
-from stride_service.evidence import evidence_catalog
-from stride_service.frameworks.stride.record import STRIDE_CATEGORIES
-from stride_service.graph import (
+import analysis_service.graph as graph_module
+from analysis_service.critic import DraftJoinError
+from analysis_service.deployment import Deployment
+from analysis_service.evidence import evidence_catalog
+from analysis_service.frameworks.stride.record import STRIDE_CATEGORIES
+from analysis_service.graph import (
     ENTRY_PREPARE,
     analyze_node_name,
     tier_node_by_graph_node,
 )
-from stride_service.sampling import load_sampling
+from analysis_service.sampling import load_sampling
+from evals.harness import modes
+from evals.harness.coverage import aggregate_coverage, coverage_totals
+from evals.harness.reference import load_case
+from evals.harness.run import _run_mode
 from tests.factories import DEFAULT_FRAMEWORKS, TEST_TIER_ENV, ScriptedLlm
 from tests.test_evals_modes import lane_of, scripted_ruling
 

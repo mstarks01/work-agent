@@ -15,9 +15,9 @@ from pathlib import Path
 import pytest
 from pydantic import ValidationError
 
-from stride_service.markdown_loader import MarkdownLoader
-from stride_service.prompts import compose_extract_prompt, compose_repair_prompt
-from stride_service.sources import (
+from analysis_service.markdown_loader import MarkdownLoader
+from analysis_service.prompts import compose_extract_prompt, compose_repair_prompt
+from analysis_service.sources import (
     DEFAULT_DESCRIPTION_LABEL,
     DEFAULT_TRANSCRIPT_LABEL,
     MAX_LABEL_CHARS,

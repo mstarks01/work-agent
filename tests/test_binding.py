@@ -13,12 +13,12 @@ import dataclasses
 
 import pytest
 
-from stride_service.binding import NodeBinding, build_tier_adapters
-from stride_service.graph import tier_node_by_graph_node
-from stride_service.model_gate import ModelGateError
-from stride_service.model_tiers import ModelConfigError, load_model_tiers
-from stride_service.resilience import load_resilience
-from stride_service.sampling import load_sampling
+from analysis_service.binding import NodeBinding, build_tier_adapters
+from analysis_service.graph import tier_node_by_graph_node
+from analysis_service.model_gate import ModelGateError
+from analysis_service.model_tiers import ModelConfigError, load_model_tiers
+from analysis_service.resilience import load_resilience
+from analysis_service.sampling import load_sampling
 from tests.factories import DEFAULT_FRAMEWORKS, PROJECT_ROOT, repo_tiers
 
 #: This install's whole selection. The node -> tier map is built per selection
@@ -129,10 +129,10 @@ class TestReasoningTemperatureFloor:
         tiers = load_model_tiers(
             PROJECT_ROOT / "config" / "model_tiers.toml",
             env={
-                "STRIDE_MODEL_BASE_VENDOR": "openai",
-                "STRIDE_MODEL_BASE_MODEL": model,
-                "STRIDE_MODEL_STRONG_VENDOR": "openai",
-                "STRIDE_MODEL_STRONG_MODEL": model,
+                "ANALYSIS_MODEL_BASE_VENDOR": "openai",
+                "ANALYSIS_MODEL_BASE_MODEL": model,
+                "ANALYSIS_MODEL_STRONG_VENDOR": "openai",
+                "ANALYSIS_MODEL_STRONG_MODEL": model,
             },
         )
         # ``build_tier_adapters`` rather than ``NodeBinding.from_configs``: the
@@ -142,7 +142,7 @@ class TestReasoningTemperatureFloor:
             tiers,
             load_sampling(config, env={}),
             load_resilience(PROJECT_ROOT / "config" / "resilience.toml"),
-            env={"STRIDE_OPENAI_API_KEY": "sk-test-not-a-real-key"},
+            env={"ANALYSIS_OPENAI_API_KEY": "sk-test-not-a-real-key"},
         )
 
     def test_greedy_decoding_on_a_reasoning_model_fails_the_build(self, tmp_path):

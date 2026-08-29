@@ -14,9 +14,9 @@ from pathlib import Path
 
 import pytest
 
+from analysis_service.frameworks import PACKAGES
 from evals.harness.reference import load_corpus
 from evals.harness.triggers import by_framework, case_trigger_recall, corpus_recall
-from stride_service.frameworks import PACKAGES
 
 CORPUS = Path(__file__).resolve().parents[1] / "evals" / "corpus"
 

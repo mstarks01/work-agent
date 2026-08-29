@@ -2,21 +2,21 @@
 
 The `/v1` job API is the decoupled surface for a front end. It is async:
 submit text, get a job handle, poll or stream until the report is ready. For an
-in-process integration prefer [`StrideEngine`](Integration-Guide.md) — it drives
+in-process integration prefer [`Engine`](Integration-Guide.md) — it drives
 the same pipeline without the job/auth/polling machinery.
 
 Build the app with `create_app()`; every seam is injectable, defaulting to
 production wiring.
 
 ```python
-from stride_service import create_app
+from analysis_service import create_app
 
 app = create_app()  # configured store, real pipeline, configured JWT verifier
 ```
 
 See [Configuration](Configuration.md) for the required
-[`STRIDE_AUTH_PROVIDER` / `STRIDE_OIDC_*`](#bearer-auth),
-the [`STRIDE_JOB_STORE`](#job-storage) backend
+[`ANALYSIS_AUTH_PROVIDER` / `ANALYSIS_OIDC_*`](#bearer-auth),
+the [`ANALYSIS_JOB_STORE`](#job-storage) backend
 selection, and the
 [credentials](Configuration.md#provider-environment) for whichever model vendor
 each tier uses.
@@ -52,7 +52,7 @@ has **blessed** (approved by a measured run, in
 `config/blessed-fingerprints.toml`). Two cases refuse with `409`:
 
 - the run is **uncertified** (a fingerprint isn't blessed) *and*
-  `STRIDE_REQUIRE_CERTIFIED` is set — off by default;
+  `ANALYSIS_REQUIRE_CERTIFIED` is set — off by default;
 - the run is **unexercised** (a tier the graph declares produced no fingerprint
   at all) — always refused, and not reachable on a run that produced a report.
 
@@ -202,24 +202,24 @@ token's `sub`, and job ownership binds to that subject.
 
 ### How the provider is chosen
 
-`STRIDE_AUTH_PROVIDER` selects the backend at deploy time and **fails closed** —
+`ANALYSIS_AUTH_PROVIDER` selects the backend at deploy time and **fails closed** —
 an unset or unknown value stops startup rather than weakening or skipping the
 check. The value is never read from the request, so a token can't pick its own
 verifier.
 
 | Variable | Purpose |
 | --- | --- |
-| `STRIDE_AUTH_PROVIDER` | Auth backend to use. Today: `oidc`. |
+| `ANALYSIS_AUTH_PROVIDER` | Auth backend to use. Today: `oidc`. |
 
 Each backend reads its own prefixed settings. The `oidc` backend is a standard
-**OIDC JWT verifier**, configured through `STRIDE_OIDC_*`:
+**OIDC JWT verifier**, configured through `ANALYSIS_OIDC_*`:
 
 | Variable | Purpose |
 | --- | --- |
-| `STRIDE_OIDC_ISSUER` | Expected `iss` claim — your IdP's issuer URL. |
-| `STRIDE_OIDC_AUDIENCE` | Expected `aud` claim — the API's identifier at the IdP. |
-| `STRIDE_OIDC_JWKS_URL` | JWKS endpoint the IdP publishes its signing keys at. |
-| `STRIDE_OIDC_ALGORITHMS` | *Optional.* Comma-separated accepted signing algorithms. Defaults to `RS256`. |
+| `ANALYSIS_OIDC_ISSUER` | Expected `iss` claim — your IdP's issuer URL. |
+| `ANALYSIS_OIDC_AUDIENCE` | Expected `aud` claim — the API's identifier at the IdP. |
+| `ANALYSIS_OIDC_JWKS_URL` | JWKS endpoint the IdP publishes its signing keys at. |
+| `ANALYSIS_OIDC_ALGORITHMS` | *Optional.* Comma-separated accepted signing algorithms. Defaults to `RS256`. |
 
 Tokens must carry `exp`, `iss`, `aud`, and `sub`, and be signed with one of the
 accepted algorithms; anything else is rejected with a single generic error (the
@@ -232,7 +232,7 @@ algorithm, so a deployment that sets nothing works against any compliant IdP. An
 IdP signing something else — `ES256` is common — is configured, not code-changed:
 
 ```bash
-export STRIDE_OIDC_ALGORITHMS="ES256"        # or "RS256,ES256" during a rotation
+export ANALYSIS_OIDC_ALGORITHMS="ES256"        # or "RS256,ES256" during a rotation
 ```
 
 The accepted set is an **allowlist**, and configuration chooses from it rather
@@ -262,12 +262,12 @@ which is OIDC's own vocabulary. For each provider, the settings come from its
 discovery document (`<issuer>/.well-known/openid-configuration` → `issuer`,
 `jwks_uri` and `id_token_signing_alg_values_supported`); the audience is the
 API/resource identifier you register for this service. Switching providers is a
-values change only — the variable names stay `STRIDE_OIDC_*`.
+values change only — the variable names stay `ANALYSIS_OIDC_*`.
 
 Listed alphabetically. None is more supported than any other, and the list is
 illustrative rather than exhaustive — an IdP absent from it is not unsupported.
 
-| Provider | Typical issuer (`STRIDE_OIDC_ISSUER`) |
+| Provider | Typical issuer (`ANALYSIS_OIDC_ISSUER`) |
 | --- | --- |
 | Auth0 | `https://<tenant>.auth0.com/` |
 | AWS Cognito | `https://cognito-idp.<region>.amazonaws.com/<pool-id>` |
@@ -279,7 +279,7 @@ illustrative rather than exhaustive — an IdP absent from it is not unsupported
 ### Example: Okta
 
 1. In the IdP, register this service as an API/resource and note the **audience**
-   (resource identifier) clients will request tokens for — e.g. `stride-service`.
+   (resource identifier) clients will request tokens for — e.g. `analysis-service`.
 2. Fetch the discovery document to read the issuer and JWKS URL:
    ```bash
    curl -s https://<org>.okta.com/oauth2/<auth-server-id>/.well-known/openid-configuration \
@@ -287,10 +287,10 @@ illustrative rather than exhaustive — an IdP absent from it is not unsupported
    ```
 3. Set the environment:
    ```bash
-   export STRIDE_AUTH_PROVIDER=oidc
-   export STRIDE_OIDC_ISSUER="https://<org>.okta.com/oauth2/<auth-server-id>"
-   export STRIDE_OIDC_AUDIENCE="stride-service"
-   export STRIDE_OIDC_JWKS_URL="https://<org>.okta.com/oauth2/<auth-server-id>/v1/keys"
+   export ANALYSIS_AUTH_PROVIDER=oidc
+   export ANALYSIS_OIDC_ISSUER="https://<org>.okta.com/oauth2/<auth-server-id>"
+   export ANALYSIS_OIDC_AUDIENCE="analysis-service"
+   export ANALYSIS_OIDC_JWKS_URL="https://<org>.okta.com/oauth2/<auth-server-id>/v1/keys"
    ```
 4. Start the app. Callers pass `Authorization: Bearer <token>` on every `/v1`
    request; see the [HTTP API](HTTP-API.md) for the routes.
@@ -298,13 +298,13 @@ illustrative rather than exhaustive — an IdP absent from it is not unsupported
 Okta is the worked example because one had to be, not because it is preferred.
 Pointing at a different OIDC IdP (Auth0, Entra, Ping, …) is the same settings
 read from that IdP's discovery document — no code change, and a different
-signing algorithm is `STRIDE_OIDC_ALGORITHMS` rather than a patch.
+signing algorithm is `ANALYSIS_OIDC_ALGORITHMS` rather than a patch.
 
 ### Adding a new backend
 
 A backend with a distinct name (or a non-OIDC mechanism — opaque-token
 introspection, mTLS, an API key) is a new entry in the `_FACTORIES` registry in
-[`src/stride_service/auth.py`](../src/stride_service/auth.py). Reuse
+[`src/analysis_service/auth.py`](../src/analysis_service/auth.py). Reuse
 `OidcJwtVerifier` for another OIDC issuer, or implement the `TokenVerifier`
 protocol (`verify(token) -> str`) for anything else; the API layer is unchanged.
 
@@ -314,13 +314,13 @@ Required by the [`/v1` API](HTTP-API.md); the in-process engine keeps no jobs.
 The API only ever talks to the `JobStore` interface, so the backend is a
 deploy-time choice.
 
-`STRIDE_JOB_STORE` selects the backend at startup and **fails closed** — an
+`ANALYSIS_JOB_STORE` selects the backend at startup and **fails closed** — an
 unset or unknown value stops startup rather than silently falling back to
 non-durable storage. The value is never read from the request.
 
 | Variable | Purpose |
 | --- | --- |
-| `STRIDE_JOB_STORE` | Job-store backend to use. Today: `memory`. |
+| `ANALYSIS_JOB_STORE` | Job-store backend to use. Today: `memory`. |
 
 The `memory` backend is a per-instance, in-process dict: fast and dependency-free,
 but jobs are lost on restart and are not shared across instances, so it suits
@@ -330,6 +330,6 @@ deployments need a shared backend (see below).
 ### Adding a new backend
 
 A durable or shared backend (Redis, Postgres, …) is a new entry in the
-`_FACTORIES` registry in [`src/stride_service/jobs.py`](../src/stride_service/jobs.py).
+`_FACTORIES` registry in [`src/analysis_service/jobs.py`](../src/analysis_service/jobs.py).
 Implement the `JobStore` protocol (`create`, `get`, `save`) and read any
 connection settings from its own prefixed env vars; the API layer is unchanged.

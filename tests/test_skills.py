@@ -5,15 +5,15 @@ import dataclasses
 
 import pytest
 
-from stride_service.frameworks import LANE_SECTION_HEADINGS
-from stride_service.frameworks.stride import STRIDE
-from stride_service.frameworks.stride.record import STRIDE_CATEGORIES, Claim
-from stride_service.markdown_loader import (
+from analysis_service.frameworks import LANE_SECTION_HEADINGS
+from analysis_service.frameworks.stride import STRIDE
+from analysis_service.frameworks.stride.record import STRIDE_CATEGORIES, Claim
+from analysis_service.markdown_loader import (
     MarkdownFormatError,
     MarkdownLoader,
     MarkdownNotFoundError,
 )
-from stride_service.skills import (
+from analysis_service.skills import (
     compose_critic_skills,
     compose_domain_skills,
     compose_lane_skills,

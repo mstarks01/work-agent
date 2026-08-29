@@ -83,7 +83,7 @@ their content too.
 ## Consequences
 
 - **Breaking, with no shim.** `description` is gone from the wire, from
-  `StrideEngine.analyze`, and from the package's public exports. An old-shaped
+  `Engine.analyze`, and from the package's public exports. An old-shaped
   submission is refused rather than adapted.
 - `config/resilience.toml` is **v3**; a v2 file fails to load, so every
   deployment edits its file rather than inheriting bounds nobody chose.

@@ -1,6 +1,6 @@
 # examples/
 
-Runnable code for embedding `StrideEngine` in your own application, plus the
+Runnable code for embedding `Engine` in your own application, plus the
 sample system description the web app and the docs both use.
 
 Everything here runs from a clone with provider credentials configured — see

@@ -18,6 +18,14 @@ from pathlib import Path
 
 import pytest
 
+from analysis_service.certification import load_manifest
+from analysis_service.deployment import (
+    BLESSED_FINGERPRINTS_VAR,
+    SAMPLING_VAR,
+)
+from analysis_service.graph import tier_node_by_graph_node
+from analysis_service.report import NodeRun
+from analysis_service.sampling import load_sampling, sampling_fingerprint
 from evals.harness.artifact import ARTIFACT_VERSION, load_artifact
 from evals.harness.certify import plan_promotion
 from evals.harness.provenance import (
@@ -26,14 +34,6 @@ from evals.harness.provenance import (
 )
 from evals.harness.reference import load_case
 from evals.harness.run import main
-from stride_service.certification import load_manifest
-from stride_service.deployment import (
-    BLESSED_FINGERPRINTS_VAR,
-    SAMPLING_VAR,
-)
-from stride_service.graph import tier_node_by_graph_node
-from stride_service.report import NodeRun
-from stride_service.sampling import load_sampling, sampling_fingerprint
 from tests.factories import (
     DEFAULT_FRAMEWORKS,
     TEST_TIER_ENV,
@@ -536,7 +536,7 @@ class TestPromoteCommand:
         # A param the file pins: promotion re-pins those, and refuses to pin one
         # the file deliberately leaves unset.
         measured = load_sampling(
-            SAMPLING_PATH, env={"STRIDE_SAMPLING_BASE_MAX_OUTPUT_TOKENS": "12288"}
+            SAMPLING_PATH, env={"ANALYSIS_SAMPLING_BASE_MAX_OUTPUT_TOKENS": "12288"}
         )
         artifact = write_artifact(tmp_path, provenance(measured))
 

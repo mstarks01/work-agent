@@ -1,6 +1,6 @@
 """The measurement's half of the vocabulary: equivalence, and what it cannot separate.
 
-The vocabulary itself ships in :mod:`stride_service.actions` and is checked by
+The vocabulary itself ships in :mod:`analysis_service.actions` and is checked by
 ``tests/test_actions.py`` — every verb glossed, every family disjoint, the menu
 covering the set. What is left here is what only a measurement has: which verbs
 count as **one** action, and the three corpus pairs the rule cannot tell apart.

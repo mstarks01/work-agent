@@ -10,22 +10,22 @@ from __future__ import annotations
 
 from collections.abc import Callable, Iterable
 
-from evals.harness.identity import ClaimPair, ClaimRuling
-from evals.harness.reference import ReferenceThreat
-from stride_service.actions import ActionVerb
-from stride_service.frameworks.stride.record import (
+from analysis_service.actions import ActionVerb
+from analysis_service.frameworks.stride.record import (
     STRIDE_VERSION,
     DraftThreat,
     StrideCategory,
     Threat,
 )
-from stride_service.report import (
+from analysis_service.report import (
     Ground,
     Rating,
     Severity,
     UnknownRef,
     Verdict,
 )
+from evals.harness.identity import ClaimPair, ClaimRuling
+from evals.harness.reference import ReferenceThreat
 
 CATEGORY_LETTERS = {
     "spoofing": "S",

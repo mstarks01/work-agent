@@ -27,9 +27,9 @@ from typing import Literal, get_args, get_origin
 
 import pytest
 
+from analysis_service.system_model import CORE_ASSET_TAGS, Element, SystemModel
+from analysis_service.validation import parse_and_validate
 from evals import verify_corpus
-from stride_service.system_model import CORE_ASSET_TAGS, Element, SystemModel
-from stride_service.validation import parse_and_validate
 
 #: The one vocabulary an annotation cannot carry. ``assets`` is ``list[str]``
 #: because the validator extends it from config, so the closed core set is

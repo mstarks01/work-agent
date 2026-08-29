@@ -18,13 +18,13 @@ import sys
 
 import pytest
 
-from stride_service.model_gate import (
+from analysis_service.model_gate import (
     ModelGateError,
     assert_kwarg_supported,
     check_supported,
     output_ceiling,
 )
-from stride_service.vendors import vendor_for
+from analysis_service.vendors import vendor_for
 
 GEMINI = "gemini-2.5-pro"
 VERTEX_CLAUDE = "claude-sonnet-4-6"
@@ -168,7 +168,7 @@ class TestOutputCeiling:
         # Why output_ceiling catches `Exception` rather than something narrower.
         # If a version bump starts raising a real type, this fails and the catch
         # can be tightened.
-        from stride_service.model_gate import _litellm
+        from analysis_service.model_gate import _litellm
 
         with pytest.raises(Exception) as excinfo:
             _litellm.get_model_info(
@@ -200,7 +200,7 @@ class TestRetryLayering:
 
         from litellm.llms.openai.openai import OpenAIChatCompletion
 
-        from stride_service.model_gate import _litellm
+        from analysis_service.model_gate import _litellm
 
         built: list[int] = []
 
@@ -258,7 +258,7 @@ class TestHermeticImport:
         # the ordering held for this process rather than merely that the
         # variable is set now.
         assert "litellm" in sys.modules
-        assert "stride_service.model_gate" in sys.modules
+        assert "analysis_service.model_gate" in sys.modules
 
 
 class TestErrorsPointAtTheKnob:
@@ -293,17 +293,17 @@ def test_every_documented_vendor_passes_the_gate_on_shipped_sampling(
     """
     from pathlib import Path
 
-    from stride_service.model_tiers import load_model_tiers
-    from stride_service.sampling import load_sampling
+    from analysis_service.model_tiers import load_model_tiers
+    from analysis_service.sampling import load_sampling
 
     root = Path(__file__).resolve().parents[1]
     tiers = load_model_tiers(
         root / "config" / "model_tiers.toml",
         env={
-            "STRIDE_MODEL_BASE_VENDOR": vendor,
-            "STRIDE_MODEL_BASE_MODEL": base_model,
-            "STRIDE_MODEL_STRONG_VENDOR": vendor,
-            "STRIDE_MODEL_STRONG_MODEL": strong_model,
+            "ANALYSIS_MODEL_BASE_VENDOR": vendor,
+            "ANALYSIS_MODEL_BASE_MODEL": base_model,
+            "ANALYSIS_MODEL_STRONG_VENDOR": vendor,
+            "ANALYSIS_MODEL_STRONG_MODEL": strong_model,
         },
     )
     sampling = load_sampling(root / "config" / "sampling.toml", env={})
