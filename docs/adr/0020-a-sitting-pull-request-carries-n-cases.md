@@ -81,10 +81,10 @@ names the author refuses the submission. A reader cannot carry a case they did n
 > describes is unchanged, and #327's rule that a claim edit travels with its record still
 > holds — a reference set is an answer.
 
-**The checklist length does not move.** Each per-case check loops and collects the problems
-of every case into one line, so the sitting checklist is eight lines whatever N is. The
-check names are the contract the reader reads, and 104 lines at thirteen cases would bury
-them.
+**The checklist length does not move with N.** Each per-case check loops and collects the
+problems of every case into one line, so the sitting checklist is the same length whatever
+N is. The check names are the contract the reader reads, and 104 lines at thirteen cases
+would bury them. It is nine lines today; a new rule adds a line, and a new case never does.
 
 **The pull request says how many.** `_sitting_title` returns `Sitting: <author>, <n> cases`,
 and the closing text lists the case ids.
