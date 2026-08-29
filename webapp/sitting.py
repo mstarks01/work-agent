@@ -95,6 +95,17 @@ the file on disk says. The reader stops the app, runs it again tomorrow, and
 finds the case where they left it. They may also throw one draft away, which
 puts that case back on the list to do and changes nothing in the repository.
 
+**The app says so when the text moved under an open draft.** The draft pins
+the digest of every required file as the reader opened it, and that pin is
+what makes the warning honest: without it the app could say only that a file
+differs from what a recorded sitting signed, which answers a different
+question. The check runs at open, because a reader needs to know before they
+spend an hour on the case, and again at finish, because a file can move while
+the tab sits open. The recorded entry signs the digests taken at finish, so it
+signs the bytes that will merge. The reader keeps their own list either way,
+and judges whether it still answers the text; nothing here judges that for
+them.
+
 **A hand-edited draft costs nothing this project can price, and nothing
 notices it.** A reader who types their own list into that file by hand wrote a
 list, which is the whole of what the filled document claims. A timestamp pair
@@ -391,6 +402,7 @@ def create_app(session: Session) -> FastAPI:
                 "marks": work.marks,
                 "missing": work.missing,
                 "notes": work.notes,
+                "moved": _moved(session, prepared, held),
             }
         )
 
@@ -527,6 +539,11 @@ def create_app(session: Session) -> FastAPI:
             raise HTTPException(
                 status_code=409, detail="this session already recorded that case"
             )
+        # The second half of the drift check. A file can move while the tab
+        # sits open, and this is where the digest is signed — so the reader
+        # hears it here as well as at open, and their own list is untouched
+        # either way.
+        moved = _moved(session, prepared, held)
         case_dir = session.corpus_dir / body.case
         try:
             text = sittings.document(
@@ -557,6 +574,7 @@ def create_app(session: Session) -> FastAPI:
                     f"evals/corpus/{prepared.case_id}/case.json",
                     *([sittings.UNREVIEWED_FILE] if cleared else []),
                 ],
+                "moved": moved,
                 "command": "python -m evals.harness.run submit sitting",
                 "paste": _paste(session, prepared, len(read)),
                 "can_submit": session.can_submit,
@@ -642,6 +660,30 @@ def _draft(session: Session, case_id: str) -> sittings.Draft | None:
         return session.draft(case_id)
     except sittings.DraftError as exc:
         raise HTTPException(status_code=409, detail=str(exc)) from exc
+
+
+def _moved(
+    session: Session, prepared: sittings.Prepared, draft: sittings.Draft | None
+) -> list[str]:
+    """The required files that moved since this reader opened this case.
+
+    Asked at open, because a reader needs to know the text moved before they
+    spend an hour on it, and again at finish, because a file can move while
+    the tab sits open. It names files and judges nothing: the reader keeps
+    their own list either way and decides whether it still answers the text.
+
+    **The walk is the required list, never the draft's own keys.** The draft
+    is a file the reader owns, so a name in it is a name this app did not
+    write; walking the required files means every path read here comes from
+    the case. A required file the draft never pinned carries no digest, which
+    no file matches, so it reads as moved — a file the reader never opened.
+    """
+    if draft is None:
+        return []
+    return sittings.moved(
+        session.corpus_dir / prepared.case_id,
+        {name: draft.opened_digests.get(name, "") for name in prepared.files},
+    )
 
 
 def _save(session: Session, draft: sittings.Draft) -> None:
@@ -792,6 +834,7 @@ _PAGE = r"""<!doctype html>
     </p>
   </header>
   <p class="sub"><code id="caseId"></code>, read by <!--reviewer--></p>
+  <p id="moved" class="note hidden"></p>
 
   <section id="one">
     <h2>Part 1 — the system</h2>
@@ -969,6 +1012,18 @@ function step(delta) {
   if (delta > 0) openSubmit();
 }
 
+// The text moved under a read in progress. The reader hears it at open and
+// again at finish, keeps every word they wrote, and judges for themselves
+// whether their list still answers the text — this names files and no more.
+function warn(files) {
+  const box = $("moved");
+  box.classList.toggle("hidden", !files.length);
+  box.textContent = files.length
+    ? "These files moved since you opened this case: " + files.join(", ")
+      + ". Your list is untouched. Read them again, and decide whether it still answers the text."
+    : "";
+}
+
 // The marks a draft came back with, onto the rows part two just drew.
 function setMarks(marks) {
   for (const select of document.querySelectorAll("select[data-finding]")) {
@@ -995,6 +1050,7 @@ async function openCase(caseId) {
   $("caseTitle").textContent = d.title;
   $("caseId").textContent = d.case;
   $("partOne").textContent = d.body;
+  warn(d.moved);
   // A case takes one own list. Where this reader already holds a draft, the
   // box comes back filled and locked and the sets open, because the server
   // refuses a second list for the same case.
@@ -1029,6 +1085,7 @@ async function openSubmit() {
 // The gate re-arms per case, so a case arriving on the stage arrives blind.
 function blank() {
   $("partOne").textContent = "loading…";
+  warn([]);
   $("partTwo").replaceChildren();
   for (const id of ["own", "missing", "notes"]) $(id).value = "";
   for (const id of ["written", "command", "paste"]) $(id).textContent = "";
@@ -1153,6 +1210,7 @@ $("finish").addEventListener("click", async () => {
   });
   const d = await res.json();
   if (!res.ok) { $("written").textContent = d.detail; $("done").classList.remove("hidden"); return; }
+  warn(d.moved);
   $("written").textContent = d.written.join("\n");
   $("command").textContent = d.command;
   $("paste").textContent = d.paste;

@@ -318,22 +318,37 @@ def required_files(frameworks: Iterable[str]) -> list[str]:
     return ["source.md", "model.json", *claim_files(frameworks)]
 
 
+def moved(case_dir: Path, digests: Mapping[str, str]) -> list[str]:
+    """The named files whose bytes no longer match the digest beside them.
+
+    One comparison, and two questions asked of it. A recorded sitting asks
+    whether the bytes it signed still stand, through :func:`drifted`. A
+    **Draft Sitting** asks whether the text moved under a read in progress,
+    which is the warning the reader gets at open and at finish.
+
+    A file that is gone counts as moved, so a deleted source fails closed.
+    """
+    stale = []
+    for name, digest in digests.items():
+        target = case_dir / name
+        if (
+            not target.is_file()
+            or hashlib.sha256(target.read_bytes()).hexdigest() != digest
+        ):
+            stale.append(name)
+    return stale
+
+
 def drifted(case: GoldenCase, sitting: CaseSitting, corpus_dir: Path) -> list[str]:
     """The read files whose bytes no longer match the sitting's digests.
 
     The corpus directory is passed rather than defaulted, because a caller
     that means a temporary tree must not silently read the shipped one.
     """
-    case_dir = corpus_dir / case.meta.id
-    stale = []
-    for record in sitting.read:
-        target = case_dir / record.file
-        if (
-            not target.is_file()
-            or hashlib.sha256(target.read_bytes()).hexdigest() != record.sha256
-        ):
-            stale.append(record.file)
-    return stale
+    return moved(
+        corpus_dir / case.meta.id,
+        {record.file: record.sha256 for record in sitting.read},
+    )
 
 
 def clears(
