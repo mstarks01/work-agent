@@ -316,7 +316,9 @@ uv run python webapp/sitting.py --case <case-id>
 
 It shows you the sources and the model, takes your own threat list, and only
 *then* reveals the recorded sets — the one rule this method has, enforced by
-the server rather than by asking. When you finish it writes everything below
+the server rather than by asking. Each recorded finding carries a control that
+takes `agree`, `doubt` or `dup`, which is the same mark the by-hand path writes
+into a `> mark:` slot. When you finish it writes everything below
 into your working tree and offers three ways out: run the printed command,
 paste the text into a pull request you open, or press the button and let it
 open the pull request through the `gh` you are already signed in to. It binds

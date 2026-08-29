@@ -67,7 +67,7 @@ category.
 ```
 """
 
-MARKS = """\
+MARK_GUIDANCE = """\
 For each, mark one of:
 
 - `agree` — a real finding against this system, worth reporting.
@@ -227,7 +227,7 @@ def model_tables(model: dict) -> str:
 def stride_part(claims: list[dict], part: int) -> str:
     lines = [f"## Part {part} — the {len(claims)} recorded STRIDE threats\n"]
     lines.append("Only after your own list exists.\n")
-    lines.append(MARKS)
+    lines.append(MARK_GUIDANCE)
     current = None
     for number, claim in enumerate(claims, start=1):
         if claim["category"] != current:
