@@ -160,7 +160,9 @@ class Session:
 
     @property
     def document_name(self) -> str:
-        return f"REVIEW-{self.reviewer}.md"
+        """Spelled in :mod:`evals.harness.sitting`, because ``submit
+        sitting`` admits this name under the case prefix and no other."""
+        return sittings.document_name(self.reviewer)
 
 
 def create_app(session: Session) -> FastAPI:
