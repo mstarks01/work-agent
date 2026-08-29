@@ -409,8 +409,9 @@ def rail(
     unreviewed list, and a rail keyed on the entry would grey a case CI asks
     somebody to read.
 
-    A case a sitting clears is not pressable, whoever signed it. The status
-    names the signer, which reads correctly either way.
+    A case a sitting clears is not pressable once no draft of it is left,
+    whoever signed it. The status names the signer, which reads correctly
+    either way.
 
     ``drafts`` is what the reader's own store says, from
     :func:`draft_states`. A caller that passes none gets the rail of a reader
@@ -452,22 +453,24 @@ def _standing(
 ) -> tuple[str, RowState, bool]:
     """What one case is waiting for, out of the two things that can be true of it.
 
-    **An unreadable draft is asked about first**, because it is the one
+    **A live draft outranks a signature.** The draft is what makes a case
+    re-openable, and a case dies in the rail when it carries a clearing
+    signature and no draft — whoever signed it. So a reader who records a
+    case still holds its draft, and their row reads *finished, not
+    submitted* and presses, which is how they record it again.
+
+    An unreadable draft answers before the state in it, because it is the one
     answer that is not about how far the read got. It refuses its own case
     and names the file, and every other case still walks.
-
-    A signature outranks a live draft. A recorded sitting greys its case
-    whoever signed it, and the draft left behind says only that the record
-    has not merged.
     """
-    if draft is not None and draft.state == UNREADABLE:
+    if draft is None:
+        if signer is not None:
+            return f"signed by {signer}", "signed", False
+        return TO_DO, "todo", True
+    if draft.state == UNREADABLE:
         return f"draft unreadable: {draft.path}", "error", False
-    if signer is not None:
-        return f"signed by {signer}", "signed", False
-    if draft is not None:
-        status, state = DRAFT_ROW[draft.state]
-        return status, state, True
-    return TO_DO, "todo", True
+    status, state = DRAFT_ROW[draft.state]
+    return status, state, True
 
 
 def read_records(case_dir: Path, files: list[str]) -> list[ReadRecord]:
@@ -688,12 +691,20 @@ def record(
     read: list[ReadRecord],
     document_name: str,
     notes: str,
+    replaces: dict[str, Any] | None = None,
 ) -> dict[str, Any]:
     """Append the sitting to ``case.json``'s ``reviews``, and return the entry.
 
     Append-only: a correction is a new entry, never an edit to one recorded
     (#327). The file is rewritten whole because it is small and JSON has no
     append, but nothing already in ``reviews`` is touched.
+
+    ``replaces`` is an entry the caller appended itself and now re-records.
+    It comes off before the new one goes on, so one reader and one case never
+    write two entries into one submission. The caller passes the entry this
+    function returned, so nothing but its own append is ever removed — a
+    recorded sitting that merged is untouchable here, which is what keeps the
+    rule above true.
     """
     path = case_dir / "case.json"
     meta = json.loads(path.read_text(encoding="utf-8"))
@@ -704,7 +715,10 @@ def record(
         "document": document_name,
         "notes": notes,
     }
-    meta.setdefault("reviews", []).append(entry)
+    reviews = meta.setdefault("reviews", [])
+    if replaces is not None and replaces in reviews:
+        reviews.remove(replaces)
+    reviews.append(entry)
     path.write_text(
         json.dumps(meta, ensure_ascii=False, indent=2) + "\n", encoding="utf-8"
     )
@@ -751,6 +765,10 @@ def _unreviewed_entries(source: str) -> list[tuple[str, int, int]]:
         raise SittingError(
             f"{UNREVIEWED_FILE}: UNREVIEWED holds a key that is not a string"
         )
+    # An empty table names no case and bounds nothing. It is the day the last
+    # case is read, and the pairing below has no entry to close.
+    if not starts:
+        return []
     # The closing brace bounds the last entry; every other one ends where the
     # next begins. `end_lineno` on the value would stop before the `),`.
     bounds = [line for _, line in starts[1:]] + [(table.end_lineno or 0) - 1]
