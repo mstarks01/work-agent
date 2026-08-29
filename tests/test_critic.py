@@ -633,6 +633,79 @@ class TestAssembleThreats:
         with pytest.raises(CriticOutputError, match="hangs its needs-info verdict"):
             assemble_claims(drafts, rulings, model, SCHEMAS)
 
+    def test_a_question_with_no_place_in_the_model_resolves(self, model):
+        """The second spelling passes the seam with no element to point at.
+
+        A framework ruling on requirements asks most of its questions about a
+        codebase rather than about an element, and the system model holds no
+        field for one. Before this spelling existed, the only legal answer was
+        to point at whichever attribute resolved on whichever element was
+        nearest — an entry that passes the check and tells a reader nothing.
+        """
+        drafts = [sample_draft("S-01")]
+        rulings = [
+            sample_ruling(
+                "S-01",
+                verdict=Verdict(
+                    status="needs-info",
+                    reason="the input does not say whether queries are parameterized",
+                    related_unknowns=[
+                        UnknownRef(subject="are database queries parameterized")
+                    ],
+                ),
+            )
+        ]
+
+        assembled = assemble_claims(drafts, rulings, model, SCHEMAS)
+
+        assert assembled.claims[0].verdict.related_unknowns[0].subject
+
+    def test_an_entry_naming_neither_an_element_nor_a_subject_is_a_fault(self, model):
+        """Saying nothing is still a fault. The rule is what must be answered."""
+        drafts = [sample_draft("S-01")]
+        rulings = [
+            sample_ruling(
+                "S-01",
+                verdict=Verdict(
+                    status="needs-info",
+                    reason="unsettled",
+                    related_unknowns=[UnknownRef(subject="   ")],
+                ),
+            )
+        ]
+
+        with pytest.raises(CriticOutputError, match="nothing says what has to be"):
+            assemble_claims(drafts, rulings, model, SCHEMAS)
+
+    def test_a_bad_attribute_names_the_ones_the_element_does_have(self, model):
+        """The re-ask is told what is available, not only what is wrong.
+
+        An attribute is a fixed field per element *type*, so a critic reaching
+        for one that exists on another type has named a real attribute in the
+        wrong place. Without the available set it repoints at whatever resolves
+        everywhere, which is how a question becomes an answerless pointer.
+        """
+        drafts = [sample_draft("S-01")]
+        rulings = [
+            sample_ruling(
+                "S-01",
+                verdict=Verdict(
+                    status="needs-info",
+                    reason="unsettled",
+                    related_unknowns=[
+                        UnknownRef(element_id="store:orders-db", attribute="exposure")
+                    ],
+                ),
+            )
+        ]
+
+        with pytest.raises(CriticOutputError) as raised:
+            assemble_claims(drafts, rulings, model, SCHEMAS)
+
+        assert "That element has:" in str(raised.value)
+        assert "encryption_at_rest" in str(raised.value)
+        assert "`subject`" in str(raised.value)
+
     def test_a_needs_info_attribute_the_element_lacks_is_a_fault(self, model):
         """Checked to the same depth as the grounds surface, and no deeper.
 

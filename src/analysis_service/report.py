@@ -183,6 +183,27 @@ from analysis_service.system_model import BoundaryCrossing, SystemModel
 # ground carries the submitter's words after that, and the mark carries the
 # agent's, so a consumer reading a quote as "what the agent wrote" must read
 # this list too.
+# 3.0 also carries ``unreconciled_rulings``, an eleventh list: how the *first*
+# critic pass failed to reconcile with its drafts, before the bounded re-ask
+# repaired it. It rides 3.0 for the reason the three before it do, and it would
+# have been additive and minor on its own.
+#
+# What moves beside it is what a ``needs-info`` verdict may name.
+# ``related_unknowns`` used to hold one spelling — an element and one of its
+# attributes — and now holds two, the second being a ``subject``: a question
+# with no place in the System Model at all. A consumer switching on the pair it
+# knew now meets an entry where both halves are empty and ``subject`` carries
+# the whole of the question, which is the same class of change as 3.0's fourth
+# ``GroundKind`` and would have earned its own major bump had it arrived
+# separately.
+#
+# The reason is a property rather than a package's name: **a framework may need
+# a fact the system model has no slot for.** A framework ruling on requirements
+# asks most of its questions about a codebase rather than about an element, so
+# with one spelling available its commonest verdict was inexpressible — and the
+# only legal answer left was to point at whatever attribute resolved on
+# whichever element was nearest, which passes every check and tells a reader
+# nothing.
 SCHEMA_VERSION = "3.0"
 
 # The envelope's disclaimer, which is about the *service* rather than about any
@@ -342,12 +363,52 @@ AttributeName = Annotated[str, BeforeValidator(_bare_attribute)]
 
 
 class UnknownRef(BaseModel):
-    """Points a needs-info verdict at the unknown attribute that caused it."""
+    """What a ``needs-info`` verdict says has to be answered.
+
+    Two spellings in one flat shape, which is the answer :class:`Ground` and
+    :class:`Verdict` already give to "tagged variant in a provider-facing
+    schema". A union here would compile to ``oneOf``, and ``Ground`` records at
+    length what an uncompilable grammar costs.
+
+    * **An unknown in the model** — ``element_id`` with ``attribute``. The fact
+      has a place in the **System Model**, so naming it tells the submitter
+      which field to fill in.
+    * **A question with no place in the model** — ``subject``. Not every fact a
+      framework needs is a property of a system's structure. Whether a
+      documented authorization policy exists, or whether queries are
+      parameterized, is a question about a codebase rather than about an
+      element, and no representation of a running system holds the answer.
+
+    **Why the second spelling exists.** A framework whose claims rule on
+    requirements answers the second kind by construction — ASVS's own output
+    contract says most of its requirements "address a coding practice with no
+    position in the System Model". With only the first spelling available, that
+    framework's commonest verdict was inexpressible, and the only legal move
+    left was to point every question at whichever attribute happened to resolve
+    on whichever element was nearest. That answer passes the check and tells a
+    reader nothing, which is worse than a refusal.
+
+    Stated as a property rather than as a package's name, because it holds for
+    a framework nobody has written yet: **a framework may need a fact the
+    system model has no slot for.**
+
+    Nothing here is a shape error, deliberately, exactly as
+    :class:`ProposedVerdict` carries no rule between its own fields. Which
+    spelling a ruling used, and whether it says anything, is asked at the review
+    seam — where a failure routes to the bounded re-ask rather than killing the
+    node.
+    """
 
     model_config = ConfigDict(extra="forbid")
 
-    element_id: str = Field(max_length=300)
-    attribute: AttributeName = Field(min_length=1, max_length=100)
+    element_id: str = Field(default="", max_length=300)
+    attribute: AttributeName = Field(default="", max_length=100)
+    subject: str = Field(default="", max_length=300)
+
+    @property
+    def names_an_element(self) -> bool:
+        """Is this the model-reference spelling? Asked in three places."""
+        return bool(self.element_id or self.attribute)
 
 
 class Ground(BaseModel):
@@ -511,8 +572,8 @@ class Verdict(ProposedVerdict):
     def _check_shape(self) -> Self:
         if self.status == "needs-info" and not self.related_unknowns:
             raise ValueError(
-                "a needs-info verdict must reference at least one unknown"
-                " attribute in related_unknowns"
+                "a needs-info verdict must say what has to be answered, in at"
+                " least one related_unknowns entry"
             )
         if self.status != "needs-info" and self.related_unknowns:
             raise ValueError(
@@ -1526,6 +1587,20 @@ class AnalysisMarks(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
     unverified_grounds: list[UnverifiedGround] = Field(default_factory=list)
+    #: How the *first* critic pass failed to reconcile with its drafts, one
+    #: message per problem, as the bounded re-ask was asked to fix them. Empty
+    #: means the first pass was clean.
+    #:
+    #: **Recorded because nothing else can see it.** These messages already
+    #: existed — ``route_review`` renders them into the re-ask's prompt — and
+    #: were then discarded, so a repaired run and a clean one were
+    #: indistinguishable in every artifact the service keeps. A package whose
+    #: first pass never reconciles is running on its single retry, and that is
+    #: not a fact anybody should have to reproduce a live run to learn.
+    #:
+    #: A mark, not a failure: the re-ask exists for these, and a run that
+    #: repaired itself is a successful run. What it is not is a *clean* one.
+    unreconciled_rulings: list[str] = Field(default_factory=list)
     repaired_quotes: list[RepairedQuote] = Field(default_factory=list)
     unresolved_references: list[UnresolvedReference] = Field(default_factory=list)
     unresolved_mentions: list[UnresolvedMention] = Field(default_factory=list)
@@ -1836,6 +1911,20 @@ class FrameworkAnalysis(BaseModel):
     scope: list[ScopeEntry] = Field(default_factory=list)
     coverage: list[LaneCoverage] = Field(default_factory=list)
     unverified_grounds: list[UnverifiedGround] = Field(default_factory=list)
+    #: How the *first* critic pass failed to reconcile with its drafts, one
+    #: message per problem, as the bounded re-ask was asked to fix them. Empty
+    #: means the first pass was clean.
+    #:
+    #: **Recorded because nothing else can see it.** These messages already
+    #: existed — ``route_review`` renders them into the re-ask's prompt — and
+    #: were then discarded, so a repaired run and a clean one were
+    #: indistinguishable in every artifact the service keeps. A package whose
+    #: first pass never reconciles is running on its single retry, and that is
+    #: not a fact anybody should have to reproduce a live run to learn.
+    #:
+    #: A mark, not a failure: the re-ask exists for these, and a run that
+    #: repaired itself is a successful run. What it is not is a *clean* one.
+    unreconciled_rulings: list[str] = Field(default_factory=list)
     repaired_quotes: list[RepairedQuote] = Field(default_factory=list)
     unresolved_references: list[UnresolvedReference] = Field(default_factory=list)
     unresolved_mentions: list[UnresolvedMention] = Field(default_factory=list)

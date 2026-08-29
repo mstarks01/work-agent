@@ -38,6 +38,7 @@ from analysis_service.report import (
     NodeRun,
     Report,
     UnknownRef,
+    UnresolvedMention,
     Verdict,
 )
 from analysis_service.resilience import load_resilience
@@ -1133,6 +1134,53 @@ def test_router_revises_and_feeds_the_re_ask_prompt():
     assert event.actions.route == graph.ROUTE_REVISE
     assert "T-01" in ctx.state[NODES.key("critic_issues")]
     assert "S-01" in ctx.state[NODES.key("previous_review")]
+
+
+def test_the_first_pass_problems_are_recorded_on_the_marks():
+    """A repaired run and a clean one must not look identical afterwards.
+
+    ``route_review`` already computed these messages to feed the re-ask and
+    then dropped them, so nothing the service kept said whether the first
+    critic pass reconciled. A package whose first pass never reconciles is
+    running on its only retry, and that should be readable from a report rather
+    than only from a live run.
+    """
+    drafts = [sample_draft("S-01"), sample_draft("T-01", category="tampering")]
+    rulings = [sample_ruling("S-01")]  # T-01 dropped
+    ctx = FakeContext()
+    ctx.state[NODES.key("marks")] = AnalysisMarks(
+        unresolved_mentions=[UnresolvedMention(claim_id="S-01", mention="orders")]
+    ).model_dump(mode="json")
+
+    route(
+        valid_model().model_dump(mode="json"),
+        [draft.model_dump(mode="json") for draft in drafts],
+        ctx,
+        reviewed_threats={
+            "claims": [ruling.model_dump(mode="json") for ruling in rulings]
+        },
+    )
+
+    marks = AnalysisMarks.model_validate(ctx.state[NODES.key("marks")])
+    assert any("T-01" in message for message in marks.unreconciled_rulings)
+    # Merged, not assigned: what fan-in already recorded survives a second look.
+    assert marks.unresolved_mentions[0].claim_id == "S-01"
+
+
+def test_a_clean_first_pass_records_nothing():
+    """Empty means what it says, so the mark is readable as a signal."""
+    drafts = [sample_draft("S-01")]
+    ctx = FakeContext()
+
+    route(
+        valid_model().model_dump(mode="json"),
+        [draft.model_dump(mode="json") for draft in drafts],
+        ctx,
+        reviewed_threats={"claims": [sample_ruling("S-01").model_dump(mode="json")]},
+    )
+
+    marks = AnalysisMarks.model_validate(ctx.state.get(NODES.key("marks")) or {})
+    assert marks.unreconciled_rulings == []
 
 
 def _revise(drafts, rulings):
