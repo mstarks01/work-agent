@@ -38,11 +38,14 @@ from __future__ import annotations
 import ast
 import hashlib
 import json
+import os
 from collections.abc import Iterable, Mapping
 from dataclasses import dataclass
 from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any, Literal, get_args
+
+from pydantic import BaseModel, ConfigDict, Field, ValidationError
 
 from evals import build_review_docs as docs
 from evals.harness.fingerprint import FingerprintError, key_claim
@@ -79,9 +82,208 @@ MARKS: tuple[Mark, ...] = get_args(Mark)
 #: can carry names the signer, and it is spelled where it is computed.
 TO_DO = "to do"
 
+#: The five states a rail row can be in, which is what a surface colours a dot
+#: by. The prose beside each one is :attr:`Row.status`, and it is a tooltip.
+RowState = Literal["todo", "draft", "finished", "signed", "error"]
+
 
 class SittingError(ValueError):
     """The sitting cannot be recorded; the message says what stops it."""
+
+
+#: The two states a **Draft Sitting** file can name. It is ``open`` while the
+#: reader is still reading, and ``finished`` once they record the sitting —
+#: the record is written into the working tree by then, and the draft says
+#: only that it has not merged yet.
+DraftState = Literal["open", "finished"]
+
+#: What the store reports for a draft it cannot read. It is not a state the
+#: file can name: no file says this about itself, and a file that will not
+#: read cannot say anything about itself at all.
+UNREADABLE = "unreadable"
+
+#: What a live draft puts on its rail row, keyed by the state in the file so
+#: a state the shape gains arrives here rather than through an ``if``. A key
+#: it does not hold raises, which is the whole reason it is a table: a state
+#: nobody wrote a row for stops the rail rather than drawing a wrong one.
+DRAFT_ROW: Mapping[str, tuple[str, RowState]] = {
+    "open": ("draft in progress", "draft"),
+    "finished": ("finished, not submitted", "finished"),
+}
+
+
+class DraftError(ValueError):
+    """This draft will not read; the message names the file.
+
+    Deliberately not a :class:`SittingError`. A sitting that cannot be
+    recorded is about the corpus, and this is about one file in the reader's
+    own store — the surface refuses that one case and walks every other.
+    """
+
+
+class Draft(BaseModel):
+    """A **Draft Sitting**: one reader's part-finished read of one case.
+
+    It lives outside the repository, one file per case, and it never merges.
+    That is what keeps an unsigned own list out of a pull request.
+
+    **It caches no case text.** Part one and part two are read from the case
+    directory every time, because a cache that can disagree with its source
+    is a defect that waits.
+
+    ``opened_digests`` pins each required file to the bytes it held when the
+    draft opened. That is a different question from the digest in the case
+    metadata, which pins what a recorded sitting signed, and it is what lets
+    a surface tell the reader the text moved under a read in progress.
+
+    **A hand-edited draft costs nothing this project can price, and nothing
+    notices it.** A reader who types their own list into this file by hand
+    wrote a list, which is the whole of what the filled document claims. A
+    timestamp pair is rejected for the same reason: the reader owns the file,
+    so they can write the timestamps too. The gate's job is to make the
+    ordinary path the correct path, not to police the person at the keyboard.
+    """
+
+    model_config = ConfigDict(extra="forbid")
+
+    case: str
+    #: The clone this draft was written from. It is in the file rather than in
+    #: the path so a reader who moves their checkout keeps their drafts and
+    #: gets a warning, rather than a silently empty store.
+    clone: str
+    state: DraftState = "open"
+    own_list: list[str] = Field(default_factory=list)
+    #: Keyed by the finding's fingerprint, exactly as a mark is keyed
+    #: everywhere else, so an edit to a claim file moves no mark.
+    marks: dict[str, Mark] = Field(default_factory=dict)
+    missing: list[str] = Field(default_factory=list)
+    notes: str = ""
+    opened_digests: dict[str, str] = Field(default_factory=dict)
+
+
+@dataclass(frozen=True)
+class DraftStatus:
+    """What the store says about one case, for the rail that reads it."""
+
+    #: A :data:`DraftState`, or :data:`UNREADABLE`.
+    state: str
+    #: The file itself, because the refusal an unreadable draft gets names it.
+    path: Path
+
+
+def draft_root() -> Path:
+    """Where drafts live when a caller names nowhere else.
+
+    A function rather than a constant, so importing this module resolves no
+    home directory and a test can pass a temporary one instead.
+    """
+    return Path.home() / ".local" / "state" / "work-agent" / "sittings"
+
+
+def draft_path(root: Path, login: str, case_id: str) -> Path:
+    """The one file this reader's draft of this case lives in.
+
+    The login is in the path because a sitting binds to the GitHub account
+    that submits it, so two logins on one machine never collide. One file per
+    case, which is the **Ledger**'s own answer to the same problem: two
+    writers never touch one file.
+
+    Both segments are checked here rather than trusted. The case id arrives in
+    a request, and a value carrying a separator would write outside the store.
+    """
+    for name in (login, case_id):
+        if not name or name.startswith(".") or name != Path(name).name:
+            raise DraftError(f"{name!r} is not a name a draft can be filed under")
+    return root / login / f"{case_id}.json"
+
+
+def save_draft(root: Path, login: str, draft: Draft) -> Path:
+    """Write the draft over whatever stood there, and return the file.
+
+    Written beside the target and moved into place, because a half-written
+    draft would refuse its own case and the file holds an hour of somebody's
+    attention. The store is one reader's own, so it is created readable by
+    them alone.
+    """
+    path = draft_path(root, login, draft.case)
+    path.parent.mkdir(parents=True, exist_ok=True, mode=0o700)
+    scratch = path.with_name(f"{path.name}.part")
+    scratch.write_text(draft.model_dump_json(indent=2) + "\n", encoding="utf-8")
+    scratch.chmod(0o600)
+    os.replace(scratch, path)
+    return path
+
+
+def load_draft(root: Path, login: str, case_id: str) -> Draft | None:
+    """This reader's draft of this case, ``None`` where they hold none.
+
+    **A draft that will not read raises rather than reporting nothing.** The
+    two alternatives are rejected. To treat it as absent throws the reader's
+    own list away and re-arms the gate, so they retype a list they already
+    wrote and never learn the first one existed. To repair it writes a guess
+    into the one file the reader owns.
+    """
+    path = draft_path(root, login, case_id)
+    if not path.is_file():
+        return None
+    try:
+        text = path.read_text(encoding="utf-8")
+    except OSError as exc:
+        raise DraftError(f"{path}: this draft will not open — {exc}") from exc
+    try:
+        draft = Draft.model_validate_json(text)
+    except ValidationError as exc:
+        raise DraftError(f"{path}: {_first_problem(exc)}") from exc
+    if draft.case != case_id:
+        raise DraftError(f"{path}: this draft names the case {draft.case!r}")
+    return draft
+
+
+def _first_problem(error: ValidationError) -> str:
+    """One problem out of a validation report, for a reader to act on.
+
+    The whole report names every field at once and reads as a stack trace.
+    The reader's next step is to open the file this message already names, so
+    one field and one reason is what carries them there.
+    """
+    first = error.errors()[0]
+    where = ".".join(str(part) for part in first["loc"]) or "the file"
+    return f"{where} — {first['msg']}"
+
+
+def discard_draft(root: Path, login: str, case_id: str) -> bool:
+    """Delete one draft, and say whether there was one.
+
+    Unlinking is the whole of it. A draft never merged, so nothing else
+    records it and the case goes back to the state it had before.
+    """
+    path = draft_path(root, login, case_id)
+    if not path.is_file():
+        return False
+    path.unlink()
+    return True
+
+
+def draft_states(root: Path, login: str) -> dict[str, DraftStatus]:
+    """Every draft this reader holds, keyed by case id.
+
+    A file that will not read reports :data:`UNREADABLE` and stops nothing
+    else, so one bad draft costs its own case and no other. Nothing here
+    writes, so a survey of the store changes nothing on disk.
+    """
+    folder = root / login
+    if not folder.is_dir():
+        return {}
+    held: dict[str, DraftStatus] = {}
+    for path in sorted(folder.glob("*.json")):
+        try:
+            draft = load_draft(root, login, path.stem)
+        except DraftError:
+            held[path.stem] = DraftStatus(UNREADABLE, path)
+            continue
+        if draft is not None:
+            held[path.stem] = DraftStatus(draft.state, path)
+    return held
 
 
 def claim_files(frameworks: Iterable[str]) -> list[str]:
@@ -169,13 +371,21 @@ class Row:
     number: str
     title: str
     status: str
+    #: The machine-readable half of :attr:`status`. The prose is the tooltip
+    #: a reader hovers; this is what a surface draws the five states apart by,
+    #: so no surface parses a sentence to colour a dot.
+    state: RowState
     #: Whether the reader may open this case. A row that does not press is
     #: also off the offered list, so the refusal a signed case needs costs no
     #: code of its own.
     pressable: bool
 
 
-def rail(corpus_dir: Path, roster: Roster) -> tuple[Row, ...]:
+def rail(
+    corpus_dir: Path,
+    roster: Roster,
+    drafts: Mapping[str, DraftStatus] | None = None,
+) -> tuple[Row, ...]:
     """Every case in the corpus, in corpus order, with the status a reader reads.
 
     **The status comes from :func:`clears`, never from the presence of an
@@ -186,9 +396,14 @@ def rail(corpus_dir: Path, roster: Roster) -> tuple[Row, ...]:
 
     A case a sitting clears is not pressable, whoever signed it. The status
     names the signer, which reads correctly either way.
+
+    ``drafts`` is what the reader's own store says, from
+    :func:`draft_states`. A caller that passes none gets the rail of a reader
+    who holds no drafts, which is what the corpus alone can say.
     """
+    held = drafts or {}
     return tuple(
-        _row(case, _signer(case, roster, corpus_dir))
+        _row(case, _signer(case, roster, corpus_dir), held.get(case.meta.id))
         for case in load_corpus(corpus_dir)
     )
 
@@ -205,14 +420,39 @@ def _signer(case: GoldenCase, roster: Roster, corpus_dir: Path) -> str | None:
     )
 
 
-def _row(case: GoldenCase, signer: str | None) -> Row:
+def _row(case: GoldenCase, signer: str | None, draft: DraftStatus | None) -> Row:
+    status, state, pressable = _standing(signer, draft)
     return Row(
         case_id=case.meta.id,
         number=case.meta.id.split("-")[0],
         title=case.meta.title,
-        status=f"signed by {signer}" if signer else TO_DO,
-        pressable=signer is None,
+        status=status,
+        state=state,
+        pressable=pressable,
     )
+
+
+def _standing(
+    signer: str | None, draft: DraftStatus | None
+) -> tuple[str, RowState, bool]:
+    """What one case is waiting for, out of the two things that can be true of it.
+
+    **An unreadable draft is asked about first**, because it is the one
+    answer that is not about how far the read got. It refuses its own case
+    and names the file, and every other case still walks.
+
+    A signature outranks a live draft. A recorded sitting greys its case
+    whoever signed it, and the draft left behind says only that the record
+    has not merged.
+    """
+    if draft is not None and draft.state == UNREADABLE:
+        return f"draft unreadable: {draft.path}", "error", False
+    if signer is not None:
+        return f"signed by {signer}", "signed", False
+    if draft is not None:
+        status, state = DRAFT_ROW[draft.state]
+        return status, state, True
+    return TO_DO, "todo", True
 
 
 def read_records(case_dir: Path, files: list[str]) -> list[ReadRecord]:
@@ -233,6 +473,17 @@ def read_records(case_dir: Path, files: list[str]) -> list[ReadRecord]:
             ReadRecord(file=name, sha256=hashlib.sha256(path.read_bytes()).hexdigest())
         )
     return records
+
+
+def digests(case_dir: Path, files: list[str]) -> dict[str, str]:
+    """The same reading, keyed by file name, for a draft to hold.
+
+    A **Draft Sitting** pins what the reader opened; an entry in the case
+    metadata pins what a recorded sitting signed. Both read the bytes the
+    same way, so they agree about what a file said at the moment each was
+    taken.
+    """
+    return {record.file: record.sha256 for record in read_records(case_dir, files)}
 
 
 @dataclass(frozen=True)
