@@ -821,15 +821,15 @@ class ProposalBatch(BaseModel):
     so the domain keeps working in lists.
 
     **A batch validates by salvaging.** The node validates its emission against
-    this model before anything else runs, so one proposal with a verb outside
-    the closed set, a severity value the enum does not hold, or neither a
-    reference nor a quote used to fail the node and the job. The wrap validator
-    validates each item on its own: the ones that pass fill ``claims``, and the
-    ones that fail fill ``invalid``, keyed enough to name the claim the agent
-    meant. ``invalid`` is kept out of the JSON schema, so the provider is still
-    asked for exactly the strict shape and never told there is a slot for a
-    bad one. A payload that already carries ``invalid`` is a batch read back
-    from state and is validated as it stands.
+    this model before anything else runs, so one proposal carrying a verb
+    outside the closed set, a severity value the enum does not hold, or
+    neither a reference nor a quote would otherwise cost the node and the job.
+    The wrap validator validates each item on its own: the ones that pass fill
+    ``claims``, and the ones that fail fill ``invalid``, keyed enough to name
+    the claim the agent meant. ``invalid`` is kept out of the JSON schema, so
+    the provider is asked for exactly the strict shape and never told there is
+    a slot for a bad one. A payload that already carries ``invalid`` is a
+    batch read back from state and is validated as it stands.
     """
 
     model_config = ConfigDict(extra="forbid")
@@ -1401,13 +1401,14 @@ class DroppedClaim(BaseModel):
       earlier draft's, or its only grounds are quotes the source it names does
       not contain (:func:`~stride_service.critic.join_drafts`).
 
-    Each of these used to fail the whole job. The argument was that a finding
-    deleted for a reason recorded in a list is a silent removal, and a dead
-    job at least tells someone — but :class:`UnknownClaimIdentity` already
-    drops a claim on the same terms, the viewer renders the list as a
-    block-level note, and one entry's fault discarded every lane's work. The
-    drop is visible; the dead job was not. Nothing else persists a draft, so
-    the reason carries what was wrong.
+    Each of these costs one entry and never the job. The case against a drop
+    is that a finding deleted for a reason recorded in a list is a silent
+    removal, and that a dead job at least tells somebody. It does not hold
+    here: :class:`UnknownClaimIdentity` drops a claim on the same terms, the
+    viewer renders the list as a block-level note, and the alternative
+    discards every lane's work over one entry's fault. The drop is visible
+    where the dead job is not. Nothing else persists a draft, so the reason
+    carries what was wrong.
 
     Service-owned rather than a field on the record, for the reason every mark
     here is: an agent must not report on its own accuracy.

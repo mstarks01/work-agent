@@ -64,12 +64,13 @@ from stride_service.report import (
     UnverifiedGround,
 )
 
-# Why the fan-in killed a case. A claim that lost every ground no longer kills
-# one — it is dropped and marked, and :attr:`CaseGrounds.dropped_count`
-# reads it off the report — so what is left is ``other``: every way the fan-in
-# still rejects a set of drafts (a dangling element reference, a duplicate ID,
-# an unresolvable label), kept as its own kind so no measured rate quietly
-# absorbs a defect that is not about grounds at all.
+# Why the fan-in killed a case. A claim that loses every ground costs its own
+# entry rather than the case: it is dropped and marked, and
+# :attr:`CaseGrounds.dropped_count` reads it off the report. So one kind is
+# left, ``other``: every way the fan-in still rejects a set of drafts (a
+# dangling element reference, a duplicate ID, an unresolvable label). It is
+# kept as a kind of its own so no measured rate quietly absorbs a defect that
+# is not about grounds at all.
 #
 # A mis-shaped ``Ground`` is deliberately **not** among them: see
 # :class:`GroundMisShape`.
