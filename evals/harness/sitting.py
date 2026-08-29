@@ -77,6 +77,26 @@ class SittingError(ValueError):
     """The sitting cannot be recorded; the message says what stops it."""
 
 
+def claim_files(frameworks: Iterable[str]) -> list[str]:
+    """One reference set per declared framework, named by the declaration.
+
+    Derived rather than listed, so a **Framework Package** nobody wrote yet
+    arrives the moment a case declares it. Both the reading a sitting must
+    cover and the files a sitting submission may change read this.
+    """
+    return [f"{CLAIMS_DIR}/{name}.json" for name in frameworks]
+
+
+def document_name(reviewer: str) -> str:
+    """The filled reading document one reader writes beside a case.
+
+    Spelled once: the app writes this name, and ``submit sitting`` admits
+    this name and no other under the case prefix. A document under another
+    name is another reader's, and a reader may not change one (#388).
+    """
+    return f"REVIEW-{reviewer}.md"
+
+
 def required_files(frameworks: Iterable[str]) -> list[str]:
     """What a complete sitting reads, derived from the case's own declaration.
 
@@ -86,9 +106,7 @@ def required_files(frameworks: Iterable[str]) -> list[str]:
     the declaration reaches this module as raw JSON on one path and as a
     loaded :class:`~evals.harness.reference.CaseMetadata` on the other.
     """
-    return ["source.md", "model.json"] + [
-        f"{CLAIMS_DIR}/{name}.json" for name in frameworks
-    ]
+    return ["source.md", "model.json", *claim_files(frameworks)]
 
 
 def drifted(case: GoldenCase, sitting: CaseSitting, corpus_dir: Path) -> list[str]:

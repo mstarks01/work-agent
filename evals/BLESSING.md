@@ -359,6 +359,13 @@ filled copy shows the method ran. The generated `REVIEW.md` carries this
 entry pre-filled with the current digests.
 `python -m evals.harness.run submit sitting` opens the PR.
 
+**A sitting pull request may change an answer, never the question it answers.**
+Under each case it carries `case.json`, your own `REVIEW-<login>.md` and the
+`claims/` reference sets, so a correction to a recorded set travels with the
+record that justifies it. `model.json` and every file `sources` lists stay
+outside it — they are what you read, and a submission that edits one fails the
+scope check by name.
+
 `tests/test_case_review.py` fails on a new case that arrives without a
 clearing sitting, and names every case still waiting in its `UNREVIEWED`
 list. Twelve of the 13 cases that shipped before this was enforced are still
