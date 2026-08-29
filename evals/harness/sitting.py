@@ -4,13 +4,14 @@ The act is #327's, and ``evals/BLESSING.md`` step 6 is the method. This module
 is the part a front end does not get to reinvent: which files a sitting must
 read, the digest of each as it stood, what a reader may say about one recorded
 finding and the key that mark files under, the append-only entry that records
-it, the line it clears in the unreviewed list, whether a recorded sitting
-clears its case at all, and the rail of every case with the status that rule
-gives it. ``webapp/sitting.py`` is one surface over this;
-the CLI path writes the same files by hand and the checks cannot tell them
-apart, which is the point — one implementation of the rules. CI reads
-:func:`clears` through ``tests/test_case_review.py``, so no surface can call a
-case read while CI still asks somebody to read it.
+it and the one a surface may take back off, the line it clears in the
+unreviewed list and puts back, whether a recorded sitting clears its case at
+all, and the rail of every case with the status that rule gives it.
+``webapp/sitting.py`` is one surface over this; the CLI path writes the same
+files by hand and the checks cannot tell them apart, which is the point — one
+implementation of the rules. CI reads :func:`clears` through
+``tests/test_case_review.py``, so no surface can call a case read while CI
+still asks somebody to read it.
 
 **The own list comes first, and that is a property rather than an
 instruction.** What the order protects is the evidence in the filled
@@ -159,6 +160,18 @@ class Draft(BaseModel):
     missing: list[str] = Field(default_factory=list)
     notes: str = ""
     opened_digests: dict[str, str] = Field(default_factory=dict)
+    #: The entry the record appended to ``case.json``, or ``None`` while this
+    #: read is unrecorded. It is in the draft rather than in a surface's
+    #: memory because a reader records a case one day and re-records or drops
+    #: it the next. It is also the whole of what a surface may take back off:
+    #: an entry it did not write is untouchable, which is what keeps
+    #: ``reviews`` append-only.
+    recorded: dict[str, Any] | None = None
+    #: The ``UNREVIEWED`` entry the record removed, verbatim, or ``""`` where
+    #: it removed none. The reason in that entry is prose a person wrote and
+    #: nothing can recompute it, so a surface that puts the case back on the
+    #: list puts back the lines it took out.
+    unreviewed_entry: str = ""
 
 
 @dataclass(frozen=True)
@@ -707,7 +720,8 @@ def record(
     rule above true.
     """
     path = case_dir / "case.json"
-    meta = json.loads(path.read_text(encoding="utf-8"))
+    raw = path.read_text(encoding="utf-8")
+    meta = json.loads(raw)
     entry = {
         "reviewer": reviewer,
         "date": datetime.now(UTC).date().isoformat(),
@@ -719,14 +733,60 @@ def record(
     if replaces is not None and replaces in reviews:
         reviews.remove(replaces)
     reviews.append(entry)
-    path.write_text(
-        json.dumps(meta, ensure_ascii=False, indent=2) + "\n", encoding="utf-8"
-    )
+    _write_meta(path, meta, raw)
     return entry
 
 
-def _unreviewed_entries(source: str) -> list[tuple[str, int, int]]:
-    """Each ``UNREVIEWED`` entry as ``(case id, first line, last line)``.
+def unrecord(case_dir: Path, entry: dict[str, Any]) -> bool:
+    """Take one entry back off ``reviews``, and say whether it was there.
+
+    The caller passes the entry :func:`record` returned, so nothing but its
+    own append is ever removed — a recorded sitting that merged is
+    untouchable here, exactly as it is under ``replaces``.
+
+    This is what a reader who holds a recorded case back from a submission
+    needs, because the submission is built from the working tree: a case
+    whose entry stays behind is a case the pull request carries.
+
+    **An empty list comes off with the entry that made it.** A case nobody
+    has sat carries no ``reviews`` key at all, and :func:`record` is what
+    writes one, so leaving ``[]`` behind would keep the case in the diff with
+    a key that says nothing — and the pull request would carry a case the
+    reader dropped.
+    """
+    path = case_dir / "case.json"
+    raw = path.read_text(encoding="utf-8")
+    meta = json.loads(raw)
+    reviews = meta.get("reviews", [])
+    if entry not in reviews:
+        return False
+    reviews.remove(entry)
+    if not reviews:
+        meta.pop("reviews", None)
+    _write_meta(path, meta, raw)
+    return True
+
+
+def _write_meta(path: Path, meta: dict[str, Any], raw: str) -> None:
+    """Write the case metadata back, in the escaping the file already uses.
+
+    **An append reformats nothing else.** The corpus does not spell a
+    non-ASCII character one way: some files carry the character and some
+    carry the ``\\uXXXX`` escape, so a write that picked either would rewrite
+    unrelated lines in about a third of the cases. Matching what the file
+    already does means an append adds one entry to the diff and
+    :func:`unrecord` takes it away again, which is what lets a surface put a
+    case back the way it found it.
+    """
+    path.write_text(
+        json.dumps(meta, ensure_ascii=raw.isascii(), indent=2) + "\n",
+        encoding="utf-8",
+    )
+
+
+def _unreviewed_table(source: str) -> tuple[list[tuple[str, int, int]], int]:
+    """Each ``UNREVIEWED`` entry as ``(case id, first line, last line)``, and
+    the line the table closes on.
 
     Read through :mod:`ast` rather than by matching text, because the entry
     prose is arbitrary English: counting brackets to find where an entry ends
@@ -765,43 +825,73 @@ def _unreviewed_entries(source: str) -> list[tuple[str, int, int]]:
         raise SittingError(
             f"{UNREVIEWED_FILE}: UNREVIEWED holds a key that is not a string"
         )
+    close = (table.end_lineno or 0) - 1
     # An empty table names no case and bounds nothing. It is the day the last
     # case is read, and the pairing below has no entry to close.
     if not starts:
-        return []
+        return [], close
     # The closing brace bounds the last entry; every other one ends where the
     # next begins. `end_lineno` on the value would stop before the `),`.
-    bounds = [line for _, line in starts[1:]] + [(table.end_lineno or 0) - 1]
+    bounds = [line for _, line in starts[1:]] + [close]
     return [
         (case, start, end) for (case, start), end in zip(starts, bounds, strict=True)
-    ]
+    ], close
 
 
-def clear_unreviewed(root: Path, case_id: str) -> bool:
-    """Remove this case's entry from ``UNREVIEWED``. Returns whether it wrote.
+def clear_unreviewed(root: Path, case_id: str) -> str:
+    """Remove this case's entry from ``UNREVIEWED``, and return what it removed.
 
     The list names the cases nobody has read, so it is only accurate while a
     case that gets read comes off it.
+
+    **It hands the removed lines back** because the reason in them is prose a
+    person wrote, and nothing can recompute it. A reader who holds a recorded
+    case back from a submission puts that case on the list again, and these
+    are the lines that go there. The answer is ``""`` where the list did not
+    name the case, so a caller that only asks whether it wrote reads it as a
+    falsehood.
     """
     path = root / UNREVIEWED_FILE
     source = path.read_text(encoding="utf-8")
+    entries, _ = _unreviewed_table(source)
     span = next(
-        (
-            (start, end)
-            for case, start, end in _unreviewed_entries(source)
-            if case == case_id
-        ),
+        ((start, end) for case, start, end in entries if case == case_id),
         None,
     )
     if span is None:
-        return False
+        return ""
     start, end = span
     lines = source.splitlines(keepends=True)
     path.write_text("".join(lines[:start] + lines[end:]), encoding="utf-8")
+    return "".join(lines[start:end])
+
+
+def restore_unreviewed(root: Path, case_id: str, entry: str) -> bool:
+    """Put one case's ``UNREVIEWED`` entry back, and say whether it wrote.
+
+    The reverse of :func:`clear_unreviewed`, and the reason that function
+    returns its lines. A reader who holds a recorded case back from a
+    submission leaves that case unread, so the list has to name it again —
+    otherwise the count CI reads is a lie the pull request carries.
+
+    The entry goes in front of the first key that sorts after it, which is
+    where the table keeps it: the ids are numbered and the table is in corpus
+    order. A case the list already names is left alone, so putting one back
+    twice writes once.
+    """
+    path = root / UNREVIEWED_FILE
+    source = path.read_text(encoding="utf-8")
+    entries, close = _unreviewed_table(source)
+    if any(case == case_id for case, _, _ in entries):
+        return False
+    at = next((start for case, start, _ in entries if case > case_id), close)
+    lines = source.splitlines(keepends=True)
+    path.write_text("".join(lines[:at] + [entry] + lines[at:]), encoding="utf-8")
     return True
 
 
 def unreviewed_cases(root: Path) -> list[str]:
     """Every case the unreviewed list still names, in file order."""
     source = (root / UNREVIEWED_FILE).read_text(encoding="utf-8")
-    return [case for case, _, _ in _unreviewed_entries(source)]
+    entries, _ = _unreviewed_table(source)
+    return [case for case, _, _ in entries]

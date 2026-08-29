@@ -24,6 +24,7 @@ from fastapi.testclient import TestClient
 
 from evals.harness import sitting as sittings
 from webapp.sitting import _PAGE, build_session, create_app
+from webapp.sitting import main as app_main
 
 LOOPBACK = "http://127.0.0.1:8020"
 CASE = "02-iot-fleet-telemetry"
@@ -83,6 +84,20 @@ def session_for(tree, reviewer="ada", case=None, can_submit=False):
 def draft_file(tree, case, reviewer="ada") -> Path:
     """One reader's draft of one case, as the store files it."""
     return drafts_root(tree) / reviewer / f"{case}.json"
+
+
+def read_and_record(app, case=CASE, notes="21 agree", missing=()):
+    """One whole sitting through the app: the own list, then the record.
+
+    The shortest route to a finished draft, which is the one thing the submit
+    stage, the pinned footer and the drop are all about.
+    """
+    app.post("/api/own-list", json={"case": case, "items": ["a spoofed device"]})
+    app.get(f"/api/part-two?case={case}")
+    return app.post(
+        "/api/finish",
+        json={"case": case, "marks": {}, "missing": list(missing), "notes": notes},
+    )
 
 
 @pytest.fixture
@@ -260,12 +275,19 @@ class TestWhatASittingWrites:
         assert len(after) == 2
         assert after[0]["reviewer"] == "sam", "the recorded sitting was rewritten"
 
-    def test_it_answers_with_the_command_and_the_paste(self, client):
+    def test_it_answers_with_the_paths_it_wrote(self, client):
+        """The command and the paste text moved to the submit stage.
+
+        One press carries every case, so there is one command and one paste
+        text for the session rather than one per case. What a record answers
+        with is what that record wrote.
+        """
         app, _, _ = client
         payload = self.finish(app).json()
-        assert payload["command"] == "python -m evals.harness.run submit sitting"
-        assert "Sitting:" in payload["paste"]
         assert f"evals/corpus/{CASE}/case.json" in payload["written"]
+        assert f"evals/corpus/{CASE}/REVIEW-ada.md" in payload["written"]
+        assert sittings.UNREVIEWED_FILE in payload["written"]
+        assert payload["ready"] == 1, "the pinned footer counts this case"
 
 
 class TestThePosture:
@@ -330,7 +352,7 @@ class TestThePosture:
                 assert refused.status_code == 403, f"{path} accepted a {site} request"
 
         assert not draft_file(tree, CASE).exists(), "a refused request wrote a draft"
-        assert not session.recorded, "a refused request recorded the sitting"
+        assert not session.carried(), "a refused request recorded the sitting"
         assert not (tree / "evals" / "corpus" / CASE / "REVIEW-ada.md").exists()
 
     def test_a_bare_post_is_refused_too(self, tree):
@@ -513,15 +535,41 @@ class TestTheUnreviewedHelper:
     """The list is a Python literal, so removing a line is worth testing."""
 
     def test_both_entry_shapes_are_removed(self, tree):
-        assert sittings.clear_unreviewed(tree, CASE) is True
-        assert sittings.clear_unreviewed(tree, "03-batch-data-pipeline") is True
+        assert sittings.clear_unreviewed(tree, CASE)
+        assert sittings.clear_unreviewed(tree, "03-batch-data-pipeline")
         text = (tree / "tests" / "test_case_review.py").read_text("utf-8")
         assert text.count('": ') == 0
         assert text.endswith("}\n"), "the dict is still a dict"
 
     def test_a_case_not_listed_writes_nothing(self, tree):
         before = (tree / "tests" / "test_case_review.py").read_text("utf-8")
-        assert sittings.clear_unreviewed(tree, "99-not-a-case") is False
+        assert sittings.clear_unreviewed(tree, "99-not-a-case") == ""
+        assert (tree / "tests" / "test_case_review.py").read_text("utf-8") == before
+
+    def test_a_cleared_entry_goes_back_where_it_came_from(self, tree):
+        """The reverse of the clear, byte for byte and in key order.
+
+        A reader who holds a recorded case back leaves it unread, so the list
+        has to name it again — and the reason in the entry is prose a person
+        wrote, which nothing can recompute.
+        """
+        listing = tree / "tests" / "test_case_review.py"
+        before = listing.read_text("utf-8")
+        entry = sittings.clear_unreviewed(tree, CASE)
+        assert sittings.restore_unreviewed(tree, CASE, entry) is True
+        assert listing.read_text("utf-8") == before
+
+    def test_an_entry_goes_back_into_an_empty_table(self, tree):
+        """The day every case is read, and the reader drops one of them."""
+        entries = {case: sittings.clear_unreviewed(tree, case) for case in CASES}
+        assert sittings.unreviewed_cases(tree) == []
+        sittings.restore_unreviewed(tree, OTHER, entries[OTHER])
+        sittings.restore_unreviewed(tree, CASE, entries[CASE])
+        assert sittings.unreviewed_cases(tree) == list(CASES), "in key order"
+
+    def test_a_case_the_list_already_names_is_left_alone(self, tree):
+        before = (tree / "tests" / "test_case_review.py").read_text("utf-8")
+        assert sittings.restore_unreviewed(tree, CASE, "junk\n") is False
         assert (tree / "tests" / "test_case_review.py").read_text("utf-8") == before
 
     def test_the_last_case_comes_off_and_leaves_an_empty_table(self, tree):
@@ -834,6 +882,8 @@ class TestEveryEndpointResolvesItsCase:
                 "/api/finish",
                 {"case": case, "marks": {}, "missing": [], "notes": ""},
             ),
+            "POST /api/drop": ("post", "/api/drop", {"case": case}),
+            "POST /api/put-back": ("post", "/api/put-back", {"case": case}),
         }
 
     def refused(self, app, case):
@@ -1221,6 +1271,8 @@ class TestTheDraftSurvivesTheProcess:
             "missing",
             "notes",
             "opened_digests",
+            "recorded",
+            "unreviewed_entry",
         }
         assert held["case"] == CASE
         assert held["clone"] == str(tree), "the clone path is in the file"
@@ -1781,6 +1833,393 @@ class TestTheDraftStore:
         named = tmp_path / "elsewhere"
         assert build_session(tree, "ada", drafts=named).drafts == named
         assert build_session(tree, "ada").drafts == sittings.draft_root()
+
+
+class TestThePinnedRailFooter:
+    """``Submit — N cases ready``: the count and the way to press, in one.
+
+    It counts the finished drafts, which is what one press carries, so the
+    footer and the submit stage can never disagree about the size of the job.
+    It is off at a count of zero, because a press with nothing behind it is
+    not an offer.
+    """
+
+    def ready(self, app):
+        return app.get("/api/rail").json()["ready"]
+
+    def test_it_counts_the_finished_drafts(self, tree):
+        app = browser(session_for(tree, "ada"))
+        assert self.ready(app) == 0
+        for count, case in enumerate(CASES, start=1):
+            read_and_record(app, case)
+            assert self.ready(app) == count
+
+    def test_a_draft_in_progress_is_not_ready(self, tree):
+        """A read the reader started carries no record, so no press carries
+        it — the footer counts what is finished and never what is open."""
+        app = browser(session_for(tree, "ada"))
+        app.post("/api/own-list", json={"case": CASE, "items": ["a stolen key"]})
+        assert self.ready(app) == 0
+
+    def test_a_dropped_case_leaves_the_count(self, tree):
+        app = browser(session_for(tree, "ada"))
+        read_and_record(app, CASE)
+        app.post("/api/drop", json={"case": CASE})
+        assert self.ready(app) == 0
+
+    def test_the_footer_is_in_the_rail_and_off_at_zero(self, tree):
+        """The rail never leaves, so the footer is on screen on every stage.
+
+        The page is asserted rather than driven, as every other page property
+        here is: the button ships hidden, and the rail's own load is what
+        turns it on.
+        """
+        nav = _PAGE.split("<nav>")[1].split("</nav>")[0]
+        assert '<button id="toSubmit" class="hidden">' in nav
+        assert '"Submit — " + count + " cases ready"' in _PAGE
+
+
+class TestTheSubmitStage:
+    """What one press carries, and what stays behind.
+
+    The list is read from the tree on every ask, so it is the submission the
+    press builds rather than a description of one. The stage also names what
+    stays unfinished, which is the failure a read that survives the process
+    invites: believing you submitted five cases when you submitted four.
+    """
+
+    def stage(self, app):
+        return app.get("/api/stage").json()
+
+    def test_it_lists_every_finished_draft(self, tree):
+        app = browser(session_for(tree, "ada"))
+        assert self.stage(app)["ready"] == []
+        for case in CASES:
+            read_and_record(app, case)
+        listed = self.stage(app)["ready"]
+        assert [row["case"] for row in listed] == sorted(CASES)
+        for row in listed:
+            assert row["number"] == row["case"].split("-")[0]
+            assert row["title"] and row["title"] != row["case"]
+
+    def test_a_row_carries_no_claim_count(self, tree):
+        """The same rule the rail row reads under. A number here would tell
+        the reader how much a case they have not read holds."""
+        app = browser(session_for(tree, "ada"))
+        read_and_record(app, CASE)
+        for row in self.stage(app)["ready"]:
+            assert set(row) == {"case", "number", "title"}
+        assert "STRIDE claims" not in json.dumps(self.stage(app))
+
+    def test_it_says_how_many_cases_stay_unfinished(self, tree):
+        app = browser(session_for(tree, "ada"))
+        assert self.stage(app)["unfinished"] == len(CASES)
+        read_and_record(app, CASE)
+        assert self.stage(app)["unfinished"] == len(CASES) - 1
+
+    def test_a_signed_case_is_not_unfinished(self, tree):
+        """A case somebody cleared is done rather than left, whoever signed
+        it. What is left is what nobody finished."""
+        sign(tree, OTHER, "sam")
+        app = browser(session_for(tree, "ada"))
+        assert self.stage(app)["unfinished"] == len(CASES) - 1
+
+    def test_the_written_paths_name_every_case_it_carries(self, tree):
+        app = browser(session_for(tree, "ada"))
+        for case in CASES:
+            read_and_record(app, case)
+        written = self.stage(app)["written"]
+        for case in CASES:
+            assert f"evals/corpus/{case}/REVIEW-ada.md" in written
+            assert f"evals/corpus/{case}/case.json" in written
+        assert written.count(sittings.UNREVIEWED_FILE) == 1, "one list, once"
+
+    def test_the_paste_text_names_every_case_it_carries(self, tree):
+        """In the shape the pull request itself takes: a title that counts
+        the cases and a body that lists them."""
+        app = browser(session_for(tree, "ada"))
+        for case in CASES:
+            read_and_record(app, case)
+        paste = self.stage(app)["paste"]
+        assert paste.startswith(f"Sitting: ada, {len(CASES)} cases")
+        for case in CASES:
+            assert f"- {case}" in paste
+
+    def test_one_command_carries_the_whole_session(self, tree):
+        app = browser(session_for(tree, "ada"))
+        read_and_record(app, CASE)
+        assert self.stage(app)["command"] == (
+            "python -m evals.harness.run submit sitting"
+        )
+
+    def test_with_nothing_recorded_the_ways_out_are_off(self, tree):
+        """A reader who walks to the end having recorded nothing is offered
+        no way out, because there is nothing for one to carry."""
+        app = browser(session_for(tree, "ada"))
+        stage = self.stage(app)
+        assert stage["ready"] == []
+        assert stage["written"] == []
+        assert '$("waysOut").classList.toggle("hidden", !d.ready.length)' in _PAGE
+
+    def test_with_no_gh_login_the_ways_out_stay_and_the_button_never_appears(
+        self, tree
+    ):
+        """The path still ends somewhere. The command and the paste text are
+        the same either way; only the press is missing."""
+        session = session_for(tree, "ada", can_submit=False)
+        app = browser(session)
+        read_and_record(app, CASE)
+        stage = self.stage(app)
+        assert stage["command"] and stage["paste"] and stage["written"]
+        assert "const CAN_SUBMIT = false;" in app.get("/").text
+        refused = app.post("/api/submit")
+        assert refused.status_code == 409
+        assert "nothing to" in refused.json()["detail"]
+
+
+class TestDroppingACase:
+    """A drop holds one recorded case back, and a put back returns it.
+
+    The press takes no argument and the submission builds itself from the
+    working tree, so a drop has to take the record out of the tree. That is
+    what makes the list on the page exactly what the press carries — and it
+    is why the reader's own words survive it untouched.
+    """
+
+    def case_dir(self, tree, case=CASE):
+        return tree / "evals" / "corpus" / case
+
+    def snapshot(self, tree, case=CASE):
+        """Every file under one case, as it stands. The drop is measured
+        against it, because a stray byte in this directory puts the case in
+        the pull request."""
+        root = self.case_dir(tree, case)
+        return {
+            str(path.relative_to(root)): path.read_bytes()
+            for path in sorted(root.rglob("*"))
+            if path.is_file()
+        }
+
+    def test_a_dropped_case_returns_to_draft_in_progress(self, tree):
+        app = browser(session_for(tree, "ada"))
+        read_and_record(app, CASE)
+        assert app.post("/api/drop", json={"case": CASE}).json() == {
+            "case": CASE,
+            "state": "open",
+        }
+        rows = {row["case"]: row for row in app.get("/api/rail").json()["cases"]}
+        assert rows[CASE]["state"] == "draft"
+        assert rows[CASE]["status"] == "draft in progress"
+        assert rows[CASE]["pressable"] is True
+
+    def test_it_takes_the_record_out_of_the_working_tree(self, tree):
+        """The whole record, byte for byte: the filled document, the appended
+        entry and the cleared line. A case the press must not carry has to
+        leave nothing in the diff at all."""
+        app = browser(session_for(tree, "ada"))
+        listing = tree / "tests" / "test_case_review.py"
+        before, listed = self.snapshot(tree), listing.read_text("utf-8")
+        read_and_record(app, CASE)
+        assert self.snapshot(tree) != before
+        app.post("/api/drop", json={"case": CASE})
+        assert self.snapshot(tree) == before
+        assert listing.read_text("utf-8") == listed
+
+    def test_it_leaves_every_other_case_alone(self, tree):
+        app = browser(session_for(tree, "ada"))
+        for case in CASES:
+            read_and_record(app, case)
+        kept = self.snapshot(tree, OTHER)
+        app.post("/api/drop", json={"case": CASE})
+        assert self.snapshot(tree, OTHER) == kept
+        assert [row["case"] for row in app.get("/api/stage").json()["ready"]] == [OTHER]
+
+    def test_the_reader_keeps_every_word_they_wrote(self, tree):
+        """A drop is about this pull request, never about the read."""
+        app = browser(session_for(tree, "ada"))
+        read_and_record(app, CASE, notes="21 agree", missing=["no fleet key"])
+        app.post("/api/drop", json={"case": CASE})
+        held = json.loads(draft_file(tree, CASE).read_text("utf-8"))
+        assert held["own_list"] == ["a spoofed device"]
+        assert held["missing"] == ["no fleet key"]
+        assert held["notes"] == "21 agree"
+        assert held["state"] == "open"
+        assert held["recorded"] is None, "the entry it took back off"
+
+    def test_the_stage_shows_it_held_back_and_reversible(self, tree):
+        app = browser(session_for(tree, "ada"))
+        read_and_record(app, CASE)
+        app.post("/api/drop", json={"case": CASE})
+        stage = app.get("/api/stage").json()
+        assert stage["ready"] == []
+        assert [row["case"] for row in stage["held_back"]] == [CASE]
+        assert stage["held_back"][0]["title"]
+
+    def test_putting_it_back_writes_the_record_again(self, tree):
+        app = browser(session_for(tree, "ada"))
+        read_and_record(app, CASE, notes="21 agree", missing=["no fleet key"])
+        before = self.snapshot(tree)
+        app.post("/api/drop", json={"case": CASE})
+        assert app.post("/api/put-back", json={"case": CASE}).json() == {
+            "case": CASE,
+            "state": "finished",
+        }
+        assert self.snapshot(tree) == before, "the same record, from the draft"
+        stage = app.get("/api/stage").json()
+        assert [row["case"] for row in stage["ready"]] == [CASE]
+        assert stage["held_back"] == []
+
+    def test_putting_it_back_appends_no_second_entry(self, tree):
+        """One reader and one case never write two entries into one pull
+        request, whichever route wrote the second one."""
+        app = browser(session_for(tree, "ada"))
+        read_and_record(app, CASE)
+        app.post("/api/drop", json={"case": CASE})
+        app.post("/api/put-back", json={"case": CASE})
+        path = self.case_dir(tree) / "case.json"
+        reviews = json.loads(path.read_text("utf-8"))["reviews"]
+        assert [entry["reviewer"] for entry in reviews] == ["ada"]
+
+    def test_a_recorded_sitting_that_merged_is_untouchable(self, tree):
+        """The drop removes the entry this reader appended and nothing else."""
+        sign(tree, CASE, "sam")
+        app = browser(session_for(tree, "ada"))
+        read_and_record(app, CASE)
+        app.post("/api/drop", json={"case": CASE})
+        path = self.case_dir(tree) / "case.json"
+        reviews = json.loads(path.read_text("utf-8"))["reviews"]
+        assert [entry["reviewer"] for entry in reviews] == ["sam"]
+
+    def test_a_case_nobody_sat_keeps_no_empty_review_list(self, tree):
+        """The key `record` wrote comes off with the entry that made it.
+
+        A case left carrying `"reviews": []` stays in the diff, and the pull
+        request then carries a case the reader dropped.
+        """
+        app = browser(session_for(tree, "ada"))
+        read_and_record(app, CASE)
+        app.post("/api/drop", json={"case": CASE})
+        meta = json.loads((self.case_dir(tree) / "case.json").read_text("utf-8"))
+        assert "reviews" not in meta
+
+    def test_a_case_that_is_not_recorded_cannot_be_dropped(self, tree):
+        app = browser(session_for(tree, "ada"))
+        app.post("/api/own-list", json={"case": CASE, "items": []})
+        refused = app.post("/api/drop", json={"case": CASE})
+        assert refused.status_code == 409
+        assert "does not carry it" in refused.json()["detail"]
+
+    def test_a_case_nobody_dropped_cannot_be_put_back(self, tree):
+        app = browser(session_for(tree, "ada"))
+        app.post("/api/own-list", json={"case": CASE, "items": []})
+        refused = app.post("/api/put-back", json={"case": CASE})
+        assert refused.status_code == 409
+        assert "not held back" in refused.json()["detail"]
+
+    def test_both_carry_both_controls(self, tree):
+        """They name a case, they write under the reader's own store, and
+        they decide what the next press publishes."""
+        session = session_for(tree, "ada")
+        app = browser(session)
+        read_and_record(app, CASE)
+        untokened = TestClient(
+            create_app(session), base_url=LOOPBACK, headers=SAME_ORIGIN
+        )
+        for path in ("/api/drop", "/api/put-back"):
+            foreign = app.post(
+                path, json={"case": CASE}, headers={"Sec-Fetch-Site": "cross-site"}
+            )
+            assert foreign.status_code == 403, path
+            assert untokened.post(path, json={"case": CASE}).status_code == 403, path
+        assert self.snapshot(tree) != {}
+        assert (self.case_dir(tree) / "REVIEW-ada.md").is_file(), "nothing moved"
+
+
+class TestWhatASuccessfulSubmitLeaves:
+    """A successful submit deletes every draft it carried, and no other.
+
+    That work is in a pull request by then, and a store that only grows is a
+    store nobody trusts. Nothing here reaches GitHub: the spine is stubbed,
+    which is the same seam the button's other tests use.
+    """
+
+    def spine(self, monkeypatch, ok=True):
+        from evals.harness import submit as spine
+
+        outcome = (
+            spine.Outcome(author="ada", url="https://example.test/pr/9", closing="ok")
+            if ok
+            else spine.Outcome(
+                author="ada",
+                checks=(spine.Check(name="the digests hold", problems=("x",)),),
+            )
+        )
+        monkeypatch.setattr(spine, "submission", lambda root, kind, **kw: outcome)
+
+    def test_it_deletes_every_draft_it_carried(self, tree, monkeypatch):
+        self.spine(monkeypatch)
+        app = browser(session_for(tree, "ada", can_submit=True))
+        for case in CASES:
+            read_and_record(app, case)
+        answer = app.post("/api/submit")
+        assert answer.status_code == 200
+        assert answer.json()["carried"] == sorted(CASES)
+        assert answer.json()["kept"] == []
+        for case in CASES:
+            assert not draft_file(tree, case).exists(), case
+
+    def test_a_case_the_reader_dropped_keeps_its_draft(self, tree, monkeypatch):
+        self.spine(monkeypatch)
+        app = browser(session_for(tree, "ada", can_submit=True))
+        for case in CASES:
+            read_and_record(app, case)
+        app.post("/api/drop", json={"case": CASE})
+        assert app.post("/api/submit").json()["carried"] == [OTHER]
+        assert draft_file(tree, CASE).is_file(), "the held-back read survives"
+        assert not draft_file(tree, OTHER).exists()
+
+    def test_a_failed_submission_keeps_every_draft(self, tree, monkeypatch):
+        """Nothing merged, so nothing is finished. The reader repairs the
+        failures and presses again."""
+        self.spine(monkeypatch, ok=False)
+        app = browser(session_for(tree, "ada", can_submit=True))
+        read_and_record(app, CASE)
+        assert app.post("/api/submit").status_code == 409
+        assert draft_file(tree, CASE).is_file()
+
+    def test_submitting_with_every_case_dropped_is_refused(self, tree):
+        app = browser(session_for(tree, "ada", can_submit=True))
+        read_and_record(app, CASE)
+        app.post("/api/drop", json={"case": CASE})
+        refused = app.post("/api/submit")
+        assert refused.status_code == 409
+        assert "record the sitting" in refused.json()["detail"]
+
+
+class TestTheTerminalReadsNoDraft:
+    """Decision 38, as a property of the command line rather than a promise.
+
+    A terminal reader of the draft file would be a second surface over the
+    rules the app enforces, so the command line never opens one.
+    """
+
+    def test_no_command_line_path_reads_the_store(self):
+        import inspect
+
+        import webapp.sitting as app_module
+
+        source = inspect.getsource(app_module.main)
+        for name in ("load_draft", "draft_states", "draft_path", "discard_draft"):
+            assert name not in source, f"the command line reads a draft through {name}"
+
+    def test_listing_the_cases_left_starts_no_server_and_opens_no_draft(
+        self, tree, monkeypatch, capsys
+    ):
+        monkeypatch.setattr(
+            "evals.harness.sitting.unreviewed_cases", lambda root: list(CASES)
+        )
+        assert app_main(["--list"]) == 0
+        assert capsys.readouterr().out.splitlines() == list(CASES)
 
 
 class TestThePageParses:
