@@ -12,7 +12,7 @@ from dataclasses import FrozenInstanceError
 
 import pytest
 
-from stride_service.vendors import (
+from analysis_service.vendors import (
     REASONING_KWARG,
     VENDOR_NAMES,
     CredentialMode,
@@ -57,12 +57,12 @@ class TestCredentialMode:
         assert vendor_for(name).credential is CredentialMode.API_KEY
 
     def test_the_key_var_is_vendor_scoped(self):
-        assert vendor_for("anthropic").api_key_var == "STRIDE_ANTHROPIC_API_KEY"
-        assert vendor_for("openai").api_key_var == "STRIDE_OPENAI_API_KEY"
+        assert vendor_for("anthropic").api_key_var == "ANALYSIS_ANTHROPIC_API_KEY"
+        assert vendor_for("openai").api_key_var == "ANALYSIS_OPENAI_API_KEY"
 
     def test_the_key_is_read_from_the_vendor_scoped_var(self):
         kwargs = vendor_for("anthropic").credential_kwargs(
-            {"STRIDE_ANTHROPIC_API_KEY": API_KEY}
+            {"ANALYSIS_ANTHROPIC_API_KEY": API_KEY}
         )
         assert kwargs == {"api_key": API_KEY}
 
@@ -76,23 +76,23 @@ class TestCredentialMode:
     def test_a_missing_key_fails_closed_naming_the_var_not_the_value(self):
         with pytest.raises(ProviderAuthError) as excinfo:
             vendor_for("openai").credential_kwargs({})
-        assert "STRIDE_OPENAI_API_KEY" in str(excinfo.value)
+        assert "ANALYSIS_OPENAI_API_KEY" in str(excinfo.value)
 
     def test_an_empty_key_is_a_deploy_mistake_not_an_absence(self):
         with pytest.raises(ProviderAuthError):
-            vendor_for("openai").credential_kwargs({"STRIDE_OPENAI_API_KEY": "   "})
+            vendor_for("openai").credential_kwargs({"ANALYSIS_OPENAI_API_KEY": "   "})
 
     def test_a_key_value_never_appears_in_the_error(self):
         # OWASP A09: a key echoed into a log or a problem+json body has leaked.
         with pytest.raises(ProviderAuthError) as excinfo:
-            vendor_for("openai").credential_kwargs({"STRIDE_OPENAI_API_KEY": ""})
+            vendor_for("openai").credential_kwargs({"ANALYSIS_OPENAI_API_KEY": ""})
         assert API_KEY not in str(excinfo.value)
 
     def test_vertex_needs_project_location_and_adc(self):
         kwargs = vendor_for("vertex").credential_kwargs(
             {
-                "STRIDE_VERTEX_PROJECT": "p",
-                "STRIDE_VERTEX_LOCATION": "us-central1",
+                "ANALYSIS_VERTEX_PROJECT": "p",
+                "ANALYSIS_VERTEX_LOCATION": "us-central1",
                 "GOOGLE_APPLICATION_CREDENTIALS": "/adc.json",
             }
         )
@@ -102,15 +102,15 @@ class TestCredentialMode:
     @pytest.mark.parametrize(
         "missing",
         [
-            "STRIDE_VERTEX_PROJECT",
-            "STRIDE_VERTEX_LOCATION",
+            "ANALYSIS_VERTEX_PROJECT",
+            "ANALYSIS_VERTEX_LOCATION",
             "GOOGLE_APPLICATION_CREDENTIALS",
         ],
     )
     def test_each_vertex_variable_is_required(self, missing):
         env = {
-            "STRIDE_VERTEX_PROJECT": "p",
-            "STRIDE_VERTEX_LOCATION": "us-central1",
+            "ANALYSIS_VERTEX_PROJECT": "p",
+            "ANALYSIS_VERTEX_LOCATION": "us-central1",
             "GOOGLE_APPLICATION_CREDENTIALS": "/adc.json",
         }
         del env[missing]

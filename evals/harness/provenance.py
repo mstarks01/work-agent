@@ -13,13 +13,13 @@ the requested model instead would certify a route rather than a build
 one entry per node *execution*, carrying the tier it ran on, what was requested,
 what answered, and the hash that pair produced. Everything else here is derived
 from it — the per-tier summary a reader greps for, and the node -> fingerprint
-observation map :func:`~stride_service.certification.certify` rules on. The
+observation map :func:`~analysis_service.certification.certify` rules on. The
 summary is written into the artifact for legibility and **re-derived** rather
 than read back on load; a stored summary that disagrees with the per-node record
 is a corrupted artifact, not a second opinion (OWASP A08).
 
 The resolved sampling is stored **once per tier**, not per execution, mirroring
-the clear block a :class:`~stride_service.report.Report` already carries:
+the clear block a :class:`~analysis_service.report.Report` already carries:
 a fingerprint is recomputable from a node's served build plus its tier's block,
 and repeating the block on every execution would be the same fact twelve times
 over, free to drift.
@@ -43,14 +43,14 @@ from pydantic import (
     model_validator,
 )
 
-from stride_service.certification import (
+from analysis_service.certification import (
     CertificationError,
     Fingerprint,
     TierResolver,
 )
-from stride_service.model_tiers import TIER_NAMES, TierName
-from stride_service.report import NodeRun
-from stride_service.sampling import SamplingConfig, TierSampling, sampling_fingerprint
+from analysis_service.model_tiers import TIER_NAMES, TierName
+from analysis_service.report import NodeRun
+from analysis_service.sampling import SamplingConfig, TierSampling, sampling_fingerprint
 
 # How an unset param reads in the operator-facing display. A param this
 # deployment leaves unset is not the same claim as one pinned to zero, and the
@@ -75,7 +75,7 @@ class NodeExecution(BaseModel):
     substituting the requested route where the served build is unknown is
     exactly the silent weakening certification exists to prevent. A node
     execution without a served build carries no fingerprint either (see
-    :class:`~stride_service.report.NodeRun`), so it is absent from this record
+    :class:`~analysis_service.report.NodeRun`), so it is absent from this record
     rather than present with a hole in it.
 
     ``tier`` is resolved once, here, from the deployment's node -> tier walk.
@@ -231,7 +231,7 @@ class RunProvenance(BaseModel):
         """Recompute every recorded fingerprint; raise on the first that differs.
 
         The serialized hash is never the input to a promotion — the canonical
-        :func:`~stride_service.sampling.sampling_fingerprint` recomputes it from
+        :func:`~analysis_service.sampling.sampling_fingerprint` recomputes it from
         the served build and the tier's sampling block. This check is what makes
         the stored value evidence rather than an assertion: an artifact whose
         hash does not follow from the identity beside it is refused, so a

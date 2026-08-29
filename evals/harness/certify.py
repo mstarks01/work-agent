@@ -1,13 +1,13 @@
 """Promoting a sweep winner: re-pin the sampling file and bless its fingerprints.
 
 The **write** half of certification. The pure check lives in the service
-(:mod:`stride_service.certification`), which certifies each job it completes;
+(:mod:`analysis_service.certification`), which certifies each job it completes;
 this module is what only a sanctioned sweep does — re-pinning this deployment's
 sampling file in place and recording the fingerprints that pinning implies.
 
 *This deployment's*, not the repo's: both files are located through
-:class:`~stride_service.deployment.Deployment`, so a sweep run against a
-redirected ``STRIDE_SAMPLING`` promotes into the file it actually measured.
+:class:`~analysis_service.deployment.Deployment`, so a sweep run against a
+redirected ``ANALYSIS_SAMPLING`` promotes into the file it actually measured.
 
 The write path is single-sourced: one ``SamplingConfig`` both re-pins the
 file's values *and* derives the fingerprints recorded in the manifest, so the
@@ -26,23 +26,23 @@ from collections.abc import Mapping
 from dataclasses import dataclass
 from pathlib import Path
 
-from evals.harness.provenance import ProvenanceError, RunProvenance, TierIdentity
-from stride_service.certification import (
+from analysis_service.certification import (
     MANIFEST_VERSION,
     BlessedManifest,
     CertificationError,
     load_manifest,
 )
-from stride_service.deployment import ConfigPaths, Deployment
-from stride_service.model_tiers import TIER_NAMES, TierName
-from stride_service.sampling import SamplingConfig, TierSampling, sampling_fingerprint
+from analysis_service.deployment import ConfigPaths, Deployment
+from analysis_service.model_tiers import TIER_NAMES, TierName
+from analysis_service.sampling import SamplingConfig, TierSampling, sampling_fingerprint
+from evals.harness.provenance import ProvenanceError, RunProvenance, TierIdentity
 
 
 def promotion_paths(deployment: Deployment | None = None) -> ConfigPaths:
     """Which ``sampling.toml`` and manifest a promotion re-pins.
 
     The deployment's, not the repo's. A sweep measures whatever
-    ``STRIDE_SAMPLING`` names, so promoting its winner has to re-pin that same
+    ``ANALYSIS_SAMPLING`` names, so promoting its winner has to re-pin that same
     file — re-pinning the checked-in copy instead would bless a fingerprint
     describing params the measured configuration never held. The manifest is
     deployment-local by design and follows for the same reason.
@@ -155,7 +155,7 @@ class PromotionPlan:
 
     Built before anything is written so the operator approves a concrete list of
     identities rather than a command. Every fingerprint here is **recomputed**
-    by :func:`~stride_service.sampling.sampling_fingerprint` from the served
+    by :func:`~analysis_service.sampling.sampling_fingerprint` from the served
     build and that tier's sampling — the artifact's stored hashes are verified
     against the same function and never copied forward, so an edited artifact
     cannot smuggle a fingerprint into the manifest.

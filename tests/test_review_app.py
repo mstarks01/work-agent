@@ -16,9 +16,9 @@ import json
 import pytest
 from fastapi.testclient import TestClient
 
+from analysis_service.frameworks import PACKAGES
 from evals.harness import queue as review_queue
 from evals.harness.ledger import load
-from stride_service.frameworks import PACKAGES
 from webapp.review import (
     QUESTIONS,
     build_session,

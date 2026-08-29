@@ -44,7 +44,7 @@ arrive, deterministically, and whether they can leak into evidence.
 ## Decision
 
 **Retrieval is a set intersection against the rules that fired, and that is the
-whole mechanism.** Two closed tables in `stride_service/knowledge.py` map each
+whole mechanism.** Two closed tables in `analysis_service/knowledge.py` map each
 document to the rule IDs that select it; a lane gets the documents its own fired
 rules name, ranked by how many named them, with declaration order as the
 tie-break. No index, no query, no scoring function, no embedding model.

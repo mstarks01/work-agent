@@ -23,14 +23,14 @@ from evals.harness.reference import load_case
 from evals.harness.structural import report_issues
 
 CORPUS = Path(__file__).resolve().parents[1] / "evals" / "corpus"
-from stride_service.certification import fingerprints_of
-from stride_service.evidence import evidence_catalog
-from stride_service.frameworks import package_for
-from stride_service.frameworks.stride.record import (
+from analysis_service.certification import fingerprints_of
+from analysis_service.evidence import evidence_catalog
+from analysis_service.frameworks import package_for
+from analysis_service.frameworks.stride.record import (
     CATEGORY_LETTERS,
     STRIDE_CATEGORIES,
 )
-from stride_service.graph import (
+from analysis_service.graph import (
     ENTRY_EXTRACT,
     ENTRY_EXTRACT_ONLY,
     ENTRY_PREPARE,
@@ -39,7 +39,7 @@ from stride_service.graph import (
     analyze_node_name,
     tier_node_by_graph_node,
 )
-from stride_service.report import (
+from analysis_service.report import (
     AnalysisMarks,
     Mitigation,
     Report,
@@ -47,7 +47,7 @@ from stride_service.report import (
     SharedElementName,
     Verdict,
 )
-from stride_service.sampling import load_sampling
+from analysis_service.sampling import load_sampling
 from tests.factories import DEFAULT_FRAMEWORKS, ScriptedLlm
 
 REPO_ROOT = Path(__file__).resolve().parents[1]
@@ -233,14 +233,14 @@ def test_an_eval_report_carries_every_field_production_stamps(case):
     """The eval report is the production shape or it measures a different one.
 
     The pinned set is the guard, and it is pinned rather than derived on
-    purpose: every field an :class:`~stride_service.graph.Analysis` and a
-    :class:`~stride_service.report.Report` share is one the eval seam has
+    purpose: every field an :class:`~analysis_service.graph.Analysis` and a
+    :class:`~analysis_service.report.Report` share is one the eval seam has
     to be *asked* to carry, and a field added to both without a decision here
     is exactly how ``coverage`` came to be computed at the fan-in for a sweep
     that then read an empty list for it.
 
     The five marks are pinned through
-    :class:`~stride_service.report.AnalysisMarks`, which is where an
+    :class:`~analysis_service.report.AnalysisMarks`, which is where an
     ``Analysis`` holds them now.
     """
     pipeline = build(case, ENTRY_PREPARE, {})
@@ -859,7 +859,7 @@ class TestTheInitiatorReadingOfAnExtraction:
 
     def model(self, flows):
         """A blessed model carrying only what the reading walks: its flows."""
-        from stride_service.system_model import SystemModel
+        from analysis_service.system_model import SystemModel
 
         case = load_case(CORPUS / "07-cicd-store-deploy")
         return SystemModel.model_validate(

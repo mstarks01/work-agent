@@ -1,9 +1,9 @@
 """The **Framework Package** contract's precondition: declared, and run.
 
 Two checks in two places, because one needs a **Valid System Model** and the
-other does not. :func:`~stride_service.frameworks.validate_package` checks the
+other does not. :func:`~analysis_service.frameworks.validate_package` checks the
 member is callable, beside the checks it already runs on the other eight.
-:func:`~stride_service.frameworks.run_precondition` checks what the member
+:func:`~analysis_service.frameworks.run_precondition` checks what the member
 *returns*, which nothing can know until a model exists.
 
 Every test here builds its package from the shipped one
@@ -15,7 +15,7 @@ from __future__ import annotations
 
 import pytest
 
-from stride_service.frameworks import (
+from analysis_service.frameworks import (
     PACKAGES,
     PRECONDITION_RESULTS,
     FrameworkPackageError,

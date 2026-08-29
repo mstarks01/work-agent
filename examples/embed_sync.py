@@ -23,19 +23,19 @@ import asyncio
 import sys
 from pathlib import Path
 
-from stride_service import (
+from analysis_service import (
+    Engine,
     EngineInputError,
     PipelineCompleted,
     PipelineRejected,
     Source,
-    StrideEngine,
 )
 
 SAMPLE = Path(__file__).resolve().parent / "orders.md"
 
 
 # docs-region: embed_sync
-def analyze_orders(engine: StrideEngine) -> None:
+def analyze_orders(engine: Engine) -> None:
     """The synchronous call, with the same three outcomes as the async one."""
     sources = [
         Source.description(SAMPLE.read_text(encoding="utf-8"), label="Orders note"),
@@ -65,7 +65,7 @@ def analyze_orders(engine: StrideEngine) -> None:
 # docs-region-end: embed_sync
 
 
-async def main(engine: StrideEngine) -> None:
+async def main(engine: Engine) -> None:
     """The ``main(engine)`` contract every example follows, for the offline test.
 
     A blocking call reached from async code belongs on a worker thread, which
@@ -79,4 +79,4 @@ async def main(engine: StrideEngine) -> None:
 
 
 if __name__ == "__main__":
-    analyze_orders(StrideEngine.from_config(["stride"]))
+    analyze_orders(Engine.from_config(["stride"]))

@@ -110,7 +110,7 @@ redefines the metric mid-flight and resets every recorded baseline. The
 adjudication payload is unchanged, and grounds do not leak into it.
 
 Consequently the *only* thing that reads a quote against its source is
-`stride_service.grounding`, at `join_drafts`.
+`analysis_service.grounding`, at `join_drafts`.
 
 ### `source_excerpt` survives beside `grounds`
 

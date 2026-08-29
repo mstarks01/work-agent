@@ -1,6 +1,6 @@
 """The shipped action vocabulary: its invariants, where its docstring says they are.
 
-:mod:`stride_service.actions` ships — `Claim` carries the field it validates —
+:mod:`analysis_service.actions` ships — `Claim` carries the field it validates —
 so the checks on it belong in a test named for it rather than beside a
 measurement. The measurement's own half, which verbs count as one action and
 what the corpus cannot separate, stays in ``tests/test_evals_verbs.py``.
@@ -22,7 +22,7 @@ from __future__ import annotations
 
 import pytest
 
-from stride_service.actions import (
+from analysis_service.actions import (
     ACTION_VERBS,
     FAMILIES,
     GLOSS,
@@ -94,7 +94,7 @@ def test_a_claim_refuses_a_verb_outside_the_vocabulary():
     """The end of the chain: the shipped model is what actually enforces it."""
     from pydantic import ValidationError
 
-    from stride_service.frameworks.stride.record import ThreatProposal
+    from analysis_service.frameworks.stride.record import ThreatProposal
 
     common = {
         "sequence": 1,

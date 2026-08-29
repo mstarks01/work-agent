@@ -49,18 +49,18 @@ from typing import Literal, get_args, get_origin
 import pytest
 from pydantic import ValidationError
 
-from stride_service.actions import menu
-from stride_service.critic import mentioned_ids
-from stride_service.evidence import (
+from analysis_service.actions import menu
+from analysis_service.critic import mentioned_ids
+from analysis_service.evidence import (
     ABSENT_PREFIX,
     CROSSING_PREFIX,
     UNKNOWN_PREFIX,
     render_catalog,
 )
-from stride_service.frameworks import PACKAGES, schemas_for
-from stride_service.grounding import verify_quote
-from stride_service.markdown_loader import MarkdownLoader, split_sections
-from stride_service.prompts import (
+from analysis_service.frameworks import PACKAGES, schemas_for
+from analysis_service.grounding import verify_quote
+from analysis_service.markdown_loader import MarkdownLoader, split_sections
+from analysis_service.prompts import (
     ANALYZE_PROMPT_NAME,
     EXTRACT_PROMPT_NAME,
     PROMPT_BODY_NAMES,
@@ -68,9 +68,9 @@ from stride_service.prompts import (
     compose_analyze_prompt,
     lane_exemplars_doc,
 )
-from stride_service.report import Ground
-from stride_service.skills import estimate_tokens
-from stride_service.token_caps import (
+from analysis_service.report import Ground
+from analysis_service.skills import estimate_tokens
+from analysis_service.token_caps import (
     COMPOSED_ANALYZE_CAP,
     TOKEN_CAPS,
     prompt_key,
@@ -170,7 +170,7 @@ def source_block(system):
     """One exemplar system's source, as ``(label, text)``.
 
     Found by shape rather than by position: a fenced block whose first line is
-    ``label:`` is exactly what :func:`~stride_service.sources.render_sources`
+    ``label:`` is exactly what :func:`~analysis_service.sources.render_sources`
     emits, which is the shape the block exists to depict.
     """
     match = SOURCE_BLOCK_RE.search(system)
@@ -183,7 +183,7 @@ def catalog(system):
 
     Found by shape, like the source block: the rows of the table whose left
     column is a backticked ID, which is exactly what ``prepare_analysis`` puts
-    in front of an agent (:func:`~stride_service.evidence.render_catalog`).
+    in front of an agent (:func:`~analysis_service.evidence.render_catalog`).
     A table rather than a JSON array because a list of well-formed IDs reads as
     a specimen of the format and got composed from rather than selected out of
     (#138); the exemplars show the shape an agent actually receives, so they
@@ -594,7 +594,7 @@ def test_the_exemplar_catalog_is_rendered_the_way_a_real_one_is(name):
     is the #138 fix rather than decoration, so an exemplar drifting from it
     would teach agents to read a table they will not be given, which is the
     failure the fix exists to prevent. Without this the drift is silent in the
-    direction that matters: :func:`~stride_service.evidence._gloss` is free to
+    direction that matters: :func:`~analysis_service.evidence._gloss` is free to
     change and nothing here would notice.
 
     Rebuilding the grounds from the refs is exact rather than approximate — a
@@ -681,7 +681,7 @@ def test_the_verb_menu_in_the_output_contract_is_the_vocabulary():
     """``frameworks/stride/output.md`` carries exactly ``actions.menu()``.
 
     Without this the menu is a static copy that happens to match. A verb added
-    to :data:`~stride_service.actions.ActionVerb` would reach the response
+    to :data:`~analysis_service.actions.ActionVerb` would reach the response
     schema — so the provider would accept it — and never reach the prompt, so no
     agent would learn the distinction exists. The field would be enforceable and
     unfillable, which is worse than either alone.
@@ -702,7 +702,7 @@ def test_the_verb_menu_in_the_output_contract_is_the_vocabulary():
     in_contract = [line for line in contract.splitlines() if family_line.match(line)]
     assert in_contract == menu().splitlines(), (
         "the verb menu in frameworks/stride/output.md is not what"
-        " stride_service.actions.menu() emits. Regenerate it:\n\n" + menu()
+        " analysis_service.actions.menu() emits. Regenerate it:\n\n" + menu()
     )
 
 
@@ -730,7 +730,7 @@ CLOSED_VOCABULARIES = "closed vocabularies that reject `unknown`"
 
 def _literal_vocabularies():
     """Every `Literal` field on an element type, with the values it admits."""
-    from stride_service.system_model import (
+    from analysis_service.system_model import (
         DataFlow,
         DataStore,
         ExternalEntity,
@@ -746,7 +746,7 @@ def _literal_vocabularies():
 
 def test_the_asset_vocabulary_still_rejects_unknown():
     """The schema half of the trap, pinned so the prose below stays necessary."""
-    from stride_service.system_model import CORE_ASSET_TAGS
+    from analysis_service.system_model import CORE_ASSET_TAGS
 
     assert "unknown" not in CORE_ASSET_TAGS
 
@@ -828,7 +828,7 @@ def test_every_extraction_failure_mode_is_declared():
     here until the prompt accounts for it, or until somebody declares — as
     ``too-many-elements`` is declared — that no wording prevents it.
     """
-    from stride_service.validation import IssueCode
+    from analysis_service.validation import IssueCode
 
     assert set(EXTRACTION_FAILURE_RULES) == set(get_args(IssueCode))
 

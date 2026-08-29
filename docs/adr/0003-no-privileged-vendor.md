@@ -25,7 +25,7 @@ Every occurrence of `vertex`, `gemini`, `google`, `ping`, `flash`, `pro` and
 
 ### Required provider implementation — kept
 
-`src/stride_service/vendors.py` is the only module that names vendors, and it
+`src/analysis_service/vendors.py` is the only module that names vendors, and it
 holds three facts per vendor that nothing else can supply: the LiteLLM router
 prefix, the credential mode the vendor *implies*, and the pinned-form rule.
 `GOOGLE_APPLICATION_CREDENTIALS` is Vertex's declared ADC variable. All of this
@@ -39,7 +39,7 @@ is implementation, not bias.
 | `docs/First-Run.md` | Vertex had its own section; Anthropic and OpenAI shared one | three sections, alphabetical, equal detail, each with a complete config block |
 | `docs/HTTP-API.md` | Ping led the IdP table | alphabetical, and stated to be illustrative rather than exhaustive |
 | `tests/test_auth.py`, `tests/test_pipeline*.py` | fixtures used `ping.example.com` and `ping\|user-1` | `idp.example.com`, `idp\|user-1` |
-| `src/stride_service/auth.py` | RS256 was unconfigurable — see below | `STRIDE_OIDC_ALGORITHMS`, over an allowlist |
+| `src/analysis_service/auth.py` | RS256 was unconfigurable — see below | `ANALYSIS_OIDC_ALGORITHMS`, over an allowlist |
 
 ### Already resolved — no change needed
 
@@ -82,7 +82,7 @@ A live smoke suite per vendor was therefore the wrong first move: it would have
 added three lanes that all skip, to fix an imbalance between two lanes that
 already both skip. What was actually missing was coverage that *can* run.
 
-So `stride_service.conformance` probes the pinned `litellm`'s local model-cost
+So `analysis_service.conformance` probes the pinned `litellm`'s local model-cost
 map, and `tests/test_conformance.py` hands `build_tier_adapters` a synthetic
 environment — the registry checks that a credential was *declared*, never that
 it authenticates. Both run for all three vendors in the offline lane on every
@@ -132,7 +132,7 @@ as a field and `from_env` never read it, so the knob was present, documented by
 its own existence, and unreachable. A standards-compliant IdP signing ES256 could
 not be pointed at this service at all.
 
-`STRIDE_OIDC_ALGORITHMS` now configures it, and the security content is entirely
+`ANALYSIS_OIDC_ALGORITHMS` now configures it, and the security content is entirely
 in what it refuses. The allowlist admits the asymmetric families
 (`RS*`, `PS*`, `ES*`, `EdDSA`) and configuration selects from it rather than
 extending it, because two candidates must never be reachable:

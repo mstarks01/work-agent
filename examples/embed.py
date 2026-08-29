@@ -1,4 +1,4 @@
-"""Embed :class:`StrideEngine` in your own application — route step 5.
+"""Embed :class:`Engine` in your own application — route step 5.
 
 Run it against the sample source::
 
@@ -22,20 +22,20 @@ import asyncio
 import sys
 from pathlib import Path
 
-from stride_service import (
+from analysis_service import (
+    Engine,
     EngineInputError,
     PipelineCompleted,
     PipelineRejected,
     Report,
     Source,
-    StrideEngine,
 )
 
 SAMPLE = Path(__file__).resolve().parent / "orders.md"
 
 
 # docs-region: embed
-async def main(engine: StrideEngine) -> None:
+async def main(engine: Engine) -> None:
     """Analyze one system, handling every outcome the run can have."""
     # A job takes an ordered list of sources. One written description is the
     # simplest case; add Source.transcript(...) for a recorded call, and give
@@ -94,4 +94,4 @@ def summarise(report: Report) -> None:
 if __name__ == "__main__":
     # A selection is required: this service ships no default set, so an
     # embedder names the frameworks it wants analysed under.
-    asyncio.run(main(StrideEngine.from_config(["stride"])))
+    asyncio.run(main(Engine.from_config(["stride"])))

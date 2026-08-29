@@ -44,6 +44,21 @@ from dataclasses import replace
 from pathlib import Path
 from typing import Any
 
+from analysis_service.certification import CertificationError, CertifyResult, certify
+from analysis_service.deployment import Deployment
+from analysis_service.frameworks import PACKAGES
+from analysis_service.frameworks.stride.record import Threat
+from analysis_service.graph import Pipeline
+from analysis_service.report import (
+    FrameworkAnalysis,
+    FrameworkName,
+    NodeLatency,
+    NodeRun,
+    Report,
+    TokenUsage,
+    latency_by_node,
+    usage_by_node,
+)
 from evals.harness import (
     comparison,
     consent,
@@ -106,21 +121,6 @@ from evals.harness.stability import (
     load_runs,
 )
 from evals.harness.structural import report_issues
-from stride_service.certification import CertificationError, CertifyResult, certify
-from stride_service.deployment import Deployment
-from stride_service.frameworks import PACKAGES
-from stride_service.frameworks.stride.record import Threat
-from stride_service.graph import Pipeline
-from stride_service.report import (
-    FrameworkAnalysis,
-    FrameworkName,
-    NodeLatency,
-    NodeRun,
-    Report,
-    TokenUsage,
-    latency_by_node,
-    usage_by_node,
-)
 
 EVALS_ROOT = Path(__file__).resolve().parents[1]
 DEFAULT_CORPUS_DIR = EVALS_ROOT / "corpus"
@@ -863,7 +863,7 @@ def _print_certification(result: CertifyResult) -> None:
     """Surface the gate verdict, always — and never claim more than it checked.
 
     ``certified`` is narrow by design (see
-    :mod:`stride_service.certification`): it means no *observed* fingerprint
+    :mod:`analysis_service.certification`): it means no *observed* fingerprint
     went unblessed, which is vacuously true of a sweep that observed none.
     Printing it alone is how a run that certified nothing came to announce that
     every fingerprint was blessed, so completeness is reported first and the

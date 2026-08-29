@@ -227,7 +227,7 @@ def test_the_committed_table_is_not_stale():
 
 def test_the_generator_hardcodes_no_framework_name():
     """A framework named in the generator is the gap #330 exists to avoid."""
-    from stride_service.frameworks import PACKAGES
+    from analysis_service.frameworks import PACKAGES
 
     source = Path(comparison.__file__).read_text(encoding="utf-8")
     named = [name for name in PACKAGES if f'"{name}"' in source]

@@ -4,7 +4,7 @@ Start it from a clone, with model auth already configured::
 
     uv run python webapp/main.py
 
-It embeds :class:`~stride_service.StrideEngine` **in process**. It does not go
+It embeds :class:`~analysis_service.Engine` **in process**. It does not go
 through the ``/v1`` HTTP surface, so it needs no bearer token and no CORS — and
 it runs real models against real prose, because there is no credential-free
 path here. Its whole job is to show a first-time integrator that the engine
@@ -117,8 +117,9 @@ from starlette.datastructures import MutableHeaders
 from starlette.middleware.trustedhost import TrustedHostMiddleware
 from starlette.types import ASGIApp, Message, Receive, Scope, Send
 
-from stride_service import (
+from analysis_service import (
     ConfigError,
+    Engine,
     EngineDeadlineError,
     EngineInputError,
     FrameworkName,
@@ -126,12 +127,11 @@ from stride_service import (
     PipelineCompleted,
     Report,
     Source,
-    StrideEngine,
 )
-from stride_service.deployment import Deployment
-from stride_service.frameworks import package_for
-from stride_service.model_tiers import ModelTierConfig
-from stride_service.vendors import vendor_for
+from analysis_service.deployment import Deployment
+from analysis_service.frameworks import package_for
+from analysis_service.model_tiers import ModelTierConfig
+from analysis_service.vendors import vendor_for
 
 logger = logging.getLogger("webapp")
 
@@ -315,7 +315,7 @@ class Analyses:
 #: built engine, because an engine is built *for* a selection and the selection
 #: is now the submitter's: the options a package needs ride on it, and they are
 #: known only once a form has been filled in.
-EngineFactory = Callable[[Sequence[FrameworkSelection]], StrideEngine]
+EngineFactory = Callable[[Sequence[FrameworkSelection]], Engine]
 
 
 @dataclass(frozen=True)
@@ -346,7 +346,7 @@ def build_startup(env: Mapping[str, str] | None = None) -> Startup:
     """Resolve the config and prove the credentials, or convert the failure to a page.
 
     Two stages, and the split is the whole content of the diagnostic. Resolving
-    the :class:`~stride_service.deployment.Deployment` reads the config files;
+    the :class:`~analysis_service.deployment.Deployment` reads the config files;
     building a runner off it resolves the vendor's credentials and runs every
     tier's ``(vendor, model, sampling)`` through LiteLLM's own check. So a
     *config* failure leaves no tiers to report, while a *credential* failure
@@ -360,7 +360,7 @@ def build_startup(env: Mapping[str, str] | None = None) -> Startup:
     thing. The probe names the whole carried set for a second reason: that is
     the selection the form ships ticked, so the most common submission finds
     its graph already composed.
-    :meth:`~stride_service.deployment.Deployment.runner` memoizes per
+    :meth:`~analysis_service.deployment.Deployment.runner` memoizes per
     selection, so a narrower pick composes its own graph once and no
     submission binds the adapters twice.
     """
@@ -374,7 +374,7 @@ def build_startup(env: Mapping[str, str] | None = None) -> Startup:
         tiers = deployment.tiers if deployment is not None else None
         return Startup(engine_for=None, frameworks=(), tiers=tiers, error=exc)
     return Startup(
-        engine_for=partial(StrideEngine.from_deployment, deployment),
+        engine_for=partial(Engine.from_deployment, deployment),
         frameworks=deployment.frameworks,
         tiers=deployment.tiers,
         error=None,
@@ -547,7 +547,7 @@ def _selection(
     from ``carried`` rather than trusting the order or the membership of what
     was sent. Three things fall out of deriving it that way rather than
     filtering in place: a name this install does not carry is refused instead of
-    reaching :meth:`~stride_service.deployment.Deployment.selection` as a
+    reaching :meth:`~analysis_service.deployment.Deployment.selection` as a
     sentence about configuration, a name sent twice runs once instead of
     building a graph with two blocks of it, and the block order of every report
     is ``config/frameworks.toml`` order rather than whatever the page posted.
@@ -560,7 +560,7 @@ def _selection(
     Raises ``TypeError`` for a body whose ``frameworks`` is not a list,
     ``ValueError`` for an empty or non-carried selection, and
     ``ValidationError`` for an entry that is not a
-    :class:`~stride_service.report.FrameworkSelection`. The route answers all
+    :class:`~analysis_service.report.FrameworkSelection`. The route answers all
     three as one 400.
     """
     if not isinstance(requested, list):
@@ -660,7 +660,7 @@ def _html(page: RenderedPage, status_code: int = 200) -> HTMLResponse:
 
 
 async def _drive(
-    engine: StrideEngine, analyses: Analyses, run: Run, sources: list[Source]
+    engine: Engine, analyses: Analyses, run: Run, sources: list[Source]
 ) -> None:
     """Run one analysis to a terminal state, narrating it onto the run's queue.
 

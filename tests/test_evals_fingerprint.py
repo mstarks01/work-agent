@@ -14,6 +14,7 @@ from dataclasses import replace
 
 import pytest
 
+from analysis_service.frameworks import PACKAGES
 from evals.harness.fingerprint import (
     DEFAULT_VERSION,
     EXTRA_COMPONENT,
@@ -32,7 +33,6 @@ from evals.harness.fingerprint import (
 )
 from evals.harness.reference import ReferenceRequirement, ReferenceThreat
 from evals.harness.verbs import VerbError
-from stride_service.frameworks import PACKAGES
 
 FLOWS = {
     "flow:shopper-to-storefront-api:place-order": (

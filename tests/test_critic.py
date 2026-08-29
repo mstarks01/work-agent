@@ -2,7 +2,7 @@
 
 import pytest
 
-from stride_service.critic import (
+from analysis_service.critic import (
     CriticOutputError,
     DraftJoinError,
     assemble_claims,
@@ -12,10 +12,10 @@ from stride_service.critic import (
     snap_drafts,
     snap_rulings,
 )
-from stride_service.frameworks import schemas_for
-from stride_service.frameworks.stride import STRIDE
-from stride_service.frameworks.stride.record import DraftThreat
-from stride_service.report import (
+from analysis_service.frameworks import schemas_for
+from analysis_service.frameworks.stride import STRIDE
+from analysis_service.frameworks.stride.record import DraftThreat
+from analysis_service.report import (
     Ground,
     Mitigation,
     ProposedVerdict,
@@ -23,7 +23,7 @@ from stride_service.report import (
     UnknownRef,
     Verdict,
 )
-from stride_service.sources import DEFAULT_DESCRIPTION_LABEL
+from analysis_service.sources import DEFAULT_DESCRIPTION_LABEL
 from tests.factories import sample_draft, sample_ruling, valid_model
 
 #: The five model-facing shapes STRIDE's own nodes speak in. ``assemble_claims``

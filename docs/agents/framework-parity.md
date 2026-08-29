@@ -8,7 +8,7 @@ means for each of the others.
 The answer may be "nothing". That is a legitimate outcome and often the right
 one. What is not legitimate is silence.
 
-The set is `PACKAGES` in `src/stride_service/frameworks/__init__.py`, whatever is
+The set is `PACKAGES` in `src/analysis_service/frameworks/__init__.py`, whatever is
 in it at the time you read this — two today, and
 [#170](https://github.com/mstarks01/work-agent/issues/170) files LINDDUN as a
 candidate. **Read this document as N frameworks, never as a pair.** Every rule
@@ -74,16 +74,18 @@ when a package lands — every entry reading *"this code is that framework's"* i
 dispatch a third package may need adding to.
 
 **A literal is not the only way to name a framework, and two of the other ways
-shipped.** The scan read `.py` files under `src/` and `evals/` and matched the
-string `"stride"`. So it saw neither of these, and both were wrong for a year:
+shipped.** A scan that reads `.py` files under `src/` and `evals/` and matches
+the string `"stride"` is blind to both of these:
 
-- **A framework's name inside a word.** `StrideEngine` builds a graph for
-  whatever selection a caller names, and `stride_pipeline` is the workflow name
-  ADK stamps into every run's node paths. Neither is a literal.
-- **Text a person reads.** `webapp/` was not searched at all, so the first-run
-  app served the heading "STRIDE threat model" over a form that offers every
-  carried framework. A job naming ASVS alone got its answer under another
-  framework's name.
+- **A framework's name inside a word.** A class, a function or a default value
+  that serves every framework can still carry one framework's name, and none of
+  those is a string literal. Public surface is where this shape survives
+  longest, because renaming it is a larger change than the pull request that
+  finds it.
+- **Text a person reads.** `webapp/` went unsearched, so an app served a heading
+  naming one framework over a form that offers every framework the install
+  carries. A job naming ASVS alone got its answer under another framework's
+  name.
 
 The scan now covers `webapp/` too, and two further checks close those gaps. A
 framework-named class, function or value outside a package must be in a
