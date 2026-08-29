@@ -325,11 +325,21 @@ the server rather than by asking. The rule holds per case: **Previous** and
 list for arrives blind however you reach it. Each recorded finding carries a
 control that takes `agree`, `doubt` or `dup`, which is the same mark the
 by-hand path writes into a `> mark:` slot. When you finish a case it writes
-everything below into your working tree and prints the command and the paste
-text. The last **Next** ends at the submit stage, which is where the button
+that case's record into your working tree.
+
+**One press submits every case you finished, as one pull request.** A footer
+under the list reads `Submit — N cases ready`, counts them, and is the way to
+the submit stage; the last **Next** ends there too. The stage lists every case
+the press carries, one row each, with a **Drop**. A dropped case moves to a
+held-back group with a **Put back**, and goes back to *draft in progress* in
+the list — you keep every word you wrote, and the press stops carrying it. The
+stage also says how many cases stay unfinished, so you never send four cases
+believing you sent five. Below the list it carries the written paths, the
+command and the paste text, each over every case the press carries. The button
 opens the pull request through the `gh` you are already signed in to. It binds
-to loopback and holds no credential of its own; `--no-submit` hides the button.
-`--list` prints the cases nobody has read.
+to loopback and holds no credential of its own; `--no-submit` hides the button
+and keeps the command and the paste text. `--list` prints the cases nobody has
+read.
 
 **Stop whenever you like.** The moment you post your own list, the app opens a
 **Draft Sitting** for that case and keeps your list, your marks, your missing
@@ -337,10 +347,11 @@ list and your notes in it as you write them. It lives at
 `~/.local/state/work-agent/sittings/<login>/<case-id>.json`, outside this
 repository, and it never merges — that is what keeps an unsigned own list out
 of a pull request. Close the browser, run the command again tomorrow, and the
-case comes back where you left it. *Discard this draft* on the case throws one
-away and puts that case back on the list to do. A draft the app cannot read
-refuses its own case and names the file in the rail; the file is yours, so
-repair it or delete it, and every other case still walks.
+case comes back where you left it. A successful submit deletes every draft it
+carried, and a case you dropped keeps its own. *Discard this draft* on the
+case throws one away and puts that case back on the list to do. A draft the
+app cannot read refuses its own case and names the file in the rail; the file
+is yours, so repair it or delete it, and every other case still walks.
 
 The rest of this section is what it writes, and what you write by hand if you
 would rather. Both paths end in the same files, and the checks cannot tell
