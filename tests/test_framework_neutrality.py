@@ -66,12 +66,25 @@ from stride_service.frameworks import CONTENT_LICENSE, PACKAGES
 from tests.factories import SCRIPTED_FRAMEWORKS
 
 REPO_ROOT = Path(__file__).resolve().parents[1]
-SEARCHED = ("src", "evals")
+SEARCHED = ("src", "evals", "webapp")
 
 #: A string literal naming a framework. Import paths and module names are not
 #: matched — ``stride_service`` is this distribution's name, not a package
 #: selection, and ``frameworks.stride.record`` is a module.
 LITERAL = re.compile(r'"(?:stride|asvs)"')
+
+#: A framework's name anywhere inside a word, which is what :data:`LITERAL`
+#: cannot see. ``StrideEngine`` and ``stride_pipeline`` are both a framework
+#: name on a thing that serves every framework, and neither is a string
+#: literal, so the scan above ran past them for two packages.
+IDENTIFIER = re.compile(r"[A-Za-z_][A-Za-z0-9_]*")
+
+#: This distribution's own name. Stripped before either scan, because it names
+#: the wheel rather than a package selection.
+DISTRIBUTION = re.compile(r"stride_service")
+
+#: A framework's name inside a word, once the distribution name is gone.
+IN_WORD = re.compile(r"stride|asvs", re.IGNORECASE)
 
 #: Where a framework literal is allowed, and why. Two readings live here and the
 #: reason has to say which:
@@ -143,6 +156,13 @@ DECLARED: dict[str, str] = {
         " per-case mechanical dispatch that used to branch here is now"
         " `PACKAGE_SCORERS`, a table keyed by framework."
     ),
+    "webapp/review.py": (
+        "QUESTIONS is a table keyed by framework, checked against PACKAGES at"
+        " import: a package without a reviewer question fails the app rather"
+        " than asking about its records in another package's words. Each entry"
+        " asks what that package's records rule on, which is the browser's half"
+        " of `evals/build_review_docs.py`'s RENDERERS."
+    ),
     "evals/build_review_docs.py": (
         "RENDERERS is a table keyed by framework, checked against PACKAGES at"
         " import: a package without a renderer fails the generator loudly"
@@ -182,6 +202,164 @@ DECLARED: dict[str, str] = {
         " claim identity is (#167)."
     ),
 }
+
+
+#: A framework's name on a service-wide thing, left in place **by decision**
+#: rather than because it is right. Keyed by the name, not by the file, so one
+#: deferred decision costs one row however many modules spell it.
+#:
+#: This is not a second exemption list for :data:`DECLARED`. An entry there says
+#: the code genuinely belongs to one framework; an entry here says the code
+#: belongs to all of them and carries one framework's name anyway. A row leaves
+#: when the rename lands, and nothing else empties it.
+OPEN_BY_DECISION: dict[str, str] = {
+    "StrideEngine": (
+        "The in-process entry point, built for whatever selection a caller"
+        " names. Renaming it breaks every embedder and the wheel's public"
+        " surface, so it moves with the distribution rather than before it."
+    ),
+    "stride_pipeline": (
+        "The graph's default workflow name, which ADK stamps into the node"
+        " paths a run reports. Renaming it changes recorded provenance, so it"
+        " moves with the distribution."
+    ),
+    "STRIDE_": (
+        "The environment-variable prefix, on all 21 names the service reads."
+        " It is one namespace and one cutover, not one decision per variable."
+    ),
+}
+
+
+def _docstrings(tree: ast.AST) -> set[int]:
+    """Every string node id that is a docstring rather than a value.
+
+    **This check reads code, not prose.** A docstring naming
+    ``analyze_stride_spoofing`` shows a reader what the graph generates, which
+    is the opposite of a problem: the generated name carries the framework on
+    purpose. What the check is for is a *thing* — a class, a function, a
+    default value — that serves every framework under one framework's name.
+    Comments are skipped for the same reason, and by ``ast`` never seeing them.
+    """
+    found = set()
+    for node in ast.walk(tree):
+        if isinstance(node, ast.Module | ast.ClassDef | ast.FunctionDef):
+            body = getattr(node, "body", [])
+            if (
+                body
+                and isinstance(body[0], ast.Expr)
+                and isinstance(body[0].value, ast.Constant)
+                and isinstance(body[0].value.value, str)
+            ):
+                found.add(id(body[0].value))
+    return found
+
+
+def _framework_named_words(source: Path) -> set[str]:
+    """Every declared name and value string in ``source`` carrying a framework.
+
+    A bare framework name is not one: ``"stride"`` as a key or a value is what
+    :data:`LITERAL` already reads, and it is the spelling a table is keyed by.
+    """
+    tree = ast.parse(source.read_text(encoding="utf-8"))
+    docstrings = _docstrings(tree)
+    words: set[str] = set()
+    for node in ast.walk(tree):
+        if isinstance(node, ast.ClassDef | ast.FunctionDef | ast.AsyncFunctionDef):
+            words.add(node.name)
+        elif isinstance(node, ast.Name):
+            words.add(node.id)
+        elif isinstance(node, ast.Attribute):
+            words.add(node.attr)
+        elif isinstance(node, ast.arg):
+            words.add(node.arg)
+        elif (
+            isinstance(node, ast.Constant)
+            and isinstance(node.value, str)
+            and id(node) not in docstrings
+        ):
+            words.update(IDENTIFIER.findall(node.value))
+    return {
+        word
+        for word in words
+        if IN_WORD.search(DISTRIBUTION.sub("", word)) and word.lower() not in PACKAGES
+    }
+
+
+def framework_named_identifiers() -> dict[str, set[str]]:
+    """Every framework-named name or value outside a package, by file."""
+    found: dict[str, set[str]] = {}
+    for root in SEARCHED:
+        for path in sorted((REPO_ROOT / root).rglob("*.py")):
+            relative = path.relative_to(REPO_ROOT).as_posix()
+            if any(f"/frameworks/{name}/" in relative for name in PACKAGES):
+                continue
+            words = _framework_named_words(path)
+            if words:
+                found[relative] = words
+    return found
+
+
+#: Where a browser gets its words from. Markup assigned to a module-level name,
+#: the ``title=`` an app is constructed with, and the standalone templates.
+PAGES = ("webapp",)
+
+#: A comment inside a page's own script or style. Skipped for the reason the
+#: Python scan skips ``#`` lines: a comment comparing two packages explains the
+#: code, and no reader of the app ever sees it.
+PAGE_COMMENT = re.compile(r"^\s*(?://|/\*|\*)")
+
+
+def page_text() -> dict[str, list[tuple[int, str]]]:
+    """Every line of text an app puts in front of a person, by file.
+
+    **The surface the literal scan could not reach, and the one that was
+    wrong.** ``webapp/`` served a heading reading "STRIDE threat model" over a
+    form that offers every carried framework, so a job naming ASVS alone got its
+    answer under another framework's name. No check could see it: the heading is
+    prose inside a longer string, not a ``"stride"`` literal, and ``webapp/`` was
+    not searched at all.
+
+    A framework's name reaches a page through the report, never through a
+    constant. Anything a package's records rule on differently — the question a
+    reviewer answers, say — is a table keyed by framework, read per finding.
+    """
+    found: dict[str, list[tuple[int, str]]] = {}
+    for root in PAGES:
+        for path in sorted((REPO_ROOT / root).rglob("*.py")):
+            lines = _rendered_lines(path)
+            if lines:
+                found[path.relative_to(REPO_ROOT).as_posix()] = lines
+        for path in sorted((REPO_ROOT / root).rglob("*.html")):
+            relative = path.relative_to(REPO_ROOT).as_posix()
+            found[relative] = list(
+                enumerate(path.read_text(encoding="utf-8").splitlines(), 1)
+            )
+    return found
+
+
+def _rendered_lines(source: Path) -> list[tuple[int, str]]:
+    """Markup constants and app titles in one module, as numbered lines."""
+    tree = ast.parse(source.read_text(encoding="utf-8"))
+    lines: list[tuple[int, str]] = []
+    for node in ast.walk(tree):
+        if isinstance(node, ast.Assign):
+            for value in ast.walk(node.value):
+                if (
+                    isinstance(value, ast.Constant)
+                    and isinstance(value.value, str)
+                    and "<" in value.value
+                    and ">" in value.value
+                ):
+                    lines += [(node.lineno, line) for line in value.value.splitlines()]
+        if isinstance(node, ast.Call) and getattr(node.func, "id", "") == "FastAPI":
+            lines += [
+                (node.lineno, keyword.value.value)
+                for keyword in node.keywords
+                if keyword.arg == "title"
+                and isinstance(keyword.value, ast.Constant)
+                and isinstance(keyword.value.value, str)
+            ]
+    return lines
 
 
 def framework_literals() -> dict[str, list[tuple[int, str]]]:
@@ -264,6 +442,57 @@ def test_a_new_framework_literal_is_declared(literals):
         " is right, add the file to DECLARED with which of the two readings"
         " applies. See docs/agents/framework-parity.md."
     )
+
+
+def test_a_framework_named_thing_is_declared_or_open(literals):
+    """A class or a value may not carry a framework's name unexplained.
+
+    The half :data:`LITERAL` is blind to. ``StrideEngine`` and
+    ``stride_pipeline`` are a framework's name on something every framework
+    uses, and neither is a string literal, so the scan above walked past both
+    while two packages shipped. A name is fine here on one of two showings: its
+    file is in :data:`DECLARED`, so the code is that framework's, or the name is
+    in :data:`OPEN_BY_DECISION`, so somebody decided to keep it and said why.
+    """
+    unexplained = {
+        name: sorted(
+            word
+            for word in words
+            if not any(word.startswith(open_) for open_ in OPEN_BY_DECISION)
+        )
+        for name, words in framework_named_identifiers().items()
+        if name not in DECLARED
+    }
+    unexplained = {name: words for name, words in unexplained.items() if words}
+
+    assert not unexplained, (
+        f"these name a framework on a thing that serves every framework:"
+        f" {unexplained}. Rename it, or add the file to DECLARED if the code is"
+        " really that package's, or add the name to OPEN_BY_DECISION with the"
+        " reason it stays. See docs/agents/framework-parity.md."
+    )
+
+
+def test_every_open_decision_is_still_open():
+    """A name renamed away has to leave the list, or it excuses a fresh one."""
+    live = set()
+    for words in framework_named_identifiers().values():
+        live.update(words)
+    stale = sorted(
+        open_
+        for open_ in OPEN_BY_DECISION
+        if not any(word.startswith(open_) for word in live)
+    )
+    assert not stale, (
+        f"these names are gone and are still recorded as open: {stale}."
+        " Remove the row — an open decision nobody can act on excuses the next"
+        " name that spells it."
+    )
+
+
+def test_every_open_decision_gives_a_reason():
+    thin = sorted(name for name, why in OPEN_BY_DECISION.items() if len(why) < 40)
+    assert not thin, f"these open decisions need a real reason: {thin}"
 
 
 def test_the_declaration_does_not_rot(literals):
@@ -542,4 +771,35 @@ def test_notice_names_every_package_licensed_apart_from_the_repo():
         f"{unattributed} ships text under a licence NOTICE does not name."
         " Add the upstream project, its copyright, its licence and the files"
         " it governs."
+    )
+
+
+def test_there_are_pages_to_check():
+    """Guards the guard: an AST walk that finds no markup agrees with anything."""
+    assert sum(len(lines) for lines in page_text().values()) > 200
+
+
+def test_no_page_names_a_framework():
+    """What a person reads is the report's word, never the template's.
+
+    This is the check that was missing. Every app here serves whatever
+    frameworks the install carries, so a framework's name baked into a heading,
+    a title or a button is wrong for every job that did not name it.
+    """
+    named = {
+        name: [
+            (number, line.strip())
+            for number, line in lines
+            if IN_WORD.search(DISTRIBUTION.sub("", line))
+            and not PAGE_COMMENT.search(line)
+        ]
+        for name, lines in page_text().items()
+    }
+    named = {name: hits for name, hits in named.items() if hits}
+
+    assert not named, (
+        f"these put a framework's name in front of a person: {named}. A page"
+        " serves every framework the install carries, so the name has to come"
+        " from the finding being shown — through a table keyed by framework"
+        " where the wording differs, as webapp/review.py's QUESTIONS does."
     )

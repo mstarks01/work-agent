@@ -1,6 +1,6 @@
 # CLAUDE.md
 
-Project instructions for the STRIDE threat-modeling service.
+Project instructions for the security-analysis service.
 
 ## Agent skills
 
