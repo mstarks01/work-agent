@@ -2,8 +2,8 @@
 
 from typing import ClassVar
 
-from stride_service.system_model import SystemModel
-from stride_service.validation import (
+from analysis_service.system_model import SystemModel
+from analysis_service.validation import (
     MAX_ELEMENTS,
     allowed_asset_tags,
     parse_and_validate,
@@ -259,7 +259,7 @@ class TestCitationsResolve:
 class TestExcerptsVerify:
     """An excerpt is checked against the source it cites, not just its label.
 
-    The same question :mod:`stride_service.grounding` answers for a threat's
+    The same question :mod:`analysis_service.grounding` answers for a threat's
     quote ground, asked of the citation that ties an element to the words it
     came from. Failing closed is affordable here and nowhere else: extraction
     has the ``repair`` pass, so the transcriber is shown its own fabrication

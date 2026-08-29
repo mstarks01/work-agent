@@ -21,9 +21,9 @@ from pathlib import Path
 
 import pytest
 
-from stride_service.frameworks import PACKAGES
-from stride_service.system_model import SystemModel
-from stride_service.validation import parse_and_validate
+from analysis_service.frameworks import PACKAGES
+from analysis_service.system_model import SystemModel
+from analysis_service.validation import parse_and_validate
 
 CORPUS_DIR = Path(__file__).resolve().parents[1] / "evals" / "corpus"
 

@@ -7,7 +7,7 @@
 # answers the question that one cannot: does a real provider actually serve
 # this graph. It has never answered it -- see the preflight below.
 #
-# Vertex because this workflow *chooses* Vertex, in the STRIDE_MODEL_* block
+# Vertex because this workflow *chooses* Vertex, in the ANALYSIS_MODEL_* block
 # below. The shipped config/model_tiers.toml selects no vendor at all, so a live
 # sweep has to name one; this is the only place that choice is written down, and
 # changing the four variables there is what moves the sweep to another vendor.
@@ -56,7 +56,7 @@ on:
     # HTTP surface and its bearer check are off the path entirely,
     # `conformance.py` reports capabilities without gating anything, `smoke.py`
     # is the live lane that reports alongside it (`provider-smoke.yml`, which
-    # carries its own filter), and `StrideEngine` is the *other* in-process
+    # carries its own filter), and `Engine` is the *other* in-process
     # entry point rather than the one evals use -- the one `smoke.py` drives.
     # Everything else in the package is on the transitive import
     # closure of `evals/` and is therefore swept, including the three that
@@ -71,20 +71,20 @@ on:
     #
     # WITHOUT THE BACKSTOP: nothing catches what subtraction still cannot see.
     # The scheduled sweep is gone, so a responsibility that moves out of
-    # `src/stride_service/` altogether -- into `evals/`, or into a new
+    # `src/analysis_service/` altogether -- into `evals/`, or into a new
     # top-level package -- is invisible until someone dispatches a run by hand.
     paths:
       - "prompts/**"
       - "frameworks/**"
       - "domains/**"
       - "config/**"
-      - "src/stride_service/**"
-      - "!src/stride_service/api.py"
-      - "!src/stride_service/auth.py"
-      - "!src/stride_service/conformance.py"
-      - "!src/stride_service/engine.py"
-      - "!src/stride_service/smoke.py"
-      - "!src/stride_service/token_caps.py"
+      - "src/analysis_service/**"
+      - "!src/analysis_service/api.py"
+      - "!src/analysis_service/auth.py"
+      - "!src/analysis_service/conformance.py"
+      - "!src/analysis_service/engine.py"
+      - "!src/analysis_service/smoke.py"
+      - "!src/analysis_service/token_caps.py"
       - ".github/workflows/evals-live.yml"
   # NO `schedule`. There was a Monday 06:00 UTC backstop sweep here until
   # federation went unconfigured indefinitely. A scheduled run fails closed when
@@ -126,7 +126,7 @@ jobs:
       contents: read
       id-token: write # the OIDC token exchanged for short-lived Vertex credentials
 
-    # The vendor registry reads its own STRIDE_-prefixed variables and nothing
+    # The vendor registry reads its own ANALYSIS_-prefixed variables and nothing
     # else (#9): an ambient credential this deployment did not declare must not
     # be able to authenticate a run, which is the ASI03 inherited-credential
     # path. So the project and location have to be handed over explicitly --
@@ -144,17 +144,17 @@ jobs:
     # The third required variable, GOOGLE_APPLICATION_CREDENTIALS, is exported
     # by the auth action below rather than set here.
     #
-    # The STRIDE_MODEL_* four are the sweep's vendor choice. Nothing is selected
+    # The ANALYSIS_MODEL_* four are the sweep's vendor choice. Nothing is selected
     # by default, so without them the run stops at config load with the
     # onboarding error rather than reaching a model. _VENDOR and _MODEL move
     # together per tier: a vendor without its model is rejected at startup.
     env:
-      STRIDE_MODEL_BASE_VENDOR: vertex
-      STRIDE_MODEL_BASE_MODEL: gemini-2.5-flash
-      STRIDE_MODEL_STRONG_VENDOR: vertex
-      STRIDE_MODEL_STRONG_MODEL: gemini-2.5-pro
-      STRIDE_VERTEX_PROJECT: ${{ vars.GCP_PROJECT_ID }}
-      STRIDE_VERTEX_LOCATION: ${{ vars.GCP_LOCATION }}
+      ANALYSIS_MODEL_BASE_VENDOR: vertex
+      ANALYSIS_MODEL_BASE_MODEL: gemini-2.5-flash
+      ANALYSIS_MODEL_STRONG_VENDOR: vertex
+      ANALYSIS_MODEL_STRONG_MODEL: gemini-2.5-pro
+      ANALYSIS_VERTEX_PROJECT: ${{ vars.GCP_PROJECT_ID }}
+      ANALYSIS_VERTEX_LOCATION: ${{ vars.GCP_LOCATION }}
 
     steps:
       - name: Check out
@@ -297,7 +297,7 @@ jobs:
       # Nothing catches it now. examples/README.md carried that promise in those
       # words and has been corrected in the same commit -- keep the two in step.
       #
-      # Credentials come from the job-level STRIDE_VERTEX_* block, like every
+      # Credentials come from the job-level ANALYSIS_VERTEX_* block, like every
       # other live step here.
       - name: Sample description still extracts (examples/embed.py)
         if: steps.preflight.outputs.configured == 'true'

@@ -6,7 +6,7 @@ What you may copy into this repo, and what you must record when you do.
 
 Apache-2.0 covers the code. It does not cover everything in the tree.
 
-`src/stride_service/frameworks/asvs/catalog.json` and the 17 files at
+`src/analysis_service/frameworks/asvs/catalog.json` and the 17 files at
 `frameworks/asvs/lanes/*/skill.md` reproduce the 345 requirement sentences of
 OWASP ASVS 5.0.0. OWASP publishes ASVS under CC BY-SA 4.0. Those 18 files carry
 CC BY-SA 4.0 and its ShareAlike condition.
@@ -40,7 +40,7 @@ mentioned.
 A package that quotes a published standard inherits that standard's licence.
 
 1. Add the package's SPDX identifier to `CONTENT_LICENSE` in
-   `src/stride_service/frameworks/__init__.py`. A missing key fails
+   `src/analysis_service/frameworks/__init__.py`. A missing key fails
    `tests/test_framework_neutrality.py`.
 2. If it is not `Apache-2.0`, add a `THIRD_PARTY` entry naming the upstream
    licence, the files it governs, and a reader for the upstream text.

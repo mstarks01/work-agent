@@ -16,12 +16,12 @@ from pathlib import Path
 
 import pytest
 
+from analysis_service.report import Report
 from evals.harness.artifact import ARTIFACT_VERSION
 from evals.harness.fingerprint import components_for
 from evals.harness.ledger import append, cast
 from evals.harness.reference import load_case
 from evals.harness.run import _write_reports, main, reports_dir, stride_threats
-from stride_service.report import Report
 from tests.test_evals_run_grounds import CASE_DIR, sweep
 
 

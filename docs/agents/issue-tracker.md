@@ -239,7 +239,7 @@ Completed on GitHub Issues (canonical):
   there has no **Evidence Reference** — filed off-map as
   [#171](https://github.com/mstarks01/work-agent/issues/171); 18 of 300 corpus candidates fire on one.
   **#169 found a test that will pass while covering nothing**:
-  `test_no_document_is_reachable_from_the_evidence_seam` globs `src/stride_service/*.py` flat, so a package's
+  `test_no_document_is_reachable_from_the_evidence_seam` globs `src/analysis_service/*.py` flat, so a package's
   tables under `frameworks/<name>/` escape it. It is correct today and is not filed; #169 rules the fix.
   And **#166 corrected #163** — the service constructs a **Verdict** for every framework's claim, so the
   report's record is `RuledClaim(Claim)`, not `verdict` on `Claim` itself.
@@ -400,7 +400,7 @@ Completed on GitHub Issues (canonical):
 
 - [#24 — Map: answer "how do I use this?" — a first-run path for the integrator](https://github.com/mstarks01/work-agent/issues/24)
   — 10 tickets (8 resolved, 2 out of scope), charted 2026-07-29, complete 2026-07-30. A
-  **planning** map: it decided the first-run path for an integrator embedding `StrideEngine`
+  **planning** map: it decided the first-run path for an integrator embedding `Engine`
   (docs plus two utilities — an unbloated in-process web app and a runnable `examples/`) and
   stopped at the spec. The map itself is a decision record; **the spec was implemented
   afterwards** as ordinary follow-up work needing no map, on `build/first-run-path`. Read the

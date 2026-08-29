@@ -14,13 +14,13 @@ from pathlib import Path
 
 import pytest
 
+from analysis_service.report import Verdict
 from evals.harness import critic_yield
 from evals.harness.critic_yield import aggregate_yield, score_case_with_yield
 from evals.harness.fingerprint import components_for, version_for
 from evals.harness.ledger import Ledger, cast
 from evals.harness.reference import load_case
 from evals.harness.scorer import score_case
-from stride_service.report import Verdict
 from tests.eval_factories import ScriptedMatcher, draft_threat, promote
 
 CORPUS_DIR = Path(__file__).resolve().parents[1] / "evals" / "corpus"
@@ -273,11 +273,11 @@ def _report_with(case, threats):
     """A minimal report carrying the given threats, as the modes build one."""
     from datetime import UTC, datetime
 
-    from stride_service.frameworks.stride.record import (
+    from analysis_service.frameworks.stride.record import (
         STRIDE_VERSION,
         StrideAnalysis,
     )
-    from stride_service.report import (
+    from analysis_service.report import (
         FrameworkSelection,
         InputRef,
         Job,

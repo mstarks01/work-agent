@@ -27,7 +27,7 @@ import json
 from collections.abc import Callable
 from pathlib import Path
 
-from stride_service.frameworks import PACKAGES
+from analysis_service.frameworks import PACKAGES
 
 EVALS = Path(__file__).resolve().parent
 CORPUS = EVALS / "corpus"

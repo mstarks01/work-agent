@@ -148,7 +148,7 @@ def test_a_rekey_needs_no_revote(tmp_path):
     """The property that stops this ledger expiring when the rule changes.
 
     Cast at version 1 and re-keyed to the current default, which is the shape a
-    row written before :class:`~stride_service.report.Claim` carried a verb
+    row written before :class:`~analysis_service.report.Claim` carried a verb
     takes today: the components were stored, so the new key is a recomputation
     rather than a re-vote.
     """

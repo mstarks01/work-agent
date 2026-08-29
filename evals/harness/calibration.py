@@ -40,8 +40,8 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Any, Literal
 
+from analysis_service.frameworks.stride.record import STRIDE_CATEGORIES, StrideCategory
 from evals.harness.identity import ClaimPair, IdentityError, Matcher
-from stride_service.frameworks.stride.record import STRIDE_CATEGORIES, StrideCategory
 
 EVALS_ROOT = Path(__file__).resolve().parents[1]
 DEFAULT_PAIRS_PATH = EVALS_ROOT / "calibration_labels" / "pairs.json"

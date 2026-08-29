@@ -65,7 +65,7 @@ measurement in this repo says a shorter instruction finds more threats.
 against it. `envelope` returns to its one `CONTEXT.md` meaning.
 
 **One table, keyed by asset kind: `TOKEN_CAPS` in
-`stride_service.token_caps`.** Eight module constants across two modules become
+`analysis_service.token_caps`.** Eight module constants across two modules become
 thirteen entries in one dictionary. The package half is keyed by *kind* rather
 than by package, so a framework nobody has written yet is already covered.
 

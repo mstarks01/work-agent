@@ -28,7 +28,7 @@ set -euo pipefail
 
 POOL_ID="github"
 PROVIDER_ID="github-actions"
-SA_ID="stride-evals"
+SA_ID="analysis-evals"
 
 PROJECT_ID=""
 LOCATION=""

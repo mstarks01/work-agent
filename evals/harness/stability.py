@@ -32,10 +32,10 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
 
+from analysis_service.report import FrameworkName
 from evals.harness.artifact import EvalArtifact, load_artifact
 from evals.harness.provenance import ProvenanceError
 from evals.harness.scorer import ratio
-from stride_service.report import FrameworkName
 
 #: One case of one framework. Stability is per framework because the two
 #: instruments answer over different sets — STRIDE's open claim set through a

@@ -1,6 +1,6 @@
 # Integration Guide
 
-`StrideEngine` is the in-process entry point: hand it the text describing a
+`Engine` is the in-process entry point: hand it the text describing a
 system and it returns a [`Report`](Report-Schema.md). It owns none of the
 [HTTP contract's](HTTP-API.md) ceremony — no auth token, no job store, no polling
 — so it is the right surface for swapping this pipeline in behind an
@@ -12,9 +12,9 @@ Build once and reuse. `from_config()` composes the pipeline's cacheable prompt
 prefix at construction, so a fresh engine per call pays that cost every time.
 
 ```python
-from stride_service import StrideEngine
+from analysis_service import Engine
 
-engine = StrideEngine.from_config(
+engine = Engine.from_config(
     ["stride"]
 )  # bundled prompts, bundled config, pinned models
 ```
@@ -27,9 +27,9 @@ that rule exists to prevent. Pass a `FrameworkSelection` instead of a bare name
 where a framework takes job-level options:
 
 ```python
-from stride_service import FrameworkSelection
+from analysis_service import FrameworkSelection
 
-engine = StrideEngine.from_config([FrameworkSelection(name="stride")])
+engine = Engine.from_config([FrameworkSelection(name="stride")])
 ```
 
 If [config](Configuration.md) is missing or invalid, `from_config()` raises
@@ -38,11 +38,11 @@ reads paths and overrides from the environment; pass `env=` to override that
 (mainly for tests):
 
 ```python
-engine = StrideEngine.from_config(
+engine = Engine.from_config(
     ["stride"],
     env={
-        "STRIDE_MODEL_STRONG_VENDOR": "anthropic",
-        "STRIDE_MODEL_STRONG_MODEL": "claude-opus-5",
+        "ANALYSIS_MODEL_STRONG_VENDOR": "anthropic",
+        "ANALYSIS_MODEL_STRONG_MODEL": "claude-opus-5",
     },
 )
 ```
@@ -60,14 +60,14 @@ tasks.
 ### When you need the configuration too
 
 `from_config()` resolves a `Deployment` — this installation's config files,
-located by the `STRIDE_*` variables in [Configuration](Configuration.md) and read
+located by the `ANALYSIS_*` variables in [Configuration](Configuration.md) and read
 once — and builds the engine from it. Resolve it yourself when you need both:
 
 ```python
-from stride_service import Deployment, StrideEngine
+from analysis_service import Deployment, Engine
 
 deployment = Deployment.from_env()  # reads config; no credentials touched
-engine = StrideEngine.from_deployment(deployment, deployment.frameworks)
+engine = Engine.from_deployment(deployment, deployment.frameworks)
 
 deployment.frameworks  # what config/frameworks.toml carries
 
@@ -200,7 +200,7 @@ here rather than retyped, so the shape below is provably the shape that works:
 
 <!-- docs-include: examples/embed.py#embed -->
 ```python
-async def main(engine: StrideEngine) -> None:
+async def main(engine: Engine) -> None:
     """Analyze one system, handling every outcome the run can have."""
     # A job takes an ordered list of sources. One written description is the
     # simplest case; add Source.transcript(...) for a recorded call, and give
@@ -267,7 +267,7 @@ From [`examples/embed_sync.py`](../examples/embed_sync.py):
 
 <!-- docs-include: examples/embed_sync.py#embed_sync -->
 ```python
-def analyze_orders(engine: StrideEngine) -> None:
+def analyze_orders(engine: Engine) -> None:
     """The synchronous call, with the same three outcomes as the async one."""
     sources = [
         Source.description(SAMPLE.read_text(encoding="utf-8"), label="Orders note"),

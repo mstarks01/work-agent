@@ -14,7 +14,7 @@ from dataclasses import dataclass
 import pytest
 from litellm import APIConnectionError, RateLimitError
 
-from stride_service.retry import (
+from analysis_service.retry import (
     RetryBudget,
     RetryBudgetExhausted,
     RetryPolicy,

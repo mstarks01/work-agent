@@ -12,7 +12,7 @@ kills ~20% of findings at 92-96% agreement with human triage, and unfiltered
 LLM threat enumeration runs ~86% raw false positives.
 
 **How it works.** The critic returns exactly the drafts it was given
-(:func:`~stride_service.critic.assemble_claims` enforces it), so a killed
+(:func:`~analysis_service.critic.assemble_claims` enforces it), so a killed
 draft is one carrying a ``rejected`` verdict, and the two sides are a superset
 and its subset. That makes the whole instrument a matter of scoring the same
 case twice through the shipped scorer — no second metric implementation, no
@@ -43,11 +43,11 @@ from collections.abc import Sequence
 from dataclasses import dataclass
 from typing import Any, Literal
 
+from analysis_service.frameworks.stride.record import DraftThreat, StrideCategory
 from evals.harness.identity import Matcher
 from evals.harness.ledger import Ledger
 from evals.harness.reference import GoldenCase
 from evals.harness.scorer import CaseScore, candidate_claim, ratio, score_case
-from stride_service.frameworks.stride.record import DraftThreat, StrideCategory
 
 # What one produced threat turned out to be, in the pass that scored it. The
 # first two are hits against the reference set, the last four are the ways of
@@ -257,7 +257,7 @@ def _yield(
 def _dispositions(score: CaseScore) -> dict[str, tuple[Disposition, int | None]]:
     """Every produced threat's fate in one scoring pass, keyed by threat ID.
 
-    Threat IDs are unique within a run — :func:`~stride_service.critic.
+    Threat IDs are unique within a run — :func:`~analysis_service.critic.
     join_drafts` fails closed if two category agents reuse one — so a dict is a safe
     index. The scorer's outcomes are mutually exclusive by construction: a
     threat is matched, or a lane error, or ``needs-info``, or unlisted with

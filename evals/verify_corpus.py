@@ -4,7 +4,7 @@ Everything here is deterministic and credential-free by construction;
 ``tests/test_corpus_lints.py`` runs the same checks in CI.
 
 **This module is also the merge bar.** A deployment cannot read ``evals/`` —
-``pyproject.toml`` packages ``src/stride_service`` alone — so no load-time gate
+``pyproject.toml`` packages ``src/analysis_service`` alone — so no load-time gate
 can check that a framework was ever measured, and a package that *asserted* it
 had been would be the shape Promotion already rejects. The floor sits here
 instead, and it draws the same line the package gate does: the gate checks what
@@ -36,21 +36,21 @@ sys.path.insert(0, str(_REPO_ROOT / "src"))
 # twenty verbs twice would guarantee the two copies drift.
 sys.path.insert(0, str(_REPO_ROOT))
 
-from evals.harness.verbs import unknown_verbs
-from stride_service.frameworks import PACKAGES, run_precondition
-from stride_service.frameworks.asvs.catalog import ASVS_LEVELS, requirements_for
-from stride_service.frameworks.stride.record import STRIDE_CATEGORIES
-from stride_service.grounding import verify_quote
-from stride_service.report import (
+from analysis_service.frameworks import PACKAGES, run_precondition
+from analysis_service.frameworks.asvs.catalog import ASVS_LEVELS, requirements_for
+from analysis_service.frameworks.stride.record import STRIDE_CATEGORIES
+from analysis_service.grounding import verify_quote
+from analysis_service.report import (
     FrameworkName,
     InputRef,
     Rating,
     SourceRef,
     derive_severity_level,
 )
-from stride_service.sources import SourceKind
-from stride_service.system_model import SystemModel
-from stride_service.validation import parse_and_validate
+from analysis_service.sources import SourceKind
+from analysis_service.system_model import SystemModel
+from analysis_service.validation import parse_and_validate
+from evals.harness.verbs import unknown_verbs
 
 SOURCE_KINDS = frozenset(get_args(SourceKind))
 

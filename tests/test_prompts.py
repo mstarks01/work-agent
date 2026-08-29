@@ -2,12 +2,12 @@
 
 import pytest
 
-from stride_service.frameworks.stride.record import STRIDE_CATEGORIES
-from stride_service.markdown_loader import (
+from analysis_service.frameworks.stride.record import STRIDE_CATEGORIES
+from analysis_service.markdown_loader import (
     MarkdownLoader,
     MarkdownNotFoundError,
 )
-from stride_service.prompts import (
+from analysis_service.prompts import (
     PROMPT_BODY_NAMES,
     PROMPT_SECTION_HEADINGS,
     compose_analyze_prompt,
@@ -15,7 +15,7 @@ from stride_service.prompts import (
     compose_extract_prompt,
     compose_repair_prompt,
 )
-from stride_service.skills import lane_exemplars_doc
+from analysis_service.skills import lane_exemplars_doc
 
 
 def prompt_text(title, body="Body."):

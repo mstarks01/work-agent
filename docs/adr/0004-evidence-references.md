@@ -89,7 +89,7 @@ and the critic's to rule on.
 
 **Quotes stay outside the catalog**, and could not be in it: choosing a span for
 what it states is the judgement no enumeration can make. An agent proposes one;
-the pinned ladder in `stride_service.grounding` still checks it against the
+the pinned ladder in `analysis_service.grounding` still checks it against the
 source it names at the fan-in, and an unverifiable quote is still marked rather
 than dropped.
 

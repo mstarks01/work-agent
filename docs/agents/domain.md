@@ -19,7 +19,7 @@ This repo is **single-context**: one `CONTEXT.md` at the root, one `docs/adr/`.
 /
 ├── CONTEXT.md          ← the glossary; exists and is maintained
 ├── docs/adr/           ← decisions with in-repo consequences the glossary cannot carry
-└── src/stride_service/
+└── src/analysis_service/
 ```
 
 There is no `CONTEXT-MAP.md` and there are no per-context `src/<context>/docs/adr/`

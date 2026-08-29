@@ -36,8 +36,8 @@ figures from other tools. The matching half is deterministic, so it cannot move
 between two runs of one configuration; the standing half moves only when a
 person votes.
 
-The scorer takes :class:`~stride_service.report.DraftThreat`, not
-:class:`~stride_service.report.Threat`, so the *same* function scores the
+The scorer takes :class:`~analysis_service.report.DraftThreat`, not
+:class:`~analysis_service.report.Threat`, so the *same* function scores the
 pre-critic union and the post-critic report. Nothing is promoted to make that
 work: ``verdict`` and ``confidence`` are the critic's outputs, and synthesizing
 them to measure the critic would decide the answer by fiat. The one field a
@@ -53,16 +53,16 @@ from collections.abc import Iterable, Mapping, Sequence
 from dataclasses import dataclass, field
 from typing import Any, Literal
 
-from evals.harness.fingerprint import components_for, fingerprint, version_for
-from evals.harness.identity import ClaimPair, Matcher
-from evals.harness.ledger import Ledger
-from evals.harness.reference import GoldenCase, ReferenceThreat
-from stride_service.frameworks.stride.record import (
+from analysis_service.frameworks.stride.record import (
     DraftThreat,
     StrideCategory,
     Threat,
 )
-from stride_service.report import SeverityLevel, derive_severity_level
+from analysis_service.report import SeverityLevel, derive_severity_level
+from evals.harness.fingerprint import components_for, fingerprint, version_for
+from evals.harness.identity import ClaimPair, Matcher
+from evals.harness.ledger import Ledger
+from evals.harness.reference import GoldenCase, ReferenceThreat
 
 
 def candidate_claim(threat: DraftThreat) -> str:

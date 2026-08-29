@@ -162,7 +162,7 @@ marking the first revise path in production uncertified on a technicality.
 The list is **deployment-local**. This project can never ship a run that already
 counts as certified, because a repo-level blessing plus a local one could only
 resolve as one silently overriding the other.
-`STRIDE_BLESSED_FINGERPRINTS` chooses *which* single file is read — it does not
+`ANALYSIS_BLESSED_FINGERPRINTS` chooses *which* single file is read — it does not
 layer a second one on top.
 
 **The service certifies every job it completes**, not just the eval harness. The
@@ -173,7 +173,7 @@ is one deployment's claim about it.
 | State | Meaning | Effect on `GET /v1/jobs/{id}/report` |
 | --- | --- | --- |
 | certified | Every observed fingerprint is blessed | Served |
-| uncertified | At least one is not | Served **unless** `STRIDE_REQUIRE_CERTIFIED` |
+| uncertified | At least one is not | Served **unless** `ANALYSIS_REQUIRE_CERTIFIED` |
 | unexercised | A tier the graph declares presented no fingerprint at all | **Always** withheld |
 
 The lists ship **empty**, so until you promote a measured baseline every run
@@ -193,7 +193,7 @@ Nothing about certification appears in the job status view — it is operator-on
 
 | Variable | Effect |
 | --- | --- |
-| `STRIDE_REQUIRE_CERTIFIED` | Withhold the report when the run is uncertified. Off by default. |
+| `ANALYSIS_REQUIRE_CERTIFIED` | Withhold the report when the run is uncertified. Off by default. |
 
 ## Outcomes
 
@@ -260,11 +260,11 @@ whole graph runs offline against scripted models:
 | Seam | Interface | Default | Status |
 | --- | --- | --- | --- |
 | Pipeline execution | `PipelineRunner` | `AdkPipelineRunner` (real graph) / `StubPipelineRunner` (tests) | Complete |
-| Job persistence | `JobStore` | `InMemoryJobStore` (`memory`) | Backend selected by `STRIDE_JOB_STORE` via a fail-closed registry; only the non-durable `memory` backend ships — a durable one is a new registry entry |
+| Job persistence | `JobStore` | `InMemoryJobStore` (`memory`) | Backend selected by `ANALYSIS_JOB_STORE` via a fail-closed registry; only the non-durable `memory` backend ships — a durable one is a new registry entry |
 | ADK sessions | `BaseSessionService` | `InMemorySessionService` | In-memory only; a `session_service_uri` backend is unwired |
 
 The in-memory defaults are enough to get a report in process. Choosing a backend
-is already wired for the `JobStore` (`STRIDE_JOB_STORE`, which stops startup on
+is already wired for the `JobStore` (`ANALYSIS_JOB_STORE`, which stops startup on
 an unset or unknown value rather than quietly falling back). Still out of scope
 for the current work: a durable `JobStore` implementation, a session backend,
 deployment packaging (container, Cloud Run), and observability. The interfaces
@@ -274,28 +274,28 @@ and the selection seam are in place for all of them.
 
 | Module | Responsibility |
 | --- | --- |
-| `stride_service.engine` | In-process `StrideEngine` facade. |
-| `stride_service.api` | The `/v1` FastAPI app. |
-| `stride_service.jobs` | Job lifecycle, `JobStore`, `PipelineRunner` seams. |
-| `stride_service.sources` | `Source`: the untrusted text a job is built from, the per-deployment bounds both entry points enforce, and the fenced render that is the only way caller bytes reach a model (OWASP LLM01). |
-| `stride_service.deployment` | One installation's config, resolved once: the files, the graph they configure, its runner and its certification gate. |
-| `stride_service.pipeline` | `AdkPipelineRunner`: one job's identity, input digest and certification around a Graph Run. |
-| `stride_service.execution` | Drives a built graph and stamps each node execution. Shared by the service and the eval harness. |
-| `stride_service.graph` | Topology and node functions. |
-| `stride_service.system_model` | Canonical model + validity helpers. |
-| `stride_service.analysis` | Deterministic traversal of a validated model: flows, reachability, paths, unknown controls. No security claims. |
-| `stride_service.candidates` | The rule table. Structural conditions an agent should investigate — leads, never findings, never evidence. |
-| `stride_service.domains` | Which `skills/domains/` packs a model earns, decided from its own technology fields. |
-| `stride_service.coverage` | Per-lane accounting: what each agent was offered, and what its drafts cite. |
-| `stride_service.report` | The `Report` envelope, the neutral `Claim` and the severity model. |
-| `stride_service.frameworks` | The framework-package contract, its registry and its deployment gate. |
-| `stride_service.validation` | The mechanical validity gate. |
-| `stride_service.critic` | The mechanical checks around the critic step — the ones no model should be asked to perform. |
-| `stride_service.skills` / `.prompts` / `.markdown_loader` | Skill/prompt loading and composition. |
-| `stride_service.model_tiers` / `.sampling` / `.resilience` | Config loaders. |
-| `stride_service.vendors` | The vendor registry: each vendor's router prefix, credential mode, and model-name rules. |
-| `stride_service.binding` | Builds one adapter per tier from `(vendor, model, sampling, resilience)`, and the `NodeBinding` the graph binds onto its LLM nodes. |
-| `stride_service.model_gate` | The startup check that asks the provider library whether a tier's parameters are actually supported. |
-| `stride_service.certification` | Compares a run's fingerprints against the deployment's blessed manifest. |
-| `stride_service.auth` | Bearer-token (OIDC JWT) verification. |
-| `stride_service.errors` | `ConfigError`, the base every fail-closed config loader raises — so a caller can handle "this deployment cannot run" without enumerating which knob was wrong. |
+| `analysis_service.engine` | In-process `Engine` facade. |
+| `analysis_service.api` | The `/v1` FastAPI app. |
+| `analysis_service.jobs` | Job lifecycle, `JobStore`, `PipelineRunner` seams. |
+| `analysis_service.sources` | `Source`: the untrusted text a job is built from, the per-deployment bounds both entry points enforce, and the fenced render that is the only way caller bytes reach a model (OWASP LLM01). |
+| `analysis_service.deployment` | One installation's config, resolved once: the files, the graph they configure, its runner and its certification gate. |
+| `analysis_service.pipeline` | `AdkPipelineRunner`: one job's identity, input digest and certification around a Graph Run. |
+| `analysis_service.execution` | Drives a built graph and stamps each node execution. Shared by the service and the eval harness. |
+| `analysis_service.graph` | Topology and node functions. |
+| `analysis_service.system_model` | Canonical model + validity helpers. |
+| `analysis_service.analysis` | Deterministic traversal of a validated model: flows, reachability, paths, unknown controls. No security claims. |
+| `analysis_service.candidates` | The rule table. Structural conditions an agent should investigate — leads, never findings, never evidence. |
+| `analysis_service.domains` | Which `skills/domains/` packs a model earns, decided from its own technology fields. |
+| `analysis_service.coverage` | Per-lane accounting: what each agent was offered, and what its drafts cite. |
+| `analysis_service.report` | The `Report` envelope, the neutral `Claim` and the severity model. |
+| `analysis_service.frameworks` | The framework-package contract, its registry and its deployment gate. |
+| `analysis_service.validation` | The mechanical validity gate. |
+| `analysis_service.critic` | The mechanical checks around the critic step — the ones no model should be asked to perform. |
+| `analysis_service.skills` / `.prompts` / `.markdown_loader` | Skill/prompt loading and composition. |
+| `analysis_service.model_tiers` / `.sampling` / `.resilience` | Config loaders. |
+| `analysis_service.vendors` | The vendor registry: each vendor's router prefix, credential mode, and model-name rules. |
+| `analysis_service.binding` | Builds one adapter per tier from `(vendor, model, sampling, resilience)`, and the `NodeBinding` the graph binds onto its LLM nodes. |
+| `analysis_service.model_gate` | The startup check that asks the provider library whether a tier's parameters are actually supported. |
+| `analysis_service.certification` | Compares a run's fingerprints against the deployment's blessed manifest. |
+| `analysis_service.auth` | Bearer-token (OIDC JWT) verification. |
+| `analysis_service.errors` | `ConfigError`, the base every fail-closed config loader raises — so a caller can handle "this deployment cannot run" without enumerating which knob was wrong. |
