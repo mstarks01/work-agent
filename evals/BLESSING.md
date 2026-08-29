@@ -331,6 +331,17 @@ opens the pull request through the `gh` you are already signed in to. It binds
 to loopback and holds no credential of its own; `--no-submit` hides the button.
 `--list` prints the cases nobody has read.
 
+**Stop whenever you like.** The moment you post your own list, the app opens a
+**Draft Sitting** for that case and keeps your list, your marks, your missing
+list and your notes in it as you write them. It lives at
+`~/.local/state/work-agent/sittings/<login>/<case-id>.json`, outside this
+repository, and it never merges — that is what keeps an unsigned own list out
+of a pull request. Close the browser, run the command again tomorrow, and the
+case comes back where you left it. *Discard this draft* on the case throws one
+away and puts that case back on the list to do. A draft the app cannot read
+refuses its own case and names the file in the rail; the file is yours, so
+repair it or delete it, and every other case still walks.
+
 The rest of this section is what it writes, and what you write by hand if you
 would rather. Both paths end in the same files, and the checks cannot tell
 them apart.

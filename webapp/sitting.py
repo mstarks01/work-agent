@@ -55,9 +55,11 @@ a later press publishes. ``/api/own-list`` satisfies the method's one rule, so
 a foreign page that reaches it opens the recorded sets for whoever asks next.
 It carries the page token too, because it names a case: one such page would
 post an empty list for every case in the offered list and open the whole
-corpus in one pass. ``/api/part-two`` gains no token — it is a read, it serves
-only what a passed gate already opened, and the frame rule covers the page
-that would read it.
+corpus in one pass. ``/api/draft`` and ``/api/discard`` carry both for those
+two reasons and one more: they write under ``~/.local/state/``, so their
+effect outlives the process. ``/api/part-two`` gains no token — it is a read,
+it serves only what a passed gate already opened, and the frame rule covers
+the page that would read it.
 
 **The own list comes first, and the server enforces it.** ``/api/part-two``
 refuses until the reader has posted their own threat list for that case, so
@@ -80,9 +82,32 @@ them — evidence of an order that did not happen.
 **The reader walks the corpus, and Previous and Next sit in the stage header.**
 They step in the rail's order over the cases the reader may open, and the last
 Next lands on the submit stage. The rail never leaves, so the walk reloads no
-document: the own list comes back from the server on every arrival, and the
-marks, the missing list and the notes are held per case in the page for as
-long as it is open.
+document: every arrival reads the case back from the server.
+
+**A part-finished read survives the browser and the process.** It lives in a
+**Draft Sitting**, one file per case under the reader's own GitHub login,
+outside the repository, and it never merges — which is what keeps an unsigned
+own list out of a pull request. The own list creates it, so a reader who reads
+part one of ten cases and writes nothing leaves no trace. The page holds no
+copy of what they wrote: the own list, the marks, the missing list and the
+notes go to the draft as they are written, and a case comes back saying what
+the file on disk says. The reader stops the app, runs it again tomorrow, and
+finds the case where they left it. They may also throw one draft away, which
+puts that case back on the list to do and changes nothing in the repository.
+
+**A hand-edited draft costs nothing this project can price, and nothing
+notices it.** A reader who types their own list into that file by hand wrote a
+list, which is the whole of what the filled document claims. A timestamp pair
+on the draft is rejected for the same reason: the reader owns the file, so
+they can write the timestamps too. The gate's job is to make the ordinary path
+the correct path, not to police the person at the keyboard.
+
+**A draft the app cannot read refuses its own case, names the file, and
+changes nothing on disk** (A10). The rail shows that one row in an error
+state, and every other case still walks. Two alternatives are rejected. To
+treat it as absent throws the reader's own list away and re-arms the gate, so
+they retype a list they already wrote and never learn the first one existed.
+To repair it writes a guess into the one file the reader owns.
 
 Security posture, inherited from ``webapp/review.py`` rather than re-derived:
 
@@ -102,6 +127,9 @@ Security posture, inherited from ``webapp/review.py`` rather than re-derived:
   unreviewed list. A request names a case id and never a path, and the id is
   resolved against the offered list by allow-list, so a case the rail greys
   and a case nobody wrote refuse the same way.
+* **A draft is filed under a login and a case id, and both are checked as
+  path segments** (A01). The case id arrives in a request, and a value
+  carrying a separator would write outside the store.
 * **The submit endpoint is off unless ``gh`` is authenticated** — with no
   login there is nothing to act as, so the button is never offered.
 """
@@ -162,6 +190,14 @@ Line = Annotated[str, Field(max_length=500)]
 CaseId = Annotated[str, Field(max_length=120)]
 
 
+class Which(BaseModel):
+    """A case and nothing else, for a write whose whole argument is which one."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    case: CaseId
+
+
 class OwnList(BaseModel):
     """What the reader saw for themselves, before the sets were shown."""
 
@@ -171,8 +207,13 @@ class OwnList(BaseModel):
     items: list[Line] = Field(default_factory=list, max_length=200)
 
 
-class Finish(BaseModel):
-    """The sitting's result: a mark per recorded finding, and the reader's own findings."""
+class Progress(BaseModel):
+    """The reader's work in one case: a mark per recorded finding, and their own.
+
+    Both ``/api/draft`` and ``/api/finish`` take it. Saving and recording ask
+    for the same thing, so a second model would be the same fields under a
+    second name and a chance for the two to drift.
+    """
 
     model_config = ConfigDict(extra="forbid")
 
@@ -198,6 +239,10 @@ class Session:
     #: Read once from the clone the reader is in, because the rail's status
     #: asks the clearing rule and that rule asks who is rostered.
     roster: Roster
+    #: Where this reader's **Draft Sitting**s live. A field the caller sets
+    #: rather than a path this module resolves, so a test points it at a
+    #: temporary directory and no test writes into a real home directory.
+    drafts: Path
     #: The case ``--case`` named, or ``None``. It moves the rail and grants
     #: nothing: the endpoints resolve against :attr:`offered`, which a
     #: preselect does not join.
@@ -209,9 +254,6 @@ class Session:
     #: One prepared case per case the reader opened. Preparing reads a whole
     #: case directory, and a reader opens a few of thirteen.
     prepared: dict[str, sittings.Prepared] = field(default_factory=dict)
-    #: The own list per case, because the gate re-arms per case: a reader who
-    #: reaches a case they have not written for reaches it blind.
-    own_lists: dict[str, list[str]] = field(default_factory=dict)
     #: Minted per process and embedded in the page. The submit endpoint
     #: requires it, so a request that never read the page cannot carry it —
     #: and reading the page cross-origin is what the Host and Sec-Fetch-Site
@@ -243,13 +285,27 @@ class Session:
         return frozenset(row.case_id for row in self.rows if row.pressable)
 
     def refresh(self) -> tuple[sittings.Row, ...]:
-        """Re-read the rail from the tree, and with it the offered list.
+        """Re-read the rail from the tree and the store, and with it the offered list.
 
-        A recorded sitting greys its own case, so the page asks for this
-        after every finish as well as at load.
+        A recorded sitting greys its own case and a posted own list moves its
+        case to *draft in progress*, so the page asks for this after every
+        write as well as at load.
         """
-        self.rows = sittings.rail(self.corpus_dir, self.roster)
+        self.rows = sittings.rail(
+            self.corpus_dir,
+            self.roster,
+            sittings.draft_states(self.drafts, self.reviewer),
+        )
         return self.rows
+
+    def draft(self, case_id: str) -> sittings.Draft | None:
+        """This reader's draft of one case, read from disk on every ask.
+
+        Never held in memory. The draft is the one record of a part-finished
+        read, and a copy in the process could disagree with the file the
+        reader owns.
+        """
+        return sittings.load_draft(self.drafts, self.reviewer, case_id)
 
     def prepare(self, case_id: str) -> sittings.Prepared:
         """One case, prepared once and kept for as long as the process runs."""
@@ -296,6 +352,7 @@ def create_app(session: Session) -> FastAPI:
                         "number": row.number,
                         "title": row.title,
                         "status": row.status,
+                        "state": row.state,
                         "pressable": row.pressable,
                     }
                     for row in rows
@@ -305,14 +362,24 @@ def create_app(session: Session) -> FastAPI:
 
     @app.get("/api/part-one")
     def part_one(case: CaseId) -> JSONResponse:
-        """The system, and this case's own list where the reader wrote one.
+        """The system, and this case's draft where the reader holds one.
 
-        The list rides here so a case the reader comes back to re-opens with
-        what they wrote rather than with an empty box. It is their own words
+        The reader's own words ride here so a case they come back to re-opens
+        with what they wrote rather than with an empty box — their own list,
+        their marks, their missing list and their notes. All of it is theirs
         and this case's alone, so it discloses nothing: a case they have not
-        written for answers ``null``, which is what re-arms the gate.
+        written for answers ``null`` for the own list, which is what re-arms
+        the gate.
+
+        The draft is read here rather than held, so the page it paints is the
+        file on disk. That is what makes a read survive the process: the
+        reader stops the app, runs it again, and this answers the same.
         """
         prepared = _open(session, case)
+        held = _draft(session, case)
+        # An empty draft where the reader holds none, so the three fields
+        # that are not gated read the same either way.
+        work = held or sittings.Draft(case=prepared.case_id, clone=str(session.root))
         return JSONResponse(
             {
                 "case": prepared.case_id,
@@ -320,7 +387,10 @@ def create_app(session: Session) -> FastAPI:
                 "reviewer": session.reviewer,
                 "body": prepared.part_one,
                 "files": prepared.files,
-                "own_list": session.own_lists.get(case),
+                "own_list": held.own_list if held else None,
+                "marks": work.marks,
+                "missing": work.missing,
+                "notes": work.notes,
             }
         )
 
@@ -333,8 +403,8 @@ def create_app(session: Session) -> FastAPI:
         # the offered list and open the whole corpus in one pass.
         refuse_cross_origin(request)
         _require_token(request, session)
-        _open(session, body.case)
-        if body.case in session.own_lists:
+        prepared = _open(session, body.case)
+        if _draft(session, body.case) is not None:
             # **A case takes one own list, and it is the first one.** The
             # sets for this case are open by now, so a second list would be
             # written after them and recorded as though it came first — which
@@ -346,17 +416,74 @@ def create_app(session: Session) -> FastAPI:
                 " sets are open on it; a list written now would be evidence of"
                 " an order that did not happen",
             )
-        # Recorded before part two is reachable, and per case, because the
+        # Written before part two is reachable, and per case, because the
         # gate re-arms for each one. An empty list is allowed — "I saw
         # nothing" is an answer — but it has to be given.
         written = [item.strip() for item in body.items if item.strip()]
-        session.own_lists[body.case] = written
+        # **The own list creates the draft; opening a case creates nothing.**
+        # A reader who reads part one of ten cases and writes nothing leaves
+        # no trace. The digests are taken here, so they say what the required
+        # files held when this read began.
+        case_dir = session.corpus_dir / prepared.case_id
+        try:
+            opened = sittings.digests(case_dir, prepared.files)
+        except sittings.SittingError as exc:
+            raise HTTPException(status_code=409, detail=str(exc)) from exc
+        _save(
+            session,
+            sittings.Draft(
+                case=prepared.case_id,
+                clone=str(session.root),
+                own_list=written,
+                opened_digests=opened,
+            ),
+        )
         return JSONResponse({"case": body.case, "accepted": len(written)})
+
+    @app.post("/api/draft")
+    def save_progress(request: Request, body: Progress) -> JSONResponse:
+        """Keep the marks, the missing list and the notes in the draft.
+
+        The page posts this as the reader works, so a closed browser costs
+        them nothing. It carries both controls for the reasons
+        ``/api/own-list`` carries them: it names a case, and it writes under
+        the reader's own store, so its effect outlives the process.
+        """
+        refuse_cross_origin(request)
+        _require_token(request, session)
+        _open(session, body.case)
+        held = _draft(session, body.case)
+        if held is None:
+            raise HTTPException(
+                status_code=409,
+                detail="no draft holds that case; write your own list first",
+            )
+        held.marks = dict(body.marks)
+        held.missing = list(body.missing)
+        held.notes = body.notes
+        _save(session, held)
+        return JSONResponse({"case": body.case, "state": held.state})
+
+    @app.post("/api/discard")
+    def discard(request: Request, body: Which) -> JSONResponse:
+        """Throw one draft away, and put its case back where it started.
+
+        The reader's own decision to abandon a case, so it deletes and does
+        not archive: the draft never merged, and nothing else records it.
+        """
+        refuse_cross_origin(request)
+        _require_token(request, session)
+        _open(session, body.case)
+        try:
+            gone = sittings.discard_draft(session.drafts, session.reviewer, body.case)
+        except sittings.DraftError as exc:
+            raise HTTPException(status_code=409, detail=str(exc)) from exc
+        return JSONResponse({"case": body.case, "discarded": gone})
 
     @app.get("/api/part-two")
     def part_two(case: CaseId) -> JSONResponse:
         prepared = _open(session, case)
-        if case not in session.own_lists:
+        if _draft(session, case) is None:
             # The method's one rule, enforced rather than requested, and
             # asked of this case rather than of the session.
             raise HTTPException(
@@ -382,7 +509,7 @@ def create_app(session: Session) -> FastAPI:
         )
 
     @app.post("/api/finish")
-    def finish(request: Request, body: Finish) -> JSONResponse:
+    def finish(request: Request, body: Progress) -> JSONResponse:
         # This writes the reading document, appends to `case.json` and clears
         # the UNREVIEWED line — and it is what puts the case in `recorded`,
         # which `/api/submit` tests. Everything the allow-list then carries
@@ -390,8 +517,8 @@ def create_app(session: Session) -> FastAPI:
         # endpoint it feeds.
         refuse_cross_origin(request)
         prepared = _open(session, body.case)
-        own = session.own_lists.get(body.case)
-        if own is None:
+        held = _draft(session, body.case)
+        if held is None:
             raise HTTPException(status_code=409, detail="no own list was written")
         if body.case in session.recorded:
             # One entry per reader per case in one pull request. This is the
@@ -403,7 +530,7 @@ def create_app(session: Session) -> FastAPI:
         case_dir = session.corpus_dir / body.case
         try:
             text = sittings.document(
-                prepared, own, body.marks, body.missing, body.notes
+                prepared, held.own_list, body.marks, body.missing, body.notes
             )
             (case_dir / session.document_name).write_text(text, encoding="utf-8")
             read = sittings.read_records(case_dir, prepared.files)
@@ -414,6 +541,14 @@ def create_app(session: Session) -> FastAPI:
         except sittings.SittingError as exc:
             raise HTTPException(status_code=409, detail=str(exc)) from exc
         session.recorded.add(body.case)
+        # The draft keeps what the reader wrote and says the sitting is
+        # recorded. It stays until a submit carries it: the record is in the
+        # working tree by now, and nothing is a record until it merges.
+        held.marks = dict(body.marks)
+        held.missing = list(body.missing)
+        held.notes = body.notes
+        held.state = "finished"
+        _save(session, held)
         return JSONResponse(
             {
                 "case": prepared.case_id,
@@ -494,6 +629,31 @@ def _open(session: Session, case_id: str) -> sittings.Prepared:
         raise HTTPException(status_code=409, detail=str(exc)) from exc
 
 
+def _draft(session: Session, case_id: str) -> sittings.Draft | None:
+    """This reader's draft of one case, or the refusal an unreadable one gets.
+
+    **A draft the app cannot read refuses its own case, names the file, and
+    changes nothing on disk.** Every other case still walks, because the rail
+    surveys the store per case and this is asked per case. The message
+    carries the path, which is the reader's next step: the file is theirs and
+    nothing here will guess at what it should have said.
+    """
+    try:
+        return session.draft(case_id)
+    except sittings.DraftError as exc:
+        raise HTTPException(status_code=409, detail=str(exc)) from exc
+
+
+def _save(session: Session, draft: sittings.Draft) -> None:
+    """Write one draft, or refuse in the words the store used."""
+    try:
+        sittings.save_draft(session.drafts, session.reviewer, draft)
+    except (sittings.DraftError, OSError) as exc:
+        raise HTTPException(
+            status_code=409, detail=f"the draft did not save — {exc}"
+        ) from exc
+
+
 def _paste(session: Session, prepared: sittings.Prepared, files_read: int) -> str:
     """The copy-paste alternative, for somebody not opening the PR from here."""
     return (
@@ -551,7 +711,11 @@ def _html(page: tuple[str, str]) -> HTMLResponse:
     return HTMLResponse(content=body, headers={"Content-Security-Policy": csp})
 
 
-_PAGE = """<!doctype html>
+#: The page, as a raw string. Every ``\n`` in it is a newline escape inside a
+#: JavaScript string literal, and a plain string would hand the browser the
+#: newline itself — which ends the literal and stops the whole script block
+#: parsing. ``tests/test_sitting_app.py`` holds that as a check.
+_PAGE = r"""<!doctype html>
 <html lang="en"><head><meta charset="utf-8">
 <title>Case sitting</title>
 <style nonce="__CSP_NONCE__">
@@ -576,7 +740,10 @@ _PAGE = """<!doctype html>
   .row.dead { color: #7a7a7a; }
   .dot { flex: 0 0 .6rem; height: .6rem; border-radius: 50%; }
   .dot.todo { background: #d08b28; }
+  .dot.draft { background: #3f7fd0; }
+  .dot.finished { background: #2f9e5e; }
   .dot.signed { background: #8886; }
+  .dot.error { background: #c34a3c; }
   .label { flex: 1; }
   pre { background: #8881; padding: 1rem; overflow-x: auto; white-space: pre-wrap;
         border-radius: 6px; font-size: .88rem; }
@@ -659,6 +826,14 @@ _PAGE = """<!doctype html>
     <p><button id="finish">Record the sitting</button></p>
   </section>
 
+  <section id="discardBox" class="hidden">
+    <h2>Discard this draft</h2>
+    <p class="note">Throws away your own list, your marks, your missing list
+    and your notes for this case, and puts it back on the list to do. No other
+    case changes, and nothing in the repository changes.</p>
+    <p><button id="discard">Discard my draft for this case</button></p>
+  </section>
+
   <section id="done" class="hidden">
     <h2>Recorded</h2>
     <p>Written into your working tree:</p>
@@ -704,12 +879,35 @@ let rows = [];
 // apart from the `command` element, because an id is a global of its own.
 let printedCommand = "";
 
-// What this session recorded, and what the reader has written but not yet
-// sent. The walk reloads no document, so a case they come back to comes back
-// as they left it. The own list is not here: it comes from the server,
-// because the gate that turns on it is the server's.
+// What this session recorded. Nothing the reader writes is held here: every
+// word of it goes to the draft on the server, so a case they come back to
+// comes back as the file on disk says, and a closed browser costs nothing.
 const recorded = new Set();
-const answers = {};
+
+// The pending save. Every field in part two saves on a short delay, and the
+// walk flushes before it moves, so what leaves the stage is already on disk.
+let queued = 0;
+
+function queueSave() {
+  clearTimeout(queued);
+  queued = setTimeout(saveDraft, 600);
+}
+
+// The reader's marks, missing list and notes, into the draft that already
+// holds their own list. Nothing to save before part two is open: the draft
+// does not exist yet, and the server refuses a save that names no draft.
+async function saveDraft() {
+  clearTimeout(queued);
+  if (!current || $("two").classList.contains("hidden")) return;
+  await fetch("/api/draft", {
+    method: "POST",
+    headers: {"Content-Type": "application/json", "X-Sitting-Token": TOKEN},
+    body: JSON.stringify({
+      case: current, marks: marksNow(), missing: lines("missing"),
+      notes: $("notes").value,
+    }),
+  });
+}
 
 async function loadRail() {
   const d = await (await fetch("/api/rail")).json();
@@ -730,7 +928,7 @@ function railRow(row) {
   item.title = row.status;
   item.dataset.case = row.case;
   const dot = document.createElement("span");
-  dot.className = row.pressable ? "dot todo" : "dot signed";
+  dot.className = "dot " + row.state;
   const label = document.createElement("span");
   label.className = "label";
   label.textContent = row.number + "  " + row.title;
@@ -771,28 +969,15 @@ function step(delta) {
   if (delta > 0) openSubmit();
 }
 
-// Everything the server has not been told yet, held per case for as long as
-// the page is open. The own list is absent by design: it is on the server the
-// moment it is written, and it is what opens this case's sets.
-function remember() {
-  if (!current) return;
-  answers[current] = {
-    missing: $("missing").value, notes: $("notes").value, marks: marksNow(),
-  };
-}
-
-function restore(caseId) {
-  const kept = answers[caseId];
-  if (!kept) return;
-  $("missing").value = kept.missing;
-  $("notes").value = kept.notes;
+// The marks a draft came back with, onto the rows part two just drew.
+function setMarks(marks) {
   for (const select of document.querySelectorAll("select[data-finding]")) {
-    select.value = kept.marks[select.dataset.finding] || "";
+    select.value = marks[select.dataset.finding] || "";
   }
 }
 
 async function openCase(caseId) {
-  remember();
+  await saveDraft();
   current = caseId;
   select(caseId);
   blank();
@@ -810,21 +995,24 @@ async function openCase(caseId) {
   $("caseTitle").textContent = d.title;
   $("caseId").textContent = d.case;
   $("partOne").textContent = d.body;
-  // A case takes one own list. Where this reader already wrote it, the box
-  // comes back filled and locked and the sets open, because the server
+  // A case takes one own list. Where this reader already holds a draft, the
+  // box comes back filled and locked and the sets open, because the server
   // refuses a second list for the same case.
-  if (d.own_list !== null) {
-    $("own").value = d.own_list.join("\n");
-    lock();
-    await showSets(caseId);
-    restore(caseId);
-  }
+  if (d.own_list === null) return;
+  $("own").value = d.own_list.join("\n");
+  $("missing").value = d.missing.join("\n");
+  $("notes").value = d.notes;
+  lock();
+  $("discardBox").classList.remove("hidden");
+  await showSets(caseId);
+  if (current !== caseId) return;
+  setMarks(d.marks);
 }
 
 // The end of the walk. The rail stays where it is, as it does on every case,
 // so this is a stage rather than a page the reader has to come back from.
-function openSubmit() {
-  remember();
+async function openSubmit() {
+  await saveDraft();
   current = null;
   select(null);
   $("empty").classList.add("hidden");
@@ -849,7 +1037,7 @@ function blank() {
   // A blind case shows the placeholder where part two will open, so the case
   // reads the same whichever way the reader arrived at it.
   $("placeholder").classList.remove("hidden");
-  for (const id of ["two", "done"]) $(id).classList.add("hidden");
+  for (const id of ["two", "done", "discardBox"]) $(id).classList.add("hidden");
 }
 
 function lock() {
@@ -902,8 +1090,29 @@ $("lock").addEventListener("click", async () => {
   // the box anyway would leave the reader with nowhere to write it.
   if (!res.ok) { $("partOne").textContent = (await res.json()).detail; return; }
   lock();
+  $("discardBox").classList.remove("hidden");
   await showSets(caseId);
   $("two").scrollIntoView({behavior: "smooth"});
+});
+
+// Every field in part two saves itself. A textarea reports `input` and a mark
+// reports `change`, and both land on the same delayed save.
+for (const name of ["input", "change"]) $("two").addEventListener(name, queueSave);
+
+$("discard").addEventListener("click", async () => {
+  const caseId = current;
+  if (!confirm("Throw away your draft for this case? This cannot be undone.")) return;
+  // Blanked first, so the flush inside openCase finds nothing to save and
+  // the case comes back the way a case nobody wrote for comes back.
+  blank();
+  const res = await fetch("/api/discard", {
+    method: "POST",
+    headers: {"Content-Type": "application/json", "X-Sitting-Token": TOKEN},
+    body: JSON.stringify({case: caseId}),
+  });
+  if (!res.ok) { $("partOne").textContent = (await res.json()).detail; return; }
+  await loadRail();
+  await openCase(caseId);
 });
 
 // The claim text is data, so it lands through textContent rather than through
@@ -948,6 +1157,9 @@ $("finish").addEventListener("click", async () => {
   $("command").textContent = d.command;
   $("paste").textContent = d.paste;
   $("two").classList.add("hidden");
+  // The record is in the working tree now, so this case is off the rail and
+  // the draft behind it is no longer the reader's to throw away here.
+  $("discardBox").classList.add("hidden");
   $("done").classList.remove("hidden");
   printedCommand = d.command;
   recorded.add(caseId);
@@ -986,7 +1198,11 @@ loadRail().then(d => {
 
 
 def build_session(
-    root: Path, reviewer: str, case: str | None = None, can_submit: bool = False
+    root: Path,
+    reviewer: str,
+    case: str | None = None,
+    can_submit: bool = False,
+    drafts: Path | None = None,
 ) -> Session:
     """One reader, the whole corpus, and the case ``--case`` preselected.
 
@@ -994,11 +1210,17 @@ def build_session(
     the start, where the reader is still looking at their terminal. A
     preselect the rail greys is kept: it moves the rail and grants nothing,
     because :func:`_open` reads the offered list rather than this field.
+
+    ``drafts`` is where the reader's part-finished reads live. It is a
+    parameter for the same reason the review app takes its ledger path as
+    one: a caller that means a temporary tree must not write into a real home
+    directory.
     """
     session = Session(
         root=root,
         reviewer=reviewer,
         roster=rosters.load(root / submit_spine.ROSTER_FILE),
+        drafts=drafts or sittings.draft_root(),
         preselect=case,
         can_submit=can_submit,
     )
