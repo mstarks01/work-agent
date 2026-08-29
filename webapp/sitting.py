@@ -52,9 +52,11 @@ endpoint carries five controls rather than the app's usual none:
   what changes that, and it is a write of its own with its own controls.
 
 **Every writing endpoint carries the origin check, not only the submit one.**
-``/api/finish`` writes the reading document, appends to ``case.json`` and sets
-the flag ``/api/submit`` tests, so a foreign page that reaches it decides what
-a later press publishes. ``/api/own-list`` satisfies the method's one rule, so
+``/api/finish`` writes the reading document, appends to ``case.json`` and puts
+the case on the list the press carries, so a foreign page that reaches it
+decides what a later press publishes — and it writes the draft too, so it
+carries the page token for all the reasons below.
+``/api/own-list`` satisfies the method's one rule, so
 a foreign page that reaches it opens the recorded sets for whoever asks next.
 It carries the page token too, because it names a case: one such page would
 post an empty list for every case in the offered list and open the whole
@@ -572,11 +574,13 @@ def create_app(session: Session) -> FastAPI:
     @app.post("/api/finish")
     def finish(request: Request, body: Progress) -> JSONResponse:
         # This writes the reading document, appends to `case.json` and clears
-        # the UNREVIEWED line — and it is what puts the case in `recorded`,
-        # which `/api/submit` tests. Everything the allow-list then carries
-        # into a pull request passes through here, so it is checked like the
-        # endpoint it feeds.
+        # the UNREVIEWED line, and it is what puts the case on the list the
+        # press carries. Everything the allow-list then carries into a pull
+        # request passes through here, so it is checked like the endpoint it
+        # feeds: it names a case, it writes under the reader's own store, and
+        # it decides what a later press publishes.
         refuse_cross_origin(request)
+        _require_token(request, session)
         prepared = _open(session, body.case)
         held = _draft(session, body.case)
         if held is None:
@@ -667,7 +671,7 @@ def create_app(session: Session) -> FastAPI:
         case_dir = session.corpus_dir / prepared.case_id
         try:
             if held.recorded is not None:
-                sittings.unrecord(case_dir, held.recorded)
+                sittings.unrecord(case_dir, session.reviewer, held.recorded)
             if held.unreviewed_entry:
                 sittings.restore_unreviewed(
                     session.root, prepared.case_id, held.unreviewed_entry
@@ -753,7 +757,7 @@ def _require_token(request: Request, session: Session) -> None:
 
     A request that never read the page cannot hold it. It rides beside the
     origin check rather than instead of it, and it is spelled once because
-    ``/api/own-list`` and ``/api/submit`` ask the same question of a request.
+    every writing endpoint asks the same question of a request.
 
     ``/api/part-two`` gains no token: it is a read, it serves only what a
     passed gate already opened, and ``frame-ancestors 'none'`` covers the
@@ -1549,7 +1553,8 @@ function marksNow() {
 $("finish").addEventListener("click", async () => {
   const caseId = current;
   const res = await fetch("/api/finish", {
-    method: "POST", headers: {"Content-Type": "application/json"},
+    method: "POST",
+    headers: {"Content-Type": "application/json", "X-Sitting-Token": TOKEN},
     body: JSON.stringify({
       case: caseId, marks: marksNow(), missing: lines("missing"),
       notes: $("notes").value,

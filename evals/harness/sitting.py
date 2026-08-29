@@ -714,9 +714,11 @@ def record(
 
     ``replaces`` is an entry the caller appended itself and now re-records.
     It comes off before the new one goes on, so one reader and one case never
-    write two entries into one submission. The caller passes the entry this
-    function returned, so nothing but its own append is ever removed — a
-    recorded sitting that merged is untouchable here, which is what keeps the
+    write two entries into one submission. **Only an entry naming this
+    reviewer comes off**, checked here rather than assumed of the caller: the
+    entry reaches this function from a **Draft Sitting**, which is a file the
+    reader owns, so a value in it is a value this module did not write. A
+    sitting recorded by somebody else is untouchable, which is what keeps the
     rule above true.
     """
     path = case_dir / "case.json"
@@ -730,19 +732,40 @@ def record(
         "notes": notes,
     }
     reviews = meta.setdefault("reviews", [])
-    if replaces is not None and replaces in reviews:
-        reviews.remove(replaces)
+    if replaces is not None:
+        _yours(replaces, reviewer)
+        if replaces in reviews:
+            reviews.remove(replaces)
     reviews.append(entry)
     _write_meta(path, meta, raw)
     return entry
 
 
-def unrecord(case_dir: Path, entry: dict[str, Any]) -> bool:
-    """Take one entry back off ``reviews``, and say whether it was there.
+def _yours(entry: Mapping[str, Any], reviewer: str) -> None:
+    """Refuse an entry that names somebody other than this reviewer.
 
-    The caller passes the entry :func:`record` returned, so nothing but its
-    own append is ever removed — a recorded sitting that merged is
-    untouchable here, exactly as it is under ``replaces``.
+    Both the entry :func:`record` replaces and the entry :func:`unrecord`
+    removes arrive from a caller that read them off a **Draft Sitting** — a
+    file outside the repository that the reader owns. So "only your own
+    append comes off" is checked where the removal happens, rather than
+    assumed of the caller who supplied the value.
+    """
+    named = entry.get("reviewer")
+    if named != reviewer:
+        raise SittingError(
+            f"that entry names {named!r} and you are {reviewer!r}; a sitting"
+            " somebody else recorded is not yours to take off"
+        )
+
+
+def unrecord(case_dir: Path, reviewer: str, entry: dict[str, Any]) -> bool:
+    """Take one of your own entries back off ``reviews``, and say whether it
+    was there.
+
+    The caller passes the entry :func:`record` returned. **Only an entry
+    naming this reviewer comes off**, for the reason :func:`_yours` gives —
+    a sitting recorded by somebody else is untouchable here, exactly as it is
+    under ``replaces``.
 
     This is what a reader who holds a recorded case back from a submission
     needs, because the submission is built from the working tree: a case
@@ -755,6 +778,7 @@ def unrecord(case_dir: Path, entry: dict[str, Any]) -> bool:
     reader dropped.
     """
     path = case_dir / "case.json"
+    _yours(entry, reviewer)
     raw = path.read_text(encoding="utf-8")
     meta = json.loads(raw)
     reviews = meta.get("reviews", [])
@@ -796,8 +820,18 @@ def _unreviewed_table(source: str) -> tuple[list[tuple[str, int, int]], int]:
     parenthesis and any comment with it, whatever shape they were written in.
 
     Line numbers are 0-based and the end is exclusive, ready to slice.
+
+    A source that will not parse raises a :class:`SittingError` like every
+    other answer this gives, because one caller is a submission check reading
+    a file somebody edited — and a checklist line is what a contributor can
+    act on, where a traceback is not.
     """
-    tree = ast.parse(source)
+    try:
+        tree = ast.parse(source)
+    except SyntaxError as exc:
+        raise SittingError(
+            f"{UNREVIEWED_FILE}: this file will not parse — {exc}"
+        ) from exc
     table = next(
         (
             node.value
@@ -878,7 +912,15 @@ def restore_unreviewed(root: Path, case_id: str, entry: str) -> bool:
     where the table keeps it: the ids are numbered and the table is in corpus
     order. A case the list already names is left alone, so putting one back
     twice writes once.
+
+    **The entry is checked before it is written.** It is text from a
+    **Draft Sitting**, which is a file outside the repository, and it lands
+    in a module ``pytest`` imports — so text that is anything other than one
+    table entry for this case would be Python nobody wrote running in
+    everybody's checkout. :func:`_one_entry` decides that, and a value that
+    fails it changes nothing on disk.
     """
+    _one_entry(case_id, entry)
     path = root / UNREVIEWED_FILE
     source = path.read_text(encoding="utf-8")
     entries, close = _unreviewed_table(source)
@@ -888,6 +930,61 @@ def restore_unreviewed(root: Path, case_id: str, entry: str) -> bool:
     lines = source.splitlines(keepends=True)
     path.write_text("".join(lines[:at] + [entry] + lines[at:]), encoding="utf-8")
     return True
+
+
+def _one_entry(case_id: str, entry: str) -> None:
+    """Refuse text that is not exactly one ``UNREVIEWED`` entry for this case.
+
+    Read as a dict literal of its own rather than by matching text, because
+    what has to be true is a shape and not a spelling: one string key equal
+    to this case, one string value, and nothing else in the fragment. Text
+    that closes the table and opens another parses as a module and never as
+    one expression, which is the whole of what this refuses.
+    """
+    try:
+        parsed = ast.parse(f"{{{entry}}}", mode="eval").body
+    except SyntaxError as exc:
+        raise SittingError(
+            f"{case_id}: that UNREVIEWED entry is not one table entry — {exc}"
+        ) from exc
+    keys = getattr(parsed, "keys", [])
+    values = getattr(parsed, "values", [])
+    ok = (
+        isinstance(parsed, ast.Dict)
+        and len(keys) == 1
+        and isinstance(keys[0], ast.Constant)
+        and keys[0].value == case_id
+        and isinstance(values[0], ast.Constant)
+        and isinstance(values[0].value, str)
+    )
+    if not ok:
+        raise SittingError(
+            f"{case_id}: that UNREVIEWED entry names something other than this"
+            " case, or carries something other than a reason"
+        )
+
+
+def without_unreviewed(source: str, cases: Iterable[str]) -> str:
+    """The unreviewed list with these cases' entries taken out, as text.
+
+    What is left is everything a sitting may not touch: the module's own
+    prose and code, and every entry naming a case the submission does not
+    carry. A caller compares this across a diff, so an edit anywhere but the
+    carried cases' own lines shows up as a difference.
+    """
+    entries, _ = _unreviewed_table(source)
+    drop = set(cases)
+    cut = {
+        number
+        for case, start, end in entries
+        if case in drop
+        for number in range(start, end)
+    }
+    return "".join(
+        line
+        for number, line in enumerate(source.splitlines(keepends=True))
+        if number not in cut
+    )
 
 
 def unreviewed_cases(root: Path) -> list[str]:
