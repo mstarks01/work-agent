@@ -77,6 +77,9 @@ class FrameworkAnalysis:
     scope: list[ScopeEntry]  # units this framework considered and raised nothing about
     coverage: list[LaneCoverage]  # per-lane account of what each agent was offered
     unverified_grounds: list[UnverifiedGround]
+    unreconciled_rulings: list[
+        str
+    ]  # how the first critic pass failed, before the re-ask
     repaired_quotes: list[RepairedQuote]
     unresolved_mentions: list[UnresolvedMention]
     unresolved_evidence: list[UnresolvedEvidence]
@@ -648,6 +651,42 @@ Two things `grounds` is deliberately not:
   `related_unknowns` is forward-looking (the unknown that must be answered
   before the finding can be ruled on) and critic-authored. When they name the
   same attribute, that is agreement, not duplication.
+
+### What a `needs-info` may name
+
+`related_unknowns` holds at least one entry, in one of two spellings. Which one
+is true of the fact, never a matter of taste:
+
+```python
+class UnknownRef:
+    element_id: str  # with attribute: the fact has a place in the model
+    attribute: str
+    subject: str  # alone: the fact has no place in the model
+```
+
+**The element spelling** points at a field a submitter can fill in, and is the
+ordinary case for a claim about a specific element.
+
+**The `subject` spelling** carries the question itself, for a fact the System
+Model holds no slot for — whether a policy is documented, or what code does.
+A framework ruling on requirements answers mostly that kind, so with only the
+first spelling available its commonest verdict was inexpressible.
+
+A reader should treat an entry pointing at an attribute that exists on every
+element type — `notes`, say — with suspicion. Before the second spelling
+existed, that was the only legal way to express a question about something the
+model does not describe, and it passes every check while saying nothing.
+
+### `unreconciled_rulings`
+
+How the *first* critic pass failed to reconcile with its drafts, one message
+per problem, before the bounded re-ask repaired it. **Empty means the first
+pass was clean**, which is the reading that matters: a run that repaired itself
+is a successful run but not a clean one, and the two were previously
+indistinguishable in every artifact the service keeps.
+
+A framework whose first pass never reconciles is running on its single retry.
+That is worth knowing from a report rather than from a live run.
 
 ### Severity is derived, never asserted
 
