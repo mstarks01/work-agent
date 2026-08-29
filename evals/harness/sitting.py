@@ -4,8 +4,9 @@ The act is #327's, and ``evals/BLESSING.md`` step 6 is the method. This module
 is the part a front end does not get to reinvent: which files a sitting must
 read, the digest of each as it stood, what a reader may say about one recorded
 finding and the key that mark files under, the append-only entry that records
-it, the line it clears in the unreviewed list, and whether a recorded sitting
-clears its case at all. ``webapp/sitting.py`` is one surface over this;
+it, the line it clears in the unreviewed list, whether a recorded sitting
+clears its case at all, and the rail of every case with the status that rule
+gives it. ``webapp/sitting.py`` is one surface over this;
 the CLI path writes the same files by hand and the checks cannot tell them
 apart, which is the point — one implementation of the rules. CI reads
 :func:`clears` through ``tests/test_case_review.py``, so no surface can call a
@@ -52,6 +53,7 @@ from evals.harness.reference import (
     ReadRecord,
     ReferenceClaim,
     load_case,
+    load_corpus,
 )
 from evals.harness.roster import Roster
 from stride_service.report import FrameworkName
@@ -71,6 +73,10 @@ Mark = Literal["agree", "doubt", "dup"]
 
 #: The same three, for a surface that offers them and a check that reads them.
 MARKS: tuple[Mark, ...] = get_args(Mark)
+
+#: What the rail says about a case no sitting clears. The other status a row
+#: can carry names the signer, and it is spelled where it is computed.
+TO_DO = "to do"
 
 
 class SittingError(ValueError):
@@ -145,6 +151,66 @@ def clears(
         covered
         and sitting.reviewer in roster
         and not drifted(case, sitting, corpus_dir)
+    )
+
+
+@dataclass(frozen=True)
+class Row:
+    """One rail row: a case a reader sees, and whether they may open it.
+
+    It carries the case number, the title and the status, and nothing else.
+    A claim count or a reason the case waits would tell the reader how long
+    to make their own list before they have written it, which is the one
+    thing the page must never say.
+    """
+
+    case_id: str
+    number: str
+    title: str
+    status: str
+    #: Whether the reader may open this case. A row that does not press is
+    #: also off the offered list, so the refusal a signed case needs costs no
+    #: code of its own.
+    pressable: bool
+
+
+def rail(corpus_dir: Path, roster: Roster) -> tuple[Row, ...]:
+    """Every case in the corpus, in corpus order, with the status a reader reads.
+
+    **The status comes from :func:`clears`, never from the presence of an
+    entry in ``reviews``.** Those are different questions: a drifted digest
+    leaves an entry that clears nothing, CI puts that case back on the
+    unreviewed list, and a rail keyed on the entry would grey a case CI asks
+    somebody to read.
+
+    A case a sitting clears is not pressable, whoever signed it. The status
+    names the signer, which reads correctly either way.
+    """
+    return tuple(
+        _row(case, _signer(case, roster, corpus_dir))
+        for case in load_corpus(corpus_dir)
+    )
+
+
+def _signer(case: GoldenCase, roster: Roster, corpus_dir: Path) -> str | None:
+    """Who signed this case off, or ``None`` while nobody has."""
+    return next(
+        (
+            sitting.reviewer
+            for sitting in case.meta.reviews
+            if clears(case, sitting, roster, corpus_dir)
+        ),
+        None,
+    )
+
+
+def _row(case: GoldenCase, signer: str | None) -> Row:
+    return Row(
+        case_id=case.meta.id,
+        number=case.meta.id.split("-")[0],
+        title=case.meta.title,
+        status=f"signed by {signer}" if signer else TO_DO,
+        pressable=signer is None,
     )
 
 

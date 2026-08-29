@@ -2,7 +2,23 @@
 
 Run it from a clone, with no credentials of any kind::
 
-    uv run python webapp/sitting.py --case 02-iot-fleet-telemetry
+    uv run python webapp/sitting.py
+
+**The app offers the whole corpus.** A rail on the left lists every case with
+a status dot, the case number and the title, and it never leaves — so it is
+both how a reader starts and how they get back, and no control returns to a
+list that never went away. A row carries no claim count and no reason the case
+waits, because either would tell the reader how long to make their own list
+before they have written it. ``--case`` preselects where the rail opens and
+grants nothing.
+
+**A case a sitting already clears is greyed, whoever signed it, and is off the
+offered list.** :func:`_open` resolves every case id that arrives in a request
+against that list, so the refusal a signed case needs is the same rule that
+refuses a case id nobody wrote. The status reads
+:func:`evals.harness.sitting.clears` and never the presence of an entry in
+``reviews``: a drifted digest leaves an entry that clears nothing, and a rail
+keyed on the entry would grey a case CI asks somebody to read.
 
 It is **eval-side tooling and not the product**, and it is the browser half of
 a path that also works entirely from the shell: everything it writes is what
@@ -39,12 +55,20 @@ a later press publishes. ``/api/own-list`` satisfies the method's one rule, so
 a foreign page that reaches it opens the recorded sets for whoever asks next.
 
 **The own list comes first, and the server enforces it.** ``/api/part-two``
-refuses until the reader has posted their own threat list, so the recorded
-sets are not in the page for a curious reader to find. That is the method's
-only rule: a reader who opens the recorded sets first finds them reasonable,
-and the sitting measures nothing. It is enforced the way the review app
-enforces configuration-blindness — by the payload not carrying it — rather
-than by asking.
+refuses until the reader has posted their own threat list for that case, so
+the recorded sets are not in the page for a curious reader to find. That is
+the method's only rule: a reader who opens the recorded sets first finds them
+reasonable, and the sitting measures nothing. It is enforced the way the
+review app enforces configuration-blindness — by the payload not carrying it
+— rather than by asking.
+
+**The gate re-arms per case, and a case takes one own list.** Both halves are
+the same rule read two ways: a case's sets open once that case's own list
+exists. So a reader who reaches a case they have not written for reaches it
+blind, and a case they already wrote for re-opens with the list they wrote and
+refuses a second one. Without that refusal the reader could open a case's
+sets, come back to it, and post a list the document would then print above
+them — evidence of an order that did not happen.
 
 Security posture, inherited from ``webapp/review.py`` rather than re-derived:
 
@@ -60,8 +84,10 @@ Security posture, inherited from ``webapp/review.py`` rather than re-derived:
 * **A mark is an allow-list, checked here** (A05). The value is the method's
   closed set of three, and the key must name a recorded finding of this case,
   so a request cannot write a sentence of its own into the evidence.
-* **Every write lands inside the one case directory** the command named
-  (A01), plus the unreviewed list. There is no path in the request at all.
+* **Every write lands inside one offered case's directory** (A01), plus the
+  unreviewed list. A request names a case id and never a path, and the id is
+  resolved against the offered list by allow-list, so a case the rail greys
+  and a case nobody wrote refuse the same way.
 * **The submit endpoint is off unless ``gh`` is authenticated** — with no
   login there is nothing to act as, so the button is never offered.
 """
@@ -84,8 +110,10 @@ from starlette.middleware.trustedhost import TrustedHostMiddleware
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
+from evals.harness import roster as rosters
 from evals.harness import sitting as sittings
 from evals.harness import submit as submit_spine
+from evals.harness.roster import Roster
 from webapp.main import LOOPBACK_HOSTS, SecurityHeaders, refuse_cross_origin
 
 HOST = "127.0.0.1"
@@ -114,12 +142,18 @@ _CSP = (
 #: request. Generous for a line somebody types, and finite.
 Line = Annotated[str, Field(max_length=500)]
 
+#: A case id as it arrives in a request. The bound is here so an oversized
+#: string is refused before anything reads it; which ids exist is not a shape
+#: question, and :func:`_open` answers it against the offered list.
+CaseId = Annotated[str, Field(max_length=120)]
+
 
 class OwnList(BaseModel):
     """What the reader saw for themselves, before the sets were shown."""
 
     model_config = ConfigDict(extra="forbid")
 
+    case: CaseId
     items: list[Line] = Field(default_factory=list, max_length=200)
 
 
@@ -127,6 +161,8 @@ class Finish(BaseModel):
     """The sitting's result: a mark per recorded finding, and the reader's own findings."""
 
     model_config = ConfigDict(extra="forbid")
+
+    case: CaseId
 
     #: Keyed by the finding's fingerprint, which the page reads off
     #: ``/api/part-two``. The value is the method's closed set, so a mark this
@@ -141,13 +177,27 @@ class Finish(BaseModel):
 
 @dataclass
 class Session:
-    """One sitting: who is reading, which case, and how far they have got."""
+    """One reader over the whole corpus: who is reading, and how far they got."""
 
-    case_dir: Path
-    reviewer: str
-    prepared: sittings.Prepared
     root: Path
-    own_list: list[str] | None = field(default=None)
+    reviewer: str
+    #: Read once from the clone the reader is in, because the rail's status
+    #: asks the clearing rule and that rule asks who is rostered.
+    roster: Roster
+    #: The case ``--case`` named, or ``None``. It moves the rail and grants
+    #: nothing: the endpoints resolve against :attr:`offered`, which a
+    #: preselect does not join.
+    preselect: str | None = None
+    #: The rail as the tree last stood. :meth:`refresh` re-reads it, and
+    #: nothing else writes it, so the offered list moves only when the tree
+    #: does.
+    rows: tuple[sittings.Row, ...] = ()
+    #: One prepared case per case the reader opened. Preparing reads a whole
+    #: case directory, and a reader opens a few of thirteen.
+    prepared: dict[str, sittings.Prepared] = field(default_factory=dict)
+    #: The own list per case, because the gate re-arms per case: a reader who
+    #: reaches a case they have not written for reaches it blind.
+    own_lists: dict[str, list[str]] = field(default_factory=dict)
     #: Minted per process and embedded in the page. The submit endpoint
     #: requires it, so a request that never read the page cannot carry it —
     #: and reading the page cross-origin is what the Host and Sec-Fetch-Site
@@ -156,7 +206,7 @@ class Session:
     #: Whether a `gh` login is available to act as. With none there is nothing
     #: to submit with, so the button is never offered.
     can_submit: bool = False
-    recorded: bool = False
+    recorded: set[str] = field(default_factory=set)
 
     @property
     def document_name(self) -> str:
@@ -164,9 +214,38 @@ class Session:
         sitting`` admits this name under the case prefix and no other."""
         return sittings.document_name(self.reviewer)
 
+    @property
+    def corpus_dir(self) -> Path:
+        return self.root / "evals" / "corpus"
+
+    @property
+    def offered(self) -> frozenset[str]:
+        """The cases this session may open — the rail rows that press.
+
+        A case the rail greys is off this set, so the refusal a signed case
+        needs is the same rule that refuses a case id nobody wrote, and it
+        costs no check of its own.
+        """
+        return frozenset(row.case_id for row in self.rows if row.pressable)
+
+    def refresh(self) -> tuple[sittings.Row, ...]:
+        """Re-read the rail from the tree, and with it the offered list.
+
+        A recorded sitting greys its own case, so the page asks for this
+        after every finish as well as at load.
+        """
+        self.rows = sittings.rail(self.corpus_dir, self.roster)
+        return self.rows
+
+    def prepare(self, case_id: str) -> sittings.Prepared:
+        """One case, prepared once and kept for as long as the process runs."""
+        if case_id not in self.prepared:
+            self.prepared[case_id] = sittings.prepare(self.corpus_dir / case_id)
+        return self.prepared[case_id]
+
 
 def create_app(session: Session) -> FastAPI:
-    """The sitting app over one prepared case."""
+    """The sitting app: the rail over the whole corpus, one case on the stage."""
     app = FastAPI(title="STRIDE case sitting", docs_url=None, redoc_url=None)
     app.add_middleware(TrustedHostMiddleware, allowed_hosts=LOOPBACK_HOSTS)
     app.add_middleware(SecurityHeaders)
@@ -176,23 +255,58 @@ def create_app(session: Session) -> FastAPI:
         return _html(
             _page(
                 _PAGE,
-                case=_escape(session.prepared.case_id),
-                title=_escape(session.prepared.title),
                 reviewer=_escape(session.reviewer),
                 token=_js_literal(session.token),
                 cansubmit=_js_literal(session.can_submit),
             )
         )
 
-    @app.get("/api/part-one")
-    def part_one() -> JSONResponse:
+    @app.get("/api/rail")
+    def rail() -> JSONResponse:
+        """The whole corpus, each case with the status the reader reads.
+
+        Re-read from the tree on every call, because a recorded sitting greys
+        its own case and the reader must see that without a restart. It
+        carries no claim count and no reason a case waits: a number here would
+        tell the reader how long to make their own list.
+        """
+        rows = session.refresh()
         return JSONResponse(
             {
-                "case": session.prepared.case_id,
-                "title": session.prepared.title,
                 "reviewer": session.reviewer,
-                "body": session.prepared.part_one,
-                "files": session.prepared.files,
+                "todo": sum(1 for row in rows if row.pressable),
+                "preselect": session.preselect,
+                "cases": [
+                    {
+                        "case": row.case_id,
+                        "number": row.number,
+                        "title": row.title,
+                        "status": row.status,
+                        "pressable": row.pressable,
+                    }
+                    for row in rows
+                ],
+            }
+        )
+
+    @app.get("/api/part-one")
+    def part_one(case: CaseId) -> JSONResponse:
+        """The system, and this case's own list where the reader wrote one.
+
+        The list rides here so a case the reader comes back to re-opens with
+        what they wrote rather than with an empty box. It is their own words
+        and this case's alone, so it discloses nothing: a case they have not
+        written for answers ``null``, which is what re-arms the gate.
+        """
+        prepared = _open(session, case)
+        return JSONResponse(
+            {
+                "case": prepared.case_id,
+                "title": prepared.title,
+                "reviewer": session.reviewer,
+                "body": prepared.part_one,
+                "files": prepared.files,
+                "own_list": session.own_lists.get(case),
             }
         )
 
@@ -202,15 +316,32 @@ def create_app(session: Session) -> FastAPI:
         # the sets open for whoever asks next. The rule is the method, so the
         # endpoint that satisfies it is a write like any other.
         refuse_cross_origin(request)
-        # Recorded before part two is reachable. An empty list is allowed —
-        # "I saw nothing" is an answer — but it has to be given.
-        session.own_list = [item.strip() for item in body.items if item.strip()]
-        return JSONResponse({"accepted": len(session.own_list)})
+        _open(session, body.case)
+        if body.case in session.own_lists:
+            # **A case takes one own list, and it is the first one.** The
+            # sets for this case are open by now, so a second list would be
+            # written after them and recorded as though it came first — which
+            # is exactly the order the filled document claims. Refusing it is
+            # what makes that claim true rather than hoped for.
+            raise HTTPException(
+                status_code=409,
+                detail="that case already has your own list, and the recorded"
+                " sets are open on it; a list written now would be evidence of"
+                " an order that did not happen",
+            )
+        # Recorded before part two is reachable, and per case, because the
+        # gate re-arms for each one. An empty list is allowed — "I saw
+        # nothing" is an answer — but it has to be given.
+        written = [item.strip() for item in body.items if item.strip()]
+        session.own_lists[body.case] = written
+        return JSONResponse({"case": body.case, "accepted": len(written)})
 
     @app.get("/api/part-two")
-    def part_two() -> JSONResponse:
-        if session.own_list is None:
-            # The method's one rule, enforced rather than requested.
+    def part_two(case: CaseId) -> JSONResponse:
+        prepared = _open(session, case)
+        if case not in session.own_lists:
+            # The method's one rule, enforced rather than requested, and
+            # asked of this case rather than of the session.
             raise HTTPException(
                 status_code=409,
                 detail="write your own list first; the recorded sets are not"
@@ -219,14 +350,15 @@ def create_app(session: Session) -> FastAPI:
             )
         return JSONResponse(
             {
-                "frameworks": session.prepared.part_two,
+                "case": prepared.case_id,
+                "frameworks": prepared.part_two,
                 "marks": [
                     {
                         "fingerprint": target.fingerprint,
                         "framework": target.framework,
                         "claims": list(target.claims),
                     }
-                    for target in session.prepared.mark_targets
+                    for target in prepared.mark_targets
                 ],
                 "values": list(sittings.MARKS),
             }
@@ -235,41 +367,46 @@ def create_app(session: Session) -> FastAPI:
     @app.post("/api/finish")
     def finish(request: Request, body: Finish) -> JSONResponse:
         # This writes the reading document, appends to `case.json` and clears
-        # the UNREVIEWED line — and it is what sets `recorded`, which
-        # `/api/submit` tests. Everything the allow-list then carries into a
-        # pull request passes through here, so it is checked like the endpoint
-        # it feeds.
+        # the UNREVIEWED line — and it is what puts the case in `recorded`,
+        # which `/api/submit` tests. Everything the allow-list then carries
+        # into a pull request passes through here, so it is checked like the
+        # endpoint it feeds.
         refuse_cross_origin(request)
-        if session.own_list is None:
+        prepared = _open(session, body.case)
+        own = session.own_lists.get(body.case)
+        if own is None:
             raise HTTPException(status_code=409, detail="no own list was written")
+        if body.case in session.recorded:
+            # One entry per reader per case in one pull request. This is the
+            # local half of the rule the rail states: the case is signed now,
+            # so the next reader of the rail sees it greyed either way.
+            raise HTTPException(
+                status_code=409, detail="this session already recorded that case"
+            )
+        case_dir = session.corpus_dir / body.case
         try:
             text = sittings.document(
-                session.prepared, session.own_list, body.marks, body.missing, body.notes
+                prepared, own, body.marks, body.missing, body.notes
             )
-            (session.case_dir / session.document_name).write_text(
-                text, encoding="utf-8"
-            )
-            read = sittings.read_records(session.case_dir, session.prepared.files)
+            (case_dir / session.document_name).write_text(text, encoding="utf-8")
+            read = sittings.read_records(case_dir, prepared.files)
             sittings.record(
-                session.case_dir,
-                session.reviewer,
-                read,
-                session.document_name,
-                body.notes,
+                case_dir, session.reviewer, read, session.document_name, body.notes
             )
-            cleared = sittings.clear_unreviewed(session.root, session.prepared.case_id)
+            cleared = sittings.clear_unreviewed(session.root, prepared.case_id)
         except sittings.SittingError as exc:
             raise HTTPException(status_code=409, detail=str(exc)) from exc
-        session.recorded = True
+        session.recorded.add(body.case)
         return JSONResponse(
             {
+                "case": prepared.case_id,
                 "written": [
-                    f"evals/corpus/{session.prepared.case_id}/{session.document_name}",
-                    f"evals/corpus/{session.prepared.case_id}/case.json",
+                    f"evals/corpus/{prepared.case_id}/{session.document_name}",
+                    f"evals/corpus/{prepared.case_id}/case.json",
                     *([sittings.UNREVIEWED_FILE] if cleared else []),
                 ],
                 "command": "python -m evals.harness.run submit sitting",
-                "paste": _paste(session, len(read)),
+                "paste": _paste(session, prepared, len(read)),
                 "can_submit": session.can_submit,
             }
         )
@@ -309,10 +446,28 @@ def create_app(session: Session) -> FastAPI:
     return app
 
 
-def _paste(session: Session, files_read: int) -> str:
+def _open(session: Session, case_id: str) -> sittings.Prepared:
+    """One offered case, prepared — or the refusal every naming endpoint gives.
+
+    **This is the single rule for a case id that arrives in a request.** It
+    resolves against the offered list, which is the rail's own pressable rows,
+    so a signed case and a case nobody wrote refuse the same way and neither
+    costs a check of its own. Reading the list is an allow-list check, so no
+    request can name a path (A01). The message names no id, because a refusal
+    that echoes the request tells a caller which ids exist.
+    """
+    if case_id not in session.offered:
+        raise HTTPException(status_code=404, detail="not a case this sitting offers")
+    try:
+        return session.prepare(case_id)
+    except sittings.SittingError as exc:
+        raise HTTPException(status_code=409, detail=str(exc)) from exc
+
+
+def _paste(session: Session, prepared: sittings.Prepared, files_read: int) -> str:
     """The copy-paste alternative, for somebody not opening the PR from here."""
     return (
-        f"Sitting: {session.prepared.case_id} by {session.reviewer}\n\n"
+        f"Sitting: {prepared.case_id} by {session.reviewer}\n\n"
         f"Held over {files_read} file(s) — the sources, the model and every"
         " declared framework's reference set. My own threat list was written"
         " before the recorded sets were opened; the filled document is"
@@ -368,19 +523,38 @@ def _html(page: tuple[str, str]) -> HTMLResponse:
 
 _PAGE = """<!doctype html>
 <html lang="en"><head><meta charset="utf-8">
-<title>Case sitting — <!--case--></title>
+<title>Case sitting</title>
 <style nonce="__CSP_NONCE__">
   :root { color-scheme: light dark; --line: #8884; }
-  body { font: 16px/1.55 system-ui, sans-serif; margin: 0 auto; max-width: 46rem;
-         padding: 2rem 1rem 6rem; }
-  h1 { font-size: 1.3rem; margin-bottom: .2rem; }
+  body { font: 16px/1.55 system-ui, sans-serif; margin: 0; display: flex;
+         align-items: stretch; min-height: 100vh; }
+  nav { flex: 0 0 19rem; border-right: 1px solid var(--line); padding: 1.4rem 1rem;
+        position: sticky; top: 0; align-self: flex-start; max-height: 100vh;
+        overflow-y: auto; }
+  main { flex: 1; padding: 2rem 1.5rem 6rem; max-width: 46rem; }
+  h1 { font-size: 1.1rem; margin: 0 0 .2rem; }
+  h2 { font-size: 1.2rem; }
   .sub { color: #7a7a7a; margin-top: 0; }
+  ol { list-style: none; margin: 1rem 0 0; padding: 0; }
+  li { margin: 0; }
+  .row { display: flex; gap: .55rem; align-items: baseline; width: 100%;
+         text-align: left; font: inherit; padding: .4rem .5rem; border: 0;
+         border-radius: 6px; background: none; }
+  button.row { cursor: pointer; }
+  button.row:hover { background: #8882; }
+  li.current .row { background: #8883; }
+  .row.dead { color: #7a7a7a; }
+  .dot { flex: 0 0 .6rem; height: .6rem; border-radius: 50%; }
+  .dot.todo { background: #d08b28; }
+  .dot.signed { background: #8886; }
+  .label { flex: 1; }
   pre { background: #8881; padding: 1rem; overflow-x: auto; white-space: pre-wrap;
         border-radius: 6px; font-size: .88rem; }
   textarea { width: 100%; min-height: 9rem; font: inherit; padding: .6rem;
              border: 1px solid var(--line); border-radius: 6px; }
   button { font: inherit; padding: .5rem 1rem; border-radius: 6px;
            border: 1px solid var(--line); background: #8882; cursor: pointer; }
+  button:disabled { cursor: default; opacity: .5; }
   section { border-top: 1px solid var(--line); margin-top: 2rem; padding-top: 1rem; }
   .hidden { display: none; }
   .note { background: #8881; padding: .8rem 1rem; border-radius: 6px; }
@@ -391,69 +565,169 @@ _PAGE = """<!doctype html>
   .mark span { flex: 1; }
 </style></head>
 <body>
-<h1>Case sitting — <!--title--></h1>
-<p class="sub"><code><!--case--></code>, read by <!--reviewer--></p>
+<nav>
+  <h1>Case sitting</h1>
+  <p class="sub" id="left">reading the corpus…</p>
+  <ol id="cases"></ol>
+</nav>
 
-<section id="one">
-  <h2>Part 1 — the system</h2>
-  <pre id="partOne">loading…</pre>
-  <h2>Your list, written first</h2>
-  <p class="note">Write what could go wrong: an attack, a missing control, a
-  question the text does not answer. One per line. The recorded sets are not
-  in this page until you submit this — that is the whole method.</p>
-  <textarea id="own" placeholder="one per line"></textarea>
-  <p><button id="lock">Save my list and show the recorded sets</button></p>
-</section>
+<main>
+<div id="empty">
+  <h2>The whole corpus is on the left</h2>
+  <p class="note">Every case is in the list, with what it is waiting for. Pick
+  one, or take the first case nobody has read. The list stays where it is, so
+  there is nothing to come back from.</p>
+  <p><button id="start">Start with the first case to do</button></p>
+</div>
 
-<section id="two" class="hidden">
-  <h2>Part 2 — what is recorded</h2>
-  <p class="note">Mark each recorded finding: <code>agree</code> a real finding
-  worth reporting, <code>doubt</code> overstated or unsupported by the text,
-  <code>dup</code> the same finding as another entry. Leave a mark unset to say
-  nothing about that one.</p>
-  <div id="partTwo"></div>
-  <h2>On your list and not on theirs</h2>
-  <p class="note">The finding this sitting exists for. One per line.</p>
-  <textarea id="missing" placeholder="one per line"></textarea>
-  <h2>Notes</h2>
-  <textarea id="notes" placeholder="counts, and anything you changed"></textarea>
-  <p><button id="finish">Record the sitting</button></p>
-</section>
+<article id="case" class="hidden">
+  <h2 id="caseTitle"></h2>
+  <p class="sub"><code id="caseId"></code>, read by <!--reviewer--></p>
 
-<section id="done" class="hidden">
-  <h2>Recorded</h2>
-  <p>Written into your working tree:</p>
-  <pre id="written"></pre>
-  <p>Open the pull request:</p>
-  <pre id="command"></pre>
-  <p>Or paste this into one you open yourself:</p>
-  <pre id="paste"></pre>
-  <div id="submitBox" class="hidden">
-    <p class="note">Or let this open it for you, through the
-    <code>gh</code> you are already signed in to. It runs the same checks
-    first, pushes to your fork, and opens the pull request as you.</p>
-    <p><button id="submit">Open the pull request as <!--reviewer--></button></p>
-    <pre id="result" class="hidden"></pre>
-  </div>
-</section>
+  <section id="one">
+    <h2>Part 1 — the system</h2>
+    <pre id="partOne">loading…</pre>
+    <h2>Your list, written first</h2>
+    <p class="note">Write what could go wrong: an attack, a missing control, a
+    question the text does not answer. One per line. The recorded sets are not
+    in this page until you submit this — that is the whole method.</p>
+    <textarea id="own" placeholder="one per line"></textarea>
+    <p><button id="lock">Save my list and show the recorded sets</button></p>
+  </section>
+
+  <section id="two" class="hidden">
+    <h2>Part 2 — what is recorded</h2>
+    <p class="note">Mark each recorded finding: <code>agree</code> a real finding
+    worth reporting, <code>doubt</code> overstated or unsupported by the text,
+    <code>dup</code> the same finding as another entry. Leave a mark unset to say
+    nothing about that one.</p>
+    <div id="partTwo"></div>
+    <h2>On your list and not on theirs</h2>
+    <p class="note">The finding this sitting exists for. One per line.</p>
+    <textarea id="missing" placeholder="one per line"></textarea>
+    <h2>Notes</h2>
+    <textarea id="notes" placeholder="counts, and anything you changed"></textarea>
+    <p><button id="finish">Record the sitting</button></p>
+  </section>
+
+  <section id="done" class="hidden">
+    <h2>Recorded</h2>
+    <p>Written into your working tree:</p>
+    <pre id="written"></pre>
+    <p>Open the pull request:</p>
+    <pre id="command"></pre>
+    <p>Or paste this into one you open yourself:</p>
+    <pre id="paste"></pre>
+    <div id="submitBox" class="hidden">
+      <p class="note">Or let this open it for you, through the
+      <code>gh</code> you are already signed in to. It runs the same checks
+      first, pushes to your fork, and opens the pull request as you.</p>
+      <p><button id="submit">Open the pull request as <!--reviewer--></button></p>
+      <pre id="result" class="hidden"></pre>
+    </div>
+  </section>
+</article>
+</main>
 
 <script nonce="__CSP_NONCE__">
 const $ = (id) => document.getElementById(id);
-const lines = (id) => $(id).value.split("\\n").map(s => s.trim()).filter(Boolean);
+const lines = (id) => $(id).value.split("\n").map(s => s.trim()).filter(Boolean);
 
-fetch("/api/part-one").then(r => r.json()).then(d => {
+const TOKEN = <!--token-->;
+const CAN_SUBMIT = <!--cansubmit-->;
+
+// The case on the stage, and the rail as the server last described it.
+let current = null;
+let rows = [];
+
+async function loadRail() {
+  const d = await (await fetch("/api/rail")).json();
+  rows = d.cases;
+  $("left").textContent = d.todo + " to do";
+  $("cases").replaceChildren(...rows.map(railRow));
+  $("start").disabled = !rows.some(row => row.pressable);
+  select(current);
+  return d;
+}
+
+// A status dot, the case number and the title, with the full status as the
+// row's tooltip. Nothing else rides here: a claim count would tell the reader
+// how long to make their own list before they have written it. The title is
+// case prose, so it lands through textContent like every other piece of it.
+function railRow(row) {
+  const item = document.createElement("li");
+  item.title = row.status;
+  item.dataset.case = row.case;
+  const dot = document.createElement("span");
+  dot.className = row.pressable ? "dot todo" : "dot signed";
+  const label = document.createElement("span");
+  label.className = "label";
+  label.textContent = row.number + "  " + row.title;
+  const press = document.createElement(row.pressable ? "button" : "span");
+  press.className = row.pressable ? "row" : "row dead";
+  press.append(dot, label);
+  if (row.pressable) press.addEventListener("click", () => openCase(row.case));
+  item.appendChild(press);
+  return item;
+}
+
+function select(caseId) {
+  for (const item of $("cases").children) {
+    item.classList.toggle("current", item.dataset.case === caseId);
+  }
+}
+
+async function openCase(caseId) {
+  current = caseId;
+  select(caseId);
+  blank();
+  $("empty").classList.add("hidden");
+  $("case").classList.remove("hidden");
+  const res = await fetch("/api/part-one?case=" + encodeURIComponent(caseId));
+  // A second click while this one was in flight owns the stage now, so this
+  // answer is stale and must not paint one case's prose under another's name.
+  if (current !== caseId) return;
+  const d = await res.json();
+  if (!res.ok) { $("partOne").textContent = d.detail; return; }
+  $("caseTitle").textContent = d.title;
+  $("caseId").textContent = d.case;
   $("partOne").textContent = d.body;
-});
+  // A case takes one own list. Where this reader already wrote it, the box
+  // comes back filled and locked and the sets open, because the server
+  // refuses a second list for the same case.
+  if (d.own_list !== null) {
+    $("own").value = d.own_list.join("\n");
+    lock();
+    await showSets(caseId);
+  }
+}
 
-$("lock").addEventListener("click", async () => {
-  await fetch("/api/own-list", {
-    method: "POST", headers: {"Content-Type": "application/json"},
-    body: JSON.stringify({items: lines("own")}),
-  });
+// The gate re-arms per case, so a case arriving on the stage arrives blind.
+function blank() {
+  $("partOne").textContent = "loading…";
+  $("partTwo").replaceChildren();
+  for (const id of ["own", "missing", "notes"]) $(id).value = "";
+  for (const id of ["written", "command", "paste"]) $(id).textContent = "";
+  $("own").readOnly = false;
+  $("lock").disabled = false;
+  $("submit").disabled = false;
+  for (const id of ["two", "done", "submitBox", "result"]) {
+    $(id).classList.add("hidden");
+  }
+}
+
+function lock() {
   $("own").readOnly = true;
   $("lock").disabled = true;
-  const sets = await (await fetch("/api/part-two")).json();
+}
+
+async function showSets(caseId) {
+  const res = await fetch("/api/part-two?case=" + encodeURIComponent(caseId));
+  const sets = await res.json();
+  if (current !== caseId) return;
+  if (!res.ok) { $("partOne").textContent = sets.detail; return; }
   const box = $("partTwo");
+  box.replaceChildren();
   for (const [name, body] of Object.entries(sets.frameworks)) {
     const pre = document.createElement("pre");
     pre.textContent = body;
@@ -463,6 +737,24 @@ $("lock").addEventListener("click", async () => {
     }
   }
   $("two").classList.remove("hidden");
+}
+
+$("start").addEventListener("click", () => {
+  const first = rows.find(row => row.pressable);
+  if (first) openCase(first.case);
+});
+
+$("lock").addEventListener("click", async () => {
+  const caseId = current;
+  const res = await fetch("/api/own-list", {
+    method: "POST", headers: {"Content-Type": "application/json"},
+    body: JSON.stringify({case: caseId, items: lines("own")}),
+  });
+  // Locked only once the server holds the list. A refused post that locked
+  // the box anyway would leave the reader with nowhere to write it.
+  if (!res.ok) { $("partOne").textContent = (await res.json()).detail; return; }
+  lock();
+  await showSets(caseId);
   $("two").scrollIntoView({behavior: "smooth"});
 });
 
@@ -485,9 +777,6 @@ function markRow(target, values) {
   return row;
 }
 
-const TOKEN = <!--token-->;
-const CAN_SUBMIT = <!--cansubmit-->;
-
 $("finish").addEventListener("click", async () => {
   const marks = {};
   for (const select of document.querySelectorAll("select[data-finding]")) {
@@ -495,16 +784,20 @@ $("finish").addEventListener("click", async () => {
   }
   const res = await fetch("/api/finish", {
     method: "POST", headers: {"Content-Type": "application/json"},
-    body: JSON.stringify({marks, missing: lines("missing"), notes: $("notes").value}),
+    body: JSON.stringify({
+      case: current, marks, missing: lines("missing"), notes: $("notes").value,
+    }),
   });
   const d = await res.json();
   if (!res.ok) { $("written").textContent = d.detail; $("done").classList.remove("hidden"); return; }
-  $("written").textContent = d.written.join("\\n");
+  $("written").textContent = d.written.join("\n");
   $("command").textContent = d.command;
   $("paste").textContent = d.paste;
   $("two").classList.add("hidden");
   $("done").classList.remove("hidden");
   if (CAN_SUBMIT && d.can_submit) $("submitBox").classList.remove("hidden");
+  // The recorded entry clears the case, so its row greys where it stands.
+  await loadRail();
 });
 
 $("submit").addEventListener("click", async () => {
@@ -517,11 +810,20 @@ $("submit").addEventListener("click", async () => {
   });
   const d = await res.json();
   if (d.detail) { $("result").textContent = d.detail; $("submit").disabled = false; return; }
-  const lines = (d.checks || []).map(c => (c.passed ? "ok   " : "FAIL ") + c.name
+  const report = (d.checks || []).map(c => (c.passed ? "ok   " : "FAIL ") + c.name
     + (c.problems.length ? "\n       " + c.problems.join("\n       ") : ""));
-  if (d.ok) { lines.push("", d.url, "", d.closing); }
-  else { lines.push("", d.error || "nothing opened; fix the failures above."); $("submit").disabled = false; }
-  $("result").textContent = lines.join("\n");
+  if (d.ok) { report.push("", d.url, "", d.closing); }
+  else { report.push("", d.error || "nothing opened; fix the failures above."); $("submit").disabled = false; }
+  $("result").textContent = report.join("\n");
+});
+
+// A preselect moves the rail. It opens the case only when the rail presses it,
+// because the endpoints resolve against the offered list and grant it nothing.
+loadRail().then(d => {
+  if (!d.preselect) return;
+  const row = rows.find(item => item.case === d.preselect);
+  if (row && row.pressable) openCase(row.case);
+  else select(d.preselect);
 });
 </script>
 </body></html>
@@ -529,23 +831,39 @@ $("submit").addEventListener("click", async () => {
 
 
 def build_session(
-    case_id: str, reviewer: str, root: Path, can_submit: bool = False
+    root: Path, reviewer: str, case: str | None = None, can_submit: bool = False
 ) -> Session:
-    case_dir = root / "evals" / "corpus" / case_id
-    if not (case_dir / "case.json").is_file():
-        raise SystemExit(f"no case {case_id!r} under evals/corpus/")
-    return Session(
-        case_dir=case_dir,
-        reviewer=reviewer,
-        prepared=sittings.prepare(case_dir),
+    """One reader, the whole corpus, and the case ``--case`` preselected.
+
+    A preselect that names a case the corpus does not hold refuses here, at
+    the start, where the reader is still looking at their terminal. A
+    preselect the rail greys is kept: it moves the rail and grants nothing,
+    because :func:`_open` reads the offered list rather than this field.
+    """
+    session = Session(
         root=root,
+        reviewer=reviewer,
+        roster=rosters.load(root / submit_spine.ROSTER_FILE),
+        preselect=case,
         can_submit=can_submit,
     )
+    session.refresh()
+    if case is not None and case not in {row.case_id for row in session.rows}:
+        raise SystemExit(f"no case {case!r} under evals/corpus/")
+    if case in session.offered:
+        # Eagerly, so a case whose claims the identity rule cannot key
+        # refuses at the command line rather than at the first click.
+        session.prepare(case)
+    return session
 
 
 def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument("--case", required=True, help="the case id to sit with")
+    parser.add_argument(
+        "--case",
+        help="the case id the rail opens on. One value: a preselect answers"
+        " where the walk starts, and that question has one answer.",
+    )
     parser.add_argument(
         "--reviewer",
         help="your GitHub login. Read from the authenticated `gh` when omitted,"
@@ -589,10 +907,11 @@ def main(argv: list[str] | None = None) -> int:
     # hold would fail #320's binding in CI, so offering the button would be
     # inviting a red PR.
     can_submit = bool(login) and login == reviewer and not args.no_submit
-    session = build_session(args.case, reviewer, root, can_submit)
+    session = build_session(root, reviewer, args.case, can_submit)
     import uvicorn
 
-    print(f"sitting with {args.case} as {reviewer}")
+    print(f"sitting as {reviewer}")
+    print(f"{len(session.offered)} cases to do")
     if can_submit:
         print("the page can open the pull request as you; --no-submit hides it")
     print(f"open http://{HOST}:{PORT}/")
