@@ -311,8 +311,12 @@ property that the threat set is exhaustive *against that model*.
 **There is a browser path, and it is the shorter one.**
 
 ```sh
-uv run python webapp/sitting.py --case <case-id>
+uv run python webapp/sitting.py
 ```
+
+Every case in the corpus is in a list on the left, each with a status. Pick
+one — a case somebody already signed off is greyed. `--case <case-id>` opens
+on one case and takes one value; the list is how you choose the rest.
 
 It shows you the sources and the model, takes your own threat list, and only
 *then* reveals the recorded sets — the one rule this method has, enforced by

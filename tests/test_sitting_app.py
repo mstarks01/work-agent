@@ -27,41 +27,77 @@ from webapp.sitting import build_session, create_app
 
 LOOPBACK = "http://127.0.0.1:8020"
 CASE = "02-iot-fleet-telemetry"
+OTHER = "03-batch-data-pipeline"
+
+#: The two real cases the throwaway tree holds. Two rather than one, because
+#: the rail is a list and a list of one proves nothing about order, about the
+#: count of what is left, or about a row the reader may not press.
+CASES = (CASE, OTHER)
 
 #: What a browser puts on every request this page makes. Every writing endpoint
 #: refuses without it, so the clients carry it and the tests that care about
 #: its absence set their own.
 SAME_ORIGIN = {"Sec-Fetch-Site": "same-origin"}
 
+#: The tree's own roster. Written here rather than copied from the clone, so a
+#: test that needs a rostered reader does not wait on who the project rosters.
+ROSTER = """version = 1
+
+[voters.ada]
+standing = "contributor"
+
+[voters.sam]
+standing = "maintainer"
+"""
+
 
 @pytest.fixture
 def tree(tmp_path):
-    """A throwaway repo holding one real corpus case and an unreviewed list."""
+    """A throwaway repo holding two real corpus cases, a roster and the list."""
     root = Path(__file__).resolve().parents[1]
-    case_dir = tmp_path / "evals" / "corpus" / CASE
-    case_dir.parent.mkdir(parents=True)
-    source = root / "evals" / "corpus" / CASE
-    for item in source.rglob("*"):
-        target = case_dir / item.relative_to(source)
-        target.parent.mkdir(parents=True, exist_ok=True)
-        if item.is_file():
-            target.write_bytes(item.read_bytes())
+    (tmp_path / "evals" / "corpus").mkdir(parents=True)
+    for case in CASES:
+        source = root / "evals" / "corpus" / case
+        for item in source.rglob("*"):
+            target = tmp_path / "evals" / "corpus" / case / item.relative_to(source)
+            target.parent.mkdir(parents=True, exist_ok=True)
+            if item.is_file():
+                target.write_bytes(item.read_bytes())
+    (tmp_path / "evals" / "review").mkdir(parents=True)
+    (tmp_path / "evals" / "review" / "voters.toml").write_text(ROSTER, encoding="utf-8")
     (tmp_path / "tests").mkdir()
     (tmp_path / "tests" / "test_case_review.py").write_text(
         "UNREVIEWED: dict[str, str] = {\n"
         f'    "{CASE}": (\n'
         '        "18 STRIDE claims and 8 ASVS records, unread."\n'
         "    ),\n"
-        '    "03-batch-data-pipeline": "17 STRIDE claims, unread.",\n'
+        f'    "{OTHER}": "17 STRIDE claims, unread.",\n'
         "}\n",
         encoding="utf-8",
     )
     return tmp_path
 
 
+def sign(tree, case, reviewer):
+    """Give one case a sitting that clears it, as a real reader would leave it.
+
+    Every required file read at the bytes it holds now, a rostered reviewer,
+    and the filled document beside the case — which is what
+    :func:`evals.harness.sitting.clears` asks for.
+    """
+    case_dir = tree / "evals" / "corpus" / case
+    name = sittings.document_name(reviewer)
+    (case_dir / name).write_text(f"# read by {reviewer}\n", encoding="utf-8")
+    declared = json.loads((case_dir / "case.json").read_text("utf-8"))["frameworks"]
+    read = sittings.read_records(
+        case_dir, sittings.required_files(item["name"] for item in declared)
+    )
+    sittings.record(case_dir, reviewer, read, name, "")
+
+
 @pytest.fixture
 def client(tree):
-    session = build_session(CASE, "ada", tree)
+    session = build_session(tree, "ada", CASE)
     app = TestClient(create_app(session), base_url=LOOPBACK, headers=SAME_ORIGIN)
     return app, session, tree
 
@@ -70,7 +106,7 @@ class TestTheOwnListRuleIsEnforced:
     def test_part_two_is_refused_before_the_own_list(self, client):
         """The method's only rule, and the reason it is server-side."""
         app, _, _ = client
-        refused = app.get("/api/part-two")
+        refused = app.get(f"/api/part-two?case={CASE}")
         assert refused.status_code == 409
         assert "own list first" in refused.json()["detail"]
 
@@ -94,29 +130,33 @@ class TestTheOwnListRuleIsEnforced:
 
     def test_the_sets_arrive_once_the_list_is_in(self, client):
         app, _, _ = client
-        app.post("/api/own-list", json={"items": ["someone spoofs a device"]})
-        sets = app.get("/api/part-two").json()["frameworks"]
+        app.post(
+            "/api/own-list", json={"case": CASE, "items": ["someone spoofs a device"]}
+        )
+        sets = app.get(f"/api/part-two?case={CASE}").json()["frameworks"]
         assert "stride" in sets
         assert sets["stride"].strip()
 
     def test_finishing_without_a_list_is_refused(self, client):
         app, _, _ = client
-        assert app.post("/api/finish", json={}).status_code == 409
+        refused = app.post("/api/finish", json={"case": CASE})
+        assert refused.status_code == 409
 
     def test_an_empty_list_is_an_answer(self, client):
         """ "I saw nothing" is a real answer; it just has to be given."""
         app, _, _ = client
-        app.post("/api/own-list", json={"items": []})
-        assert app.get("/api/part-two").status_code == 200
+        app.post("/api/own-list", json={"case": CASE, "items": []})
+        assert app.get(f"/api/part-two?case={CASE}").status_code == 200
 
 
 class TestWhatASittingWrites:
     def finish(self, app):
-        app.post("/api/own-list", json={"items": ["a spoofed device"]})
-        app.get("/api/part-two")
+        app.post("/api/own-list", json={"case": CASE, "items": ["a spoofed device"]})
+        app.get(f"/api/part-two?case={CASE}")
         return app.post(
             "/api/finish",
             json={
+                "case": CASE,
                 "marks": {},
                 "missing": ["nothing about the fleet key"],
                 "notes": "21 agree",
@@ -196,15 +236,20 @@ class TestWhatASittingWrites:
 class TestThePosture:
     def test_a_rebound_host_is_refused(self, tree):
         """This app writes to the corpus, so it gets the same Host check."""
-        session = build_session(CASE, "ada", tree)
+        session = build_session(tree, "ada", CASE)
         app = TestClient(create_app(session), base_url="http://attacker.example")
         assert app.get("/").status_code == 400
-        assert app.post("/api/own-list", json={"items": []}).status_code == 400
+        assert (
+            app.post("/api/own-list", json={"case": CASE, "items": []}).status_code
+            == 400
+        )
 
     def test_the_reviewer_cannot_be_set_from_a_request(self, client):
         """#320's binding: a browser field naming the reviewer would break it."""
         app, _, _ = client
-        refused = app.post("/api/own-list", json={"items": [], "reviewer": "sam"})
+        refused = app.post(
+            "/api/own-list", json={"case": CASE, "items": [], "reviewer": "sam"}
+        )
         assert refused.status_code == 422
 
     def test_the_page_carries_a_nonce_policy(self, client):
@@ -236,16 +281,21 @@ class TestThePosture:
         """
         app, session, tree = client
         writes = {
-            "/api/own-list": {"items": ["a spoofed device"]},
-            "/api/finish": {"marks": {}, "missing": [], "notes": "not mine"},
+            "/api/own-list": {"case": CASE, "items": ["a spoofed device"]},
+            "/api/finish": {
+                "case": CASE,
+                "marks": {},
+                "missing": [],
+                "notes": "not mine",
+            },
         }
         for path, body in writes.items():
             for site in ("cross-site", "same-site", "none"):
                 refused = app.post(path, json=body, headers={"Sec-Fetch-Site": site})
                 assert refused.status_code == 403, f"{path} accepted a {site} request"
 
-        assert session.own_list is None, "a refused request set the own list"
-        assert session.recorded is False, "a refused request recorded the sitting"
+        assert not session.own_lists, "a refused request set the own list"
+        assert not session.recorded, "a refused request recorded the sitting"
         assert not (tree / "evals" / "corpus" / CASE / "REVIEW-ada.md").exists()
 
     def test_a_bare_post_is_refused_too(self, tree):
@@ -255,10 +305,13 @@ class TestThePosture:
         anything that sends nothing is refused too. This builds its own client
         because the shared one carries the header on every request.
         """
-        session = build_session(CASE, "ada", tree)
+        session = build_session(tree, "ada", CASE)
         app = TestClient(create_app(session), base_url=LOOPBACK)
-        assert app.post("/api/own-list", json={"items": []}).status_code == 403
-        assert session.own_list is None
+        assert (
+            app.post("/api/own-list", json={"case": CASE, "items": []}).status_code
+            == 403
+        )
+        assert not session.own_lists
 
     def test_the_page_token_is_a_javascript_literal(self, client):
         """A ``<script>`` block does not decode HTML entities.
@@ -282,14 +335,29 @@ class TestThePosture:
         """
         app, _, _ = client
         long_line = "x" * 501
-        assert app.post("/api/own-list", json={"items": [long_line]}).status_code == 422
+        assert (
+            app.post(
+                "/api/own-list", json={"case": CASE, "items": [long_line]}
+            ).status_code
+            == 422
+        )
 
-        app.post("/api/own-list", json={"items": ["a spoofed device"]})
+        app.post("/api/own-list", json={"case": CASE, "items": ["a spoofed device"]})
         for body in (
-            {"marks": {}, "missing": [long_line], "notes": ""},
-            {"marks": {"stride:1": long_line}, "missing": [], "notes": ""},
-            {"marks": {long_line: "ok"}, "missing": [], "notes": ""},
-            {"marks": {str(n): "ok" for n in range(201)}, "missing": [], "notes": ""},
+            {"case": CASE, "marks": {}, "missing": [long_line], "notes": ""},
+            {
+                "case": CASE,
+                "marks": {"stride:1": long_line},
+                "missing": [],
+                "notes": "",
+            },
+            {"case": CASE, "marks": {long_line: "ok"}, "missing": [], "notes": ""},
+            {
+                "case": CASE,
+                "marks": {str(n): "ok" for n in range(201)},
+                "missing": [],
+                "notes": "",
+            },
         ):
             assert app.post("/api/finish", json=body).status_code == 422
 
@@ -305,11 +373,13 @@ class TestTheSubmitButton:
     """
 
     def sat(self, tree, can_submit=True):
-        session = build_session(CASE, "ada", tree, can_submit=can_submit)
+        session = build_session(tree, "ada", CASE, can_submit=can_submit)
         app = TestClient(create_app(session), base_url=LOOPBACK, headers=SAME_ORIGIN)
-        app.post("/api/own-list", json={"items": ["a stolen key"]})
-        app.get("/api/part-two")
-        app.post("/api/finish", json={"marks": {}, "missing": [], "notes": ""})
+        app.post("/api/own-list", json={"case": CASE, "items": ["a stolen key"]})
+        app.get(f"/api/part-two?case={CASE}")
+        app.post(
+            "/api/finish", json={"case": CASE, "marks": {}, "missing": [], "notes": ""}
+        )
         return app, session
 
     def headers(self, session):
@@ -342,12 +412,12 @@ class TestTheSubmitButton:
         assert refused.status_code == 403
 
     def test_a_rebound_host_is_refused_here_too(self, tree):
-        session = build_session(CASE, "ada", tree, can_submit=True)
+        session = build_session(tree, "ada", CASE, can_submit=True)
         app = TestClient(create_app(session), base_url="http://attacker.example")
         assert app.post("/api/submit", headers=self.headers(session)).status_code == 400
 
     def test_submitting_before_recording_is_refused(self, tree):
-        session = build_session(CASE, "ada", tree, can_submit=True)
+        session = build_session(tree, "ada", CASE, can_submit=True)
         app = TestClient(create_app(session), base_url=LOOPBACK)
         refused = app.post("/api/submit", headers=self.headers(session))
         assert refused.status_code == 409
@@ -431,16 +501,17 @@ class TestTheMarks:
     """
 
     def marked(self, app, marks):
-        app.post("/api/own-list", json={"items": ["a spoofed device"]})
-        app.get("/api/part-two")
+        app.post("/api/own-list", json={"case": CASE, "items": ["a spoofed device"]})
+        app.get(f"/api/part-two?case={CASE}")
         return app.post(
-            "/api/finish", json={"marks": marks, "missing": [], "notes": ""}
+            "/api/finish",
+            json={"case": CASE, "marks": marks, "missing": [], "notes": ""},
         )
 
     def test_part_two_offers_a_target_per_recorded_finding(self, client):
         app, _, _ = client
-        app.post("/api/own-list", json={"items": []})
-        payload = app.get("/api/part-two").json()
+        app.post("/api/own-list", json={"case": CASE, "items": []})
+        payload = app.get(f"/api/part-two?case={CASE}").json()
         assert payload["values"] == list(sittings.MARKS)
         offered = payload["marks"]
         assert offered, "part two offered nothing to mark"
@@ -454,12 +525,12 @@ class TestTheMarks:
     def test_one_finding_takes_one_mark_however_often_it_is_written(self, client):
         """The fingerprint is the identity, so it is what a target is keyed by."""
         _, session, _ = client
-        keys = [target.fingerprint for target in session.prepared.mark_targets]
+        keys = [target.fingerprint for target in session.prepared[CASE].mark_targets]
         assert len(keys) == len(set(keys))
 
     def test_a_value_outside_the_closed_set_is_refused(self, client):
         app, session, _ = client
-        first = session.prepared.mark_targets[0].fingerprint
+        first = session.prepared[CASE].mark_targets[0].fingerprint
         assert self.marked(app, {first: "maybe"}).status_code == 422
 
     def test_a_mark_naming_no_recorded_finding_is_refused(self, client):
@@ -474,7 +545,7 @@ class TestTheMarks:
         app, session, tree = client
         first = {
             target.framework: target.fingerprint
-            for target in reversed(session.prepared.mark_targets)
+            for target in reversed(session.prepared[CASE].mark_targets)
         }
         assert len(first) > 1, "this case declares one framework"
         self.marked(app, dict.fromkeys(first.values(), "doubt"))
@@ -496,7 +567,7 @@ class TestTheMarks:
         _, session, tree = client
         before = {
             target.fingerprint: target.claims
-            for target in session.prepared.mark_targets
+            for target in session.prepared[CASE].mark_targets
         }
 
         claims_file = tree / "evals" / "corpus" / CASE / "claims" / "stride.json"
@@ -508,7 +579,7 @@ class TestTheMarks:
 
         after = {
             target.fingerprint: target.claims
-            for target in build_session(CASE, "ada", tree).prepared.mark_targets
+            for target in build_session(tree, "ada", CASE).prepared[CASE].mark_targets
         }
         assert len(after) == len(before) + 1, "the inserted claim is not a new finding"
         for fingerprint, texts in before.items():
@@ -535,6 +606,300 @@ class TestTheMarks:
         claims_file.write_text(json.dumps(claims, indent=2), encoding="utf-8")
 
         with pytest.raises(sittings.SittingError) as refused:
-            build_session(CASE, "ada", tree)
+            build_session(tree, "ada", CASE)
         assert CASE in str(refused.value)
         assert claims[0]["claim"] in str(refused.value)
+
+
+class TestTheRail:
+    """The whole corpus in one list, and what a row may say about a case.
+
+    Two properties carry this. A row says the case number, the title and the
+    status and nothing else, because a claim count would tell the reader how
+    long to make their own list before they have written it. And the status
+    asks the clearing rule rather than the presence of an entry in ``reviews``,
+    so the page never greys a case CI still asks somebody to read.
+    """
+
+    def rail(self, app):
+        return app.get("/api/rail").json()
+
+    def rows(self, app):
+        return {row["case"]: row for row in self.rail(app)["cases"]}
+
+    def opened(self, tree, case=None):
+        session = build_session(tree, "ada", case)
+        return TestClient(create_app(session), base_url=LOOPBACK, headers=SAME_ORIGIN)
+
+    def test_the_app_starts_with_no_case_named(self, tree):
+        """The reader chooses inside the page, so the terminal names nothing."""
+        app = self.opened(tree)
+        assert app.get("/").status_code == 200
+        assert len(self.rail(app)["cases"]) == len(CASES)
+
+    def test_every_case_has_a_row_with_a_number_and_a_title(self, tree):
+        app = self.opened(tree)
+        rows = self.rows(app)
+        assert set(rows) == set(CASES)
+        for case, row in rows.items():
+            assert row["number"] == case.split("-")[0]
+            assert row["title"] and row["title"] != case
+            assert row["status"]
+
+    def test_the_rows_are_in_corpus_order(self, tree):
+        app = self.opened(tree)
+        assert [row["case"] for row in self.rail(app)["cases"]] == sorted(CASES)
+
+    def test_a_row_carries_no_claim_count_and_no_reason_the_case_waits(self, tree):
+        """The payload's shape is the contract, so it is asserted whole.
+
+        A field added here reaches every reader, and the one thing the page
+        must never carry is how much is recorded against a case they have not
+        read yet. The reason a case waits is the same disclosure in prose.
+        """
+        app = self.opened(tree)
+        for row in self.rail(app)["cases"]:
+            assert set(row) == {"case", "number", "title", "status", "pressable"}
+        listing = (tree / "tests" / "test_case_review.py").read_text("utf-8")
+        blob = json.dumps(self.rail(app))
+        assert "STRIDE claims" not in blob, "the rail carries a claim count"
+        assert "STRIDE claims" in listing, "the reason moved; re-point this test"
+
+    def test_the_header_counts_what_is_left(self, tree):
+        app = self.opened(tree)
+        assert self.rail(app)["todo"] == len(CASES)
+        sign(tree, OTHER, "sam")
+        assert self.rail(app)["todo"] == len(CASES) - 1
+
+    def test_a_signed_case_is_greyed_and_unpressable(self, tree):
+        """Whoever signed it. The status names the signer, which reads both ways."""
+        sign(tree, OTHER, "sam")
+        app = self.opened(tree)
+        assert self.rows(app)[OTHER] == {
+            "case": OTHER,
+            "number": "03",
+            "title": self.rows(app)[OTHER]["title"],
+            "status": "signed by sam",
+            "pressable": False,
+        }
+        assert self.rows(app)[CASE]["pressable"] is True
+
+    def test_the_reader_s_own_signature_greys_it_too(self, tree):
+        """The draft is what re-opens a case, not the login, so a submitted
+        session leaves a case of the reader's own looking exactly like one
+        somebody else signed."""
+        sign(tree, OTHER, "ada")
+        app = self.opened(tree)
+        assert self.rows(app)[OTHER]["status"] == "signed by ada"
+        assert self.rows(app)[OTHER]["pressable"] is False
+
+    def test_a_sitting_by_an_unrostered_reader_greys_nothing(self, tree):
+        """The clearing rule asks for a rostered reader, and the rail asks it."""
+        sign(tree, OTHER, "nobody")
+        app = self.opened(tree)
+        assert self.rows(app)[OTHER]["status"] == sittings.TO_DO
+        assert self.rows(app)[OTHER]["pressable"] is True
+
+    def test_a_drifted_digest_puts_the_case_back_on_the_rail(self, tree):
+        """The entry stays and clears nothing, and CI asks for that case.
+
+        A rail keyed on the presence of an entry would grey it, so the reader
+        could not reach the one case the failing check names.
+        """
+        sign(tree, OTHER, "sam")
+        source = tree / "evals" / "corpus" / OTHER / "source.md"
+        source.write_text(source.read_text("utf-8") + "\nan edit\n", encoding="utf-8")
+        app = self.opened(tree)
+        assert json.loads(
+            (tree / "evals" / "corpus" / OTHER / "case.json").read_text("utf-8")
+        )["reviews"], "the entry is still there"
+        assert self.rows(app)[OTHER]["status"] == sittings.TO_DO
+        assert self.rows(app)[OTHER]["pressable"] is True
+
+    def test_recording_a_sitting_greys_its_own_case(self, tree):
+        app = self.opened(tree)
+        app.post("/api/own-list", json={"case": CASE, "items": ["a spoofed device"]})
+        app.post(
+            "/api/finish", json={"case": CASE, "marks": {}, "missing": [], "notes": ""}
+        )
+        assert self.rows(app)[CASE]["status"] == "signed by ada"
+        assert self.rows(app)[CASE]["pressable"] is False
+        assert self.rail(app)["todo"] == len(CASES) - 1
+
+    def test_the_gate_re_arms_for_each_case(self, tree):
+        """One case's own list opens that case's sets and no other's."""
+        app = self.opened(tree)
+        app.post("/api/own-list", json={"case": CASE, "items": ["a spoofed device"]})
+        assert app.get(f"/api/part-two?case={CASE}").status_code == 200
+        assert app.get(f"/api/part-two?case={OTHER}").status_code == 409
+
+    def test_the_page_offers_one_button_and_no_way_back_to_a_list(self, tree):
+        """The rail never leaves, so there is nothing to return to."""
+        page = self.opened(tree).get("/").text
+        assert "Start with the first case to do" in page
+        assert "Back to" not in page
+
+
+class TestEveryEndpointResolvesItsCase:
+    """Decision 34, and the refusal decision 40 says costs no code of its own.
+
+    A case id that arrives in a request is resolved against the offered list —
+    the rail's pressable rows. So a signed case, a case somebody guessed and a
+    case nobody wrote all refuse the same way, and the refusal names no id,
+    because a message that echoes the request tells a caller which ids exist.
+    """
+
+    def naming(self, case):
+        return {
+            "GET /api/part-one": ("get", f"/api/part-one?case={case}", None),
+            "GET /api/part-two": ("get", f"/api/part-two?case={case}", None),
+            "POST /api/own-list": (
+                "post",
+                "/api/own-list",
+                {"case": case, "items": []},
+            ),
+            "POST /api/finish": (
+                "post",
+                "/api/finish",
+                {"case": case, "marks": {}, "missing": [], "notes": ""},
+            ),
+        }
+
+    def refused(self, app, case):
+        for name, (method, path, body) in self.naming(case).items():
+            answer = getattr(app, method)(path, **({"json": body} if body else {}))
+            assert answer.status_code == 404, f"{name} accepted {case}"
+            assert case not in answer.text, f"{name} echoed the case id back"
+
+    def test_a_case_nobody_wrote_is_refused(self, tree):
+        session = build_session(tree, "ada")
+        app = TestClient(create_app(session), base_url=LOOPBACK, headers=SAME_ORIGIN)
+        self.refused(app, "99-not-a-case")
+
+    def test_a_signed_case_is_refused(self, tree):
+        sign(tree, OTHER, "sam")
+        session = build_session(tree, "ada")
+        app = TestClient(create_app(session), base_url=LOOPBACK, headers=SAME_ORIGIN)
+        self.refused(app, OTHER)
+
+    def test_a_case_signed_mid_session_is_refused_from_then_on(self, tree):
+        """The offered list is re-read from the tree, so it can only shrink
+        under the reader while they are working — never grow stale open."""
+        session = build_session(tree, "ada")
+        app = TestClient(create_app(session), base_url=LOOPBACK, headers=SAME_ORIGIN)
+        assert app.get(f"/api/part-one?case={OTHER}").status_code == 200
+        sign(tree, OTHER, "sam")
+        app.get("/api/rail")
+        self.refused(app, OTHER)
+
+    def test_a_write_still_refuses_a_cross_site_request_first(self, tree):
+        """The origin check runs before the case is resolved, so an unoffered
+        case tells a foreign page nothing it could not already guess."""
+        session = build_session(tree, "ada")
+        app = TestClient(create_app(session), base_url=LOOPBACK)
+        for path, body in (
+            ("/api/own-list", {"case": "99-not-a-case", "items": []}),
+            (
+                "/api/finish",
+                {"case": "99-not-a-case", "marks": {}, "missing": [], "notes": ""},
+            ),
+        ):
+            assert app.post(path, json=body).status_code == 403
+
+
+class TestThePreselect:
+    """``--case`` moves the rail, and grants nothing.
+
+    It answers where the reader opens, which has one answer, so the flag takes
+    one value. Choosing several cases is what the rail is for.
+    """
+
+    def test_it_names_the_row_the_page_opens_on(self, tree):
+        session = build_session(tree, "ada", CASE)
+        app = TestClient(create_app(session), base_url=LOOPBACK, headers=SAME_ORIGIN)
+        assert app.get("/api/rail").json()["preselect"] == CASE
+
+    def test_a_case_id_not_in_the_corpus_refuses_at_the_command_line(self, tree):
+        with pytest.raises(SystemExit) as refused:
+            build_session(tree, "ada", "99-not-a-case")
+        assert "99-not-a-case" in str(refused.value)
+
+    def test_a_signed_case_preselects_greyed_and_opens_nothing(self, tree):
+        sign(tree, CASE, "sam")
+        session = build_session(tree, "ada", CASE)
+        app = TestClient(create_app(session), base_url=LOOPBACK, headers=SAME_ORIGIN)
+        rail = app.get("/api/rail").json()
+        assert rail["preselect"] == CASE
+        row = next(item for item in rail["cases"] if item["case"] == CASE)
+        assert row["pressable"] is False
+        assert app.get(f"/api/part-one?case={CASE}").status_code == 404
+
+    def test_no_preselect_prepares_no_case(self, tree):
+        """Preparing reads a whole case directory, and the reader opens a few."""
+        assert build_session(tree, "ada").prepared == {}
+
+
+class TestACaseTakesOneOwnList:
+    """The first list, and no second one.
+
+    The filled document prints the reader's own list above the recorded sets,
+    and the gate is what makes that order true rather than hoped for. A case
+    the reader can re-open is a case whose sets are already open, so a second
+    list posted against it would be evidence of an order that did not happen.
+    """
+
+    def opened(self, tree):
+        session = build_session(tree, "ada")
+        return TestClient(create_app(session), base_url=LOOPBACK, headers=SAME_ORIGIN)
+
+    def test_a_second_list_for_the_same_case_is_refused(self, tree):
+        app = self.opened(tree)
+        first = {"case": CASE, "items": ["a spoofed device"]}
+        assert app.post("/api/own-list", json=first).status_code == 200
+        refused = app.post("/api/own-list", json={"case": CASE, "items": ["seen it"]})
+        assert refused.status_code == 409
+        assert "already has your own list" in refused.json()["detail"]
+
+    def test_the_refused_list_changes_nothing(self, tree):
+        app = self.opened(tree)
+        app.post("/api/own-list", json={"case": CASE, "items": ["a spoofed device"]})
+        app.post("/api/own-list", json={"case": CASE, "items": ["written after"]})
+        app.post(
+            "/api/finish",
+            json={"case": CASE, "marks": {}, "missing": [], "notes": ""},
+        )
+        text = (tree / "evals" / "corpus" / CASE / "REVIEW-ada.md").read_text("utf-8")
+        assert "a spoofed device" in text
+        assert "written after" not in text, "a list written after the sets was recorded"
+
+    def test_a_second_case_still_takes_its_own_first_list(self, tree):
+        app = self.opened(tree)
+        app.post("/api/own-list", json={"case": CASE, "items": ["a spoofed device"]})
+        answer = app.post("/api/own-list", json={"case": OTHER, "items": ["a bad row"]})
+        assert answer.status_code == 200
+
+    def test_part_one_carries_this_case_s_list_back_and_no_other_s(self, tree):
+        """A case comes back filled; a case never written for comes back blind."""
+        app = self.opened(tree)
+        app.post("/api/own-list", json={"case": CASE, "items": ["a spoofed device"]})
+        assert app.get(f"/api/part-one?case={CASE}").json()["own_list"] == [
+            "a spoofed device"
+        ]
+        blind = app.get(f"/api/part-one?case={OTHER}").json()
+        assert blind["own_list"] is None
+        assert "a spoofed device" not in json.dumps(blind)
+
+    def test_recording_one_case_twice_in_one_session_is_refused(self, tree):
+        """Append-only governs the record, and one reader reading one case
+        once is one entry. A second press must not append a second."""
+        app = self.opened(tree)
+        app.post("/api/own-list", json={"case": CASE, "items": ["a spoofed device"]})
+        body = {"case": CASE, "marks": {}, "missing": [], "notes": ""}
+        assert app.post("/api/finish", json=body).status_code == 200
+        refused = app.post("/api/finish", json=body)
+        assert refused.status_code == 409
+        assert "already recorded" in refused.json()["detail"]
+        meta = json.loads(
+            (tree / "evals" / "corpus" / CASE / "case.json").read_text("utf-8")
+        )
+        assert len(meta["reviews"]) == 1

@@ -16,8 +16,9 @@ is any good. Two kinds:
   system, or noise? [`evals/VOTING.md`](evals/VOTING.md) is the procedure.
 - A **Case Sitting** — you read one golden case whole (its sources, its model,
   every framework's reference set) and say whether the recorded set describes
-  what could actually go wrong. Run `uv run python webapp/sitting.py --case
-  <case-id>` and do the whole thing in a browser, pull request included;
+  what could actually go wrong. Run `uv run python webapp/sitting.py`, pick a
+  case from the list on the left, and do the whole thing in a browser, pull
+  request included;
   [`evals/BLESSING.md`](evals/BLESSING.md) step 6 explains the method and the
   by-hand path. 12 of the 13 cases are still waiting for one.
 
