@@ -1342,8 +1342,13 @@ def _batch_of(payload: object) -> dict[str, Any]:
 
     The node already validated and dumped the batch, so state holds both its
     lists, and re-validating the whole payload keeps the invalid entries the
-    node salvaged. Anything else reads as a batch of nothing, the same absence
-    :func:`_claims_of` reads for the review nodes.
+    node salvaged. A key that was never written reads as a batch of nothing,
+    the same absence :func:`_claims_of` reads for the review nodes.
+
+    A payload that is a mapping goes back as it stands, including one carrying
+    no ``claims``. That shape is nothing this graph writes, so the caller's
+    validation refuses it rather than reading it as an empty batch — a lane
+    whose drafts became unreadable is not a lane that drafted nothing.
     """
     return payload if isinstance(payload, dict) else {"claims": []}
 
