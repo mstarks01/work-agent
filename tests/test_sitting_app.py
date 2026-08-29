@@ -1319,6 +1319,116 @@ class TestTheDraftSurvivesTheProcess:
         assert "const answers" not in page
 
 
+class TestTheTextMovedUnderTheRead:
+    """A required file moves while a draft is open, and the reader hears it.
+
+    The draft's opening digests are what make the warning honest: they say
+    what the reader opened, where the digest in the case metadata says what a
+    recorded sitting signed. The check runs at open, because a reader needs
+    to know before they spend an hour, and again at finish, because a file
+    can move while the tab sits open.
+
+    The app names the files and judges nothing. The reader keeps their own
+    list either way, and decides for themselves whether it still answers the
+    text.
+    """
+
+    def move(self, tree, case=CASE, name="source.md"):
+        """Somebody edits a read file under a read in progress."""
+        path = tree / "evals" / "corpus" / case / name
+        path.write_text(
+            path.read_text("utf-8") + "\nA paragraph added later.\n", encoding="utf-8"
+        )
+
+    def finish(self, app, case=CASE):
+        return app.post(
+            "/api/finish",
+            json={"case": case, "marks": {}, "missing": [], "notes": ""},
+        )
+
+    def test_a_case_that_did_not_move_names_nothing(self, tree):
+        app = browser(session_for(tree, "ada"))
+        app.post("/api/own-list", json={"case": CASE, "items": ["a spoofed device"]})
+        assert app.get(f"/api/part-one?case={CASE}").json()["moved"] == []
+
+    def test_a_case_with_no_draft_names_nothing(self, tree):
+        """There is no opening digest to compare against, because nothing
+        opened: the warning answers a read in progress and not a file."""
+        app = browser(session_for(tree, "ada"))
+        self.move(tree)
+        assert app.get(f"/api/part-one?case={CASE}").json()["moved"] == []
+
+    def test_the_open_names_the_file_that_moved(self, tree):
+        app = browser(session_for(tree, "ada"))
+        app.post("/api/own-list", json={"case": CASE, "items": ["a spoofed device"]})
+        self.move(tree)
+        assert app.get(f"/api/part-one?case={CASE}").json()["moved"] == ["source.md"]
+
+    def test_it_names_only_the_case_that_moved(self, tree):
+        app = browser(session_for(tree, "ada"))
+        for case in CASES:
+            app.post("/api/own-list", json={"case": case, "items": []})
+        self.move(tree, OTHER)
+        assert app.get(f"/api/part-one?case={CASE}").json()["moved"] == []
+        assert app.get(f"/api/part-one?case={OTHER}").json()["moved"] == ["source.md"]
+
+    def test_the_own_list_survives_the_warning_at_open(self, tree):
+        """A reader never retypes a list because somebody edited a file."""
+        app = browser(session_for(tree, "ada"))
+        app.post("/api/own-list", json={"case": CASE, "items": ["a spoofed device"]})
+        self.move(tree)
+        came_back = app.get(f"/api/part-one?case={CASE}").json()
+        assert came_back["own_list"] == ["a spoofed device"]
+        assert app.get(f"/api/part-two?case={CASE}").status_code == 200
+
+    def test_a_file_that_moves_while_the_tab_sits_open_reaches_the_finish(self, tree):
+        """The open said nothing, because at open nothing had moved."""
+        app = browser(session_for(tree, "ada"))
+        app.post("/api/own-list", json={"case": CASE, "items": ["a spoofed device"]})
+        assert app.get(f"/api/part-one?case={CASE}").json()["moved"] == []
+        self.move(tree)
+        assert self.finish(app).json()["moved"] == ["source.md"]
+
+    def test_the_finish_names_nothing_where_nothing_moved(self, tree):
+        app = browser(session_for(tree, "ada"))
+        app.post("/api/own-list", json={"case": CASE, "items": ["a spoofed device"]})
+        assert self.finish(app).json()["moved"] == []
+
+    def test_the_own_list_survives_the_warning_at_finish(self, tree):
+        """The record is written, and the reader's list rides into it whole."""
+        app = browser(session_for(tree, "ada"))
+        app.post("/api/own-list", json={"case": CASE, "items": ["a spoofed device"]})
+        self.move(tree)
+        assert self.finish(app).status_code == 200
+        case_dir = tree / "evals" / "corpus" / CASE
+        filled = (case_dir / sittings.document_name("ada")).read_text("utf-8")
+        assert "a spoofed device" in filled
+        held = json.loads(draft_file(tree, CASE).read_text("utf-8"))
+        assert held["own_list"] == ["a spoofed device"]
+
+    def test_the_page_carries_the_warning(self, tree):
+        """Both payloads that carry the drift reach the reader, and the box
+        that holds it starts hidden — a case that did not move says nothing."""
+        page = browser(session_for(tree, "ada")).get("/").text
+        assert 'id="moved" class="note hidden"' in page
+        assert page.count("warn(d.moved)") == 2, "at open, and again at finish"
+
+    def test_the_recorded_entry_signs_the_bytes_that_will_merge(self, tree):
+        """The digests are taken fresh at finish, so a file that moved under
+        the read is signed as it stands rather than as it was opened."""
+        app = browser(session_for(tree, "ada"))
+        app.post("/api/own-list", json={"case": CASE, "items": []})
+        self.move(tree)
+        assert self.finish(app).status_code == 200
+        case_dir = tree / "evals" / "corpus" / CASE
+        entry = json.loads((case_dir / "case.json").read_text("utf-8"))["reviews"][-1]
+        signed = {record["file"]: record["sha256"] for record in entry["read"]}
+        now = hashlib.sha256((case_dir / "source.md").read_bytes()).hexdigest()
+        assert signed["source.md"] == now
+        opened = json.loads(draft_file(tree, CASE).read_text("utf-8"))
+        assert opened["opened_digests"]["source.md"] != now
+
+
 class TestDiscardingADraft:
     """One draft the reader abandons, by hand, on the case it belongs to."""
 
