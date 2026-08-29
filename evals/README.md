@@ -119,6 +119,7 @@ evals/
 | `harness/critic_yield.py` | What the critic added and removed, scored on both sides. |
 | `harness/grounds.py` | What the category agents did with `grounds` — the branch mix, the padding number and the unverified-quote rate — plus the two failures the grounding path kills a case with. |
 | `harness/coverage.py` | What each category agent was offered and how much of it its drafts cite, pooled over the sweep. |
+| `harness/filler.py` | Whether a package's required justifications say anything: questions pointed at an attribute the evidence catalog would refuse, and how concentrated its grounds are. |
 | `harness/stability.py` | Run-to-run stability: which references two or more finished sweeps agree on. Reads artifacts rather than re-running. |
 | `harness/triggers.py` | Candidate-trigger recall: whether `analysis_service.candidates` fired a rule in a reference claim's own lane, on an element that claim names. Costs no provider call. |
 | `harness/calibration.py` | Rule-vs-label agreement over the labelled fixtures — the scoreboard any rule change must clear. |
@@ -339,6 +340,27 @@ is reading a shape the corpus does not contain, or nothing at all.
 printed as two tables. They answer different questions about the same
 executions: the dearest node is not the slowest one, and the deterministic
 derivations cost no tokens while still costing the job its seconds.
+
+**Filler** asks whether a package's required justifications say anything. A
+mechanical check can be satisfiable by construction for one package's claim
+shape and not for another's, and a model required to satisfy it finds the value
+that always passes — so every check goes green and the output tells a reader
+nothing. Two readings, both over the shared claim shape:
+
+- **Ineligible pointers** counts `needs-info` entries naming an attribute the
+  evidence catalog would refuse as a ground. The catalog admits only
+  type-specific attributes, on the stated grounds that a note "is a sentence,
+  not an unstated control", so a question pointed at `notes` names a field this
+  repo has already ruled says nothing. **Read a non-zero here as a finding**:
+  across fifteen archived STRIDE sweeps it is 0 of 378.
+- **Ground concentration** is the share of claims whose grounds use the single
+  most common combination of kinds. It is a number to judge rather than a
+  threshold. STRIDE sits near 23%; a package justifying most claims one way is
+  either reading a very uniform system or reaching for one filler.
+
+It reads finished reports rather than a scored pass, because the defect it looks
+for passes every offline check by construction — the suite scripts the agents,
+so pointers always resolve and quotes always verify.
 
 **Stability** needs two sweeps, so it is its own command rather than a metric of
 one run. It compares which *reference indices* each sweep matched — a corpus

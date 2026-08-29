@@ -52,6 +52,7 @@ from evals.harness import (
     applicability,
     coverage,
     critic_yield,
+    filler,
     grounds,
     instruction,
     modes,
@@ -299,6 +300,20 @@ INSTRUMENTS: dict[str, Instrument] = {
         ),
         artifact=lambda sweep: coverage.artifact(sweep.lanes),
         keys=("coverage", "coverage_totals"),
+    ),
+    "filler": Instrument(
+        # Reads finished reports rather than a scored pass, because the defect
+        # it looks for passes every offline check by construction: the suite
+        # scripts the agents, so pointers always resolve and quotes always
+        # verify. Neutral — it reads the shared claim and verdict shape, so a
+        # package nobody has written is measured on arrival.
+        render=lambda sweep: filler.render(
+            filler.rows(run.report for run in sweep.run.runs.values())
+        ),
+        artifact=lambda sweep: filler.artifact(
+            filler.rows(run.report for run in sweep.run.runs.values())
+        ),
+        keys=("filler",),
     ),
     "instruction": Instrument(
         render=lambda sweep: instruction.render(sweep.run.instructions),
