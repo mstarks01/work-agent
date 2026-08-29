@@ -13,8 +13,9 @@ apart, which is the point — one implementation of the rules. CI reads
 case read while CI still asks somebody to read it.
 
 **The own list comes first, and that is a property rather than an
-instruction.** A reader who opens the recorded sets first finds them
-reasonable and the sitting measures nothing. So a caller here asks for part
+instruction.** What the order protects is the evidence in the filled
+document: it prints the reader's own list above the recorded sets, and a
+later reader takes that order on trust. So a caller here asks for part
 one and part two separately, and :func:`parts_after` is what a surface must
 withhold until the reader has written their own list down. That mirrors the
 review app's configuration-blindness, which is enforced by the queue item

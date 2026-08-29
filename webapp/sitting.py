@@ -53,14 +53,21 @@ endpoint carries five controls rather than the app's usual none:
 the flag ``/api/submit`` tests, so a foreign page that reaches it decides what
 a later press publishes. ``/api/own-list`` satisfies the method's one rule, so
 a foreign page that reaches it opens the recorded sets for whoever asks next.
+It carries the page token too, because it names a case: one such page would
+post an empty list for every case in the offered list and open the whole
+corpus in one pass. ``/api/part-two`` gains no token — it is a read, it serves
+only what a passed gate already opened, and the frame rule covers the page
+that would read it.
 
 **The own list comes first, and the server enforces it.** ``/api/part-two``
 refuses until the reader has posted their own threat list for that case, so
-the recorded sets are not in the page for a curious reader to find. That is
-the method's only rule: a reader who opens the recorded sets first finds them
-reasonable, and the sitting measures nothing. It is enforced the way the
-review app enforces configuration-blindness — by the payload not carrying it
-— rather than by asking.
+the recorded sets are not in the page at all. **What the gate protects is the
+evidence in the filled document.** That document prints the reader's own list
+above the recorded sets, and a later reader takes the order on trust. The gate
+makes the order true by construction, so the trust is earned rather than
+asked for. It is enforced the way the review app enforces
+configuration-blindness — by the payload not carrying it — rather than by
+asking.
 
 **The gate re-arms per case, and a case takes one own list.** Both halves are
 the same rule read two ways: a case's sets open once that case's own list
@@ -69,6 +76,13 @@ blind, and a case they already wrote for re-opens with the list they wrote and
 refuses a second one. Without that refusal the reader could open a case's
 sets, come back to it, and post a list the document would then print above
 them — evidence of an order that did not happen.
+
+**The reader walks the corpus, and Previous and Next sit in the stage header.**
+They step in the rail's order over the cases the reader may open, and the last
+Next lands on the submit stage. The rail never leaves, so the walk reloads no
+document: the own list comes back from the server on every arrival, and the
+marks, the missing list and the notes are held per case in the page for as
+long as it is open.
 
 Security posture, inherited from ``webapp/review.py`` rather than re-derived:
 
@@ -314,8 +328,11 @@ def create_app(session: Session) -> FastAPI:
     def own_list(request: Request, body: OwnList) -> JSONResponse:
         # A foreign page that posts this decides the reader saw nothing, and
         # the sets open for whoever asks next. The rule is the method, so the
-        # endpoint that satisfies it is a write like any other.
+        # endpoint that satisfies it is a write like any other — and it names
+        # a case, so one such page would post an empty list for every case in
+        # the offered list and open the whole corpus in one pass.
         refuse_cross_origin(request)
+        _require_token(request, session)
         _open(session, body.case)
         if body.case in session.own_lists:
             # **A case takes one own list, and it is the first one.** The
@@ -345,8 +362,8 @@ def create_app(session: Session) -> FastAPI:
             raise HTTPException(
                 status_code=409,
                 detail="write your own list first; the recorded sets are not"
-                " served until it is in, because a reader who sees them first"
-                " finds them reasonable and the sitting measures nothing",
+                " served until it is in, because the document prints your list"
+                " above them and a later reader takes that order on trust",
             )
         return JSONResponse(
             {
@@ -432,10 +449,7 @@ def create_app(session: Session) -> FastAPI:
                 " submit as. Run the printed command yourself.",
             )
         refuse_cross_origin(request)
-        if not secrets.compare_digest(
-            request.headers.get("x-sitting-token", ""), session.token
-        ):
-            raise HTTPException(status_code=403, detail="wrong or missing page token")
+        _require_token(request, session)
         if not session.recorded:
             raise HTTPException(
                 status_code=409, detail="record the sitting before submitting it"
@@ -444,6 +458,22 @@ def create_app(session: Session) -> FastAPI:
         return JSONResponse(outcome.to_json(), status_code=200 if outcome.ok else 409)
 
     return app
+
+
+def _require_token(request: Request, session: Session) -> None:
+    """The page token, on the two endpoints that carry it.
+
+    A request that never read the page cannot hold it. It rides beside the
+    origin check rather than instead of it, and it is spelled once because
+    ``/api/own-list`` and ``/api/submit`` ask the same question of a request.
+
+    ``/api/part-two`` gains no token: it is a read, it serves only what a
+    passed gate already opened, and ``frame-ancestors 'none'`` covers the
+    page that would read it.
+    """
+    sent = request.headers.get("x-sitting-token", "")
+    if not secrets.compare_digest(sent.encode(), session.token.encode()):
+        raise HTTPException(status_code=403, detail="wrong or missing page token")
 
 
 def _open(session: Session, case_id: str) -> sittings.Prepared:
@@ -556,8 +586,14 @@ _PAGE = """<!doctype html>
            border: 1px solid var(--line); background: #8882; cursor: pointer; }
   button:disabled { cursor: default; opacity: .5; }
   section { border-top: 1px solid var(--line); margin-top: 2rem; padding-top: 1rem; }
+  header { display: flex; gap: 1rem; align-items: baseline;
+           justify-content: space-between; }
+  header h2 { margin: 0; }
+  .walk { flex: 0 0 auto; margin: 0; display: flex; gap: .4rem; }
   .hidden { display: none; }
   .note { background: #8881; padding: .8rem 1rem; border-radius: 6px; }
+  .frame { border: 1px dashed var(--line); border-radius: 6px; color: #7a7a7a;
+           padding: 1.2rem 1rem; }
   select { font: inherit; padding: .2rem .4rem; border-radius: 6px;
            border: 1px solid var(--line); }
   .mark { display: flex; gap: .8rem; align-items: baseline; padding: .35rem 0;
@@ -581,7 +617,13 @@ _PAGE = """<!doctype html>
 </div>
 
 <article id="case" class="hidden">
-  <h2 id="caseTitle"></h2>
+  <header>
+    <h2 id="caseTitle"></h2>
+    <p class="walk">
+      <button id="previous">← Previous</button>
+      <button id="next">Next →</button>
+    </p>
+  </header>
   <p class="sub"><code id="caseId"></code>, read by <!--reviewer--></p>
 
   <section id="one">
@@ -593,6 +635,13 @@ _PAGE = """<!doctype html>
     in this page until you submit this — that is the whole method.</p>
     <textarea id="own" placeholder="one per line"></textarea>
     <p><button id="lock">Save my list and show the recorded sets</button></p>
+  </section>
+
+  <section id="placeholder">
+    <h2>Part 2 — what is recorded</h2>
+    <p class="frame">The recorded sets open here, once your list is in. Until
+    then they are not in this page at all, so the document can say your list
+    came first and be right.</p>
   </section>
 
   <section id="two" class="hidden">
@@ -618,14 +667,26 @@ _PAGE = """<!doctype html>
     <pre id="command"></pre>
     <p>Or paste this into one you open yourself:</p>
     <pre id="paste"></pre>
-    <div id="submitBox" class="hidden">
-      <p class="note">Or let this open it for you, through the
-      <code>gh</code> you are already signed in to. It runs the same checks
-      first, pushes to your fork, and opens the pull request as you.</p>
-      <p><button id="submit">Open the pull request as <!--reviewer--></button></p>
-      <pre id="result" class="hidden"></pre>
-    </div>
+    <p class="note">Next carries you to the next case. The last Next ends at
+    the submit stage, which is where the pull request is opened.</p>
   </section>
+</article>
+
+<article id="submitStage" class="hidden">
+  <header>
+    <h2>Submit</h2>
+    <p class="walk"><button id="backToWalk">← Previous</button></p>
+  </header>
+  <p class="sub">The end of the walk, read by <!--reviewer--></p>
+  <p id="ready" class="note"></p>
+  <pre id="stageCommand" class="hidden"></pre>
+  <div id="submitBox" class="hidden">
+    <p class="note">Or let this open it for you, through the
+    <code>gh</code> you are already signed in to. It runs the same checks
+    first, pushes to your fork, and opens the pull request as you.</p>
+    <p><button id="submit">Open the pull request as <!--reviewer--></button></p>
+    <pre id="result" class="hidden"></pre>
+  </div>
 </article>
 </main>
 
@@ -639,6 +700,16 @@ const CAN_SUBMIT = <!--cansubmit-->;
 // The case on the stage, and the rail as the server last described it.
 let current = null;
 let rows = [];
+// The command the last record printed, which the submit stage repeats. Named
+// apart from the `command` element, because an id is a global of its own.
+let printedCommand = "";
+
+// What this session recorded, and what the reader has written but not yet
+// sent. The walk reloads no document, so a case they come back to comes back
+// as they left it. The own list is not here: it comes from the server,
+// because the gate that turns on it is the server's.
+const recorded = new Set();
+const answers = {};
 
 async function loadRail() {
   const d = await (await fetch("/api/rail")).json();
@@ -677,12 +748,59 @@ function select(caseId) {
   }
 }
 
+// The cases the walk steps over: the rail's pressable rows, in rail order,
+// which is the same list the server resolves a request against. A dead row is
+// off it, so the walk never stops on a case that would refuse to open.
+function walkable() {
+  return rows.filter(row => row.pressable);
+}
+
+// One step from where the reader stands, in the rail's own order, landing
+// only on a case they may open. It reads the rail rather than the walkable
+// list, because recording a case greys its row: the reader is then standing
+// on a case the walk no longer offers, and Next must still carry them
+// forward from there rather than back to the top.
+function step(delta) {
+  const at = rows.findIndex(row => row.case === current);
+  for (let i = at + delta; i >= 0 && i < rows.length; i += delta) {
+    if (rows[i].pressable) {
+      openCase(rows[i].case);
+      return;
+    }
+  }
+  if (delta > 0) openSubmit();
+}
+
+// Everything the server has not been told yet, held per case for as long as
+// the page is open. The own list is absent by design: it is on the server the
+// moment it is written, and it is what opens this case's sets.
+function remember() {
+  if (!current) return;
+  answers[current] = {
+    missing: $("missing").value, notes: $("notes").value, marks: marksNow(),
+  };
+}
+
+function restore(caseId) {
+  const kept = answers[caseId];
+  if (!kept) return;
+  $("missing").value = kept.missing;
+  $("notes").value = kept.notes;
+  for (const select of document.querySelectorAll("select[data-finding]")) {
+    select.value = kept.marks[select.dataset.finding] || "";
+  }
+}
+
 async function openCase(caseId) {
+  remember();
   current = caseId;
   select(caseId);
   blank();
   $("empty").classList.add("hidden");
+  $("submitStage").classList.add("hidden");
   $("case").classList.remove("hidden");
+  const first = walkable()[0];
+  $("previous").disabled = !first || first.case === caseId;
   const res = await fetch("/api/part-one?case=" + encodeURIComponent(caseId));
   // A second click while this one was in flight owns the stage now, so this
   // answer is stale and must not paint one case's prose under another's name.
@@ -699,7 +817,25 @@ async function openCase(caseId) {
     $("own").value = d.own_list.join("\n");
     lock();
     await showSets(caseId);
+    restore(caseId);
   }
+}
+
+// The end of the walk. The rail stays where it is, as it does on every case,
+// so this is a stage rather than a page the reader has to come back from.
+function openSubmit() {
+  remember();
+  current = null;
+  select(null);
+  $("empty").classList.add("hidden");
+  $("case").classList.add("hidden");
+  $("submitStage").classList.remove("hidden");
+  $("ready").textContent = recorded.size
+    ? recorded.size + " case(s) recorded into your working tree."
+    : "No case is recorded yet. Walk back and record one.";
+  $("stageCommand").textContent = printedCommand;
+  $("stageCommand").classList.toggle("hidden", !printedCommand);
+  $("submitBox").classList.toggle("hidden", !(CAN_SUBMIT && recorded.size));
 }
 
 // The gate re-arms per case, so a case arriving on the stage arrives blind.
@@ -710,10 +846,10 @@ function blank() {
   for (const id of ["written", "command", "paste"]) $(id).textContent = "";
   $("own").readOnly = false;
   $("lock").disabled = false;
-  $("submit").disabled = false;
-  for (const id of ["two", "done", "submitBox", "result"]) {
-    $(id).classList.add("hidden");
-  }
+  // A blind case shows the placeholder where part two will open, so the case
+  // reads the same whichever way the reader arrived at it.
+  $("placeholder").classList.remove("hidden");
+  for (const id of ["two", "done"]) $(id).classList.add("hidden");
 }
 
 function lock() {
@@ -736,18 +872,30 @@ async function showSets(caseId) {
       box.appendChild(markRow(target, sets.values));
     }
   }
+  $("placeholder").classList.add("hidden");
   $("two").classList.remove("hidden");
 }
 
 $("start").addEventListener("click", () => {
-  const first = rows.find(row => row.pressable);
+  const first = walkable()[0];
   if (first) openCase(first.case);
+});
+
+$("previous").addEventListener("click", () => step(-1));
+$("next").addEventListener("click", () => step(1));
+
+// Previous off the submit stage lands on the last case the walk offers, which
+// is the case the last Next came from.
+$("backToWalk").addEventListener("click", () => {
+  const list = walkable();
+  if (list.length) openCase(list[list.length - 1].case);
 });
 
 $("lock").addEventListener("click", async () => {
   const caseId = current;
   const res = await fetch("/api/own-list", {
-    method: "POST", headers: {"Content-Type": "application/json"},
+    method: "POST",
+    headers: {"Content-Type": "application/json", "X-Sitting-Token": TOKEN},
     body: JSON.stringify({case: caseId, items: lines("own")}),
   });
   // Locked only once the server holds the list. A refused post that locked
@@ -777,15 +925,21 @@ function markRow(target, values) {
   return row;
 }
 
-$("finish").addEventListener("click", async () => {
+function marksNow() {
   const marks = {};
   for (const select of document.querySelectorAll("select[data-finding]")) {
     if (select.value) marks[select.dataset.finding] = select.value;
   }
+  return marks;
+}
+
+$("finish").addEventListener("click", async () => {
+  const caseId = current;
   const res = await fetch("/api/finish", {
     method: "POST", headers: {"Content-Type": "application/json"},
     body: JSON.stringify({
-      case: current, marks, missing: lines("missing"), notes: $("notes").value,
+      case: caseId, marks: marksNow(), missing: lines("missing"),
+      notes: $("notes").value,
     }),
   });
   const d = await res.json();
@@ -795,7 +949,8 @@ $("finish").addEventListener("click", async () => {
   $("paste").textContent = d.paste;
   $("two").classList.add("hidden");
   $("done").classList.remove("hidden");
-  if (CAN_SUBMIT && d.can_submit) $("submitBox").classList.remove("hidden");
+  printedCommand = d.command;
+  recorded.add(caseId);
   // The recorded entry clears the case, so its row greys where it stands.
   await loadRail();
 });
