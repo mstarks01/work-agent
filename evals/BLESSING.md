@@ -349,9 +349,9 @@ repository, and it never merges — that is what keeps an unsigned own list out
 of a pull request. Close the browser, run the command again tomorrow, and the
 case comes back where you left it. A successful submit deletes every draft it
 carried, and a case you dropped keeps its own. *Discard this draft* on the
-case throws one away and puts that case back on the list to do. A draft the app cannot read
-refuses its own case and names the file in the rail; the file is yours, so
-repair it or delete it, and every other case still walks.
+case throws one away and puts that case back on the list to do. A draft the
+app cannot read refuses its own case and names the file in the rail; the file
+is yours, so repair it or delete it, and every other case still walks.
 
 The rest of this section is what it writes, and what you write by hand if you
 would rather. Both paths end in the same files, and the checks cannot tell
