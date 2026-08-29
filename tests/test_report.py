@@ -91,8 +91,25 @@ class TestVerdictShapes:
         assert verdict.related_unknowns == []
 
     def test_needs_info_requires_related_unknowns(self):
-        with pytest.raises(ValidationError, match="at least one unknown"):
+        with pytest.raises(ValidationError, match="must say what has to be answered"):
             Verdict(status="needs-info", reason="encryption unknown")
+
+    def test_needs_info_accepts_a_question_with_no_place_in_the_model(self):
+        """The second spelling, for a fact the system model has no slot for.
+
+        A framework ruling on requirements asks most of its questions about a
+        codebase rather than about an element. With only the element spelling
+        available its commonest verdict was inexpressible, and the legal move
+        left was to point at whatever attribute happened to resolve.
+        """
+        verdict = Verdict(
+            status="needs-info",
+            reason="the input does not say whether queries are parameterized",
+            related_unknowns=[UnknownRef(subject="are database queries parameterized")],
+        )
+
+        assert verdict.related_unknowns[0].subject
+        assert not verdict.related_unknowns[0].names_an_element
 
     def test_needs_info_with_unknown_ref_is_accepted(self):
         verdict = Verdict(

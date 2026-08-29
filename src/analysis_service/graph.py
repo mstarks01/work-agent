@@ -1572,6 +1572,17 @@ def route_review(
                 )
             ),
         )
+        # Recorded onto this framework's marks before the re-ask runs, so the
+        # report says how the first pass failed even when the re-ask repairs it
+        # completely. Merged rather than assigned: ``marks`` already holds what
+        # fan-in produced, and a second look must not drop it.
+        parked = AnalysisMarks.model_validate(state.get(nodes.key("marks")) or {})
+        state.put(
+            nodes.key("marks"),
+            parked.model_copy(
+                update={"unreconciled_rulings": list(problems.messages)}
+            ).model_dump(mode="json"),
+        )
         return _routed(ROUTE_REVISE, {"issue_count": len(problems.messages)})
     # The marker ``assemble`` reads a framework as finished by. ``reviewed``
     # alone cannot say so: it holds the first critic's malformed rulings for
