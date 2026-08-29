@@ -150,6 +150,22 @@ class ReferenceClaim(BaseModel):
         """
         return ""
 
+    @property
+    def identifier(self) -> str | None:
+        """The catalog requirement this claim names, or ``None``.
+
+        The other half of what :func:`~evals.harness.fingerprint.key_claim`
+        reads, declared on the base and answered by each record for the same
+        reason :attr:`lane` is. ``None`` says this package's claims compose an
+        identity from an action and a place, which is what an open claim set
+        does; a record type that names a catalog answers with the standard's
+        own identifier, and it answers the same string
+        :func:`~evals.harness.fingerprint.identifier_of` reads off a live
+        claim ID — so a mark on a corpus claim and a vote on a produced
+        finding key alike.
+        """
+        return None
+
 
 class ReferenceThreat(ReferenceClaim):
     """STRIDE's reference record: a category and a graded severity.
@@ -194,6 +210,10 @@ class ReferenceRequirement(ReferenceClaim):
     @property
     def lane(self) -> str:
         return self.chapter
+
+    @property
+    def identifier(self) -> str:
+        return self.requirement
 
 
 #: The reference record each framework's corpus file validates as. Harness data

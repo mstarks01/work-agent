@@ -419,3 +419,122 @@ class TestTheUnreviewedHelper:
 
     def test_the_unreviewed_cases_are_listed_in_file_order(self, tree):
         assert sittings.unreviewed_cases(tree) == [CASE, "03-batch-data-pipeline"]
+
+
+class TestTheMarks:
+    """A mark per recorded finding, keyed by the finding's own identity.
+
+    The by-hand document writes one ``> mark:`` slot per claim, so a browser
+    sitting that recorded none recorded less than the shell path beside it.
+    The key is the fingerprint rather than a position, because an insertion
+    into a claim file moves every position and moves no fingerprint.
+    """
+
+    def marked(self, app, marks):
+        app.post("/api/own-list", json={"items": ["a spoofed device"]})
+        app.get("/api/part-two")
+        return app.post(
+            "/api/finish", json={"marks": marks, "missing": [], "notes": ""}
+        )
+
+    def test_part_two_offers_a_target_per_recorded_finding(self, client):
+        app, _, _ = client
+        app.post("/api/own-list", json={"items": []})
+        payload = app.get("/api/part-two").json()
+        assert payload["values"] == list(sittings.MARKS)
+        offered = payload["marks"]
+        assert offered, "part two offered nothing to mark"
+        assert {target["framework"] for target in offered} == set(
+            payload["frameworks"]
+        ), "a declared framework offered no mark target"
+        for target in offered:
+            assert target["fingerprint"].startswith("v")
+            assert target["claims"], "a target names no recorded claim"
+
+    def test_one_finding_takes_one_mark_however_often_it_is_written(self, client):
+        """The fingerprint is the identity, so it is what a target is keyed by."""
+        _, session, _ = client
+        keys = [target.fingerprint for target in session.prepared.mark_targets]
+        assert len(keys) == len(set(keys))
+
+    def test_a_value_outside_the_closed_set_is_refused(self, client):
+        app, session, _ = client
+        first = session.prepared.mark_targets[0].fingerprint
+        assert self.marked(app, {first: "maybe"}).status_code == 422
+
+    def test_a_mark_naming_no_recorded_finding_is_refused(self, client):
+        app, _, tree = client
+        refused = self.marked(app, {"v2:0000000000000000": "agree"})
+        assert refused.status_code == 409
+        assert "v2:0000000000000000" in refused.json()["detail"]
+        assert not (tree / "evals" / "corpus" / CASE / "REVIEW-ada.md").exists()
+
+    def test_each_framework_prints_its_own_marks(self, client):
+        """Selected off the fingerprint's components, never off a key prefix."""
+        app, session, tree = client
+        first = {
+            target.framework: target.fingerprint
+            for target in reversed(session.prepared.mark_targets)
+        }
+        assert len(first) > 1, "this case declares one framework"
+        self.marked(app, dict.fromkeys(first.values(), "doubt"))
+
+        text = (tree / "evals" / "corpus" / CASE / "REVIEW-ada.md").read_text("utf-8")
+        for framework, fingerprint in first.items():
+            head = text.split(f"## The recorded `{framework}` set")[1]
+            section = head.split("\n---\n")[0]
+            assert fingerprint in section, f"{framework}'s mark landed elsewhere"
+
+    def test_a_sitting_with_no_marks_still_records(self, client):
+        app, _, tree = client
+        assert self.marked(app, {}).status_code == 200
+        text = (tree / "evals" / "corpus" / CASE / "REVIEW-ada.md").read_text("utf-8")
+        assert "### Marks" not in text
+
+    def test_an_insertion_into_a_claim_file_re_points_no_mark(self, client):
+        """A positional key would move every mark below the insertion."""
+        _, session, tree = client
+        before = {
+            target.fingerprint: target.claims
+            for target in session.prepared.mark_targets
+        }
+
+        claims_file = tree / "evals" / "corpus" / CASE / "claims" / "stride.json"
+        claims = json.loads(claims_file.read_text("utf-8"))
+        inserted = dict(claims[0], claim="an inserted claim", verb="flood")
+        claims_file.write_text(
+            json.dumps([inserted, *claims], indent=2), encoding="utf-8"
+        )
+
+        after = {
+            target.fingerprint: target.claims
+            for target in build_session(CASE, "ada", tree).prepared.mark_targets
+        }
+        assert len(after) == len(before) + 1, "the inserted claim is not a new finding"
+        for fingerprint, texts in before.items():
+            assert after[fingerprint] == texts, f"{fingerprint} re-pointed"
+
+    def test_the_by_hand_document_offers_the_same_closed_set(self):
+        """One method, two surfaces. The prose a reader follows names each value."""
+        from evals import build_review_docs as build_docs
+
+        for value in sittings.MARKS:
+            assert f"`{value}`" in build_docs.MARK_GUIDANCE
+
+    def test_a_claim_the_rule_cannot_key_refuses_by_name(self, tree):
+        """A claim nobody can mark stops the case, and the refusal says which.
+
+        The corpus gate in ``tests/test_verb_coverage.py`` keeps this off
+        ``main``, so what is left is the message a contributor meets on a
+        branch: the case, the framework and the sentence, rather than the
+        identity rule's own words about a component it wanted.
+        """
+        claims_file = tree / "evals" / "corpus" / CASE / "claims" / "stride.json"
+        claims = json.loads(claims_file.read_text("utf-8"))
+        claims[0]["verb"] = None
+        claims_file.write_text(json.dumps(claims, indent=2), encoding="utf-8")
+
+        with pytest.raises(sittings.SittingError) as refused:
+            build_session(CASE, "ada", tree)
+        assert CASE in str(refused.value)
+        assert claims[0]["claim"] in str(refused.value)

@@ -30,6 +30,7 @@ from evals.harness.fingerprint import (
     version_for,
     version_of,
 )
+from evals.harness.reference import ReferenceRequirement, ReferenceThreat
 from evals.harness.verbs import VerbError
 from stride_service.frameworks import PACKAGES
 
@@ -197,6 +198,30 @@ class TestACatalogIdentifierIsHalfTheKey:
 
     def test_the_identifier_table_covers_every_package(self):
         assert set(IDENTIFIER_OF) == set(PACKAGES)
+
+    def test_a_reference_claim_declares_what_its_package_reads(self):
+        """A mark on a corpus claim and a vote on a live finding key alike.
+
+        The reference record answers for its own package, exactly as it answers
+        for its lane, so a package that ships a new record type carries its
+        identifier here with no table to edit.
+        """
+        requirement = ReferenceRequirement(
+            claim="the session token is replaced on authentication",
+            tier="must-find",
+            chapter="session-management",
+            requirement="V7.2.4",
+        )
+        assert requirement.identifier == identifier_of("asvs", "v5.0.0-7.2.4")
+
+        threat = ReferenceThreat(
+            claim="an attacker replays a captured reading",
+            tier="must-find",
+            affected_element_ids=("process:web-app",),
+            category="spoofing",
+            severity={"likelihood": "medium", "impact": "medium"},
+        )
+        assert threat.identifier is None
 
     def test_a_package_with_no_declared_reader_raises(self):
         with pytest.raises(FingerprintError, match="no identifier reader"):

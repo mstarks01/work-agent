@@ -54,8 +54,12 @@ Security posture, inherited from ``webapp/review.py`` rather than re-derived:
 * **The reviewer comes from the command line, never from the request** (A01).
   A browser field naming the reviewer would let one person file a sitting as
   another, and #320's binding rests on the name being true.
-* **Case prose reaches the page as data** (LLM05, A05). The document is
-  injected as one JSON blob the client renders through ``textContent``.
+* **Case prose reaches the page as data** (LLM05, A05). The document and each
+  recorded claim are injected as JSON the client renders through
+  ``textContent``.
+* **A mark is an allow-list, checked here** (A05). The value is the method's
+  closed set of three, and the key must name a recorded finding of this case,
+  so a request cannot write a sentence of its own into the evidence.
 * **Every write lands inside the one case directory** the command named
   (A01), plus the unreviewed list. There is no path in the request at all.
 * **The submit endpoint is off unless ``gh`` is authenticated** — with no
@@ -120,14 +124,17 @@ class OwnList(BaseModel):
 
 
 class Finish(BaseModel):
-    """The sitting's result. Marks are prose, so no code reads their values."""
+    """The sitting's result: a mark per recorded finding, and the reader's own findings."""
 
     model_config = ConfigDict(extra="forbid")
 
-    #: Keyed by framework-prefixed identifier, which is why the keys are bounded
-    #: too: :func:`evals.harness.sitting.document` selects on the key and writes
-    #: it beside its value.
-    marks: dict[Line, Line] = Field(default_factory=dict, max_length=200)
+    #: Keyed by the finding's fingerprint, which the page reads off
+    #: ``/api/part-two``. The value is the method's closed set, so a mark this
+    #: app records is a mark a count can be taken over; the key is bounded like
+    #: every other written line, and
+    #: :func:`evals.harness.sitting.document` refuses one that names no
+    #: recorded finding of this case.
+    marks: dict[Line, sittings.Mark] = Field(default_factory=dict, max_length=200)
     missing: list[Line] = Field(default_factory=list, max_length=200)
     notes: str = Field(default="", max_length=4000)
 
@@ -208,7 +215,20 @@ def create_app(session: Session) -> FastAPI:
                 " served until it is in, because a reader who sees them first"
                 " finds them reasonable and the sitting measures nothing",
             )
-        return JSONResponse({"frameworks": session.prepared.part_two})
+        return JSONResponse(
+            {
+                "frameworks": session.prepared.part_two,
+                "marks": [
+                    {
+                        "fingerprint": target.fingerprint,
+                        "framework": target.framework,
+                        "claims": list(target.claims),
+                    }
+                    for target in session.prepared.mark_targets
+                ],
+                "values": list(sittings.MARKS),
+            }
+        )
 
     @app.post("/api/finish")
     def finish(request: Request, body: Finish) -> JSONResponse:
@@ -362,6 +382,11 @@ _PAGE = """<!doctype html>
   section { border-top: 1px solid var(--line); margin-top: 2rem; padding-top: 1rem; }
   .hidden { display: none; }
   .note { background: #8881; padding: .8rem 1rem; border-radius: 6px; }
+  select { font: inherit; padding: .2rem .4rem; border-radius: 6px;
+           border: 1px solid var(--line); }
+  .mark { display: flex; gap: .8rem; align-items: baseline; padding: .35rem 0;
+          border-bottom: 1px solid var(--line); }
+  .mark span { flex: 1; }
 </style></head>
 <body>
 <h1>Case sitting — <!--title--></h1>
@@ -380,7 +405,11 @@ _PAGE = """<!doctype html>
 
 <section id="two" class="hidden">
   <h2>Part 2 — what is recorded</h2>
-  <pre id="partTwo"></pre>
+  <p class="note">Mark each recorded finding: <code>agree</code> a real finding
+  worth reporting, <code>doubt</code> overstated or unsupported by the text,
+  <code>dup</code> the same finding as another entry. Leave a mark unset to say
+  nothing about that one.</p>
+  <div id="partTwo"></div>
   <h2>On your list and not on theirs</h2>
   <p class="note">The finding this sitting exists for. One per line.</p>
   <textarea id="missing" placeholder="one per line"></textarea>
@@ -422,19 +451,49 @@ $("lock").addEventListener("click", async () => {
   $("own").readOnly = true;
   $("lock").disabled = true;
   const sets = await (await fetch("/api/part-two")).json();
-  $("partTwo").textContent = Object.entries(sets.frameworks)
-    .map(([name, body]) => body).join("\\n\\n");
+  const box = $("partTwo");
+  for (const [name, body] of Object.entries(sets.frameworks)) {
+    const pre = document.createElement("pre");
+    pre.textContent = body;
+    box.appendChild(pre);
+    for (const target of sets.marks.filter(m => m.framework === name)) {
+      box.appendChild(markRow(target, sets.values));
+    }
+  }
   $("two").classList.remove("hidden");
   $("two").scrollIntoView({behavior: "smooth"});
 });
+
+// The claim text is data, so it lands through textContent rather than through
+// any markup — the same rule the rest of this page reads case prose under.
+function markRow(target, values) {
+  const row = document.createElement("div");
+  row.className = "mark";
+  const text = document.createElement("span");
+  text.textContent = target.claims.join(" / ");
+  const select = document.createElement("select");
+  select.dataset.finding = target.fingerprint;
+  for (const value of ["", ...values]) {
+    const option = document.createElement("option");
+    option.value = value;
+    option.textContent = value || "—";
+    select.appendChild(option);
+  }
+  row.append(text, select);
+  return row;
+}
 
 const TOKEN = <!--token-->;
 const CAN_SUBMIT = <!--cansubmit-->;
 
 $("finish").addEventListener("click", async () => {
+  const marks = {};
+  for (const select of document.querySelectorAll("select[data-finding]")) {
+    if (select.value) marks[select.dataset.finding] = select.value;
+  }
   const res = await fetch("/api/finish", {
     method: "POST", headers: {"Content-Type": "application/json"},
-    body: JSON.stringify({marks: {}, missing: lines("missing"), notes: $("notes").value}),
+    body: JSON.stringify({marks, missing: lines("missing"), notes: $("notes").value}),
   });
   const d = await res.json();
   if (!res.ok) { $("written").textContent = d.detail; $("done").classList.remove("hidden"); return; }
