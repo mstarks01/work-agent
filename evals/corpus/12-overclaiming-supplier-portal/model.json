@@ -256,6 +256,7 @@
     {
       "assumption": "Suppliers reach the portal across the public internet.",
       "element_id": "process:supplier-portal",
+      "attribute": "exposure",
       "basis": "The portal is a vendor-hosted SaaS product suppliers sign in to, and the source places suppliers nowhere on our networks."
     }
   ]
