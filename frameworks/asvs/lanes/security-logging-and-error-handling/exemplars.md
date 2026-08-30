@@ -9,6 +9,7 @@ The audit record is described and its content is stated to be incomplete. That i
 ```json
 {
   "requirement": "2.1",
+  "needs_evidence": "",
   "title": "Audit records do not identify the acting customer",
   "description": "V16.2.1 asks that security-relevant events are logged with enough detail to identify who acted. It applies here because `flow:ledger-service-to-audit-log:append-transfer-record` writes every transfer to `store:audit-log`, so an audit trail exists. The submitter states what it contains: the entry names the ledger service and never the customer. So the input settles that the record does not identify the acting party, and it settles it without any inference about the logging library.",
   "affected_element_ids": [
@@ -33,6 +34,7 @@ Error handling is a requirement that applies to every system and that a working-
 ```json
 {
   "requirement": "5.1",
+  "needs_evidence": "code",
   "title": "Error handling behaviour is never described",
   "description": "V16.5.1 asks that the application handles an unexpected error without revealing internal detail and without failing open. It applies to this system: `process:web-api` is `internet-facing` and accepts payment instructions, so errors reach an untrusted caller. The notes describe the working path and never describe what a caller sees when the ledger service is unavailable or the database rejects a write. The requirement applies and the input does not settle it.",
   "affected_element_ids": [

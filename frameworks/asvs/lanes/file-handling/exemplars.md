@@ -9,6 +9,7 @@ The chapter needs an upload path. The model has none — no flow carries a file 
 ```json
 {
   "requirement": "2.1",
+  "needs_evidence": "",
   "title": "This system accepts no uploaded file",
   "description": "V5.2.1 governs the validation of an uploaded file's content and type. It does not apply here. The five flows in this model carry payment instructions, settlement confirmations, transfer instructions, balances and audit records; none carries a file from an untrusted source, and no element is described as receiving an attachment or a multipart body. `store:audit-log` is an append-only bucket written by `process:ledger-service`, which is an internal writer rather than an upload path. The requirement has no subject in this system.",
   "affected_element_ids": [],
@@ -29,6 +30,7 @@ The same absence decides a second requirement, and the draft says so in one clau
 ```json
 {
   "requirement": "3.1",
+  "needs_evidence": "",
   "title": "No uploaded file is served back to a client",
   "description": "V5.3.1 governs how stored files are served back, so that an uploaded document cannot be executed or interpreted by the browser that fetches it. It does not apply here, on the same stated fact that rules out V5.2.1: no flow in this model carries a file from an untrusted source, and no element serves stored file content to a caller. The requirement has no subject in this system.",
   "affected_element_ids": [],

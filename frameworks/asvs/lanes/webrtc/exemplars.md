@@ -9,6 +9,7 @@ The exclusion, resting on the protocols the five flows state.
 ```json
 {
   "requirement": "2.1",
+  "needs_evidence": "",
   "title": "This system carries no WebRTC media path",
   "description": "V17.2.1 governs the protection of a WebRTC media stream. It does not apply here. The five flows in this model state HTTPS, HTTPS POST, gRPC, the PostgreSQL wire protocol and an HTTPS append; none is a WebRTC session, and no element's technology names SRTP, STUN, TURN or a data channel. The requirement has no subject in this system.",
   "affected_element_ids": [],
@@ -29,6 +30,7 @@ A second requirement excluded on the same fact, stated once rather than argued a
 ```json
 {
   "requirement": "3.1",
+  "needs_evidence": "",
   "title": "No WebRTC signalling path exists to protect",
   "description": "V17.3.1 governs the signalling channel two WebRTC peers use to find each other. It does not apply here, on the same stated fact that rules out V17.2.1: no flow in this model is a WebRTC session and no element is a peer, a relay or a signalling server. The requirement has no subject in this system.",
   "affected_element_ids": [],

@@ -108,6 +108,7 @@ from __future__ import annotations
 import hashlib
 import json
 import logging
+from collections import Counter
 from collections.abc import Callable, Collection, Mapping, Sequence
 from dataclasses import dataclass
 from types import MappingProxyType
@@ -1469,6 +1470,22 @@ def merge_drafts(
     for _, reasons in partitions.values():
         deferred.update(reasons)
     state.put(nodes.key("deferred"), deferred)
+    # Logged because the field a proposal carries to make this decision does not
+    # survive into a draft, so a run that defers nothing leaves no trace of what
+    # its agents actually answered. The first live run of this seam deferred
+    # nothing and there was no way to tell whether the agents said "I ruled" or
+    # the plumbing had failed. One line ends that.
+    for lane, (kept, reasons) in partitions.items():
+        answered = Counter(getattr(proposal, "needs_evidence", "") for proposal in kept)
+        answered.update(reasons.values())
+        logger.info(
+            "%s/%s: %d proposals, %d deferred; answers %s",
+            package.name,
+            lane,
+            len(kept) + len(reasons),
+            len(reasons),
+            sorted(answered.items()),
+        )
     resolutions = {
         lane: resolve_proposals(kept, catalog, package, lane)
         for lane, (kept, _) in partitions.items()
