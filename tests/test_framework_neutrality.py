@@ -802,6 +802,7 @@ NEUTRAL_HOOKS: dict[str, str] = {
     "claim_marks": "record",
     "lane_diagnostics": "record",
     "misfiled": "record",
+    "ruled_out": "record",
     "scope_entries": "block",
     "summarize": "block",
 }
