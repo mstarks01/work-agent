@@ -83,11 +83,6 @@ class ApplicabilityScore:
     must_find: tuple[str, ...]
     matched: tuple[str, ...]
     missed: tuple[str, ...]
-    #: The subset of ``missed`` a lane raised and the service then withheld,
-    #: because the job carries no evidence of the kind that would settle it.
-    #: Not an analysis failure: the requirement was seen and deliberately not
-    #: ruled on, which is a cost `CARRIED_EVIDENCE_KINDS` sets and a reader can
-    #: reverse by supplying a different input kind.
     #: Expected requirements the run applied only through a
     #: ``needs-other-evidence`` scope entry: a lane raised each, and the service
     #: withheld the claim for want of evidence the job does not carry. Matched,
@@ -214,8 +209,7 @@ def score_applicability(
     # matrix here is over applicability, so the entry counts as applied beside
     # a ``confirmed`` or ``needs-info`` claim (#454). It is listed apart because
     # the report carries no claim for it — that is the policy cost
-    # `CARRIED_EVIDENCE_KINDS` sets, and the first sweep to carry deferral
-    # withheld 45 of 57 expected requirements this way.
+    # `CARRIED_EVIDENCE_KINDS` sets.
     deferred_units = {
         entry.unit for entry in block.scope if entry.state == "needs-other-evidence"
     }
@@ -224,7 +218,7 @@ def score_applicability(
     matched = expected & in_universe
     missed = expected - in_universe
     over_applied = in_universe - expected
-    matched_by_deferral = matched & deferred_units - applied
+    matched_by_deferral = matched & (deferred_units - applied)
 
     return ApplicabilityScore(
         case=case.id,

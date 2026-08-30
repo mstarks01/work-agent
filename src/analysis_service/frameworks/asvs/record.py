@@ -189,6 +189,11 @@ class DraftRequirementRuling(Claim):
         return ruled_out_requirements(model, level, lane)
 
     @classmethod
+    def unit_of(cls, draft: Claim) -> str:
+        """The requirement a draft rules on, which is this framework's unit."""
+        return requirement_of(draft.id)
+
+    @classmethod
     def partition_proposals(
         cls, proposals: Sequence[Any], lane: str, carried: Collection[str]
     ) -> tuple[list[Any], dict[str, str]]:
@@ -279,13 +284,12 @@ class RequirementProposal(Proposal):
     # arriving any other way is refused rather than carried.
     verb: SkipJsonSchema[None] = None
     requirement: str = Field(pattern=REQUIREMENT_KEY_PATTERN, max_length=10)
-    # REQUIRED, WITH NO DEFAULT, AND THAT IS THE WHOLE MECHANISM. A first live
-    # run shipped this optional: the field sat in the schema with a default,
-    # so the model omitted it on all 253 requirements and not one was deferred.
-    # The prompt asked for it and the model was never obliged to answer.
+    # REQUIRED, WITH NO DEFAULT, AND THAT IS THE WHOLE MECHANISM. A structured
+    # output model omits a field that carries a default, and a prompt alone does
+    # not oblige it to answer; a required field does.
     #
-    # `""` stays a legal value — it is the ordinary answer, meaning the agent
-    # ruled — but it must now be *chosen* rather than fallen into. The enum is
+    # `""` is a legal value — it is the ordinary answer, meaning the agent
+    # ruled — but it must be *chosen* rather than fallen into. The enum is
     # what keeps a required field from becoming an invented one.
     needs_evidence: Literal["", "prose", "code", "config", "people"]
 

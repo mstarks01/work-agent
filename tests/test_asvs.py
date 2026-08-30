@@ -63,7 +63,7 @@ from analysis_service.report import (
 from analysis_service.skills import lane_skill_doc
 from analysis_service.sources import SourceLimits
 from analysis_service.system_model import SystemModel
-from tests.factories import PROJECT_ROOT, valid_model
+from tests.factories import PROJECT_ROOT, sample_draft, valid_model
 
 ASVS = PACKAGES["asvs"]
 STRIDE = PACKAGES["stride"]
@@ -1036,19 +1036,52 @@ class TestThisPackageCarriesNoActionVerb:
         assert "verb" in ThreatProposal.model_json_schema()["properties"]
 
 
-def test_a_term_fires_only_at_the_start_of_a_word():
+def test_a_term_fires_at_the_start_of_a_word_or_as_a_whole_word():
     """#429: ``sso`` fired inside ``processor`` and raised an OAuth lead.
 
-    A leading boundary and no trailing one, so ``authenticat`` still reaches
-    ``authenticated`` and ``http`` still reaches ``https``.
+    A leading boundary always. The trailing one is per term: a stem reaches
+    its inflections, and a term marked ``$`` reaches the whole word only.
     """
-    from analysis_service.frameworks.asvs.rules import _starts_a_word
+    from analysis_service.frameworks.asvs.rules import _matches
 
-    assert not _starts_a_word("sso", "our card processor is a third party")
-    assert not _starts_a_word("sso", "an associate signs in")
-    assert _starts_a_word("sso", "company sso")
-    assert _starts_a_word("authenticat", "an authenticated session")
-    assert _starts_a_word("http", "https post")
+    assert not _matches("sso", "our card processor is a third party")
+    assert not _matches("sso", "an associate signs in")
+    assert _matches("sso", "company sso")
+    assert _matches("authenticat", "an authenticated session")
+    assert _matches("http", "https post")
+    assert _matches("java", "a javascript front end")
+    assert not _matches("java$", "a javascript front end")
+    assert _matches("java$", "a java service")
+    assert not _matches("log$", "the login flow")
+
+
+def test_a_javascript_system_does_not_keep_the_jndi_requirement():
+    """#455: ``java`` reached ``javascript`` and kept V1.3.8 in the lane."""
+    from analysis_service.frameworks.asvs.rules import REQUIREMENT_TESTS, _names_any
+
+    model = SystemModel.model_validate(
+        json.loads((CORPUS_DIR / "01-payments-checkout" / "model.json").read_text())
+    )
+    model.processes[0].description += " The storefront is a JavaScript front end."
+    assert not _names_any(model, REQUIREMENT_TESTS["V1.3.8"])
+    model.processes[0].description += " It queries a Java directory service."
+    assert _names_any(model, REQUIREMENT_TESTS["V1.3.8"])
+
+
+def test_the_unit_of_a_draft_is_its_requirement():
+    """The fan-in refuses a draft on a ruled-out unit through this hook (#443)."""
+    from analysis_service.frameworks.asvs.record import DraftRequirementRuling
+
+    draft = DraftRequirementRuling.model_validate(
+        {
+            **sample_draft("S-01").model_dump(
+                exclude={"category", "verb", "severity", "mitigations"}
+            ),
+            "id": "v5.0.0-6.2.1",
+            "chapter": "authentication",
+        }
+    )
+    assert DraftRequirementRuling.unit_of(draft) == "V6.2.1"
 
 
 class TestAChapterRuledOutInCode:

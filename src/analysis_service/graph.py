@@ -129,6 +129,7 @@ from analysis_service.critic import (
     join_drafts,
     rating_disagreements,
     review_issues,
+    unsettled_drafts,
 )
 from analysis_service.domains import select_domain_packs
 from analysis_service.evidence import (
@@ -165,9 +166,11 @@ from analysis_service.prompts import (
     compose_repair_prompt,
 )
 from analysis_service.report import (
+    DROPPED_REASON_MAX_CHARS,
     AnalysisContext,
     AnalysisMarks,
     Claim,
+    DroppedClaim,
     FrameworkAnalysis,
     FrameworkName,
     InputRef,
@@ -1506,21 +1509,17 @@ def merge_drafts(
     for _, reasons in partitions.values():
         deferred.update(reasons)
     state.put(nodes.key("deferred"), deferred)
-    # Logged because the field a proposal carries to make this decision does not
-    # survive into a draft, so a run that defers nothing leaves no trace of what
-    # its agents actually answered. The first live run of this seam deferred
-    # nothing and there was no way to tell whether the agents said "I ruled" or
-    # the plumbing had failed. One line ends that.
+    # Logged because the answer a proposal carries to make this decision does
+    # not survive into a draft: without this line a run that defers nothing
+    # leaves no trace of whether the agents ruled or the seam never ran.
     for lane, (kept, reasons) in partitions.items():
-        answered = Counter(getattr(proposal, "needs_evidence", "") for proposal in kept)
-        answered.update(reasons.values())
         logger.info(
-            "%s/%s: %d proposals, %d deferred; answers %s",
+            "%s/%s: %d proposals, %d kept, deferred for %s",
             package.name,
             lane,
             len(kept) + len(reasons),
-            len(reasons),
-            sorted(answered.items()),
+            len(kept),
+            sorted(Counter(reasons.values()).items()),
         )
     resolutions = {
         lane: resolve_proposals(kept, catalog, package, lane)
@@ -1530,13 +1529,28 @@ def merge_drafts(
         lane: resolution.drafts for lane, resolution in resolutions.items()
     }
     joined = join_drafts(drafts_by_lane, package, model, source_texts or {})
-    merged = joined.drafts
+    # A draft on a unit the package's own rules ruled out in ``prepare`` is
+    # refused here, whatever the agent read in its scope line: the unit is
+    # settled, and a claim on it would put the same requirement on the report
+    # twice, once as a claim and once as not applicable (#443).
+    ruled_out = state.get(nodes.key("ruled_out")) or {}
+    refused = [
+        DroppedClaim(
+            claim_id=draft.id,
+            title=draft.title,
+            reason=ruled_out[unit][:DROPPED_REASON_MAX_CHARS],
+        )
+        for draft in joined.drafts
+        if (unit := package.record.unit_of(draft)) in ruled_out
+    ]
+    refused_ids = {dropped.claim_id for dropped in refused}
+    merged = [draft for draft in joined.drafts if draft.id not in refused_ids]
     state.put(nodes.key("drafts"), [draft.model_dump(mode="json") for draft in merged])
     # Every mark this framework's fan-in produced, from both of its producers:
     # the join across its lanes, and each lane's own evidence resolution. Merged
     # rather than parked separately — they share an owner, a standing and a
     # policy, so one key carries them and ``assemble`` reads one parameter.
-    marks = joined.marks
+    marks = joined.marks.merged_with(AnalysisMarks(dropped_claims=refused))
     for lane, resolution in resolutions.items():
         marks = marks.merged_with(invalid[lane]).merged_with(resolution.marks)
     state.put(nodes.key("marks"), marks.model_dump(mode="json"))
@@ -1558,11 +1572,14 @@ def merge_drafts(
         package,
     )
     state.put(nodes.key("coverage"), [row.model_dump(mode="json") for row in coverage])
+    # The critic reads only the drafts code has not already ruled; a draft its
+    # own grounds settle is ruled needs-info at assembly and never shown.
+    shown = unsettled_drafts(merged)
     state.prompt(
         nodes.key("draft_view"),
         render(
             _ruling_view(
-                merged, duplicate_groups(merged, model), rating_disagreements(merged)
+                shown, duplicate_groups(shown, model), rating_disagreements(shown)
             )
         ),
     )
@@ -1633,20 +1650,15 @@ def route_review(
         # The roster is the covering set the re-ask must reproduce, and an ID is
         # the whole of that claim — the re-ask reproduces rulings, not drafts.
         # Only the drafts it cannot fix without reading travel in full.
-        state.prompt(
-            nodes.key("draft_roster"), render([draft.id for draft in package_drafts])
-        )
+        shown = unsettled_drafts(package_drafts)
+        state.prompt(nodes.key("draft_roster"), render([draft.id for draft in shown]))
         state.prompt(
             nodes.key("unreconciled_drafts"),
             render(
                 _ruling_view(
-                    [
-                        draft
-                        for draft in package_drafts
-                        if draft.id in problems.implicated
-                    ],
-                    duplicate_groups(package_drafts, model),
-                    rating_disagreements(package_drafts),
+                    [draft for draft in shown if draft.id in problems.implicated],
+                    duplicate_groups(shown, model),
+                    rating_disagreements(shown),
                 )
             ),
         )

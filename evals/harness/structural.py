@@ -102,12 +102,9 @@ def _block_issues(block: FrameworkAnalysis, known_ids: set[str]) -> list[str]:
         # states a question about a fact the System Model has no slot for, so it
         # carries no ``element_id`` and there is nothing here to resolve.
         #
-        # **This check is the service's own, one seam later, and it drifted.**
-        # `Report._reference_issues` learned the second spelling when it
-        # arrived; this did not, so the first ASVS corpus sweep hard-failed on
-        # eleven claims that were correctly shaped. A gate that re-derives a
-        # service rule has to move when the rule does, and nothing offline
-        # could catch that: the scripted critic never emits a subject.
+        # This re-derives `Report._reference_issues` one seam later, so it has
+        # to read both spellings exactly as that check does. Nothing offline
+        # exercises the difference: the scripted critic never emits a subject.
         issues += [
             f"{where}: claim {claim.id!r} hangs its needs-info verdict on element"
             f" {ref.element_id!r}, absent from the embedded system model"
