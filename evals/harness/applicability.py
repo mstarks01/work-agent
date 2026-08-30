@@ -88,7 +88,12 @@ class ApplicabilityScore:
     #: Not an analysis failure: the requirement was seen and deliberately not
     #: ruled on, which is a cost `CARRIED_EVIDENCE_KINDS` sets and a reader can
     #: reverse by supplying a different input kind.
-    missed_by_deferral: tuple[str, ...]
+    #: Expected requirements the run applied only through a
+    #: ``needs-other-evidence`` scope entry: a lane raised each, and the service
+    #: withheld the claim for want of evidence the job does not carry. Matched,
+    #: because the entry asserts the requirement applies (#454); listed apart,
+    #: because the report carries no claim for it.
+    matched_by_deferral: tuple[str, ...]
     must_find_missed: tuple[str, ...]
     over_applied: tuple[str, ...]
     rejected: tuple[str, ...]
@@ -128,6 +133,7 @@ class ApplicabilityScore:
             "must_find": len(self.must_find),
             "matched": list(self.matched),
             "missed": list(self.missed),
+            "matched_by_deferral": list(self.matched_by_deferral),
             "must_find_missed": list(self.must_find_missed),
             "over_applied": list(self.over_applied),
             "rejected": list(self.rejected),
@@ -202,26 +208,23 @@ def score_applicability(
 
     applied, rejected = applied_requirements(block.claims)
     off_catalog = applied - universe
-    in_universe = applied & universe
+    # A ``needs-other-evidence`` scope entry is the service's other way of
+    # saying a requirement applies: a lane raised it, and the claim was withheld
+    # because settling it needs evidence the job does not carry (#417). The
+    # matrix here is over applicability, so the entry counts as applied beside
+    # a ``confirmed`` or ``needs-info`` claim (#454). It is listed apart because
+    # the report carries no claim for it — that is the policy cost
+    # `CARRIED_EVIDENCE_KINDS` sets, and the first sweep to carry deferral
+    # withheld 45 of 57 expected requirements this way.
+    deferred_units = {
+        entry.unit for entry in block.scope if entry.state == "needs-other-evidence"
+    }
+    in_universe = (applied | deferred_units) & universe
 
     matched = expected & in_universe
     missed = expected - in_universe
     over_applied = in_universe - expected
-
-    # A missed requirement has two very different causes and the pooled figure
-    # hides which. Either no lane raised it — an analysis miss — or a lane
-    # raised it and said this job's input could not settle it, so the service
-    # withheld it deliberately. The second is a *policy* cost, priced by
-    # `CARRIED_EVIDENCE_KINDS`, and it is the one a reader can act on by
-    # supplying a different kind of input.
-    #
-    # Measured because the first sweep to carry deferral gave up 45 of its 57
-    # misses this way, and nothing said so: the saving was reported in dollars
-    # and the cost in findings was found by hand afterwards.
-    deferred_units = {
-        entry.unit for entry in block.scope if entry.state == "needs-other-evidence"
-    }
-    missed_by_deferral = missed & deferred_units
+    matched_by_deferral = matched & deferred_units - applied
 
     return ApplicabilityScore(
         case=case.id,
@@ -232,7 +235,7 @@ def score_applicability(
         must_find=tuple(sorted(must_find)),
         matched=tuple(sorted(matched)),
         missed=tuple(sorted(missed)),
-        missed_by_deferral=tuple(sorted(missed_by_deferral)),
+        matched_by_deferral=tuple(sorted(matched_by_deferral)),
         must_find_missed=tuple(sorted(must_find - in_universe)),
         over_applied=tuple(sorted(over_applied)),
         rejected=tuple(sorted(rejected)),
@@ -269,7 +272,7 @@ def pooled(scores: Sequence[ApplicabilityScore]) -> Mapping[str, Any]:
         "expected": expected,
         "matched": matched,
         "missed": sum(len(score.missed) for score in scores),
-        "missed_by_deferral": sum(len(score.missed_by_deferral) for score in scores),
+        "matched_by_deferral": sum(len(score.matched_by_deferral) for score in scores),
         "recall": round(matched / expected, 4) if expected else 0.0,
         "must_find": must_find,
         "must_find_recall": (
@@ -467,7 +470,7 @@ def render(scores: Sequence[ApplicabilityScore]) -> None:
         print(
             f"{score.case:<26} {score.level:>3} {score.recall:>6.0%}"
             f" {score.must_find_recall:>6.0%} {score.precision:>6.0%}"
-            f" {len(score.missed):>5} {len(score.missed_by_deferral):>5}"
+            f" {len(score.missed):>5} {len(score.matched_by_deferral):>5}"
             f" {len(score.over_applied):>5}"
             f" {len(score.rejected):>5} {len(score.off_catalog):>4}"
         )
@@ -481,14 +484,14 @@ def render(scores: Sequence[ApplicabilityScore]) -> None:
         " (instrument, non-gating)"
     )
     # Printed as its own line because it answers a different question from the
-    # recall figure above it: not *how much was missed* but *how much was
-    # withheld on purpose*, which is a policy `CARRIED_EVIDENCE_KINDS` sets
-    # rather than a limit of the analysis.
-    if totals["missed_by_deferral"]:
+    # recall figure above it: not *how much was found* but *how much of it the
+    # report withholds*, which is a policy `CARRIED_EVIDENCE_KINDS` sets rather
+    # than a limit of the analysis.
+    if totals["matched_by_deferral"]:
         print(
-            f"  of {totals['missed']} missed,"
-            f" {totals['missed_by_deferral']} were deferred for want of another"
-            " kind of evidence rather than never raised"
+            f"  of {totals['matched']} matched,"
+            f" {totals['matched_by_deferral']} reached the report only as a"
+            " scope entry, deferred for want of another kind of evidence"
         )
 
 
