@@ -204,15 +204,15 @@ LANES_REQUIRED_PER_CASE: Mapping[FrameworkName, bool] = {
     "stride": True,
 }
 
-#: The extra fields each framework's reference record carries, and the checks
-#: over them. Harness data keyed off the closed ``FrameworkName``, beside
-#: :data:`evals.harness.reference.REFERENCE_TYPES` and for the same reason: what
-#: a reference set looks like is the eval's business, not a package member.
 #: The expected dispositions a record may name, from the corpus vocabulary
 #: rather than a second list here — a lint spelling its own would pass a value
 #: the loader then refuses.
 ASVS_DISPOSITIONS: frozenset[str] = frozenset(get_args(AsvsDisposition))
 
+#: The extra fields each framework's reference record carries, and the checks
+#: over them. Harness data keyed off the closed ``FrameworkName``, beside
+#: :data:`evals.harness.reference.REFERENCE_TYPES` and for the same reason: what
+#: a reference set looks like is the eval's business, not a package member.
 RECORD_FIELDS: Mapping[FrameworkName, frozenset[str]] = {
     "asvs": CLAIM_FIELDS | {"chapter", "requirement"},
     "stride": CLAIM_FIELDS | {"category", "severity"},

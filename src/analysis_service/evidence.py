@@ -351,7 +351,8 @@ def _grounds_of(
     and this is where that costs its entry. A term longer than
     :data:`~analysis_service.report.GROUND_TERM_MAX_CHARS` leaves the same way:
     the field holds one term, an agent that wrote a sentence named no term, and
-    the entry is what that costs — never the run.
+    the entry is what that costs — never the run. A blank one leaves with no
+    mark at all, because an empty string names nothing for a mark to be about.
     """
     grounds = [
         Ground(kind="quote", text=quote.text, source_label=quote.source_label)
@@ -366,7 +367,13 @@ def _grounds_of(
             grounds.append(ground)
     for raw in proposal.absent_elements:
         term = raw.strip().lower()
-        if not term or len(term) > GROUND_TERM_MAX_CHARS or names_term(model, term):
+        # A blank entry earns no mark, on the rule the caller applies to a blank
+        # evidence reference: a mark names what the model contradicts, and an
+        # empty string names nothing. It cannot be filtered there, because the
+        # prefix below has already made the string non-blank.
+        if not term:
+            continue
+        if len(term) > GROUND_TERM_MAX_CHARS or names_term(model, term):
             unresolved.append(absent_element_ref(raw)[:REFERENCE_MAX_CHARS])
         else:
             grounds.append(Ground(kind="absent-element", term=term))

@@ -340,6 +340,12 @@ positive — the same rule `harness/scorer.py` applies to STRIDE's unmatched
 threats, and for the same reason: scoring it as an error punishes finding real
 things and pushes every tuning cycle toward under-reporting.
 
+So **precision is reported only where the set says `exhaustive`**. Every case is
+`sampled` today, so the `prec` column reads `n/a` and the pooled line names how
+many of the cases it could read. The `over` column and
+`over_applied_for_promotion` are unchanged either way: the list is a reading for
+the next sitting, and only the rate over it is a score.
+
 - **must-find recall** — did the tool find the threats a case marks as
   essential? Reported **per case**, never averaged: an average hides one case
   failing completely, which is the failure that matters most.
