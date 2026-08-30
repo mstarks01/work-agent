@@ -44,6 +44,7 @@ below and the table is the whole of what is authored.
 
 from __future__ import annotations
 
+import re
 from collections.abc import Iterator
 from dataclasses import dataclass
 
@@ -92,6 +93,17 @@ class PresenceTest:
         return f"{self.lane}-{self.predicate}"
 
 
+def _starts_a_word(term: str, text: str) -> bool:
+    """Whether ``term`` appears in ``text`` at the start of a word.
+
+    A leading boundary and no trailing one: ``authenticat`` is meant to reach
+    ``authenticated``, and ``http`` to reach ``https``. A bare substring test
+    reached further than that — ``sso`` matched inside ``processor`` and raised
+    an OAuth lead for a system with no OAuth.
+    """
+    return re.search(rf"\b{re.escape(term)}", text) is not None
+
+
 def _hits(model: SystemModel, test: PresenceTest) -> Iterator[Match]:
     """Every element whose text answers this presence test, in model order.
 
@@ -105,7 +117,9 @@ def _hits(model: SystemModel, test: PresenceTest) -> Iterator[Match]:
             if not isinstance(value, str):
                 continue
             lowered = value.lower()
-            term = next((term for term in test.terms if term in lowered), "")
+            term = next(
+                (term for term in test.terms if _starts_a_word(term, lowered)), ""
+            )
             if not term:
                 continue
             yield (
