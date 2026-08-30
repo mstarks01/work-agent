@@ -35,7 +35,7 @@ Each pattern names its trigger in the System Model attribute vocabulary. `unknow
 
 ## Guardrails
 
-- **Second-order reach.** A spoofed low-value identity is a foothold, not an endpoint. After each threat, walk the model's flows outward: what can the impersonated identity reach, initiate, or read? Score impact on the full reachable set — impersonating a metrics agent that can write to a config store is a config-tampering enabler, and worth saying so in the description.
+- **Second-order reach.** A spoofed low-value identity is a foothold, not an endpoint. After each threat, walk the model's flows outward: what can the impersonated identity reach, initiate, or read? Score impact on the full reachable set — impersonating a metrics agent that can write to a config store is a config-tampering enabler, and worth saying so in the description. Name that reach in the description only; `affected_element_ids` stays with the element the action lands on.
 - **Attacker perspective.** State each threat as an attacker action with a named target: *who* is impersonated, *to which* element, *via which* flow ID. "No MFA on the login flow" is an observation, not a threat; "an attacker replays stuffed credentials over `flow:user-to-web:login` to act as any registered user" is.
 - **Unknowns are findings, not assumptions.** When the trigger is an `unknown` attribute, write the threat conditionally, cite the attribute, and let the critic mark it needs-info. Never write "no authentication exists" when the model says `unknown`.
 - **Stay in the model.** Reference only element IDs present in the System Model. Do not invent components, flows, or controls the extraction did not capture; if something material seems missing, note it against the nearest real element.
