@@ -36,7 +36,7 @@ The original submitted text:
 4. If an issue is a dangling reference, prefer repointing it at the element that actually exists over deleting the flow; delete only when the text supports no endpoint at all.
 5. Change nothing the issues do not cite. Untouched elements must come back byte-identical — a "while I'm here" improvement is an unreviewed edit.
 
-Never satisfy a rule by asserting a fact the text does not contain. `unknown` plus an assumption is always available and always correct.
+Never satisfy a rule by asserting a fact the text does not contain. Where the schema permits `unknown`, it is always available and needs no assumption. Where the schema forbids it — a `trust_zone`, an External Entity's `kind`, a flow's endpoints — emit a legal value and record the inference in `assumptions`.
 
 ## Output
 
