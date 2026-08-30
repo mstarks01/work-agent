@@ -133,6 +133,14 @@ DECLARED: dict[str, str] = {
         "This code is STRIDE's. It reads a category and two rated severity axes,"
         " which only that package's record carries (#167)."
     ),
+    "evals/harness/pairing.py": (
+        "This code is ASVS's, and reads the same catalog `applicability.py`"
+        " scores against. A framework whose claims name a catalog requirement"
+        " can disagree with a reference set about whether a requirement"
+        " applies, and settling that needs the standard's own text beside the"
+        " claim's argument. A framework whose claim set is open has no catalog"
+        " text to pair, so nothing here answers for one."
+    ),
     "evals/harness/applicability.py": (
         "This code is ASVS's. It reads the ASVS catalog, and `FRAMEWORK` is"
         " declared once at the closed type rather than spelled per call."
