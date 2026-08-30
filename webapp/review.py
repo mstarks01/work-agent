@@ -73,6 +73,7 @@ if str(REPO_ROOT) not in sys.path:
 from analysis_service.frameworks import PACKAGES
 from evals import verify_corpus
 from evals.harness import queue as review_queue
+from evals.harness import run
 from evals.harness.fingerprint import identifier_of, lane_field
 from evals.harness.ledger import (
     DEFAULT_LEDGER_PATH,
@@ -616,7 +617,15 @@ def findings_from_artifact(path: Path) -> tuple[list[review_queue.Finding], dict
     holds the aggregates this harness computed, and the reports hold what the
     agents actually said.
     """
-    reports_dir = Path(str(path) + ".reports")
+    # The suffix the harness writes, not one composed here. `run.py` uses
+    # `Path(out).with_suffix(REPORTS_SUFFIX)`, which *replaces* `.json`; this
+    # appended to it, so `--out sweep.json` wrote `sweep.reports` and this
+    # looked for `sweep.json.reports` and found nothing.
+    #
+    # Nobody noticed because nobody has held a sitting: the review app has
+    # never been pointed at a real sweep, and the tests build their queues from
+    # `Finding` values directly rather than from a directory on disk.
+    reports_dir = run.reports_dir(path)
     if not reports_dir.is_dir():
         raise FileNotFoundError(
             f"{reports_dir} does not exist; a queue is built from the reports a"
