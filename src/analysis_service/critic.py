@@ -45,6 +45,7 @@ from analysis_service.frameworks import FrameworkPackage, FrameworkSchemas
 from analysis_service.grounding import normalize, repair_quote, verify_normalized
 from analysis_service.references import canonical, snap
 from analysis_service.report import (
+    BEYOND_GROUNDS,
     DROPPED_REASON_MAX_CHARS,
     AnalysisMarks,
     Claim,
@@ -296,6 +297,98 @@ def _resolve_element_references(
             continue
         unresolved += [
             UnresolvedReference(claim_id=claim.id, element_id=ref[:300]) for ref in lost
+        ]
+        drafts.append(claim.model_copy(update={"affected_element_ids": kept}))
+    return _ReferenceCheck(drafts, unresolved, dropped)
+
+
+def _reach_of(places: Collection[str], system_model: SystemModel) -> frozenset[str]:
+    """``places`` plus every element one hop away in the graph.
+
+    A flow reaches its two endpoints. An element reaches the flows that touch
+    it and the elements at their far ends. Nothing further: the second hop is
+    the reach a description narrates, never the place an action lands.
+    """
+    flows = {
+        flow.id: (flow.source, flow.destination) for flow in system_model.data_flows
+    }
+    reach = set(places)
+    for place in places:
+        endpoints = flows.get(place)
+        if endpoints is not None:
+            reach.update(endpoints)
+            continue
+        for flow_id, (source, destination) in flows.items():
+            if place in (source, destination):
+                reach.update((flow_id, source, destination))
+    return frozenset(reach)
+
+
+def _grounded_places(claim: Claim, known_ids: Collection[str]) -> frozenset[str]:
+    """The places a claim's grounds name, or the IDs its description cites.
+
+    A catalogued ground names an element or a flow. A claim resting on quotes
+    alone names none, so its bound is what its own prose cites — the same
+    resolution :func:`mentioned_ids` gives coverage — and a claim citing nothing
+    anywhere has no bound and passes untouched.
+    """
+    places = {
+        ground.element_id or ground.flow_id
+        for ground in claim.grounds
+        if ground.kind != "quote"
+    }
+    if places:
+        return frozenset(places)
+    return frozenset(
+        resolved
+        for mention in mentioned_ids(claim.description)
+        if (resolved := canonical(mention, known_ids))
+    )
+
+
+def _bound_element_references(
+    claims: Iterable[Claim], system_model: SystemModel
+) -> _ReferenceCheck:
+    """Drop every cited element the claim's own grounds do not reach, and mark it.
+
+    The prompts say reach belongs in the description and
+    ``affected_element_ids`` is what the action lands on. This is that rule in
+    code (#441): an ID more than one hop from every place the grounds name is
+    dropped with :data:`BEYOND_GROUNDS` as its reason, on the same terms as an
+    ID the model does not contain, and a claim left with none is dropped.
+    """
+    known_ids = {element.id for element in system_model.elements()}
+    drafts: list[Claim] = []
+    unresolved: list[UnresolvedReference] = []
+    dropped: list[DroppedClaim] = []
+    for claim in claims:
+        places = _grounded_places(claim, known_ids)
+        if not places:
+            drafts.append(claim)
+            continue
+        reach = _reach_of(places, system_model)
+        kept = [ref for ref in claim.affected_element_ids if ref in reach]
+        lost = [ref for ref in claim.affected_element_ids if ref not in reach]
+        if not lost:
+            drafts.append(claim)
+            continue
+        if not kept:
+            dropped.append(
+                DroppedClaim(
+                    claim_id=claim.id,
+                    title=claim.title,
+                    reason=(
+                        "names only elements its grounds do not reach"
+                        f" ({', '.join(repr(ref) for ref in lost)})"
+                    )[:DROPPED_REASON_MAX_CHARS],
+                )
+            )
+            continue
+        unresolved += [
+            UnresolvedReference(
+                claim_id=claim.id, element_id=ref, reason=BEYOND_GROUNDS
+            )
+            for ref in lost
         ]
         drafts.append(claim.model_copy(update={"affected_element_ids": kept}))
     return _ReferenceCheck(drafts, unresolved, dropped)
@@ -745,10 +838,11 @@ def join_drafts(
     issues = _ground_reference_issues(referenced.drafts, system_model)
     if issues:
         raise DraftJoinError("; ".join(issues))
+    bounded = _bound_element_references(referenced.drafts, system_model)
     checked = (
-        _verify_quotes(referenced.drafts, sources)
+        _verify_quotes(bounded.drafts, sources)
         if sources
-        else _QuoteCheck(list(referenced.drafts), [], [], [])
+        else _QuoteCheck(list(bounded.drafts), [], [], [])
     )
     kept = checked.drafts
     return JoinedDrafts(
@@ -756,9 +850,14 @@ def join_drafts(
         marks=AnalysisMarks(
             unverified_grounds=checked.unverified,
             repaired_quotes=checked.repaired,
-            unresolved_references=referenced.unresolved,
+            unresolved_references=[*referenced.unresolved, *bounded.unresolved],
             unresolved_mentions=_unresolved_mentions(kept, known_ids),
-            dropped_claims=[*duplicates, *referenced.dropped, *checked.groundless],
+            dropped_claims=[
+                *duplicates,
+                *referenced.dropped,
+                *bounded.dropped,
+                *checked.groundless,
+            ],
         ).merged_with(package.record.claim_marks(kept)),
     )
 

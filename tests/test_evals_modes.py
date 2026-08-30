@@ -72,6 +72,31 @@ def unknown_ref(case) -> str:
     )
 
 
+def reaching_refs(case, element_ids) -> list[str]:
+    """The one catalog entry whose place best reaches ``element_ids``.
+
+    The fan-in bounds ``affected_element_ids`` to one hop from the places a
+    claim's grounds name (#441), so a scripted draft has to cite a fact that
+    reaches the elements it stands in for, or the service drops them. One
+    entry, because these tests count grounds per draft; an ``unknown:`` entry
+    over a ``crossing:`` where both reach, because the scripted critic rules
+    a conditional draft ``needs-info`` and that is the case worth exercising.
+    Where nothing reaches every element the best partial reach is cited, and
+    the drop of the rest is the point.
+    """
+    from analysis_service.critic import _reach_of
+
+    catalog = evidence_catalog(case.model)
+    wanted = set(element_ids)
+
+    def merit(ref: str) -> tuple[int, bool]:
+        ground = catalog[ref]
+        reach = _reach_of({ground.element_id or ground.flow_id}, case.model)
+        return len(wanted & reach), ref.startswith("unknown:")
+
+    return [max(catalog, key=merit)]
+
+
 def scripted_proposal(case, category) -> dict:
     """One category agent's emission citing an element the blessed model contains.
 
@@ -91,7 +116,7 @@ def scripted_proposal(case, category) -> dict:
         # Taken from the reference the scripted draft is standing in for, so a
         # mode test grades the pipeline rather than this file's verb-picking.
         "verb": reference.verb,
-        "evidence_refs": [unknown_ref(case)],
+        "evidence_refs": reaching_refs(case, reference.affected_element_ids),
         "severity": Severity(
             likelihood=reference.severity.likelihood,
             impact=reference.severity.impact,
@@ -101,21 +126,25 @@ def scripted_proposal(case, category) -> dict:
     }
 
 
-def scripted_ruling(category) -> dict:
+def scripted_ruling(case, category) -> dict:
     """The critic's ruling on one scripted draft: judgement only, keyed by ID.
 
     Carries no ``severity``: the draft's rating stands, which is the common
     case and the one the assemble seam merges through.
 
-    A bare ``needs-info``, because every scripted draft cites an
-    ``unknown-attribute`` ground and the contract settles such a draft that
-    way (#439): the service fills the pairs and the reason from the grounds,
-    and a confirmation would route the job to the re-ask.
+    The verdict follows the draft's grounds, as the contract asks (#439): a
+    draft citing an ``unknown-attribute`` ground gets a bare ``needs-info``
+    the service completes, and one resting on a crossing alone is confirmed.
     """
+    reference = next(
+        ref for ref in case.claims_for("stride") if ref.category == category
+    )
+    refs = reaching_refs(case, reference.affected_element_ids)
+    conditional = any(ref.startswith("unknown:") for ref in refs)
     return {
         "id": f"{CATEGORY_LETTERS[category]}-01",
-        "confidence": "low",
-        "verdict": {"status": "needs-info"},
+        "confidence": "low" if conditional else "high",
+        "verdict": {"status": "needs-info" if conditional else "confirmed"},
     }
 
 
@@ -202,7 +231,11 @@ def _reply_for(case, graph_node: str) -> str:
         return json.dumps(case.model.model_dump(mode="json"))
     if graph_node == "critic_stride":
         return json.dumps(
-            {"claims": [scripted_ruling(category) for category in STRIDE_CATEGORIES]}
+            {
+                "claims": [
+                    scripted_ruling(case, category) for category in STRIDE_CATEGORIES
+                ]
+            }
         )
     for category in STRIDE_CATEGORIES:
         if graph_node == analyze_node_name("stride", category):
