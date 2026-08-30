@@ -387,3 +387,26 @@ def test_empty_production_scores_zero_without_crashing(case):
     assert score.element_accuracy == 0.0
     assert score.lane_accuracy == 0.0
     assert len(score.missed) == len(case.claims_for("stride"))
+
+
+def test_a_threat_citing_an_id_the_blessed_model_lacks_is_foreign(case, no_votes):
+    """#431: an end-to-end run's lanes cite the IDs a live extraction spelled.
+
+    Such a threat can equal no reference, and a fingerprint over its IDs is a
+    key no vote can land on, so it is counted apart from both ``unlisted`` and
+    ``missed``.
+    """
+    produced = [
+        produced_threat(
+            1, "spoofing", "Spelled as extracted.", element_ids=("entity:shoppers",)
+        ),
+        produced_threat(
+            2, "spoofing", "Spelled as blessed.", element_ids=("entity:shopper",)
+        ),
+    ]
+
+    score = score_case(case, produced, ScriptedMatcher(), no_votes)
+
+    assert score.foreign == ("S-01",)
+    assert [entry.threat_id for entry in score.unlisted] == ["S-02"]
+    assert score.to_json()["counts"]["foreign"] == 1
