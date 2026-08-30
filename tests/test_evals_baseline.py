@@ -200,9 +200,10 @@ class TestAssembleAndVerify:
     ):
         """A sweep is keyed by its own bytes, so the same file is one sweep.
 
-        Re-running ``submit baseline`` over an artifact already laid down used
-        to append a second entry that every check passed: the digests and the
-        cost recompute per entry, so a duplicate agrees with itself.
+        Re-running ``submit baseline`` over an artifact already laid down
+        rewrites its entry. An appended second entry would pass every check:
+        the digests and the cost recompute per entry, so a duplicate agrees
+        with itself.
         """
         source = write_sweep(tmp_path, payload())
         assemble(tmp_path, "ada", [source])
