@@ -9,6 +9,7 @@
     ],
     "claim": "The moderation website reads and writes the player database directly and nothing says how its queries are built.",
     "tier": "must-find",
+    "disposition": "needs-code",
     "notes": "A process reaching a store is the fact that makes the requirement apply; the input settles nothing about query construction."
   },
   {
@@ -20,6 +21,7 @@
     ],
     "claim": "Nothing says which side validates the moderation actions support staff take on player accounts.",
     "tier": "expected",
+    "disposition": "needs-more-prose",
     "notes": "The website acts on accounts on a reviewer's behalf, so the trusted-service-layer rule applies. Weaker than the store record because no interface detail is stated."
   },
   {
@@ -32,6 +34,7 @@
     ],
     "claim": "The moderation website is browser-delivered and no cookie attribute is stated.",
     "tier": "expected",
+    "disposition": "needs-config",
     "notes": "`interface_kind: web` puts this system in the chapter. Expected rather than must-find because the source names no session mechanism at all."
   },
   {
@@ -42,6 +45,7 @@
     ],
     "claim": "No documentation defines rate limiting or anti-automation for the moderation website.",
     "tier": "expected",
+    "disposition": "needs-more-prose",
     "notes": "A documentation requirement: the subject sits outside the running system, so needs-info by construction."
   },
   {
@@ -52,6 +56,7 @@
     ],
     "claim": "No authorization documentation defines which support staff may act on which player accounts.",
     "tier": "expected",
+    "disposition": "needs-more-prose",
     "notes": "Documentation requirement, as V6.1.1."
   },
   {
@@ -64,6 +69,7 @@
     ],
     "claim": "Support staff act on player accounts and nothing restricts which accounts a given member of staff may reach.",
     "tier": "must-find",
+    "disposition": "needs-code",
     "notes": "Data-specific access over a store holding every player. The source says the diagram records no authentication on any link, so nothing settles it."
   }
 ]
