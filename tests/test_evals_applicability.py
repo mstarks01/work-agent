@@ -458,17 +458,17 @@ def test_pooling_the_yield_weights_by_draft_and_not_by_case(case):
     assert totals["rejection_rate"] == 0.1
 
 
-class TestDeferralIsSeparatedFromAMiss:
-    """A missed requirement has two causes and they are not one finding.
+class TestADeferredRequirementApplies:
+    """A ``needs-other-evidence`` scope entry says the requirement applies (#454).
 
-    Either no lane raised it, or a lane raised it and the service withheld it
-    for want of the right kind of evidence. The second is a policy cost
-    `CARRIED_EVIDENCE_KINDS` sets; the first is a limit of the analysis. The
-    first sweep carrying deferral gave up 45 of 57 misses the second way, and
-    nothing said so.
+    A lane raised it and the service withheld the claim for want of the right
+    kind of evidence. That is a match on applicability, and a policy cost
+    `CARRIED_EVIDENCE_KINDS` sets on the report; a requirement nobody raised is
+    the miss. The first sweep carrying deferral withheld 45 of 57 expected
+    requirements, and the scorer read all 45 as misses.
     """
 
-    def test_a_deferred_expectation_is_named_as_such(self, case):
+    def test_a_deferred_expectation_is_matched_and_named_as_such(self, case):
         expected = [reference.requirement for reference in case.references["asvs"]]
         withheld = expected[0]
 
@@ -477,16 +477,31 @@ class TestDeferralIsSeparatedFromAMiss:
             Block((ruling(r) for r in expected[1:]), scope=[Scoped(withheld)]),
         )
 
-        assert withheld in score.missed
-        assert withheld in score.missed_by_deferral
+        assert withheld in score.matched
+        assert withheld not in score.missed
+        assert score.matched_by_deferral == (withheld,)
+        assert score.recall == 1.0
 
-    def test_a_requirement_nobody_raised_is_not(self, case):
+    def test_a_deferred_unit_nobody_expected_is_over_applied(self, case):
+        expected = [reference.requirement for reference in case.references["asvs"]]
+        universe = {
+            r.id for r in requirements_for(case.declaration("asvs").options["level"])
+        }
+        unexpected = min(universe - set(expected))
+
+        score = score_applicability(
+            case, Block((ruling(r) for r in expected), scope=[Scoped(unexpected)])
+        )
+
+        assert unexpected in score.over_applied
+
+    def test_a_requirement_nobody_raised_is_the_miss(self, case):
         expected = [reference.requirement for reference in case.references["asvs"]]
 
         score = score_applicability(case, Block(ruling(r) for r in expected[1:]))
 
         assert expected[0] in score.missed
-        assert score.missed_by_deferral == ()
+        assert score.matched_by_deferral == ()
 
     def test_a_scope_entry_of_another_state_does_not_count(self, case):
         """Only `needs-other-evidence` is a withholding. `not-applicable` is an
@@ -501,4 +516,5 @@ class TestDeferralIsSeparatedFromAMiss:
             ),
         )
 
-        assert score.missed_by_deferral == ()
+        assert expected[0] in score.missed
+        assert score.matched_by_deferral == ()
