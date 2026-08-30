@@ -81,10 +81,24 @@ def ruling(requirement: str, status: VerdictStatus = "confirmed") -> Requirement
 
 
 class Block:
-    """The one field the scorer reads off a block."""
+    """The two fields the scorer reads off a block.
 
-    def __init__(self, claims):
+    ``scope`` matters because a missed requirement has two causes and they are
+    not the same finding: a lane never raised it, or a lane raised it and the
+    service withheld it for want of the right kind of evidence.
+    """
+
+    def __init__(self, claims, scope=()):
         self.claims = list(claims)
+        self.scope = list(scope)
+
+
+class Scoped:
+    """One scope entry, as the scorer reads it."""
+
+    def __init__(self, unit, state="needs-other-evidence"):
+        self.unit = unit
+        self.state = state
 
 
 def test_a_perfect_run_matches_every_expected_requirement(case):
@@ -442,3 +456,49 @@ def test_pooling_the_yield_weights_by_draft_and_not_by_case(case):
     assert totals["drafts"] == 10
     assert totals["rejected"] == 1
     assert totals["rejection_rate"] == 0.1
+
+
+class TestDeferralIsSeparatedFromAMiss:
+    """A missed requirement has two causes and they are not one finding.
+
+    Either no lane raised it, or a lane raised it and the service withheld it
+    for want of the right kind of evidence. The second is a policy cost
+    `CARRIED_EVIDENCE_KINDS` sets; the first is a limit of the analysis. The
+    first sweep carrying deferral gave up 45 of 57 misses the second way, and
+    nothing said so.
+    """
+
+    def test_a_deferred_expectation_is_named_as_such(self, case):
+        expected = [reference.requirement for reference in case.references["asvs"]]
+        withheld = expected[0]
+
+        score = score_applicability(
+            case,
+            Block((ruling(r) for r in expected[1:]), scope=[Scoped(withheld)]),
+        )
+
+        assert withheld in score.missed
+        assert withheld in score.missed_by_deferral
+
+    def test_a_requirement_nobody_raised_is_not(self, case):
+        expected = [reference.requirement for reference in case.references["asvs"]]
+
+        score = score_applicability(case, Block(ruling(r) for r in expected[1:]))
+
+        assert expected[0] in score.missed
+        assert score.missed_by_deferral == ()
+
+    def test_a_scope_entry_of_another_state_does_not_count(self, case):
+        """Only `needs-other-evidence` is a withholding. `not-applicable` is an
+        answer, and `applicable` is *considered and nothing raised*."""
+        expected = [reference.requirement for reference in case.references["asvs"]]
+
+        score = score_applicability(
+            case,
+            Block(
+                (ruling(r) for r in expected[1:]),
+                scope=[Scoped(expected[0], state="applicable")],
+            ),
+        )
+
+        assert score.missed_by_deferral == ()
