@@ -16,6 +16,7 @@ from analysis_service.frameworks import schemas_for
 from analysis_service.frameworks.stride import STRIDE
 from analysis_service.frameworks.stride.record import DraftThreat
 from analysis_service.report import (
+    MENTION_MAX_CHARS,
     REASON_MAX_CHARS,
     Ground,
     Mitigation,
@@ -1026,6 +1027,37 @@ class TestSnapRulings:
         ruling = sample_ruling()
         [snapped] = snap_rulings([ruling], ELEMENT_IDS)
         assert snapped == ruling
+
+
+class TestAFreeStringFromAnAgentCannotOverrunAMark:
+    """A mark's fields are bounded and the agent text they quote is not.
+
+    Both writers below read a list or a description the model filled, so
+    neither has a length of its own. A raise here lands in the merge node,
+    where it costs the run every lane that already answered.
+    """
+
+    def test_a_blank_element_id_is_skipped_rather_than_marked(self):
+        model = valid_model()
+        draft = sample_draft("S-01", affected_element_ids=["store:orders-db", ""])
+
+        joined = join_drafts({"spoofing": [draft]}, STRIDE, model)
+
+        assert joined.marks.unresolved_references == []
+
+    def test_a_long_mention_is_cut_to_the_marks_bound(self):
+        model = valid_model()
+        draft = sample_draft(
+            "S-01",
+            description=(
+                "The threat reaches store:" + "a" * 400 + " and reads it there."
+            ),
+        )
+
+        joined = join_drafts({"spoofing": [draft]}, STRIDE, model)
+
+        (mark,) = joined.marks.unresolved_mentions
+        assert len(mark.mention) == MENTION_MAX_CHARS
 
 
 class TestAnUnknownGroundSettlesTheVerdict:

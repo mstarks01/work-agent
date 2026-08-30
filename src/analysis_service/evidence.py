@@ -62,6 +62,7 @@ from analysis_service.analysis import (
 from analysis_service.frameworks import FrameworkPackage, schemas_for
 from analysis_service.report import (
     DROPPED_REASON_MAX_CHARS,
+    GROUND_TERM_MAX_CHARS,
     REFERENCE_MAX_CHARS,
     AnalysisMarks,
     Claim,
@@ -347,7 +348,10 @@ def _grounds_of(
     in the model names it, and is dropped as unresolved when something does.
     An agent claiming a system has no directory service, in a model whose store
     is called "LDAP directory", has asserted an absence the model contradicts,
-    and this is where that costs its entry.
+    and this is where that costs its entry. A term longer than
+    :data:`~analysis_service.report.GROUND_TERM_MAX_CHARS` leaves the same way:
+    the field holds one term, an agent that wrote a sentence named no term, and
+    the entry is what that costs — never the run.
     """
     grounds = [
         Ground(kind="quote", text=quote.text, source_label=quote.source_label)
@@ -362,8 +366,8 @@ def _grounds_of(
             grounds.append(ground)
     for raw in proposal.absent_elements:
         term = raw.strip().lower()
-        if not term or names_term(model, term):
-            unresolved.append(absent_element_ref(raw))
+        if not term or len(term) > GROUND_TERM_MAX_CHARS or names_term(model, term):
+            unresolved.append(absent_element_ref(raw)[:REFERENCE_MAX_CHARS])
         else:
             grounds.append(Ground(kind="absent-element", term=term))
     return grounds, unresolved
@@ -471,9 +475,14 @@ def resolve_proposals(
                 )
             )
             continue
+        # A blank reference is skipped rather than marked: a mark names what
+        # the catalog does not hold, and an empty string names nothing. The
+        # groundless reason above still lists it, so a claim that cited only
+        # blanks is still reported.
         unresolved_evidence += [
             UnresolvedEvidence(claim_id=claim_id, reference=ref[:REFERENCE_MAX_CHARS])
             for ref in unresolved
+            if ref.strip()
         ]
         # The agent's own fields plus the lane the graph stamped, as one mapping:
         # what a package's record declares beyond :class:`Claim` is the package's
