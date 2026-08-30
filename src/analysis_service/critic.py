@@ -324,12 +324,16 @@ def _reach_of(places: Collection[str], system_model: SystemModel) -> frozenset[s
     return frozenset(reach)
 
 
-def _grounded_places(claim: Claim, known_ids: Collection[str]) -> frozenset[str]:
-    """The places a claim's grounds name, or the IDs its description cites.
+def _bound_of(
+    claim: Claim, known_ids: Collection[str], system_model: SystemModel
+) -> frozenset[str]:
+    """The element IDs a claim may cite, from its grounds or from its prose.
 
-    A catalogued ground names an element or a flow. A claim resting on quotes
-    alone names none, so its bound is what its own prose cites — the same
-    resolution :func:`mentioned_ids` gives coverage — and a claim citing nothing
+    A catalogued ground names an element or a flow, and the bound is one hop
+    from those (:func:`_reach_of`). A claim resting on quotes alone names none,
+    so its bound is exactly what its own prose cites — the same resolution
+    :func:`mentioned_ids` gives coverage — with no hop, since a description
+    that names an element has already put it in reach. A claim citing nothing
     anywhere has no bound and passes untouched.
     """
     places = {
@@ -338,7 +342,7 @@ def _grounded_places(claim: Claim, known_ids: Collection[str]) -> frozenset[str]
         if ground.kind != "quote"
     }
     if places:
-        return frozenset(places)
+        return _reach_of(places, system_model)
     return frozenset(
         resolved
         for mention in mentioned_ids(claim.description)
@@ -362,11 +366,10 @@ def _bound_element_references(
     unresolved: list[UnresolvedReference] = []
     dropped: list[DroppedClaim] = []
     for claim in claims:
-        places = _grounded_places(claim, known_ids)
-        if not places:
+        reach = _bound_of(claim, known_ids, system_model)
+        if not reach:
             drafts.append(claim)
             continue
-        reach = _reach_of(places, system_model)
         kept = [ref for ref in claim.affected_element_ids if ref in reach]
         lost = [ref for ref in claim.affected_element_ids if ref not in reach]
         if not lost:
@@ -463,6 +466,9 @@ class ReviewProblems(NamedTuple):
 
     messages: list[str]
     implicated: frozenset[str]
+    #: The rulings as :func:`complete_rulings` left them, so assembly reads
+    #: the set the check ran over rather than completing it a second time.
+    rulings: tuple[Ruling, ...] = ()
 
     def __bool__(self) -> bool:
         return bool(self.messages)
@@ -862,41 +868,18 @@ def join_drafts(
     )
 
 
-def derived_unknowns(draft: Claim) -> list[UnknownRef]:
-    """The element/attribute pairs a draft's own grounds say the input left open.
-
-    Every ``unknown-attribute`` ground is one. A draft citing one rests on a
-    control the input never settled, and the prompts already say what that
-    makes it: a conditional claim, ruled ``needs-info`` on exactly those pairs.
-    Computed from the grounds, so the pairs resolve by construction — they were
-    copied out of the evidence catalog — and the critic never has to re-derive
-    them from prose (#439).
-    """
-    seen: dict[tuple[str, str], UnknownRef] = {}
-    for ground in draft.grounds:
-        if ground.kind == "unknown-attribute":
-            key = (ground.element_id, ground.attribute)
-            seen.setdefault(
-                key,
-                UnknownRef(element_id=ground.element_id, attribute=ground.attribute),
-            )
-    return list(seen.values())
-
-
-def _name_unknowns(unknowns: Sequence[UnknownRef]) -> str:
-    return ", ".join(f"`{ref.attribute}` on `{ref.element_id}`" for ref in unknowns)
-
-
 def complete_rulings(
     drafts: Sequence[Claim], rulings: Sequence[Ruling]
 ) -> list[Ruling]:
     """Each ruling with what the draft's grounds settle already filled in.
 
-    A ``needs-info`` ruling on a draft that cites an ``unknown-attribute``
-    ground gains those pairs in ``related_unknowns`` (beside any the critic
-    named) and, where the critic wrote none, a reason naming them. The critic
-    may therefore answer such a draft with a bare ``needs-info``; what it may
-    not do is confirm it, which :func:`review_issues` reports.
+    A draft whose grounds settle it (:meth:`Claim.settled_by_grounds`) is not
+    shown to the critic, and where the critic wrote no ruling on it the
+    settled ruling is added here. Where a critic did rule on one — a scripted
+    critic reads every draft — a ``needs-info`` ruling gains the pairs in
+    ``related_unknowns`` (beside any the critic named) and, where the critic
+    wrote none, a reason naming them. What a critic may not do is confirm such
+    a draft, which :func:`review_issues` reports.
 
     A ruling on a draft the package's own table calls misfiled
     (:meth:`~analysis_service.report.Claim.misfiled`) becomes ``rejected`` with
@@ -905,12 +888,19 @@ def complete_rulings(
     Rulings on drafts with no such ground pass through untouched, and so does a
     ruling that names no drafted ID: the reconciliation check owns that.
     """
-    by_id = {draft.id: derived_unknowns(draft) for draft in drafts}
+    by_id = {draft.id: draft.unknown_grounds() for draft in drafts}
     misfiled = {
         draft.id: reason for draft in drafts if (reason := type(draft).misfiled(draft))
     }
+    ruled_ids = {ruling.id for ruling in rulings}
+    settled = [
+        ruling
+        for draft in drafts
+        if draft.id not in ruled_ids
+        and (ruling := type(draft).settled_by_grounds(draft)) is not None
+    ]
     completed = []
-    for ruling in rulings:
+    for ruling in (*rulings, *settled):
         if ruling.id in misfiled:
             # A lane error is a table lookup, so the ruling is the table's
             # whatever the critic said (#442). The reason names the lanes the
@@ -933,7 +923,7 @@ def complete_rulings(
         }
         added = [ref for ref in derived if (ref.element_id, ref.attribute) not in named]
         reason = ruling.verdict.reason or (
-            f"The claim rests on {_name_unknowns(derived)}, which the input never stated."
+            f"The claim rests on {_named(derived)}, which the input never stated."
         )
         verdict = ruling.verdict.model_copy(
             update={
@@ -943,6 +933,19 @@ def complete_rulings(
         )
         completed.append(ruling.model_copy(update={"verdict": verdict}))
     return completed
+
+
+def _named(unknowns: Sequence[UnknownRef]) -> str:
+    return ", ".join(f"`{ref.attribute}` on `{ref.element_id}`" for ref in unknowns)
+
+
+def unsettled_drafts(drafts: Sequence[Claim]) -> list[Claim]:
+    """The drafts a critic reads: every one its own grounds do not settle.
+
+    A draft :meth:`Claim.settled_by_grounds` rules is ruled in code and never
+    shown, so the critic spends nothing on it (#439).
+    """
+    return [draft for draft in drafts if type(draft).settled_by_grounds(draft) is None]
 
 
 def _confirmed_on_unknown_issues(
@@ -955,12 +958,12 @@ def _confirmed_on_unknown_issues(
     ``needs-info`` — which the service completes — or ``rejected`` with a
     reason, and a re-ask is what turns a confirmation into one of those.
     """
-    by_id = {draft.id: derived_unknowns(draft) for draft in drafts}
+    by_id = {draft.id: draft.unknown_grounds() for draft in drafts}
     return [
         CriticIssue(
             ruling.id,
             f"claim {ruling.id!r} is ruled confirmed but its own grounds cite"
-            f" {_name_unknowns(by_id[ruling.id])} as never stated, so it cannot"
+            f" {_named(by_id[ruling.id])} as never stated, so it cannot"
             " be confirmed: rule it needs-info, or reject it with a reason",
         )
         for ruling in rulings
@@ -999,11 +1002,9 @@ def duplicate_groups(
 ) -> dict[str, list[str]]:
     """Each draft's ID against the other drafts naming one action at one place.
 
-    The critic's duplicate step asked the model to find, across every lane,
-    two drafts that are the same attacker action against the same element.
-    That is a comparison of two fields — the verb and the endpoint-resolved
-    targets — and it is made here so the critic reads the pairs rather than
-    hunting for them (#440). Lanes are not compared: a read and a write of one
+    The critic's duplicate step is a comparison of two fields — the verb and
+    the endpoint-resolved targets — made here so the critic reads the pairs
+    rather than hunting for them across every lane (#440). Lanes are not compared: a read and a write of one
     flow carry two verbs, and two lanes filing one verb at one place is the
     duplicate the step exists to catch.
 
@@ -1034,13 +1035,16 @@ def rating_disagreements(drafts: Sequence[Claim]) -> dict[str, list[str]]:
     reads the pair and only picks the rating (#444). Quotes are left out of the
     key: two agents quoting two spans of one sentence are not two patterns.
 
-    A draft with no ``severity`` belongs to a framework that grades nothing
-    and is never compared.
+    The ratings are read through :meth:`Claim.rating_of`, so a framework that
+    grades nothing answers ``None`` and is never compared.
     """
     by_pattern: dict[tuple[str, frozenset[tuple[str, str, str]]], list[Claim]] = {}
+    ratings: dict[str, tuple[str, str]] = {}
     for draft in drafts:
-        if draft.verb is None or getattr(draft, "severity", None) is None:
+        rating = type(draft).rating_of(draft)
+        if draft.verb is None or rating is None:
             continue
+        ratings[draft.id] = rating
         facts = frozenset(
             (ground.kind, ground.element_id or ground.flow_id, ground.attribute)
             for ground in draft.grounds
@@ -1050,8 +1054,7 @@ def rating_disagreements(drafts: Sequence[Claim]) -> dict[str, list[str]]:
             by_pattern.setdefault((draft.verb, facts), []).append(draft)
     disagreements: dict[str, list[str]] = {}
     for group in by_pattern.values():
-        ratings = {(d.severity.likelihood, d.severity.impact) for d in group}  # type: ignore[attr-defined]
-        if len(ratings) < 2:
+        if len({ratings[d.id] for d in group}) < 2:
             continue
         for draft in group:
             disagreements[draft.id] = [d.id for d in group if d.id != draft.id]
@@ -1125,7 +1128,9 @@ def review_issues(
     implicated = set(dropped) | {
         issue.claim_id for issue in per_ruling if issue.claim_id in drafted_ids
     }
-    return ReviewProblems(messages=messages, implicated=frozenset(implicated))
+    return ReviewProblems(
+        messages=messages, implicated=frozenset(implicated), rulings=tuple(rulings)
+    )
 
 
 def _ruled(draft: Claim, ruling: Ruling, ruled_record: type[RuledClaim]) -> RuledClaim:
@@ -1187,8 +1192,9 @@ def assemble_claims(
     if problems:
         raise CriticOutputError("; ".join(problems.messages))
 
-    rulings = complete_rulings(drafts, rulings)
-    rulings = snap_rulings(rulings, {element.id for element in system_model.elements()})
+    rulings = snap_rulings(
+        problems.rulings, {element.id for element in system_model.elements()}
+    )
     ruling_by_id = {ruling.id: ruling for ruling in rulings}
     reviewed = [
         _ruled(draft, ruling_by_id[draft.id], schemas.ruled_record) for draft in drafts

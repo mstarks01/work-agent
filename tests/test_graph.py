@@ -1085,6 +1085,26 @@ def test_merge_drops_and_marks_a_claim_about_a_hallucinated_element():
     assert "process:invented" in marks["dropped_claims"][0]["reason"]
 
 
+def test_merge_refuses_a_draft_on_a_unit_the_rules_ruled_out(monkeypatch):
+    """#443: a unit ruled out in ``prepare`` takes no claim, whatever the agent read."""
+    from analysis_service.frameworks.stride.record import DraftThreat
+
+    monkeypatch.setattr(
+        DraftThreat, "unit_of", classmethod(lambda cls, draft: draft.id)
+    )
+    ctx = FakeContext(**analyze_state(spoofing=[sample_proposal("S-01")]))
+    ctx.state[NODES.key("ruled_out")] = {"S-01": "ruled out in code by a test"}
+
+    output = graph.merge_drafts(valid_model().model_dump(mode="json"), ctx, KEYS, NODES)
+
+    assert output["draft_count"] == 0
+    (dropped,) = ctx.state[NODES.key("marks")]["dropped_claims"]
+    assert (dropped["claim_id"], dropped["reason"]) == (
+        "S-01",
+        "ruled out in code by a test",
+    )
+
+
 def test_merge_drops_and_marks_a_proposal_that_fails_its_schema():
     """The node's own schema salvages: a verb outside the closed set costs
     that proposal, and the mark names the claim the agent meant."""

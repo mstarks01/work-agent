@@ -230,6 +230,25 @@ class DraftThreat(Claim):
         )
 
     @classmethod
+    def settled_by_grounds(cls, draft: Claim) -> Ruling | None:
+        """The neutral ruling, as a :class:`ThreatRuling` rated ``low``.
+
+        The critic's confidence rule already says what a threat resting on an
+        ``unknown`` earns, so the ruling code writes carries that rating.
+        """
+        ruling = super().settled_by_grounds(draft)
+        if ruling is None:
+            return None
+        return ThreatRuling(id=ruling.id, verdict=ruling.verdict, confidence="low")
+
+    @classmethod
+    def rating_of(cls, draft: Claim) -> tuple[str, str] | None:
+        """This framework grades harm, so a draft's two ratings are its own."""
+        if not isinstance(draft, DraftThreat):
+            return None
+        return draft.severity.likelihood, draft.severity.impact
+
+    @classmethod
     def lane_diagnostics(cls, drafts: Sequence[Claim]) -> list[str]:
         """Every lane whose drafts are not numbered ``01..N``, as messages.
 
