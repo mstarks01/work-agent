@@ -991,3 +991,78 @@ class TestSnapRulings:
         ruling = sample_ruling()
         [snapped] = snap_rulings([ruling], ELEMENT_IDS)
         assert snapped == ruling
+
+
+class TestAnUnknownGroundSettlesTheVerdict:
+    """#439: a draft citing an ``unknown-attribute`` ground is conditional by
+    its own evidence, so the verdict is decided in code and the critic only
+    chooses between ``needs-info`` and ``rejected``."""
+
+    @pytest.fixture
+    def model(self):
+        return valid_model()
+
+    def _draft(self):
+        return sample_draft(
+            "S-01",
+            grounds=[
+                Ground(
+                    kind="unknown-attribute",
+                    element_id="store:orders-db",
+                    attribute="encryption_at_rest",
+                )
+            ],
+        )
+
+    def test_a_confirmation_is_reported_for_the_re_ask(self, model):
+        problems = review_issues([self._draft()], [sample_ruling("S-01")], model)
+
+        assert "cannot be confirmed" in "; ".join(problems.messages)
+        assert problems.implicated == frozenset({"S-01"})
+
+    def test_a_bare_needs_info_is_completed_from_the_grounds(self, model):
+        ruling = sample_ruling(
+            "S-01", confidence="low", verdict=ProposedVerdict(status="needs-info")
+        )
+
+        assert not review_issues([self._draft()], [ruling], model)
+        assembled = assemble_claims([self._draft()], [ruling], model, SCHEMAS)
+        verdict = assembled.claims[0].verdict
+        assert verdict.related_unknowns == [
+            UnknownRef(element_id="store:orders-db", attribute="encryption_at_rest")
+        ]
+        assert "encryption_at_rest" in verdict.reason
+
+    def test_the_critics_own_unknowns_and_reason_are_kept(self, model):
+        ruling = sample_ruling(
+            "S-01",
+            confidence="low",
+            verdict=ProposedVerdict(
+                status="needs-info",
+                reason="Also depends on who can reach the store.",
+                related_unknowns=[
+                    UnknownRef(element_id="store:orders-db", attribute="technology")
+                ],
+            ),
+        )
+
+        assembled = assemble_claims([self._draft()], [ruling], model, SCHEMAS)
+        verdict = assembled.claims[0].verdict
+        assert verdict.reason == "Also depends on who can reach the store."
+        assert [ref.attribute for ref in verdict.related_unknowns] == [
+            "technology",
+            "encryption_at_rest",
+        ]
+
+    def test_a_rejection_still_stands(self, model):
+        ruling = sample_ruling(
+            "S-01",
+            verdict=ProposedVerdict(
+                status="rejected", reason="filed in the wrong lane"
+            ),
+        )
+
+        assert not review_issues([self._draft()], [ruling], model)
+
+    def test_a_draft_with_no_unknown_ground_is_untouched(self, model):
+        assert not review_issues([sample_draft("S-01")], [sample_ruling("S-01")], model)
