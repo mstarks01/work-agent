@@ -98,6 +98,20 @@ _HEADER_RULE = "----"
 _BACKTICK_RUN = re.compile(r"`+")
 
 
+#: What a job's input actually holds, as kinds of evidence a **Framework** can
+#: settle a claim from. One entry today, because a **Source** is text and this
+#: service accepts nothing else.
+#:
+#: A constant rather than a field on the job, and that is the honest shape while
+#: there is one value: a field would imply a caller chooses, and none can.
+#: **It is threaded as an argument everywhere it is read**, so the day the
+#: service accepts source code or a configuration dump, this becomes a job field
+#: and no package changes — which is the whole reason a package declares what
+#: kind of evidence settles its claims rather than declaring what it cannot
+#: answer.
+CARRIED_EVIDENCE_KINDS: tuple[str, ...] = ("prose",)
+
+
 class Source(BaseModel):
     """One piece of untrusted input text a job is built from.
 

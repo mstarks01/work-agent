@@ -18,6 +18,7 @@ import re
 from collections import Counter
 from collections.abc import Sequence
 from pathlib import Path
+from typing import Any
 
 import pytest
 from pydantic import ValidationError
@@ -53,6 +54,7 @@ from analysis_service.markdown_loader import MarkdownLoader, split_sections
 from analysis_service.report import (
     FrameworkSelection,
     Ground,
+    QuoteCandidate,
     Report,
     ScopeEntry,
     Verdict,
@@ -825,3 +827,103 @@ def test_the_package_root_carries_no_stray_markdown():
     found = {path.relative_to(ASVS_ROOT) for path in ASVS_ROOT.rglob("*.md")}
 
     assert found == expected
+
+
+class TestAJobDefersWhatItsInputCannotSettle:
+    """The split a lane agent makes, and where each half lands.
+
+    A requirement whose substance needs source code is not a question a
+    submitter can answer by writing more. Recorded as a **Scope Entry** rather
+    than as a **Claim** carrying a ``needs-info`` verdict, so a reader can tell
+    *send more description* from *no description will do*.
+    """
+
+    @staticmethod
+    def _proposal(key: str, needs: Any) -> RequirementProposal:
+        return RequirementProposal(
+            title="t",
+            description="d",
+            requirement=key,
+            needs_evidence=needs,
+            quotes=[QuoteCandidate(text="Shoppers sign in", source_label="note")],
+        )
+
+    def test_a_kind_the_job_carries_is_kept(self):
+        """`prose` survives: the description was thin, which is answerable."""
+        kept, deferred = AsvsAnalysis.partition_proposals(
+            [self._proposal("2.5", "prose")], "encoding-and-sanitization", ["prose"]
+        )
+
+        assert len(kept) == 1
+        assert deferred == {}
+
+    def test_a_kind_the_job_does_not_carry_is_deferred(self):
+        kept, deferred = AsvsAnalysis.partition_proposals(
+            [self._proposal("2.4", "code")], "encoding-and-sanitization", ["prose"]
+        )
+
+        assert kept == []
+        assert "needs code" in deferred["V1.2.4"]
+        assert "carries prose" in deferred["V1.2.4"]
+
+    def test_a_ruled_proposal_is_kept(self):
+        """Empty means the agent ruled, and the critic judges it as before."""
+        kept, deferred = AsvsAnalysis.partition_proposals(
+            [self._proposal("2.6", "")], "encoding-and-sanitization", ["prose"]
+        )
+
+        assert len(kept) == 1
+        assert deferred == {}
+
+    def test_a_richer_job_defers_less(self):
+        """Nothing is discounted permanently: the answer is the job's, not the
+        requirement's."""
+        proposals = [self._proposal("2.4", "code")]
+
+        _, prose_only = AsvsAnalysis.partition_proposals(
+            proposals, "encoding-and-sanitization", ["prose"]
+        )
+        kept, with_code = AsvsAnalysis.partition_proposals(
+            proposals, "encoding-and-sanitization", ["prose", "code"]
+        )
+
+        assert prose_only
+        assert with_code == {}
+        assert len(kept) == 1
+
+    def test_a_deferred_requirement_reaches_scope_with_its_reason(self):
+        entries = AsvsAnalysis.scope_entries(
+            lanes=list(LANES),
+            claims=[],
+            options={"level": 1},
+            refusal_reason="",
+            deferred={"V1.2.4": "applies, and settling it needs code"},
+        )
+        by_unit = {entry.unit: entry for entry in entries}
+
+        assert by_unit["V1.2.4"].state == "needs-other-evidence"
+        assert "needs code" in by_unit["V1.2.4"].reason
+        # Everything else it raised nothing about stays as it was.
+        assert by_unit["V1.2.5"].state == "applicable"
+
+    def test_a_refused_precondition_still_wins(self):
+        """A lane that never ran cannot have deferred anything."""
+        entries = AsvsAnalysis.scope_entries(
+            lanes=list(LANES),
+            claims=[],
+            options={"level": 1},
+            refusal_reason="not a web application",
+            deferred={"V1.2.4": "applies, and settling it needs code"},
+        )
+
+        assert {entry.state for entry in entries} == {"not-applicable"}
+
+
+def test_a_package_that_defers_nothing_inherits_the_neutral_default():
+    """STRIDE's claims rest on the system's own shape, so it defers none."""
+    from analysis_service.frameworks.stride.record import DraftThreat
+
+    assert DraftThreat.partition_proposals(["a", "b"], "spoofing", ["prose"]) == (
+        ["a", "b"],
+        {},
+    )

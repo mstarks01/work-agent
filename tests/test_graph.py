@@ -1957,6 +1957,9 @@ FRAMEWORK_KEY_WRITERS: tuple[tuple[str, dict[str, Any]], ...] = (
                 }
             ],
             "marks": {"missing_mitigations": [{"claim_id": "S-01"}]},
+            # Unit -> why this job could not settle it. Empty for a package
+            # that defers nothing, which is every package but ASVS.
+            "deferred": {},
         },
     ),
     (
