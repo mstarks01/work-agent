@@ -579,6 +579,14 @@ class Ground(BaseModel):
         return self
 
 
+# The bound on a verdict's ``reason``, named because code writes one too.
+# :meth:`Claim.settled_by_grounds` composes a sentence from a draft's unknown
+# grounds, and a draft can cite more pairs than a sentence of this length names.
+# A writer that cannot read the bound writes a string the schema refuses, and
+# that fails the node rather than the claim.
+REASON_MAX_CHARS = 1000
+
+
 class ProposedVerdict(BaseModel):
     """The critic's ruling on one threat, as the critic emits it.
 
@@ -598,7 +606,7 @@ class ProposedVerdict(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
     status: VerdictStatus
-    reason: str = Field(default="", max_length=1000)
+    reason: str = Field(default="", max_length=REASON_MAX_CHARS)
     related_unknowns: list[UnknownRef] = Field(default_factory=list)
     rejected_because: RejectionStep | None = None
 
@@ -838,6 +846,10 @@ class Claim(BaseModel):
         rules it here, and the critic never sees it (#439). ``None`` for a
         draft the grounds do not settle. A package whose ruling carries fields
         beyond the neutral shape overrides this to fill them.
+
+        The sentence names each pair, and names the count instead when the
+        pairs overrun ``REASON_MAX_CHARS``. ``related_unknowns`` carries every
+        pair either way, so the prose is the only thing that shortens.
         """
         unknowns = draft.unknown_grounds()
         if not unknowns:
@@ -845,9 +857,14 @@ class Claim(BaseModel):
         named = ", ".join(
             f"`{ref.attribute}` on `{ref.element_id}`" for ref in unknowns
         )
+        reason = f"The claim rests on {named}, which the input never stated."
+        if len(reason) > REASON_MAX_CHARS:
+            reason = (
+                f"The claim rests on {len(unknowns)} attributes the input never stated."
+            )
         verdict = ProposedVerdict(
             status="needs-info",
-            reason=f"The claim rests on {named}, which the input never stated.",
+            reason=reason,
             related_unknowns=unknowns,
         )
         return Ruling(id=draft.id, verdict=verdict)
