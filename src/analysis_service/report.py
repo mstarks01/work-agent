@@ -30,6 +30,7 @@ import hashlib
 from collections import Counter
 from collections.abc import Collection, Iterable, Mapping, Sequence
 from datetime import datetime
+from types import MappingProxyType
 from typing import Annotated, Any, ClassVar, Literal, Self, get_args
 
 from pydantic import (
@@ -669,6 +670,41 @@ class Claim(BaseModel):
         """
         del drafts
         return AnalysisMarks()
+
+    @classmethod
+    def partition_proposals(
+        cls, proposals: Sequence[Any], lane: str, carried: Collection[str]
+    ) -> tuple[list[Any], dict[str, str]]:
+        """Split a lane's proposals into the ones this job can settle, and the rest.
+
+        Returns the kept proposals and, keyed by the unit the package answers
+        in, the reason each deferred one was set aside. One call rather than
+        two, so the neutral fan-in needs no way of composing a package's unit
+        from a package's proposal.
+
+        Keyed by the unit the package answers in — a requirement, a lane — with
+        the reason a reader gets, so the caller needs no second lookup and no
+        knowledge of what the package's units are.
+
+        **Stated as a property, because it holds for a package nobody has
+        written: a framework may need a fact of a kind a job does not carry.**
+        A framework whose claims all rest on the system's own shape defers
+        nothing, and inherits this. One ruling on requirements defers most of
+        what it looks at, because most of what it looks at is settled by source
+        code, by a deployed setting, or by a person.
+
+        A deferred proposal never becomes a draft, so it never reaches the
+        **Critic** and never becomes a **Claim**. It becomes a **Scope Entry**
+        in the ``needs-other-evidence`` state, which is why the reason returned
+        here has to name the kind of evidence that would settle it rather than
+        merely say no.
+
+        ``carried`` is what the job's input actually holds. It is an argument
+        rather than a constant so that the answer changes when the service
+        accepts a second kind of input, with no edit to any package.
+        """
+        del lane, carried
+        return list(proposals), {}
 
     @classmethod
     def lane_diagnostics(cls, drafts: Sequence[Claim]) -> list[str]:
@@ -1665,7 +1701,21 @@ class ScopeEntry(BaseModel):
     own catalog; a report's reader does not. Self-containment is the property
     this payload enforces everywhere else.
 
-    A ``not-applicable`` entry must state a reason, which is the rule
+    **Three states, and the third is not a weaker second.** ``not-applicable``
+    says the unit does not apply to a system of this shape — a complete answer.
+    ``applicable`` says the framework considered it and raised nothing.
+    ``needs-other-evidence`` says the unit *does* apply and this job cannot
+    settle it, because the evidence that would is not the kind the job carries.
+
+    That third state exists because collapsing it into either of the others
+    loses the distinction a reader most needs. Folded into ``not-applicable`` it
+    claims the unit was ruled out, which is false. Left as a **Claim** with a
+    ``needs-info`` **Verdict** it reads as *send more of the same input*, which
+    will never work — and a submitter cannot tell those apart. Its reason names
+    the kind of evidence that would settle it, so the answer is actionable in
+    the only way it can be: by supplying a different kind of input.
+
+    Both non-``applicable`` states must state a reason, which is the rule
     :class:`Verdict` already applies to its two non-confirmed states.
 
     **STRIDE's list is empty**, and that is not an omission: STRIDE has no
@@ -1675,14 +1725,14 @@ class ScopeEntry(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
     unit: str = Field(min_length=1, max_length=300)
-    state: Literal["applicable", "not-applicable"]
+    state: Literal["applicable", "not-applicable", "needs-other-evidence"]
     reason: str = Field(default="", max_length=1000)
 
     @model_validator(mode="after")
     def _check_shape(self) -> Self:
-        if self.state == "not-applicable" and not self.reason:
+        if self.state != "applicable" and not self.reason:
             raise ValueError(
-                f"scope entry {self.unit!r} is not-applicable and must state a reason"
+                f"scope entry {self.unit!r} is {self.state} and must state a reason"
             )
         return self
 
@@ -1961,6 +2011,7 @@ class FrameworkAnalysis(BaseModel):
         claims: Sequence[RuledClaim],
         options: Mapping[str, Any],
         refusal_reason: str,
+        deferred: Mapping[str, str] = MappingProxyType({}),
     ) -> list[ScopeEntry]:
         """What this framework considered and raised no claim about.
 
@@ -1978,10 +2029,20 @@ class FrameworkAnalysis(BaseModel):
         ``refusal_reason`` is empty when the precondition let the lanes run.
         ``options`` is the job's own selection for this framework, as the input
         ladder validated it.
+
+        ``deferred`` maps a unit this job could not settle to the reason, from
+        :meth:`Claim.partition_proposals`. Empty for a package that defers
+        nothing, which is every package whose claims rest on the system's own
+        shape. It arrives here rather than being recomputed because the fan-in
+        is where the proposals were, and a second derivation could disagree with
+        the first.
         """
         del claims, options
         if not refusal_reason:
-            return []
+            return [
+                ScopeEntry(unit=unit, state="needs-other-evidence", reason=reason)
+                for unit, reason in deferred.items()
+            ]
         return [
             ScopeEntry(unit=lane, state="not-applicable", reason=refusal_reason)
             for lane in lanes

@@ -186,7 +186,7 @@ from analysis_service.skills import (
     compose_domain_skills,
     compose_lane_skills,
 )
-from analysis_service.sources import fence_for
+from analysis_service.sources import CARRIED_EVIDENCE_KINDS, fence_for
 from analysis_service.system_model import BoundaryCrossing, SystemModel
 from analysis_service.validation import ValidationIssue, parse_and_validate
 
@@ -583,6 +583,9 @@ FRAMEWORK_RENDERED_ARTIFACTS: tuple[str, ...] = (
 FRAMEWORK_STRUCTURED_ARTIFACTS: tuple[str, ...] = (
     "drafts",
     "coverage",
+    # Unit -> why this job could not settle it. Written by the fan-in, read by
+    # ``assemble``, and empty for a package that defers nothing.
+    "deferred",
     "marks",
     "precondition",
     "retrieved",
@@ -1453,9 +1456,22 @@ def merge_drafts(
         lane: invalid_proposal_marks(batch.invalid, package, lane)
         for lane, batch in batches.items()
     }
-    resolutions = {
-        lane: resolve_proposals(batch.claims, catalog, package, lane)
+    # Split before resolving, because a deferred proposal must not become a
+    # draft: the whole point is that it never reaches the critic. The package
+    # decides which, since the unit and the reason are both its own.
+    partitions = {
+        lane: package.record.partition_proposals(
+            batch.claims, lane, CARRIED_EVIDENCE_KINDS
+        )
         for lane, batch in batches.items()
+    }
+    deferred: dict[str, str] = {}
+    for _, reasons in partitions.values():
+        deferred.update(reasons)
+    state.put(nodes.key("deferred"), deferred)
+    resolutions = {
+        lane: resolve_proposals(kept, catalog, package, lane)
+        for lane, (kept, _) in partitions.items()
     }
     drafts_by_lane = {
         lane: resolution.drafts for lane, resolution in resolutions.items()
@@ -1820,6 +1836,7 @@ def _framework_block(
             refusal_reason=_refusal_reason(
                 package, state.get(nodes.key("precondition"))
             ),
+            deferred=state.get(nodes.key("deferred")) or {},
         ),
         coverage=[
             LaneCoverage.model_validate(row)

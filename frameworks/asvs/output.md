@@ -14,15 +14,16 @@ These follow step 7 of the procedure above and belong to this framework alone.
 
 8. **Rule each requirement.** Take the requirements in your `## Applicability` in order. For each one, decide which of three things the input supports, and write the claim that says so:
     - the requirement applies to this system, and the input does not show it satisfied — write the claim plainly;
-    - the requirement applies, and the input does not settle it — write it conditionally and name the element and attribute it hangs on, so the critic can mark it needs-info;
+    - the requirement applies, and the input does not settle it — write it conditionally, say what has to be answered, and set `needs_evidence`;
     - the requirement does not apply to a system of this shape — write the claim and say which fact of the model rules it out, so the critic can reject it. A rejected claim is an answer, not a gap.
 9. **Say which position in the graph, or none.** Most requirements in this standard address a coding practice with no position in the System Model. Where yours does, name the elements — each **copied from the element roster** rather than assembled from a name. Where it does not, leave `affected_element_ids` empty rather than reaching for the nearest element — a requirement about output encoding is not about the web process just because one exists.
 
 ## Your fields
 
-Each draft carries exactly six fields — `requirement`, `title`, `description`, `affected_element_ids`, `evidence_refs`, `quotes` — and nothing else.
+Each draft carries exactly seven fields — `requirement`, `title`, `description`, `affected_element_ids`, `evidence_refs`, `quotes`, `needs_evidence` — and nothing else.
 
 - **`requirement`** — the `<section>.<requirement>` pair inside your chapter, as your `## Applicability` spells it: `2.5` for `V1.2.5` in the encoding and sanitization lane. Digits and one dot, nothing else. The service composes the published version-safe reference from it and your chapter, so `2.5` becomes `v5.0.0-1.2.5` — never spell your chapter and never spell the version.
 - **`title`** — name the requirement's subject and what this system's input says about it. "V1.2.4 parameterized queries" restates the catalog; "database queries are built by hand in the order service" is a ruling.
 - **`description`** — the full argument in prose: what the requirement asks, which fact of this system makes it apply, and what the input does or does not show about it. Where the requirement does not apply, say which fact rules it out. Quote no requirement text at length — the reader has the standard.
 - **`affected_element_ids`** — the elements the requirement is about, or an empty list. Empty is the ordinary case here, and it is correct rather than a gap.
+- **`needs_evidence`** — empty when you ruled. `prose` when a fuller description of *this* system would settle it, which the submitter can act on. `code`, `config` or `people` when no description could, because the answer is in the implementation, in a deployed setting, or with a person — that requirement is then recorded as one this job cannot reach, not as a question nobody can answer. Judge it against **this** submission: a requirement is settleable whenever the text in front of you speaks to it.
