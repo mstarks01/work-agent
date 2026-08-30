@@ -98,6 +98,15 @@ def make_one_finding_unlisted(artifact: Path, case) -> None:
     for block in raw["analyses"]:
         for claim in block["claims"]:
             claim["verb"] = "abuse-grant"
+            # Confirmed, because the scripted critic rules every draft
+            # needs-info (its drafts cite an unknown ground), and a needs-info
+            # finding is counted rather than keyed: it can never be unlisted.
+            claim["verdict"] = {
+                "status": "confirmed",
+                "reason": "",
+                "related_unknowns": [],
+            }
+            block["summary"]["needs_info_count"] -= 1
             break
         break
     path.write_text(json.dumps(raw, indent=2), encoding="utf-8")
