@@ -188,6 +188,13 @@ from analysis_service.system_model import BoundaryCrossing, SystemModel
 # critic pass failed to reconcile with its drafts, before the bounded re-ask
 # repaired it.
 #
+# 3.0 also carries ``rejected_because`` on a verdict: which of the critic's
+# three checks — the draft's own substance, the lane it was filed in, or another
+# draft already covering it — ended a rejected draft. A consumer reading the
+# rejected array as an audit trail had to parse the reason prose for this and can
+# now read a field. It rides 3.0 because 3.0 has never shipped; on its own it
+# would be major, since the field is required on every rejected verdict.
+#
 # A ``needs-info`` verdict names what has to be answered in one of two
 # spellings: an element and one of its attributes, or a ``subject`` — a question
 # with no place in the System Model at all. A consumer switching on the element
@@ -228,6 +235,19 @@ FRAMEWORK_NAMES: tuple[FrameworkName, ...] = get_args(FrameworkName)
 Rating = Literal["low", "medium", "high"]
 SeverityLevel = Literal["low", "medium", "high", "critical"]
 VerdictStatus = Literal["confirmed", "needs-info", "rejected"]
+
+# Which of the critic's three checks killed a rejected draft. The rejected array
+# is an audit trail, and a reader has to be able to tell which step ended a
+# draft; the reason says it in prose, and this says it in a field the code reads.
+#
+# **The steps, not a package's reasons.** ``prompts/critic.md`` numbers three
+# checks and every package's own critic text names the same three in its own
+# words, because the property is neutral: a draft can fail on its own substance,
+# on where it was filed, or on another draft already covering it. A framework
+# that ruled a unit out of scope and one that rejected an attacker action both
+# answer ``evidence``; the vocabulary describes the check rather than what the
+# check was about, so it answers for a package nobody has written.
+RejectionStep = Literal["evidence", "lane", "duplicate"]
 
 # One value in a report's per-tier sampling clear block. Wide on purpose: it is
 # every scalar type a resolved sampling param can hold, and the block is a
@@ -513,12 +533,13 @@ class Ground(BaseModel):
 class ProposedVerdict(BaseModel):
     """The critic's ruling on one threat, as the critic emits it.
 
-    The three fields and **no rule between them**, which is what makes this the
+    The four fields and **no rule between them**, which is what makes this the
     shape a provider can be asked to generate: nothing a critic writes here is
     a shape error, so nothing it writes can fail the node on the way into
     state. Whether the combination is *coherent* — a ``needs-info`` that names
-    what must be answered, a non-``confirmed`` that says why — is asked at the
-    review seam, which can send it back.
+    what must be answered, a non-``confirmed`` that says why, a ``rejected``
+    that names the check it failed — is asked at the review seam, which can
+    send it back.
 
     Every field's own constraint still applies. ``status`` is a closed
     vocabulary and a ``reason`` still has a maximum length; what moved is only
@@ -530,15 +551,17 @@ class ProposedVerdict(BaseModel):
     status: VerdictStatus
     reason: str = Field(default="", max_length=1000)
     related_unknowns: list[UnknownRef] = Field(default_factory=list)
+    rejected_because: RejectionStep | None = None
 
 
 class Verdict(ProposedVerdict):
     """The critic's ruling on one threat, as the report carries it.
 
     ``needs-info`` must name the unknown attributes that caused it;
-    ``needs-info`` and ``rejected`` must state a reason.
+    ``needs-info`` and ``rejected`` must state a reason; ``rejected`` must name
+    the check that killed it.
 
-    THREE RULES BETWEEN FIELDS, AND NOT ONE OF THEM IS IN THE SCHEMA. Which
+    FIVE RULES BETWEEN FIELDS, AND NOT ONE OF THEM IS IN THE SCHEMA. Which
     fields a verdict must and must not carry depends on its own ``status``, and
     that dependency is not expressible in a JSON schema a provider will
     reliably compile — the same constraint :class:`Ground` documents at length.
@@ -571,6 +594,16 @@ class Verdict(ProposedVerdict):
             )
         if self.status != "confirmed" and not self.reason:
             raise ValueError(f"a {self.status} verdict must state a reason")
+        if self.status == "rejected" and self.rejected_because is None:
+            raise ValueError(
+                "a rejected verdict must name the check that killed it, in"
+                " rejected_because"
+            )
+        if self.status != "rejected" and self.rejected_because is not None:
+            raise ValueError(
+                f"rejected_because is only meaningful for rejected verdicts,"
+                f" not {self.status!r}"
+            )
         return self
 
 

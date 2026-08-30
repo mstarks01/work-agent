@@ -831,7 +831,11 @@ def report_with_markup_everywhere():
             likelihood="medium", impact="high", justification=MARKUP_PAYLOAD
         ),
         mitigations=[Mitigation(summary=MARKUP_PAYLOAD)],
-        verdict=Verdict(status="rejected", reason=MARKUP_PAYLOAD),
+        verdict=Verdict(
+            status="rejected",
+            reason=MARKUP_PAYLOAD,
+            rejected_because="evidence",
+        ),
     )
     report = sample_report(threats=[], rejected_threats=[threat])
     return report.model_copy(update={"system_model": model_with_markup_everywhere()})

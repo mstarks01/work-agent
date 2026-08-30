@@ -65,6 +65,10 @@ def ruling(requirement: str, status: VerdictStatus = "confirmed") -> Requirement
         verdict=Verdict(
             status=status,
             reason="" if status == "confirmed" else "the input does not settle it",
+            # A rejection names the check that ended it, exactly as production
+            # builds it: these stand for a requirement ruled not applicable,
+            # which is the critic's first step.
+            rejected_because="evidence" if status == "rejected" else None,
             # The review seam binds the fields to the status: needs-info must
             # name the unknown it is waiting on, exactly as production builds it.
             related_unknowns=(
