@@ -168,6 +168,11 @@ def declared_level(case: GoldenCase) -> int:
 def applied_requirements(claims: Sequence[RuledClaim]) -> tuple[set[str], set[str]]:
     """One block's claims split into what applies and what the critic rejected.
 
+    Hand it **every** ruled claim — :meth:`FrameworkAnalysis.all_claims` — because
+    the split it makes is by verdict, and a block keeps its rejections in a
+    second array. Handed ``claims`` alone it can only ever return an empty
+    rejected set, which reads as a run that rejected nothing.
+
     Returns ``(applied, rejected)`` as sets of the standard's identifiers.
     A claim whose ID does not parse contributes to neither: the block's own
     checks report a malformed ID, and counting it here as a miss would charge one
@@ -201,7 +206,12 @@ def score_applicability(
         reference.requirement for reference in references if reference.must_find
     }
 
-    applied, rejected = applied_requirements(block.claims)
+    # Both arrays, because the critic's rejections land in ``rejected_claims``
+    # and the report validator forbids one sitting in ``claims``. Reading
+    # ``claims`` alone left the negative cell permanently empty: a requirement
+    # the critic ruled inapplicable reached neither ``rejected`` here nor the
+    # block's ``scope``, so it was missed with nothing saying why.
+    applied, rejected = applied_requirements(block.all_claims())
     off_catalog = applied - universe
     # A ``needs-other-evidence`` scope entry is the service's other way of
     # saying a requirement applies: a lane raised it, and the claim was withheld

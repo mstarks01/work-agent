@@ -89,16 +89,25 @@ def ruling(
 
 
 class Block:
-    """The two fields the scorer reads off a block.
+    """The fields the scorer reads off a block, in production's own arrangement.
 
     ``scope`` matters because a missed requirement has two causes and they are
     not the same finding: a lane never raised it, or a lane raised it and the
     service withheld it for want of the right kind of evidence.
+
+    ``rejected_claims`` is a second array rather than a status inside ``claims``
+    because that is the only shape production can build: ``_verdict_placement_issues``
+    fails a block that puts a rejected verdict in ``claims``. A fake that allowed
+    it would let the scorer pass against a report nothing can emit.
     """
 
-    def __init__(self, claims, scope=()):
+    def __init__(self, claims, scope=(), rejected_claims=()):
         self.claims = list(claims)
         self.scope = list(scope)
+        self.rejected_claims = list(rejected_claims)
+
+    def all_claims(self):
+        return (*self.claims, *self.rejected_claims)
 
 
 class Scoped:
@@ -155,7 +164,8 @@ def test_a_rejected_ruling_is_not_an_applied_one(case):
     expected = [reference.requirement for reference in case.references["asvs"]]
 
     score = score_applicability(
-        case, Block(ruling(r, status="rejected") for r in expected)
+        case,
+        Block([], rejected_claims=[ruling(r, status="rejected") for r in expected]),
     )
 
     assert score.matched == ()
