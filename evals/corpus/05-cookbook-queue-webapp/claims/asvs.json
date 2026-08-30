@@ -9,6 +9,7 @@
     ],
     "claim": "No security response header is described for the one encrypted browser-facing link.",
     "tier": "must-find",
+    "disposition": "needs-config",
     "notes": "tech:browser-frontend fires; the chapter applies and every header is unstated."
   },
   {
@@ -20,6 +21,7 @@
     ],
     "claim": "Nothing states whether the web application sets any cookie or with which attributes.",
     "tier": "expected",
+    "disposition": "needs-config",
     "notes": "A browser client is stated; the cookie question is open rather than answered."
   },
   {
@@ -31,6 +33,7 @@
     ],
     "claim": "Two configuration stores are named and nothing says whether either holds a secret or how.",
     "tier": "must-find",
+    "disposition": "needs-more-prose",
     "notes": "Both stores carry unknown technology and classification."
   },
   {
@@ -43,6 +46,7 @@
     ],
     "claim": "Nothing states what bounds the work a queued job can consume.",
     "tier": "must-find",
+    "disposition": "needs-more-prose",
     "notes": "A queue with an internal worker raises the availability requirement; the input never reaches it."
   },
   {
@@ -51,6 +55,7 @@
     "affected_element_ids": [],
     "claim": "No WebRTC media path exists in this system, so this chapter does not apply.",
     "tier": "must-find",
+    "disposition": "not-applicable",
     "notes": "The exclusion the standard invites by name. The flows state HTTP/S and unknown, and no element is a media server."
   },
   {
@@ -63,6 +68,7 @@
     ],
     "claim": "Every link except the browser one states no transport protection at all.",
     "tier": "expected",
+    "disposition": "gap-from-prose",
     "notes": "The submitter marks one link as the only encrypted one, which settles the others."
   },
   {
@@ -73,6 +79,7 @@
     ],
     "claim": "Nothing states how the web application authenticates anybody.",
     "tier": "expected",
+    "disposition": "needs-more-prose",
     "notes": "authentication is unknown on the browser flow; the chapter applies and stays open."
   }
 ]

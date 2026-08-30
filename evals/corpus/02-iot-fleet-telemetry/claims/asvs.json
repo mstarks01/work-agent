@@ -9,6 +9,7 @@
     ],
     "claim": "Every sensor node authenticates with one fleet-wide pre-shared key that is never rotated.",
     "tier": "must-find",
+    "disposition": "gap-from-prose",
     "notes": "A shared machine credential is stated outright, so the ruling is plain."
   },
   {
@@ -21,6 +22,7 @@
     ],
     "claim": "Nothing states what restricts the device gateway's access to the device registry.",
     "tier": "must-find",
+    "disposition": "needs-code",
     "notes": "authentication on the flow is unknown; the requirement applies and stays open."
   },
   {
@@ -32,6 +34,7 @@
     ],
     "claim": "Nothing states which layer enforces a tenant boundary on telemetry writes.",
     "tier": "expected",
+    "disposition": "needs-code",
     "notes": "The normalizer writes every fleet's readings and no enforcing layer is named."
   },
   {
@@ -44,6 +47,7 @@
     ],
     "claim": "Company SSO is named for operator dashboards and nothing says which grant it uses.",
     "tier": "must-find",
+    "disposition": "needs-config",
     "notes": "tech:oauth fires on the SSO mention. The chapter may apply and the input never settles it."
   },
   {
@@ -55,6 +59,7 @@
     ],
     "claim": "No cipher is stated for either the device registry or the telemetry lake at rest.",
     "tier": "must-find",
+    "disposition": "needs-config",
     "notes": "Both carry encryption_at_rest unknown against confidential and customer data."
   },
   {
@@ -67,6 +72,7 @@
     ],
     "claim": "The MQTT publish path from the field to an internet-facing broker states no transport protection.",
     "tier": "must-find",
+    "disposition": "needs-config",
     "notes": "encryption_in_transit is unknown on a crossing into an internet-facing element."
   },
   {
@@ -78,6 +84,7 @@
     ],
     "claim": "Nothing says how the normalizer builds the queries that load readings into BigQuery.",
     "tier": "expected",
+    "disposition": "needs-code",
     "notes": "tech:database fires on the BigQuery store."
   },
   {
@@ -90,6 +97,7 @@
     ],
     "claim": "Firmware is fetched from a publicly readable bucket with no stated integrity or access control.",
     "tier": "expected",
+    "disposition": "gap-from-prose",
     "notes": "The bucket is stated public read, so the access half is settled."
   }
 ]

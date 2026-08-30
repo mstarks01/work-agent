@@ -186,8 +186,51 @@ class ReferenceThreat(ReferenceClaim):
     severity: ReferenceSeverity
 
 
+#: What a case expects the service to conclude about one requirement it applies.
+#:
+#: **Six answers, and none of them is a pass.** A job here carries prose, and
+#: verifying that a control is correctly implemented needs the source, the
+#: deployed settings, or the people who operate it. So the vocabulary spans what
+#: a prose-only service can honestly reach: the requirement does not apply, the
+#: description settles it against the system, or the description cannot settle it
+#: and something else would.
+#:
+#: **It is a relation between a requirement and a submission, never a property
+#: of the requirement.** The same requirement is ``gap-from-prose`` in a case
+#: whose description happens to state that nothing rate-limits a caller, and
+#: ``needs-code`` in one that says nothing about it. #418 removed a table keyed
+#: by requirement for exactly this reason, and a disposition that lived on the
+#: catalog rather than on the case would be that table again.
+AsvsDisposition = Literal[
+    "not-applicable",
+    "gap-from-prose",
+    "needs-more-prose",
+    "needs-code",
+    "needs-config",
+    "needs-people",
+]
+
+#: The disposition that names each kind of evidence a lane agent can ask for,
+#: keyed by the kind as ``RequirementProposal.needs_evidence`` spells it.
+#:
+#: **A table, checked against its registry.** ``test_disposition_vocabulary``
+#: compares the keys here against that field's own closed set, so a kind added
+#: to production without an answer here fails rather than scoring as nothing.
+#: The empty string is absent deliberately: it is the agent saying it *did*
+#: rule, which is ``gap-from-prose`` reached by another route, not a request
+#: for evidence.
+DISPOSITION_FOR_EVIDENCE: Mapping[str, AsvsDisposition] = MappingProxyType(
+    {
+        "prose": "needs-more-prose",
+        "code": "needs-code",
+        "config": "needs-config",
+        "people": "needs-people",
+    }
+)
+
+
 class ReferenceRequirement(ReferenceClaim):
-    """ASVS's reference record: the chapter and the requirement it expects.
+    """ASVS's reference record: the chapter, the requirement, and what it expects.
 
     ``requirement`` is the standard's own identifier, ``V1.2.4``. It is what
     makes this reference set **closed** where STRIDE's is open: the catalog is
@@ -198,14 +241,27 @@ class ReferenceRequirement(ReferenceClaim):
     requirements address a coding practice with no position in the graph, so a
     reference record naming no element is the ordinary case here.
 
-    No severity and no verdict. This package grades nothing, and what a ruling
-    should conclude belongs in ``claim`` as the sentence a scorer matches on —
-    adding a verdict field would put a second, unscored copy of it beside the
-    first.
+    No severity. This package grades nothing, so there is no rating to calibrate.
+
+    ``disposition`` is **not** a verdict, and the difference is why it is a field
+    rather than a second copy of ``claim``. A verdict would restate in an
+    unscored field what the claim sentence already says. This is scored: it is
+    the case's answer to *what can this submission conclude*, which the claim
+    sentence does not carry and which the applicability matrix cannot see. Two
+    runs can name the same requirement, and one of them can be telling the
+    submitter to send more description for a property only the source code
+    settles. That difference is the whole of #471.
+
+    ``None`` means nobody has judged this record yet, on the same footing
+    ``verb`` used before the corpus filled in: legal, counted per case by
+    ``tests/test_asvs_disposition_coverage.py``, and excluded from the
+    disposition metrics rather than scored as a wrong answer. A record whose
+    disposition is unjudged still scores for applicability.
     """
 
     chapter: AsvsChapter
     requirement: str = Field(pattern=r"^V\d{1,2}\.\d{1,2}\.\d{1,2}$")
+    disposition: AsvsDisposition | None = None
 
     @property
     def lane(self) -> str:
@@ -247,6 +303,11 @@ class CaseFramework(BaseModel):
         are written in. It sits on the (case, framework) pair because exemplars
         live at ``frameworks/<name>/lanes/<lane>/exemplars.md`` — case ``01`` is
         near STRIDE's payments exemplar and near nothing else.
+    ``reference_set``
+        Whether this framework's records were read as complete against the
+        model. It rides here rather than on the case because completeness is a
+        property of one reference set: a sitting that read STRIDE's 21 claims
+        establishes nothing about the 17 ASVS records beside them.
 
         A bit, not a scale, and it stays a bit however many exemplar systems
         there are: what the delta asks is whether recall depends on having been
@@ -260,6 +321,23 @@ class CaseFramework(BaseModel):
     name: FrameworkName
     options: Mapping[str, object] = Field(default_factory=dict)
     exemplar_proximity: Literal["near", "far"]
+    #: Whether this reference set was read as **complete** against the model, or
+    #: is a sample of what the case expects.
+    #:
+    #: It decides what the complement means. A scorer over a finite catalog can
+    #: derive negatives — the requirements the case did not list — and treat a
+    #: run that ruled on one as over-applied. That inference is only sound on a
+    #: set somebody read as exhaustive. On a sample, an unlisted requirement the
+    #: run applied may be perfectly correct and merely unrecorded, which is the
+    #: same trap ``evals/harness/scorer.py`` refuses for STRIDE: scoring it as a
+    #: false positive punishes finding real things and pushes every tuning cycle
+    #: toward under-reporting.
+    #:
+    #: **Defaults to the closed answer.** ``sampled`` is what is true of a case
+    #: nobody has read, and every case is that until a **Case Sitting** clears
+    #: it. A default of ``exhaustive`` would assert the property the sitting
+    #: exists to establish.
+    reference_set: Literal["exhaustive", "sampled"] = "sampled"
 
 
 class CaseSource(BaseModel):

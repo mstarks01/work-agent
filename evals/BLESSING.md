@@ -202,8 +202,8 @@ of scope — see
 [#219](https://github.com/mstarks01/work-agent/issues/219).
 
 Write one entry per requirement you expect a ruling on: `chapter`,
-`requirement`, `affected_element_ids`, `claim`, `tier`, `notes`. No severity —
-the package grades nothing.
+`requirement`, `affected_element_ids`, `claim`, `tier`, `disposition`, `notes`.
+No severity — the package grades nothing.
 
 - **Name the requirement the standard's way**, `V6.2.1`. It is what the scorer
   matches on, by string, with no identity composed. So the claim sentence is not
@@ -225,6 +225,38 @@ the package grades nothing.
   practice with no position in the graph. One record in 63 uses this today; it is
   legal, and it drops out of candidate-trigger recall by name rather than
   counting as a miss.
+
+**Then say what this submission can conclude**, in `disposition`. The
+requirement being in play is one judgement; what the reader should do next is
+another, and the applicability matrix cannot see the second. Ask the questions in
+this order and stop at the first that answers:
+
+1. Does the requirement's subject exist in this system at all? If not,
+   `not-applicable`. This is the entry the standard invites by name — a WebRTC
+   chapter against a system with no media path.
+2. Does the source **state a fact** that settles the requirement against the
+   system? Then `gap-from-prose`. A stated shared account, a password in an
+   environment variable, a link stated to carry no TLS.
+3. Could a **fuller description** answer it — documentation, a design decision,
+   an architectural fact a submitter could write down? Then `needs-more-prose`.
+   Requirements phrased as *the documentation defines…* land here.
+4. Otherwise name the kind of evidence that would settle it: `needs-code` for a
+   property of the source (how a query is built, what a handler returns, what a
+   parser accepts), `needs-config` for a deployed setting (a header, a cookie
+   attribute, a cipher, a TLS termination, a permission grant), `needs-people`
+   for a practice you would have to ask the team about (whether update windows
+   are honoured, how a third party issues an initial credential).
+
+**The same requirement takes different dispositions in different cases, and that
+is the point.** `V6.1.1` is `needs-more-prose` where the source is merely silent
+about rate limiting, and `gap-from-prose` in a case whose source states that
+nobody wrote the sign-in down. Write the disposition against *this* source, never
+against the requirement in general — a value that depended only on the
+requirement would be the table [#418](https://github.com/mstarks01/work-agent/issues/418)
+removed.
+
+There is no `pass`. If the text settles the requirement as *satisfied*, the entry
+does not belong in the set at all, as above.
 
 ### 4b. Assign an action verb to every claim
 

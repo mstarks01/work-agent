@@ -9,6 +9,7 @@
     ],
     "claim": "The order service reaches a PostgreSQL store and the input never says how its queries are built.",
     "tier": "must-find",
+    "disposition": "needs-code",
     "notes": "tech:database fires on store:orders-db. The requirement applies and no fact settles it."
   },
   {
@@ -19,6 +20,7 @@
     ],
     "claim": "No documented input validation rules exist for the order payload the storefront API accepts.",
     "tier": "expected",
+    "disposition": "needs-more-prose",
     "notes": "A documentation requirement: the subject is outside the running system, so needs-info by construction."
   },
   {
@@ -31,6 +33,7 @@
     ],
     "claim": "Nothing says which side enforces validation of the order the shopper submits.",
     "tier": "must-find",
+    "disposition": "needs-more-prose",
     "notes": "The crossing from the public zone is the fact that makes the requirement apply."
   },
   {
@@ -43,6 +46,7 @@
     ],
     "claim": "The shopper session cookie is named and none of its attributes is stated.",
     "tier": "must-find",
+    "disposition": "needs-config",
     "notes": "A browser-delivered credential puts this system in the chapter; the attributes are the requirement."
   },
   {
@@ -53,6 +57,7 @@
     ],
     "claim": "The storefront API's response content types are never described.",
     "tier": "expected",
+    "disposition": "needs-code",
     "notes": "An HTTP surface exists on two flows; the header policy is unstated."
   },
   {
@@ -64,6 +69,7 @@
     ],
     "claim": "No password length policy is stated for shopper accounts.",
     "tier": "must-find",
+    "disposition": "needs-config",
     "notes": "feature:password-auth fires. The mechanism is named and no parameter of it is."
   },
   {
@@ -75,6 +81,7 @@
     ],
     "claim": "The shopper login carries no second factor and no stated anti-automation control.",
     "tier": "must-find",
+    "disposition": "gap-from-prose",
     "notes": "The submitter states there is no MFA, so this half is settled rather than open."
   },
   {
@@ -86,6 +93,7 @@
     ],
     "claim": "Nothing states whether a terminated shopper session stops being accepted.",
     "tier": "must-find",
+    "disposition": "needs-code",
     "notes": "A session cookie exists, so the chapter applies; termination is unstated."
   },
   {
@@ -96,6 +104,7 @@
     ],
     "claim": "The session token's generation and entropy are never described.",
     "tier": "expected",
+    "disposition": "needs-code",
     "notes": "A framework default is not evidence about the token."
   },
   {
@@ -108,6 +117,7 @@
     ],
     "claim": "One shared account holds full read and write on every order record.",
     "tier": "must-find",
+    "disposition": "gap-from-prose",
     "notes": "Stated outright, so the ruling is plain rather than conditional."
   },
   {
@@ -118,6 +128,7 @@
     ],
     "claim": "No cipher is stated for the order database at rest.",
     "tier": "must-find",
+    "disposition": "needs-config",
     "notes": "encryption_at_rest is unknown: an open question, not a missing control."
   },
   {
@@ -130,6 +141,7 @@
     ],
     "claim": "The gRPC link between the storefront API and the order service states no transport protection.",
     "tier": "must-find",
+    "disposition": "needs-config",
     "notes": "A derived crossing with encryption_in_transit unknown; the internal scope is not an exemption."
   },
   {
@@ -141,6 +153,7 @@
     ],
     "claim": "The database password is held in an environment variable rather than a secret store.",
     "tier": "must-find",
+    "disposition": "gap-from-prose",
     "notes": "Stated outright by the submitter."
   },
   {
@@ -151,6 +164,7 @@
     ],
     "claim": "No protection requirement follows from the order database's confidential classification.",
     "tier": "expected",
+    "disposition": "needs-more-prose",
     "notes": "The model answers the classification half and nothing answers the controls half."
   },
   {
@@ -162,6 +176,7 @@
     ],
     "claim": "Nothing states whether the Node and Python components are within their update windows.",
     "tier": "expected",
+    "disposition": "needs-people",
     "notes": "A code-practice requirement: the input carries prose rather than a dependency inventory."
   },
   {
@@ -173,6 +188,7 @@
     ],
     "claim": "Receipt archive entries name the order service rather than the acting shopper.",
     "tier": "must-find",
+    "disposition": "gap-from-prose",
     "notes": "The submitter states the record's content, so the ruling is plain."
   },
   {
@@ -183,6 +199,7 @@
     ],
     "claim": "Nothing describes what the storefront API returns to a caller when an order fails.",
     "tier": "expected",
+    "disposition": "needs-code",
     "notes": "Applies to every internet-facing surface and is unstated here."
   }
 ]

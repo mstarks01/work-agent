@@ -9,6 +9,7 @@
     ],
     "claim": "No documentation defines rate limiting or anti-automation on a sign-in colleagues reach from their own devices at home.",
     "tier": "expected",
+    "disposition": "needs-more-prose",
     "notes": "A documentation requirement: the subject sits outside the running system, so needs-info by construction."
   },
   {
@@ -21,6 +22,7 @@
     ],
     "claim": "The broker accepts a franchise provider's assertion as a sign-in and nothing documents the trust relationships in that federation.",
     "tier": "expected",
+    "disposition": "needs-more-prose",
     "notes": "The source states the gap as which colleagues the provider may vouch for. This requirement asks for the documented relationship rather than the check itself."
   },
   {
@@ -33,6 +35,7 @@
     ],
     "claim": "A leaver stops being a colleague on a nightly pull while their twelve-hour token stays usable, and nothing can end it early.",
     "tier": "must-find",
+    "disposition": "gap-from-prose",
     "notes": "The source states all three facts: nightly leaver processing, a twelve-hour lifetime, and no way to pull a token back. This requirement is the one they meet."
   },
   {
@@ -45,6 +48,7 @@
     ],
     "claim": "The console reads the store-manager group from the token and never checks which store the holder belongs to.",
     "tier": "must-find",
+    "disposition": "gap-from-prose",
     "notes": "The source states the defect outright: a store-manager token works against every store. Data-specific access is the requirement it fails."
   },
   {
@@ -57,6 +61,7 @@
     ],
     "claim": "Franchise colleagues and staff colleagues share one console and one token format, with no control keeping one tenant's operations off another's.",
     "tier": "must-find",
+    "disposition": "gap-from-prose",
     "notes": "Two tenants are stated \u2014 the organization's own stores and the franchise stores \u2014 and the store check that would separate them is stated to be absent."
   },
   {
@@ -68,6 +73,7 @@
     ],
     "claim": "Nothing states which signing algorithms the broker issues under or which an application will accept.",
     "tier": "expected",
+    "disposition": "needs-config",
     "notes": "Tokens are self-contained and signature-checked, so the chapter applies; the allowlist is what nothing settles."
   },
   {
@@ -80,6 +86,7 @@
     ],
     "claim": "One signing key issues tokens for every application and nothing distinguishes the audience a token was issued for.",
     "tier": "must-find",
+    "disposition": "gap-from-prose",
     "notes": "The source states the shared key directly. This requirement is the one a shared issuing key lands on, which is why the case is scored at level 2."
   },
   {
@@ -91,6 +98,7 @@
     ],
     "claim": "The broker signs every token and nothing states the hash function behind that signature.",
     "tier": "expected",
+    "disposition": "needs-config",
     "notes": "Signing is stated; the primitive is not."
   },
   {
@@ -103,6 +111,7 @@
     ],
     "claim": "Colleagues sign in from their own devices at home and no flow states its transport.",
     "tier": "must-find",
+    "disposition": "needs-config",
     "notes": "The broker is stated to be reachable from outside and its transport is stated nowhere. Applicability comes from what the broker presents, not from this silence \u2014 see ADR 0014."
   },
   {
@@ -115,6 +124,7 @@
     ],
     "claim": "An audit log exists and nobody has written down what it records or whether it covers the franchise route.",
     "tier": "must-find",
+    "disposition": "gap-from-prose",
     "notes": "The source states the gap in the inventory's own terms, which is what this requirement asks for."
   },
   {
@@ -125,6 +135,7 @@
     ],
     "claim": "Nothing states what metadata a sign-in entry carries, so nothing says an investigation could reconstruct one.",
     "tier": "expected",
+    "disposition": "needs-code",
     "notes": "Follows V16.1.1: with no inventory there is nothing stating the fields."
   },
   {
@@ -137,6 +148,7 @@
     ],
     "claim": "The directory, the audit log and the key store hold colleague and credential data and nothing classifies any of it.",
     "tier": "expected",
+    "disposition": "needs-more-prose",
     "notes": "The source states nobody wrote down whether the directory or the log are encrypted where they sit, which is the downstream half of an absent classification."
   }
 ]

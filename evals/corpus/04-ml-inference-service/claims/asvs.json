@@ -7,6 +7,7 @@
     ],
     "claim": "The inference gateway's response content types and method policy are never described.",
     "tier": "must-find",
+    "disposition": "needs-code",
     "notes": "An internet-facing HTTPS surface exists and its contract is unstated."
   },
   {
@@ -19,6 +20,7 @@
     ],
     "claim": "Nothing limits the size or type of a model artifact published into the registry.",
     "tier": "must-find",
+    "disposition": "needs-config",
     "notes": "An artifact upload path exists; feature:file-upload has a subject here."
   },
   {
@@ -30,6 +32,7 @@
     ],
     "claim": "Nothing states what validates a published artifact before the model server loads it.",
     "tier": "expected",
+    "disposition": "needs-code",
     "notes": "The registry is read by an internal server, so an unvalidated artifact is executed content."
   },
   {
@@ -42,6 +45,7 @@
     ],
     "claim": "The per-team API key carries no claims, so this chapter does not apply to the gateway.",
     "tier": "must-find",
+    "disposition": "not-applicable",
     "notes": "The stated credential is an opaque key rather than a self-contained token; the exclusion is the answer."
   },
   {
@@ -53,6 +57,7 @@
     ],
     "claim": "The per-team API key is never expired or rotated.",
     "tier": "must-find",
+    "disposition": "gap-from-prose",
     "notes": "Stated outright, so the ruling is plain."
   },
   {
@@ -65,6 +70,7 @@
     ],
     "claim": "The model server accepts forwarded requests on network position with no stated permission check.",
     "tier": "expected",
+    "disposition": "gap-from-prose",
     "notes": "authentication is stated as none, so the ruling is plain."
   },
   {
@@ -76,6 +82,7 @@
     ],
     "claim": "No cipher is stated for the feature store or the inference log at rest.",
     "tier": "expected",
+    "disposition": "needs-config",
     "notes": "Both are confidential with encryption_at_rest unknown."
   },
   {
@@ -88,6 +95,7 @@
     ],
     "claim": "The gateway to model server link states neither a protocol nor transport protection.",
     "tier": "must-find",
+    "disposition": "needs-config",
     "notes": "protocol and encryption_in_transit are both unknown on an internal crossing."
   },
   {
@@ -100,6 +108,7 @@
     ],
     "claim": "Nothing states what of an inference request is written to the confidential request log.",
     "tier": "must-find",
+    "disposition": "needs-code",
     "notes": "The log is confidential and its content is never described."
   },
   {
@@ -111,6 +120,7 @@
     ],
     "claim": "Nothing states what limits the model server's registry service account.",
     "tier": "expected",
+    "disposition": "needs-config",
     "notes": "A service account is named and its scope is not."
   }
 ]

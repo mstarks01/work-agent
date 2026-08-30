@@ -9,6 +9,7 @@
     ],
     "claim": "The mobile app reaches the web API over HTTP rather than HTTPS.",
     "tier": "must-find",
+    "disposition": "gap-from-prose",
     "notes": "encryption_in_transit is stated absent, so the ruling is plain rather than conditional."
   },
   {
@@ -21,6 +22,7 @@
     ],
     "claim": "Customer names, addresses and card details are held with no stated protection.",
     "tier": "must-find",
+    "disposition": "needs-code",
     "notes": "The classification is stated and nothing that follows from it is."
   },
   {
@@ -33,6 +35,7 @@
     ],
     "claim": "A macro-bearing spreadsheet sends SQL statements to the web API over an unstated transport.",
     "tier": "must-find",
+    "disposition": "gap-from-prose",
     "notes": "The strongest injection trigger in the corpus: raw SQL from a client the model names."
   },
   {
@@ -45,6 +48,7 @@
     ],
     "claim": "Nothing states what subset of a customer record reaches the delivery address file.",
     "tier": "must-find",
+    "disposition": "needs-code",
     "notes": "A flat file holding addresses only, written from a store holding more."
   },
   {
@@ -57,6 +61,7 @@
     ],
     "claim": "Nothing states how a customer is authenticated to the mobile app.",
     "tier": "must-find",
+    "disposition": "needs-more-prose",
     "notes": "authentication is unknown on the one human-facing flow."
   },
   {
@@ -68,6 +73,7 @@
     ],
     "claim": "Nothing restricts what the web API may read from the customer record store.",
     "tier": "expected",
+    "disposition": "needs-code",
     "notes": "The store holds payment card data and the flow's authentication is unknown."
   },
   {
@@ -79,6 +85,7 @@
     ],
     "claim": "Nothing states which HTTP methods the web API accepts for order submission.",
     "tier": "expected",
+    "disposition": "needs-code",
     "notes": "An HTTP surface is stated; the method policy is not."
   }
 ]

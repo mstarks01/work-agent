@@ -50,6 +50,7 @@ from analysis_service.report import (
 from analysis_service.sources import SourceKind
 from analysis_service.system_model import SystemModel
 from analysis_service.validation import parse_and_validate
+from evals.harness.reference import AsvsDisposition
 from evals.harness.verbs import unknown_verbs
 
 SOURCE_KINDS = frozenset(get_args(SourceKind))
@@ -156,6 +157,10 @@ def _asvs_record_issues(
 
     No severity and no element check. This package grades nothing, and most of
     its requirements address a coding practice with no position in the graph.
+
+    The optional ``disposition`` is checked against the closed vocabulary rather
+    than against a pattern, for the reason the requirement is checked against the
+    catalog: a value nothing recognises scores as nothing at all.
     """
     chapter = record["chapter"]
     if chapter not in PACKAGES["asvs"].lanes:
@@ -171,6 +176,15 @@ def _asvs_record_issues(
             f"{where} requirement {record['requirement']!r} is not in the"
             f" {chapter} chapter of ASVS {PACKAGES['asvs'].version} at level"
             f" {level}"
+        )
+    # A disposition outside the vocabulary would load as a validation error
+    # rather than as a lint finding, which reports the whole corpus unreadable
+    # instead of naming the one record. Caught here, where the record is.
+    disposition = record.get("disposition")
+    if disposition is not None and disposition not in ASVS_DISPOSITIONS:
+        yield (
+            f"{where} disposition {disposition!r} is not one of"
+            f" {sorted(ASVS_DISPOSITIONS)}"
         )
 
 
@@ -194,6 +208,11 @@ LANES_REQUIRED_PER_CASE: Mapping[FrameworkName, bool] = {
 #: over them. Harness data keyed off the closed ``FrameworkName``, beside
 #: :data:`evals.harness.reference.REFERENCE_TYPES` and for the same reason: what
 #: a reference set looks like is the eval's business, not a package member.
+#: The expected dispositions a record may name, from the corpus vocabulary
+#: rather than a second list here — a lint spelling its own would pass a value
+#: the loader then refuses.
+ASVS_DISPOSITIONS: frozenset[str] = frozenset(get_args(AsvsDisposition))
+
 RECORD_FIELDS: Mapping[FrameworkName, frozenset[str]] = {
     "asvs": CLAIM_FIELDS | {"chapter", "requirement"},
     "stride": CLAIM_FIELDS | {"category", "severity"},
@@ -204,11 +223,17 @@ RECORD_FIELDS: Mapping[FrameworkName, frozenset[str]] = {
 #: ``tests/test_verb_coverage.py`` is what stops that becoming permanent: it
 #: counts the claims still missing one and fails when the count moves.
 #:
-#: ASVS carries no entry because its records need no verb — a claim whose
-#: identity is a catalog requirement identifier composes nothing. That is a
-#: property of the framework, so it answers for a package nobody has written.
+#: ASVS needs no verb — a claim whose identity is a catalog requirement
+#: identifier composes nothing. It carries ``disposition`` instead, on the same
+#: footing and for the same reason: a framework that defers a requirement for
+#: want of a kind of evidence the job does not hold has an expected routing
+#: answer to record, and one whose claims rest on the system's own shape defers
+#: nothing and has none. Both are properties of a framework rather than its
+#: name, so both answer for a package nobody has written.
+#: ``tests/test_asvs_disposition_coverage.py`` counts the records still missing
+#: one, exactly as the verb count does.
 OPTIONAL_RECORD_FIELDS: Mapping[FrameworkName, frozenset[str]] = {
-    "asvs": frozenset(),
+    "asvs": frozenset({"disposition"}),
     "stride": frozenset({"verb"}),
 }
 RECORD_CHECKS: Mapping[
