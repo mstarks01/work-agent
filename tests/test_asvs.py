@@ -1064,9 +1064,12 @@ class TestAChapterRuledOutInCode:
                 DraftRequirementRuling.ruled_out(model, {"level": 2}, lane)
             )
 
-        chapters = {unit.split(".")[0] for unit in ruled_out}
-        assert chapters == {"V5", "V9", "V10", "V17"}
-        assert all("ruled out in code by" in reason for reason in ruled_out.values())
+        by_chapter_test = {
+            unit.split(".")[0]
+            for unit, reason in ruled_out.items()
+            if "ruled out in code by" in reason
+        }
+        assert by_chapter_test == {"V5", "V9", "V10", "V17"}
 
     def test_a_model_naming_the_thing_rules_nothing_out(self):
         model = SystemModel.model_validate(
@@ -1093,3 +1096,58 @@ class TestAChapterRuledOutInCode:
         assert entry.state == "not-applicable"
         assert "ruled out in code" in entry.reason
         assert entry.needs == ""
+
+
+class TestARequirementRuledOutByItsOwnTerms:
+    """#455: a requirement naming a technology the model names nowhere."""
+
+    def test_the_table_names_only_published_requirements(self):
+        from analysis_service.frameworks.asvs.rules import REQUIREMENT_TESTS
+
+        published = {requirement.id for requirement in requirements_for(3)}
+        assert set(REQUIREMENT_TESTS) <= published
+        assert all(terms for terms in REQUIREMENT_TESTS.values())
+
+    def test_no_blessed_reference_is_ruled_out_by_code(self):
+        """The two tables can never sit narrower than the corpus.
+
+        A reference whose own claim says the requirement does not apply is the
+        one exception: ruling it out in code is that answer, given earlier.
+        """
+        ruled: list[tuple[str, str]] = []
+        for case_dir in sorted(CORPUS_DIR.iterdir()):
+            claims_path = case_dir / "claims" / "asvs.json"
+            if not claims_path.exists():
+                continue
+            case = json.loads((case_dir / "case.json").read_text())
+            level = next(
+                f["options"]["level"] for f in case["frameworks"] if f["name"] == "asvs"
+            )
+            model = SystemModel.model_validate(
+                json.loads((case_dir / "model.json").read_text())
+            )
+            out: dict[str, str] = {}
+            for lane in ASVS.lanes:
+                out.update(
+                    DraftRequirementRuling.ruled_out(model, {"level": level}, lane)
+                )
+            ruled += [
+                (case_dir.name, claim["requirement"])
+                for claim in json.loads(claims_path.read_text())
+                if claim["requirement"] in out and "not apply" not in claim["claim"]
+            ]
+        assert ruled == []
+
+    def test_corpus01_rules_out_graphql_and_federation_but_not_a_named_thing(self):
+        model = SystemModel.model_validate(
+            json.loads((CORPUS_DIR / "01-payments-checkout" / "model.json").read_text())
+        )
+        api = DraftRequirementRuling.ruled_out(
+            model, {"level": 2}, "api-and-web-service"
+        )
+        auth = DraftRequirementRuling.ruled_out(model, {"level": 2}, "authentication")
+
+        assert {"V4.3.1", "V4.4.1"} <= set(api)
+        assert "V6.8.3" in auth
+        # The password requirements name nothing the model lacks.
+        assert "V6.2.1" not in auth
