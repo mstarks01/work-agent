@@ -312,14 +312,26 @@ class Session:
     dropped: set[str] = field(default_factory=set)
 
     @property
+    def store(self) -> sittings.Store:
+        """Where this reader's sitting reads and writes.
+
+        The three values :mod:`evals.harness.sitting` needs to record a
+        sitting and to take the record back off. Built rather than held, so a
+        session that moves its clone or its draft store moves this with it.
+        """
+        return sittings.Store(
+            root=self.root, reviewer=self.reviewer, drafts=self.drafts
+        )
+
+    @property
     def document_name(self) -> str:
         """Spelled in :mod:`evals.harness.sitting`, because ``submit
         sitting`` admits this name under the case prefix and no other."""
-        return sittings.document_name(self.reviewer)
+        return self.store.document_name
 
     @property
     def corpus_dir(self) -> Path:
-        return self.root / "evals" / "corpus"
+        return self.store.corpus_dir
 
     @property
     def offered(self) -> frozenset[str]:
@@ -669,25 +681,10 @@ def create_app(session: Session) -> FastAPI:
                 status_code=409,
                 detail="that case is not recorded, so this press does not carry it",
             )
-        # The entry first, because that is the one the submission reads a
-        # case directory for, and the untracked document last. A write that
-        # fails part way leaves the draft saying *finished*, so the stage
-        # still lists the case and the checklist still refuses it.
-        case_dir = session.corpus_dir / prepared.case_id
         try:
-            if held.recorded is not None:
-                sittings.unrecord(case_dir, session.reviewer, held.recorded)
-            if held.unreviewed_entry:
-                sittings.restore_unreviewed(
-                    session.root, prepared.case_id, held.unreviewed_entry
-                )
-            (case_dir / session.document_name).unlink(missing_ok=True)
-        except (OSError, ValueError) as exc:
+            sittings.withdraw(session.store, prepared, held)
+        except (sittings.SittingError, sittings.DraftError, OSError, ValueError) as exc:
             raise HTTPException(status_code=409, detail=str(exc)) from exc
-        held.recorded = None
-        held.unreviewed_entry = ""
-        held.state = "open"
-        _save(session, held)
         session.dropped.add(prepared.case_id)
         return JSONResponse({"case": prepared.case_id, "state": held.state})
 
@@ -848,51 +845,19 @@ def _record(
     missing: list[str],
     notes: str,
 ) -> None:
-    """Write one case's record, and put what it wrote into the draft.
+    """Record one sitting, in the words a browser gets when it will not.
 
-    Three files and one draft, in one place, because *Record the sitting* and
-    *Put back* write the same record by different routes — one from the page
-    and one from the draft.
-
-    **A second press corrects the record rather than adding to it.** The
-    entry this reader appended comes off before the new one goes on, so the
-    submission never carries two entries by one reader for one case. An entry
-    they did not write is untouchable, which is what keeps ``reviews``
-    append-only.
-
-    What the record left behind goes into the draft, because a drop takes
-    back exactly what a record put on and the draft is the only thing here
-    that outlives the process. A re-record clears no line — the case came off
-    the unreviewed list at the first press — so the lines the draft already
-    holds stay.
+    The act is :func:`evals.harness.sitting.finish`, which writes the three
+    files and saves the draft that says what it wrote. What is left here is
+    what the app owes the page: a 409 rather than a traceback, and the one
+    piece of state a press keeps in memory.
     """
-    case_dir = session.corpus_dir / prepared.case_id
     try:
-        text = sittings.document(prepared, held.own_list, marks, missing, notes)
-        (case_dir / session.document_name).write_text(text, encoding="utf-8")
-        read = sittings.read_records(case_dir, prepared.files)
-        entry = sittings.record(
-            case_dir,
-            session.reviewer,
-            read,
-            session.document_name,
-            notes,
-            replaces=held.recorded,
+        sittings.finish(
+            session.store, prepared, held, marks=marks, missing=missing, notes=notes
         )
-        cleared = sittings.clear_unreviewed(session.root, prepared.case_id)
-    except (sittings.SittingError, OSError) as exc:
+    except (sittings.SittingError, sittings.DraftError, OSError) as exc:
         raise HTTPException(status_code=409, detail=str(exc)) from exc
-    # The draft keeps what the reader wrote and says the sitting is recorded.
-    # It stays until a submit carries it: the record is in the working tree by
-    # now, and nothing is a record until it merges — so the case re-opens, and
-    # the row that carries it still presses.
-    held.marks = dict(marks)
-    held.missing = list(missing)
-    held.notes = notes
-    held.recorded = entry
-    held.unreviewed_entry = cleared or held.unreviewed_entry
-    held.state = "finished"
-    _save(session, held)
     session.dropped.discard(prepared.case_id)
 
 

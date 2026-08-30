@@ -13,6 +13,15 @@ implementation of the rules. CI reads :func:`clears` through
 ``tests/test_case_review.py``, so no surface can call a case read while CI
 still asks somebody to read it.
 
+**Recording a sitting is one act, and so is taking it back.** :func:`finish`
+writes the three files and says on the draft what it wrote; :func:`withdraw`
+takes off exactly that. They are a pair rather than two sequences a surface
+assembles, because what makes them correct is that the tree comes back byte for
+byte — a stray byte left under a case directory puts that case in the pull
+request, and a field one of them sets that the other forgets is a case that
+cannot be put back. The primitives they compose stay named, because a reader
+following one of them needs to see what it does.
+
 **The own list comes first, and that is a property rather than an
 instruction.** What the order protects is the evidence in the filled
 document: it prints the reader's own list above the recorded sets, and a
@@ -992,3 +1001,117 @@ def unreviewed_cases(root: Path) -> list[str]:
     source = (root / UNREVIEWED_FILE).read_text(encoding="utf-8")
     entries, _ = _unreviewed_table(source)
     return [case for case, _, _ in entries]
+
+
+@dataclass(frozen=True)
+class Store:
+    """Where one reader's sitting reads and writes.
+
+    Three values, because a surface that holds two of them and derives the
+    third has half of this. ``corpus_dir`` and :attr:`document_name` are
+    derived here for the same reason the rest of the rules are: a surface that
+    spelled the document name itself could spell one ``submit sitting`` does
+    not admit.
+    """
+
+    #: The clone. The unreviewed list is read and written under it.
+    root: Path
+    #: The GitHub login this sitting binds to.
+    reviewer: str
+    #: Where this reader's **Draft Sitting**s live, outside the repository.
+    drafts: Path
+
+    @property
+    def corpus_dir(self) -> Path:
+        return self.root / "evals" / "corpus"
+
+    @property
+    def document_name(self) -> str:
+        return document_name(self.reviewer)
+
+    def case_dir(self, case_id: str) -> Path:
+        return self.corpus_dir / case_id
+
+
+def finish(
+    store: Store,
+    prepared: Prepared,
+    draft: Draft,
+    *,
+    marks: Mapping[str, Mark],
+    missing: Iterable[str],
+    notes: str,
+) -> Draft:
+    """Record one sitting: three files written, and the draft that says so.
+
+    The whole forward half of the act, in one place, because *Record the
+    sitting* and *Put back* reach it by two routes — one carrying what the
+    reader just typed, one carrying what their draft already holds — and the
+    two must write the same record.
+
+    **A second press corrects the record rather than adding to it.** The entry
+    this reader appended comes off before the new one goes on, so a submission
+    never carries two entries by one reader for one case. An entry they did
+    not write is untouchable, which is what keeps ``reviews`` append-only.
+
+    **A re-record clears no line.** The case came off the unreviewed list at
+    the first press, so the lines the draft already holds stay.
+
+    What the record left behind goes onto the draft, because :func:`withdraw`
+    takes back exactly what this put on and the draft is the only thing here
+    that outlives a process. The draft is saved before this returns, and it
+    stays until a submission carries it: the record is in the working tree by
+    now, and nothing is a record until it merges.
+    """
+    case_dir = store.case_dir(prepared.case_id)
+    marks = dict(marks)
+    missing = list(missing)
+    text = document(prepared, draft.own_list, marks, missing, notes)
+    (case_dir / store.document_name).write_text(text, encoding="utf-8")
+    entry = record(
+        case_dir,
+        store.reviewer,
+        read_records(case_dir, prepared.files),
+        store.document_name,
+        notes,
+        replaces=draft.recorded,
+    )
+    cleared = clear_unreviewed(store.root, prepared.case_id)
+    draft.marks = marks
+    draft.missing = missing
+    draft.notes = notes
+    draft.recorded = entry
+    draft.unreviewed_entry = cleared or draft.unreviewed_entry
+    draft.state = "finished"
+    save_draft(store.drafts, store.reviewer, draft)
+    return draft
+
+
+def withdraw(store: Store, prepared: Prepared, draft: Draft) -> Draft:
+    """Take one recorded sitting back out of the working tree.
+
+    The exact inverse of :func:`finish`, and written beside it for that
+    reason: what one puts on, the other takes off, and a field added to one
+    that the other forgets is a case that cannot be put back.
+
+    **The order is load-bearing.** The entry comes off first, because that is
+    what a submission reads a case directory for, and the untracked document
+    comes off last. A write that fails part way leaves the draft saying
+    ``finished``, so a surface still lists the case and the submission
+    checklist still refuses it — which is the safe direction.
+
+    **The reader keeps every word they wrote.** Only the two fields the record
+    set are cleared, so :func:`finish` writes the same record again from the
+    same draft.
+    """
+    case_dir = store.case_dir(prepared.case_id)
+    if draft.recorded is not None:
+        unrecord(case_dir, store.reviewer, draft.recorded)
+    if draft.unreviewed_entry:
+        restore_unreviewed(store.root, prepared.case_id, draft.unreviewed_entry)
+    (case_dir / store.document_name).unlink(missing_ok=True)
+    draft.recorded = None
+    draft.unreviewed_entry = ""
+    draft.state = "open"
+    save_draft(store.drafts, store.reviewer, draft)
+    return draft
