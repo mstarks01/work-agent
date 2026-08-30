@@ -201,8 +201,9 @@ from analysis_service.system_model import BoundaryCrossing, SystemModel
 # three checks — the draft's own substance, the lane it was filed in, or another
 # draft already covering it — ended a rejected draft. A consumer reading the
 # rejected array as an audit trail had to parse the reason prose for this and can
-# now read a field. It rides 3.0 because 3.0 has never shipped; on its own it
-# would be major, since the field is required on every rejected verdict.
+# now read a field. It rides 3.0 because 3.0 has never shipped, and it is
+# additive: ``None`` is the honest answer for a rejection recorded before the
+# field, so a report written then still validates and still reads.
 #
 # A ``needs-info`` verdict names what has to be answered in one of two
 # spellings: an element and one of its attributes, or a ``subject`` — a question
@@ -606,10 +607,19 @@ class Verdict(ProposedVerdict):
     """The critic's ruling on one threat, as the report carries it.
 
     ``needs-info`` must name the unknown attributes that caused it;
-    ``needs-info`` and ``rejected`` must state a reason; ``rejected`` must name
-    the check that killed it.
+    ``needs-info`` and ``rejected`` must state a reason.
 
-    FIVE RULES BETWEEN FIELDS, AND NOT ONE OF THEM IS IN THE SCHEMA. Which
+    **``rejected_because`` is required of the critic and not of this record**,
+    and the asymmetry is deliberate. :func:`~analysis_service.critic.review_issues`
+    refuses a rejection that names no check, so nothing this service builds ever
+    lacks one. A report *read back* is a different thing: one written before the
+    field existed carries no answer, and ``None`` says so truthfully. Requiring
+    it here would assert that every rejection ever recorded named its check,
+    which is false, and the only way to make it true is to invent a
+    classification the critic never made. So the archive stays readable and the
+    live path stays checked.
+
+    FOUR RULES BETWEEN FIELDS, AND NOT ONE OF THEM IS IN THE SCHEMA. Which
     fields a verdict must and must not carry depends on its own ``status``, and
     that dependency is not expressible in a JSON schema a provider will
     reliably compile — the same constraint :class:`Ground` documents at length.
@@ -642,11 +652,6 @@ class Verdict(ProposedVerdict):
             )
         if self.status != "confirmed" and not self.reason:
             raise ValueError(f"a {self.status} verdict must state a reason")
-        if self.status == "rejected" and self.rejected_because is None:
-            raise ValueError(
-                "a rejected verdict must name the check that killed it, in"
-                " rejected_because"
-            )
         if self.status != "rejected" and self.rejected_because is not None:
             raise ValueError(
                 f"rejected_because is only meaningful for rejected verdicts,"

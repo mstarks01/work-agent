@@ -46,7 +46,11 @@ def case(corpus):
     return next(entry for entry in corpus if entry.id == CASE_ID)
 
 
-def ruling(requirement: str, status: VerdictStatus = "confirmed") -> RequirementRuling:
+def ruling(
+    requirement: str,
+    status: VerdictStatus = "confirmed",
+    description: str = "d",
+) -> RequirementRuling:
     """One ruled claim carrying the standard's identifier, as the graph builds it.
 
     ``requirement`` is spelled the way the report does — ``V1.2.4`` becomes the
@@ -59,7 +63,7 @@ def ruling(requirement: str, status: VerdictStatus = "confirmed") -> Requirement
         framework_version="5.0.0",
         chapter="authentication",
         title="t",
-        description="d",
+        description=description,
         affected_element_ids=[],
         grounds=[Ground(kind="unknown-attribute", element_id="x", attribute="y")],
         verdict=Verdict(
@@ -98,11 +102,17 @@ class Block:
 
 
 class Scoped:
-    """One scope entry, as the scorer reads it."""
+    """One scope entry, as the scorer and the pairing read it.
 
-    def __init__(self, unit, state="needs-other-evidence"):
+    ``reason`` is what the service said it was waiting for. The scorer counts
+    the entry and never reads the sentence; a pairing shows it, because that
+    sentence is what a reader is being asked to agree or disagree with.
+    """
+
+    def __init__(self, unit, state="needs-other-evidence", reason="needs source code"):
         self.unit = unit
         self.state = state
+        self.reason = reason
 
 
 def test_a_perfect_run_matches_every_expected_requirement(case):
