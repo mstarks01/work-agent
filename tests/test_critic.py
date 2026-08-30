@@ -1066,3 +1066,43 @@ class TestAnUnknownGroundSettlesTheVerdict:
 
     def test_a_draft_with_no_unknown_ground_is_untouched(self, model):
         assert not review_issues([sample_draft("S-01")], [sample_ruling("S-01")], model)
+
+
+class TestDuplicateGroups:
+    """#440: one action at one place is a comparison of two fields, made in code."""
+
+    @pytest.fixture
+    def model(self):
+        return valid_model()
+
+    def test_one_verb_at_one_place_is_marked_across_lanes(self, model):
+        from analysis_service.critic import duplicate_groups
+
+        drafts = [
+            sample_draft("S-01", verb="forge", affected_element_ids=[CROSSING]),
+            sample_draft(
+                "T-01",
+                "tampering",
+                verb="forge",
+                affected_element_ids=["entity:customer", "process:web-app"],
+            ),
+            sample_draft("S-02", verb="replay", affected_element_ids=[CROSSING]),
+        ]
+
+        assert duplicate_groups(drafts, model) == {"S-01": ["T-01"], "T-01": ["S-01"]}
+
+    def test_a_draft_with_no_verb_is_never_compared(self, model):
+        from analysis_service.critic import duplicate_groups
+        from analysis_service.frameworks.asvs.record import DraftRequirementRuling
+
+        ruling = DraftRequirementRuling.model_validate(
+            {
+                **sample_draft("S-01").model_dump(
+                    exclude={"category", "verb", "severity", "mitigations"}
+                ),
+                "id": "v5.0.0-6.2.1",
+                "chapter": "authentication",
+            }
+        )
+
+        assert duplicate_groups([ruling, ruling], model) == {}

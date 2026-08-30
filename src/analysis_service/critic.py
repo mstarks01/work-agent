@@ -60,7 +60,7 @@ from analysis_service.report import (
     UnverifiedGround,
     Verdict,
 )
-from analysis_service.system_model import DataFlow, Element, SystemModel
+from analysis_service.system_model import DataFlow, Element, SystemModel, TrustBoundary
 
 # Most severe first — the order a graded framework's ``claims`` array carries.
 # The service holds the order because it holds
@@ -847,6 +847,62 @@ def _confirmed_on_unknown_issues(
         for ruling in rulings
         if ruling.verdict.status == "confirmed" and by_id.get(ruling.id)
     ]
+
+
+def endpoint_targets(
+    element_ids: Iterable[str], system_model: SystemModel
+) -> frozenset[str]:
+    """The cited elements with every flow replaced by its two endpoints.
+
+    One place in the graph, spelled one way: a claim citing a flow and one
+    citing the process at its end name the same place. Trust boundaries are
+    dropped, since a zone is the context a claim sits in rather than what it is
+    about. The same fold ``evals/harness/identity.py`` applies when it scores,
+    kept in step by ``tests/test_evals_identity.py``.
+    """
+    flows = {
+        flow.id: (flow.source, flow.destination) for flow in system_model.data_flows
+    }
+    targets: set[str] = set()
+    for element_id in element_ids:
+        if element_id.startswith(f"{TrustBoundary.id_prefix}:"):
+            continue
+        endpoints = flows.get(element_id)
+        if endpoints is None:
+            targets.add(element_id)
+        else:
+            targets.update(endpoints)
+    return frozenset(targets)
+
+
+def duplicate_groups(
+    drafts: Sequence[Claim], system_model: SystemModel
+) -> dict[str, list[str]]:
+    """Each draft's ID against the other drafts naming one action at one place.
+
+    The critic's duplicate step asked the model to find, across every lane,
+    two drafts that are the same attacker action against the same element.
+    That is a comparison of two fields — the verb and the endpoint-resolved
+    targets — and it is made here so the critic reads the pairs rather than
+    hunting for them (#440). Lanes are not compared: a read and a write of one
+    flow carry two verbs, and two lanes filing one verb at one place is the
+    duplicate the step exists to catch.
+
+    A draft with no verb belongs to a package whose identity is a catalog
+    identifier, and its duplicates are ID collisions the join already refuses.
+    """
+    by_key: dict[tuple[str, frozenset[str]], list[str]] = {}
+    for draft in drafts:
+        if draft.verb is None:
+            continue
+        key = (draft.verb, endpoint_targets(draft.affected_element_ids, system_model))
+        by_key.setdefault(key, []).append(draft.id)
+    return {
+        draft_id: [other for other in ids if other != draft_id]
+        for ids in by_key.values()
+        if len(ids) > 1
+        for draft_id in ids
+    }
 
 
 def review_issues(

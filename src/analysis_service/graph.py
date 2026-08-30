@@ -125,6 +125,7 @@ from analysis_service.candidates import generate_candidates
 from analysis_service.coverage import build_coverage, lane_scope
 from analysis_service.critic import (
     assemble_claims,
+    duplicate_groups,
     join_drafts,
     review_issues,
 )
@@ -1079,7 +1080,10 @@ def _without_source_fields(valid_model: dict) -> dict:
 _DRAFT_UNRULED_FIELDS = frozenset({"mitigations"})
 
 
-def _ruling_view(drafts: Sequence[Claim]) -> list[dict]:
+def _ruling_view(
+    drafts: Sequence[Claim],
+    duplicates: Mapping[str, Sequence[str]] = MappingProxyType({}),
+) -> list[dict]:
     """The drafts as a critic reads them: no recommendations, no empty branches.
 
     A critic's steps read ``description`` (evidence), the lane,
@@ -1110,14 +1114,20 @@ def _ruling_view(drafts: Sequence[Claim]) -> list[dict]:
     the same pair on every draft in one critic's prompt — it rules one
     framework's drafts — so they are a constant repeated per claim.
     """
-    return [
-        draft.model_dump(
+    views = []
+    for draft in drafts:
+        view = draft.model_dump(
             mode="json",
             exclude={*_DRAFT_UNRULED_FIELDS, "framework", "framework_version"},
             exclude_defaults=True,
         )
-        for draft in drafts
-    ]
+        # Computed, never drafted: the IDs of the other drafts naming the same
+        # action at the same place (:func:`~analysis_service.critic.duplicate_groups`),
+        # so the critic's duplicate step reads a pair instead of hunting for it.
+        if draft.id in duplicates:
+            view["same_action_as"] = list(duplicates[draft.id])
+        views.append(view)
+    return views
 
 
 def prepare_analysis(
@@ -1522,7 +1532,10 @@ def merge_drafts(
         package,
     )
     state.put(nodes.key("coverage"), [row.model_dump(mode="json") for row in coverage])
-    state.prompt(nodes.key("draft_view"), render(_ruling_view(merged)))
+    state.prompt(
+        nodes.key("draft_view"),
+        render(_ruling_view(merged, duplicate_groups(merged, model))),
+    )
     return {
         "framework": nodes.name,
         "draft_count": len(merged),
@@ -1601,7 +1614,8 @@ def route_review(
                         draft
                         for draft in package_drafts
                         if draft.id in problems.implicated
-                    ]
+                    ],
+                    duplicate_groups(package_drafts, model),
                 )
             ),
         )
