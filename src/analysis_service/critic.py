@@ -38,6 +38,7 @@ from __future__ import annotations
 import re
 from collections import Counter
 from collections.abc import Collection, Iterable, Mapping, Sequence
+from dataclasses import dataclass
 from types import MappingProxyType
 from typing import NamedTuple, get_args
 
@@ -1350,14 +1351,16 @@ def critic_view(
     return _ruling_view(chosen, duplicates, rated_unlike)
 
 
-class Accepted(NamedTuple):
+@dataclass(frozen=True)
+class Accepted:
     """One critic pass that reconciled with its drafts."""
 
     #: How many rulings it returned, for the routing event.
     count: int
 
 
-class Revision(NamedTuple):
+@dataclass(frozen=True)
+class Revision:
     """One critic pass that did not, and everything the re-ask needs.
 
     Built in one place so **the prompt and the check cannot disagree about
