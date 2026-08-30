@@ -794,17 +794,16 @@ def test_a_vocabulary_that_rejects_unknown_is_named_in_the_prompt(field, values)
 #
 # `validation.IssueCode` is the closed set of ways a model's output is refused.
 # Each one kills the job — `repair` gets a single pass — so each is a failure
-# the prompt is responsible for preventing, and the two the 2026-08-23 sweeps
-# actually hit were both cases where it did not.
+# the prompt is responsible for preventing.
 #
-# `illegal-asset-tag` (#295, #296): the prompt named `unknown` a dozen times as
-# the sentinel and handed the model a vocabulary that rejects it.
-#
-# `invalid-reference` (#295 item 2): rule 4 said "Both endpoints must be zoned
-# elements you have already created" — the right rule with no remedy. A model
-# that wants a flow to something it did not inventory can drop the interaction
-# or write the dangling endpoint, and the prompt said which to prefer nowhere.
-# gpt-4o wrote the dangling endpoint on 4 of 13 cases.
+# The phrase this table stores is the rule, not a remedy for ignoring it. Rule 4
+# states the precondition an `invalid-reference` breaks; it does not tell a model
+# what to do when it wants a flow to an element it never inventoried. That is
+# deliberate. Two edits supplying such a remedy — one where the model notices the
+# dangling endpoint, one where the omission happens — each measured at under half
+# a standard deviation over ten runs, so the prompt carries the rule and nothing
+# else. `evals/TUNING.md` holds the numbers, and says to budget for a null result
+# before writing a third.
 #
 # The table is the decidable half. A code added to `IssueCode` fails here until
 # somebody says what the prompt does about it — which is the point, because the
@@ -813,7 +812,8 @@ EXTRACTION_FAILURE_RULES: dict[str, str] = {
     "schema": "Your output is validated mechanically",
     "duplicate-id": "Two elements sharing a name share an ID",
     "id-mismatch": "IDs are recomputed from the names you give",
-    "invalid-reference": "go back and create it",
+    "invalid-reference": "Both endpoints must be zoned elements you have "
+    "already created",
     "no-trust-zones": "create one that covers the system as described",
     "illegal-asset-tag": "`unknown` is not one of them",
     "too-many-elements": "",  # a size ceiling no wording prevents; see below
