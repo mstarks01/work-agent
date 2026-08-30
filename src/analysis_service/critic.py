@@ -477,7 +477,7 @@ class ReviewProblems(NamedTuple):
 def _verdict_shape_issues(rulings: Iterable[Ruling]) -> list[CriticIssue]:
     """Every ruling whose verdict's fields disagree with its own ``status``.
 
-    The three rules :class:`~analysis_service.report.Verdict` states, asked here
+    The five rules :class:`~analysis_service.report.Verdict` states, asked here
     rather than in the schema. The schema is the wrong place for them twice
     over: a provider cannot be made to enforce a dependency between fields, and
     a validator that raises does so at the node boundary, killing the critic
@@ -488,10 +488,10 @@ def _verdict_shape_issues(rulings: Iterable[Ruling]) -> list[CriticIssue]:
     router sends them to ``recritic``. Each names its claim, because the fix
     is per-ruling: a reason to write, an unknown to name, or a list to drop.
 
-    Deliberately three separate messages rather than one per ruling. A critic
-    that rejected a claim without a reason *and* attached unknowns to it has
-    two independent things to fix, and a merged message would leave the second
-    to be discovered on the pass that no longer exists.
+    Deliberately one message per broken rule rather than one per ruling. A
+    critic that rejected a claim without a reason *and* attached unknowns to it
+    has two independent things to fix, and a merged message would leave the
+    second to be discovered on the pass that no longer exists.
     """
     issues = []
     for ruling in rulings:
@@ -512,6 +512,24 @@ def _verdict_shape_issues(rulings: Iterable[Ruling]) -> list[CriticIssue]:
                     f"claim {ruling.id!r} is ruled {verdict.status} but carries"
                     " related_unknowns, which is only meaningful on a"
                     " needs-info verdict",
+                )
+            )
+        if verdict.status == "rejected" and verdict.rejected_because is None:
+            issues.append(
+                CriticIssue(
+                    ruling.id,
+                    f"claim {ruling.id!r} is rejected but names no check in"
+                    " rejected_because, so nothing says which of evidence,"
+                    " lane or duplicate ended it",
+                )
+            )
+        if verdict.status != "rejected" and verdict.rejected_because is not None:
+            issues.append(
+                CriticIssue(
+                    ruling.id,
+                    f"claim {ruling.id!r} is ruled {verdict.status} but carries"
+                    " rejected_because, which is only meaningful on a rejected"
+                    " verdict",
                 )
             )
         if verdict.status != "confirmed" and not verdict.reason:
@@ -883,7 +901,8 @@ def complete_rulings(
 
     A ruling on a draft the package's own table calls misfiled
     (:meth:`~analysis_service.report.Claim.misfiled`) becomes ``rejected`` with
-    the table's reason, whatever the critic ruled.
+    the table's reason and ``rejected_because="lane"``, whatever the critic
+    ruled. That is the one rejection this service writes rather than reads.
 
     Rulings on drafts with no such ground pass through untouched, and so does a
     ruling that names no drafted ID: the reconciliation check owns that.
@@ -904,12 +923,14 @@ def complete_rulings(
         if ruling.id in misfiled:
             # A lane error is a table lookup, so the ruling is the table's
             # whatever the critic said (#442). The reason names the lanes the
-            # verb belongs to, which is what the audit array owes a reader.
+            # verb belongs to, which is what the audit array owes a reader, and
+            # the step is `lane` by construction: the table is the lane check.
             verdict = ruling.verdict.model_copy(
                 update={
                     "status": "rejected",
                     "reason": misfiled[ruling.id],
                     "related_unknowns": [],
+                    "rejected_because": "lane",
                 }
             )
             completed.append(ruling.model_copy(update={"verdict": verdict}))
