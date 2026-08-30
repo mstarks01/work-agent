@@ -60,6 +60,7 @@ NOTES: dict[str, tuple[str, ...]] = {
     "where-the-rule-is-enforced": (
         "validation-and-business-logic-client-side-code",
         "validation-and-business-logic-multi-step-flow",
+        "validation-and-business-logic-crossing-from-an-entity",
     ),
     "browser-delivered-controls": (
         "web-frontend-security-browser-frontend",
@@ -81,11 +82,20 @@ NOTES: dict[str, tuple[str, ...]] = {
     "delegated-authorization": ("oauth-and-oidc-oauth",),
     "algorithms-and-key-custody": ("cryptography-encryption",),
     "sensitive-data-in-the-client": ("data-protection-browser-frontend",),
-    "who-may-reach-what": ("authorization-privileged-role",),
-    "the-channel-itself": ("secure-communication-transport",),
+    "who-may-reach-what": (
+        "authorization-privileged-role",
+        "authorization-shared-account",
+    ),
+    "the-channel-itself": (
+        "secure-communication-transport",
+        "secure-communication-unverified-transit",
+    ),
     "where-the-secret-lives": ("configuration-secret-material",),
     "code-you-did-not-write": ("secure-coding-and-architecture-third-party-component",),
-    "what-reaches-the-log": ("security-logging-and-error-handling-log-or-audit-trail",),
+    "what-reaches-the-log": (
+        "security-logging-and-error-handling-log-or-audit-trail",
+        "security-logging-and-error-handling-write-with-no-record",
+    ),
     "real-time-media-and-signalling": ("webrtc-real-time-media",),
 }
 
@@ -102,6 +112,7 @@ CASES: dict[str, tuple[str, ...]] = {
         "authentication-password-auth",
         "session-management-sessions",
         "encoding-and-sanitization-database",
+        "data-protection-classified-store",
     ),
     "a-stated-control-is-not-a-verification": (
         "cryptography-encryption",
