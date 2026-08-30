@@ -347,6 +347,18 @@ def _grounds_of(
 #: fields. Everything else an agent wrote is carried across untouched.
 _RESOLVED_AWAY = frozenset({"evidence_refs", "quotes"})
 
+#: What a proposal carries for the *fan-in* rather than for the claim. A field
+#: here has already done its work by the time a draft is built, so carrying it
+#: on would put a routing signal in the report.
+#:
+#: ``needs_evidence`` is the one: the fan-in reads it to decide whether the
+#: proposal becomes a draft at all, and a proposal that survives that split is
+#: one this job can settle. What remains of the distinction — *the description
+#: is thin* against *no description would do* — is already carried by whether
+#: the requirement is a **Claim** or a **Scope Entry**, so repeating it as a
+#: field would be a second spelling of the same fact.
+_ROUTED_AWAY = frozenset({"needs_evidence"})
+
 
 def resolve_proposals(
     proposals: Iterable[Proposal],
@@ -397,7 +409,7 @@ def resolve_proposals(
     cited.
     """
     key_field = schemas_for(package.name).key_field
-    carried = _RESOLVED_AWAY | {key_field}
+    carried = _RESOLVED_AWAY | _ROUTED_AWAY | {key_field}
     drafts: list[Claim] = []
     unresolved_evidence: list[UnresolvedEvidence] = []
     unknown_identities: list[UnknownClaimIdentity] = []
