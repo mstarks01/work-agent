@@ -367,7 +367,11 @@ class TestReportInvariants:
         rejected = sample_threat(
             threat_id="T-01",
             category="tampering",
-            verdict=Verdict(status="rejected", reason="ungrounded"),
+            verdict=Verdict(
+                status="rejected",
+                reason="ungrounded",
+                rejected_because="evidence",
+            ),
         )
         with pytest.raises(ValidationError, match="belongs in rejected_claims"):
             sample_report(threats=[rejected])
@@ -559,7 +563,11 @@ class TestSummary:
             sample_threat(
                 threat_id="E-01",
                 category="elevation-of-privilege",
-                verdict=Verdict(status="rejected", reason="ungrounded"),
+                verdict=Verdict(
+                    status="rejected",
+                    reason="ungrounded",
+                    rejected_because="evidence",
+                ),
             )
         ]
         summary = build_stride_summary(threats, rejected)
