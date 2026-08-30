@@ -31,7 +31,8 @@ The layering is ``Claim`` -> :class:`DraftRequirementRuling` ->
 
 from __future__ import annotations
 
-from collections.abc import Mapping, Sequence
+from collections.abc import Collection, Mapping, Sequence
+from types import MappingProxyType
 from typing import Any, Literal, get_args
 
 from pydantic import BaseModel, ConfigDict, Field
@@ -41,6 +42,7 @@ from analysis_service.frameworks.asvs.catalog import (
     CHAPTER_NUMBERS,
     LANES,
     AsvsLevel,
+    requirement_id,
     requirements_for,
 )
 from analysis_service.report import (
@@ -192,11 +194,35 @@ class RequirementProposal(Proposal):
     ``min_length=1``. Most ASVS requirements address a coding practice with no
     position in the graph, so a requirement naming no element is the ordinary
     case here rather than a defect.
+
+    ``needs_evidence`` splits one of the three cases the output contract already
+    asks a lane agent to decide between. Two of them the agent can answer from
+    the input — the requirement does not apply, or it applies and the input
+    shows a gap. The third, *it applies and the input does not settle it*, hides
+    two different answers: **send more description**, and **no description will
+    ever answer this**. Only the agent that read the Source can tell them apart,
+    so it is asked, and it answers by naming the kind of evidence that would
+    settle the requirement.
+
+    Empty means the agent ruled: the claim stands and the **Critic** judges it.
+    ``prose`` means more of the same input would settle it, so the claim also
+    stands and reads as a request the submitter can act on. Any other kind means
+    this job cannot reach it at all, and the requirement becomes a **Scope
+    Entry** rather than a claim.
+
+    **Judgement, deliberately, rather than a table.** Whether a description
+    settles a requirement depends on what that description says: four
+    requirements were ruled ``confirmed`` from prose only because the submission
+    happened to describe CORS and to state that nothing rate-limited a caller.
+    A table keyed by requirement answers a question that has no fixed answer,
+    and would be wrong invisibly. This is wrong visibly, in a field a reader can
+    disagree with.
     """
 
     model_config = ConfigDict(extra="forbid")
 
     requirement: str = Field(pattern=REQUIREMENT_KEY_PATTERN, max_length=10)
+    needs_evidence: Literal["", "prose", "code", "config", "people"] = ""
 
 
 class RequirementProposals(ProposalBatch):
@@ -251,6 +277,22 @@ def build_asvs_summary(
     return AsvsSummary(**neutral.model_dump(), by_chapter=by_chapter)
 
 
+def _scope_state(
+    unit: str, refusal_reason: str, deferred: Mapping[str, str]
+) -> Literal["applicable", "not-applicable", "needs-other-evidence"]:
+    """Which of the three states one unlisted requirement is in.
+
+    Order matters. A refused **Precondition** rules out every requirement, so it
+    wins over anything a lane said — a lane that never ran cannot have deferred
+    anything, and if the two ever disagreed the precondition is the older and
+    broader fact. After that a deferred requirement is the one this job could
+    not settle, and everything else was considered and raised nothing.
+    """
+    if refusal_reason:
+        return "not-applicable"
+    return "needs-other-evidence" if unit in deferred else "applicable"
+
+
 class AsvsAnalysis(FrameworkAnalysis):
     """The report block one ASVS analysis fills.
 
@@ -279,6 +321,35 @@ class AsvsAnalysis(FrameworkAnalysis):
         return build_asvs_summary(claims, rejected_claims)
 
     @classmethod
+    def partition_proposals(
+        cls, proposals: Sequence[Any], lane: str, carried: Collection[str]
+    ) -> tuple[list[Any], dict[str, str]]:
+        """Every requirement whose lane agent said this job cannot settle it.
+
+        The agent names the kind of evidence that would settle the requirement;
+        this drops the ones that kind is not among what the job carries. A
+        ``prose`` answer is kept, because a job carrying prose *can* settle it —
+        the description was simply thin, and that is a request the submitter can
+        act on rather than a wall.
+
+        The reason names the kind, so the **Scope Entry** tells a reader what
+        would answer the requirement instead of only that nothing did.
+        """
+        defer = [
+            proposal
+            for proposal in proposals
+            if proposal.needs_evidence and proposal.needs_evidence not in carried
+        ]
+        kept = [proposal for proposal in proposals if proposal not in defer]
+        return kept, {
+            requirement_id(lane, proposal.requirement): (
+                f"applies, and settling it needs {proposal.needs_evidence};"
+                f" this job carries {', '.join(sorted(carried))}"
+            )
+            for proposal in defer
+        }
+
+    @classmethod
     def scope_entries(
         cls,
         *,
@@ -286,6 +357,7 @@ class AsvsAnalysis(FrameworkAnalysis):
         claims: Sequence[Claim],
         options: Mapping[str, Any],
         refusal_reason: str,
+        deferred: Mapping[str, str] = MappingProxyType({}),
     ) -> list[ScopeEntry]:
         """Every requirement in the selected level this block raised no claim about.
 
@@ -310,8 +382,8 @@ class AsvsAnalysis(FrameworkAnalysis):
         return [
             ScopeEntry(
                 unit=requirement.id,
-                state="not-applicable" if refusal_reason else "applicable",
-                reason=refusal_reason,
+                state=_scope_state(requirement.id, refusal_reason, deferred),
+                reason=refusal_reason or deferred.get(requirement.id, ""),
             )
             for requirement in requirements_for(level)
             if refusal_reason or requirement.id not in ruled
