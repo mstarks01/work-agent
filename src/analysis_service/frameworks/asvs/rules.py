@@ -6,13 +6,14 @@ else: no applies-when field, no tag and no technology list. The CWE and NIST
 mappings of 4.x are gone in 5.0. So nothing selects a requirement for a system
 unless this repo writes it.
 
-**Every rule is a presence test.** The #160 research derived 16 predicates across
+**Most rules are presence tests.** The #160 research derived 16 predicates across
 the 70 level 1 requirements, and all 16 ask whether the application *has* a thing
 — a browser frontend, cookies, a database, OAuth, a file upload, a session. Six
 more were added afterwards to reach the six chapters that had none, and they ask
-the same shape of question. Not one reads an element type, a trust zone, a
-boundary crossing or a count. That is the sharpest contrast with STRIDE's 11
-rules, which read exactly those things.
+the same shape of question. Five more (``STRUCTURAL_RULES``) read what the
+corpus's own reference claims read: a stated credential on one attribute, a
+classification, a write with no record named anywhere, a crossing from an
+external entity, a channel with no stated protection. Those are the leads a term cannot raise.
 
 **Each rule reads free text by string match**, because no attribute in the
 **System Model** is a closed enum an ASVS predicate can test. #162 ruled that
@@ -48,12 +49,18 @@ import re
 from collections.abc import Iterator
 from dataclasses import dataclass
 
-from analysis_service.analysis import control_state
+from analysis_service.analysis import control_state, is_unverified
 from analysis_service.candidates import Match, Rule, clip_fact
 from analysis_service.frameworks import PreconditionResult
 from analysis_service.system_model import SystemModel
 
-__all__ = ["PRESENCE_TESTS", "RULES", "WEB_PROTOCOL_TERMS", "asvs_precondition"]
+__all__ = [
+    "PRESENCE_TESTS",
+    "RULES",
+    "STRUCTURAL_RULES",
+    "WEB_PROTOCOL_TERMS",
+    "asvs_precondition",
+]
 
 #: The free-text attributes a presence test may read, per element type. Every one
 #: is a ``str`` the submitter authored, which is why a rule here matches a term
@@ -549,7 +556,169 @@ PRESENCE_TESTS: tuple[PresenceTest, ...] = (
     ),
 )
 
-RULES: tuple[Rule, ...] = tuple(_rule_of(test) for test in PRESENCE_TESTS)
+
+# --- Leads the term table cannot raise ---------------------------------------
+#
+# #430 measured the term table against the corpus: 43 of 99 reference claims
+# sat in a lane that raised no candidate, because the references are written
+# from the model's structure and the terms ask whether a technology exists.
+# These read the structure the references read. Two are narrowed term tests on
+# one attribute; two read the graph the way STRIDE's rules do.
+
+SHARED_ACCOUNT_TEST = PresenceTest(
+    predicate="shared-account",
+    lane="authorization",
+    question=(
+        "One credential reaches this store for every caller. What restricts"
+        " which records each caller may reach through it?"
+    ),
+    terms=(
+        "shared",
+        "single ",
+        "same account",
+        "one account",
+        "full read",
+        "read/write",
+        "read-write",
+        "read and write",
+        "all tables",
+    ),
+    attributes=("authentication",),
+)
+
+CLASSIFIED_STORE_TEST = PresenceTest(
+    predicate="classified-store",
+    lane="data-protection",
+    question=(
+        "This store carries a stated classification. What protection does"
+        " that classification require, and what states it is in place?"
+    ),
+    terms=("confidential", "restricted", "secret", "sensitive", "regulated", "pii"),
+    attributes=("data_classification",),
+)
+
+#: Store asset tags whose writes the standard expects a record of.
+AUDITED_ASSET_TAGS = frozenset({"financial", "business-critical-data", "pii", "health"})
+
+#: What a store or process says when it holds a record of what happened.
+AUDIT_TERMS = ("log", "audit", "receipt", "journal", "history", "event")
+
+
+def _mentions_a_record(model: SystemModel) -> bool:
+    """Whether any element's text says it holds a log, an audit trail or a receipt."""
+    return any(
+        _starts_a_word(term, f"{element.name} {element.description}".lower())
+        for element in model.elements()
+        for term in AUDIT_TERMS
+    )
+
+
+def _write_with_no_record(model: SystemModel) -> Iterator[Match]:
+    """A process writing an audited asset into a store, in a model naming no record.
+
+    The V16 finding the corpus writes is that the record names the service and
+    not the actor, or that there is no record at all. A term test cannot raise
+    it: a submitter writes "the receipt records that the order service wrote
+    it", never the word "log".
+    """
+    stores = {store.id: store for store in model.data_stores}
+    mentions = _mentions_a_record(model)
+    for flow in model.data_flows:
+        store = stores.get(flow.destination)
+        if store is None or not AUDITED_ASSET_TAGS & set(store.assets):
+            continue
+        yield (
+            (flow.source, store.id, flow.id),
+            {
+                "assets": ", ".join(sorted(AUDITED_ASSET_TAGS & set(store.assets))),
+                "authentication": clip_fact(flow.authentication),
+                "record_named_anywhere": mentions,
+            },
+        )
+
+
+def _crossing_from_an_entity(model: SystemModel) -> Iterator[Match]:
+    """A boundary crossing whose source is an external entity.
+
+    The V2 requirements ask which side enforces validation of what a caller
+    submits, and the crossing from a zone the system does not control is the
+    fact that makes them apply.
+    """
+    entities = {entity.id: entity for entity in model.external_entities}
+    flows = {flow.id: flow for flow in model.data_flows}
+    for crossing in model.boundary_crossings():
+        flow = flows[crossing.flow_id]
+        entity = entities.get(flow.source)
+        if entity is None:
+            continue
+        yield (
+            (flow.id, entity.id, flow.destination),
+            {
+                "source_kind": entity.kind,
+                "source_zone": crossing.source_zone,
+                "destination_zone": crossing.destination_zone,
+                "data_description": clip_fact(flow.data_description),
+            },
+        )
+
+
+def _unverified_transit(model: SystemModel) -> Iterator[Match]:
+    """A flow whose transport protection the input never settled or ruled out.
+
+    The transport term test reads ``protocol``, so a flow that says gRPC and
+    nothing about encryption raises no lead in the chapter that asks about
+    exactly that.
+    """
+    for flow in model.data_flows:
+        if not is_unverified(flow.encryption_in_transit):
+            continue
+        yield (
+            (flow.id, flow.source, flow.destination),
+            {
+                "protocol": clip_fact(flow.protocol),
+                "encryption_in_transit": clip_fact(flow.encryption_in_transit),
+                "encryption_state": control_state(flow.encryption_in_transit),
+            },
+        )
+
+
+STRUCTURAL_RULES: tuple[Rule, ...] = (
+    Rule(
+        rule_id="secure-communication-unverified-transit",
+        lane="secure-communication",
+        question=(
+            "Nothing states what protects this channel. Which requirement of"
+            " the chapter does the input leave open, and which does it settle?"
+        ),
+        find=_unverified_transit,
+    ),
+    _rule_of(SHARED_ACCOUNT_TEST),
+    _rule_of(CLASSIFIED_STORE_TEST),
+    Rule(
+        rule_id="security-logging-and-error-handling-write-with-no-record",
+        lane="security-logging-and-error-handling",
+        question=(
+            "This process writes an asset the standard expects a record of."
+            " What records the write, and does the record name the actor or"
+            " only the service?"
+        ),
+        find=_write_with_no_record,
+    ),
+    Rule(
+        rule_id="validation-and-business-logic-crossing-from-an-entity",
+        lane="validation-and-business-logic",
+        question=(
+            "A party outside the system's control submits this flow across a"
+            " boundary. Which side validates what it carries, and what says so?"
+        ),
+        find=_crossing_from_an_entity,
+    ),
+)
+
+RULES: tuple[Rule, ...] = (
+    *(_rule_of(test) for test in PRESENCE_TESTS),
+    *STRUCTURAL_RULES,
+)
 
 
 #: What a **Data Flow**'s ``protocol`` says when the flow carries the web. ASVS
