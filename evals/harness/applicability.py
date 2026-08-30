@@ -83,6 +83,12 @@ class ApplicabilityScore:
     must_find: tuple[str, ...]
     matched: tuple[str, ...]
     missed: tuple[str, ...]
+    #: The subset of ``missed`` a lane raised and the service then withheld,
+    #: because the job carries no evidence of the kind that would settle it.
+    #: Not an analysis failure: the requirement was seen and deliberately not
+    #: ruled on, which is a cost `CARRIED_EVIDENCE_KINDS` sets and a reader can
+    #: reverse by supplying a different input kind.
+    missed_by_deferral: tuple[str, ...]
     must_find_missed: tuple[str, ...]
     over_applied: tuple[str, ...]
     rejected: tuple[str, ...]
@@ -202,6 +208,21 @@ def score_applicability(
     missed = expected - in_universe
     over_applied = in_universe - expected
 
+    # A missed requirement has two very different causes and the pooled figure
+    # hides which. Either no lane raised it — an analysis miss — or a lane
+    # raised it and said this job's input could not settle it, so the service
+    # withheld it deliberately. The second is a *policy* cost, priced by
+    # `CARRIED_EVIDENCE_KINDS`, and it is the one a reader can act on by
+    # supplying a different kind of input.
+    #
+    # Measured because the first sweep to carry deferral gave up 45 of its 57
+    # misses this way, and nothing said so: the saving was reported in dollars
+    # and the cost in findings was found by hand afterwards.
+    deferred_units = {
+        entry.unit for entry in block.scope if entry.state == "needs-other-evidence"
+    }
+    missed_by_deferral = missed & deferred_units
+
     return ApplicabilityScore(
         case=case.id,
         level=level,
@@ -211,6 +232,7 @@ def score_applicability(
         must_find=tuple(sorted(must_find)),
         matched=tuple(sorted(matched)),
         missed=tuple(sorted(missed)),
+        missed_by_deferral=tuple(sorted(missed_by_deferral)),
         must_find_missed=tuple(sorted(must_find - in_universe)),
         over_applied=tuple(sorted(over_applied)),
         rejected=tuple(sorted(rejected)),
@@ -246,6 +268,8 @@ def pooled(scores: Sequence[ApplicabilityScore]) -> Mapping[str, Any]:
         "cases": len(scores),
         "expected": expected,
         "matched": matched,
+        "missed": sum(len(score.missed) for score in scores),
+        "missed_by_deferral": sum(len(score.missed_by_deferral) for score in scores),
         "recall": round(matched / expected, 4) if expected else 0.0,
         "must_find": must_find,
         "must_find_recall": (
@@ -437,13 +461,14 @@ def render(scores: Sequence[ApplicabilityScore]) -> None:
     print("\nASVS applicability (mechanical, catalog match)")
     print(
         f"{'case':<26} {'lvl':>3} {'rec':>6} {'must':>6} {'prec':>6}"
-        f" {'miss':>5} {'over':>5} {'rej':>5} {'off':>4}"
+        f" {'miss':>5} {'defr':>5} {'over':>5} {'rej':>5} {'off':>4}"
     )
     for score in scores:
         print(
             f"{score.case:<26} {score.level:>3} {score.recall:>6.0%}"
             f" {score.must_find_recall:>6.0%} {score.precision:>6.0%}"
-            f" {len(score.missed):>5} {len(score.over_applied):>5}"
+            f" {len(score.missed):>5} {len(score.missed_by_deferral):>5}"
+            f" {len(score.over_applied):>5}"
             f" {len(score.rejected):>5} {len(score.off_catalog):>4}"
         )
     totals = pooled(scores)
@@ -455,6 +480,16 @@ def render(scores: Sequence[ApplicabilityScore]) -> None:
         f" off-catalog {totals['off_catalog']}"
         " (instrument, non-gating)"
     )
+    # Printed as its own line because it answers a different question from the
+    # recall figure above it: not *how much was missed* but *how much was
+    # withheld on purpose*, which is a policy `CARRIED_EVIDENCE_KINDS` sets
+    # rather than a limit of the analysis.
+    if totals["missed_by_deferral"]:
+        print(
+            f"  of {totals['missed']} missed,"
+            f" {totals['missed_by_deferral']} were deferred for want of another"
+            " kind of evidence rather than never raised"
+        )
 
 
 def artifact(scores: Sequence[ApplicabilityScore]) -> dict[str, Any]:
