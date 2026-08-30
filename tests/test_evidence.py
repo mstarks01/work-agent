@@ -296,7 +296,9 @@ class TestABadReferenceCostsItsEntryNotTheJob:
             quotes=[],
         )
 
-        resolution = resolve_proposals([proposal], catalog, STRIDE, "spoofing")
+        resolution = resolve_proposals(
+            [proposal], catalog, STRIDE, "spoofing", valid_model()
+        )
 
         (draft,) = resolution.drafts
         assert draft.grounds == [catalog[ENCRYPTION_REF]]
@@ -315,7 +317,7 @@ class TestABadReferenceCostsItsEntryNotTheJob:
         )
 
         (mark,) = resolve_proposals(
-            [proposal], catalog, STRIDE, "spoofing"
+            [proposal], catalog, STRIDE, "spoofing", valid_model()
         ).marks.unresolved_evidence
 
         assert mark.claim_id == "S-01"
@@ -330,7 +332,9 @@ class TestABadReferenceCostsItsEntryNotTheJob:
             quotes=[{"text": "Customers log in", "source_label": "Description"}],
         )
 
-        resolution = resolve_proposals([proposal], catalog, STRIDE, "spoofing")
+        resolution = resolve_proposals(
+            [proposal], catalog, STRIDE, "spoofing", valid_model()
+        )
 
         assert len(resolution.drafts) == 1
         assert len(resolution.marks.unresolved_evidence) == 1
@@ -346,7 +350,9 @@ class TestABadReferenceCostsItsEntryNotTheJob:
             "S-01", evidence_refs=["crossing:flow:ghost"], quotes=[]
         )
 
-        resolution = resolve_proposals([proposal], catalog, STRIDE, "spoofing")
+        resolution = resolve_proposals(
+            [proposal], catalog, STRIDE, "spoofing", valid_model()
+        )
 
         assert resolution.drafts == []
         (mark,) = resolution.marks.dropped_claims
@@ -363,7 +369,9 @@ class TestABadReferenceCostsItsEntryNotTheJob:
             sample_proposal("S-02", evidence_refs=["crossing:flow:ghost"], quotes=[]),
         ]
 
-        resolution = resolve_proposals(proposals, catalog, STRIDE, "spoofing")
+        resolution = resolve_proposals(
+            proposals, catalog, STRIDE, "spoofing", valid_model()
+        )
 
         assert [draft.id for draft in resolution.drafts] == ["S-01"]
         assert [m.claim_id for m in resolution.marks.dropped_claims] == ["S-02"]
@@ -371,7 +379,9 @@ class TestABadReferenceCostsItsEntryNotTheJob:
     def test_a_clean_lane_records_no_marks(self):
         catalog = evidence_catalog(valid_model())
 
-        resolution = resolve_proposals([sample_proposal()], catalog, STRIDE, "spoofing")
+        resolution = resolve_proposals(
+            [sample_proposal()], catalog, STRIDE, "spoofing", valid_model()
+        )
 
         assert resolution.marks.unresolved_evidence == []
 
@@ -381,7 +391,9 @@ class TestResolveProposals:
         catalog = evidence_catalog(valid_model())
         proposal = sample_proposal("S-01", evidence_refs=[ENCRYPTION_REF], quotes=[])
 
-        (draft,) = resolve_proposals([proposal], catalog, STRIDE, "spoofing").drafts
+        (draft,) = resolve_proposals(
+            [proposal], catalog, STRIDE, "spoofing", valid_model()
+        ).drafts
 
         assert draft.grounds == [catalog[ENCRYPTION_REF]]
 
@@ -393,7 +405,9 @@ class TestResolveProposals:
             quotes=[{"text": "Customers log in", "source_label": "Description"}],
         )
 
-        (draft,) = resolve_proposals([proposal], catalog, STRIDE, "spoofing").drafts
+        (draft,) = resolve_proposals(
+            [proposal], catalog, STRIDE, "spoofing", valid_model()
+        ).drafts
 
         assert draft.grounds == [
             Ground(kind="quote", text="Customers log in", source_label="Description")
@@ -410,7 +424,9 @@ class TestResolveProposals:
             quotes=[{"text": "Customers log in", "source_label": "Description"}],
         )
 
-        (draft,) = resolve_proposals([proposal], catalog, STRIDE, "spoofing").drafts
+        (draft,) = resolve_proposals(
+            [proposal], catalog, STRIDE, "spoofing", valid_model()
+        ).drafts
 
         assert [ground.kind for ground in draft.grounds] == [
             "quote",
@@ -423,7 +439,7 @@ class TestResolveProposals:
         catalog = evidence_catalog(valid_model())
 
         (draft,) = resolve_proposals(
-            [sample_proposal()], catalog, STRIDE, "spoofing"
+            [sample_proposal()], catalog, STRIDE, "spoofing", valid_model()
         ).drafts
 
         assert draft == sample_draft()
@@ -433,8 +449,8 @@ class TestResolveProposals:
         proposals = [sample_proposal("S-01"), sample_proposal("S-02")]
 
         assert resolve_proposals(
-            proposals, catalog, STRIDE, "spoofing"
-        ) == resolve_proposals(proposals, catalog, STRIDE, "spoofing")
+            proposals, catalog, STRIDE, "spoofing", valid_model()
+        ) == resolve_proposals(proposals, catalog, STRIDE, "spoofing", valid_model())
 
     def test_a_reference_naming_nothing_is_reported_as_itself(self):
         """There is no near match and no repair: inferring which fact was
@@ -444,7 +460,9 @@ class TestResolveProposals:
             "S-01", evidence_refs=["crossing:flow:not-real"], quotes=[]
         )
 
-        resolution = resolve_proposals([proposal], catalog, STRIDE, "spoofing")
+        resolution = resolve_proposals(
+            [proposal], catalog, STRIDE, "spoofing", valid_model()
+        )
 
         assert resolution.drafts == []
         assert "crossing:flow:not-real" in resolution.marks.dropped_claims[0].reason
@@ -456,7 +474,9 @@ class TestResolveProposals:
             sample_proposal("S-02", evidence_refs=["unknown:store:ghost:x"], quotes=[]),
         ]
 
-        resolution = resolve_proposals(proposals, catalog, STRIDE, "spoofing")
+        resolution = resolve_proposals(
+            proposals, catalog, STRIDE, "spoofing", valid_model()
+        )
 
         assert [(m.claim_id, m.reason) for m in resolution.marks.dropped_claims] == [
             (
@@ -477,7 +497,9 @@ class TestResolveProposals:
             "S-01", evidence_refs=[f"  {ENCRYPTION_REF} "], quotes=[]
         )
 
-        (draft,) = resolve_proposals([proposal], catalog, STRIDE, "spoofing").drafts
+        (draft,) = resolve_proposals(
+            [proposal], catalog, STRIDE, "spoofing", valid_model()
+        ).drafts
 
         assert draft.grounds == [catalog[ENCRYPTION_REF]]
 
@@ -527,7 +549,9 @@ class TestTheMisShapeIsUnreachable:
             "S-01", evidence_refs=[LOGIN_CROSSING_REF], quotes=[]
         )
 
-        (draft,) = resolve_proposals([proposal], catalog, STRIDE, "spoofing").drafts
+        (draft,) = resolve_proposals(
+            [proposal], catalog, STRIDE, "spoofing", valid_model()
+        ).drafts
 
         assert draft.grounds[0].kind == "derived-fact"
         assert draft.grounds[0].flow_id == "flow:customer-to-web-app:login"
@@ -552,7 +576,9 @@ class TestTheMisShapeIsUnreachable:
         catalog = evidence_catalog(valid_model())
         proposal = sample_proposal("S-07", evidence_refs=[ENCRYPTION_REF], quotes=[])
 
-        (draft,) = resolve_proposals([proposal], catalog, STRIDE, "tampering").drafts
+        (draft,) = resolve_proposals(
+            [proposal], catalog, STRIDE, "tampering", valid_model()
+        ).drafts
 
         assert draft.id == "T-07"
         assert draft.category == "tampering"
@@ -631,3 +657,62 @@ class TestTheElementRoster:
         model = valid_model()
 
         assert render_element_roster(model) == render_element_roster(model)
+
+
+class TestAnAbsenceIsAGround:
+    """#412: a claim about what a system does not have needs a ground that says so.
+
+    Every other branch names something present, so a framework that rules a
+    unit out of scope had nothing honest to cite and reached for an unrelated
+    quote instead. This branch's referent is the whole model.
+    """
+
+    def test_a_term_the_model_names_nowhere_becomes_a_ground(self):
+        catalog = evidence_catalog(valid_model())
+        proposal = sample_proposal(
+            "S-01", evidence_refs=[], quotes=[], absent_elements=["ldap"]
+        )
+
+        (draft,) = resolve_proposals(
+            [proposal], catalog, STRIDE, "spoofing", valid_model()
+        ).drafts
+
+        assert draft.grounds == [Ground(kind="absent-element", term="ldap")]
+
+    def test_a_term_the_model_does_name_is_refused(self):
+        """The check that stops this branch asserting an absence that is not one."""
+        model = valid_model()
+        model.processes[0].description += " It queries an LDAP directory."
+        proposal = sample_proposal(
+            "S-01", evidence_refs=[], quotes=[], absent_elements=["ldap"]
+        )
+
+        resolution = resolve_proposals(
+            [proposal], evidence_catalog(model), STRIDE, "spoofing", model
+        )
+
+        assert resolution.drafts == []
+        (mark,) = resolution.marks.dropped_claims
+        assert "absent-element:ldap" in mark.reason
+
+    def test_the_term_is_lowercased_and_stripped(self):
+        catalog = evidence_catalog(valid_model())
+        proposal = sample_proposal(
+            "S-01", evidence_refs=[], quotes=[], absent_elements=["  LDAP  "]
+        )
+
+        (draft,) = resolve_proposals(
+            [proposal], catalog, STRIDE, "spoofing", valid_model()
+        ).drafts
+
+        assert draft.grounds == [Ground(kind="absent-element", term="ldap")]
+
+    def test_an_absence_alone_justifies_a_proposal(self):
+        """The min-one rule runs over three lists, not two."""
+        assert sample_proposal(
+            "S-01", evidence_refs=[], quotes=[], absent_elements=["ldap"]
+        )
+
+    def test_a_proposal_citing_nothing_at_all_is_still_refused(self):
+        with pytest.raises(ValidationError, match="justifies itself with nothing"):
+            sample_proposal("S-01", evidence_refs=[], quotes=[], absent_elements=[])

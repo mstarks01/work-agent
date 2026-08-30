@@ -184,7 +184,11 @@ def _snapped_ground(
         return ground.model_copy(
             update={"element_id": snap(ground.element_id, element_ids)}
         )
-    return ground.model_copy(update={"flow_id": snap(ground.flow_id, element_ids)})
+    if ground.kind == "derived-fact":
+        return ground.model_copy(update={"flow_id": snap(ground.flow_id, element_ids)})
+    # An absent-element ground carries a term rather than an ID, so there is no
+    # spelling to canonicalise: the model names it nowhere, which is the point.
+    return ground
 
 
 def snap_drafts(
@@ -336,11 +340,7 @@ def _bound_of(
     that names an element has already put it in reach. A claim citing nothing
     anywhere has no bound and passes untouched.
     """
-    places = {
-        ground.element_id or ground.flow_id
-        for ground in claim.grounds
-        if ground.kind != "quote"
-    }
+    places = {ground.place for ground in claim.grounds if ground.place}
     if places:
         return _reach_of(places, system_model)
     return frozenset(
@@ -658,6 +658,11 @@ def _one_ground_issues(
     """The reference failure of one catalogued grounds entry, or nothing."""
     issue = ""
     if ground.kind == "quote":
+        return []
+    if ground.kind == "absent-element":
+        # Nothing to resolve: the term names no element by construction, and
+        # that the model names it nowhere was already checked against this same
+        # model by ``resolve_proposals``, which dropped it otherwise.
         return []
     if ground.kind == "derived-fact":
         if ground.flow_id not in crossing_ids:
@@ -1067,7 +1072,7 @@ def rating_disagreements(drafts: Sequence[Claim]) -> dict[str, list[str]]:
             continue
         ratings[draft.id] = rating
         facts = frozenset(
-            (ground.kind, ground.element_id or ground.flow_id, ground.attribute)
+            (ground.kind, ground.place or ground.term, ground.attribute)
             for ground in draft.grounds
             if ground.kind != "quote"
         )
