@@ -100,9 +100,13 @@ def read_and_record(app, case=CASE, notes="21 agree", missing=()):
     )
 
 
-@pytest.fixture
-def tree(tmp_path):
-    """A throwaway repo holding two real corpus cases, a roster and the list."""
+def build_tree(tmp_path):
+    """A throwaway repo holding two real corpus cases, a roster and the list.
+
+    A function as well as a fixture, because ``tests/test_sitting.py`` sits
+    with the same corpus one layer down, against the module rather than the
+    app.
+    """
     root = Path(__file__).resolve().parents[1]
     tmp_path = tmp_path / "clone"
     (tmp_path / "evals" / "corpus").mkdir(parents=True)
@@ -126,6 +130,11 @@ def tree(tmp_path):
         encoding="utf-8",
     )
     return tmp_path
+
+
+@pytest.fixture
+def tree(tmp_path):
+    return build_tree(tmp_path)
 
 
 def sign(tree, case, reviewer):
@@ -554,100 +563,6 @@ class TestTheSubmitButton:
         answer = app.post("/api/submit", headers=self.headers(session))
         assert answer.status_code == 409
         assert answer.json()["checks"][0]["problems"] == ["source.md"]
-
-
-class TestTheUnreviewedHelper:
-    """The list is a Python literal, so removing a line is worth testing."""
-
-    def test_both_entry_shapes_are_removed(self, tree):
-        assert sittings.clear_unreviewed(tree, CASE)
-        assert sittings.clear_unreviewed(tree, "03-batch-data-pipeline")
-        text = (tree / "tests" / "test_case_review.py").read_text("utf-8")
-        assert text.count('": ') == 0
-        assert text.endswith("}\n"), "the dict is still a dict"
-
-    def test_a_case_not_listed_writes_nothing(self, tree):
-        before = (tree / "tests" / "test_case_review.py").read_text("utf-8")
-        assert sittings.clear_unreviewed(tree, "99-not-a-case") == ""
-        assert (tree / "tests" / "test_case_review.py").read_text("utf-8") == before
-
-    def test_a_cleared_entry_goes_back_where_it_came_from(self, tree):
-        """The reverse of the clear, byte for byte and in key order.
-
-        A reader who holds a recorded case back leaves it unread, so the list
-        has to name it again — and the reason in the entry is prose a person
-        wrote, which nothing can recompute.
-        """
-        listing = tree / "tests" / "test_case_review.py"
-        before = listing.read_text("utf-8")
-        entry = sittings.clear_unreviewed(tree, CASE)
-        assert sittings.restore_unreviewed(tree, CASE, entry) is True
-        assert listing.read_text("utf-8") == before
-
-    def test_an_entry_goes_back_into_an_empty_table(self, tree):
-        """The day every case is read, and the reader drops one of them."""
-        entries = {case: sittings.clear_unreviewed(tree, case) for case in CASES}
-        assert sittings.unreviewed_cases(tree) == []
-        sittings.restore_unreviewed(tree, OTHER, entries[OTHER])
-        sittings.restore_unreviewed(tree, CASE, entries[CASE])
-        assert sittings.unreviewed_cases(tree) == list(CASES), "in key order"
-
-    def test_a_case_the_list_already_names_is_left_alone(self, tree):
-        before = (tree / "tests" / "test_case_review.py").read_text("utf-8")
-        entry = f'    "{CASE}": "unread",\n'
-        assert sittings.restore_unreviewed(tree, CASE, entry) is False
-        assert (tree / "tests" / "test_case_review.py").read_text("utf-8") == before
-
-
-class TestTheUnreviewedEntryIsChecked:
-    """The list is a module ``pytest`` imports, and the entry is not ours.
-
-    An entry travels back to the list through a **Draft Sitting** — a file
-    outside the repository that the reader owns — so text that is anything
-    but one table entry for the named case would be Python nobody wrote,
-    running in everybody's checkout. The shape is checked, never the
-    spelling.
-    """
-
-    #: Closes the table, runs a statement, and opens a second table so the
-    #: file still parses. The whole class of attack in one value.
-    INJECTION = (
-        '    "{case}": "unread",\n'
-        "}}\nimport pathlib\n"
-        'pathlib.Path("/tmp/never").write_text("ran")\n'
-        "JUNK: dict[str, str] = {{\n"
-    )
-
-    def test_text_that_closes_the_table_is_refused(self, tree):
-        listing = tree / "tests" / "test_case_review.py"
-        sittings.clear_unreviewed(tree, CASE)
-        before = listing.read_text("utf-8")
-        with pytest.raises(sittings.SittingError, match="not one table entry"):
-            sittings.restore_unreviewed(tree, CASE, self.INJECTION.format(case=CASE))
-        assert listing.read_text("utf-8") == before, "a refusal changed the file"
-
-    def test_an_entry_naming_another_case_is_refused(self, tree):
-        sittings.clear_unreviewed(tree, CASE)
-        with pytest.raises(sittings.SittingError, match="other than this case"):
-            sittings.restore_unreviewed(tree, CASE, f'    "{OTHER}": "x",\n')
-
-    def test_a_value_that_is_not_a_reason_is_refused(self, tree):
-        """A call, an f-string or a name evaluates when the module imports."""
-        sittings.clear_unreviewed(tree, CASE)
-        for value in ('__import__("os").system("id")', 'f"{1}"', "open"):
-            with pytest.raises(sittings.SittingError):
-                sittings.restore_unreviewed(tree, CASE, f'    "{CASE}": {value},\n')
-
-    def test_every_entry_the_real_list_holds_is_accepted(self):
-        """The check is over the shape, so it has to accept the shapes the
-        corpus actually writes — a plain string and a parenthesised one."""
-        root = Path(__file__).resolve().parents[1]
-        source = (root / sittings.UNREVIEWED_FILE).read_text("utf-8")
-        entries, _ = sittings._unreviewed_table(source)
-        lines = source.splitlines(keepends=True)
-        assert entries
-        for case, start, end in entries:
-            sittings._one_entry(case, "".join(lines[start:end]))
 
 
 class TestOnlyYourOwnEntryComesOff:
@@ -1565,47 +1480,6 @@ class TestReRecordingACase:
         page = browser(session_for(tree, "ada")).get("/").text
         assert "Re-record this sitting" in page
 
-    def test_re_recording_replaces_the_entry_this_session_appended(self, tree):
-        app = browser(session_for(tree, "ada"))
-        self.read_and_record(app, notes="21 agree")
-        assert self.record(app, notes="22 agree, I miscounted").status_code == 200
-        entries = self.reviews(tree)
-        assert len(entries) == 1, "one reader and one case never write two entries"
-        assert entries[0]["notes"] == "22 agree, I miscounted"
-
-    def test_the_second_record_rewrites_the_filled_document(self, tree):
-        app = browser(session_for(tree, "ada"))
-        self.read_and_record(app, missing=["nothing about the fleet key"])
-        self.record(app, missing=["nobody rotates the key"])
-        text = (tree / "evals" / "corpus" / CASE / "REVIEW-ada.md").read_text("utf-8")
-        assert "nobody rotates the key" in text
-        assert "nothing about the fleet key" not in text
-
-    def test_an_entry_this_session_did_not_write_survives(self, tree):
-        """Append-only still governs the record: nothing but the entry this
-        session appended ever comes off."""
-        case_dir = tree / "evals" / "corpus" / CASE
-        meta = json.loads((case_dir / "case.json").read_text("utf-8"))
-        meta["reviews"] = [
-            {
-                "reviewer": "sam",
-                "date": "2026-08-01",
-                "read": [{"file": "source.md", "sha256": "0" * 64}],
-                "document": "REVIEW-sam.md",
-                "notes": "",
-            }
-        ]
-        (case_dir / "case.json").write_text(
-            json.dumps(meta, indent=2), encoding="utf-8"
-        )
-
-        app = browser(session_for(tree, "ada"))
-        self.read_and_record(app)
-        self.record(app, notes="again")
-        entries = self.reviews(tree)
-        assert [entry["reviewer"] for entry in entries] == ["sam", "ada"]
-        assert entries[1]["notes"] == "again"
-
     def test_the_draft_keeps_the_answers_the_second_press_carried(self, tree):
         app = browser(session_for(tree, "ada"))
         self.read_and_record(app, notes="21 agree")
@@ -1614,14 +1488,6 @@ class TestReRecordingACase:
         assert held["state"] == "finished"
         assert held["notes"] == "22 agree"
         assert held["missing"] == ["nobody rotates the key"]
-
-    def test_the_unreviewed_line_stays_clear(self, tree):
-        app = browser(session_for(tree, "ada"))
-        self.read_and_record(app)
-        self.record(app, notes="again")
-        listing = (tree / "tests" / "test_case_review.py").read_text("utf-8")
-        assert CASE not in listing
-        assert OTHER in listing, "only this case comes off the list"
 
     def test_it_records_whichever_case_is_in_the_stage(self, tree):
         """The walk records the case the reader stands on, and a re-record
@@ -2143,19 +2009,6 @@ class TestDroppingACase:
         assert rows[CASE]["status"] == "draft in progress"
         assert rows[CASE]["pressable"] is True
 
-    def test_it_takes_the_record_out_of_the_working_tree(self, tree):
-        """The whole record, byte for byte: the filled document, the appended
-        entry and the cleared line. A case the press must not carry has to
-        leave nothing in the diff at all."""
-        app = browser(session_for(tree, "ada"))
-        listing = tree / "tests" / "test_case_review.py"
-        before, listed = self.snapshot(tree), listing.read_text("utf-8")
-        read_and_record(app, CASE)
-        assert self.snapshot(tree) != before
-        app.post("/api/drop", json={"case": CASE})
-        assert self.snapshot(tree) == before
-        assert listing.read_text("utf-8") == listed
-
     def test_it_leaves_every_other_case_alone(self, tree):
         app = browser(session_for(tree, "ada"))
         for case in CASES:
@@ -2164,18 +2017,6 @@ class TestDroppingACase:
         app.post("/api/drop", json={"case": CASE})
         assert self.snapshot(tree, OTHER) == kept
         assert [row["case"] for row in app.get("/api/stage").json()["ready"]] == [OTHER]
-
-    def test_the_reader_keeps_every_word_they_wrote(self, tree):
-        """A drop is about this pull request, never about the read."""
-        app = browser(session_for(tree, "ada"))
-        read_and_record(app, CASE, notes="21 agree", missing=["no fleet key"])
-        app.post("/api/drop", json={"case": CASE})
-        held = json.loads(draft_file(tree, CASE).read_text("utf-8"))
-        assert held["own_list"] == ["a spoofed device"]
-        assert held["missing"] == ["no fleet key"]
-        assert held["notes"] == "21 agree"
-        assert held["state"] == "open"
-        assert held["recorded"] is None, "the entry it took back off"
 
     def test_the_stage_shows_it_held_back_and_reversible(self, tree):
         app = browser(session_for(tree, "ada"))
