@@ -285,7 +285,7 @@ REFERENCE_TYPES: Mapping[FrameworkName, type[ReferenceClaim]] = MappingProxyType
 class CaseFramework(BaseModel):
     """One framework this case is graded for, declared as a job submits it.
 
-    Three facts ride here rather than in three places:
+    Four facts ride here rather than in four places:
 
     ``name``
         Which frameworks the case carries records for. A case a framework's
@@ -303,17 +303,20 @@ class CaseFramework(BaseModel):
         are written in. It sits on the (case, framework) pair because exemplars
         live at ``frameworks/<name>/lanes/<lane>/exemplars.md`` — case ``01`` is
         near STRIDE's payments exemplar and near nothing else.
+        A bit, not a scale, and it stays a bit however many exemplar systems
+        there are: what the delta asks is whether recall depends on having been
+        shown the architecture, and that question has two sides no matter how
+        wide the near side gets. A framework whose cases declare no ``near``
+        case reports the delta unexercised rather than zero.
     ``reference_set``
         Whether this framework's records were read as complete against the
         model. It rides here rather than on the case because completeness is a
         property of one reference set: a sitting that read STRIDE's 21 claims
         establishes nothing about the 17 ASVS records beside them.
 
-        A bit, not a scale, and it stays a bit however many exemplar systems
-        there are: what the delta asks is whether recall depends on having been
-        shown the architecture, and that question has two sides no matter how
-        wide the near side gets. A framework whose cases declare no ``near``
-        case reports the delta unexercised rather than zero.
+        It is read: :attr:`~evals.harness.applicability.ApplicabilityScore.precision`
+        is defined only where it says ``exhaustive``, because the complement of
+        a sample is not a set of negatives.
     """
 
     model_config = ConfigDict(extra="forbid", frozen=True)

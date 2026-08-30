@@ -86,6 +86,10 @@ class ApplicabilityScore:
     #: ``frameworks/<name>/lanes/<lane>/exemplars.md`` — a case near STRIDE's
     #: payments exemplar is near nothing of ASVS's.
     exemplar_proximity: str
+    #: Whether the case read this framework's records as complete against the
+    #: model. It decides whether :attr:`precision` is defined at all, because
+    #: the complement of a sample is not a set of negatives.
+    reference_set: str
     universe: int
     expected: tuple[str, ...]
     must_find: tuple[str, ...]
@@ -116,12 +120,28 @@ class ApplicabilityScore:
         return (len(self.must_find) - len(self.must_find_missed)) / len(self.must_find)
 
     @property
-    def precision(self) -> float:
+    def precision(self) -> float | None:
         """Of what the run said applies, how much the case expected.
 
         ``off_catalog`` counts against this: a claim naming a requirement the
         level does not carry is still a claim the reader has to read.
+
+        **``None`` on a sampled reference set**, which is every case until a
+        **Case Sitting** clears one. The figure divides by the requirements the
+        run applied that the case did not list, and reading those as wrong
+        needs a set somebody read as complete: on a sample, an unlisted
+        requirement the run applied may be correct and merely unrecorded.
+        ``evals/harness/scorer.py`` refuses the same inference for STRIDE, and
+        for the same reason — scoring it punishes finding real things and
+        pushes every tuning cycle toward under-reporting.
+
+        ``over_applied`` stays a list either way. It is what
+        :mod:`evals.harness.pairing` reads and what
+        :func:`over_applied_for_promotion` feeds back, and both are readings a
+        person settles rather than a rate anything gates on.
         """
+        if self.reference_set != "exhaustive":
+            return None
         applied = len(self.matched) + len(self.over_applied) + len(self.off_catalog)
         return len(self.matched) / applied if applied else 0.0
 
@@ -131,6 +151,7 @@ class ApplicabilityScore:
             "framework": FRAMEWORK,
             "level": self.level,
             "exemplar_proximity": self.exemplar_proximity,
+            "reference_set": self.reference_set,
             "universe": self.universe,
             "expected": len(self.expected),
             "must_find": len(self.must_find),
@@ -144,7 +165,7 @@ class ApplicabilityScore:
             "excluded": self.excluded,
             "recall": round(self.recall, 4),
             "must_find_recall": round(self.must_find_recall, 4),
-            "precision": round(self.precision, 4),
+            "precision": None if self.precision is None else round(self.precision, 4),
         }
 
 
@@ -242,6 +263,7 @@ def score_applicability(
         case=case.id,
         level=level,
         exemplar_proximity=declared(case).exemplar_proximity,
+        reference_set=declared(case).reference_set,
         universe=len(universe),
         expected=tuple(sorted(expected)),
         must_find=tuple(sorted(must_find)),
@@ -577,6 +599,9 @@ def pooled_dispositions(scores: Sequence[DispositionScore]) -> Mapping[str, Any]
     judged = sum(len(score.judged) for score in scores)
     correct = sum(len(score.correct) for score in scores)
     reachable = sum(len(score.needs_other_evidence) for score in scores)
+    routed_right = sum(
+        1 for score in scores for entry in score.needs_other_evidence if entry.ok
+    )
     false_prose = sum(len(score.false_prose_requests) for score in scores)
     false_confirmed = sum(len(score.false_confirmed) for score in scores)
     wrong_kind = sum(len(score.wrong_kind) for score in scores)
@@ -604,12 +629,12 @@ def pooled_dispositions(scores: Sequence[DispositionScore]) -> Mapping[str, Any]
             round(false_confirmed / reachable, 4) if reachable else 0.0
         ),
         "wrong_kind": wrong_kind,
+        # Counted from the records that were actually right, never from the
+        # three named failures subtracted off the denominator. A record the run
+        # ruled out entirely is none of those three and is still wrong, so
+        # subtracting would report it as correctly routed.
         "evidence_kind_accuracy": (
-            round(
-                (reachable - wrong_kind - false_prose - false_confirmed) / reachable, 4
-            )
-            if reachable
-            else 0.0
+            round(routed_right / reachable, 4) if reachable else 0.0
         ),
         "applicable_judged": applicable,
         "false_not_applicable": false_not_applicable,
@@ -681,18 +706,35 @@ def _published(
     return float(value) if isinstance(value, int | float) else None
 
 
+def _rate(value: float | None) -> str:
+    """One rate for a table cell, or ``n/a`` where the figure is undefined.
+
+    Printed rather than defaulted to zero: a rate nobody can compute and a rate
+    that came out at zero are different facts, and a column that spells them the
+    same way reads the second as the first.
+    """
+    return "n/a" if value is None else f"{value:.0%}"
+
+
 def pooled(scores: Sequence[ApplicabilityScore]) -> Mapping[str, Any]:
     """The corpus-wide figures, pooled over claims rather than averaged per case.
 
     A per-case mean would weight a case carrying 6 records the same as one
     carrying 17, which is the arithmetic that makes a small case's miss vanish.
+
+    **Precision pools over the exhaustive cases alone**, for the reason
+    :attr:`ApplicabilityScore.precision` gives, and ``precision_cases`` carries
+    that denominator beside it: a figure over no case at all is ``None`` rather
+    than a clean-reading zero.
     """
     expected = sum(len(score.expected) for score in scores)
     matched = sum(len(score.matched) for score in scores)
     must_find = sum(len(score.must_find) for score in scores)
     must_find_missed = sum(len(score.must_find_missed) for score in scores)
-    applied = matched + sum(
-        len(score.over_applied) + len(score.off_catalog) for score in scores
+    read = [score for score in scores if score.reference_set == "exhaustive"]
+    read_matched = sum(len(score.matched) for score in read)
+    applied = read_matched + sum(
+        len(score.over_applied) + len(score.off_catalog) for score in read
     )
     return {
         "cases": len(scores),
@@ -705,7 +747,8 @@ def pooled(scores: Sequence[ApplicabilityScore]) -> Mapping[str, Any]:
         "must_find_recall": (
             round((must_find - must_find_missed) / must_find, 4) if must_find else 0.0
         ),
-        "precision": round(matched / applied, 4) if applied else 0.0,
+        "precision": round(read_matched / applied, 4) if applied else None,
+        "precision_cases": len(read),
         "off_catalog": sum(len(score.off_catalog) for score in scores),
     }
 
@@ -896,7 +939,7 @@ def render(scores: Sequence[ApplicabilityScore]) -> None:
     for score in scores:
         print(
             f"{score.case:<26} {score.level:>3} {score.recall:>6.0%}"
-            f" {score.must_find_recall:>6.0%} {score.precision:>6.0%}"
+            f" {score.must_find_recall:>6.0%} {_rate(score.precision):>6}"
             f" {len(score.missed):>5} {len(score.matched_by_deferral):>5}"
             f" {len(score.over_applied):>5}"
             f" {len(score.rejected):>5} {len(score.off_catalog):>4}"
@@ -906,7 +949,9 @@ def render(scores: Sequence[ApplicabilityScore]) -> None:
         f"pooled over {totals['cases']} cases: recall {totals['recall']:.0%}"
         f" ({totals['matched']}/{totals['expected']}),"
         f" must-find {totals['must_find_recall']:.0%},"
-        f" precision {totals['precision']:.0%},"
+        f" precision {_rate(totals['precision'])}"
+        f" (over {totals['precision_cases']} of {totals['cases']} cases read"
+        " as exhaustive),"
         f" off-catalog {totals['off_catalog']}"
         " (instrument, non-gating)"
     )
