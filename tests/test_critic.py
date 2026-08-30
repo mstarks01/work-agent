@@ -16,6 +16,7 @@ from analysis_service.frameworks import schemas_for
 from analysis_service.frameworks.stride import STRIDE
 from analysis_service.frameworks.stride.record import DraftThreat
 from analysis_service.report import (
+    REASON_MAX_CHARS,
     Ground,
     Mitigation,
     ProposedVerdict,
@@ -1079,6 +1080,31 @@ class TestAnUnknownGroundSettlesTheVerdict:
             UnknownRef(element_id="store:orders-db", attribute="encryption_at_rest")
         ]
         assert "encryption_at_rest" in verdict.reason
+
+    def test_many_unknowns_are_counted_rather_than_named(self):
+        """The composed reason has a maximum length, and the pairs do not.
+
+        A draft can rest on more unknowns than the field holds a sentence for.
+        The reason names the count instead of the pairs, and
+        ``related_unknowns`` still carries every pair, so nothing is lost.
+        """
+        draft = sample_draft(
+            "S-01",
+            grounds=[
+                Ground(
+                    kind="unknown-attribute",
+                    element_id=f"store:orders-db-{index:03d}",
+                    attribute="protection_of_data_at_rest",
+                )
+                for index in range(40)
+            ],
+        )
+
+        ruling = type(draft).settled_by_grounds(draft)
+
+        assert len(ruling.verdict.reason) <= REASON_MAX_CHARS
+        assert "40 attributes" in ruling.verdict.reason
+        assert len(ruling.verdict.related_unknowns) == 40
 
     def test_the_critics_own_unknowns_and_reason_are_kept(self, model):
         ruling = sample_ruling(
