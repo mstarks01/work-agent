@@ -750,6 +750,27 @@ class TestAnAbsenceIsAGround:
         (mark,) = resolution.marks.dropped_claims
         assert "cites only evidence" in mark.reason
 
+    def test_a_blank_term_earns_no_mark(self):
+        """The rule the two sibling lists follow: an empty string names nothing.
+
+        It cannot be filtered where a blank evidence reference is, because the
+        ``absent-element:`` prefix has already made the string non-blank by
+        then. So a mark reading ``absent-element:`` with no term after it named
+        nothing for a reader to chase.
+        """
+        catalog = evidence_catalog(valid_model())
+        proposal = sample_proposal(
+            "S-01", evidence_refs=[], quotes=[], absent_elements=["   ", "ldap"]
+        )
+
+        resolution = resolve_proposals(
+            [proposal], catalog, STRIDE, "spoofing", valid_model()
+        )
+
+        (draft,) = resolution.drafts
+        assert draft.grounds == [Ground(kind="absent-element", term="ldap")]
+        assert resolution.marks.unresolved_evidence == []
+
     def test_an_absence_alone_justifies_a_proposal(self):
         """The min-one rule runs over three lists, not two."""
         assert sample_proposal(

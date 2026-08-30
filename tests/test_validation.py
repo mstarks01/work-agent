@@ -79,7 +79,11 @@ class TestReferentialIntegrity:
         model = valid_model()
         model.assumptions[0].attribute = "encryption_at_rest"
         issues = [i for i in validate(model) if i.code == "invalid-reference"]
-        assert any(i.field == "attribute" for i in issues)
+        # ``field`` names the model field a repair pass edits, and that is the
+        # assumptions list for every rule here: no element carries a field
+        # called ``attribute``, so `repair.md`'s "locate the element and field
+        # it names" would send the model looking for one that does not exist.
+        assert any(i.field == "assumptions" for i in issues)
 
     def test_assumption_may_not_name_an_identity_field(self):
         """``name`` is what an element is, never a fact inferred about it."""

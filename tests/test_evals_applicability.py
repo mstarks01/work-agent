@@ -13,6 +13,7 @@ half of the contract entirely.
 
 from __future__ import annotations
 
+from dataclasses import replace
 from pathlib import Path
 
 import pytest
@@ -49,6 +50,24 @@ def corpus():
 @pytest.fixture(scope="module")
 def case(corpus):
     return next(entry for entry in corpus if entry.id == CASE_ID)
+
+
+@pytest.fixture(scope="module")
+def read_case(case):
+    """``case`` with its ASVS reference set declared exhaustive.
+
+    Precision is defined only there, so a test about the figure needs a case
+    somebody read. No corpus case declares it yet — every one is ``sampled``
+    until a **Case Sitting** clears it — which is exactly why the fixture builds
+    the declaration rather than reaching for a case that carries it.
+    """
+    frameworks = [
+        entry.model_copy(update={"reference_set": "exhaustive"})
+        if entry.name == "asvs"
+        else entry
+        for entry in case.meta.frameworks
+    ]
+    return replace(case, meta=case.meta.model_copy(update={"frameworks": frameworks}))
 
 
 def ruling(
@@ -139,10 +158,10 @@ class Scoped:
         self.needs = needs
 
 
-def test_a_perfect_run_matches_every_expected_requirement(case):
-    expected = [reference.requirement for reference in case.references["asvs"]]
+def test_a_perfect_run_matches_every_expected_requirement(read_case):
+    expected = [reference.requirement for reference in read_case.references["asvs"]]
 
-    score = score_applicability(case, Block(ruling(r) for r in expected))
+    score = score_applicability(read_case, Block(ruling(r) for r in expected))
 
     assert set(score.matched) == set(expected)
     assert score.missed == ()
@@ -169,17 +188,17 @@ def test_the_four_cells_partition_the_level_s_universe(case):
     assert counted == score.universe == len(universe)
 
 
-def test_a_rejected_ruling_is_not_an_applied_one(case):
+def test_a_rejected_ruling_is_not_an_applied_one(read_case):
     """``rejected`` is the critic saying the requirement does not apply.
 
     It is the negative answer rather than a missing one, so it neither matches a
     reference nor counts against precision — and it is reported, because a run
     that rejected everything is a different fact from one that produced nothing.
     """
-    expected = [reference.requirement for reference in case.references["asvs"]]
+    expected = [reference.requirement for reference in read_case.references["asvs"]]
 
     score = score_applicability(
-        case,
+        read_case,
         Block([], rejected_claims=[ruling(r, status="rejected") for r in expected]),
     )
 
@@ -205,21 +224,21 @@ def test_needs_info_asserts_the_requirement_applies():
     assert APPLIES == {"confirmed", "needs-info"}
 
 
-def test_a_requirement_outside_the_level_is_its_own_cell(case):
+def test_a_requirement_outside_the_level_is_its_own_cell(read_case):
     """Off-catalog is a package bug; over-applied is a judgement to argue with.
 
     Folding them together would hide the first behind the second — a composed
     identifier the catalog does not hold at this level is the package spelling
     something wrong, not an opinion this corpus disagrees with.
     """
-    level = declared_level(case)
+    level = declared_level(read_case)
     beyond = next(
         entry.id
         for entry in requirements_for(3)
         if entry.id not in {inside.id for inside in requirements_for(level)}
     )
 
-    score = score_applicability(case, Block([ruling(beyond)]))
+    score = score_applicability(read_case, Block([ruling(beyond)]))
 
     assert score.off_catalog == (beyond,)
     assert score.over_applied == ()
@@ -257,6 +276,65 @@ def test_pooling_weights_by_record_and_not_by_case(case):
     assert totals["expected"] == 2 * len(expected)
     assert totals["matched"] == len(expected)
     assert totals["recall"] == 0.5
+
+
+class TestPrecisionNeedsAReferenceSetSomebodyRead:
+    """The complement of a sample is not a set of negatives.
+
+    ``over_applied`` divides the precision figure, and reading an unlisted
+    requirement as wrong is only sound where a **Case Sitting** read the set as
+    complete. ``evals/harness/scorer.py`` refuses the same inference for STRIDE:
+    scoring it punishes finding real things and pushes every tuning cycle toward
+    under-reporting. See #474.
+    """
+
+    @staticmethod
+    def unexpected(case) -> str:
+        """One requirement the level rules on that this case does not list."""
+        expected = {reference.requirement for reference in case.references["asvs"]}
+        universe = {entry.id for entry in requirements_for(declared_level(case))}
+        return min(universe - expected)
+
+    def test_a_sampled_set_reports_no_precision(self, case):
+        score = score_applicability(case, Block([ruling(self.unexpected(case))]))
+
+        assert score.reference_set == "sampled"
+        assert score.over_applied != ()
+        assert score.precision is None
+        assert score.to_json()["precision"] is None
+
+    def test_the_over_applied_list_survives_either_way(self, case, read_case):
+        """The list is a reading, and the rate is a score. Only the rate goes."""
+        extra = self.unexpected(case)
+        sampled = score_applicability(case, Block([ruling(extra)]))
+        read = score_applicability(read_case, Block([ruling(extra)]))
+
+        assert sampled.over_applied == read.over_applied == (extra,)
+        assert read.precision == 0.0
+
+    def test_every_corpus_case_is_sampled_until_somebody_reads_one(self, corpus):
+        """No case declares ``exhaustive``, so no ASVS precision is published."""
+        declarations = [
+            entry.reference_set
+            for golden in corpus
+            for entry in golden.meta.frameworks
+            if entry.name == "asvs"
+        ]
+
+        assert declarations and set(declarations) == {"sampled"}
+
+    def test_pooling_reads_only_the_cases_somebody_read(self, case, read_case):
+        expected = [reference.requirement for reference in case.references["asvs"]]
+        sampled = score_applicability(case, Block(ruling(r) for r in expected))
+        read = score_applicability(read_case, Block([ruling(self.unexpected(case))]))
+
+        assert pooled([sampled])["precision"] is None
+        assert pooled([sampled])["precision_cases"] == 0
+        # The sampled case is perfect and the read one is not. Pooling both
+        # gives the read case's figure alone, never an average of the two.
+        totals = pooled([sampled, read])
+        assert totals["precision_cases"] == 1
+        assert totals["precision"] == read.precision
 
 
 def test_a_case_s_graph_is_built_for_the_frameworks_it_declares(corpus):
@@ -794,3 +872,31 @@ def test_the_pooled_rates_carry_their_own_denominators(case):
     assert totals["false_prose_requests"] == 1
     assert totals["false_prose_request_rate"] == 1.0
     assert totals["accuracy"] == 0.0
+
+
+def test_evidence_kind_accuracy_counts_what_was_right_and_not_what_was_named(case):
+    """A wrong answer that is none of the three named failures is still wrong.
+
+    The rate counted the reachable records left after subtracting the three
+    failures it names. A run that *rejected* a requirement needing source code
+    falls into none of them, so it landed in the numerator and the routing rate
+    read 100% on a record the accuracy figure beside it scored 0%.
+    """
+    needs_code = _requirement_expecting(case, "needs-code")
+    scores = [
+        score_dispositions(
+            case,
+            DispositionBlock(rejected_claims=[ruling(needs_code, "rejected")]),
+            carried=("prose",),
+        )
+    ]
+
+    totals = pooled_dispositions(scores)
+
+    assert totals["needs_other_evidence"] == 1
+    assert totals["false_prose_requests"] == 0
+    assert totals["false_confirmed"] == 0
+    assert totals["wrong_kind"] == 0
+    assert totals["false_not_applicable"] == 1
+    assert totals["accuracy"] == 0.0
+    assert totals["evidence_kind_accuracy"] == 0.0

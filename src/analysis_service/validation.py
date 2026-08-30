@@ -223,8 +223,8 @@ def _assumption_issues(
 
     Three rules, and the third is the one that carries the meaning. The pair
     has to *resolve*: an element that exists, and an attribute that element
-    actually declares — ``attribute_names`` is the registry, derived from the
-    schema, so a field added to an element type is covered here the day it
+    actually declares — ``assumable_attributes`` is the registry, derived from
+    the schema, so a field added to an element type is covered here the day it
     lands and nothing lists the names twice.
 
     Then the attribute has to hold an inference. An **Assumption** is what
@@ -262,7 +262,7 @@ def _assumption_issues(
                 f" which {assumption.element_id!r} does not carry; it declares"
                 f" {list(legal)}",
                 element_id=assumption.element_id,
-                field="attribute",
+                field="assumptions",
             )
         ]
     if _states_nothing(getattr(element, assumption.attribute)):
@@ -274,7 +274,7 @@ def _assumption_issues(
                 " that attribute is still unknown; an unknown value is not an"
                 " inference and needs no assumption",
                 element_id=assumption.element_id,
-                field="attribute",
+                field="assumptions",
             )
         ]
     return []
