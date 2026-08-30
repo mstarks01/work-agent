@@ -1727,12 +1727,23 @@ class ScopeEntry(BaseModel):
     unit: str = Field(min_length=1, max_length=300)
     state: Literal["applicable", "not-applicable", "needs-other-evidence"]
     reason: str = Field(default="", max_length=1000)
+    #: The kind of evidence that would settle this unit, when the state says
+    #: none available could. A field rather than a phrase inside ``reason``
+    #: because a reader groups by it — "141 need source code" is the readable
+    #: form of 141 separate sentences — and grouping by parsing our own prose
+    #: is a rule nothing enforces.
+    needs: str = Field(default="", max_length=100)
 
     @model_validator(mode="after")
     def _check_shape(self) -> Self:
         if self.state != "applicable" and not self.reason:
             raise ValueError(
                 f"scope entry {self.unit!r} is {self.state} and must state a reason"
+            )
+        if (self.state == "needs-other-evidence") != bool(self.needs):
+            raise ValueError(
+                f"scope entry {self.unit!r} must name the evidence it needs if and"
+                " only if its state says none available could settle it"
             )
         return self
 
@@ -2040,8 +2051,13 @@ class FrameworkAnalysis(BaseModel):
         del claims, options
         if not refusal_reason:
             return [
-                ScopeEntry(unit=unit, state="needs-other-evidence", reason=reason)
-                for unit, reason in deferred.items()
+                ScopeEntry(
+                    unit=unit,
+                    state="needs-other-evidence",
+                    reason=f"applies, and settling it needs {kind}",
+                    needs=kind,
+                )
+                for unit, kind in deferred.items()
             ]
         return [
             ScopeEntry(unit=lane, state="not-applicable", reason=refusal_reason)

@@ -342,10 +342,7 @@ class AsvsAnalysis(FrameworkAnalysis):
         ]
         kept = [proposal for proposal in proposals if proposal not in defer]
         return kept, {
-            requirement_id(lane, proposal.requirement): (
-                f"applies, and settling it needs {proposal.needs_evidence};"
-                f" this job carries {', '.join(sorted(carried))}"
-            )
+            requirement_id(lane, proposal.requirement): proposal.needs_evidence
             for proposal in defer
         }
 
@@ -383,7 +380,13 @@ class AsvsAnalysis(FrameworkAnalysis):
             ScopeEntry(
                 unit=requirement.id,
                 state=_scope_state(requirement.id, refusal_reason, deferred),
-                reason=refusal_reason or deferred.get(requirement.id, ""),
+                reason=refusal_reason
+                or (
+                    f"applies, and settling it needs {deferred[requirement.id]}"
+                    if requirement.id in deferred
+                    else ""
+                ),
+                needs=("" if refusal_reason else deferred.get(requirement.id, "")),
             )
             for requirement in requirements_for(level)
             if refusal_reason or requirement.id not in ruled

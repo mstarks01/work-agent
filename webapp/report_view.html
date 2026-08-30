@@ -588,17 +588,39 @@
     });
     section.append(tiles);
 
-    // What this framework considered and raised nothing about, as a count. The
-    // entries themselves are not rendered: a framework answering in its own
-    // units lists every one of them — ASVS lists 70 requirements at level 1 and
-    // 345 at level 3 — and a page that printed all of them would bury the
-    // findings under the things that were fine. The count is what a reader needs
-    // to know the list is in the payload.
+    // What this framework considered and raised nothing about, grouped. The
+    // entries are not listed one by one: a framework answering in its own units
+    // lists every one of them — ASVS lists 70 requirements at level 1 and 345 at
+    // level 3 — and a page printing all of them would bury the findings under
+    // the things that were fine. The payload still carries every unit, which is
+    // the rule; this is how a person reads it.
+    //
+    // Grouped by state, and the deferred group again by the evidence that would
+    // settle it, because those two say different things. "Ruled out" is a
+    // finished answer. "Needs source code" is a live one a reader can act on by
+    // supplying a different kind of input, and it is worth naming what kind.
     if (block.scope.length) {
-      const ruledOut = block.scope.filter(e => e.state === "not-applicable").length;
-      const tail = ruledOut ? ` (${ruledOut} ruled out)` : "";
-      section.append(el("div", "meta",
-        `${block.scope.length} units considered with no claim raised${tail}`));
+      const byState = {};
+      block.scope.forEach(e => { (byState[e.state] = byState[e.state] || []).push(e); });
+      const wrap = el("div", "meta");
+      wrap.append(el("div", null,
+        `${block.scope.length} units considered with no claim raised`));
+
+      const ruledOut = (byState["not-applicable"] || []).length;
+      if (ruledOut) {
+        wrap.append(el("div", null, `\u00a0\u00a0${ruledOut} ruled out — does not apply`));
+      }
+      const deferred = byState["needs-other-evidence"] || [];
+      if (deferred.length) {
+        const byNeed = {};
+        deferred.forEach(e => { byNeed[e.needs] = (byNeed[e.needs] || 0) + 1; });
+        wrap.append(el("div", null,
+          `\u00a0\u00a0${deferred.length} could not be evaluated from this input:`));
+        Object.keys(byNeed).sort().forEach(need => {
+          wrap.append(el("div", null, `\u00a0\u00a0\u00a0\u00a0${byNeed[need]} need ${need}`));
+        });
+      }
+      section.append(wrap);
     }
 
     // What the service dropped for naming something this framework does not
