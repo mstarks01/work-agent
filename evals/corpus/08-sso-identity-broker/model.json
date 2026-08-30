@@ -276,16 +276,19 @@
     {
       "assumption": "The identity broker is reachable from outside the corporate network.",
       "element_id": "process:identity-broker",
+      "attribute": "exposure",
       "basis": "Colleagues are stated to sign in to it from wherever they are, including their own devices at home, while it is stated to run on the corporate network."
     },
     {
       "assumption": "The franchise identity provider is a separate trust party from everywhere else outside the corporate network.",
       "element_id": "entity:franchise-identity-provider",
+      "attribute": "trust_zone",
       "basis": "The source introduces the franchise stores as a distinct group let in on distinct terms; it does not say where the provider runs, so the zone is drawn on the party rather than on a network."
     },
     {
       "assumption": "The HR system sits outside the corporate network.",
       "element_id": "entity:hr-system",
+      "attribute": "trust_zone",
       "basis": "The source names it as the system of record the broker pulls from and never places it; grouped with the other unplaced parties rather than assumed internal."
     }
   ]

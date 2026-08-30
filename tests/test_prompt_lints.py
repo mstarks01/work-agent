@@ -852,6 +852,8 @@ EXTRACTION_FAILURE_RULES: dict[str, str] = {
     "illegal-asset-tag": "`unknown` is not one of them",
     "too-many-elements": "",  # a size ceiling no wording prevents; see below
     "unverifiable-excerpt": "a short verbatim quote",
+    "assumption-on-unknown": "An attribute you left `unknown` inferred nothing and "
+    "takes no entry",
 }
 
 

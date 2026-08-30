@@ -206,16 +206,19 @@
     {
       "assumption": "The web server is reachable from the internet.",
       "element_id": "process:web-server",
+      "attribute": "exposure",
       "basis": "Described as the 'Public site' that 'readers hit ... over HTTPS'."
     },
     {
       "assumption": "The admin connects from outside the hosted network.",
       "element_id": "entity:admin",
+      "attribute": "trust_zone",
       "basis": "\"they do it from wherever they happen to be \u2014 there is no jump host\"."
     },
     {
       "assumption": "The CDN and its bucket sit in a separate trust zone from the hosted network.",
       "element_id": "entity:cdn",
+      "attribute": "trust_zone",
       "basis": "Assets 'do not come off the web server'; the web server 'pushes them up to the CDN's bucket', implying a distinct, separately operated location."
     }
   ]

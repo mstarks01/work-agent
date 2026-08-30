@@ -203,6 +203,25 @@ def attribute_names(element: Element) -> tuple[str, ...]:
     )
 
 
+def assumable_attributes(element: Element) -> tuple[str, ...]:
+    """Every field an **Assumption** may name, derived from the schema.
+
+    :func:`attribute_names` plus ``assets``. The type-specific fields are the
+    facts an element's *type* makes true of it; ``assets`` is the one fact
+    every type can hold, which is why it sits on ``_Element`` beside identity
+    rather than beside them. It is still a fact about the element and still
+    one a rule reads, so an inference can land there and has to be recordable:
+    the corpus infers ``pii`` on a store whose ``data_classification`` nobody
+    stated, and an assumption with nowhere to point would have to be dropped.
+
+    One name added to a derived tuple, never a list of its own. A field added
+    to any element type is covered the day it lands, and
+    ``tests/test_validation.py`` compares this against the schema so the one
+    exception stays the only one.
+    """
+    return (*attribute_names(element), "assets")
+
+
 def derive_element_id(element: Element) -> str:
     """The deterministic ID an element's type, name, and endpoints imply.
 
@@ -220,12 +239,32 @@ ZonedElement = ExternalEntity | Process | DataStore
 
 
 class Assumption(BaseModel):
-    """A value extraction inferred on the record, with a stated basis."""
+    """A value extraction inferred on the record, with a stated basis.
+
+    ``element_id`` and ``attribute`` together name *what* was inferred, which
+    is the whole reason the pair exists rather than the element alone. An
+    element carries several security-relevant attributes and often more than
+    one stated value; an assumption naming only the element leaves a reader
+    unable to tell which of them the basis covers. The gate resolves the pair
+    (:func:`~analysis_service.validation.validate`), so the link is checked
+    rather than asserted.
+
+    The value is deliberately *not* carried. It is ``getattr(element,
+    attribute)``, and a copy beside it would be two fields kept in agreement
+    by hand — the mechanical constraint :func:`normalize_element_ids` exists
+    to remove from element IDs.
+
+    An assumption is an inference, so the attribute it names holds one: the
+    gate refuses an assumption on an attribute that is still unverified. A
+    hedge somebody voiced is not an inference this service made, and it
+    belongs in ``notes``.
+    """
 
     model_config = ConfigDict(extra="forbid")
 
     assumption: str = Field(min_length=1, max_length=1000)
     element_id: str = Field(max_length=300)
+    attribute: str = Field(min_length=1, max_length=100)
     basis: str = Field(min_length=1, max_length=1000)
 
 

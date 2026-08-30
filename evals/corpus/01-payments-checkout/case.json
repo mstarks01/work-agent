@@ -27,31 +27,5 @@
       "exemplar_proximity": "near"
     }
   ],
-  "notes": "The control case for the exemplar-domain-bias delta (ticket 009 decision 6). Deliberately near-identical in shape to analyst.md's shared exemplar system: three network zones, an internet-facing API in a DMZ, a core worker, a PII/financial datastore with unverified at-rest protection, an append-only-ish archive, and an unauthenticated third-party payment callback. It is not a copy — names, technologies and flow labels differ — but nothing structural is far from the exemplar, which is the point: far-domain recall is only meaningful as a delta against this.",
-  "reviews": [
-    {
-      "reviewer": "mstarks01",
-      "date": "2026-08-23",
-      "read": [
-        {
-          "file": "source.md",
-          "sha256": "00335740adbf8247bb22bdaeedb9e574f75fb6a6615c772edc13a72fff07be08"
-        },
-        {
-          "file": "model.json",
-          "sha256": "264086248f560b14d77462d909132afec1e047d8fce012c3dc5cf83d5e2eaa75"
-        },
-        {
-          "file": "claims/stride.json",
-          "sha256": "08158c55e6538aef55de62a0f89ad5468fdfb7b40cfbb68bbba0bcdfea6a4041"
-        },
-        {
-          "file": "claims/asvs.json",
-          "sha256": "14533c6dff97a5acd7308169dc8d0f3efb9d249314c3ed76403213530817d474"
-        }
-      ],
-      "document": "REVIEW-02.md",
-      "notes": "Agreed with all 21 STRIDE claims and all 17 ASVS records; no claim was changed. The reader's own list, written before the recorded sets were opened, named nothing the sets did not already carry. See REVIEW-02.md."
-    }
-  ]
+  "notes": "The control case for the exemplar-domain-bias delta (ticket 009 decision 6). Deliberately near-identical in shape to analyst.md's shared exemplar system: three network zones, an internet-facing API in a DMZ, a core worker, a PII/financial datastore with unverified at-rest protection, an append-only-ish archive, and an unauthenticated third-party payment callback. It is not a copy — names, technologies and flow labels differ — but nothing structural is far from the exemplar, which is the point: far-domain recall is only meaningful as a delta against this."
 }
