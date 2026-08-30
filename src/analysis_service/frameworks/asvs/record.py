@@ -46,6 +46,7 @@ from analysis_service.frameworks.asvs.catalog import (
     requirement_id,
     requirements_for,
 )
+from analysis_service.frameworks.asvs.rules import ruled_out_requirements
 from analysis_service.report import (
     BlockSummary,
     Claim,
@@ -58,6 +59,7 @@ from analysis_service.report import (
     ScopeEntry,
     build_block_summary,
 )
+from analysis_service.system_model import SystemModel
 
 __all__ = [
     "ASVS_ID_FORMAT",
@@ -177,6 +179,14 @@ class DraftRequirementRuling(Claim):
     # move with it: a proposal that validates must resolve into a claim that
     # validates, which is the rule `Proposal.verb`'s own comment states.
     verb: SkipJsonSchema[None] = None
+
+    @classmethod
+    def ruled_out(
+        cls, model: SystemModel, options: Mapping[str, Any], lane: str
+    ) -> dict[str, str]:
+        """The chapter's requirements at the level, where its deciding test fired nowhere."""
+        level = AsvsOptions.model_validate(options).level
+        return ruled_out_requirements(model, level, lane)
 
     @classmethod
     def partition_proposals(
@@ -333,7 +343,10 @@ def build_asvs_summary(
 
 
 def _scope_state(
-    unit: str, refusal_reason: str, deferred: Mapping[str, str]
+    unit: str,
+    refusal_reason: str,
+    deferred: Mapping[str, str],
+    ruled_out: Mapping[str, str] = MappingProxyType({}),
 ) -> Literal["applicable", "not-applicable", "needs-other-evidence"]:
     """Which of the three states one unlisted requirement is in.
 
@@ -343,7 +356,7 @@ def _scope_state(
     broader fact. After that a deferred requirement is the one this job could
     not settle, and everything else was considered and raised nothing.
     """
-    if refusal_reason:
+    if refusal_reason or unit in ruled_out:
         return "not-applicable"
     return "needs-other-evidence" if unit in deferred else "applicable"
 
@@ -384,6 +397,7 @@ class AsvsAnalysis(FrameworkAnalysis):
         options: Mapping[str, Any],
         refusal_reason: str,
         deferred: Mapping[str, str] = MappingProxyType({}),
+        ruled_out: Mapping[str, str] = MappingProxyType({}),
     ) -> list[ScopeEntry]:
         """Every requirement in the selected level this block raised no claim about.
 
@@ -408,14 +422,19 @@ class AsvsAnalysis(FrameworkAnalysis):
         return [
             ScopeEntry(
                 unit=requirement.id,
-                state=_scope_state(requirement.id, refusal_reason, deferred),
+                state=_scope_state(requirement.id, refusal_reason, deferred, ruled_out),
                 reason=refusal_reason
+                or ruled_out.get(requirement.id, "")
                 or (
                     f"applies, and settling it needs {deferred[requirement.id]}"
                     if requirement.id in deferred
                     else ""
                 ),
-                needs=("" if refusal_reason else deferred.get(requirement.id, "")),
+                needs=(
+                    ""
+                    if refusal_reason or requirement.id in ruled_out
+                    else deferred.get(requirement.id, "")
+                ),
             )
             for requirement in requirements_for(level)
             if refusal_reason or requirement.id not in ruled

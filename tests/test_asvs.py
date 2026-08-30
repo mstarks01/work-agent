@@ -1049,3 +1049,47 @@ def test_a_term_fires_only_at_the_start_of_a_word():
     assert _starts_a_word("sso", "company sso")
     assert _starts_a_word("authenticat", "an authenticated session")
     assert _starts_a_word("http", "https post")
+
+
+class TestAChapterRuledOutInCode:
+    """#443: a deciding presence test that fires nowhere rules its chapter out."""
+
+    def test_corpus01_at_level_2_rules_out_four_chapters(self):
+        model = SystemModel.model_validate(
+            json.loads((CORPUS_DIR / "01-payments-checkout" / "model.json").read_text())
+        )
+        ruled_out: dict[str, str] = {}
+        for lane in ASVS.lanes:
+            ruled_out.update(
+                DraftRequirementRuling.ruled_out(model, {"level": 2}, lane)
+            )
+
+        chapters = {unit.split(".")[0] for unit in ruled_out}
+        assert chapters == {"V5", "V9", "V10", "V17"}
+        assert all("ruled out in code by" in reason for reason in ruled_out.values())
+
+    def test_a_model_naming_the_thing_rules_nothing_out(self):
+        model = SystemModel.model_validate(
+            json.loads((CORPUS_DIR / "01-payments-checkout" / "model.json").read_text())
+        )
+        model.processes[0].description += " Shoppers upload a receipt image."
+
+        assert (
+            DraftRequirementRuling.ruled_out(model, {"level": 2}, "file-handling") == {}
+        )
+
+    def test_a_ruled_out_unit_reaches_scope_as_not_applicable(self):
+        entries = AsvsAnalysis.scope_entries(
+            lanes=ASVS.lanes,
+            claims=[],
+            options={"level": 2},
+            refusal_reason="",
+            ruled_out={
+                "V17.1.1": "no peer connection; ruled out in code by webrtc-real-time-media"
+            },
+        )
+
+        (entry,) = [entry for entry in entries if entry.unit == "V17.1.1"]
+        assert entry.state == "not-applicable"
+        assert "ruled out in code" in entry.reason
+        assert entry.needs == ""

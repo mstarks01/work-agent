@@ -52,6 +52,7 @@ from dataclasses import dataclass
 from analysis_service.analysis import control_state, is_unverified
 from analysis_service.candidates import Match, Rule, clip_fact
 from analysis_service.frameworks import PreconditionResult
+from analysis_service.frameworks.asvs.catalog import requirements_for
 from analysis_service.system_model import SystemModel
 
 __all__ = [
@@ -60,6 +61,7 @@ __all__ = [
     "STRUCTURAL_RULES",
     "WEB_PROTOCOL_TERMS",
     "asvs_precondition",
+    "ruled_out_requirements",
 ]
 
 #: The free-text attributes a presence test may read, per element type. Every one
@@ -93,6 +95,13 @@ class PresenceTest:
     question: str
     terms: tuple[str, ...]
     attributes: tuple[str, ...] = _TEXT_ATTRIBUTES
+    #: Whether this test firing nowhere rules its whole chapter out (#443).
+    #: True only where every requirement of the chapter presupposes the thing
+    #: the terms name — a file upload, a self-contained token, an OAuth flow, a
+    #: peer connection — so that its absence from the model is the answer.
+    #: False where a silent model may still have the thing: most systems
+    #: authenticate a caller whether or not the submitter wrote "login".
+    decides_chapter: bool = False
 
     @property
     def rule_id(self) -> str:
@@ -288,6 +297,7 @@ PRESENCE_TESTS: tuple[PresenceTest, ...] = (
     ),
     PresenceTest(
         predicate="file-upload",
+        decides_chapter=True,
         lane="file-handling",
         question=(
             "This system accepts an uploaded file. What limits its size, its"
@@ -333,6 +343,7 @@ PRESENCE_TESTS: tuple[PresenceTest, ...] = (
     ),
     PresenceTest(
         predicate="self-contained-tokens",
+        decides_chapter=True,
         lane="self-contained-tokens",
         question=(
             "This system carries a self-contained token. Which algorithms and"
@@ -361,6 +372,7 @@ PRESENCE_TESTS: tuple[PresenceTest, ...] = (
     ),
     PresenceTest(
         predicate="oauth",
+        decides_chapter=True,
         lane="oauth-and-oidc",
         question=(
             "This system uses OAuth or OIDC. Which grant, which redirect URIs"
@@ -534,6 +546,7 @@ PRESENCE_TESTS: tuple[PresenceTest, ...] = (
     ),
     PresenceTest(
         predicate="real-time-media",
+        decides_chapter=True,
         lane="webrtc",
         question=(
             "This system carries real-time media or a peer connection. What"
@@ -714,6 +727,30 @@ STRUCTURAL_RULES: tuple[Rule, ...] = (
         find=_crossing_from_an_entity,
     ),
 )
+
+
+def ruled_out_requirements(model: SystemModel, level: int, lane: str) -> dict[str, str]:
+    """The requirements of ``lane`` ruled out because its deciding test fired nowhere.
+
+    Each is keyed by the standard's own identifier against the reason a reader
+    gets. Empty for a lane with no deciding test, and for one whose test fired
+    on any element.
+    """
+    ruled_out: dict[str, str] = {}
+    for test in PRESENCE_TESTS:
+        if test.lane != lane or not test.decides_chapter:
+            continue
+        if any(True for _ in _hits(model, test)):
+            continue
+        reason = (
+            f"no element of this system names {test.predicate.replace('-', ' ')}"
+            f" ({', '.join(test.terms[:4])}, ...), and every requirement of this"
+            f" chapter presupposes one; ruled out in code by {test.rule_id}"
+        )
+        for requirement in requirements_for(level, lane):
+            ruled_out[requirement.id] = reason
+    return ruled_out
+
 
 RULES: tuple[Rule, ...] = (
     *(_rule_of(test) for test in PRESENCE_TESTS),

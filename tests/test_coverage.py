@@ -192,3 +192,14 @@ class TestLaneScope:
         second = lane_scope("tampering", STRIDE, model, candidates["tampering"])
 
         assert first == second
+
+
+def test_the_scope_line_names_the_units_ruled_out_in_code():
+    """#443: the agent is told which of its units the report already settled."""
+    model = valid_model()
+
+    scope = lane_scope("spoofing", STRIDE, model, None, ruled_out=("U-1", "U-2"))
+
+    assert "2 units of this lane were ruled out in code" in scope
+    assert "U-1, U-2" in scope
+    assert "ruled out" not in lane_scope("spoofing", STRIDE, model, None)

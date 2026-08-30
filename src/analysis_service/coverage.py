@@ -32,7 +32,7 @@ later rejects was still a part of the system being examined.
 
 from __future__ import annotations
 
-from collections.abc import Collection, Iterable, Mapping
+from collections.abc import Collection, Iterable, Mapping, Sequence
 from types import MappingProxyType
 
 from analysis_service.analysis import unknown_controls
@@ -52,6 +52,7 @@ def lane_scope(
     model: SystemModel,
     candidate_set: CandidateSet | None,
     options: Mapping[str, object] = MappingProxyType({}),
+    ruled_out: Sequence[str] = (),
 ) -> str:
     """One lane's denominators and its job's options, as a line the agent reads.
 
@@ -84,12 +85,18 @@ def lane_scope(
         f" This job asked for {package.name} with {name} {value}."
         for name, value in sorted(options.items())
     )
+    excluded = (
+        f" {len(ruled_out)} units of this lane were ruled out in code and are on"
+        f" the report's scope list; do not rule on them: {', '.join(ruled_out)}."
+        if ruled_out
+        else ""
+    )
     return (
         f"Scope for your lane: {len(model.elements())} elements, "
         f"{len(model.boundary_crossings())} boundary crossings, "
         f"{len(unknown_controls(model))} unstated controls. "
         f"{len(package.rules_for(lane))} {lane} rules ran; {fired} fired, "
-        f"raising {len(offered)} candidates.{selected}\n"
+        f"raising {len(offered)} candidates.{selected}{excluded}\n"
     )
 
 
