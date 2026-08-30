@@ -37,11 +37,15 @@ sides rather than reported as a change to zero.
 
 from __future__ import annotations
 
+import argparse
+import json
+import sys
 from collections.abc import Iterable, Mapping, Sequence
 from dataclasses import dataclass
+from pathlib import Path
 from typing import Any
 
-from evals.harness.artifact import EvalArtifact
+from evals.harness.artifact import EvalArtifact, ProvenanceError, load_artifact
 from evals.harness.instruments import INSTRUMENTS
 
 #: What an instruction row is keyed by. The pair is unique within a sweep —
@@ -238,3 +242,31 @@ def artifact(
         "instruction_nodes": len(nodes),
         "measurement_delta": [row.to_json() for row in measurements],
     }
+
+
+def command_compare(args: argparse.Namespace) -> int:
+    """What one prompt edit did, read off the sweeps either side of it.
+
+    Credential-free, like ``stability`` and ``promote``: both artifacts already
+    hold what their nodes were told and what their scores were, so this is
+    arithmetic over records. Nothing here gates, and nothing here concludes —
+    it prints the instruction change and the measurements that moved beside it,
+    which is what ADR 0016 said no reading could do.
+    """
+    try:
+        before = load_artifact(args.before)
+        after = load_artifact(args.after)
+    except (ProvenanceError, ValueError) as error:
+        print(f"cannot compare: {error}", file=sys.stderr)
+        return 1
+
+    nodes = node_deltas(before, after)
+    measurements = measurement_deltas(before, after)
+    render(nodes, measurements)
+    if args.out:
+        record = artifact(nodes, measurements)
+        record["before"] = str(before.path)
+        record["after"] = str(after.path)
+        Path(args.out).write_text(json.dumps(record, indent=2), encoding="utf-8")
+        print(f"wrote {args.out}")
+    return 0

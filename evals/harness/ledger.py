@@ -45,6 +45,7 @@ reversible by appending, never by rewriting (A08).
 
 from __future__ import annotations
 
+import argparse
 import json
 import os
 import re
@@ -59,6 +60,7 @@ from evals.harness.fingerprint import (
     Components,
     FingerprintError,
     fingerprint,
+    version_of,
 )
 
 EVALS_ROOT = Path(__file__).resolve().parents[1]
@@ -476,3 +478,49 @@ def rekey(votes: Iterable[Vote], version: int) -> list[Vote]:
         replace(vote, fingerprint=fingerprint(vote.components, version=version))
         for vote in votes
     ]
+
+
+def command_rekey(args: argparse.Namespace) -> int:
+    """Recompute every vote's fingerprint under a new rule, in place.
+
+    The operation the whole versioning argument rests on: a better recogniser
+    changes every key, and a vote stores its **components** rather than its
+    hash, so moving the ledger is arithmetic over a file. No provider, no
+    credentials, no re-vote: the ledger stores each vote's components, so a
+    version bump is a pure recomputation over the file.
+
+    Refuses to write anything unless ``--yes`` is given, like ``promote``: this
+    rewrites the only human record in the repository, and a preview that also
+    edited would be a preview nobody could trust. Each voter's file is replaced
+    by an atomic rename, so an interrupted re-key leaves every file whole —
+    old or new — rather than half of a new one.
+    """
+    path = Path(args.ledger)
+    current = load(path)
+    if not current:
+        print(f"{path}: no votes to re-key")
+        return 0
+
+    try:
+        moved = rekey(current.votes, version=args.to_version)
+    except FingerprintError as exc:
+        print(f"cannot re-key: {exc}")
+        return 1
+
+    changed = sum(
+        1
+        for before, after in zip(current.votes, moved, strict=True)
+        if before.fingerprint != after.fingerprint
+    )
+    was = sorted({version_of(v.fingerprint) for v in current.votes})
+    print(f"{len(moved)} votes at version {was} -> {args.to_version}")
+    print(f"{changed} fingerprints move, {len(moved) - changed} unchanged")
+    print(f"{len(current.pool())} findings in the pool, before and after")
+
+    if not args.yes:
+        print("\npreview only; nothing written. Re-run with --yes to apply.")
+        return 0
+
+    write_all(moved, path)
+    print(f"\n{path} rewritten")
+    return 0
