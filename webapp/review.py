@@ -87,7 +87,15 @@ from evals.harness.ledger import (
     load,
 )
 from evals.harness.reference import load_corpus
-from webapp.main import LOOPBACK_HOSTS, SecurityHeaders, refuse_cross_origin
+from webapp.page import (
+    LOOPBACK_HOSTS,
+    Grants,
+    SecurityHeaders,
+    escape,
+    refuse_cross_origin,
+    render,
+    response,
+)
 
 HOST = "127.0.0.1"
 PORT = 8010
@@ -130,24 +138,18 @@ if _unasked:
         " so that package's findings are not asked about in another's words"
     )
 
-_NONCE_PLACEHOLDER = "__CSP_NONCE__"
-
-#: No network origin at all: every asset is inline and nonce-authorised, and
-#: ``connect-src 'self'`` is the one grant the page needs — it calls its own
-#: three endpoints and nothing else.
+#: Both pages do the same three things. No network origin beyond this one:
+#: every asset is inline and nonce-authorised, and the page calls its own three
+#: endpoints and nothing else.
 #:
-#: ``frame-ancestors 'none'`` is load-bearing rather than tidy. A vote button
+#: The closed half of the policy is load-bearing rather than tidy, and
+#: :mod:`webapp.page` spells it on every page for that reason. A vote button
 #: pressed inside somebody else's frame sends a request this app cannot tell
 #: from a real one: it is same-origin, because it genuinely comes from this
 #: page. So framing is the way past every check on the write path, and refusing
-#: to be framed is the check. It is spelled out because ``frame-ancestors`` does
-#: not fall back to ``default-src``, exactly as ``base-uri`` and ``form-action``
-#: beside it do not.
-_CSP = (
-    "default-src 'none'; style-src 'nonce-{nonce}'; script-src 'nonce-{nonce}';"
-    " connect-src 'self'; base-uri 'none'; form-action 'none';"
-    " frame-ancestors 'none'"
-)
+#: to be framed is the check.
+_PAGE_GRANTS = Grants(script=True, style=True, connect=True)
+
 
 
 class VoteBody(BaseModel):
@@ -250,11 +252,11 @@ def create_app(session: Session) -> FastAPI:
 
     @app.get("/", response_class=HTMLResponse)
     def index() -> HTMLResponse:
-        return _html(_page(_QUEUE_PAGE, voter=_escape(session.voter)))
+        return response(render(_QUEUE_PAGE, _PAGE_GRANTS, voter=escape(session.voter)))
 
     @app.get("/review", response_class=HTMLResponse)
     def review() -> HTMLResponse:
-        return _html(_page(_REVIEW_PAGE, voter=_escape(session.voter)))
+        return response(render(_REVIEW_PAGE, _PAGE_GRANTS, voter=escape(session.voter)))
 
     @app.get("/api/summary")
     def summary() -> JSONResponse:
@@ -334,33 +336,6 @@ def _reason_payload() -> list[dict[str, str]]:
         }
         for code in sorted(SUBSTANCE_REASONS) + sorted(STYLE_REASONS)
     ]
-
-
-def _escape(text: str) -> str:
-    """Server-side escape for the one value the templates interpolate."""
-    import html
-
-    return html.escape(text)
-
-
-def _page(template: str, **fields: str) -> tuple[str, str]:
-    """Fill a template and stamp the nonce its policy authorises.
-
-    The nonce is stamped before the fields, the ordering ``webapp/main.py``
-    keeps and for the same reason: a field's value is content, and content that
-    happens to spell the placeholder must come back as those characters rather
-    than as a live nonce.
-    """
-    nonce = secrets.token_urlsafe(16)
-    html = template.replace(_NONCE_PLACEHOLDER, nonce)
-    for name, value in fields.items():
-        html = html.replace(f"<!--{name}-->", value)
-    return html, _CSP.format(nonce=nonce)
-
-
-def _html(page: tuple[str, str]) -> HTMLResponse:
-    body, csp = page
-    return HTMLResponse(content=body, headers={"Content-Security-Policy": csp})
 
 
 _STYLE = """
