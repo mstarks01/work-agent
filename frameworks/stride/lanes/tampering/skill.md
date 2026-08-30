@@ -35,7 +35,7 @@ Each pattern names its trigger in the System Model attribute vocabulary. `unknow
 
 ## Guardrails
 
-- **Second-order reach.** Integrity loss propagates: a tampered config store rewrites the behavior of every process that reads it; a poisoned queue message executes in each consumer. After each threat, follow the model's outbound flows from the tampered element and score impact on the furthest trusted consumer, naming the chain in the description.
+- **Second-order reach.** Integrity loss propagates: a tampered config store rewrites the behavior of every process that reads it; a poisoned queue message executes in each consumer. After each threat, follow the model's outbound flows from the tampered element and score impact on the furthest trusted consumer, naming the chain in the description. Name that reach in the description only; `affected_element_ids` stays with the element the action lands on.
 - **Attacker perspective.** State each threat as an attacker's modification with a named vehicle: *what* is altered, *on which* element ID, *via which* access path. "Flow is unencrypted" is an observation; "an on-path attacker rewrites payment amounts in `flow:web-to-payments:charge` before they reach the processor" is a threat.
 - **Unknowns are findings, not assumptions.** `encryption_in_transit: unknown` yields a conditional threat citing the attribute, for the critic to hold as needs-info — not a claim that the channel is plaintext.
 - **Stay in the model.** Reference only element IDs the System Model contains. Do not invent middleware, WAFs, or validation layers in either direction — absence of a control in the model is at most `unknown`, and presence must come from the model, not from charity.
