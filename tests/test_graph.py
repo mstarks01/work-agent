@@ -2305,5 +2305,3 @@ class TestTheInstructionDigest:
         )
         assert "{system_model}" in instructions
         assert "{input_text}" in instructions
-
-
