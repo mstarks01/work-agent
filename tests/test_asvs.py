@@ -863,8 +863,9 @@ class TestAJobDefersWhatItsInputCannotSettle:
         )
 
         assert kept == []
-        assert "needs code" in deferred["V1.2.4"]
-        assert "carries prose" in deferred["V1.2.4"]
+        # The kind itself, not a sentence: the report composes the wording and
+        # a reader groups by this.
+        assert deferred == {"V1.2.4": "code"}
 
     def test_a_ruled_proposal_is_kept(self):
         """Empty means the agent ruled, and the critic judges it as before."""
@@ -897,11 +898,12 @@ class TestAJobDefersWhatItsInputCannotSettle:
             claims=[],
             options={"level": 1},
             refusal_reason="",
-            deferred={"V1.2.4": "applies, and settling it needs code"},
+            deferred={"V1.2.4": "code"},
         )
         by_unit = {entry.unit: entry for entry in entries}
 
         assert by_unit["V1.2.4"].state == "needs-other-evidence"
+        assert by_unit["V1.2.4"].needs == "code"
         assert "needs code" in by_unit["V1.2.4"].reason
         # Everything else it raised nothing about stays as it was.
         assert by_unit["V1.2.5"].state == "applicable"
@@ -913,7 +915,7 @@ class TestAJobDefersWhatItsInputCannotSettle:
             claims=[],
             options={"level": 1},
             refusal_reason="not a web application",
-            deferred={"V1.2.4": "applies, and settling it needs code"},
+            deferred={"V1.2.4": "code"},
         )
 
         assert {entry.state for entry in entries} == {"not-applicable"}
@@ -927,3 +929,35 @@ def test_a_package_that_defers_nothing_inherits_the_neutral_default():
         ["a", "b"],
         {},
     )
+
+
+class TestScopeEntryNamesWhatWouldSettleIt:
+    """The kind is a field, so a reader groups by it instead of by prose."""
+
+    def test_a_deferred_entry_carries_the_kind(self):
+        entry = ScopeEntry(
+            unit="V1.2.4",
+            state="needs-other-evidence",
+            reason="applies, and settling it needs code",
+            needs="code",
+        )
+
+        assert entry.needs == "code"
+
+    def test_a_deferred_entry_must_name_one(self):
+        with pytest.raises(ValidationError, match="must name the evidence"):
+            ScopeEntry(
+                unit="V1.2.4",
+                state="needs-other-evidence",
+                reason="applies, and nothing here settles it",
+            )
+
+    def test_only_a_deferred_entry_may_name_one(self):
+        """A ruled-out unit needs no further evidence: it has its answer."""
+        with pytest.raises(ValidationError, match="must name the evidence"):
+            ScopeEntry(
+                unit="V1.2.4",
+                state="not-applicable",
+                reason="no LDAP in this system",
+                needs="code",
+            )
