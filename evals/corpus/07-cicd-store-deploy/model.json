@@ -262,21 +262,25 @@
     {
       "assumption": "Developers sit on the corporate network.",
       "element_id": "entity:developer",
+      "attribute": "trust_zone",
       "basis": "The git server they push to is stated to sit on the corporate network; the source places developers nowhere else."
     },
     {
       "assumption": "The build runner is not reachable from the internet.",
       "element_id": "process:build-runner",
+      "attribute": "exposure",
       "basis": "Stated to live in its own build environment; the only internet interaction stated is outbound dependency resolution."
     },
     {
       "assumption": "The deploy controller is not reachable from the internet.",
       "element_id": "process:deploy-controller",
+      "attribute": "exposure",
       "basis": "Stated to run on the corporate network and to be reached by store servers over the retail WAN."
     },
     {
       "assumption": "The store servers are not reachable from the internet.",
       "element_id": "process:store-server",
+      "attribute": "exposure",
       "basis": "Back-office servers reached over the retail WAN; the source states they do not get pushed to at all."
     }
   ]

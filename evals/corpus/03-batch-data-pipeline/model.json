@@ -234,11 +234,13 @@
     {
       "assumption": "SFTP traffic from partners is protected by the SSH transport it runs over.",
       "element_id": "flow:insurance-partner-to-landing-bucket:push-daily-extract",
+      "attribute": "encryption_in_transit",
       "basis": "The text names SFTP, whose transport encryption is intrinsic to the protocol; no other transport claim is made."
     },
     {
       "assumption": "The claims data is health-related personal data.",
       "element_id": "store:claims-warehouse",
+      "attribute": "assets",
       "basis": "Described as insurance claim records carrying member names and dates of birth."
     }
   ]

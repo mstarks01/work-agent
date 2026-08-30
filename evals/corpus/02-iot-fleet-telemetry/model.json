@@ -259,11 +259,13 @@
     {
       "assumption": "The firmware bucket accepts unauthenticated reads from anywhere.",
       "element_id": "store:firmware-bucket",
+      "attribute": "data_classification",
       "basis": "Described as \"public read\" and polled by devices that hold no credential for it."
     },
     {
       "assumption": "The telemetry lake holds personal data about customer sites.",
       "element_id": "store:telemetry-lake",
+      "attribute": "assets",
       "basis": "Stated to contain \"site addresses and occupancy patterns\", described as customer data."
     }
   ]
