@@ -14,7 +14,7 @@ import json
 
 from evals.harness.fingerprint import Components
 from evals.harness.ledger import append, cast, load
-from evals.harness.run import main
+from evals.harness.run import main, reports_dir
 
 
 def seed(path, *, version=1):
@@ -105,7 +105,9 @@ def _sweep(tmp_path, name="artifact.json", claims=None):
     """A sweep artifact and the reports directory ``run --out`` writes beside it."""
     artifact = tmp_path / name
     artifact.write_text(json.dumps({"mode": "analysis"}), encoding="utf-8")
-    reports = tmp_path / f"{name}.reports"
+    # From the harness's own helper: composing the name here is what let this
+    # fixture agree with a review app looking in the wrong place.
+    reports = reports_dir(tmp_path / name)
     reports.mkdir()
     (reports / "01-payments-checkout.report.json").write_text(
         json.dumps(

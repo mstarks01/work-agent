@@ -18,6 +18,7 @@ from fastapi.testclient import TestClient
 
 from analysis_service.frameworks import PACKAGES
 from evals.harness import queue as review_queue
+from evals.harness import run as harness_run
 from evals.harness.ledger import load
 from webapp.review import (
     QUESTIONS,
@@ -301,7 +302,10 @@ class TestReadingSeveralSweeps:
     def _sweep(tmp_path, name, claims, engine="engine-1.2.3"):
         artifact = tmp_path / name
         artifact.write_text("{}", encoding="utf-8")
-        reports = tmp_path / f"{name}.reports"
+        # Named by the harness's own helper rather than composed here. These
+        # fixtures used to append the suffix, which is what let the app and the
+        # harness disagree about the directory without a test noticing.
+        reports = harness_run.reports_dir(artifact)
         reports.mkdir()
         (reports / "01-payments-checkout.report.json").write_text(
             json.dumps({"engine_version": engine, "analyses": claims}),
