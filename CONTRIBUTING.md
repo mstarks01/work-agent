@@ -20,7 +20,7 @@ is any good. Two kinds:
   case from the list on the left, and do the whole thing in a browser, pull
   request included;
   [`evals/BLESSING.md`](evals/BLESSING.md) step 6 explains the method and the
-  by-hand path. 12 of the 13 cases are still waiting for one.
+  by-hand path. 13 of the 13 cases are still waiting for one.
 
 Both are **free and offline**, and neither needs a provider key. A golden case
 carries its own sources, model and reference sets, so a Case Sitting is open

@@ -75,6 +75,66 @@ class TestReferentialIntegrity:
         issues = [i for i in validate(model) if i.code == "invalid-reference"]
         assert any(i.field == "assumptions" for i in issues)
 
+    def test_assumption_must_name_an_attribute_the_element_carries(self):
+        model = valid_model()
+        model.assumptions[0].attribute = "encryption_at_rest"
+        issues = [i for i in validate(model) if i.code == "invalid-reference"]
+        assert any(i.field == "attribute" for i in issues)
+
+    def test_assumption_may_not_name_an_identity_field(self):
+        """``name`` is what an element is, never a fact inferred about it."""
+        model = valid_model()
+        model.assumptions[0].attribute = "name"
+        assert "invalid-reference" in codes(validate(model))
+
+
+class TestAssumptionsRecordAnInference:
+    """An assumption on an unknown attribute inferred nothing. See #465."""
+
+    def test_an_unknown_attribute_carries_no_assumption(self):
+        model = valid_model()
+        model.processes[0].exposure = "unknown"
+        assert "assumption-on-unknown" in codes(validate(model))
+
+    def test_a_decorated_hedge_is_refused_with_the_bare_word(self):
+        """`CONTEXT.md`: a voiced hedge is unknown, and never an assumption."""
+        model = valid_model()
+        model.assumptions[0].attribute = "technology"
+        model.processes[0].technology = "unknown; somebody thought Django"
+        assert "assumption-on-unknown" in codes(validate(model))
+
+    def test_a_stated_absence_may_be_inferred(self):
+        """ "There is no authentication here" is a fact a model can infer."""
+        model = valid_model()
+        flow = model.data_flows[0]
+        flow.authentication = "none; the endpoint is open"
+        model.assumptions[0].element_id = flow.id
+        model.assumptions[0].attribute = "authentication"
+        assert validate(model) == []
+
+    def test_an_empty_asset_list_states_nothing(self):
+        model = valid_model()
+        model.processes[0].assets = []
+        model.assumptions[0].attribute = "assets"
+        assert "assumption-on-unknown" in codes(validate(model))
+
+    def test_a_tagged_asset_list_is_an_inference_that_can_be_recorded(self):
+        model = valid_model()
+        model.processes[0].assets = ["pii"]
+        model.assumptions[0].attribute = "assets"
+        assert validate(model) == []
+
+    def test_the_assumable_registry_is_the_schema_plus_assets(self):
+        """The one exception stays the only one, checked against the schema."""
+        from analysis_service.system_model import (
+            assumable_attributes,
+            attribute_names,
+        )
+
+        for element in valid_model().elements():
+            extra = set(assumable_attributes(element)) - set(attribute_names(element))
+            assert extra == {"assets"}
+
 
 class TestTrustZones:
     def test_model_without_zones_is_reported(self):

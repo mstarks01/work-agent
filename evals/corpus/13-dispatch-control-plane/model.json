@@ -255,6 +255,7 @@
     {
       "assumption": "The dispatch API is not reachable from the internet.",
       "element_id": "process:dispatch-api",
+      "attribute": "exposure",
       "basis": "The source states the control plane is not reachable from the internet, and places the dispatch API in it; the source states nothing about the API's own exposure."
     }
   ]

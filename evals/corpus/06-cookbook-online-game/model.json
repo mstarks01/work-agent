@@ -280,11 +280,13 @@
     {
       "assumption": "The lobby and the game servers accept connections from arbitrary networks.",
       "element_id": "process:lobby",
+      "attribute": "exposure",
       "basis": "Stated to be reachable \"from wherever a player is, so they are exposed\"."
     },
     {
       "assumption": "Player records constitute personal data.",
       "element_id": "store:player-database",
+      "attribute": "assets",
       "basis": "Described as player accounts acted on by customer support moderation."
     }
   ]

@@ -301,16 +301,19 @@
     {
       "assumption": "The web API is reachable from the internet.",
       "element_id": "process:web-api",
+      "attribute": "exposure",
       "basis": "The mobile app is the only customer channel and talks to the web API over HTTP from customers' own devices."
     },
     {
       "assumption": "The customer and the mobile app sit outside Sokify's own systems, in a customer-device zone.",
       "element_id": "process:mobile-app",
+      "attribute": "trust_zone",
       "basis": "The app is the channel through which customers browse and order, and it reaches the web API over HTTP; the source names no other placement for it."
     },
     {
       "assumption": "The marketing laptop and its spreadsheet sit in a separate office zone from the server-side systems.",
       "element_id": "process:catalogue-spreadsheet",
+      "attribute": "trust_zone",
       "basis": "\"The spreadsheet lives on a marketing laptop in the office\", distinct from where the web API and SIMS are described as running."
     }
   ]

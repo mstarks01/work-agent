@@ -227,11 +227,13 @@
     {
       "assumption": "ML engineers work from inside the model network rather than over the public internet.",
       "element_id": "entity:ml-engineer",
+      "attribute": "trust_zone",
       "basis": "No remote-access path is described for artifact publication; the registry is stated to sit in the model network."
     },
     {
       "assumption": "The inference log contains personal data.",
       "element_id": "store:inference-log",
+      "attribute": "assets",
       "basis": "Stated to hold raw prompts carrying \"whatever the calling team's users typed\"."
     }
   ]

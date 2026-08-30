@@ -227,6 +227,7 @@
     {
       "assumption": "The web application is reachable from the public internet.",
       "element_id": "process:web-application",
+      "attribute": "exposure",
       "basis": "The browser is stated to reach it across the public internet."
     }
   ]

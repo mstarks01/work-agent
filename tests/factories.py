@@ -315,6 +315,7 @@ def valid_model(source_label: str = DEFAULT_DESCRIPTION_LABEL) -> SystemModel:
             Assumption(
                 assumption="web app is internet-facing",
                 element_id="process:web-app",
+                attribute="exposure",
                 basis="customers reach it directly from the browser",
             )
         ],

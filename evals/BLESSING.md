@@ -403,7 +403,7 @@ out of both sides.
 
 `tests/test_case_review.py` fails on a new case that arrives without a
 clearing sitting, and names every case still waiting in its `UNREVIEWED`
-list. Twelve of the 13 cases that shipped before this was enforced are still
+list. Thirteen of the 13 cases that shipped before this was enforced are still
 on that list. It names work nobody has done, not an exemption, and it is
 meant to shrink to nothing.
 

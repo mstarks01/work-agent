@@ -44,6 +44,12 @@ from evals.harness.sitting import clears, drifted
 #: acceptable. They are the cases that shipped before step 6 was enforced, and
 #: the list is meant to shrink to nothing.
 UNREVIEWED: dict[str, str] = {
+    "01-payments-checkout": (
+        "21 STRIDE claims and 17 ASVS records. The 2026-08-23 sitting read "
+        "them and its finding stands, but the model.json it signed predates "
+        "the assumption `attribute` field (#465), so the digest no longer "
+        "matches the bytes anybody read. The case needs a fresh sitting."
+    ),
     "02-iot-fleet-telemetry": (
         "18 STRIDE claims and 8 ASVS records, unread. The ASVS records feed the "
         "applicability matrix, which scores whether a requirement applies and "

@@ -226,11 +226,13 @@
     {
       "assumption": "The scheduling web app is reachable from outside the internal network.",
       "element_id": "process:scheduling-web-app",
+      "attribute": "exposure",
       "basis": "Colleagues are stated to reach it from their own phones, which the source does not place on the internal network."
     },
     {
       "assumption": "The scheduling web app itself sits on the internal network.",
       "element_id": "process:scheduling-web-app",
+      "attribute": "trust_zone",
       "basis": "The source lists the service, database and share as internal and does not place the web app anywhere; it is grouped with them for want of any stated zone of its own."
     }
   ]

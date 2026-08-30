@@ -202,6 +202,7 @@
     {
       "assumption": "The order service is reachable only from inside the core network, not from the internet.",
       "element_id": "process:order-service",
+      "attribute": "exposure",
       "basis": "Described as \"in our core network; it is not exposed outside\"."
     }
   ]

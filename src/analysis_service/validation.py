@@ -3,7 +3,8 @@
 The well-formedness rules: unique typed IDs deterministic from type+name,
 referential integrity of flow endpoints and ``trust_zone``, at least one trust
 zone, legal enum values (including the config-extendable asset-tag vocabulary),
-and assumptions referencing real elements. The admission cap on model size
+and assumptions that name a real element, a real attribute, and an attribute
+holding an inference. The admission cap on model size
 (:data:`MAX_ELEMENTS`) is enforced here because this is the one gate every
 extraction passes through before any category-agent spend.
 
@@ -27,12 +28,15 @@ from typing import Literal
 
 from pydantic import BaseModel, ConfigDict, ValidationError
 
+from analysis_service.analysis import control_state
 from analysis_service.grounding import normalize, verify_normalized
 from analysis_service.references import canonical
 from analysis_service.system_model import (
     CORE_ASSET_TAGS,
+    Assumption,
     Element,
     SystemModel,
+    assumable_attributes,
     derive_element_id,
     normalize_element_ids,
 )
@@ -46,6 +50,7 @@ IssueCode = Literal[
     "illegal-asset-tag",
     "too-many-elements",
     "unverifiable-excerpt",
+    "assumption-on-unknown",
 ]
 
 # Admission cap on model size. Deliberately loose: it is a
@@ -187,21 +192,92 @@ def validate(
             )
         )
 
-    element_ids = {element.id for element in elements}
+    by_id = {element.id: element for element in elements}
     for assumption in model.assumptions:
-        if assumption.element_id not in element_ids:
-            issues.append(
-                ValidationIssue(
-                    code="invalid-reference",
-                    message=f"assumption references element {assumption.element_id!r},"
-                    " which does not exist in the model",
-                    element_id=assumption.element_id,
-                    field="assumptions",
-                )
-            )
+        issues.extend(_assumption_issues(assumption, by_id))
 
     issues.extend(_citation_issues(elements, sources))
     return issues
+
+
+def _states_nothing(value: object) -> bool:
+    """Whether an attribute holds no value for an assumption to have inferred.
+
+    Two shapes, because the schema has two. ``assets`` is a list and states
+    nothing when it is empty — ``extract.md`` rule 6 makes an empty list the
+    honest answer where no tag applies, exactly as ``unknown`` is for a string.
+    Every other attribute is a string, and
+    :func:`~analysis_service.analysis.control_state` is the classifier the rest
+    of the repo reads it with, so a decorated hedge is refused with the bare
+    word.
+    """
+    if isinstance(value, list):
+        return not value
+    return control_state(str(value)) == "unverified"
+
+
+def _assumption_issues(
+    assumption: Assumption, by_id: Mapping[str, Element]
+) -> list[ValidationIssue]:
+    """One assumption resolves to a real element, a real attribute, and a value.
+
+    Three rules, and the third is the one that carries the meaning. The pair
+    has to *resolve*: an element that exists, and an attribute that element
+    actually declares — ``attribute_names`` is the registry, derived from the
+    schema, so a field added to an element type is covered here the day it
+    lands and nothing lists the names twice.
+
+    Then the attribute has to hold an inference. An **Assumption** is what
+    extraction inferred with a stated basis, which makes an assumption on an
+    attribute still reading ``unknown`` a contradiction of its own record:
+    nothing was inferred, so there is nothing for the basis to support.
+    ``CONTEXT.md`` draws the same line — a hedge somebody voiced is
+    ``unknown`` and goes in ``notes``, never here — and this is where the
+    prompt's rule stops being wording and becomes a rule.
+
+    :func:`~analysis_service.analysis.control_state` classifies rather than an
+    equality test against the sentinel, so a decorated hedge
+    (``"unknown; possibly a shared group account"``) is refused with the bare
+    word. A control the input states is *absent* is left alone: "there is no
+    authentication here" is a fact a model can infer, and refusing it would
+    delete the one inference most worth recording.
+    """
+    element = by_id.get(assumption.element_id)
+    if element is None:
+        return [
+            ValidationIssue(
+                code="invalid-reference",
+                message=f"assumption references element {assumption.element_id!r},"
+                " which does not exist in the model",
+                element_id=assumption.element_id,
+                field="assumptions",
+            )
+        ]
+    legal = assumable_attributes(element)
+    if assumption.attribute not in legal:
+        return [
+            ValidationIssue(
+                code="invalid-reference",
+                message=f"assumption names attribute {assumption.attribute!r},"
+                f" which {assumption.element_id!r} does not carry; it declares"
+                f" {list(legal)}",
+                element_id=assumption.element_id,
+                field="attribute",
+            )
+        ]
+    if _states_nothing(getattr(element, assumption.attribute)):
+        return [
+            ValidationIssue(
+                code="assumption-on-unknown",
+                message=f"assumption records an inference for"
+                f" {assumption.attribute!r} on {assumption.element_id!r}, but"
+                " that attribute is still unknown; an unknown value is not an"
+                " inference and needs no assumption",
+                element_id=assumption.element_id,
+                field="attribute",
+            )
+        ]
+    return []
 
 
 def _citation_issues(
