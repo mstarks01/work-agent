@@ -436,6 +436,14 @@ class UnknownRef(BaseModel):
         return bool(self.element_id or self.attribute)
 
 
+# How long an absent-element term may be. Exported because the producer must
+# check it: ``absent_elements`` is a free list the model fills, and the prompt
+# asks for one lowercase term, so an agent writing a sentence instead would fail
+# validation here and cost the job the whole report. One name, so the bound the
+# producer tests and the bound this field accepts cannot drift apart.
+GROUND_TERM_MAX_CHARS = 100
+
+
 class Ground(BaseModel):
     """What justifies one finding: a quote, an attribute's state, or a derived fact.
 
@@ -524,7 +532,7 @@ class Ground(BaseModel):
         default="", max_length=100
     )  # both attribute branches
     flow_id: str = Field(default="", max_length=300)  # derived-fact
-    term: str = Field(default="", max_length=100)  # absent-element
+    term: str = Field(default="", max_length=GROUND_TERM_MAX_CHARS)  # absent-element
 
     # Which fields each branch requires. Everything not listed for a branch is
     # forbidden on it — a quote carrying an element_id is a shape error, not a
@@ -1535,6 +1543,12 @@ class RepairedQuote(BaseModel):
     similarity: float = Field(ge=0.0, le=1.0)
 
 
+# How much of a named element ID a mark carries. Exported for the reason
+# :data:`REFERENCE_MAX_CHARS` gives: ``affected_element_ids`` is a free list the
+# model fills, and an entry that resolves to nothing has no length of its own.
+ELEMENT_REF_MAX_CHARS = 300
+
+
 class UnresolvedReference(BaseModel):
     """An element ID a claim named in ``affected_element_ids`` and lost.
 
@@ -1554,7 +1568,7 @@ class UnresolvedReference(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
     claim_id: str = Field(min_length=1, max_length=CLAIM_ID_MAX_CHARS)
-    element_id: str = Field(min_length=1, max_length=300)
+    element_id: str = Field(min_length=1, max_length=ELEMENT_REF_MAX_CHARS)
     #: Why the reference was dropped. Empty means the model does not contain
     #: it; :data:`BEYOND_GROUNDS` means it exists and the claim's own grounds
     #: do not reach it (#441).
@@ -1566,6 +1580,12 @@ class UnresolvedReference(BaseModel):
 #: name. Reach belongs in the description; ``affected_element_ids`` is what the
 #: action lands on.
 BEYOND_GROUNDS = "more than one hop from every place the claim's grounds name"
+
+
+# How much of a cited ID a mark carries. Exported for the reason
+# :data:`REFERENCE_MAX_CHARS` gives: the producer reads a run of ID characters
+# out of a description the model wrote, and that run has no length of its own.
+MENTION_MAX_CHARS = 300
 
 
 class UnresolvedMention(BaseModel):
@@ -1598,7 +1618,7 @@ class UnresolvedMention(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
     claim_id: str = Field(min_length=1, max_length=CLAIM_ID_MAX_CHARS)
-    mention: str = Field(min_length=1, max_length=300)
+    mention: str = Field(min_length=1, max_length=MENTION_MAX_CHARS)
 
 
 # How much of an agent-supplied evidence reference a mark carries. Exported
