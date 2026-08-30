@@ -24,7 +24,6 @@ from pydantic import Field
 import analysis_service.graph as graph_module
 from analysis_service.critic import DraftJoinError
 from analysis_service.deployment import Deployment
-from analysis_service.evidence import evidence_catalog
 from analysis_service.frameworks.stride.record import STRIDE_CATEGORIES
 from analysis_service.graph import (
     ENTRY_PREPARE,
@@ -37,7 +36,7 @@ from evals.harness.coverage import aggregate_coverage, coverage_totals
 from evals.harness.reference import load_case
 from evals.harness.run import _run_mode
 from tests.factories import DEFAULT_FRAMEWORKS, TEST_TIER_ENV, ScriptedLlm
-from tests.test_evals_modes import lane_of, scripted_ruling
+from tests.test_evals_modes import lane_of, reaching_refs, scripted_ruling
 
 TIER_NODE_BY_GRAPH_NODE = tier_node_by_graph_node(DEFAULT_FRAMEWORKS)
 
@@ -111,17 +110,16 @@ def proposal(case, category, evidence: dict[str, Any], sequence: int = 1) -> dic
     }
 
 
-def sound_evidence(case) -> dict[str, Any]:
-    """One real ``unknown-attribute`` entry: verified by set membership, always."""
-    return {
-        "evidence_refs": [
-            next(
-                ref
-                for ref in evidence_catalog(case.model)
-                if ref.startswith("unknown:")
-            )
-        ]
-    }
+def sound_evidence(case, category) -> dict[str, Any]:
+    """Real catalog entries, verified by set membership, always.
+
+    Chosen to reach the elements the category's first reference cites, since
+    the fan-in drops a cited element the grounds do not reach (#441).
+    """
+    reference = next(
+        ref for ref in case.claims_for("stride") if ref.category == category
+    )
+    return {"evidence_refs": reaching_refs(case, reference.affected_element_ids)}
 
 
 FABRICATED = {
@@ -174,7 +172,7 @@ def sweep(monkeypatch, case, spoofing_first: dict[str, Any] | None) -> Any:
             reply=_reply_for(case, graph_node),
             lane_replies=_lane_replies(case, graph_node),
             queued=_queued_for(case, graph_node, first),
-            first_replies=_critic_first(graph_node, first),
+            first_replies=_critic_first(case, graph_node, first),
         )
 
     pipeline = modes.build_eval_pipeline(
@@ -194,17 +192,21 @@ def sweep(monkeypatch, case, spoofing_first: dict[str, Any] | None) -> Any:
 def _reply_for(case, graph_node: str) -> str:
     if graph_node == "critic_stride":
         return json.dumps(
-            {"claims": [scripted_ruling(category) for category in STRIDE_CATEGORIES]}
+            {
+                "claims": [
+                    scripted_ruling(case, category) for category in STRIDE_CATEGORIES
+                ]
+            }
         )
     for category in STRIDE_CATEGORIES:
         if graph_node == analyze_node_name("stride", category):
             return json.dumps(
-                {"claims": [proposal(case, category, sound_evidence(case))]}
+                {"claims": [proposal(case, category, sound_evidence(case, category))]}
             )
     return '{"claims": []}'
 
 
-def _critic_first(graph_node: str, first: dict[str, Any] | None) -> list[str]:
+def _critic_first(case, graph_node: str, first: dict[str, Any] | None) -> list[str]:
     """The critic's ruling on a first case whose spoofing draft was dropped.
 
     A broken spoofing emission loses its only ground, so the service drops
@@ -214,7 +216,7 @@ def _critic_first(graph_node: str, first: dict[str, Any] | None) -> list[str]:
     if graph_node != "critic_stride" or first is None:
         return []
     rulings = [
-        scripted_ruling(category)
+        scripted_ruling(case, category)
         for category in STRIDE_CATEGORIES
         if category != "spoofing"
     ]
@@ -229,7 +231,7 @@ def _lane_replies(case, graph_node: str) -> dict[str, str]:
         return {}
     return {
         category: json.dumps(
-            {"claims": [proposal(case, category, sound_evidence(case))]}
+            {"claims": [proposal(case, category, sound_evidence(case, category))]}
         )
         for category in STRIDE_CATEGORIES
     }
