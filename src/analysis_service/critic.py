@@ -47,6 +47,8 @@ from analysis_service.references import canonical, snap
 from analysis_service.report import (
     BEYOND_GROUNDS,
     DROPPED_REASON_MAX_CHARS,
+    ELEMENT_REF_MAX_CHARS,
+    MENTION_MAX_CHARS,
     AnalysisMarks,
     Claim,
     DroppedClaim,
@@ -154,7 +156,7 @@ def _unresolved_mentions(
 ) -> list[UnresolvedMention]:
     """Marks for every ID a description cites that the model does not contain."""
     return [
-        UnresolvedMention(claim_id=claim.id, mention=mention)
+        UnresolvedMention(claim_id=claim.id, mention=mention[:MENTION_MAX_CHARS])
         for claim in claims
         for mention in mentioned_ids(claim.description)
         if not canonical(mention, element_ids)
@@ -299,8 +301,16 @@ def _resolve_element_references(
                 )
             )
             continue
+        # A blank ID is skipped rather than marked, for the reason
+        # :func:`~analysis_service.evidence.resolve_proposals` skips a blank
+        # reference: a mark names an element the model does not contain, and an
+        # empty string names none. The drop reason above still lists it.
         unresolved += [
-            UnresolvedReference(claim_id=claim.id, element_id=ref[:300]) for ref in lost
+            UnresolvedReference(
+                claim_id=claim.id, element_id=ref[:ELEMENT_REF_MAX_CHARS]
+            )
+            for ref in lost
+            if ref.strip()
         ]
         drafts.append(claim.model_copy(update={"affected_element_ids": kept}))
     return _ReferenceCheck(drafts, unresolved, dropped)
