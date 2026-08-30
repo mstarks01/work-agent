@@ -1034,3 +1034,18 @@ class TestThisPackageCarriesNoActionVerb:
         from analysis_service.frameworks.stride.record import ThreatProposal
 
         assert "verb" in ThreatProposal.model_json_schema()["properties"]
+
+
+def test_a_term_fires_only_at_the_start_of_a_word():
+    """#429: ``sso`` fired inside ``processor`` and raised an OAuth lead.
+
+    A leading boundary and no trailing one, so ``authenticat`` still reaches
+    ``authenticated`` and ``http`` still reaches ``https``.
+    """
+    from analysis_service.frameworks.asvs.rules import _starts_a_word
+
+    assert not _starts_a_word("sso", "our card processor is a third party")
+    assert not _starts_a_word("sso", "an associate signs in")
+    assert _starts_a_word("sso", "company sso")
+    assert _starts_a_word("authenticat", "an authenticated session")
+    assert _starts_a_word("http", "https post")
