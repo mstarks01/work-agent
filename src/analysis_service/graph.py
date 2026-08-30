@@ -127,6 +127,7 @@ from analysis_service.critic import (
     assemble_claims,
     duplicate_groups,
     join_drafts,
+    rating_disagreements,
     review_issues,
 )
 from analysis_service.domains import select_domain_packs
@@ -1083,6 +1084,7 @@ _DRAFT_UNRULED_FIELDS = frozenset({"mitigations"})
 def _ruling_view(
     drafts: Sequence[Claim],
     duplicates: Mapping[str, Sequence[str]] = MappingProxyType({}),
+    rated_unlike: Mapping[str, Sequence[str]] = MappingProxyType({}),
 ) -> list[dict]:
     """The drafts as a critic reads them: no recommendations, no empty branches.
 
@@ -1131,6 +1133,11 @@ def _ruling_view(
         # critic not to spend a judgement on it.
         if reason := type(draft).misfiled(draft):
             view["filed_in_wrong_lane"] = reason
+        # Computed too: the other drafts with this one's fact pattern and a
+        # different rating (:func:`~analysis_service.critic.rating_disagreements`),
+        # which is the pair step 4 calibrates across.
+        if draft.id in rated_unlike:
+            view["rated_unlike"] = list(rated_unlike[draft.id])
         views.append(view)
     return views
 
@@ -1539,7 +1546,11 @@ def merge_drafts(
     state.put(nodes.key("coverage"), [row.model_dump(mode="json") for row in coverage])
     state.prompt(
         nodes.key("draft_view"),
-        render(_ruling_view(merged, duplicate_groups(merged, model))),
+        render(
+            _ruling_view(
+                merged, duplicate_groups(merged, model), rating_disagreements(merged)
+            )
+        ),
     )
     return {
         "framework": nodes.name,
@@ -1621,6 +1632,7 @@ def route_review(
                         if draft.id in problems.implicated
                     ],
                     duplicate_groups(package_drafts, model),
+                    rating_disagreements(package_drafts),
                 )
             ),
         )
