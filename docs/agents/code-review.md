@@ -27,9 +27,11 @@ Three dots, so the comparison runs from the merge-base.
 
 ## Record a new one
 
-Tag the commit the review actually covered, never a later one. A doc change
-that lands after the review is unreviewed, and a tag that includes it says
-otherwise.
+Tag the **head of the range the review covered**, never a later one. The PR
+that fixes the findings lands after the tag, so the next review reads it as the
+first commits of its own range. A tag on the fix PR puts that PR outside every
+review: the review before it ended at the range head, and the review after it
+starts at the tag.
 
 ```
 git tag -a reviewed/<date> <sha> -F -
