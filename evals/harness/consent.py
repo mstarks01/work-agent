@@ -223,13 +223,23 @@ def _price_drift(manifest: dict[str, Any]) -> tuple[str, ...]:
         if current is None or _same_rates(recorded, current):
             continue
         lines.append(
-            f"{model}: this Baseline recorded"
-            f" ${recorded.input_per_token * 1e6:.2f} in /"
-            f" ${recorded.output_per_token * 1e6:.2f} out; the price map now"
-            f" says ${current.input_per_token * 1e6:.2f} in /"
-            f" ${current.output_per_token * 1e6:.2f} out, per million tokens"
+            f"{model}: this Baseline recorded {_rates(recorded)}; the price map"
+            f" now says {_rates(current)}, per million tokens"
         )
     return tuple(lines)
+
+
+def _rates(prices: UnitPrices) -> str:
+    """Every rate :func:`_same_rates` compares, so a line never shows two equal pairs."""
+    cached = (
+        "no cache rate"
+        if prices.cache_read_per_token is None
+        else f"${prices.cache_read_per_token * 1e6:.2f} cached"
+    )
+    return (
+        f"${prices.input_per_token * 1e6:.2f} in /"
+        f" ${prices.output_per_token * 1e6:.2f} out / {cached}"
+    )
 
 
 def _same_rates(one: UnitPrices, other: UnitPrices) -> bool:

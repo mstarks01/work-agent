@@ -393,6 +393,25 @@ class TestTheDriftDisclosure:
         assert "$1.00 in / $4.00 out" in drift[0]  # what the Baseline recorded
         assert "$2.00 in / $8.00 out" in drift[0]  # what the map says today
 
+    def test_a_moved_cache_rate_shows_as_its_own_figure(self, tmp_path, priced):
+        """The line prints every rate the comparison reads, cache rate included.
+
+        A Baseline recorded before the map stated a cache rate carries ``None``
+        there; one recorded as ``0.0`` differs from a map that now says
+        ``None``. Either way the line has to show where the difference is,
+        not two equal input/output pairs.
+        """
+        known = priced["openai/gpt-5.6"]
+        recorded = UnitPrices(
+            known.model, known.input_per_token, known.output_per_token, None
+        )
+        merged(tmp_path, "one", IDENTITY, actual=0.60, recorded_prices=(recorded,))
+        estimate = consent.estimate(IDENTITY, ROUTES, tmp_path)
+
+        (drift,) = [line for line in estimate.lines if "the price map now says" in line]
+        assert "no cache rate" in drift
+        assert f"${known.cache_read_per_token * 1e6:.2f} cached" in drift
+
     def test_an_unmoved_price_says_nothing(self, tmp_path, priced):
         merged(
             tmp_path,
