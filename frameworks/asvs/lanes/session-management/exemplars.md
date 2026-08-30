@@ -9,6 +9,7 @@ Lifetime is two requirements, not one — idle and absolute — and this draft r
 ```json
 {
   "requirement": "4.1",
+  "needs_evidence": "config",
   "title": "No session timeout is stated for the customer session",
   "description": "V7.4.1 asks that a session expires after a period of inactivity. It applies here because `flow:customer-to-web-api:submit-payment` carries a session cookie issued after a password login, so this system holds a session rather than authenticating each request independently. The notes say the cookie is issued and say nothing about when it stops being accepted. The requirement applies and the input does not settle it. The idle timeout `process:web-api` enforces would settle it.",
   "affected_element_ids": [
@@ -33,6 +34,7 @@ Generation is the requirement the input can least often settle, and assuming a f
 ```json
 {
   "requirement": "2.3",
+  "needs_evidence": "code",
   "title": "The session token's generation is never described",
   "description": "V7.2.3 sets a floor on the entropy of a session token and asks how it is generated. It applies here for the same reason V7.4.1 does: a session cookie is issued to `entity:customer` after a password login. The notes name the cookie and describe neither its length, its alphabet, nor the generator behind it. The requirement applies and the input does not settle it, and the framework `process:web-api` runs on is not evidence about the token — a stated generator would be.",
   "affected_element_ids": [

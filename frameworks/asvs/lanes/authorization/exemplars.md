@@ -9,6 +9,7 @@ The database credential is the sharpest authorization fact this model carries: o
 ```json
 {
   "requirement": "2.1",
+  "needs_evidence": "",
   "title": "The ledger service holds unrestricted access to every account record",
   "description": "V8.2.1 asks that access to data is restricted to what the accessing component needs. It applies here because `process:ledger-service` reaches `store:accounts-db` over `flow:ledger-service-to-accounts-db:read-write-balances`, and that store is classified confidential and tagged `pii` and `financial`. The submitter states the answer: the connection uses one shared password and the account behind it holds full read/write on every table. So the input settles that no restriction exists at the database layer. Whether `process:ledger-service` applies its own restriction above that is not stated.",
   "affected_element_ids": [
@@ -33,6 +34,7 @@ A documentation requirement again. It applies — there are rules to document, b
 ```json
 {
   "requirement": "1.1",
+  "needs_evidence": "people",
   "title": "Documented authorization rules cannot be settled from this input",
   "description": "V8.1.1 verifies that the application's authorization rules are documented. It applies to this system: `entity:customer` and `entity:payments-provider` reach `process:web-api` from `boundary:public-internet` on different flows carrying different payloads, so there are rules distinguishing what each may do. This job carries a description of the system rather than that documentation, so the requirement applies and this input cannot settle it.",
   "affected_element_ids": [

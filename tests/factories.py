@@ -797,6 +797,10 @@ SCRIPTED_FRAMEWORKS: Mapping[FrameworkName, ScriptedFramework] = MappingProxyTyp
                     requirement="2.1",
                     title="No password length policy is stated",
                     description="The requirement applies and the input does not settle it.",
+                    # The agent ruled, which is the ordinary answer and the one
+                    # that keeps this scripted claim a claim rather than a
+                    # scope entry.
+                    needs_evidence="",
                     evidence_refs=["crossing:flow:customer-to-web-app:login"],
                 )
             ),
