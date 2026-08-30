@@ -120,6 +120,38 @@ def _threat_id(lane: StrideCategory, sequence: int) -> str:
     return ID_FORMAT.format(prefix=CATEGORY_LETTERS[lane], key=sequence)
 
 
+#: The lanes each action verb may be filed in. **A table, checked against the
+#: corpus**: ``tests/test_stride_lanes_of_verb.py`` fails if any reference claim
+#: files a verb in a lane this table does not allow, so the table can never sit
+#: narrower than the blessed sets. Twelve verbs take one lane — a flood is
+#: denial of service wherever it lands — and eight take several, because the
+#: corpus files them so: forging a message is spoofing when the identity is the
+#: point and tampering when the content is, and deleting a record is tampering,
+#: repudiation or denial of service by what the record was for.
+LANES_OF_VERB: dict[str, tuple[StrideCategory, ...]] = {
+    "read": ("information-disclosure",),
+    "intercept": ("information-disclosure",),
+    "elicit": ("information-disclosure",),
+    "recover-credential": ("information-disclosure",),
+    "guess-credential": ("spoofing",),
+    "use-credential": ("spoofing",),
+    "impersonate": ("spoofing",),
+    "alter-in-transit": ("tampering",),
+    "flood": ("denial-of-service",),
+    "disable": ("denial-of-service",),
+    "escalate": ("elevation-of-privilege",),
+    "unattributable": ("repudiation",),
+    "abuse-grant": ("elevation-of-privilege", "information-disclosure"),
+    "alter": ("tampering", "repudiation", "denial-of-service"),
+    "delete": ("tampering", "repudiation", "denial-of-service"),
+    "forge": ("spoofing", "tampering"),
+    "inject": ("tampering", "elevation-of-privilege", "denial-of-service"),
+    "plant": ("tampering", "spoofing", "elevation-of-privilege", "denial-of-service"),
+    "replay": ("spoofing", "tampering"),
+    "ride-session": ("spoofing", "elevation-of-privilege"),
+}
+
+
 class DraftThreat(Claim):
     """One draft STRIDE finding: a claim plus what this framework judges.
 
@@ -182,6 +214,19 @@ class DraftThreat(Claim):
                     ground.kind == "unknown-attribute" for ground in draft.grounds
                 )
             ]
+        )
+
+    @classmethod
+    def misfiled(cls, draft: Claim) -> str:
+        """A draft whose verb no threat in its lane takes, with the lanes that do."""
+        if not isinstance(draft, DraftThreat):
+            return ""
+        lanes = LANES_OF_VERB[draft.verb]
+        if draft.category in lanes:
+            return ""
+        return (
+            f"the verb {draft.verb!r} is filed in {draft.category}, and it belongs to"
+            f" {' or '.join(lanes)}"
         )
 
     @classmethod
