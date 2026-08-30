@@ -151,7 +151,6 @@ if _unasked:
 _PAGE_GRANTS = Grants(script=True, style=True, connect=True)
 
 
-
 class VoteBody(BaseModel):
     """What the page posts. Closed, so an unknown field is a 422 not a silent drop."""
 
