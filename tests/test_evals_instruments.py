@@ -129,7 +129,7 @@ class TestTheTableCoversTheArtifact:
                 owners[key] = name
 
     def test_the_instrument_keys_are_the_ones_the_artifact_carried(self):
-        """The 22 keys a sweep writes, pinned one by one.
+        """The 24 keys a sweep writes, pinned one by one.
 
         Pinned as a literal because this is the one place a silent loss would
         not show up as a failing fold: an instrument dropped from the table
@@ -152,6 +152,8 @@ class TestTheTableCoversTheArtifact:
             "over_applied_for_promotion",
             "applicability_yield",
             "applicability_yield_aggregate",
+            "disposition",
+            "disposition_aggregate",
             "scores",
             "exemplar_delta",
             "unlisted_for_promotion",
@@ -343,11 +345,12 @@ class TestOneCaseMeasuredAlone:
         assert [entry.framework for entry in measured.grounds] == ["asvs"]
 
     def test_a_package_with_a_per_case_scorer_contributes_its_rows(self):
-        """ASVS declares one, so both its rows arrive keyed by instrument."""
+        """ASVS declares one, so all three of its rows arrive keyed by instrument."""
         measured = self.measured([asvs_block(1)])
 
-        assert set(measured.rows) == {"applicability", "applicability_yield"}
-        assert set(measured.payload) >= {"applicability", "applicability_yield"}
+        expected = {"applicability", "disposition", "applicability_yield"}
+        assert set(measured.rows) == expected
+        assert set(measured.payload) >= expected
 
     def test_a_package_whose_scorer_is_none_contributes_no_rows(self):
         """STRIDE's entry is ``None``; the neutral instruments still read it."""

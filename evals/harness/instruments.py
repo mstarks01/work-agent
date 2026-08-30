@@ -340,6 +340,34 @@ INSTRUMENTS: dict[str, Instrument] = {
             ),
         ),
     ),
+    "disposition": Instrument(
+        # ASVS's second per-case instrument. It reads the same block the matrix
+        # does and answers the other half of the question: not whether the
+        # requirement is in play, but whether the run reached the right next
+        # action for it (#471).
+        render=lambda sweep: applicability.render_dispositions(
+            sweep.rows("disposition")
+        ),
+        artifact=lambda sweep: applicability.disposition_artifact(
+            sweep.rows("disposition")
+        ),
+        frameworks=("asvs",),
+        keys=("disposition", "disposition_aggregate"),
+        published=(
+            Column(
+                "disp_acc",
+                lambda blocks, _: applicability.published_disposition(
+                    blocks, "accuracy"
+                ),
+            ),
+            Column(
+                "false_prose",
+                lambda blocks, _: applicability.published_disposition(
+                    blocks, "false_prose_request_rate"
+                ),
+            ),
+        ),
+    ),
     "applicability_yield": Instrument(
         render=lambda sweep: applicability.render_yield(
             sweep.rows("applicability_yield")

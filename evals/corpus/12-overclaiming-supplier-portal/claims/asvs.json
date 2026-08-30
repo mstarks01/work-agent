@@ -9,6 +9,7 @@
     ],
     "claim": "The supplier master service writes records from a vendor CSV into the supplier database and nothing says how those writes are built.",
     "tier": "must-find",
+    "disposition": "needs-code",
     "notes": "The runbook states the file arrives as plain CSV and is picked up as-is, which is the fact that makes an untrusted-input path concrete."
   },
   {
@@ -20,6 +21,7 @@
     ],
     "claim": "Suppliers upload compliance documents and nothing states a size the portal will accept.",
     "tier": "expected",
+    "disposition": "needs-config",
     "notes": "Upload is stated; the limit is not."
   },
   {
@@ -32,6 +34,7 @@
     ],
     "claim": "Suppliers upload insurance certificates and audit documents and nothing says the portal checks the file against an expected type.",
     "tier": "must-find",
+    "disposition": "needs-code",
     "notes": "An upload from outside the organization is the trigger. The vendor datasheet asserts the platform is secure by design, which is a claim rather than a stated control."
   },
   {
@@ -42,6 +45,7 @@
     ],
     "claim": "No documentation defines rate limiting or anti-automation on the supplier sign-in.",
     "tier": "expected",
+    "disposition": "needs-more-prose",
     "notes": "Documentation requirement. The datasheet's 'fully authenticated' is not a control the input states."
   },
   {
@@ -53,6 +57,7 @@
     ],
     "claim": "Suppliers sign in with a password and no minimum length is stated.",
     "tier": "expected",
+    "disposition": "needs-config",
     "notes": "Password authentication is stated outright, so the chapter applies; the parameter is what nothing settles."
   },
   {
@@ -65,6 +70,7 @@
     ],
     "claim": "The vendor issues each supplier a username and password, and nothing says the initial credential is randomly generated or expires.",
     "tier": "must-find",
+    "disposition": "needs-people",
     "notes": "A stated issued credential is exactly this requirement's subject, and the party issuing it is outside the organization."
   },
   {
@@ -77,6 +83,7 @@
     ],
     "claim": "Every supplier uploads into one platform and nothing restricts a supplier to its own documents.",
     "tier": "must-find",
+    "disposition": "needs-code",
     "notes": "The documents carry contact details for the suppliers' own staff, so data-specific access is the requirement. The datasheet asserts access is fully authenticated, which says nothing about which data a signed-in supplier reaches."
   },
   {
@@ -89,6 +96,7 @@
     ],
     "claim": "Suppliers upload to an externally hosted portal and no flow states its transport.",
     "tier": "must-find",
+    "disposition": "needs-config",
     "notes": "'Enterprise-grade encryption throughout' is the vendor's claim about its own product, not a stated fact about this connection. The requirement applies and is unsettled."
   },
   {
@@ -100,6 +108,7 @@
     ],
     "claim": "The whole portal is a third-party product and no documentation defines remediation time frames for it.",
     "tier": "must-find",
+    "disposition": "needs-more-prose",
     "notes": "The source states the organization runs no part of the portal, which makes the third-party rule the central one for this case."
   },
   {
@@ -110,6 +119,7 @@
     ],
     "claim": "Nothing says the portal's components sit inside any documented update window.",
     "tier": "expected",
+    "disposition": "needs-people",
     "notes": "Follows V15.1.1: with no documented time frame there is nothing to hold the components to."
   }
 ]

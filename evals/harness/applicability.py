@@ -28,9 +28,10 @@ cannot steer a number (OWASP LLM01).
 
 from __future__ import annotations
 
-from collections.abc import Iterable, Mapping, Sequence
+from collections.abc import Collection, Iterable, Mapping, Sequence
 from dataclasses import dataclass
-from typing import Any
+from types import MappingProxyType
+from typing import Any, Literal
 
 from analysis_service.frameworks.asvs.catalog import requirements_for
 from analysis_service.frameworks.asvs.record import requirement_of
@@ -39,8 +40,15 @@ from analysis_service.report import (
     FrameworkAnalysis,
     FrameworkName,
     RuledClaim,
+    ScopeEntry,
 )
-from evals.harness.reference import CaseFramework, GoldenCase, ReferenceRequirement
+from analysis_service.sources import CARRIED_EVIDENCE_KINDS
+from evals.harness.reference import (
+    DISPOSITION_FOR_EVIDENCE,
+    CaseFramework,
+    GoldenCase,
+    ReferenceRequirement,
+)
 
 #: The verdicts that assert a requirement applies to this system. ``rejected``
 #: is the critic ruling it does not, which is the negative answer rather than a
@@ -249,9 +257,424 @@ def score_applicability(
     )
 
 
+# ---------------------------------------------------------------------------
+# Disposition: what a run concluded, beside whether the requirement applies.
+# ---------------------------------------------------------------------------
+
+
+@dataclass(frozen=True)
+class Observation:
+    """What one report says about one requirement, at the grain a case judges.
+
+    Six kinds, and they are the *report's* own vocabulary rather than the
+    corpus's: three verdicts a claim can carry, two scope states that answer
+    without one, and silence. The corpus speaks in
+    :data:`~evals.harness.reference.AsvsDisposition`, and :func:`satisfies` is
+    the only place the two meet — which is what keeps the mapping relative to
+    what the job carries rather than hard-coded at each comparison.
+
+    **``needs_evidence`` is not here, because it is not in the report.** The
+    fan-in strips it once it has decided whether a proposal becomes a draft
+    (``evidence._ROUTED_AWAY``), on the ground that the claim-versus-scope-entry
+    split already carries the distinction. So everything below reads a verdict
+    or a scope entry, which is all a consumer of the payload can read either.
+
+    ``needs`` is set only for ``deferred``, where the scope entry names the kind
+    of evidence that would settle the requirement.
+    """
+
+    kind: Literal[
+        "confirmed", "needs-info", "rejected", "not-applicable", "deferred", "silent"
+    ]
+    needs: str = ""
+
+
+#: The evidence kind each disposition asks for, inverted from the corpus table
+#: so the two cannot drift. ``not-applicable`` and ``gap-from-prose`` are absent:
+#: neither asks for evidence, and :func:`satisfies` answers them before it looks
+#: here.
+EVIDENCE_FOR_DISPOSITION: Mapping[str, str] = MappingProxyType(
+    {disposition: kind for kind, disposition in DISPOSITION_FOR_EVIDENCE.items()}
+)
+
+
+def observe(
+    requirement: str,
+    applied_by_id: Mapping[str, RuledClaim],
+    rejected_by_id: Mapping[str, RuledClaim],
+    scope_by_unit: Mapping[str, ScopeEntry],
+) -> Observation:
+    """What the report says about one requirement.
+
+    A requirement reaches a reader through exactly one of these: the fan-in
+    hands ``scope_entries`` every ruled claim, so a requirement a claim covers
+    gets no scope entry, and one the critic rejected is covered. The order below
+    states that invariant rather than breaking a tie.
+
+    **An ``applicable`` scope entry reads as silence, and that is a decision.**
+    It is the state ``scope_entries`` gives every requirement no claim covers —
+    *considered, and nothing raised*. For a case that listed the requirement,
+    that is the miss the recall figure already charges, so naming it a seventh
+    disposition would put one failure in two metrics. A case cannot expect it,
+    which is why :data:`~evals.harness.reference.AsvsDisposition` has no word
+    for it.
+    """
+    claim = applied_by_id.get(requirement)
+    if claim is not None:
+        settled = claim.verdict.status == "confirmed"
+        return Observation("confirmed" if settled else "needs-info")
+    if requirement in rejected_by_id:
+        return Observation("rejected")
+    entry = scope_by_unit.get(requirement)
+    if entry is None:
+        return Observation("silent")
+    if entry.state == "needs-other-evidence":
+        return Observation("deferred", entry.needs)
+    if entry.state == "not-applicable":
+        return Observation("not-applicable")
+    return Observation("silent")
+
+
+def satisfies(
+    disposition: str,
+    observation: Observation,
+    carried: Collection[str] = CARRIED_EVIDENCE_KINDS,
+) -> bool:
+    """Whether one run's answer is the one this case expected.
+
+    **``carried`` is read, never assumed**, and that is the whole reason this is
+    a function rather than a lookup table. Which kinds of evidence become a
+    **Scope Entry** is a policy
+    :data:`~analysis_service.sources.CARRIED_EVIDENCE_KINDS` sets, not a
+    property of the kinds: a job carrying source code would keep a ``needs-code``
+    proposal as a claim and rule it, exactly as it keeps a ``prose`` one today.
+    A scorer that hard-coded *code, config and people are deferred* would invert
+    silently the day that tuple grows, and would fail a run for doing the newly
+    correct thing.
+
+    The cost of reading the policy is that two carried kinds are
+    indistinguishable in the report — both arrive as ``needs-info``, because the
+    field that told them apart is stripped before the payload. With one carried
+    kind, which is what ships, there is nothing to confuse.
+    """
+    if disposition == "not-applicable":
+        return observation.kind in {"rejected", "not-applicable"}
+    if disposition == "gap-from-prose":
+        return observation.kind == "confirmed"
+    wanted = EVIDENCE_FOR_DISPOSITION[disposition]
+    if wanted in carried:
+        return observation.kind == "needs-info"
+    return observation.kind == "deferred" and observation.needs == wanted
+
+
+@dataclass(frozen=True)
+class Judged:
+    """One requirement a case judged, the run answered, and the scorer compared."""
+
+    requirement: str
+    expected: str
+    observed: Observation
+    ok: bool
+
+    def to_json(self) -> dict[str, Any]:
+        return {
+            "requirement": self.requirement,
+            "expected": self.expected,
+            "observed": self.observed.kind,
+            "needs": self.observed.needs,
+            "ok": self.ok,
+        }
+
+
+@dataclass(frozen=True)
+class DispositionScore:
+    """One case's evidence routing: did the run reach the right next action.
+
+    Deliberately **not** folded into :class:`ApplicabilityScore`. That one
+    answers *is this requirement in play*, and this one answers *what can this
+    submission conclude about it* — two questions one number would average into
+    something that moves for either reason. A run can score full applicability
+    recall and still tell a submitter to send more description for a property
+    only the source settles.
+
+    ``unreached`` is the requirements a case judged that the run said nothing
+    about. They are excluded from :attr:`accuracy` rather than counted wrong,
+    because the recall figure beside this one already charges them, and charging
+    them twice would make one miss move two metrics.
+
+    ``unjudged`` counts records carrying no expected disposition. It is the
+    corpus's own gap, and it rides in the artifact so a reader can tell a small
+    denominator from a good score.
+    """
+
+    case: str
+    carried: tuple[str, ...]
+    judged: tuple[Judged, ...]
+    unreached: tuple[str, ...]
+    unjudged: int
+
+    @property
+    def correct(self) -> tuple[Judged, ...]:
+        return tuple(entry for entry in self.judged if entry.ok)
+
+    @property
+    def wrong(self) -> tuple[Judged, ...]:
+        return tuple(entry for entry in self.judged if not entry.ok)
+
+    @property
+    def accuracy(self) -> float:
+        """Of the judged requirements the run answered, how many it answered right."""
+        return len(self.correct) / len(self.judged) if self.judged else 0.0
+
+    @property
+    def needs_other_evidence(self) -> tuple[Judged, ...]:
+        """The judged records only evidence this job cannot carry would settle.
+
+        The denominator of the two rates below, and the only records on which
+        either failure is reachable at all. A case expecting ``gap-from-prose``
+        cannot produce a false prose request, so counting it in the denominator
+        would report a flattering zero.
+        """
+        return tuple(
+            entry
+            for entry in self.judged
+            if EVIDENCE_FOR_DISPOSITION.get(entry.expected, "")
+            not in ("", *self.carried)
+        )
+
+    @property
+    def false_prose_requests(self) -> tuple[Judged, ...]:
+        """Asked for more description where no description could ever answer.
+
+        The failure this instrument exists for. The requirement needs source,
+        settings or a person; the run raised a ``needs-info`` claim instead,
+        which reads to a submitter as *send more of what you already sent*.
+        """
+        return tuple(
+            entry
+            for entry in self.needs_other_evidence
+            if entry.observed.kind == "needs-info"
+        )
+
+    @property
+    def false_confirmed(self) -> tuple[Judged, ...]:
+        """Ruled a deficiency from prose that only other evidence could establish."""
+        return tuple(
+            entry
+            for entry in self.needs_other_evidence
+            if entry.observed.kind == "confirmed"
+        )
+
+    @property
+    def wrong_kind(self) -> tuple[Judged, ...]:
+        """Deferred for the wrong kind of evidence: right refusal, wrong routing."""
+        return tuple(
+            entry
+            for entry in self.needs_other_evidence
+            if entry.observed.kind == "deferred" and not entry.ok
+        )
+
+    @property
+    def false_not_applicable(self) -> tuple[Judged, ...]:
+        """Ruled out a requirement the case says applies."""
+        return tuple(
+            entry
+            for entry in self.wrong
+            if entry.expected != "not-applicable"
+            and entry.observed.kind in {"rejected", "not-applicable"}
+        )
+
+    def to_json(self) -> dict[str, Any]:
+        return {
+            "case": self.case,
+            "framework": FRAMEWORK,
+            "carried": list(self.carried),
+            "judged": len(self.judged),
+            "correct": len(self.correct),
+            "accuracy": round(self.accuracy, 4),
+            "unreached": list(self.unreached),
+            "unjudged": self.unjudged,
+            "needs_other_evidence": len(self.needs_other_evidence),
+            "wrong": [entry.to_json() for entry in self.wrong],
+            "false_prose_requests": [
+                entry.to_json() for entry in self.false_prose_requests
+            ],
+            "false_confirmed": [entry.to_json() for entry in self.false_confirmed],
+            "false_not_applicable": [
+                entry.to_json() for entry in self.false_not_applicable
+            ],
+            "wrong_kind": [entry.to_json() for entry in self.wrong_kind],
+        }
+
+
+def score_dispositions(
+    case: GoldenCase,
+    block: FrameworkAnalysis,
+    carried: Collection[str] = CARRIED_EVIDENCE_KINDS,
+) -> DispositionScore:
+    """One case's expected dispositions against what the run actually said.
+
+    Security: every value compared here is a closed-vocabulary token or a
+    catalog identifier — a verdict status, a scope state, an evidence kind. No
+    claim prose is read, so a model's text cannot move a number (OWASP LLM01).
+    """
+    references = [
+        reference
+        for reference in case.references.get(FRAMEWORK) or ()
+        if isinstance(reference, ReferenceRequirement)
+    ]
+    applied_by_id = {
+        requirement_of(claim.id): claim
+        for claim in block.claims
+        if requirement_of(claim.id)
+    }
+    rejected_by_id = {
+        requirement_of(claim.id): claim
+        for claim in block.rejected_claims
+        if requirement_of(claim.id)
+    }
+    scope_by_unit = {entry.unit: entry for entry in block.scope}
+
+    judged: list[Judged] = []
+    unreached: list[str] = []
+    unjudged = 0
+    for reference in sorted(references, key=lambda ref: ref.requirement):
+        if reference.disposition is None:
+            unjudged += 1
+            continue
+        observation = observe(
+            reference.requirement, applied_by_id, rejected_by_id, scope_by_unit
+        )
+        if observation.kind == "silent":
+            unreached.append(reference.requirement)
+            continue
+        judged.append(
+            Judged(
+                requirement=reference.requirement,
+                expected=reference.disposition,
+                observed=observation,
+                ok=satisfies(reference.disposition, observation, carried),
+            )
+        )
+
+    return DispositionScore(
+        case=case.id,
+        carried=tuple(carried),
+        judged=tuple(judged),
+        unreached=tuple(unreached),
+        unjudged=unjudged,
+    )
+
+
+def pooled_dispositions(scores: Sequence[DispositionScore]) -> Mapping[str, Any]:
+    """The corpus-wide routing figures, pooled over requirements.
+
+    Pooled rather than averaged per case, for the reason :func:`pooled` is: a
+    case carrying two judged records would otherwise weigh as much as one
+    carrying seventeen. Each rate carries its own denominator beside it, so a
+    reader can tell a clean run from an unexercised one.
+    """
+    judged = sum(len(score.judged) for score in scores)
+    correct = sum(len(score.correct) for score in scores)
+    reachable = sum(len(score.needs_other_evidence) for score in scores)
+    false_prose = sum(len(score.false_prose_requests) for score in scores)
+    false_confirmed = sum(len(score.false_confirmed) for score in scores)
+    wrong_kind = sum(len(score.wrong_kind) for score in scores)
+    applicable = sum(
+        1
+        for score in scores
+        for entry in score.judged
+        if entry.expected != "not-applicable"
+    )
+    false_not_applicable = sum(len(score.false_not_applicable) for score in scores)
+    return {
+        "cases": len(scores),
+        "judged": judged,
+        "correct": correct,
+        "accuracy": round(correct / judged, 4) if judged else 0.0,
+        "unreached": sum(len(score.unreached) for score in scores),
+        "unjudged": sum(score.unjudged for score in scores),
+        "needs_other_evidence": reachable,
+        "false_prose_requests": false_prose,
+        "false_prose_request_rate": (
+            round(false_prose / reachable, 4) if reachable else 0.0
+        ),
+        "false_confirmed": false_confirmed,
+        "false_confirmed_rate": (
+            round(false_confirmed / reachable, 4) if reachable else 0.0
+        ),
+        "wrong_kind": wrong_kind,
+        "evidence_kind_accuracy": (
+            round(
+                (reachable - wrong_kind - false_prose - false_confirmed) / reachable, 4
+            )
+            if reachable
+            else 0.0
+        ),
+        "applicable_judged": applicable,
+        "false_not_applicable": false_not_applicable,
+        "false_not_applicable_rate": (
+            round(false_not_applicable / applicable, 4) if applicable else 0.0
+        ),
+    }
+
+
+def render_dispositions(scores: Sequence[DispositionScore]) -> None:
+    """The routing table: what a run told the submitter to do next.
+
+    Printed apart from the applicability table because it answers a different
+    question, and a reader who reads one number off the wrong table draws the
+    wrong conclusion about what to fix.
+    """
+    if not scores:
+        return
+    print("\nASVS disposition (mechanical, closed vocabulary)")
+    print(
+        f"{'case':<26} {'judged':>7} {'acc':>6} {'unjud':>6} {'unrch':>6}"
+        f" {'prose!':>7} {'conf!':>6} {'kind!':>6} {'na!':>4}"
+    )
+    for score in scores:
+        print(
+            f"{score.case:<26} {len(score.judged):>7} {score.accuracy:>6.0%}"
+            f" {score.unjudged:>6} {len(score.unreached):>6}"
+            f" {len(score.false_prose_requests):>7}"
+            f" {len(score.false_confirmed):>6} {len(score.wrong_kind):>6}"
+            f" {len(score.false_not_applicable):>4}"
+        )
+    totals = pooled_dispositions(scores)
+    print(
+        f"pooled over {totals['cases']} cases:"
+        f" accuracy {totals['accuracy']:.0%}"
+        f" ({totals['correct']}/{totals['judged']}),"
+        f" {totals['unjudged']} records carry no expected disposition"
+        " (instrument, non-gating)"
+    )
+    if totals["needs_other_evidence"]:
+        print(
+            f"  of {totals['needs_other_evidence']} requirements needing evidence"
+            " this job cannot carry:"
+            f" {totals['false_prose_requests']} asked for more prose"
+            f" ({totals['false_prose_request_rate']:.0%}),"
+            f" {totals['false_confirmed']} were ruled from prose"
+            f" ({totals['false_confirmed_rate']:.0%}),"
+            f" {totals['wrong_kind']} named the wrong kind"
+        )
+
+
 def published(blocks: Mapping[str, Any], metric: str) -> float | None:
     """One pooled ASVS number, for the comparison table."""
-    aggregate = blocks.get("applicability_aggregate")
+    return _published(blocks, "applicability_aggregate", metric)
+
+
+def published_disposition(blocks: Mapping[str, Any], metric: str) -> float | None:
+    """One pooled routing number, for the comparison table."""
+    return _published(blocks, "disposition_aggregate", metric)
+
+
+def _published(
+    blocks: Mapping[str, Any], aggregate_key: str, metric: str
+) -> float | None:
+    aggregate = blocks.get(aggregate_key)
     if not isinstance(aggregate, Mapping):
         return None
     value = aggregate.get(metric)
@@ -519,6 +942,19 @@ def artifact(scores: Sequence[ApplicabilityScore]) -> dict[str, Any]:
     }
 
 
+def disposition_artifact(scores: Sequence[DispositionScore]) -> dict[str, Any]:
+    """The routing instrument's own artifact keys, never rows in the matrix's.
+
+    Separate keys for the reason :func:`artifact` gives: applicability and
+    evidence routing are two measurements, and one list would invite a reader
+    to average them.
+    """
+    return {
+        "disposition": [score.to_json() for score in scores],
+        "disposition_aggregate": pooled_dispositions(scores) if scores else None,
+    }
+
+
 def render_yield(yields: Sequence[ApplicabilityYield]) -> None:
     """This framework's critic, both sides, never one.
 
@@ -579,6 +1015,10 @@ def score_case(
     """
     return {
         "applicability": score_applicability(case, block),
+        # What the run told the submitter to do next, which the matrix above
+        # cannot see: a matched requirement is matched whether the report routed
+        # it to the right kind of evidence or to the wrong one (#471).
+        "disposition": score_dispositions(case, block),
         # Both sides of this framework's critic, from the block the run already
         # produced: no second scoring pass, because both sides are
         # requirement identifiers.

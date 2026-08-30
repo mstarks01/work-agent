@@ -116,7 +116,7 @@ evals/
 | `harness/structural.py` | The structural gates — the only checks that fail a run. |
 | `harness/scorer.py` | The scoring pipeline: prefilter → rule → match → standing → severity. |
 | `harness/pairing.py` | The reading view behind one applicability disagreement: every requirement the run applied that the case did not expect, and every one the case expected that the run did not deliver, each with the standard's text and the argument made for it. Scores nothing and rules on nothing. |
-| `harness/applicability.py` | ASVS's scorer: a confusion matrix over a finite catalog, matched by requirement ID. A closed claim set needs no composed identity, so no rule runs here. |
+| `harness/applicability.py` | ASVS's scorer: a confusion matrix over a finite catalog, matched by requirement ID. A closed claim set needs no composed identity, so no rule runs here. Carries the `disposition` instrument beside it, which reads what the run concluded rather than whether the requirement applies. |
 | `harness/critic_yield.py` | What the critic added and removed, scored on both sides. |
 | `harness/grounds.py` | What the category agents did with `grounds` — the branch mix, the padding number and the unverified-quote rate — plus the two failures the grounding path kills a case with. |
 | `harness/coverage.py` | What each category agent was offered and how much of it its drafts cite, pooled over the sweep. |
@@ -286,6 +286,59 @@ agent-authored and unreviewed.
 matrix over a finite catalog, matched by requirement ID: its claims carry
 their identity, so no rule composes one. It is reported separately because a
 catalog match and a composed match are not one kind of number.
+
+**ASVS measures applicability and evidentiary reach, never pass/fail.** A job
+here carries prose, and a prose-only service cannot verify that a control is
+correctly implemented — so no ASVS number is a verification score, and the
+corpus has no `pass` disposition to expect. The two blocks answer two different
+questions, and neither substitutes for the other:
+
+- `applicability` — **is this requirement in play for this system?** A
+  `needs-other-evidence` scope entry counts as *applied* here: the lane raised
+  the requirement, and the service withheld the claim for want of evidence the
+  job does not carry. Withholding is not missing.
+- `disposition` — **given that it is in play, did the run reach the right next
+  action?** A run can score full applicability recall and still send the
+  submitter to re-describe a property only the source code settles.
+
+The disposition metrics read two things a report actually carries — a claim's
+verdict, and a scope entry's state and `needs` field. They never read
+`needs_evidence`, which the fan-in strips before the payload. Which kinds of
+evidence become a scope entry is a policy `CARRIED_EVIDENCE_KINDS` sets, and
+the scorer reads it rather than assuming that code, config and people are
+always deferred.
+
+- **disposition accuracy** — of the requirements a case judged and the run
+  answered, how many got the right answer. Requirements the run said nothing
+  about are reported as **unreached** and excluded, because applicability recall
+  already charges them and one miss should not move two metrics.
+- **false-prose-request rate** — the run asked for more description where no
+  description could ever answer. The failure the block exists for: it reads to a
+  submitter as *send more of what you already sent*. Denominated in the
+  requirements that need evidence this job cannot carry, which are the only ones
+  where it is reachable.
+- **false-confirmed rate** — the run ruled a deficiency from prose that only
+  code, config or a person could establish. Same denominator.
+- **evidence-kind accuracy** — of those same requirements, how many the run
+  routed to the right kind of evidence.
+- **false-not-applicable rate** — the run ruled out a requirement the case says
+  applies. Denominated in the judged requirements that are not expected to be
+  `not-applicable`.
+- **unjudged** — reference records carrying no expected disposition. Read it
+  beside the accuracy figure: a small denominator and a good score are different
+  facts.
+
+An `applicable` scope entry — *considered, and nothing raised* — reads as
+silence rather than as a seventh disposition, so a case cannot expect one. For a
+requirement the case listed, that is the miss recall already counts.
+
+**The complement is only a negative on an exhaustive set.** Each framework
+declares `reference_set` in `case.json`, and it defaults to `sampled`, which is
+what is true of a set nobody has read. On a sampled set a requirement the run
+applied that the case did not list is a candidate for promotion, not a false
+positive — the same rule `harness/scorer.py` applies to STRIDE's unmatched
+threats, and for the same reason: scoring it as an error punishes finding real
+things and pushes every tuning cycle toward under-reporting.
 
 - **must-find recall** — did the tool find the threats a case marks as
   essential? Reported **per case**, never averaged: an average hides one case

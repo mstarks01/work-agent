@@ -9,6 +9,7 @@
     ],
     "claim": "The scheduling service reads and writes the rota database and nothing says how its queries are built.",
     "tier": "must-find",
+    "disposition": "needs-code",
     "notes": "A process reaching a store; query construction unstated."
   },
   {
@@ -21,6 +22,7 @@
     ],
     "claim": "Colleagues reach the scheduling web app from their own phones and no cookie attribute is stated.",
     "tier": "expected",
+    "disposition": "needs-config",
     "notes": "The source says nobody documented how colleagues or managers sign in, which is the silence this requirement lands in."
   },
   {
@@ -31,6 +33,7 @@
     ],
     "claim": "No documentation defines rate limiting or anti-automation for a sign-in reachable from colleagues' own phones.",
     "tier": "must-find",
+    "disposition": "gap-from-prose",
     "notes": "The source states the gap outright: nobody has written down how colleagues or managers sign in."
   },
   {
@@ -42,6 +45,7 @@
     ],
     "claim": "Nothing says where a colleague's session token is verified, or that a trusted backend does it.",
     "tier": "expected",
+    "disposition": "needs-code",
     "notes": "The web app holds no rota data of its own, so the verification point is a real question the input does not answer."
   },
   {
@@ -53,6 +57,7 @@
     ],
     "claim": "No authorization documentation separates what a store manager may do from what a colleague may do.",
     "tier": "expected",
+    "disposition": "needs-more-prose",
     "notes": "Documentation requirement; both roles reach the same app."
   },
   {
@@ -66,6 +71,7 @@
     ],
     "claim": "Colleagues view their own shifts and managers build their own store's rota, and nothing restricts either to their own data.",
     "tier": "must-find",
+    "disposition": "needs-code",
     "notes": "Two roles over one store of colleague names, contact details and availability. Data-specific access is the requirement and nothing settles it."
   },
   {
@@ -78,6 +84,7 @@
     ],
     "claim": "Colleagues reach the web app from their own phones and the source says nobody documented whether any of it is encrypted.",
     "tier": "must-find",
+    "disposition": "needs-config",
     "notes": "The case that made #219 concrete: the app is stated to be a web app and its transport is stated to be unrecorded. The requirement applies for the first fact and is unsettled by the second."
   },
   {
@@ -89,6 +96,7 @@
     ],
     "claim": "Colleague contact details and availability move through the app and nothing says they stay out of URLs and query strings.",
     "tier": "expected",
+    "disposition": "needs-code",
     "notes": "The store is named as holding the data; the transport detail is unstated."
   }
 ]

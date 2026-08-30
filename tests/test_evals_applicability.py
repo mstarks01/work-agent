@@ -25,10 +25,15 @@ from evals import verify_corpus
 from evals.harness.applicability import (
     APPLIES,
     ApplicabilityError,
+    Observation,
     applied_requirements,
     declared_level,
+    observe,
     pooled,
+    pooled_dispositions,
+    satisfies,
     score_applicability,
+    score_dispositions,
 )
 from evals.harness.modes import case_frameworks
 from evals.harness.reference import load_corpus
@@ -118,10 +123,20 @@ class Scoped:
     sentence is what a reader is being asked to agree or disagree with.
     """
 
-    def __init__(self, unit, state="needs-other-evidence", reason="needs source code"):
+    def __init__(
+        self,
+        unit,
+        state="needs-other-evidence",
+        reason="needs source code",
+        needs="",
+    ):
         self.unit = unit
         self.state = state
         self.reason = reason
+        # Production binds these: a `needs-other-evidence` entry names its kind
+        # and no other state may. A fake that let them drift would let the
+        # routing scorer pass against an entry the report validator refuses.
+        self.needs = needs
 
 
 def test_a_perfect_run_matches_every_expected_requirement(case):
@@ -542,3 +557,240 @@ class TestADeferredRequirementApplies:
 
         assert expected[0] in score.missed
         assert score.matched_by_deferral == ()
+
+
+class DispositionBlock:
+    """A block carrying all three surfaces the routing scorer reads.
+
+    Both claim arrays and the scope list, because a disposition is spread across
+    them: a ruling arrives as a verdict, a refusal as a rejected claim or a
+    ``not-applicable`` entry, and a deferral as a ``needs-other-evidence`` entry
+    naming its kind.
+    """
+
+    def __init__(self, claims=(), rejected_claims=(), scope=()):
+        self.claims = list(claims)
+        self.rejected_claims = list(rejected_claims)
+        self.scope = list(scope)
+
+    def all_claims(self):
+        return (*self.claims, *self.rejected_claims)
+
+
+def deferred(unit, needs="code"):
+    """One ``needs-other-evidence`` scope entry, as ``scope_entries`` builds it."""
+    return Scoped(
+        unit, state="needs-other-evidence", reason=f"needs {needs}", needs=needs
+    )
+
+
+class TestObservingOneRequirement:
+    """What the report says about a requirement, read off the payload."""
+
+    def test_a_confirmed_claim_is_a_gap_the_prose_settled(self):
+        block = DispositionBlock(claims=[ruling("V1.2.4", "confirmed")])
+
+        observed = observe("V1.2.4", *_surfaces(block))
+
+        assert observed == Observation("confirmed")
+
+    def test_a_needs_info_claim_asks_for_more_of_what_the_job_carries(self):
+        block = DispositionBlock(claims=[ruling("V1.2.4", "needs-info")])
+
+        assert observe("V1.2.4", *_surfaces(block)).kind == "needs-info"
+
+    def test_a_rejection_is_read_from_the_array_it_actually_lives_in(self):
+        """The bug #472 fixed, pinned on this scorer too."""
+        block = DispositionBlock(rejected_claims=[ruling("V1.2.4", "rejected")])
+
+        assert observe("V1.2.4", *_surfaces(block)).kind == "rejected"
+
+    def test_a_deferral_carries_the_kind_of_evidence_it_needs(self):
+        entry = deferred("V1.2.4", "code")
+        block = DispositionBlock(scope=[entry])
+
+        assert observe("V1.2.4", *_surfaces(block)) == Observation("deferred", "code")
+
+    def test_an_applicable_scope_entry_reads_as_silence(self):
+        """The decision #471 left open, made here.
+
+        ``applicable`` is *considered and nothing raised*, which for a listed
+        requirement is the miss recall already charges. Reading it as a seventh
+        disposition would put one failure in two metrics.
+        """
+        entry = Scoped("V1.2.4", state="applicable", reason="")
+        block = DispositionBlock(scope=[entry])
+
+        assert observe("V1.2.4", *_surfaces(block)).kind == "silent"
+
+    def test_a_requirement_nothing_mentions_is_silent(self):
+        assert observe("V1.2.4", *_surfaces(DispositionBlock())).kind == "silent"
+
+
+def _surfaces(block):
+    """The three lookups :func:`observe` takes, built as the scorer builds them."""
+    from analysis_service.frameworks.asvs.record import requirement_of
+
+    return (
+        {requirement_of(c.id): c for c in block.claims if requirement_of(c.id)},
+        {
+            requirement_of(c.id): c
+            for c in block.rejected_claims
+            if requirement_of(c.id)
+        },
+        {entry.unit: entry for entry in block.scope},
+    )
+
+
+class TestTheCarriedPolicyDecidesWhatSatisfies:
+    """``CARRIED_EVIDENCE_KINDS`` is read, never assumed."""
+
+    def test_an_uncarried_kind_must_arrive_as_a_deferral_naming_it(self):
+        assert satisfies("needs-code", Observation("deferred", "code"), ("prose",))
+        assert not satisfies(
+            "needs-code", Observation("deferred", "config"), ("prose",)
+        )
+
+    def test_asking_for_more_prose_does_not_satisfy_a_need_for_code(self):
+        """The false prose request, at the level of one comparison."""
+        assert not satisfies("needs-code", Observation("needs-info"), ("prose",))
+
+    def test_a_carried_kind_is_satisfied_by_the_claim_path_instead(self):
+        """A job that carried source would rule a ``needs-code`` proposal.
+
+        The scorer must follow the policy rather than the kind's name, or it
+        fails a run for doing the newly correct thing the day the tuple grows.
+        """
+        carried = ("prose", "code")
+
+        assert satisfies("needs-code", Observation("needs-info"), carried)
+        assert not satisfies("needs-code", Observation("deferred", "code"), carried)
+
+    def test_more_prose_is_the_claim_path_because_prose_is_carried(self):
+        assert satisfies("needs-more-prose", Observation("needs-info"), ("prose",))
+
+    def test_a_rejection_and_a_not_applicable_entry_both_rule_it_out(self):
+        assert satisfies("not-applicable", Observation("rejected"), ("prose",))
+        assert satisfies("not-applicable", Observation("not-applicable"), ("prose",))
+        assert not satisfies("not-applicable", Observation("confirmed"), ("prose",))
+
+
+class TestTheRoutingFailures:
+    """The two rates the instrument exists to expose."""
+
+    def _scored(self, case, block):
+        return score_dispositions(case, block, carried=("prose",))
+
+    def test_asking_for_prose_where_only_code_answers_is_named_as_such(self, case):
+        needs_code = _requirement_expecting(case, "needs-code")
+        block = DispositionBlock(claims=[ruling(needs_code, "needs-info")])
+
+        score = self._scored(case, block)
+
+        assert [entry.requirement for entry in score.false_prose_requests] == [
+            needs_code
+        ]
+        assert score.false_confirmed == ()
+
+    def test_ruling_from_prose_what_only_code_settles_is_named_apart(self, case):
+        needs_code = _requirement_expecting(case, "needs-code")
+        block = DispositionBlock(claims=[ruling(needs_code, "confirmed")])
+
+        score = self._scored(case, block)
+
+        assert [entry.requirement for entry in score.false_confirmed] == [needs_code]
+        assert score.false_prose_requests == ()
+
+    def test_ruling_out_a_requirement_the_case_says_applies(self, case):
+        needs_code = _requirement_expecting(case, "needs-code")
+        block = DispositionBlock(rejected_claims=[ruling(needs_code, "rejected")])
+
+        score = self._scored(case, block)
+
+        assert [entry.requirement for entry in score.false_not_applicable] == [
+            needs_code
+        ]
+
+    def test_the_right_deferral_scores_correct(self, case):
+        needs_code = _requirement_expecting(case, "needs-code")
+        entry = deferred(needs_code, "code")
+
+        score = self._scored(case, DispositionBlock(scope=[entry]))
+
+        assert [entry.requirement for entry in score.correct] == [needs_code]
+        assert score.accuracy == 1.0
+        assert score.wrong == ()
+
+    def test_the_wrong_kind_is_a_routing_error_rather_than_a_refusal_error(self, case):
+        """Right to refuse, wrong about what would answer."""
+        needs_code = _requirement_expecting(case, "needs-code")
+        entry = deferred(needs_code, "people")
+
+        score = self._scored(case, DispositionBlock(scope=[entry]))
+
+        assert [entry.requirement for entry in score.wrong_kind] == [needs_code]
+        assert score.false_prose_requests == ()
+        assert score.false_confirmed == ()
+
+
+class TestWhatTheRoutingScoreExcludes:
+    """Two metrics, and one miss must not move both."""
+
+    def test_a_requirement_the_run_never_mentioned_is_unreached(self, case):
+        """Recall already charges it, so accuracy does not see it."""
+        score = score_dispositions(case, DispositionBlock(), carried=("prose",))
+
+        assert score.judged == ()
+        assert score.accuracy == 0.0
+        assert len(score.unreached) == len(case.references["asvs"])
+
+    def test_an_unjudged_record_is_counted_rather_than_scored(self, case):
+        """The corpus's own gap reads as a gap, never as a wrong answer."""
+        stripped = [
+            reference.model_copy(update={"disposition": None})
+            for reference in case.references["asvs"]
+        ]
+        thin = replace_references(case, stripped)
+
+        score = score_dispositions(thin, DispositionBlock(), carried=("prose",))
+
+        assert score.unjudged == len(stripped)
+        assert score.judged == ()
+        assert score.unreached == ()
+
+
+def replace_references(case, references):
+    """The same case carrying a different ASVS reference set."""
+    import dataclasses
+
+    return dataclasses.replace(
+        case, references={**case.references, "asvs": tuple(references)}
+    )
+
+
+def _requirement_expecting(case, disposition):
+    """One requirement this case expects the given disposition for."""
+    return next(
+        reference.requirement
+        for reference in case.references["asvs"]
+        if reference.disposition == disposition
+    )
+
+
+def test_the_pooled_rates_carry_their_own_denominators(case):
+    """A rate over an empty denominator reads as a clean run, so it is reported."""
+    needs_code = _requirement_expecting(case, "needs-code")
+    scores = [
+        score_dispositions(
+            case,
+            DispositionBlock(claims=[ruling(needs_code, "needs-info")]),
+            carried=("prose",),
+        )
+    ]
+
+    totals = pooled_dispositions(scores)
+
+    assert totals["needs_other_evidence"] == 1
+    assert totals["false_prose_requests"] == 1
+    assert totals["false_prose_request_rate"] == 1.0
+    assert totals["accuracy"] == 0.0
