@@ -2331,3 +2331,12 @@ def test_ruling_view_names_the_drafts_that_share_an_action():
 
     assert view["same_action_as"] == ["T-01"]
     assert "same_action_as" not in bare
+
+
+def test_ruling_view_says_when_a_verb_belongs_to_another_lane():
+    """#442: the critic reads a settled lane error rather than judging it."""
+    (view,) = graph._ruling_view([sample_draft("S-01", verb="flood")])
+    (clean,) = graph._ruling_view([sample_draft("S-01")])
+
+    assert "denial-of-service" in view["filed_in_wrong_lane"]
+    assert "filed_in_wrong_lane" not in clean

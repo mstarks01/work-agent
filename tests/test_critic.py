@@ -1175,3 +1175,21 @@ class TestTheGroundsBoundTheCitedElements:
         assert joined.drafts == []
         (dropped,) = joined.marks.dropped_claims
         assert "do not reach" in dropped.reason
+
+
+class TestAMisfiledVerbIsRejectedInCode:
+    """#442: the lane a verb belongs to is a table, so the ruling is the table's."""
+
+    @pytest.fixture
+    def model(self):
+        return valid_model()
+
+    def test_a_confirmation_becomes_a_rejection_naming_the_lane(self, model):
+        draft = sample_draft("S-01", verb="flood")
+
+        assembled = assemble_claims([draft], [sample_ruling("S-01")], model, SCHEMAS)
+
+        assert assembled.claims == []
+        (rejected,) = assembled.rejected_claims
+        assert rejected.verdict.status == "rejected"
+        assert "denial-of-service" in rejected.verdict.reason

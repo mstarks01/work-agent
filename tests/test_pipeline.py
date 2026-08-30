@@ -73,9 +73,9 @@ VERTEX_ENV = {
 }
 
 
-def proposal_json(threat_id: str, category: str) -> str:
+def proposal_json(threat_id: str, category: str, **overrides) -> str:
     """One category agent's whole emission: the shape its node's schema names."""
-    return claims_json(sample_proposal(threat_id, category))
+    return claims_json(sample_proposal(threat_id, category, **overrides))
 
 
 def job(text: str = DESCRIPTION_TEXT) -> JobRecord:
@@ -432,7 +432,7 @@ def test_each_agent_gets_its_own_category_and_the_shared_model():
 def test_the_critic_sees_each_category_agents_drafts_once():
     replies = happy_replies()
     replies[graph.analyze_node_name("stride", "tampering")] = proposal_json(
-        "T-01", "tampering"
+        "T-01", "tampering", verb="alter"
     )
     replies[CRITIC] = claims_json(sample_ruling("S-01"), sample_ruling("T-01"))
     pipeline, models = build(replies)
@@ -504,7 +504,7 @@ def test_a_malformed_critic_output_is_re_asked_once_and_then_assembled():
     """The critic drops a draft; the bounded re-ask returns the full set."""
     replies = happy_replies()
     replies[graph.analyze_node_name("stride", "tampering")] = proposal_json(
-        "T-01", "tampering"
+        "T-01", "tampering", verb="alter"
     )
     both = claims_json(sample_ruling("S-01"), sample_ruling("T-01"))
     # The critic drops T-01; the re-ask returns both drafts, reconciled.

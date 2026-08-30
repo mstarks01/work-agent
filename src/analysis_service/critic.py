@@ -898,12 +898,32 @@ def complete_rulings(
     may therefore answer such a draft with a bare ``needs-info``; what it may
     not do is confirm it, which :func:`review_issues` reports.
 
+    A ruling on a draft the package's own table calls misfiled
+    (:meth:`~analysis_service.report.Claim.misfiled`) becomes ``rejected`` with
+    the table's reason, whatever the critic ruled.
+
     Rulings on drafts with no such ground pass through untouched, and so does a
     ruling that names no drafted ID: the reconciliation check owns that.
     """
     by_id = {draft.id: derived_unknowns(draft) for draft in drafts}
+    misfiled = {
+        draft.id: reason for draft in drafts if (reason := type(draft).misfiled(draft))
+    }
     completed = []
     for ruling in rulings:
+        if ruling.id in misfiled:
+            # A lane error is a table lookup, so the ruling is the table's
+            # whatever the critic said (#442). The reason names the lanes the
+            # verb belongs to, which is what the audit array owes a reader.
+            verdict = ruling.verdict.model_copy(
+                update={
+                    "status": "rejected",
+                    "reason": misfiled[ruling.id],
+                    "related_unknowns": [],
+                }
+            )
+            completed.append(ruling.model_copy(update={"verdict": verdict}))
+            continue
         derived = by_id.get(ruling.id, [])
         if ruling.verdict.status != "needs-info" or not derived:
             completed.append(ruling)
