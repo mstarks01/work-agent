@@ -40,6 +40,44 @@ def test_dangling_element_reference_fails_the_gate():
     assert any("system model" in issue for issue in structural_issues(payload))
 
 
+def test_a_subject_only_unknown_is_not_a_dangling_reference():
+    """The second `related_unknowns` spelling names no element to resolve.
+
+    The gate re-derives a service rule one seam later, and it drifted: the
+    report learned this spelling when it arrived and this did not, so the first
+    ASVS corpus sweep hard-failed on eleven correctly shaped claims. Nothing
+    offline caught it because the scripted critic never emits a subject.
+    """
+    payload = sample_report().model_dump(mode="json")
+    claim = claims_of(payload)[0]
+    claim["verdict"] = {
+        "status": "needs-info",
+        "reason": "the input does not say whether queries are parameterized",
+        "related_unknowns": [
+            {"element_id": "", "attribute": "", "subject": "are queries parameterized"}
+        ],
+    }
+
+    assert not [
+        issue for issue in structural_issues(payload) if "system model" in issue
+    ]
+
+
+def test_an_element_spelled_unknown_still_has_to_resolve():
+    """The first spelling is unchanged: a named element must exist."""
+    payload = sample_report().model_dump(mode="json")
+    claim = claims_of(payload)[0]
+    claim["verdict"] = {
+        "status": "needs-info",
+        "reason": "unsettled",
+        "related_unknowns": [
+            {"element_id": "process:ghost", "attribute": "technology", "subject": ""}
+        ],
+    }
+
+    assert any("system model" in issue for issue in structural_issues(payload))
+
+
 def test_duplicate_claim_ids_fail_the_gate():
     payload = sample_report(
         threats=[sample_threat("S-01"), sample_threat("S-02")]
