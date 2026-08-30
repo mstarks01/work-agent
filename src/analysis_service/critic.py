@@ -1024,6 +1024,40 @@ def duplicate_groups(
     }
 
 
+def rating_disagreements(drafts: Sequence[Claim]) -> dict[str, list[str]]:
+    """Each draft against the others with one fact pattern and another rating.
+
+    Critic step 4 asks that identical fact patterns carry identical ratings
+    across lanes. Two drafts with the same verb and the same set of catalogued
+    grounds are one fact pattern, and whether their ``likelihood`` or
+    ``impact`` differ is a comparison of four fields, made here so the critic
+    reads the pair and only picks the rating (#444). Quotes are left out of the
+    key: two agents quoting two spans of one sentence are not two patterns.
+
+    A draft with no ``severity`` belongs to a framework that grades nothing
+    and is never compared.
+    """
+    by_pattern: dict[tuple[str, frozenset[tuple[str, str, str]]], list[Claim]] = {}
+    for draft in drafts:
+        if draft.verb is None or getattr(draft, "severity", None) is None:
+            continue
+        facts = frozenset(
+            (ground.kind, ground.element_id or ground.flow_id, ground.attribute)
+            for ground in draft.grounds
+            if ground.kind != "quote"
+        )
+        if facts:
+            by_pattern.setdefault((draft.verb, facts), []).append(draft)
+    disagreements: dict[str, list[str]] = {}
+    for group in by_pattern.values():
+        ratings = {(d.severity.likelihood, d.severity.impact) for d in group}  # type: ignore[attr-defined]
+        if len(ratings) < 2:
+            continue
+        for draft in group:
+            disagreements[draft.id] = [d.id for d in group if d.id != draft.id]
+    return disagreements
+
+
 def review_issues(
     drafts: Sequence[Claim],
     rulings: Sequence[Ruling],

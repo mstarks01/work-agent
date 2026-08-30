@@ -1193,3 +1193,25 @@ class TestAMisfiledVerbIsRejectedInCode:
         (rejected,) = assembled.rejected_claims
         assert rejected.verdict.status == "rejected"
         assert "denial-of-service" in rejected.verdict.reason
+
+
+class TestRatingDisagreements:
+    """#444: one fact pattern with two ratings is a comparison of four fields."""
+
+    def test_two_drafts_with_one_pattern_and_two_ratings_name_each_other(self):
+        from analysis_service.critic import rating_disagreements
+
+        drafts = [
+            sample_draft("S-01", severity=severity("medium", "high")),
+            sample_draft("S-02", severity=severity("high", "high")),
+            sample_draft("S-03", verb="replay", severity=severity("low", "low")),
+        ]
+
+        assert rating_disagreements(drafts) == {"S-01": ["S-02"], "S-02": ["S-01"]}
+
+    def test_agreeing_ratings_are_not_named(self):
+        from analysis_service.critic import rating_disagreements
+
+        drafts = [sample_draft("S-01"), sample_draft("S-02")]
+
+        assert rating_disagreements(drafts) == {}
