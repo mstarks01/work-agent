@@ -2320,3 +2320,14 @@ class TestTheInstructionDigest:
         )
         assert "{system_model}" in instructions
         assert "{input_text}" in instructions
+
+
+def test_ruling_view_names_the_drafts_that_share_an_action():
+    """#440: the critic reads a marked pair rather than hunting for one."""
+    draft = sample_draft("S-01")
+
+    (view,) = graph._ruling_view([draft], {"S-01": ["T-01"]})
+    (bare,) = graph._ruling_view([draft])
+
+    assert view["same_action_as"] == ["T-01"]
+    assert "same_action_as" not in bare
