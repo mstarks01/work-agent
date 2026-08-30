@@ -219,6 +219,14 @@ class CaseScore:
     lane_errors: tuple[LaneError, ...]
     unlisted: tuple[UnlistedThreat, ...]
     needs_info_unmatched: tuple[str, ...]
+    #: Unmatched threats citing an element the blessed model does not hold.
+    #: Only an ``end-to-end`` run can fill this: its lanes cite the IDs a live
+    #: extraction spelled, and the references cite the blessed ones, so such a
+    #: threat can equal no reference however right its analysis is. Kept apart
+    #: from ``unlisted`` because a fingerprint over a foreign ID is a key no
+    #: vote can land on, and apart from ``missed`` because the number it feeds
+    #: says how much of the gap is spelling rather than analysis (#431).
+    foreign: tuple[str, ...]
     rulings: tuple[PairRuling, ...] = field(repr=False)
     severity_confusion: dict[str, int] = field(default_factory=dict)
 
@@ -305,6 +313,7 @@ class CaseScore:
                 "must_find_total": self.must_find_total,
                 "must_find_matched": self.must_find_matched,
                 "needs_info_unmatched": len(self.needs_info_unmatched),
+                "foreign": len(self.foreign),
                 "lane_errors": len(self.lane_errors),
                 **self.standing_counts,
             },
@@ -324,6 +333,7 @@ class CaseScore:
             "lane_errors": [error.to_json() for error in self.lane_errors],
             "unlisted": [entry.to_json() for entry in self.unlisted],
             "needs_info_unmatched": list(self.needs_info_unmatched),
+            "foreign": list(self.foreign),
             "rulings": [ruling.to_json() for ruling in self.rulings],
         }
 
@@ -378,7 +388,7 @@ def score_case(
         case, produced, matcher, rulings, unmatched_positions, missed
     )
     misfiled = {error.threat_id for error in lane_errors}
-    unlisted, needs_info = _standing_of_unmatched(
+    unlisted, needs_info, foreign = _standing_of_unmatched(
         case, produced, votes, unmatched_positions, misfiled
     )
 
@@ -394,6 +404,7 @@ def score_case(
         lane_errors=lane_errors,
         unlisted=unlisted,
         needs_info_unmatched=needs_info,
+        foreign=foreign,
         rulings=tuple(rulings),
         severity_confusion=_severity_confusion(matched),
     )
@@ -577,7 +588,7 @@ def _standing_of_unmatched(
     votes: Ledger,
     unmatched_positions: Sequence[int],
     misfiled: set[str],
-) -> tuple[tuple[UnlistedThreat, ...], tuple[str, ...]]:
+) -> tuple[tuple[UnlistedThreat, ...], tuple[str, ...], tuple[str, ...]]:
     """Step 4: each unmatched threat's fingerprint, looked up in the ledger.
 
     Whether the **System Model** supports a claim nobody wrote down is a
@@ -586,7 +597,10 @@ def _standing_of_unmatched(
     threat is never a false positive — it is the designed response to an
     unknown attribute — so it is counted, not keyed. A threat already recorded
     as a lane error is accounted for too, and keying it again would
-    double-count one mistake.
+    double-count one mistake. A threat citing an element the blessed model
+    does not hold is counted as ``foreign`` and not keyed either: only an
+    end-to-end run produces one, and its fingerprint would name an ID no
+    reviewer can resolve.
 
     The fingerprint is computed exactly the way the review queue computes it,
     from the same components under the same per-framework version, so a vote
@@ -594,7 +608,9 @@ def _standing_of_unmatched(
     """
     unlisted: list[UnlistedThreat] = []
     needs_info: list[str] = []
+    foreign: list[str] = []
     flows = {flow.id: (flow.source, flow.destination) for flow in case.model.data_flows}
+    blessed_ids = {element.id for element in case.model.elements()}
     version = version_for("stride")
 
     for position in unmatched_positions:
@@ -603,6 +619,9 @@ def _standing_of_unmatched(
             continue
         if _is_needs_info(threat):
             needs_info.append(threat.id)
+            continue
+        if not blessed_ids.issuperset(threat.affected_element_ids):
+            foreign.append(threat.id)
             continue
         components = components_for(
             "stride",
@@ -621,7 +640,7 @@ def _standing_of_unmatched(
                 standing=_standing(votes, value),
             )
         )
-    return tuple(unlisted), tuple(needs_info)
+    return tuple(unlisted), tuple(needs_info), tuple(foreign)
 
 
 def _standing(votes: Ledger, value: str) -> Standing:
@@ -722,6 +741,7 @@ def render(scores: Sequence[CaseScore]) -> None:
             f"  element {score.element_accuracy:.2f}"
             f"  rejected {score.rejected_rate:.2f}"
             f"  unvoted {score.unvoted_count}"
+            + (f"  foreign {len(score.foreign)}" if score.foreign else "")
         )
     if scores:
         delta = exemplar_delta(scores)
