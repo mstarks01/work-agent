@@ -67,6 +67,7 @@ from evals.harness import (
     instruction_delta,
     ledger,
     modes,
+    pairing,
     queue,
     roster,
     standings,
@@ -1110,6 +1111,60 @@ def command_score(args: argparse.Namespace) -> int:
     return 0
 
 
+def command_pairing(args: argparse.Namespace) -> int:
+    """Build the reading view behind one case's applicability disagreement.
+
+    Credential-free, like ``score`` and ``review``: the reports are on disk and
+    the requirement text comes from the catalog. It answers nothing — the whole
+    output is the two sides of a question only a person settles (#447).
+
+    ``--html`` is refused inside this repository. The page carries ASVS
+    sentences under CC BY-SA 4.0 and this tree is Apache-2.0, so
+    :func:`~evals.harness.pairing.refuse_path_inside_repo` says so where the
+    message can explain it.
+    """
+    path = Path(args.artifact)
+    loaded = load_artifact(path)
+    case = next(
+        (
+            entry
+            for entry in load_corpus(args.corpus)
+            if entry.id == args.case and entry.id in loaded.cases
+        ),
+        None,
+    )
+    if case is None:
+        print(f"{path} carries no case {args.case!r}", file=sys.stderr)
+        return 1
+
+    runs = _runs_from_reports(path, [case])
+    block = next(
+        (
+            candidate
+            for candidate in runs[case.id].report.analyses
+            if candidate.framework == pairing.FRAMEWORK
+        ),
+        None,
+    )
+    if block is None:
+        print(
+            f"{path}: {case.id} carries no {pairing.FRAMEWORK} block", file=sys.stderr
+        )
+        return 1
+
+    built = pairing.pair_case(case, block)
+    pairing.render(built)
+    if args.html:
+        out = pairing.refuse_path_inside_repo(Path(args.html))
+        out.write_text(pairing.render_html(built, str(path)), "utf-8")
+        print(f"\npage written to {out}")
+    if args.json:
+        out = Path(args.json)
+        out.write_text(json.dumps(built.to_json(), indent=2) + "\n", "utf-8")
+        print(f"identifiers written to {out}")
+    return 0
+
+
 def command_rekey(args: argparse.Namespace) -> int:
     """Recompute every vote's fingerprint under a new rule, in place.
 
@@ -1453,6 +1508,31 @@ def main(argv: Sequence[str] | None = None) -> int:
         " rewritten in place",
     )
     score_parser.set_defaults(func=command_score)
+
+    pairing_parser = subparsers.add_parser(
+        "pairing",
+        help="the two sides of one case's applicability disagreement (no credentials)",
+    )
+    pairing_parser.add_argument(
+        "artifact", help="a sweep artifact with a .reports/ dir"
+    )
+    pairing_parser.add_argument(
+        "--case", required=True, help="which corpus case to pair"
+    )
+    pairing_parser.add_argument(
+        "--corpus",
+        default=str(DEFAULT_CORPUS_DIR),
+        help="corpus root, for the reference set this pairs against",
+    )
+    pairing_parser.add_argument(
+        "--html",
+        help="where to write the reading page. Refused inside this repository:"
+        " the page carries ASVS text under CC BY-SA 4.0",
+    )
+    pairing_parser.add_argument(
+        "--json", help="where to write the identifiers alone, which carry no ASVS text"
+    )
+    pairing_parser.set_defaults(func=command_pairing)
 
     rekey_parser = subparsers.add_parser(
         "rekey", help="recompute every vote's fingerprint under another rule"

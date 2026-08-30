@@ -477,8 +477,12 @@ class ReviewProblems(NamedTuple):
 def _verdict_shape_issues(rulings: Iterable[Ruling]) -> list[CriticIssue]:
     """Every ruling whose verdict's fields disagree with its own ``status``.
 
-    The five rules :class:`~analysis_service.report.Verdict` states, asked here
-    rather than in the schema. The schema is the wrong place for them twice
+    The four rules :class:`~analysis_service.report.Verdict` states, plus the
+    one it deliberately does not: a rejection must name the check that killed
+    it. That one is asked only here, because a report read back from before the
+    field carries no answer and ``None`` is the truthful value for it — see
+    :class:`~analysis_service.report.Verdict`. Asked here rather than in the
+    schema. The schema is the wrong place for them twice
     over: a provider cannot be made to enforce a dependency between fields, and
     a validator that raises does so at the node boundary, killing the critic
     node — one pass over every draft in the job — with the re-ask that exists

@@ -115,6 +115,7 @@ evals/
 | `harness/reference.py` | The `ReferenceThreat` type and the fail-closed corpus loader. |
 | `harness/structural.py` | The structural gates — the only checks that fail a run. |
 | `harness/scorer.py` | The scoring pipeline: prefilter → rule → match → standing → severity. |
+| `harness/pairing.py` | The reading view behind one applicability disagreement: every requirement the run applied that the case did not expect, and every one the case expected that the run did not deliver, each with the standard's text and the argument made for it. Scores nothing and rules on nothing. |
 | `harness/applicability.py` | ASVS's scorer: a confusion matrix over a finite catalog, matched by requirement ID. A closed claim set needs no composed identity, so no rule runs here. |
 | `harness/critic_yield.py` | What the critic added and removed, scored on both sides. |
 | `harness/grounds.py` | What the category agents did with `grounds` — the branch mix, the padding number and the unverified-quote rate — plus the two failures the grounding path kills a case with. |
