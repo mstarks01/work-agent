@@ -707,6 +707,19 @@ class Claim(BaseModel):
         return list(proposals), {}
 
     @classmethod
+    def misfiled(cls, draft: Claim) -> str:
+        """Why this draft cannot belong to the lane it was filed in, or ``""``.
+
+        A framework whose claims carry an action verb can say from a table
+        which lanes that action may be filed in; a draft outside them is a lane
+        error the review seam rejects before any judgement is spent on it
+        (#442). The neutral answer is that every lane is legal, which is what a
+        framework with no verb, or no lane grammar over its verbs, inherits.
+        """
+        del draft
+        return ""
+
+    @classmethod
     def lane_diagnostics(cls, drafts: Sequence[Claim]) -> list[str]:
         """What this framework wants *logged* about one job's drafts. Nothing, here.
 
