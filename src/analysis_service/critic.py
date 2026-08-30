@@ -38,6 +38,7 @@ from __future__ import annotations
 import re
 from collections import Counter
 from collections.abc import Collection, Iterable, Mapping, Sequence
+from dataclasses import dataclass
 from types import MappingProxyType
 from typing import NamedTuple, get_args
 
@@ -1256,3 +1257,147 @@ def _claim_order(claim: RuledClaim) -> tuple[int, str]:
     severity = getattr(claim, "severity", None)
     rank = SEVERITY_ORDER.index(severity.level) if severity is not None else 0
     return rank, claim.id
+
+
+_DRAFT_UNRULED_FIELDS = frozenset({"mitigations"})
+
+
+def _ruling_view(
+    drafts: Sequence[Claim],
+    duplicates: Mapping[str, Sequence[str]] = MappingProxyType({}),
+    rated_unlike: Mapping[str, Sequence[str]] = MappingProxyType({}),
+) -> list[dict]:
+    """The drafts as a critic reads them: no recommendations, no empty branches.
+
+    A critic's steps read ``description`` (evidence), the lane,
+    ``affected_element_ids`` (duplicate), and ``grounds`` — plus whatever its own
+    framework grades. ``mitigations`` is read by none of them, and the prompt
+    already says so. A :class:`~analysis_service.report.Mitigation` is a
+    200-character summary plus 2000 characters of detail, and a draft carries a
+    list of them, so this is the largest block in the longest prompt the graph
+    sends that no judgement is spent on. Same argument as
+    :func:`_without_source_fields`, one node further down.
+
+    ``exclude_defaults`` is what drops the empty branches of a
+    :class:`~analysis_service.report.Ground`. That model is one flat object
+    rather than a discriminated union — a deliberate choice, for provider
+    schema-compiler reasons it documents itself — so four of its six fields are
+    the empty string on any given ground, and rendering them spends a line each
+    on a field whose own validator forbids it carrying anything.
+
+    THE HAZARD THIS BUYS, stated rather than left to be discovered: a field
+    added to a package's record with a default now disappears from that
+    framework's critic's view whenever it holds that default, silently and with
+    nothing downstream able to see it. Every field a critic rules on is required
+    today and so cannot be dropped;
+    ``test_ruling_view_keeps_every_field_the_critic_rules_on`` is what holds that
+    true for the next field.
+
+    ``framework`` and ``framework_version`` go too, under the same rule: they are
+    the same pair on every draft in one critic's prompt — it rules one
+    framework's drafts — so they are a constant repeated per claim.
+    """
+    views = []
+    for draft in drafts:
+        view = draft.model_dump(
+            mode="json",
+            exclude={*_DRAFT_UNRULED_FIELDS, "framework", "framework_version"},
+            exclude_defaults=True,
+        )
+        # Computed, never drafted: the IDs of the other drafts naming the same
+        # action at the same place (:func:`~analysis_service.critic.duplicate_groups`),
+        # so the critic's duplicate step reads a pair instead of hunting for it.
+        if draft.id in duplicates:
+            view["same_action_as"] = list(duplicates[draft.id])
+        # Also computed: the package's own table says this draft's action is not
+        # one its lane files. The ruling is settled in code; the key tells the
+        # critic not to spend a judgement on it.
+        if reason := type(draft).misfiled(draft):
+            view["filed_in_wrong_lane"] = reason
+        # Computed too: the other drafts with this one's fact pattern and a
+        # different rating (:func:`~analysis_service.critic.rating_disagreements`),
+        # which is the pair step 4 calibrates across.
+        if draft.id in rated_unlike:
+            view["rated_unlike"] = list(rated_unlike[draft.id])
+        views.append(view)
+    return views
+
+
+def critic_view(
+    drafts: Sequence[Claim],
+    system_model: SystemModel,
+    *,
+    only: Collection[str] | None = None,
+) -> list[dict]:
+    """The drafts a critic is shown, with everything computed for it already.
+
+    One function rather than four calls in the right order, because the graph
+    builds this view twice — once for the first pass over the whole fan-in, once
+    for the bounded re-ask over the few drafts it names — and the two must agree
+    about what a critic reads. A draft its own grounds settle is dropped first
+    (:func:`unsettled_drafts`), then the pairs the critic would otherwise hunt
+    for are computed and attached.
+
+    **The pairs are computed over every shown draft, never over ``only``.** A
+    duplicate is a relation between two drafts, so narrowing the set first would
+    leave a draft paired with nothing and read as unique. ``only`` narrows what
+    is *rendered* and nothing else: the re-ask reproduces rulings rather than
+    drafts, and an ID is the whole of a claim it need not read.
+    """
+    shown = unsettled_drafts(drafts)
+    duplicates = duplicate_groups(shown, system_model)
+    rated_unlike = rating_disagreements(shown)
+    chosen = shown if only is None else [d for d in shown if d.id in only]
+    return _ruling_view(chosen, duplicates, rated_unlike)
+
+
+@dataclass(frozen=True)
+class Accepted:
+    """One critic pass that reconciled with its drafts."""
+
+    #: How many rulings it returned, for the routing event.
+    count: int
+
+
+@dataclass(frozen=True)
+class Revision:
+    """One critic pass that did not, and everything the re-ask needs.
+
+    Built in one place so **the prompt and the check cannot disagree about
+    which claims are in trouble**. The messages say what did not reconcile and
+    the view carries the drafts those messages name, and both come out of the
+    same call over the same set.
+    """
+
+    #: One message per problem, as the re-ask is asked to fix them.
+    messages: list[str]
+    #: Every drafted ID: the covering set the re-ask must reproduce.
+    roster: list[str]
+    #: The few drafts a structural fix cannot be made without reading.
+    unreconciled: list[dict]
+
+
+def review(
+    drafts: Sequence[Claim], rulings: Sequence[Ruling], system_model: SystemModel
+) -> Accepted | Revision:
+    """Rule on one critic pass: reconciled, or a revision and what it must read.
+
+    The whole mechanical check on a critic's output, and the whole of what a
+    re-ask is told, behind one call. A caller routes on which of the two it
+    gets back and parks what that value carries; deciding *what* a re-ask reads
+    is this module's, because it is the same judgement as deciding what the
+    first pass read.
+
+    The re-ask sees a **roster of IDs plus the few it must read**, not the whole
+    set again. Its job is structural — cover exactly the drafted IDs, once each,
+    with unknowns that resolve — and an ID carries the whole of that claim.
+    """
+    problems = review_issues(drafts, rulings, system_model)
+    if not problems:
+        return Accepted(count=len(rulings))
+    shown = unsettled_drafts(drafts)
+    return Revision(
+        messages=list(problems.messages),
+        roster=[draft.id for draft in shown],
+        unreconciled=critic_view(drafts, system_model, only=problems.implicated),
+    )

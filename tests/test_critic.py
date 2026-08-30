@@ -2,6 +2,7 @@
 
 import pytest
 
+from analysis_service import critic
 from analysis_service.critic import (
     CriticOutputError,
     DraftJoinError,
@@ -1395,3 +1396,158 @@ class TestAnAbsenceRidesTheCriticPath:
             Ground(kind="unknown-attribute", element_id="e", attribute="a").place == "e"
         )
         assert Ground(kind="derived-fact", flow_id="f").place == "f"
+
+
+def test_ruling_view_keeps_every_field_the_critic_rules_on():
+    """The guard on ``_ruling_view``'s ``exclude_defaults``.
+
+    Narrowing the prompt view is only free while nothing a verdict is reached
+    from can fall through it. A ``DraftThreat`` field added with a default
+    would vanish here whenever it held that default — so this names the fields
+    the five steps read and fails the moment one stops arriving.
+    """
+    draft = sample_draft("S-01", "spoofing")
+
+    (view,) = critic._ruling_view([draft])
+
+    for field in ("id", "category", "description", "affected_element_ids"):
+        assert field in view, f"the critic rules on {field!r}"
+    assert view["severity"]["likelihood"] and view["severity"]["justification"]
+    # Step 5 reads grounds for relevance, so each entry keeps its own branch.
+    assert [ground["kind"] for ground in view["grounds"]] == ["quote", "derived-fact"]
+    assert view["grounds"][0]["text"] == "Customers log in to the web app"
+    assert view["grounds"][1]["flow_id"] == "flow:customer-to-web-app:login"
+
+
+def test_ruling_view_drops_what_no_verdict_is_reached_from():
+    """Mitigations and a Ground's empty branches, gone from the prompt only."""
+    draft = sample_draft("S-01", "spoofing")
+    assert draft.mitigations, "the fixture must carry one for this to prove anything"
+
+    (view,) = critic._ruling_view([draft])
+
+    assert "mitigations" not in view
+    # A quote carries text and source_label; the other four fields are the
+    # empty string its own validator requires them to be.
+    assert set(view["grounds"][0]) == {"kind", "text", "source_label"}
+    assert set(view["grounds"][1]) == {"kind", "flow_id"}
+
+
+def test_ruling_view_names_the_drafts_that_share_an_action():
+    """#440: the critic reads a marked pair rather than hunting for one."""
+    draft = sample_draft("S-01")
+
+    (view,) = critic._ruling_view([draft], {"S-01": ["T-01"]})
+    (bare,) = critic._ruling_view([draft])
+
+    assert view["same_action_as"] == ["T-01"]
+    assert "same_action_as" not in bare
+
+
+def test_ruling_view_says_when_a_verb_belongs_to_another_lane():
+    """#442: the critic reads a settled lane error rather than judging it."""
+    (view,) = critic._ruling_view([sample_draft("S-01", verb="flood")])
+    (clean,) = critic._ruling_view([sample_draft("S-01")])
+
+    assert "denial-of-service" in view["filed_in_wrong_lane"]
+    assert "filed_in_wrong_lane" not in clean
+
+
+def test_ruling_view_names_the_drafts_rated_unlike():
+    """#444: the critic reads the calibration pair rather than finding it."""
+    (view,) = critic._ruling_view(
+        [sample_draft("S-01")], rated_unlike={"S-01": ["S-02"]}
+    )
+
+    assert view["rated_unlike"] == ["S-02"]
+
+
+class TestOneReviewCall:
+    """The check and the re-ask view come out of one call, over one set.
+
+    Before this, a graph node called four functions in the right order and
+    composed the view itself. What that risked is the thing the pair exists to
+    prevent: the messages naming one set of drafts and the view carrying
+    another.
+    """
+
+    def test_a_pass_that_reconciles_is_accepted_with_its_count(self):
+        drafts = [sample_draft("S-01")]
+        rulings = [sample_ruling("S-01")]
+
+        outcome = critic.review(drafts, rulings, valid_model())
+
+        assert isinstance(outcome, critic.Accepted)
+        assert outcome.count == 1
+
+    def test_a_dropped_ruling_revises(self):
+        drafts = [sample_draft("S-01"), sample_draft("T-01", category="tampering")]
+
+        outcome = critic.review(drafts, [sample_ruling("S-01")], valid_model())
+
+        assert isinstance(outcome, critic.Revision)
+        assert outcome.messages
+
+    def test_the_roster_is_every_drafted_id_and_the_view_is_not(self):
+        """The re-ask reproduces rulings, not drafts.
+
+        An ID carries the whole of a claim it need not read, so the roster is
+        the covering set and only the drafts a structural fix cannot be made
+        without reading travel in full.
+        """
+        drafts = [sample_draft("S-01"), sample_draft("T-01", category="tampering")]
+
+        outcome = critic.review(drafts, [sample_ruling("S-01")], valid_model())
+
+        assert outcome.roster == ["S-01", "T-01"]
+        assert [draft["id"] for draft in outcome.unreconciled] == ["T-01"]
+
+    def test_every_draft_the_view_carries_is_one_a_message_names(self):
+        """The property the pair exists for, over a pass that drops both."""
+        drafts = [sample_draft("S-01"), sample_draft("T-01", category="tampering")]
+
+        outcome = critic.review(drafts, [], valid_model())
+
+        shown = {draft["id"] for draft in outcome.unreconciled}
+        assert shown
+        for draft_id in shown:
+            assert any(draft_id in message for message in outcome.messages), (
+                f"{draft_id} travels in full but no message says why"
+            )
+
+
+class TestTheCriticView:
+    def test_the_pairs_are_computed_over_every_shown_draft(self):
+        """``only`` narrows what is rendered and nothing else.
+
+        A duplicate is a relation between two drafts, so narrowing the set
+        before pairing would leave a draft paired with nothing and read as
+        unique — which is exactly the judgement the critic is being spared.
+        """
+        drafts = [sample_draft("S-01"), sample_draft("T-01", category="tampering")]
+        model = valid_model()
+
+        (narrowed,) = critic.critic_view(drafts, model, only={"S-01"})
+        whole = critic.critic_view(drafts, model)
+
+        assert narrowed["same_action_as"] == ["T-01"]
+        assert narrowed == next(view for view in whole if view["id"] == "S-01")
+
+    def test_narrowing_to_nothing_renders_nothing(self):
+        drafts = [sample_draft("S-01")]
+
+        assert critic.critic_view(drafts, valid_model(), only=set()) == []
+
+    def test_both_critic_passes_read_one_view(self):
+        """The fan-in and the re-ask reach the same function.
+
+        A draft the first pass was shown and the re-ask renders differently
+        would be a second opinion about what a claim is.
+        """
+        drafts = [sample_draft("S-01"), sample_draft("T-01", category="tampering")]
+        model = valid_model()
+
+        first_pass = critic.critic_view(drafts, model)
+        re_ask = critic.critic_view(drafts, model, only={"S-01", "T-01"})
+
+        assert first_pass == re_ask
