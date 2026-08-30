@@ -62,13 +62,14 @@ from analysis_service.grounding import verify_quote
 from analysis_service.markdown_loader import MarkdownLoader, split_sections
 from analysis_service.prompts import (
     ANALYZE_PROMPT_NAME,
+    CRITIC_PROMPT_NAME,
     EXTRACT_PROMPT_NAME,
     PROMPT_BODY_NAMES,
     PROMPT_SECTION_HEADINGS,
     compose_analyze_prompt,
     lane_exemplars_doc,
 )
-from analysis_service.report import Ground
+from analysis_service.report import Ground, RejectionStep
 from analysis_service.skills import estimate_tokens
 from analysis_service.token_caps import (
     COMPOSED_ANALYZE_CAP,
@@ -786,6 +787,21 @@ def test_a_vocabulary_that_rejects_unknown_is_named_in_the_prompt(field, values)
     assert f"`{attribute}`" in body, (
         f"{field} rejects `unknown` and the prompt never names {attribute!r}. "
         f"A model applying the controlling rule to it emits an illegal value."
+    )
+
+
+@pytest.mark.parametrize("step", sorted(get_args(RejectionStep)))
+def test_the_critic_prompt_names_every_rejection_step(step):
+    """A step the code can store is a step the critic was taught to write.
+
+    ``rejected_because`` is the field a reader of the rejected array switches
+    on, and a critic can only fill it with a value the prompt names. Keyed to
+    the vocabulary rather than to a list here, so a fourth step fails until
+    ``critic.md`` says which check produces it.
+    """
+    assert f"`{step}`" in loader.load(CRITIC_PROMPT_NAME), (
+        f"{step!r} is a rejection step the report can carry and the critic "
+        f"prompt never names, so no critic can be expected to write it."
     )
 
 

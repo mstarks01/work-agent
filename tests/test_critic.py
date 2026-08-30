@@ -576,7 +576,11 @@ class TestAssembleThreats:
             sample_ruling("S-01"),
             sample_ruling(
                 "S-02",
-                verdict=Verdict(status="rejected", reason="duplicate of S-01"),
+                verdict=Verdict(
+                    status="rejected",
+                    reason="duplicate of S-01",
+                    rejected_because="duplicate",
+                ),
             ),
         ]
         threats, rejected = assemble_claims(drafts, rulings, model, SCHEMAS)
@@ -798,6 +802,7 @@ class TestVerdictShapeIsReAskableRatherThanFatal:
             [sample_draft("S-01")],
             self._rulings(
                 status="rejected",
+                rejected_because="evidence",
                 related_unknowns=[
                     UnknownRef(element_id="store:orders-db", attribute="technology")
                 ],
@@ -806,6 +811,25 @@ class TestVerdictShapeIsReAskableRatherThanFatal:
         )
 
         assert len(problems.messages) == 2
+
+    def test_a_rejection_naming_no_step_is_reported(self, model):
+        """The rejected array is an audit trail, and the step is a field."""
+        problems = review_issues(
+            [sample_draft("S-01")],
+            self._rulings(status="rejected", reason="ungrounded"),
+            model,
+        )
+
+        assert "names no check in rejected_because" in "; ".join(problems.messages)
+
+    def test_a_step_on_a_verdict_that_is_not_rejected_is_reported(self, model):
+        problems = review_issues(
+            [sample_draft("S-01")],
+            self._rulings(status="confirmed", rejected_because="lane"),
+            model,
+        )
+
+        assert "only meaningful on a rejected verdict" in "; ".join(problems.messages)
 
     def test_a_malformed_threat_id_reads_as_a_drop_and_an_invention(self, model):
         """Both halves of the same typo, each nameable by the re-ask.
@@ -889,8 +913,18 @@ class TestRulingsMergeOntoDrafts:
     def test_threats_are_built_in_draft_order_not_ruling_order(self, model):
         drafts = [sample_draft("S-01"), sample_draft("S-02")]
         rulings = [
-            sample_ruling("S-02", verdict=Verdict(status="rejected", reason="dup")),
-            sample_ruling("S-01", verdict=Verdict(status="rejected", reason="dup")),
+            sample_ruling(
+                "S-02",
+                verdict=Verdict(
+                    status="rejected", reason="dup", rejected_because="duplicate"
+                ),
+            ),
+            sample_ruling(
+                "S-01",
+                verdict=Verdict(
+                    status="rejected", reason="dup", rejected_because="duplicate"
+                ),
+            ),
         ]
         _, rejected = assemble_claims(drafts, rulings, model, SCHEMAS)
         assert [t.id for t in rejected] == ["S-01", "S-02"]
@@ -1071,7 +1105,9 @@ class TestAnUnknownGroundSettlesTheVerdict:
         ruling = sample_ruling(
             "S-01",
             verdict=ProposedVerdict(
-                status="rejected", reason="filed in the wrong lane"
+                status="rejected",
+                reason="filed in the wrong lane",
+                rejected_because="lane",
             ),
         )
 
