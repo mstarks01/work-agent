@@ -124,12 +124,11 @@ from pydantic import ValidationError
 from analysis_service.candidates import generate_candidates
 from analysis_service.coverage import build_coverage, lane_scope
 from analysis_service.critic import (
+    Revision,
     assemble_claims,
-    duplicate_groups,
+    critic_view,
     join_drafts,
-    rating_disagreements,
-    review_issues,
-    unsettled_drafts,
+    review,
 )
 from analysis_service.domains import select_domain_packs
 from analysis_service.evidence import (
@@ -570,8 +569,8 @@ STATE_FRAMEWORK_OPTIONS = "framework_options"
 #
 # ``drafts`` holds one framework's merged drafts whole, because that is what
 # ``assemble_claims`` merges rulings onto; ``draft_view`` is the *prompt* view of
-# the same drafts, narrowed by :func:`_ruling_view` to the fields a verdict is
-# reached from. ``marks`` is every service-owned mark that fan-in produced, as
+# the same drafts, built by :func:`~analysis_service.critic.critic_view` and
+# narrowed to the fields a verdict is reached from. ``marks`` is every service-owned mark that fan-in produced, as
 # one :class:`~analysis_service.report.AnalysisMarks` — one key rather than one per
 # mark kind, since they share an owner, a standing and a policy.
 FRAMEWORK_RENDERED_ARTIFACTS: tuple[str, ...] = (
@@ -1085,70 +1084,6 @@ def _without_source_fields(valid_model: dict) -> dict:
 # held beside the ruling and copied through untouched. A package adding a field
 # of that kind adds it here, and the alternative (a per-package exclusion list)
 # would let one framework quietly send its critic the block another does not.
-_DRAFT_UNRULED_FIELDS = frozenset({"mitigations"})
-
-
-def _ruling_view(
-    drafts: Sequence[Claim],
-    duplicates: Mapping[str, Sequence[str]] = MappingProxyType({}),
-    rated_unlike: Mapping[str, Sequence[str]] = MappingProxyType({}),
-) -> list[dict]:
-    """The drafts as a critic reads them: no recommendations, no empty branches.
-
-    A critic's steps read ``description`` (evidence), the lane,
-    ``affected_element_ids`` (duplicate), and ``grounds`` — plus whatever its own
-    framework grades. ``mitigations`` is read by none of them, and the prompt
-    already says so. A :class:`~analysis_service.report.Mitigation` is a
-    200-character summary plus 2000 characters of detail, and a draft carries a
-    list of them, so this is the largest block in the longest prompt the graph
-    sends that no judgement is spent on. Same argument as
-    :func:`_without_source_fields`, one node further down.
-
-    ``exclude_defaults`` is what drops the empty branches of a
-    :class:`~analysis_service.report.Ground`. That model is one flat object
-    rather than a discriminated union — a deliberate choice, for provider
-    schema-compiler reasons it documents itself — so four of its six fields are
-    the empty string on any given ground, and rendering them spends a line each
-    on a field whose own validator forbids it carrying anything.
-
-    THE HAZARD THIS BUYS, stated rather than left to be discovered: a field
-    added to a package's record with a default now disappears from that
-    framework's critic's view whenever it holds that default, silently and with
-    nothing downstream able to see it. Every field a critic rules on is required
-    today and so cannot be dropped;
-    ``test_ruling_view_keeps_every_field_the_critic_rules_on`` is what holds that
-    true for the next field.
-
-    ``framework`` and ``framework_version`` go too, under the same rule: they are
-    the same pair on every draft in one critic's prompt — it rules one
-    framework's drafts — so they are a constant repeated per claim.
-    """
-    views = []
-    for draft in drafts:
-        view = draft.model_dump(
-            mode="json",
-            exclude={*_DRAFT_UNRULED_FIELDS, "framework", "framework_version"},
-            exclude_defaults=True,
-        )
-        # Computed, never drafted: the IDs of the other drafts naming the same
-        # action at the same place (:func:`~analysis_service.critic.duplicate_groups`),
-        # so the critic's duplicate step reads a pair instead of hunting for it.
-        if draft.id in duplicates:
-            view["same_action_as"] = list(duplicates[draft.id])
-        # Also computed: the package's own table says this draft's action is not
-        # one its lane files. The ruling is settled in code; the key tells the
-        # critic not to spend a judgement on it.
-        if reason := type(draft).misfiled(draft):
-            view["filed_in_wrong_lane"] = reason
-        # Computed too: the other drafts with this one's fact pattern and a
-        # different rating (:func:`~analysis_service.critic.rating_disagreements`),
-        # which is the pair step 4 calibrates across.
-        if draft.id in rated_unlike:
-            view["rated_unlike"] = list(rated_unlike[draft.id])
-        views.append(view)
-    return views
-
-
 def prepare_analysis(
     valid_model: dict,
     ctx,
@@ -1470,8 +1405,9 @@ def merge_drafts(
 
     Two state keys, two shapes, on purpose. ``drafts`` holds the drafts whole,
     because that is what ``assemble_claims`` merges rulings onto to build the
-    block. ``draft_view`` is the *prompt* view, narrowed by :func:`_ruling_view`
-    to the fields a verdict is actually reached from.
+    block. ``draft_view`` is the *prompt* view, built by
+    :func:`~analysis_service.critic.critic_view` and narrowed to the fields a
+    verdict is actually reached from.
     """
     state = keys.state(ctx)
     lanes = nodes.lanes
@@ -1572,17 +1508,11 @@ def merge_drafts(
         package,
     )
     state.put(nodes.key("coverage"), [row.model_dump(mode="json") for row in coverage])
-    # The critic reads only the drafts code has not already ruled; a draft its
-    # own grounds settle is ruled needs-info at assembly and never shown.
-    shown = unsettled_drafts(merged)
-    state.prompt(
-        nodes.key("draft_view"),
-        render(
-            _ruling_view(
-                shown, duplicate_groups(shown, model), rating_disagreements(shown)
-            )
-        ),
-    )
+    # The critic reads only the drafts code has not already ruled, with the
+    # pairs it would otherwise hunt for computed onto them. The re-ask builds
+    # its own view through the same function, so the two passes cannot disagree
+    # about what a critic reads.
+    state.prompt(nodes.key("draft_view"), render(critic_view(merged, model)))
     return {
         "framework": nodes.name,
         "draft_count": len(merged),
@@ -1603,14 +1533,14 @@ def route_review(
     element the model does not contain, routes to ``revise``, with the failing
     rulings and the problem list parked where the re-ask prompt reads them.
 
-    The re-ask sees the drafts as a **roster of IDs plus the few it must
-    read**, not as the whole set again. Its job is structural — cover exactly
-    the drafted IDs, once each, with unknowns that resolve — and an ID carries
-    the whole of that claim. The two drafts a structural fix cannot be made
-    without reading are named by
-    :attr:`~analysis_service.critic.ReviewProblems.implicated`, which is computed
-    beside the messages so the prompt and the check cannot disagree about which
-    claims are in trouble.
+    **The check and the re-ask view are one value.**
+    :func:`~analysis_service.critic.review` returns either an
+    :class:`~analysis_service.critic.Accepted` or a
+    :class:`~analysis_service.critic.Revision`, and the Revision carries its own
+    messages, its roster and the drafts those messages name. So the prompt and
+    the check cannot disagree about which claims are in trouble: they come out
+    of one call over one set. This function parks what the value carries and
+    takes the edge it names, and composes nothing.
 
     Both of a framework's review nodes run this same function — what differs is
     where their ``revise`` edge points (``recritic`` for the first look,
@@ -1643,25 +1573,15 @@ def route_review(
     package_drafts = _drafts_of(state.get(nodes.key("drafts")), nodes.package)
     ruled = _claims_of(state.get(nodes.key("reviewed")))
     rulings = _rulings_of(ruled, nodes.schemas)
-    problems = review_issues(package_drafts, rulings, model)
-    if problems:
+    outcome = review(package_drafts, rulings, model)
+    if isinstance(outcome, Revision):
+        # ``previous_review`` is the parked payload itself rather than anything
+        # recomputed, because what the re-ask must reconcile with is the bytes
+        # the critic actually returned.
         state.prompt(nodes.key("previous_review"), render(ruled))
-        state.prompt(nodes.key("critic_issues"), render(problems.messages))
-        # The roster is the covering set the re-ask must reproduce, and an ID is
-        # the whole of that claim — the re-ask reproduces rulings, not drafts.
-        # Only the drafts it cannot fix without reading travel in full.
-        shown = unsettled_drafts(package_drafts)
-        state.prompt(nodes.key("draft_roster"), render([draft.id for draft in shown]))
-        state.prompt(
-            nodes.key("unreconciled_drafts"),
-            render(
-                _ruling_view(
-                    [draft for draft in shown if draft.id in problems.implicated],
-                    duplicate_groups(shown, model),
-                    rating_disagreements(shown),
-                )
-            ),
-        )
+        state.prompt(nodes.key("critic_issues"), render(outcome.messages))
+        state.prompt(nodes.key("draft_roster"), render(outcome.roster))
+        state.prompt(nodes.key("unreconciled_drafts"), render(outcome.unreconciled))
         # Recorded onto this framework's marks before the re-ask runs, so the
         # report says how the first pass failed even when the re-ask repairs it
         # completely. Merged rather than assigned: ``marks`` already holds what
@@ -1670,15 +1590,15 @@ def route_review(
         state.put(
             nodes.key("marks"),
             parked.model_copy(
-                update={"unreconciled_rulings": list(problems.messages)}
+                update={"unreconciled_rulings": list(outcome.messages)}
             ).model_dump(mode="json"),
         )
-        return _routed(ROUTE_REVISE, {"issue_count": len(problems.messages)})
+        return _routed(ROUTE_REVISE, {"issue_count": len(outcome.messages)})
     # The marker ``assemble`` reads a framework as finished by. ``reviewed``
     # alone cannot say so: it holds the first critic's malformed rulings for
     # as long as the re-ask runs.
     state.put(nodes.key("accepted"), True)
-    return _routed(ROUTE_ACCEPT, {"reviewed_count": len(rulings)})
+    return _routed(ROUTE_ACCEPT, {"reviewed_count": outcome.count})
 
 
 def _drafts_of(drafts: list | None, package: FrameworkPackage) -> list[Claim]:
@@ -1707,8 +1627,8 @@ def fail_review(valid_model: dict, ctx, keys: GraphKeys, nodes: FrameworkNodes) 
     """
     model = SystemModel.model_validate(valid_model)
     state = keys.state(ctx)
-    # review_issues is non-empty here by construction; assemble_claims raises
-    # the CriticOutputError naming exactly what still does not reconcile.
+    # ``review`` returned a Revision here by construction; assemble_claims
+    # raises the CriticOutputError naming exactly what still does not reconcile.
     assemble_claims(
         _drafts_of(state.get(nodes.key("drafts")), nodes.package),
         _rulings_of(_claims_of(state.get(nodes.key("reviewed"))), nodes.schemas),
