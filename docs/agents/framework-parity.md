@@ -236,6 +236,15 @@ one-package assumption survived:
   `notes` on every question, an arbitrary verified quote on every ruling — and
   every check goes green while the output says nothing.
 
+- **Which class the service asks for.** A package overriding a neutral hook has
+  to put it on the class the *caller* reaches, not merely on one of its own.
+  ASVS put `partition_proposals` on its analysis block while the fan-in asks its
+  record; Python resolved the neutral default and two live runs deferred nothing
+  while reading as a model that would not answer. This one *is* mechanical —
+  `test_no_package_override_is_orphaned` — and the tests that missed it did so
+  by calling the override on the same wrong class. **A test that names a class
+  the caller never reaches proves the method works, not that it runs.**
+
 The second is the general form of the first, and neither is decidable in
 advance. `evals/harness/filler.py` measures the symptom *after* a run, which is
 the best that can be done: the defect passes every offline check by
@@ -253,7 +262,7 @@ for free" is a claim to check, never one to assume.
 
 ## Where this is enforced
 
-Six mechanical instances, each for a narrow question:
+Seven mechanical instances, each for a narrow question:
 
 - **`tests/test_framework_neutrality.py`** — every framework literal outside a
   package root is declared with a reason, so a new one fails until somebody says
@@ -262,6 +271,11 @@ Six mechanical instances, each for a narrow question:
   inside a word is declared or recorded as open, and no text an app puts in
   front of a person names a framework. These cover the two ways of naming one
   that carry no literal.
+- **`test_no_package_override_is_orphaned`** — a package that overrides a
+  neutral hook is reached through the class the *caller* asks for. Three hooks
+  are reached through `package.record` and two through the analysis block; an
+  override on any other class of the package resolves to the neutral default,
+  silently, and the package's intent is dropped with no error.
 - **`evals/harness/filler.py`** — whether a package's required justifications
   say anything, over a finished sweep. It reports rather than gates, because the
   honest threshold is unknown for every reading but one: a question pointed at

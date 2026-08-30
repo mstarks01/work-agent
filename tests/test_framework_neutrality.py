@@ -56,12 +56,15 @@ list, so the reasoning above does not reach it.
 from __future__ import annotations
 
 import ast
+import importlib
+import inspect
+import pkgutil
 import re
 from pathlib import Path
 
 import pytest
 
-from analysis_service.frameworks import CONTENT_LICENSE, PACKAGES
+from analysis_service.frameworks import CONTENT_LICENSE, PACKAGES, SCHEMAS
 from evals.harness.instruments import INSTRUMENTS, PACKAGE_SCORERS
 from tests.factories import SCRIPTED_FRAMEWORKS
 
@@ -788,3 +791,83 @@ def test_no_page_names_a_framework():
         " from the finding being shown — through a table keyed by framework"
         " where the wording differs, as webapp/review.py's QUESTIONS does."
     )
+
+
+#: Every hook a package may override, and the attribute the *caller* reaches it
+#: through. A package's own class is not the seam — the seam is whatever the
+#: service asks for, and an override anywhere else resolves to the neutral
+#: default.
+NEUTRAL_HOOKS: dict[str, str] = {
+    "partition_proposals": "record",
+    "claim_marks": "record",
+    "lane_diagnostics": "record",
+    "scope_entries": "block",
+    "summarize": "block",
+}
+
+
+def _package_modules(name: str):
+    """Every module of one package, so a definition anywhere is found."""
+    package = importlib.import_module(f"analysis_service.frameworks.{name}")
+    yield package
+    for found in pkgutil.iter_modules(package.__path__):
+        yield importlib.import_module(
+            f"analysis_service.frameworks.{name}.{found.name}"
+        )
+
+
+def orphaned_overrides() -> dict[str, list[str]]:
+    """Hooks a package defines that the caller never reaches, by package.
+
+    **The failure this exists for is silent and expensive.** A package writing
+    an override on one of its own classes has said what it wants; if that is not
+    the class the service asks, Python resolves the neutral default and the
+    package's intent is dropped with no error, no warning and no test failure.
+    It shows up only as behaviour that never happens.
+
+    That is not hypothetical. ASVS's ``partition_proposals`` sat on its
+    *analysis block* while the fan-in asks its *record*, so two live runs
+    deferred nothing and read as a model that would not answer. The tests missed
+    it by calling the override on the same wrong class: a test that names a
+    class the caller never reaches proves the method works, not that it runs.
+    """
+    found: dict[str, list[str]] = {}
+    for name in sorted(PACKAGES):
+        reached_by = {"record": PACKAGES[name].record, "block": SCHEMAS[name].block}
+        home = f"analysis_service.frameworks.{name}"
+        for hook, attribute in NEUTRAL_HOOKS.items():
+            defines = any(
+                hook in vars(obj)
+                for module in _package_modules(name)
+                for _, obj in inspect.getmembers(module, inspect.isclass)
+                if obj.__module__.startswith(home)
+            )
+            if not defines:
+                continue
+            reached = getattr(reached_by[attribute], hook)
+            function = getattr(reached, "__func__", reached)
+            module = inspect.getmodule(function)
+            if module is None or not module.__name__.startswith(home):
+                found.setdefault(name, []).append(hook)
+    return found
+
+
+def test_no_package_override_is_orphaned():
+    orphaned = orphaned_overrides()
+
+    assert not orphaned, (
+        f"these packages define a hook the caller never reaches: {orphaned}."
+        " The service asks `package.record` for some and the analysis block for"
+        " others — see NEUTRAL_HOOKS. An override on any other class of the"
+        " package resolves to the neutral default, silently, and the package's"
+        " intent is dropped."
+    )
+
+
+def test_the_hook_table_names_only_real_hooks():
+    """Guards the guard: a hook nothing declares can never be orphaned."""
+    from analysis_service.report import Claim, FrameworkAnalysis
+
+    for hook, attribute in NEUTRAL_HOOKS.items():
+        base = Claim if attribute == "record" else FrameworkAnalysis
+        assert hasattr(base, hook), f"{hook} is not a neutral hook on {base.__name__}"
