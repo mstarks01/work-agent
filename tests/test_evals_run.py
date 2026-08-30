@@ -15,6 +15,15 @@ import pytest
 
 from analysis_service.certification import CertifyResult, UncertifiedNode
 from analysis_service.deployment import Deployment
+from evals.harness import (
+    comparison,
+    instruction_delta,
+    ledger,
+    queue,
+    run,
+    standings,
+    submit,
+)
 from evals.harness.modes import AttributeCheck, ExtractionScore, render_extraction
 from evals.harness.run import _models_record, _print_certification
 from tests.factories import TEST_CREDENTIAL_ENV, TEST_TIER_ENV
@@ -152,3 +161,63 @@ class TestTheArtifactCanActuallyBeWritten:
             record["tiers"]["strong"]["model"]
             == TEST_TIER_ENV["ANALYSIS_MODEL_STRONG_MODEL"]
         )
+
+
+class TestTheCommandTable:
+    """A table nobody compares to its registry fails as quietly as a branch.
+
+    There is no registry outside the table here — the commands *are* the
+    registry — so what these check is the two ways a table can go stale: an
+    entry nothing implements, and an implementation no entry reaches.
+    """
+
+    def test_every_entry_names_something_callable(self):
+        for name, command in run.COMMANDS.items():
+            assert callable(command.run), f"{name} runs nothing"
+            assert command.help, f"{name} says nothing in --help"
+
+    def test_every_command_function_is_in_the_table(self):
+        """The quiet failure: a ``command_*`` added and never keyed.
+
+        Walked over the harness modules the table draws from, because a command
+        lives beside the subject it reads and this is what says so.
+        """
+        reachable = {command.run for command in run.COMMANDS.values()}
+        modules = (
+            run,
+            comparison,
+            instruction_delta,
+            ledger,
+            queue,
+            standings,
+            submit,
+        )
+        for module in modules:
+            for attribute in dir(module):
+                if not attribute.startswith("command_"):
+                    continue
+                function = getattr(module, attribute)
+                assert function in reachable, (
+                    f"{module.__name__}.{attribute} is a command nothing can"
+                    " reach; add it to run.COMMANDS or delete it"
+                )
+
+    def test_the_parser_offers_exactly_the_table(self, capsys):
+        """``main`` walks the table, so the two cannot drift apart."""
+        with pytest.raises(SystemExit):
+            run.main(["--help"])
+        printed = capsys.readouterr().out
+        for name in run.COMMANDS:
+            assert name in printed, f"{name} is keyed but --help does not offer it"
+
+    def test_a_name_the_table_does_not_hold_is_refused(self):
+        with pytest.raises(SystemExit):
+            run.main(["not-a-command"])
+
+    @pytest.mark.parametrize("name", sorted(run.COMMANDS))
+    def test_each_command_parses_its_own_help(self, name, capsys):
+        """Every entry builds a subparser that argparse accepts."""
+        with pytest.raises(SystemExit) as exit_code:
+            run.main([name, "--help"])
+        assert exit_code.value.code == 0
+        assert capsys.readouterr().out.startswith("usage:")
