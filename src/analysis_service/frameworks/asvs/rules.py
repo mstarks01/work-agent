@@ -57,6 +57,7 @@ from analysis_service.system_model import SystemModel
 
 __all__ = [
     "PRESENCE_TESTS",
+    "REQUIREMENT_TESTS",
     "RULES",
     "STRUCTURAL_RULES",
     "WEB_PROTOCOL_TERMS",
@@ -303,7 +304,7 @@ PRESENCE_TESTS: tuple[PresenceTest, ...] = (
             "This system accepts an uploaded file. What limits its size, its"
             " type and where it lands?"
         ),
-        terms=("upload", "attachment", "multipart"),
+        terms=("upload", "attachment", "multipart", "artifact", "registry"),
     ),
     PresenceTest(
         predicate="authentication",
@@ -729,12 +730,89 @@ STRUCTURAL_RULES: tuple[Rule, ...] = (
 )
 
 
-def ruled_out_requirements(model: SystemModel, level: int, lane: str) -> dict[str, str]:
-    """The requirements of ``lane`` ruled out because its deciding test fired nowhere.
+#: Requirements whose own text names a technology, against the words a
+#: submitter writes for it (#455). Where none of the words appears at the
+#: start of a word anywhere in the model, the requirement is ruled out in code
+#: with the terms in the reason, the way a deciding chapter test rules its
+#: chapter out. Only requirements that presuppose the thing are here: V1.2.2
+#: (URL building), V1.2.5 (OS commands) and V1.3.6 (outbound fetches) ask
+#: about what an application does, not what it names, and stay with the lane.
+#: Checked at import against the catalog, so a retired identifier fails closed.
+REQUIREMENT_TESTS: dict[str, tuple[str, ...]] = {
+    "V1.2.6": ("ldap", "active directory", "directory service"),
+    "V1.2.7": ("xpath", "xml"),
+    "V1.2.8": ("latex", "tex "),
+    "V1.2.10": ("csv", "spreadsheet", "excel", "export"),
+    "V1.3.1": ("wysiwyg", "rich text", "html editor", "markdown"),
+    "V1.3.5": ("markdown", "css", "xsl", "template"),
+    "V1.3.7": ("template",),
+    "V1.3.8": ("jndi", "java"),
+    "V1.3.9": ("memcache",),
+    "V1.3.11": ("mail", "smtp", "imap", "email"),
+    "V1.5.1": ("xml", "soap", "xslt", "xsd", "svg"),
+    "V4.3.1": ("graphql",),
+    "V4.3.2": ("graphql",),
+    "V4.4.1": ("websocket", "ws://", "wss://", "socket.io"),
+    "V4.4.2": ("websocket", "ws://", "wss://", "socket.io"),
+    "V4.4.3": ("websocket", "ws://", "wss://", "socket.io"),
+    "V4.4.4": ("websocket", "ws://", "wss://", "socket.io"),
+    **dict.fromkeys(
+        ("V6.5.1", "V6.5.2", "V6.5.3", "V6.5.4", "V6.5.5"),
+        (
+            "lookup secret",
+            "totp",
+            "one-time",
+            "otp",
+            "out-of-band",
+            "authenticator app",
+            "backup code",
+            "recovery code",
+            "mfa",
+            "second factor",
+            "two-factor",
+            "2fa",
+        ),
+    ),
+    **dict.fromkeys(
+        ("V6.6.1", "V6.6.2", "V6.6.3"),
+        ("sms", "phone", "pstn", "out-of-band", "otp", "one-time", "push notification"),
+    ),
+    **dict.fromkeys(
+        ("V6.8.1", "V6.8.2", "V6.8.3", "V6.8.4", "V7.1.3", "V7.6.1", "V7.6.2"),
+        (
+            "identity provider",
+            "idp",
+            "saml",
+            "federat",
+            "sso",
+            "single sign",
+            "oidc",
+            "openid",
+            "relying party",
+        ),
+    ),
+}
 
+
+def _names_any(model: SystemModel, terms: tuple[str, ...]) -> bool:
+    """Whether any element's text starts a word with any of ``terms``."""
+    return any(
+        _starts_a_word(term, value.lower())
+        for element in model.elements()
+        for attribute in _TEXT_ATTRIBUTES
+        if isinstance(value := getattr(element, attribute, ""), str)
+        for term in terms
+    )
+
+
+def ruled_out_requirements(model: SystemModel, level: int, lane: str) -> dict[str, str]:
+    """The requirements of ``lane`` ruled out because the model names nothing they need.
+
+    Two readings, one answer. A deciding chapter test that fired nowhere rules
+    every requirement of the chapter out; a requirement in
+    :data:`REQUIREMENT_TESTS` whose own terms appear nowhere rules itself out.
     Each is keyed by the standard's own identifier against the reason a reader
-    gets. Empty for a lane with no deciding test, and for one whose test fired
-    on any element.
+    gets.
     """
     ruled_out: dict[str, str] = {}
     for test in PRESENCE_TESTS:
@@ -749,7 +827,29 @@ def ruled_out_requirements(model: SystemModel, level: int, lane: str) -> dict[st
         )
         for requirement in requirements_for(level, lane):
             ruled_out[requirement.id] = reason
+    for requirement in requirements_for(level, lane):
+        terms = REQUIREMENT_TESTS.get(requirement.id)
+        if requirement.id in ruled_out or terms is None or _names_any(model, terms):
+            continue
+        ruled_out[requirement.id] = (
+            f"no element of this system names what {requirement.id} presupposes"
+            f" ({', '.join(terms[:4])}{', ...' if len(terms) > 4 else ''});"
+            " ruled out in code"
+        )
     return ruled_out
+
+
+def _requirement_test_issues() -> list[str]:
+    """Every key of :data:`REQUIREMENT_TESTS` the catalog does not publish."""
+    published = {requirement.id for requirement in requirements_for(3)}
+    return [key for key in REQUIREMENT_TESTS if key not in published]
+
+
+if _requirement_test_issues():
+    raise ValueError(
+        "REQUIREMENT_TESTS names requirements the catalog does not publish:"
+        f" {_requirement_test_issues()}"
+    )
 
 
 RULES: tuple[Rule, ...] = (
