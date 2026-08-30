@@ -232,3 +232,22 @@ def test_every_helper_is_stable_across_calls(chain):
         assert [c.model_dump() for c in unknown_controls(chain)] == [
             c.model_dump() for c in unknown_controls(chain)
         ]
+
+
+def test_a_term_fires_at_the_start_of_a_word_or_as_a_whole_word():
+    """#429: ``sso`` fired inside ``processor`` and raised an OAuth lead.
+
+    A leading boundary always. The trailing one is per term: a stem reaches
+    its inflections, and a term marked ``$`` reaches the whole word only.
+    """
+    from analysis_service.analysis import matches_term
+
+    assert not matches_term("sso", "our card processor is a third party")
+    assert not matches_term("sso", "an associate signs in")
+    assert matches_term("sso", "company sso")
+    assert matches_term("authenticat", "an authenticated session")
+    assert matches_term("http", "https post")
+    assert matches_term("java", "a javascript front end")
+    assert not matches_term("java$", "a javascript front end")
+    assert matches_term("java$", "a java service")
+    assert not matches_term("log$", "the login flow")

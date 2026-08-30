@@ -15,7 +15,7 @@ These follow step 7 of the procedure above and belong to this framework alone.
 8. **Rule each requirement.** Take the requirements in your `## Applicability` in order. For each one, decide which of three things the input supports, and write the claim that says so:
     - the requirement applies to this system, and the input does not show it satisfied — write the claim plainly;
     - the requirement applies, and the input does not settle it — write it conditionally, say what has to be answered, and set `needs_evidence`;
-    - the requirement does not apply to a system of this shape — write the claim and say which fact of the model rules it out, so the critic can reject it. A rejected claim is an answer, not a gap.
+    - the requirement does not apply to a system of this shape — write the claim and say which fact of the model rules it out, so the critic can reject it. A rejected claim is an answer, not a gap. Where the fact is that the system has no such component, name the thing in `absent_elements` rather than reaching for a quote about an unrelated part of the system: a requirement about directory injection is ruled out by `ldap` appearing nowhere, and the service checks that for you.
 9. **Say which position in the graph, or none.** Most requirements in this standard address a coding practice with no position in the System Model. Where yours does, name the elements — each **copied from the element roster** rather than assembled from a name. Where it does not, leave `affected_element_ids` empty rather than reaching for the nearest element — a requirement about output encoding is not about the web process just because one exists.
 
 ## Your fields
