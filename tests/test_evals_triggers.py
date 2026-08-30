@@ -79,13 +79,14 @@ TRIGGER_FLOORS: dict[str, dict[str, float]] = {
 #: records. ``secure-coding-and-architecture`` and ``webrtc`` gained a rule and
 #: stayed, which is the distinction this module exists to make — the first fires
 #: on models but not on the elements its records name, and the second fires
-#: nowhere at all and says so in ``UNEXERCISED``.
+#: nowhere at all and says so in ``UNEXERCISED``. ``validation-and-business-logic``
+#: left when #430 gave it a rule that reads a crossing from an external entity,
+#: which is the element its reference records name.
 UNTRIGGERED_LANES: dict[str, str] = dict.fromkeys(
     (
         "cryptography",
         "secure-coding-and-architecture",
         "self-contained-tokens",
-        "validation-and-business-logic",
         "webrtc",
     ),
     "asvs: the chapter's rule fires on some model but never on an element one of"
