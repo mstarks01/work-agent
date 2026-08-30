@@ -24,7 +24,7 @@ from analysis_service.evidence import (
 )
 from analysis_service.frameworks.stride import STRIDE
 from analysis_service.frameworks.stride.record import ThreatProposal, ThreatProposals
-from analysis_service.report import Ground
+from analysis_service.report import GROUND_TERM_MAX_CHARS, Ground
 from analysis_service.system_model import UNKNOWN, DataStore, SystemModel
 from tests.factories import sample_draft, sample_proposal, valid_model
 
@@ -489,6 +489,26 @@ class TestResolveProposals:
             ),
         ]
 
+    def test_a_blank_reference_is_skipped_rather_than_marked(self):
+        """A mark names what the catalog does not hold; an empty string names nothing.
+
+        ``evidence_refs`` is a free list the model fills, and a mark's reference
+        cannot be empty. So a blank entry earns no mark, and the claim stands on
+        the references that did resolve.
+        """
+        catalog = evidence_catalog(valid_model())
+        proposal = sample_proposal(
+            "S-01", evidence_refs=["", ENCRYPTION_REF], quotes=[]
+        )
+
+        resolution = resolve_proposals(
+            [proposal], catalog, STRIDE, "spoofing", valid_model()
+        )
+
+        (draft,) = resolution.drafts
+        assert draft.grounds == [catalog[ENCRYPTION_REF]]
+        assert resolution.marks.unresolved_evidence == []
+
     def test_surrounding_whitespace_on_a_reference_is_not_a_defect(self):
         """Which spelling of a name arrived is mechanical; settled here rather
         than argued with in a prompt."""
@@ -706,6 +726,29 @@ class TestAnAbsenceIsAGround:
         ).drafts
 
         assert draft.grounds == [Ground(kind="absent-element", term="ldap")]
+
+    def test_a_term_longer_than_the_ground_holds_costs_its_entry(self):
+        """The field holds one term, so a sentence in it names no term.
+
+        ``absent_elements`` is a free list the model fills, and the ground it
+        builds is bounded. An over-long entry leaves the way a contradicted one
+        does — as a mark — because the alternative is a raise in the merge node
+        that costs the run every lane it already paid for.
+        """
+        catalog = evidence_catalog(valid_model())
+        sentence = "no directory service " * 10
+        assert len(sentence) > GROUND_TERM_MAX_CHARS
+        proposal = sample_proposal(
+            "S-01", evidence_refs=[], quotes=[], absent_elements=[sentence]
+        )
+
+        resolution = resolve_proposals(
+            [proposal], catalog, STRIDE, "spoofing", valid_model()
+        )
+
+        assert resolution.drafts == []
+        (mark,) = resolution.marks.dropped_claims
+        assert "cites only evidence" in mark.reason
 
     def test_an_absence_alone_justifies_a_proposal(self):
         """The min-one rule runs over three lists, not two."""
