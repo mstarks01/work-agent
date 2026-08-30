@@ -45,7 +45,6 @@ from analysis_service.report import (
     Report,
     Severity,
     SharedElementName,
-    Verdict,
 )
 from analysis_service.sampling import load_sampling
 from tests.factories import DEFAULT_FRAMEWORKS, ScriptedLlm
@@ -107,11 +106,16 @@ def scripted_ruling(category) -> dict:
 
     Carries no ``severity``: the draft's rating stands, which is the common
     case and the one the assemble seam merges through.
+
+    A bare ``needs-info``, because every scripted draft cites an
+    ``unknown-attribute`` ground and the contract settles such a draft that
+    way (#439): the service fills the pairs and the reason from the grounds,
+    and a confirmation would route the job to the re-ask.
     """
     return {
         "id": f"{CATEGORY_LETTERS[category]}-01",
-        "confidence": "high",
-        "verdict": Verdict(status="confirmed").model_dump(mode="json"),
+        "confidence": "low",
+        "verdict": {"status": "needs-info"},
     }
 
 
