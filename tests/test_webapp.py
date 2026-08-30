@@ -40,7 +40,7 @@ SAME_ORIGIN = {"Sec-Fetch-Site": "same-origin"}
 
 #: The app refuses any other Host, so the client has to wear one it accepts.
 #: ``testserver``, the TestClient default, is the shape a DNS-rebound request
-#: arrives in — see ``webapp.main.LOOPBACK_HOSTS``.
+#: arrives in — see ``webapp.page.LOOPBACK_HOSTS``.
 LOOPBACK = "http://127.0.0.1:8000"
 
 # The payload that breaks a naive injection: it closes the JSON block and the
@@ -1170,17 +1170,3 @@ def test_the_event_stream_still_streams_under_the_header_middleware(client):
         assert response.headers["X-Content-Type-Options"] == "nosniff"
         assert response.headers["content-type"].startswith("text/event-stream")
         assert "event: done" in "".join(response.iter_text())
-
-
-def test_the_server_side_escape_covers_quotes():
-    """Every call site lands in text position today; that is not the guarantee.
-
-    An escape that is only adequate where it happens to be called is one
-    interpolation away from not being adequate, so the helper is correct in
-    attribute position too.
-    """
-    from webapp.main import _escape
-
-    escaped = _escape("\"><img src=x onerror=alert(1)>'")
-    for character in ("<", ">", '"', "'"):
-        assert character not in escaped

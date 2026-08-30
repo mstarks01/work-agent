@@ -43,8 +43,9 @@ endpoint carries five controls rather than the app's usual none:
   anything. A press inside somebody else's frame arrives same-origin and
   carries the page token, because the page it comes from really is this one.
   So framing is the way past both, and refusing to be framed is the answer;
-* **``Sec-Fetch-Site: same-origin``**, the check ``webapp/main.py`` uses on its
-  own write endpoint, through the ``refuse_cross_origin`` both apps share;
+* **``Sec-Fetch-Site: same-origin``**, the check every local app here runs on
+  its own write endpoints, through the one
+  :func:`~webapp.page.refuse_cross_origin` they share;
 * a **one-time token** minted per process and embedded in the page, so a
   request that never read the page cannot carry it;
 * **no request-controlled arguments at all** — the endpoint opens whatever
@@ -175,8 +176,6 @@ Security posture, inherited from ``webapp/review.py`` rather than re-derived:
 from __future__ import annotations
 
 import argparse
-import html
-import json
 import secrets
 import sys
 from dataclasses import dataclass, field
@@ -194,25 +193,30 @@ from evals.harness import roster as rosters
 from evals.harness import sitting as sittings
 from evals.harness import submit as submit_spine
 from evals.harness.roster import Roster
-from webapp.main import LOOPBACK_HOSTS, SecurityHeaders, refuse_cross_origin
+from webapp.page import (
+    LOOPBACK_HOSTS,
+    Grants,
+    SecurityHeaders,
+    escape,
+    refuse_cross_origin,
+    render,
+    response,
+    script_json,
+)
 
 HOST = "127.0.0.1"
 PORT = 8020
 
-_NONCE_PLACEHOLDER = "__CSP_NONCE__"
-
-#: ``frame-ancestors 'none'`` is the fifth control on the submit path, and it
-#: is what makes the other four mean anything. A press inside somebody else's
-#: frame reaches this app as same-origin and carries the page token, because
-#: the page it comes from really is this one — so framing beats the header
-#: check and the token together. The directive is spelled out because it does
-#: not fall back to ``default-src``, as ``base-uri`` and ``form-action`` beside
-#: it do not.
-_CSP = (
-    "default-src 'none'; style-src 'nonce-{nonce}'; script-src 'nonce-{nonce}';"
-    " connect-src 'self'; base-uri 'none'; form-action 'none';"
-    " frame-ancestors 'none'"
-)
+#: The page runs its own script, carries its own style and calls its own
+#: endpoints. Nothing else.
+#:
+#: The closed half of the policy that :mod:`webapp.page` adds is the fifth
+#: control on the submit path, and it is what makes the other four mean
+#: anything. A press inside somebody else's frame reaches this app as
+#: same-origin and carries the page token, because the page it comes from
+#: really is this one — so framing beats the header check and the token
+#: together.
+_PAGE_GRANTS = Grants(script=True, style=True, connect=True)
 
 
 #: One written line, wherever this app takes a list of them. A cap on the list
@@ -376,12 +380,13 @@ def create_app(session: Session) -> FastAPI:
 
     @app.get("/", response_class=HTMLResponse)
     def index() -> HTMLResponse:
-        return _html(
-            _page(
+        return response(
+            render(
                 _PAGE,
-                reviewer=_escape(session.reviewer),
-                token=_js_literal(session.token),
-                cansubmit=_js_literal(session.can_submit),
+                _PAGE_GRANTS,
+                reviewer=escape(session.reviewer),
+                token=script_json(session.token),
+                cansubmit=script_json(session.can_submit),
             )
         )
 
@@ -954,49 +959,6 @@ def _paste(session: Session, cases: list[str]) -> str:
         " file as it stands in this PR, so a later edit to any of them puts"
         " that case back on the list."
     )
-
-
-def _escape(text: str) -> str:
-    """Escape for the page's **markup**, where the value lands in element text.
-
-    Not for the ``<script>`` block: a script block does not decode HTML
-    entities, so this is the wrong escape there and :func:`_js_literal` is the
-    right one. Which of the two a field wants is decided by where its
-    placeholder sits in :data:`_PAGE`.
-    """
-    return html.escape(text)
-
-
-def _js_literal(value: object) -> str:
-    """A value as a JavaScript literal, for a placeholder inside ``<script>``.
-
-    Two things have to be true and neither is HTML escaping. The value has to
-    survive as a JavaScript literal, which is what :func:`json.dumps` gives —
-    ``html.escape`` would deliver the characters ``&quot;`` where a quote was,
-    because nothing decodes entities in a script block. And it must not close
-    the block: a value spelling ``</script>`` ends it and the rest of the page
-    parses as HTML, so every ``<`` goes out as ``\\u003c``. That is the same
-    escape, for the same reason, as the report payload in
-    :func:`webapp.main.render_report`.
-
-    The two values this carries today are a token and a boolean, and neither
-    can spell either character. It is written this way so that stays a fact
-    about the page rather than a condition the next field has to re-satisfy.
-    """
-    return json.dumps(value).replace("<", "\\u003c")
-
-
-def _page(template: str, **fields: str) -> tuple[str, str]:
-    nonce = secrets.token_urlsafe(16)
-    page = template.replace(_NONCE_PLACEHOLDER, nonce)
-    for name, value in fields.items():
-        page = page.replace(f"<!--{name}-->", value)
-    return page, _CSP.format(nonce=nonce)
-
-
-def _html(page: tuple[str, str]) -> HTMLResponse:
-    body, csp = page
-    return HTMLResponse(content=body, headers={"Content-Security-Policy": csp})
 
 
 #: The page, as a raw string. Every ``\n`` in it is a newline escape inside a

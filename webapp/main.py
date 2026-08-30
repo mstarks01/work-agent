@@ -56,14 +56,14 @@ Security posture, all of it deliberate:
   is defence in depth behind it. The form page is included: a source label and a
   validator message both carry submitter bytes onto it over SSE, and both land
   as text nodes. Server-side, the two f-string pages escape through
-  :func:`_escape`, which is quote-safe so that where a value lands is not part
-  of whether the escape is adequate.
+  :func:`~webapp.page.escape`, which is quote-safe so that where a value lands
+  is not part of whether the escape is adequate.
 * **CSRF.** ``POST /analyze`` requires ``Sec-Fetch-Site: same-origin``. The
   header is browser-set and unspoofable from script, and it is checked before
   anything else so a cross-origin caller cannot even start a run. The check is
-  :func:`is_same_origin`, which the two eval-side apps share through
-  :func:`refuse_cross_origin` — one spelling of the header name and the
-  accepted value, rather than one per endpoint.
+  :func:`~webapp.page.is_same_origin`, which the two eval-side apps share
+  through :func:`~webapp.page.refuse_cross_origin` — one spelling of the header
+  name and the accepted value, rather than one per endpoint.
 * **No page here can be framed.** Each policy closes ``frame-ancestors``,
   which does not fall back to ``default-src`` however total the rest of the
   policy reads. It is the control the origin check rests on rather than a
@@ -80,11 +80,14 @@ Security posture, all of it deliberate:
   nothing else: the report page reaches the network not at all, the form page
   only its own origin (``connect-src 'self'`` for ``/example``, ``/analyze`` and
   ``/events``), and the diagnostic page runs no script, so it is granted no
-  ``script-src`` at all. A page and its policy are built together as a
-  :class:`RenderedPage` and served through :func:`_html`, so serving HTML
-  without its header is unspellable rather than merely discouraged.
+  ``script-src`` at all. Each page declares what it does as a
+  :class:`~webapp.page.Grants`, and the policy follows from the declaration
+  rather than from a string this file keeps. A page and its policy are built
+  together as a :class:`~webapp.page.RenderedPage` and served through
+  :func:`~webapp.page.response`, so serving HTML without its header is
+  unspellable rather than merely discouraged.
 * **``nosniff`` and ``no-referrer`` on every response**, HTML or not, applied by
-  :class:`SecurityHeaders`. Content sniffing is what would let a browser treat
+  :class:`~webapp.page.SecurityHeaders`. Content sniffing is what would let a browser treat
   ``/example``'s ``text/plain`` prose as something else, and the referrer policy
   keeps a run id out of outbound ``Referer`` headers.
 """
@@ -92,11 +95,9 @@ Security posture, all of it deliberate:
 from __future__ import annotations
 
 import asyncio
-import html
 import json
 import logging
 import os
-import re
 import secrets
 from collections.abc import AsyncIterator, Callable, Mapping, Sequence
 from dataclasses import dataclass, field
@@ -104,7 +105,7 @@ from functools import partial
 from pathlib import Path
 from typing import get_args
 
-from fastapi import FastAPI, HTTPException, Request
+from fastapi import FastAPI, Request
 from fastapi.responses import (
     HTMLResponse,
     JSONResponse,
@@ -113,9 +114,7 @@ from fastapi.responses import (
     StreamingResponse,
 )
 from pydantic import ValidationError
-from starlette.datastructures import MutableHeaders
 from starlette.middleware.trustedhost import TrustedHostMiddleware
-from starlette.types import ASGIApp, Message, Receive, Scope, Send
 
 from analysis_service import (
     ConfigError,
@@ -132,6 +131,17 @@ from analysis_service.deployment import Deployment
 from analysis_service.frameworks import package_for
 from analysis_service.model_tiers import ModelTierConfig
 from analysis_service.vendors import vendor_for
+from webapp.page import (
+    LOOPBACK_HOSTS,
+    Grants,
+    RenderedPage,
+    SecurityHeaders,
+    escape,
+    is_same_origin,
+    render,
+    response,
+    script_json,
+)
 
 logger = logging.getLogger("webapp")
 
@@ -142,131 +152,25 @@ SAMPLE = REPO_ROOT / "examples" / "orders.md"
 HOST = "127.0.0.1"
 PORT = 8000
 
-#: The only ``Host`` values a loopback app answers to. Binding to 127.0.0.1
-#: stops a request arriving off the host; it does **not** stop a page in the
-#: operator's own browser reaching the app, because DNS rebinding makes an
-#: attacker's domain resolve to 127.0.0.1 and become same-origin with it. Then
-#: no CORS preflight applies and a write endpoint is reachable from any page
-#: the operator happens to visit. Checking the header the rebound request
-#: still carries is the defence, and it is why this is not decoration: the
-#: vote ledger is the supply chain of every published quality number (A01).
-LOOPBACK_HOSTS = ["127.0.0.1", "localhost"]
-
-
-def is_same_origin(request: Request) -> bool:
-    """Whether the browser marked this request as sent from the app's own page.
-
-    The header is browser-set and script cannot spoof it, so this is the check
-    every writing endpoint in every app here runs before it does anything. It
-    is one function rather than one line repeated at each endpoint because the
-    header name and the accepted value are the whole of the check: spelled
-    four times, they are four chances to accept ``same-site`` by typo.
-
-    **It is necessary and not sufficient.** A page framed by somebody else
-    sends requests this returns ``True`` for, because they really do come from
-    this app's own page. ``frame-ancestors 'none'`` in each policy is what
-    closes that, and neither control replaces the other.
-
-    Callers answer a refusal in their own shape — this app owes its form page
-    a ``message`` and the other two raise ``HTTPException`` — so this decides
-    and does not respond.
-    """
-    return request.headers.get("sec-fetch-site") == "same-origin"
-
-
-def refuse_cross_origin(request: Request) -> None:
-    """:func:`is_same_origin`, as the 403 the two eval-side apps answer with.
-
-    They both want the same refusal from every writing endpoint, so the status
-    and the sentence live here once rather than at each of the four.
-    """
-    if not is_same_origin(request):
-        raise HTTPException(
-            status_code=403, detail="this request did not come from the app's page"
-        )
-
-
 # The registry is a demo surface, not a job store — /v1 already is one. It holds
 # untrusted prose and its report, in memory, per process, never persisted, and
 # oldest-first evicted. A restart loses history, which is correct here.
 MAX_RUNS = 20
 
-# The template's own script parses this same block. Matched by id rather than
-# by position, so the chrome can move without breaking injection; the trailing
-# ``[^>]*`` tolerates the nonce attribute the render pass fills in.
-_PAYLOAD_BLOCK = re.compile(
-    r'(<script type="application/json" id="report"[^>]*>)(.*?)(</script>)',
-    re.DOTALL,
-)
+#: The report page loads nothing external and reaches the network not at all.
+_REPORT_GRANTS = Grants(script=True, style=True)
 
-# Replaced with a fresh per-response nonce on every render. The viewer ships
-# with the placeholder in its three inline blocks, so a block added later
-# without one simply stops running rather than running unauthorised.
-_NONCE_PLACEHOLDER = "__CSP_NONCE__"
+#: The form page calls ``/example``, ``/analyze`` and ``/events/{run}``, so it
+#: needs its own origin and the report page does not. ``form-action`` stays
+#: closed even though the page carries a ``<form>`` — the submit handler is
+#: ``preventDefault()``-ed and posts through fetch, so a navigation away from
+#: this form is something going wrong.
+_FORM_GRANTS = Grants(script=True, style=True, connect=True)
 
-# ``default-src 'none'`` and no ``'unsafe-inline'``: the viewer loads nothing
-# external, so everything it needs is the nonce. ``base-uri``, ``form-action``
-# and ``frame-ancestors`` are closed because none of the three has any use on a
-# report page — and because none of the three falls back to ``default-src``.
-# That last one is the whole reason they are spelled: a policy can read as
-# total and still leave a page framable.
-_CSP = (
-    "default-src 'none'; script-src 'nonce-{nonce}'; style-src 'nonce-{nonce}'; "
-    "base-uri 'none'; form-action 'none'; frame-ancestors 'none'"
-)
-
-# The form page's policy differs from the report page's by exactly what the page
-# does: it calls ``/example``, ``/analyze`` and ``/events/{run}``, so it needs
-# ``connect-src 'self'`` and the report page does not. ``form-action`` stays
-# closed even though the page carries a ``<form>`` — the submit handler is
-# ``preventDefault()``-ed and posts through fetch, so a navigation away from
-# this form is something going wrong.
-_FORM_CSP = (
-    "default-src 'none'; script-src 'nonce-{nonce}'; style-src 'nonce-{nonce}'; "
-    "connect-src 'self'; base-uri 'none'; form-action 'none'; frame-ancestors 'none'"
-)
-
-# The diagnostic page runs no script and makes no request: it is one style block
-# and static prose. So it is granted neither ``script-src`` nor ``connect-src``
-# and both fall through to ``default-src 'none'`` — a page that has nothing to
-# authorise should not carry the grant that would authorise one.
-_DIAGNOSTIC_CSP = (
-    "default-src 'none'; style-src 'nonce-{nonce}'; base-uri 'none';"
-    " form-action 'none'; frame-ancestors 'none'"
-)
-
-
-class SecurityHeaders:
-    """``nosniff`` and ``no-referrer`` on every response, whatever served it.
-
-    Pure ASGI rather than a ``@app.middleware("http")`` function so it cannot
-    come between ``/events/{run}`` and its client: this only edits the header
-    frame on its way out and never touches the body, so a stream stays a stream.
-
-    Both headers are per *response* rather than per page, which is why they are
-    here and the CSP is not. ``nosniff`` matters most for the responses that are
-    not HTML — ``/example`` serves prose as ``text/plain``, and content sniffing
-    is precisely the mechanism that would let a browser decide otherwise.
-    ``no-referrer`` keeps a run id out of the ``Referer`` of anything the report
-    page's own links reach.
-    """
-
-    def __init__(self, app: ASGIApp) -> None:
-        self._app = app
-
-    async def __call__(self, scope: Scope, receive: Receive, send: Send) -> None:
-        if scope["type"] != "http":
-            await self._app(scope, receive, send)
-            return
-
-        async def _send(message: Message) -> None:
-            if message["type"] == "http.response.start":
-                headers = MutableHeaders(scope=message)
-                headers.setdefault("X-Content-Type-Options", "nosniff")
-                headers.setdefault("Referrer-Policy", "no-referrer")
-            await send(message)
-
-        await self._app(scope, receive, _send)
+#: The diagnostic page runs no script and makes no request: it is one style
+#: block and static prose. A page that has nothing to authorise should not
+#: carry the grant that would authorise one.
+_DIAGNOSTIC_GRANTS = Grants(style=True)
 
 
 @dataclass
@@ -381,52 +285,29 @@ def build_startup(env: Mapping[str, str] | None = None) -> Startup:
     )
 
 
-@dataclass(frozen=True)
-class RenderedPage:
-    """A page and the CSP header that authorises exactly its own nonce.
-
-    The two travel together so a caller cannot serve the page without the
-    policy: a nonce nothing authorises would leave the page's own blocks
-    blocked, and a policy without its page is meaningless. Every HTML response
-    this app serves is one of these — the three pages differ in what their
-    policy grants, never in whether they carry one.
-    """
-
-    html: str
-    csp: str
-
-
 def render_report(report: Report) -> RenderedPage:
     """``report_view.html``, carrying this run's report.
 
     The template is a self-contained renderer for the report schema — no build
-    step, no framework, its own inline CSS and JS. This substitutes the contents
-    of its JSON block and its per-response CSP nonce, and serves the result.
+    step, no framework, its own inline CSS and JS. This fills its one payload
+    placeholder and its per-response CSP nonce, and serves the result.
 
-    **The escape is the contract.** The report carries the submitter's own prose,
-    so a description containing ``</script>`` would close the block and
-    everything after it would parse as HTML — a stored-input XSS on the one page
-    the first-run route sends people to. Escaping every ``<`` to ``\\u003c``
-    keeps the payload inert while remaining valid JSON, and the substitution
-    goes through a function rather than a replacement string so that those
-    backslashes are not themselves re-interpreted.
+    **The escape is the contract.** The report carries the submitter's own
+    prose, so a description containing ``</script>`` would close the JSON block
+    and everything after it would parse as HTML — a stored-input XSS on the one
+    page the first-run route sends people to. The payload goes through
+    :func:`~webapp.page.script_json`, the same function every other value
+    landing in a script block goes through, rather than through a rule this
+    file keeps for itself.
 
-    **The nonce is stamped before the payload is injected**, never after, so a
-    submitter who writes the placeholder into their own prose gets it back
-    verbatim as data instead of having it substituted.
+    A viewer that lost its payload placeholder raises at
+    :func:`~webapp.page.render` rather than serving a report of nothing.
     """
-    nonce = secrets.token_urlsafe(16)
-    template = VIEWER.read_text(encoding="utf-8").replace(_NONCE_PLACEHOLDER, nonce)
-
-    payload = json.dumps(report.model_dump(mode="json")).replace("<", "\\u003c")
-    rendered, count = _PAYLOAD_BLOCK.subn(
-        lambda match: f"{match.group(1)}\n{payload}\n{match.group(3)}",
-        template,
-        count=1,
+    return render(
+        VIEWER.read_text(encoding="utf-8"),
+        _REPORT_GRANTS,
+        report=script_json(report.model_dump(mode="json")),
     )
-    if count != 1:
-        raise RuntimeError(f"{VIEWER} has no <script id='report'> block to inject into")
-    return RenderedPage(html=rendered, csp=_CSP.format(nonce=nonce))
 
 
 def create_app(
@@ -447,11 +328,11 @@ def create_app(
     @app.get("/", response_class=HTMLResponse)
     async def form_page() -> Response:
         if not state.ok:
-            return _html(diagnostic_page(state), status_code=503)
-        return _html(
-            _page(
+            return response(diagnostic_page(state), status_code=503)
+        return response(
+            render(
                 _FORM_PAGE,
-                _FORM_CSP,
+                _FORM_GRANTS,
                 tiers=_tier_lines(state.tiers),
                 frameworks=_framework_fields(state.frameworks),
             )
@@ -532,7 +413,7 @@ def create_app(
         run = analyses.get(run_id)
         if run is None or run.report is None:
             return PlainTextResponse("no such report", status_code=404)
-        return _html(render_report(run.report))
+        return response(render_report(run.report))
 
     return app
 
@@ -600,7 +481,7 @@ def _framework_fields(frameworks: Sequence[FrameworkName]) -> str:
         )
         rows.append(
             f'<div class="pick"><label><input type="checkbox" name="framework"'
-            f' value="{_escape(name)}" checked> <b>{_escape(name)}</b></label>'
+            f' value="{escape(name)}" checked> <b>{escape(name)}</b></label>'
             f'<span class="opts">{options}</span></div>'
         )
     return "\n".join(rows)
@@ -636,26 +517,12 @@ def _option_control(name: FrameworkName, field: str, annotation: object) -> str:
             " which is not a closed set of choices this form can offer"
         )
     rendered = "".join(
-        f'<option value="{_escape(json.dumps(choice))}">{_escape(str(choice))}</option>'
+        f'<option value="{escape(json.dumps(choice))}">{escape(str(choice))}</option>'
         for choice in choices
     )
     return (
-        f'<label> {_escape(field)} <select data-framework="{_escape(name)}"'
-        f' data-option="{_escape(field)}">{rendered}</select></label>'
-    )
-
-
-def _html(page: RenderedPage, status_code: int = 200) -> HTMLResponse:
-    """The only way this app serves HTML, so no page can be served bare.
-
-    A page and its policy are built together and travel together; taking a
-    :class:`RenderedPage` rather than a string is what makes "serve the HTML,
-    forget the header" unspellable rather than merely discouraged.
-    """
-    return HTMLResponse(
-        page.html,
-        status_code=status_code,
-        headers={"Content-Security-Policy": page.csp},
+        f'<label> {escape(field)} <select data-framework="{escape(name)}"'
+        f' data-option="{escape(field)}">{rendered}</select></label>'
     )
 
 
@@ -747,8 +614,8 @@ def _tier_lines(tiers: ModelTierConfig | None) -> str:
     if tiers is None:
         return ""
     return "\n".join(
-        f'<div class="tier"><b>{_escape(tier)}</b> → '
-        f"{_escape(selection.vendor)} / {_escape(selection.model)}</div>"
+        f'<div class="tier"><b>{escape(tier)}</b> → '
+        f"{escape(selection.vendor)} / {escape(selection.model)}</div>"
         for tier, selection in tiers.tiers.items()
     )
 
@@ -766,10 +633,10 @@ def diagnostic_page(state: Startup) -> RenderedPage:
     which is overwhelmingly the common one at this point on the route. One
     instruction that is always right beats one that is conditionally right.
     """
-    return _page(
+    return render(
         _DIAGNOSTIC_PAGE,
-        _DIAGNOSTIC_CSP,
-        message=_escape(str(state.error)),
+        _DIAGNOSTIC_GRANTS,
+        message=escape(str(state.error)),
         vendors=_vendor_sections(state.tiers),
     )
 
@@ -802,7 +669,7 @@ def _vendor_sections(
             _env_var_item(var, bool(env.get(var, "").strip()))
             for var in vendor_for(vendor).required_env_vars
         )
-        sections.append(f"<h3>{_escape(vendor)}</h3>\n<ul>{items}</ul>")
+        sections.append(f"<h3>{escape(vendor)}</h3>\n<ul>{items}</ul>")
     return "\n".join(sections)
 
 
@@ -810,40 +677,8 @@ def _env_var_item(var: str, is_set: bool) -> str:
     """One variable's row — presence only, never the value (OWASP A09)."""
     css_class, label = ("set", "set") if is_set else ("not", "NOT SET")
     return (
-        f'<li><code>{_escape(var)}</code> <span class="{css_class}">{label}</span></li>'
+        f'<li><code>{escape(var)}</code> <span class="{css_class}">{label}</span></li>'
     )
-
-
-def _escape(text: str) -> str:
-    """Server-side escape for the two f-string pages.
-
-    :func:`html.escape` rather than a hand-rolled three-character replace,
-    because the hand-rolled one covered ``&<>`` and not quotes: every call site
-    here lands in element text position, so it was correct, and it would have
-    stopped being correct the first time someone interpolated into an attribute
-    value. The stdlib version is right in both positions, so where a value goes
-    is no longer part of whether the escape is adequate.
-    """
-    return html.escape(text)
-
-
-def _page(template: str, csp: str, **fields: str) -> RenderedPage:
-    """Fill a page template, and stamp the nonce its policy authorises.
-
-    Substitution is by explicit token replacement rather than ``str.format``:
-    the templates contain CSS and JavaScript, which are full of braces that
-    ``format`` would try to interpret as fields.
-
-    **The nonce is stamped before the fields are filled**, never after, the same
-    ordering :func:`render_report` keeps and for the same reason: a field's value
-    is content, and content that happens to spell the placeholder must come back
-    as those characters rather than as a live nonce.
-    """
-    nonce = secrets.token_urlsafe(16)
-    html = template.replace(_NONCE_PLACEHOLDER, nonce)
-    for name, value in fields.items():
-        html = html.replace(f"<!--{name}-->", value)
-    return RenderedPage(html=html, csp=csp.format(nonce=nonce))
 
 
 _STYLE = """

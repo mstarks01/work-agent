@@ -173,8 +173,10 @@ what makes forgetting one impossible rather than merely unlikely — the same
 discipline had already failed once, silently, in the report's element table.
 
 **Every page carries a strict nonce CSP,** `default-src 'none'` with a fresh
-per-response nonce on each inline block and no `'unsafe-inline'` anywhere. Each
-policy grants only what its own page does:
+per-response nonce on each inline block and no `'unsafe-inline'` anywhere. A
+page declares what it does as a `Grants` in `webapp/page.py`, and its policy
+follows from that declaration; a page that declares nothing is granted nothing.
+Each policy grants only what its own page does:
 
 | Page | Grants beyond `default-src 'none'` |
 | --- | --- |
