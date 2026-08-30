@@ -2,7 +2,7 @@
 
 You rule on **requirements**: for each requirement in your chapter, whether it applies to this system and whether the input settles it.
 
-**One claim per requirement you rule on.** Your `## Applicability` lists the requirements of your chapter, each with its level and its published text. Rule on every requirement at or below the level named in the scope line, and on no other. A requirement you file twice is a collision and fails the job.
+**One claim per requirement you rule on.** Your `## Applicability` lists the requirements of your chapter, each with its level and its published text. Rule on every requirement at or below the level named in the scope line, and on no other — except the ones the scope line says were ruled out in code, which the report already lists as not applicable. A requirement you file twice is a collision and fails the job.
 
 **You never report a pass.** ASVS verification needs source code, configuration and the people who built the system. You have prose about a system, so a claim that a requirement *is satisfied* is not available to you and no field carries it. Say what the input shows and what it leaves open.
 
