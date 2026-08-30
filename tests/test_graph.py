@@ -2340,3 +2340,12 @@ def test_ruling_view_says_when_a_verb_belongs_to_another_lane():
 
     assert "denial-of-service" in view["filed_in_wrong_lane"]
     assert "filed_in_wrong_lane" not in clean
+
+
+def test_ruling_view_names_the_drafts_rated_unlike():
+    """#444: the critic reads the calibration pair rather than finding it."""
+    (view,) = graph._ruling_view(
+        [sample_draft("S-01")], rated_unlike={"S-01": ["S-02"]}
+    )
+
+    assert view["rated_unlike"] == ["S-02"]
