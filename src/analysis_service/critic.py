@@ -54,6 +54,7 @@ from analysis_service.report import (
     RuledClaim,
     Ruling,
     SeverityLevel,
+    UnknownRef,
     UnresolvedMention,
     UnresolvedReference,
     UnverifiedGround,
@@ -762,6 +763,92 @@ def join_drafts(
     )
 
 
+def derived_unknowns(draft: Claim) -> list[UnknownRef]:
+    """The element/attribute pairs a draft's own grounds say the input left open.
+
+    Every ``unknown-attribute`` ground is one. A draft citing one rests on a
+    control the input never settled, and the prompts already say what that
+    makes it: a conditional claim, ruled ``needs-info`` on exactly those pairs.
+    Computed from the grounds, so the pairs resolve by construction — they were
+    copied out of the evidence catalog — and the critic never has to re-derive
+    them from prose (#439).
+    """
+    seen: dict[tuple[str, str], UnknownRef] = {}
+    for ground in draft.grounds:
+        if ground.kind == "unknown-attribute":
+            key = (ground.element_id, ground.attribute)
+            seen.setdefault(
+                key,
+                UnknownRef(element_id=ground.element_id, attribute=ground.attribute),
+            )
+    return list(seen.values())
+
+
+def _name_unknowns(unknowns: Sequence[UnknownRef]) -> str:
+    return ", ".join(f"`{ref.attribute}` on `{ref.element_id}`" for ref in unknowns)
+
+
+def complete_rulings(
+    drafts: Sequence[Claim], rulings: Sequence[Ruling]
+) -> list[Ruling]:
+    """Each ruling with what the draft's grounds settle already filled in.
+
+    A ``needs-info`` ruling on a draft that cites an ``unknown-attribute``
+    ground gains those pairs in ``related_unknowns`` (beside any the critic
+    named) and, where the critic wrote none, a reason naming them. The critic
+    may therefore answer such a draft with a bare ``needs-info``; what it may
+    not do is confirm it, which :func:`review_issues` reports.
+
+    Rulings on drafts with no such ground pass through untouched, and so does a
+    ruling that names no drafted ID: the reconciliation check owns that.
+    """
+    by_id = {draft.id: derived_unknowns(draft) for draft in drafts}
+    completed = []
+    for ruling in rulings:
+        derived = by_id.get(ruling.id, [])
+        if ruling.verdict.status != "needs-info" or not derived:
+            completed.append(ruling)
+            continue
+        named = {
+            (ref.element_id, ref.attribute) for ref in ruling.verdict.related_unknowns
+        }
+        added = [ref for ref in derived if (ref.element_id, ref.attribute) not in named]
+        reason = ruling.verdict.reason or (
+            f"The claim rests on {_name_unknowns(derived)}, which the input never stated."
+        )
+        verdict = ruling.verdict.model_copy(
+            update={
+                "related_unknowns": [*ruling.verdict.related_unknowns, *added],
+                "reason": reason,
+            }
+        )
+        completed.append(ruling.model_copy(update={"verdict": verdict}))
+    return completed
+
+
+def _confirmed_on_unknown_issues(
+    drafts: Sequence[Claim], rulings: Iterable[Ruling]
+) -> list[CriticIssue]:
+    """Every ``confirmed`` ruling on a draft whose grounds cite an unknown.
+
+    The draft's own evidence says the fact is open, so a confirmation asserts
+    what the model does not state. The critic's choices on such a draft are
+    ``needs-info`` — which the service completes — or ``rejected`` with a
+    reason, and a re-ask is what turns a confirmation into one of those.
+    """
+    by_id = {draft.id: derived_unknowns(draft) for draft in drafts}
+    return [
+        CriticIssue(
+            ruling.id,
+            f"claim {ruling.id!r} is ruled confirmed but its own grounds cite"
+            f" {_name_unknowns(by_id[ruling.id])} as never stated, so it cannot"
+            " be confirmed: rule it needs-info, or reject it with a reason",
+        )
+        for ruling in rulings
+        if ruling.verdict.status == "confirmed" and by_id.get(ruling.id)
+    ]
+
+
 def review_issues(
     drafts: Sequence[Claim],
     rulings: Sequence[Ruling],
@@ -802,11 +889,14 @@ def review_issues(
     listed here has to be one the re-ask can actually fix, and a draft's bad
     reference never was.
     """
+    rulings = complete_rulings(drafts, rulings)
     drafted_ids = {draft.id for draft in drafts}
     ruled_ids = {ruling.id for ruling in rulings}
     dropped = sorted(drafted_ids - ruled_ids)
-    per_ruling = _verdict_shape_issues(rulings) + _unresolved_unknown_ref_issues(
-        rulings, system_model
+    per_ruling = (
+        _confirmed_on_unknown_issues(drafts, rulings)
+        + _verdict_shape_issues(rulings)
+        + _unresolved_unknown_ref_issues(rulings, system_model)
     )
     messages = [f"critic dropped draft {claim_id!r}" for claim_id in dropped]
     messages += [
@@ -888,6 +978,7 @@ def assemble_claims(
     if problems:
         raise CriticOutputError("; ".join(problems.messages))
 
+    rulings = complete_rulings(drafts, rulings)
     rulings = snap_rulings(rulings, {element.id for element in system_model.elements()})
     ruling_by_id = {ruling.id: ruling for ruling in rulings}
     reviewed = [
