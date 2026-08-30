@@ -1126,6 +1126,11 @@ def _ruling_view(
         # so the critic's duplicate step reads a pair instead of hunting for it.
         if draft.id in duplicates:
             view["same_action_as"] = list(duplicates[draft.id])
+        # Also computed: the package's own table says this draft's action is not
+        # one its lane files. The ruling is settled in code; the key tells the
+        # critic not to spend a judgement on it.
+        if reason := type(draft).misfiled(draft):
+            view["filed_in_wrong_lane"] = reason
         views.append(view)
     return views
 
