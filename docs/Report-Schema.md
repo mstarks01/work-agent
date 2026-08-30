@@ -205,15 +205,36 @@ ASVS rather than ASVS**, and no output of one is a compliance result.
 ```python
 class ScopeEntry:
     unit: str  # the requirement, lane or unit considered
-    state: "applicable" | "not-applicable"
-    reason: str  # required when not-applicable
+    state: "applicable" | "not-applicable" | "needs-other-evidence"
+    reason: str  # required unless applicable
+    needs: (
+        str  # the kind of evidence that would settle it; set iff needs-other-evidence
+    )
 ```
 
 A framework whose own presence tests rule a unit out has to **say so**: dropping
 it silently leaves a reader unable to tell "considered and cleared" from "never
-looked". A `not-applicable` entry must state a reason, which is the rule
-`Verdict` already applies to its two non-confirmed states. The complement is not
-derived — every unit appears.
+looked". The complement is not derived — every unit appears.
+
+**Three states, and the third is not a weaker second.**
+
+- `not-applicable` — the unit does not apply to a system of this shape. A
+  finished answer, with the reason: either the framework's **Precondition**
+  refused the model, or the package's own rules ruled the unit out before its
+  lane ran (a chapter whose deciding presence test fired nowhere, or a
+  requirement whose own technology is named nowhere). A draft the lane files
+  on such a unit anyway is refused at the fan-in and listed in
+  `dropped_claims`.
+- `applicable` — the framework considered the unit and raised nothing.
+- `needs-other-evidence` — the unit applies, a lane raised it, and the service
+  withheld the claim because settling it needs evidence of a kind the job does
+  not carry: `code`, `config` or `people`, where a job carries `prose`. The
+  kind sits in `needs` as a field rather than a phrase in `reason`, so a reader
+  can group by it. The answer is actionable by supplying that kind of input.
+
+Both non-`applicable` states must state a reason, which is the rule `Verdict`
+already applies to its two non-confirmed states. `needs` is set if and only if
+the state is `needs-other-evidence`.
 
 **The unit is the framework's own.** The neutral answer is the lane, because a
 lane is the only unit the service knows without reading a catalog it does not
@@ -441,12 +462,21 @@ Each of these used to fail the whole job. See
 class UnresolvedReference:
     claim_id: str  # the claim that named it
     element_id: str  # the ID as written, e.g. "process:web-api"
+    reason: str  # empty: not in the model; otherwise why an existing ID was dropped
 ```
 
 The structural twin of `unresolved_mentions`: an ID in `affected_element_ids`
 rather than in prose. The reference is dropped from the claim and recorded here,
 and the claim stands on the elements that resolved. A claim that named elements
 and lost every one is in `dropped_claims` instead.
+
+`reason` is empty when the model does not contain the ID. It reads `more than
+one hop from every place the claim's grounds name` when the ID exists and the
+claim's own grounds do not reach it: a cited flow reaches its two endpoints, a
+cited element reaches its flows and their far ends, and nothing further. A
+claim resting on quotes alone is bounded by the IDs its own description cites,
+with no hop. Reach belongs in the description; `affected_element_ids` is what
+the action lands on.
 
 ## `unresolved_mentions` — IDs the prose cites that do not exist
 

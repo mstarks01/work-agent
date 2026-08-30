@@ -186,25 +186,15 @@ from analysis_service.system_model import BoundaryCrossing, SystemModel
 # this list too.
 # 3.0 also carries ``unreconciled_rulings``, an eleventh list: how the *first*
 # critic pass failed to reconcile with its drafts, before the bounded re-ask
-# repaired it. It rides 3.0 for the reason the three before it do, and it would
-# have been additive and minor on its own.
+# repaired it.
 #
-# What moves beside it is what a ``needs-info`` verdict may name.
-# ``related_unknowns`` used to hold one spelling — an element and one of its
-# attributes — and now holds two, the second being a ``subject``: a question
-# with no place in the System Model at all. A consumer switching on the pair it
-# knew now meets an entry where both halves are empty and ``subject`` carries
-# the whole of the question, which is the same class of change as 3.0's fourth
-# ``GroundKind`` and would have earned its own major bump had it arrived
-# separately.
-#
-# The reason is a property rather than a package's name: **a framework may need
-# a fact the system model has no slot for.** A framework ruling on requirements
-# asks most of its questions about a codebase rather than about an element, so
-# with one spelling available its commonest verdict was inexpressible — and the
-# only legal answer left was to point at whatever attribute resolved on
-# whichever element was nearest, which passes every check and tells a reader
-# nothing.
+# A ``needs-info`` verdict names what has to be answered in one of two
+# spellings: an element and one of its attributes, or a ``subject`` — a question
+# with no place in the System Model at all. A consumer switching on the element
+# pair alone meets an entry where both halves are empty and ``subject`` carries
+# the whole of the question, which is why the second spelling is a 3.0 change
+# rather than a minor one. The reason is a property rather than a package's
+# name: **a framework may need a fact the system model has no slot for.**
 SCHEMA_VERSION = "3.0"
 
 # The envelope's disclaimer, which is about the *service* rather than about any
@@ -383,11 +373,9 @@ class UnknownRef(BaseModel):
     **Why the second spelling exists.** A framework whose claims rule on
     requirements answers the second kind by construction — ASVS's own output
     contract says most of its requirements "address a coding practice with no
-    position in the System Model". With only the first spelling available, that
-    framework's commonest verdict was inexpressible, and the only legal move
-    left was to point every question at whichever attribute happened to resolve
-    on whichever element was nearest. That answer passes the check and tells a
-    reader nothing, which is worse than a refusal.
+    position in the System Model". A question of that kind pointed at whichever
+    attribute resolves on whichever element is nearest passes the check and
+    tells a reader nothing, which is worse than a refusal.
 
     Stated as a property rather than as a package's name, because it holds for
     a framework nobody has written yet: **a framework may need a fact the
@@ -735,6 +723,73 @@ class Claim(BaseModel):
         """
         del draft
         return ""
+
+    def unknown_grounds(self) -> list[UnknownRef]:
+        """The element/attribute pairs this claim's own grounds say the input left open.
+
+        Every ``unknown-attribute`` ground is one, in ground order and without
+        repeats. The pairs come from the evidence catalog, so they resolve by
+        construction and nothing has to re-derive them from prose (#439).
+        """
+        seen: dict[tuple[str, str], UnknownRef] = {}
+        for ground in self.grounds:
+            if ground.kind == "unknown-attribute":
+                seen.setdefault(
+                    (ground.element_id, ground.attribute),
+                    UnknownRef(
+                        element_id=ground.element_id, attribute=ground.attribute
+                    ),
+                )
+        return list(seen.values())
+
+    @classmethod
+    def settled_by_grounds(cls, draft: Claim) -> Ruling | None:
+        """The ruling a draft's own grounds settle before any critic reads it.
+
+        A draft citing an ``unknown-attribute`` ground rests on a control the
+        input never stated, and the prompts already say what that makes it: a
+        conditional claim, ruled ``needs-info`` on exactly those pairs. Code
+        rules it here, and the critic never sees it (#439). ``None`` for a
+        draft the grounds do not settle. A package whose ruling carries fields
+        beyond the neutral shape overrides this to fill them.
+        """
+        unknowns = draft.unknown_grounds()
+        if not unknowns:
+            return None
+        named = ", ".join(
+            f"`{ref.attribute}` on `{ref.element_id}`" for ref in unknowns
+        )
+        verdict = ProposedVerdict(
+            status="needs-info",
+            reason=f"The claim rests on {named}, which the input never stated.",
+            related_unknowns=unknowns,
+        )
+        return Ruling(id=draft.id, verdict=verdict)
+
+    @classmethod
+    def unit_of(cls, draft: Claim) -> str:
+        """The unit of this framework's scope list a draft rules on, or ``""``.
+
+        A package that answers in its own units — a requirement — names the
+        one a draft is about, so the fan-in can refuse a draft on a unit
+        :meth:`ruled_out` already settled. The neutral answer names none: a
+        framework whose claims are not a catalog has no unit a draft could be
+        refused on.
+        """
+        del draft
+        return ""
+
+    @classmethod
+    def rating_of(cls, draft: Claim) -> tuple[str, str] | None:
+        """The two ratings a draft carries, where this framework grades harm.
+
+        ``None`` for a framework that grades nothing, which is what the
+        neutral shape says; a package with a ``severity`` returns its
+        ``likelihood`` and ``impact`` so the review seam can compare two drafts
+        of one fact pattern without reading a package's field (#444).
+        """
+        del draft
+        return None
 
     @classmethod
     def lane_diagnostics(cls, drafts: Sequence[Claim]) -> list[str]:
@@ -1670,12 +1725,11 @@ class AnalysisMarks(BaseModel):
     #: message per problem, as the bounded re-ask was asked to fix them. Empty
     #: means the first pass was clean.
     #:
-    #: **Recorded because nothing else can see it.** These messages already
-    #: existed — ``route_review`` renders them into the re-ask's prompt — and
-    #: were then discarded, so a repaired run and a clean one were
-    #: indistinguishable in every artifact the service keeps. A package whose
-    #: first pass never reconciles is running on its single retry, and that is
-    #: not a fact anybody should have to reproduce a live run to learn.
+    #: **Recorded because nothing else can see it.** ``route_review`` renders
+    #: these messages into the re-ask's prompt, and without this list a
+    #: repaired run and a clean one read alike in every artifact the service
+    #: keeps. A package whose first pass never reconciles is running on its
+    #: single retry, which a report should say without a live run.
     #:
     #: A mark, not a failure: the re-ask exists for these, and a run that
     #: repaired itself is a successful run. What it is not is a *clean* one.
@@ -2015,19 +2069,8 @@ class FrameworkAnalysis(BaseModel):
     scope: list[ScopeEntry] = Field(default_factory=list)
     coverage: list[LaneCoverage] = Field(default_factory=list)
     unverified_grounds: list[UnverifiedGround] = Field(default_factory=list)
-    #: How the *first* critic pass failed to reconcile with its drafts, one
-    #: message per problem, as the bounded re-ask was asked to fix them. Empty
-    #: means the first pass was clean.
-    #:
-    #: **Recorded because nothing else can see it.** These messages already
-    #: existed — ``route_review`` renders them into the re-ask's prompt — and
-    #: were then discarded, so a repaired run and a clean one were
-    #: indistinguishable in every artifact the service keeps. A package whose
-    #: first pass never reconciles is running on its single retry, and that is
-    #: not a fact anybody should have to reproduce a live run to learn.
-    #:
-    #: A mark, not a failure: the re-ask exists for these, and a run that
-    #: repaired itself is a successful run. What it is not is a *clean* one.
+    #: See :attr:`AnalysisMarks.unreconciled_rulings`; the marks are flattened
+    #: onto the block one field each.
     unreconciled_rulings: list[str] = Field(default_factory=list)
     repaired_quotes: list[RepairedQuote] = Field(default_factory=list)
     unresolved_references: list[UnresolvedReference] = Field(default_factory=list)

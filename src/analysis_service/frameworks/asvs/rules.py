@@ -110,15 +110,19 @@ class PresenceTest:
         return f"{self.lane}-{self.predicate}"
 
 
-def _starts_a_word(term: str, text: str) -> bool:
-    """Whether ``term`` appears in ``text`` at the start of a word.
+#: Marks a term that matches a whole word only: ``java$`` does not reach
+#: ``javascript`` and ``log$`` does not reach ``login``. A term without it
+#: matches at the start of a word, because most terms are stems —
+#: ``authenticat`` reaches ``authenticated`` and ``http`` reaches ``https``.
+#: The mode is data in the table, per term, rather than a rule in the matcher.
+WHOLE_WORD = "$"
 
-    A leading boundary and no trailing one: ``authenticat`` is meant to reach
-    ``authenticated``, and ``http`` to reach ``https``. A bare substring test
-    reached further than that — ``sso`` matched inside ``processor`` and raised
-    an OAuth lead for a system with no OAuth.
-    """
-    return re.search(rf"\b{re.escape(term)}", text) is not None
+
+def _matches(term: str, text: str) -> bool:
+    """Whether ``term`` appears in ``text`` at the start of a word, or as one."""
+    stem = re.escape(term.rstrip(WHOLE_WORD))
+    tail = r"(?!\w)" if term.endswith(WHOLE_WORD) else ""
+    return re.search(rf"(?<!\w){stem}{tail}", text) is not None
 
 
 def _hits(model: SystemModel, test: PresenceTest) -> Iterator[Match]:
@@ -134,9 +138,7 @@ def _hits(model: SystemModel, test: PresenceTest) -> Iterator[Match]:
             if not isinstance(value, str):
                 continue
             lowered = value.lower()
-            term = next(
-                (term for term in test.terms if _starts_a_word(term, lowered)), ""
-            )
+            term = next((term for term in test.terms if _matches(term, lowered)), "")
             if not term:
                 continue
             yield (
@@ -588,7 +590,9 @@ SHARED_ACCOUNT_TEST = PresenceTest(
     ),
     terms=(
         "shared",
-        "single ",
+        "single account",
+        "single credential",
+        "single user",
         "same account",
         "one account",
         "full read",
@@ -615,13 +619,23 @@ CLASSIFIED_STORE_TEST = PresenceTest(
 AUDITED_ASSET_TAGS = frozenset({"financial", "business-critical-data", "pii", "health"})
 
 #: What a store or process says when it holds a record of what happened.
-AUDIT_TERMS = ("log", "audit", "receipt", "journal", "history", "event")
+AUDIT_TERMS = (
+    "log$",
+    "logs$",
+    "logging",
+    "logged",
+    "audit",
+    "receipt",
+    "journal",
+    "history",
+    "event",
+)
 
 
 def _mentions_a_record(model: SystemModel) -> bool:
     """Whether any element's text says it holds a log, an audit trail or a receipt."""
     return any(
-        _starts_a_word(term, f"{element.name} {element.description}".lower())
+        _matches(term, f"{element.name} {element.description}".lower())
         for element in model.elements()
         for term in AUDIT_TERMS
     )
@@ -741,12 +755,12 @@ STRUCTURAL_RULES: tuple[Rule, ...] = (
 REQUIREMENT_TESTS: dict[str, tuple[str, ...]] = {
     "V1.2.6": ("ldap", "active directory", "directory service"),
     "V1.2.7": ("xpath", "xml"),
-    "V1.2.8": ("latex", "tex "),
+    "V1.2.8": ("latex", "tex$"),
     "V1.2.10": ("csv", "spreadsheet", "excel", "export"),
     "V1.3.1": ("wysiwyg", "rich text", "html editor", "markdown"),
     "V1.3.5": ("markdown", "css", "xsl", "template"),
     "V1.3.7": ("template",),
-    "V1.3.8": ("jndi", "java"),
+    "V1.3.8": ("jndi", "java$"),
     "V1.3.9": ("memcache",),
     "V1.3.11": ("mail", "smtp", "imap", "email"),
     "V1.5.1": ("xml", "soap", "xslt", "xsd", "svg"),
@@ -797,7 +811,7 @@ REQUIREMENT_TESTS: dict[str, tuple[str, ...]] = {
 def _names_any(model: SystemModel, terms: tuple[str, ...]) -> bool:
     """Whether any element's text starts a word with any of ``terms``."""
     return any(
-        _starts_a_word(term, value.lower())
+        _matches(term, value.lower())
         for element in model.elements()
         for attribute in _TEXT_ATTRIBUTES
         if isinstance(value := getattr(element, attribute, ""), str)
