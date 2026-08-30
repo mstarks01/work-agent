@@ -45,11 +45,16 @@ below and the table is the whole of what is authored.
 
 from __future__ import annotations
 
-import re
 from collections.abc import Iterator
 from dataclasses import dataclass
 
-from analysis_service.analysis import control_state, is_unverified
+from analysis_service.analysis import (
+    TEXT_ATTRIBUTES,
+    control_state,
+    is_unverified,
+    matches_term,
+    names_term,
+)
 from analysis_service.candidates import Match, Rule, clip_fact
 from analysis_service.frameworks import PreconditionResult
 from analysis_service.frameworks.asvs.catalog import requirements_for
@@ -65,22 +70,6 @@ __all__ = [
     "ruled_out_requirements",
 ]
 
-#: The free-text attributes a presence test may read, per element type. Every one
-#: is a ``str`` the submitter authored, which is why a rule here matches a term
-#: rather than looking a value up.
-_TEXT_ATTRIBUTES: tuple[str, ...] = (
-    "name",
-    "description",
-    "notes",
-    "technology",
-    "protocol",
-    "authentication",
-    "data_description",
-    "data_classification",
-    "encryption_at_rest",
-    "encryption_in_transit",
-)
-
 
 @dataclass(frozen=True)
 class PresenceTest:
@@ -95,7 +84,7 @@ class PresenceTest:
     lane: str
     question: str
     terms: tuple[str, ...]
-    attributes: tuple[str, ...] = _TEXT_ATTRIBUTES
+    attributes: tuple[str, ...] = TEXT_ATTRIBUTES
     #: Whether this test firing nowhere rules its whole chapter out (#443).
     #: True only where every requirement of the chapter presupposes the thing
     #: the terms name — a file upload, a self-contained token, an OAuth flow, a
@@ -108,21 +97,6 @@ class PresenceTest:
     def rule_id(self) -> str:
         """This test's rule ID, which carries its lane like STRIDE's do."""
         return f"{self.lane}-{self.predicate}"
-
-
-#: Marks a term that matches a whole word only: ``java$`` does not reach
-#: ``javascript`` and ``log$`` does not reach ``login``. A term without it
-#: matches at the start of a word, because most terms are stems —
-#: ``authenticat`` reaches ``authenticated`` and ``http`` reaches ``https``.
-#: The mode is data in the table, per term, rather than a rule in the matcher.
-WHOLE_WORD = "$"
-
-
-def _matches(term: str, text: str) -> bool:
-    """Whether ``term`` appears in ``text`` at the start of a word, or as one."""
-    stem = re.escape(term.rstrip(WHOLE_WORD))
-    tail = r"(?!\w)" if term.endswith(WHOLE_WORD) else ""
-    return re.search(rf"(?<!\w){stem}{tail}", text) is not None
 
 
 def _hits(model: SystemModel, test: PresenceTest) -> Iterator[Match]:
@@ -138,7 +112,9 @@ def _hits(model: SystemModel, test: PresenceTest) -> Iterator[Match]:
             if not isinstance(value, str):
                 continue
             lowered = value.lower()
-            term = next((term for term in test.terms if _matches(term, lowered)), "")
+            term = next(
+                (term for term in test.terms if matches_term(term, lowered)), ""
+            )
             if not term:
                 continue
             yield (
@@ -635,7 +611,7 @@ AUDIT_TERMS = (
 def _mentions_a_record(model: SystemModel) -> bool:
     """Whether any element's text says it holds a log, an audit trail or a receipt."""
     return any(
-        _matches(term, f"{element.name} {element.description}".lower())
+        matches_term(term, f"{element.name} {element.description}".lower())
         for element in model.elements()
         for term in AUDIT_TERMS
     )
@@ -808,17 +784,6 @@ REQUIREMENT_TESTS: dict[str, tuple[str, ...]] = {
 }
 
 
-def _names_any(model: SystemModel, terms: tuple[str, ...]) -> bool:
-    """Whether any element's text starts a word with any of ``terms``."""
-    return any(
-        _matches(term, value.lower())
-        for element in model.elements()
-        for attribute in _TEXT_ATTRIBUTES
-        if isinstance(value := getattr(element, attribute, ""), str)
-        for term in terms
-    )
-
-
 def ruled_out_requirements(model: SystemModel, level: int, lane: str) -> dict[str, str]:
     """The requirements of ``lane`` ruled out because the model names nothing they need.
 
@@ -843,7 +808,11 @@ def ruled_out_requirements(model: SystemModel, level: int, lane: str) -> dict[st
             ruled_out[requirement.id] = reason
     for requirement in requirements_for(level, lane):
         terms = REQUIREMENT_TESTS.get(requirement.id)
-        if requirement.id in ruled_out or terms is None or _names_any(model, terms):
+        if (
+            requirement.id in ruled_out
+            or terms is None
+            or any(names_term(model, term) for term in terms)
+        ):
             continue
         ruled_out[requirement.id] = (
             f"no element of this system names what {requirement.id} presupposes"

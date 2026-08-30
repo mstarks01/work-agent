@@ -1522,7 +1522,7 @@ def merge_drafts(
             sorted(Counter(reasons.values()).items()),
         )
     resolutions = {
-        lane: resolve_proposals(kept, catalog, package, lane)
+        lane: resolve_proposals(kept, catalog, package, lane, model)
         for lane, (kept, _) in partitions.items()
     }
     drafts_by_lane = {

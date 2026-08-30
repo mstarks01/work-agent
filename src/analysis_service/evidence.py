@@ -54,7 +54,11 @@ from __future__ import annotations
 from collections.abc import Iterable, Mapping, Sequence
 from typing import Any, NamedTuple
 
-from analysis_service.analysis import CONTROL_ATTRIBUTES, control_state
+from analysis_service.analysis import (
+    CONTROL_ATTRIBUTES,
+    control_state,
+    names_term,
+)
 from analysis_service.frameworks import FrameworkPackage, schemas_for
 from analysis_service.report import (
     DROPPED_REASON_MAX_CHARS,
@@ -86,6 +90,11 @@ EvidenceCatalog = dict[str, Ground]
 UNKNOWN_PREFIX = "unknown"
 ABSENT_PREFIX = "absent"
 CROSSING_PREFIX = "crossing"
+#: Not a catalog prefix: no entry is ever keyed by it, because a catalog
+#: enumerates what a model holds and an absence is not in it. It exists so an
+#: absence a model contradicts is reported in the same spelling as every other
+#: reference that named nothing.
+ABSENT_ELEMENT_PREFIX = "absent-element"
 
 
 def unknown_evidence_ref(element_id: str, attribute: str) -> str:
@@ -101,6 +110,11 @@ def absent_evidence_ref(element_id: str, attribute: str) -> str:
 def crossing_evidence_ref(flow_id: str) -> str:
     """The catalog ID for one flow's derived boundary crossing."""
     return f"{CROSSING_PREFIX}:{flow_id}"
+
+
+def absent_element_ref(term: str) -> str:
+    """How an unresolved absence is named in a mark. Never a catalog key."""
+    return f"{ABSENT_ELEMENT_PREFIX}:{term}"
 
 
 def evidence_catalog(model: SystemModel) -> EvidenceCatalog:
@@ -309,16 +323,16 @@ class Resolution(NamedTuple):
 
 
 def _grounds_of(
-    proposal: Proposal, catalog: Mapping[str, Ground]
+    proposal: Proposal, catalog: Mapping[str, Ground], model: SystemModel
 ) -> tuple[list[Ground], list[str]]:
     """One proposal's grounds, and every reference of its that named nothing.
 
-    Quotes first, then evidence, and the order is fixed rather than incidental:
-    :class:`~analysis_service.report.UnverifiedGround` marks a quote by its
-    *index* into the finished list, so a reader following a mark back to the
-    quote it is about depends on this being the one place the list is built.
-    Quotes lead because they are the submitter's own words, which is what a
-    reader looks for first.
+    Quotes first, then evidence, then absences, and the order is fixed rather
+    than incidental: :class:`~analysis_service.report.UnverifiedGround` marks a
+    quote by its *index* into the finished list, so a reader following a mark
+    back to the quote it is about depends on this being the one place the list
+    is built. Quotes lead because they are the submitter's own words, which is
+    what a reader looks for first.
 
     A ref is stripped of surrounding whitespace before lookup — which spelling
     of a name arrived is mechanical — and matched exactly thereafter.
@@ -327,6 +341,13 @@ def _grounds_of(
     Nothing can be built from it — the catalog is the only source of a ground's
     branch and fields — so it leaves as a mark the caller records, and whether
     the threat survives is decided by what is left, not by this function.
+
+    An ``absent_elements`` term is checked the other way round, and it is the
+    only entry here whose referent is the whole model: it resolves when nothing
+    in the model names it, and is dropped as unresolved when something does.
+    An agent claiming a system has no directory service, in a model whose store
+    is called "LDAP directory", has asserted an absence the model contradicts,
+    and this is where that costs its entry.
     """
     grounds = [
         Ground(kind="quote", text=quote.text, source_label=quote.source_label)
@@ -339,13 +360,19 @@ def _grounds_of(
             unresolved.append(ref)
         else:
             grounds.append(ground)
+    for raw in proposal.absent_elements:
+        term = raw.strip().lower()
+        if not term or names_term(model, term):
+            unresolved.append(absent_element_ref(raw))
+        else:
+            grounds.append(Ground(kind="absent-element", term=term))
     return grounds, unresolved
 
 
 #: What every proposal carries for this module rather than for the claim: the
-#: two evidence lists, which resolve into ``grounds`` and do not survive as
+#: three evidence lists, which resolve into ``grounds`` and do not survive as
 #: fields. Everything else an agent wrote is carried across untouched.
-_RESOLVED_AWAY = frozenset({"evidence_refs", "quotes"})
+_RESOLVED_AWAY = frozenset({"evidence_refs", "quotes", "absent_elements"})
 
 #: What a proposal carries for the *fan-in* rather than for the claim. A field
 #: here has already done its work by the time a draft is built, so carrying it
@@ -365,6 +392,7 @@ def resolve_proposals(
     catalog: Mapping[str, Ground],
     package: FrameworkPackage,
     lane: str,
+    model: SystemModel,
 ) -> Resolution:
     """Turn one lane's proposals into drafts: resolve the evidence, stamp the lane.
 
@@ -427,7 +455,7 @@ def resolve_proposals(
                 UnknownClaimIdentity(claim_id=claim_id, title=proposal.title)
             )
             continue
-        grounds, unresolved = _grounds_of(proposal, catalog)
+        grounds, unresolved = _grounds_of(proposal, catalog, model)
         # A per-reference mark names a claim the block carries, so a claim that
         # is dropped gets none: its groundless mark names the references instead.
         if not grounds:

@@ -51,6 +51,8 @@ from analysis_service.system_model import (
 
 __all__ = [
     "CONTROL_ATTRIBUTES",
+    "TEXT_ATTRIBUTES",
+    "WHOLE_WORD",
     "ControlState",
     "UnknownControl",
     "control_state",
@@ -59,6 +61,8 @@ __all__ = [
     "inbound_flows",
     "internet_exposed_elements",
     "is_unverified",
+    "matches_term",
+    "names_term",
     "outbound_flows",
     "reachable_from",
     "sensitive_assets",
@@ -246,3 +250,57 @@ def _control_values(element: Element) -> Iterator[tuple[str, str, ControlState]]
         value = getattr(element, attribute, None)
         if isinstance(value, str):
             yield attribute, value, control_state(value)
+
+
+#: The free-text attributes a term is matched against, per element type. Every
+#: one is a ``str`` the submitter authored, which is why a search here matches a
+#: term rather than looking a value up: #162 ruled that controls stay string
+#: attributes, so no attribute in the System Model is a closed enum to test.
+TEXT_ATTRIBUTES: tuple[str, ...] = (
+    "name",
+    "description",
+    "notes",
+    "technology",
+    "protocol",
+    "authentication",
+    "data_description",
+    "data_classification",
+    "encryption_at_rest",
+    "encryption_in_transit",
+)
+
+#: Marks a term that matches a whole word only: ``java$`` does not reach
+#: ``javascript`` and ``log$`` does not reach ``login``. A term without it
+#: matches at the start of a word, because most terms are stems —
+#: ``authenticat`` reaches ``authenticated`` and ``http`` reaches ``https``.
+#: The mode is data in the term, per term, rather than a rule in the matcher.
+WHOLE_WORD = "$"
+
+
+def matches_term(term: str, text: str) -> bool:
+    """Whether ``term`` appears in ``text`` at the start of a word, or as one.
+
+    ``text`` is matched as given, so a caller comparing against a submitter's
+    prose lowercases it first — the terms this reads are written lowercase.
+    """
+    stem = re.escape(term.rstrip(WHOLE_WORD))
+    tail = r"(?!\w)" if term.endswith(WHOLE_WORD) else ""
+    return re.search(rf"(?<!\w){stem}{tail}", text) is not None
+
+
+def names_term(model: SystemModel, term: str) -> bool:
+    """Whether any element's free text names ``term``.
+
+    The structural question behind "the model contains no such thing". It reads
+    only :data:`TEXT_ATTRIBUTES`, so an element *named* for a technology answers
+    for it and a control value mentioning one does too — which is the whole of
+    what a submitter's prose offers. Answering ``False`` is not proof of
+    absence from the *system*; it is proof of absence from the description,
+    which is the only thing this service ever has.
+    """
+    return any(
+        matches_term(term, value.lower())
+        for element in model.elements()
+        for attribute in TEXT_ATTRIBUTES
+        if isinstance(value := getattr(element, attribute, ""), str)
+    )

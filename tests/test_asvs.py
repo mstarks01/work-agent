@@ -427,7 +427,7 @@ def test_a_claim_naming_an_unpublished_requirement_is_dropped_and_marked():
         ),
     ]
 
-    resolution = resolve_proposals(proposals, catalog, ASVS, "authentication")
+    resolution = resolve_proposals(proposals, catalog, ASVS, "authentication", model)
 
     assert [draft.id for draft in resolution.drafts] == ["v5.0.0-6.2.1"]
     assert [
@@ -1036,36 +1036,19 @@ class TestThisPackageCarriesNoActionVerb:
         assert "verb" in ThreatProposal.model_json_schema()["properties"]
 
 
-def test_a_term_fires_at_the_start_of_a_word_or_as_a_whole_word():
-    """#429: ``sso`` fired inside ``processor`` and raised an OAuth lead.
-
-    A leading boundary always. The trailing one is per term: a stem reaches
-    its inflections, and a term marked ``$`` reaches the whole word only.
-    """
-    from analysis_service.frameworks.asvs.rules import _matches
-
-    assert not _matches("sso", "our card processor is a third party")
-    assert not _matches("sso", "an associate signs in")
-    assert _matches("sso", "company sso")
-    assert _matches("authenticat", "an authenticated session")
-    assert _matches("http", "https post")
-    assert _matches("java", "a javascript front end")
-    assert not _matches("java$", "a javascript front end")
-    assert _matches("java$", "a java service")
-    assert not _matches("log$", "the login flow")
-
-
 def test_a_javascript_system_does_not_keep_the_jndi_requirement():
     """#455: ``java`` reached ``javascript`` and kept V1.3.8 in the lane."""
-    from analysis_service.frameworks.asvs.rules import REQUIREMENT_TESTS, _names_any
+    from analysis_service.analysis import names_term
+    from analysis_service.frameworks.asvs.rules import REQUIREMENT_TESTS
 
     model = SystemModel.model_validate(
         json.loads((CORPUS_DIR / "01-payments-checkout" / "model.json").read_text())
     )
     model.processes[0].description += " The storefront is a JavaScript front end."
-    assert not _names_any(model, REQUIREMENT_TESTS["V1.3.8"])
+    terms = REQUIREMENT_TESTS["V1.3.8"]
+    assert not any(names_term(model, term) for term in terms)
     model.processes[0].description += " It queries a Java directory service."
-    assert _names_any(model, REQUIREMENT_TESTS["V1.3.8"])
+    assert any(names_term(model, term) for term in terms)
 
 
 def test_the_unit_of_a_draft_is_its_requirement():

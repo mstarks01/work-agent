@@ -188,6 +188,15 @@ from analysis_service.system_model import BoundaryCrossing, SystemModel
 # critic pass failed to reconcile with its drafts, before the bounded re-ask
 # repaired it.
 #
+# 3.0 also carries a fifth ``GroundKind``, ``absent-element``: a term no element
+# of the model names, which is the only branch whose referent is the whole model
+# rather than a part of it. A consumer switching over the four kinds it knew now
+# meets a fifth whose ``element_id`` and ``flow_id`` are both empty. It rides 3.0
+# for the reason ``absent-attribute`` does — 3.0 has never shipped — and it would
+# have been major on its own. The reason is a property rather than a package's
+# name: **a framework may need to justify a claim by the absence of a thing from
+# the model, and every other branch can only name something present.**
+#
 # 3.0 also carries ``rejected_because`` on a verdict: which of the critic's
 # three checks — the draft's own substance, the lane it was filed in, or another
 # draft already covering it — ended a rejected draft. A consumer reading the
@@ -272,7 +281,13 @@ SamplingValue = bool | int | float | str | None
 # attribute". ``absent-attribute`` follows that spelling for the same reason and
 # for one more: the two attribute branches carry identical fields, so the kind
 # is the only place their difference can live.
-GroundKind = Literal["quote", "unknown-attribute", "absent-attribute", "derived-fact"]
+GroundKind = Literal[
+    "quote",
+    "unknown-attribute",
+    "absent-attribute",
+    "derived-fact",
+    "absent-element",
+]
 
 # How long a claim ID may be. **Not a grammar**: #163 ruled that ``id`` has no
 # shared one, because each package composes its own from its own ``id_format``
@@ -432,7 +447,7 @@ class Ground(BaseModel):
     raised.
 
     NO MODEL EVER GENERATES ONE, which is what makes a flat object safe here.
-    The four branches carry different required fields, and that relationship
+    The five branches carry different required fields, and that relationship
     is not expressible in a JSON schema a provider will reliably compile —
     ``oneOf`` has the thinnest, least uniform support across the vendors a
     category agent may be routed to, and ``config/sampling.toml`` records what
@@ -473,6 +488,21 @@ class Ground(BaseModel):
       as missing as a gap in the *description*. Both branches say only what the
       model carries; neither says the control is inadequate, which stays the
       agent's argument and the critic's to rule on.
+    * ``absent-element`` — ``term`` alone: a word a submitter writes for a
+      thing, which no element's free text names. **The only branch whose
+      referent is the whole model rather than a part of it**, and the one a
+      framework needs to justify a claim about what a system does not have. A
+      requirement about LDAP injection does not apply to a system that never
+      mentions a directory service, and the fact that rules it out is the
+      absence itself; the four branches above can each only name something
+      present, so a claim about an absence had no honest ground to cite.
+      Verified like a quote rather than trusted like prose: the service checks
+      the term against every element's text
+      (:func:`~analysis_service.analysis.names_term`) and drops the ground where
+      the model does name it, so the branch cannot assert an absence that is
+      not there. What it may not do is prove the *system* lacks the thing —
+      only that the description never mentions it, which is all this service
+      ever has.
     * ``derived-fact`` — ``flow_id`` alone, a **reference and never a copy**.
       The crossing's zones are recomputed from the system model the report
       already embeds, so a renderer holding only the report resolves them; a
@@ -493,6 +523,7 @@ class Ground(BaseModel):
         default="", max_length=100
     )  # both attribute branches
     flow_id: str = Field(default="", max_length=300)  # derived-fact
+    term: str = Field(default="", max_length=100)  # absent-element
 
     # Which fields each branch requires. Everything not listed for a branch is
     # forbidden on it — a quote carrying an element_id is a shape error, not a
@@ -505,7 +536,24 @@ class Ground(BaseModel):
         "unknown-attribute": ("element_id", "attribute"),
         "absent-attribute": ("element_id", "attribute"),
         "derived-fact": ("flow_id",),
+        "absent-element": ("term",),
     }
+
+    @property
+    def place(self) -> str:
+        """The model element this ground points at, or ``""`` where it points at none.
+
+        Two branches name no place and they name none for different reasons. A
+        ``quote`` is a span of the submitter's words, which belongs to a source
+        rather than to an element. An ``absent-element`` is about the model as a
+        whole, and its ``term`` is a word rather than an ID — there is no element
+        to point at, which is the fact it exists to state.
+
+        Read wherever a caller needs "which part of the model is this about",
+        so a sixth branch answers here once instead of in each caller's own
+        ``or`` chain.
+        """
+        return self.element_id or self.flow_id
 
     @model_validator(mode="after")
     def _check_shape(self) -> Self:
@@ -912,23 +960,29 @@ class Proposal(BaseModel):
     six lanes, at a seam with no re-ask path.
 
     So the agent stops spelling it. ``evidence_refs`` holds IDs copied from the
-    evidence catalog the service derived from the validated System Model, and
-    ``quotes`` holds spans plus the source each came from. Both are flat lists
-    of a single shape, which a schema compiler can express exactly; nothing an
-    agent can put in either is a shape error, and a reference naming nothing
-    fails deterministically against the catalog rather than probabilistically
-    against a validator.
+    evidence catalog the service derived from the validated System Model,
+    ``quotes`` holds spans plus the source each came from, and
+    ``absent_elements`` holds terms the model names nowhere. All three are flat
+    lists of a single shape, which a schema compiler can express exactly;
+    nothing an agent can put in any of them is a shape error, and an entry
+    naming nothing fails deterministically against the model rather than
+    probabilistically against a validator.
+
+    ``absent_elements`` is named rather than selected because a catalog can
+    enumerate what a model holds and never what it lacks. It is checked rather
+    than trusted: the service drops a term the model does in fact name.
 
     What is given up: the branch is no longer the agent's to state. That is the
     point — the branch was always dictated by the trigger, so an agent choosing
     it was an agent given a mechanical job to get wrong. The catalog entry
     carries the branch, and picking the entry picks it.
 
-    At least one entry across the two lists, which is ``grounds``'
-    ``min_length=1`` expressed over the pair: a finding with no justification
-    at all is the one thing neither list may say. Which list carries it is free
-    — a threat triggered by a crossing or an unknown legitimately quotes
-    nothing.
+    At least one entry across the three lists, which is ``grounds``'
+    ``min_length=1`` expressed over them: a finding with no justification at
+    all is the one thing none of them may say. Which list carries it is free —
+    a threat triggered by a crossing or an unknown legitimately quotes nothing,
+    and a requirement ruled out for a component the system never had cites only
+    an absence.
     """
 
     model_config = ConfigDict(extra="forbid")
@@ -963,13 +1017,20 @@ class Proposal(BaseModel):
     verb: ActionVerb | None = None
     evidence_refs: list[str] = Field(default_factory=list)
     quotes: list[QuoteCandidate] = Field(default_factory=list)
+    # The third list, and the one whose referent is the model as a whole. A
+    # catalog can enumerate what a model contains; it cannot enumerate what a
+    # model lacks, so an absence is named rather than selected. Each entry is
+    # one lowercase term, and the service checks it against every element's
+    # text before building the ground.
+    absent_elements: list[str] = Field(default_factory=list)
 
     @model_validator(mode="after")
     def _check_shape(self) -> Self:
-        if not self.evidence_refs and not self.quotes:
+        if not self.evidence_refs and not self.quotes and not self.absent_elements:
             raise ValueError(
                 f"the draft titled {self.title!r} justifies itself with"
-                " nothing: name at least one evidence reference or quote"
+                " nothing: name at least one evidence reference, quote or"
+                " absent element"
             )
         return self
 

@@ -52,6 +52,7 @@ from pydantic import ValidationError
 from analysis_service.actions import menu
 from analysis_service.critic import mentioned_ids
 from analysis_service.evidence import (
+    _RESOLVED_AWAY,
     ABSENT_PREFIX,
     CROSSING_PREFIX,
     UNKNOWN_PREFIX,
@@ -69,7 +70,7 @@ from analysis_service.prompts import (
     compose_analyze_prompt,
     lane_exemplars_doc,
 )
-from analysis_service.report import Ground, RejectionStep
+from analysis_service.report import Ground, Proposal, RejectionStep
 from analysis_service.skills import estimate_tokens
 from analysis_service.token_caps import (
     COMPOSED_ANALYZE_CAP,
@@ -787,6 +788,23 @@ def test_a_vocabulary_that_rejects_unknown_is_named_in_the_prompt(field, values)
     assert f"`{attribute}`" in body, (
         f"{field} rejects `unknown` and the prompt never names {attribute!r}. "
         f"A model applying the controlling rule to it emits an illegal value."
+    )
+
+
+@pytest.mark.parametrize(
+    "list_name", sorted(_RESOLVED_AWAY & set(Proposal.model_fields))
+)
+def test_the_analyze_prompt_names_every_evidence_list(list_name):
+    """A list the resolver reads is a list the prompt taught the agent to fill.
+
+    Keyed to what ``resolve_proposals`` resolves away rather than to a list
+    here, so a fourth evidence list fails until ``analyze.md`` says what goes
+    in it. An unnamed list is one no agent ever fills, which reads as a feature
+    and is a silence.
+    """
+    assert f"`{list_name}`" in loader.load(ANALYZE_PROMPT_NAME), (
+        f"{list_name!r} is an evidence list the resolver reads and the analyze "
+        f"prompt never names, so no agent can be expected to fill it."
     )
 
 

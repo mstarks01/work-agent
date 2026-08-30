@@ -80,7 +80,7 @@ def prompt_key(name: str) -> str:
 #: be a table that answers for the frameworks somebody already wrote.
 TOKEN_CAPS: dict[str, int] = {
     # The five shared bodies, under ``prompts/``.
-    "prompts/analyze": 4100,
+    "prompts/analyze": 4500,
     "prompts/critic": 2100,
     "prompts/recritic": 1100,
     "prompts/extract": 2900,
@@ -88,7 +88,7 @@ TOKEN_CAPS: dict[str, int] = {
     # One package's own text, under ``frameworks/<name>/``.
     f"package/{CRITIC_DOC}": 700,
     f"package/{DISCLAIMER_DOC}": 200,
-    f"package/{OUTPUT_DOC}": 900,
+    f"package/{OUTPUT_DOC}": 1100,
     f"package/{SEVERITY_RUBRIC_DOC}": 900,
     "package/lane_skill": 3600,
     "package/lane_exemplars": 1600,

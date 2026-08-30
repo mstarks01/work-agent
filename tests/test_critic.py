@@ -1290,3 +1290,50 @@ class TestRatingDisagreements:
         drafts = [sample_draft("S-01"), sample_draft("S-02")]
 
         assert rating_disagreements(drafts) == {}
+
+
+class TestAnAbsenceRidesTheCriticPath:
+    """#412: the fifth branch names no element, and four seams assumed one did.
+
+    Each of them read "the place this ground is about" as an element ID or a
+    flow ID, so a ground that is about the whole model reached them carrying
+    neither. The suite could not see it: nothing drove this branch past
+    resolution.
+    """
+
+    @pytest.fixture
+    def draft(self):
+        return sample_draft(
+            "S-01", grounds=[Ground(kind="absent-element", term="ldap")]
+        )
+
+    def test_it_survives_the_join(self, draft):
+        model = valid_model()
+
+        joined = join_drafts({"spoofing": [draft]}, STRIDE, model)
+
+        assert [claim.id for claim in joined.drafts] == ["S-01"]
+        assert joined.drafts[0].grounds[0].term == "ldap"
+
+    def test_snapping_leaves_it_alone(self, draft):
+        """There is no ID to canonicalise: a term is a word, not a reference."""
+        [snapped] = snap_drafts([draft], ELEMENT_IDS)
+
+        assert snapped.grounds == [Ground(kind="absent-element", term="ldap")]
+
+    def test_it_reaches_the_report(self, draft):
+        model = valid_model()
+
+        assembled = assemble_claims([draft], [sample_ruling("S-01")], model, SCHEMAS)
+
+        (claim,) = assembled.claims
+        assert claim.grounds == [Ground(kind="absent-element", term="ldap")]
+
+    def test_it_names_no_place(self):
+        """The property four seams now read, rather than four ``or`` chains."""
+        assert Ground(kind="absent-element", term="ldap").place == ""
+        assert Ground(kind="quote", text="t", source_label="s").place == ""
+        assert (
+            Ground(kind="unknown-attribute", element_id="e", attribute="a").place == "e"
+        )
+        assert Ground(kind="derived-fact", flow_id="f").place == "f"
