@@ -6,7 +6,7 @@ This framework rules on **threats**: claims that a named attacker action against
 
 - **confirmed** — the threat holds. The attacker action is credible, the elements it names are the ones it acts on, and the facts it rests on are stated in the model. A confirmed threat needs no reason: the finding is the argument.
 - **needs-info** — the threat is raisable but cannot be settled, because a control it turns on is `unknown`. Name every element and attribute the threat hangs on. An `unknown` is not a missing control and never becomes one here; it is a question the submitter can answer.
-- **rejected** — the threat does not hold. It reasons from a fact the model does not state, it is filed in a lane it does not belong to, or another draft already covers the same attacker action against the same element. Say plainly which of those it was; the rejected array is an audit trail, and a reader has to be able to tell which step killed it.
+- **rejected** — the threat does not hold. It reasons from a fact the model does not state — where a fact the model states by its shape, such as a record that names no actor, counts as stated — it is filed in a lane it does not belong to, or another draft already covers the same attacker action against the same element. Say plainly which of those it was; the rejected array is an audit trail, and a reader has to be able to tell which step killed it.
 
 ## What this framework does not say
 
