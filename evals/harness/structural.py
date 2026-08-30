@@ -98,11 +98,21 @@ def _block_issues(block: FrameworkAnalysis, known_ids: set[str]) -> list[str]:
             for ref in claim.affected_element_ids
             if ref not in known_ids
         ]
+        # Only the model-reference spelling names an element. A ``subject``
+        # states a question about a fact the System Model has no slot for, so it
+        # carries no ``element_id`` and there is nothing here to resolve.
+        #
+        # **This check is the service's own, one seam later, and it drifted.**
+        # `Report._reference_issues` learned the second spelling when it
+        # arrived; this did not, so the first ASVS corpus sweep hard-failed on
+        # eleven claims that were correctly shaped. A gate that re-derives a
+        # service rule has to move when the rule does, and nothing offline
+        # could catch that: the scripted critic never emits a subject.
         issues += [
             f"{where}: claim {claim.id!r} hangs its needs-info verdict on element"
             f" {ref.element_id!r}, absent from the embedded system model"
             for ref in claim.verdict.related_unknowns
-            if ref.element_id not in known_ids
+            if ref.names_an_element and ref.element_id not in known_ids
         ]
 
     issues += [
