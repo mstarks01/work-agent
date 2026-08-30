@@ -36,6 +36,7 @@ from types import MappingProxyType
 from typing import Any, Literal, get_args
 
 from pydantic import BaseModel, ConfigDict, Field
+from pydantic.json_schema import SkipJsonSchema
 
 from analysis_service.frameworks.asvs.catalog import (
     ASVS_VERSION,
@@ -172,6 +173,10 @@ class DraftRequirementRuling(Claim):
     model_config = ConfigDict(extra="forbid")
 
     chapter: AsvsChapter
+    # The claim side of the pair narrowed on the proposal above, and it has to
+    # move with it: a proposal that validates must resolve into a claim that
+    # validates, which is the rule `Proposal.verb`'s own comment states.
+    verb: SkipJsonSchema[None] = None
 
     @classmethod
     def partition_proposals(
@@ -247,6 +252,22 @@ class RequirementProposal(Proposal):
 
     model_config = ConfigDict(extra="forbid")
 
+    # NARROWED CLOSED, AND OFF THE PROVIDER SCHEMA. A verb is half of what makes
+    # two claims of an open set the same finding; this package's claims carry a
+    # catalog requirement and compose their identity from that and the place, so
+    # a verb here is a field nothing reads. :class:`~analysis_service.report.Claim`
+    # says as much and left it optional, which is not the same as forbidden.
+    #
+    # A live sweep found 42 of 960 claims carrying one — `replay`, `impersonate`,
+    # `abuse-grant` — and 30 of those in the OAuth lane alone. That is not noise
+    # in a spare field: an agent reaching for an attacker action while ruling on
+    # a requirement is answering a different framework's question, and the verb
+    # is the visible half of it.
+    #
+    # ``SkipJsonSchema`` on the precedent :class:`~analysis_service.report.Severity`
+    # sets: an agent is never handed the field, so it cannot fill it, and a value
+    # arriving any other way is refused rather than carried.
+    verb: SkipJsonSchema[None] = None
     requirement: str = Field(pattern=REQUIREMENT_KEY_PATTERN, max_length=10)
     # REQUIRED, WITH NO DEFAULT, AND THAT IS THE WHOLE MECHANISM. A first live
     # run shipped this optional: the field sat in the schema with a default,

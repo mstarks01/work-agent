@@ -45,6 +45,7 @@ from analysis_service.frameworks.asvs.record import (
     AsvsAnalysis,
     AsvsChapter,
     AsvsOptions,
+    DraftRequirementRuling,
     RequirementProposal,
     RequirementRuling,
     requirement_of,
@@ -983,3 +984,53 @@ def test_the_fan_in_reaches_this_packages_own_partition():
     assert (
         record.partition_proposals.__func__.__qualname__ != "Claim.partition_proposals"
     ), "ASVS resolves the neutral default, so it defers nothing"
+
+
+class TestThisPackageCarriesNoActionVerb:
+    """A requirement ruling names no attacker and no action.
+
+    `Claim.verb` is optional and narrowed by the packages that need it. STRIDE
+    narrows it to required, because an action is half of what makes two claims
+    of an open set the same finding. This package composes its identity from a
+    catalog requirement and the place it was ruled in, so a verb here is a field
+    nothing reads — and a live sweep found 42 of 960 claims carrying one anyway,
+    30 of them in the OAuth lane. That is an agent answering STRIDE's question.
+    """
+
+    def test_the_agent_is_never_handed_the_field(self):
+        """Off the provider schema, on the `Severity.level` precedent: a model
+        that cannot see a field cannot fill it."""
+        schema = RequirementProposal.model_json_schema()
+
+        assert "verb" not in schema["properties"]
+
+    def test_a_verb_reaching_the_proposal_any_other_way_is_refused(self):
+        with pytest.raises(ValidationError):
+            RequirementProposal(
+                title="t",
+                description="d",
+                requirement="2.1",
+                needs_evidence="",
+                verb="replay",
+                quotes=[QuoteCandidate(text="x", source_label="n")],
+            )
+
+    def test_the_claim_side_moves_with_the_proposal(self):
+        """A proposal that validates must resolve into a claim that validates."""
+        with pytest.raises(ValidationError):
+            DraftRequirementRuling(
+                id="v5.0.0-1.2.1",
+                framework="asvs",
+                framework_version=ASVS.version,
+                title="t",
+                description="d",
+                chapter="encoding-and-sanitization",
+                verb="replay",
+                grounds=[Ground(kind="quote", text="x", source_label="n")],
+            )
+
+    def test_stride_still_requires_one(self):
+        """The narrowing is this package's, not a change to the neutral shape."""
+        from analysis_service.frameworks.stride.record import ThreatProposal
+
+        assert "verb" in ThreatProposal.model_json_schema()["properties"]
