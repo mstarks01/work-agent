@@ -1106,3 +1106,72 @@ class TestDuplicateGroups:
         )
 
         assert duplicate_groups([ruling, ruling], model) == {}
+
+
+class TestTheGroundsBoundTheCitedElements:
+    """#441: ``affected_element_ids`` reaches one hop from the grounds' places."""
+
+    @pytest.fixture
+    def model(self):
+        return valid_model()
+
+    def test_an_element_two_hops_away_is_dropped_and_marked(self, model):
+        from analysis_service.report import BEYOND_GROUNDS
+
+        drafts = {
+            "spoofing": [
+                sample_draft(affected_element_ids=[CROSSING, "store:orders-db"])
+            ]
+        }
+
+        joined = join_drafts(drafts, STRIDE, model)
+
+        (draft,) = joined.drafts
+        assert draft.affected_element_ids == [CROSSING]
+        (mark,) = joined.marks.unresolved_references
+        assert (mark.element_id, mark.reason) == ("store:orders-db", BEYOND_GROUNDS)
+
+    def test_the_endpoints_of_a_cited_flow_are_in_reach(self, model):
+        drafts = {
+            "spoofing": [
+                sample_draft(
+                    affected_element_ids=[
+                        CROSSING,
+                        "entity:customer",
+                        "process:web-app",
+                    ]
+                )
+            ]
+        }
+
+        joined = join_drafts(drafts, STRIDE, model)
+
+        assert joined.marks.unresolved_references == []
+
+    def test_a_claim_on_quotes_alone_is_bounded_by_its_own_prose(self, model):
+        quote = Ground(
+            kind="quote", text="Customers log in to the web app", source_label=LABEL
+        )
+        drafts = {
+            "spoofing": [
+                sample_draft(
+                    grounds=[quote],
+                    description="An attacker rides `entity:customer`'s session.",
+                    affected_element_ids=["entity:customer", "store:orders-db"],
+                )
+            ]
+        }
+
+        joined = join_drafts(drafts, STRIDE, model)
+
+        (draft,) = joined.drafts
+        assert draft.affected_element_ids == ["entity:customer"]
+
+    def test_a_claim_whose_grounds_reach_none_of_its_elements_is_dropped(self, model):
+        drafts = {"spoofing": [sample_draft(affected_element_ids=["store:orders-db"])]}
+
+        joined = join_drafts(drafts, STRIDE, model)
+
+        assert joined.drafts == []
+        (dropped,) = joined.marks.dropped_claims
+        assert "do not reach" in dropped.reason

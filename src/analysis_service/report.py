@@ -1335,8 +1335,10 @@ class RepairedQuote(BaseModel):
 
 
 class UnresolvedReference(BaseModel):
-    """An element ID a claim named in ``affected_element_ids`` that the model does
-    not contain.
+    """An element ID a claim named in ``affected_element_ids`` and lost.
+
+    Either the model does not contain it, or it lies beyond the reach of the
+    claim's own grounds; ``reason`` says which.
 
     The structural twin of :class:`UnresolvedMention`. That mark is an ID in
     prose; this is an ID in the field the claim's identity is computed from.
@@ -1352,6 +1354,17 @@ class UnresolvedReference(BaseModel):
 
     claim_id: str = Field(min_length=1, max_length=CLAIM_ID_MAX_CHARS)
     element_id: str = Field(min_length=1, max_length=300)
+    #: Why the reference was dropped. Empty means the model does not contain
+    #: it; :data:`BEYOND_GROUNDS` means it exists and the claim's own grounds
+    #: do not reach it (#441).
+    reason: str = Field(default="", max_length=200)
+
+
+#: The reason on an :class:`UnresolvedReference` an element the model holds
+#: earns when it sits more than one hop from every place the claim's grounds
+#: name. Reach belongs in the description; ``affected_element_ids`` is what the
+#: action lands on.
+BEYOND_GROUNDS = "more than one hop from every place the claim's grounds name"
 
 
 class UnresolvedMention(BaseModel):
