@@ -707,6 +707,23 @@ class Claim(BaseModel):
         return list(proposals), {}
 
     @classmethod
+    def ruled_out(
+        cls, model: SystemModel, options: Mapping[str, Any], lane: str
+    ) -> dict[str, str]:
+        """Units of ``lane`` this framework's own rules rule out of a model, with why.
+
+        A framework whose units presuppose a thing — a chapter on file uploads
+        for a model naming no upload — can say from its rules, before any agent
+        runs, that the unit does not apply (#443). Each is keyed by the unit the
+        package answers in against the reason a reader gets; the lane agent is
+        told not to rule on them, and they reach the block's scope as
+        ``not-applicable``. The neutral answer rules out nothing, which is what a
+        framework whose claims rest on the system's own shape inherits.
+        """
+        del model, options, lane
+        return {}
+
+    @classmethod
     def misfiled(cls, draft: Claim) -> str:
         """Why this draft cannot belong to the lane it was filed in, or ``""``.
 
@@ -2049,6 +2066,7 @@ class FrameworkAnalysis(BaseModel):
         options: Mapping[str, Any],
         refusal_reason: str,
         deferred: Mapping[str, str] = MappingProxyType({}),
+        ruled_out: Mapping[str, str] = MappingProxyType({}),
     ) -> list[ScopeEntry]:
         """What this framework considered and raised no claim about.
 
@@ -2067,8 +2085,10 @@ class FrameworkAnalysis(BaseModel):
         ``options`` is the job's own selection for this framework, as the input
         ladder validated it.
 
-        ``deferred`` maps a unit this job could not settle to the reason, from
-        :meth:`Claim.partition_proposals`. Empty for a package that defers
+        ``ruled_out`` maps a unit the package's own rules ruled out of this
+        model to the reason, from :meth:`Claim.ruled_out`, and each becomes a
+        ``not-applicable`` entry. ``deferred`` maps a unit this job could not
+        settle to the reason, from :meth:`Claim.partition_proposals`. Empty for a package that defers
         nothing, which is every package whose claims rest on the system's own
         shape. It arrives here rather than being recomputed because the fan-in
         is where the proposals were, and a second derivation could disagree with
@@ -2077,13 +2097,19 @@ class FrameworkAnalysis(BaseModel):
         del claims, options
         if not refusal_reason:
             return [
-                ScopeEntry(
-                    unit=unit,
-                    state="needs-other-evidence",
-                    reason=f"applies, and settling it needs {kind}",
-                    needs=kind,
-                )
-                for unit, kind in deferred.items()
+                *(
+                    ScopeEntry(unit=unit, state="not-applicable", reason=reason)
+                    for unit, reason in ruled_out.items()
+                ),
+                *(
+                    ScopeEntry(
+                        unit=unit,
+                        state="needs-other-evidence",
+                        reason=f"applies, and settling it needs {kind}",
+                        needs=kind,
+                    )
+                    for unit, kind in deferred.items()
+                ),
             ]
         return [
             ScopeEntry(unit=lane, state="not-applicable", reason=refusal_reason)

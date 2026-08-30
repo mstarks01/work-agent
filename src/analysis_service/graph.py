@@ -589,6 +589,10 @@ FRAMEWORK_STRUCTURED_ARTIFACTS: tuple[str, ...] = (
     # Unit -> why this job could not settle it. Written by the fan-in, read by
     # ``assemble``, and empty for a package that defers nothing.
     "deferred",
+    # Unit -> why the package's own rules ruled it out of this model, before
+    # any lane ran. Written by ``prepare``, read by ``assemble``, and empty
+    # for a package whose rules rule nothing out.
+    "ruled_out",
     "marks",
     "precondition",
     "retrieved",
@@ -1250,8 +1254,16 @@ def prepare_analysis(
         loader = package_loaders[name]
         candidates = generate_candidates(model, package.lanes, package.rules)
         retrieved: list[str] = []
+        ruled_out: dict[str, str] = {}
         for lane in nodes.lanes:
             candidate_set = candidates[lane.lane]
+            # The package's own rules may rule a lane's units out of this model
+            # before its agent runs; the agent is told, and the block's scope
+            # carries them as not-applicable with the rule's reason.
+            lane_ruled_out = package.record.ruled_out(
+                model, options.get(name) or {}, lane.lane
+            )
+            ruled_out.update(lane_ruled_out)
             # Retrieval is by *fired* rule, so a lane that triggered nothing gets
             # nothing: the material follows the leads rather than the lane.
             fired = {candidate.rule_id for candidate in candidate_set.candidates}
@@ -1268,6 +1280,7 @@ def prepare_analysis(
                         model,
                         candidate_set,
                         options.get(name) or {},
+                        ruled_out=tuple(lane_ruled_out),
                     ),
                     "reference_notes": compose_notes(loader, notes),
                     "prior_cases": compose_cases(loader, cases),
@@ -1282,6 +1295,7 @@ def prepare_analysis(
         # because a rule and a document both belong to the package that declared
         # them. Sorted and deduplicated: it is a set of rules that matched, and
         # firing order across independent lanes is not a fact about anything.
+        state.put(nodes.key("ruled_out"), ruled_out)
         state.put(
             nodes.key("retrieved"),
             {
@@ -1885,6 +1899,7 @@ def _framework_block(
                 package, state.get(nodes.key("precondition"))
             ),
             deferred=state.get(nodes.key("deferred")) or {},
+            ruled_out=state.get(nodes.key("ruled_out")) or {},
         ),
         coverage=[
             LaneCoverage.model_validate(row)
