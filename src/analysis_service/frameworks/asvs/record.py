@@ -173,6 +173,32 @@ class DraftRequirementRuling(Claim):
 
     chapter: AsvsChapter
 
+    @classmethod
+    def partition_proposals(
+        cls, proposals: Sequence[Any], lane: str, carried: Collection[str]
+    ) -> tuple[list[Any], dict[str, str]]:
+        """Every requirement whose lane agent said this job cannot settle it.
+
+        The agent names the kind of evidence that would settle the requirement;
+        this drops the ones that kind is not among what the job carries. A
+        ``prose`` answer is kept, because a job carrying prose *can* settle it —
+        the description was simply thin, and that is a request the submitter can
+        act on rather than a wall.
+
+        The reason names the kind, so the **Scope Entry** tells a reader what
+        would answer the requirement instead of only that nothing did.
+        """
+        defer = [
+            proposal
+            for proposal in proposals
+            if proposal.needs_evidence and proposal.needs_evidence not in carried
+        ]
+        kept = [proposal for proposal in proposals if proposal not in defer]
+        return kept, {
+            requirement_id(lane, proposal.requirement): proposal.needs_evidence
+            for proposal in defer
+        }
+
 
 class RequirementRuling(DraftRequirementRuling, RuledClaim):
     """One ruled ASVS finding: a draft plus the critic's verdict.
@@ -222,7 +248,15 @@ class RequirementProposal(Proposal):
     model_config = ConfigDict(extra="forbid")
 
     requirement: str = Field(pattern=REQUIREMENT_KEY_PATTERN, max_length=10)
-    needs_evidence: Literal["", "prose", "code", "config", "people"] = ""
+    # REQUIRED, WITH NO DEFAULT, AND THAT IS THE WHOLE MECHANISM. A first live
+    # run shipped this optional: the field sat in the schema with a default,
+    # so the model omitted it on all 253 requirements and not one was deferred.
+    # The prompt asked for it and the model was never obliged to answer.
+    #
+    # `""` stays a legal value — it is the ordinary answer, meaning the agent
+    # ruled — but it must now be *chosen* rather than fallen into. The enum is
+    # what keeps a required field from becoming an invented one.
+    needs_evidence: Literal["", "prose", "code", "config", "people"]
 
 
 class RequirementProposals(ProposalBatch):
@@ -319,32 +353,6 @@ class AsvsAnalysis(FrameworkAnalysis):
     def summarize(cls, claims, rejected_claims) -> AsvsSummary:
         """ASVS's own summary, beside the fields that narrowed it."""
         return build_asvs_summary(claims, rejected_claims)
-
-    @classmethod
-    def partition_proposals(
-        cls, proposals: Sequence[Any], lane: str, carried: Collection[str]
-    ) -> tuple[list[Any], dict[str, str]]:
-        """Every requirement whose lane agent said this job cannot settle it.
-
-        The agent names the kind of evidence that would settle the requirement;
-        this drops the ones that kind is not among what the job carries. A
-        ``prose`` answer is kept, because a job carrying prose *can* settle it —
-        the description was simply thin, and that is a request the submitter can
-        act on rather than a wall.
-
-        The reason names the kind, so the **Scope Entry** tells a reader what
-        would answer the requirement instead of only that nothing did.
-        """
-        defer = [
-            proposal
-            for proposal in proposals
-            if proposal.needs_evidence and proposal.needs_evidence not in carried
-        ]
-        kept = [proposal for proposal in proposals if proposal not in defer]
-        return kept, {
-            requirement_id(lane, proposal.requirement): proposal.needs_evidence
-            for proposal in defer
-        }
 
     @classmethod
     def scope_entries(

@@ -414,12 +414,14 @@ def test_a_claim_naming_an_unpublished_requirement_is_dropped_and_marked():
             requirement="2.1",
             title="A real requirement",
             description="d",
+            needs_evidence="",
             evidence_refs=[reference],
         ),
         RequirementProposal(
             requirement="99.99",
             title="An invented requirement",
             description="d",
+            needs_evidence="",
             evidence_refs=[reference],
         ),
     ]
@@ -832,6 +834,12 @@ def test_the_package_root_carries_no_stray_markdown():
 class TestAJobDefersWhatItsInputCannotSettle:
     """The split a lane agent makes, and where each half lands.
 
+    **Driven through ``PACKAGES["asvs"].record``, which is what the fan-in
+    calls.** The first version of these tests called the override directly on
+    the block class, so they passed while the graph resolved the neutral default
+    and deferred nothing across two live runs. A test that names a class the
+    caller never reaches proves the method works and not that it runs.
+
     A requirement whose substance needs source code is not a question a
     submitter can answer by writing more. Recorded as a **Scope Entry** rather
     than as a **Claim** carrying a ``needs-info`` verdict, so a reader can tell
@@ -850,7 +858,7 @@ class TestAJobDefersWhatItsInputCannotSettle:
 
     def test_a_kind_the_job_carries_is_kept(self):
         """`prose` survives: the description was thin, which is answerable."""
-        kept, deferred = AsvsAnalysis.partition_proposals(
+        kept, deferred = PACKAGES["asvs"].record.partition_proposals(
             [self._proposal("2.5", "prose")], "encoding-and-sanitization", ["prose"]
         )
 
@@ -858,7 +866,7 @@ class TestAJobDefersWhatItsInputCannotSettle:
         assert deferred == {}
 
     def test_a_kind_the_job_does_not_carry_is_deferred(self):
-        kept, deferred = AsvsAnalysis.partition_proposals(
+        kept, deferred = PACKAGES["asvs"].record.partition_proposals(
             [self._proposal("2.4", "code")], "encoding-and-sanitization", ["prose"]
         )
 
@@ -869,7 +877,7 @@ class TestAJobDefersWhatItsInputCannotSettle:
 
     def test_a_ruled_proposal_is_kept(self):
         """Empty means the agent ruled, and the critic judges it as before."""
-        kept, deferred = AsvsAnalysis.partition_proposals(
+        kept, deferred = PACKAGES["asvs"].record.partition_proposals(
             [self._proposal("2.6", "")], "encoding-and-sanitization", ["prose"]
         )
 
@@ -881,10 +889,10 @@ class TestAJobDefersWhatItsInputCannotSettle:
         requirement's."""
         proposals = [self._proposal("2.4", "code")]
 
-        _, prose_only = AsvsAnalysis.partition_proposals(
+        _, prose_only = PACKAGES["asvs"].record.partition_proposals(
             proposals, "encoding-and-sanitization", ["prose"]
         )
-        kept, with_code = AsvsAnalysis.partition_proposals(
+        kept, with_code = PACKAGES["asvs"].record.partition_proposals(
             proposals, "encoding-and-sanitization", ["prose", "code"]
         )
 
@@ -961,3 +969,17 @@ class TestScopeEntryNamesWhatWouldSettleIt:
                 reason="no LDAP in this system",
                 needs="code",
             )
+
+
+def test_the_fan_in_reaches_this_packages_own_partition():
+    """The seam itself, because naming the wrong class is what went wrong.
+
+    ``merge_drafts`` calls ``package.record.partition_proposals``. An override
+    written on any other class of this package resolves to the neutral default,
+    which defers nothing — silently, and only visible in a live run.
+    """
+    record = PACKAGES["asvs"].record
+
+    assert (
+        record.partition_proposals.__func__.__qualname__ != "Claim.partition_proposals"
+    ), "ASVS resolves the neutral default, so it defers nothing"

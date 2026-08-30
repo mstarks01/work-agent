@@ -9,6 +9,7 @@ Two drafts against exemplar system A. This is the chapter the System Model answe
 ```json
 {
   "requirement": "1.1",
+  "needs_evidence": "",
   "title": "The transfer path to the ledger service runs unencrypted",
   "description": "V12.1.1 asks that connections carrying application data use TLS at a current version. It applies to `flow:web-api-to-ledger-service:post-transfer`, which carries transfer instructions with customer identifiers and is a derived boundary crossing from `boundary:dmz` into `boundary:core`. Its `encryption_in_transit` is stated absent rather than left open, so the input settles this: the link runs without transport protection. The requirement's internal scope is not an exemption — ASVS applies it to a backend link exactly as to an internet-facing one.",
   "affected_element_ids": [
@@ -31,6 +32,7 @@ The same requirement family against a flow whose attribute is `unknown`. The rem
 ```json
 {
   "requirement": "2.1",
+  "needs_evidence": "prose",
   "title": "Transport protection on the database link is never stated",
   "description": "V12.2.1 asks that connections to backend components are protected in transit. It applies to `flow:ledger-service-to-accounts-db:read-write-balances`, which carries balances and account-holder PII over the PostgreSQL wire protocol. Its `encryption_in_transit` is never stated, which is a different fact from the stated absence on `flow:web-api-to-ledger-service:post-transfer`: here the input left the question open rather than answering it. The requirement applies and the input does not settle it.",
   "affected_element_ids": [

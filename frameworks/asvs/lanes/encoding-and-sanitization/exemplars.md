@@ -11,6 +11,7 @@ The store's technology is named outright, so the requirement about parameterized
 ```json
 {
   "requirement": "2.4",
+  "needs_evidence": "code",
   "title": "Query construction against the accounts database is undescribed",
   "description": "V1.2.4 asks that database queries are built with parameterization or an equivalent that separates the query from its data. The requirement applies here because `store:accounts-db` is a PostgreSQL instance and `flow:ledger-service-to-accounts-db:read-write-balances` speaks the PostgreSQL wire protocol, so `process:ledger-service` builds queries. The submitted notes describe the credential that account uses and the privileges it holds, and say nothing at all about how the SQL reaching that connection is assembled. So the requirement applies and the input does not settle it. What would settle it is one fact: whether the ledger service composes SQL by string concatenation or hands parameters to a driver.",
   "affected_element_ids": [
@@ -35,6 +36,7 @@ The opposite ruling. No element in this model parses XML and no flow names SOAP,
 ```json
 {
   "requirement": "5.1",
+  "needs_evidence": "",
   "title": "No XML parser exists in this system",
   "description": "V1.5.1 governs the configuration of an XML parser against external entity and schema resolution. It does not apply here. The model carries five flows and their stated protocols are HTTPS, gRPC and the PostgreSQL wire protocol; no element's technology names an XML parser, a SOAP endpoint or an XSLT processor, and no data description names an XML document. The requirement has no subject in this system, so it is ruled out on the protocols the flows state rather than on silence.",
   "affected_element_ids": [],
