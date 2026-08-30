@@ -31,6 +31,7 @@ prints beside the mean.
 
 from __future__ import annotations
 
+import argparse
 import json
 import subprocess
 from dataclasses import dataclass
@@ -306,3 +307,15 @@ def write(root: Path = REPO_ROOT) -> Path:
     path.parent.mkdir(parents=True, exist_ok=True)
     path.write_text(build(root), encoding="utf-8")
     return path
+
+
+def command_comparison(args: argparse.Namespace) -> int:
+    """Rebuild the published comparison over the merged Baselines.
+
+    A person runs this and commits the result; a test recomputes it and fails
+    on a stale copy, so CI never needs to push (#330). ``submit baseline``
+    calls it during staging, so a contributor never learns it exists.
+    """
+    path = write(REPO_ROOT)
+    print(f"{path} rebuilt from {REPO_ROOT / TABLE_REL.parent}")
+    return 0

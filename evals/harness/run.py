@@ -40,7 +40,7 @@ import asyncio
 import json
 import sys
 from collections.abc import Callable, Mapping, Sequence
-from dataclasses import replace
+from dataclasses import dataclass, replace
 from pathlib import Path
 from typing import Any
 
@@ -62,7 +62,6 @@ from analysis_service.report import (
 from evals.harness import (
     comparison,
     consent,
-    fingerprint,
     instruction,
     instruction_delta,
     ledger,
@@ -90,7 +89,6 @@ from evals.harness.calibration import (
 from evals.harness.certify import PromotionPlan, plan_promotion, promote
 from evals.harness.coverage import TaggedRow
 from evals.harness.critic_yield import CriticYield, score_case_with_yield
-from evals.harness.fingerprint import FingerprintError
 from evals.harness.grounds import (
     CAUGHT,
     CaseGrounds,
@@ -950,45 +948,6 @@ def command_promote(args: argparse.Namespace) -> int:
     return 0
 
 
-def command_review(args: argparse.Namespace) -> int:
-    """What a reviewer has waiting, and what the ledger already holds.
-
-    Credential-free, like ``promote`` and ``stability``: it reads a finished
-    sweep's reports and ``evals/review/votes/`` and calls nothing. This is
-    the read-only half of the loop — ``webapp/review.py`` is where an answer is
-    recorded, because a vote wants the source text beside the finding and a
-    terminal is the wrong place to read 1,400 characters of prose.
-
-    Prints per case, never one total: a sitting is usually one case, and a
-    reviewer with fifteen minutes needs to know which one they can finish.
-    """
-    from webapp.review import build_session, findings_from_artifacts
-
-    runs, _ = findings_from_artifacts([Path(path) for path in args.artifact])
-    session = build_session(runs, args.voter, Path(args.ledger))
-    waiting = session.remaining()
-    summary = queue.summarise(waiting, ledger.load(Path(args.ledger)))
-
-    print(
-        f"{summary['waiting']} findings waiting for {args.voter},"
-        f" over {len(runs)} sweep(s)"
-    )
-    print(f"  {summary['volatile']} found in some runs and not others")
-    for case_id, count in summary["by_case"].items():
-        print(f"    {case_id:<34} {count}")
-    print(
-        f"\nledger: {summary['votes_recorded']} votes by"
-        f" {', '.join(summary['voters']) or 'nobody'};"
-        f" {summary['pool']} findings in the pool;"
-        f" {summary['double_voted']} answered twice"
-    )
-    if waiting:
-        print("\nrecord answers with:")
-        artifacts = " ".join(f"--artifact {path}" for path in args.artifact)
-        print(f"  uv run python webapp/review.py --voter {args.voter} {artifacts}")
-    return 0
-
-
 def _runs_from_reports(artifact: Path, cases: Sequence[GoldenCase]) -> dict[str, Any]:
     """Read a finished sweep's saved reports and drafts back into runs.
 
@@ -1030,37 +989,6 @@ def _runs_from_reports(artifact: Path, cases: Sequence[GoldenCase]) -> dict[str,
             f"{directory} carries no report for any case in the artifact"
         )
     return runs
-
-
-def command_comparison(args: argparse.Namespace) -> int:
-    """Rebuild the published comparison over the merged Baselines.
-
-    A person runs this and commits the result; a test recomputes it and fails
-    on a stale copy, so CI never needs to push (#330). ``submit baseline``
-    calls it during staging, so a contributor never learns it exists.
-    """
-    path = comparison.write(REPO_ROOT)
-    print(f"{path} rebuilt from {REPO_ROOT / comparison.TABLE_REL.parent}")
-    return 0
-
-
-def command_agreement(args: argparse.Namespace) -> int:
-    """How far two voters agree — what a maintainer reads before promoting.
-
-    Read-only and credential-free, like ``review`` beside it. It decides
-    nothing: a promotion is a line in the roster flipped to ``maintainer``, in
-    a PR a maintainer merges (#326). An agreement threshold in code would
-    promote on noise whenever the overlap is thin, which is exactly when the
-    figure needs a person's judgement rather than a comparison.
-    """
-    votes = ledger.load(Path(args.ledger))
-    try:
-        table = roster.load(Path(args.roster))
-    except roster.RosterError as exc:
-        print(exc, file=sys.stderr)
-        return 1
-    print(standings.render(standings.agreement(votes, table)))
-    return 0
 
 
 def command_score(args: argparse.Namespace) -> int:
@@ -1162,80 +1090,6 @@ def command_pairing(args: argparse.Namespace) -> int:
         out = Path(args.json)
         out.write_text(json.dumps(built.to_json(), indent=2) + "\n", "utf-8")
         print(f"identifiers written to {out}")
-    return 0
-
-
-def command_rekey(args: argparse.Namespace) -> int:
-    """Recompute every vote's fingerprint under a new rule, in place.
-
-    The operation the whole versioning argument rests on: a better recogniser
-    changes every key, and a vote stores its **components** rather than its
-    hash, so moving the ledger is arithmetic over a file. No provider, no
-    credentials, no re-vote: the ledger stores each vote's components, so a
-    version bump is a pure recomputation over the file.
-
-    Refuses to write anything unless ``--yes`` is given, like ``promote``: this
-    rewrites the only human record in the repository, and a preview that also
-    edited would be a preview nobody could trust. Each voter's file is replaced
-    by an atomic rename, so an interrupted re-key leaves every file whole —
-    old or new — rather than half of a new one.
-    """
-    path = Path(args.ledger)
-    current = ledger.load(path)
-    if not current:
-        print(f"{path}: no votes to re-key")
-        return 0
-
-    try:
-        moved = ledger.rekey(current.votes, version=args.to_version)
-    except FingerprintError as exc:
-        print(f"cannot re-key: {exc}")
-        return 1
-
-    changed = sum(
-        1
-        for before, after in zip(current.votes, moved, strict=True)
-        if before.fingerprint != after.fingerprint
-    )
-    was = sorted({fingerprint.version_of(v.fingerprint) for v in current.votes})
-    print(f"{len(moved)} votes at version {was} -> {args.to_version}")
-    print(f"{changed} fingerprints move, {len(moved) - changed} unchanged")
-    print(f"{len(current.pool())} findings in the pool, before and after")
-
-    if not args.yes:
-        print("\npreview only; nothing written. Re-run with --yes to apply.")
-        return 0
-
-    ledger.write_all(moved, path)
-    print(f"\n{path} rewritten")
-    return 0
-
-
-def command_compare(args: argparse.Namespace) -> int:
-    """What one prompt edit did, read off the sweeps either side of it.
-
-    Credential-free, like ``stability`` and ``promote``: both artifacts already
-    hold what their nodes were told and what their scores were, so this is
-    arithmetic over records. Nothing here gates, and nothing here concludes —
-    it prints the instruction change and the measurements that moved beside it,
-    which is what ADR 0016 said no reading could do.
-    """
-    try:
-        before = load_artifact(args.before)
-        after = load_artifact(args.after)
-    except (ProvenanceError, ValueError) as error:
-        print(f"cannot compare: {error}", file=sys.stderr)
-        return 1
-
-    nodes = instruction_delta.node_deltas(before, after)
-    measurements = instruction_delta.measurement_deltas(before, after)
-    instruction_delta.render(nodes, measurements)
-    if args.out:
-        record = instruction_delta.artifact(nodes, measurements)
-        record["before"] = str(before.path)
-        record["after"] = str(after.path)
-        Path(args.out).write_text(json.dumps(record, indent=2), encoding="utf-8")
-        print(f"wrote {args.out}")
     return 0
 
 
@@ -1398,14 +1252,30 @@ def command_calibrate(args: argparse.Namespace) -> int:
     return 1
 
 
-def main(argv: Sequence[str] | None = None) -> int:
-    parser = argparse.ArgumentParser(description=__doc__)
-    subparsers = parser.add_subparsers(dest="command", required=True)
+@dataclass(frozen=True)
+class Command:
+    """One subcommand: what it is called for, what it takes, and what it runs.
 
-    run_parser = subparsers.add_parser("run", help="run one eval mode over the corpus")
-    run_parser.add_argument("--mode", choices=sorted(modes.MODE_ENTRIES), required=True)
-    run_parser.add_argument("--case", action="append", default=[])
-    run_parser.add_argument(
+    A table entry rather than three edits in :func:`main`. The harness keys
+    everything else it grows an entry per — instruments, modes, package scorers
+    — and a command is no different: a new one is a key here, and
+    ``TestTheCommandTable`` is what stops a ``command_*`` function from existing
+    that nothing can reach.
+    """
+
+    #: What ``--help`` says this command is for.
+    help: str
+    #: What it does, given the parsed arguments. Returns the exit code.
+    run: Callable[[argparse.Namespace], int]
+    #: What it takes, added to its own subparser. A command with no arguments
+    #: of its own declares none.
+    arguments: Callable[[argparse.ArgumentParser], None] | None = None
+
+
+def _run_arguments(parser: argparse.ArgumentParser) -> None:
+    parser.add_argument("--mode", choices=sorted(modes.MODE_ENTRIES), required=True)
+    parser.add_argument("--case", action="append", default=[])
+    parser.add_argument(
         "--framework",
         action="append",
         default=[],
@@ -1414,13 +1284,13 @@ def main(argv: Sequence[str] | None = None) -> int:
         " no option and changes no reference set. Default is every framework a"
         " case declares.",
     )
-    run_parser.add_argument("--corpus", default=DEFAULT_CORPUS_DIR)
-    run_parser.add_argument(
+    parser.add_argument("--corpus", default=DEFAULT_CORPUS_DIR)
+    parser.add_argument(
         "--roster",
         default=str(roster.DEFAULT_ROSTER_PATH),
         help="the standing roster the scored series are split by",
     )
-    run_parser.add_argument(
+    parser.add_argument(
         "--accept-cost",
         metavar="USD|unknown",
         help="accept this many dollars without a prompt, for scripts. The run"
@@ -1428,42 +1298,37 @@ def main(argv: Sequence[str] | None = None) -> int:
         " nobody can state. Omit it and the terminal asks you to type the"
         " amount back — an enter never proceeds.",
     )
-    run_parser.add_argument(
+    parser.add_argument(
         "--ledger",
         default=str(ledger.DEFAULT_LEDGER_PATH),
         help="the vote ledger the scorer reads standings from",
     )
-    run_parser.add_argument(
+    parser.add_argument(
         "--out",
         help=(
             "where to write the run artifact. Each finished case's whole report"
             " is written beside it, as <out>.reports/<case>.report.json"
         ),
     )
-    run_parser.add_argument(
+    parser.add_argument(
         "--require-certified",
         action="store_true",
         help="fail the run when its fingerprints are not in the blessed manifest",
     )
-    run_parser.set_defaults(func=command_run)
 
-    calibrate_parser = subparsers.add_parser(
-        "calibrate", help="measure rule-label agreement over the fixtures"
-    )
-    calibrate_parser.add_argument("--out", help="where to write the agreement report")
-    calibrate_parser.add_argument(
+
+def _calibrate_arguments(parser: argparse.ArgumentParser) -> None:
+    parser.add_argument("--out", help="where to write the agreement report")
+    parser.add_argument(
         "--corpus",
         default=str(DEFAULT_CORPUS_DIR),
         help="corpus root, for the flow maps the rule resolves endpoints against",
     )
-    calibrate_parser.set_defaults(func=command_calibrate)
 
-    promote_parser = subparsers.add_parser(
-        "promote",
-        help="bless a finished sweep's generation identities from its artifact",
-    )
-    promote_parser.add_argument("artifact", help="the run artifact to promote")
-    promote_parser.add_argument(
+
+def _promote_arguments(parser: argparse.ArgumentParser) -> None:
+    parser.add_argument("artifact", help="the run artifact to promote")
+    parser.add_argument(
         "--served",
         action="append",
         default=[],
@@ -1475,109 +1340,92 @@ def main(argv: Sequence[str] | None = None) -> int:
             " introduce a build the sweep never saw."
         ),
     )
-    promote_parser.add_argument(
+    parser.add_argument(
         "--yes",
         action="store_true",
         help="write the files; without it the promotion is only previewed",
     )
-    promote_parser.set_defaults(func=command_promote)
 
-    score_parser = subparsers.add_parser(
-        "score",
-        help="re-score a finished sweep against the ledger (no credentials)",
-    )
-    score_parser.add_argument("artifact", help="a sweep artifact with a .reports/ dir")
-    score_parser.add_argument(
+
+def _score_arguments(parser: argparse.ArgumentParser) -> None:
+    parser.add_argument("artifact", help="a sweep artifact with a .reports/ dir")
+    parser.add_argument(
         "--ledger",
         default=str(ledger.DEFAULT_LEDGER_PATH),
         help="the vote ledger the standings are read from",
     )
-    score_parser.add_argument(
+    parser.add_argument(
         "--roster",
         default=str(roster.DEFAULT_ROSTER_PATH),
         help="the standing roster the scored series are split by",
     )
-    score_parser.add_argument(
+    parser.add_argument(
         "--corpus",
         default=str(DEFAULT_CORPUS_DIR),
         help="corpus root, for the reference sets and flow maps",
     )
-    score_parser.add_argument(
+    parser.add_argument(
         "--out",
         help="where to write the scored artifact; without it the input is"
         " rewritten in place",
     )
-    score_parser.set_defaults(func=command_score)
 
-    pairing_parser = subparsers.add_parser(
-        "pairing",
-        help="the two sides of one case's applicability disagreement (no credentials)",
-    )
-    pairing_parser.add_argument(
-        "artifact", help="a sweep artifact with a .reports/ dir"
-    )
-    pairing_parser.add_argument(
-        "--case", required=True, help="which corpus case to pair"
-    )
-    pairing_parser.add_argument(
+
+def _pairing_arguments(parser: argparse.ArgumentParser) -> None:
+    parser.add_argument("artifact", help="a sweep artifact with a .reports/ dir")
+    parser.add_argument("--case", required=True, help="which corpus case to pair")
+    parser.add_argument(
         "--corpus",
         default=str(DEFAULT_CORPUS_DIR),
         help="corpus root, for the reference set this pairs against",
     )
-    pairing_parser.add_argument(
+    parser.add_argument(
         "--html",
         help="where to write the reading page. Refused inside this repository:"
         " the page carries ASVS text under CC BY-SA 4.0",
     )
-    pairing_parser.add_argument(
+    parser.add_argument(
         "--json", help="where to write the identifiers alone, which carry no ASVS text"
     )
-    pairing_parser.set_defaults(func=command_pairing)
 
-    rekey_parser = subparsers.add_parser(
-        "rekey", help="recompute every vote's fingerprint under another rule"
-    )
-    rekey_parser.add_argument(
+
+def _rekey_arguments(parser: argparse.ArgumentParser) -> None:
+    parser.add_argument(
         "--to-version",
         type=int,
         required=True,
         help="the fingerprint version to move to; see VERSION_FOR for which"
         " rule each framework is keyed under",
     )
-    rekey_parser.add_argument(
+    parser.add_argument(
         "--ledger", default=str(ledger.DEFAULT_LEDGER_PATH), help="the vote ledger"
     )
-    rekey_parser.add_argument(
+    parser.add_argument(
         "--yes", action="store_true", help="write; without it this is a preview"
     )
-    rekey_parser.set_defaults(func=command_rekey)
 
-    review_parser = subparsers.add_parser(
-        "review", help="what a reviewer has waiting over a finished sweep"
-    )
-    review_parser.add_argument(
+
+def _review_arguments(parser: argparse.ArgumentParser) -> None:
+    parser.add_argument(
         "artifact",
         nargs="+",
         help="one or more sweep artifacts, each with a .reports/ dir. Several"
         " sweeps of one configuration are what make a finding's run count"
         " readable, and the queue asks first about what they disagree on",
     )
-    review_parser.add_argument(
+    parser.add_argument(
         "--voter",
         required=True,
         help="whose queue to report; a finding this person has answered is not"
         " waiting for them, even when somebody else has not answered it",
     )
-    review_parser.add_argument(
+    parser.add_argument(
         "--ledger", default=str(ledger.DEFAULT_LEDGER_PATH), help="the vote ledger"
     )
-    review_parser.set_defaults(func=command_review)
 
-    stability_parser = subparsers.add_parser(
-        "stability",
-        help="compare finished sweeps for run-to-run stability (no credentials)",
-    )
-    stability_parser.add_argument(
+
+def _stability_arguments(parser: argparse.ArgumentParser) -> None:
+    parser.add_argument(
         "artifact",
         nargs="+",
         help=(
@@ -1585,77 +1433,143 @@ def main(argv: Sequence[str] | None = None) -> int:
             " by only some of them are excluded and named."
         ),
     )
-    stability_parser.add_argument("--out", help="where to write the stability report")
-    stability_parser.set_defaults(func=command_stability)
+    parser.add_argument("--out", help="where to write the stability report")
 
-    compare_parser = subparsers.add_parser(
-        "compare",
-        help="what a prompt edit did: instruction delta beside score delta"
-        " (no credentials)",
-    )
-    compare_parser.add_argument("before", help="the sweep from before the edit")
-    compare_parser.add_argument("after", help="the sweep from after it")
-    compare_parser.add_argument("--out", help="where to write the comparison")
-    compare_parser.set_defaults(func=command_compare)
 
-    submit_parser = subparsers.add_parser(
-        "submit",
-        help="open a contribution PR through gh, after running its CI checks locally",
-    )
-    submit_parser.add_argument(
+def _compare_arguments(parser: argparse.ArgumentParser) -> None:
+    parser.add_argument("before", help="the sweep from before the edit")
+    parser.add_argument("after", help="the sweep from after it")
+    parser.add_argument("--out", help="where to write the comparison")
+
+
+def _submit_arguments(parser: argparse.ArgumentParser) -> None:
+    parser.add_argument(
         "kind",
         choices=sorted(submit.KINDS),
         help="what this PR carries; one kind per PR",
     )
-    submit_parser.add_argument(
+    parser.add_argument(
         "--dry-run",
         action="store_true",
         help="stop after the checklist, before any branch or PR is made."
         " Your roster line is still added if you have none, because you need"
         " it either way.",
     )
-    submit_parser.add_argument(
+    parser.add_argument(
         "--artifact",
         action="append",
         default=[],
         help="a sweep artifact to assemble into the Baseline before the"
         " checks run (baseline kind only; repeat per sweep)",
     )
-    submit_parser.set_defaults(func=submit.command_submit)
 
-    verify_parser = subparsers.add_parser(
-        "verify-contribution",
-        help="run a contribution PR's checks against its author (what CI runs)",
-    )
-    verify_parser.add_argument(
+
+def _verify_contribution_arguments(parser: argparse.ArgumentParser) -> None:
+    parser.add_argument(
         "--author",
         required=True,
         help="the GitHub login that opened the PR",
     )
-    verify_parser.set_defaults(func=submit.command_verify)
 
-    agreement_parser = subparsers.add_parser(
-        "agreement",
-        help="how far each pair of voters agrees, for a promotion decision"
-        " (no credentials)",
-    )
-    agreement_parser.add_argument(
+
+def _agreement_arguments(parser: argparse.ArgumentParser) -> None:
+    parser.add_argument(
         "--ledger", default=str(ledger.DEFAULT_LEDGER_PATH), help="the vote ledger"
     )
-    agreement_parser.add_argument(
+    parser.add_argument(
         "--roster",
         default=str(roster.DEFAULT_ROSTER_PATH),
         help="the standing roster",
     )
-    agreement_parser.set_defaults(func=command_agreement)
 
-    comparison_parser = subparsers.add_parser(
-        "comparison",
+
+#: Every subcommand, in the order ``--help`` lists them.
+#:
+#: Each ``run`` lives in the module that owns its subject, which is where
+#: ``submit`` and ``verify-contribution`` already were. What stays here is the
+#: sweep and the readings taken over one: ``run`` *is* this module, and
+#: ``score``, ``promote``, ``pairing``, ``stability`` and ``calibrate`` each
+#: share a private helper with it, so moving one would split a pair rather than
+#: place it.
+COMMANDS: dict[str, Command] = {
+    "run": Command(
+        help="run one eval mode over the corpus",
+        run=command_run,
+        arguments=_run_arguments,
+    ),
+    "calibrate": Command(
+        help="measure rule-label agreement over the fixtures",
+        run=command_calibrate,
+        arguments=_calibrate_arguments,
+    ),
+    "promote": Command(
+        help="bless a finished sweep's generation identities from its artifact",
+        run=command_promote,
+        arguments=_promote_arguments,
+    ),
+    "score": Command(
+        help="re-score a finished sweep against the ledger (no credentials)",
+        run=command_score,
+        arguments=_score_arguments,
+    ),
+    "pairing": Command(
+        help="the two sides of one case's applicability disagreement (no credentials)",
+        run=command_pairing,
+        arguments=_pairing_arguments,
+    ),
+    "rekey": Command(
+        help="recompute every vote's fingerprint under another rule",
+        run=ledger.command_rekey,
+        arguments=_rekey_arguments,
+    ),
+    "review": Command(
+        help="what a reviewer has waiting over a finished sweep",
+        run=queue.command_review,
+        arguments=_review_arguments,
+    ),
+    "stability": Command(
+        help="compare finished sweeps for run-to-run stability (no credentials)",
+        run=command_stability,
+        arguments=_stability_arguments,
+    ),
+    "compare": Command(
+        help="what a prompt edit did: instruction delta beside score delta"
+        " (no credentials)",
+        run=instruction_delta.command_compare,
+        arguments=_compare_arguments,
+    ),
+    "submit": Command(
+        help="open a contribution PR through gh, after running its CI checks locally",
+        run=submit.command_submit,
+        arguments=_submit_arguments,
+    ),
+    "verify-contribution": Command(
+        help="run a contribution PR's checks against its author (what CI runs)",
+        run=submit.command_verify,
+        arguments=_verify_contribution_arguments,
+    ),
+    "agreement": Command(
+        help="how far each pair of voters agrees, for a promotion decision"
+        " (no credentials)",
+        run=standings.command_agreement,
+        arguments=_agreement_arguments,
+    ),
+    "comparison": Command(
         help="rebuild evals/baselines/README.md from the merged Baselines"
         " (no credentials)",
-    )
-    comparison_parser.set_defaults(func=command_comparison)
+        run=comparison.command_comparison,
+    ),
+}
 
+
+def main(argv: Sequence[str] | None = None) -> int:
+    parser = argparse.ArgumentParser(description=__doc__)
+    subparsers = parser.add_subparsers(dest="command", required=True)
+    for name, command in COMMANDS.items():
+        sub = subparsers.add_parser(name, help=command.help)
+        if command.arguments is not None:
+            command.arguments(sub)
+        sub.set_defaults(func=command.run)
     args = parser.parse_args(argv)
     return args.func(args)
 

@@ -21,10 +21,14 @@ weigh a thin number where a code gate would only hide it.
 
 from __future__ import annotations
 
+import argparse
+import sys
 from dataclasses import dataclass, replace
 from itertools import combinations
+from pathlib import Path
 from typing import Literal
 
+from evals.harness import ledger, roster
 from evals.harness.ledger import Ledger, Vote
 from evals.harness.roster import Roster, Standing
 
@@ -196,3 +200,22 @@ def render(pairs: list[PairAgreement]) -> str:
         " maintainer merges; it re-classes that voter's whole history at once."
     )
     return "\n".join(lines)
+
+
+def command_agreement(args: argparse.Namespace) -> int:
+    """How far two voters agree — what a maintainer reads before promoting.
+
+    Read-only and credential-free, like ``review`` beside it. It decides
+    nothing: a promotion is a line in the roster flipped to ``maintainer``, in
+    a PR a maintainer merges (#326). An agreement threshold in code would
+    promote on noise whenever the overlap is thin, which is exactly when the
+    figure needs a person's judgement rather than a comparison.
+    """
+    votes = ledger.load(Path(args.ledger))
+    try:
+        table = roster.load(Path(args.roster))
+    except roster.RosterError as exc:
+        print(exc, file=sys.stderr)
+        return 1
+    print(render(agreement(votes, table)))
+    return 0

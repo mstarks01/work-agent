@@ -24,12 +24,15 @@ disagreements. That is the whole economic argument for the fingerprint.
 
 from __future__ import annotations
 
+import argparse
 from collections import Counter
 from collections.abc import Iterable, Iterator, Mapping, Sequence
 from dataclasses import dataclass, replace
+from pathlib import Path
 from typing import Any
 
 from analysis_service.report import FrameworkName
+from evals.harness import ledger
 from evals.harness.fingerprint import Components, key_claim
 from evals.harness.identity import FlowMap
 from evals.harness.ledger import Ledger
@@ -285,3 +288,42 @@ def summarise(items: Sequence[QueueItem], ledger: Ledger) -> dict[str, Any]:
         "double_voted": len(ledger.double_voted()),
         "pool": len(ledger.pool()),
     }
+
+
+def command_review(args: argparse.Namespace) -> int:
+    """What a reviewer has waiting, and what the ledger already holds.
+
+    Credential-free, like ``promote`` and ``stability``: it reads a finished
+    sweep's reports and ``evals/review/votes/`` and calls nothing. This is
+    the read-only half of the loop — ``webapp/review.py`` is where an answer is
+    recorded, because a vote wants the source text beside the finding and a
+    terminal is the wrong place to read 1,400 characters of prose.
+
+    Prints per case, never one total: a sitting is usually one case, and a
+    reviewer with fifteen minutes needs to know which one they can finish.
+    """
+    from webapp.review import build_session, findings_from_artifacts
+
+    runs, _ = findings_from_artifacts([Path(path) for path in args.artifact])
+    session = build_session(runs, args.voter, Path(args.ledger))
+    waiting = session.remaining()
+    summary = summarise(waiting, ledger.load(Path(args.ledger)))
+
+    print(
+        f"{summary['waiting']} findings waiting for {args.voter},"
+        f" over {len(runs)} sweep(s)"
+    )
+    print(f"  {summary['volatile']} found in some runs and not others")
+    for case_id, count in summary["by_case"].items():
+        print(f"    {case_id:<34} {count}")
+    print(
+        f"\nledger: {summary['votes_recorded']} votes by"
+        f" {', '.join(summary['voters']) or 'nobody'};"
+        f" {summary['pool']} findings in the pool;"
+        f" {summary['double_voted']} answered twice"
+    )
+    if waiting:
+        print("\nrecord answers with:")
+        artifacts = " ".join(f"--artifact {path}" for path in args.artifact)
+        print(f"  uv run python webapp/review.py --voter {args.voter} {artifacts}")
+    return 0
