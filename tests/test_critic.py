@@ -1020,6 +1020,19 @@ class TestAnUnknownGroundSettlesTheVerdict:
         assert "cannot be confirmed" in "; ".join(problems.messages)
         assert problems.implicated == frozenset({"S-01"})
 
+    def test_a_draft_the_critic_never_saw_is_ruled_from_the_grounds(self, model):
+        from analysis_service.critic import unsettled_drafts
+
+        other = sample_draft("S-02")
+        assert unsettled_drafts([self._draft(), other]) == [other]
+        assert not review_issues([self._draft()], [], model)
+        assembled = assemble_claims([self._draft()], [], model, SCHEMAS)
+        (claim,) = assembled.claims
+        assert (claim.verdict.status, claim.confidence) == ("needs-info", "low")
+        assert claim.verdict.related_unknowns == [
+            UnknownRef(element_id="store:orders-db", attribute="encryption_at_rest")
+        ]
+
     def test_a_bare_needs_info_is_completed_from_the_grounds(self, model):
         ruling = sample_ruling(
             "S-01", confidence="low", verdict=ProposedVerdict(status="needs-info")
@@ -1130,6 +1143,32 @@ class TestTheGroundsBoundTheCitedElements:
         assert draft.affected_element_ids == [CROSSING]
         (mark,) = joined.marks.unresolved_references
         assert (mark.element_id, mark.reason) == ("store:orders-db", BEYOND_GROUNDS)
+
+    def test_a_claim_on_quotes_alone_is_bounded_by_what_its_prose_cites(self, model):
+        from analysis_service.report import BEYOND_GROUNDS
+
+        drafts = {
+            "spoofing": [
+                sample_draft(
+                    grounds=[
+                        Ground(
+                            kind="quote",
+                            text="log in to the web app",
+                            source_label=LABEL,
+                        )
+                    ],
+                    description=f"A stolen cookie rides {CROSSING} as the customer.",
+                    affected_element_ids=[CROSSING, "entity:customer"],
+                )
+            ]
+        }
+
+        joined = join_drafts(drafts, STRIDE, model)
+
+        (draft,) = joined.drafts
+        assert draft.affected_element_ids == [CROSSING]
+        (mark,) = joined.marks.unresolved_references
+        assert (mark.element_id, mark.reason) == ("entity:customer", BEYOND_GROUNDS)
 
     def test_the_endpoints_of_a_cited_flow_are_in_reach(self, model):
         drafts = {
