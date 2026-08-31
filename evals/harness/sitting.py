@@ -26,9 +26,9 @@ following one of them needs to see what it does.
 instruction.** What the order protects is the evidence in the filled
 document: it prints the reader's own list above the recorded sets, and a
 later reader takes that order on trust. So a caller here asks for part
-one and part two separately, and :func:`parts_after` is what a surface must
-withhold until the reader has written their own list down. That mirrors the
-review app's configuration-blindness, which is enforced by the queue item
+one and part two separately, and :attr:`Prepared.part_two_blocks` is what a
+surface must withhold until the reader has written their own list down. That
+mirrors the review app's configuration-blindness, which is enforced by the queue item
 having no field for it rather than by asking the reviewer not to peek.
 
 **A mark is keyed by the finding, never by its position.** The reader answers
@@ -552,16 +552,37 @@ class Prepared:
 
     case_id: str
     title: str
-    part_one: str
-    #: Framework -> the recorded set as the reading document renders it. A
-    #: surface must not send this until the reader's own list is in.
-    part_two: dict[str, str]
+    #: The system as the reader meets it, as the blocks a surface lays out.
+    part_one_blocks: list[dict]
+    #: Framework -> that package's recorded set, as blocks. A surface must not
+    #: send this until the reader's own list is in.
+    part_two_blocks: dict[str, dict]
     files: list[str]
     #: One target per recorded finding, in the order the parts render. Part of
     #: part two rather than part one: a target names a claim, and a count of
     #: them is a count of the recorded set. No default, because a ``Prepared``
     #: built without them would refuse every mark a reader made.
     mark_targets: tuple[MarkTarget, ...]
+
+    @property
+    def part_one(self) -> str:
+        """Part one as the reading document prints it.
+
+        Derived rather than stored beside the blocks: the filled evidence
+        document and the page must lay out one description of the case, and a
+        second stored copy is where the two start to disagree.
+        """
+        return docs.part_one_markdown(self.part_one_blocks)
+
+    @property
+    def part_two(self) -> dict[str, str]:
+        """Framework -> that set as the reading document prints it."""
+        return {
+            name: docs.part_markdown(rendered, part)
+            for part, (name, rendered) in enumerate(
+                self.part_two_blocks.items(), start=2
+            )
+        }
 
 
 def mark_targets(case: GoldenCase) -> tuple[MarkTarget, ...]:
@@ -627,8 +648,8 @@ def prepare(case_dir: Path) -> Prepared:
     return Prepared(
         case_id=case.id,
         title=case.meta.title,
-        part_one=docs.part_one(case_dir),
-        part_two=docs.parts_after(case_dir),
+        part_one_blocks=docs.part_one_blocks(case_dir),
+        part_two_blocks=docs.parts_after_blocks(case_dir),
         files=required_files(case.frameworks),
         mark_targets=mark_targets(case),
     )

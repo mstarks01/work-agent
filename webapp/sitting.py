@@ -104,6 +104,13 @@ refuses a second one. Without that refusal the reader could open a case's
 sets, come back to it, and post a list the document would then print above
 them — evidence of an order that did not happen.
 
+**The case is laid out rather than printed flat.** ``evals/build_review_docs``
+describes part one and each recorded set as blocks, and the reading document
+and this page render those same blocks — one description of a case, two
+surfaces, so neither can drift into describing a different system. Each
+recorded finding is a card that carries the mark answering it, rather than a
+wall of text above a list of selects.
+
 **The reader walks the corpus, and Previous and Next sit in the stage header.**
 They step in the rail's order over the cases the reader may open, and the last
 Next lands on the submit stage. The rail never leaves, so the walk reloads no
@@ -156,9 +163,10 @@ Security posture, inherited from ``webapp/review.py`` rather than re-derived:
 * **The reviewer comes from the command line, never from the request** (A01).
   A browser field naming the reviewer would let one person file a sitting as
   another, and #320's binding rests on the name being true.
-* **Case prose reaches the page as data** (LLM05, A05). The document and each
-  recorded claim are injected as JSON the client renders through
-  ``textContent``.
+* **Case prose reaches the page as data** (LLM05, A05). The case and each
+  recorded claim arrive as JSON blocks. The page builds its own markup around
+  them and puts every word inside it through ``textContent``, so a sentence
+  that spells a tag arrives as those characters.
 * **A mark is an allow-list, checked here** (A05). The value is the method's
   closed set of three, and the key must name a recorded finding of this case,
   so a request cannot write a sentence of its own into the evidence.
@@ -460,7 +468,7 @@ def create_app(session: Session) -> FastAPI:
                 "case": prepared.case_id,
                 "title": prepared.title,
                 "reviewer": session.reviewer,
-                "body": prepared.part_one,
+                "blocks": prepared.part_one_blocks,
                 "files": prepared.files,
                 "own_list": held.own_list if held else None,
                 # ``None`` where the reader holds no draft, because a draft is
@@ -575,7 +583,7 @@ def create_app(session: Session) -> FastAPI:
         return JSONResponse(
             {
                 "case": prepared.case_id,
-                "frameworks": prepared.part_two,
+                "frameworks": prepared.part_two_blocks,
                 "marks": [
                     {
                         "fingerprint": target.fingerprint,
@@ -982,9 +990,56 @@ _PAGE = r"""<!doctype html>
            padding: 1.2rem 1rem; }
   select { font: inherit; padding: .2rem .4rem; border-radius: 6px;
            border: 1px solid var(--line); }
-  .line { display: flex; gap: .8rem; align-items: baseline; padding: .35rem 0;
-          border-bottom: 1px solid var(--line); }
-  .line span { flex: 1; }
+
+  /* The case, laid out. Every word below still arrives through textContent;
+     the markup around it is this page's own, written here and never built
+     from case prose. */
+  .doc h3 { font-size: .74rem; text-transform: uppercase; letter-spacing: .08em;
+            color: #8a8a8a; margin: 1.8rem 0 .6rem; font-weight: 600; }
+  .doc h3:first-child { margin-top: .4rem; }
+  /* One framework's whole set, over the groups inside it. The rule is what
+     separates two packages' sets where a case declares both. */
+  .doc h3.set { font-size: .8rem; color: inherit; margin: 2.4rem 0 .8rem;
+                padding-top: 1.2rem; border-top: 1px solid var(--line); }
+  .doc h3.set:first-child { padding-top: 0; border-top: 0; }
+  .card { border: 1px solid var(--line); border-radius: 10px; background: #8881;
+          padding: .9rem 1.1rem; margin: 0 0 .8rem; }
+  .card > :first-child { margin-top: 0; }
+  .card > :last-child { margin-bottom: 0; }
+  .card h4 { font-size: 1rem; font-weight: 600; margin: 0; flex: 1 1 16rem; }
+  .head { display: flex; gap: .55rem; align-items: baseline; flex-wrap: wrap; }
+  .num { font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+         font-size: .8rem; color: #7a7a7a; }
+  .hint { color: #7a7a7a; font-size: .85rem; margin: .4rem 0 .7rem; }
+  .verbatim { background: none; border-left: 2px solid var(--line); border-radius: 0;
+              margin: 0; padding: 0 0 0 1rem; font: inherit; font-size: .95rem; }
+  code.id { font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+            font-size: .85em; background: #8882; border-radius: 4px;
+            padding: .05rem .3rem; }
+  .scroll { overflow-x: auto; }
+  table { border-collapse: collapse; width: 100%; font-size: .84rem; }
+  th, td { text-align: left; padding: .35rem .6rem; white-space: nowrap;
+           border-bottom: 1px solid var(--line); }
+  th { font-size: .7rem; text-transform: uppercase; letter-spacing: .05em;
+       color: #7a7a7a; font-weight: 600; }
+  td { font-family: ui-monospace, SFMono-Regular, Menlo, monospace; }
+  ul.terms { list-style: none; margin: 0; padding: 0; }
+  ul.terms li { font-size: .9rem; padding: .35rem 0;
+                border-bottom: 1px solid var(--line); }
+  ul.terms li:last-child { border-bottom: 0; }
+
+  /* One recorded finding, and the mark that answers it. */
+  .rec { border-left: 3px solid #8886; }
+  ul.fields { list-style: none; margin: .6rem 0 0; padding: 0; font-size: .85rem; }
+  ul.fields li { padding: .12rem 0; color: #6f6f6f; }
+  .lbl { text-transform: uppercase; letter-spacing: .05em; font-size: .68rem;
+         color: #8a8a8a; margin-right: .35rem; }
+  .mark { display: flex; gap: .6rem; align-items: baseline; margin-top: .8rem;
+          padding-top: .7rem; border-top: 1px solid var(--line); }
+  .mark label { font-size: .8rem; color: #7a7a7a; }
+  .aside { font-size: .82rem; color: #7a7a7a; margin: .8rem 0 0;
+           padding-top: .7rem; border-top: 1px solid var(--line); }
+  .gap { border-left: 3px solid #c34a3c; }
 </style></head>
 <body>
 <nav>
@@ -1016,7 +1071,7 @@ _PAGE = r"""<!doctype html>
 
   <section id="one">
     <h2>Part 1 — the system</h2>
-    <pre id="partOne">loading…</pre>
+    <div id="partOne" class="doc">loading…</div>
     <h2>Your list, written first</h2>
     <p class="note">Write what could go wrong: an attack, a missing control, a
     question the text does not answer. One per line. The recorded sets are not
@@ -1038,7 +1093,7 @@ _PAGE = r"""<!doctype html>
     worth reporting, <code>doubt</code> overstated or unsupported by the text,
     <code>dup</code> the same finding as another entry. Leave a mark unset to say
     nothing about that one.</p>
-    <div id="partTwo"></div>
+    <div id="partTwo" class="doc"></div>
     <h2>On your list and not on theirs</h2>
     <p class="note">The finding this sitting exists for. One per line.</p>
     <textarea id="missing" placeholder="one per line"></textarea>
@@ -1259,7 +1314,7 @@ async function openCase(caseId) {
   if (!res.ok) { $("partOne").textContent = d.detail; return; }
   $("caseTitle").textContent = d.title;
   $("caseId").textContent = d.case;
-  $("partOne").textContent = d.body;
+  layout($("partOne"), d.blocks);
   warn(d.moved);
   // A case takes one own list. Where this reader already holds a draft, the
   // box comes back filled and locked and the sets open, because the server
@@ -1384,14 +1439,25 @@ async function showSets(caseId) {
   const sets = await res.json();
   if (current !== caseId) return;
   if (!res.ok) { $("partOne").textContent = sets.detail; return; }
+  // A target is anchored to its claim sentence and carries no position, so
+  // the sentence is what pairs a recorded finding with the mark that answers
+  // it. Two claims the identity rule calls one finding share one target, and
+  // the second card says so rather than offering a second select that would
+  // overwrite the first.
+  const byClaim = new Map();
+  for (const target of sets.marks) {
+    for (const claim of target.claims) byClaim.set(claim, target);
+  }
   const box = $("partTwo");
   box.replaceChildren();
-  for (const [name, body] of Object.entries(sets.frameworks)) {
-    const pre = document.createElement("pre");
-    pre.textContent = body;
-    box.appendChild(pre);
-    for (const target of sets.marks.filter(m => m.framework === name)) {
-      box.appendChild(markRow(target, sets.values));
+  for (const part of Object.values(sets.frameworks)) {
+    box.append(el("h3", "set", part.heading), el("p", "note", part.question));
+    const answered = new Map();
+    for (const group of part.groups) {
+      box.append(el("h3", null, group.name));
+      for (const record of group.records) {
+        box.append(recordCard(record, byClaim.get(record.title), sets.values, answered));
+      }
     }
   }
   $("placeholder").classList.add("hidden");
@@ -1450,23 +1516,138 @@ $("discard").addEventListener("click", async () => {
   await openCase(caseId);
 });
 
-// The claim text is data, so it lands through textContent rather than through
-// any markup — the same rule the rest of this page reads case prose under.
-function markRow(target, values) {
-  const row = document.createElement("div");
-  row.className = "line";
-  const text = document.createElement("span");
-  text.textContent = target.claims.join(" / ");
+// Case prose is data, so it lands through textContent rather than through any
+// markup — the same rule the flat text obeyed, kept while the page gained a
+// layout. Every builder below writes its own elements and puts the case's own
+// words inside them, so a sentence spelling a tag arrives as those characters.
+function el(tag, className, text) {
+  const node = document.createElement(tag);
+  if (className) node.className = className;
+  if (text !== undefined && text !== null) node.textContent = text;
+  return node;
+}
+
+function sourceBlock(block) {
+  const card = el("div", "card");
+  const head = el("div", "head");
+  head.append(el("h4", null, block.label), el("span", "num", block.source_kind));
+  card.append(head, el("p", "hint", "Exactly what the service would receive."),
+              el("pre", "verbatim", block.text));
+  return card;
+}
+
+function tableBlock(block) {
+  const out = document.createDocumentFragment();
+  const head = el("tr");
+  for (const name of block.headers) head.append(el("th", null, name));
+  const body = el("tbody");
+  for (const row of block.rows) {
+    const line = el("tr");
+    for (const cell of row) line.append(el("td", null, cell));
+    body.append(line);
+  }
+  const thead = el("thead");
+  thead.append(head);
+  const grid = el("table");
+  grid.append(thead, body);
+  const scroll = el("div", "scroll");
+  scroll.append(grid);
+  out.append(el("h3", null, block.caption), scroll);
+  return out;
+}
+
+function termsBlock(block) {
+  const out = document.createDocumentFragment();
+  out.append(el("h3", null, block.caption));
+  if (block.hint) out.append(el("p", "hint", block.hint));
+  const list = el("ul", "terms");
+  for (const item of block.items) {
+    const line = el("li");
+    line.append(el("code", "id", item.term), " — ", item.text);
+    list.append(line);
+  }
+  out.append(list);
+  return out;
+}
+
+// One builder per block kind, keyed rather than branched: a kind the server
+// grows and this table does not carry stops the page here, rather than
+// dropping that part of the case off it in silence.
+const BLOCKS = {source: sourceBlock, table: tableBlock, terms: termsBlock};
+
+function layout(box, blocks) {
+  box.replaceChildren();
+  for (const block of blocks) {
+    const build = BLOCKS[block.kind];
+    // Said on the page rather than thrown. A throw here would leave the
+    // reader a blank stage and put the reason somewhere only a developer
+    // looks, and this reader is about to write a list about what they see.
+    if (!build) {
+      const gap = el("div", "card gap");
+      gap.append(el("p", "hint", "This page has no layout for a "
+        + block.kind + " block, so part of the case is missing from it."));
+      box.append(gap);
+      continue;
+    }
+    box.append(build(block));
+  }
+}
+
+// One printed line of a record's named fields. A field says whether its values
+// are identifiers, so this page spells them as code where the reading document
+// spells them in backticks — one description of the record, two surfaces.
+function fieldRow(row) {
+  const line = el("li");
+  row.forEach((field, n) => {
+    if (n) line.append(" · ");
+    line.append(el("span", "lbl", field.label));
+    field.values.forEach((value, i) => {
+      if (i) line.append(", ");
+      line.append(field.code ? el("code", "id", value) : document.createTextNode(value));
+    });
+  });
+  return line;
+}
+
+function recordCard(record, target, values, answered) {
+  const card = el("div", "card rec");
+  const head = el("div", "head");
+  head.append(el("span", "num", record.label));
+  if (record.identifier) head.append(el("code", "id", record.identifier));
+  head.append(el("h4", null, record.title));
+  card.append(head);
+  if (record.fields.length) {
+    const list = el("ul", "fields");
+    for (const row of record.fields) list.append(fieldRow(row));
+    card.append(list);
+  }
+  if (!target) {
+    card.append(el("p", "aside", "No mark: the identity rule keys no recorded"
+      + " finding for this claim, so nothing here would answer it."));
+    return card;
+  }
+  const first = answered.get(target.fingerprint);
+  if (first !== undefined) {
+    card.append(el("p", "aside", "The same finding as " + first
+      + " above, so the one mark there answers this too."));
+    return card;
+  }
+  answered.set(target.fingerprint, record.label);
   const select = document.createElement("select");
   select.dataset.finding = target.fingerprint;
+  select.id = "mark-" + target.fingerprint;
   for (const value of ["", ...values]) {
     const option = document.createElement("option");
     option.value = value;
     option.textContent = value || "—";
-    select.appendChild(option);
+    select.append(option);
   }
-  row.append(text, select);
-  return row;
+  const label = el("label", null, "Your mark");
+  label.htmlFor = select.id;
+  const mark = el("div", "mark");
+  mark.append(label, select);
+  card.append(mark);
+  return card;
 }
 
 function marksNow() {
