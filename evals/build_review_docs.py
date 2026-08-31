@@ -116,157 +116,226 @@ def table(headers: list[str], rows: list[list[str]]) -> str:
     return "\n".join(out)
 
 
-def model_tables(model: dict) -> str:
-    parts = []
-    if model.get("external_entities"):
-        parts.append("**External entities**\n")
-        parts.append(
-            table(
-                ["id", "kind", "zone"],
-                [
-                    [e["id"], e["kind"], e["trust_zone"]]
-                    for e in model["external_entities"]
-                ],
-            )
-        )
-    if model.get("processes"):
-        parts.append("\n**Processes**\n")
-        parts.append(
-            table(
-                ["id", "exposure", "interface", "zone", "technology"],
-                [
-                    [
-                        p["id"],
-                        p["exposure"],
-                        p["interface_kind"],
-                        p["trust_zone"],
-                        p["technology"],
-                    ]
-                    for p in model["processes"]
-                ],
-            )
-        )
-    if model.get("data_stores"):
-        parts.append("\n**Data stores**\n")
-        parts.append(
-            table(
-                ["id", "zone", "at rest", "classification"],
-                [
-                    [
-                        s["id"],
-                        s["trust_zone"],
-                        s["encryption_at_rest"],
-                        s["data_classification"],
-                    ]
-                    for s in model["data_stores"]
-                ],
-            )
-        )
-    if model.get("data_flows"):
-        parts.append("\n**Data flows**\n")
-        parts.append(
-            table(
-                [
-                    "id",
-                    "source",
-                    "destination",
-                    "protocol",
-                    "authentication",
-                    "in transit",
-                ],
-                [
-                    [
-                        f["id"],
-                        f["source"],
-                        f["destination"],
-                        f["protocol"],
-                        f["authentication"],
-                        f["encryption_in_transit"],
-                    ]
-                    for f in model["data_flows"]
-                ],
-            )
-        )
-    if model.get("trust_boundaries"):
-        parts.append("\n**Trust boundaries**\n")
-        parts.append(
-            table(
-                ["id", "kind"],
-                [[b["id"], b["kind"]] for b in model["trust_boundaries"]],
-            )
-        )
+#: One model group per row: the key it lives under in ``model.json``, the
+#: caption a reader sees, the column headers, and the cells one element fills.
+#: A table rather than five near-identical blocks, so a group added to the
+#: model reaches both surfaces through one row. Order is the reading order.
+MODEL_TABLES: list[tuple[str, str, list[str], Callable[[dict], list[str]]]] = [
+    (
+        "external_entities",
+        "External entities",
+        ["id", "kind", "zone"],
+        lambda e: [e["id"], e["kind"], e["trust_zone"]],
+    ),
+    (
+        "processes",
+        "Processes",
+        ["id", "exposure", "interface", "zone", "technology"],
+        lambda p: [
+            p["id"],
+            p["exposure"],
+            p["interface_kind"],
+            p["trust_zone"],
+            p["technology"],
+        ],
+    ),
+    (
+        "data_stores",
+        "Data stores",
+        ["id", "zone", "at rest", "classification"],
+        lambda s: [
+            s["id"],
+            s["trust_zone"],
+            s["encryption_at_rest"],
+            s["data_classification"],
+        ],
+    ),
+    (
+        "data_flows",
+        "Data flows",
+        ["id", "source", "destination", "protocol", "authentication", "in transit"],
+        lambda f: [
+            f["id"],
+            f["source"],
+            f["destination"],
+            f["protocol"],
+            f["authentication"],
+            f["encryption_in_transit"],
+        ],
+    ),
+    (
+        "trust_boundaries",
+        "Trust boundaries",
+        ["id", "kind"],
+        lambda b: [b["id"], b["kind"]],
+    ),
+]
 
+
+def model_blocks(model: dict) -> list[dict]:
+    """One model, as the blocks a surface lays out.
+
+    Two block kinds carry all of it. ``table`` is a caption over headers and
+    rows; ``terms`` is a caption over ``id — sentence`` pairs, which is the
+    shape both the recorded notes and the assumptions already have.
+    """
+    blocks: list[dict] = []
+    for key, caption, headers, cells in MODEL_TABLES:
+        elements = model.get(key)
+        if elements:
+            blocks.append(
+                {
+                    "kind": "table",
+                    "caption": caption,
+                    "headers": headers,
+                    "rows": [cells(element) for element in elements],
+                }
+            )
     noted = [
-        (el["id"], el["notes"])
-        for group in (
-            "external_entities",
-            "processes",
-            "data_stores",
-            "data_flows",
-            "trust_boundaries",
-        )
-        for el in model.get(group, [])
+        {"term": el["id"], "text": el["notes"]}
+        for key, _, _, _ in MODEL_TABLES
+        for el in model.get(key, [])
         if el.get("notes")
     ]
     if noted:
-        parts.append(
-            "\n**Recorded notes** — hedges, probed gaps and source disagreements"
-            " live here, so read them before the sets.\n"
+        blocks.append(
+            {
+                "kind": "terms",
+                "caption": "Recorded notes",
+                "hint": "hedges, probed gaps and source disagreements live here,"
+                " so read them before the sets.",
+                "items": noted,
+            }
         )
-        for element_id, note in noted:
-            parts.append(f"- `{element_id}` — {note}")
     if model.get("assumptions"):
-        parts.append("\n**Assumptions**\n")
-        for entry in model["assumptions"]:
-            parts.append(
-                f"- `{entry['element_id']}` — {entry['assumption']} (basis: {entry['basis']})"
-            )
-    return "\n".join(parts)
-
-
-def stride_part(claims: list[dict], part: int) -> str:
-    lines = [f"## Part {part} — the {len(claims)} recorded STRIDE threats\n"]
-    lines.append("Only after your own list exists.\n")
-    lines.append(MARK_GUIDANCE)
-    current = None
-    for number, claim in enumerate(claims, start=1):
-        if claim["category"] != current:
-            current = claim["category"]
-            lines.append(f"\n### {current}\n")
-        severity = claim["severity"]
-        lines.append(f"**{number}.** {claim['claim']}\n")
-        cites = ", ".join(f"`{i}`" for i in claim["affected_element_ids"])
-        lines.append(f"- cites: {cites}")
-        lines.append(
-            f"- tier: {claim['tier']} · severity: {severity['likelihood']}/{severity['impact']}"
-            f" · verb: `{claim['verb']}`"
+        blocks.append(
+            {
+                "kind": "terms",
+                "caption": "Assumptions",
+                "hint": None,
+                "items": [
+                    {
+                        "term": entry["element_id"],
+                        "text": f"{entry['assumption']} (basis: {entry['basis']})",
+                    }
+                    for entry in model["assumptions"]
+                ],
+            }
         )
-        if claim.get("notes"):
-            lines.append(f"- recorded note: {claim['notes']}")
-        lines.append("\n> mark:\n")
-    return "\n".join(lines)
+    return blocks
 
 
-def asvs_part(records: list[dict], part: int) -> str:
-    lines = [f"## Part {part} — the {len(records)} recorded ASVS records\n"]
-    lines.append(
-        "The narrower question, per record: **does this requirement apply to"
-        " this system, and does the input show it satisfied?** An ASVS claim"
-        " rules applicability and never a pass.\n"
-    )
-    current = None
+def model_markdown(blocks: list[dict]) -> str:
+    """The model blocks as the reading document prints them."""
+    chunks = []
+    for block in blocks:
+        head = f"**{block['caption']}**"
+        if block.get("hint"):
+            head += f" — {block['hint']}"
+        if block["kind"] == "table":
+            body = table(block["headers"], block["rows"])
+        else:
+            body = "\n".join(
+                f"- `{item['term']}` — {item['text']}" for item in block["items"]
+            )
+        chunks.append(f"{head}\n\n{body}")
+    return "\n\n".join(chunks)
+
+
+def model_tables(model: dict) -> str:
+    """One model, as the reading document prints it."""
+    return model_markdown(model_blocks(model))
+
+
+def _fields(*rows: list[dict] | None) -> list[list[dict]]:
+    """The named fields of one record, one printed line per row.
+
+    A row is a list of fields, because the reading document puts a record's
+    tier, severity and verb on one line and its citations on another. A field
+    names itself, carries its values as values, and says whether they are
+    identifiers — so the document can print backticks and a page can print
+    code spans, from one description of the same record.
+    """
+    return [row for row in rows if row]
+
+
+def _field(label: str, *values: str, code: bool = False) -> dict:
+    return {"label": label, "values": list(values), "code": code}
+
+
+def _note_row(record: dict) -> list[dict] | None:
+    if not record.get("notes"):
+        return None
+    return [_field("recorded note", record["notes"])]
+
+
+def stride_part(claims: list[dict]) -> dict:
+    """STRIDE's part: could this attack happen in this system?"""
+    groups: list[dict] = []
+    for number, claim in enumerate(claims, start=1):
+        if not groups or groups[-1]["name"] != claim["category"]:
+            groups.append({"name": claim["category"], "records": []})
+        severity = claim["severity"]
+        groups[-1]["records"].append(
+            {
+                "label": str(number),
+                "identifier": None,
+                "title": claim["claim"],
+                "fields": _fields(
+                    [_field("cites", *claim["affected_element_ids"], code=True)],
+                    [
+                        _field("tier", claim["tier"]),
+                        _field(
+                            "severity",
+                            f"{severity['likelihood']}/{severity['impact']}",
+                        ),
+                        _field("verb", claim["verb"], code=True),
+                    ],
+                    _note_row(claim),
+                ),
+            }
+        )
+    return {
+        "framework": "stride",
+        "question": "Could this attack happen in this system?",
+        "heading": f"the {len(claims)} recorded STRIDE threats",
+        "intro": ["Only after your own list exists.\n", MARK_GUIDANCE],
+        "groups": groups,
+    }
+
+
+def asvs_part(records: list[dict]) -> dict:
+    """ASVS's part: does this requirement apply, and is it shown satisfied?"""
+    groups: list[dict] = []
     for number, record in enumerate(records, start=1):
-        if record["chapter"] != current:
-            current = record["chapter"]
-            lines.append(f"\n### {current}\n")
-        lines.append(f"**A{number}.** `{record['requirement']}` — {record['claim']}\n")
-        cites = ", ".join(f"`{i}`" for i in record["affected_element_ids"])
-        lines.append(f"- cites: {cites}")
-        lines.append(f"- tier: {record['tier']}")
-        if record.get("notes"):
-            lines.append(f"- recorded note: {record['notes']}")
-        lines.append("\n> mark:\n")
-    return "\n".join(lines)
+        if not groups or groups[-1]["name"] != record["chapter"]:
+            groups.append({"name": record["chapter"], "records": []})
+        groups[-1]["records"].append(
+            {
+                "label": f"A{number}",
+                "identifier": record["requirement"],
+                "title": record["claim"],
+                "fields": _fields(
+                    [_field("cites", *record["affected_element_ids"], code=True)],
+                    [_field("tier", record["tier"])],
+                    _note_row(record),
+                ),
+            }
+        )
+    return {
+        "framework": "asvs",
+        "question": "Does this requirement apply to this system, and does the"
+        " input show it satisfied?",
+        "heading": f"the {len(records)} recorded ASVS records",
+        "intro": [
+            (
+                "The narrower question, per record: **does this requirement apply"
+                " to this system, and does the input show it satisfied?** An ASVS"
+                " claim rules applicability and never a pass.\n"
+            )
+        ],
+        "groups": groups,
+    }
 
 
 #: One renderer per framework, keyed rather than branched: a package missing
@@ -274,8 +343,10 @@ def asvs_part(records: list[dict], part: int) -> str:
 #: keeps the table complete against the registry — a table nobody compares to
 #: `PACKAGES` fails as quietly as the branch it replaces. Each renderer asks
 #: the question that package's records rule on: STRIDE's is a threat, ASVS's
-#: is applicability.
-RENDERERS: dict[str, Callable[[list[dict], int], str]] = {
+#: is applicability. Each answers in blocks rather than in text, so the
+#: reading document and `webapp/sitting.py` lay out one description of the
+#: record and cannot drift into describing two.
+RENDERERS: dict[str, Callable[[list[dict]], dict]] = {
     "stride": stride_part,
     "asvs": asvs_part,
 }
@@ -286,6 +357,29 @@ if _missing:
         f"no reading-document renderer for {sorted(_missing)}; add a row to"
         " RENDERERS so that package's reference set reaches a sitting"
     )
+
+
+def _printed(field: dict) -> str:
+    values = field["values"]
+    if field["code"]:
+        values = [f"`{value}`" for value in values]
+    return f"{field['label']}: {', '.join(values)}"
+
+
+def part_markdown(rendered: dict, part: int) -> str:
+    """One framework's part as the reading document prints it."""
+    lines = [f"## Part {part} — {rendered['heading']}\n", *rendered["intro"]]
+    for group in rendered["groups"]:
+        lines.append(f"\n### {group['name']}\n")
+        for record in group["records"]:
+            named = f"`{record['identifier']}` — " if record["identifier"] else ""
+            lines.append(f"**{record['label']}.** {named}{record['title']}\n")
+            lines += [
+                "- " + " · ".join(_printed(field) for field in row)
+                for row in record["fields"]
+            ]
+            lines.append("\n> mark:\n")
+    return "\n".join(lines)
 
 
 def closing(case_id: str, meta: dict) -> str:
@@ -357,32 +451,53 @@ contributor adds their own, standing `contributor`. Then
 """
 
 
-def part_one(case_dir: Path) -> str:
+def part_one_blocks(case_dir: Path) -> list[dict]:
     """The system as the reader meets it: every source, then the model.
 
     Split out so a surface can show this and withhold the recorded sets until
     the reader's own list is written — the one rule the method has. The
-    generated document and `webapp/sitting.py` compose the same text.
+    generated document and `webapp/sitting.py` lay out these same blocks, so
+    a page and a document cannot describe two different systems.
     """
     meta = load_meta(case_dir / "case.json")
-    model = load_meta(case_dir / "model.json")
+    blocks: list[dict] = [
+        {
+            "kind": "source",
+            "label": source["label"],
+            "source_kind": source["kind"],
+            "text": (case_dir / source["file"]).read_text(encoding="utf-8"),
+        }
+        for source in meta["sources"]
+    ]
+    return blocks + model_blocks(load_meta(case_dir / "model.json"))
+
+
+def part_one_markdown(blocks: list[dict]) -> str:
+    """Part one's blocks as the reading document prints them."""
     lines = ["## Part 1 — the system\n"]
-    for source in meta["sources"]:
-        text = (case_dir / source["file"]).read_text(encoding="utf-8")
-        lines.append(f"### {source['label']} ({source['kind']})\n")
+    for block in blocks:
+        if block["kind"] != "source":
+            continue
+        lines.append(f"### {block['label']} ({block['source_kind']})\n")
         lines.append("Exactly what the service would receive.\n")
-        lines.append(quoted(text))
+        lines.append(quoted(block["text"]))
         lines.append("")
     lines.append("### What the model says is in it\n")
     lines.append(
         "Not part of the question, but the records cite these names, so you"
         " need them.\n"
     )
-    lines.append(model_tables(model))
+    lines.append(
+        model_markdown([block for block in blocks if block["kind"] != "source"])
+    )
     return "\n".join(lines)
 
 
-def parts_after(case_dir: Path) -> dict[str, str]:
+def part_one(case_dir: Path) -> str:
+    return part_one_markdown(part_one_blocks(case_dir))
+
+
+def parts_after_blocks(case_dir: Path) -> dict[str, dict]:
     """The recorded set per declared framework, rendered through RENDERERS.
 
     Keyed by framework rather than concatenated, so a caller can show one at a
@@ -390,12 +505,22 @@ def parts_after(case_dir: Path) -> dict[str, str]:
     renderer entry with no edit.
     """
     meta = load_meta(case_dir / "case.json")
-    rendered = {}
-    for part, declared in enumerate(meta["frameworks"], start=2):
-        name = declared["name"]
-        claims = load_records(case_dir / "claims" / f"{name}.json")
-        rendered[name] = RENDERERS[name](claims, part)
-    return rendered
+    return {
+        declared["name"]: RENDERERS[declared["name"]](
+            load_records(case_dir / "claims" / f"{declared['name']}.json")
+        )
+        for declared in meta["frameworks"]
+    }
+
+
+def parts_after(case_dir: Path) -> dict[str, str]:
+    """The recorded set per declared framework, as the document prints it."""
+    return {
+        name: part_markdown(rendered, part)
+        for part, (name, rendered) in enumerate(
+            parts_after_blocks(case_dir).items(), start=2
+        )
+    }
 
 
 def build_doc(case_dir: Path) -> str:

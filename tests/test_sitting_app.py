@@ -22,6 +22,7 @@ from pathlib import Path
 import pytest
 from fastapi.testclient import TestClient
 
+from evals import verify_corpus
 from evals.harness import sitting as sittings
 from webapp.sitting import _PAGE, build_session, create_app
 from webapp.sitting import main as app_main
@@ -194,7 +195,10 @@ class TestTheOwnListRuleIsEnforced:
         )
         sets = app.get(f"/api/part-two?case={CASE}").json()["frameworks"]
         assert "stride" in sets
-        assert sets["stride"].strip()
+        records = [
+            record for group in sets["stride"]["groups"] for record in group["records"]
+        ]
+        assert records, "the recorded set arrived with no record in it"
 
     def test_finishing_without_a_list_is_refused(self, client):
         app, _, _ = client
@@ -1347,9 +1351,12 @@ class TestTheDraftSurvivesTheProcess:
         waits."""
         app = browser(session_for(tree, "ada"))
         app.post("/api/own-list", json={"case": CASE, "items": []})
-        part_one = app.get(f"/api/part-one?case={CASE}").json()["body"]
+        blocks = app.get(f"/api/part-one?case={CASE}").json()["blocks"]
         held = draft_file(tree, CASE).read_text("utf-8")
-        longest = max(part_one.split("\n"), key=len).strip()
+        prose = "\n".join(
+            block["text"] for block in blocks if block["kind"] == "source"
+        )
+        longest = max(prose.split("\n"), key=len).strip()
         assert len(longest) > 40, "the case has a sentence long enough to look for"
         assert longest not in held
 
@@ -2237,3 +2244,53 @@ class TestThePageParses:
         """The escape the reader's lists are split and joined on."""
         assert '.split("\\n")' in self.script()
         assert '.join("\\n")' in self.script()
+
+
+class TestTheLayoutCoversTheCase:
+    """The page lays the case out, and neither half may outgrow the other.
+
+    The flat text the page used to print could not lose a part of a case: a
+    block the layout did not know about still arrived as its own words. Markup
+    can, so both halves are checked against what the corpus actually holds.
+    """
+
+    def kinds(self) -> set[str]:
+        """The block kinds the page's own table carries a builder for."""
+        table = _PAGE.split("const BLOCKS = {")[1].split("}")[0]
+        return {entry.split(":")[0].strip() for entry in table.split(",")}
+
+    @pytest.mark.parametrize(
+        "case_dir", verify_corpus.case_dirs(), ids=lambda path: path.name
+    )
+    def test_every_block_the_corpus_holds_has_a_builder(self, case_dir):
+        """A kind the page cannot build drops that part of the case in silence."""
+        prepared = sittings.prepare(case_dir)
+        served = {block["kind"] for block in prepared.part_one_blocks}
+        assert served <= self.kinds(), (
+            f"{case_dir.name} serves {sorted(served - self.kinds())}, which the"
+            " page's BLOCKS table has no builder for"
+        )
+
+    @pytest.mark.parametrize(
+        "case_dir", verify_corpus.case_dirs(), ids=lambda path: path.name
+    )
+    def test_every_recorded_record_reaches_the_mark_that_answers_it(self, case_dir):
+        """The claim sentence is the anchor, so it has to be one on both sides.
+
+        The page pairs a record card with its mark target by the claim
+        sentence, because a target carries no position. A record whose sentence
+        names no target would print with no mark on it, and a sentence written
+        twice in one case would put the second card's mark on the first.
+        """
+        prepared = sittings.prepare(case_dir)
+        anchored = {
+            claim for target in prepared.mark_targets for claim in target.claims
+        }
+        titles = [
+            record["title"]
+            for part in prepared.part_two_blocks.values()
+            for group in part["groups"]
+            for record in group["records"]
+        ]
+        assert set(titles) <= anchored, "a recorded record reaches no mark target"
+        assert len(titles) == len(set(titles)), "one sentence names two records"
