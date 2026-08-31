@@ -125,6 +125,7 @@ evals/
 | `harness/triggers.py` | Candidate-trigger recall: whether `analysis_service.candidates` fired a rule in a reference claim's own lane, on an element that claim names. Costs no provider call. |
 | `harness/calibration.py` | Rule-vs-label agreement over the labelled fixtures — the scoreboard any rule change must clear. |
 | `harness/verbs.py` | The closed vocabulary of attacker actions, and what counts as one action. |
+| `harness/exemplar_verbs.py` | Which actions a package's shipped exemplars demonstrate against which its reference sets grade, and the exemplar pairs that name one place and two actions. Reads text and blessed models only, so it costs no provider call. |
 | `harness/identity.py` | Claim identity from the fields a claim carries. `SubsetVerbIdentity` scores 185/200 against the recorded labels, over the 90% bar, with no model call. |
 | `harness/fingerprint.py` | A **Claim**'s identity as a versioned value code computes. No model call. |
 | `harness/ledger.py` | The append-only record of what a **person** decided about a finding. One file per voter, named by the GitHub login. |
