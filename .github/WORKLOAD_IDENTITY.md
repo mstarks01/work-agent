@@ -7,7 +7,7 @@ this repository.
 The same four variables enable the Vertex lane of
 `.github/workflows/provider-smoke.yml`, which is the cheaper of the two and the
 one to watch first: it runs one small job rather than the thirteen-case corpus, so
-it answers "does Vertex serve this graph" for cents, on every pull request.
+it answers "does Vertex serve this graph" for cents, on every merge to `main`.
 
 This covers **Vertex only**, because that is what `evals-live.yml` selects in
 its `ANALYSIS_MODEL_*` block. The shipped configuration selects no vendor at all
@@ -24,6 +24,50 @@ is scoped to a single workflow run. If any step below tempts you toward
 `gcloud iam service-accounts keys create`, the setup has gone wrong.
 
 The offline job in `ci.yml` needs none of this and must never be granted it.
+
+## The trust model
+
+**No credential-bearing job runs mutable pull-request-head code.** That is the
+one rule this setup exists to keep, and every choice below follows from it.
+
+The threat is a *collaborator*, not a fork. Fork pull requests get no secrets
+and were always skipped, which is what made a `pull_request` trigger look
+sufficient. It is not. Anyone who can push a branch to this repository and open
+a pull request can edit the application code a live lane imports, or edit the
+lane's own workflow file, and have the edit run while the job holds the Vertex
+identity or a provider key. The OIDC token minted for that run carries the same
+`repository` claim as one minted on `main`, so repository-scoped federation
+admits it.
+
+Two layers close it, and either one closes it alone:
+
+1. **The workflows.** No credential-bearing job triggers on `pull_request`.
+   `evals-live.yml` and `provider-smoke.yml` run on `push` to `main`;
+   `evals-live-api-key.yml` is dispatch-only. All three carry
+   `if: github.ref == 'refs/heads/main'` on the job, because a
+   `workflow_dispatch` names its own ref and would otherwise reach an
+   unreviewed branch. `pull_request_target` is prohibited outright.
+2. **The federation.** The attribute condition pins `job_workflow_ref` to the
+   trusted ref, so only a workflow file already on `main` can exchange a token
+   at all — see section 3.
+
+Two layers rather than one because layer 1 lives in files a collaborator can
+edit in a pull request, and layer 2 does not.
+
+`tests/test_workflow_lints.py` enforces both halves of layer 1 against every
+workflow in the directory, so a lane added later is covered without anyone
+remembering to come back here.
+
+What a pull request gets instead is `ci.yml`'s offline conformance suite. It
+exercises Vertex, Anthropic and OpenAI equally and holds no credential, so it
+establishes what each provider would be asked for. The live lanes answer the
+second question one merge later.
+
+The API-key jobs additionally name a `live-providers` environment, so a
+deployment can require reviewers and restrict deployment branches from the
+repository settings. That is a second layer behind the ref guard, not a
+replacement: an environment nobody has configured protection rules on protects
+nothing.
 
 ## 0. The repository
 
@@ -74,7 +118,7 @@ issuer `https://token.actions.githubusercontent.com`, carrying this attribute
 condition:
 
 ```
-assertion.repository == '<OWNER>/<REPO>'
+assertion.repository == '<OWNER>/<REPO>' && assertion.job_workflow_ref.endsWith('@refs/heads/main')
 ```
 
 That condition is **load-bearing and not optional**. Without it the provider
@@ -83,8 +127,31 @@ could then exchange its token for these credentials. The condition must name
 the repository, not just the owner: `repository_owner` alone still admits every
 repo under the account, including one an attacker gets a workflow merged into.
 
-Re-running with a different `--repo` updates the condition rather than leaving
-the old repository trusted.
+**The repository claim is where this condition used to stop, and it is not
+enough.** A collaborator's pull-request branch produces a token whose
+`repository` claim is identical to `main`'s, so repository scoping federates
+reviewed and unreviewed code alike. `job_workflow_ref` is the claim that tells
+them apart: it names the ref of the *workflow definition* GitHub is running —
+`<OWNER>/<REPO>/.github/workflows/<file>@<REF>` — so pinning its suffix admits
+only workflow files already on the trusted ref. It covers a reusable workflow
+called from elsewhere for the same reason, because the claim names the file
+that is executing.
+
+Pass `--trusted-ref` to name a different ref. It is a full git ref rather than a
+branch name, because that is what the claim carries.
+
+Re-running with a different `--repo` or `--trusted-ref` updates the condition
+rather than leaving the old one trusted.
+
+### What this rejects
+
+| Token from | `repository` | `job_workflow_ref` | Admitted |
+| --- | --- | --- | --- |
+| `push` to `main` | matches | `…@refs/heads/main` | yes |
+| `workflow_dispatch` on `main` | matches | `…@refs/heads/main` | yes |
+| a collaborator's pull request | matches | `…@refs/heads/<branch>` | **no** |
+| `workflow_dispatch` on a branch | matches | `…@refs/heads/<branch>` | **no** |
+| another repository | differs | — | **no** |
 
 ## 4. What it creates: a separate eval service account
 

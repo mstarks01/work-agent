@@ -74,8 +74,8 @@ question this section tracked no longer has a subject.
 The issue's stated problem was an assurance imbalance: Vertex exercised by CI,
 other vendors exercised manually. The premise turned out to be wrong in a way
 that matters more than the claim — Workload Identity Federation is unprovisioned,
-so the Vertex lane *skips* on every pull request and has never run. Neither the
-API-key lane nor the Vertex lane has ever produced a result. The imbalance was in
+so the Vertex lane *skips* and has never run. Neither the API-key lane nor the
+Vertex lane has ever produced a result. The imbalance was in
 intent; the assurance was zero across the board.
 
 A live smoke suite per vendor was therefore the wrong first move: it would have

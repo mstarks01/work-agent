@@ -1,4 +1,4 @@
-# The live provider smoke: one small job per vendor, on every pull request.
+# The live provider smoke: one small job per vendor, on every merge to main.
 #
 # WHAT THIS IS FOR, and it is the half of #116 the offline suite cannot reach.
 # `ci.yml` runs the credential-free conformance suite for Vertex, Anthropic and
@@ -30,16 +30,31 @@
 # job holds no identity at all. Splitting these into two files would add nothing
 # except a second place for the smoke's shape to drift.
 #
-# `pull_request_target` is PROHIBITED repository-wide, and it is prohibited here
-# for the reason `evals-live.yml` gives at greater length: combined with a
-# PR-head checkout it runs untrusted code while holding credentials. Fork PRs
-# are skipped instead -- this repository takes no fork contributions, and a fork
-# gets no secrets in any case, so a fork lane could only ever report itself
-# unexercised.
+# NO CREDENTIAL-BEARING JOB RUNS MUTABLE PR-HEAD CODE, and that is the rule this
+# file exists to obey rather than a property of which trigger looks safest.
+# `pull_request_target` was already prohibited repository-wide for the reason
+# `evals-live.yml` gives at greater length: combined with a PR-head checkout it
+# runs untrusted code while holding credentials. Plain `pull_request` reaches
+# the same place by a longer road. It skips forks, but it does not skip a
+# collaborator, and a collaborator who can push a branch and open a pull request
+# can edit `src/analysis_service/**` -- which this job imports -- or edit this
+# file, and have the edit execute while the job holds an OIDC identity or a
+# provider key. Repository-scoped federation cannot tell that code from main's.
+#
+# So the trigger is `push` on main: the code that runs has already passed
+# review, and the checkout is of a ref nobody can rewrite unreviewed. What a
+# pull request gets instead is `ci.yml`'s offline conformance suite, which
+# establishes what each provider would be asked for and holds no credential to
+# lose. The smoke answers the second question one merge later.
+#
+# `workflow_dispatch` stays, and the ref guard below is what keeps it honest: a
+# dispatch can name any ref, so without the guard it would be the pull_request
+# hole with a manual step in front of it.
 name: Provider smoke
 
 on:
-  pull_request:
+  push:
+    branches: [main]
     # The whole agentic surface, and *not* the subtracted closure
     # `evals-live.yml` carries. That filter exists because the eval harness
     # cannot reach every module; this workflow drives the shipped engine, so a
@@ -60,8 +75,8 @@ permissions: {}
 # Its own group, deliberately NOT the `evals-live` one. That group serializes
 # spend across the corpus sweeps, and a smoke queued behind a 90-minute sweep
 # would report a provider outage that ended an hour earlier. cancel-in-progress
-# is true for the opposite reason it is false there: superseding a PR's smoke
-# costs a few cents, and the result being cancelled was about an older commit.
+# is true for the opposite reason it is false there: superseding a smoke costs
+# a few cents, and the result being cancelled was about an older commit.
 concurrency:
   group: provider-smoke-${{ github.ref }}
   cancel-in-progress: true
@@ -71,10 +86,13 @@ jobs:
     name: Smoke (vertex)
     runs-on: ubuntu-latest
     timeout-minutes: 20
-    # Skip fork PRs rather than authenticating them, exactly as the Vertex
-    # sweep does. With no fork contributions this should never fire; if it
-    # does, it is a signal to look, not to loosen.
-    if: github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name == github.repository
+    # The ref guard, and it is the whole of the trust boundary in this file.
+    # `push` on main already implies it; `workflow_dispatch` does not, because
+    # a dispatch names its own ref and anyone with write access can point one
+    # at an unreviewed branch. Written as a condition here rather than left to
+    # the trigger list, so adding a trigger cannot quietly widen what runs with
+    # this job's identity.
+    if: github.ref == 'refs/heads/main'
     permissions:
       contents: read
       # The OIDC token exchanged for short-lived Vertex credentials. This job
@@ -117,8 +135,8 @@ jobs:
       # (.github/WORKLOAD_IDENTITY.md), so a green checkout says nothing about
       # whether it exists. Unconfigured, this lane states that it is
       # unexercised and stops; it does not fail. A red check for absent
-      # infrastructure on every pull request teaches people to ignore the lane,
-      # and the whole point of this file is that people read it.
+      # infrastructure on every merge teaches people to ignore the lane, and
+      # the whole point of this file is that people read it.
       #
       # Only variable *names* are ever printed.
       - name: Check federation is configured
@@ -203,7 +221,15 @@ jobs:
     name: Smoke (${{ matrix.vendor }})
     runs-on: ubuntu-latest
     timeout-minutes: 20
-    if: github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name == github.repository
+    # Same guard, same reason. See the vertex job above.
+    if: github.ref == 'refs/heads/main'
+    # The approval boundary for the bearer keys. Scoping the secrets to an
+    # environment lets a deployment add required reviewers and a deployment-
+    # branch restriction without editing this file, and it is the second layer
+    # behind the ref guard rather than a replacement for it -- an environment
+    # nobody has configured protection rules on protects nothing, which is
+    # exactly why the guard above does not depend on it.
+    environment: live-providers
     permissions:
       contents: read
       # NO id-token. This job mounts a long-lived bearer key, so it must not
@@ -254,7 +280,8 @@ jobs:
       # the same call the Vertex preflight above makes, for the same reason.
       # This differs from `evals-live-api-key.yml`, which fails closed on a
       # missing key: that workflow is dispatch-only, so every event it has did
-      # ask for a live run. This one fires on pull requests, which did not.
+      # ask for a live run. This one fires on every qualifying merge, which
+      # did not.
       #
       # Only the secret's NAME is ever printed.
       - name: Check the vendor key is configured
