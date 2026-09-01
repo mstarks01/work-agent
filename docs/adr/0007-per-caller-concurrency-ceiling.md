@@ -51,8 +51,8 @@ burst a per-minute quota sees.
 ### The counter lives on the `JobStore` seam
 
 Of the three candidates the issue set out — an in-process counter, a
-`JobStore.active_for(subject)` query, or enforcement pushed to the edge — the
-store seam wins on the argument `build_store` already makes.
+`JobStore` query, or enforcement pushed to the edge — the store seam wins on the
+argument `build_store` already makes.
 
 `build_store` refuses to default to the `memory` backend on the stated grounds
 that per-instance storage "loses every job on restart and isolates jobs behind a
@@ -62,12 +62,20 @@ the configured number, and it resets on every deploy. Asked of the store, the
 ceiling is precisely as shared as the deployment's storage is, and registering a
 shared backend turns it into a shared ceiling with no change at the call site.
 
-The protocol therefore carries a documented atomicity requirement, because the
-API calls `active_for` and then `create`: an implementation must observe the
-count and the create together, or a burst can overshoot the number.
-`InMemoryJobStore` satisfies it by never awaiting inside either method, so
-asyncio cannot interleave the pair; a networked backend needs the check and the
-insert in one transaction.
+The protocol therefore carries the atomicity requirement in its **signature**.
+`JobStore.reserve(record, *, ceiling)` counts the owner's jobs in flight and
+inserts the record as one operation, and the protocol exposes neither a bare
+count nor an unconditional create beside it. A caller holding both would write
+the check-then-act race by hand: two submissions that each read the count before
+either inserts both pass a ceiling of one. `InMemoryJobStore` satisfies the
+requirement by never awaiting inside `reserve`, so asyncio cannot interleave a
+second reservation with it; a networked backend needs the count and the insert
+in one transaction or one conditional write.
+
+> **Amended by [#505](https://github.com/mstarks01/work-agent/issues/505).**
+> The pair above was `active_for` then `create`, with the atomicity stated in
+> prose and nothing enforcing it. A backend author could satisfy the type and
+> miss the paragraph. One method cannot be used non-atomically.
 
 Edge enforcement was not chosen *against* — a deployment behind a gateway that
 already meters per caller should keep doing that. It was rejected as the only
@@ -90,14 +98,24 @@ start. `0` is refused for the same reason from the other direction — a
 deployment that accepts no jobs should not be running — while `1` is legal and
 makes the service strictly serial per caller, matching the web app's gate.
 
-### The refusal is `429`, before the input ladder, with no `Retry-After`
+### The refusal is `429`, after the input ladder, with no `Retry-After`
 
-The ceiling is checked *before* the source ladder rather than after. It is a
-fact about the caller, not about the submission, so a caller at their ceiling
-gets the same answer whatever they sent; checking it second would let a
-malformed body outrank it and make the ceiling probe-able through requests that
-were never going to run. Auth stays outermost — the ceiling is per subject and
-cannot be consulted before there is one.
+The ceiling is checked *after* the source ladder. `reserve` enforces it and
+`reserve` needs the record, and the record is built from the resolved framework
+selection and the validated sources — so the ladder has to run first.
+
+This reverses the original ordering, which put the ceiling first on the grounds
+that it is a fact about the caller rather than about the submission, so a caller
+at their ceiling should get the same answer whatever they sent. That property is
+real and it is now gone: a submission which breaches a rung *and* sits on the
+ceiling hears about the rung. The trade is deliberate. A count taken before the
+ladder is a count another submission can land behind, and an ordering preference
+does not outrank a race that lets a burst overshoot the number. Both answers
+refuse the request and neither runs a model, so nothing the ceiling exists to
+stop gets through the new ordering.
+
+Auth stays outermost — the ceiling is per subject and cannot be consulted before
+there is one.
 
 A submission past the ceiling is refused rather than queued, for the reason
 `Analyses.claim`'s docstring already gives: a queued job holds the caller's place
@@ -121,9 +139,12 @@ caller's reaching a terminal state, not the passage of time.
   sum across instances. This is stated in `config/resilience.toml` and in
   `docs/Configuration.md` rather than left for an operator to discover, and it
   is an argument for a shared backend, not a caveat that weakens the bound.
-- A new `JobStore` backend must implement `active_for` and must make the
-  count-then-create pair atomic. The protocol says so; nothing enforces it at
-  the type level.
+- A new `JobStore` backend must implement `reserve` as one transaction or one
+  conditional write. The protocol offers no second way to admit a job, so an
+  implementer cannot satisfy the type and miss the requirement. `reserve`
+  distinguishes `at_ceiling` from `duplicate`, and raises on a backend failure
+  rather than returning an outcome — a store that cannot answer must not read as
+  a store that said no.
 - **Not addressed here**: jobs still run in-process via FastAPI
   `BackgroundTasks`, so accepted work is still work inside the serving
   container, and on Cloud Run CPU outside a request is not guaranteed unless
