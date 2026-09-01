@@ -69,6 +69,57 @@ MAX_ELEMENTS = 20
 MIN_CALIBRATION_PAIRS = 100
 MIN_LABEL_SHARE = 0.3
 
+#: The calibration candidates that carry no element IDs and no verb, with the
+#: reason each cannot be assigned one.
+#:
+#: **This is the refusal set, and it is a fixture rather than a leftover.** The
+#: identity rule refuses a pair it cannot read, and that path has to stay
+#: exercised by pairs chosen for it — not by a backlog nobody finished. Every
+#: other candidate carries both fields whatever its label.
+#:
+#: One rule decides membership: the sentence names no **Element** this case's
+#: model holds, or no action the closed vocabulary holds. A candidate that
+#: merely asserts a *false* fact about a real element is not here; it is
+#: assignable, and it is labelled ``unsupported``.
+UNASSIGNABLE: dict[tuple[str, str], str] = {
+    (
+        "02-iot-fleet-telemetry",
+        "An attacker registers a device that was never manufactured by the operator.",
+    ): "device enrolment is in no element, and no verb names it",
+    (
+        "03-batch-data-pipeline",
+        "An analyst cannot reproduce a warehouse figure because the transform logic is undocumented.",
+    ): "a documentation gap names no attacker action",
+    (
+        "04-ml-inference-service",
+        "An attacker poisons the training data so the published model behaves incorrectly.",
+    ): "no training pipeline exists, so the target is in no element",
+    (
+        "06-cookbook-online-game",
+        "An attacker takes over a player's account by resetting its password.",
+    ): "no recovery path is modelled, and no verb names a reset",
+    (
+        "10-cookbook-generic-cms",
+        "An attacker registers a reader account in someone else's name.",
+    ): "registration is in no element, and no verb names it",
+    (
+        "10-cookbook-generic-cms",
+        "An attacker deletes the CMS audit log to hide the change they made.",
+    ): "the model holds no audit log to name",
+    (
+        "11-sparse-shift-scheduling",
+        "An attacker deletes the audit records of a rota change to hide it.",
+    ): "the model holds no audit store to name",
+    (
+        "12-overclaiming-supplier-portal",
+        "A category manager disputes an approval, and the platform's audit log shows the wrong actor.",
+    ): "the model holds no audit log to name",
+    (
+        "13-dispatch-control-plane",
+        "A duty engineer disputes a crew move and the dispatch API's audit log names the wrong actor.",
+    ): "the model holds no audit log to name",
+}
+
 RATINGS = frozenset(("low", "medium", "high"))
 TIERS = frozenset(("must-find", "expected"))
 EXEMPLAR_PROXIMITY = frozenset(("near", "far"))
@@ -749,12 +800,15 @@ def _check_pair_elements(
         )
     candidate = pair["candidate_element_ids"]
     if candidate is None:
-        # Only ``match`` pairs are assigned so far, and the ones that are not
-        # are excluded by the identity measurement rather than scored as a miss.
-        if pair["label"] == "match":
+        # A pair is unassigned only when the candidate names no element this
+        # case's model holds, or no action the vocabulary holds. That is the
+        # refusal set, and it is deliberately small; everything else carries
+        # both fields whatever its label.
+        if (pair["case"], pair["candidate_claim"]) not in UNASSIGNABLE:
             problems.append(
-                f"{where} is labelled match and carries no candidate_element_ids;"
-                " every match pair is assigned, so this one was missed"
+                f"{where} carries no candidate_element_ids. Assign them from"
+                " the candidate's own words, or record it in UNASSIGNABLE with"
+                " the reason it cannot be assigned"
             )
         return problems
     dangling = sorted(set(candidate) - element_ids)
@@ -822,6 +876,13 @@ def check_calibration(
     # pair is excluded rather than counted against either side: it is not a
     # no-match, and reading it as one would let undecided pairs unbalance the
     # set they are not even scored in.
+    declared = {(pair["case"], pair["candidate_claim"]) for pair in pairs}
+    for key in sorted(UNASSIGNABLE.keys() - declared):
+        problems.append(
+            f"UNASSIGNABLE names a pair no fixture holds: {key}. Remove it, or"
+            " restore the fixture it was recorded for"
+        )
+
     scored = [pair for pair in pairs if pair.get("label") in SCORED_LABELS]
     matches = sum(1 for pair in scored if pair.get("label") == "match")
     for label, count in (("match", matches), ("no-match", len(scored) - matches)):

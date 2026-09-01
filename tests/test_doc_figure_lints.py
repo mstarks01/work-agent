@@ -123,19 +123,24 @@ def _calibration() -> Mapping[str, object]:
 
 
 def _error_directions() -> Mapping[str, object]:
-    """Both ways the shipped rule fails, which is the primary measurement.
+    """Every way the shipped rule fails, which is the primary measurement.
 
-    One figure rather than two, because every sentence that states a split
-    count states the merge count beside it — and a guide that updated one
-    alone would be worse than one that updated neither.
+    One figure rather than three, because every sentence that states a split
+    count states the merge counts beside it — and a guide that updated one
+    alone would be worse than one that updated none. The three denominators are
+    three populations and are named apart for that reason.
     """
     corpus = load_corpus(verify_corpus.CORPUS_DIR)
     matcher = SubsetVerbIdentity(_flows_by_case(corpus))
-    result = measure_agreement(matcher, load_pairs())
+    pairs = [pair for pair in load_pairs() if pair.is_scored]
+    result = measure_agreement(matcher, pairs)
     merges = measure_merges(matcher, corpus, "stride")
+    positives = sum(1 for pair in pairs if pair.label_match)
     return {
         "splits": len(result.false_non_matches),
-        "split_of": result.total,
+        "split_of": positives,
+        "cand_merges": len(result.false_matches),
+        "cand_of": result.total - positives,
         "merges": len(merges.merges),
         "merge_of": merges.within_lane_pairs,
     }
@@ -189,41 +194,60 @@ FIGURES: tuple[Figure, ...] = (
         compute=_error_directions,
         claims=(
             ("evals/README.md", "splits over {split_of} equivalent candidate pairs", 1),
+            (
+                "evals/README.md",
+                "{cand_merges} false merges over {cand_of} candidate",
+                1,
+            ),
             ("evals/README.md", "{merges} false merges over {merge_of}", 1),
             (
                 "evals/README.md",
                 (
-                    "{splits} false splits of {split_of} and {merges} false"
-                    " merges of {merge_of}"
+                    "{splits} false splits of {split_of}, {cand_merges} false"
+                    " merges of {cand_of} and {merges} false merges of"
+                    " {merge_of}"
                 ),
                 1,
             ),
             (
                 "evals/TUNING.md",
-                "{splits} false splits of {split_of} equivalent candidate pairs",
-                1,
-            ),
-            (
-                "docs/agents/claim-identity.md",
-                "| False splits (of {split_of}) | False merges (of {merge_of}) |",
-                1,
-            ),
-            (
-                "docs/agents/claim-identity.md",
-                "| **endpoint subset + verb** | **{splits}** | **{merges}** |",
-                1,
-            ),
-            (
-                "docs/agents/claim-identity.md",
                 (
-                    "false splits over the {split_of} labelled match pairs,"
-                    " false merges over the {merge_of}"
+                    "{splits} false splits of {split_of} equivalent candidate"
+                    " pairs, {cand_merges} false merges of"
                 ),
                 1,
             ),
             (
                 "docs/agents/claim-identity.md",
-                "{splits} of {split_of} labelled matches split",
+                (
+                    "| False splits (of {split_of}) | Candidate merges (of"
+                    " {cand_of}) | Reference merges (of {merge_of}) |"
+                ),
+                1,
+            ),
+            (
+                "docs/agents/claim-identity.md",
+                (
+                    "| **endpoint subset + verb** | **{splits}** |"
+                    " **{cand_merges}** | **{merges}** |"
+                ),
+                1,
+            ),
+            (
+                "docs/agents/claim-identity.md",
+                (
+                    "over the {cand_of} scored candidate negatives, and"
+                    " {merges} false merges"
+                ),
+                1,
+            ),
+            (
+                "docs/agents/claim-identity.md",
+                (
+                    "{splits} of {split_of} labelled\nmatches split,"
+                    " {cand_merges} of {cand_of} candidate negatives merged,"
+                    " {merges} of {merge_of} reference pairs\nmerged"
+                ),
                 1,
             ),
         ),

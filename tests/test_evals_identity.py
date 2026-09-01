@@ -20,6 +20,7 @@ Free of provider calls: the rule is arithmetic over two sorted lists.
 
 from __future__ import annotations
 
+import collections
 import dataclasses
 import itertools
 
@@ -43,44 +44,61 @@ from evals.harness.identity import (
 from evals.harness.reference import ReferenceThreat, load_corpus
 from evals.harness.verbs import UNSEPARATED, same_action
 
-#: What element agreement alone is worth on the recorded labels, measured
-#: 2026-08-18 over the 200 ``match`` pairs that carry candidate element IDs.
-#: Review sitting 01 relabelled one pair out of the set, which is why the count
-#: is 200 and not the 201 #204 reported.
-#: Every number here is quoted in #201, so moving one means updating the issue.
+#: What element agreement alone is worth on the recorded labels, over the 315
+#: scored pairs that carry candidate element IDs and a verb.
+#:
+#: **Both halves are assigned now.** Until #511 only the 200 ``match``
+#: candidates carried the fields, so this rule was priced on the split
+#: direction alone and its ``false_matches`` was structurally zero. The 115
+#: scored negatives now say what element equality really costs: it merges 26 of
+#: them. Every number here is quoted in #201, so moving one means updating the
+#: issue.
 MEASURED = {
-    "assigned_pairs": 200,
+    "assigned_pairs": 315,
+    "match_pairs": 200,
+    "no_match_pairs": 115,
     # The rule the record can express today: the two element sets are equal,
     # with zones dropped.
-    "equality_agreements": 111,
-    # It never merges two claims a human called different, and splits nearly
-    # half of the ones a human called the same.
-    "false_matches": 0,
+    "equality_agreements": 200,
+    # It splits nearly half the pairs a label calls the same, and merges a
+    # fifth of the ones it calls different.
+    "false_matches": 26,
     "false_non_matches": 89,
 }
 
-#: The frontier, both errors at once. ``splits`` counts the ``match`` pairs a
-#: rule calls different; ``merges`` counts the reference-claim pairs a rule calls
-#: the same, over the 287 within-lane pairs the corpus holds — and every one of
-#: those is a pair the corpus records as a distinct claim, so every merge is an error.
+#: The frontier, all three ways of being wrong at once.
 #:
-#: Read down the table: no rule here is usable. The tightest loses 89 of 200
-#: paraphrases; the loosest destroys 126 findings. **The interesting row is
-#: endpoint subset**, which clears the 90% bar on splits and is the only row
-#: whose merges are few enough to enumerate and design against — which is what
-#: #201's ``mechanism`` has to separate.
+#: - ``splits`` counts the 200 ``match`` pairs a rule calls different.
+#: - ``candidate_merges`` counts the 115 scored ``no-match`` pairs it calls the
+#:   same. These are candidate paraphrases, which is the population a live run
+#:   emits, and they were unmeasurable before #511 assigned them elements and
+#:   verbs.
+#: - ``reference_merges`` counts the 287 within-lane pairs of distinct corpus
+#:   claims it calls the same. Every one is an error by construction.
+#:
+#: **The candidate column is why the verb is not optional.** Read on reference
+#: pairs alone, ``endpoint subset`` merges 23 of 287 and looks survivable. Read
+#: on the candidates a run actually produces, it merges **85 of 115** — it is
+#: barely a rule at all. The verb takes that to 5 for one extra split.
 FRONTIER = {
-    "equality": {"splits": 89, "merges": 1},
-    #: The rule #201 argues for, and the only row here that is usable. Both
-    #: columns move the right way against ``endpoint subset``: one more split,
-    #: twenty fewer merges. It is not an element rule, so it is measured by
-    #: :func:`_rules`'s verb-aware entry rather than by a shape function.
-    "endpoint subset + verb": {"splits": 15, "merges": 3},
-    "endpoint equality": {"splits": 60, "merges": 6},
-    "subset": {"splits": 41, "merges": 7},
-    "endpoint subset": {"splits": 14, "merges": 23},
-    "overlap": {"splits": 4, "merges": 34},
-    "endpoint overlap": {"splits": 1, "merges": 126},
+    "equality": {"splits": 89, "candidate_merges": 26, "reference_merges": 1},
+    #: The rule #201 argues for, and the only row here that is usable.
+    #: It is not an element rule, so it is measured by :func:`_rules`'s
+    #: verb-aware entry rather than by a shape function.
+    "endpoint subset + verb": {
+        "splits": 15,
+        "candidate_merges": 5,
+        "reference_merges": 3,
+    },
+    "endpoint equality": {"splits": 60, "candidate_merges": 40, "reference_merges": 6},
+    "subset": {"splits": 41, "candidate_merges": 68, "reference_merges": 7},
+    "endpoint subset": {"splits": 14, "candidate_merges": 85, "reference_merges": 23},
+    "overlap": {"splits": 4, "candidate_merges": 87, "reference_merges": 34},
+    "endpoint overlap": {
+        "splits": 1,
+        "candidate_merges": 103,
+        "reference_merges": 126,
+    },
 }
 
 
@@ -143,19 +161,26 @@ def flows_by_case(corpus):
 
 @pytest.fixture(scope="module")
 def assigned():
-    """The labelled pairs whose candidate claim carries element IDs."""
-    return [pair for pair in load_pairs() if pair.candidate_element_ids is not None]
+    """The scored pairs whose candidate claim carries element IDs and a verb."""
+    return [
+        pair
+        for pair in load_pairs()
+        if pair.is_scored and pair.candidate_element_ids is not None
+    ]
 
 
-def test_every_assigned_pair_is_a_match_label(assigned):
-    """The assignment pass covered the ``match`` half and only that half.
+def test_both_label_halves_are_assigned(assigned):
+    """Both directions are measurable, which #511 is the work that made true.
 
-    The false-split question lives entirely in the pairs the labels call equal,
-    so those were assigned first. A ``no-match`` pair that acquired element IDs
-    without the figures below moving would mean the two sets stopped describing
-    the same population.
+    While only the ``match`` half carried the fields, every merge figure came
+    from reference claims comparing with each other and no candidate pair could
+    ever produce one. A drop here means a fixture lost its assignment and a
+    merge count silently fell with it.
     """
-    assert {pair.label for pair in assigned} == {"match"}
+    by_label = collections.Counter(pair.label for pair in assigned)
+
+    assert by_label["match"] == MEASURED["match_pairs"]
+    assert by_label["no-match"] == MEASURED["no_match_pairs"]
     assert len(assigned) == MEASURED["assigned_pairs"]
 
 
@@ -175,26 +200,28 @@ def test_element_agreement_alone_does_not_reach_the_bar(assigned):
 
 
 def test_the_frontier_is_priced_on_both_errors(assigned, corpus, flows_by_case):
-    """Every rule in :data:`FRONTIER`, against both ways of being wrong.
+    """Every rule in :data:`FRONTIER`, against all three ways of being wrong.
 
     None of them is adopted. Measuring them together is the point: a rule read on
-    one axis always looks good, and the pair of numbers is what shows that no
+    one axis always looks good, and the columns together are what show that no
     comparison of **Element**s alone is usable.
     """
     rules = _rules(flows_by_case)
     measured = {}
     for name, rule in rules.items():
-        splits = sum(
-            1
-            for pair in assigned
-            if not rule(
+        splits = candidate_merges = 0
+        for pair in assigned:
+            ruled = rule(
                 pair.case,
                 pair.reference_element_ids,
                 pair.candidate_element_ids,
                 pair.reference_verb,
                 pair.candidate_verb,
             )
-        )
+            if pair.label_match and not ruled:
+                splits += 1
+            elif ruled and not pair.label_match:
+                candidate_merges += 1
         merges = 0
         for case in corpus:
             claims = [
@@ -213,12 +240,16 @@ def test_the_frontier_is_priced_on_both_errors(assigned, corpus, flows_by_case):
                     right.verb,
                 ):
                     merges += 1
-        measured[name] = {"splits": splits, "merges": merges}
+        measured[name] = {
+            "splits": splits,
+            "candidate_merges": candidate_merges,
+            "reference_merges": merges,
+        }
 
     assert measured == FRONTIER, (
         f"the frontier moved to {measured}. Update FRONTIER and re-quote it on"
-        " #201; the design of `mechanism` is argued from these six pairs of"
-        " numbers."
+        " #201 and in docs/agents/claim-identity.md; the design of `mechanism`"
+        " is argued from these numbers."
     )
 
 
@@ -252,12 +283,13 @@ VERB_MEASURED = {
 
 #: What :class:`~evals.harness.identity.SubsetVerbIdentity` scores against the
 #: recorded labels, on the shared bar. The first mechanical rule in this
-#: repository to clear it — ``MechanicalIdentity`` sits at 111/200 — and the
-#: number the judge's retirement rests on.
+#: repository to clear it — ``MechanicalIdentity`` sits at 200/315 — and the
+#: number the judge's retirement rests on. It is the admission gate, not the
+#: measurement: :data:`FRONTIER` carries that.
 #:
 #: Read it as ``evals/README.md`` reads every other agreement figure: the labels
 #: are agent-authored, so this measures reproduction and not correctness.
-SUBSET_VERB_AGREEMENT = {"agreements": 185, "total": 200}
+SUBSET_VERB_AGREEMENT = {"agreements": 295, "total": 315}
 
 
 def test_the_verb_separates_what_elements_alone_merge(corpus, flows_by_case):
@@ -359,9 +391,13 @@ def test_the_rule_clears_the_bar(assigned, flows_by_case):
         " docs/agents/claim-identity.md."
     )
     assert result.meets_bar, "the rule fell below the bar"
-    assert not result.false_matches, (
-        "this set is match-labelled throughout, so a false match is impossible"
-        " and its appearance means the fixtures changed shape"
+    assert len(result.false_non_matches) == FRONTIER["endpoint subset + verb"]["splits"]
+    assert (
+        len(result.false_matches)
+        == FRONTIER["endpoint subset + verb"]["candidate_merges"]
+    ), (
+        "the scoreboard and the frontier must agree on the candidate merge"
+        " count; they read the same pairs through two code paths"
     )
 
 
@@ -391,7 +427,7 @@ def test_the_shared_merge_measurement_matches_the_frontier(corpus, flows_by_case
 
     assert merges.within_lane_pairs == VERB_MEASURED["within_lane_pairs"]
     assert len(merges.merges) == VERB_MEASURED["subset_verb"]
-    assert len(merges.merges) == FRONTIER["endpoint subset + verb"]["merges"]
+    assert len(merges.merges) == FRONTIER["endpoint subset + verb"]["reference_merges"]
     assert {(merge.case, merge.lane) for merge in merges.merges} == {
         (case, lane) for case, lane, _ in UNSEPARATED
     }
