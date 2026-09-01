@@ -100,9 +100,13 @@ asking.
 reader's own words, counted with the blank lines and the padding taken out.
 The press was a click before this: an empty box opened the recorded sets, and
 the sitting then measured a list nobody wrote against the list it is supposed
-to test. The page disables the press below the same count and says how much is
-left, but the endpoint is where the rule lives, because the press is a request
-and the request is what opens the sets.
+to test. The page disables the press below the same count, but the endpoint is
+where the rule lives, because the press is a request and the request is what
+opens the sets.
+
+**The page counts and says nothing about the count.** A reader writing their
+own list is the one moment of this method that has to be theirs, and a running
+total sets the length they write to.
 
 **The gate re-arms per case, and a case takes one own list.** Both halves are
 the same rule read two ways: a case's sets open once that case's own list
@@ -1461,17 +1465,17 @@ function typed() {
   return lines("own").join("").length;
 }
 
-// The press waits until the list says something, and the hint says how much is
-// left. This is a courtesy and not the rule: the press is a request, the
-// request is what opens the sets, and `/api/own-list` holds the same count.
+// The press waits until the list says something. This is a courtesy and not
+// the rule: the press is a request, the request is what opens the sets, and
+// `/api/own-list` holds the same count.
+//
+// It counts and says nothing about the count. A reader writing their own list
+// is the one moment of this method that has to be theirs, and a page telling
+// them how many characters are left sets the length they write to.
 function gate() {
   if ($("own").readOnly) return;  // the list is in; the press is spent
-  const short = MIN_OWN_LIST - typed();
-  $("lock").disabled = short > 0;
-  $("ownHint").textContent = short > 0
-    ? short + (short === 1 ? " more character" : " more characters")
-      + " before the recorded sets open"
-    : "";
+  $("lock").disabled = typed() < MIN_OWN_LIST;
+  $("ownHint").textContent = "";  // a refusal they have started answering
 }
 
 $("own").addEventListener("input", gate);
