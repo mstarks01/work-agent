@@ -50,6 +50,7 @@ from analysis_service.report import (
 from analysis_service.sources import SourceKind
 from analysis_service.system_model import SystemModel
 from analysis_service.validation import parse_and_validate
+from evals.harness.calibration import SCORED_LABELS, Label
 from evals.harness.reference import AsvsDisposition
 from evals.harness.verbs import unknown_verbs
 
@@ -63,8 +64,8 @@ CALIBRATION_PATH = Path(__file__).resolve().parent / "calibration_labels" / "pai
 MIN_ELEMENTS = 8
 MAX_ELEMENTS = 20
 
-# A floor, not a count: the fixtures hold 339. A set below this, or one that
-# is all matches or all non-matches, cannot measure agreement.
+# A floor, not a count: the fixtures hold 339. A set below this, or one whose
+# scored half is all matches or all non-matches, cannot measure agreement.
 MIN_CALIBRATION_PAIRS = 100
 MIN_LABEL_SHARE = 0.3
 
@@ -811,15 +812,24 @@ def check_calibration(
             )
         if pair["category"] not in STRIDE_CATEGORIES:
             problems.append(f"{where} category {pair['category']!r} is not a lane")
-        if pair["label"] not in ("match", "no-match"):
-            problems.append(f"{where} label {pair['label']!r} is not match/no-match")
-
-    matches = sum(1 for pair in pairs if pair.get("label") == "match")
-    for label, count in (("match", matches), ("no-match", len(pairs) - matches)):
-        if count < MIN_LABEL_SHARE * len(pairs):
+        if pair["label"] not in get_args(Label):
             problems.append(
-                f"only {count} of {len(pairs)} pairs are labelled {label};"
-                " agreement on a lopsided fixture set is not informative"
+                f"{where} label {pair['label']!r} is not one of"
+                f" {sorted(get_args(Label))}"
+            )
+
+    # Balance is measured over the pairs that carry an answer. An ``unclear``
+    # pair is excluded rather than counted against either side: it is not a
+    # no-match, and reading it as one would let undecided pairs unbalance the
+    # set they are not even scored in.
+    scored = [pair for pair in pairs if pair.get("label") in SCORED_LABELS]
+    matches = sum(1 for pair in scored if pair.get("label") == "match")
+    for label, count in (("match", matches), ("no-match", len(scored) - matches)):
+        if count < MIN_LABEL_SHARE * len(scored):
+            problems.append(
+                f"only {count} of {len(scored)} scored pairs are labelled"
+                f" {label}; agreement on a lopsided fixture set is not"
+                " informative"
             )
     return problems
 

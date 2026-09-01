@@ -286,13 +286,19 @@ claims are prose. ASVS matches by requirement ID, so it reaches no
 claim-equivalence question and contributes no pair — that is settled design
 ([#167](https://github.com/mstarks01/work-agent/issues/167)), not an omission.
 
-In the same sitting, label candidate threat pairs as match / no-match in
-`build_pairs.py`. A pair that carries candidate element IDs carries a candidate
+In the same sitting, label candidate threat pairs as match / no-match /
+`unclear` in `build_pairs.py`. **Write `unclear` when the two sentences alone
+cannot decide it** — that is a real answer, it leaves the denominator rather
+than counting against either side, and it is better than a binary the evidence
+does not support. Check the bullet below on specificity first: review sitting
+01 returned four `unclear` answers and all four had one cause that bullet now
+settles. A pair that carries candidate element IDs carries a candidate
 **verb** beside them, assigned from the candidate sentence's own words — never
 by reading the reference's, which would make every pair agree by construction
-and the measurement worthless. These are what the **≥90% rule–label agreement
-bar** scores against, and they're what lets the scorer be tested with no live
-calls at all. They are not ground truth: a person has read 30 of the 339, in
+and the measurement worthless. These are what the **false-split count** is measured over, and what lets the
+scorer be tested with no live calls at all. The **≥90% rule–label agreement
+bar** they also feed is the admission gate for a candidate rule, not a quality
+statement about the shipped one. They are not ground truth: a person has read 30 of the 339, in
 review sitting 01, so the bar says the identity rule reproduces what an agent
 wrote and says almost nothing about whether it is right.
 
@@ -324,6 +330,15 @@ wrote and says almost nothing about whether it is right.
   the tool.
 - **Keep the set balanced;** `verify_corpus.py` fails if either label drops below
   30%.
+- **Do not try to bless every label.** A person has read 30 of the 339, and the
+  other 309 are not the backlog — blessing an easy paraphrase buys nothing.
+  Spend a sitting on the decision boundaries: same target with a different
+  action, same action against a different target, flow against endpoint naming,
+  a narrower wording against a broader one, and any pair near a merge recorded
+  in `verbs.UNSEPARATED`. Add a fixture when a real matcher failure turns one
+  up, and record the new counts with it. A full Case Sitting (step 6) is worth
+  more reading time than any of this, because it says whether the corpus itself
+  is right.
 - **Assign the candidate's affected element IDs on every `match` pair.** The
   sixth field of the tuple, and `verify_corpus.py` fails on a `match` pair
   without one. Answer it from the candidate sentence's own words against
@@ -331,7 +346,9 @@ wrote and says almost nothing about whether it is right.
   list makes every pair agree by construction and the measurement in
   `tests/test_evals_identity.py` worthless. Follow the reference sets' own
   conventions — a flow, process, store or entity, one or two of them, never a
-  boundary. `no-match` candidates carry `None`; nobody has assigned them yet.
+  boundary. `no-match` candidates carry `None`; nobody has assigned them yet,
+  which is why the rule refuses all 139 and the candidate merge direction is
+  unmeasured ([#511](https://github.com/mstarks01/work-agent/issues/511)).
 
 ### 6. Bless and merge
 

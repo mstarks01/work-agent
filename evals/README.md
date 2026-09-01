@@ -50,9 +50,17 @@ of 2.0% and 3.4%. [`TUNING.md`](TUNING.md#choosing-a-model-to-sweep-with) says
 which questions a cheap model may answer and which it may not.
 
 **There is no model judge.** Claim matching is `SubsetVerbIdentity`, a rule in
-`harness/identity.py`; it scores 185/200 against the recorded labels
-(`python -m evals.harness.run calibrate`), over the 90% bar, with no provider
-call. Whether an unmatched finding is real is a question about prose, and a
+`harness/identity.py`, and it is measured on the two directions it can fail in
+(`python -m evals.harness.run calibrate`), with no provider call: **15 false
+splits over 200 equivalent candidate pairs, and 3 false merges over 287
+distinct reference pairs.** Read the two apart. A false split hands a reviewer
+one unmatched finding; a false merge destroys a finding and inflates recall,
+and nobody sees it happen. The two denominators are different populations and
+neither is a rate over what a live run emits — the candidate merge direction is
+not measured at all yet, because every `no-match` fixture lacks the fields the
+rule reads ([#511](https://github.com/mstarks01/work-agent/issues/511)).
+
+Whether an unmatched finding is real is a question about prose, and a
 person answers it: each unmatched finding is keyed by its fingerprint and
 looked up in the vote ledger (`harness/ledger.py`). A finding nobody voted on
 is `unvoted` — visible, non-gating, and served by the review queue. The
@@ -126,7 +134,7 @@ evals/
 | `harness/calibration.py` | Rule-vs-label agreement over the labelled fixtures — the scoreboard any rule change must clear. |
 | `harness/verbs.py` | The closed vocabulary of attacker actions, and what counts as one action. |
 | `harness/exemplar_verbs.py` | Which actions a package's shipped exemplars demonstrate against which its reference sets grade, and the exemplar pairs that name one place and two actions. Reads text and blessed models only, so it costs no provider call. |
-| `harness/identity.py` | Claim identity from the fields a claim carries. `SubsetVerbIdentity` scores 185/200 against the recorded labels, over the 90% bar, with no model call. |
+| `harness/identity.py` | Claim identity from the fields a claim carries. `SubsetVerbIdentity` has 15 false splits of 200 and 3 false merges of 287, with no model call. |
 | `harness/fingerprint.py` | A **Claim**'s identity as a versioned value code computes. No model call. |
 | `harness/ledger.py` | The append-only record of what a **person** decided about a finding. One file per voter, named by the GitHub login. |
 | `harness/envelope.py` | The offline sitting envelope: one reader's answers read back from the standalone page and applied through the same `finish` the app runs. Treats the file as untrusted input and recomputes every digest against this tree. |
@@ -223,8 +231,8 @@ scored again, against the ledger as it stands now, with no provider call:
 python -m evals.harness.run score artifact.json
 ```
 
-`calibrate` is offline too — it prices the rule against the recorded labels and
-gates a rule change on the 90% bar:
+`calibrate` is offline too — it prints both error directions, then gates a
+rule change on the 90% bar:
 
 ```sh
 python -m evals.harness.run calibrate --out agreement.json
@@ -273,9 +281,16 @@ below is computed, printed, and written to the artifact, but does **not** fail
 the run: a gate that fires before anyone knows the normal range just trains
 people to bypass it. `calibrate` is the exception — it fails below the 90%
 rule–label agreement bar, because a rule that disagrees with the recorded
-labels makes every other number meaningless. Read that bar as the top of this
-file describes it: the labels are agent-authored and unreviewed, so the bar
-measures agreement with them and not correctness.
+labels makes every other number meaningless.
+
+**The bar is an admission gate, not a quality statement.** It prices a
+*candidate* rule, which has no pinned counts of its own to regress against.
+Once a rule ships, its false-split and false-merge counts are the regression
+signal: `tests/test_evals_identity.py` asserts them exactly, so they bind
+harder than the ratio and a rule cannot rot downwards inside the bar's slack.
+Read the bar as the top of this file describes it: the labels are
+agent-authored and unreviewed, so it measures agreement with them and not
+correctness.
 
 ## What the metrics mean
 

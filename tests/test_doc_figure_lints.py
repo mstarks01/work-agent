@@ -47,8 +47,9 @@ from evals.harness.calibration import (
     AGREEMENT_BAR,
     load_pairs,
     measure_agreement,
+    measure_merges,
 )
-from evals.harness.identity import SubsetVerbIdentity
+from evals.harness.identity import MechanicalIdentity, SubsetVerbIdentity
 from evals.harness.reference import load_corpus
 from evals.harness.run import _flows_by_case
 from evals.harness.sitting import unreviewed_cases
@@ -106,13 +107,37 @@ class Figure:
 
 
 def _calibration() -> Mapping[str, object]:
-    """What ``run calibrate`` reports, computed the way that command does."""
+    """The admission-gate ratio, for both rules the guides tabulate."""
     matcher = SubsetVerbIdentity(_flows_by_case(load_corpus(verify_corpus.CORPUS_DIR)))
-    result = measure_agreement(matcher, load_pairs())
+    pairs = load_pairs()
+    result = measure_agreement(matcher, pairs)
+    floor = measure_agreement(MechanicalIdentity(), pairs)
     return {
         "agreed": result.agreements,
         "total": result.total,
         "percent": f"{result.agreement * 100:.1f}",
+        "floor_agreed": floor.agreements,
+        "floor_total": floor.total,
+        "floor_percent": f"{floor.agreement * 100:.1f}",
+    }
+
+
+def _error_directions() -> Mapping[str, object]:
+    """Both ways the shipped rule fails, which is the primary measurement.
+
+    One figure rather than two, because every sentence that states a split
+    count states the merge count beside it — and a guide that updated one
+    alone would be worse than one that updated neither.
+    """
+    corpus = load_corpus(verify_corpus.CORPUS_DIR)
+    matcher = SubsetVerbIdentity(_flows_by_case(corpus))
+    result = measure_agreement(matcher, load_pairs())
+    merges = measure_merges(matcher, corpus, "stride")
+    return {
+        "splits": len(result.false_non_matches),
+        "split_of": result.total,
+        "merges": len(merges.merges),
+        "merge_of": merges.within_lane_pairs,
     }
 
 
@@ -160,12 +185,67 @@ FIGURES: tuple[Figure, ...] = (
         ),
     ),
     Figure(
+        name="the identity rule's two error directions",
+        compute=_error_directions,
+        claims=(
+            ("evals/README.md", "splits over {split_of} equivalent candidate pairs", 1),
+            ("evals/README.md", "{merges} false merges over {merge_of}", 1),
+            (
+                "evals/README.md",
+                (
+                    "{splits} false splits of {split_of} and {merges} false"
+                    " merges of {merge_of}"
+                ),
+                1,
+            ),
+            (
+                "evals/TUNING.md",
+                "{splits} false splits of {split_of} equivalent candidate pairs",
+                1,
+            ),
+            (
+                "docs/agents/claim-identity.md",
+                "| False splits (of {split_of}) | False merges (of {merge_of}) |",
+                1,
+            ),
+            (
+                "docs/agents/claim-identity.md",
+                "| **endpoint subset + verb** | **{splits}** | **{merges}** |",
+                1,
+            ),
+            (
+                "docs/agents/claim-identity.md",
+                (
+                    "false splits over the {split_of} labelled match pairs,"
+                    " false merges over the {merge_of}"
+                ),
+                1,
+            ),
+            (
+                "docs/agents/claim-identity.md",
+                "{splits} of {split_of} labelled matches split",
+                1,
+            ),
+        ),
+    ),
+    Figure(
         name="the identity rule's agreement with the labels",
         compute=_calibration,
         claims=(
-            ("evals/README.md", "scores {agreed}/{total}", 2),
             ("evals/README.md", "A rule at {percent}%", 1),
-            ("evals/TUNING.md", "{percent}%", 1),
+            (
+                "docs/agents/claim-identity.md",
+                "| `SubsetVerbIdentity` | **{agreed}/{total} = {percent}%** |",
+                1,
+            ),
+            (
+                "docs/agents/claim-identity.md",
+                (
+                    "| `MechanicalIdentity` (element equality) |"
+                    " {floor_agreed}/{floor_total} = {floor_percent}% |"
+                ),
+                1,
+            ),
         ),
     ),
     Figure(
@@ -174,7 +254,7 @@ FIGURES: tuple[Figure, ...] = (
         claims=(
             ("evals/README.md", "of the {value} match labels", 1),
             ("evals/TUNING.md", "of the {value}", 1),
-            ("evals/BLESSING.md", "of the {value}", 1),
+            ("evals/BLESSING.md", "of the {value}", 2),
         ),
     ),
     Figure(
@@ -191,7 +271,10 @@ FIGURES: tuple[Figure, ...] = (
     Figure(
         name="the rule-label agreement bar",
         compute=lambda: {"percent": round(AGREEMENT_BAR * 100)},
-        claims=(("evals/README.md", "{percent}% bar", 4),),
+        claims=(
+            ("evals/README.md", "{percent}% bar", 2),
+            ("docs/agents/claim-identity.md", "clears the {percent}% bar", 1),
+        ),
     ),
 )
 

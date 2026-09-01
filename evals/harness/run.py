@@ -86,6 +86,7 @@ from evals.harness.calibration import (
     AGREEMENT_BAR,
     load_pairs,
     measure_agreement,
+    measure_merges,
 )
 from evals.harness.certify import PromotionPlan, plan_promotion, promote
 from evals.harness.coverage import TaggedRow
@@ -1220,29 +1221,44 @@ def _print_promotion(
 
 
 def command_calibrate(args: argparse.Namespace) -> int:
-    """The >= 90% rule-label bar; failing it blocks a rule change.
+    """Both error directions, then the >= 90% admission gate for a new rule.
 
-    Prices the shipped identity rule against the recorded labels. Offline and
-    free: the rule is code, the labels are in the repository, and no provider
-    is contacted. Run it on any change to the rule or to
-    ``evals/harness/verbs.py``, because a matcher change silently re-scores
-    every historical number.
+    Prices the shipped identity rule against the recorded labels and against
+    the corpus's own distinct claims. Offline and free: the rule is code, the
+    labels and the corpus are in the repository, and no provider is contacted.
+    Run it on any change to the rule or to ``evals/harness/verbs.py``, because
+    a matcher change silently re-scores every historical number.
+
+    **The two directions print first, because they are the measurement.** The
+    ratio prints after them as the gate a candidate rule passes before it earns
+    pinned counts, and it is not matcher accuracy — see
+    :mod:`evals.harness.calibration`.
     """
     pairs = load_pairs()
-    matcher = SubsetVerbIdentity(_flows_by_case(load_corpus(args.corpus)))
+    corpus = load_corpus(args.corpus)
+    matcher = SubsetVerbIdentity(_flows_by_case(corpus))
     result = measure_agreement(matcher, pairs)
+    merges = measure_merges(matcher, corpus, "stride")
     print(
-        f"rule-label agreement {result.agreement:.1%} over {result.total} pairs"
-        f" (bar {AGREEMENT_BAR:.0%}); {result.refused} pair(s) refused"
+        f"false splits {len(result.false_non_matches)} of {result.total}"
+        " equivalent candidate pairs"
     )
     print(
-        f"  false matches {len(result.false_matches)},"
-        f" false non-matches {len(result.false_non_matches)}"
+        f"false merges {len(merges.merges)} of {merges.within_lane_pairs}"
+        " distinct reference pairs"
+        f" (+ {len(result.false_matches)} of {result.total} candidate pairs)"
+    )
+    print(
+        f"  {result.refused} pair(s) refused by the rule,"
+        f" {result.unclear} labelled unclear; neither is scored"
+    )
+    print(
+        f"admission gate: {result.agreement:.1%} label agreement over"
+        f" {result.total} pairs (bar {AGREEMENT_BAR:.0%})"
     )
     if args.out:
-        Path(args.out).write_text(
-            json.dumps(result.to_json(), indent=2) + "\n", "utf-8"
-        )
+        payload = result.to_json() | {"corpus_merges": merges.to_json()}
+        Path(args.out).write_text(json.dumps(payload, indent=2) + "\n", "utf-8")
     if result.meets_bar:
         return 0
     print(
