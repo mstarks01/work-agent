@@ -11,10 +11,17 @@ The template is ``corpus/01-payments-checkout/REVIEW-02.md``, the first such
 document and the record of what a sitting needs: the sources verbatim, the
 model as tables, the reader's own list *before* the recorded sets, one mark
 per record, and the exact ``reviews`` entry to paste at the end. Case 01 keeps
-its hand-written document; this writes ``REVIEW.md`` for every other case whose
-``case.json`` records no sitting, and refreshes it as reference sets
-change — the document is derived, so editing it by hand is editing the wrong
-file.
+its hand-written document; this writes ``REVIEW.md`` for every other case and
+refreshes it as reference sets change — the document is derived, so editing it
+by hand is editing the wrong file.
+
+**A case that records a sitting keeps a current document.** A sitting does not
+retire a case: a second reader may sit the same one, and a change to any file
+a sitting read puts that case back on the unreviewed list. A document this
+skipped would go stale exactly while somebody needed it, and nothing would
+pin it — ``tests/test_corpus_lints.py`` holds every case's document against
+what this writes, and a case it skipped would be a case that check could not
+cover.
 
 Run: ``python evals/build_review_docs.py``. Offline, no dependencies beyond
 the repository.
@@ -548,20 +555,28 @@ def build_doc(case_dir: Path) -> str:
     return "\n".join(lines)
 
 
+def documents(corpus: Path = CORPUS) -> list[Path]:
+    """Every case this generator writes a document for.
+
+    Split out of :func:`main` so the check that pins those documents reads the
+    same selection rather than a second copy of it. A derived file leaves the
+    submission delta, so that check is the only thing pinning one — and a case
+    the generator writes but the check skips would be pinned by nothing.
+    """
+    return [
+        case_dir
+        for case_dir in sorted(corpus.iterdir())
+        if case_dir.is_dir() and case_dir.name not in HAND_WRITTEN
+    ]
+
+
 def main() -> int:
-    written = 0
-    for case_dir in sorted(CORPUS.iterdir()):
-        if not case_dir.is_dir() or case_dir.name in HAND_WRITTEN:
-            continue
-        meta = load_meta(case_dir / "case.json")
-        if meta.get("reviews"):
-            continue
+    for case_dir in documents():
         (case_dir / GENERATED_DOCUMENT).write_text(
             build_doc(case_dir), encoding="utf-8"
         )
-        written += 1
         print(f"wrote {case_dir.name}/{GENERATED_DOCUMENT}")
-    print(f"{written} reading document(s)")
+    print(f"{len(documents())} reading document(s)")
     return 0
 
 
