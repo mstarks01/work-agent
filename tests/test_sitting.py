@@ -23,6 +23,7 @@ from evals.harness import sitting as sittings
 from evals.harness.reference import ANONYMOUS
 from evals.harness.sitting import Draft, Store
 from tests.test_sitting_app import CASE, CASES, OTHER, build_tree, drafts_root
+from webapp.sitting import HELD
 
 OWN_LIST = ["a spoofed device"]
 
@@ -35,7 +36,11 @@ def tree(tmp_path):
 @pytest.fixture
 def store(tree):
     return Store(
-        root=tree, submitted_by="ada", submitted_for="ada", drafts=drafts_root(tree)
+        root=tree,
+        submitted_by="ada",
+        submitted_for="ada",
+        drafts=drafts_root(tree),
+        held=HELD,
     )
 
 
@@ -47,6 +52,7 @@ def proxy_store(tree):
         submitted_by="ada",
         submitted_for=ANONYMOUS,
         drafts=drafts_root(tree),
+        held=HELD,
     )
 
 

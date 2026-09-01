@@ -1,0 +1,244 @@
+"""The offline sitting envelope, out and back.
+
+The file crosses a trust boundary: it is written on a machine this project
+never sees, arrives by email, and asks for a write into the corpus. So these
+hold two properties rather than one. The round trip has to *work* — a reader
+who spends an hour must not lose it to a schema quibble — and the import has
+to refuse everything that would put words nobody read into the record.
+
+``tests/test_offline_sitting.py`` holds what the page owes the reader. This
+holds what the tree owes the operator.
+"""
+
+from __future__ import annotations
+
+import json
+from pathlib import Path
+
+import pytest
+
+from evals.harness import envelope as envelopes
+from evals.harness import sitting as sittings
+from evals.harness.envelope import Envelope, EnvelopeError
+from evals.harness.reference import ANONYMOUS
+from tests.test_sitting_app import CASE, OTHER, build_tree, drafts_root
+
+OWN_LIST = ["a spoofed device reports for another", "nobody rotates the fleet key"]
+
+
+@pytest.fixture
+def tree(tmp_path):
+    return build_tree(tmp_path)
+
+
+def digests_for(tree: Path, case: str) -> dict[str, str]:
+    case_dir = tree / "evals" / "corpus" / case
+    return sittings.digests(case_dir, sittings.prepare(case_dir).files)
+
+
+def answers(tree: Path, case: str = CASE, **fields) -> dict:
+    base = {
+        "own_list": list(OWN_LIST),
+        "marks": {},
+        "missing": [],
+        "notes": "",
+        "opened_digests": digests_for(tree, case),
+    }
+    return {**base, **fields}
+
+
+def envelope(tree: Path, cases: dict | None = None, **fields) -> Envelope:
+    body = {
+        "envelope": envelopes.VERSION,
+        "submitted_by": "ada",
+        "submitted_for": ANONYMOUS,
+        "generated": "2026-09-01",
+        "cases": cases if cases is not None else {CASE: answers(tree)},
+        **fields,
+    }
+    return Envelope.model_validate(body)
+
+
+def applied(tree: Path, env: Envelope) -> list[str]:
+    return envelopes.apply(env, tree, drafts=drafts_root(tree))
+
+
+def reviews(tree: Path, case: str = CASE) -> list[dict]:
+    path = tree / "evals" / "corpus" / case / "case.json"
+    return json.loads(path.read_text(encoding="utf-8")).get("reviews", [])
+
+
+class TestTheRoundTripRecordsTheRead:
+    def test_it_writes_the_entry_the_document_and_clears_the_line(self, tree):
+        assert applied(tree, envelope(tree)) == [CASE]
+
+        entry = reviews(tree)[0]
+        assert entry["submitted_by"] == "ada"
+        assert entry["submitted_for"] == ANONYMOUS
+        assert entry["document"] == "REVIEW-ada.md"
+        assert (tree / "evals" / "corpus" / CASE / "REVIEW-ada.md").is_file()
+        assert CASE not in sittings.unreviewed_cases(tree)
+
+    def test_the_recorded_digests_are_computed_here(self, tree):
+        """A `read` entry signs the bytes that merge, so the file cannot supply it.
+
+        The envelope carries digests for one purpose only — saying which words
+        the reader saw, which is what the drift check asks. Nothing in it
+        reaches the entry, and ``CaseAnswers`` has no field that could.
+        """
+        assert "read" not in envelopes.CaseAnswers.model_fields
+
+        applied(tree, envelope(tree))
+
+        recorded = {row["file"]: row["sha256"] for row in reviews(tree)[0]["read"]}
+        assert recorded == digests_for(tree, CASE)
+
+    def test_the_document_names_the_surface_the_read_happened_on(self, tree):
+        applied(tree, envelope(tree))
+
+        text = (tree / "evals" / "corpus" / CASE / "REVIEW-ada.md").read_text("utf-8")
+        assert envelopes.HELD in text
+        assert f"Read by {ANONYMOUS}, submitted by ada." in text
+
+    def test_the_own_list_is_printed_above_the_recorded_sets(self, tree):
+        applied(tree, envelope(tree))
+
+        text = (tree / "evals" / "corpus" / CASE / "REVIEW-ada.md").read_text("utf-8")
+        assert text.index(OWN_LIST[0]) < text.index("The recorded `")
+
+    def test_many_cases_ride_in_one_envelope(self, tree):
+        both = {CASE: answers(tree), OTHER: answers(tree, OTHER)}
+
+        assert applied(tree, envelope(tree, both)) == sorted([CASE, OTHER])
+        assert reviews(tree, OTHER)
+
+    def test_it_leaves_a_draft_the_operator_can_still_drop(self, tree):
+        """An imported sitting is one the app can take back off before the press."""
+        applied(tree, envelope(tree))
+
+        held = sittings.load_draft(drafts_root(tree), "ada", CASE)
+        assert held is not None
+        assert held.state == "finished"
+        assert held.own_list == OWN_LIST
+
+
+class TestTheImportRefusesWhatWouldRecordWordsNobodyRead:
+    def test_a_case_the_corpus_does_not_hold(self, tree):
+        env = envelope(tree, {"99-not-a-case": answers(tree)})
+
+        with pytest.raises(EnvelopeError, match="does not hold"):
+            applied(tree, env)
+
+    def test_a_case_key_that_spells_a_traversal(self, tree):
+        """A key is resolved against the corpus, never joined onto a path."""
+        env = envelope(tree, {"../../etc": answers(tree)})
+
+        with pytest.raises(EnvelopeError, match="does not hold"):
+            applied(tree, env)
+        assert not (tree.parent / "etc").exists()
+
+    def test_an_own_list_too_short_to_have_opened_the_sets(self, tree):
+        env = envelope(tree, {CASE: answers(tree, own_list=["no"])})
+
+        with pytest.raises(EnvelopeError, match="own list is shorter"):
+            applied(tree, env)
+        assert not reviews(tree)
+
+    def test_a_mark_naming_no_recorded_finding(self, tree):
+        env = envelope(tree, {CASE: answers(tree, marks={"stride:nope": "agree"})})
+
+        with pytest.raises(EnvelopeError, match="names no recorded finding"):
+            applied(tree, env)
+        assert not reviews(tree)
+
+    def test_a_file_that_moved_under_the_read(self, tree):
+        """Days pass between the page and the import, and the text can move."""
+        env = envelope(tree)
+        source = tree / "evals" / "corpus" / CASE / "source.md"
+        source.write_text(source.read_text("utf-8") + "\na later edit\n", "utf-8")
+
+        with pytest.raises(EnvelopeError, match="changed since the page was built"):
+            applied(tree, env)
+        assert not reviews(tree)
+
+    def test_one_bad_case_writes_none_of_them(self, tree):
+        """A half-applied envelope leaves the operator unable to say what is real."""
+        env = envelope(
+            tree, {CASE: answers(tree), OTHER: answers(tree, OTHER, own_list=["no"])}
+        )
+
+        with pytest.raises(EnvelopeError):
+            applied(tree, env)
+        assert not reviews(tree)
+        assert not reviews(tree, OTHER)
+        assert CASE in sittings.unreviewed_cases(tree)
+
+    def test_every_problem_arrives_in_one_message(self, tree):
+        """The reader is a day away by email, so one round trip carries them all."""
+        env = envelope(
+            tree,
+            {
+                CASE: answers(tree, own_list=["no"]),
+                OTHER: answers(tree, OTHER, marks={"stride:nope": "agree"}),
+            },
+        )
+
+        with pytest.raises(EnvelopeError) as raised:
+            applied(tree, env)
+        assert CASE in str(raised.value)
+        assert OTHER in str(raised.value)
+
+
+class TestTheFileIsBoundedBeforeItIsBelieved:
+    def test_a_mark_outside_the_closed_set(self, tree):
+        with pytest.raises(ValueError):
+            envelope(tree, {CASE: answers(tree, marks={"x": "looks-fine"})})
+
+    def test_a_digest_that_is_not_a_digest(self, tree):
+        with pytest.raises(ValueError):
+            envelope(tree, {CASE: answers(tree, opened_digests={"source.md": "nope"})})
+
+    def test_a_name_the_record_cannot_hold(self, tree):
+        with pytest.raises(ValueError):
+            envelope(tree, submitted_for="Jane Doe")
+
+    def test_a_field_nobody_declared(self, tree):
+        with pytest.raises(ValueError):
+            Envelope.model_validate(
+                {**envelope(tree).model_dump(), "standing": "maintainer"}
+            )
+
+    def test_a_line_longer_than_the_cap(self, tree):
+        with pytest.raises(ValueError):
+            envelope(tree, {CASE: answers(tree, own_list=["x" * 5000])})
+
+
+class TestReadingTheFile:
+    def test_a_written_envelope_reads_back(self, tree, tmp_path):
+        path = tmp_path / "sitting-ada.json"
+        path.write_text(envelope(tree).model_dump_json(), encoding="utf-8")
+
+        assert envelopes.read(path).submitted_for == ANONYMOUS
+
+    def test_a_file_that_is_not_json(self, tmp_path):
+        path = tmp_path / "sitting.json"
+        path.write_text("not json at all", encoding="utf-8")
+
+        with pytest.raises(EnvelopeError, match="not readable JSON"):
+            envelopes.read(path)
+
+    def test_a_file_from_another_version(self, tree, tmp_path):
+        path = tmp_path / "sitting.json"
+        body = json.loads(envelope(tree).model_dump_json())
+        body["envelope"] = envelopes.VERSION + 1
+        path.write_text(json.dumps(body), encoding="utf-8")
+
+        with pytest.raises(EnvelopeError, match="envelope version"):
+            envelopes.read(path)
+
+    def test_a_file_too_big_to_be_a_sitting(self, tmp_path):
+        path = tmp_path / "sitting.json"
+        path.write_text("[]" + " " * envelopes.MAX_BYTES, encoding="utf-8")
+
+        with pytest.raises(EnvelopeError, match="ceiling"):
+            envelopes.read(path)

@@ -87,6 +87,13 @@ SYMBOL_REF = re.compile(
 #: entry fails.
 DELIBERATE: dict[tuple[str, str], str] = {
     (
+        "evals/BLESSING.md",
+        "sitting.html",
+    ): "the default output of `webapp/offline_sitting.py`, written when a"
+    " maintainer generates a page for a reader and never committed. The prose"
+    " names what the command writes, so resolving it would mean checking in a"
+    " 360 KB copy of the corpus that goes stale the moment a claim file moves.",
+    (
         "docs/agents/domain.md",
         "CONTEXT-MAP.md",
     ): "asserts the file's absence — 'There is no `CONTEXT-MAP.md`'. Resolving it"
