@@ -435,6 +435,53 @@ uv run python webapp/sitting.py --submitted-for anonymous
 Then the filled document opens with `Read by anonymous, submitted by <login>.`,
 so nobody later reads the file name as the author.
 
+### A reader with no clone: one file out, one file back
+
+A reader who cannot install a toolchain — or whose own policy stops them
+putting this repository on their machine — still reads the case. The whole
+sitting goes into one standalone HTML file.
+
+```sh
+uv run python webapp/offline_sitting.py --submitted-for anonymous
+```
+
+That writes `sitting.html`, about 360 KB, carrying every case's sources,
+blessed **System Model** and recorded sets, plus the digest of each file as it
+stands. Send it. **The browser is the runtime**, so nothing is installed,
+nothing is signed and no platform is left out.
+
+The reader opens it, picks cases from the rail, writes their own list for a
+case before that case's sets open, and marks each record `agree`, `reject` or
+`duplicate`. **Download my answers** saves one JSON file. **Load a saved file**
+takes it back, so a read that runs over several days needs no browser storage
+and no second copy: the envelope is the save file.
+
+They can change any mark up to the moment they send it — nothing is a record
+until you import it. They cannot rewrite a case's own list once that case's
+sets are open, for the reason the app refuses the same thing: a list written
+afterwards would be evidence of an order that did not happen.
+
+When the file comes back:
+
+```sh
+python -m evals.harness.run sitting-import sitting-<login>.json
+python -m evals.harness.run submit sitting
+```
+
+The import treats the file as untrusted. It resolves every case id against the
+corpus, re-checks the own list against the same `MIN_OWN_LIST`, refuses a mark
+naming no recorded finding, and **recomputes every digest from your own tree** —
+the envelope's digests only say which words the reader saw. If a read file
+changed while the file was out, the import names it and writes nothing: generate
+the page again and ask for that case to be re-read. One bad case writes none of
+them, so you never have to work out which half applied.
+
+Two limits worth knowing. The recorded sets are in the page's own source, so
+the gate rests on the reader rather than on a server — [#373](https://github.com/mstarks01/work-agent/issues/373)
+already ruled that the gate protects the evidence in the document, not the
+reader. And a reader in a browser cannot edit a reference set, so a correction
+arrives as prose in their notes and you make the change.
+
 `read` pins the bytes the sitting
 covered: a later PR that edits a read file puts the case back on the list
 fail-closed.

@@ -79,6 +79,26 @@ CORPUS_DIR = REPO_ROOT / "evals" / "corpus"
 #: leaves the count a lie, so ``submit sitting`` refuses one that has not.
 UNREVIEWED_FILE = "tests/test_case_review.py"
 
+#: The shortest own list a sitting accepts, counted over the reader's own
+#: words with the blank lines and the padding taken out. A press with nothing
+#: typed opened the recorded sets, which made the gate a click rather than a
+#: read.
+#:
+#: It lives here rather than on one surface because every surface has to hold
+#: it: the app's endpoint, and the standalone file a reader opens offline. A
+#: second spelling would be a second gate, and the looser one would win.
+MIN_OWN_LIST = 10
+
+
+def own_list_is_written(items: Iterable[str]) -> bool:
+    """Whether one own list says enough to open that case's recorded sets.
+
+    Counted over the stripped words, so a box full of blank lines does not
+    pass. The caller keeps the stripped list; this only rules on it.
+    """
+    return sum(len(item.strip()) for item in items) >= MIN_OWN_LIST
+
+
 #: What a reader may say about one recorded finding. The method's own closed
 #: set, which ``evals.build_review_docs.MARK_GUIDANCE`` writes out for the
 #: reader who fills the document by hand — free prose here would record less
@@ -697,6 +717,7 @@ def document(
     notes: str,
     submitted_by: str,
     submitted_for: str,
+    held: str,
 ) -> str:
     """The filled reading document — the evidence that the method ran.
 
@@ -709,6 +730,10 @@ def document(
     submitting login and a proxied read is not that account's own list. The
     line states both names, so a later reader of the evidence does not take
     the file name for the author.
+
+    ``held`` names the surface the read happened on. It is a value the caller
+    supplies rather than a sentence written here, because there is more than
+    one surface now and a hardcoded one would be false on all but the first.
 
     ``marks`` is keyed by fingerprint, and a key naming no recorded finding of
     this case refuses the whole document. It is either a page that lost its
@@ -728,8 +753,8 @@ def document(
         f"\n**{prepared.title}**\n",
         f"\nRead by {submitted_for}, submitted by {submitted_by}.\n",
         (
-            "\nHeld through `webapp/sitting.py`. The own list below was"
-            " written before the recorded sets were shown.\n"
+            f"\nHeld through {held}. The own list below was written before the"
+            " recorded sets were shown.\n"
         ),
         "\n---\n",
         prepared.part_one,
@@ -1097,6 +1122,10 @@ class Store:
     submitted_for: str
     #: Where this reader's **Draft Sitting**s live, outside the repository.
     drafts: Path
+    #: The surface this sitting is held on, named in the filled document. No
+    #: default: a second surface arrived, and a default would have let it
+    #: write the first one's name into its own evidence.
+    held: str
 
     @property
     def corpus_dir(self) -> Path:
@@ -1151,6 +1180,7 @@ def finish(
         notes,
         store.submitted_by,
         store.submitted_for,
+        store.held,
     )
     (case_dir / store.document_name).write_text(text, encoding="utf-8")
     entry = record(

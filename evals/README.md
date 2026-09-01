@@ -129,6 +129,7 @@ evals/
 | `harness/identity.py` | Claim identity from the fields a claim carries. `SubsetVerbIdentity` scores 185/200 against the recorded labels, over the 90% bar, with no model call. |
 | `harness/fingerprint.py` | A **Claim**'s identity as a versioned value code computes. No model call. |
 | `harness/ledger.py` | The append-only record of what a **person** decided about a finding. One file per voter, named by the GitHub login. |
+| `harness/envelope.py` | The offline sitting envelope: one reader's answers read back from the standalone page and applied through the same `finish` the app runs. Treats the file as untrusted input and recomputes every digest against this tree. |
 | `harness/roster.py` | Voter → standing, read from `review/voters.toml` — the only place a standing lives. Refuses an unrostered voter rather than defaulting one. |
 | `harness/baseline.py` | A **Baseline**: one directory under `baselines/`, one configuration, up to ten sweeps. Computes the five-part identity and the derived name, assembles the directory, and verifies that everything recomputes — never that a model ran. |
 | `harness/prices.py` | Unit prices from litellm's offline map, and the one cost rule submit and CI both run. A model the map misses prices at `None`, never at zero. |

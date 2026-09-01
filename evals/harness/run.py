@@ -62,6 +62,7 @@ from analysis_service.report import (
 from evals.harness import (
     comparison,
     consent,
+    envelope,
     instruction,
     instruction_delta,
     ledger,
@@ -1537,6 +1538,11 @@ COMMANDS: dict[str, Command] = {
         " (no credentials)",
         run=instruction_delta.command_compare,
         arguments=_compare_arguments,
+    ),
+    "sitting-import": Command(
+        help="apply one offline sitting envelope to this tree (no credentials)",
+        run=envelope.command_import,
+        arguments=envelope.import_arguments,
     ),
     "submit": Command(
         help="open a contribution PR through gh, after running its CI checks locally",
