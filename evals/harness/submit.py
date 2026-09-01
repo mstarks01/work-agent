@@ -44,6 +44,7 @@ from typing import Any
 
 from pydantic import ValidationError
 
+from evals.build_review_docs import GENERATED_DOCUMENT
 from evals.harness import baseline, comparison, ledger, roster
 from evals.harness.artifact import ProvenanceError
 from evals.harness.reference import CaseSitting
@@ -106,6 +107,12 @@ class Kind:
     #: and what the shared scope checks read, so the prefix is spelled once
     #: for the whole module.
     prefix: str = ""
+    #: File names under this kind's tree that a generator writes from the
+    #: material beside them. A submission never carries one: regenerating a
+    #: derived file claims nothing, so it names no author and appends no
+    #: entry. Declared beside the prefix rather than listed elsewhere, so a
+    #: kind that grows a generated file answers for it here.
+    derived: frozenset[str] = frozenset()
     #: What one submission of this kind is called, in a checklist sentence.
     #: Beside the prefix because the checks that read one read the other.
     noun: str = ""
@@ -183,10 +190,28 @@ def _changed_paths(root: Path) -> list[str]:
         ["git", "status", "--porcelain", "--untracked-files=all"], root
     ).splitlines()
     untracked = [line[3:] for line in porcelain if line.startswith("?? ")]
-    delta = sorted(set(tracked) | set(untracked))
+    delta = sorted(rel for rel in set(tracked) | set(untracked) if not _is_derived(rel))
     if root in _DELTA:
         _DELTA[root] = delta
     return delta
+
+
+def _is_derived(rel: str) -> bool:
+    """Whether a generator writes this path from the material beside it.
+
+    Read off :data:`KINDS` rather than a list here, so a kind that grows a
+    generated file declares it beside its own prefix.
+
+    Derived files leave the delta before any check reads it, which is what
+    makes a regeneration an ordinary code change: it selects no kind, so it
+    names no reviewer and appends no entry. Before this, refreshing the
+    reading documents was classified as twelve sittings by twelve people who
+    had not read anything, and there was no diff that could pass.
+    """
+    name = rel.rsplit("/", 1)[-1]
+    return any(
+        rel.startswith(kind.prefix) and name in kind.derived for kind in KINDS.values()
+    )
 
 
 def _base_text(root: Path, rel: str) -> str | None:
@@ -887,6 +912,10 @@ KINDS: dict[str, Kind] = {
     ),
     "sitting": Kind(
         prefix="evals/corpus/",
+        # `REVIEW.md` is written by `evals/build_review_docs.py` from the case
+        # it sits beside. The filled `REVIEW-<login>.md` is evidence and is
+        # not derived, so the two names part company here.
+        derived=frozenset({GENERATED_DOCUMENT}),
         noun="sitting",
         subject="case",
         subjects="many",
