@@ -17,13 +17,15 @@ from types import SimpleNamespace
 
 import pytest
 
+from analysis_service.identity import build_identity
 from analysis_service.report import NodeRun, TokenUsage
-from analysis_service.sampling import TierSampling, sampling_fingerprint
+from analysis_service.sampling import TierSampling
 from evals.harness import consent, modes, prices, run
 from evals.harness.artifact import ARTIFACT_VERSION, RepoCommit
 from evals.harness.consent import UNKNOWN, Estimate, Refused, gate, hold
 from evals.harness.prices import UnitPrices
 from evals.harness.provenance import RunProvenance
+from tests.factories import SAMPLE_INSTRUCTIONS, sample_fingerprint
 
 ARTIFACT_COMMIT = RepoCommit(commit="c" * 40, clean=True)
 
@@ -70,9 +72,8 @@ def artifact_document(usage, seed=1):
                 "tier": tier,
                 "requested_model": ROUTES[tier],
                 "served_model": ROUTES[tier],
-                "generation_fingerprint": sampling_fingerprint(
-                    ROUTES[tier], tiers[tier]
-                ),
+                "instruction_sha256": SAMPLE_INSTRUCTIONS,
+                "generation_fingerprint": sample_fingerprint(ROUTES[tier], tiers[tier]),
             }
         ]
         for node, tier in TIER_NODES.items()
@@ -80,6 +81,7 @@ def artifact_document(usage, seed=1):
     }
     provenance = RunProvenance.model_validate(
         {
+            "build": dict(build_identity()),
             "sampling_config_version": 1,
             "tiers_config_version": 1,
             "sampling": tiers,

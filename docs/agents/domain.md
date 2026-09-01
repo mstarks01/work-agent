@@ -5,7 +5,7 @@ How the engineering skills should consume this repo's domain documentation when 
 ## Before exploring, read these
 
 - **`CONTEXT.md`** at the repo root — the STRIDE service glossary (System Model,
-  Element, Model Tier, Generation Identity, Certification, Verdict, …).
+  Element, Model Tier, Execution Identity, Certification, Verdict, …).
 - **`docs/adr/`** — read the architecture decision records that touch the area
   you're about to work in.
 

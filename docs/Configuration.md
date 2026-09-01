@@ -19,7 +19,7 @@ Both [`Engine.from_config(frameworks, env=...)`](Integration-Guide.md) and the
 | `config/model_tiers.toml` | Maps each LLM node to a tier, and each tier to a `(vendor, model)` pair. |
 | `config/sampling.toml` | Decoding parameters, shared by production and evals. |
 | `config/resilience.toml` | Retry attempts and budget, per-request timeout, input bounds, and the job deadline. |
-| `config/blessed-fingerprints.toml` | The generation identities this deployment has blessed. |
+| `config/blessed-fingerprints.toml` | The execution identities this deployment has blessed. |
 | `config/frameworks.toml` | Which framework packages this deployment carries. |
 | `frameworks/` | One directory per framework package: its lanes, critic, disclaimer, rubric and local corpus. |
 | `domains/` | The shared domain packs, selected from the system model rather than by any framework's rules. |
@@ -336,7 +336,7 @@ cannot convert — it sent none and they generated unconstrained, silently. They
 now carry wrapper models, and a test asserts every node's schema survives the
 conversion.)
 
-It enters the sampling fingerprint, so a sweep measured with constrained output
+It enters the execution identity, so a sweep measured with constrained output
 does not certify a run made without it. It is deliberately **not** promotable: a
 sweep tunes decoding values, and this is a deployment's answer about its
 provider.
@@ -414,7 +414,7 @@ eight answers:
 | critic structured output | the ruling parsed and reached the report |
 | sampling parameter validation | the provider accepted this tier's params |
 | served-model capture | what actually answered, where the provider said |
-| execution fingerprint generation | the Generation Identity that implies |
+| execution fingerprint generation | the Execution Identity that implies |
 | provenance generation | the record is complete and recomputes from itself |
 
 Cells read `passed`, `failed` or `unknown`, and `unknown` means the *provider*

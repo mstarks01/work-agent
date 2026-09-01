@@ -76,10 +76,11 @@ from analysis_service.graph import (
     RECRITIC_ROLE,
     FrameworkNodes,
 )
+from analysis_service.identity import execution_fingerprint
 from analysis_service.jobs import PipelineRejected
 from analysis_service.model_tiers import TierName
 from analysis_service.report import FrameworkName, NodeRun, Report, SamplingValue
-from analysis_service.sampling import TierSampling, sampling_fingerprint
+from analysis_service.sampling import TierSampling
 from analysis_service.sources import Source
 
 # The fixture, and it is part of the contract rather than a sample: every
@@ -517,7 +518,9 @@ def _check_fingerprint(report: Report, deployment: Deployment) -> Check:
             CheckResult.UNKNOWN,
             "no served build was reported, so no identity could be hashed",
         )
-    unfingerprinted = sorted(run.node for run in served if not run.sampling_fingerprint)
+    unfingerprinted = sorted(
+        run.node for run in served if not run.execution_fingerprint
+    )
     if unfingerprinted:
         return Check(
             FINGERPRINT,
@@ -527,7 +530,7 @@ def _check_fingerprint(report: Report, deployment: Deployment) -> Check:
     return Check(
         FINGERPRINT,
         CheckResult.PASSED,
-        f"{len({run.sampling_fingerprint for run in served})} distinct identities"
+        f"{len({run.execution_fingerprint for run in served})} distinct identities"
         f" over {len(served)} executions",
     )
 
@@ -537,11 +540,12 @@ def _check_provenance(report: Report, deployment: Deployment) -> Check:
 
     Two things, because either alone is weak. Complete: every node the graph had
     to run appears, so a lane that vanished cannot pass by leaving no trace.
-    Self-consistent: each recorded fingerprint is **recomputed** from the served
-    build and the tier's own sampling block as the report carries them, so the
-    stored hash is evidence rather than an assertion, and a report whose numbers
-    do not follow from each other is refused (OWASP A08). It is the same
-    recomputation a promotion runs before anything reaches the blessed manifest.
+    Self-consistent: each recorded fingerprint is **recomputed** from the report's
+    own record of the identity — the node's two routes and instruction digest,
+    the tier's sampling block, and the envelope's build map — so the stored hash
+    is evidence rather than an assertion, and a report whose numbers do not
+    follow from each other is refused (OWASP A08). It is the same recomputation
+    a promotion runs before anything reaches the blessed manifest.
     """
     ran = {run.node for run in report.nodes}
     missing = [
@@ -563,22 +567,44 @@ def _check_provenance(report: Report, deployment: Deployment) -> Check:
 
 
 def _fingerprint_mismatches(report: Report, deployment: Deployment) -> list[str]:
-    """Recorded fingerprints that do not follow from the report's own numbers."""
+    """Recorded fingerprints that do not follow from the report's own numbers.
+
+    Every input is read from the report, including the build map. Reading the
+    running install instead would make this check fail on a report produced by a
+    different one — which is drift in the reader rather than in the run, and the
+    opposite of what a self-consistency check is for.
+    """
     mismatches = []
+    if report.execution is None:
+        return [
+            (
+                "the report carries no execution block, so no fingerprint can be"
+                " recomputed from it"
+            )
+        ]
     for run in _llm_runs(report, deployment):
-        if run.model is None or run.sampling_fingerprint is None:
+        if (
+            run.model is None
+            or run.requested_model is None
+            or run.instruction_sha256 is None
+            or run.execution_fingerprint is None
+        ):
             continue
         tier = deployment.tier_of(run.node)
         recorded = report.sampling.get(tier)
         if recorded is None:
             mismatches.append(f"{run.node}: tier {tier!r} has no recorded sampling")
             continue
-        recomputed = sampling_fingerprint(
-            run.model, TierSampling.model_validate(recorded)
+        recomputed = execution_fingerprint(
+            requested_route=run.requested_model,
+            served_route=run.model,
+            sampling=TierSampling.model_validate(recorded).model_dump(),
+            instruction_sha256=run.instruction_sha256,
+            build=report.execution.build,
         )
-        if recomputed != run.sampling_fingerprint:
+        if recomputed != run.execution_fingerprint:
             mismatches.append(
-                f"{run.node}: recorded {run.sampling_fingerprint} but"
+                f"{run.node}: recorded {run.execution_fingerprint} but"
                 f" {run.model} on tier {tier!r} recomputes to {recomputed}"
             )
     return mismatches

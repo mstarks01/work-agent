@@ -15,14 +15,26 @@ two cannot drift — a blessed fingerprint always describes the params the file
 actually holds.
 
 Promotion is keyed by **tier**, following the manifest. ``promote`` recomputes
-the fingerprints from the config rather than accepting them from the caller;
+the fingerprints from the identity rather than accepting them from the caller;
 that redundancy *is* the no-drift invariant.
+
+**A tier's identity is more than one served build (#504).** The execution
+identity binds the requested route and the built graph's instruction digest
+beside the served build, so a promotion resolves all three.
+
+The three are not resolved alike, and the difference is which of them an
+operator can reasonably choose between. Two **served builds** on one tier is a
+provider rotation mid-sweep: both produced numbers in the same aggregate, so the
+tool refuses and ``--served`` picks. Two **requested routes** is a configuration
+that changed mid-sweep, which is a re-run rather than a choice, so there is no
+flag. Two **instruction digests** is a sweep whose corpus declared two framework
+selections and therefore built two graphs — both legitimate, both blessed.
 """
 
 from __future__ import annotations
 
 import json
-from collections.abc import Mapping
+from collections.abc import Mapping, Sequence
 from dataclasses import dataclass
 from pathlib import Path
 
@@ -33,9 +45,31 @@ from analysis_service.certification import (
     load_manifest,
 )
 from analysis_service.deployment import ConfigPaths, Deployment
+from analysis_service.identity import execution_fingerprint
 from analysis_service.model_tiers import TIER_NAMES, TierName
-from analysis_service.sampling import SamplingConfig, TierSampling, sampling_fingerprint
+from analysis_service.sampling import SamplingConfig, TierSampling
 from evals.harness.provenance import ProvenanceError, RunProvenance, TierIdentity
+
+
+@dataclass(frozen=True)
+class TierIdentityKey:
+    """Everything but the sampling and the build that keys one tier's identity.
+
+    Both routes, because a fingerprint binds both: ``served`` is what the
+    provider said answered and ``requested`` is what this deployment asked for.
+    A promotion carrying only the served half would bless a hash it could not
+    recompute, and one carrying only the served half is also exactly the shape a
+    compromised translator gets to choose.
+
+    ``instruction_sha256`` is here rather than beside the build map because a
+    sweep builds one graph per framework selection its corpus declares, so one
+    tier can legitimately present several. A tier's promotion blesses one key
+    per digest observed.
+    """
+
+    requested: str
+    served: str
+    instruction_sha256: str
 
 
 def promotion_paths(deployment: Deployment | None = None) -> ConfigPaths:
@@ -70,7 +104,7 @@ _STR_PARAMS = frozenset({"thinking"})
 # property of the deployment rather than of the tuning. Promoting it would let a
 # sweep rewrite a *deployment's* answer to that question with its own.
 #
-# It still enters the sampling fingerprint, which is the part that matters:
+# It still enters the execution identity, which is the part that matters:
 # constrained and unconstrained generation are different generation behaviour,
 # so a sweep measured one way does not certify a run made the other way. Skipped
 # here, compared there.
@@ -79,17 +113,21 @@ _NOT_PROMOTABLE = frozenset({"constrain_output"})
 
 def promote(
     sampling: SamplingConfig,
-    served_builds: Mapping[str, str],
+    keys: Mapping[str, Sequence[TierIdentityKey]],
     *,
+    build: Mapping[str, str],
     sampling_path: Path | str | None = None,
     manifest_path: Path | str | None = None,
 ) -> BlessedManifest:
     """Promote a sweep winner: re-pin ``sampling.toml`` and bless its fingerprints.
 
-    ``served_builds`` maps each **tier** to the vendor-prefixed served build
-    that answered for it. There is no node -> tier walk: a fingerprint's
-    payload carries no node name, so blessing is per tier in substance as well
-    as in storage.
+    ``keys`` maps each **tier** to every identity key it presented. There is no
+    node -> tier walk: a fingerprint's payload carries no node name, so blessing
+    is per tier in substance as well as in storage.
+
+    ``build`` is the sweep's, not this process's. It completes the identity, and
+    reading it from the promoting machine instead would bless a hash describing
+    an install that never ran the sweep.
 
     Re-pinning is a value update **in place**, preserving the file's comments
     (the "why-absent" record is the point of the file). Promoting a param the
@@ -100,7 +138,7 @@ def promote(
     stay explicit parameters so a caller holding a deployment, or a test, can
     name them directly.
     """
-    unknown = sorted(set(served_builds) - set(TIER_NAMES))
+    unknown = sorted(set(keys) - set(TIER_NAMES))
     if unknown:
         raise CertificationError(f"unknown tier(s) in served builds: {unknown}")
 
@@ -119,11 +157,20 @@ def promote(
     # Walked in the vocabulary's order rather than the caller's, so the written
     # manifest does not vary with the order a sweep happened to report tiers in.
     for tier in TIER_NAMES:
-        served = served_builds.get(tier)
-        if served is None:
+        blessing = keys.get(tier)
+        if not blessing:
             continue
-        fingerprint = sampling_fingerprint(served, sampling.for_tier(tier))
-        merged[tier] = frozenset({*merged.get(tier, frozenset()), fingerprint})
+        fingerprints = {
+            execution_fingerprint(
+                requested_route=key.requested,
+                served_route=key.served,
+                sampling=sampling.for_tier(tier).model_dump(),
+                instruction_sha256=key.instruction_sha256,
+                build=build,
+            )
+            for key in blessing
+        }
+        merged[tier] = frozenset({*merged.get(tier, frozenset()), *fingerprints})
     manifest = BlessedManifest(version=MANIFEST_VERSION, tiers=merged)
 
     # Both writes happen only once the rewrite has succeeded, so a rejected
@@ -139,9 +186,15 @@ class TierPromotion:
 
     tier: str
     requested_models: tuple[str, ...]
+    requested_model: str
     served_model: str
     sampling: TierSampling
-    fingerprint: str
+    #: One key per instruction digest this tier ran under, and the fingerprint
+    #: each produces. Plural because a sweep whose corpus declares two framework
+    #: selections builds two graphs, and both are identities the numbers came
+    #: from.
+    keys: tuple[TierIdentityKey, ...]
+    fingerprints: tuple[str, ...]
     nodes: tuple[str, ...]
     # Every build this tier was answered by, kept even once one is selected:
     # the operator approving a promotion should see what they are *not*
@@ -155,19 +208,20 @@ class PromotionPlan:
 
     Built before anything is written so the operator approves a concrete list of
     identities rather than a command. Every fingerprint here is **recomputed**
-    by :func:`~analysis_service.sampling.sampling_fingerprint` from the served
-    build and that tier's sampling — the artifact's stored hashes are verified
+    by :func:`~analysis_service.identity.execution_fingerprint` from the
+    artifact's recorded identity — the artifact's stored hashes are verified
     against the same function and never copied forward, so an edited artifact
     cannot smuggle a fingerprint into the manifest.
     """
 
     sampling: SamplingConfig
     tiers: tuple[TierPromotion, ...]
+    build: dict[str, str]
 
     @property
-    def served_builds(self) -> dict[str, str]:
-        """The ``tier -> served build`` mapping :func:`promote` blesses."""
-        return {entry.tier: entry.served_model for entry in self.tiers}
+    def keys(self) -> dict[str, tuple[TierIdentityKey, ...]]:
+        """The ``tier -> identity keys`` mapping :func:`promote` blesses."""
+        return {entry.tier: entry.keys for entry in self.tiers}
 
 
 def plan_promotion(
@@ -205,8 +259,11 @@ def plan_promotion(
     sampling = provenance.sampling_config()
     return PromotionPlan(
         sampling=sampling,
+        build=dict(provenance.build),
         tiers=tuple(
-            _tier_promotion(tier, identity, chosen.get(tier), sampling)
+            _tier_promotion(
+                tier, identity, chosen.get(tier), sampling, build=provenance.build
+            )
             for tier, identity in identities.items()
         ),
     )
@@ -217,18 +274,57 @@ def _tier_promotion(
     identity: TierIdentity,
     chosen: str | None,
     sampling: SamplingConfig,
+    *,
+    build: Mapping[str, str],
 ) -> TierPromotion:
-    """One tier's promotion, refusing rather than choosing among served builds."""
+    """One tier's promotion, refusing rather than choosing among its identities."""
     served = _select_served(tier, identity, chosen)
+    requested = _select_requested(tier, identity)
     tier_sampling = sampling.for_tier(tier)
+    keys = tuple(
+        TierIdentityKey(requested=requested, served=served, instruction_sha256=digest)
+        for digest in identity.instruction_digests
+    )
     return TierPromotion(
         tier=tier,
         requested_models=identity.requested_models,
+        requested_model=requested,
         served_model=served,
         sampling=tier_sampling,
-        fingerprint=sampling_fingerprint(served, tier_sampling),
+        keys=keys,
+        fingerprints=tuple(
+            execution_fingerprint(
+                requested_route=key.requested,
+                served_route=key.served,
+                sampling=tier_sampling.model_dump(),
+                instruction_sha256=key.instruction_sha256,
+                build=build,
+            )
+            for key in keys
+        ),
         nodes=identity.nodes,
         observed_served_models=identity.served_models,
+    )
+
+
+def _select_requested(tier: str, identity: TierIdentity) -> str:
+    """The one requested route this tier ran on, or refuse.
+
+    There is no ``--requested`` counterpart to ``--served``, and there should not
+    be: a served build is the provider's choice and an operator can reasonably
+    pick among several, while a requested route is this deployment's own
+    configuration. A tier that presented two of them was misconfigured mid-sweep,
+    and the fix is to re-run rather than to bless half of it.
+    """
+    if len(identity.requested_models) == 1:
+        return identity.requested_models[0]
+    raise ProvenanceError(
+        f"tier {tier!r} was asked for under"
+        f" {len(identity.requested_models)} different routes"
+        f" ({', '.join(identity.requested_models)}), so its numbers came from a"
+        " mix of configurations. Re-run the sweep against one route; there is no"
+        " flag to pick among them, because a requested route is this"
+        " deployment's own configuration rather than the provider's choice"
     )
 
 

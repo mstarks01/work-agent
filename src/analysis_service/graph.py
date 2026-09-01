@@ -148,6 +148,7 @@ from analysis_service.frameworks import (
     run_precondition,
     schemas_for,
 )
+from analysis_service.identity import IDENTITY_VERSION, build_identity
 from analysis_service.knowledge import (
     MAX_CASES,
     MAX_NOTES,
@@ -170,6 +171,7 @@ from analysis_service.report import (
     AnalysisMarks,
     Claim,
     DroppedClaim,
+    ExecutionEnvelope,
     FrameworkAnalysis,
     FrameworkName,
     InputRef,
@@ -881,6 +883,9 @@ class Analysis:
             shared_element_names=self.marks.shared_element_names,
             elements_analyzed=len(self.system_model.elements()),
             analysis_context=self.context(pipeline.instruction_sha256),
+            execution=ExecutionEnvelope(
+                identity_version=IDENTITY_VERSION, build=dict(build_identity())
+            ),
             analyses=list(self.analyses),
         )
 

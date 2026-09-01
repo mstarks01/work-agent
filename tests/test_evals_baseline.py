@@ -16,8 +16,9 @@ from pathlib import Path
 
 import pytest
 
+from analysis_service.identity import build_identity
 from analysis_service.report import TokenUsage
-from analysis_service.sampling import TierSampling, sampling_fingerprint
+from analysis_service.sampling import TierSampling
 from evals.harness import baseline, prices
 from evals.harness.artifact import ARTIFACT_VERSION, load_artifact
 from evals.harness.baseline import (
@@ -29,6 +30,7 @@ from evals.harness.baseline import (
 )
 from evals.harness.prices import UnitPrices
 from evals.harness.provenance import RunProvenance
+from tests.factories import SAMPLE_INSTRUCTIONS, sample_fingerprint
 
 COMMIT = "c" * 40
 CORPUS = "d" * 64
@@ -64,13 +66,17 @@ def payload(
                 "tier": tier,
                 "requested_model": requested,
                 "served_model": served,
-                "generation_fingerprint": sampling_fingerprint(served, tiers[tier]),
+                "instruction_sha256": SAMPLE_INSTRUCTIONS,
+                "generation_fingerprint": sample_fingerprint(
+                    served, tiers[tier], requested=requested
+                ),
             }
         ]
         for node, (tier, requested, served) in runs.items()
     }
     provenance = RunProvenance.model_validate(
         {
+            "build": dict(build_identity()),
             "sampling_config_version": 1,
             "tiers_config_version": 1,
             "sampling": tiers,

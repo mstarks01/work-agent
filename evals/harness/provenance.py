@@ -1,13 +1,24 @@
 """What a sweep's generation identities were, serialized so promotion can reuse them.
 
-A blessed fingerprint is ``sha256(vendor-prefixed served build, resolved tier
-sampling)``. Both halves are observations: the served build is read back off
-each response, and the sampling is what the deployment resolved after env
-overrides. Neither is recoverable from the configured tier strings, so an
-artifact recording only what the run *asked* for cannot support a promotion —
-the operator would have to rediscover the served builds by hand, and blessing
-the requested model instead would certify a route rather than a build
+A blessed fingerprint is the sha256 of a versioned **Execution Identity** —
+see :mod:`analysis_service.identity`. Its parts are observations: the served
+build is read back off each response, the sampling is what the deployment
+resolved after env overrides, the instruction digest is what the built graph
+carried, and the build map is what was installed. None of them is recoverable
+from the configured tier strings, so an artifact recording only what the run
+*asked* for cannot support a promotion — the operator would have to rediscover
+the served builds by hand, and blessing the requested model instead would
+certify a route rather than a build
 ([#117](https://github.com/mstarks01/work-agent/issues/117)).
+
+**The artifact records the identity's non-sampling halves too (#504).** The
+build map is a per-sweep fact — one process, one install — so it sits beside the
+per-tier sampling. The instruction digest is not: a sweep builds one graph per
+framework selection its corpus declares, so it rides on each execution.
+:meth:`RunProvenance.verify` recomputes from *those recorded* values and never
+from the machine reading the file. An artifact swept on ``litellm`` 1.97.0 has
+to keep verifying after the reader upgrades, or every stored sweep would fail
+for drift in the reader rather than in the run.
 
 **One record, one derived view.** :attr:`RunProvenance.node_runs` is the record:
 one entry per node *execution*, carrying the tier it ran on, what was requested,
@@ -20,19 +31,20 @@ is a corrupted artifact, not a second opinion (OWASP A08).
 
 The resolved sampling is stored **once per tier**, not per execution, mirroring
 the clear block a :class:`~analysis_service.report.Report` already carries:
-a fingerprint is recomputable from a node's served build plus its tier's block,
-and repeating the block on every execution would be the same fact twelve times
-over, free to drift.
+a fingerprint is recomputable from a node's two routes plus its tier's block and
+the two per-sweep fields, and repeating any of them on every execution would be
+the same fact twelve times over, free to drift.
 
 Loading fails closed (OWASP A02/A10): an unreadable file, invalid JSON, a
 missing or unsupported ``artifact_version``, a malformed record, a tier with no
-sampling block, or a fingerprint that does not recompute all raise rather than
-yielding a partial record that promotion would bless.
+sampling block, an identity version this build does not compute, or a
+fingerprint that does not recompute all raise rather than yielding a partial
+record that promotion would bless.
 """
 
 from __future__ import annotations
 
-from collections.abc import Iterable
+from collections.abc import Iterable, Mapping
 from typing import Any, Self
 
 from pydantic import (
@@ -48,9 +60,10 @@ from analysis_service.certification import (
     Fingerprint,
     TierResolver,
 )
+from analysis_service.identity import IDENTITY_VERSION, execution_fingerprint
 from analysis_service.model_tiers import TIER_NAMES, TierName
 from analysis_service.report import NodeRun
-from analysis_service.sampling import SamplingConfig, TierSampling, sampling_fingerprint
+from analysis_service.sampling import SamplingConfig, TierSampling
 
 # How an unset param reads in the operator-facing display. A param this
 # deployment leaves unset is not the same claim as one pinned to zero, and the
@@ -82,6 +95,13 @@ class NodeExecution(BaseModel):
     Promotion keys by tier and must not re-derive it: a reader of the artifact
     holds no graph, and a second walk written against a later tier map would
     silently re-attribute a historical hash.
+
+    ``instruction_sha256`` is per execution rather than per sweep, because a
+    sweep builds one graph per framework selection its corpus declares and each
+    graph digests a different instruction set. Two executions of one tier under
+    two selections therefore carry two digests and two fingerprints — which is
+    an accurate record of two sanctioned identities, not an ambiguity to
+    resolve.
     """
 
     model_config = ConfigDict(extra="forbid", frozen=True)
@@ -90,6 +110,7 @@ class NodeExecution(BaseModel):
     tier: TierName
     requested_model: str = Field(min_length=1, max_length=200)
     served_model: str = Field(min_length=1, max_length=200)
+    instruction_sha256: Fingerprint
     generation_fingerprint: Fingerprint
 
     def to_json(self) -> dict[str, str]:
@@ -105,6 +126,7 @@ class NodeExecution(BaseModel):
             "tier": self.tier,
             "requested_model": self.requested_model,
             "served_model": self.served_model,
+            "instruction_sha256": self.instruction_sha256,
             "generation_fingerprint": self.generation_fingerprint,
         }
 
@@ -124,6 +146,12 @@ class TierIdentity(BaseModel):
 
     requested_models: tuple[str, ...]
     served_models: tuple[str, ...]
+    #: Every instruction digest this tier ran under, one per framework selection
+    #: the sweep's corpus declared. Plural for a different reason than the
+    #: served builds are: two served builds is a rotation an operator has to
+    #: choose between, while two digests is two graphs a sweep legitimately
+    #: built, and both get blessed.
+    instruction_digests: tuple[Fingerprint, ...]
     fingerprints: tuple[Fingerprint, ...]
     nodes: tuple[str, ...]
 
@@ -136,6 +164,7 @@ class TierIdentity(BaseModel):
         return {
             "requested_models": list(self.requested_models),
             "served_models": list(self.served_models),
+            "instruction_digests": list(self.instruction_digests),
             "fingerprints": list(self.fingerprints),
             "nodes": list(self.nodes),
         }
@@ -153,6 +182,17 @@ class RunProvenance(BaseModel):
 
     model_config = ConfigDict(extra="forbid", frozen=True)
 
+    #: The execution-identity schema every recorded fingerprint was computed
+    #: under. Checked on load rather than assumed: a hash from another schema is
+    #: a hash of a different payload, and comparing the two is exactly the
+    #: silent mismatch versioning exists to prevent.
+    identity_version: int = IDENTITY_VERSION
+    #: The installed versions of the distributions between a node and its
+    #: provider. A genuine per-sweep fact — one process, one install — so it is
+    #: recorded once here and read back on verify rather than re-read from the
+    #: verifying machine. The instruction digest is *not* here: it varies with
+    #: the framework selection a case declares, so it rides on each execution.
+    build: dict[str, str]
     sampling_config_version: int
     tiers_config_version: int
     sampling: dict[TierName, TierSampling]
@@ -205,6 +245,7 @@ class RunProvenance(BaseModel):
             tier: TierIdentity(
                 requested_models=_unique(e.requested_model for e in executions),
                 served_models=_unique(e.served_model for e in executions),
+                instruction_digests=_unique(e.instruction_sha256 for e in executions),
                 fingerprints=_unique(e.generation_fingerprint for e in executions),
                 nodes=_unique(e.node for e in executions),
             )
@@ -231,12 +272,24 @@ class RunProvenance(BaseModel):
         """Recompute every recorded fingerprint; raise on the first that differs.
 
         The serialized hash is never the input to a promotion — the canonical
-        :func:`~analysis_service.sampling.sampling_fingerprint` recomputes it from
-        the served build and the tier's sampling block. This check is what makes
-        the stored value evidence rather than an assertion: an artifact whose
-        hash does not follow from the identity beside it is refused, so a
-        hand-edited fingerprint cannot reach the manifest (OWASP A08).
+        :func:`~analysis_service.identity.execution_fingerprint` recomputes it
+        from the recorded identity. This check is what makes the stored value
+        evidence rather than an assertion: an artifact whose hash does not follow
+        from the identity beside it is refused, so a hand-edited fingerprint
+        cannot reach the manifest (OWASP A08).
+
+        Every input comes from the artifact, including the build versions. A
+        recomputation that read the verifying machine's install would fail every
+        stored sweep the moment a dependency moved, reporting drift in the reader
+        as drift in the run.
         """
+        if self.identity_version != IDENTITY_VERSION:
+            raise ProvenanceError(
+                f"the artifact records execution-identity version"
+                f" {self.identity_version}, and this build computes version"
+                f" {IDENTITY_VERSION}. Its fingerprints hash a different payload"
+                " and cannot be recomputed or promoted here"
+            )
         for execution in self.executions:
             sampling = self.sampling.get(execution.tier)
             if sampling is None:
@@ -244,14 +297,22 @@ class RunProvenance(BaseModel):
                     f"{execution.node} ran on tier {execution.tier!r}, which has no"
                     " recorded sampling block: the fingerprint cannot be recomputed"
                 )
-            recomputed = sampling_fingerprint(execution.served_model, sampling)
+            recomputed = execution_fingerprint(
+                requested_route=execution.requested_model,
+                served_route=execution.served_model,
+                sampling=sampling.model_dump(),
+                instruction_sha256=execution.instruction_sha256,
+                build=self.build,
+            )
             if recomputed != execution.generation_fingerprint:
                 raise ProvenanceError(
                     f"{execution.node}: the recorded fingerprint"
                     f" {execution.generation_fingerprint} does not follow from"
-                    f" served build {execution.served_model!r} and tier"
-                    f" {execution.tier!r}'s sampling (recomputes to {recomputed});"
-                    " the artifact is inconsistent and will not be promoted"
+                    f" requested route {execution.requested_model!r}, served build"
+                    f" {execution.served_model!r}, tier {execution.tier!r}'s"
+                    f" sampling, instructions {execution.instruction_sha256} and build"
+                    f" {self.build} (recomputes to {recomputed}); the artifact is"
+                    " inconsistent and will not be promoted"
                 )
 
     def to_json(self) -> dict[str, Any]:
@@ -264,6 +325,8 @@ class RunProvenance(BaseModel):
         stored copy disagrees.
         """
         return {
+            "identity_version": self.identity_version,
+            "build": dict(self.build),
             "sampling_config_version": self.sampling_config_version,
             "tiers_config_version": self.tiers_config_version,
             "sampling": {
@@ -291,6 +354,7 @@ def provenance_of(
     tier_of: TierResolver,
     sampling: SamplingConfig,
     tiers_config_version: int,
+    build: Mapping[str, str],
 ) -> RunProvenance:
     """Build the record from the node runs a sweep performed.
 
@@ -303,32 +367,56 @@ def provenance_of(
     ``tier_of`` is the deployment's node -> tier walk, passed in rather than
     re-derived, so this module never becomes a second opinion on which tier a
     node runs on.
+
+    ``build`` is the install the sweep ran on, handed in for the same reason
+    ``tier_of`` is: it is the sweep's own observation, and re-reading it here
+    would let the record describe something other than what produced the
+    fingerprints beside it. The instruction digest is not passed at all — it
+    rides on each :class:`~analysis_service.report.NodeRun`, because this flat
+    list spans every graph the sweep built and a lookup by node name could not
+    tell two of them apart.
     """
     node_runs: dict[str, list[NodeExecution]] = {}
     for run in executions:
-        if run.sampling_fingerprint is None:
+        if run.execution_fingerprint is None:
             continue
         # Both halves are present by construction — NodeRun's own validator
         # requires a served model beside a fingerprint, and the runner
         # fingerprints only a node it resolved a requested route for. Checked
         # anyway, because the alternative to raising here is a promotion
         # blessing an empty served identity.
-        if not run.model or not run.requested_model:
+        served, requested, instructions = (
+            run.model,
+            run.requested_model,
+            run.instruction_sha256,
+        )
+        missing = [
+            name
+            for name, value in (
+                ("a served model", served),
+                ("a requested model", requested),
+                ("an instruction digest", instructions),
+            )
+            if not value
+        ]
+        if missing or not (served and requested and instructions):
             raise ProvenanceError(
-                f"{run.node} carries a fingerprint without a"
-                f" {'served' if not run.model else 'requested'} model;"
-                " there is no generation identity to record"
+                f"{run.node} carries a fingerprint without"
+                f" {' and '.join(missing)}; there is no execution identity"
+                " to record"
             )
         node_runs.setdefault(run.node, []).append(
             NodeExecution(
                 node=run.node,
                 tier=tier_of(run.node),
-                requested_model=run.requested_model,
-                served_model=run.model,
-                generation_fingerprint=run.sampling_fingerprint,
+                requested_model=requested,
+                served_model=served,
+                instruction_sha256=instructions,
+                generation_fingerprint=run.execution_fingerprint,
             )
         )
     return RunProvenance(
+        build=dict(build),
         sampling_config_version=sampling.version,
         tiers_config_version=tiers_config_version,
         sampling=dict(sampling.tiers),

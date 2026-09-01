@@ -1299,16 +1299,37 @@ class NodeRun(BaseModel):
     would instead need a per-vendor served-id normalization table — a fourth
     mirrored vendor fact, and one that fails silently.
 
-    ``sampling_fingerprint`` is the generation-identity hash: ``sha256(served
-    route, resolved tier sampling)``, recomputable from this node's ``model``
-    and the report's top-level per-tier ``sampling`` clear block. It is computed
-    per node *execution*, so a build that moves partway through an eval sweep
-    gives one node two hashes. A deterministic FunctionNode carries none of the
-    three.
+    **The served build is what the provider said, and nothing here verifies
+    it.** ``model`` is read off the provider's own event stream, so a
+    compromised translator can put any string in it. That is why the two fields
+    are both recorded and why ``execution_fingerprint`` binds both: a manifest
+    blesses the *pair*, and the requested half comes from the deployment's
+    configuration rather than from the provider. The report states the trust
+    level once, on the envelope's ``execution`` block, rather than repeating it
+    on every node.
+
+    ``execution_fingerprint`` is the identity hash a deployment's manifest
+    blesses: ``sha256`` of the versioned execution identity — both routes, the
+    resolved tier sampling, the built graph's instruction digest, and the
+    versions of the distributions that sit between the node and its provider.
+    See :mod:`analysis_service.identity`. Computed per node *execution*, so a
+    build that moves partway through an eval sweep gives one node two hashes.
+
+    ``instruction_sha256`` is the digest of the graph this node ran in, and on a
+    report it repeats what ``analysis_context`` already says. **The repetition is
+    load-bearing.** A report holds one graph, so the two always agree there — but
+    a :class:`NodeRun` also travels alone: an eval sweep folds one flat list of
+    them across several graphs, because a case declares which frameworks it
+    carries and each distinct selection builds its own. In that list the report
+    block is gone and the node's own digest is the only thing that says which
+    instruction set produced its fingerprint. A row carrying a hash it cannot
+    account for is a row nobody can verify.
+
+    A deterministic FunctionNode carries none of these four.
 
     ``usage`` is what the node execution cost, ``None`` for a deterministic
     FunctionNode and for any LLM node whose provider reported nothing. It is
-    deliberately *not* coupled to ``model`` the way ``sampling_fingerprint``
+    deliberately *not* coupled to ``model`` the way ``execution_fingerprint``
     is: a fingerprint keyed on a served build is incoherent without one, but a
     token count is a fact about the call regardless of whether the provider
     also named the build that served it, and refusing to record it would
@@ -1320,19 +1341,68 @@ class NodeRun(BaseModel):
     node: str = Field(min_length=1, max_length=100)
     model: str | None = None  # served; None for deterministic FunctionNodes
     requested_model: str | None = None  # configured
-    sampling_fingerprint: str | None = Field(default=None, pattern=r"^[0-9a-f]{64}$")
+    instruction_sha256: str | None = Field(default=None, pattern=r"^[0-9a-f]{64}$")
+    execution_fingerprint: str | None = Field(default=None, pattern=r"^[0-9a-f]{64}$")
     duration_ms: int = Field(ge=0)
     usage: TokenUsage | None = None
 
     @model_validator(mode="after")
-    def _fingerprint_needs_model(self) -> Self:
-        # A fingerprint keyed on the served model is incoherent without one; a
-        # deterministic node has neither.
-        if self.sampling_fingerprint is not None and self.model is None:
+    def _fingerprint_needs_its_inputs(self) -> Self:
+        # Every per-node input to the identity has to be here beside the hash,
+        # or the row states a fingerprint nobody can rebuild. A deterministic
+        # node has none of them and no fingerprint, which is the consistent
+        # absence.
+        if self.execution_fingerprint is None:
+            return self
+        missing = [
+            name
+            for name, value in (
+                ("a served model", self.model),
+                ("a requested model", self.requested_model),
+                ("an instruction digest", self.instruction_sha256),
+            )
+            if value is None
+        ]
+        if missing:
             raise ValueError(
-                "sampling_fingerprint requires a served model on the same node"
+                f"execution_fingerprint requires {' and '.join(missing)}"
+                " on the same node"
             )
         return self
+
+
+class ExecutionEnvelope(BaseModel):
+    """What executed this run, and how much its self-report is worth.
+
+    One block per report rather than one per node, because every node in a
+    drive ran on the same install and asked the same graph. Repeating it would
+    be the same fact ten times over, free to drift.
+
+    ``identity_version`` is the schema of the payload each node's
+    ``execution_fingerprint`` hashes. A reader recomputing a fingerprint needs
+    it, and certification refuses a manifest written for a different one rather
+    than comparing across them.
+
+    ``served_model_trust`` states plainly what the served build on each node is
+    worth. ``provider_reported`` means the provider named it on its own event
+    stream and nothing independent confirmed it. It is recorded rather than
+    assumed because the difference between "the provider said Opus" and "Opus
+    answered" is exactly the difference a compromised translator lives in, and
+    a report that omits the distinction reads as the stronger claim.
+
+    ``build`` is the installed version of every distribution whose code sits
+    between a node and its provider — this service, the agent runtime and the
+    model translator. It is here rather than in a deployment note because it is
+    inside the fingerprint: a ``litellm`` bump moves every hash, and a reader
+    who cannot see which version ran cannot tell a sanctioned run from a
+    silently upgraded one.
+    """
+
+    model_config = ConfigDict(extra="forbid", frozen=True)
+
+    identity_version: int = Field(ge=1)
+    served_model_trust: Literal["provider_reported"] = "provider_reported"
+    build: dict[str, str] = Field(default_factory=dict)
 
 
 class AnalysisContext(BaseModel):
@@ -2510,8 +2580,8 @@ class Report(BaseModel):
     # serialized ``TierSampling``). Recorded as plain scalars, not the
     # ``TierSampling`` model, so this low-level schema module stays free of the
     # sampling/model_tiers import (which cycles back through skills). Each
-    # node's sampling_fingerprint is recomputable from its served model and its
-    # tier's entry here. Empty only on reports with no LLM provenance at all —
+    # node's execution_fingerprint is recomputable from its two routes and its
+    # tier's entry here, together with ``analysis_context`` and ``execution``. Empty only on reports with no LLM provenance at all —
     # the stub runner's. An eval report carries this block like any other: a
     # sweep's fingerprints are evidence, and evidence nobody can recompute from
     # the artifact is an assertion.
@@ -2535,6 +2605,15 @@ class Report(BaseModel):
     # without it (the stub runner's), which is the same absence an empty
     # ``coverage`` records rather than a claim that nothing informed the run.
     analysis_context: AnalysisContext | None = None
+    # What ran the graph, as distinct from what was in front of it: the identity
+    # schema version, how far the served builds can be trusted, and the versions
+    # of the distributions between a node and its provider. Every value here is
+    # inside each node's ``execution_fingerprint``, so this block is what makes
+    # a fingerprint recomputable from the artifact rather than from the machine
+    # that happens to be reading it. ``None`` on a report built without LLM
+    # provenance at all — the stub runner's — which is the same absence an empty
+    # ``sampling`` records.
+    execution: ExecutionEnvelope | None = None
     # **Declared as the base and serialized as itself.** The declaration is what
     # lets this module carry an envelope a framework it has never heard of fits
     # into; ``SerializeAsAny`` is what stops that generality from *costing* the

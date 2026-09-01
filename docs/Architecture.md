@@ -148,11 +148,25 @@ probabilistic result reproducible in the strict sense.
 | --- | --- |
 | `NodeRun.requested_model` | The configured route — what was asked for (`vertex_ai/gemini-2.5-pro`). |
 | `NodeRun.model` | The served build — what actually answered (`vertex_ai/gemini-2.5-pro-002`). |
-| `NodeRun.sampling_fingerprint` | The fingerprint of the served route and the tier's decoding params. |
+| `NodeRun.instruction_sha256` | The digest of the instructions the graph this node ran in carried. |
+| `NodeRun.execution_fingerprint` | The identity hash: both routes, the tier's decoding params, the instruction digest, and the build versions. |
+| `Report.execution` | The identity schema version, how far the served builds can be trusted, and those build versions. |
 
 The report records both model fields and compares neither directly. A served
-model change changes the sampling fingerprint, which makes the run uncertified
+model change changes the execution fingerprint, which makes the run uncertified
 unless the deployment has blessed that fingerprint.
+
+**The identity binds the requested route as well as the served one.** The served
+build is what the provider *said* answered, read off its own event stream, and
+nothing verifies it — `Report.execution.served_model_trust` says so in the
+artifact rather than leaving a reader to assume better. Binding both routes is
+what stops the provider's word from selecting a blessed entry on its own: a
+translator that returns an approved build while the deployment asked for
+something cheaper presents a pair no manifest holds.
+
+**A prompt edit, a `litellm` bump or a service release moves every fingerprint.**
+Each of those changes what a node can answer, so each re-baselines the manifest
+and runs read as uncertified until a sanctioned sweep blesses the new hashes.
 
 The fingerprint is computed **per node execution**, not once at startup. If the
 served model changes during a run, different nodes can therefore carry different

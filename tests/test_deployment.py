@@ -14,6 +14,7 @@ import pytest
 
 from analysis_service import graph
 from analysis_service.api import create_app
+from analysis_service.certification import MANIFEST_VERSION
 from analysis_service.deployment import (
     BLESSED_FINGERPRINTS_VAR,
     MODEL_TIERS_VAR,
@@ -74,7 +75,7 @@ def test_from_env_resolves_the_repo_configs_without_credentials():
     assert deployment.tiers.version == 5
     assert set(deployment.sampling.tiers) == {"base", "strong"}
     assert deployment.resilience.attempts >= 1
-    assert deployment.manifest.version == 2
+    assert deployment.manifest.version == MANIFEST_VERSION
     assert deployment.paths.model_tiers == PROJECT_ROOT / "config/model_tiers.toml"
 
 
