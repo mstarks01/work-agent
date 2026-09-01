@@ -1,8 +1,13 @@
 # Configuration
 
 The service reads its behaviour from versioned files in `config/` and from a set
-of environment variables. Loaders **fail closed**: a missing or invalid file
-stops startup rather than silently falling back to a default model or sampling.
+of environment variables. A missing, malformed, or unsupported configuration
+stops startup. The loaders also reject incomplete tier selections, unknown node
+names, invalid framework packages, and model/sampling combinations that the
+pinned capability checks know will fail.
+
+This page is reference material. For a first setup, use
+[First run](First-Run.md). For definitions, use [Concepts](Concepts.md).
 
 Both [`Engine.from_config(frameworks, env=...)`](Integration-Guide.md) and the
 [HTTP app](HTTP-API.md) take the same environment; the tables below apply to both.
@@ -22,11 +27,13 @@ Both [`Engine.from_config(frameworks, env=...)`](Integration-Guide.md) and the
 
 ### Models and vendors
 
-The service runs on **any supported vendor, with no privileged default** — and
-that holds for the shipped file, not only for the mechanism. `model_tiers.toml`
-selects **nothing**: both tier tables are absent, and a run that has not chosen
-stops at startup with an error naming the vendors and the two places a selection
-can be made. There is no vendor you reach by doing nothing.
+The code has registry entries for Vertex AI, Anthropic, and OpenAI. It reaches
+all three through ADK's LiteLLM adapter. `model_tiers.toml` selects **nothing**:
+both tier tables are absent, so startup fails until both tiers are configured.
+
+“Supported vendor” does not mean every model from that vendor is usable. The
+selected model must also pass the model-name, sampling, output-capacity, native
+structured-output, and credential checks described below.
 
 Two tiers named on a capability axis — `base` (extraction, repair) and `strong`
 (every framework's lane agents, critics and re-asks) — each select a
@@ -86,26 +93,20 @@ Claude is the family with a published form:
 claude-<name>-<major>[-<minor>]     e.g. claude-opus-5, claude-sonnet-4-6
 ```
 
-Two things to know about it. The dateless ID is **not** an alias — from the 4.6
-generation on it is the canonical pinned snapshot, and Anthropic ships a new ID
-rather than moving weights under an existing one. And Vertex spells it the same
-way, so `vendor = "vertex"` and `vendor = "anthropic"` take the identical model
-string for the same model.
-
-**This service runs Claude 4.6 and later only.** A pre-4.6 name is rejected —
-either as unpinned, because those generations carry a snapshot date
-(`claude-sonnet-4-5-20250929` direct, `claude-sonnet-4-5@20250929` on Vertex)
-and their bare form really was a floating alias, or, when the shape is right
-but the version is too old (`claude-haiku-4-5`), as a generation, with the
-message naming the one it read. There is no mode that accepts both schemes.
+The code applies that shape to every Claude model name. It does **not** enforce a
+minimum Claude generation. Dated identifiers such as
+`claude-sonnet-4-5-20250929` do not match the accepted shape, while a dateless
+name that matches it is allowed to proceed to the capability checks. Passing
+the name check does not prove that the provider still serves the model.
 
 A loose rule is the right one for the rest because it runs against three
 vendors' catalogs at once, and its predecessor — an allowlist of numbered
 Gemini builds — broke outright when Google retired them. Claude's half avoids
 that trap by matching a shape rather than enumerating builds: a model released
-tomorrow already satisfies it. The name check is only a proxy either way. The
-real guarantee is the **served build read back from every response** and
-recorded for each node execution, described under
+tomorrow already satisfies it. The name check is only a proxy either way.
+Stronger evidence comes from the **served build read back from each response**,
+when the provider supplies it, and recorded for that node execution, described
+under
 [Architecture → Provenance and certification](Architecture.md#provenance-and-certification).
 
 ### Node keys, and the frameworks this deployment carries

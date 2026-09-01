@@ -3,7 +3,12 @@
 Both entry points — the in-process [engine](Integration-Guide.md) and the
 [`/v1` API](HTTP-API.md) — drive one Google ADK Workflow graph and shape its
 outcome into a [`Report`](Report-Schema.md). This page is the map of what
-runs between text in and report out.
+runs between text in and report out. Read [Concepts](Concepts.md) first if terms
+such as system model, lane, ground, or critic are unfamiliar.
+
+The central split is simple: models extract facts and make security judgements;
+code performs checks with definite answers. The code does not make the whole
+analysis deterministic. It validates and constrains the probabilistic stages.
 
 ## The pipeline
 
@@ -92,9 +97,10 @@ run's three outcomes.
   failure is a `failed` job, not a rejection.
 - **assemble** builds the final report.
 
-Untrusted input never becomes an instruction: it enters session state as fenced
-data for the extraction prompt (OWASP LLM01). Mechanical checks live in code;
-the models are asked only for judgement.
+Untrusted input is placed in fenced prompt sections that tell the model to treat
+it as data. This is an instruction-level defense, not a proof that prompt
+injection is impossible. Every model output is validated before code relies on
+it.
 
 ## Models
 
@@ -118,7 +124,7 @@ twice rather than ten times.
 
 ## Provenance and certification
 
-Three terms, defined once and used throughout:
+The implementation records three related values:
 
 - **Served build** — the model identifier the provider says actually answered a
   request, prefixed with its vendor (`vertex_ai/gemini-2.5-pro-002`). Not
@@ -126,15 +132,17 @@ Three terms, defined once and used throughout:
   one had to be. It is also the one profiled family whose served build differs
   from the route you asked for, which is the distinction these three terms
   exist to draw. On Claude, both model fields hold the same string.
-- **Fingerprint** (also *generation identity*) — `sha256` of the served route
-  plus that tier's resolved decoding parameters. One value that identifies
-  exactly how a node produced its output.
+- **Sampling fingerprint** — `sha256` of the provider-qualified served model
+  plus that tier's resolved decoding parameters. It identifies the generation
+  setup, not everything that affected the output: the report records the input
+  digest and instruction digest separately.
 - **Blessed** — a fingerprint recorded in `config/blessed-fingerprints.toml`
   because a measured, sanctioned run produced it. The list is this deployment's
   own; nothing about it ships from this repo.
 
-Every run is **self-describing**: each node records what it asked for, what
-answered, and the fingerprint of the two together.
+Every completed report carries enough information to compare model selection,
+sampling, input identity, and instruction identity. It does not make a
+probabilistic result reproducible in the strict sense.
 
 | Field | What it holds |
 | --- | --- |
@@ -142,16 +150,15 @@ answered, and the fingerprint of the two together.
 | `NodeRun.model` | The served build — what actually answered (`vertex_ai/gemini-2.5-pro-002`). |
 | `NodeRun.sampling_fingerprint` | The fingerprint of the served route and the tier's decoding params. |
 
-The report records both model fields and **compares neither**. It doesn't need
-to: if the build moves, the fingerprint changes too, and no blessed list
-contains it — so the run reads as uncertified and the drift surfaces there
-instead.
+The report records both model fields and compares neither directly. A served
+model change changes the sampling fingerprint, which makes the run uncertified
+unless the deployment has blessed that fingerprint.
 
-The fingerprint is computed **per node execution**, not once at startup. A build
-that moves partway through a run therefore gives one node two different
-identities, which is the signal you want rather than a defect. The vendor prefix
-is part of the hash because a served identifier alone carries no vendor —
-Vertex-hosted Claude and Anthropic-direct Claude return identical build strings.
+The fingerprint is computed **per node execution**, not once at startup. If the
+served model changes during a run, different nodes can therefore carry different
+fingerprints. The vendor prefix is part of the hash because a served identifier
+alone carries no vendor—Vertex-hosted Claude and Anthropic-direct Claude can
+return the same model string.
 
 `config/blessed-fingerprints.toml` records blessed fingerprints **per tier**,
 not per node. A fingerprint contains no node name, and `critic` and `recritic`
@@ -165,10 +172,10 @@ resolve as one silently overriding the other.
 `ANALYSIS_BLESSED_FINGERPRINTS` chooses *which* single file is read — it does not
 layer a second one on top.
 
-**The service certifies every job it completes**, not just the eval harness. The
-result has three states and lives on the job record, never on the report: the
-report is portable evidence that travels with the analysis, while a blessed list
-is one deployment's claim about it.
+The service checks every completed job against the deployment's fingerprint
+manifest. This is a narrow operational attestation: it says whether the observed
+model-and-sampling fingerprints were approved. It does not judge the extracted
+model, findings, prompts, or input.
 
 | State | Meaning | Effect on `GET /v1/jobs/{id}/report` |
 | --- | --- | --- |
