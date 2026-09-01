@@ -289,15 +289,31 @@ A vote hangs on a **fingerprint**, and a better rule changes every fingerprint.
 That would expire the ledger, so a vote stores the fields its key was computed
 from. A rule change is then arithmetic over the ledger's files.
 
-1. **Measure the new rule** against the recorded labels. It must reach 90%:
+1. **Measure the new rule on both error directions.**
 
    ```sh
    python -m evals.harness.run calibrate --out agreement.json
    ```
 
-   Below the bar, fix the rule or the verb vocabulary
-   (`evals/harness/verbs.py`). Never lower the bar. A rule that matches too
-   readily raises recall silently, which is the expensive direction to be wrong.
+   The command prints false splits, then false merges, then the 90% bar. Read
+   them in that order, because the bar is the weakest of the three.
+
+   - **The merge count must not rise.** A rule that matches too readily raises
+     recall silently, which is the expensive direction to be wrong: a merged
+     finding leaves no unmatched claim for anybody to review. A new merge needs
+     a reason recorded in `verbs.UNSEPARATED`, or the rule is wrong.
+   - **The split count must not rise without an argument.** A split costs a
+     reviewer one unmatched finding, which is visible and recoverable, so a rule
+     may trade splits for merges — `SubsetVerbIdentity` takes one more split to
+     remove twenty merges. State the trade.
+   - **The bar must hold at 90%.** It admits a candidate rule that has no pinned
+     counts of its own yet. Below it, fix the rule or the verb vocabulary
+     (`evals/harness/verbs.py`). Never lower the bar.
+
+   `tests/test_evals_identity.py` asserts the shipped counts exactly rather than
+   as a floor, so a rule change fails there before it reaches the bar. Update
+   those constants in the same commit that changes the rule, and re-quote them
+   in `docs/agents/claim-identity.md` — the figure lint checks that file.
 
 2. **Bump the framework's version** in `VERSION_FOR`
    (`evals/harness/fingerprint.py`). It is a table keyed by framework, checked
