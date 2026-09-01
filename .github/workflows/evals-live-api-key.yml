@@ -84,6 +84,18 @@ jobs:
     name: Golden-case evals (${{ matrix.vendor }})
     runs-on: ubuntu-latest
     timeout-minutes: 90
+    # The ref guard, and dispatch-only is not a substitute for it (#508). This
+    # workflow has no `pull_request` trigger, so it looked safe -- but a
+    # dispatch names its own ref, and anyone with write access can point one at
+    # an unreviewed branch and have it run with these keys. No credential-
+    # bearing job may execute mutable PR-head code, whichever event started it.
+    if: github.ref == 'refs/heads/main'
+    # The approval boundary for the bearer keys. Scoping the secrets to an
+    # environment lets a deployment add required reviewers and a deployment-
+    # branch restriction without editing this file. It is the second layer
+    # behind the ref guard rather than a replacement for it -- an environment
+    # nobody has configured protection rules on protects nothing.
+    environment: live-providers
     permissions:
       contents: read
       # NO id-token. See the header: this job holds a bearer key, so it must

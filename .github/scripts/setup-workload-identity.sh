@@ -19,16 +19,23 @@
 #   .github/scripts/setup-workload-identity.sh \
 #       --project-id  <PROJECT_ID> \
 #       --location    us-central1 \
-#       [--repo       mstarks01/work-agent] \
+#       [--repo        mstarks01/work-agent] \
+#       [--trusted-ref refs/heads/main] \
 #       [--dry-run]
 #
 # --repo defaults to the `origin` remote as gh resolves it.
+# --trusted-ref is the ref a credential-bearing workflow must be defined on;
+#   only workflow files already on it can federate. Defaults to refs/heads/main.
 
 set -euo pipefail
 
 POOL_ID="github"
 PROVIDER_ID="github-actions"
 SA_ID="analysis-evals"
+
+# The ref a credential-bearing workflow must be defined on to federate. See the
+# attribute condition below for why this is a ref and not a branch name.
+TRUSTED_REF="refs/heads/main"
 
 PROJECT_ID=""
 LOCATION=""
@@ -59,6 +66,7 @@ while (($#)); do
     --project-id) PROJECT_ID="${2:-}"; shift 2 ;;
     --location)   LOCATION="${2:-}";   shift 2 ;;
     --repo)       REPO="${2:-}";       shift 2 ;;
+    --trusted-ref) TRUSTED_REF="${2:-}"; shift 2 ;;
     --dry-run)    DRY_RUN=1;           shift   ;;
     # The header comment is the usage text; print it rather than maintaining a
     # second copy that can disagree with it.
@@ -138,10 +146,32 @@ fi
 
 # The attribute-condition is load-bearing and not optional. Without it the
 # provider trusts every OIDC token GitHub issues to anyone, and any repository
-# on github.com could exchange its token for these credentials. It must name
-# the repository: repository_owner alone still admits every repo under the
-# account, including one an attacker gets a workflow merged into.
-ATTRIBUTE_CONDITION="assertion.repository == '${REPO}'"
+# on github.com could exchange its token for these credentials.
+#
+# IT NAMES TWO THINGS, AND THE REPOSITORY IS ONLY THE FIRST. `repository_owner`
+# alone still admits every repo under the account, including one an attacker
+# gets a workflow merged into -- so the repository is named. But the repository
+# is where this condition used to stop, and #508 is what that missed: a
+# collaborator who pushes a branch and opens a pull request produces a token
+# whose `repository` claim is identical to main's. Repository scoping cannot
+# tell reviewed code from unreviewed code, so on its own it federates both.
+#
+# `job_workflow_ref` is the claim that can. It carries the ref of the *workflow
+# definition* that GitHub is running -- `owner/repo/.github/workflows/x.yml@REF`
+# -- so pinning its suffix to the trusted ref admits only workflow files that
+# are already on that ref. It covers a reusable workflow called from elsewhere
+# for the same reason, because the claim names the file that is executing.
+#
+# This is defence in depth behind the workflow files themselves, which no longer
+# carry a `pull_request` trigger on any credential-bearing job and guard
+# `workflow_dispatch` with a ref condition. Either layer alone closes the hole;
+# the point of two is that the workflow half lives in a file a collaborator can
+# edit in a pull request, and this half does not.
+#
+# --trusted-ref exists so a repository whose default branch is not `main` can
+# say so. It is a full git ref, not a branch name, because that is what the
+# claim carries.
+ATTRIBUTE_CONDITION="assertion.repository == '${REPO}' && assertion.job_workflow_ref.endsWith('@${TRUSTED_REF}')"
 
 note "OIDC provider: ${PROVIDER_ID}"
 if gcloud iam workload-identity-pools providers describe "$PROVIDER_ID" \

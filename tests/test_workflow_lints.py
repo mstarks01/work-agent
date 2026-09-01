@@ -186,3 +186,147 @@ def test_the_contribution_filter_covers_the_roster():
         roster.startswith(entry.removesuffix("**").removesuffix("/") + "/")
         for entry in entries
     ), f"{CONTRIBUTION.name} does not fire on {roster}"
+
+
+# --------------------------------------------------------------------------
+# The credential boundary (#508)
+#
+# No credential-bearing job may execute mutable PR-head code. The rule below
+# reads *every* workflow rather than the two that hold credentials today, so a
+# workflow added later is covered without anyone remembering to add it here —
+# the same reason the path-filter lints above recompute a closure instead of
+# checking a list.
+
+WORKFLOW_DIR = REPO_ROOT / ".github" / "workflows"
+
+#: A trigger that runs code from a ref a contributor controls.
+UNTRUSTED_TRIGGERS = frozenset({"pull_request", "pull_request_target"})
+
+#: The condition a credential-bearing job carries so that `workflow_dispatch`,
+#: which can name any ref, cannot reach unreviewed code.
+TRUSTED_REF_GUARD = "if: github.ref == 'refs/heads/main'"
+
+#: Grants that make a job worth attacking. ``secrets.GITHUB_TOKEN`` is not one:
+#: it is scoped by the workflow's own ``permissions:`` block and every job gets
+#: one whether it asks or not.
+_OIDC_GRANT = "id-token: write"
+_SECRET_REFERENCE = "secrets."
+
+
+def _workflows() -> list[Path]:
+    return sorted(WORKFLOW_DIR.glob("*.yml"))
+
+
+def _code_lines(workflow: Path) -> list[str]:
+    """The workflow's lines with whole-line comments dropped.
+
+    Whole-line only, deliberately. These files argue with themselves at length
+    about which job may hold which credential, so a scan that counted prose
+    would find `id-token` in a paragraph explaining why a job must not have one.
+    A trailing comment cannot introduce either marker below, because both are
+    spelled the same way in prose and in code and prose about them lives on its
+    own lines.
+    """
+    return [
+        line
+        for line in workflow.read_text(encoding="utf-8").splitlines()
+        if not line.lstrip().startswith("#")
+    ]
+
+
+def _triggers(workflow: Path) -> set[str]:
+    """The top-level keys of the workflow's ``on:`` block."""
+    found = set()
+    in_block = False
+    for line in _code_lines(workflow):
+        if line.startswith("on:"):
+            in_block = True
+        elif in_block and line.startswith("  ") and line.strip().endswith(":"):
+            if not line.startswith("    "):
+                found.add(line.strip().removesuffix(":"))
+        elif in_block and line and not line.startswith(" "):
+            break
+    return found
+
+
+def _credential_grants(workflow: Path) -> set[str]:
+    """Which credential a workflow hands a job, if any."""
+    grants = set()
+    for line in _code_lines(workflow):
+        if _OIDC_GRANT in line:
+            grants.add(_OIDC_GRANT)
+        if _SECRET_REFERENCE in line and "secrets.GITHUB_TOKEN" not in line:
+            grants.add(line.strip())
+    return grants
+
+
+def _credential_bearing() -> list[Path]:
+    return [path for path in _workflows() if _credential_grants(path)]
+
+
+@pytest.mark.parametrize("workflow", _workflows(), ids=lambda path: path.name)
+def test_no_credential_bearing_workflow_runs_on_a_contributor_ref(workflow):
+    """The invariant #508 was filed for, checked against every workflow.
+
+    ``pull_request`` skips forks, which is what made it look sufficient. It does
+    not skip a collaborator: someone who can push a branch and open a pull
+    request can edit the application code a live lane imports, or edit the
+    workflow file itself, and have the edit execute while the job holds an OIDC
+    identity or a provider key. Repository-scoped federation cannot tell that
+    token from one minted on main, because the repository claim is the same.
+
+    ``pull_request_target`` is worse and is prohibited repository-wide; it is
+    named here so the prohibition is enforced rather than remembered.
+    """
+    grants = _credential_grants(workflow)
+    if not grants:
+        return
+    reachable = _triggers(workflow) & UNTRUSTED_TRIGGERS
+    assert not reachable, (
+        f"{workflow.name} grants {sorted(grants)} and triggers on "
+        f"{sorted(reachable)}. A job holding a credential must run only code "
+        f"that has already passed review: use `push` on the trusted branch, or "
+        f"`workflow_dispatch` with the ref guard, and leave the pull request to "
+        f"ci.yml's offline suite."
+    )
+
+
+@pytest.mark.parametrize("workflow", _credential_bearing(), ids=lambda path: path.name)
+def test_every_credential_bearing_job_carries_the_ref_guard(workflow):
+    """`workflow_dispatch` names its own ref, so the trigger list is not enough.
+
+    Anyone with write access can dispatch a workflow against an unreviewed
+    branch. The guard is written on the job rather than inferred from the
+    triggers so that adding a trigger cannot quietly widen what runs with the
+    job's identity.
+    """
+    assert TRUSTED_REF_GUARD in workflow.read_text(encoding="utf-8"), (
+        f"{workflow.name} hands a job a credential but carries no "
+        f"`{TRUSTED_REF_GUARD}`. Without it a workflow_dispatch against any "
+        f"branch runs unreviewed code with that credential."
+    )
+
+
+def test_the_credential_scan_is_not_vacuously_empty():
+    """Guards the guard: a scan that finds nothing would pass on anything."""
+    bearing = {path.name for path in _credential_bearing()}
+    assert {
+        "evals-live.yml",
+        "evals-live-api-key.yml",
+        "provider-smoke.yml",
+    } <= bearing, f"the credential scan stopped seeing known live lanes: {bearing}"
+
+
+def test_the_offline_suite_still_covers_pull_requests():
+    """The other half of the trade, and it is what makes the first half safe.
+
+    Moving the live lanes to `push` only holds if a pull request still gets
+    provider-adapter coverage. It does: `ci.yml` runs the conformance suite for
+    every vendor on every pull request, and it needs no credentials at all.
+    """
+    ci = WORKFLOW_DIR / "ci.yml"
+    assert "pull_request" in _triggers(ci)
+    assert not _credential_grants(ci), (
+        "ci.yml acquired a credential. It is the lane that runs on pull "
+        "requests, so it is the one lane that must never hold one."
+    )

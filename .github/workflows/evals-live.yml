@@ -19,12 +19,22 @@
 # meaningful against a known pair, and reading it from a file that may be edited
 # between runs is how a re-baseline goes unnoticed.
 #
-# `pull_request_target` is PROHIBITED in this repository and this file is where
-# the prohibition bites: combined with a PR-head checkout it would run
-# untrusted code while holding the Vertex identity, which is a
-# credential-exfiltration primitive rather than a CI convenience. This repo
-# takes no fork contributions, so plain `pull_request` with `id-token: write`
-# is sufficient. Do not "fix" a skipped fork run by reaching for it.
+# NO CREDENTIAL-BEARING JOB RUNS MUTABLE PR-HEAD CODE. `pull_request_target` is
+# PROHIBITED in this repository and this file is where the prohibition bites:
+# combined with a PR-head checkout it would run untrusted code while holding the
+# Vertex identity, which is a credential-exfiltration primitive rather than a CI
+# convenience.
+#
+# Plain `pull_request` was held to be sufficient here on the grounds that this
+# repository takes no fork contributions. That reasoning was wrong, and #508 is
+# where it was corrected: the fork check is not the boundary. A collaborator who
+# can push a branch and open a pull request can edit any module this sweep
+# imports, or edit this file, and have the edit execute while the job holds the
+# Vertex identity. Repository-scoped federation admits that token, because the
+# repository is the same one. So the trigger is `push` on main -- the code that
+# runs has already passed review. Do not "fix" a lane that no longer fires on a
+# pull request by reaching for `pull_request`, and do not reach for
+# `pull_request_target` either.
 #
 # Auth is GitHub OIDC -> Workload Identity Federation -> short-lived
 # credentials. There are no long-lived secrets: the provider path and the
@@ -35,13 +45,14 @@
 # Vertex. That setup is one-time and lives outside this repository:
 # .github/WORKLOAD_IDENTITY.md explains it and
 # .github/scripts/setup-workload-identity.sh performs it. Until it is done the
-# preflight step below skips this job on pull_request rather than failing it --
+# preflight step below skips this job on `push` rather than failing it --
 # provisioning was ruled an ops concern, so an unprovisioned repository is a
 # supported state, not a broken one.
 name: Evals (live Vertex)
 
 on:
-  pull_request:
+  push:
+    branches: [main]
     # Path-filtered to the agentic surface, by naming the *package* and
     # subtracting from it rather than by listing the files that make it up. A
     # list of filenames covers the responsibilities that existed when it was
@@ -118,10 +129,13 @@ jobs:
     name: Golden-case evals
     runs-on: ubuntu-latest
     timeout-minutes: 90
-    # Skip fork PRs rather than authenticating them. With no fork
-    # contributions this should never fire; if it does, it is a signal to
-    # look, not to loosen.
-    if: github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name == github.repository
+    # The ref guard, and it is the whole of the trust boundary in this file.
+    # `push` on main already implies it; `workflow_dispatch` does not, because
+    # a dispatch names its own ref and anyone with write access can point one
+    # at an unreviewed branch. Written as a condition here rather than left to
+    # the trigger list, so adding a trigger cannot quietly widen what runs with
+    # this job's identity.
+    if: github.ref == 'refs/heads/main'
     permissions:
       contents: read
       id-token: write # the OIDC token exchanged for short-lived Vertex credentials
@@ -179,11 +193,13 @@ jobs:
       # the action's input rather than the repository variable that feeds it,
       # and says nothing about the setup document.
       #
-      # Skipping is allowed on `pull_request` alone. A PR that touches a path
-      # filter has not asked for a live run, and a red check for absent
-      # infrastructure teaches people to ignore this workflow.
-      # `workflow_dispatch` did ask, so for it missing credentials fail the
-      # job: a sweep that silently runs nothing is worse than one that stops.
+      # Skipping is allowed on `push` alone. A merge that touches a path filter
+      # has not asked for a live run, and a red check for absent infrastructure
+      # teaches people to ignore this workflow. `workflow_dispatch` did ask, so
+      # for it missing credentials fail the job: a sweep that silently runs
+      # nothing is worse than one that stops. The exemption names the one
+      # automatic, path-filtered trigger rather than listing what is not exempt,
+      # so a trigger added later is on the failing side by default.
       #
       # That asymmetry is why the schedule was removed rather than left to fail
       # quietly -- a scheduled run is on the failing side of it, every week,
@@ -237,7 +253,7 @@ jobs:
             echo '```'
           } >>"$GITHUB_STEP_SUMMARY"
 
-          if [[ "$GITHUB_EVENT_NAME" != "pull_request" ]]; then
+          if [[ "$GITHUB_EVENT_NAME" != "push" ]]; then
             echo "::error::A ${GITHUB_EVENT_NAME} event asked for a live run, but" \
                  "Workload Identity Federation is not configured. Unset:" \
                  "${missing[*]}. See .github/WORKLOAD_IDENTITY.md."
@@ -288,8 +304,8 @@ jobs:
       # accepted as an unverified risk when the sample was purpose-built rather
       # than promoted out of the golden corpus.
       #
-      # Note: `examples/**` is deliberately NOT on this workflow's PR path
-      # filter, so an examples-only pull request does not fire this.
+      # Note: `examples/**` is deliberately NOT on this workflow's path filter,
+      # so an examples-only merge does not fire this.
       #
       # WITHOUT THE BACKSTOP: that gap no longer closes on its own. The Monday
       # sweep used to be the guarantee behind the omitted path filter, so a
