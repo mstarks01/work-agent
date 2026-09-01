@@ -187,13 +187,37 @@ time — poll or subscribe to the jobs you have, then resubmit. The count is not
 a rate: nothing accrues over a window, and finishing a job immediately buys the
 next one. See [ADR 0007](adr/0007-per-caller-concurrency-ceiling.md).
 
-**Because the count is not a rate, this service does not bound a caller's spend
-over time — you must.** One token that submits serially, letting each job finish
-before the next, stays under the ceiling while running an unbounded number of
-paid jobs. Place a per-caller rate limit (requests or cost per window) at your
-edge or gateway in front of `/v1`; the concurrency ceiling is the backstop
-behind it, not a substitute for it. This is the unbounded-consumption half of
-OWASP LLM10, and it is the integrator's to close.
+### How much you may consume over time
+
+The count is not a rate, so the ceiling bounds no spend: one token that submits
+serially, letting each job finish before the next, stays under it forever. Three
+further bounds close that, over a rolling window the deployment sets
+(`budget_window_seconds`, one hour as shipped):
+
+| Status | Cause |
+| --- | --- |
+| `429` | You have started too many jobs in the current window (`max_jobs_per_window`). |
+| `429` | You have committed too many tokens in the current window (`max_tokens_per_window`). |
+| `429` | The deployment is at its own limit across every caller (`global_max_tokens_per_window`). |
+
+Each message names what clears it. The first two clear as the window rolls past
+your earlier jobs; the third is a deployment-wide bound that nothing you do
+clears, and it deliberately tells you nothing about any other caller.
+
+**The budget is in tokens, not currency.** A job reserves an estimate at
+admission — its own submitted tokens times every model call its framework
+selection implies — and that reservation is replaced by the measured usage the
+moment the job reaches a terminal state. The estimate over-counts on purpose,
+because a bound that must hold before anything is spent has to err upward; a job
+that reserved a lot and cost little frees the difference as soon as it finishes.
+
+The window is **rolling**, not aligned to a clock boundary: a fixed hourly window
+would let a caller spend a full allowance at 10:59 and another at 11:00.
+
+An edge or gateway that already meters per caller should keep doing so. These
+bounds are the backstop behind it, and a provider-side spend limit is the
+backstop behind them both — see
+[Configuration](Configuration.md#the-per-window-budgets).
 
 ## Bearer auth
 

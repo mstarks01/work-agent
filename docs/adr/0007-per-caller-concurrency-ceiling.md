@@ -130,10 +130,16 @@ caller's reaching a terminal state, not the passage of time.
   implied by its infrastructure. It bounds concurrency, not cumulative spend: a
   caller who submits serially, letting one job finish before the next, stays
   inside the ceiling while spending without limit over time. The unbounded-
-  consumption half of OWASP LLM10 is therefore **not** closed here and remains
-  the integrator's to close, with a per-caller rate limit at the edge — see
-  `docs/Integration-Guide.md`. `analysis_service.resilience`'s module docstring
-  states the same boundary.
+  consumption half of OWASP LLM10 is therefore **not** closed here.
+
+  > **Closed by [#503](https://github.com/mstarks01/work-agent/issues/503).**
+  > It was left to the integrator, with a per-caller rate limit at the edge. It
+  > is now enforced by the service: `analysis_service.budgets` adds a per-subject
+  > job rate, a per-subject token budget and a deployment-wide token budget over
+  > a rolling window, all decided inside the same `reserve` call as the ceiling.
+  > An edge that meters per caller should keep doing so, and a provider-side
+  > spend limit is still the backstop behind both — that part of the reasoning
+  > holds.
 - **The ceiling is only as shared as the configured store.** With the shipped
   `memory` backend behind more than one instance, the effective ceiling is the
   sum across instances. This is stated in `config/resilience.toml` and in

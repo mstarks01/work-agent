@@ -497,7 +497,9 @@ implies a provider was tried.
 
 `attempts = 3`, `timeout_ms = 300000`, `max_source_bytes = 102400`,
 `max_sources = 10`, `job_deadline_ms = 900000`, `retry_budget_ratio = 0.1`,
-`max_active_jobs = 3` (`version = 5`). On library
+`max_active_jobs = 3`, `budget_window_seconds = 3600`,
+`max_jobs_per_window = 30`, `max_tokens_per_window = 20000000`,
+`global_max_tokens_per_window = 100000000` (`version = 6`). On library
 defaults the LLM nodes never retry and never time out, so a single 429 kills a
 paid-for job; two more bound what one job may carry, the deadline bounds how
 long one may run, and the ceiling bounds how many one caller may run at once.
@@ -507,8 +509,8 @@ the service tries, the input bounds and the ceiling decide only whether a
 submission is accepted at all, and the deadline only whether an answer arrives
 in time.
 
-`max_active_jobs` is the only bound here that is per **caller** rather than per
-job, and the others are why it has to exist: a caller who respects every one of
+`max_active_jobs` is the first of the bounds here that is per **caller** rather
+than per job, and the others are why it has to exist: a caller who respects every one of
 them and simply keeps submitting is inside the contract while spending the
 deployment's whole provider quota. Each accepted job fans out one lane
 agent per lane of every framework it runs, in parallel on the `strong` tier:
@@ -531,6 +533,46 @@ register a shared store and get a shared ceiling with no config change. Where
 the edge (a load balancer or API gateway) already enforces a per-caller quota,
 this is the backstop behind it, not a duplicate of it. See
 [ADR 0007](adr/0007-per-caller-concurrency-ceiling.md).
+
+#### The per-window budgets
+
+A ceiling bounds how many jobs run **at once** and is self-clearing, which is
+exactly why it bounds no spend: a caller who submits serially stays inside a
+ceiling of 3 forever while running an unbounded number of paid jobs. Three
+further bounds close that over a rolling window:
+
+| Knob | What it bounds |
+| --- | --- |
+| `budget_window_seconds` | The width of the window all three are measured over. Rolling, not aligned to a clock boundary — a fixed hourly window lets a caller spend a full allowance at 10:59 and another at 11:00. |
+| `max_jobs_per_window` | Jobs one token subject may **start** per window, whether or not they finished. The rate the ceiling is not. |
+| `max_tokens_per_window` | Tokens one token subject may commit per window. One very large submission can cost more than thirty small ones, and a count admits it. |
+| `global_max_tokens_per_window` | The same across **every** subject. Not the sum of theirs — this is the provider quota's share, which a deployment with ten subjects divides rather than multiplies. |
+
+**Tokens, not currency.** A price is vendor data with an expiry date. `evals/`
+carries a price table because a sweep reports what it *spent* and can be
+re-priced when the table moves; a gate that refuses a submission cannot be
+re-priced after it has refused one. Convert to your own currency once, at the
+knob, where you can see the rate you used — and set the provider's own spend
+limit as the backstop behind both.
+
+A job **reserves** an estimate at admission: its own submitted tokens times
+every model call its framework selection implies, derived from the package
+registry so a framework added later moves it with no edit. The estimate
+over-counts on purpose, because a bound that must hold before anything is spent
+has to err upward. The reservation is **replaced** by the measured usage the
+moment the job reaches a terminal state, so a job that reserved a lot and cost
+little frees the difference immediately, and a failed job frees all of it.
+
+A window's total is a scan over the records rather than a maintained counter, so
+a job cannot be counted twice and a total cannot fall below zero however a job
+ended — the same choice, for the same reason, as the concurrency count.
+
+Every refusal is a `429` naming what clears it, and a global refusal names no
+other caller: the deployment-wide figure goes to the operator's log. Sizing:
+`max_jobs_per_window = 30` is ten times the ceiling, which is the shape of the
+pair — the ceiling decides how much runs together, the rate decides how often.
+Size the token budgets against **your** provider quota and the framework
+selections you offer, never against the shipped numbers.
 
 `job_deadline_ms` is the only bound on a **job as a whole**, and the per-call
 knobs cannot substitute for it. `timeout_ms` bounds one request at 300 s,
@@ -705,6 +747,10 @@ it with a measurement — see [Tuning the models](../evals/TUNING.md).
 | `ANALYSIS_MAX_SOURCES` | How many sources one job may carry. |
 | `ANALYSIS_JOB_DEADLINE_MS` | Wall-clock budget for one whole job, milliseconds. Turn it down to shed load. |
 | `ANALYSIS_RETRY_BUDGET_RATIO` | Retries as a share of successful requests. Turn it down to give up sooner under sustained failure. |
+| `ANALYSIS_BUDGET_WINDOW_SECONDS` | Width of the rolling budget window. |
+| `ANALYSIS_MAX_JOBS_PER_WINDOW` | Jobs one subject may start per window. Turn it down to shed load. |
+| `ANALYSIS_MAX_TOKENS_PER_WINDOW` | Tokens one subject may commit per window. |
+| `ANALYSIS_GLOBAL_MAX_TOKENS_PER_WINDOW` | Tokens every subject may commit per window, together. Turn it down to protect a provider quota mid-incident. |
 | `ANALYSIS_MAX_ACTIVE_JOBS` | Jobs one token subject may have in flight. Turn it down to shed load; raising it multiplies by the lane count of the frameworks a job names. |
 
 ### How strictly each override family is checked

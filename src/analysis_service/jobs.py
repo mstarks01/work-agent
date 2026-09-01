@@ -33,6 +33,7 @@ from uuid import uuid4
 
 from pydantic import BaseModel, ConfigDict, Field, model_validator
 
+from analysis_service.budgets import BudgetPolicy, measured_tokens, spent_tokens
 from analysis_service.certification import CertifyResult
 from analysis_service.report import (
     FrameworkAnalysis,
@@ -137,6 +138,14 @@ class JobRecord(BaseModel):
     # it depends on a mutable, deployment-local manifest. The report is
     # portable; the manifest is not. Operator-only: no route exposes it.
     certification: CertifyResult | None = None
+    # The two halves of this job's charge against its subject's window budget.
+    # ``reserved_tokens`` is what admission held before anything was spent, from
+    # the submission and the selection alone. ``measured_tokens`` replaces it
+    # once the job is terminal, and is ``None`` until then — which is what makes
+    # a window's total a scan over records rather than a counter something has
+    # to remember to decrement. See :mod:`analysis_service.budgets`.
+    reserved_tokens: int = Field(default=0, ge=0)
+    measured_tokens: int | None = Field(default=None, ge=0)
 
     @classmethod
     def create(
@@ -146,6 +155,7 @@ class JobRecord(BaseModel):
         sources: Sequence[Source],
         frameworks: Sequence[FrameworkSelection],
         system_name: str | None = None,
+        reserved_tokens: int = 0,
     ) -> Self:
         """A fresh queued job with its initial status event recorded."""
         now = datetime.now(UTC)
@@ -157,6 +167,7 @@ class JobRecord(BaseModel):
             system_name=system_name,
             created_at=now,
             updated_at=now,
+            reserved_tokens=reserved_tokens,
         )
         record._append_event(kind="status", status="queued")
         return record
@@ -172,13 +183,34 @@ class JobRecord(BaseModel):
         return tuple(selection.name for selection in self.frameworks)
 
     def transition(self, new_status: JobStatus) -> None:
-        """Move to ``new_status``, refusing edges outside the lifecycle."""
+        """Move to ``new_status``, refusing edges outside the lifecycle.
+
+        Reaching a terminal state also **settles this job's token charge**: the
+        reservation admission held is replaced by what the run measured, so the
+        subject's window shows what happened rather than what was feared. It
+        happens here rather than at each of the four terminal call sites because
+        this is the single funnel into a terminal state — a reservation a path
+        forgot to settle would hold budget until the window rolled past it, and
+        for a failed job that budget bought nothing at all.
+
+        A job carrying no report settles to zero. Failed, rejected and
+        deadline-killed runs all reach here, and none of them has a measurement
+        to keep.
+        """
         if new_status not in _LEGAL_TRANSITIONS[self.status]:
             raise InvalidTransitionError(
                 f"job {self.id} cannot move from {self.status!r} to {new_status!r}"
             )
         self.status = new_status
+        if new_status in TERMINAL_STATUSES:
+            self.measured_tokens = self.spent_tokens()
         self._append_event(kind="status", status=new_status)
+
+    def spent_tokens(self) -> int:
+        """What this job's node runs measured, or 0 with no report to read."""
+        if self.report is None:
+            return 0
+        return measured_tokens(node.usage for node in self.report.nodes)
 
     def record_node(self, node: str) -> None:
         """Log completion of one pipeline node."""
@@ -200,10 +232,23 @@ class JobRecord(BaseModel):
         self.updated_at = now
 
 
-# What one admission attempt did. ``at_ceiling`` is the caller's own budget and
-# is theirs to see; ``duplicate`` says the store already holds this job id, which
-# the API mints itself, so it reports a defect rather than a caller error.
-AdmissionOutcome = Literal["admitted", "at_ceiling", "duplicate"]
+# What one admission attempt did.
+#
+# Four refusals rather than one, because they clear at different times and a
+# caller needs to know which: ``at_ceiling`` clears when one of their jobs
+# finishes, ``over_rate`` and ``over_subject_budget`` clear as the window rolls
+# past their older jobs, and ``over_global_budget`` is a deployment-wide bound
+# that no action of theirs will clear. ``duplicate`` says the store already
+# holds this job id, which the API mints itself, so it reports a defect rather
+# than a caller error.
+AdmissionOutcome = Literal[
+    "admitted",
+    "at_ceiling",
+    "over_rate",
+    "over_subject_budget",
+    "over_global_budget",
+    "duplicate",
+]
 
 
 @dataclass(frozen=True)
@@ -222,6 +267,15 @@ class Admission:
 
     outcome: AdmissionOutcome
     active: int
+    #: Tokens the reserving subject has committed inside the window, before this
+    #: job. Measured where a job of theirs has finished, reserved where it has
+    #: not. Zero on every outcome the budget did not decide.
+    subject_tokens: int = 0
+    #: The same total across every subject. It is the *only* field here that
+    #: describes activity beyond the caller, and the API never puts it in a
+    #: response — a caller learning the deployment's load learns about other
+    #: callers. It goes to the operator's log.
+    global_tokens: int = 0
 
 
 class JobStore(Protocol):
@@ -242,9 +296,16 @@ class JobStore(Protocol):
     before either inserts both pass a ceiling of one. Handing a backend a single
     method makes the atomicity requirement a signature rather than a paragraph an
     implementer can miss.
+
+    **Every bound admission enforces is enforced by that one call.** The
+    concurrency ceiling, the per-subject rate, the per-subject token budget and
+    the deployment's global token budget all read state the insert then changes,
+    so splitting any of them out would put the race back — one bound at a time.
     """
 
-    async def reserve(self, record: JobRecord, *, ceiling: int) -> Admission: ...
+    async def reserve(
+        self, record: JobRecord, *, ceiling: int, budget: BudgetPolicy
+    ) -> Admission: ...
 
     async def get(self, job_id: str) -> JobRecord | None: ...
 
@@ -257,8 +318,10 @@ class InMemoryJobStore:
     def __init__(self) -> None:
         self._records: dict[str, JobRecord] = {}
 
-    async def reserve(self, record: JobRecord, *, ceiling: int) -> Admission:
-        """Count the owner's jobs in flight and insert, as one step.
+    async def reserve(
+        self, record: JobRecord, *, ceiling: int, budget: BudgetPolicy
+    ) -> Admission:
+        """Check every admission bound and insert, as one step.
 
         Atomic here because the body awaits nothing: asyncio can only switch
         tasks at an ``await``, so no second submission runs between the count and
@@ -275,22 +338,66 @@ class InMemoryJobStore:
         run; that is the same growth the dict itself already has, and bounding it
         is a property of the backend rather than of this count.
 
-        A duplicate id is settled before the ceiling, so a record the store
-        already holds is never also counted against the budget it is already
+        A duplicate id is settled before every bound, so a record the store
+        already holds is never also counted against the budgets it is already
         inside.
+
+        **The bounds run cheapest-first, and the order is the answer a caller
+        gets.** A submission over several of them hears about the concurrency
+        ceiling before the rate, and the rate before either budget, because that
+        is the order in which they clear: a job of theirs finishing, then the
+        window rolling, then the window rolling further. Telling a caller about
+        the bound that clears soonest is the one that helps them.
         """
-        active = sum(
-            1
-            for held in self._records.values()
-            if held.owner_subject == record.owner_subject
-            and held.status not in TERMINAL_STATUSES
-        )
         if record.id in self._records:
-            return Admission(outcome="duplicate", active=active)
+            return Admission(outcome="duplicate", active=0)
+
+        subject = record.owner_subject
+        since = budget.window_start()
+        mine = [
+            held for held in self._records.values() if held.owner_subject == subject
+        ]
+
+        active = sum(1 for held in mine if held.status not in TERMINAL_STATUSES)
         if active >= ceiling:
             return Admission(outcome="at_ceiling", active=active)
+
+        started = sum(1 for held in mine if held.created_at >= since)
+        if started >= budget.max_jobs_per_window:
+            return Admission(outcome="over_rate", active=active)
+
+        subject_tokens = spent_tokens(
+            (held.reserved_tokens, held.measured_tokens)
+            for held in mine
+            if held.created_at >= since
+        )
+        if subject_tokens + record.reserved_tokens > budget.max_tokens_per_window:
+            return Admission(
+                outcome="over_subject_budget",
+                active=active,
+                subject_tokens=subject_tokens,
+            )
+
+        global_tokens = spent_tokens(
+            (held.reserved_tokens, held.measured_tokens)
+            for held in self._records.values()
+            if held.created_at >= since
+        )
+        if global_tokens + record.reserved_tokens > budget.global_max_tokens_per_window:
+            return Admission(
+                outcome="over_global_budget",
+                active=active,
+                subject_tokens=subject_tokens,
+                global_tokens=global_tokens,
+            )
+
         self._records[record.id] = record.model_copy(deep=True)
-        return Admission(outcome="admitted", active=active)
+        return Admission(
+            outcome="admitted",
+            active=active,
+            subject_tokens=subject_tokens,
+            global_tokens=global_tokens,
+        )
 
     async def get(self, job_id: str) -> JobRecord | None:
         record = self._records.get(job_id)
@@ -513,9 +620,12 @@ async def execute_job(
         return
 
     if isinstance(outcome, PipelineCompleted):
-        record.transition("completed")
+        # The report first, then the transition: settling reads the report, and
+        # a transition that ran before it was attached would settle to zero and
+        # give a caller a completed job for free.
         record.report = outcome.report
         record.certification = outcome.certification
+        record.transition("completed")
     else:
         record.transition("rejected")
         record.validation_issues = outcome.issues
