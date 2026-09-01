@@ -356,7 +356,7 @@ the server rather than by asking. The press waits until the list says
 something, so the sets cannot open on an empty box. The rule holds per case: **Previous** and
 **Next** in the case header walk the list, and a case you have not written a
 list for arrives blind however you reach it. Each recorded finding carries a
-control that takes `agree`, `doubt` or `dup`, which is the same mark the
+control that takes `agree`, `reject` or `duplicate`, which is the same mark the
 by-hand path writes into a `> mark:` slot. When you finish a case it writes
 that case's record into your working tree.
 
