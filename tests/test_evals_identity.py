@@ -26,7 +26,12 @@ import itertools
 import pytest
 
 from evals import verify_corpus
-from evals.harness.calibration import AGREEMENT_BAR, load_pairs, measure_agreement
+from evals.harness.calibration import (
+    AGREEMENT_BAR,
+    load_pairs,
+    measure_agreement,
+    measure_merges,
+)
 from evals.harness.identity import (
     IdentityError,
     MechanicalIdentity,
@@ -371,3 +376,22 @@ def test_the_rule_refuses_a_pair_with_no_verb(assigned, flows_by_case):
     stripped = dataclasses.replace(assigned[0].to_claim_pair(), candidate_verb=None)
     with pytest.raises(IdentityError, match="no action verb"):
         SubsetVerbIdentity(flows_by_case).equivalent(stripped)
+
+
+def test_the_shared_merge_measurement_matches_the_frontier(corpus, flows_by_case):
+    """``measure_merges`` and ``FRONTIER`` must count the same three merges.
+
+    The frontier prices seven rules with raw shape functions, because the point
+    is to compare them. ``calibration.measure_merges`` prices one rule through
+    the :class:`~evals.harness.identity.Matcher` protocol, because the CLI and
+    the doc lint need the shipped rule's number without the other six. Two
+    computations of one figure drift, so this pins them together.
+    """
+    merges = measure_merges(SubsetVerbIdentity(flows_by_case), corpus, "stride")
+
+    assert merges.within_lane_pairs == VERB_MEASURED["within_lane_pairs"]
+    assert len(merges.merges) == VERB_MEASURED["subset_verb"]
+    assert len(merges.merges) == FRONTIER["endpoint subset + verb"]["merges"]
+    assert {(merge.case, merge.lane) for merge in merges.merges} == {
+        (case, lane) for case, lane, _ in UNSEPARATED
+    }
