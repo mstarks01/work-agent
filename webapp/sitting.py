@@ -96,6 +96,14 @@ asked for. It is enforced the way the review app enforces
 configuration-blindness — by the payload not carrying it — rather than by
 asking.
 
+**The list has to say something.** ``MIN_OWN_LIST`` characters of the
+reader's own words, counted with the blank lines and the padding taken out.
+The press was a click before this: an empty box opened the recorded sets, and
+the sitting then measured a list nobody wrote against the list it is supposed
+to test. The page disables the press below the same count and says how much is
+left, but the endpoint is where the rule lives, because the press is a request
+and the request is what opens the sets.
+
 **The gate re-arms per case, and a case takes one own list.** Both halves are
 the same rule read two ways: a case's sets open once that case's own list
 exists. So a reader who reaches a case they have not written for reaches it
@@ -214,6 +222,11 @@ from webapp.page import (
 
 HOST = "127.0.0.1"
 PORT = 8020
+
+#: The shortest own list this app accepts, counted over the reader's own words
+#: with the blank lines and the padding taken out. A press with nothing typed
+#: opened the recorded sets, which made the gate a click rather than a read.
+MIN_OWN_LIST = 10
 
 #: The page runs its own script, carries its own style and calls its own
 #: endpoints. Nothing else.
@@ -407,6 +420,7 @@ def create_app(session: Session) -> FastAPI:
                 reviewer=escape(session.reviewer),
                 token=script_json(session.token),
                 cansubmit=script_json(session.can_submit),
+                minownlist=script_json(MIN_OWN_LIST),
             )
         )
 
@@ -505,9 +519,21 @@ def create_app(session: Session) -> FastAPI:
                 " an order that did not happen",
             )
         # Written before part two is reachable, and per case, because the
-        # gate re-arms for each one. An empty list is allowed — "I saw
-        # nothing" is an answer — but it has to be given.
+        # gate re-arms for each one.
         written = [item.strip() for item in body.items if item.strip()]
+        # **The list has to say something.** The page disables the press below
+        # the same count, and this is why the rule is here as well: the press
+        # is a request, and a request is what opens the sets. Counted over the
+        # stripped words, so a page full of blank lines does not pass.
+        typed = sum(len(item) for item in written)
+        if typed < MIN_OWN_LIST:
+            raise HTTPException(
+                status_code=400,
+                detail=f"your own list is {typed} characters and the sets open"
+                f" at {MIN_OWN_LIST}; write what you think could go wrong"
+                " first, because the sitting measures your list against"
+                " theirs",
+            )
         # **The own list creates the draft; opening a case creates nothing.**
         # A reader who reads part one of ten cases and writes nothing leaves
         # no trace. The digests are taken here, so they say what the required
@@ -1040,6 +1066,7 @@ _PAGE = r"""<!doctype html>
   .aside { font-size: .82rem; color: #7a7a7a; margin: .8rem 0 0;
            padding-top: .7rem; border-top: 1px solid var(--line); }
   .gap { border-left: 3px solid #c34a3c; }
+  .gate { color: #7a7a7a; font-size: .85rem; margin-left: .6rem; }
 </style></head>
 <body>
 <nav>
@@ -1075,9 +1102,11 @@ _PAGE = r"""<!doctype html>
     <h2>Your list, written first</h2>
     <p class="note">Write what could go wrong: an attack, a missing control, a
     question the text does not answer. One per line. The recorded sets are not
-    in this page until you submit this — that is the whole method.</p>
+    in this page until you submit this — that is the whole method, so the
+    press waits until the list says something.</p>
     <textarea id="own" placeholder="one per line"></textarea>
-    <p><button id="lock">Save my list and show the recorded sets</button></p>
+    <p><button id="lock">Save my list and show the recorded sets</button>
+    <span id="ownHint" class="gate"></span></p>
   </section>
 
   <section id="placeholder">
@@ -1164,6 +1193,7 @@ const lines = (id) => $(id).value.split("\n").map(s => s.trim()).filter(Boolean)
 
 const TOKEN = <!--token-->;
 const CAN_SUBMIT = <!--cansubmit-->;
+const MIN_OWN_LIST = <!--minownlist-->;
 
 // The case on the stage, and the rail as the server last described it.
 let current = null;
@@ -1411,7 +1441,7 @@ function blank() {
   for (const id of ["own", "missing", "notes"]) $(id).value = "";
   $("written").textContent = "";
   $("own").readOnly = false;
-  $("lock").disabled = false;
+  gate();
   $("finish").textContent = "Record the sitting";
   // A blind case shows the placeholder where part two will open, so the case
   // reads the same whichever way the reader arrived at it.
@@ -1422,7 +1452,29 @@ function blank() {
 function lock() {
   $("own").readOnly = true;
   $("lock").disabled = true;
+  $("ownHint").textContent = "";
 }
+
+// How much the reader has written, counted the way the server counts it: the
+// stripped lines joined, so blank lines and padding are worth nothing.
+function typed() {
+  return lines("own").join("").length;
+}
+
+// The press waits until the list says something, and the hint says how much is
+// left. This is a courtesy and not the rule: the press is a request, the
+// request is what opens the sets, and `/api/own-list` holds the same count.
+function gate() {
+  if ($("own").readOnly) return;  // the list is in; the press is spent
+  const short = MIN_OWN_LIST - typed();
+  $("lock").disabled = short > 0;
+  $("ownHint").textContent = short > 0
+    ? short + (short === 1 ? " more character" : " more characters")
+      + " before the recorded sets open"
+    : "";
+}
+
+$("own").addEventListener("input", gate);
 
 // What the case on the stage offers once it is recorded, and what it offers
 // while it is not. Spelled once, because the record and a re-opened case
@@ -1489,7 +1541,10 @@ $("lock").addEventListener("click", async () => {
   });
   // Locked only once the server holds the list. A refused post that locked
   // the box anyway would leave the reader with nowhere to write it.
-  if (!res.ok) { $("partOne").textContent = (await res.json()).detail; return; }
+  // Said beside the press rather than over the case: a refused list is a
+  // normal thing to meet, and painting it into the stage would take the
+  // system the reader is about to write about off the screen.
+  if (!res.ok) { $("ownHint").textContent = (await res.json()).detail; return; }
   lock();
   $("discardBox").classList.remove("hidden");
   await showSets(caseId);

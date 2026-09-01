@@ -24,12 +24,19 @@ from fastapi.testclient import TestClient
 
 from evals import verify_corpus
 from evals.harness import sitting as sittings
-from webapp.sitting import _PAGE, build_session, create_app
+from webapp.sitting import _PAGE, MIN_OWN_LIST, build_session, create_app
 from webapp.sitting import main as app_main
 
 LOOPBACK = "http://127.0.0.1:8020"
 CASE = "02-iot-fleet-telemetry"
 OTHER = "03-batch-data-pipeline"
+
+#: An own list long enough to open the recorded sets. Most tests here measure
+#: something other than the length gate, so they post this and get on with it.
+OWN_LIST = ["a spoofed device"]
+#: The same, for ``OTHER``, so a test that writes for both cases can tell the
+#: two lists apart in the file each one lands in.
+OTHER_LIST = ["a bad row in the batch"]
 
 #: The two real cases the throwaway tree holds. Two rather than one, because
 #: the rail is a list and a list of one proves nothing about order, about the
@@ -93,7 +100,7 @@ def read_and_record(app, case=CASE, notes="21 agree", missing=()):
     The shortest route to a finished draft, which is the one thing the submit
     stage, the pinned footer and the drop are all about.
     """
-    app.post("/api/own-list", json={"case": case, "items": ["a spoofed device"]})
+    app.post("/api/own-list", json={"case": case, "items": OWN_LIST})
     app.get(f"/api/part-two?case={case}")
     return app.post(
         "/api/finish",
@@ -205,16 +212,46 @@ class TestTheOwnListRuleIsEnforced:
         refused = app.post("/api/finish", json={"case": CASE})
         assert refused.status_code == 409
 
-    def test_an_empty_list_is_an_answer(self, client):
-        """ "I saw nothing" is a real answer; it just has to be given."""
+    def test_a_list_too_short_to_say_anything_is_refused(self, client):
+        """A gate nothing has to pass is not a gate.
+
+        The press opened the recorded sets on an empty box, so a reader could
+        reach them with one click and the sitting then measured their nothing
+        against the recorded set. The count is here rather than only on the
+        page, because the press is a request and the request is what opens
+        the sets.
+        """
         app, _, _ = client
-        app.post("/api/own-list", json={"case": CASE, "items": []})
+        refused = app.post("/api/own-list", json={"case": CASE, "items": ["short"]})
+        assert refused.status_code == 400
+        assert str(MIN_OWN_LIST) in refused.json()["detail"]
+        assert app.get(f"/api/part-two?case={CASE}").status_code == 409
+
+    def test_the_count_reads_the_words_and_not_the_padding(self, client):
+        """Blank lines and spaces open nothing; the server counts what the
+        page counts, which is the stripped lines joined."""
+        app, _, _ = client
+        padding = ["   ", "", "  a  ", "\t"]
+        refused = app.post("/api/own-list", json={"case": CASE, "items": padding})
+        assert refused.status_code == 400
+        assert "1 characters" in refused.json()["detail"]
+
+    def test_a_list_long_enough_opens_the_sets(self, client):
+        app, _, _ = client
+        written = app.post("/api/own-list", json={"case": CASE, "items": OWN_LIST})
+        assert written.status_code == 200
         assert app.get(f"/api/part-two?case={CASE}").status_code == 200
+
+    def test_the_page_takes_the_count_from_the_server(self, client):
+        """One count, injected. A second copy written into the script would
+        drift from the endpoint that actually holds the rule."""
+        app, _, _ = client
+        assert f"const MIN_OWN_LIST = {MIN_OWN_LIST};" in app.get("/").text
 
 
 class TestWhatASittingWrites:
     def finish(self, app):
-        app.post("/api/own-list", json={"case": CASE, "items": ["a spoofed device"]})
+        app.post("/api/own-list", json={"case": CASE, "items": OWN_LIST})
         app.get(f"/api/part-two?case={CASE}")
         return app.post(
             "/api/finish",
@@ -310,7 +347,9 @@ class TestThePosture:
         app = TestClient(create_app(session), base_url="http://attacker.example")
         assert app.get("/").status_code == 400
         assert (
-            app.post("/api/own-list", json={"case": CASE, "items": []}).status_code
+            app.post(
+                "/api/own-list", json={"case": CASE, "items": OWN_LIST}
+            ).status_code
             == 400
         )
 
@@ -318,7 +357,7 @@ class TestThePosture:
         """#320's binding: a browser field naming the reviewer would break it."""
         app, _, _ = client
         refused = app.post(
-            "/api/own-list", json={"case": CASE, "items": [], "reviewer": "sam"}
+            "/api/own-list", json={"case": CASE, "items": OWN_LIST, "reviewer": "sam"}
         )
         assert refused.status_code == 422
 
@@ -351,7 +390,7 @@ class TestThePosture:
         """
         app, session, tree = client
         writes = {
-            "/api/own-list": {"case": CASE, "items": ["a spoofed device"]},
+            "/api/own-list": {"case": CASE, "items": OWN_LIST},
             "/api/finish": {
                 "case": CASE,
                 "marks": {},
@@ -381,7 +420,7 @@ class TestThePosture:
             create_app(session), base_url=LOOPBACK, headers=SAME_ORIGIN
         )
         writes = {
-            "/api/own-list": {"case": CASE, "items": []},
+            "/api/own-list": {"case": CASE, "items": OWN_LIST},
             "/api/draft": {"case": CASE, "marks": {}, "missing": [], "notes": ""},
             "/api/discard": {"case": CASE},
             "/api/finish": {"case": CASE, "marks": {}, "missing": [], "notes": ""},
@@ -403,7 +442,9 @@ class TestThePosture:
         session = session_for(tree, "ada", CASE)
         app = TestClient(create_app(session), base_url=LOOPBACK)
         assert (
-            app.post("/api/own-list", json={"case": CASE, "items": []}).status_code
+            app.post(
+                "/api/own-list", json={"case": CASE, "items": OWN_LIST}
+            ).status_code
             == 403
         )
         assert not draft_file(tree, CASE).exists()
@@ -437,7 +478,7 @@ class TestThePosture:
             == 422
         )
 
-        app.post("/api/own-list", json={"case": CASE, "items": ["a spoofed device"]})
+        app.post("/api/own-list", json={"case": CASE, "items": OWN_LIST})
         for body in (
             {"case": CASE, "marks": {}, "missing": [long_line], "notes": ""},
             {
@@ -609,7 +650,7 @@ class TestOnlyYourOwnEntryComesOff:
         it: their own list, then a record pointed at somebody else's entry."""
         _, theirs = self.merged(tree)
         app = browser(session_for(tree, "ada"))
-        app.post("/api/own-list", json={"case": CASE, "items": ["mine"]})
+        app.post("/api/own-list", json={"case": CASE, "items": OWN_LIST})
         path = draft_file(tree, CASE)
         held = json.loads(path.read_text("utf-8"))
         held["recorded"] = theirs
@@ -643,7 +684,7 @@ class TestTheMarks:
     """
 
     def marked(self, app, marks):
-        app.post("/api/own-list", json={"case": CASE, "items": ["a spoofed device"]})
+        app.post("/api/own-list", json={"case": CASE, "items": OWN_LIST})
         app.get(f"/api/part-two?case={CASE}")
         return app.post(
             "/api/finish",
@@ -652,7 +693,7 @@ class TestTheMarks:
 
     def test_part_two_offers_a_target_per_recorded_finding(self, client):
         app, _, _ = client
-        app.post("/api/own-list", json={"case": CASE, "items": []})
+        app.post("/api/own-list", json={"case": CASE, "items": OWN_LIST})
         payload = app.get(f"/api/part-two?case={CASE}").json()
         assert payload["values"] == list(sittings.MARKS)
         offered = payload["marks"]
@@ -824,7 +865,7 @@ class TestTheRail:
         """The count names the cases nobody opened. A row that presses is a
         different question, and a finished case presses."""
         app = self.opened(tree)
-        app.post("/api/own-list", json={"case": CASE, "items": ["a spoofed device"]})
+        app.post("/api/own-list", json={"case": CASE, "items": OWN_LIST})
         assert self.rail(app)["todo"] == len(CASES) - 1
 
     def test_a_signed_case_is_greyed_and_unpressable(self, tree):
@@ -877,7 +918,7 @@ class TestTheRail:
         """The record is in the working tree and the draft behind it lives, so
         the row says the record is not submitted and it still presses."""
         app = self.opened(tree)
-        app.post("/api/own-list", json={"case": CASE, "items": ["a spoofed device"]})
+        app.post("/api/own-list", json={"case": CASE, "items": OWN_LIST})
         app.post(
             "/api/finish", json={"case": CASE, "marks": {}, "missing": [], "notes": ""}
         )
@@ -890,7 +931,7 @@ class TestTheRail:
         """The draft is what makes a case re-openable, not the login. A case
         dies in the rail when it carries a clearing signature and no draft."""
         app = self.opened(tree)
-        app.post("/api/own-list", json={"case": OTHER, "items": ["a bad row"]})
+        app.post("/api/own-list", json={"case": OTHER, "items": OTHER_LIST})
         sign(tree, OTHER, "sam")
         assert self.rows(app)[OTHER]["status"] == "draft in progress"
         assert self.rows(app)[OTHER]["pressable"] is True
@@ -898,7 +939,7 @@ class TestTheRail:
     def test_the_gate_re_arms_for_each_case(self, tree):
         """One case's own list opens that case's sets and no other's."""
         app = self.opened(tree)
-        app.post("/api/own-list", json={"case": CASE, "items": ["a spoofed device"]})
+        app.post("/api/own-list", json={"case": CASE, "items": OWN_LIST})
         assert app.get(f"/api/part-two?case={CASE}").status_code == 200
         assert app.get(f"/api/part-two?case={OTHER}").status_code == 409
 
@@ -925,7 +966,7 @@ class TestEveryEndpointResolvesItsCase:
             "POST /api/own-list": (
                 "post",
                 "/api/own-list",
-                {"case": case, "items": []},
+                {"case": case, "items": OWN_LIST},
             ),
             "POST /api/finish": (
                 "post",
@@ -969,7 +1010,7 @@ class TestEveryEndpointResolvesItsCase:
         session = session_for(tree, "ada")
         app = TestClient(create_app(session), base_url=LOOPBACK)
         for path, body in (
-            ("/api/own-list", {"case": "99-not-a-case", "items": []}),
+            ("/api/own-list", {"case": "99-not-a-case", "items": OWN_LIST}),
             (
                 "/api/finish",
                 {"case": "99-not-a-case", "marks": {}, "missing": [], "notes": ""},
@@ -1025,7 +1066,7 @@ class TestACaseTakesOneOwnList:
 
     def test_a_second_list_for_the_same_case_is_refused(self, tree):
         app = self.opened(tree)
-        first = {"case": CASE, "items": ["a spoofed device"]}
+        first = {"case": CASE, "items": OWN_LIST}
         assert app.post("/api/own-list", json=first).status_code == 200
         refused = app.post("/api/own-list", json={"case": CASE, "items": ["seen it"]})
         assert refused.status_code == 409
@@ -1033,7 +1074,7 @@ class TestACaseTakesOneOwnList:
 
     def test_the_refused_list_changes_nothing(self, tree):
         app = self.opened(tree)
-        app.post("/api/own-list", json={"case": CASE, "items": ["a spoofed device"]})
+        app.post("/api/own-list", json={"case": CASE, "items": OWN_LIST})
         app.post("/api/own-list", json={"case": CASE, "items": ["written after"]})
         app.post(
             "/api/finish",
@@ -1045,14 +1086,14 @@ class TestACaseTakesOneOwnList:
 
     def test_a_second_case_still_takes_its_own_first_list(self, tree):
         app = self.opened(tree)
-        app.post("/api/own-list", json={"case": CASE, "items": ["a spoofed device"]})
-        answer = app.post("/api/own-list", json={"case": OTHER, "items": ["a bad row"]})
+        app.post("/api/own-list", json={"case": CASE, "items": OWN_LIST})
+        answer = app.post("/api/own-list", json={"case": OTHER, "items": OTHER_LIST})
         assert answer.status_code == 200
 
     def test_part_one_carries_this_case_s_list_back_and_no_other_s(self, tree):
         """A case comes back filled; a case never written for comes back blind."""
         app = self.opened(tree)
-        app.post("/api/own-list", json={"case": CASE, "items": ["a spoofed device"]})
+        app.post("/api/own-list", json={"case": CASE, "items": OWN_LIST})
         assert app.get(f"/api/part-one?case={CASE}").json()["own_list"] == [
             "a spoofed device"
         ]
@@ -1079,7 +1120,7 @@ class TestTheOwnListCarriesThePageToken:
 
     def test_a_post_without_the_token_is_refused(self, tree):
         app, _ = self.bare(tree)
-        refused = app.post("/api/own-list", json={"case": CASE, "items": []})
+        refused = app.post("/api/own-list", json={"case": CASE, "items": OWN_LIST})
         assert refused.status_code == 403
         assert not draft_file(tree, CASE).exists(), "a refused post wrote a draft"
 
@@ -1087,7 +1128,7 @@ class TestTheOwnListCarriesThePageToken:
         app, _ = self.bare(tree)
         refused = app.post(
             "/api/own-list",
-            json={"case": CASE, "items": []},
+            json={"case": CASE, "items": OWN_LIST},
             headers={"X-Sitting-Token": "guessed"},
         )
         assert refused.status_code == 403
@@ -1096,14 +1137,16 @@ class TestTheOwnListCarriesThePageToken:
     def test_the_refused_post_leaves_the_case_blind(self, tree):
         """The refusal is the whole point: the sets stay shut behind it."""
         app, _ = self.bare(tree)
-        app.post("/api/own-list", json={"case": CASE, "items": []})
+        app.post("/api/own-list", json={"case": CASE, "items": OWN_LIST})
         assert app.get(f"/api/part-two?case={CASE}").status_code == 409
 
     def test_the_page_s_own_token_opens_it(self, tree):
         session = session_for(tree, "ada")
         app = browser(session)
         assert (
-            app.post("/api/own-list", json={"case": CASE, "items": []}).status_code
+            app.post(
+                "/api/own-list", json={"case": CASE, "items": OWN_LIST}
+            ).status_code
             == 200
         )
 
@@ -1114,7 +1157,7 @@ class TestTheOwnListCarriesThePageToken:
         app = browser(session)
         refused = app.post(
             "/api/own-list",
-            json={"case": CASE, "items": []},
+            json={"case": CASE, "items": OWN_LIST},
             headers={"Sec-Fetch-Site": "cross-site"},
         )
         assert refused.status_code == 403
@@ -1126,7 +1169,7 @@ class TestTheOwnListCarriesThePageToken:
         be a third opinion on the same question rather than a new control."""
         session = session_for(tree, "ada")
         app = browser(session)
-        app.post("/api/own-list", json={"case": CASE, "items": ["a spoofed device"]})
+        app.post("/api/own-list", json={"case": CASE, "items": OWN_LIST})
         opened = TestClient(create_app(session), base_url=LOOPBACK)
         assert opened.get(f"/api/part-two?case={CASE}").status_code == 200
 
@@ -1177,7 +1220,7 @@ class TestTheWalkStaysBlind:
         started = set()
         for case in offered:
             self.blind(app, tree, offered, started, f"before {case} opened")
-            app.post("/api/own-list", json={"case": case, "items": ["mine"]})
+            app.post("/api/own-list", json={"case": case, "items": OWN_LIST})
             started.add(case)
             self.blind(app, tree, offered, started, f"after {case} opened")
 
@@ -1185,7 +1228,7 @@ class TestTheWalkStaysBlind:
         """Finish answers with the written paths and the paste text, and the
         rail is re-read after it. Neither may carry a case still to do."""
         app = browser(session_for(tree, "ada"))
-        app.post("/api/own-list", json={"case": CASE, "items": ["a spoofed device"]})
+        app.post("/api/own-list", json={"case": CASE, "items": OWN_LIST})
         recorded = app.post(
             "/api/finish", json={"case": CASE, "marks": {}, "missing": [], "notes": ""}
         )
@@ -1241,13 +1284,13 @@ class TestTheWalk:
         disagree with the file on disk.
         """
         app = browser(session_for(tree, "ada"))
-        app.post("/api/own-list", json={"case": CASE, "items": ["a spoofed device"]})
+        app.post("/api/own-list", json={"case": CASE, "items": OWN_LIST})
         app.post(
             "/api/draft",
             json={"case": CASE, "marks": {}, "missing": ["theirs"], "notes": "mine"},
         )
         came_back = app.get(f"/api/part-one?case={CASE}").json()
-        assert came_back["own_list"] == ["a spoofed device"]
+        assert came_back["own_list"] == OWN_LIST
         assert came_back["missing"] == ["theirs"]
         assert came_back["notes"] == "mine"
 
@@ -1271,7 +1314,9 @@ class TestATokenOutsideAscii:
     def test_the_own_list_refuses_it(self, tree):
         session = session_for(tree, "ada")
         app = TestClient(create_app(session), base_url=LOOPBACK, headers=SAME_ORIGIN)
-        refused = self.sent(app, "/api/own-list", json={"case": CASE, "items": []})
+        refused = self.sent(
+            app, "/api/own-list", json={"case": CASE, "items": OWN_LIST}
+        )
         assert refused.status_code == 403
         assert not draft_file(tree, CASE).exists()
 
@@ -1300,7 +1345,7 @@ class TestTheDraftSurvivesTheProcess:
 
     def test_the_own_list_creates_the_draft(self, tree):
         app = browser(session_for(tree, "ada"))
-        app.post("/api/own-list", json={"case": CASE, "items": ["a spoofed device"]})
+        app.post("/api/own-list", json={"case": CASE, "items": OWN_LIST})
         assert draft_file(tree, CASE).is_file()
 
     def test_the_draft_holds_the_shape_the_spec_names(self, tree):
@@ -1310,7 +1355,7 @@ class TestTheDraftSurvivesTheProcess:
         place in this path nothing else can repair.
         """
         app = browser(session_for(tree, "ada"))
-        app.post("/api/own-list", json={"case": CASE, "items": ["a spoofed device"]})
+        app.post("/api/own-list", json={"case": CASE, "items": OWN_LIST})
         held = json.loads(draft_file(tree, CASE).read_text("utf-8"))
         assert set(held) == {
             "case",
@@ -1327,7 +1372,7 @@ class TestTheDraftSurvivesTheProcess:
         assert held["case"] == CASE
         assert held["clone"] == str(tree), "the clone path is in the file"
         assert held["state"] == "open"
-        assert held["own_list"] == ["a spoofed device"]
+        assert held["own_list"] == OWN_LIST
 
     def test_it_pins_every_required_file_as_it_stood(self, tree):
         """The opening digests are what make a drift warning honest.
@@ -1336,7 +1381,7 @@ class TestTheDraftSurvivesTheProcess:
         metadata, which pins what a recorded sitting signed.
         """
         app = browser(session_for(tree, "ada"))
-        app.post("/api/own-list", json={"case": CASE, "items": []})
+        app.post("/api/own-list", json={"case": CASE, "items": OWN_LIST})
         held = json.loads(draft_file(tree, CASE).read_text("utf-8"))
         case_dir = tree / "evals" / "corpus" / CASE
         declared = json.loads((case_dir / "case.json").read_text("utf-8"))["frameworks"]
@@ -1350,7 +1395,7 @@ class TestTheDraftSurvivesTheProcess:
         because a cache that can disagree with its source is a defect that
         waits."""
         app = browser(session_for(tree, "ada"))
-        app.post("/api/own-list", json={"case": CASE, "items": []})
+        app.post("/api/own-list", json={"case": CASE, "items": OWN_LIST})
         blocks = app.get(f"/api/part-one?case={CASE}").json()["blocks"]
         held = draft_file(tree, CASE).read_text("utf-8")
         prose = "\n".join(
@@ -1363,7 +1408,7 @@ class TestTheDraftSurvivesTheProcess:
     def test_a_second_process_finds_the_read_where_it_was_left(self, tree):
         """The reader stops the app, runs it again, and continues."""
         first = browser(session_for(tree, "ada"))
-        first.post("/api/own-list", json={"case": CASE, "items": ["a spoofed device"]})
+        first.post("/api/own-list", json={"case": CASE, "items": OWN_LIST})
         marks = {
             target["fingerprint"]: "agree"
             for target in first.get(f"/api/part-two?case={CASE}").json()["marks"][:1]
@@ -1380,7 +1425,7 @@ class TestTheDraftSurvivesTheProcess:
 
         again = browser(session_for(tree, "ada"))
         came_back = again.get(f"/api/part-one?case={CASE}").json()
-        assert came_back["own_list"] == ["a spoofed device"]
+        assert came_back["own_list"] == OWN_LIST
         assert came_back["marks"] == marks
         assert came_back["missing"] == ["nobody rotates the key"]
         assert came_back["notes"] == "counted 18"
@@ -1389,14 +1434,14 @@ class TestTheDraftSurvivesTheProcess:
         """The gate asks whether the case has an own list, and the draft is
         where that answer now lives — so a restart re-arms nothing."""
         first = browser(session_for(tree, "ada"))
-        first.post("/api/own-list", json={"case": CASE, "items": []})
+        first.post("/api/own-list", json={"case": CASE, "items": OWN_LIST})
         again = browser(session_for(tree, "ada"))
         assert again.get(f"/api/part-two?case={CASE}").status_code == 200
         assert again.get(f"/api/part-two?case={OTHER}").status_code == 409
 
     def test_a_case_with_a_draft_says_so_in_the_rail(self, tree):
         app = browser(session_for(tree, "ada"))
-        app.post("/api/own-list", json={"case": CASE, "items": []})
+        app.post("/api/own-list", json={"case": CASE, "items": OWN_LIST})
         rows = {row["case"]: row for row in app.get("/api/rail").json()["cases"]}
         assert rows[CASE]["status"] == "draft in progress"
         assert rows[CASE]["state"] == "draft"
@@ -1407,7 +1452,7 @@ class TestTheDraftSurvivesTheProcess:
         """The record is in the working tree by then, and nothing is a record
         until it merges — so the draft says ``finished`` and stays."""
         app = browser(session_for(tree, "ada"))
-        app.post("/api/own-list", json={"case": CASE, "items": ["a spoofed device"]})
+        app.post("/api/own-list", json={"case": CASE, "items": OWN_LIST})
         app.post(
             "/api/finish",
             json={"case": CASE, "marks": {}, "missing": ["mine"], "notes": "done"},
@@ -1457,7 +1502,7 @@ class TestReRecordingACase:
 
     def read_and_record(self, app, case=CASE, notes="21 agree", missing=()):
         """One whole sitting: the own list, then the record."""
-        app.post("/api/own-list", json={"case": case, "items": ["a spoofed device"]})
+        app.post("/api/own-list", json={"case": case, "items": OWN_LIST})
         return self.record(app, case, notes, missing)
 
     def reviews(self, tree, case=CASE):
@@ -1470,7 +1515,7 @@ class TestReRecordingACase:
         app = browser(session_for(tree, "ada"))
         self.read_and_record(app, missing=["nothing about the fleet key"])
         came_back = app.get(f"/api/part-one?case={CASE}").json()
-        assert came_back["own_list"] == ["a spoofed device"]
+        assert came_back["own_list"] == OWN_LIST
         assert came_back["missing"] == ["nothing about the fleet key"]
         assert came_back["state"] == "finished"
         assert app.get(f"/api/part-two?case={CASE}").status_code == 200
@@ -1540,7 +1585,7 @@ class TestTheTextMovedUnderTheRead:
 
     def test_a_case_that_did_not_move_names_nothing(self, tree):
         app = browser(session_for(tree, "ada"))
-        app.post("/api/own-list", json={"case": CASE, "items": ["a spoofed device"]})
+        app.post("/api/own-list", json={"case": CASE, "items": OWN_LIST})
         assert app.get(f"/api/part-one?case={CASE}").json()["moved"] == []
 
     def test_a_case_with_no_draft_names_nothing(self, tree):
@@ -1552,14 +1597,14 @@ class TestTheTextMovedUnderTheRead:
 
     def test_the_open_names_the_file_that_moved(self, tree):
         app = browser(session_for(tree, "ada"))
-        app.post("/api/own-list", json={"case": CASE, "items": ["a spoofed device"]})
+        app.post("/api/own-list", json={"case": CASE, "items": OWN_LIST})
         self.move(tree)
         assert app.get(f"/api/part-one?case={CASE}").json()["moved"] == ["source.md"]
 
     def test_it_names_only_the_case_that_moved(self, tree):
         app = browser(session_for(tree, "ada"))
         for case in CASES:
-            app.post("/api/own-list", json={"case": case, "items": []})
+            app.post("/api/own-list", json={"case": case, "items": OWN_LIST})
         self.move(tree, OTHER)
         assert app.get(f"/api/part-one?case={CASE}").json()["moved"] == []
         assert app.get(f"/api/part-one?case={OTHER}").json()["moved"] == ["source.md"]
@@ -1567,36 +1612,36 @@ class TestTheTextMovedUnderTheRead:
     def test_the_own_list_survives_the_warning_at_open(self, tree):
         """A reader never retypes a list because somebody edited a file."""
         app = browser(session_for(tree, "ada"))
-        app.post("/api/own-list", json={"case": CASE, "items": ["a spoofed device"]})
+        app.post("/api/own-list", json={"case": CASE, "items": OWN_LIST})
         self.move(tree)
         came_back = app.get(f"/api/part-one?case={CASE}").json()
-        assert came_back["own_list"] == ["a spoofed device"]
+        assert came_back["own_list"] == OWN_LIST
         assert app.get(f"/api/part-two?case={CASE}").status_code == 200
 
     def test_a_file_that_moves_while_the_tab_sits_open_reaches_the_finish(self, tree):
         """The open said nothing, because at open nothing had moved."""
         app = browser(session_for(tree, "ada"))
-        app.post("/api/own-list", json={"case": CASE, "items": ["a spoofed device"]})
+        app.post("/api/own-list", json={"case": CASE, "items": OWN_LIST})
         assert app.get(f"/api/part-one?case={CASE}").json()["moved"] == []
         self.move(tree)
         assert self.finish(app).json()["moved"] == ["source.md"]
 
     def test_the_finish_names_nothing_where_nothing_moved(self, tree):
         app = browser(session_for(tree, "ada"))
-        app.post("/api/own-list", json={"case": CASE, "items": ["a spoofed device"]})
+        app.post("/api/own-list", json={"case": CASE, "items": OWN_LIST})
         assert self.finish(app).json()["moved"] == []
 
     def test_the_own_list_survives_the_warning_at_finish(self, tree):
         """The record is written, and the reader's list rides into it whole."""
         app = browser(session_for(tree, "ada"))
-        app.post("/api/own-list", json={"case": CASE, "items": ["a spoofed device"]})
+        app.post("/api/own-list", json={"case": CASE, "items": OWN_LIST})
         self.move(tree)
         assert self.finish(app).status_code == 200
         case_dir = tree / "evals" / "corpus" / CASE
         filled = (case_dir / sittings.document_name("ada")).read_text("utf-8")
         assert "a spoofed device" in filled
         held = json.loads(draft_file(tree, CASE).read_text("utf-8"))
-        assert held["own_list"] == ["a spoofed device"]
+        assert held["own_list"] == OWN_LIST
 
     def test_the_page_carries_the_warning(self, tree):
         """Both payloads that carry the drift reach the reader, and the box
@@ -1609,7 +1654,7 @@ class TestTheTextMovedUnderTheRead:
         """The digests are taken fresh at finish, so a file that moved under
         the read is signed as it stands rather than as it was opened."""
         app = browser(session_for(tree, "ada"))
-        app.post("/api/own-list", json={"case": CASE, "items": []})
+        app.post("/api/own-list", json={"case": CASE, "items": OWN_LIST})
         self.move(tree)
         assert self.finish(app).status_code == 200
         case_dir = tree / "evals" / "corpus" / CASE
@@ -1629,7 +1674,7 @@ class TestDiscardingADraft:
 
     def test_the_case_returns_to_to_do(self, tree):
         app = browser(session_for(tree, "ada"))
-        app.post("/api/own-list", json={"case": CASE, "items": ["a spoofed device"]})
+        app.post("/api/own-list", json={"case": CASE, "items": OWN_LIST})
         assert self.discard(app).json() == {"case": CASE, "discarded": True}
         assert not draft_file(tree, CASE).exists()
         rows = {row["case"]: row for row in app.get("/api/rail").json()["cases"]}
@@ -1640,7 +1685,7 @@ class TestDiscardingADraft:
     def test_the_gate_re_arms_behind_it(self, tree):
         """The case is blind again, which is the whole of what *to do* means."""
         app = browser(session_for(tree, "ada"))
-        app.post("/api/own-list", json={"case": CASE, "items": ["a spoofed device"]})
+        app.post("/api/own-list", json={"case": CASE, "items": OWN_LIST})
         self.discard(app)
         assert app.get(f"/api/part-two?case={CASE}").status_code == 409
         assert app.get(f"/api/part-one?case={CASE}").json()["own_list"] is None
@@ -1648,7 +1693,7 @@ class TestDiscardingADraft:
     def test_it_takes_the_case_it_is_given_and_no_other(self, tree):
         app = browser(session_for(tree, "ada"))
         for case in CASES:
-            app.post("/api/own-list", json={"case": case, "items": []})
+            app.post("/api/own-list", json={"case": case, "items": OWN_LIST})
         self.discard(app, CASE)
         assert not draft_file(tree, CASE).exists()
         assert draft_file(tree, OTHER).is_file()
@@ -1662,7 +1707,7 @@ class TestDiscardingADraft:
         foreign page that reached it would throw away somebody's afternoon."""
         session = session_for(tree, "ada")
         app = browser(session)
-        app.post("/api/own-list", json={"case": CASE, "items": ["a spoofed device"]})
+        app.post("/api/own-list", json={"case": CASE, "items": OWN_LIST})
         foreign = app.post(
             "/api/discard",
             json={"case": CASE},
@@ -1707,7 +1752,7 @@ class TestADraftTheAppCannotRead:
         app = browser(session_for(tree, "ada"))
         assert self.rows(app)[OTHER]["pressable"] is True
         assert app.get(f"/api/part-one?case={OTHER}").status_code == 200
-        opened = app.post("/api/own-list", json={"case": OTHER, "items": []})
+        opened = app.post("/api/own-list", json={"case": OTHER, "items": OWN_LIST})
         assert opened.status_code == 200
         assert app.get(f"/api/part-two?case={OTHER}").status_code == 200
 
@@ -1733,7 +1778,7 @@ class TestTwoLoginsOnOneMachine:
 
     def test_neither_reader_sees_the_other_s_draft(self, tree):
         ada = browser(session_for(tree, "ada"))
-        ada.post("/api/own-list", json={"case": CASE, "items": ["a spoofed device"]})
+        ada.post("/api/own-list", json={"case": CASE, "items": OWN_LIST})
 
         sam = browser(session_for(tree, "sam"))
         assert sam.get(f"/api/part-one?case={CASE}").json()["own_list"] is None
@@ -1762,9 +1807,7 @@ class TestTheDraftStore:
 
     def test_a_saved_draft_round_trips(self, tmp_path):
         root = self.store(tmp_path)
-        written = sittings.Draft(
-            case=CASE, clone=str(tmp_path), own_list=["a spoofed device"]
-        )
+        written = sittings.Draft(case=CASE, clone=str(tmp_path), own_list=OWN_LIST)
         path = sittings.save_draft(root, "ada", written)
         assert path == root / "ada" / f"{CASE}.json"
         assert sittings.load_draft(root, "ada", CASE) == written
@@ -2104,14 +2147,14 @@ class TestDroppingACase:
 
     def test_a_case_that_is_not_recorded_cannot_be_dropped(self, tree):
         app = browser(session_for(tree, "ada"))
-        app.post("/api/own-list", json={"case": CASE, "items": []})
+        app.post("/api/own-list", json={"case": CASE, "items": OWN_LIST})
         refused = app.post("/api/drop", json={"case": CASE})
         assert refused.status_code == 409
         assert "does not carry it" in refused.json()["detail"]
 
     def test_a_case_nobody_dropped_cannot_be_put_back(self, tree):
         app = browser(session_for(tree, "ada"))
-        app.post("/api/own-list", json={"case": CASE, "items": []})
+        app.post("/api/own-list", json={"case": CASE, "items": OWN_LIST})
         refused = app.post("/api/put-back", json={"case": CASE})
         assert refused.status_code == 409
         assert "not held back" in refused.json()["detail"]
