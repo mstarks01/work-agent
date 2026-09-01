@@ -34,8 +34,8 @@ recorded digest.
 
 So every agreement figure the suite produces is **self-consistency, not
 accuracy**: it measures how closely a rule reproduces what an earlier agent
-wrote down. That includes the 90% bar. A rule at 92.5% agrees with an agent's
-opinions 92.5% of the time, and sitting 01 is the only evidence anywhere that
+wrote down. That includes the 90% bar. A rule at 93.7% agrees with an agent's
+opinions 93.7% of the time, and sitting 01 is the only evidence anywhere that
 any of those opinions are right.
 
 **Two live sweeps exist, and neither is a quality standard.** The service has
@@ -52,13 +52,22 @@ which questions a cheap model may answer and which it may not.
 **There is no model judge.** Claim matching is `SubsetVerbIdentity`, a rule in
 `harness/identity.py`, and it is measured on the two directions it can fail in
 (`python -m evals.harness.run calibrate`), with no provider call: **15 false
-splits over 200 equivalent candidate pairs, and 3 false merges over 287
-distinct reference pairs.** Read the two apart. A false split hands a reviewer
-one unmatched finding; a false merge destroys a finding and inflates recall,
-and nobody sees it happen. The two denominators are different populations and
-neither is a rate over what a live run emits — the candidate merge direction is
-not measured at all yet, because every `no-match` fixture lacks the fields the
-rule reads ([#511](https://github.com/mstarks01/work-agent/issues/511)).
+splits over 200 equivalent candidate pairs, 5 false merges over 115 candidate
+negatives, and 3 false merges over 287 distinct reference pairs.** Read them
+apart. A false split hands a reviewer one unmatched finding; a false merge
+destroys a finding and inflates recall, and nobody sees it happen. The three
+denominators are different populations and none is a rate over what a live run
+emits.
+
+The candidate merge column arrived with
+[#511](https://github.com/mstarks01/work-agent/issues/511), which assigned the
+negative half the elements and verbs the rule reads. Before it every candidate
+merge count was structurally zero. A further 15 negatives carry the
+`unsupported` label: they name the same place and the same action as their
+reference and differ only in a fact the model does not hold, which no
+comparison of elements and verbs can reach. Scored anyway the rule has 20
+candidate merges of 330 and 89.4% agreement, so both numbers are on the
+record.
 
 Whether an unmatched finding is real is a question about prose, and a
 person answers it: each unmatched finding is keyed by its fingerprint and
@@ -134,7 +143,7 @@ evals/
 | `harness/calibration.py` | Rule-vs-label agreement over the labelled fixtures — the scoreboard any rule change must clear. |
 | `harness/verbs.py` | The closed vocabulary of attacker actions, and what counts as one action. |
 | `harness/exemplar_verbs.py` | Which actions a package's shipped exemplars demonstrate against which its reference sets grade, and the exemplar pairs that name one place and two actions. Reads text and blessed models only, so it costs no provider call. |
-| `harness/identity.py` | Claim identity from the fields a claim carries. `SubsetVerbIdentity` has 15 false splits of 200 and 3 false merges of 287, with no model call. |
+| `harness/identity.py` | Claim identity from the fields a claim carries. `SubsetVerbIdentity` has 15 false splits of 200, 5 false merges of 115 and 3 false merges of 287, with no model call. |
 | `harness/fingerprint.py` | A **Claim**'s identity as a versioned value code computes. No model call. |
 | `harness/ledger.py` | The append-only record of what a **person** decided about a finding. One file per voter, named by the GitHub login. |
 | `harness/envelope.py` | The offline sitting envelope: one reader's answers read back from the standalone page and applied through the same `finish` the app runs. Treats the file as untrusted input and recomputes every digest against this tree. |

@@ -287,7 +287,7 @@ claim-equivalence question and contributes no pair — that is settled design
 ([#167](https://github.com/mstarks01/work-agent/issues/167)), not an omission.
 
 In the same sitting, label candidate threat pairs as match / no-match /
-`unclear` in `build_pairs.py`. **Write `unclear` when the two sentences alone
+`unclear` / `unsupported` in `build_pairs.py`. **Write `unclear` when the two sentences alone
 cannot decide it** — that is a real answer, it leaves the denominator rather
 than counting against either side, and it is better than a binary the evidence
 does not support. Check the bullet below on specificity first: review sitting
@@ -325,9 +325,13 @@ wrote and says almost nothing about whether it is right.
   write path and the other through what a client reports: the remedies differ,
   and the route is the finding. Review sitting 01 relabelled a pair for exactly
   this, so the two bullets above have a floor under them.
-- **Include candidates that assert facts the model doesn't support.** Those are
-  no-match — and downstream they're the "unsupported" bucket that counts against
-  the tool.
+- **Include candidates that assert facts the model doesn't support.** Label
+  them **`unsupported`**, not `no-match`: downstream they're the "unsupported"
+  bucket that counts against the tool, and that is a groundedness question the
+  identity rule cannot reach. Use the label only when the invented fact is the
+  *sole* separator — if the candidate also names a different place or a
+  different action, the rule can decide it, so it is a `no-match` the score
+  should keep.
 - **Keep the set balanced;** `verify_corpus.py` fails if either label drops below
   30%.
 - **Do not try to bless every label.** A person has read 30 of the 339, and the
@@ -346,9 +350,10 @@ wrote and says almost nothing about whether it is right.
   list makes every pair agree by construction and the measurement in
   `tests/test_evals_identity.py` worthless. Follow the reference sets' own
   conventions — a flow, process, store or entity, one or two of them, never a
-  boundary. `no-match` candidates carry `None`; nobody has assigned them yet,
-  which is why the rule refuses all 139 and the candidate merge direction is
-  unmeasured ([#511](https://github.com/mstarks01/work-agent/issues/511)).
+  boundary. **Every candidate is assigned, whatever its label** — the negative
+  half is what prices the rule on false merges. The only exceptions are the
+  handful in `verify_corpus.UNASSIGNABLE`, where the sentence names no element
+  the model holds or no action the vocabulary holds; record the reason there.
 
 ### 6. Bless and merge
 

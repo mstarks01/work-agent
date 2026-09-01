@@ -40,19 +40,32 @@ than grading half of itself. Refused pairs are counted and reported beside the
 agreement, never inside it: folding them in either direction would let a rule
 buy accuracy by refusing the hard pairs.
 
-**A label may decline too, and that is ``unclear``.** A reader who cannot tell
-two write-ups apart from the sentences alone records that, rather than forcing
-a binary the evidence does not support. An ``unclear`` pair sits outside the
-agreement for the same reason a refusal does: nobody knows the answer, so no
-rule can be wrong about it. The two exclusions are counted apart because they
-say different things — a refusal is the rule declining, and ``unclear`` is the
-label declining.
+**A label may decline too.** Two dispositions carry no answer an identity rule
+can be graded against, and each sits outside the agreement for the reason a
+refusal does — nobody asked the rule a question it could be wrong about. They
+are counted under their own keys in ``set_aside``, never folded together.
 
-**No shipped pair carries ``unclear`` today.** Review sitting 01 returned four,
-and step 5 of ``evals/BLESSING.md`` now states the test that decides them, so
-each resolved to a binary label. The disposition exists so the next reader who
-finds a genuinely undecidable pair can record it; before this, the loader
-failed closed on any label but the two, which forced a false record.
+``unclear`` is the reader declining: two write-ups they could not tell apart
+from the sentences alone. No shipped pair carries it. Review sitting 01
+returned four and step 5 of ``evals/BLESSING.md`` now states the test that
+decides them, so each resolved to a binary label; the disposition exists so the
+next undecidable pair is recorded rather than forced.
+
+``unsupported`` is a **different axis, not a softer no-match**. The candidate
+names the same place and the same action as the reference and is still not a
+match, because it asserts a fact the **System Model** does not hold — a card
+that never crosses a link, an MFA control nobody wrote down. Whether a claim is
+grounded is not decidable from elements and verbs, so scoring an identity rule
+against these measures nothing about identity. ``BLESSING.md`` step 5 asks for
+them deliberately and routes them to the downstream "unsupported" bucket; they
+sat inside this score only while the rule refused the whole ``no-match`` half
+and nobody could see them.
+
+**The exclusion is stated, not inferred.** Each ``unsupported`` fixture records
+the reason in its note, ``build_pairs.py`` carries the label, and the count
+prints beside every score. The number before the partition is on the record
+too: over all 330 readable pairs the rule has **20** false merges and 89.4%
+agreement, and 15 of those 20 are these fixtures.
 
 The consequence to state plainly, every time these numbers are quoted: recall
 and precision from this suite are **rule-relative**. They are valid for
@@ -68,8 +81,9 @@ from __future__ import annotations
 
 import itertools
 import json
-from collections.abc import Sequence
-from dataclasses import dataclass
+from collections import Counter
+from collections.abc import Mapping, Sequence
+from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any, Literal, get_args
 
@@ -83,13 +97,23 @@ DEFAULT_PAIRS_PATH = EVALS_ROOT / "calibration_labels" / "pairs.json"
 
 AGREEMENT_BAR = 0.90
 
-#: What a recorded label may say. ``unclear`` is a real answer and not a
-#: missing one: it records that the pair cannot be decided from the two
-#: sentences alone, which is what review sitting 01 asked its reader to write.
-Label = Literal["match", "no-match", "unclear"]
+#: What a recorded label may say. Two of the four carry no answer an identity
+#: rule can be graded against, and each says why it does not:
+#:
+#: - ``unclear`` — a reader could not decide the pair from the two sentences
+#:   alone, which is what review sitting 01 asked its reader to write.
+#: - ``unsupported`` — the candidate names the **same place and the same
+#:   action** as the reference and is still not a match, because it asserts a
+#:   fact the **System Model** does not hold. That is a groundedness question,
+#:   and no comparison of elements and verbs can reach it. ``BLESSING.md`` step
+#:   5 asks for these deliberately and sends them to the downstream
+#:   "unsupported" bucket; they were scored here only because the rule used to
+#:   refuse the whole ``no-match`` half.
+Label = Literal["match", "no-match", "unclear", "unsupported"]
 
-#: The labels that carry an answer a rule can be graded against. ``unclear``
-#: is absent by construction, which is what keeps it out of the denominator.
+#: The labels that carry an answer an identity rule can be graded against. The
+#: two dispositions above are absent by construction, which is what keeps them
+#: out of the denominator.
 SCORED_LABELS: tuple[Label, ...] = ("match", "no-match")
 
 
@@ -180,11 +204,15 @@ class CalibrationResult:
     """Agreement, the two error directions, and every disagreement.
 
     ``total`` counts the pairs the matcher answered. ``refused`` counts the
-    pairs it declined to read and ``unclear`` the pairs the label declined to
-    decide; both sit outside the agreement, because neither the rule nor the
-    label can be wrong about a question nobody answered. Both counts are always
-    reported beside the bar, so a rule cannot buy accuracy by refusing the hard
-    pairs unseen.
+    pairs it declined to read, and ``set_aside`` counts the pairs each
+    disposition kept out of the score, keyed by the label that did it. All of
+    them sit outside the agreement, because neither the rule nor the label can
+    be wrong about a question nobody asked it. Every count is always reported
+    beside the bar, so a rule cannot buy accuracy by refusing the hard pairs
+    unseen.
+
+    ``set_aside`` is keyed rather than one field per disposition: a new
+    disposition is an entry, and it is reported without an edit here.
 
     ``false_non_matches`` is the **false split** direction and
     ``false_matches`` the **false merge** direction over these labels. Read
@@ -197,7 +225,7 @@ class CalibrationResult:
     false_matches: tuple[Disagreement, ...]
     false_non_matches: tuple[Disagreement, ...]
     refused: int = 0
-    unclear: int = 0
+    set_aside: Mapping[Label, int] = field(default_factory=dict)
 
     @property
     def agreement(self) -> float:
@@ -215,7 +243,7 @@ class CalibrationResult:
             "bar": AGREEMENT_BAR,
             "meets_bar": self.meets_bar,
             "refused": self.refused,
-            "unclear": self.unclear,
+            "set_aside": dict(self.set_aside),
             "false_splits": len(self.false_non_matches),
             "false_merges": len(self.false_matches),
             "false_matches": [entry.to_json() for entry in self.false_matches],
@@ -273,21 +301,22 @@ def measure_agreement(
 
     A refusal (:class:`~evals.harness.identity.IdentityError`) is counted and
     set aside, never scored: the fixtures deliberately keep pairs the rule
-    cannot read, so the refusing path stays exercised. An ``unclear`` label is
-    set aside the same way and counted apart, because a rule cannot disagree
-    with an answer nobody gave.
+    cannot read, so the refusing path stays exercised. A label that carries no
+    answer — ``unclear`` or ``unsupported`` — is set aside the same way and
+    counted under its own key, because a rule cannot disagree with an answer
+    nobody gave it.
     """
     if not pairs:
         raise CalibrationError("no labelled pairs to calibrate against")
 
     agreements = 0
     refused = 0
-    unclear = 0
+    set_aside: Counter[Label] = Counter()
     false_matches: list[Disagreement] = []
     false_non_matches: list[Disagreement] = []
     for pair in pairs:
         if not pair.is_scored:
-            unclear += 1
+            set_aside[pair.label] += 1
             continue
         try:
             ruling = matcher.equivalent(pair.to_claim_pair())
@@ -306,12 +335,12 @@ def measure_agreement(
             false_non_matches.append(disagreement)
 
     return CalibrationResult(
-        total=len(pairs) - refused - unclear,
+        total=len(pairs) - refused - sum(set_aside.values()),
         agreements=agreements,
         false_matches=tuple(false_matches),
         false_non_matches=tuple(false_non_matches),
         refused=refused,
-        unclear=unclear,
+        set_aside=dict(set_aside),
     )
 
 

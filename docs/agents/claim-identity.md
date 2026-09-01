@@ -41,39 +41,53 @@ differently and one finding becomes two.
 ## Why the verb, and what it is worth
 
 Elements alone cannot separate a read from a write against one store. The
-frontier in `tests/test_evals_identity.py` prices every rule on both errors at
-once — false splits over the 200 labelled match pairs, false merges over the 287
+frontier in `tests/test_evals_identity.py` prices every rule on all three ways
+of being wrong — false splits over the 200 labelled match pairs, false merges
+over the 115 scored candidate negatives, and 3 false merges over the 287
 within-lane reference pairs:
 
-| Rule | False splits (of 200) | False merges (of 287) |
-|---|---|---|
-| equality | 89 | 1 |
-| endpoint subset | 14 | 23 |
-| **endpoint subset + verb** | **15** | **3** |
-| overlap | 4 | 34 |
-| endpoint overlap | 1 | 126 |
+| Rule | False splits (of 200) | Candidate merges (of 115) | Reference merges (of 287) |
+|---|---|---|---|
+| equality | 89 | 26 | 1 |
+| endpoint subset | 14 | 85 | 23 |
+| **endpoint subset + verb** | **15** | **5** | **3** |
+| overlap | 4 | 87 | 34 |
+| endpoint overlap | 1 | 103 | 126 |
 
 No element-only row is usable: the tightest loses 89 paraphrases and the loosest
-destroys 126 findings. **The verb row is the first one that is.** One more split
-buys twenty fewer merges.
+destroys 126 findings. **The verb row is the first one that is.**
 
-### What the two columns are measured over, and what they are not
+**Read the candidate column, not the reference one.** On reference pairs alone
+`endpoint subset` merges 23 of 287 and looks survivable. On the candidate
+paraphrases a live run actually emits it merges **85 of 115** — it is barely a
+rule. The verb takes that to 5 for one extra split. That column did not exist
+until [#511](https://github.com/mstarks01/work-agent/issues/511) assigned the
+negative half its elements and verbs; before it, every candidate merge count
+was structurally zero and the argument for the verb rested on the weaker
+number.
 
-The columns come from **two different populations**, so neither is a rate over
-what a live run emits and the pair does not combine into one figure.
+### What each column is measured over, and what none of them is
+
+The columns come from **three different populations**, so none is a rate over
+what a live run emits and they do not combine into one figure.
 
 - **False splits** are candidate-vs-reference: 200 paraphrase pairs an agent
-  labelled equivalent. This is the population a live run resembles.
-- **False merges** are reference-vs-reference: every within-lane pair of
-  distinct claims the corpus already records as two findings. It needs no
-  label to interpret, because every merge here is an error by construction.
+  labelled equivalent.
+- **Candidate merges** are candidate-vs-reference too: 115 hard negatives,
+  weighted toward the same element and lane with a *different attacker action*.
+  This is the population a live run resembles most closely.
+- **Reference merges** are reference-vs-reference: every within-lane pair of
+  distinct claims the corpus already records as two findings. It needs no label
+  to interpret, because every merge is an error by construction.
 
-**The candidate merge direction is not measured at all.** Every `no-match`
-fixture carries no candidate element IDs and no verb, so `SubsetVerbIdentity`
-refuses all 139 of them and `measure_agreement` reports a false-merge count
-that is structurally zero. Closing that gap is
-[#511](https://github.com/mstarks01/work-agent/issues/511), and until it lands
-the merge column above is the only merge evidence there is.
+**Fifteen negatives are not on this axis at all.** They name the same place and
+the same action as their reference and are still not a match, because they
+assert a fact the **System Model** does not hold — a card that never crosses a
+link, an MFA control nobody wrote down. Whether a claim is grounded is not
+decidable from elements and verbs, so they carry the `unsupported` label, sit
+outside the score, and are counted beside it. Scored anyway, the rule has 20
+candidate merges of 330 rather than 5 of 315; both numbers are on the record,
+and nothing here measures the groundedness axis they belong to.
 
 ### The agreement ratio, and the one job it has
 
@@ -81,8 +95,8 @@ Scored on the shared scoreboard, through `measure_agreement`:
 
 | Rule | Agreement with the recorded labels |
 |---|---|
-| `MechanicalIdentity` (element equality) | 111/200 = 55.5% |
-| `SubsetVerbIdentity` | **185/200 = 92.5%** |
+| `MechanicalIdentity` (element equality) | 200/315 = 63.5% |
+| `SubsetVerbIdentity` | **295/315 = 93.7%** |
 
 **This is an admission gate, not a quality statement.** It clears the 90% bar,
 and the bar exists to price a *candidate* rule — one nobody has measured, which
@@ -109,13 +123,18 @@ than a rule to loosen.
 
 ### A label may decline, and the reviewed set stays small
 
-A pair carries `match`, `no-match`, or **`unclear`** — the last for a pair a
-reader cannot decide from the two sentences alone. An `unclear` pair leaves the
-denominator and is counted beside the refusals, because a rule cannot disagree
-with an answer nobody gave. No shipped pair uses it: review sitting 01 returned
-four, and step 5 of `evals/BLESSING.md` now states the test that decides them.
-The disposition exists so the next undecidable pair is recorded rather than
-forced into a binary.
+A pair carries `match`, `no-match`, `unclear` or `unsupported`. The last two
+leave the denominator and are counted beside the refusals, each under its own
+key, because a rule cannot disagree with an answer nobody gave it.
+
+- **`unclear`** — a reader could not decide the pair from the two sentences
+  alone. No shipped pair uses it: review sitting 01 returned four, and step 5
+  of `evals/BLESSING.md` now states the test that decides them.
+- **`unsupported`** — the candidate asserts a fact the model does not hold,
+  and that is the *only* thing separating it from the reference. Fifteen
+  fixtures. `BLESSING.md` step 5 asks for these deliberately and routes them to
+  the downstream unsupported bucket; they sat inside the identity score only
+  while the rule refused the whole negative half and nobody could see them.
 
 **Do not plan to read the remaining 309 labels.** Blessing hundreds of easy
 paraphrases buys almost nothing. Identity review belongs on the decision
@@ -248,11 +267,11 @@ lane rather than answering zero, because "nothing was asked" must not read as
 The rule is the only matcher a scored sweep has. A `match` is a recall hit; a
 `no-match` leaves the finding unmatched, and its fingerprint is looked up in
 the vote ledger — `rejected`, `pooled`, `open` or `unvoted`. Nothing asks a
-model. The rule's known error costs are the record above: 3 of 287 reference
-pairs merged, 15 of 200 labelled matches split, and a split surfaces as an
-unvoted finding in the queue rather than vanishing. A merge does not surface at
-all, which is why the unmeasured candidate merge direction (#511) is the gap
-worth closing first.
+model. The rule's known error costs are the record above: 15 of 200 labelled
+matches split, 5 of 115 candidate negatives merged, 3 of 287 reference pairs
+merged. A split surfaces as an unvoted finding in the queue rather than
+vanishing. A merge does not surface at all, which is why the candidate merge
+column is the one to watch.
 
 The gain is determinism before it is cost. A match the rule settles cannot move
 between two runs of one configuration — which is exactly the band

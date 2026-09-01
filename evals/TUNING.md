@@ -116,21 +116,22 @@ noise. Check it first — offline, no credentials:
 python -m evals.harness.run calibrate --out agreement.json
 ```
 
-**Read the two error directions first; they are the measurement.** The shipped
-rule has 15 false splits of 200 equivalent candidate pairs and 3 false merges
-of 287 distinct reference pairs. A split hands a reviewer one unmatched
-finding. A merge destroys a finding and inflates recall, and nobody sees it
-happen — which is the expensive way to be wrong, and why a lenient rule is
-never the fix.
+**Read the error directions first; they are the measurement.** The shipped
+rule has 15 false splits of 200 equivalent candidate pairs, 5 false merges of
+115 candidate negatives and 3 false merges of 287 distinct reference pairs. A
+split hands a reviewer one unmatched finding. A merge destroys a finding and
+inflates recall, and nobody sees it happen — which is the expensive way to be
+wrong, and why a lenient rule is never the fix. Watch the candidate column
+first: it is the population a live run resembles.
 
 The command then reports **≥90% agreement**. That bar is the admission gate for
 a *candidate* rule, which has no pinned counts of its own yet; the shipped
 rule's split and merge counts are pinned exactly in
 `tests/test_evals_identity.py` and bind harder. If the bar fails, the fix is
 the rule or the verb vocabulary (`evals/harness/verbs.py`), not a lower bar.
-Don't tune anything until this passes. The pairs the rule refuses, and any
-pair a reader labelled `unclear`, are counted beside the bar rather than
-inside it.
+Don't tune anything until this passes. The pairs the rule refuses, and the
+pairs a label sets aside as `unclear` or `unsupported`, are counted beside the
+bar rather than inside it.
 
 What passing means is narrower than it looks. The labels are agent-authored and
 a person has read 30 of the 339, so this measures whether the rule reproduces
