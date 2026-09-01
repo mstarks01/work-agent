@@ -1,10 +1,11 @@
 # Integration Guide
 
-`Engine` is the in-process entry point: hand it the text describing a
-system and it returns a [`Report`](Report-Schema.md). It owns none of the
-[HTTP contract's](HTTP-API.md) ceremony — no auth token, no job store, no polling
-— so it is the right surface for swapping this pipeline in behind an
-application's own analysis interface.
+`Engine` is the in-process entry point. Give it one or more labeled text sources
+and it returns either a completed report or a structured rejection; internal
+failures raise. It does not add the bearer authentication, job store, or polling
+used by the [HTTP API](HTTP-API.md).
+
+If the terms in this guide are unfamiliar, read [Concepts](Concepts.md) first.
 
 ## Building an engine
 
@@ -41,14 +42,17 @@ reads paths and overrides from the environment; pass `env=` to override that
 engine = Engine.from_config(
     ["stride"],
     env={
+        "ANALYSIS_MODEL_BASE_VENDOR": "anthropic",
+        "ANALYSIS_MODEL_BASE_MODEL": "claude-sonnet-4-6",
         "ANALYSIS_MODEL_STRONG_VENDOR": "anthropic",
         "ANALYSIS_MODEL_STRONG_MODEL": "claude-opus-5",
+        "ANALYSIS_ANTHROPIC_API_KEY": "...",
     },
 )
 ```
 
-The pair above is arbitrary: `vertex`, `anthropic` and `openai` all go here,
-and this service prefers none of them.
+The pair above is one of the reference pairs declared by the code, not a
+recommendation. `vertex`, `anthropic`, and `openai` are the registered vendors.
 
 `_MODEL` on its own retunes a tier whose vendor the file already names. Nothing
 is selected by default, so where the file names none — as it ships — both halves
