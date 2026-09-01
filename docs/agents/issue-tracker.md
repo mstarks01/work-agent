@@ -74,7 +74,7 @@ Completed on GitHub Issues (canonical):
   The route in one pass. **A part-finished sitting lives in a Draft Sitting outside the repository**
   ([#370](https://github.com/mstarks01/work-agent/issues/370)), at
   `~/.local/state/work-agent/sittings/<login>/<case-id>.json`; the own list creates it, not opening
-  the case, and marks are the closed set `agree` / `doubt` / `dup` keyed by `key_claim`'s
+  the case, and marks are the closed set `agree` / `reject` / `duplicate` keyed by `key_claim`'s
   fingerprint. It never merges, and a successful submit deletes it. **Cardinality lives on the
   `KINDS` table** ([#371](https://github.com/mstarks01/work-agent/issues/371)) as one `Kind` field,
   `subjects`, so `_check_one_directory` becomes `_check_subject_count`; the four per-case checks loop

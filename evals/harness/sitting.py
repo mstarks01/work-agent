@@ -83,7 +83,7 @@ UNREVIEWED_FILE = "tests/test_case_review.py"
 #: set, which ``evals.build_review_docs.MARK_GUIDANCE`` writes out for the
 #: reader who fills the document by hand — free prose here would record less
 #: than that path does, and no count could be taken over it.
-Mark = Literal["agree", "doubt", "dup"]
+Mark = Literal["agree", "reject", "duplicate"]
 
 #: The same three, for a surface that offers them and a check that reads them.
 MARKS: tuple[Mark, ...] = get_args(Mark)
