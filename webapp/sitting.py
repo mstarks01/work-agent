@@ -172,9 +172,11 @@ Security posture, inherited from ``webapp/review.py`` rather than re-derived:
 * **Loopback only, and a checked ``Host``** (A01). Binding alone does not stop
   a rebound page in the operator's own browser, and this app writes to the
   corpus.
-* **The reviewer comes from the command line, never from the request** (A01).
-  A browser field naming the reviewer would let one person file a sitting as
-  another, and #320's binding rests on the name being true.
+* **Both names come from the command line, never from the request** (A01).
+  A browser field naming the submitting account would let one person file a
+  sitting as another, and #320's binding rests on that name being true. The
+  same rule covers ``--submitted-for``, which grants nothing but is evidence:
+  a request that could set it could write a read onto somebody's name.
 * **Case prose reaches the page as data** (LLM05, A05). The case and each
   recorded claim arrive as JSON blocks. The page builds its own markup around
   them and puts every word inside it through ``textContent``, so a sentence
@@ -212,6 +214,7 @@ sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 from evals.harness import roster as rosters
 from evals.harness import sitting as sittings
 from evals.harness import submit as submit_spine
+from evals.harness.reference import ANONYMOUS, is_submitted_for
 from evals.harness.roster import Roster
 from webapp.page import (
     LOOPBACK_HOSTS,
@@ -302,7 +305,11 @@ class Session:
     """One reader over the whole corpus: who is reading, and how far they got."""
 
     root: Path
-    reviewer: str
+    #: The account this session acts as, from `gh` or ``--submitted-by``.
+    submitted_by: str
+    #: Who is doing the reading, from ``--submitted-for``. It equals
+    #: :attr:`submitted_by` unless the operator says otherwise at launch.
+    submitted_for: str
     #: Read once from the clone the reader is in, because the rail's status
     #: asks the clearing rule and that rule asks who is rostered.
     roster: Roster
@@ -345,7 +352,10 @@ class Session:
         session that moves its clone or its draft store moves this with it.
         """
         return sittings.Store(
-            root=self.root, reviewer=self.reviewer, drafts=self.drafts
+            root=self.root,
+            submitted_by=self.submitted_by,
+            submitted_for=self.submitted_for,
+            drafts=self.drafts,
         )
 
     @property
@@ -378,7 +388,7 @@ class Session:
         self.rows = sittings.rail(
             self.corpus_dir,
             self.roster,
-            sittings.draft_states(self.drafts, self.reviewer),
+            sittings.draft_states(self.drafts, self.submitted_by),
         )
         return self.rows
 
@@ -400,7 +410,7 @@ class Session:
         read, and a copy in the process could disagree with the file the
         reader owns.
         """
-        return sittings.load_draft(self.drafts, self.reviewer, case_id)
+        return sittings.load_draft(self.drafts, self.submitted_by, case_id)
 
     def prepare(self, case_id: str) -> sittings.Prepared:
         """One case, prepared once and kept for as long as the process runs."""
@@ -421,7 +431,8 @@ def create_app(session: Session) -> FastAPI:
             render(
                 _PAGE,
                 _PAGE_GRANTS,
-                reviewer=escape(session.reviewer),
+                readby=escape(session.submitted_for),
+                submitter=escape(session.submitted_by),
                 token=script_json(session.token),
                 cansubmit=script_json(session.can_submit),
                 minownlist=script_json(MIN_OWN_LIST),
@@ -440,7 +451,8 @@ def create_app(session: Session) -> FastAPI:
         rows = session.refresh()
         return JSONResponse(
             {
-                "reviewer": session.reviewer,
+                "submitted_by": session.submitted_by,
+                "submitted_for": session.submitted_for,
                 "todo": sum(1 for row in rows if row.state == "todo"),
                 # The pinned footer's count and its own reason to be on
                 # screen. It is the finished drafts, which is what the press
@@ -485,7 +497,8 @@ def create_app(session: Session) -> FastAPI:
             {
                 "case": prepared.case_id,
                 "title": prepared.title,
-                "reviewer": session.reviewer,
+                "submitted_by": session.submitted_by,
+                "submitted_for": session.submitted_for,
                 "blocks": prepared.part_one_blocks,
                 "files": prepared.files,
                 "own_list": held.own_list if held else None,
@@ -593,7 +606,9 @@ def create_app(session: Session) -> FastAPI:
         _require_token(request, session)
         _open(session, body.case)
         try:
-            gone = sittings.discard_draft(session.drafts, session.reviewer, body.case)
+            gone = sittings.discard_draft(
+                session.drafts, session.submitted_by, body.case
+            )
         except sittings.DraftError as exc:
             raise HTTPException(status_code=409, detail=str(exc)) from exc
         return JSONResponse({"case": body.case, "discarded": gone})
@@ -678,7 +693,8 @@ def create_app(session: Session) -> FastAPI:
         cases = [row.case_id for row in carried]
         return JSONResponse(
             {
-                "reviewer": session.reviewer,
+                "submitted_by": session.submitted_by,
+                "submitted_for": session.submitted_for,
                 "ready": [_stage_row(row) for row in carried],
                 "held_back": [_stage_row(row) for row in held_back],
                 # Every case that is neither carried nor signed off. A signed
@@ -868,7 +884,7 @@ def _moved(
 def _save(session: Session, draft: sittings.Draft) -> None:
     """Write one draft, or refuse in the words the store used."""
     try:
-        sittings.save_draft(session.drafts, session.reviewer, draft)
+        sittings.save_draft(session.drafts, session.submitted_by, draft)
     except (sittings.DraftError, OSError) as exc:
         raise HTTPException(
             status_code=409, detail=f"the draft did not save — {exc}"
@@ -909,7 +925,7 @@ def _delete_drafts(session: Session, cases: list[str]) -> list[str]:
     kept = []
     for case_id in cases:
         try:
-            sittings.discard_draft(session.drafts, session.reviewer, case_id)
+            sittings.discard_draft(session.drafts, session.submitted_by, case_id)
         except (sittings.DraftError, OSError) as exc:
             kept.append(f"{case_id}: {exc}")
     return kept
@@ -951,13 +967,14 @@ def _paste(session: Session, cases: list[str]) -> str:
     not write.
     """
     listed = "\n".join(f"- {case}" for case in cases)
+    names = sittings.naming(session.submitted_by, session.submitted_for)
     return (
-        f"Sitting: {session.reviewer}, {len(cases)} cases\n\n"
+        f"Sitting: {names}, {len(cases)} cases\n\n"
         f"{listed}\n\n"
         "Each case above was read whole — the sources, the model and every"
-        " declared framework's reference set. My own threat list for a case"
-        " was written before that case's recorded sets were opened, and the"
-        f" filled document is committed as `{session.document_name}`.\n\n"
+        " declared framework's reference set. The reader's own threat list for"
+        " a case was written before that case's recorded sets were opened, and"
+        f" the filled document is committed as `{session.document_name}`.\n\n"
         "The `reviews` entry in each `case.json` records the digest of every"
         " file as it stands in this PR, so a later edit to any of them puts"
         " that case back on the list."
@@ -1097,7 +1114,7 @@ _PAGE = r"""<!doctype html>
       <button id="next">Next →</button>
     </p>
   </header>
-  <p class="sub"><code id="caseId"></code>, read by <!--reviewer--></p>
+  <p class="sub"><code id="caseId"></code>, read by <!--readby--></p>
   <p id="moved" class="note hidden"></p>
 
   <section id="one">
@@ -1158,7 +1175,7 @@ _PAGE = r"""<!doctype html>
     <h2>Submit</h2>
     <p class="walk"><button id="backToWalk">← Previous</button></p>
   </header>
-  <p class="sub">The end of the walk, read by <!--reviewer--></p>
+  <p class="sub">The end of the walk, read by <!--readby--></p>
   <p id="ready" class="note"></p>
   <ol id="carrying"></ol>
 
@@ -1185,7 +1202,7 @@ _PAGE = r"""<!doctype html>
     <p class="note">Or let this open it for you, through the
     <code>gh</code> you are already signed in to. It runs the same checks
     first, pushes to your fork, and opens the pull request as you.</p>
-    <p><button id="submit">Open the pull request as <!--reviewer--></button></p>
+    <p><button id="submit">Open the pull request as <!--submitter--></button></p>
     <pre id="result" class="hidden"></pre>
   </div>
 </article>
@@ -1783,7 +1800,8 @@ loadRail().then(d => {
 
 def build_session(
     root: Path,
-    reviewer: str,
+    submitted_by: str,
+    submitted_for: str | None = None,
     case: str | None = None,
     can_submit: bool = False,
     drafts: Path | None = None,
@@ -1799,10 +1817,14 @@ def build_session(
     parameter for the same reason the review app takes its ledger path as
     one: a caller that means a temporary tree must not write into a real home
     directory.
+
+    ``submitted_for`` defaults to the submitting account, which is the common
+    shape: a person reads their own case and answers for it.
     """
     session = Session(
         root=root,
-        reviewer=reviewer,
+        submitted_by=submitted_by,
+        submitted_for=submitted_for or submitted_by,
         roster=rosters.load(root / submit_spine.ROSTER_FILE),
         drafts=drafts or sittings.draft_root(),
         preselect=case,
@@ -1826,9 +1848,17 @@ def main(argv: list[str] | None = None) -> int:
         " where the walk starts, and that question has one answer.",
     )
     parser.add_argument(
-        "--reviewer",
-        help="your GitHub login. Read from the authenticated `gh` when omitted,"
-        " because it is the name the record carries either way.",
+        "--submitted-by",
+        help="your GitHub login: the account that carries the sitting and"
+        " opens the pull request. Read from the authenticated `gh` when"
+        " omitted, because it is the name the record carries either way.",
+    )
+    parser.add_argument(
+        "--submitted-for",
+        help="who is reading, when that is not you: a GitHub login, or"
+        f" {ANONYMOUS!r} for a reader who takes part on no name of their own."
+        " Defaults to --submitted-by. It records who read the case and grants"
+        " nothing; the submitting account still answers for the sitting.",
     )
     parser.add_argument(
         "--list", action="store_true", help="print the cases nobody has read"
@@ -1855,23 +1885,36 @@ def main(argv: list[str] | None = None) -> int:
     except submit_spine.SubmitError:
         login = ""
 
-    reviewer = args.reviewer or login
-    if not reviewer:
+    submitted_by = args.submitted_by or login
+    if not submitted_by:
         print(
-            "cannot read your gh login, so pass --reviewer with the login the"
-            " record should carry",
+            "cannot read your gh login, so pass --submitted-by with the login"
+            " the record should carry",
+            file=sys.stderr,
+        )
+        return 1
+
+    # Checked here, at the command line, so a value the record cannot hold
+    # stops the session rather than the submission. The shape is the model's,
+    # read off it rather than spelled again (A05).
+    submitted_for = args.submitted_for or submitted_by
+    if not is_submitted_for(submitted_for):
+        print(
+            f"{submitted_for!r} is not a GitHub login and is not"
+            f" {ANONYMOUS!r}; --submitted-for takes one of those two",
             file=sys.stderr,
         )
         return 1
 
     # Only ever as yourself. A submission opened under a name `gh` does not
     # hold would fail #320's binding in CI, so offering the button would be
-    # inviting a red PR.
-    can_submit = bool(login) and login == reviewer and not args.no_submit
-    session = build_session(root, reviewer, args.case, can_submit)
+    # inviting a red PR. Who the read was *for* does not enter this: it binds
+    # nothing, so it loosens nothing.
+    can_submit = bool(login) and login == submitted_by and not args.no_submit
+    session = build_session(root, submitted_by, submitted_for, args.case, can_submit)
     import uvicorn
 
-    print(f"sitting as {reviewer}")
+    print(f"sitting as {sittings.naming(submitted_by, submitted_for)}")
     print(f"{len(session.offered)} cases to do")
     if can_submit:
         print("the page can open the pull request as you; --no-submit hides it")

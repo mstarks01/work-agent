@@ -18,6 +18,11 @@ under another person's name. Two voters' PRs therefore never conflict with
 each other; two PRs from one voter still can, and that is correct — one
 person sequences their own PRs.
 
+A **Case Sitting** binds the same way and splits the name in two: the entry's
+`submitted_by` is the account that carries it and needs the roster line, and
+`submitted_for` records who read the case — a login, or `anonymous` for a
+reader who takes part on no name of their own. Only the first grants anything.
+
 `voters.toml` is the roster: every voter's line, holding their **standing**
 (`maintainer` or `contributor`) and, after a rename, the old login in
 `aliases`. Standing lives only here — never on a vote row — so a promotion is

@@ -432,15 +432,16 @@ The point of the sitting. One line each, and say which set you expected it in.
   direction, still wrong.
 
 **Then record the sitting.** Save this filled document as
-`REVIEW-<your GitHub login>.md` beside the original — the filled copy is the
-evidence, and the generated `REVIEW.md` stays derived and unfilled. Append
-this entry to `reviews` in `evals/corpus/04-ml-inference-service/case.json`, which is what
-`tests/test_case_review.py` reads:
+`REVIEW-<the submitting GitHub login>.md` beside the original — the filled copy
+is the evidence, and the generated `REVIEW.md` stays derived and unfilled.
+Append this entry to `reviews` in `evals/corpus/04-ml-inference-service/case.json`, which is
+what `tests/test_case_review.py` reads:
 
 ```json
   "reviews": [
     {
-      "reviewer": "<your GitHub login>",
+      "submitted_by": "<the GitHub login opening the PR>",
+      "submitted_for": "<who read the case: a login, or the word anonymous>",
       "date": "<YYYY-MM-DD>",
       "read": [
         {"file": "source.md", "sha256": "3da14d8d61e45baa73b0a7ee2b6935b0da3c1d47c62fdf9cb30ef4a09d6c67b6"},
@@ -448,11 +449,17 @@ this entry to `reviews` in `evals/corpus/04-ml-inference-service/case.json`, whi
         {"file": "claims/asvs.json", "sha256": "3985e6d73b9aa5b5dc8f1b72eee1930c67fab410a2d4710041b39df07339ad31"},
         {"file": "claims/stride.json", "sha256": "219c4116a56305055f1ff4ce543c246ab37e0bb5e3082e83523044d56d5fb94d"}
       ],
-      "document": "REVIEW-<your GitHub login>.md",
+      "document": "REVIEW-<the submitting GitHub login>.md",
       "notes": "<counts, and anything you changed>"
     }
   ],
 ```
+
+**Two names, because they answer two questions.** `submitted_by` is the account
+that opens the pull request and answers for the sitting. `submitted_for` is who
+read the case: the same login where you read it yourself, another login, or
+`anonymous` where the reader takes part on no name of their own. Only
+`submitted_by` needs a roster line, and only `submitted_by` names the document.
 
 The digests above are the files as they were when this document was
 generated. If the sitting changed a file — a claim edit is a normal outcome —
@@ -466,6 +473,7 @@ with this entry from the start.
 
 `tests/test_case_review.py` checks that `read` covers every framework the
 case declares, that every digest matches, that the `document` file exists,
-and that the reviewer has a line in `evals/review/voters.toml` — a first-time
-contributor adds their own, standing `contributor`. Then
+and that `submitted_by` has a line in `evals/review/voters.toml` — a first-time
+contributor adds their own, standing `contributor`. `submitted_for` needs no
+roster line, because it grants nothing. Then
 `python -m evals.harness.run submit sitting` opens the PR.

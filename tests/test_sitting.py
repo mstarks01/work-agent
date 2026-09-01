@@ -20,6 +20,7 @@ from pathlib import Path
 import pytest
 
 from evals.harness import sitting as sittings
+from evals.harness.reference import ANONYMOUS
 from evals.harness.sitting import Draft, Store
 from tests.test_sitting_app import CASE, CASES, OTHER, build_tree, drafts_root
 
@@ -33,7 +34,20 @@ def tree(tmp_path):
 
 @pytest.fixture
 def store(tree):
-    return Store(root=tree, reviewer="ada", drafts=drafts_root(tree))
+    return Store(
+        root=tree, submitted_by="ada", submitted_for="ada", drafts=drafts_root(tree)
+    )
+
+
+@pytest.fixture
+def proxy_store(tree):
+    """One account carrying a read somebody else did, and does not name."""
+    return Store(
+        root=tree,
+        submitted_by="ada",
+        submitted_for=ANONYMOUS,
+        drafts=drafts_root(tree),
+    )
 
 
 def prepared_for(store: Store, case: str = CASE):
@@ -114,7 +128,7 @@ class TestFinishRecordsTheSitting:
             notes="",
         )
 
-        held = sittings.load_draft(store.drafts, store.reviewer, CASE)
+        held = sittings.load_draft(store.drafts, store.submitted_by, CASE)
         assert held is not None
         assert held.state == "finished"
         assert held.own_list == OWN_LIST
@@ -146,7 +160,7 @@ class TestASecondFinishCorrectsTheRecord:
         reviews = json.loads((store.case_dir(CASE) / "case.json").read_text("utf-8"))[
             "reviews"
         ]
-        mine = [entry for entry in reviews if entry["reviewer"] == "ada"]
+        mine = [entry for entry in reviews if entry["submitted_by"] == "ada"]
         assert len(mine) == 1, "a submission never carries two entries by one reader"
         assert mine[0]["notes"] == "second"
 
@@ -194,13 +208,14 @@ class TestASecondFinishCorrectsTheRecord:
         """Append-only still governs the record.
 
         Nothing but the entry this reader appended ever comes off, which is why
-        a re-record replaces by ``replaces=`` rather than by reviewer.
+        a re-record replaces by ``replaces=`` rather than by the name on it.
         """
         case_json = store.case_dir(CASE) / "case.json"
         meta = json.loads(case_json.read_text("utf-8"))
         meta["reviews"] = [
             {
-                "reviewer": "sam",
+                "submitted_by": "sam",
+                "submitted_for": "sam",
                 "date": "2026-08-01",
                 "read": [{"file": "source.md", "sha256": "0" * 64}],
                 "document": "REVIEW-sam.md",
@@ -215,7 +230,7 @@ class TestASecondFinishCorrectsTheRecord:
         sittings.finish(store, prepared, draft, marks={}, missing=[], notes="again")
 
         entries = json.loads(case_json.read_text("utf-8"))["reviews"]
-        assert [entry["reviewer"] for entry in entries] == ["sam", "ada"]
+        assert [entry["submitted_by"] for entry in entries] == ["sam", "ada"]
         assert entries[1]["notes"] == "again"
 
 
@@ -404,3 +419,89 @@ class TestTheUnreviewedEntryIsChecked:
         assert entries
         for case, start, end in entries:
             sittings._one_entry(case, "".join(lines[start:end]))
+
+
+class TestASittingCarriedForSomebodyElse:
+    """The proxy shape: one account submits a read it did not do.
+
+    What these hold is the split. The record carries both names, the account
+    is what every rule reads, and the evidence document says whose words it
+    holds — so nothing about the arrangement is inferred from the file name.
+    """
+
+    def test_the_entry_carries_both_names(self, proxy_store):
+        draft = open_draft(proxy_store)
+
+        sittings.finish(
+            proxy_store,
+            prepared_for(proxy_store),
+            draft,
+            marks={},
+            missing=[],
+            notes="",
+        )
+
+        entry = json.loads(
+            (proxy_store.case_dir(CASE) / "case.json").read_text("utf-8")
+        )["reviews"][0]
+        assert entry["submitted_by"] == "ada"
+        assert entry["submitted_for"] == ANONYMOUS
+
+    def test_the_document_is_named_for_the_submitting_account(self, proxy_store):
+        """``submit sitting`` admits this name and no other under the case."""
+        sittings.finish(
+            proxy_store,
+            prepared_for(proxy_store),
+            open_draft(proxy_store),
+            marks={},
+            missing=[],
+            notes="",
+        )
+
+        assert proxy_store.document_name == "REVIEW-ada.md"
+        assert (proxy_store.case_dir(CASE) / "REVIEW-ada.md").is_file()
+
+    def test_the_document_says_whose_words_it_holds(self, proxy_store):
+        """The file name is the submitter's, so the text names the reader."""
+        sittings.finish(
+            proxy_store,
+            prepared_for(proxy_store),
+            open_draft(proxy_store),
+            marks={},
+            missing=[],
+            notes="",
+        )
+
+        text = (proxy_store.case_dir(CASE) / proxy_store.document_name).read_text(
+            "utf-8"
+        )
+        assert f"Read by {ANONYMOUS}, submitted by ada." in text
+
+    def test_the_read_name_takes_no_entry_off(self, proxy_store):
+        """Only the submitting account may withdraw, whoever it read for."""
+        case_dir = proxy_store.case_dir(CASE)
+        theirs = {
+            "submitted_by": "sam",
+            "submitted_for": ANONYMOUS,
+            "date": "2026-08-01",
+            "read": [{"file": "source.md", "sha256": "0" * 64}],
+            "document": "REVIEW-sam.md",
+            "notes": "",
+        }
+        case_json = case_dir / "case.json"
+        meta = json.loads(case_json.read_text("utf-8"))
+        meta["reviews"] = [theirs]
+        case_json.write_text(json.dumps(meta, indent=2), encoding="utf-8")
+
+        with pytest.raises(sittings.SittingError, match="not"):
+            sittings.unrecord(case_dir, proxy_store.submitted_by, theirs)
+
+        assert json.loads(case_json.read_text("utf-8"))["reviews"] == [theirs]
+
+
+class TestTheNamingPhrase:
+    def test_one_name_where_a_person_reads_their_own_case(self):
+        assert sittings.naming("ada", "ada") == "ada"
+
+    def test_both_names_where_an_account_carries_another_read(self):
+        assert sittings.naming("ada", ANONYMOUS) == f"ada for {ANONYMOUS}"

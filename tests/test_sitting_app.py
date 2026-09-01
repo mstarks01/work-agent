@@ -84,9 +84,11 @@ def drafts_root(tree: Path) -> Path:
     return tree.parent / "state" / "sittings"
 
 
-def session_for(tree, reviewer="ada", case=None, can_submit=False):
+def session_for(tree, reviewer="ada", case=None, can_submit=False, read_for=None):
     """One session over the throwaway tree, with its own draft store."""
-    return build_session(tree, reviewer, case, can_submit, drafts=drafts_root(tree))
+    return build_session(
+        tree, reviewer, read_for, case, can_submit, drafts=drafts_root(tree)
+    )
 
 
 def draft_file(tree, case, reviewer="ada") -> Path:
@@ -159,7 +161,7 @@ def sign(tree, case, reviewer):
     read = sittings.read_records(
         case_dir, sittings.required_files(item["name"] for item in declared)
     )
-    sittings.record(case_dir, reviewer, read, name, "")
+    sittings.record(case_dir, reviewer, reviewer, read, name, "")
 
 
 @pytest.fixture
@@ -277,7 +279,7 @@ class TestWhatASittingWrites:
         self.finish(app)
         case_dir = tree / "evals" / "corpus" / CASE
         entry = json.loads((case_dir / "case.json").read_text("utf-8"))["reviews"][-1]
-        assert entry["reviewer"] == "ada"
+        assert entry["submitted_by"] == "ada"
         assert entry["document"] == "REVIEW-ada.md"
         read = {item["file"]: item["sha256"] for item in entry["read"]}
         declared = json.loads((case_dir / "case.json").read_text("utf-8"))["frameworks"]
@@ -309,7 +311,8 @@ class TestWhatASittingWrites:
         meta = json.loads((case_dir / "case.json").read_text("utf-8"))
         meta["reviews"] = [
             {
-                "reviewer": "sam",
+                "submitted_by": "sam",
+                "submitted_for": "sam",
                 "date": "2026-08-01",
                 "read": [{"file": "source.md", "sha256": "0" * 64}],
                 "document": "REVIEW-sam.md",
@@ -323,7 +326,7 @@ class TestWhatASittingWrites:
         self.finish(app)
         after = json.loads((case_dir / "case.json").read_text("utf-8"))["reviews"]
         assert len(after) == 2
-        assert after[0]["reviewer"] == "sam", "the recorded sitting was rewritten"
+        assert after[0]["submitted_by"] == "sam", "the recorded sitting was rewritten"
 
     def test_it_answers_with_the_paths_it_wrote(self, client):
         """The command and the paste text moved to the submit stage.
@@ -353,11 +356,12 @@ class TestThePosture:
             == 400
         )
 
-    def test_the_reviewer_cannot_be_set_from_a_request(self, client):
-        """#320's binding: a browser field naming the reviewer would break it."""
+    def test_the_submitting_account_cannot_be_set_from_a_request(self, client):
+        """#320's binding: a browser field naming the account would break it."""
         app, _, _ = client
         refused = app.post(
-            "/api/own-list", json={"case": CASE, "items": OWN_LIST, "reviewer": "sam"}
+            "/api/own-list",
+            json={"case": CASE, "items": OWN_LIST, "submitted_by": "sam"},
         )
         assert refused.status_code == 422
 
@@ -625,18 +629,22 @@ class TestOnlyYourOwnEntryComesOff:
         case_dir = tree / "evals" / "corpus" / case
         read = sittings.read_records(case_dir, ["source.md"])
         return case_dir, sittings.record(
-            case_dir, reviewer, read, f"REVIEW-{reviewer}.md", "theirs"
+            case_dir, reviewer, reviewer, read, f"REVIEW-{reviewer}.md", "theirs"
         )
 
     def reviewers(self, tree, case=CASE):
         path = tree / "evals" / "corpus" / case / "case.json"
-        return [e["reviewer"] for e in json.loads(path.read_text("utf-8"))["reviews"]]
+        return [
+            e["submitted_by"] for e in json.loads(path.read_text("utf-8"))["reviews"]
+        ]
 
     def test_a_record_refuses_to_replace_it(self, tree):
         case_dir, theirs = self.merged(tree)
         read = sittings.read_records(case_dir, ["source.md"])
         with pytest.raises(sittings.SittingError, match="not yours to take off"):
-            sittings.record(case_dir, "ada", read, "REVIEW-ada.md", "", replaces=theirs)
+            sittings.record(
+                case_dir, "ada", "ada", read, "REVIEW-ada.md", "", replaces=theirs
+            )
         assert self.reviewers(tree) == ["sam"]
 
     def test_an_unrecord_refuses_to_remove_it(self, tree):
@@ -2100,7 +2108,7 @@ class TestDroppingACase:
         app.post("/api/put-back", json={"case": CASE})
         path = self.case_dir(tree) / "case.json"
         reviews = json.loads(path.read_text("utf-8"))["reviews"]
-        assert [entry["reviewer"] for entry in reviews] == ["ada"]
+        assert [entry["submitted_by"] for entry in reviews] == ["ada"]
 
     def test_a_recorded_sitting_that_merged_is_untouchable(self, tree):
         """The drop removes the entry this reader appended and nothing else."""
@@ -2110,7 +2118,7 @@ class TestDroppingACase:
         app.post("/api/drop", json={"case": CASE})
         path = self.case_dir(tree) / "case.json"
         reviews = json.loads(path.read_text("utf-8"))["reviews"]
-        assert [entry["reviewer"] for entry in reviews] == ["sam"]
+        assert [entry["submitted_by"] for entry in reviews] == ["sam"]
 
     def test_a_doctored_draft_cannot_write_python_into_the_list(self, tree):
         """The drop puts the case back on the unreviewed list from the draft,

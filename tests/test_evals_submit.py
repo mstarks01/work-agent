@@ -129,6 +129,7 @@ def prepare_sitting(
     clone: Path,
     case: str = CASE,
     reviewer: str = "ada",
+    read_for: str | None = None,
     read: list[str] | None = None,
     document: str = "REVIEW-ada.md",
     write_document: bool = True,
@@ -142,7 +143,8 @@ def prepare_sitting(
     meta = json.loads((case_dir / "case.json").read_text(encoding="utf-8"))
     meta["reviews"].append(
         {
-            "reviewer": reviewer,
+            "submitted_by": reviewer,
+            "submitted_for": read_for or reviewer,
             "date": "2026-08-26",
             "read": [
                 {"file": name, "sha256": digest(case_dir / name)} for name in files
@@ -301,7 +303,8 @@ class TestTheSittingChecks:
         meta = json.loads((case_dir / "case.json").read_text(encoding="utf-8"))
         meta["reviews"] = [
             {
-                "reviewer": "mstarks01",
+                "submitted_by": "mstarks01",
+                "submitted_for": "mstarks01",
                 "date": "2026-08-20",
                 "read": [{"file": "source.md", "sha256": "0" * 64}],
                 "document": "REVIEW-mstarks01.md",
@@ -749,7 +752,7 @@ class TestTheCommand:
             staged = json.loads(
                 git(self.repo, "show", f"origin/{branch}:evals/corpus/{case}/case.json")
             )
-            assert staged["reviews"][0]["reviewer"] == "ada"
+            assert staged["reviews"][0]["submitted_by"] == "ada"
         listing = git(self.repo, "show", f"origin/{branch}:tests/test_case_review.py")
         assert CASE not in listing
         assert OTHER not in listing

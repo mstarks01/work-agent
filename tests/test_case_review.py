@@ -9,8 +9,8 @@ belt-and-braces on top of the lints — it is the only instrument for a whole cl
 of defect, and the corpus shipped 13 cases without it.
 
 This makes the gap countable and stops it growing. A case whose ``reviews``
-list holds a clearing **Case Sitting** — a rostered reviewer, every required
-file read, every recorded digest still matching — has been read. Every case
+list holds a clearing **Case Sitting** — a rostered submitting account, every
+required file read, every recorded digest still matching — has been read. Every case
 that has not is named in :data:`UNREVIEWED` with what it is still exposed to,
 and a **new** case that arrives without one fails.
 
@@ -144,8 +144,9 @@ def test_a_new_case_carries_a_sitting(reviewed_by_case):
     )
     assert not undeclared, (
         f"these cases have no Case Sitting that clears them: {undeclared}."
-        " Either no `reviews` entry covers every required file, its reviewer"
-        " has no roster line, or a read file changed under its digests. Hold"
+        " Either no `reviews` entry covers every required file, its"
+        " `submitted_by` has no roster line, or a read file changed under its"
+        " digests. Hold"
         " a sitting (evals/BLESSING.md step 6) and append the entry, or name"
         " the case as unread by adding its line to UNREVIEWED. A case merged"
         " unread cannot be caught later by any lint — that is what this"
@@ -209,18 +210,18 @@ def test_every_sitting_names_an_existing_document(corpus):
     )
 
 
-def test_every_reviewer_has_a_roster_line(corpus, roster):
+def test_every_submitting_account_has_a_roster_line(corpus, roster):
     """Standing labels the read, and the one roster is where standing lives."""
     unrostered = sorted(
         {
-            sitting.reviewer
+            sitting.submitted_by
             for case in corpus
             for sitting in case.meta.reviews
-            if sitting.reviewer not in roster
+            if sitting.submitted_by not in roster
         }
     )
     assert not unrostered, (
-        f"these reviewers have no line in evals/review/voters.toml:"
-        f" {unrostered}. A sitting by an unrostered person clears nothing,"
+        f"these submitting accounts have no line in evals/review/voters.toml:"
+        f" {unrostered}. A sitting no rostered account carries clears nothing,"
         " because no published number could state the standing behind it."
     )
