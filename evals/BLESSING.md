@@ -352,7 +352,8 @@ on one case and takes one value; the list is how you choose the rest.
 
 It shows you the sources and the model, takes your own threat list, and only
 *then* reveals the recorded sets — the one rule this method has, enforced by
-the server rather than by asking. The rule holds per case: **Previous** and
+the server rather than by asking. The press waits until the list says
+something, so the sets cannot open on an empty box. The rule holds per case: **Previous** and
 **Next** in the case header walk the list, and a case you have not written a
 list for arrives blind however you reach it. Each recorded finding carries a
 control that takes `agree`, `doubt` or `dup`, which is the same mark the
