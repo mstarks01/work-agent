@@ -200,10 +200,34 @@ class JobRecord(BaseModel):
         self.updated_at = now
 
 
+# What one admission attempt did. ``at_ceiling`` is the caller's own budget and
+# is theirs to see; ``duplicate`` says the store already holds this job id, which
+# the API mints itself, so it reports a defect rather than a caller error.
+AdmissionOutcome = Literal["admitted", "at_ceiling", "duplicate"]
+
+
+@dataclass(frozen=True)
+class Admission:
+    """The result of one :meth:`JobStore.reserve` call.
+
+    ``active`` is how many of the reserving subject's jobs the store observed in
+    flight *before* this one, so an ``at_ceiling`` refusal can quote the number
+    it refused against. It counts only the subject named on the record, so no
+    outcome here describes another caller's activity.
+
+    A backend failure is not an outcome. It raises, and the API's unhandled-error
+    handler turns it into an opaque ``500`` — a store that cannot answer must not
+    be read as a store that said no.
+    """
+
+    outcome: AdmissionOutcome
+    active: int
+
+
 class JobStore(Protocol):
     """Persistence seam for job records; the real backend is a deferred decision.
 
-    :meth:`active_for` is the seam the per-caller concurrency ceiling is enforced
+    :meth:`reserve` is the seam the per-caller concurrency ceiling is enforced
     through, and it lives here rather than in process state on purpose: a counter
     beside the API would be per-instance no matter what backend a deployment
     configured, so behind two instances the effective ceiling would silently be
@@ -212,21 +236,19 @@ class JobStore(Protocol):
     ceiling is exactly as shared as the deployment's storage is, and a shared
     backend makes it a shared ceiling with no change at the call site.
 
-    **Implementations must observe the count and the create atomically.** The API
-    calls :meth:`active_for` and then :meth:`create`, and a backend that lets
-    another submission land between them turns the ceiling into a number a burst
-    can overshoot. :class:`InMemoryJobStore` satisfies this by never awaiting
-    inside either method, so asyncio cannot interleave the pair; a networked
-    backend needs the check and the insert in one transaction.
+    **Counting and creating is one operation, not two.** The protocol exposes no
+    unconditional create and no bare count, because a caller holding both writes
+    the check-then-act race by hand: two submissions that each read the count
+    before either inserts both pass a ceiling of one. Handing a backend a single
+    method makes the atomicity requirement a signature rather than a paragraph an
+    implementer can miss.
     """
 
-    async def create(self, record: JobRecord) -> None: ...
+    async def reserve(self, record: JobRecord, *, ceiling: int) -> Admission: ...
 
     async def get(self, job_id: str) -> JobRecord | None: ...
 
     async def save(self, record: JobRecord) -> None: ...
-
-    async def active_for(self, subject: str) -> int: ...
 
 
 class InMemoryJobStore:
@@ -235,10 +257,40 @@ class InMemoryJobStore:
     def __init__(self) -> None:
         self._records: dict[str, JobRecord] = {}
 
-    async def create(self, record: JobRecord) -> None:
+    async def reserve(self, record: JobRecord, *, ceiling: int) -> Admission:
+        """Count the owner's jobs in flight and insert, as one step.
+
+        Atomic here because the body awaits nothing: asyncio can only switch
+        tasks at an ``await``, so no second submission runs between the count and
+        the insert. That is this backend's whole claim, and it is a property of
+        the coroutine rather than of a lock — a networked backend cannot borrow
+        it and needs the count and the insert inside one transaction or one
+        conditional write.
+
+        The count is a scan rather than a maintained counter, because the records
+        are the truth and a counter is a second copy of it that can drift — every
+        path that ends a job would have to remember to decrement, and the one that
+        forgets leaks ceiling until the process restarts. This store retains
+        terminal records, so the scan is linear in everything the process has ever
+        run; that is the same growth the dict itself already has, and bounding it
+        is a property of the backend rather than of this count.
+
+        A duplicate id is settled before the ceiling, so a record the store
+        already holds is never also counted against the budget it is already
+        inside.
+        """
+        active = sum(
+            1
+            for held in self._records.values()
+            if held.owner_subject == record.owner_subject
+            and held.status not in TERMINAL_STATUSES
+        )
         if record.id in self._records:
-            raise ValueError(f"job {record.id!r} already exists")
+            return Admission(outcome="duplicate", active=active)
+        if active >= ceiling:
+            return Admission(outcome="at_ceiling", active=active)
         self._records[record.id] = record.model_copy(deep=True)
+        return Admission(outcome="admitted", active=active)
 
     async def get(self, job_id: str) -> JobRecord | None:
         record = self._records.get(job_id)
@@ -248,24 +300,6 @@ class InMemoryJobStore:
         if record.id not in self._records:
             raise ValueError(f"job {record.id!r} does not exist")
         self._records[record.id] = record.model_copy(deep=True)
-
-    async def active_for(self, subject: str) -> int:
-        """How many of ``subject``'s jobs have not reached a terminal state.
-
-        A scan rather than a maintained counter, because the records are the
-        truth and a counter is a second copy of it that can drift — every path
-        that ends a job would have to remember to decrement, and the one that
-        forgets leaks ceiling until the process restarts. This store retains
-        terminal records, so the scan is linear in everything the process has
-        ever run; that is the same growth the dict itself already has, and
-        bounding it is a property of the backend rather than of this count.
-        """
-        return sum(
-            1
-            for record in self._records.values()
-            if record.owner_subject == subject
-            and record.status not in TERMINAL_STATUSES
-        )
 
 
 class JobStoreConfigError(ValueError):

@@ -128,6 +128,21 @@ def repo_tiers() -> ModelTierConfig:
     )
 
 
+# Far above any ceiling a test configures, so seeding never refuses.
+_SEEDING_CEILING = 1_000_000
+
+
+async def admit(store: Any, record: Any) -> Any:
+    """Put ``record`` in ``store`` without exercising the ceiling.
+
+    :meth:`~analysis_service.jobs.JobStore.reserve` is the only way in, by
+    design — the protocol carries no unconditional create, so a backend cannot
+    offer one the API might race on. A test that is seeding rather than
+    measuring the ceiling passes one it cannot reach.
+    """
+    return await store.reserve(record, ceiling=_SEEDING_CEILING)
+
+
 def sample_selection(
     frameworks: Sequence[FrameworkName] = DEFAULT_FRAMEWORKS,
 ) -> list[FrameworkSelection]:

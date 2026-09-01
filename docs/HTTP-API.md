@@ -171,10 +171,11 @@ shipped value is 3.
 | --- | --- |
 | `429` | This token is already at its ceiling. The message names your current count and the limit. |
 
-This one is checked **before** the table above, so a caller at their ceiling
-gets `429` whatever they sent — it is a fact about the caller, not the payload,
-and checking it second would make the ceiling probe-able through requests that
-were never going to run.
+This one is checked **after** the table above, so a submission that breaches a
+size rung *and* sits on the ceiling gets the rung's status rather than `429`.
+The ceiling is enforced by the same store operation that creates the job, which
+is what makes a burst unable to overshoot it, and that operation needs the job —
+so the payload is checked first. Both answers refuse the request either way.
 
 A submission past the ceiling is **refused, not queued**. Each accepted job fans
 every selected framework's lane agents out in parallel on the strongest model

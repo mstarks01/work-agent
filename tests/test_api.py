@@ -23,7 +23,7 @@ from analysis_service.jobs import (
 from analysis_service.report import FrameworkName, Report
 from analysis_service.sources import Source, SourceLimits
 from analysis_service.validation import ValidationIssue
-from tests.factories import DEFAULT_FRAMEWORKS, sample_selection
+from tests.factories import DEFAULT_FRAMEWORKS, admit, sample_selection
 
 TOKENS = {"alice-token": "alice", "bob-token": "bob"}
 
@@ -522,7 +522,7 @@ class TestReport:
             sources=[Source.description("an app")],
             frameworks=sample_selection(),
         )
-        asyncio.run(store.create(record))
+        asyncio.run(admit(store, record))
         client, _ = make_client(store=store)
         response = client.get(f"/v1/jobs/{record.id}/report", headers=auth())
         assert response.status_code == 409
@@ -552,7 +552,7 @@ def seed(store: InMemoryJobStore, subject: str, status: JobStatus) -> JobRecord:
         record.transition("running")
     if status not in ("queued", "running"):
         record.transition(status)
-    asyncio.run(store.create(record))
+    asyncio.run(admit(store, record))
     return record
 
 
@@ -580,11 +580,17 @@ class TestConcurrencyCeiling:
     def test_a_refusal_queues_nothing(self):
         # A refusal that still created the record would be a queue with extra
         # steps: the caller's place in the provider quota would be held anyway.
+        # Asked through a fresh reservation, because the store has no bare count.
         store = InMemoryJobStore()
         seed(store, "alice", "running")
         client, _ = make_client(store=store, max_active_jobs=1)
         client.post("/v1/jobs", json=submission(), headers=auth())
-        assert asyncio.run(store.active_for("alice")) == 1
+        probe = JobRecord.create(
+            owner_subject="alice",
+            sources=[Source.description("an app")],
+            frameworks=sample_selection(),
+        )
+        assert asyncio.run(admit(store, probe)).active == 1
 
     def test_below_the_ceiling_a_submission_is_accepted(self):
         store = InMemoryJobStore()
@@ -612,15 +618,26 @@ class TestConcurrencyCeiling:
         response = client.post("/v1/jobs", json=submission(), headers=auth("bob-token"))
         assert response.status_code == 201
 
-    def test_the_ceiling_outranks_the_input_ladder(self):
-        # A caller at their ceiling gets the same answer whatever they sent:
-        # this is their budget, not a fact about the submission. Checking it
-        # after the ladder would let a malformed body outrank it and make the
-        # ceiling probe-able through requests that were never going to run.
+    def test_the_input_ladder_outranks_the_ceiling(self):
+        # The ladder runs first, because the ceiling is enforced by the call
+        # that inserts the record and that call needs the record (#505). So a
+        # submission that breaches a rung *and* sits on the ceiling hears about
+        # the rung. Both answers refuse it and neither runs a model, which is
+        # why the atomicity is worth the ordering.
         store = InMemoryJobStore()
         seed(store, "alice", "running")
         client, _ = make_client(store=store, max_active_jobs=1)
         response = client.post("/v1/jobs", json=submission(sources=[]), headers=auth())
+        assert response.status_code == 400
+
+    def test_a_well_formed_submission_at_the_ceiling_is_still_429(self):
+        # The ordering above costs nothing for a caller who sent a valid
+        # request: past the ladder, the ceiling is the only thing left to
+        # refuse them, and it does.
+        store = InMemoryJobStore()
+        seed(store, "alice", "running")
+        client, _ = make_client(store=store, max_active_jobs=1)
+        response = client.post("/v1/jobs", json=submission(), headers=auth())
         assert response.status_code == 429
 
     def test_a_refusal_is_logged(self, caplog):
