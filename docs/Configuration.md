@@ -400,8 +400,11 @@ uv run python -m analysis_service.smoke
 
 One small system, once, through the shipped graph, on whichever pair your tiers
 select. Roughly eight model calls on a ~600-character input, which is what makes
-it cheap enough to run on every pull request rather than before a release. It
-reports eight answers:
+it cheap enough to run on every merge to `main` rather than before a release. It
+runs there and not on a pull request because it holds live provider
+credentials — see
+[the trust model](../.github/WORKLOAD_IDENTITY.md#the-trust-model). It reports
+eight answers:
 
 | | |
 | --- | --- |
