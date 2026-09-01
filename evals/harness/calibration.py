@@ -82,15 +82,23 @@ from __future__ import annotations
 import itertools
 import json
 from collections import Counter
-from collections.abc import Mapping, Sequence
+from collections.abc import Callable, Mapping, Sequence
 from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any, Literal, get_args
 
 from analysis_service.frameworks import FrameworkName
 from analysis_service.frameworks.stride.record import STRIDE_CATEGORIES, StrideCategory
-from evals.harness.identity import ClaimPair, IdentityError, Matcher
-from evals.harness.reference import GoldenCase, ReferenceThreat
+from evals.harness.identity import (
+    ClaimPair,
+    FlowMap,
+    IdentityError,
+    Matcher,
+    endpoint_form,
+    endpoint_subset,
+)
+from evals.harness.reference import GoldenCase
+from evals.harness.verbs import UNSEPARATED, same_action
 
 EVALS_ROOT = Path(__file__).resolve().parents[1]
 DEFAULT_PAIRS_PATH = EVALS_ROOT / "calibration_labels" / "pairs.json"
@@ -391,65 +399,152 @@ class MergeResult:
         }
 
 
-def measure_merges(
-    matcher: Matcher, corpus: Sequence[GoldenCase], framework: FrameworkName
-) -> MergeResult:
-    """Price a matcher on the merge direction, over one package's claim sets.
+@dataclass(frozen=True)
+class IdentityValidation:
+    """What identity evidence one package's claim type needs, and how a
+    collision is decided for it.
 
-    Only cases whose every claim carries a verb are read. A case part-way
-    through verb assignment would otherwise contribute refusals that look like
-    separations, and quietly flatter the rule.
+    **An entry follows from the claim type, never from the package's name.** A
+    package whose claim set is open and written in prose has nothing but the
+    words to say whether two spellings are one finding, so only a labelled pair
+    can price a rule on it. A package whose claim names a catalog requirement
+    is identified by that requirement, so a pair set adds nothing a comparison
+    of identifiers does not already settle.
 
-    It raises for a package whose reference claims carry no lane, rather than
-    inventing one. STRIDE's claim set is open and its lane is a category, so
-    two claims in one lane are comparable; a package that keys on a catalog
-    requirement reaches no such question in this shape. Giving that package a
-    merge measurement it *can* answer is
-    `#512 <https://github.com/mstarks01/work-agent/issues/512>`_.
+    The half that does **not** follow from that split is ``collides``. Every
+    claim type can destroy a finding by keying two distinct claims alike, and
+    the consequence is the same whatever the identity is composed from — the
+    second finding stops existing and no reviewer sees it go. So every package
+    has a collision rule, and none may leave it unstated.
     """
+
+    #: Does this package need labelled candidate pairs to price a rule?
+    needs_candidate_pairs: bool
+    #: Why, as a property of the claim type. Quoted in the parity tests.
+    why: str
+    #: Would the shipped rule treat these two *distinct* reference claims as
+    #: one finding? Every within-case pair is a pair the corpus already records
+    #: as two, so every ``True`` is an error.
+    collides: Callable[[Any, Any, FlowMap], bool]
+    #: The collisions this corpus is known to carry, as ``(case, lane) ->
+    #: reason``. A collision outside this table fails
+    #: ``tests/test_evals_identity.py``: three recorded exceptions must not
+    #: become a floor nobody notices rising.
+    recorded_collisions: Mapping[tuple[str, str], str]
+
+
+def _stride_collides(left: Any, right: Any, flows: FlowMap) -> bool:
+    """Endpoint subset and one action, within a lane: what the matcher rules.
+
+    ``tests/test_evals_identity.py`` pins this against
+    :class:`~evals.harness.identity.SubsetVerbIdentity` itself, so the
+    scoreboard and this predicate cannot drift into two answers.
+    """
+    if left.lane != right.lane:
+        return False
+    if not (left.verb and right.verb):
+        raise CalibrationError(
+            f"a stride reference claim carries no verb, so the action half of"
+            f" the collision rule cannot answer: {left.claim!r}"
+        )
+    return endpoint_subset(
+        left.affected_element_ids, right.affected_element_ids, flows
+    ) and same_action(left.verb, right.verb)
+
+
+def _asvs_collides(left: Any, right: Any, flows: FlowMap) -> bool:
+    """One requirement ruled in one place: what the fingerprint keys.
+
+    No verb, because a claim naming a catalog requirement composes none —
+    :data:`~evals.harness.fingerprint.VERSION_FOR` keys this package at version
+    3, which reads the identifier where STRIDE's version 2 reads the action.
+    The comparison is exactly the components that version hashes, so a
+    ``True`` here is a fingerprint collision and one vote answering for two
+    findings.
+    """
+    return (
+        left.lane == right.lane
+        and left.identifier == right.identifier
+        and endpoint_form(left.affected_element_ids, flows)
+        == endpoint_form(right.affected_element_ids, flows)
+    )
+
+
+#: What identity evidence each package needs. **Keyed, never branched**, and
+#: checked against ``PACKAGES`` by ``tests/test_framework_neutrality.py`` — a
+#: table nobody compares to its registry fails as quietly as the ``if`` it
+#: replaced.
+#:
+#: A package added to ``PACKAGES`` and missing here raises at
+#: :func:`measure_merges`, which is the question its author should answer: what
+#: does this package's claim compose its identity from, and what would it take
+#: for two of them to collide?
+IDENTITY_VALIDATION: dict[FrameworkName, IdentityValidation] = {
+    "stride": IdentityValidation(
+        needs_candidate_pairs=True,
+        why=(
+            "an open claim set written in prose: only a labelled pair can say"
+            " whether two spellings name one attacker action"
+        ),
+        collides=_stride_collides,
+        recorded_collisions={
+            (case, lane): reason for case, lane, reason in UNSEPARATED
+        },
+    ),
+    "asvs": IdentityValidation(
+        needs_candidate_pairs=False,
+        why=(
+            "a claim naming a catalog requirement: the identifier decides"
+            " equivalence, so a labelled prose pair adds nothing"
+        ),
+        collides=_asvs_collides,
+        recorded_collisions={},
+    ),
+}
+
+
+def measure_merges(
+    corpus: Sequence[GoldenCase],
+    framework: FrameworkName,
+    flows_by_case: Mapping[str, FlowMap],
+) -> MergeResult:
+    """Price one package's shipped rule on the merge direction.
+
+    Every within-lane pair of that package's reference claims, run through the
+    collision rule :data:`IDENTITY_VALIDATION` declares for it. The corpus
+    already records both sides as distinct findings, so every collision is an
+    error and no label is needed to read the count.
+
+    It raises for a package with no entry rather than answering zero, because
+    "nothing was asked" must never read as "no collisions".
+    """
+    contract = IDENTITY_VALIDATION.get(framework)
+    if contract is None:
+        raise CalibrationError(
+            f"{framework} declares no identity validation, so its collision"
+            " count is undefined. Add an entry to IDENTITY_VALIDATION: what"
+            " does this package's claim compose its identity from, and what"
+            " would make two of them one finding?"
+        )
+
     pairs = 0
     merges: list[MergedPair] = []
     for case in corpus:
         claims = case.references.get(framework, ())
-        if not claims:
-            continue
-        threats = [claim for claim in claims if isinstance(claim, ReferenceThreat)]
-        if len(threats) != len(claims):
-            raise CalibrationError(
-                f"{case.id}: {framework} reference claims carry no lane, so a"
-                " within-lane merge count is not defined for this package;"
-                " see issue #512"
-            )
-        if not all(claim.verb for claim in threats):
-            continue
-        for left, right in itertools.combinations(threats, 2):
+        flows = flows_by_case.get(case.id, {})
+        for left, right in itertools.combinations(claims, 2):
             if left.lane != right.lane:
                 continue
             pairs += 1
-            ruling = matcher.equivalent(
-                ClaimPair(
-                    case=case.id,
-                    category=left.category,
-                    reference_claim=left.claim,
-                    candidate_claim=right.claim,
-                    reference_element_ids=tuple(left.affected_element_ids),
-                    candidate_element_ids=tuple(right.affected_element_ids),
-                    reference_verb=left.verb,
-                    candidate_verb=right.verb,
-                )
-            )
-            if ruling.match:
+            if contract.collides(left, right, flows):
                 merges.append(
                     MergedPair(
-                        case=case.id,
-                        lane=left.lane,
-                        left=left.claim,
-                        right=right.claim,
+                        case=case.id, lane=left.lane, left=left.claim, right=right.claim
                     )
                 )
     if not pairs:
         raise CalibrationError(
-            f"no {framework} case carries a complete set of verbs, so the merge"
-            " direction cannot be measured"
+            f"no {framework} case holds two claims in one lane, so the merge"
+            " direction cannot be measured over this corpus"
         )
     return MergeResult(within_lane_pairs=pairs, merges=tuple(merges))
