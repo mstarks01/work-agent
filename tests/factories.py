@@ -55,6 +55,7 @@ from analysis_service.graph import (
     Pipeline,
     build_pipeline,
 )
+from analysis_service.identity import build_identity, execution_fingerprint
 from analysis_service.markdown_loader import MarkdownLoader
 from analysis_service.model_tiers import ModelTierConfig, load_model_tiers
 from analysis_service.report import (
@@ -130,6 +131,34 @@ def repo_tiers() -> ModelTierConfig:
 
 # Far above any ceiling a test configures, so seeding never refuses.
 _SEEDING_CEILING = 1_000_000
+
+
+# A stand-in instruction digest for a test that is not exercising the digest
+# itself. Any 64-hex value works: the identity hashes it opaquely.
+SAMPLE_INSTRUCTIONS = "1c" * 32
+
+
+def sample_fingerprint(
+    served: str,
+    sampling: Any,
+    *,
+    requested: str | None = None,
+    instructions: str = SAMPLE_INSTRUCTIONS,
+    build: Any = None,
+) -> str:
+    """One execution fingerprint, with the parts a test does not care about filled.
+
+    ``requested`` defaults to ``served``, which is what an offline stand-in
+    produces: the scripted model echoes the route it was bound to, so the two
+    routes agree. A test about the requested/served split passes both.
+    """
+    return execution_fingerprint(
+        requested_route=served if requested is None else requested,
+        served_route=served,
+        sampling=sampling.model_dump() if hasattr(sampling, "model_dump") else sampling,
+        instruction_sha256=instructions,
+        build=build_identity() if build is None else build,
+    )
 
 
 async def admit(store: Any, record: Any) -> Any:

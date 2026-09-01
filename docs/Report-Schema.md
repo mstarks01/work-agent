@@ -802,9 +802,10 @@ class NodeRun:
     )
     model: str | None  # the SERVED build, vendor-prefixed; None for code-only nodes
     requested_model: str | None  # the CONFIGURED route this node asked for
-    sampling_fingerprint: (
+    instruction_sha256: (
         str | None
-    )  # 64-hex identity hash of (served route, decoding params)
+    )  # 64-hex digest of the instructions the graph this node ran in carried
+    execution_fingerprint: str | None  # 64-hex hash of the execution identity
     duration_ms: int
     usage: TokenUsage | None  # what the provider says the call cost; None if unmetered
 
@@ -830,12 +831,33 @@ class TokenUsage:
   `vertex_ai/gemini-2.5-pro`. Gemini is the example because one had to be, and
   because it is the one profiled family whose two values differ. On Claude,
   both fields hold the same string.
-- **`sampling_fingerprint`** is a hash of the served route plus those parameters
-  — one value identifying the model-and-sampling setup used for that call. It
-  can be recomputed from the node's `model` and its tier's entry in `sampling`,
-  so a consumer can verify that those recorded fields agree. It does not hash
-  the input, instructions, or output. Code-only nodes (like `assemble`) have all
-  three as `null`.
+- **`instruction_sha256`** is the digest of every instruction the graph this
+  node ran in carried, with the job-varying placeholders unexpanded. It contains
+  no submitter bytes. On a report it repeats `analysis_context.instruction_sha256`,
+  because a report holds one graph — but a `NodeRun` also travels alone in an
+  eval sweep that folds several graphs into one list, and there the node's own
+  copy is the only thing that says which instruction set produced its hash.
+- **`execution_fingerprint`** is a hash of the versioned **execution identity**:
+  the requested route, the served route, the tier's decoding parameters, the
+  instruction digest, and the installed versions of the distributions between
+  the node and its provider. One value identifying everything that decided what
+  this call could answer. It can be recomputed from the artifact alone — the two
+  routes and the digest are on the node, the parameters are in `sampling`, and
+  the build versions are in `execution`. It does not hash the input or the
+  output. Code-only nodes (like `assemble`) have all four as `null`.
+
+  Both routes are in it because the served one is the *provider's claim* and
+  nothing verifies it. With the served build alone, a compromised translator
+  could name a build the deployment already blesses and certify whatever it
+  liked; with the pair, the requested half comes from the deployment's own
+  configuration and the translator has no say in it.
+
+- **`execution`** is one block per report: `identity_version` (the schema the
+  fingerprints hash), `served_model_trust` (always `"provider_reported"` — the
+  provider named the build on its own event stream and nothing independent
+  confirmed it), and `build` (the version of each distribution between a node
+  and its provider). It is `null` only on a report with no LLM provenance at
+  all.
 
 - **`usage`** is what the provider reported the call cost, in vendor-neutral
   field names. `null` for code-only nodes, and for any LLM node whose provider

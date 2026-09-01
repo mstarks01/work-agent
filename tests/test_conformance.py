@@ -52,7 +52,7 @@ from analysis_service.markdown_loader import MarkdownLoader
 from analysis_service.model_gate import ModelGateError
 from analysis_service.model_tiers import ModelTierConfig, load_model_tiers
 from analysis_service.resilience import load_resilience
-from analysis_service.sampling import load_sampling, sampling_fingerprint
+from analysis_service.sampling import load_sampling
 from analysis_service.system_model import SystemModel
 from analysis_service.vendors import (
     VENDOR_NAMES,
@@ -65,6 +65,7 @@ from tests.factories import (
     EMPTY_CLAIMS,
     ScriptedLlm,
     repo_package_loaders,
+    sample_fingerprint,
 )
 
 PROJECT_ROOT = Path(__file__).resolve().parents[1]
@@ -407,7 +408,7 @@ class TestProvenanceIsProviderIndependent:
     def test_a_fingerprint_is_produced_for_every_pair(self, vendor, model):
         sampling = load_sampling(CONFIG / "sampling.toml", env={}).for_tier("strong")
         served = join_served(vendor_for(vendor).route(model), model)
-        assert len(sampling_fingerprint(served, sampling)) == 64
+        assert len(sample_fingerprint(served, sampling)) == 64
 
     def test_the_vendor_is_part_of_the_fingerprint(self):
         """Vertex-hosted Claude and Anthropic-direct must not share an identity.
@@ -420,10 +421,10 @@ class TestProvenanceIsProviderIndependent:
         """
         sampling = load_sampling(CONFIG / "sampling.toml", env={}).for_tier("strong")
         model = "claude-opus-5"
-        direct = sampling_fingerprint(
+        direct = sample_fingerprint(
             join_served(vendor_for("anthropic").route(model), model), sampling
         )
-        hosted = sampling_fingerprint(
+        hosted = sample_fingerprint(
             join_served(vendor_for("vertex").route(model), model), sampling
         )
         assert direct != hosted

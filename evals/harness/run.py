@@ -49,6 +49,7 @@ from analysis_service.deployment import Deployment
 from analysis_service.frameworks import PACKAGES
 from analysis_service.frameworks.stride.record import Threat
 from analysis_service.graph import Pipeline
+from analysis_service.identity import build_identity
 from analysis_service.report import (
     FrameworkAnalysis,
     FrameworkName,
@@ -410,6 +411,7 @@ async def _run_mode(
             tier_of=deployment.tier_of,
             sampling=deployment.sampling,
             tiers_config_version=deployment.tiers.version,
+            build=build_identity(),
         ),
         # The union across the graphs the sweep built. Certification reports a
         # tier that presented no fingerprint as *unexercised*, so a node that
@@ -935,7 +937,8 @@ def command_promote(args: argparse.Namespace) -> int:
     try:
         manifest = promote(
             plan.sampling,
-            plan.served_builds,
+            plan.keys,
+            build=plan.build,
             sampling_path=paths.sampling,
             manifest_path=paths.blessed_fingerprints,
         )
@@ -1217,8 +1220,9 @@ def _print_promotion(
         for param, value in entry.sampling.model_dump().items():
             shown = UNSET if value is None else value
             print(f"  {param + ':':<20} {shown}")
-        print("\n  fingerprint:")
-        print(f"    {entry.fingerprint}")
+        print("\n  instruction digest(s) and the fingerprint each blesses:")
+        for key, fingerprint in zip(entry.keys, entry.fingerprints, strict=True):
+            print(f"    {key.instruction_sha256}  ->  {fingerprint}")
 
 
 def command_calibrate(args: argparse.Namespace) -> int:

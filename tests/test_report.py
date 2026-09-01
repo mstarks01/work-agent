@@ -27,8 +27,9 @@ from analysis_service.report import (
     Verdict,
     derive_severity_level,
 )
-from analysis_service.sampling import TierSampling, sampling_fingerprint
+from analysis_service.sampling import TierSampling
 from tests.factories import (
+    sample_fingerprint,
     sample_report,
     sample_threat,
     valid_model,
@@ -640,8 +641,8 @@ class TestTheSamplingClearBlock:
         ).sampling["base"]
 
         served = "openai/gpt-4.1-mini-2025-04-14"
-        assert sampling_fingerprint(served, TierSampling(**stored)) == (
-            sampling_fingerprint(served, resolved)
+        assert sample_fingerprint(served, TierSampling(**stored)) == (
+            sample_fingerprint(served, resolved)
         )
 
 

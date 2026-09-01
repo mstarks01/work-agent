@@ -68,8 +68,6 @@ offered surface — no wider.
 
 from __future__ import annotations
 
-import hashlib
-import json
 import os
 import tomllib
 from collections.abc import Callable, Mapping
@@ -95,9 +93,9 @@ from analysis_service.model_tiers import TIER_NAMES, TierName
 #
 # Version 4 adds ``constrain_output``. It carries a default, so a version-3 file
 # would have loaded unchanged — the bump is deliberate anyway, because the field
-# enters the sampling fingerprint and therefore re-baselines every blessed
-# number. A silent default would have moved that line under deployments that
-# never read this file.
+# enters the execution identity and therefore re-baselines every blessed number.
+# A silent default would have moved that line under deployments that never read
+# this file.
 SUPPORTED_VERSION = 4
 
 # The uniform reasoning surface. Deliberately not per-vendor data: the enum is
@@ -286,32 +284,6 @@ class SamplingConfig(BaseModel):
 
 
 SamplingResolver = Callable[[str], TierSampling]
-
-
-def sampling_fingerprint(served_route: str, sampling: TierSampling) -> str:
-    """One node execution's generation-identity hash: ``sha256(served route, sampling)``.
-
-    Model and the resolved tier sampling are bound into **one** hash:
-    certification is about a tier's *generation behaviour*, which is model and
-    sampling jointly — splitting them lets a mismatched pair pass two green
-    half-checks.
-
-    ``served_route`` is the vendor prefix joined to the **served** build, e.g.
-    ``vertex_ai/gemini-2.5-pro-002``. The served half comes from
-    ``LlmResponse.model_version``, per node *execution* rather than from the
-    configured string at build time. The vendor half is not decoration: a
-    served identifier carries no vendor, and Vertex-hosted Claude and
-    Anthropic-direct return through an identical transformation, so a
-    served-only hash would let a manifest blessed on one silently certify the
-    other.
-
-    Canonical serialization — sorted keys over the resolved values plus the
-    served route — so the hash is recomputable from the recorded clear block
-    alone, never from some upstream state.
-    """
-    payload = {"model": served_route, **sampling.model_dump()}
-    canonical = json.dumps(payload, sort_keys=True, separators=(",", ":"))
-    return hashlib.sha256(canonical.encode("utf-8")).hexdigest()
 
 
 def env_var_for(tier: TierName, param: str) -> str:

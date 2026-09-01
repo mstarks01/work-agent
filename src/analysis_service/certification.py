@@ -8,7 +8,8 @@ certification-bar verification import
 *this* module.
 
 **The manifest keys by tier, not by node.** A fingerprint's payload contains no
-node name — it is ``(vendor-prefixed served build, tier sampling)`` — and the
+node name — it is the versioned execution identity in
+:mod:`analysis_service.identity` — and the
 tier map puts ``critic/<framework>`` and ``recritic/<framework>`` both on
 ``strong`` (the tier loader *requires* that pairing), ``extract`` and ``repair``
 both on ``base``, and every one of a framework's lane agents on its single
@@ -22,6 +23,14 @@ technicality.
 names carry their framework, so they multiply with the selection while the tiers
 do not — a manifest keyed by node would need a new blessing for every framework
 added, over generation identities that had not changed.
+
+**A provider's word cannot select a blessed entry on its own (#504).** The
+identity binds the *requested* route beside the served one, so blessing is over
+a pair. A translator that returns an approved build string while the deployment
+asked for something cheaper produces a fingerprint no manifest holds, and the
+run reports uncertified. That is the manipulation this gate can actually refuse;
+what it still cannot do is *verify* a served build, which is why the report
+labels it ``provider_reported`` rather than leaving a reader to assume better.
 
 **Three states, and the third is a separate field.** ``certified`` keeps its
 narrow meaning — every observed fingerprint is blessed — because callers consume
@@ -53,7 +62,14 @@ from analysis_service.report import NodeRun, Report
 
 # The manifest schema version. Keyed by tier, with no compatibility shim for
 # older files.
-MANIFEST_VERSION = 2
+#
+# Version 3 is the execution-identity cutover (#504). Every fingerprint a
+# version-2 manifest holds was computed over ``(served route, sampling)`` and
+# means nothing against a payload that now also binds the requested route, the
+# instruction digest and the build versions. A stale file is refused rather than
+# compared across schemas, because the failure of comparing is a run reported
+# certified against a hash of a different thing.
+MANIFEST_VERSION = 3
 
 # A fingerprint is a lowercase sha256 hex digest. Validating the shape on write
 # is defence in depth against TOML injection through a crafted key (OWASP A05).
@@ -197,9 +213,9 @@ def fingerprints_of(nodes: Iterable[NodeRun]) -> dict[str, frozenset[str]]:
     """
     observations: dict[str, set[str]] = {}
     for node in nodes:
-        if node.sampling_fingerprint is None:
+        if node.execution_fingerprint is None:
             continue
-        observations.setdefault(node.node, set()).add(node.sampling_fingerprint)
+        observations.setdefault(node.node, set()).add(node.execution_fingerprint)
     return {node: frozenset(prints) for node, prints in observations.items()}
 
 

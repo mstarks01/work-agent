@@ -18,14 +18,15 @@ from pathlib import Path
 
 import pytest
 
-from analysis_service.certification import load_manifest
+from analysis_service.certification import MANIFEST_VERSION, load_manifest
 from analysis_service.deployment import (
     BLESSED_FINGERPRINTS_VAR,
     SAMPLING_VAR,
 )
 from analysis_service.graph import tier_node_by_graph_node
+from analysis_service.identity import build_identity
 from analysis_service.report import NodeRun
-from analysis_service.sampling import load_sampling, sampling_fingerprint
+from analysis_service.sampling import load_sampling
 from evals.harness.artifact import ARTIFACT_VERSION, load_artifact
 from evals.harness.certify import plan_promotion
 from evals.harness.provenance import (
@@ -36,8 +37,10 @@ from evals.harness.reference import load_case
 from evals.harness.run import main
 from tests.factories import (
     DEFAULT_FRAMEWORKS,
+    SAMPLE_INSTRUCTIONS,
     TEST_TIER_ENV,
     repo_tiers,
+    sample_fingerprint,
     served_build,
 )
 from tests.test_evals_run_grounds import CASE_DIR
@@ -72,8 +75,9 @@ def node_run(node: str, requested: str, served: str, sampling) -> NodeRun:
         node=node,
         model=served,
         requested_model=requested,
-        sampling_fingerprint=sampling_fingerprint(
-            served, sampling.for_tier(tier_of(node))
+        instruction_sha256=SAMPLE_INSTRUCTIONS,
+        execution_fingerprint=sample_fingerprint(
+            served, sampling.for_tier(tier_of(node)), requested=requested
         ),
         duration_ms=1200,
     )
@@ -100,6 +104,7 @@ def provenance(sampling, executions=None):
         tier_of=tier_of,
         sampling=sampling,
         tiers_config_version=TIERS_VERSION,
+        build=build_identity(),
     )
 
 
@@ -153,7 +158,9 @@ class TestArtifactSerialization:
         # nothing.
         loaded = load_artifact(write_artifact(tmp_path, provenance(sampling)))
 
-        expected = sampling_fingerprint(BASE_SERVED, sampling.for_tier("base"))
+        expected = sample_fingerprint(
+            BASE_SERVED, sampling.for_tier("base"), requested=BASE_REQUESTED
+        )
         assert loaded.provenance.tier_identities()["base"].fingerprints == (expected,)
         assert loaded.provenance.sampling["base"] == sampling.for_tier("base")
         assert loaded.provenance.sampling_config_version == sampling.version
@@ -193,7 +200,11 @@ class TestArtifactSerialization:
 
         assert set(observations) == {"extract", CRITIC_NODE}
         assert observations["extract"] == frozenset(
-            {sampling_fingerprint(BASE_SERVED, sampling.for_tier("base"))}
+            {
+                sample_fingerprint(
+                    BASE_SERVED, sampling.for_tier("base"), requested=BASE_REQUESTED
+                )
+            }
         )
 
     def test_a_real_sweep_records_what_its_graph_actually_served(self, monkeypatch):
@@ -222,7 +233,7 @@ class TestArtifactSerialization:
             node="extract",
             model=None,
             requested_model=BASE_REQUESTED,
-            sampling_fingerprint="a" * 64,
+            execution_fingerprint="a" * 64,
             duration_ms=1,
         )
 
@@ -330,20 +341,31 @@ class TestPromotionPlan:
         plan = plan_promotion(provenance(sampling))
 
         by_tier = {entry.tier: entry for entry in plan.tiers}
-        assert by_tier["base"].fingerprint == sampling_fingerprint(
-            BASE_SERVED, sampling.for_tier("base")
+        assert by_tier["base"].fingerprints == (
+            sample_fingerprint(
+                BASE_SERVED, sampling.for_tier("base"), requested=BASE_REQUESTED
+            ),
         )
-        assert by_tier["strong"].fingerprint == sampling_fingerprint(
-            STRONG_SERVED, sampling.for_tier("strong")
+        assert by_tier["strong"].fingerprints == (
+            sample_fingerprint(
+                STRONG_SERVED, sampling.for_tier("strong"), requested=STRONG_REQUESTED
+            ),
         )
 
     def test_the_plan_blesses_the_served_build_never_the_requested_one(self, sampling):
         plan = plan_promotion(provenance(sampling))
 
-        assert plan.served_builds == {"base": BASE_SERVED, "strong": STRONG_SERVED}
+        assert {tier: keys[0].served for tier, keys in plan.keys.items()} == {
+            "base": BASE_SERVED,
+            "strong": STRONG_SERVED,
+        }
         # The requested route would produce a different hash entirely, which is
         # the whole reason it must not be substituted.
-        assert plan.served_builds["base"] != BASE_REQUESTED
+        assert plan.keys["base"][0].served != BASE_REQUESTED
+        # ...and the requested route is recorded beside it rather than dropped:
+        # the identity binds both, so a translator naming an approved build
+        # while a cheaper route was asked for matches nothing.
+        assert plan.keys["base"][0].requested == BASE_REQUESTED
 
     def test_a_sweep_that_observed_nothing_cannot_be_promoted(self, sampling):
         with pytest.raises(ProvenanceError, match="nothing to bless"):
@@ -369,7 +391,9 @@ class TestPromotionPlan:
             provenance(sampling, executions), {"base": "openai/gpt-4.1-mini-b"}
         )
 
-        assert plan.served_builds == {"base": "openai/gpt-4.1-mini-b"}
+        assert {tier: keys[0].served for tier, keys in plan.keys.items()} == {
+            "base": "openai/gpt-4.1-mini-b"
+        }
         # What is *not* being blessed is carried too, so the operator sees it.
         assert plan.tiers[0].observed_served_models == (
             BASE_SERVED,
@@ -392,13 +416,13 @@ class TestPromotionPlan:
 
         plan = plan_promotion(provenance(sampling, executions))
 
-        assert set(plan.served_builds) == {"base"}
+        assert set(plan.keys) == {"base"}
 
 
 # --- the CLI writes both files, or neither -------------------------------
 
 
-EMPTY_MANIFEST = "version = 2\n\n[tiers]\nbase = []\nstrong = []\n"
+EMPTY_MANIFEST = f"version = {MANIFEST_VERSION}\n\n[tiers]\nbase = []\nstrong = []\n"
 
 
 @pytest.fixture
@@ -435,7 +459,12 @@ class TestPromoteCommand:
         out = capsys.readouterr().out
         assert BASE_SERVED in out
         assert BASE_REQUESTED in out
-        assert sampling_fingerprint(BASE_SERVED, sampling.for_tier("base")) in out
+        assert (
+            sample_fingerprint(
+                BASE_SERVED, sampling.for_tier("base"), requested=BASE_REQUESTED
+            )
+            in out
+        )
         # An unset param must not read as one pinned to zero.
         assert "top_p:" in out and "unset" in out
         assert manifest_copy.read_text(encoding="utf-8") == EMPTY_MANIFEST
@@ -450,10 +479,20 @@ class TestPromoteCommand:
 
         manifest = load_manifest(manifest_copy)
         assert manifest.blessed_for("base") == frozenset(
-            {sampling_fingerprint(BASE_SERVED, sampling.for_tier("base"))}
+            {
+                sample_fingerprint(
+                    BASE_SERVED, sampling.for_tier("base"), requested=BASE_REQUESTED
+                )
+            }
         )
         assert manifest.blessed_for("strong") == frozenset(
-            {sampling_fingerprint(STRONG_SERVED, sampling.for_tier("strong"))}
+            {
+                sample_fingerprint(
+                    STRONG_SERVED,
+                    sampling.for_tier("strong"),
+                    requested=STRONG_REQUESTED,
+                )
+            }
         )
 
     def test_promoting_preserves_fingerprints_blessed_earlier(
@@ -463,7 +502,8 @@ class TestPromoteCommand:
         _, manifest_copy = promotion_env
         existing = "c" * 64
         manifest_copy.write_text(
-            f'version = 2\n[tiers]\nbase = ["{existing}"]\nstrong = []\n', "utf-8"
+            f'version = {MANIFEST_VERSION}\n[tiers]\nbase = ["{existing}"]\nstrong = []\n',
+            "utf-8",
         )
         artifact = write_artifact(tmp_path, provenance(sampling))
 

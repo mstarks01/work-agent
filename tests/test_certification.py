@@ -23,6 +23,7 @@ from analysis_service.report import NodeRun, Report
 from tests.factories import sample_report
 
 FP_A = "a" * 64
+INSTRUCTIONS = "1c" * 32
 FP_B = "b" * 64
 FP_C = "c" * 64
 
@@ -143,7 +144,12 @@ class TestReportFingerprints:
         report = self._report(
             [
                 NodeRun(
-                    node="extract", model="m", sampling_fingerprint=FP_A, duration_ms=1
+                    node="extract",
+                    model="m",
+                    requested_model="m",
+                    instruction_sha256=INSTRUCTIONS,
+                    execution_fingerprint=FP_A,
+                    duration_ms=1,
                 ),
                 NodeRun(node="validate", model=None, duration_ms=0),
             ]
@@ -154,10 +160,20 @@ class TestReportFingerprints:
         report = self._report(
             [
                 NodeRun(
-                    node="critic", model="m", sampling_fingerprint=FP_A, duration_ms=1
+                    node="critic",
+                    model="m",
+                    requested_model="m",
+                    instruction_sha256=INSTRUCTIONS,
+                    execution_fingerprint=FP_A,
+                    duration_ms=1,
                 ),
                 NodeRun(
-                    node="critic", model="m2", sampling_fingerprint=FP_B, duration_ms=1
+                    node="critic",
+                    model="m2",
+                    requested_model="m",
+                    instruction_sha256=INSTRUCTIONS,
+                    execution_fingerprint=FP_B,
+                    duration_ms=1,
                 ),
             ]
         )
@@ -182,19 +198,26 @@ class TestManifestLoading:
 
     def test_an_unknown_tier_key_is_rejected(self, tmp_path):
         bad = tmp_path / "m.toml"
-        bad.write_text("version = 2\n[tiers]\nturbo = []\n", encoding="utf-8")
+        bad.write_text(
+            f"version = {MANIFEST_VERSION}\n[tiers]\nturbo = []\n", encoding="utf-8"
+        )
         with pytest.raises(CertificationError):
             load_manifest(bad)
 
     def test_a_non_hex_fingerprint_is_rejected(self, tmp_path):
         bad = tmp_path / "m.toml"
-        bad.write_text('version = 2\n[tiers]\nbase = ["nope"]\n', encoding="utf-8")
+        bad.write_text(
+            f'version = {MANIFEST_VERSION}\n[tiers]\nbase = ["nope"]\n',
+            encoding="utf-8",
+        )
         with pytest.raises(CertificationError):
             load_manifest(bad)
 
     def test_a_stray_top_level_key_is_rejected(self, tmp_path):
         bad = tmp_path / "m.toml"
-        bad.write_text("version = 2\nbogus = 1\n[tiers]\n", encoding="utf-8")
+        bad.write_text(
+            f"version = {MANIFEST_VERSION}\nbogus = 1\n[tiers]\n", encoding="utf-8"
+        )
         with pytest.raises(CertificationError):
             load_manifest(bad)
 

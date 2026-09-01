@@ -165,6 +165,7 @@ class ModeRun:
             failures=[],
             runs={},
             provenance=RunProvenance(
+                build={},
                 sampling_config_version=1,
                 tiers_config_version=1,
                 sampling={},

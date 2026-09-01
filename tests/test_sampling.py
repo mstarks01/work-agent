@@ -9,7 +9,6 @@ graph node is asserted in ``test_graph``.
 
 from __future__ import annotations
 
-import re
 from pathlib import Path
 
 import pytest
@@ -25,8 +24,8 @@ from analysis_service.sampling import (
     env_var_for,
     load_sampling,
     make_resolve_sampling,
-    sampling_fingerprint,
 )
+from tests.factories import sample_fingerprint
 
 PROJECT_ROOT = Path(__file__).resolve().parents[1]
 SAMPLING_PATH = PROJECT_ROOT / "config" / "sampling.toml"
@@ -373,50 +372,6 @@ def test_direct_construction_requires_both_tiers():
         SamplingConfig(version=SUPPORTED_VERSION, tiers={"base": TierSampling()})
 
 
-class TestSamplingFingerprint:
-    """The generation-identity hash."""
-
-    def test_is_a_sha256_hex_digest(self):
-        fp = sampling_fingerprint(
-            "vertex_ai/gemini-2.5-pro", TierSampling(temperature=0.0)
-        )
-        assert re.fullmatch(r"[0-9a-f]{64}", fp)
-
-    def test_is_deterministic(self):
-        sampling = TierSampling(temperature=0.0, seed=7)
-        first = sampling_fingerprint("m", sampling)
-        assert first == sampling_fingerprint("m", sampling)
-
-    def test_same_sampling_different_served_build_diverges(self):
-        # Two nodes on one tier served different builds must differ — the drift
-        # the gate exists to catch.
-        sampling = TierSampling(temperature=0.0)
-        assert sampling_fingerprint(
-            "vertex_ai/gemini-2.5-pro", sampling
-        ) != sampling_fingerprint("vertex_ai/gemini-2.5-pro-002", sampling)
-
-    def test_the_same_served_build_under_two_vendors_diverges(self):
-        # The served identifier carries no vendor, and Vertex-hosted Claude and
-        # Anthropic-direct return through an identical transformation — so
-        # without the prefix a manifest blessed on one would certify the other.
-        sampling = TierSampling(temperature=0.0)
-        assert sampling_fingerprint(
-            "vertex_ai/claude-opus-5", sampling
-        ) != sampling_fingerprint("anthropic/claude-opus-5", sampling)
-
-    def test_same_model_different_sampling_diverges(self):
-        assert sampling_fingerprint(
-            "m", TierSampling(temperature=0.0)
-        ) != sampling_fingerprint("m", TierSampling(temperature=1.0))
-
-    def test_recomputable_from_the_recorded_clear_values(self):
-        # The report stores TierSampling.model_dump(); reconstructing from that
-        # dict must reproduce the very hash stamped on the NodeRun.
-        sampling = TierSampling(temperature=0.0, seed=3, thinking="low")
-        recomputed = sampling_fingerprint("m", TierSampling(**sampling.model_dump()))
-        assert recomputed == sampling_fingerprint("m", sampling)
-
-
 class TestConstrainOutput:
     """Whether a tier's node schema is sent to the provider at all.
 
@@ -457,9 +412,9 @@ class TestConstrainOutput:
         loose = load_sampling(
             config_path(config_toml(base_body="constrain_output = false\n")), env={}
         )
-        assert sampling_fingerprint(
+        assert sample_fingerprint(
             "anthropic/claude-opus-4-6", constrained.for_tier("base")
-        ) != sampling_fingerprint("anthropic/claude-opus-4-6", loose.for_tier("base"))
+        ) != sample_fingerprint("anthropic/claude-opus-4-6", loose.for_tier("base"))
 
     @pytest.mark.parametrize(
         ("value", "expected"), [("false", False), ("FALSE", False), ("true", True)]

@@ -1,12 +1,29 @@
 # Blessed generation-identity fingerprints — the certification baseline.
 #
 # Each TIER maps to the set of fingerprints a sanctioned baseline sweep
-# recorded for it. A run whose observed fingerprint (sha256 of the
-# vendor-prefixed served build plus the resolved tier sampling) is absent from
-# its tier's set is *uncertified*.
+# recorded for it. A run whose observed fingerprint is absent from its tier's
+# set is *uncertified*.
 #
-# KEYED BY TIER, NOT BY NODE (version 2, wayfinder #14). A fingerprint's payload
-# contains no node name — it is (served build, tier sampling) — and the tier map
+# THE FINGERPRINT IS THE VERSIONED EXECUTION IDENTITY (version 3, #504): the
+# requested route, the served build, the resolved tier sampling, the built
+# graph's instruction digest, and the installed versions of the distributions
+# between a node and its provider. `analysis_service.identity` is the one place
+# that payload is spelled.
+#
+# Version 2 hashed only the served build and the sampling, so a translator that
+# claimed an approved build while the deployment asked for something cheaper
+# produced a blessed hash. Binding the requested route makes a blessing a claim
+# about a *pair*, and the requested half comes from this deployment's config
+# rather than from the provider. A version-2 file is refused rather than read:
+# its hashes describe a different payload.
+#
+# EVERY PART RE-BASELINES. A prompt edit, a `litellm` bump or a service release
+# moves every fingerprint here, and runs read as uncertified until a sanctioned
+# sweep blesses the new ones. That is the point: a run on edited prompts is not
+# the run that was sanctioned.
+#
+# KEYED BY TIER, NOT BY NODE (wayfinder #14). A fingerprint's payload contains
+# no node name, and the tier map
 # puts critic and recritic both on `strong`, extract and repair both on `base`.
 # So recritic presents a BYTE-IDENTICAL hash to critic, and per-node keying
 # would call that same hash blessed under one key and unblessed under the other,
@@ -35,7 +52,7 @@
 # it. An *unexercised* tier withholds unconditionally — that one is a
 # cannot-happen assertion, not a measurement.
 
-version = 2
+version = 3
 
 [tiers]
 base = []
