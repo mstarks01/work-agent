@@ -26,13 +26,16 @@ from tests.factories import DEFAULT_FRAMEWORKS, PROJECT_ROOT, repo_tiers
 CARRIED_FRAMEWORKS = DEFAULT_FRAMEWORKS
 
 DIVERGENT = """\
-version = 4
+version = 5
 [tiers.base]
 temperature = 0.0
 seed = 11
 [tiers.strong]
 temperature = 1.0
 seed = 22
+[tiers.review]
+temperature = 1.0
+seed = 33
 """
 
 
@@ -133,6 +136,8 @@ class TestReasoningTemperatureFloor:
                 "ANALYSIS_MODEL_BASE_MODEL": model,
                 "ANALYSIS_MODEL_STRONG_VENDOR": "openai",
                 "ANALYSIS_MODEL_STRONG_MODEL": model,
+                "ANALYSIS_MODEL_REVIEW_VENDOR": "anthropic",
+                "ANALYSIS_MODEL_REVIEW_MODEL": "claude-opus-5",
             },
         )
         # ``build_tier_adapters`` rather than ``NodeBinding.from_configs``: the

@@ -91,12 +91,14 @@ from analysis_service.model_tiers import TIER_NAMES, TierName
 # exact-match across the four config files — a shared number would buy nothing
 # once each file pins its own, since a stale file fails its own check.
 #
-# Version 4 adds ``constrain_output``. It carries a default, so a version-3 file
-# would have loaded unchanged — the bump is deliberate anyway, because the field
-# enters the execution identity and therefore re-baselines every blessed number.
-# A silent default would have moved that line under deployments that never read
-# this file.
-SUPPORTED_VERSION = 4
+# Version 5 adds the ``review`` tier's block. Every tier is required, so a
+# version-4 file is short one and fails its own check — which is the point: a
+# file that could omit a tier is one where moving criticism onto ``review``
+# silently runs it on values nobody chose.
+#
+# Version 4 added ``constrain_output``, which enters the execution identity and
+# therefore re-baselines every blessed number.
+SUPPORTED_VERSION = 5
 
 # The uniform reasoning surface. Deliberately not per-vendor data: the enum is
 # what every vendor accepts, and the wire value it becomes (Gemini derives a

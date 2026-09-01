@@ -1,9 +1,19 @@
 """Model-tier configuration for the graph's LLM nodes.
 
-Exactly two vendor-neutral tiers: ``base`` runs extraction and repair,
-``strong`` the six STRIDE category agents, the critic and the critic re-ask. Each tier
-independently selects a ``(vendor, model)`` **pair**, so the two tiers may run
-different vendors at once, and no vendor is privileged.
+Three vendor-neutral tiers: ``base`` runs extraction and repair, ``strong`` runs
+a framework's lane agents, and ``review`` exists so that criticism can be bound
+away from the analysis it checks. Each tier independently selects a ``(vendor,
+model)`` **pair**, so the three may run different vendors at once, and no vendor
+is privileged.
+
+**``review`` is a place, not a policy.** Which nodes sit on it is the node map's
+business, and the shipped map puts ``critic/<name>`` and ``recritic/<name>`` on
+``strong`` — the same domain as the analysis, which is cheaper and is what most
+deployments want. What the tier buys is that a deployment *can* move them, and
+:data:`REVIEW_INDEPENDENCE` is where it says how far apart they have to be. With
+two tiers the only way to make criticism distinct was to run it on ``base``,
+which is a re-ask on a cheaper model than the pass it corrects — the failure
+:func:`critic_pairing_issues` exists to refuse.
 
 Vendor and model are two keys, never one router string. Three consumers need
 the vendor as a *key* — the credential mode it implies, the family-branching
@@ -43,16 +53,37 @@ from analysis_service.vendors import VENDOR_NAMES, Vendor, VendorName, vendor_fo
 # The only schema version this loader accepts. A file on any other version
 # fails its own check rather than being migrated in place.
 #
-# Version 5 is the framework cutover. Six ``analyze/<category>`` keys that all
-# held one value became one ``analyze/<framework>`` key, and ``critic`` and
-# ``recritic`` became ``critic/<framework>`` and ``recritic/<framework>``. The
-# framework is the unit a **Deployment** tunes — an operator can run one
-# framework on ``base`` and another on ``strong``, which is the choice that has
-# a purpose, where a knob per lane is the same knob on a second axis.
-SUPPORTED_VERSION = 5
+# Version 6 adds the ``review`` tier and ``review_independence``. Both are
+# required in every install: a third tier a file may omit is a third tier no
+# deployment has chosen a model for, and the policy defaults to nothing because
+# "how independent is your critic" is a question a deployment answers rather
+# than inherits.
+SUPPORTED_VERSION = 6
 
-TierName = Literal["base", "strong"]
-TIER_NAMES: tuple[TierName, ...] = ("base", "strong")
+TierName = Literal["base", "strong", "review"]
+TIER_NAMES: tuple[TierName, ...] = ("base", "strong", "review")
+
+# How far a framework's criticism has to sit from its own analysis. A table
+# rather than a chain of ``if``s, and the values are ordered weakest first so a
+# reader sees that each admits strictly less than the one below it.
+#
+# * ``shared`` requires nothing. Criticism may run on the very model it checks,
+#   which is the shipped configuration: a critic on one model still catches
+#   inconsistency and unsupported claims, and it costs one tier rather than two.
+# * ``distinct_model`` requires a different ``(vendor, model)`` pair. It removes
+#   a single build's blind spots, and leaves the provider's.
+# * ``distinct_provider`` requires a different vendor. It removes a provider's
+#   blind spots too, at the cost of a second credential and a second quota.
+#
+# **None of these makes a review more accurate.** Independence bounds correlated
+# failure; it does not make a second opinion a better one, and a deployment that
+# reads ``distinct_provider`` as "more correct" has read it wrong.
+ReviewIndependence = Literal["shared", "distinct_model", "distinct_provider"]
+REVIEW_INDEPENDENCE: tuple[ReviewIndependence, ...] = (
+    "shared",
+    "distinct_model",
+    "distinct_provider",
+)
 
 
 # The graph's LLM nodes. Deterministic FunctionNodes (validate, prepare, join,
@@ -161,6 +192,11 @@ class ModelTierConfig(BaseModel):
     version: int = Field(ge=1)
     tiers: dict[TierName, TierSelection]
     nodes: dict[str, TierName]
+    #: How far each framework's criticism must sit from its own analysis. No
+    #: default: a deployment states it, because inheriting ``shared`` is how a
+    #: high-assurance install ends up reviewing itself and reporting nothing
+    #: unusual. See :data:`REVIEW_INDEPENDENCE`.
+    review_independence: ReviewIndependence
 
     @model_validator(mode="after")
     def _check_complete(self) -> Self:
@@ -177,7 +213,58 @@ class ModelTierConfig(BaseModel):
         missing = [node for node in LLM_NODES if node not in self.nodes]
         if missing:
             raise ValueError(f"nodes missing entries for: {missing}")
+        # Both cross-node rules, run here because this is the one place a
+        # complete node -> tier map exists. `critic_pairing_issues` was written
+        # as a free function and never called from anywhere, so the pairing the
+        # config file said the loader checked was in fact unchecked; a third
+        # tier is where that would first have cost something, since `review` is
+        # a place a critic can move to and leave its re-ask behind.
+        problems = critic_pairing_issues(self.nodes.__getitem__)
+        problems += self.independence_breaches()
+        if problems:
+            raise ValueError("; ".join(problems))
         return self
+
+    def independence_breaches(self) -> list[str]:
+        """Every framework whose criticism is closer to its analysis than policy allows.
+
+        **Fails closed at load, which is why there is no runtime warning.** A
+        deployment that asked for a distinct reviewer and cannot have one has a
+        configuration error, not a run to annotate — annotating it would put the
+        finding in the artifact of a job somebody already paid for. What the
+        report carries instead is the policy itself, so a reader of a ``shared``
+        run can see that the review was same-domain rather than infer it.
+
+        Checked per framework rather than once, because the node map is per
+        framework: a deployment may run one package's analysis on ``strong`` and
+        another's on ``base``, and each one's critic has to be independent of its
+        own analysis rather than of some other package's.
+        """
+        if self.review_independence == "shared":
+            return []
+        distinct = "vendor" if self.review_independence == "distinct_provider" else None
+        breaches = []
+        for name in FRAMEWORK_NAMES:
+            analyze = self.tiers[self.nodes[f"analyze/{name}"]]
+            critic = self.tiers[self.nodes[f"critic/{name}"]]
+            if distinct == "vendor":
+                shared_part = analyze.vendor == critic.vendor
+                detail = f"both run vendor {analyze.vendor!r}"
+            else:
+                shared_part = (analyze.vendor, analyze.model) == (
+                    critic.vendor,
+                    critic.model,
+                )
+                detail = f"both run {analyze.vendor}/{analyze.model}"
+            if shared_part:
+                breaches.append(
+                    f"review_independence is {self.review_independence!r} but"
+                    f" analyze/{name} and critic/{name} are not independent:"
+                    f" {detail}. Point critic/{name} and recritic/{name} at a"
+                    f" tier whose selection differs, or set review_independence"
+                    f' to "shared" and accept a same-domain review'
+                )
+        return breaches
 
     def resolve_tier(self, node: str) -> TierName:
         """The tier the named LLM node runs on.

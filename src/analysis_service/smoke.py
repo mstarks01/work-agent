@@ -645,7 +645,15 @@ def _unreached(reason: str) -> tuple[Check, ...]:
 
 
 def _tier_summary(deployment: Deployment) -> dict[TierName, dict[str, str]]:
-    """What each tier selected, for the result header."""
+    """What each **bound** tier selected, for the result header.
+
+    Bound, because the header is a claim about what this run reached. A
+    deployment selects a pair for every tier including one its node map points
+    nothing at — ``review`` under the shipped map — and naming that pair here
+    would report a provider the smoke never called, which is exactly the
+    "unexercised reads like exercised" failure this whole file exists to avoid.
+    """
+    bound = set(deployment.tiers.nodes.values())
     return {
         tier: {
             "vendor": selection.vendor,
@@ -653,6 +661,7 @@ def _tier_summary(deployment: Deployment) -> dict[TierName, dict[str, str]]:
             "route": selection.route,
         }
         for tier, selection in deployment.tiers.tiers.items()
+        if tier in bound
     }
 
 

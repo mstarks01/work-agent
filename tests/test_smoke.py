@@ -415,12 +415,17 @@ class TestDrivingTheEngine:
 
         assert any("asvs: not exercised" in note for note in result.notes)
 
-    def test_a_completed_run_passes_every_check_and_names_both_tiers(self, monkeypatch):
+    def test_a_completed_run_passes_every_check_and_names_the_bound_tiers(
+        self, monkeypatch
+    ):
         result = self.smoke_with(monkeypatch, PipelineCompleted(report=smoke_report()))
 
         assert result.exercised
         assert not result.failed
         assert all(check.result is CheckResult.PASSED for check in result.checks)
+        # The bound tiers only. `review` is selected and nothing runs on it
+        # under the shipped node map, so a smoke that named it would report a
+        # provider it never called.
         assert set(result.tiers) == {"base", "strong"}
         assert (
             result.tiers["base"]["vendor"]

@@ -159,6 +159,13 @@ jobs:
       ANALYSIS_MODEL_BASE_MODEL: ${{ matrix.base_model }}
       ANALYSIS_MODEL_STRONG_VENDOR: ${{ matrix.vendor }}
       ANALYSIS_MODEL_STRONG_MODEL: ${{ matrix.strong_model }}
+      # `review` selects the same pair as `strong`. Every tier must name one or
+      # the config refuses to load, and the shipped node map binds nothing to
+      # this tier -- so no adapter is built for it and it costs no credential.
+      # The shipped `review_independence = "shared"` is what makes a repeated
+      # pair legal here.
+      ANALYSIS_MODEL_REVIEW_VENDOR: ${{ matrix.vendor }}
+      ANALYSIS_MODEL_REVIEW_MODEL: ${{ matrix.strong_model }}
 
     steps:
       - name: Check out

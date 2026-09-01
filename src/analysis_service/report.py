@@ -1396,6 +1396,20 @@ class ExecutionEnvelope(BaseModel):
     inside the fingerprint: a ``litellm`` bump moves every hash, and a reader
     who cannot see which version ran cannot tell a sanctioned run from a
     silently upgraded one.
+
+    ``review_independence`` is how far this deployment required each framework's
+    criticism to sit from its own analysis. It is a **statement, never a
+    warning**: a deployment that asked for an independent reviewer and could not
+    have one fails to load, so no report exists to warn on. What this answers is
+    the other direction — a reader of a ``shared`` run can see the review was
+    same-domain rather than infer it from two node rows naming one model. The
+    detail behind it is already on :class:`NodeRun`: the ``analyze/<name>`` and
+    ``critic/<name>`` rows each carry their own requested route, served build
+    and fingerprint.
+
+    Deliberately **not** in the fingerprint. The policy decides nothing at run
+    time — the loader has already enforced it — so hashing it would re-baseline
+    every blessed identity on a policy edit that moved no model.
     """
 
     model_config = ConfigDict(extra="forbid", frozen=True)
@@ -1403,6 +1417,9 @@ class ExecutionEnvelope(BaseModel):
     identity_version: int = Field(ge=1)
     served_model_trust: Literal["provider_reported"] = "provider_reported"
     build: dict[str, str] = Field(default_factory=dict)
+    review_independence: Literal["shared", "distinct_model", "distinct_provider"] = (
+        "shared"
+    )
 
 
 class AnalysisContext(BaseModel):

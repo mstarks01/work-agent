@@ -116,11 +116,13 @@ to a `(vendor, model)` pair. Deterministic `FunctionNode`s carry no model. The
 `strong` tier does most of a job's model work — the six-way category fan-out
 plus the critic and its re-ask.
 
-The two tiers choose their vendor **independently**, so `base` and `strong` can
-run different vendors at the same time. Every vendor is reached through one
-adapter (LiteLLM), and the ten LLM nodes share **two** adapter instances — one
-per tier — so the startup checks on credentials and decoding parameters run
-twice rather than ten times.
+The tiers choose their vendor **independently**, so they can run different
+vendors at the same time. A third tier, `review`, exists so criticism can be
+bound off the model it checks; the shipped node map points nothing at it. Every
+vendor is reached through one adapter (LiteLLM), and the LLM nodes share **one
+adapter per bound tier** — so the startup checks on credentials and decoding
+parameters run once per tier rather than once per node, and a selected tier
+nothing runs on costs no credential at all.
 
 ## Provenance and certification
 

@@ -304,6 +304,8 @@ def test_every_documented_vendor_passes_the_gate_on_shipped_sampling(
             "ANALYSIS_MODEL_BASE_MODEL": base_model,
             "ANALYSIS_MODEL_STRONG_VENDOR": vendor,
             "ANALYSIS_MODEL_STRONG_MODEL": strong_model,
+            "ANALYSIS_MODEL_REVIEW_VENDOR": "anthropic",
+            "ANALYSIS_MODEL_REVIEW_MODEL": "claude-opus-5",
         },
     )
     sampling = load_sampling(root / "config" / "sampling.toml", env={})

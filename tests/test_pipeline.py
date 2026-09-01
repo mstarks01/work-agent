@@ -443,6 +443,10 @@ def test_the_report_records_what_ran_it():
     # claim and nothing here confirms it.
     assert envelope.served_model_trust == "provider_reported"
     assert envelope.build == dict(build_identity())
+    # The policy this deployment required, stated rather than inferred. The
+    # shipped node map leaves criticism on `strong`, so a reader has to be able
+    # to see that the review was same-domain.
+    assert envelope.review_independence == "shared"
 
 
 def test_each_agent_gets_its_own_category_and_the_shared_model():

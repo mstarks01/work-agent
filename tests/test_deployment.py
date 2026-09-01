@@ -32,6 +32,7 @@ from analysis_service.model_gate import (
     output_ceiling,
 )
 from analysis_service.model_tiers import LLM_NODES, ModelConfigError
+from analysis_service.model_tiers import SUPPORTED_VERSION as TIERS_SUPPORTED_VERSION
 from analysis_service.vendors import ProviderAuthError, vendor_for
 from tests.factories import DEFAULT_FRAMEWORKS, PROJECT_ROOT
 
@@ -54,6 +55,12 @@ VERTEX_TIERS = {
     "ANALYSIS_MODEL_BASE_MODEL": "gemini-2.5-flash",
     "ANALYSIS_MODEL_STRONG_VENDOR": "vertex",
     "ANALYSIS_MODEL_STRONG_MODEL": "gemini-2.5-pro",
+    # Vertex here too, keeping this module's subject to one credential mode.
+    # The shipped node map points nothing at `review`, so this pair selects a
+    # tier no node in these tests runs on — but it must still be selected, or
+    # the tier config refuses to load at all.
+    "ANALYSIS_MODEL_REVIEW_VENDOR": "vertex",
+    "ANALYSIS_MODEL_REVIEW_MODEL": "gemini-2.5-pro",
 }
 
 # Building adapters for that selection needs these three present. They are names
@@ -72,8 +79,8 @@ def test_from_env_resolves_the_repo_configs_without_credentials():
     """Reading config is cheap and credential-free; that is why it is eager."""
     deployment = Deployment.from_env(env=VERTEX_TIERS)
 
-    assert deployment.tiers.version == 5
-    assert set(deployment.sampling.tiers) == {"base", "strong"}
+    assert deployment.tiers.version == TIERS_SUPPORTED_VERSION
+    assert set(deployment.sampling.tiers) == {"base", "strong", "review"}
     assert deployment.resilience.attempts >= 1
     assert deployment.manifest.version == MANIFEST_VERSION
     assert deployment.paths.model_tiers == PROJECT_ROOT / "config/model_tiers.toml"
@@ -102,7 +109,7 @@ def test_a_path_variable_picks_the_file_and_never_layers_a_second(tmp_path):
     """#10: exactly one file is read; the variable only chooses which."""
     custom = tmp_path / "sampling.toml"
     custom.write_text(
-        "version = 4\n[tiers.base]\ntemperature = 0.25\n[tiers.strong]\n",
+        "version = 5\n[tiers.base]\ntemperature = 0.25\n[tiers.strong]\n[tiers.review]\n",
         encoding="utf-8",
     )
 
@@ -193,7 +200,7 @@ def test_default_config_path_prefers_the_bundled_copy_when_present(
     bundled_config = tmp_path / "config"
     bundled_config.mkdir()
     bundled_file = bundled_config / "sampling.toml"
-    bundled_file.write_text("version = 4\n", encoding="utf-8")
+    bundled_file.write_text("version = 5\n", encoding="utf-8")
     monkeypatch.setattr(module, "_BUNDLED_DIR", tmp_path)
 
     assert module._default_config_path("sampling.toml") == bundled_file
@@ -409,16 +416,20 @@ ANTHROPIC_ENV = {
     "ANALYSIS_MODEL_BASE_MODEL": CLAUDE_5,
     "ANALYSIS_MODEL_STRONG_VENDOR": "anthropic",
     "ANALYSIS_MODEL_STRONG_MODEL": CLAUDE_5,
+    "ANALYSIS_MODEL_REVIEW_VENDOR": "anthropic",
+    "ANALYSIS_MODEL_REVIEW_MODEL": CLAUDE_5,
     # A name, not a secret: the loader checks a variable is declared, never that
     # it authenticates, and nothing here reaches a provider.
     "ANALYSIS_ANTHROPIC_API_KEY": "sk-ant-not-a-real-key",
 }
 
 NO_TEMPERATURE = """\
-version = 4
+version = 5
 [tiers.base]
 max_output_tokens = 8192
 [tiers.strong]
+max_output_tokens = 8192
+[tiers.review]
 max_output_tokens = 8192
 """
 
@@ -633,11 +644,14 @@ def test_gemini_and_openai_are_untouched_by_the_schema_gate():
 
 
 UNCONSTRAINED_BASE = """\
-version = 4
+version = 5
 [tiers.base]
 max_output_tokens = 8192
 constrain_output = false
 [tiers.strong]
+max_output_tokens = 8192
+constrain_output = false
+[tiers.review]
 max_output_tokens = 8192
 constrain_output = false
 """
