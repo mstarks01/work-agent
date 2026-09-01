@@ -447,6 +447,7 @@ def test_stability_reads_the_applicability_block_too():
         trusted=True,
         structural_failures=(),
         provenance=RunProvenance(
+            build={},
             sampling_config_version=1,
             tiers_config_version=1,
             sampling={},

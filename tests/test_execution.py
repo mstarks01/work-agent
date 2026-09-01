@@ -21,7 +21,6 @@ from analysis_service.report import latency_by_node, usage_by_node
 from analysis_service.sampling import (
     TierSampling,
     load_sampling,
-    sampling_fingerprint,
 )
 from analysis_service.sources import Source, render_sources
 from tests.factories import (
@@ -36,6 +35,7 @@ from tests.factories import (
     claims_json,
     package_answering,
     repo_tiers,
+    sample_fingerprint,
     sample_proposal,
     sample_ruling,
     scripted_pipeline,
@@ -124,7 +124,7 @@ def test_a_deterministic_node_carries_no_model_and_no_fingerprint(graph_run):
     assemble = by_node(graph_run)[graph.ASSEMBLE_NODE]
     assert assemble.model is None
     assert assemble.requested_model is None
-    assert assemble.sampling_fingerprint is None
+    assert assemble.execution_fingerprint is None
 
 
 def test_a_node_with_no_served_build_carries_no_fingerprint():
@@ -133,7 +133,7 @@ def test_a_node_with_no_served_build_carries_no_fingerprint():
     extract = by_node(drive(pipeline))[graph.EXTRACT_NODE]
 
     assert extract.model is None
-    assert extract.sampling_fingerprint is None
+    assert extract.execution_fingerprint is None
     # What was asked for is still known, and still recorded.
     assert extract.requested_model == BASE_MODEL
 
@@ -167,7 +167,7 @@ def test_usage_is_recorded_even_when_the_served_build_is_not():
     extract = by_node(drive(pipeline))[graph.EXTRACT_NODE]
 
     assert extract.model is None
-    assert extract.sampling_fingerprint is None
+    assert extract.execution_fingerprint is None
     assert extract.usage is not None
     assert extract.usage.prompt_tokens == 1100
 
@@ -229,33 +229,50 @@ def test_latency_by_node_charges_a_slow_model_to_its_own_node():
     assert latency[graph.ASSEMBLE_NODE].total_ms < 50
 
 
-def test_every_llm_node_fingerprint_recomputes_from_its_tier_sampling(graph_run):
-    """The hash is derivable from the served build and the tier's clear values."""
+def test_every_llm_node_fingerprint_recomputes_from_what_the_run_recorded(graph_run):
+    """The hash is derivable from the identity the node itself carries.
+
+    Every input comes off the run: the two routes and the instruction digest
+    from the row, the sampling from the pipeline's clear block, the build map
+    from the install that produced it. A hash a reader cannot rebuild from the
+    artifact is an assertion rather than evidence.
+    """
     pipeline, _ = scripted_pipeline(happy_replies())
     tiers = repo_tiers()
 
     for node_run in graph_run.node_runs:
         canonical = TIER_NODES.get(node_run.node)
         if canonical is None:  # deterministic FunctionNode
-            assert node_run.sampling_fingerprint is None
+            assert node_run.execution_fingerprint is None
+            assert node_run.instruction_sha256 is None
             continue
         tier = tiers.resolve_tier(canonical)
         clear = pipeline.tier_sampling[tier].model_dump()
-        expected = sampling_fingerprint(node_run.model, TierSampling(**clear))
-        assert node_run.sampling_fingerprint == expected
+        assert node_run.instruction_sha256 == pipeline.instruction_sha256
+        expected = sample_fingerprint(
+            node_run.model,
+            TierSampling(**clear),
+            requested=node_run.requested_model,
+            instructions=node_run.instruction_sha256,
+        )
+        assert node_run.execution_fingerprint == expected
 
 
 def test_base_and_strong_nodes_get_different_identities(graph_run):
     """Different served build and tier sampling → distinct generation identities."""
     nodes = by_node(graph_run)
-    extract_fp = nodes[graph.EXTRACT_NODE].sampling_fingerprint
-    critic_fp = nodes[CRITIC].sampling_fingerprint
+    extract_fp = nodes[graph.EXTRACT_NODE].execution_fingerprint
+    critic_fp = nodes[CRITIC].execution_fingerprint
 
     assert extract_fp and critic_fp and extract_fp != critic_fp
 
     sampling = load_sampling(PROJECT_ROOT / "config" / "sampling.toml", env={})
-    assert critic_fp == sampling_fingerprint(
-        served_build(STRONG_MODEL), sampling.for_tier("strong")
+    critic_run = nodes[CRITIC]
+    assert critic_fp == sample_fingerprint(
+        served_build(STRONG_MODEL),
+        sampling.for_tier("strong"),
+        requested=critic_run.requested_model,
+        instructions=critic_run.instruction_sha256,
     )
 
 
@@ -386,7 +403,7 @@ def test_extract_only_entry_stamps_just_the_one_node():
     run = drive(pipeline)
 
     assert [node_run.node for node_run in run.node_runs] == [graph.EXTRACT_NODE]
-    assert run.node_runs[0].sampling_fingerprint is not None
+    assert run.node_runs[0].execution_fingerprint is not None
 
 
 class TestSourceRendering:

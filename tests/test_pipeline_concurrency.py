@@ -212,4 +212,4 @@ def test_each_concurrent_job_gets_its_own_threats_and_fingerprints():
         # Sampling provenance is present and well-formed on every concurrent run.
         assert report.sampling
         extract_run = next(n for n in report.nodes if n.node == graph.EXTRACT_NODE)
-        assert extract_run.sampling_fingerprint is not None
+        assert extract_run.execution_fingerprint is not None

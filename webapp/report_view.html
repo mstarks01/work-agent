@@ -765,9 +765,9 @@
       el("b", null, n.node), " ",
       el("span", "m", n.model ? n.model : "code"), ` · ${n.duration_ms} ms`
     );
-    if (n.sampling_fingerprint) {
-      const fp = el("code", "m", `fp ${n.sampling_fingerprint.slice(0, 12)}…`);
-      fp.title = `generation-identity fingerprint: sha256(served model, resolved tier sampling)\n${n.sampling_fingerprint}`;
+    if (n.execution_fingerprint) {
+      const fp = el("code", "m", `fp ${n.execution_fingerprint.slice(0, 12)}…`);
+      fp.title = `execution-identity fingerprint: sha256 of the requested route, the served build, the resolved tier sampling, the instruction digest and the build versions\n${n.execution_fingerprint}`;
       row.append(" · ", fp);
     }
     $("nodes").append(row);

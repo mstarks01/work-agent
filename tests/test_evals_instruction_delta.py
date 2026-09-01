@@ -59,6 +59,7 @@ def write_run(tmp_path: Path, name: str, instruction: list[dict], **overrides) -
         "repo_commit": {"commit": "0" * 40, "clean": True},
         "corpus_digest": "0" * 64,
         "provenance": RunProvenance(
+            build={},
             sampling_config_version=1,
             tiers_config_version=1,
             sampling={},

@@ -27,6 +27,7 @@ from analysis_service.graph import (
     EXTRACT_NODE,
     tier_node_by_graph_node,
 )
+from analysis_service.identity import IDENTITY_VERSION, build_identity
 from analysis_service.jobs import (
     JobRecord,
     NodeCallback,
@@ -34,8 +35,7 @@ from analysis_service.jobs import (
     PipelineOutcome,
     PipelineRejected,
 )
-from analysis_service.report import NodeRun, Report
-from analysis_service.sampling import sampling_fingerprint
+from analysis_service.report import ExecutionEnvelope, NodeRun, Report
 from analysis_service.smoke import (
     ANALYST,
     BINDING,
@@ -62,8 +62,10 @@ from analysis_service.validation import ValidationIssue
 from analysis_service.vendors import join_served
 from tests.factories import (
     DEFAULT_FRAMEWORKS,
+    SAMPLE_INSTRUCTIONS,
     TEST_TIER_ENV,
     sample_analysis,
+    sample_fingerprint,
     sample_report,
     sample_selection,
     served_build,
@@ -107,6 +109,12 @@ def smoke_report(**overrides: object) -> Report:
         "nodes": [node_run(node) for node in LLM_NODES]
         + [NodeRun(node=ASSEMBLE_NODE, duration_ms=20).model_dump()],
         "sampling": sampling,
+        # The build map every node's fingerprint was computed under. A report
+        # without it is one whose hashes nobody can recompute, which the
+        # provenance check refuses — see the failure tests below.
+        "execution": ExecutionEnvelope(
+            identity_version=IDENTITY_VERSION, build=dict(build_identity())
+        ).model_dump(),
         **overrides,
     }
     return Report.model_validate(fields)
@@ -121,8 +129,9 @@ def node_run(node: str, **overrides: object) -> dict[str, object]:
         "node": node,
         "model": served,
         "requested_model": requested,
-        "sampling_fingerprint": sampling_fingerprint(
-            served, DEPLOYMENT.sampling.for_tier(tier)
+        "instruction_sha256": SAMPLE_INSTRUCTIONS,
+        "execution_fingerprint": sample_fingerprint(
+            served, DEPLOYMENT.sampling.for_tier(tier), requested=requested
         ),
         "duration_ms": 1200,
     }
@@ -233,7 +242,7 @@ class TestTheApplicationsFailures:
         """The pair is the identity; half of it is not a lesser record."""
         report = smoke_report(
             nodes=[
-                node_run(EXTRACT_NODE, sampling_fingerprint=None),
+                node_run(EXTRACT_NODE, execution_fingerprint=None),
                 *(node_run(node) for node in LLM_NODES[1:]),
             ]
         )
@@ -248,7 +257,7 @@ class TestTheApplicationsFailures:
         """
         report = smoke_report(
             nodes=[
-                node_run(EXTRACT_NODE, sampling_fingerprint="0" * 64),
+                node_run(EXTRACT_NODE, execution_fingerprint="0" * 64),
                 *(node_run(node) for node in LLM_NODES[1:]),
             ]
         )
@@ -276,7 +285,7 @@ class TestWhatTheProviderDidNotAnswer:
         """
         report = smoke_report(
             nodes=[
-                node_run(node, model=None, sampling_fingerprint=None)
+                node_run(node, model=None, execution_fingerprint=None)
                 for node in LLM_NODES
             ]
         )
@@ -287,7 +296,7 @@ class TestWhatTheProviderDidNotAnswer:
     def test_a_partly_silent_provider_is_unknown_and_names_the_silent_nodes(self):
         report = smoke_report(
             nodes=[
-                node_run(EXTRACT_NODE, model=None, sampling_fingerprint=None),
+                node_run(EXTRACT_NODE, model=None, execution_fingerprint=None),
                 *(node_run(node) for node in LLM_NODES[1:]),
             ]
         )

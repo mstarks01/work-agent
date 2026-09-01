@@ -36,8 +36,8 @@ from analysis_service.graph import (
     STATE_SOURCE_TEXTS,
     Pipeline,
 )
+from analysis_service.identity import build_identity, execution_fingerprint
 from analysis_service.report import NodeRun, TokenUsage
-from analysis_service.sampling import sampling_fingerprint
 from analysis_service.sources import Source, render_sources
 from analysis_service.vendors import join_served
 
@@ -227,12 +227,19 @@ class GraphExecutor:
             )
             requested = self._pipeline.node_models.get(finish.node)
             served = _served_route(requested, finish.served_model)
+            fingerprint = self._fingerprint(finish.node, requested, served)
             runs.append(
                 NodeRun(
                     node=finish.node,
                     model=served,
                     requested_model=requested,
-                    sampling_fingerprint=self._fingerprint(finish.node, served),
+                    # Stamped with the fingerprint or not at all: the digest is
+                    # an input to that hash, and a row carrying one without the
+                    # other states an identity it cannot account for.
+                    instruction_sha256=(
+                        self._pipeline.instruction_sha256 if fingerprint else None
+                    ),
+                    execution_fingerprint=fingerprint,
                     duration_ms=max(round((finish.at - ready_at) * 1000), 0),
                     usage=finish.usage,
                 )
@@ -240,19 +247,38 @@ class GraphExecutor:
             finished_at[finish.node] = finish.at
         return runs
 
-    def _fingerprint(self, node: str, served_route: str | None) -> str | None:
-        """This node execution's generation identity, or ``None`` if unknowable.
+    def _fingerprint(
+        self, node: str, requested_route: str | None, served_route: str | None
+    ) -> str | None:
+        """This node execution's identity hash, or ``None`` if unknowable.
 
         Computed per *execution*, so 12 cases give one node 12 hashes and a
         build that moves mid-sweep gives it two — which is the drift signal,
-        not a defect. Without a served build there is nothing honest to hash, so
-        the node carries no fingerprint at all rather than one keyed on what
-        was merely requested.
+        not a defect.
+
+        Three inputs have to be present and any one of them missing means there
+        is nothing honest to hash. Without a served build the node ran but
+        nobody said on what; without a requested route it is not an LLM node;
+        without sampling its tier resolved to nothing. A node short of any of
+        them carries no fingerprint rather than one keyed on a partial identity,
+        which would certify against a manifest entry it does not share.
+
+        The instruction digest and the build versions come from the pipeline and
+        the install, so they are the same for every node in one drive. They are
+        in each node's hash anyway, because a fingerprint the manifest blesses
+        has to carry everything that decided the answer — a per-run field
+        checked separately is a second gate somebody can forget to run.
         """
         sampling = self._pipeline.node_sampling.get(node)
-        if served_route is None or sampling is None:
+        if served_route is None or requested_route is None or sampling is None:
             return None
-        return sampling_fingerprint(served_route, sampling)
+        return execution_fingerprint(
+            requested_route=requested_route,
+            served_route=served_route,
+            sampling=sampling.model_dump(),
+            instruction_sha256=self._pipeline.instruction_sha256,
+            build=build_identity(),
+        )
 
 
 # The provider's spelling for each vendor-neutral TokenUsage field. This is the

@@ -21,6 +21,7 @@ from analysis_service import graph
 from analysis_service.api import create_app
 from analysis_service.frameworks import PACKAGES, FrameworkName
 from analysis_service.frameworks.stride.record import STRIDE_CATEGORIES
+from analysis_service.identity import IDENTITY_VERSION, build_identity
 from analysis_service.jobs import (
     InMemoryJobStore,
     JobRecord,
@@ -30,7 +31,7 @@ from analysis_service.jobs import (
 )
 from analysis_service.pipeline import AdkPipelineRunner, PipelineError
 from analysis_service.report import FrameworkSelection, InputRef
-from analysis_service.sampling import TierSampling, load_sampling, sampling_fingerprint
+from analysis_service.sampling import TierSampling, load_sampling
 from analysis_service.sources import DEFAULT_DESCRIPTION_LABEL, Source
 from tests.factories import (
     BASE_MODEL,
@@ -42,6 +43,7 @@ from tests.factories import (
     ScriptedLlm,
     claims_json,
     repo_tiers,
+    sample_fingerprint,
     sample_proposal,
     sample_ruling,
     sample_selection,
@@ -352,8 +354,8 @@ def test_the_report_carries_the_graph_runs_node_stamps():
     assert [node_run.node for node_run in outcome.report.nodes] == visited
     by_node = {run_.node: run_ for run_ in outcome.report.nodes}
     assert by_node[graph.EXTRACT_NODE].model == served_build(BASE_MODEL)
-    assert by_node[CRITIC].sampling_fingerprint is not None
-    assert by_node[graph.ASSEMBLE_NODE].sampling_fingerprint is None
+    assert by_node[CRITIC].execution_fingerprint is not None
+    assert by_node[graph.ASSEMBLE_NODE].execution_fingerprint is None
 
 
 def test_report_stamps_the_per_tier_sampling_clear_block():
@@ -397,25 +399,50 @@ def test_a_tier_running_a_reasoning_effort_still_produces_a_report():
 
 
 def test_each_llm_node_fingerprint_recomputes_from_the_artifact():
-    """The per-node hash is derivable from the clear block + served model alone.
+    """The per-node hash is derivable from the report and nothing else.
 
-    The report is the portable evidence, so this is asserted over the assembled
-    artifact rather than over the executor's output.
+    Every input to the identity is in here: both routes and the instruction
+    digest on the node, the sampling in the clear block, the build map on the
+    execution envelope. The report is the portable evidence, so this is asserted
+    over the assembled artifact rather than over the executor's output — a
+    reader holding only the JSON has to be able to check the hash.
     """
     pipeline, _ = build(happy_replies())
     outcome, _ = run(pipeline, job())
     tiers = repo_tiers()
-    clear = outcome.report.sampling
+    report = outcome.report
+    clear = report.sampling
+    assert report.execution is not None
 
-    for node_run in outcome.report.nodes:
+    for node_run in report.nodes:
         canonical = TIER_NODES.get(node_run.node)
         if canonical is None:  # deterministic FunctionNode
             assert node_run.model is None
-            assert node_run.sampling_fingerprint is None
+            assert node_run.execution_fingerprint is None
             continue
         tier = tiers.resolve_tier(canonical)
-        expected = sampling_fingerprint(node_run.model, TierSampling(**clear[tier]))
-        assert node_run.sampling_fingerprint == expected
+        expected = sample_fingerprint(
+            node_run.model,
+            TierSampling(**clear[tier]),
+            requested=node_run.requested_model,
+            instructions=node_run.instruction_sha256,
+            build=report.execution.build,
+        )
+        assert node_run.execution_fingerprint == expected
+
+
+def test_the_report_records_what_ran_it():
+    """The execution envelope: identity version, trust level, build map."""
+    pipeline, _ = build(happy_replies())
+    outcome, _ = run(pipeline, job())
+
+    envelope = outcome.report.execution
+    assert envelope is not None
+    assert envelope.identity_version == IDENTITY_VERSION
+    # Stated, not assumed: the served build on every node is the provider's own
+    # claim and nothing here confirms it.
+    assert envelope.served_model_trust == "provider_reported"
+    assert envelope.build == dict(build_identity())
 
 
 def test_each_agent_gets_its_own_category_and_the_shared_model():

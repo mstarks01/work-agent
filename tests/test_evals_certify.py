@@ -20,11 +20,18 @@ from analysis_service.certification import (
 )
 from analysis_service.deployment import SAMPLING_VAR, Deployment
 from analysis_service.graph import ENTRY_EXTRACT, tier_node_by_graph_node
+from analysis_service.identity import build_identity
 from analysis_service.model_tiers import TierName
-from analysis_service.sampling import load_sampling, sampling_fingerprint
+from analysis_service.sampling import load_sampling
 from evals.harness import modes
-from evals.harness.certify import promote, promotion_paths
-from tests.factories import DEFAULT_FRAMEWORKS, TEST_TIER_ENV, repo_tiers
+from evals.harness.certify import TierIdentityKey, promote, promotion_paths
+from tests.factories import (
+    DEFAULT_FRAMEWORKS,
+    SAMPLE_INSTRUCTIONS,
+    TEST_TIER_ENV,
+    repo_tiers,
+    sample_fingerprint,
+)
 
 TIER_NODE_BY_GRAPH_NODE = tier_node_by_graph_node(DEFAULT_FRAMEWORKS)
 
@@ -55,6 +62,25 @@ def _blessed_from(observations: dict[str, frozenset[str]]) -> BlessedManifest:
 ALL_NODES = tuple(TIER_NODE_BY_GRAPH_NODE)
 
 
+def keys(**served: str) -> dict[str, tuple[TierIdentityKey, ...]]:
+    """A tier -> identity-key map for a promotion, one key per tier.
+
+    Promotion blesses a whole identity, so a test naming only a served build
+    supplies the rest. The requested route echoes the served one, which is what
+    an offline stand-in produces.
+    """
+    return {
+        tier: (
+            TierIdentityKey(
+                requested=build,
+                served=build,
+                instruction_sha256=SAMPLE_INSTRUCTIONS,
+            ),
+        )
+        for tier, build in served.items()
+    }
+
+
 # --- sweep parametrization: each variant is fingerprinted, drift flagged ---
 
 
@@ -72,7 +98,7 @@ def _build_fingerprints(sampling, served="fake-model-001"):
         sampling=sampling,
     )
     return {
-        node: frozenset({sampling_fingerprint(served, node_sampling)})
+        node: frozenset({sample_fingerprint(served, node_sampling)})
         for node, node_sampling in pipeline.node_sampling.items()
     }
 
@@ -150,7 +176,8 @@ def test_promote_reprints_values_in_place_and_writes_the_manifest(tmp_path):
 
     manifest = promote(
         winner,
-        {"base": "build-001", "strong": "build-001"},
+        keys(base="build-001", strong="build-001"),
+        build=build_identity(),
         sampling_path=sampling_copy,
         manifest_path=manifest_copy,
     )
@@ -185,7 +212,8 @@ def test_promoting_a_param_the_file_leaves_unset_raises(tmp_path):
     with pytest.raises(CertificationError, match="tiers.strong.temperature"):
         promote(
             winner,
-            {"base": "build-001", "strong": "build-001"},
+            keys(base="build-001", strong="build-001"),
+            build=build_identity(),
             sampling_path=sampling_copy,
             manifest_path=manifest_copy,
         )
@@ -201,7 +229,8 @@ def test_promoting_one_tier_leaves_the_other_unblessed(tmp_path):
 
     manifest = promote(
         winner,
-        {"base": "build-001"},
+        keys(base="build-001"),
+        build=build_identity(),
         sampling_path=sampling_copy,
         manifest_path=manifest_copy,
     )
@@ -215,7 +244,8 @@ def test_promote_rejects_an_unknown_tier(tmp_path):
     with pytest.raises(CertificationError, match="unknown tier"):
         promote(
             load_sampling(SAMPLING_PATH),
-            {"extract": "build-001"},  # a node name, not a tier
+            keys(extract="build-001"),  # a node name, not a tier
+            build=build_identity(),
             sampling_path=sampling_copy,
             manifest_path=manifest_copy,
         )
@@ -227,13 +257,15 @@ def test_promote_accumulates_blessed_builds(tmp_path):
 
     promote(
         winner,
-        {"base": "build-001"},
+        keys(base="build-001"),
+        build=build_identity(),
         sampling_path=sampling_copy,
         manifest_path=manifest_copy,
     )
     manifest = promote(
         winner,
-        {"base": "build-002"},
+        keys(base="build-002"),
+        build=build_identity(),
         sampling_path=sampling_copy,
         manifest_path=manifest_copy,
     )
@@ -251,7 +283,8 @@ def test_promote_refuses_to_pin_a_previously_unset_param(tmp_path):
     with pytest.raises(CertificationError, match="tiers.strong.top_p"):
         promote(
             winner,
-            {"strong": "build-001"},
+            keys(strong="build-001"),
+            build=build_identity(),
             sampling_path=sampling_copy,
             manifest_path=manifest_copy,
         )
