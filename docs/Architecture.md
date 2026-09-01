@@ -275,6 +275,52 @@ analyses isolated (nothing is shared), but then each worker has its own in-memor
 job and session state, so a job must be routed to the worker that holds it —
 which is what the persistent backends below are for.
 
+## The model translator runs in this process
+
+Every model reaches its provider through ADK's `LiteLlm` and, beneath that,
+`litellm` — [ADR 0015](adr/0015-adk-and-litellm-are-one-substrate.md) records
+why that is one substrate rather than a swappable adapter. Both run **in the
+service process, with the service's authority**. LiteLLM holds the provider
+credentials, opens the network connections, and is the only code between a
+node's request and a provider's answer.
+
+**State the consequence plainly: a compromise of that dependency is a compromise
+of this application.** A malicious release, or arbitrary code execution inside
+it, would reach the process's environment — including every provider credential
+this deployment declared — its filesystem, and its outbound network. Nothing in
+this repository contains that, because containment is deployment work and this
+repository ships no deployment packaging: no image, no container definition, no
+egress policy. An operator running this service in production owns that
+boundary. What it should look like is set out in
+[#502](https://github.com/mstarks01/work-agent/issues/502).
+
+What the repository *does* bound is the seam — the set of values this service
+hands the translator, and where each comes from:
+
+| What crosses | Where it comes from |
+| --- | --- |
+| the model route | `Vendor.route()` — a registry entry, in code |
+| the credential kwargs | the vendor's own table, read from declared `ANALYSIS_*` variables |
+| the decoding params | `sampling.toml` plus an explicit env allowlist |
+| `num_retries=0` | a literal |
+
+**No provider endpoint crosses it at all.** Nothing sets `api_base`, `base_url`
+or `api_version` anywhere in the package, so a request goes where the vendor's
+own client sends it. `custom_llm_provider` is set — the build-time capability
+probe has to name a provider — and only ever from a `Vendor`.
+
+That matters because prompts, submitted sources, corpus text and model output
+all flow through this process. An adapter that accepted an address from any of
+them would be an SSRF and endpoint-substitution path.
+`tests/test_translator_seam.py` fails if one appears, if a decoding param could
+express one, or if a new value starts crossing the seam.
+
+Dependency versions are pinned exactly (`pyproject.toml`) and hashed at install
+(`uv.lock`), and the installed version of every distribution between a node and
+its provider is inside each run's
+[execution identity](#provenance-and-certification) — so a `litellm` bump moves
+every fingerprint rather than silently reusing a blessing taken before it.
+
 ## Seams
 
 The pipeline is reached through interfaces, so backends are swappable and the
