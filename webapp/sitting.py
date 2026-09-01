@@ -216,6 +216,7 @@ from evals.harness import sitting as sittings
 from evals.harness import submit as submit_spine
 from evals.harness.reference import ANONYMOUS, is_submitted_for
 from evals.harness.roster import Roster
+from evals.harness.sitting import MIN_OWN_LIST, own_list_is_written
 from webapp.page import (
     LOOPBACK_HOSTS,
     Grants,
@@ -230,10 +231,10 @@ from webapp.page import (
 HOST = "127.0.0.1"
 PORT = 8020
 
-#: The shortest own list this app accepts, counted over the reader's own words
-#: with the blank lines and the padding taken out. A press with nothing typed
-#: opened the recorded sets, which made the gate a click rather than a read.
-MIN_OWN_LIST = 10
+#: What this surface calls itself in the evidence it writes. The offline page
+#: writes its own name into the same line, so the document says which of the
+#: two a read happened on rather than assuming the older one.
+HELD = "`webapp/sitting.py`"
 
 #: The page runs its own script, carries its own style and calls its own
 #: endpoints. Nothing else.
@@ -356,6 +357,7 @@ class Session:
             submitted_by=self.submitted_by,
             submitted_for=self.submitted_for,
             drafts=self.drafts,
+            held=HELD,
         )
 
     @property
@@ -543,7 +545,7 @@ def create_app(session: Session) -> FastAPI:
         # is a request, and a request is what opens the sets. Counted over the
         # stripped words, so a page full of blank lines does not pass.
         typed = sum(len(item) for item in written)
-        if typed < MIN_OWN_LIST:
+        if not own_list_is_written(written):
             raise HTTPException(
                 status_code=400,
                 detail=f"your own list is {typed} characters and the sets open"
