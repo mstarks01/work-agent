@@ -109,7 +109,7 @@
 #   stop_sequences      would truncate structured output mid-token
 #   http_options        owned by resilience.toml, not sampling
 
-version = 4
+version = 5
 
 # SIZING THE TWO CAPS. Measured, not chosen: token counts below are o200k_base
 # over artifacts in this repo, and reasoning tokens are spent against the same
@@ -176,6 +176,35 @@ constrain_output = true  # send this tier's node schema to the provider.
 #                   "high"; the wire value each becomes is the vendor's business
 
 [tiers.strong]
+max_output_tokens = 64000 # pinned: silence means a vendor-derived cap (see above)
+candidate_count = 1      # reserved Self-MoA lever; loader rejects != 1
+constrain_output = true  # send this tier's node schema to the provider.
+                         # Leave it true: setting it false is not currently a
+                         # working configuration -- see the note above.
+# temperature       unset -> the model's own default. Set a value to state one;
+#                   a tier that does cannot then run Claude >= 4.7, which
+#                   rejects the param, and an OpenAI reasoning family accepts
+#                   only 1. Greedy decoding narrows variation; it never bought
+#                   reproducibility, which rests on the served build read back
+#                   from every response.
+# top_p             unset -> model default; no published per-tier constant
+# seed              unset -> no numeric default; buys consistency, not
+#                   reproducibility, and is unavailable on Anthropic at all
+# presence_penalty  unset -> effective default 0.0; valid range unverified
+# frequency_penalty unset -> effective default 0.0; valid range unverified
+# thinking          unset -> the model's own preset. Set "low", "medium" or
+#                   "high"; the wire value each becomes is the vendor's business
+
+# The review tier's decoding params. Its values track `strong` because the
+# judgement is the same judgement: a critic reasons against the same cap the
+# pass it corrects did, and giving it less room is the failure the recritic
+# pairing check exists to refuse. What the tier buys is a different *model*,
+# never a cheaper decode.
+#
+# The block is required whether or not the node map points anything at it. A
+# sampling file that could omit a tier is one where moving critic/* onto
+# `review` silently runs it on values nobody chose.
+[tiers.review]
 max_output_tokens = 64000 # pinned: silence means a vendor-derived cap (see above)
 candidate_count = 1      # reserved Self-MoA lever; loader rejects != 1
 constrain_output = true  # send this tier's node schema to the provider.

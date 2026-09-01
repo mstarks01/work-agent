@@ -72,12 +72,37 @@
 # picked. The three vendors are reached through one adapter and differ only in
 # the credential mode each implies; none is cheaper to select than the others.
 
-version = 5
+version = 6
+
+# HOW FAR THE CRITIC MUST SIT FROM THE ANALYSIS IT CHECKS. Required, and there
+# is deliberately no default: inheriting `shared` is how an install that meant
+# to review itself independently ends up not doing so, and reporting nothing
+# unusual about it.
+#
+#   "shared"            criticism may run on the very model it checks. What the
+#                       shipped node map below does. A critic on one model still
+#                       catches inconsistency and unsupported claims, and it
+#                       costs one tier rather than two.
+#   "distinct_model"    every framework's critic must run a different
+#                       (vendor, model) pair from its own analysis. Removes a
+#                       single build's blind spots; leaves the provider's.
+#   "distinct_provider" the vendor must differ too. Removes a provider's blind
+#                       spots, at the cost of a second credential and quota.
+#
+# NONE OF THESE MAKES A REVIEW MORE ACCURATE. Independence bounds *correlated*
+# failure. It does not make a second opinion a better one, and no measurement in
+# this repository says a second provider finds more. Choose it as a risk control.
+#
+# Asking for more than "shared" while leaving critic/* on `strong` beside
+# analyze/* is a load-time error naming the framework, not a warning: a
+# deployment that asked for an independent reviewer and did not get one has a
+# configuration to fix, not a run to annotate.
+review_independence = "shared"
 
 # CHOOSE A VENDOR AND MODEL FOR EACH TIER. Fill in the template below, or set
-# ANALYSIS_MODEL_{BASE,STRONG}_VENDOR together with the matching _MODEL — the two
-# halves must move together, since a vendor without its model is not a usable
-# selection. Model identifiers must be pinned: no `-latest`, `-preview` or
+# ANALYSIS_MODEL_{BASE,STRONG,REVIEW}_VENDOR together with the matching _MODEL —
+# the two halves must move together, since a vendor without its model is not a
+# usable selection. Model identifiers must be pinned: no `-latest`, `-preview` or
 # `-exp`, and Claude takes its dateless 4.6+ ID. docs/First-Run.md step 2 walks
 # through each vendor's credentials; docs/Configuration.md has the rules.
 #
@@ -88,6 +113,15 @@ version = 5
 # [tiers.strong]
 # vendor = "<vertex|anthropic|openai>"
 # model = "<model>"
+#
+# [tiers.review]
+# vendor = "<vertex|anthropic|openai>"
+# model = "<model>"
+#
+# `review` is required even while `review_independence = "shared"` leaves the
+# node map pointing criticism at `strong`. A tier a file may omit is a tier no
+# deployment has chosen a model for, and the day somebody moves critic/* onto it
+# is the wrong day to discover that.
 #
 # A TEMPLATE RATHER THAN A WORKED PAIR, and that is the same decision as the
 # empty tier tables above. This block used to show a Vertex/Gemini pair, which
@@ -108,8 +142,9 @@ version = 5
 # `uv run python -m analysis_service.conformance` to see what each pair supports
 # before choosing.
 #
-# The two tiers select independently, so a mixed pair — a cheap workhorse from
-# one vendor, judgement from another — is ordinary rather than a special case.
+# The three tiers select independently, so a mixed set — a cheap workhorse from
+# one vendor, judgement from another, review from a third — is ordinary rather
+# than a special case.
 
 [nodes]
 extract = "base"

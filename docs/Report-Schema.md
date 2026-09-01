@@ -856,8 +856,13 @@ class TokenUsage:
   fingerprints hash), `served_model_trust` (always `"provider_reported"` — the
   provider named the build on its own event stream and nothing independent
   confirmed it), and `build` (the version of each distribution between a node
-  and its provider). It is `null` only on a report with no LLM provenance at
-  all.
+  and its provider). It also carries `review_independence` — how far this
+  deployment required each framework's critic to sit from the analysis it
+  checks, so a reader of a `shared` run sees the review was same-domain rather
+  than inferring it from two node rows naming one model. That field is a
+  statement and never a warning: a deployment whose selections do not satisfy
+  its own policy fails to load, so no report exists to warn on. It is `null`
+  only on a report with no LLM provenance at all.
 
 - **`usage`** is what the provider reported the call cost, in vendor-neutral
   field names. `null` for code-only nodes, and for any LLM node whose provider

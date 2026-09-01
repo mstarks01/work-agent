@@ -35,11 +35,18 @@ def tier_block(tier, body=""):
     return f"[tiers.{tier}]\ntemperature = 0.0\ncandidate_count = 1\n{body}"
 
 
-def config_toml(version=SUPPORTED_VERSION, base_body="", strong_body="", extra=""):
+def config_toml(
+    version=SUPPORTED_VERSION,
+    base_body="",
+    strong_body="",
+    review_body="",
+    extra="",
+):
     return (
         f"version = {version}\n\n"
         f"{tier_block('base', base_body)}\n"
         f"{tier_block('strong', strong_body)}\n"
+        f"{tier_block('review', review_body)}\n"
         f"{extra}"
     )
 
@@ -55,10 +62,10 @@ def config_path(tmp_path):
 
 
 class TestShippedConfig:
-    def test_loads_and_covers_both_tiers(self):
+    def test_loads_and_covers_every_tier(self):
         config = load_sampling(SAMPLING_PATH, env={})
         assert config.version == SUPPORTED_VERSION
-        assert set(config.tiers) == {"base", "strong"}
+        assert set(config.tiers) == {"base", "strong", "review"}
 
     def test_pins_no_decoding_value_it_cannot_pin_for_every_model(self):
         """The shipped file states a cap and a count, and no decoding value.
@@ -340,11 +347,13 @@ class TestResolveSampling:
             tiers={
                 "base": TierSelection(vendor="vertex", model="gemini-2.5-flash"),
                 "strong": TierSelection(vendor="vertex", model="gemini-2.5-pro"),
+                "review": TierSelection(vendor="anthropic", model="claude-opus-5"),
             },
             nodes={
                 node: "base" if node in ("extract", "repair") else "strong"
                 for node in _all_llm_nodes()
             },
+            review_independence="shared",
         )
         resolve = make_resolve_sampling(config, tiers.resolve_tier)
         assert resolve("extract") is config.for_tier("base")

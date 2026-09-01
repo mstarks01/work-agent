@@ -76,10 +76,12 @@ export GOOGLE_APPLICATION_CREDENTIALS="$HOME/.config/gcloud/application_default_
 The Vertex identity needs `roles/aiplatform.user`. Work Agent requires the ADC
 file path explicitly; it does not search the usual gcloud location.
 
-The two tiers may use different vendors. In that case, set credentials for both.
-You may also select models through the matching
-`ANALYSIS_MODEL_BASE_{VENDOR,MODEL}` and
-`ANALYSIS_MODEL_STRONG_{VENDOR,MODEL}` environment variables. See
+The tiers may use different vendors. In that case, set credentials for each
+vendor a tier the node map binds selects — the shipped map binds `base` and
+`strong`, so a selection for `review` needs no credential until you move
+criticism onto it. You may also select models through the matching
+`ANALYSIS_MODEL_BASE_{VENDOR,MODEL}`, `ANALYSIS_MODEL_STRONG_{VENDOR,MODEL}` and
+`ANALYSIS_MODEL_REVIEW_{VENDOR,MODEL}` environment variables. See
 [Configuration](Configuration.md#model-overrides-deploy-time-no-image-rebuild)
 for the exact override rules.
 

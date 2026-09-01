@@ -35,13 +35,29 @@ both tier tables are absent, so startup fails until both tiers are configured.
 selected model must also pass the model-name, sampling, output-capacity, native
 structured-output, and credential checks described below.
 
-Two tiers named on a capability axis — `base` (extraction, repair) and `strong`
-(every framework's lane agents, critics and re-asks) — each select a
-`(vendor, model)` pair **independently**, so the two tiers may run different
-vendors at once.
+Three tiers, each selecting a `(vendor, model)` pair **independently**, so they
+may run different vendors at once:
+
+| Tier | What runs on it |
+| --- | --- |
+| `base` | extraction and repair |
+| `strong` | every framework's lane agents, and by default its critic and re-ask |
+| `review` | nothing, until you move criticism onto it |
+
+`base` and `strong` are named on a capability axis. **`review` names a place
+rather than a capability** — it is not stronger or cheaper. It exists so a
+critic can run on a model other than the one it is checking, which two tiers
+could not express: the only other place to put criticism was `base`, and a
+re-ask on a cheaper model than the pass it corrects is refused.
+
+Every tier must select a pair, including one nothing runs on. Only a tier the
+node map **binds** builds an adapter, so selecting `review` costs no credential
+until something runs on it. See
+[Review independence](#review-independence).
 
 ```toml
-version = 5
+version = 6
+review_independence = "shared"
 
 [tiers.base]
 vendor = "vertex"
@@ -341,6 +357,54 @@ does not certify a run made without it. It is deliberately **not** promotable: a
 sweep tunes decoding values, and this is a deployment's answer about its
 provider.
 
+### Review independence
+
+How far each framework's critic must sit from the analysis it checks. Required,
+with **no default**: inheriting `shared` is how an install that meant to review
+itself independently ends up not doing so, and reporting nothing unusual.
+
+| Value | What it requires |
+| --- | --- |
+| `shared` | Nothing. Criticism may run on the very model it checks. |
+| `distinct_model` | Every framework's critic runs a different `(vendor, model)` pair from its own analysis. |
+| `distinct_provider` | The vendor must differ too. |
+
+**None of these makes a review more accurate.** Independence bounds *correlated*
+failure — an analysis and a critic on one model share that model's blind spots,
+so the critic improves consistency and cannot notice what the model does not
+know. It does not make a second opinion a better one, and no measurement in this
+repository says a second provider finds more. Choose it as a risk control, and
+weigh it against a second credential, a second quota and a dearer job.
+
+Asking for more than `shared` while the node map leaves `critic/*` on the tier
+`analyze/*` runs on is a **load-time error naming the framework**, not a warning
+on the report. A deployment that asked for an independent reviewer and did not
+get one has a configuration to fix, not a run to annotate — annotating it would
+put the finding in an artifact somebody already paid for.
+
+To get an independent reviewer, point criticism at `review` and give that tier a
+different selection:
+
+```toml
+review_independence = "distinct_provider"
+
+[tiers.review]
+vendor = "anthropic"
+model = "claude-opus-5"
+
+[nodes]
+"critic/stride" = "review"
+"recritic/stride" = "review"
+```
+
+A `recritic` must resolve to its own `critic`'s tier, so the two move together.
+The same pair under two tier names is not independence and is refused: the check
+reads the selection, never the tier's label.
+
+Every report states the policy in `execution.review_independence`, so a reader
+of a `shared` run sees the review was same-domain rather than inferring it from
+two node rows naming one model.
+
 ### Provider capabilities
 
 Providers legitimately differ, and the service reports the difference rather
@@ -599,6 +663,7 @@ want. The same pattern covers `sampling.toml` and `resilience.toml`.
 | --- | --- |
 | `ANALYSIS_MODEL_BASE_VENDOR` / `ANALYSIS_MODEL_BASE_MODEL` | Overrides the `base` tier's pair. |
 | `ANALYSIS_MODEL_STRONG_VENDOR` / `ANALYSIS_MODEL_STRONG_MODEL` | Overrides the `strong` tier's pair. |
+| `ANALYSIS_MODEL_REVIEW_VENDOR` / `ANALYSIS_MODEL_REVIEW_MODEL` | Overrides the `review` tier's pair. |
 
 `_MODEL` **alone** is the ordinary case — retune a tier's model on a deployed
 revision. `_VENDOR` alone is a **startup error**: a mismatched pair such as
