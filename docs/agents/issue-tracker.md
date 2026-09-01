@@ -55,8 +55,18 @@ gh api --method POST repos/mstarks01/work-agent/issues/<child>/dependencies/bloc
 
 ### The live map
 
-**None.** [#369](https://github.com/mstarks01/work-agent/issues/369) completed 2026-08-28 and has
-moved to Completed efforts below. Chart a new one only against the bar at the end of this file.
+[#491 — Map: Amazon Bedrock is the fourth vendor row](https://github.com/mstarks01/work-agent/issues/491),
+charted 2026-09-01. A **planning** map: it settles the spec for a fourth row in the vendor registry
+and stops at the spec. Seven tickets, one closed. The frontier is
+[#493 — The credential mode Bedrock implies](https://github.com/mstarks01/work-agent/issues/493) and
+[#494 — The pinned-form rule for a Bedrock model identifier](https://github.com/mstarks01/work-agent/issues/494).
+
+The map runs **offline throughout**: the maintainer holds no AWS account, so no Bedrock call, sweep
+or blessed fingerprint is in scope. Every decision rests on the pinned litellm cost map.
+
+Research findings sit on the throwaway branch `research/bedrock-credential-paths` @ `36653cb`.
+Archive the tip as `archive/research/bedrock-credential-paths` when the map completes, per the tag
+convention at the end of this file.
 
 ### Completed efforts
 
