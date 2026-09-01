@@ -1,185 +1,167 @@
-**This repo is under early active development and breaking changes should be expected.** 
+# Work Agent
 
-# analysis-service
+**Early active development:** expect breaking changes.
 
-An agentic **security-analysis engine**: semi-structured text describing a
-system goes in, a structured JSON report comes out. Every analysis runs
-under a **Framework** the job named — STRIDE and ASVS today. It runs as
-a [Google ADK](https://google.github.io/adk-docs/) multi-agent graph over
-per-tier models from any supported vendor — Vertex, Anthropic or OpenAI, with no
-privileged default.
+Work Agent turns a written description of a software system into a structured
+security analysis. It currently supports:
+
+- **STRIDE threat modeling** — credible attacker actions, questions that need
+  more information, and rejected draft findings.
+- **OWASP ASVS 5.0.0 applicability analysis** — requirements that apply to the
+  described system and questions the description cannot answer. This is not a
+  compliance assessment and never reports that a requirement passed.
+
+The output is JSON. It includes the system model used for the analysis, the
+findings from each selected framework, the evidence behind each finding, and a
+record of which model calls produced it.
+
+## What actually happens
+
+The implementation follows this path:
+
+1. A model converts the submitted text into a data-flow model containing
+   actors, processes, data stores, flows, and trust boundaries.
+2. Code checks that model. It verifies its schema, IDs, references, trust-zone
+   membership, controlled asset tags, and source excerpts. If it fails, a model
+   gets one repair attempt; a second failure rejects the submission.
+3. Code derives boundary crossings, an allowed evidence catalog, and
+   framework-specific leads from the validated model. These leads tell an
+   analyzer what to inspect; they are not findings and cannot become findings
+   without a model making the security argument.
+4. When a framework's precondition passes, one specialized analyzer runs for
+   each of its lanes—six STRIDE categories or 17 ASVS chapters. The analyzers
+   run in parallel and propose claims with evidence.
+5. Code resolves those evidence references, verifies quoted text against the
+   submitted sources, composes claim IDs, and removes individual proposals that
+   cannot be represented safely. A claim based on an attribute the input left
+   unknown is mechanically assigned `needs-info`.
+6. Each framework's reviewer (called the **critic** in the code) judges the
+   remaining drafts. It may confirm or reject them, remove duplicates, and—for
+   STRIDE—correct severity. Code checks that every draft received one coherent
+   ruling. A malformed review gets one retry; another failure fails the job.
+7. Code builds one report containing the shared system model and one analysis
+   block per selected framework.
 
 ```mermaid
-flowchart LR
-    src(["sources<br/>(text)"]) --> extract["extract<br/>(base)"]
-    extract --> analyze["lane agents<br/>in parallel<br/>(strong)"]
-    analyze --> critic["critic<br/>(per framework, strong)"]
-    critic --> report(["Report<br/>(JSON)"])
-
-    classDef io fill:#f1f5f9,stroke:#64748b,stroke-width:1.5px,color:#0f172a
-    classDef llm fill:#ede9fe,stroke:#7c3aed,stroke-width:1.5px,color:#2e1065
-    class src,report io
-    class extract,analyze,critic llm
+flowchart TD
+    input([System description]) --> extract[Build system model]
+    extract --> check{Model valid?}
+    check -- no --> repair[One repair attempt]
+    repair --> check2{Valid now?}
+    check2 -- no --> rejected([Rejected])
+    check -- yes --> prepare[Derive crossings, evidence, and leads]
+    check2 -- yes --> prepare
+    prepare --> lanes[Specialized analyzers]
+    lanes --> review[Framework reviewer]
+    review --> report([Structured report])
 ```
 
-**One extraction, many frameworks.** A single pass builds the canonical **System
-Model** (a DFD), and every framework the job selected analyses that one model.
-A framework ships as an in-repo **package** — its lanes, its deterministic
-rules, its record type and its text — with STRIDE as the first one rather than
-as the architecture. Its six lane agents draft threats in parallel, each citing
-the grounds for every threat it raises, and each package's own critic reviews
-its merged union in one pass — confirming, deduping, calibrating severity, and
-rejecting what the model does not support. See [`CONTEXT.md`](CONTEXT.md) for
-the domain glossary.
+The model makes security judgements. Code handles work that can be checked
+mechanically. The distinction matters: a matched rule is a lead, not proof that
+a vulnerability exists.
 
-## Two ways to call it
+## What you get
 
-- **In process** — embed `Engine` and get a report back from a function
-  call. The path for swapping the engine in behind an existing analysis
-  interface.
-- **Over HTTP** — the async [`/v1` job API](docs/HTTP-API.md), authenticated with
-  a bearer token from any OIDC identity provider, for a decoupled front end.
+A completed report contains:
 
-Both surfaces drive the same pipeline and return the same
-[`Report`](docs/Report-Schema.md): one envelope carrying the shared system
-model, with one block per framework the job named.
+- the extracted system model and code-derived boundary crossings;
+- one block for every framework requested, in the requested order;
+- actionable claims, rejected drafts, and items that need more information;
+- grounds for every carried claim: source quotes, unknown or explicitly absent
+  attributes, derived crossings, or an element the model does not contain;
+- warnings for repaired quotes, unresolved references, dropped proposals, and
+  other faults that cost an entry rather than the whole report;
+- per-node timing, token use when the provider returns it, requested and served
+  model identifiers, and sampling fingerprints.
 
-**New here? [docs/First-Run.md](docs/First-Run.md)** takes you from a clone to a
-real report to the engine embedded in your own code, in five steps.
+Work Agent does **not** prove that a system is secure. The reports are generated
+by models and are not human-reviewed. Sparse or inaccurate input produces a
+sparse or inaccurate system model, which limits everything downstream.
 
-**No vendor is selected out of the box.** `config/model_tiers.toml` ships with
-both tiers empty, so choosing one is a required first step rather than an
-override — "no privileged default" is a property of what ships, not just of the
-mechanism. Reaching the models then needs credentials for whichever vendor each
-tier names: Google Cloud application default credentials plus a project and
-location for Vertex, or an API key for Anthropic or OpenAI. If either the
-selection or its credentials are missing, startup stops with an error naming
-what to set rather than running on some fallback nobody chose; see
-[docs/Configuration.md](docs/Configuration.md). Offline tests and the in-memory
-stub runner need none of it.
+## Try it
 
-## Repository layout
+You need Python 3.11 or newer, [uv](https://docs.astral.sh/uv/), and credentials
+for Vertex AI, Anthropic, or OpenAI.
 
-| Path | What lives here |
-|---|---|
-| `src/analysis_service/` | The shipped engine. Graph, agents, config loaders, report schema, HTTP API. |
-| `config/` | Versioned config that stops startup rather than falling back: `model_tiers.toml`, `sampling.toml`, `resilience.toml`, `blessed-fingerprints.toml`. |
-| `prompts/` | Agent prompts and per-category exemplars. |
-| `skills/` | The per-category STRIDE skill Markdown baked into the image. |
-| `docs/` | User-facing documentation (see below). |
-| `examples/` | Runnable embedding examples and the shared sample source. The source of truth for every code block in the docs. |
-| `webapp/` | The lite first-run web app, plus the loopback review and case-sitting apps. **Never ships** in the wheel; run from a clone. |
-| `evals/` | Golden-case corpus, scorer, and the [eval harness](evals/README.md). **Never ships** in the image. |
-| `tests/` | Offline test suite (no credentials required). |
+```sh
+git clone https://github.com/mstarks01/work-agent.git
+cd work-agent
+uv sync
+```
 
-The wheel bundles `config/`, `prompts/` and `skills/` alongside the engine
-(under `analysis_service/_bundled/`), so `pip install analysis-service` elsewhere
-resolves them with no extra step. This checkout's own `config/`, `prompts/`
-and `skills/` stay the source of truth — edit them here, not the bundled copy,
-which only exists inside a built wheel. The `ANALYSIS_*_DIR` variables still
-redirect any of them, in either layout.
+No model is selected in the shipped configuration. Choose both the `base` model
+(extraction and repair) and the `strong` model (framework analysis and review),
+then set the credentials for their providers. The short, copyable setup for
+each provider is in [First run](docs/First-Run.md).
+
+Start the local demonstration app:
+
+```sh
+uv run python webapp/main.py
+```
+
+Open <http://127.0.0.1:8000>, load the included example, choose the frameworks,
+and run the analysis. The app uses real models and stores its recent runs only
+in memory. It is deliberately bound to loopback and has no authentication; do
+not expose it to a network.
+
+You can also embed [`Engine`](docs/Integration-Guide.md) directly or use the
+authenticated asynchronous [`/v1` HTTP API](docs/HTTP-API.md). Both run the same
+pipeline and return the same report shape.
+
+## A few terms
+
+- **System model** — the typed data-flow model extracted from the sources. It is
+  the common input to every selected framework.
+- **Lane** — one specialized part of a framework: a STRIDE category or ASVS
+  chapter.
+- **Candidate** — a lead produced by code from the system model. It directs an
+  analyzer's attention but is neither evidence nor a finding.
+- **Ground** — the evidence a claim rests on.
+- **Critic** — the model that reviews one framework's proposed claims.
+- **Fingerprint** — a hash of the served model route and resolved sampling
+  settings for one model call. It identifies that generation setup; it does not
+  prove the finding is correct or guarantee the same output on another run.
+- **Certification** — a deployment-local comparison between observed sampling
+  fingerprints and a list the operator approved. The report separately records
+  an input digest and an instruction digest; certification does not combine or
+  judge those values.
+
+See [Concepts](docs/Concepts.md) for the full plain-language glossary.
 
 ## Documentation
 
-- **[First-Run](docs/First-Run.md)** — start here; clone to embedded engine in five steps.
-- [Integration-Guide](docs/Integration-Guide.md) — embed the engine in process.
-- [Web-App](docs/Web-App.md) — the lite local front end used on the first run.
-- [Report-Schema](docs/Report-Schema.md) — the result shape, provenance, and the three outcomes.
-- [Configuration](docs/Configuration.md) — config files, environment variables, and per-tier decoding.
-- [HTTP-API](docs/HTTP-API.md) — the `/v1` async job contract, and its bearer auth.
-- [Architecture](docs/Architecture.md) — the graph, the seams, and how a run is certified.
-
-Measuring the analysis, for contributors changing prompts, sampling or the
-corpus:
-
-- [CONTRIBUTING](CONTRIBUTING.md) — **start here.** What you can contribute
-  with time alone, and what needs a provider key.
-- [evals/README](evals/README.md) — what the harness measures, and what every
-  number does and does not mean.
-- [evals/TUNING](evals/TUNING.md) — change one lever, measure it against the
-  run-to-run noise, ship what beats it.
-- [evals/VOTING](evals/VOTING.md) — hold a review sitting: what each answer
-  moves, and how a vote reaches the numbers.
-- [evals/BLESSING](evals/BLESSING.md) — author a golden case and its reference
-  set, per framework.
-- [evals/BASELINES](evals/BASELINES.md) — run the corpus through your own
-  models and contribute the result.
-
+- [First run](docs/First-Run.md) — install, select models, and produce a report.
+- [Concepts](docs/Concepts.md) — understand the project without reading the
+  implementation.
+- [Integration guide](docs/Integration-Guide.md) — embed the engine and handle
+  all outcomes.
+- [Web app](docs/Web-App.md) — use the local demonstration UI.
+- [Report schema](docs/Report-Schema.md) — consume the JSON report.
+- [Configuration](docs/Configuration.md) — models, credentials, sampling,
+  resilience, and input limits.
+- [HTTP API](docs/HTTP-API.md) — run the service behind an authenticated API.
+- [Architecture](docs/Architecture.md) — implementation details and extension
+  points.
+- [Contributing](CONTRIBUTING.md) — development and evaluation workflow.
 
 ## Development
 
-The project uses [uv](https://docs.astral.sh/uv/). Python ≥ 3.11.
+The offline suite needs no provider credentials:
 
 ```sh
-uv sync                                    # install deps into .venv
-uv run pytest                              # the offline suite — no credentials needed
-uv run ruff check .                        # lint
-uv run mypy                                # type check
-uv run python evals/verify_corpus.py       # mechanical checks over the golden corpus
-uv run python examples/sync_docs.py --check # the docs' code blocks match examples/
+uv run pytest
+uv run ruff check .
+uv run mypy
+uv run python evals/verify_corpus.py
+uv run python examples/sync_docs.py --check
 ```
 
-The tracked `pre-push` hook runs the two ruff checks and the type check CI runs.
-Git does not enable hooks for a clone on its own, so opt in once:
+Two commands do call configured providers:
 
-```sh
-git config core.hooksPath .githooks
-```
+- `uv run python -m analysis_service.smoke` runs a small end-to-end analysis.
+- `uv run python -m evals.harness.run run` evaluates the corpus.
 
-It is a convenience guard rather than a gate — CI is authoritative, and
-`git push --no-verify` skips it.
-
-Everything under `tests/` and `evals/verify_corpus.py` is credential-free and
-deterministic. So is most of the eval harness: only `run` calls a provider, and
-scoring, re-scoring, calibration and the review queue all read files. Two
-commands need configured provider credentials — `python -m analysis_service.smoke`
-runs one small job through the shipped graph to check that the vendor you
-selected actually serves it, and `python -m evals.harness.run run` sweeps the
-golden corpus. See [evals/TUNING.md](evals/TUNING.md) for the loop those
-numbers feed.
-
-## Status
-
-The analysis code is complete and covered by an offline test suite. Three things
-are worth stating separately, because they are different kinds of claim:
-
-- **The blessed-fingerprint list ships empty, permanently and by design.**
-  `config/blessed-fingerprints.toml` is *deployment-local*: certification attests
-  that a report came from the exact model builds and sampling parameters your
-  deployment blessed, so the project can never ship a certified pair on your
-  behalf. An empty list is the correct shipped state, not missing work.
-- **Per-tier sampling is an open tuning loop.** The shipped file states no
-  decoding value it cannot state for every model, so each tier runs at its
-  model's own default. Improving the per-tier values is a measured process
-  against the golden corpus — see [evals/TUNING.md](evals/TUNING.md).
-- **No provider has served a request in CI.** Two kinds of live lane exist and
-  neither has run: the per-vendor [provider smoke](docs/Configuration.md#checking-that-a-provider-actually-serves-the-graph),
-  which asks whether a vendor serves this graph at all, and the golden-corpus
-  eval sweeps, which ask how good its threat models are. Both need credentials
-  this repository does not hold, and each says so in its own job summary rather
-  than passing quietly. This is a not-yet rather than a cannot.
-
-Persistent job and session backends are left as seams — the in-memory defaults
-are enough to get a report in process.
-
-## Licence
-
-The code is [Apache-2.0](LICENSE).
-
-The ASVS package's text is not. `src/analysis_service/frameworks/asvs/catalog.json`
-and the 17 files at `frameworks/asvs/lanes/*/skill.md` reproduce the 345
-requirement sentences of OWASP ASVS 5.0.0, which OWASP publishes under
-[CC BY-SA 4.0](LICENSE-CC-BY-SA-4.0.txt). Those files carry that licence and its
-ShareAlike condition. The Python that reads the catalog collects it rather than
-adapts it, so the rest of the tree stays Apache-2.0.
-
-Four evaluation cases are prose conversions of OWASP Threat Model Cookbook
-models, which are CC BY 4.0 or Apache-2.0 upstream. Attribution only, no
-ShareAlike; each case names its source model in the `provenance` field of its
-`case.json`.
-
-[NOTICE](NOTICE) is the authoritative list: it names every third-party work,
-every file the work governs, and what changed. `CONTENT_LICENSE` in
-`src/analysis_service/frameworks/__init__.py` keys the same fact by framework, so
-a new package that quotes a standard cannot ship without an entry and a NOTICE
-line.
+The code is Apache-2.0. The ASVS catalog and the 17 ASVS lane skill files
+reproduce OWASP ASVS 5.0.0 under CC BY-SA 4.0. [NOTICE](NOTICE) records the
+exact scope of third-party material.

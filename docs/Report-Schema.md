@@ -1,10 +1,14 @@
 # Report Schema
 
-A successful analysis returns a `Report` (from `analysis_service.report`). It is
-**self-contained**: every element a claim references resolves inside the one
-embedded system model, so a consumer needs nothing but the one payload. The
-model validators enforce that on construction — a report that does not hold
-together cannot be built.
+A successful analysis returns a `Report` from `analysis_service.report`. The
+report keeps the result and the system model it was based on in one payload.
+Code verifies that referenced element IDs exist, boundary crossings match the
+embedded model, summary counts match the claims, and the framework blocks match
+the job's request. A report that fails those checks cannot be constructed.
+
+This structural consistency is useful but limited. It does not establish that
+the extraction or security judgement is correct. Start with
+[Concepts](Concepts.md) for the plain-language meaning of the fields below.
 
 Get one from either [the engine](Integration-Guide.md) (`outcome.report`) or the
 [`/v1/jobs/{id}/report`](HTTP-API.md) endpoint.
@@ -15,9 +19,8 @@ Run the [web app](Web-App.md) — [First-Run](First-Run.md) step 3. It renders a
 real report of your own: finding cards, a severity summary, the extracted DFD,
 and the per-node provenance panel.
 
-There is no checked-in sample report in this repository. One would be a second
-description of this schema, drifting from the schema itself every time it moved,
-and the fields below are the authoritative account.
+There is no checked-in static sample report. The local app renders the current
+schema directly from a real run.
 
 ## One envelope, N framework blocks
 
@@ -786,8 +789,11 @@ number.
 
 ## Provenance
 
-The report records exactly which models and decoding parameters produced it, so
-a result stands on its own without trusting any outside record.
+The report records the configured and provider-reported model identifiers, the
+resolved decoding parameters, and related run metadata. These values let a
+consumer audit the generation setup without an outside log. They are not a
+complete causal record of the output: input and instruction identity are stored
+in separate fields, and provider behavior remains probabilistic.
 
 ```python
 class NodeRun:
@@ -825,10 +831,11 @@ class TokenUsage:
   because it is the one profiled family whose two values differ. On Claude,
   both fields hold the same string.
 - **`sampling_fingerprint`** is a hash of the served route plus those parameters
-  — one value identifying exactly how a node generated its output. It can be
-  recomputed from the node's `model` and its tier's entry in `sampling`, so
-  anyone can verify it. Code-only nodes (like `assemble`) have all three as
-  `null`.
+  — one value identifying the model-and-sampling setup used for that call. It
+  can be recomputed from the node's `model` and its tier's entry in `sampling`,
+  so a consumer can verify that those recorded fields agree. It does not hash
+  the input, instructions, or output. Code-only nodes (like `assemble`) have all
+  three as `null`.
 
 - **`usage`** is what the provider reported the call cost, in vendor-neutral
   field names. `null` for code-only nodes, and for any LLM node whose provider
@@ -937,12 +944,12 @@ a node appears once in it; across an eval sweep a node appears once per case, an
 a build that moved partway through gives that one node two different
 fingerprints. That is the signal, not a defect.
 
-The fingerprint, not `seed`, is what makes a result reproducible to reason
-about: `seed` is best-effort, and some vendors don't accept it at all. The
-report carries fingerprints as-is. Whether they match a baseline that a
-*particular deployment* has blessed is a separate question, answered against
-that deployment's `config/blessed-fingerprints.toml` and recorded on the job —
-never on the report, which travels as portable evidence. See
+The fingerprint makes model-and-sampling drift visible; it does not make the
+result reproducible. `seed` is best-effort, and some vendors do not accept it.
+Whether the observed fingerprints match a baseline that a *particular
+deployment* has blessed is a separate question, answered against that
+deployment's `config/blessed-fingerprints.toml` and recorded on the job—never
+on the report. See
 [Architecture → Provenance and certification](Architecture.md#provenance-and-certification).
 
 A report produced without live models (the in-memory stub runner, or eval
