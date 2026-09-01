@@ -204,7 +204,7 @@ def _is_derived(rel: str) -> bool:
 
     Derived files leave the delta before any check reads it, which is what
     makes a regeneration an ordinary code change: it selects no kind, so it
-    names no reviewer and appends no entry. Before this, refreshing the
+    names no submitter and appends no entry. Before this, refreshing the
     reading documents was classified as twelve sittings by twelve people who
     had not read anything, and there was no diff that could pass.
     """
@@ -577,11 +577,17 @@ def _appended(root: Path, case: str) -> list[dict]:
 
 
 def _check_sitting_is_yours(root: Path, author: str) -> Check:
-    """#327 check 1, failed early: every appended entry names the author.
+    """#327 check 1, failed early: every appended entry is submitted by the author.
 
     This also carries the gate ADR 0020 took off the cardinality check: a case
     directory in the diff whose metadata appends nothing refuses the whole
-    submission, so a reader cannot carry a case they did not sit.
+    submission, so a submission cannot carry a case it did not sit.
+
+    **It reads ``submitted_by`` and never ``submitted_for``.** The submitting
+    account is what `gh` proves, and it stays bound to the author exactly as
+    #320 rules. ``submitted_for`` names who read the case, is free to be
+    :data:`~evals.harness.reference.ANONYMOUS` or another person, and is
+    checked by nothing here — because it grants nothing anywhere.
     """
     problems: list[str] = []
     for case in _sitting_cases(root):
@@ -595,13 +601,14 @@ def _check_sitting_is_yours(root: Path, author: str) -> Check:
                     f"{case}/case.json: an appended entry is malformed: {exc}"
                 )
                 continue
-            if sitting.reviewer != author:
+            if sitting.submitted_by != author:
                 problems.append(
-                    f"{case}: an appended entry names {sitting.reviewer!r}; you"
-                    f" are {author!r}, and a sitting only enters through its"
-                    " own reviewer's PR (#320)"
+                    f"{case}: an appended entry is submitted by"
+                    f" {sitting.submitted_by!r}; you are {author!r}, and a"
+                    " sitting only enters through its own submitter's PR"
+                    " (#320)"
                 )
-    return _check("every appended sitting names you", problems)
+    return _check("every appended sitting is submitted by you", problems)
 
 
 def _check_sitting_evidence(root: Path, author: str) -> Check:

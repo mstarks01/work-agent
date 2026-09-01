@@ -38,6 +38,7 @@ would quietly lower the recall denominator.
 from __future__ import annotations
 
 import json
+import re
 from collections.abc import Mapping
 from dataclasses import dataclass
 from pathlib import Path
@@ -375,8 +376,44 @@ class ReadRecord(BaseModel):
     sha256: str = Field(pattern=r"^[0-9a-f]{64}$")
 
 
+#: What a sitting records when the person who read the case is not named.
+#: A reserved word rather than an empty field: the read happened, and a blank
+#: reads as a field nobody filled in. Nothing resolves it — no roster lookup,
+#: no standing, no count — so two anonymous reads are two reads by nobody the
+#: record names, which is what anonymity means.
+ANONYMOUS = "anonymous"
+
+#: The GitHub login shape, as ledger.GITHUB_LOGIN spells it — but pydantic's
+#: regex engine has no look-ahead, so the length rides on ``max_length``.
+_LOGIN = r"[A-Za-z0-9](?:-?[A-Za-z0-9])*"
+
+#: The longest either name may be, which is GitHub's own login limit. It is a
+#: separate bound rather than part of the pattern because pydantic's regex
+#: engine has no look-around to express it.
+MAX_NAME = 39
+
+#: What ``submitted_for`` accepts, spelled once: a login, or the reserved
+#: word. The model validates a merged entry against it and
+#: :func:`is_submitted_for` validates a launch argument, so a value a session
+#: accepts is a value the record can hold (A05).
+SUBMITTED_FOR_PATTERN = rf"^({_LOGIN}|{ANONYMOUS})$"
+
+
+def is_submitted_for(value: str) -> bool:
+    """Whether one value may stand as ``submitted_for``.
+
+    The command line asks this before a session starts, so a name the record
+    cannot hold stops the reader at their terminal rather than at the pull
+    request they open an hour later.
+    """
+    return (
+        len(value) <= MAX_NAME
+        and re.fullmatch(SUBMITTED_FOR_PATTERN, value) is not None
+    )
+
+
 class CaseSitting(BaseModel):
-    """One **Case Sitting**: who read this case, when, which bytes, and the evidence.
+    """One **Case Sitting**: who read this case, who carries it, and which bytes.
 
     ``evals/BLESSING.md`` step 6 is one reading session over ``source.md``, the
     model and every reference set together. Until an entry exists on a case,
@@ -385,18 +422,32 @@ class CaseSitting(BaseModel):
     to review sitting 01. ``tests/test_case_review.py`` names every case still
     waiting and fails on a new one that arrives without an entry.
 
-    ``reviewer`` is the GitHub login of the account whose PR carries the
-    sitting — the same binding a vote uses (#320), checked by CI. ``document``
-    names the filled ``REVIEW-<login>.md`` committed beside the case, because
-    only the filled copy shows the method ran; the generated ``REVIEW.md``
-    stays derived and unfilled.
+    **Two names, because they answer two questions.** ``submitted_by`` is the
+    GitHub login of the account whose PR carries the sitting — the accountable
+    half, bound to the authenticated login and checked by CI, and the only one
+    the roster, the **Standing** and :func:`~evals.harness.sitting.clears` ever
+    read. ``submitted_for`` is who did the reading. It equals ``submitted_by``
+    where a person reads their own case, and it is :data:`ANONYMOUS` where an
+    account submits for a reader whose own policy stops them taking part under
+    their name.
+
+    That split is what makes the record true in both shapes. One name forced a
+    proxied read into one of two lies: the submitter signs words they did not
+    write, or the read disappears.
+
+    ``document`` names the filled ``REVIEW-<login>.md`` committed beside the
+    case, under ``submitted_by``'s login, because that is the account whose
+    submission may write it.
     """
 
     model_config = ConfigDict(extra="forbid", frozen=True)
 
-    #: The GitHub login shape, as ledger.GITHUB_LOGIN spells it — but pydantic's
-    #: regex engine has no look-ahead, so the length rides on ``max_length``.
-    reviewer: str = Field(pattern=r"^[A-Za-z0-9](?:-?[A-Za-z0-9])*$", max_length=39)
+    #: The account that carries the sitting. Accountability lives here alone.
+    submitted_by: str = Field(pattern=rf"^{_LOGIN}$", max_length=MAX_NAME)
+    #: Who read the case: a login, or :data:`ANONYMOUS`. It is provenance and
+    #: never authority — a value here clears no case and carries no standing,
+    #: so no rule has to ask whether the name behind it is real.
+    submitted_for: str = Field(pattern=SUBMITTED_FOR_PATTERN, max_length=MAX_NAME)
     #: ISO date. A sitting is a dated event; the reference set moves under it.
     date: str = Field(pattern=r"^\d{4}-\d{2}-\d{2}$")
     read: list[ReadRecord] = Field(min_length=1)

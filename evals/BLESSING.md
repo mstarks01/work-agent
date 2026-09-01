@@ -335,7 +335,7 @@ wrote and says almost nothing about whether it is right.
 
 ### 6. Bless and merge
 
-One reading session, one pull request, one approval. The reviewer signs off on
+One reading session, one pull request, one approval. The reader signs off on
 `source.md`, `model.json`, the `claims/` reference sets, and the labelled pairs
 **together** — they're one artifact, and reviewing them separately loses the
 property that the threat set is exhaustive *against that model*.
@@ -397,22 +397,45 @@ them apart.
 ```json
   "reviews": [
     {
-      "reviewer": "<your GitHub login>",
+      "submitted_by": "<the GitHub login opening the PR>",
+      "submitted_for": "<who read the case: a login, or the word anonymous>",
       "date": "<YYYY-MM-DD>",
       "read": [
         {"file": "source.md", "sha256": "<the file's digest>"},
         {"file": "model.json", "sha256": "<the file's digest>"},
         {"file": "claims/stride.json", "sha256": "<the file's digest>"}
       ],
-      "document": "REVIEW-<your GitHub login>.md",
+      "document": "REVIEW-<the submitting GitHub login>.md",
       "notes": "<counts, and anything you changed>"
     }
   ],
 ```
 
-`reviewer` is the GitHub login of the account whose PR carries the sitting,
-and the reviewer needs a line in `evals/review/voters.toml`, which `submit`
-adds for a first-timer with standing `contributor`. `read` pins the bytes the sitting
+**The entry carries two names, because they answer two questions.**
+
+`submitted_by` is the GitHub login of the account whose PR carries the sitting.
+It answers for the read. It needs a line in `evals/review/voters.toml`, which
+`submit` adds for a first-timer with standing `contributor`, and it is the name
+every rule reads: the clearing rule, the **Standing** on the read, the document
+name and the allowlist a pull request may write inside.
+
+`submitted_for` is who did the reading. Write your own login where you read the
+case yourself. Write `anonymous` where you carry a read for somebody whose own
+policy stops them taking part under their name — the field records that the
+read happened and who answers for it, without naming a person who cannot be
+named. It needs no roster line, it carries no standing and it clears no case,
+so widening who may read costs the measurement nothing.
+
+Pass `--submitted-for` to the app to record a read you carry:
+
+```sh
+uv run python webapp/sitting.py --submitted-for anonymous
+```
+
+Then the filled document opens with `Read by anonymous, submitted by <login>.`,
+so nobody later reads the file name as the author.
+
+`read` pins the bytes the sitting
 covered: a later PR that edits a read file puts the case back on the list
 fail-closed.
 `document` names the filled copy, committed beside the case, because only the
