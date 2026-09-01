@@ -237,8 +237,8 @@ Only after your own list exists.
 For each, mark one of:
 
 - `agree` — a real finding against this system, worth reporting.
-- `doubt` — overstated, unsupported by the text, or not really a finding here.
-- `dup` — the same finding as another entry on this list, by number.
+- `reject` — overstated, unsupported by the text, or not really a finding here.
+- `duplicate` — the same finding as another entry on this list, by number.
 
 Then, at the end of the last part, note anything on **your** list that is not
 on either of them. That is the finding this sitting exists for.
@@ -420,15 +420,15 @@ The point of the sitting. One line each, and say which set you expected it in.
 
 ## What to do with the result
 
-**Counts first**, kept apart per framework: how many `agree`, `doubt`, `dup`
-per part, and how many of your own items are missing from either set.
+**Counts first**, kept apart per framework: how many `agree`, `reject`,
+`duplicate` per part, and how many of your own items are missing from either set.
 
-- **Few doubts, nothing important missing** — the sets hold, and the numbers
+- **Few `reject` marks, nothing important missing** — the sets hold, and the numbers
   measured against them have a standard behind them.
 - **A whole class of attack missing** — the serious outcome. Recall is measured
   against these sets, so the tool has been scoring full marks for a gap nobody
   could see. Extend the set, and re-derive what was quoted against it.
-- **Several doubts** — the sets overstate, inflating the denominator. Cheaper
+- **Several `reject` marks** — the sets overstate, inflating the denominator. Cheaper
   direction, still wrong.
 
 **Then record the sitting.** Save this filled document as
@@ -444,8 +444,8 @@ this entry to `reviews` in `evals/corpus/04-ml-inference-service/case.json`, whi
       "date": "<YYYY-MM-DD>",
       "read": [
         {"file": "source.md", "sha256": "3da14d8d61e45baa73b0a7ee2b6935b0da3c1d47c62fdf9cb30ef4a09d6c67b6"},
-        {"file": "model.json", "sha256": "a2caf6af61c17bacd18af48713668edbefac6099699fedee477edb78f8f204e2"},
-        {"file": "claims/asvs.json", "sha256": "6317540bc9a0e28111098cd3677d09baf8c0631936b234ba4f08e7ba1f570562"},
+        {"file": "model.json", "sha256": "e0a3a1a0bf67fefcbd10b510e4ed5e7a15f2e47651bc5cdc8f660899de65d37c"},
+        {"file": "claims/asvs.json", "sha256": "3985e6d73b9aa5b5dc8f1b72eee1930c67fab410a2d4710041b39df07339ad31"},
         {"file": "claims/stride.json", "sha256": "219c4116a56305055f1ff4ce543c246ab37e0bb5e3082e83523044d56d5fb94d"}
       ],
       "document": "REVIEW-<your GitHub login>.md",

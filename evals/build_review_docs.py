@@ -36,6 +36,11 @@ CORPUS = EVALS / "corpus"
 #: was derived from; regenerating it would overwrite the historical record.
 HAND_WRITTEN = frozenset({"01-payments-checkout"})
 
+#: What this generator writes beside each case. Named rather than spelled at
+#: each use, because ``evals/harness/submit.py`` has to know which file under
+#: a case directory is derived and which is somebody's evidence.
+GENERATED_DOCUMENT = "REVIEW.md"
+
 PREAMBLE = """\
 **What you are checking.** Not whether two write-ups are the same threat — the
 identity rule decides that mechanically. This asks the question underneath:
@@ -551,9 +556,11 @@ def main() -> int:
         meta = load_meta(case_dir / "case.json")
         if meta.get("reviews"):
             continue
-        (case_dir / "REVIEW.md").write_text(build_doc(case_dir), encoding="utf-8")
+        (case_dir / GENERATED_DOCUMENT).write_text(
+            build_doc(case_dir), encoding="utf-8"
+        )
         written += 1
-        print(f"wrote {case_dir.name}/REVIEW.md")
+        print(f"wrote {case_dir.name}/{GENERATED_DOCUMENT}")
     print(f"{written} reading document(s)")
     return 0
 

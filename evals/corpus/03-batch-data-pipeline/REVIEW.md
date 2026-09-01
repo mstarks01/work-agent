@@ -121,8 +121,8 @@ Only after your own list exists.
 For each, mark one of:
 
 - `agree` — a real finding against this system, worth reporting.
-- `doubt` — overstated, unsupported by the text, or not really a finding here.
-- `dup` — the same finding as another entry on this list, by number.
+- `reject` — overstated, unsupported by the text, or not really a finding here.
+- `duplicate` — the same finding as another entry on this list, by number.
 
 Then, at the end of the last part, note anything on **your** list that is not
 on either of them. That is the finding this sitting exists for.
@@ -296,15 +296,15 @@ The point of the sitting. One line each, and say which set you expected it in.
 
 ## What to do with the result
 
-**Counts first**, kept apart per framework: how many `agree`, `doubt`, `dup`
-per part, and how many of your own items are missing from either set.
+**Counts first**, kept apart per framework: how many `agree`, `reject`,
+`duplicate` per part, and how many of your own items are missing from either set.
 
-- **Few doubts, nothing important missing** — the sets hold, and the numbers
+- **Few `reject` marks, nothing important missing** — the sets hold, and the numbers
   measured against them have a standard behind them.
 - **A whole class of attack missing** — the serious outcome. Recall is measured
   against these sets, so the tool has been scoring full marks for a gap nobody
   could see. Extend the set, and re-derive what was quoted against it.
-- **Several doubts** — the sets overstate, inflating the denominator. Cheaper
+- **Several `reject` marks** — the sets overstate, inflating the denominator. Cheaper
   direction, still wrong.
 
 **Then record the sitting.** Save this filled document as
@@ -320,7 +320,7 @@ this entry to `reviews` in `evals/corpus/03-batch-data-pipeline/case.json`, whic
       "date": "<YYYY-MM-DD>",
       "read": [
         {"file": "source.md", "sha256": "df7757178c394258cbcf1643e81fca5b01f324058a0841824f008e74346da2d0"},
-        {"file": "model.json", "sha256": "fbc0ff86459fa7282570e5d49923b7cf226761b1abe90cb3c569c730afde4f6f"},
+        {"file": "model.json", "sha256": "37d3e8f3229ce0fe2d196968aa8b3bf66bbe01e5aeb6dae8b52b92c8b8a5ecfb"},
         {"file": "claims/stride.json", "sha256": "0cff7f5fd30438bc4a6152acea87bf84fbaf5404252d9c19caeebb2b67f2e12d"}
       ],
       "document": "REVIEW-<your GitHub login>.md",
