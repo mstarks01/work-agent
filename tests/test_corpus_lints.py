@@ -9,6 +9,7 @@ from __future__ import annotations
 
 import json
 import re
+import shutil
 
 import pytest
 
@@ -430,12 +431,15 @@ def test_the_reading_document_is_what_its_generator_writes(case_dir):
     holding a sitting offline works from this file alone, so a stale copy is
     wrong in their hands rather than merely untidy in the tree — they mark
     with words the app refuses, and paste an entry ``submit sitting`` rejects.
+
+    **A case that records a sitting is covered too.** A sitting does not retire
+    a case, and the generator no longer skips one — so this covers every case
+    it writes. The skip that stood here was the one hole left in the guard: a
+    derived file leaves the submission delta, so a case neither the generator
+    nor this check reached would be pinned by nothing at all.
     """
     if case_dir.name in build_review_docs.HAND_WRITTEN:
         pytest.skip("hand-written; regenerating it would overwrite the record")
-    meta = json.loads((case_dir / "case.json").read_text(encoding="utf-8"))
-    if meta.get("reviews"):
-        pytest.skip("a sitting clears this case, so the generator writes none")
 
     document = case_dir / build_review_docs.GENERATED_DOCUMENT
     assert document.is_file(), (
@@ -450,3 +454,39 @@ def test_the_reading_document_is_what_its_generator_writes(case_dir):
         " generator writes. Run 'python evals/build_review_docs.py' and commit"
         " the result — a sitting PR no longer has to carry it."
     )
+
+
+def test_the_check_covers_every_document_the_generator_writes():
+    """The guard is two halves, and they have to meet.
+
+    A reading document is derived, so it leaves the submission delta and the
+    scope check never sees it. That leaves
+    ``test_the_reading_document_is_what_its_generator_writes`` as the only
+    thing pinning one, and a case the generator writes but that check skips
+    would be pinned by nothing at all. So the two selections are compared
+    rather than kept level by hand.
+    """
+    covered = {
+        case_dir
+        for case_dir in verify_corpus.case_dirs()
+        if case_dir.name not in build_review_docs.HAND_WRITTEN
+    }
+    assert covered == set(build_review_docs.documents())
+
+
+def test_a_case_that_records_a_sitting_still_gets_a_document(tmp_path):
+    """A sitting does not retire a case, so its document stays current.
+
+    A second reader may sit the same case, and a change to any file a sitting
+    read puts that case back on the unreviewed list. A generator that stopped
+    here would let the document go stale exactly while somebody needed it.
+    """
+    source = verify_corpus.case_dirs()[-1]
+    case_dir = tmp_path / source.name
+    shutil.copytree(source, case_dir)
+    meta = json.loads((case_dir / "case.json").read_text(encoding="utf-8"))
+    assert not meta.get("reviews"), "this case was chosen for having none"
+    meta["reviews"] = [{"reviewer": "ada", "date": "2026-09-01"}]
+    (case_dir / "case.json").write_text(json.dumps(meta), encoding="utf-8")
+
+    assert case_dir in build_review_docs.documents(tmp_path)
