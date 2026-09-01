@@ -17,13 +17,16 @@ re-score explicit, total and free.
 **Version 1 reads what a claim carries today.** Framework, lane and the
 endpoint-resolved **Element** IDs. It has a measured cost:
 ``tests/test_evals_identity.py``'s ``endpoint subset`` row prices element
-agreement alone at 14 false splits over 200 labelled pairs and 23 false merges
-over 287 reference pairs.
+agreement alone at 14 false splits of 200, 85 false merges of 115 candidate
+negatives and 23 false merges of 287 reference pairs.
 
 **Version 2 adds the action verb**, which is what closes most of that gap: it
-costs one more false split and removes twenty of the 23 false merges, and
-:class:`~evals.harness.identity.SubsetVerbIdentity` scores 185/200 against the
-recorded labels where element agreement alone scores 111.
+costs one more false split and takes the candidate merges from 85 to 5. Read
+the candidate column rather than the reference one — on reference pairs alone
+the verb removes twenty of 23 and version 1 looks survivable, and on the
+paraphrases a live run actually emits it removes eighty of 85.
+:class:`~evals.harness.identity.SubsetVerbIdentity` scores 295/315 against the
+recorded labels where element agreement alone scores 200/315.
 
 It is the default. :class:`~analysis_service.report.Claim` carries the verb and
 :class:`~analysis_service.frameworks.stride.record.DraftThreat` requires it, so a

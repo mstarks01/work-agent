@@ -295,13 +295,17 @@ from. A rule change is then arithmetic over the ledger's files.
    python -m evals.harness.run calibrate --out agreement.json
    ```
 
-   The command prints false splits, then false merges, then the 90% bar. Read
-   them in that order, because the bar is the weakest of the three.
+   The command prints false splits, then false merges on both populations,
+   then a collision line for every other package, then the 90% bar. Read them
+   in that order: the bar is the weakest signal on the page.
 
-   - **The merge count must not rise.** A rule that matches too readily raises
-     recall silently, which is the expensive direction to be wrong: a merged
-     finding leaves no unmatched claim for anybody to review. A new merge needs
-     a reason recorded in `verbs.UNSEPARATED`, or the rule is wrong.
+   - **No merge count may rise, on any population.** A rule that matches too
+     readily raises recall silently, which is the expensive direction to be
+     wrong: a merged finding leaves no unmatched claim for anybody to review.
+     Watch the candidate column first — it is the population a live run
+     resembles, and an element-only rule that merges 23 of 287 reference pairs
+     merges 85 of 115 candidates. A new collision needs a reason in that
+     package's `recorded_collisions`, or the rule is wrong.
    - **The split count must not rise without an argument.** A split costs a
      reviewer one unmatched finding, which is visible and recoverable, so a rule
      may trade splits for merges — `SubsetVerbIdentity` takes one more split to
