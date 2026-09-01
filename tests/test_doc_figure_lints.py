@@ -134,7 +134,7 @@ def _error_directions() -> Mapping[str, object]:
     matcher = SubsetVerbIdentity(_flows_by_case(corpus))
     pairs = [pair for pair in load_pairs() if pair.is_scored]
     result = measure_agreement(matcher, pairs)
-    merges = measure_merges(matcher, corpus, "stride")
+    merges = measure_merges(corpus, "stride", _flows_by_case(corpus))
     positives = sum(1 for pair in pairs if pair.label_match)
     return {
         "splits": len(result.false_non_matches),

@@ -281,10 +281,19 @@ new case that skips this step is the only way that test goes red.
 
 ### 5. Label the calibration pairs
 
-**STRIDE only.** The labels exist because STRIDE's claim set is open and its
-claims are prose. ASVS matches by requirement ID, so it reaches no
-claim-equivalence question and contributes no pair — that is settled design
+**Only a package whose claim set is open and written in prose gets pairs.**
+Nothing but a labelled pair can say whether two spellings name one attacker
+action, so STRIDE needs them. A package whose claim names a catalog requirement
+is identified by that requirement, so a prose pair adds nothing a comparison of
+identifiers does not already settle, and it contributes none — settled design
 ([#167](https://github.com/mstarks01/work-agent/issues/167)), not an omission.
+`IDENTITY_VALIDATION` in `evals/harness/calibration.py` is that table, and it
+answers for every package in `PACKAGES`.
+
+**Every package still gets a collision measurement**, whatever it composes its
+identity from: keying two distinct claims alike destroys a finding and nobody
+sees it go. `python -m evals.harness.run calibrate` prints one line per
+package.
 
 In the same sitting, label candidate threat pairs as match / no-match /
 `unclear` / `unsupported` in `build_pairs.py`. **Write `unclear` when the two sentences alone

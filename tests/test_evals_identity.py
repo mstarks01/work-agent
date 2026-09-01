@@ -423,7 +423,7 @@ def test_the_shared_merge_measurement_matches_the_frontier(corpus, flows_by_case
     the doc lint need the shipped rule's number without the other six. Two
     computations of one figure drift, so this pins them together.
     """
-    merges = measure_merges(SubsetVerbIdentity(flows_by_case), corpus, "stride")
+    merges = measure_merges(corpus, "stride", flows_by_case)
 
     assert merges.within_lane_pairs == VERB_MEASURED["within_lane_pairs"]
     assert len(merges.merges) == VERB_MEASURED["subset_verb"]

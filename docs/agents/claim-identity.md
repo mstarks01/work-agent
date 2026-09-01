@@ -233,23 +233,36 @@ and it is checked against `PACKAGES`. A fingerprint rule keyed by framework must
 be checked the same way: a table nobody compares to its registry fails as
 quietly as the `if` it replaced.
 
-**Identity *validation* is not yet keyed, and that is a known gap.** Which
-evidence a package needs follows from its claim type, and the two claim types
-shipped today need different evidence:
+**Identity validation is keyed too**, by `IDENTITY_VALIDATION` in
+`evals/harness/calibration.py`, checked against `PACKAGES` in
+`tests/test_framework_neutrality.py`. Which evidence a package needs follows
+from its claim type:
 
-| Claim type | Needs candidate pairs? | Needs a collision measurement? |
+| Claim type | Needs candidate pairs? | How a collision is decided |
 |---|---|---|
-| an open claim set in prose | yes — only a labelled pair says whether two spellings are one action | yes, within lane |
-| a claim naming a catalog requirement | no — the identifier decides equivalence | yes, on identifier and scope |
+| an open claim set in prose | yes — only a labelled pair says whether two spellings name one action | one lane, endpoint subset, one action |
+| a claim naming a catalog requirement | no — the identifier decides equivalence | one lane, one requirement, one place |
 
-The first column is settled: `evals/BLESSING.md` step 5 records from #167 that a
-package matching by requirement identifier reaches no claim-equivalence question
-and contributes no pair. The second is not. STRIDE has a collision measurement
-and ASVS has none, so an ASVS collision would destroy a finding with nothing to
-notice. `calibration.measure_merges` raises for a package whose claims carry no
-lane rather than answering zero, because "nothing was asked" must not read as
-"no collisions". Keying this and giving ASVS its own measurement is
-[#512](https://github.com/mstarks01/work-agent/issues/512).
+The first column is settled design: `evals/BLESSING.md` step 5 records from #167
+that a package matching by requirement identifier reaches no claim-equivalence
+question and contributes no pair.
+
+**The second column does not follow from the first.** Every claim type can
+destroy a finding by keying two distinct claims alike, and the cost is the same
+whatever the identity is composed from — the second finding stops existing and
+no reviewer sees it go. So every package carries a collision rule, and
+`measure_merges` raises for a package with no entry rather than answering zero:
+"nothing was asked" must never read as "no collisions".
+
+| Package | Comparable reference pairs | Collisions |
+|---|---|---|
+| `stride` | 287 | 3 |
+| `asvs` | 20 | 0 |
+
+ASVS's denominator is small because the chapter separates almost everything
+first: 448 within-case pairs, of which 20 share a chapter, of which none shares
+a requirement identifier. A rise in the second column would mean two rulings on
+one requirement in one place, and one vote answering for both.
 
 ## Where each piece lives
 
