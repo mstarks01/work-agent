@@ -1239,18 +1239,24 @@ def command_calibrate(args: argparse.Namespace) -> int:
     matcher = SubsetVerbIdentity(_flows_by_case(corpus))
     result = measure_agreement(matcher, pairs)
     merges = measure_merges(matcher, corpus, "stride")
+    positives = sum(1 for pair in pairs if pair.is_scored and pair.label_match)
+    negatives = result.total - positives
     print(
-        f"false splits {len(result.false_non_matches)} of {result.total}"
+        f"false splits {len(result.false_non_matches)} of {positives}"
         " equivalent candidate pairs"
     )
     print(
-        f"false merges {len(merges.merges)} of {merges.within_lane_pairs}"
+        f"false merges {len(result.false_matches)} of {negatives} candidate"
+        f" negatives, {len(merges.merges)} of {merges.within_lane_pairs}"
         " distinct reference pairs"
-        f" (+ {len(result.false_matches)} of {result.total} candidate pairs)"
+    )
+    set_aside = ", ".join(
+        f"{count} {label}" for label, count in sorted(result.set_aside.items())
     )
     print(
-        f"  {result.refused} pair(s) refused by the rule,"
-        f" {result.unclear} labelled unclear; neither is scored"
+        f"  {result.refused} pair(s) refused by the rule"
+        f"{'; set aside by label: ' + set_aside if set_aside else ''};"
+        " none of them is scored"
     )
     print(
         f"admission gate: {result.agreement:.1%} label agreement over"
