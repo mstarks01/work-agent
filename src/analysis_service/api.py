@@ -540,29 +540,6 @@ def create_app(
     ) -> JSONResponse:
         store: JobStore = request.app.state.store
         ceiling: int = request.app.state.max_active_jobs
-        # Before the input ladder, not after: this is the caller's budget rather
-        # than a fact about the submission, so a caller at their ceiling gets the
-        # same answer whatever they sent. Checking it second would let an
-        # oversized body outrank it and make the ceiling probe-able through
-        # requests that were never going to run.
-        active = await store.active_for(subject)
-        if active >= ceiling:
-            # The refusal is the only place this bound is observable from
-            # outside the caller it refused, so it goes to the log the way a
-            # rejected token does: a caller sitting on the ceiling is either a
-            # client that needs a larger share or the consumption this exists
-            # to stop, and neither is visible from a 429 nobody recorded.
-            logger.warning(
-                "subject %s refused at the concurrency ceiling: %d in flight, limit %d",
-                subject,
-                active,
-                ceiling,
-            )
-            raise HTTPException(
-                status_code=429,
-                detail=f"this token already has {active} jobs in flight; the"
-                f" limit is {ceiling}. Wait for one to reach a terminal state.",
-            )
         # Shape before budget: a framework this service does not carry is the
         # wrong request at any size, and answering it with a byte count would
         # quote a cap the caller never came near.
@@ -574,13 +551,44 @@ def create_app(
             raise HTTPException(
                 status_code=_STATUS_BY_RUNG[breach.rung], detail=breach.message
             )
+        # The ladder runs first because the ceiling is now enforced by the same
+        # call that inserts the record, and that call needs the record. The
+        # ordering is the price of the atomicity: a count taken before the
+        # ladder is a count another submission can land behind, which is the
+        # race this seam exists to close. What the caller loses is that a
+        # submission which breaches a rung *and* sits on the ceiling now hears
+        # about the rung; both answers refuse it, and neither runs a model.
         record = JobRecord.create(
             owner_subject=subject,
             sources=submission.sources,
             frameworks=selection,
             system_name=submission.system_name,
         )
-        await store.create(record)
+        admission = await store.reserve(record, ceiling=ceiling)
+        if admission.outcome == "at_ceiling":
+            # The refusal is the only place this bound is observable from
+            # outside the caller it refused, so it goes to the log the way a
+            # rejected token does: a caller sitting on the ceiling is either a
+            # client that needs a larger share or the consumption this exists
+            # to stop, and neither is visible from a 429 nobody recorded.
+            logger.warning(
+                "subject %s refused at the concurrency ceiling: %d in flight, limit %d",
+                subject,
+                admission.active,
+                ceiling,
+            )
+            raise HTTPException(
+                status_code=429,
+                detail=f"this token already has {admission.active} jobs in"
+                f" flight; the limit is {ceiling}. Wait for one to reach a"
+                " terminal state.",
+            )
+        if admission.outcome == "duplicate":
+            # The API mints the id, so a collision is this service's defect and
+            # not something the caller can act on or provoke. It gets the same
+            # opaque 500 every unhandled error gets, and the id goes to the log.
+            logger.error("job id %s was already held by the store", record.id)
+            raise HTTPException(status_code=500, detail="an internal error occurred")
         background_tasks.add_task(
             execute_job,
             store,

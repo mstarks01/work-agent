@@ -455,7 +455,7 @@ self-clearing — finishing a job is what buys the next one, and it needs no
 window, no timer and no state the job store does not already hold.
 
 The ceiling is exactly **as shared as the job store is**, which is why it is
-enforced through `JobStore.active_for` rather than out of process memory. Behind
+enforced through `JobStore.reserve` rather than out of process memory. Behind
 two instances of the per-instance `memory` store, each instance enforces the
 number and the effective ceiling is the sum — the same defect `ANALYSIS_JOB_STORE`
 [fails closed](HTTP-API.md#job-storage) over. Size it against one instance's share, or
