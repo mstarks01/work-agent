@@ -39,6 +39,10 @@ VALID = (
     "job_deadline_ms = 900000\n"
     "retry_budget_ratio = 0.1\n"
     "max_active_jobs = 3\n"
+    "budget_window_seconds = 3600\n"
+    "max_jobs_per_window = 30\n"
+    "max_tokens_per_window = 20000000\n"
+    "global_max_tokens_per_window = 100000000\n"
 )
 
 
@@ -58,6 +62,10 @@ def config(**kwargs) -> ResilienceConfig:
         "job_deadline_ms": 900000,
         "retry_budget_ratio": 0.1,
         "max_active_jobs": 3,
+        "budget_window_seconds": 3600,
+        "max_jobs_per_window": 30,
+        "max_tokens_per_window": 20000000,
+        "global_max_tokens_per_window": 100000000,
     }
     return ResilienceConfig(**(fields | kwargs))
 

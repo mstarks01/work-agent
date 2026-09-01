@@ -10,6 +10,7 @@ from fastapi.testclient import TestClient
 
 from analysis_service.api import _BODY_SLACK, create_app
 from analysis_service.auth import AuthenticationError
+from analysis_service.budgets import BudgetPolicy
 from analysis_service.errors import ConfigError
 from analysis_service.jobs import (
     InMemoryJobStore,
@@ -23,7 +24,12 @@ from analysis_service.jobs import (
 from analysis_service.report import FrameworkName, Report
 from analysis_service.sources import Source, SourceLimits
 from analysis_service.validation import ValidationIssue
-from tests.factories import DEFAULT_FRAMEWORKS, admit, sample_selection
+from tests.factories import (
+    DEFAULT_FRAMEWORKS,
+    SEEDING_BUDGET,
+    admit,
+    sample_selection,
+)
 
 TOKENS = {"alice-token": "alice", "bob-token": "bob"}
 
@@ -74,6 +80,7 @@ def make_client(
     store=None,
     limits: SourceLimits = TEST_LIMITS,
     max_active_jobs: int = TEST_MAX_ACTIVE_JOBS,
+    budget: BudgetPolicy = SEEDING_BUDGET,
     frameworks: Sequence[FrameworkName] = DEFAULT_FRAMEWORKS,
 ) -> tuple[TestClient, InMemoryJobStore]:
     store = store if store is not None else InMemoryJobStore()
@@ -84,6 +91,7 @@ def make_client(
         limits=limits,
         job_deadline_seconds=TEST_DEADLINE_SECONDS,
         max_active_jobs=max_active_jobs,
+        budget=budget,
         frameworks=frameworks,
     )
     return TestClient(app), store
@@ -650,7 +658,7 @@ class TestConcurrencyCeiling:
         with caplog.at_level(logging.WARNING, logger="analysis_service.api"):
             client.post("/v1/jobs", json=submission(), headers=auth())
         assert "alice" in caplog.text
-        assert "concurrency ceiling" in caplog.text
+        assert "at_ceiling" in caplog.text
 
     def test_an_unauthenticated_submission_is_still_401(self):
         # The ceiling is per subject, so it cannot be consulted before there is
@@ -756,3 +764,103 @@ class TestBodyCapUnderRootPath:
 
     def test_a_non_submission_path_is_not_capped(self):
         assert self._status_for("", "/v1/other", b"x" * 64) == 201
+
+
+class TestConsumptionBudgets:
+    """The bound the concurrency ceiling cannot be (#503).
+
+    A ceiling is self-clearing, so a caller who submits serially stays inside it
+    forever while spending without limit. These are the bounds that stop that,
+    seen from the HTTP surface.
+    """
+
+    TIGHT = BudgetPolicy(
+        window_seconds=3600,
+        max_jobs_per_window=2,
+        max_tokens_per_window=1_000_000,
+        global_max_tokens_per_window=2_000_000,
+    )
+
+    def test_serial_submissions_hit_the_rate_the_ceiling_never_would(self):
+        # Each of these finishes before the next is sent -- BackgroundTasks runs
+        # the stub to completion inside the request -- so every one of them
+        # clears a ceiling of 1. The rate is what refuses the third.
+        client, _ = make_client(max_active_jobs=1, budget=self.TIGHT)
+        for _ in range(self.TIGHT.max_jobs_per_window):
+            assert (
+                client.post("/v1/jobs", json=submission(), headers=auth()).status_code
+                == 201
+            )
+        response = client.post("/v1/jobs", json=submission(), headers=auth())
+        assert response.status_code == 429
+        assert response.headers["content-type"] == "application/problem+json"
+
+    def test_the_rate_is_per_subject(self):
+        client, _ = make_client(max_active_jobs=1, budget=self.TIGHT)
+        for _ in range(self.TIGHT.max_jobs_per_window):
+            client.post("/v1/jobs", json=submission(), headers=auth())
+        other = client.post("/v1/jobs", json=submission(), headers=auth("bob-token"))
+        assert other.status_code == 201
+
+    def test_a_token_budget_refuses_a_submission_the_rate_would_admit(self):
+        tiny = self.TIGHT.model_copy(update={"max_tokens_per_window": 1})
+        client, _ = make_client(budget=tiny)
+        response = client.post("/v1/jobs", json=submission(), headers=auth())
+        assert response.status_code == 429
+        assert "tokens" in response.json()["detail"]
+
+    def test_a_global_refusal_names_no_other_caller(self):
+        # The message says the deployment is at its limit and stops. A figure
+        # covering every subject is activity this caller has no business
+        # reading; the operator's log carries it.
+        tiny = self.TIGHT.model_copy(update={"global_max_tokens_per_window": 1})
+        client, _ = make_client(budget=tiny)
+        detail = client.post("/v1/jobs", json=submission(), headers=auth()).json()[
+            "detail"
+        ]
+        assert "this deployment is at its consumption limit" in detail
+        assert "alice" not in detail and "bob" not in detail
+
+    def test_every_refusal_names_what_clears_it(self):
+        # A 429 that does not say what to wait for teaches a client to retry
+        # immediately, which is the load the bound exists to shed.
+        for update, expected in (
+            ({"max_jobs_per_window": 1}, "window to roll"),
+            ({"max_tokens_per_window": 1}, "window to roll"),
+            ({"global_max_tokens_per_window": 1}, "Retry later"),
+        ):
+            client, _ = make_client(budget=self.TIGHT.model_copy(update=update))
+            client.post("/v1/jobs", json=submission(), headers=auth())
+            response = client.post("/v1/jobs", json=submission(), headers=auth())
+            assert expected in response.json()["detail"], update
+
+    def test_a_refusal_is_logged_with_the_figure_the_response_withholds(self, caplog):
+        tiny = self.TIGHT.model_copy(update={"global_max_tokens_per_window": 1})
+        client, _ = make_client(budget=tiny)
+        with caplog.at_level(logging.WARNING, logger="analysis_service.api"):
+            client.post("/v1/jobs", json=submission(), headers=auth())
+        assert "alice" in caplog.text
+        assert "over_global_budget" in caplog.text
+        assert "across the deployment" in caplog.text
+
+    def test_a_refusal_queues_nothing(self):
+        tiny = self.TIGHT.model_copy(update={"max_tokens_per_window": 1})
+        client, store = make_client(budget=tiny)
+        client.post("/v1/jobs", json=submission(), headers=auth())
+        probe = JobRecord.create(
+            owner_subject="alice",
+            sources=[Source.description("an app")],
+            frameworks=sample_selection(),
+        )
+        assert asyncio.run(admit(store, probe)).active == 0
+
+    def test_a_completed_job_charges_what_it_measured(self):
+        # The stub runner reports no usage, so a completed job settles to zero
+        # and frees its whole reservation. That is reconciliation, and it is
+        # what stops the coarse estimate from being a hard cap.
+        tiny = self.TIGHT.model_copy(update={"max_tokens_per_window": 400})
+        client, _ = make_client(budget=tiny)
+        first = client.post("/v1/jobs", json=submission(), headers=auth())
+        assert first.status_code == 201
+        second = client.post("/v1/jobs", json=submission(), headers=auth())
+        assert second.status_code == 201

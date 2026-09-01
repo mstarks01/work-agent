@@ -18,20 +18,30 @@ product of four numbers nobody chose, and a wedged run held a ``running`` job
 until the process died. A deadline is the one bound whose worst case is the
 number written down.
 
-``max_active_jobs`` is the only knob that bounds a *caller* rather than a job,
-and the other six are why it has to exist. Every one of them is per-job, so a
-caller who respects all six and simply submits a thousand submissions is inside
-the contract while spending the service's whole provider quota: each accepted
-job fans one lane agent per lane of every framework it names out on the
-``strong`` tier — :func:`~analysis_service.frameworks.widest_fan_out` — so ten
-concurrent submissions is ten times that against one shared per-minute quota. Per-job budgets are not a per-caller budget, and the
-unbounded-consumption half of OWASP LLM10 is the latter.
+``max_active_jobs`` and the four ``*_per_window`` knobs bound a *caller* rather
+than a job, and the six per-job knobs are why they have to exist. Every one of
+those is per job, so a caller who respects all six and simply submits a thousand
+submissions is inside the contract while spending the service's whole provider
+quota: each accepted job fans one lane agent per lane of every framework it names
+out on the ``strong`` tier —
+:func:`~analysis_service.frameworks.widest_fan_out` — so ten concurrent
+submissions is ten times that against one shared per-minute quota. Per-job
+budgets are not a per-caller budget, and the unbounded-consumption half of OWASP
+LLM10 is the latter.
 
-It bounds jobs *in flight*, not jobs per interval. A ceiling on concurrency is
-self-clearing — finishing a job is what buys the next one — so it needs no
-window, no timer and no state beyond the records the store already holds, and it
-bounds the thing that actually costs money: simultaneous provider calls. A
-submission rate says nothing about that on its own.
+``max_active_jobs`` bounds jobs *in flight*, not jobs per interval. A ceiling on
+concurrency is self-clearing — finishing a job is what buys the next one — so it
+needs no window, no timer and no state beyond the records the store already
+holds, and it bounds the thing that actually costs money: simultaneous provider
+calls. A submission rate says nothing about that on its own.
+
+**Which is also why a ceiling alone closes nothing cumulative.** A caller who
+submits serially, letting each job finish before the next, stays inside any
+ceiling forever. The four window knobs are the other half:
+:mod:`analysis_service.budgets` bounds how many jobs one subject may start per
+window, how many tokens one subject may commit, and how many every subject may
+commit together. All of them are decided inside the same atomic reservation the
+ceiling is, so no two of them can be raced apart.
 
 The input bounds are in **bytes, not tokens**. A token budget would make the
 public contract depend on which vendor a deployment's tiers happen to select,
@@ -95,13 +105,18 @@ from typing import TypeVar
 from google.genai import types
 from pydantic import BaseModel, ConfigDict, Field, ValidationError
 
+from analysis_service.budgets import BudgetPolicy
 from analysis_service.retry import RetryBudget, RetryPolicy
 from analysis_service.sources import SourceLimits
 
 # The only schema version this loader accepts. The version check fires before
 # shape validation, so a file on another schema is named as such rather than
 # reported as a set of stray keys under ``extra="forbid"``.
-SUPPORTED_VERSION = 5
+# Version 6 adds the four per-window budget knobs. Every one is required and
+# none carries a default, for the reason ``max_active_jobs`` carries none: a
+# budget nobody has chosen is version 5's behaviour, and it is the defect this
+# version exists to end.
+SUPPORTED_VERSION = 6
 
 _ENV_PREFIX = "ANALYSIS_"
 
@@ -112,6 +127,10 @@ MAX_SOURCES_VAR = f"{_ENV_PREFIX}MAX_SOURCES"
 JOB_DEADLINE_MS_VAR = f"{_ENV_PREFIX}JOB_DEADLINE_MS"
 RETRY_BUDGET_RATIO_VAR = f"{_ENV_PREFIX}RETRY_BUDGET_RATIO"
 MAX_ACTIVE_JOBS_VAR = f"{_ENV_PREFIX}MAX_ACTIVE_JOBS"
+BUDGET_WINDOW_SECONDS_VAR = f"{_ENV_PREFIX}BUDGET_WINDOW_SECONDS"
+MAX_JOBS_PER_WINDOW_VAR = f"{_ENV_PREFIX}MAX_JOBS_PER_WINDOW"
+MAX_TOKENS_PER_WINDOW_VAR = f"{_ENV_PREFIX}MAX_TOKENS_PER_WINDOW"
+GLOBAL_MAX_TOKENS_PER_WINDOW_VAR = f"{_ENV_PREFIX}GLOBAL_MAX_TOKENS_PER_WINDOW"
 
 _T = TypeVar("_T", int, float)
 
@@ -127,8 +146,12 @@ class ResilienceConfig(BaseModel):
     bound on any one of them — an over-budget submission overspent as a whole,
     and no single source is at fault.
 
-    ``max_active_jobs`` is the one bound here that is per *caller* rather than
-    per job: how many jobs one token subject may have in flight at once.
+    ``max_active_jobs`` is one of the bounds here that is per *caller* rather
+    than per job: how many jobs one token subject may have in flight at once. It
+    bounds concurrency and nothing cumulative — a caller who submits serially
+    stays inside it forever — so the four ``*_per_window`` values beside it bound
+    the spend over time that it cannot. See
+    :mod:`analysis_service.budgets`.
     """
 
     model_config = ConfigDict(extra="forbid", frozen=True)
@@ -141,6 +164,10 @@ class ResilienceConfig(BaseModel):
     job_deadline_ms: int = Field(gt=0)
     retry_budget_ratio: float = Field(gt=0, le=1)
     max_active_jobs: int = Field(ge=1)
+    budget_window_seconds: int = Field(gt=0)
+    max_jobs_per_window: int = Field(ge=1)
+    max_tokens_per_window: int = Field(ge=1)
+    global_max_tokens_per_window: int = Field(ge=1)
 
     def retry_policy(self, budget_capacity: float) -> RetryPolicy:
         """The retry loop this deployment runs, with its shared budget.
@@ -167,6 +194,15 @@ class ResilienceConfig(BaseModel):
         no caller has to remember which of the two it is holding.
         """
         return self.job_deadline_ms / 1000
+
+    def budget_policy(self) -> BudgetPolicy:
+        """The per-window bounds, as the value admission checks against."""
+        return BudgetPolicy(
+            window_seconds=self.budget_window_seconds,
+            max_jobs_per_window=self.max_jobs_per_window,
+            max_tokens_per_window=self.max_tokens_per_window,
+            global_max_tokens_per_window=self.global_max_tokens_per_window,
+        )
 
     def source_limits(self) -> SourceLimits:
         """The input bounds, as the value every entry point checks against."""
@@ -223,7 +259,9 @@ def load_resilience(
             f"{path}: unsupported version {version!r};"
             f" expected {SUPPORTED_VERSION}, which carries 'attempts',"
             " 'timeout_ms', 'max_source_bytes', 'max_sources',"
-            " 'job_deadline_ms', 'retry_budget_ratio' and 'max_active_jobs'"
+            " 'job_deadline_ms', 'retry_budget_ratio', 'max_active_jobs',"
+            " 'budget_window_seconds', 'max_jobs_per_window',"
+            " 'max_tokens_per_window' and 'global_max_tokens_per_window'"
         )
 
     overrides = {
@@ -234,6 +272,12 @@ def load_resilience(
         "job_deadline_ms": _override(env, JOB_DEADLINE_MS_VAR, int),
         "retry_budget_ratio": _override(env, RETRY_BUDGET_RATIO_VAR, float),
         "max_active_jobs": _override(env, MAX_ACTIVE_JOBS_VAR, int),
+        "budget_window_seconds": _override(env, BUDGET_WINDOW_SECONDS_VAR, int),
+        "max_jobs_per_window": _override(env, MAX_JOBS_PER_WINDOW_VAR, int),
+        "max_tokens_per_window": _override(env, MAX_TOKENS_PER_WINDOW_VAR, int),
+        "global_max_tokens_per_window": _override(
+            env, GLOBAL_MAX_TOKENS_PER_WINDOW_VAR, int
+        ),
     }
     raw.update({key: value for key, value in overrides.items() if value is not None})
 

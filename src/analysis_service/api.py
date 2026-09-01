@@ -25,7 +25,7 @@ from __future__ import annotations
 import asyncio
 import logging
 from collections import Counter
-from collections.abc import Mapping, Sequence
+from collections.abc import Callable, Mapping, Sequence
 from datetime import datetime
 from http import HTTPStatus
 from typing import Annotated, Any, cast
@@ -40,16 +40,19 @@ from pydantic import BaseModel, ConfigDict, Field, ValidationError
 from starlette._utils import get_route_path
 from starlette.exceptions import HTTPException as StarletteHTTPException
 
+from analysis_service import budgets
 from analysis_service.auth import (
     AuthenticationError,
     TokenVerifier,
     build_verifier,
 )
+from analysis_service.budgets import BudgetPolicy
 from analysis_service.deployment import Deployment
 from analysis_service.errors import ConfigError
 from analysis_service.frameworks import PACKAGES, package_for
 from analysis_service.jobs import (
     TERMINAL_STATUSES,
+    Admission,
     JobRecord,
     JobStatus,
     JobStore,
@@ -424,6 +427,37 @@ def _sse_frame(event) -> str:
     return f"id: {event.seq}\nevent: {event.kind}\ndata: {data}\n\n"
 
 
+# What a caller is told for each refusal, keyed by outcome rather than branched
+# on. Every message names the bound that stopped them and what clears it, and
+# **none of them names another caller**: a global refusal reports the caller's
+# own window and says the deployment is at its limit, because a figure covering
+# every subject is activity a caller has no business reading. The operator's log
+# carries it instead.
+#
+# A table because the machinery grew one entry per bound, which is what
+# ``CLAUDE.md`` says to key — and because a missing key raises here rather than
+# falling through to a message about the wrong bound.
+_REFUSALS: dict[str, Callable[[Admission, int], str]] = {
+    "at_ceiling": lambda admission, ceiling: (
+        f"this token already has {admission.active} jobs in flight; the limit"
+        f" is {ceiling}. Wait for one to reach a terminal state."
+    ),
+    "over_rate": lambda admission, ceiling: (
+        "this token has started too many jobs in the current window."
+        " Wait for the window to roll past your earlier jobs."
+    ),
+    "over_subject_budget": lambda admission, ceiling: (
+        "this token has committed too many tokens in the current window."
+        " Wait for the window to roll past your earlier jobs, or submit less"
+        " text."
+    ),
+    "over_global_budget": lambda admission, ceiling: (
+        "this deployment is at its consumption limit for the current window."
+        " Retry later; nothing you can do clears this one."
+    ),
+}
+
+
 def create_app(
     *,
     deployment: Deployment | None = None,
@@ -433,6 +467,7 @@ def create_app(
     limits: SourceLimits | None = None,
     job_deadline_seconds: float | None = None,
     max_active_jobs: int | None = None,
+    budget: BudgetPolicy | None = None,
     frameworks: Sequence[FrameworkName] | None = None,
 ) -> FastAPI:
     """Build the service app; production defaults, injectable seams for tests.
@@ -498,9 +533,17 @@ def create_app(
                 "instead of a deployment"
             )
         max_active_jobs = deployment.resilience.max_active_jobs
+    if budget is None:
+        if deployment is None:
+            raise ConfigError(
+                "create_app needs budget= when it is given a runner "
+                "instead of a deployment"
+            )
+        budget = deployment.resilience.budget_policy()
     app.state.limits = limits
     app.state.job_deadline_seconds = job_deadline_seconds
     app.state.max_active_jobs = max_active_jobs
+    app.state.budget = budget
     max_body_bytes = limits.max_total_bytes * _BODY_SLACK
     app.state.verifier = verifier if verifier is not None else build_verifier()
 
@@ -563,25 +606,31 @@ def create_app(
             sources=submission.sources,
             frameworks=selection,
             system_name=submission.system_name,
+            reserved_tokens=budgets.estimate(submission.sources, selection),
         )
-        admission = await store.reserve(record, ceiling=ceiling)
-        if admission.outcome == "at_ceiling":
-            # The refusal is the only place this bound is observable from
-            # outside the caller it refused, so it goes to the log the way a
-            # rejected token does: a caller sitting on the ceiling is either a
-            # client that needs a larger share or the consumption this exists
-            # to stop, and neither is visible from a 429 nobody recorded.
+        budget = request.app.state.budget
+        admission = await store.reserve(record, ceiling=ceiling, budget=budget)
+        if admission.outcome in _REFUSALS:
+            # Every refusal is logged, because it is the only place these bounds
+            # are observable from outside the caller they refused: a caller
+            # sitting on one is either a client that needs a larger share or the
+            # consumption they exist to stop, and neither is visible from a 429
+            # nobody recorded. The log carries the deployment-wide figure the
+            # response withholds.
             logger.warning(
-                "subject %s refused at the concurrency ceiling: %d in flight, limit %d",
+                "subject %s refused (%s): %d in flight of %d, %d tokens of %d"
+                " in this subject's window, %d of %d across the deployment",
                 subject,
+                admission.outcome,
                 admission.active,
                 ceiling,
+                admission.subject_tokens,
+                budget.max_tokens_per_window,
+                admission.global_tokens,
+                budget.global_max_tokens_per_window,
             )
             raise HTTPException(
-                status_code=429,
-                detail=f"this token already has {admission.active} jobs in"
-                f" flight; the limit is {ceiling}. Wait for one to reach a"
-                " terminal state.",
+                status_code=429, detail=_REFUSALS[admission.outcome](admission, ceiling)
             )
         if admission.outcome == "duplicate":
             # The API mints the id, so a collision is this service's defect and

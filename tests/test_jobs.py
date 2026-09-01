@@ -23,7 +23,7 @@ from analysis_service.jobs import (
 from analysis_service.report import InputRef
 from analysis_service.sources import Source
 from analysis_service.validation import ValidationIssue
-from tests.factories import admit, sample_selection
+from tests.factories import SEEDING_BUDGET, admit, sample_selection
 
 
 def make_record() -> JobRecord:
@@ -235,7 +235,7 @@ class TestReserve:
             store = InMemoryJobStore()
             await admit(store, make_record())
             refused = make_record()
-            outcome = await store.reserve(refused, ceiling=1)
+            outcome = await store.reserve(refused, ceiling=1, budget=SEEDING_BUDGET)
             return outcome, await store.get(refused.id)
 
         outcome, stored = asyncio.run(scenario())
@@ -249,7 +249,9 @@ class TestReserve:
             store = InMemoryJobStore()
             await admit(store, make_record())
             record = make_record()
-            return await store.reserve(record, ceiling=2), await store.get(record.id)
+            return await store.reserve(
+                record, ceiling=2, budget=SEEDING_BUDGET
+            ), await store.get(record.id)
 
         outcome, stored = asyncio.run(scenario())
         assert outcome == Admission(outcome="admitted", active=1)
@@ -265,7 +267,7 @@ class TestReserve:
                 sources=[Source.description("an app")],
                 frameworks=sample_selection(),
             )
-            return await store.reserve(bob, ceiling=1)
+            return await store.reserve(bob, ceiling=1, budget=SEEDING_BUDGET)
 
         assert asyncio.run(scenario()).outcome == "admitted"
 
@@ -289,7 +291,7 @@ class TestReserve:
             store = InMemoryJobStore()
             record = make_record()
             await admit(store, record)
-            return await store.reserve(record, ceiling=1)
+            return await store.reserve(record, ceiling=1, budget=SEEDING_BUDGET)
 
         assert asyncio.run(scenario()).outcome == "duplicate"
 
@@ -303,7 +305,9 @@ class TestReserve:
 
             async def contend():
                 await start.wait()
-                return await store.reserve(make_record(), ceiling=2)
+                return await store.reserve(
+                    make_record(), ceiling=2, budget=SEEDING_BUDGET
+                )
 
             racers = [asyncio.create_task(contend()) for _ in range(20)]
             start.set()
@@ -320,7 +324,7 @@ class TestReserve:
 
             async def contend():
                 record = make_record()
-                outcome = await store.reserve(record, ceiling=3)
+                outcome = await store.reserve(record, ceiling=3, budget=SEEDING_BUDGET)
                 return record.id, outcome.outcome
 
             results = await asyncio.gather(

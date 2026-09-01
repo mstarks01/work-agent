@@ -59,7 +59,7 @@
 # down still works and is still the blunt instrument; the budget is what makes
 # reaching for it rare.
 
-version = 5
+version = 6
 attempts = 3
 timeout_ms = 300000
 
@@ -170,3 +170,65 @@ max_sources = 10
 # serial per caller, matching the first-run web app's gate; 0 is not, because a deployment
 # that accepts no jobs should not be running.
 max_active_jobs = 3
+
+# --------------------------------------------------------------------------
+# THE PER-WINDOW BUDGETS, and they are the half `max_active_jobs` cannot reach.
+#
+# The ceiling above bounds how many jobs one caller runs AT ONCE, and it is
+# self-clearing: finishing a job buys the next one. That is exactly why it
+# bounds no spend. A caller who submits serially -- one job, wait, next job --
+# stays inside a ceiling of 3 forever while running an unbounded number of paid
+# jobs. `docs/HTTP-API.md` used to call that the integrator's problem. It is
+# closed here instead.
+#
+# TOKENS, NOT DOLLARS. A price is vendor data with an expiry date. `evals/`
+# carries a price table because a sweep reports what it SPENT and can be
+# re-priced when the table moves; a gate that refuses a submission cannot be
+# re-priced after it has refused one. Tokens are what this service can count
+# exactly. Convert once, here, where you can see the rate you used -- and set
+# the provider's own spend limit as the backstop behind both.
+#
+# THE WINDOW IS ROLLING, not aligned to a clock boundary. A fixed hourly window
+# lets a caller spend a full allowance at 10:59 and another at 11:00, which is
+# the burst this exists to stop.
+#
+# 3600 is an hour: long enough that a legitimate burst of work does not trip it,
+# short enough that a caller locked out by their own spend is not locked out for
+# a day.
+budget_window_seconds = 3600
+
+# How many jobs one token subject may START per window, counted whether or not
+# they finished. This is what the ceiling is not: a rate. It stops a burst of
+# trivial submissions that each clear the ceiling by finishing first.
+#
+# 30 is ten times the ceiling, which is the shape of the pair: the ceiling
+# decides how much runs together, this decides how often. Turn it DOWN to shed
+# load from a client that is retrying too hard.
+max_jobs_per_window = 30
+
+# The tokens one token subject may commit per window. This is the bound the job
+# count cannot express: one very large submission can cost more than thirty
+# small ones, and a count admits it.
+#
+# A job reserves an estimate at admission -- its own submitted tokens times
+# every LLM call its framework selection implies -- and that reservation is
+# replaced by the measured usage the moment the job reaches a terminal state.
+# The estimate deliberately over-counts, because a bound that must hold before
+# anything is spent has to err upward. See `analysis_service.budgets`.
+#
+# 20,000,000 is roughly what the byte cap allows a caller to spend at this
+# ceiling and this rate: 102,400 bytes is on the order of 25,000 tokens, and a
+# job naming every carried framework makes 27 LLM calls of it. Size it against
+# YOUR provider quota and the framework selections you offer, not against this
+# number.
+max_tokens_per_window = 20000000
+
+# The same bound across EVERY subject, and it is not the sum of theirs. This is
+# the provider quota's share, which a deployment with ten subjects divides
+# rather than multiplies. It is the guardrail that holds when a per-subject
+# budget is generous and ten subjects use all of it at once.
+#
+# Refusing on this one tells a caller nothing about any other caller: the API
+# answers with the same generic 429 it uses for a rate refusal, and the figure
+# goes to the operator's log.
+global_max_tokens_per_window = 100000000

@@ -36,6 +36,7 @@ from pydantic import BaseModel, Field
 
 from analysis_service import frameworks as framework_registry
 from analysis_service.binding import NodeBinding
+from analysis_service.budgets import BudgetPolicy
 from analysis_service.frameworks import PACKAGES, FrameworkName, FrameworkPackage
 from analysis_service.frameworks.asvs.record import (
     RequirementProposal,
@@ -137,8 +138,14 @@ def repo_tiers() -> ModelTierConfig:
     )
 
 
-# Far above any ceiling a test configures, so seeding never refuses.
+# Far above any bound a test configures, so seeding never refuses.
 _SEEDING_CEILING = 1_000_000
+SEEDING_BUDGET = BudgetPolicy(
+    window_seconds=3600,
+    max_jobs_per_window=_SEEDING_CEILING,
+    max_tokens_per_window=_SEEDING_CEILING,
+    global_max_tokens_per_window=_SEEDING_CEILING,
+)
 
 
 # A stand-in instruction digest for a test that is not exercising the digest
@@ -175,9 +182,9 @@ async def admit(store: Any, record: Any) -> Any:
     :meth:`~analysis_service.jobs.JobStore.reserve` is the only way in, by
     design — the protocol carries no unconditional create, so a backend cannot
     offer one the API might race on. A test that is seeding rather than
-    measuring the ceiling passes one it cannot reach.
+    measuring a bound passes bounds it cannot reach.
     """
-    return await store.reserve(record, ceiling=_SEEDING_CEILING)
+    return await store.reserve(record, ceiling=_SEEDING_CEILING, budget=SEEDING_BUDGET)
 
 
 def sample_selection(
