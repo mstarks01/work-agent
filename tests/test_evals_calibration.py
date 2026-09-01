@@ -19,8 +19,10 @@ import json
 
 import pytest
 
+from analysis_service.frameworks import PACKAGES
 from evals.harness.calibration import (
     AGREEMENT_BAR,
+    IDENTITY_VALIDATION,
     SCORED_LABELS,
     CalibrationError,
     load_pairs,
@@ -36,6 +38,12 @@ from tests.eval_factories import LabelReplayMatcher
 @pytest.fixture(scope="module")
 def pairs():
     return load_pairs()
+
+
+@pytest.fixture(scope="module")
+def corpus_and_flows():
+    corpus = load_corpus("evals/corpus")
+    return corpus, _flows_by_case(corpus)
 
 
 @pytest.fixture(scope="module")
@@ -311,7 +319,7 @@ def test_the_merge_direction_is_measured_over_distinct_reference_claims(pairs):
     matcher = SubsetVerbIdentity(_flows_by_case(corpus))
 
     result = measure_agreement(matcher, pairs)
-    merges = measure_merges(matcher, corpus, "stride")
+    merges = measure_merges(corpus, "stride", _flows_by_case(corpus))
 
     assert 0 < len(result.false_matches) < len(pairs), (
         "the candidate merge direction is measurable since #511; a zero here"
@@ -321,15 +329,79 @@ def test_the_merge_direction_is_measured_over_distinct_reference_claims(pairs):
     assert merges.to_json()["merges"] == len(merges.merges)
 
 
-def test_the_merge_direction_refuses_a_package_with_no_lane():
-    """It raises for ASVS rather than inventing a lane, and names the issue.
+def test_the_merge_direction_refuses_a_package_with_no_contract():
+    """It raises for a package with no entry rather than answering zero.
 
-    A package that keys on a catalog requirement reaches no within-lane
-    question in this shape. Answering zero would read as "no collisions" when
-    it means "nothing was asked".
+    "Nothing was asked" must never read as "no collisions". Every package in
+    ``PACKAGES`` has an entry — ``tests/test_framework_neutrality.py`` is what
+    says so — and this covers the one that has not been written yet.
     """
     corpus = load_corpus("evals/corpus")
-    matcher = SubsetVerbIdentity(_flows_by_case(corpus))
 
-    with pytest.raises(CalibrationError, match="#512"):
-        measure_merges(matcher, corpus, "asvs")
+    with pytest.raises(CalibrationError, match="declares no identity validation"):
+        measure_merges(corpus, "nomogram", _flows_by_case(corpus))
+
+
+#: Each package's collision count over this corpus, asserted exactly rather
+#: than against a floor. A corpus case or a re-cut element set moves them, and
+#: the author who moves them has to say what the new number is.
+#:
+#: ASVS's denominator is small because the chapter separates almost everything
+#: first: 448 within-case pairs of reference requirements, of which 20 share a
+#: chapter, of which none shares a requirement identifier. That is the shape a
+#: catalog claim set should have, and a rise in the third column would mean two
+#: rulings on one requirement in one place — one vote answering for both.
+PACKAGE_COLLISIONS = {
+    "stride": {"comparable_pairs": 287, "collisions": 3},
+    "asvs": {"comparable_pairs": 20, "collisions": 0},
+}
+
+
+def test_each_package_collision_count_is_pinned(corpus_and_flows):
+    """Recorded, not thresholded, for every package rather than for STRIDE."""
+    corpus, flows = corpus_and_flows
+
+    measured = {
+        package: {
+            "comparable_pairs": measure_merges(
+                corpus, package, flows
+            ).within_lane_pairs,
+            "collisions": len(measure_merges(corpus, package, flows).merges),
+        }
+        for package in PACKAGES
+    }
+
+    assert measured == PACKAGE_COLLISIONS, (
+        f"the collision counts moved to {measured}. Update PACKAGE_COLLISIONS"
+        " and re-quote them in docs/agents/claim-identity.md."
+    )
+
+
+def test_every_package_answers_the_collision_question(corpus_and_flows):
+    """Runs every way rather than outward from STRIDE.
+
+    A package cannot ship without a collision measurement: the identity a
+    claim composes differs per package, and the cost of keying two distinct
+    claims alike does not. Any collision must be recorded in that package's
+    own exception table with a reason.
+    """
+    corpus, flows = corpus_and_flows
+
+    for package in PACKAGES:
+        contract = IDENTITY_VALIDATION[package]
+        result = measure_merges(corpus, package, flows)
+
+        assert result.within_lane_pairs > 0, (
+            f"{package} has no comparable reference pairs in this corpus, so"
+            " its collision count says nothing"
+        )
+        unrecorded = [
+            merge
+            for merge in result.merges
+            if (merge.case, merge.lane) not in contract.recorded_collisions
+        ]
+        assert not unrecorded, (
+            f"{package} collides on {[(m.case, m.lane) for m in unrecorded]} and"
+            " the pairs are not recorded. Add each with its reason, or separate"
+            " them."
+        )

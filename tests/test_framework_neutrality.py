@@ -65,6 +65,7 @@ from pathlib import Path
 import pytest
 
 from analysis_service.frameworks import CONTENT_LICENSE, PACKAGES, SCHEMAS
+from evals.harness.calibration import IDENTITY_VALIDATION
 from evals.harness.instruments import INSTRUMENTS, PACKAGE_SCORERS
 from tests.factories import SCRIPTED_FRAMEWORKS
 
@@ -200,10 +201,16 @@ DECLARED: dict[str, str] = {
         " its matcher is the confusion matrix in `applicability.py`."
     ),
     "evals/harness/calibration.py": (
-        "This code is STRIDE's, through `ClaimPair` for the same reason"
-        " `identity.py` is: it prices a candidate matcher against recorded"
-        " labels over composed identities. A package whose claims carry a"
-        " catalog identifier needs no such matcher to price."
+        "IDENTITY_VALIDATION is a table keyed by framework and self-completing:"
+        " a package missing from it raises at `measure_merges` rather than"
+        " answering zero collisions. Its entries follow from the claim type —"
+        " an open prose claim set needs labelled candidate pairs, because only"
+        " a pair says whether two spellings name one action; a claim naming a"
+        " catalog requirement needs none, because the identifier decides"
+        " equivalence. Every claim type declares a collision rule, since keying"
+        " two distinct claims alike destroys a finding whatever the identity is"
+        " composed from. The `LabelledPair` fields around it are STRIDE's pair"
+        " set, which is the only one any package has."
     ),
     "evals/harness/critic_yield.py": (
         "This code is STRIDE's, through `DraftThreat` and a category. Yield is"
@@ -631,6 +638,43 @@ def test_every_package_declares_a_scorer():
         f" {undeclared}. Declare the per-case scorer their record earns, or"
         " `None` to say the neutral instruments are the whole of it."
     )
+
+
+def test_every_package_declares_what_identity_validation_it_needs():
+    """The contract runs every way rather than outward from STRIDE.
+
+    A package that ships without an entry has no collision measurement, and a
+    collision destroys a finding whatever a claim composes its identity from.
+    A *missing* key is not an answer.
+    """
+    undeclared = sorted(set(PACKAGES) - set(IDENTITY_VALIDATION))
+    assert not undeclared, (
+        f"these packages are carried and IDENTITY_VALIDATION does not name"
+        f" them: {undeclared}. Say what the claim type composes its identity"
+        " from, whether a labelled pair set can price a rule on it, and what"
+        " would make two distinct claims one finding."
+    )
+    unknown = sorted(set(IDENTITY_VALIDATION) - set(PACKAGES))
+    assert not unknown, (
+        f"IDENTITY_VALIDATION names frameworks this build does not carry: {unknown}"
+    )
+
+
+def test_each_identity_contract_argues_from_the_claim_type():
+    """``why`` must describe the claim, never name the package.
+
+    A reason that says "ASVS does not need pairs" answers for one package. A
+    reason that says "a claim naming a catalog requirement is identified by it"
+    answers for every package written after it, too.
+    """
+    for package, contract in IDENTITY_VALIDATION.items():
+        assert contract.why, f"{package} declares no reason"
+        named = sorted(name for name in PACKAGES if name in contract.why.lower())
+        assert not named, (
+            f"{package}'s reason names {named}. State the property of the claim"
+            " type that decides it, so it answers for a package nobody has"
+            " written yet."
+        )
 
 
 def test_no_scorer_names_a_package_this_build_does_not_carry():

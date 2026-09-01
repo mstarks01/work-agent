@@ -84,6 +84,7 @@ from evals.harness.artifact import (
 from evals.harness.artifact import build as build_artifact
 from evals.harness.calibration import (
     AGREEMENT_BAR,
+    IDENTITY_VALIDATION,
     load_pairs,
     measure_agreement,
     measure_merges,
@@ -1236,9 +1237,10 @@ def command_calibrate(args: argparse.Namespace) -> int:
     """
     pairs = load_pairs()
     corpus = load_corpus(args.corpus)
-    matcher = SubsetVerbIdentity(_flows_by_case(corpus))
+    flows = _flows_by_case(corpus)
+    matcher = SubsetVerbIdentity(flows)
     result = measure_agreement(matcher, pairs)
-    merges = measure_merges(matcher, corpus, "stride")
+    merges = measure_merges(corpus, "stride", flows)
     positives = sum(1 for pair in pairs if pair.is_scored and pair.label_match)
     negatives = result.total - positives
     print(
@@ -1258,6 +1260,15 @@ def command_calibrate(args: argparse.Namespace) -> int:
         f"{'; set aside by label: ' + set_aside if set_aside else ''};"
         " none of them is scored"
     )
+    for package in sorted(IDENTITY_VALIDATION):
+        if package == "stride":
+            continue
+        other = measure_merges(corpus, package, flows)
+        print(
+            f"{package}: {len(other.merges)} collisions of"
+            f" {other.within_lane_pairs} distinct reference pairs"
+            f" (no candidate pairs: {IDENTITY_VALIDATION[package].why})"
+        )
     print(
         f"admission gate: {result.agreement:.1%} label agreement over"
         f" {result.total} pairs (bar {AGREEMENT_BAR:.0%})"
