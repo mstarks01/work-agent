@@ -267,6 +267,24 @@ across every call.
   session (as fenced data — see [The pipeline](#the-pipeline)), a prompt-injection
   attempt in one submission cannot reach another running analysis.
 
+**Containment is not resistance, and the two are measured differently.** Fencing
+is structural and deterministic: every caller byte sits inside a marker sized to
+its own content, so a submission cannot close the block it is in and continue in
+instruction position. `evals/adversarial/` carries a source built to try exactly
+that, and CI asserts it fails.
+
+What fencing does *not* do is stop a model reading `ignore all previous
+instructions` from inside a fence and deciding to obey it. That is semantic, it
+is a property of a model and a prompt set rather than of this code, and it is
+measured by scoring a report against what the injection asked for — deterministic
+grading, no model judge. That half needs a live model and has never run; see
+`evals/adversarial/README.md` for the bar and the residual risk.
+
+The consequence of a failure is bounded by what a model here can reach: **no
+model in this service holds any tool or host authority.** Every LLM node returns
+structured text that a deterministic `FunctionNode` validates, so a model talked
+into something is talked into producing a bad report, not into acting.
+
 This guarantee assumes the intended concurrency model: `async` calls on a single
 event loop. The default `InMemorySessionService` is an in-process store — safe
 for cooperative async concurrency with distinct session ids, but not a
