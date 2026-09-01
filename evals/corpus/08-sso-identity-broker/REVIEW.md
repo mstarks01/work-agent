@@ -269,8 +269,8 @@ Only after your own list exists.
 For each, mark one of:
 
 - `agree` — a real finding against this system, worth reporting.
-- `doubt` — overstated, unsupported by the text, or not really a finding here.
-- `dup` — the same finding as another entry on this list, by number.
+- `reject` — overstated, unsupported by the text, or not really a finding here.
+- `duplicate` — the same finding as another entry on this list, by number.
 
 Then, at the end of the last part, note anything on **your** list that is not
 on either of them. That is the finding this sitting exists for.
@@ -492,15 +492,15 @@ The point of the sitting. One line each, and say which set you expected it in.
 
 ## What to do with the result
 
-**Counts first**, kept apart per framework: how many `agree`, `doubt`, `dup`
-per part, and how many of your own items are missing from either set.
+**Counts first**, kept apart per framework: how many `agree`, `reject`,
+`duplicate` per part, and how many of your own items are missing from either set.
 
-- **Few doubts, nothing important missing** — the sets hold, and the numbers
+- **Few `reject` marks, nothing important missing** — the sets hold, and the numbers
   measured against them have a standard behind them.
 - **A whole class of attack missing** — the serious outcome. Recall is measured
   against these sets, so the tool has been scoring full marks for a gap nobody
   could see. Extend the set, and re-derive what was quoted against it.
-- **Several doubts** — the sets overstate, inflating the denominator. Cheaper
+- **Several `reject` marks** — the sets overstate, inflating the denominator. Cheaper
   direction, still wrong.
 
 **Then record the sitting.** Save this filled document as
@@ -516,8 +516,8 @@ this entry to `reviews` in `evals/corpus/08-sso-identity-broker/case.json`, whic
       "date": "<YYYY-MM-DD>",
       "read": [
         {"file": "source.md", "sha256": "36115502847aa04640666b0dd9f458881e6f7f8968e4d499b58983b3403dc721"},
-        {"file": "model.json", "sha256": "7c52b971e7d0251ca27a0b834306632848c4f8fd6c0a32da1f077726c436e89d"},
-        {"file": "claims/asvs.json", "sha256": "5d67942277e8d54a972ceb34722af133a4ed2953a5925fa9a23f886372ffb150"},
+        {"file": "model.json", "sha256": "825c92681b885f7d36968302a5a38e904c206d9e5ba62936e754b4e3fb5ca6bb"},
+        {"file": "claims/asvs.json", "sha256": "871f331895356803f29970c254fb2e418b8c23550f562cc63b234b28e8ad6340"},
         {"file": "claims/stride.json", "sha256": "9bd0d3203a0a3bcb8ca80ed0de9efbc1b1a35a6c621653e1206e65e19c3dd849"}
       ],
       "document": "REVIEW-<your GitHub login>.md",

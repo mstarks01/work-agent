@@ -14,7 +14,7 @@ import pytest
 
 from analysis_service.report import InputRef, SourceRef
 from analysis_service.validation import parse_and_validate
-from evals import verify_corpus
+from evals import build_review_docs, verify_corpus
 
 
 @pytest.mark.parametrize(
@@ -411,4 +411,42 @@ def test_the_readme_table_names_the_case_s_own_domain(case_dir):
         f" {documented!r}. The two are read by different people and must still"
         " name one domain — correct whichever is wrong, then re-run"
         " 'python evals/build_review_docs.py'."
+    )
+
+
+@pytest.mark.parametrize(
+    "case_dir", verify_corpus.case_dirs(), ids=lambda path: path.name
+)
+def test_the_reading_document_is_what_its_generator_writes(case_dir):
+    """The committed ``REVIEW.md`` is what ``build_review_docs.py`` writes now.
+
+    Nothing compared the two before, and both halves of the document drifted
+    away from the code that writes them: the mark vocabulary moved underneath
+    it, and every ``sha256`` in the pasteable ``reviews`` entry went stale
+    against the bytes it signs. Neither was visible in a diff, because a
+    derived file nobody re-derives looks exactly like a current one.
+
+    It matters because the document is what a reader takes away. A person
+    holding a sitting offline works from this file alone, so a stale copy is
+    wrong in their hands rather than merely untidy in the tree — they mark
+    with words the app refuses, and paste an entry ``submit sitting`` rejects.
+    """
+    if case_dir.name in build_review_docs.HAND_WRITTEN:
+        pytest.skip("hand-written; regenerating it would overwrite the record")
+    meta = json.loads((case_dir / "case.json").read_text(encoding="utf-8"))
+    if meta.get("reviews"):
+        pytest.skip("a sitting clears this case, so the generator writes none")
+
+    document = case_dir / build_review_docs.GENERATED_DOCUMENT
+    assert document.is_file(), (
+        f"{case_dir.name} has no {build_review_docs.GENERATED_DOCUMENT} and no"
+        " sitting that would explain the absence. Run"
+        " 'python evals/build_review_docs.py'."
+    )
+    assert document.read_text(encoding="utf-8") == build_review_docs.build_doc(
+        case_dir
+    ), (
+        f"{case_dir.name}/{build_review_docs.GENERATED_DOCUMENT} is not what the"
+        " generator writes. Run 'python evals/build_review_docs.py' and commit"
+        " the result — a sitting PR no longer has to carry it."
     )
