@@ -62,13 +62,16 @@ on:
     # swept until someone rules it out, and the cost of being wrong is a
     # spurious run rather than a gap nobody sees.
     #
-    # The five exclusions are the modules the eval harness cannot reach. The
+    # The exclusions are the modules the eval harness cannot reach. The
     # harness drives `GraphExecutor` in process against a `Deployment`, so the
     # HTTP surface and its bearer check are off the path entirely,
     # `conformance.py` reports capabilities without gating anything, `smoke.py`
     # is the live lane that reports alongside it (`provider-smoke.yml`, which
     # carries its own filter), and `Engine` is the *other* in-process
     # entry point rather than the one evals use -- the one `smoke.py` drives.
+    # `attestation.py` and `verify_report.py` sign a finished report and check a
+    # signature; neither is on the path that produces one, so neither can move a
+    # score.
     # Everything else in the package is on the transitive import
     # closure of `evals/` and is therefore swept, including the three that
     # carry an eval outcome without touching a prompt or a schema:
@@ -91,11 +94,13 @@ on:
       - "config/**"
       - "src/analysis_service/**"
       - "!src/analysis_service/api.py"
+      - "!src/analysis_service/attestation.py"
       - "!src/analysis_service/auth.py"
       - "!src/analysis_service/conformance.py"
       - "!src/analysis_service/engine.py"
       - "!src/analysis_service/smoke.py"
       - "!src/analysis_service/token_caps.py"
+      - "!src/analysis_service/verify_report.py"
       - ".github/workflows/evals-live.yml"
   # NO `schedule`. There was a Monday 06:00 UTC backstop sweep here until
   # federation went unconfigured indefinitely. A scheduled run fails closed when

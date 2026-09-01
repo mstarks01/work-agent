@@ -787,6 +787,20 @@ is safe to trust without recounting — a mismatched summary does not validate.
 model every framework ran against, so a per-block copy would be N copies of one
 number.
 
+## Authenticity
+
+Every hash in this schema is **unkeyed**. `input.source_sha256`,
+`analysis_context.instruction_sha256` and each node's `execution_fingerprint`
+let a reader recompute a value and notice when the two disagree — and anyone who
+edits the report recomputes them too. They establish internal consistency, and
+nothing about who produced the report.
+
+A **detached signature** answers that separately. See
+[Report attestations](Report-Attestation.md). A valid signature says this report
+came from that deployment and no covered byte has moved; it says nothing about
+whether the findings are correct, and nothing about whether the run was
+certified.
+
 ## Provenance
 
 The report records the configured and provider-reported model identifiers, the

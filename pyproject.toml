@@ -32,6 +32,11 @@ dependencies = [
     # the gate asks for the mapped params rather than reading the flag, and so
     # sees what the request would actually carry.
     "litellm==1.97.0",
+    # Ed25519 for report attestations (ADR 0022). Already present transitively
+    # through the two pins above; named here because the code imports it, and a
+    # dependency you rely on but do not declare is one a transitive bump can
+    # remove.
+    "cryptography>=45",
     "pydantic>=2.7",
     "pyjwt[crypto]>=2.9",
 ]
