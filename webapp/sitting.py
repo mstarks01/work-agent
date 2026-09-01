@@ -1122,10 +1122,10 @@ _PAGE = r"""<!doctype html>
 
   <section id="two" class="hidden">
     <h2>Part 2 — what is recorded</h2>
-    <p class="note">Mark each recorded finding: <code>agree</code> a real finding
-    worth reporting, <code>doubt</code> overstated or unsupported by the text,
-    <code>dup</code> the same finding as another entry. Leave a mark unset to say
-    nothing about that one.</p>
+    <p class="note">Mark each recorded finding: <b>Agree</b> a real finding
+    worth reporting, <b>Reject</b> overstated or unsupported by the text,
+    <b>Duplicate</b> the same finding as another entry. Leave a mark unset to
+    say nothing about that one.</p>
     <div id="partTwo" class="doc"></div>
     <h2>On your list and not on theirs</h2>
     <p class="note">The finding this sitting exists for. One per line.</p>
@@ -1698,7 +1698,10 @@ function recordCard(record, target, values, answered) {
   for (const value of ["", ...values]) {
     const option = document.createElement("option");
     option.value = value;
-    option.textContent = value || "—";
+    // The label is the value with a capital, rather than a second table of
+    // words: a table would be one more thing to keep level with `MARKS`, and
+    // this way a mark the method adds arrives here already spelled.
+    option.textContent = value ? value[0].toUpperCase() + value.slice(1) : "—";
     select.append(option);
   }
   const label = el("label", null, "Your mark");

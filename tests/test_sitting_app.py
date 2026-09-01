@@ -731,7 +731,7 @@ class TestTheMarks:
             for target in reversed(session.prepared[CASE].mark_targets)
         }
         assert len(first) > 1, "this case declares one framework"
-        self.marked(app, dict.fromkeys(first.values(), "doubt"))
+        self.marked(app, dict.fromkeys(first.values(), "reject"))
 
         text = (tree / "evals" / "corpus" / CASE / "REVIEW-ada.md").read_text("utf-8")
         for framework, fingerprint in first.items():
