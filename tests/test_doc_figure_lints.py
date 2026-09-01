@@ -6,9 +6,14 @@ A number in a guide is one of two things, and they must never be checked alike.
 
 A **recomputable figure** is a property of the repository as it stands: the
 corpus holds 13 cases, the widest fan-out is 23 lanes, the identity rule agrees
-with 185 of 200 readable labels. Change the thing and the number changes with
+with 295 of 315 readable labels. Change the thing and the number changes with
 it, so prose that still states the old one is simply wrong. Every figure below
 is of this kind, and every one is computed offline with no provider call.
+
+**A module docstring is prose too.** `fingerprint.py` and `verbs.py` argue for
+version 2 from these numbers, and they went stale the moment the fixtures grew
+because nothing here read a `.py` file. A claim names any path in the
+repository; the extension decides nothing.
 
 A **recorded observation** is what a run once produced: luna's 3.4%
 unverified-quote rate, the 231 of 243 claims a mechanical check fired on,
@@ -136,6 +141,8 @@ def _error_directions() -> Mapping[str, object]:
     result = measure_agreement(matcher, pairs)
     merges = measure_merges(corpus, "stride", _flows_by_case(corpus))
     positives = sum(1 for pair in pairs if pair.label_match)
+    assigned = [pair for pair in pairs if pair.candidate_element_ids is not None]
+    floor = _frontier_row(assigned, corpus)
     return {
         "splits": len(result.false_non_matches),
         "split_of": positives,
@@ -143,7 +150,34 @@ def _error_directions() -> Mapping[str, object]:
         "cand_of": result.total - positives,
         "merges": len(merges.merges),
         "merge_of": merges.within_lane_pairs,
+        "floor_splits": floor["splits"],
+        "floor_cand_merges": floor["candidate_merges"],
     }
+
+
+def _frontier_row(pairs, corpus):
+    """One row of the frontier, so a docstring quoting it cannot go stale.
+
+    ``fingerprint.py`` and ``verbs.py`` both argue for the action verb from the
+    ``endpoint subset`` row — what version 1 costs without it — so the figure
+    that pins their prose has to recompute that row rather than the shipped
+    rule's.
+    """
+    from evals.harness.identity import endpoint_subset
+
+    flows = _flows_by_case(corpus)
+    splits = candidate_merges = 0
+    for pair in pairs:
+        ruled = endpoint_subset(
+            pair.reference_element_ids,
+            pair.candidate_element_ids,
+            flows[pair.case],
+        )
+        if pair.label_match and not ruled:
+            splits += 1
+        elif ruled and not pair.label_match:
+            candidate_merges += 1
+    return {"splits": splits, "candidate_merges": candidate_merges}
 
 
 def _corpus() -> Mapping[str, object]:
@@ -248,6 +282,32 @@ FIGURES: tuple[Figure, ...] = (
                     " {cand_merges} of {cand_of} candidate negatives merged,"
                     " {merges} of {merge_of} reference pairs\nmerged"
                 ),
+                1,
+            ),
+            (
+                "evals/harness/fingerprint.py",
+                (
+                    "takes the candidate merges from {floor_cand_merges} to"
+                    " {cand_merges}"
+                ),
+                1,
+            ),
+            (
+                "evals/harness/fingerprint.py",
+                (
+                    "agreement alone at {floor_splits} false splits of"
+                    " {split_of}, {floor_cand_merges} false merges of {cand_of}"
+                ),
+                1,
+            ),
+            (
+                "evals/harness/verbs.py",
+                ("{floor_cand_merges} false merges of\n{cand_of} candidate negatives"),
+                1,
+            ),
+            (
+                "evals/harness/verbs.py",
+                "merges {floor_cand_merges} of {cand_of}",
                 1,
             ),
         ),

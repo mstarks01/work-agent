@@ -7,11 +7,16 @@ measurement's half: which verbs count as one action for matching, and the record
 of what the rule cannot do.
 
 Measured, not asserted, and over the whole corpus. All 243 reference claims carry
-a verb. ``tests/test_evals_identity.py``'s ``FRONTIER`` prices the rule on both
-errors at once: against ``endpoint subset`` alone it costs **one** more false
-split of 200 labelled pairs and removes **twenty** of the 23 false merges of 287
-reference pairs. :class:`~evals.harness.identity.SubsetVerbIdentity` scores
-185/200 against the recorded labels where element agreement alone scores 111.
+a verb. ``tests/test_evals_identity.py``'s ``FRONTIER`` prices the rule on every
+error at once: against ``endpoint subset`` alone it costs **one** more false
+split of 200 labelled pairs, and it removes **eighty** of the 85 false merges of
+115 candidate negatives and twenty of the 23 of 287 reference pairs.
+:class:`~evals.harness.identity.SubsetVerbIdentity` scores 295/315 against the
+recorded labels where element agreement alone scores 200/315.
+
+The candidate column is the one that argues for the vocabulary. Priced on
+reference pairs alone the element rule merges 23 of 287 and reads as
+survivable; priced on the paraphrases a live run emits it merges 85 of 115.
 """
 
 from __future__ import annotations
