@@ -167,6 +167,13 @@ jobs:
       ANALYSIS_MODEL_BASE_MODEL: gemini-2.5-flash
       ANALYSIS_MODEL_STRONG_VENDOR: vertex
       ANALYSIS_MODEL_STRONG_MODEL: gemini-2.5-pro
+      # `review` selects the same pair as `strong`. Every tier must name one or
+      # the config refuses to load, and the shipped node map binds nothing to
+      # this tier -- so no adapter is built for it and it costs no credential.
+      # The shipped `review_independence = "shared"` is what makes a repeated
+      # pair legal here.
+      ANALYSIS_MODEL_REVIEW_VENDOR: vertex
+      ANALYSIS_MODEL_REVIEW_MODEL: gemini-2.5-pro
       ANALYSIS_VERTEX_PROJECT: ${{ vars.GCP_PROJECT_ID }}
       ANALYSIS_VERTEX_LOCATION: ${{ vars.GCP_LOCATION }}
 

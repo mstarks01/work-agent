@@ -102,14 +102,22 @@ TEST_TIER_ENV: dict[str, str] = {
     "ANALYSIS_MODEL_BASE_MODEL": "gpt-4.1-mini",
     "ANALYSIS_MODEL_STRONG_VENDOR": "vertex",
     "ANALYSIS_MODEL_STRONG_MODEL": "gemini-2.5-pro",
+    # A third vendor on `review`, so the tier is not accidentally covered by
+    # whatever `strong` happens to select. The shipped node map leaves criticism
+    # on `strong`, so nothing here runs on this pair until a test moves it —
+    # which is the point: an unexercised tier that is also unselectable would
+    # hide every defect in selecting it.
+    "ANALYSIS_MODEL_REVIEW_VENDOR": "anthropic",
+    "ANALYSIS_MODEL_REVIEW_MODEL": "claude-opus-5",
 }
 
-# What the selection above implies: one API key and one ADC triple, because the
-# two tiers sit on vendors with different credential modes. Placeholders — the
+# What the selection above implies: two API keys and one ADC triple, because the
+# three tiers sit on vendors with different credential modes. Placeholders — the
 # loader checks that a variable is *declared*, never that it authenticates, and
 # no test here reaches a provider. Kept beside the selection so the two cannot
-# drift; a tier moved to a third vendor needs its variables added here too.
+# drift; a tier moved to another vendor needs its variables added here too.
 TEST_CREDENTIAL_ENV: dict[str, str] = {
+    "ANALYSIS_ANTHROPIC_API_KEY": "sk-ant-not-a-real-key",
     "ANALYSIS_OPENAI_API_KEY": "sk-not-a-real-key",
     "ANALYSIS_VERTEX_PROJECT": "test-project",
     "ANALYSIS_VERTEX_LOCATION": "us-central1",

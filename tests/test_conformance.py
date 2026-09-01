@@ -110,6 +110,8 @@ def tiers_for(vendor: str) -> ModelTierConfig:
             "ANALYSIS_MODEL_BASE_MODEL": base,
             "ANALYSIS_MODEL_STRONG_VENDOR": vendor,
             "ANALYSIS_MODEL_STRONG_MODEL": strong,
+            "ANALYSIS_MODEL_REVIEW_VENDOR": "anthropic",
+            "ANALYSIS_MODEL_REVIEW_MODEL": "claude-opus-5",
         },
     )
 

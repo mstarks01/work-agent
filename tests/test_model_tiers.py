@@ -21,20 +21,28 @@ from analysis_service.model_tiers import (
 from analysis_service.report import FRAMEWORK_NAMES
 from analysis_service.vendors import VENDOR_NAMES
 
-REPO_CONFIG = Path(__file__).parents[1] / "config" / "model_tiers.toml"
+PROJECT_ROOT = Path(__file__).parents[1]
+REPO_CONFIG = PROJECT_ROOT / "config" / "model_tiers.toml"
 
 BASE = "gemini-2.5-flash"
 STRONG = "gemini-2.5-pro"
 VENDOR = "vertex"
+# A second vendor on `review`, so an independence test has something to be
+# independent *of* without inventing a config the rest of the module does not use.
+REVIEW = "claude-opus-5"
+REVIEW_VENDOR = "anthropic"
 
 
 def config_toml(
     base=BASE,
     strong=STRONG,
+    review=REVIEW,
     base_vendor=VENDOR,
     strong_vendor=VENDOR,
+    review_vendor=REVIEW_VENDOR,
     nodes=None,
     version=SUPPORTED_VERSION,
+    independence="shared",
 ):
     if nodes is None:
         nodes = {
@@ -43,9 +51,11 @@ def config_toml(
         }
     node_lines = "\n".join(f'"{node}" = "{tier}"' for node, tier in nodes.items())
     return (
-        f"version = {version}\n\n"
+        f"version = {version}\n"
+        f'review_independence = "{independence}"\n\n'
         f'[tiers.base]\nvendor = "{base_vendor}"\nmodel = "{base}"\n\n'
         f'[tiers.strong]\nvendor = "{strong_vendor}"\nmodel = "{strong}"\n\n'
+        f'[tiers.review]\nvendor = "{review_vendor}"\nmodel = "{review}"\n\n'
         f"[nodes]\n{node_lines}\n"
     )
 
@@ -95,10 +105,13 @@ class TestNodeInventory:
             FRAMEWORK_NAMES
         )
 
-    def test_exactly_two_tiers_named_on_a_capability_axis(self):
+    def test_the_tiers_are_named_on_a_capability_axis(self):
         # Not flash/pro: those were one vendor's product names and would be an
-        # active lie under a Claude or GPT model string.
-        assert TIER_NAMES == ("base", "strong")
+        # active lie under a Claude or GPT model string. `review` names a place
+        # criticism can be bound to rather than a capability, which is the
+        # exception the third tier is: it exists so a critic can be moved off
+        # the model it checks, not because it is stronger or cheaper.
+        assert TIER_NAMES == ("base", "strong", "review")
 
 
 class TestRepoConfig:
@@ -114,6 +127,8 @@ class TestRepoConfig:
         "ANALYSIS_MODEL_BASE_MODEL": "gpt-4.1-mini",
         "ANALYSIS_MODEL_STRONG_VENDOR": "anthropic",
         "ANALYSIS_MODEL_STRONG_MODEL": "claude-opus-5",
+        "ANALYSIS_MODEL_REVIEW_VENDOR": "vertex",
+        "ANALYSIS_MODEL_REVIEW_MODEL": "gemini-2.5-pro",
     }
 
     def test_shipped_config_selects_no_vendor(self):
@@ -149,6 +164,15 @@ class TestRepoConfig:
         assert config.nodes["critic/stride"] == "strong"
         for node in FRAMEWORK_NODES:
             assert config.nodes[node] == "strong"
+
+    def test_the_shipped_review_is_shared_and_says_so(self):
+        # The `review` tier exists and nothing is pointed at it. That is the
+        # cheaper default and the honest one: the policy states it rather than
+        # leaving a reader to work it out from the node map.
+        config = load_model_tiers(REPO_CONFIG, env=self.SELECTED)
+        assert config.review_independence == "shared"
+        assert "review" not in set(config.nodes.values())
+        assert config.independence_breaches() == []
 
 
 class TestResolution:
@@ -396,6 +420,155 @@ def test_direct_construction_validates_completeness():
             tiers={
                 "base": TierSelection(vendor=VENDOR, model=BASE),
                 "strong": TierSelection(vendor=VENDOR, model=STRONG),
+                "review": TierSelection(vendor=REVIEW_VENDOR, model=REVIEW),
             },
             nodes={},
+            review_independence="shared",
         )
+
+
+class TestReviewIndependence:
+    """How far a framework's criticism has to sit from its own analysis (#506).
+
+    The point is bounded *correlated* failure, never accuracy: an analysis and a
+    critic on one model share that model's blind spots, so the critic improves
+    consistency and cannot notice what the model does not know. Nothing here
+    claims a second provider finds more.
+    """
+
+    def critic_on(self, tier: str, independence: str, **kwargs):
+        """A config with every framework's critic and recritic on ``tier``."""
+        nodes = {
+            node: "base"
+            if node in ("extract", "repair")
+            else tier
+            if node.startswith(("critic/", "recritic/"))
+            else "strong"
+            for node in LLM_NODES
+        }
+        return config_toml(nodes=nodes, independence=independence, **kwargs)
+
+    def test_shared_admits_a_critic_on_the_analysis_tier(self, config_path):
+        config = load_model_tiers(
+            config_path(self.critic_on("strong", "shared")), env={}
+        )
+        assert config.review_independence == "shared"
+
+    @pytest.mark.parametrize("independence", ["distinct_model", "distinct_provider"])
+    def test_a_policy_beyond_shared_refuses_a_critic_on_the_analysis_tier(
+        self, config_path, independence
+    ):
+        # Fails closed at load, and names the framework. A deployment that asked
+        # for an independent reviewer and did not get one has a configuration to
+        # fix, not a run to annotate — annotating it would put the finding in an
+        # artifact somebody already paid for.
+        with pytest.raises(ModelConfigError, match="critic/stride are not independent"):
+            load_model_tiers(
+                config_path(self.critic_on("strong", independence)), env={}
+            )
+
+    @pytest.mark.parametrize("independence", ["distinct_model", "distinct_provider"])
+    def test_the_review_tier_satisfies_both_policies(self, config_path, independence):
+        # `review` selects anthropic/claude-opus-5 against strong's
+        # vertex/gemini-2.5-pro, so it differs in model and in vendor.
+        config = load_model_tiers(
+            config_path(self.critic_on("review", independence)), env={}
+        )
+        assert config.independence_breaches() == []
+        assert config.resolve_model("critic/stride").vendor == REVIEW_VENDOR
+
+    def test_a_distinct_model_on_one_vendor_fails_the_provider_policy(
+        self, config_path
+    ):
+        # The two policies are not the same test. A second model from one
+        # provider removes a build's blind spots and keeps the provider's, so a
+        # deployment that asked for a distinct provider must not read as
+        # satisfied by it.
+        text = self.critic_on(
+            "review",
+            "distinct_provider",
+            review_vendor=VENDOR,
+            review="gemini-2.5-flash",
+        )
+        with pytest.raises(ModelConfigError, match="both run vendor 'vertex'"):
+            load_model_tiers(config_path(text), env={})
+
+        relaxed = self.critic_on(
+            "review", "distinct_model", review_vendor=VENDOR, review="gemini-2.5-flash"
+        )
+        assert (
+            load_model_tiers(config_path(relaxed), env={}).independence_breaches() == []
+        )
+
+    def test_the_same_pair_under_two_tier_names_is_not_independence(self, config_path):
+        # Independence is about the selection, not the tier name. A `review`
+        # tier configured with strong's own pair is the shared case wearing a
+        # second label.
+        text = self.critic_on(
+            "review", "distinct_model", review_vendor=VENDOR, review=STRONG
+        )
+        with pytest.raises(ModelConfigError, match="both run vertex/gemini-2.5-pro"):
+            load_model_tiers(config_path(text), env={})
+
+    def test_an_unknown_policy_is_refused(self, config_path):
+        with pytest.raises(ModelConfigError):
+            load_model_tiers(
+                config_path(config_toml(independence="mostly_distinct")), env={}
+            )
+
+    def test_the_policy_is_required(self, config_path):
+        # No default, because inheriting "shared" is how an install that meant
+        # to review itself independently ends up not doing so.
+        text = config_toml().replace('review_independence = "shared"\n', "")
+        with pytest.raises(ModelConfigError, match="review_independence"):
+            load_model_tiers(config_path(text), env={})
+
+    def test_the_recritic_pairing_still_holds_on_the_review_tier(self, config_path):
+        # Moving criticism to `review` must move the re-ask with it: a re-ask on
+        # a different tier from the pass it corrects is the drift
+        # critic_pairing_issues exists to refuse, whichever tier that is.
+        nodes = {
+            node: "base"
+            if node in ("extract", "repair")
+            else "review"
+            if node.startswith("critic/")
+            else "strong"
+            for node in LLM_NODES
+        }
+        with pytest.raises(ModelConfigError, match="recritic/stride"):
+            load_model_tiers(
+                config_path(config_toml(nodes=nodes, independence="shared")), env={}
+            )
+
+
+def test_the_review_tier_needs_no_credentials_until_something_runs_on_it():
+    """Selecting a tier is not the same as calling its provider (#506).
+
+    `review` is required in every config so that moving criticism onto it is a
+    one-line edit rather than a discovery. Building an adapter for it anyway
+    would demand a second vendor's credentials from every deployment that never
+    asked for an independent reviewer, and refuse to start without them.
+    """
+    from analysis_service.binding import build_tier_adapters
+    from analysis_service.resilience import load_resilience
+    from analysis_service.sampling import load_sampling
+
+    tiers = load_model_tiers(
+        REPO_CONFIG,
+        env={
+            "ANALYSIS_MODEL_BASE_VENDOR": "openai",
+            "ANALYSIS_MODEL_BASE_MODEL": "gpt-4.1-mini",
+            "ANALYSIS_MODEL_STRONG_VENDOR": "openai",
+            "ANALYSIS_MODEL_STRONG_MODEL": "gpt-5.6",
+            # A vendor whose key is deliberately absent from the env below.
+            "ANALYSIS_MODEL_REVIEW_VENDOR": "anthropic",
+            "ANALYSIS_MODEL_REVIEW_MODEL": "claude-opus-5",
+        },
+    )
+    adapters = build_tier_adapters(
+        tiers,
+        load_sampling(PROJECT_ROOT / "config" / "sampling.toml", env={}),
+        load_resilience(PROJECT_ROOT / "config" / "resilience.toml", env={}),
+        env={"ANALYSIS_OPENAI_API_KEY": "sk-not-a-real-key"},
+    )
+    assert set(adapters) == {"base", "strong"}

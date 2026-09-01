@@ -343,7 +343,7 @@ def test_the_recorded_model_carries_its_vendor(pipeline):
 # The two tiers differ on every param the node config carries, so a node bound
 # to the wrong tier's sampling would read wrong here.
 _DIVERGENT_SAMPLING = """\
-version = 4
+version = 5
 [tiers.base]
 temperature = 0.0
 top_p = 0.5
@@ -355,6 +355,12 @@ temperature = 1.0
 top_p = 0.9
 max_output_tokens = 4096
 seed = 22
+thinking = "high"
+[tiers.review]
+temperature = 1.0
+top_p = 0.9
+max_output_tokens = 4096
+seed = 33
 thinking = "high"
 """
 

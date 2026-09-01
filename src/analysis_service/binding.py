@@ -72,6 +72,7 @@ from analysis_service.model_tiers import (
     LLM_NODES,
     TIER_NAMES,
     ModelTierConfig,
+    ReviewIndependence,
     TierName,
 )
 from analysis_service.resilience import ResilienceConfig
@@ -301,9 +302,21 @@ def build_tier_adapters(
     resilience: ResilienceConfig,
     env: Mapping[str, str] | None = None,
 ) -> dict[TierName, LiteLlm]:
-    """One configured ``LiteLlm`` per tier, or fail closed before any call.
+    """One configured ``LiteLlm`` per **bound** tier, or fail closed before any call.
 
-    Raises :class:`~analysis_service.model_gate.ModelGateError` if a tier's
+    Bound, not every tier in the vocabulary. ``review`` exists so criticism can
+    be moved off the model it checks, and the shipped node map leaves it empty —
+    so building an adapter for it would demand a second vendor's credentials
+    from every deployment that never asked for an independent reviewer, and
+    refuse to start without them. The tier map is what says which tiers are in
+    use, and it is read here rather than assumed.
+
+    A tier nothing runs on is still *selected*: the config requires a
+    ``(vendor, model)`` pair for it, so moving a node onto it later is a one-line
+    edit rather than a discovery. What it does not require is a credential for a
+    provider this deployment does not call.
+
+    Raises :class:`~analysis_service.model_gate.ModelGateError` if a bound tier's
     sampling is unsupported by its ``(vendor, model)`` — whether LiteLLM says so
     or :func:`_check_temperature_unset` does — and
     :class:`~analysis_service.vendors.ProviderAuthError` if its credentials are
@@ -328,7 +341,12 @@ def build_tier_adapters(
     retrying = retrying_llm_class(LiteLlm, policy)
 
     adapters: dict[TierName, LiteLlm] = {}
+    # Walked in the vocabulary's order rather than the map's, so the build order
+    # does not vary with how a config file happens to list its nodes.
+    bound = set(tiers.nodes.values())
     for tier in TIER_NAMES:
+        if tier not in bound:
+            continue
         selection = tiers.tiers[tier]
         vendor = selection.vendor_entry
         tier_sampling = sampling.for_tier(tier)
@@ -382,7 +400,7 @@ class NodeBinding:
     clear block the report records for those same tiers. Sourced from different
     :class:`~analysis_service.sampling.SamplingConfig` objects they would
     disagree silently — every node running on one config while the report
-    attested to another, leaving each ``sampling_fingerprint`` unverifiable
+    attested to another, leaving each ``execution_fingerprint`` unverifiable
     against the block shipped beside it, which is precisely what the
     fingerprint exists to make impossible. :meth:`from_configs` derives both
     from one config, so that disagreement is not a bug to catch but a state
@@ -397,6 +415,13 @@ class NodeBinding:
     resolve_sampling: SamplingResolver
     tier_sampling: dict[TierName, TierSampling]
     resilience: ResilienceConfig | None = None
+    #: How far this deployment required criticism to sit from the analysis it
+    #: checks. Carried through the binding because that is the value the tier
+    #: config already travels in, and the report has to state it: a reader of a
+    #: ``shared`` run should see that the review was same-domain rather than
+    #: work it out from two node rows naming one model. It defaults for the
+    #: offline stand-ins, which bind scripted models and hold no tier config.
+    review_independence: ReviewIndependence = "shared"
 
     @classmethod
     def from_configs(
@@ -416,4 +441,5 @@ class NodeBinding:
             resolve_sampling=make_resolve_sampling(sampling, tiers.resolve_tier),
             tier_sampling=dict(sampling.tiers),
             resilience=resilience,
+            review_independence=tiers.review_independence,
         )

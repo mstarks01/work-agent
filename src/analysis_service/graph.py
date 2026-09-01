@@ -157,7 +157,7 @@ from analysis_service.knowledge import (
     select_documents,
 )
 from analysis_service.markdown_loader import MarkdownLoader, estimate_tokens
-from analysis_service.model_tiers import TierName
+from analysis_service.model_tiers import ReviewIndependence, TierName
 from analysis_service.prompts import (
     compose_analyze_prompt,
     compose_critic_prompt,
@@ -884,7 +884,9 @@ class Analysis:
             elements_analyzed=len(self.system_model.elements()),
             analysis_context=self.context(pipeline.instruction_sha256),
             execution=ExecutionEnvelope(
-                identity_version=IDENTITY_VERSION, build=dict(build_identity())
+                identity_version=IDENTITY_VERSION,
+                build=dict(build_identity()),
+                review_independence=pipeline.review_independence,
             ),
             analyses=list(self.analyses),
         )
@@ -1936,6 +1938,11 @@ class Pipeline:
     #: selection (:func:`tier_node_by_graph_node`), so a caller computing a
     #: fingerprint reads it from here rather than rebuilding it.
     tier_nodes: dict[str, str]
+    #: How far this deployment required criticism to sit from the analysis it
+    #: checks. Carried on the built graph rather than looked up where the report
+    #: is stamped, because the tier config is what enforced it and the driver
+    #: holds no config — the same reason ``instruction_sha256`` rides here.
+    review_independence: ReviewIndependence = "shared"
 
 
 def _generate_content_config(
@@ -2250,6 +2257,7 @@ def build_pipeline(
             node_instructions=instruction_sizes([extract]),
             frameworks=tuple(frameworks),
             tier_nodes=tier_nodes,
+            review_independence=binding.review_independence,
         )
 
     keys = GraphKeys.of(frameworks)
@@ -2338,6 +2346,7 @@ def build_pipeline(
         node_instructions=instruction_sizes(llm_nodes),
         frameworks=tuple(frameworks),
         tier_nodes=tier_nodes,
+        review_independence=binding.review_independence,
     )
 
 

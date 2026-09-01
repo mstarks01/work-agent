@@ -41,7 +41,13 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
 
-from analysis_service.model_tiers import TIER_NAMES
+from analysis_service.model_tiers import TierName
+
+# The tier whose model names a baseline. Spelled, not indexed: this read
+# ``TIER_NAMES[-1]`` until `review` was appended to the vocabulary and every
+# baseline silently became ``<commit>-unknown-<hash>``. A position in a
+# vocabulary is not a fact about which tier does the analysis.
+_NAMING_TIER: TierName = "strong"
 from analysis_service.report import TokenUsage
 from evals.harness.artifact import (
     REPO_ROOT,
@@ -135,7 +141,7 @@ class BaselineIdentity:
     @property
     def name(self) -> str:
         """``<short-commit>-<strong-model-slug>-<hash8>``, e.g. ``7c3a007-gpt-5.6-3f9a1c2e``."""
-        strong = dict(self.models).get(TIER_NAMES[-1], "unknown")
+        strong = dict(self.models).get(_NAMING_TIER, "unknown")
         return f"{self.repo_commit[:7]}-{_slug(strong)}-{self.hash[:8]}"
 
 
