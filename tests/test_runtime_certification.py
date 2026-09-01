@@ -27,7 +27,7 @@ from analysis_service.jobs import (
     StubPipelineRunner,
 )
 from analysis_service.sources import SourceLimits
-from tests.factories import DEFAULT_FRAMEWORKS
+from tests.factories import DEFAULT_FRAMEWORKS, SEEDING_BUDGET
 from tests.test_api import FakeVerifier, auth, submit
 
 FP_A = "a" * 64
@@ -69,6 +69,7 @@ def make_client(result: CertifyResult, gate_policy: CertificationGate) -> TestCl
         limits=TEST_LIMITS,
         job_deadline_seconds=30,
         max_active_jobs=10,
+        budget=SEEDING_BUDGET,
         frameworks=DEFAULT_FRAMEWORKS,
     )
     app.state.certification = gate_policy
@@ -176,6 +177,7 @@ class TestNothingReachesTheClientView:
             limits=TEST_LIMITS,
             job_deadline_seconds=30,
             max_active_jobs=10,
+            budget=SEEDING_BUDGET,
             frameworks=DEFAULT_FRAMEWORKS,
         )
         app.state.certification = None
