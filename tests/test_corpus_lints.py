@@ -486,7 +486,9 @@ def test_a_case_that_records_a_sitting_still_gets_a_document(tmp_path):
     shutil.copytree(source, case_dir)
     meta = json.loads((case_dir / "case.json").read_text(encoding="utf-8"))
     assert not meta.get("reviews"), "this case was chosen for having none"
-    meta["reviews"] = [{"reviewer": "ada", "date": "2026-09-01"}]
+    meta["reviews"] = [
+        {"submitted_by": "ada", "submitted_for": "ada", "date": "2026-09-01"}
+    ]
     (case_dir / "case.json").write_text(json.dumps(meta), encoding="utf-8")
 
     assert case_dir in build_review_docs.documents(tmp_path)
