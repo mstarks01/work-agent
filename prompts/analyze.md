@@ -135,17 +135,11 @@ A **scope** line opens the input: how many elements, crossings and unstated cont
 
 {system_model}
 
-```
 {element_roster}
-```
 
-```
 {boundary_crossings}
-```
 
-```
 {evidence_catalog}
-```
 
 {candidates}
 

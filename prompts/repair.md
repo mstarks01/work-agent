@@ -22,9 +22,7 @@ The model that failed:
 
 The validation issues, each naming an element ID, a field, and a code:
 
-```
 {validation_issues}
-```
 
 The original submitted text:
 

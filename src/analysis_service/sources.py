@@ -276,9 +276,13 @@ def fence_for(body: str) -> str:
     carrying its own fence stay inside the block.
 
     Shared with the seam that renders the System Model into a category agent's prompt:
-    ``json.dumps`` escapes quotes and newlines but **not** backticks, so a
-    ``notes`` or ``source_excerpt`` value that carries a fence would otherwise
-    close a static one node downstream of here.
+    ``json.dumps`` escapes quotes, ``\\n`` and ``\\r`` but **not** backticks, and
+    **not** U+2028, U+2029 or U+0085 — three characters it passes through as
+    themselves and that ``str.splitlines`` and most renderers break a line on.
+    So a ``notes`` or ``source_excerpt`` value carrying a fence and one of those
+    has both halves of a closing fence, and would close a fence written into a
+    prompt file. Sizing the fence to the body is what makes that unspellable,
+    here and downstream.
     """
     longest = max((len(run.group()) for run in _BACKTICK_RUN.finditer(body)), default=0)
     return "`" * max(3, longest + 1)

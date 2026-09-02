@@ -16,13 +16,9 @@ Then follow the validated System Model, its derived boundary crossings, and the 
 
 {system_model}
 
-```
 {boundary_crossings}
-```
 
-```
 {drafts}
-```
 
 ## Procedure
 
