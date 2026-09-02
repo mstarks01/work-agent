@@ -406,10 +406,15 @@ async def require_subject(
 
 
 async def _owned_job(request: Request, job_id: str, subject: str) -> JobRecord:
-    """Fetch a job the subject owns; missing and foreign jobs are the same 404."""
+    """Fetch a job the subject owns; missing and foreign jobs are the same 404.
+
+    The record comes back without its report. Every route here reads the
+    envelope, and the one that serves the analysis asks the store for it
+    separately, so no read copies a report to decide something about it.
+    """
     store: JobStore = request.app.state.store
-    record = await store.get(job_id)
-    if record is None or record.owner_subject != subject:
+    record = await store.owned(job_id, subject)
+    if record is None:
         raise HTTPException(status_code=404, detail="job not found")
     return record
 
@@ -683,13 +688,15 @@ def create_app(
                 detail=f"job status is {record.status!r};"
                 " the report exists only once the job is completed",
             )
-        if record.report is None:
-            logger.error("completed job %s has no report attached", record.id)
-            raise HTTPException(status_code=500, detail="an internal error occurred")
         withheld = _withheld_report(request, record)
         if withheld is not None:
             return withheld
-        return JSONResponse(record.report.model_dump(mode="json"))
+        store: JobStore = request.app.state.store
+        payload = await store.report_json(job_id, subject)
+        if payload is None:
+            logger.error("completed job %s has no report attached", record.id)
+            raise HTTPException(status_code=500, detail="an internal error occurred")
+        return JSONResponse(payload)
 
     @app.get("/v1/jobs/{job_id}/events")
     async def stream_events(

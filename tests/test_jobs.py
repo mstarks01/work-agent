@@ -23,7 +23,12 @@ from analysis_service.jobs import (
 from analysis_service.report import InputRef
 from analysis_service.sources import Source
 from analysis_service.validation import ValidationIssue
-from tests.factories import SEEDING_BUDGET, admit, sample_selection
+from tests.factories import (
+    SEEDING_BUDGET,
+    admit,
+    sample_report,
+    sample_selection,
+)
 
 
 def make_record() -> JobRecord:
@@ -137,6 +142,66 @@ class TestInMemoryJobStore:
         fetched = asyncio.run(scenario())
         assert fetched is not None
         assert fetched.status == "queued"
+
+    def test_owned_answers_none_for_a_foreign_job(self):
+        """A foreign job and a missing one are the same answer, so a job id
+        cannot be probed for existence."""
+
+        async def scenario():
+            store = InMemoryJobStore()
+            record = make_record()
+            await admit(store, record)
+            return await store.owned(record.id, "mallory")
+
+        assert asyncio.run(scenario()) is None
+
+    def test_owned_leaves_the_report_behind(self):
+        """The status and event routes read the envelope and never the
+        analysis. Copying the report for them is the whole cost of a read, and
+        a read carries none of the bounds admission does."""
+
+        async def scenario():
+            store = InMemoryJobStore()
+            record = make_record()
+            await admit(store, record)
+            record.transition("running")
+            record.report = sample_report()
+            record.transition("completed")
+            await store.save(record)
+            return await store.owned(record.id, "alice"), await store.get(record.id)
+
+        trimmed, whole = asyncio.run(scenario())
+        assert trimmed is not None and whole is not None
+        assert trimmed.status == "completed"
+        assert trimmed.report is None
+        assert whole.report is not None, "get still answers with the whole record"
+
+    def test_report_json_serializes_without_a_second_copy(self):
+        async def scenario():
+            store = InMemoryJobStore()
+            record = make_record()
+            await admit(store, record)
+            record.transition("running")
+            record.report = sample_report()
+            record.transition("completed")
+            await store.save(record)
+            return (
+                await store.report_json(record.id, "alice"),
+                await store.report_json(record.id, "mallory"),
+            )
+
+        mine, foreign = asyncio.run(scenario())
+        assert isinstance(mine, dict) and mine
+        assert foreign is None, "ownership is re-checked, not assumed of the caller"
+
+    def test_report_json_answers_none_when_no_report_is_attached(self):
+        async def scenario():
+            store = InMemoryJobStore()
+            record = make_record()
+            await admit(store, record)
+            return await store.report_json(record.id, "alice")
+
+        assert asyncio.run(scenario()) is None
 
     def test_save_requires_existing_record(self):
         with pytest.raises(ValueError, match="does not exist"):

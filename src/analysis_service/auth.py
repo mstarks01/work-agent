@@ -338,13 +338,26 @@ class OidcJwtVerifier:
             signing_key = self._jwks_client.get_signing_key_from_jwt(token)
             claims = jwt.decode(
                 token,
-                signing_key.key,
+                # The PyJWK itself, not its bare key. PyJWT then binds the
+                # algorithm to the key it came with, and a token naming an
+                # algorithm of another family -- RS256 against the EC key whose
+                # `kid` it quotes -- is an InvalidAlgorithmError, which is a
+                # PyJWTError. Handed the bare key instead, the same token
+                # reaches a `prepare_key` that raises TypeError, which is not.
+                signing_key,
                 algorithms=list(self._settings.algorithms),
                 issuer=self._settings.issuer,
                 audience=self._settings.audience,
                 options={"require": ["exp", "iss", "aud", "sub"]},
             )
-        except jwt.PyJWTError as exc:
+        # PyJWTError is the library's own contract and TypeError/ValueError are
+        # what it raises out of a key it could not use. Both are the same answer
+        # here: the caller sent a token this verifier will not accept. Catching
+        # only the first let the second reach the 500 handler, which turned a
+        # rejected token into an oracle for the JWKS -- one kid answering
+        # differently from another is what the generic message exists to
+        # prevent -- and wrote a traceback per request to the operator's log.
+        except (jwt.PyJWTError, TypeError, ValueError) as exc:
             logger.info("rejected bearer token: %s", exc)
             raise AuthenticationError("invalid or expired credentials") from exc
         return _clean_subject(claims["sub"])
