@@ -27,7 +27,7 @@ where it can see the rate it used. The provider's own spend limit is the
 backstop behind both, and ``docs/Configuration.md`` says so.
 
 The estimate is deliberately coarse and deliberately high. :func:`estimate`
-multiplies the submission's own token count by every LLM call the selection
+multiplies the submission's own byte count by every LLM call the selection
 implies, which over-counts: not every call carries the whole input, and a repair
 node often does not run. Over-counting is the right direction for a bound that
 must hold before anything is spent. The alternative is a gate that admits a job
@@ -63,8 +63,7 @@ from datetime import UTC, datetime, timedelta
 from pydantic import BaseModel, ConfigDict, Field
 
 from analysis_service.frameworks import PACKAGES
-from analysis_service.markdown_loader import estimate_tokens
-from analysis_service.report import FrameworkSelection, TokenUsage
+from analysis_service.report import FrameworkSelection, NodeRun
 from analysis_service.sources import Source
 
 # Calls every job makes whatever it selects: one extraction, and the repair that
@@ -95,12 +94,16 @@ def estimate(
 ) -> int:
     """The tokens a submission reserves before anything is spent.
 
-    The submission's own size times every call the selection implies. It ignores
-    the instruction text each node also carries, which pulls the estimate down,
-    and assumes every call sees the whole input, which pulls it up much harder —
-    so it over-counts, on purpose. See the module docstring.
+    One token per UTF-8 byte of the submission, times every call the selection
+    implies. A byte is the unit because it is the one thing a caller cannot
+    shrink. A word count would read a 100 KiB base64 blob as two tokens while a
+    tokenizer meters it near one token per byte, so only a byte count
+    over-counts every text a caller can send.
+    It ignores the instruction text each node also carries, which pulls the
+    estimate down, and assumes every call sees the whole input, which pulls it
+    up much harder — so it over-counts, on purpose. See the module docstring.
     """
-    submitted = sum(estimate_tokens(source.text) for source in sources)
+    submitted = sum(source.size_bytes() for source in sources)
     return submitted * llm_calls_for(frameworks)
 
 
@@ -146,7 +149,7 @@ def spent_tokens(charges: Iterable[tuple[int, int | None]]) -> int:
     )
 
 
-def measured_tokens(usages: Iterable[TokenUsage | None]) -> int:
+def measured_tokens(nodes: Iterable[NodeRun]) -> int:
     """What a finished job's node runs actually cost, or 0 if nothing metered.
 
     Zero and not ``None`` for an unmetered run, because this is the number that
@@ -155,10 +158,20 @@ def measured_tokens(usages: Iterable[TokenUsage | None]) -> int:
     never reports again. Under-charging a run the provider declined to meter is
     the safer error, and the unmetered call is visible in the report either way.
 
-    Typed against :class:`~analysis_service.report.TokenUsage` rather than read
-    off any object that happens to carry the attribute. A ``getattr`` with a
-    zero default answers 0 for a usage record whose field was renamed, which
-    silently undercharges every window and no type checker can see — the number
-    that decides a budget must not have a quiet default behind it.
+    A retried node cost more than its usage says. Only the attempt that answered
+    is metered, and each failed attempt before it sent the same prompt, so every
+    attempt past the first is charged the answering call's prompt tokens. That
+    over-counts an attempt the provider refused before reading the prompt, which
+    is the direction a settlement should err in.
+
+    Typed against :class:`~analysis_service.report.NodeRun` rather than read off
+    any object that happens to carry the attributes. A ``getattr`` with a zero
+    default answers 0 for a usage record whose field was renamed, which silently
+    undercharges every window and no type checker can see — the number that
+    decides a budget must not have a quiet default behind it.
     """
-    return sum(usage.total_tokens for usage in usages if usage is not None)
+    return sum(
+        node.usage.total_tokens + node.usage.prompt_tokens * (node.attempts - 1)
+        for node in nodes
+        if node.usage is not None
+    )

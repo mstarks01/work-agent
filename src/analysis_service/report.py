@@ -157,6 +157,9 @@ from analysis_service.system_model import BoundaryCrossing, SystemModel
 # consumer switching over the three kinds it knew now meets a fourth. It rides
 # this one instead because 3.0 has never shipped, and two hard cutovers for one
 # release is a cost paid twice for nothing.
+# 3.0 also carries ``nodes[].attempts``, the provider-call count the retry
+# driver stamps on each LLM node. Optional with a default of 1, and it rides
+# the unshipped major for the same reason.
 # 3.0 also carries ``unknown_claim_identities``, a seventh list of
 # service-owned marks: a claim naming an identifier its framework's own catalog
 # does not hold. It rides 3.0 for the same reason ``absent-attribute`` does —
@@ -1335,6 +1338,12 @@ class NodeRun(BaseModel):
     token count is a fact about the call regardless of whether the provider
     also named the build that served it, and refusing to record it would
     discard a real measurement to satisfy a symmetry nobody needs.
+
+    ``attempts`` is how many provider calls the execution took, counted by the
+    retry driver. ``usage`` meters the one that answered; a failed attempt
+    reports nothing, so the count is the only trace the prompt bytes it sent
+    leave. A settlement charges them from it (see
+    :func:`analysis_service.budgets.measured_tokens`).
     """
 
     model_config = ConfigDict(extra="forbid")
@@ -1346,6 +1355,7 @@ class NodeRun(BaseModel):
     execution_fingerprint: str | None = Field(default=None, pattern=r"^[0-9a-f]{64}$")
     duration_ms: int = Field(ge=0)
     usage: TokenUsage | None = None
+    attempts: int = Field(default=1, ge=1)
 
     @model_validator(mode="after")
     def _fingerprint_needs_its_inputs(self) -> Self:

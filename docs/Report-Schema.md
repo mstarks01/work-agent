@@ -824,6 +824,7 @@ class NodeRun:
     execution_fingerprint: str | None  # 64-hex hash of the execution identity
     duration_ms: int
     usage: TokenUsage | None  # what the provider says the call cost; None if unmetered
+    attempts: int  # provider calls this execution took; 1 unless the driver retried
 
 
 class TokenUsage:
@@ -887,6 +888,11 @@ class TokenUsage:
   the parts are not cross-checked, because vendors disagree on whether
   `reasoning_tokens` sits inside `completion_tokens` or beside it. Sum them
   yourself only if you know who answered.
+- **`attempts`** is how many provider calls the node took, as the retry driver
+  counted them. `usage` meters only the call that answered; a failed attempt
+  reports nothing. The budget settlement charges each earlier attempt the
+  answering call's `prompt_tokens`, because that is the prompt every attempt
+  sent.
 
 > **`schema_version` 1.1** added `requested_model` and redefined `model` as the
 > served build rather than the configured string. A consumer keying on `model`

@@ -696,6 +696,20 @@ class TestEvents:
         assert [int(f["id"]) for f in frames] == list(range(4, 4 + len(frames)))
         assert frames[-1]["data"]["status"] == "completed"
 
+    def test_a_last_event_id_int_would_refuse_replays_from_the_start(self):
+        # ``str.isdigit`` passes a superscript that ``int`` raises on, and
+        # ``int`` refuses a string past 4300 digits. Both spell a client header,
+        # so neither may become a 500.
+        client, _ = make_client()
+        job_id = submit(client)
+        for header in (b"\xb2", b"9" * 5000, b"-1", b""):
+            response = client.get(
+                f"/v1/jobs/{job_id}/events",
+                headers=auth() | {b"last-event-id": header},
+            )
+            assert response.status_code == 200
+            assert parse_sse(response.text)[0]["id"] == "1"
+
 
 class TestFrameworksListIsBounded:
     """A frameworks list longer than the registry is refused before route work.
