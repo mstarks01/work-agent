@@ -115,7 +115,7 @@ class UncertifiedNode(BaseModel):
 
 
 class CertifyResult(BaseModel):
-    """The three-state verdict over a run's generation identities.
+    """The three-state verdict over a run's execution identities.
 
     ``uncertified`` is reported **by node** even though blessing is by tier: the
     operator needs to know which node presented the offending hash, and the hash
@@ -208,7 +208,7 @@ def fingerprints_of(nodes: Iterable[NodeRun]) -> dict[str, frozenset[str]]:
     different things: the service certifies a finished report, while a sweep
     certifies runs that may produce no report at all — the extraction mode
     scores an emission, not a :class:`Report`, and its ``extract``
-    execution is no less an observed generation identity for that.
+    execution is no less an observed execution identity for that.
     """
     observations: dict[str, set[str]] = {}
     for node in nodes:

@@ -81,7 +81,7 @@ class ProvenanceError(CertificationError):
 
 
 class NodeExecution(BaseModel):
-    """One LLM node execution's generation identity, as observed.
+    """One LLM node execution's execution identity, as observed.
 
     ``requested_model`` and ``served_model`` are both recorded and neither is
     computed from the other: their disagreement is the drift signal, and
@@ -361,7 +361,7 @@ def provenance_of(
     ``executions`` is every node execution across every case — the same flat
     list the token totals are folded from, so the artifact's provenance and its
     costs describe one set of calls. Executions carrying no fingerprint are
-    skipped: a deterministic FunctionNode has no generation identity, and an LLM
+    skipped: a deterministic FunctionNode has no execution identity, and an LLM
     node whose response named no build has nothing honest to record.
 
     ``tier_of`` is the deployment's node -> tier walk, passed in rather than

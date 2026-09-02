@@ -338,7 +338,7 @@ def _withheld_report(request: Request, record: JobRecord) -> JSONResponse | None
         return None
     return _problem_response(
         409,
-        "the report is withheld: its generation identity is not blessed by this"
+        "the report is withheld: its execution identity is not blessed by this"
         " deployment's manifest",
         uncertified_nodes=[node.to_json() for node in result.uncertified],
         unexercised_tiers=list(result.unexercised),
