@@ -53,6 +53,7 @@ from evals.harness.sitting import (
     claim_files,
     document_name,
     required_files,
+    unreviewed_cases,
     without_unreviewed,
 )
 
@@ -671,14 +672,29 @@ def _check_sitting_covers(root: Path, author: str) -> Check:
 
 
 def _check_sitting_clears_unreviewed(root: Path, author: str) -> Check:
+    """Every carried case is off the unreviewed list.
+
+    Asked of the parsed table rather than of the file's text. A substring test
+    answers a slightly different question -- is this spelling present -- and the
+    difference between the two questions is a gap: a key respelled so the text
+    does not hold it, while :mod:`ast` still reads it as the same case, passes
+    the text reader and is removed by the parsed one, so the entry survives with
+    whatever it carries. One reader, so there is no second opinion to disagree
+    with.
+    """
     cases = _sitting_cases(root)
-    listing = (root / CASE_REVIEW_TEST).read_text(encoding="utf-8") if cases else ""
+    if not cases:
+        return _check("every case's UNREVIEWED line is gone", [])
+    try:
+        listed = set(unreviewed_cases(root))
+    except SittingError as exc:
+        return _check("every case's UNREVIEWED line is gone", [str(exc)])
     return _check(
         "every case's UNREVIEWED line is gone",
         [
             f"{case}: delete its line from UNREVIEWED in {CASE_REVIEW_TEST}"
             for case in cases
-            if f'"{case}":' in listing
+            if case in listed
         ],
     )
 
