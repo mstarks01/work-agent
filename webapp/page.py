@@ -2,36 +2,36 @@
 
 The three local apps — the first-run app, the review app and the sitting app —
 each serve HTML built from a template string, on loopback, to one operator. All
-three put the operator's own text, and in the first-run app's case a submitter's
-untrusted prose, into that HTML. Getting a value into a page safely is therefore
-one problem with one answer, and this module is it.
+three put the operator's own text into that HTML, and the first-run app also
+puts a submitter's untrusted prose there. Getting a value into a page safely is
+therefore one problem with one answer, and this module is that answer.
 
-**A page declares what it does, and the policy follows.** :class:`Grants` names
-the three things a local page may be authorised to do; :meth:`Grants.policy`
+A page declares what it does, and the policy follows. :class:`Grants` names the
+three things a local page may be authorised to do, and :meth:`Grants.policy`
 turns that declaration into the header. Every field defaults to ``False``, so a
-page that says nothing is granted nothing and falls through to
+page that says nothing is granted nothing, and falls through to
 ``default-src 'none'`` (OWASP A02, deny by default). The three closed directives
 are spelled on every policy rather than left to fall back, because none of them
-falls back to ``default-src`` — a policy can read as total and still leave a
-page framable.
+falls back to ``default-src``. Without them a policy can read as total and still
+leave a page framable.
 
-**Where a value lands decides its escape**, and there are exactly two places.
+Where a value lands decides its escape, and there are exactly two places.
 :func:`escape` is for markup, where the value sits in element text or an
-attribute. :func:`script_json` is for a ``<script>`` block, which decodes no HTML
-entities, so ``html.escape`` would deliver ``&quot;`` where a quote was; it also
-closes every ``<`` as ``\\u003c``, because a value spelling ``</script>`` ends
-the block and everything after it parses as HTML. That last one is the stored
--input XSS this module exists to make unspellable (OWASP A05, LLM05): the
-first-run app's report payload carries a submitter's own description, and it
-takes the same escape as any other value in a script block, through the same
-function.
+attribute. :func:`script_json` is for a ``<script>`` block, which decodes no
+HTML entities, so ``html.escape`` would deliver ``&quot;`` where a quote was. It
+also closes every ``<`` as ``\u003c``, because a value that spells
+``</script>`` ends the block, and everything after it parses as HTML. That last
+one is the stored-input XSS this module exists to make unspellable (OWASP A05,
+LLM05). The first-run app's report payload carries a submitter's own
+description, and it takes the same escape as any other value in a script block,
+through the same function.
 
-**The nonce is stamped before the fields are filled**, never after. A field's
+The nonce is stamped before the fields are filled, and never after. A field's
 value is content, and content that happens to spell the placeholder must come
 back as those characters rather than become a live nonce.
 
 :func:`is_same_origin` and ``frame-ancestors 'none'`` sit here together on
-purpose. They are one control in two halves and neither replaces the other: a
+purpose. They are one control in two halves, and neither replaces the other. A
 page framed by somebody else sends requests the header check passes, because
 they really do come from this app's own page, and only the directive stops the
 frame. Splitting them across modules is how one of them gets edited alone.

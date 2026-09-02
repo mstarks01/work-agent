@@ -1,48 +1,47 @@
 """The whole corpus as one file a reader opens in a browser.
 
-``webapp/sitting.py`` is the sitting a maintainer holds: a local server, a
-clone, a command line. This writes the same sitting as a single standalone
-HTML file, so a reader who has none of those can still do the one thing no
-lint can do — read a case and say whether its reference sets describe what
-could actually go wrong.
+``webapp/sitting.py`` is the sitting a maintainer holds, with a local server, a
+clone and a command line. This writes the same sitting as a single standalone
+HTML file, so a reader who has none of those can still do the one thing no lint
+can do: read a case, and say whether its reference sets describe what could
+actually go wrong.
 
-**The browser is the runtime, which is what makes this OS-independent.**
-Nothing is installed, nothing is signed, no per-platform build exists, and the
-page opens from ``file://``. The payload is the whole corpus, which is about
-440 KB of sources, models and reference sets — one ordinary email attachment,
-so there is no reason to split it per case and every reason not to: the rail,
-and with it the reader's own choice of what to sit, only exists over the whole
-set.
+The browser is the runtime, which is what makes this independent of the
+operating system. Nothing is installed, nothing is signed, no per-platform build
+exists, and the page opens from ``file://``. The payload is the whole corpus, at
+about 440 KB of sources, models and reference sets. That is one ordinary email
+attachment, so there is no reason to split it per case and every reason not to:
+the rail, and with it the reader's own choice of what to sit, exists only over
+the whole set.
 
-**It lays out the same blocks the other two surfaces do.**
-``evals.build_review_docs`` describes a case as blocks precisely so a page and
-a document cannot describe two different systems; this is the third renderer
-over that description, not a third description.
+It lays out the same blocks the other two surfaces do.
+``evals.build_review_docs`` describes a case as blocks precisely so that a page
+and a document cannot describe two different systems. This is the third renderer
+over that description rather than a third description.
 
 The rules it carries, in the words the app carries them:
 
-* **The own list comes first, per case.** A case's recorded sets are not in
-  the page's reach until that case's own list is written, and the list has to
-  say at least ``MIN_OWN_LIST`` characters. This surface cannot enforce that
-  the way the app does — a static file holds its own payload, so a reader who
+* The own list comes first, per case. A case's recorded sets are not in the
+  page's reach until that case's own list is written, and the list has to say at
+  least ``MIN_OWN_LIST`` characters. This surface cannot enforce that the way
+  the app does, because a static file holds its own payload, so a reader who
   opens the source can read the sets. #373 already ruled what the gate is for:
-  it protects the evidence in the filled document, not the reader. The import
-  re-checks the same rule against the same constant.
-* **A case takes one own list.** Once written, that case's list is fixed for
-  the session. A list typed after the sets opened would be evidence of an
-  order that did not happen, and days of reading is exactly when that becomes
-  tempting.
-* **Marks, the missing list and the notes stay editable to the last minute.**
+  it protects the evidence in the filled document rather than the reader. The
+  import re-checks the same rule against the same constant.
+* A case takes one own list. Once written, that case's list is fixed for the
+  session. A list typed after the sets opened would be evidence of an order that
+  did not happen, and days of reading is exactly when that becomes tempting.
+* Marks, the missing list and the notes stay editable to the last minute.
   Nothing is a record until the operator imports it, so a reader who changes
   their mind on day four simply changes it.
-* **The page counts the own list and says nothing about the count**, because a
+* The page counts the own list and says nothing about the count, because a
   running total sets the length somebody writes to.
 
-**The envelope is the save file.** Download it to stop, load it to carry on.
+The envelope is the save file. Download it to stop, and load it to carry on.
 That is one format for two jobs, and it means the page depends on no browser
-storage — ``localStorage`` has no dependable origin on ``file://``.
+storage: ``localStorage`` has no dependable origin on ``file://``.
 
-Run: ``uv run python webapp/offline_sitting.py --submitted-for anonymous``.
+Run ``uv run python webapp/offline_sitting.py --submitted-for anonymous``.
 """
 
 from __future__ import annotations
