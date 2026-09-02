@@ -4,12 +4,12 @@ Start it from a clone, with no credentials of any kind::
 
     uv run python webapp/review.py --voter ada
 
-It is **eval-side tooling and not the product**. ``webapp/main.py`` embeds the
-engine and runs real models against real prose; this reads a sweep's artifact
+It is eval-side tooling rather than the product. ``webapp/main.py`` embeds the
+engine and runs real models against real prose. This reads a sweep's artifact
 and the vote ledger under ``evals/review/votes/``, and writes one line per
 click. Nothing here can start a job, spend a token, or reach a provider. That is
 why it needs no auth story beyond the loopback bind: there is no credential
-behind it to protect and nothing it can be made to buy.
+behind it to protect, and nothing it can be made to buy.
 
 Two pages, three data endpoints:
 
@@ -21,33 +21,33 @@ Two pages, three data endpoints:
 ``GET  /api/summary``   counts for the queue page
 ======================  =======================================================
 
-**The reviewer never sees which configuration produced the finding.** That is
-enforced by :class:`~evals.harness.queue.QueueItem`, which has no field for it,
-and asserted by ``tests/test_evals_queue.py``. The configuration is stamped onto
-the :class:`~evals.harness.ledger.Vote` *after* the answer, from the artifact,
+The reviewer never sees which configuration produced the finding.
+:class:`~evals.harness.queue.QueueItem` enforces that by having no field for it,
+and ``tests/test_evals_queue.py`` asserts it. The configuration is stamped onto
+the :class:`~evals.harness.ledger.Vote` after the answer, from the artifact,
 where the reviewer cannot reach it.
 
-Security posture, all of it deliberate and all of it inherited from
+The security posture is deliberate throughout, and inherited from
 ``webapp/main.py`` rather than re-derived:
 
-* **Loopback only**, hard-bound with no flag (A01). The ledger is the supply
-  chain of every published quality number, so a writable endpoint reachable off
-  the host is an unauthenticated way to forge that record.
-* **``POST /api/vote`` refuses a request that is not same-origin, and no page
-  here can be framed** (A01). Both, because either alone is a way to the same
-  forged row: a fingerprint is not a secret, so a foreign page can name a real
-  finding, and a framed page votes with the operator's own origin.
-* **The voter comes from the command line, never from the request** (A01). A
-  browser field naming the voter would let one reviewer file votes as another,
-  and the double-vote agreement measure rests on the name being true.
-* **Every finding is submitter prose and reaches the page as data** (LLM05,
-  A05). Values are injected as one JSON blob that the client renders through
+* Loopback only, hard-bound with no flag (A01). The ledger is the supply chain
+  of every published quality number, so a writable endpoint reachable off the
+  host is an unauthenticated way to forge that record.
+* ``POST /api/vote`` refuses a request that is not same-origin, and no page here
+  can be framed (A01). Both are needed, because either alone is a way to the
+  same forged row: a fingerprint is not a secret, so a foreign page can name a
+  real finding, and a framed page votes with the operator's own origin.
+* The voter comes from the command line, never from the request (A01). A browser
+  field naming the voter would let one reviewer file votes as another, and the
+  double-vote agreement measure rests on the name being true.
+* Every finding is submitter prose, and reaches the page as data (LLM05, A05).
+  Values are injected as one JSON blob that the client renders through
   ``textContent``, so there is no HTML path for a claim to take.
-* **The vote body is validated against closed sets before it is written**
-  (A05). ``verdict`` and ``reason`` are checked by
-  :class:`~evals.harness.ledger.Vote` itself, and the fingerprint must already
-  be one the queue offered — a client cannot invent a finding to vote on.
-* **Errors fail closed and say nothing about the filesystem** (A10).
+* The vote body is validated against closed sets before it is written (A05).
+  :class:`~evals.harness.ledger.Vote` checks ``verdict`` and ``reason`` itself,
+  and the fingerprint must already be one the queue offered, so a client cannot
+  invent a finding to vote on.
+* Errors fail closed and say nothing about the filesystem (A10).
 """
 
 from __future__ import annotations

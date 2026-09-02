@@ -4,11 +4,11 @@ Start it from a clone, with model auth already configured::
 
     uv run python webapp/main.py
 
-It embeds :class:`~analysis_service.Engine` **in process**. It does not go
-through the ``/v1`` HTTP surface, so it needs no bearer token and no CORS — and
-it runs real models against real prose, because there is no credential-free
-path here. Its whole job is to show a first-time integrator that the engine
-works, then get out of the way; the library is what they actually embed.
+It embeds :class:`~analysis_service.Engine` in process. It does not go through
+the ``/v1`` HTTP surface, so it needs no bearer token and no CORS, and it runs
+real models against real prose, because there is no credential-free path here.
+Its whole job is to show a first-time integrator that the engine works, and then
+get out of the way. The library is what they actually embed.
 
 Two pages, three data endpoints:
 
@@ -20,76 +20,76 @@ Two pages, three data endpoints:
 ``GET  /events/{run}``  server-sent per-node progress
 ======================  ========================================================
 
-**Deliberately unbloated.** One module, no template engine, no JS framework, no
-build step, no CSS framework, no bundler. HTML comes from f-strings and the
+It is deliberately unbloated: one module, no template engine, no JS framework,
+no build step, no CSS framework, no bundler. HTML comes from f-strings, and the
 only client-side JavaScript is the SSE listener, the Load-example fill, the
 picker's show-and-hide, and the redirect.
 
-Security posture, all of it deliberate:
+The security posture is deliberate throughout:
 
-* **Loopback only.** ``127.0.0.1`` is hard-bound with no flag and no override.
-  The no-auth/no-CORS posture is only safe there: anything reachable is an
-  unauthenticated proxy to someone else's vendor bill. Remote, authenticated
-  access is exactly what ``/v1`` already exists for.
-* **No HTTP input touches model identity.** Tier, vendor, model and sampling
-  come from ``config/`` alone. A form field selecting a model would be
+* Loopback only. ``127.0.0.1`` is hard-bound, with no flag and no override. The
+  no-auth and no-CORS posture is safe only there, because anything reachable is
+  an unauthenticated proxy to somebody else's vendor bill. Remote,
+  authenticated access is exactly what ``/v1`` already exists for.
+* No HTTP input touches model identity. Tier, vendor, model and sampling come
+  from ``config/`` alone. A form field that selected a model would be
   unauthenticated control over what runs and what it costs (A01, LLM10). The
-  framework picker is a different thing: it selects which framework analyses
-  the text, not which model does the analysing. It does change what a
-  submission can spend, because each selected framework runs its own nodes.
-  The one-run-at-a-time gate and the loopback bind are what bound that.
-* **The picker is an allow-list, checked server-side** (A01). A submitted name
-  must be one this install carries and a submitted option must satisfy that
+  framework picker is a different thing: it selects which framework analyses the
+  text, rather than which model does the analysing. It does change what a
+  submission can spend, because each selected framework runs its own nodes. The
+  one-run-at-a-time gate and the loopback bind are what bound that.
+* The picker is an allowlist, checked server-side (A01). A submitted name must
+  be one this install carries, and a submitted option must satisfy that
   package's own options model, both before an engine exists. The form's
   checkboxes decide nothing: :func:`_selection` re-derives the selection from
-  the carried list, so an invented name, a repeated one and a reordered pair
-  are refused or normalised rather than reaching the graph.
-* **The injection point is the whole trust boundary.** A report carries the
-  submitter's own prose, so every ``<`` is escaped to ``\\u003c`` before the
-  JSON enters the viewer's ``<script>`` block — otherwise a description
-  containing ``</script>`` closes it and the rest parses as HTML (A05 / LLM05).
-  See :func:`render_report`.
-* **Untrusted text never reaches ``innerHTML``** on any page. It renders as
-  ``textContent`` or as constructed DOM nodes, so there is no escape helper to
-  forget to call — the discipline had already failed once, unnoticed, in the
-  element table's attribute column. This is the primary control; the CSP below
-  is defence in depth behind it. The form page is included: a source label and a
-  validator message both carry submitter bytes onto it over SSE, and both land
-  as text nodes. Server-side, the two f-string pages escape through
-  :func:`~webapp.page.escape`, which is quote-safe so that where a value lands
-  is not part of whether the escape is adequate.
-* **CSRF.** ``POST /analyze`` requires ``Sec-Fetch-Site: same-origin``. The
-  header is browser-set and unspoofable from script, and it is checked before
-  anything else so a cross-origin caller cannot even start a run. The check is
+  the carried list, so an invented name, a repeated one and a reordered pair are
+  refused or normalised rather than reaching the graph.
+* The injection point is the whole trust boundary. A report carries the
+  submitter's own prose, so every ``<`` is escaped to ``\u003c`` before the JSON
+  enters the viewer's ``<script>`` block. Otherwise a description containing
+  ``</script>`` closes it, and the rest parses as HTML (A05, LLM05). See
+  :func:`render_report`.
+* Untrusted text never reaches ``innerHTML`` on any page. It renders as
+  ``textContent``, or as constructed DOM nodes, so there is no escape helper to
+  forget to call. The discipline had already failed once, unnoticed, in the
+  element table's attribute column. This is the primary control, and the CSP
+  below is defence in depth behind it. The form page is included: a source label
+  and a validator message both carry submitter bytes onto it over SSE, and both
+  land as text nodes. Server-side, the two f-string pages escape through
+  :func:`~webapp.page.escape`, which is quote-safe, so where a value lands is
+  not part of whether the escape is adequate.
+* CSRF: ``POST /analyze`` requires ``Sec-Fetch-Site: same-origin``. The header
+  is browser-set and unspoofable from script, and it is checked before anything
+  else, so a cross-origin caller cannot even start a run. The check is
   :func:`~webapp.page.is_same_origin`, which the two eval-side apps share
-  through :func:`~webapp.page.refuse_cross_origin` — one spelling of the header
-  name and the accepted value, rather than one per endpoint.
-* **No page here can be framed.** Each policy closes ``frame-ancestors``,
-  which does not fall back to ``default-src`` however total the rest of the
-  policy reads. It is the control the origin check rests on rather than a
-  second opinion about it: a press inside somebody else's frame reaches the
-  app as same-origin, because it really does come from the app's own page.
-* **One run at a time** (LLM10). A second submission is refused with a message,
-  not queued and held open.
-* **A strict nonce CSP on every page.** ``default-src 'none'`` with a
-  per-response nonce for each inline block, and no ``'unsafe-inline'`` anywhere
-  — which is why the viewer carries no ``style=""`` attributes and sets
-  generated colours through ``element.style.*``, a CSSOM write CSP does not
+  through :func:`~webapp.page.refuse_cross_origin`. That is one spelling of the
+  header name and the accepted value, rather than one per endpoint.
+* No page here can be framed. Each policy closes ``frame-ancestors``, which does
+  not fall back to ``default-src``, however total the rest of the policy reads.
+  It is the control the origin check rests on rather than a second opinion about
+  it: a press inside somebody else's frame reaches the app as same-origin,
+  because it really does come from the app's own page.
+* One run at a time (LLM10). A second submission is refused with a message,
+  rather than queued and held open.
+* A strict nonce CSP on every page. That is ``default-src 'none'`` with a
+  per-response nonce for each inline block, and no ``'unsafe-inline'`` anywhere.
+  That is why the viewer carries no ``style=""`` attributes and sets generated
+  colours through ``element.style.*``, which is a CSSOM write CSP does not
   govern. No page loads an external resource or carries an ``on*=`` handler, so
   ``'none'`` costs nothing. Each policy grants what its own page does and
   nothing else: the report page reaches the network not at all, the form page
-  only its own origin (``connect-src 'self'`` for ``/example``, ``/analyze`` and
-  ``/events``), and the diagnostic page runs no script, so it is granted no
-  ``script-src`` at all. Each page declares what it does as a
+  reaches only its own origin, through ``connect-src 'self'`` for ``/example``,
+  ``/analyze`` and ``/events``, and the diagnostic page runs no script, so it is
+  granted no ``script-src`` at all. Each page declares what it does as a
   :class:`~webapp.page.Grants`, and the policy follows from the declaration
   rather than from a string this file keeps. A page and its policy are built
   together as a :class:`~webapp.page.RenderedPage` and served through
   :func:`~webapp.page.response`, so serving HTML without its header is
   unspellable rather than merely discouraged.
-* **``nosniff`` and ``no-referrer`` on every response**, HTML or not, applied by
-  :class:`~webapp.page.SecurityHeaders`. Content sniffing is what would let a browser treat
-  ``/example``'s ``text/plain`` prose as something else, and the referrer policy
-  keeps a run id out of outbound ``Referer`` headers.
+* ``nosniff`` and ``no-referrer`` on every response, HTML or not, applied by
+  :class:`~webapp.page.SecurityHeaders`. Content sniffing is what would let a
+  browser treat ``/example``'s ``text/plain`` prose as something else, and the
+  referrer policy keeps a run id out of outbound ``Referer`` headers.
 """
 
 from __future__ import annotations
