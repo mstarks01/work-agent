@@ -258,7 +258,7 @@ async def _run_mode(
 ) -> ModeRun:
     """Run one mode over the selected cases, collecting Tier 1 failures.
 
-    The generation identities come back too, taken from the node runs rather
+    The execution identities come back too, taken from the node runs rather
     than from the report: the extraction mode produces no report, and sourcing
     them from one would leave the single tier that mode exercises the only tier
     it could never certify.
@@ -904,7 +904,7 @@ def _served_choice(value: str) -> tuple[str, str]:
 
 
 def command_promote(args: argparse.Namespace) -> int:
-    """Bless a finished sweep's generation identities, from the artifact alone.
+    """Bless a finished sweep's execution identities, from the artifact alone.
 
     The whole point is that nothing is reconstructed by hand: the served builds
     were observed during the sweep and recorded, so promotion reads them rather
@@ -1562,7 +1562,7 @@ COMMANDS: dict[str, Command] = {
         arguments=_calibrate_arguments,
     ),
     "promote": Command(
-        help="bless a finished sweep's generation identities from its artifact",
+        help="bless a finished sweep's execution identities from its artifact",
         run=command_promote,
         arguments=_promote_arguments,
     ),

@@ -4,7 +4,7 @@ These test :class:`~analysis_service.execution.GraphExecutor` at its own
 interface, because that is where stamping now lives and both drivers — the
 service and the eval harness — cross it. No Vertex endpoint is involved: each
 LLM node is bound to a scripted stand-in that reports a ``model_version`` the
-way a real provider does, so the served-build and generation-identity paths are
+way a real provider does, so the served-build and execution-identity paths are
 exercised without a live call.
 """
 
@@ -259,7 +259,7 @@ def test_every_llm_node_fingerprint_recomputes_from_what_the_run_recorded(graph_
 
 
 def test_base_and_strong_nodes_get_different_identities(graph_run):
-    """Different served build and tier sampling → distinct generation identities."""
+    """Different served build and tier sampling → distinct execution identities."""
     nodes = by_node(graph_run)
     extract_fp = nodes[graph.EXTRACT_NODE].execution_fingerprint
     critic_fp = nodes[CRITIC].execution_fingerprint

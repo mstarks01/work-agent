@@ -645,7 +645,7 @@ class ScriptedLlm(BaseLlm):
     way a real provider does — the pinned string names a family, the served
     build names what answered. Keeping them different is what lets a test tell
     "recorded what was asked for" apart from "recorded what ran", and it is
-    what makes the generation-identity path reachable at all without a live
+    what makes the execution-identity path reachable at all without a live
     provider.
 
     It reports ``usage_metadata`` for the same reason: a stand-in that

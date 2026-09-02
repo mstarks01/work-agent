@@ -1446,10 +1446,10 @@ class AnalysisContext(BaseModel):
     it identifies the repo-authored text — the shared prompts and every carried
     package's lane skills, exemplars, critic text and rubric — and carries no
     submitter bytes at all, which is what makes it
-    publishable beside a report. The generation-identity fingerprint attests to
-    the model and the decoding params; it says nothing about the instructions,
-    so two runs with identical fingerprints and completely different prompts
-    are indistinguishable without this.
+    publishable beside a report. The digest is also one of the seven parts of
+    the **Execution Identity**, so two runs told different things cannot share
+    a fingerprint, and this field is what lets a reader recompute one and see
+    which instruction set stood behind it.
 
     ``domain_packs`` is a fact about *this job's* model rather than the
     deployment: selection is per-job (:mod:`analysis_service.domains`), so the

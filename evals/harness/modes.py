@@ -82,7 +82,7 @@ class ExtractionResult:
     """One extraction run: what came out, whether it was valid, and what ran.
 
     ``node_runs`` is carried even though this mode produces no report: the
-    ``extract`` execution presented a generation identity like any other, and
+    ``extract`` execution presented an execution identity like any other, and
     sourcing observations from the report would make exactly the tier this mode
     exercises the one tier it could never certify.
     """
@@ -560,7 +560,8 @@ async def run_graph(
 
     The shipped :class:`~analysis_service.execution.GraphExecutor` drives it, so
     a sweep stamps each node execution exactly as the service does — the served
-    build it presented and the generation-identity fingerprint that implies.
+    build it presented, and the execution-identity fingerprint that build is
+    one of seven parts of.
     Stamping this here rather than in the harness is what makes the eval CLI a
     real second caller of :func:`~analysis_service.certification.certify` rather
     than one certifying an empty observation set.

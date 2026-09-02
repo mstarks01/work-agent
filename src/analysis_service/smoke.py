@@ -486,7 +486,7 @@ def _check_served(report: Report, deployment: Deployment) -> Check:
 
 
 def _check_fingerprint(report: Report, deployment: Deployment) -> Check:
-    """Every execution with a served build carries its generation identity.
+    """Every execution with a served build carries its execution identity.
 
     ``UNKNOWN`` when none did: with nothing to hash there is no fingerprint to
     require, which is the same rule
