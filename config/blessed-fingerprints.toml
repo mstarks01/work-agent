@@ -1,21 +1,27 @@
-# Blessed generation-identity fingerprints — the certification baseline.
+# Blessed execution-identity fingerprints — the certification baseline.
 #
 # Each TIER maps to the set of fingerprints a sanctioned baseline sweep
 # recorded for it. A run whose observed fingerprint is absent from its tier's
 # set is *uncertified*.
 #
-# THE FINGERPRINT IS THE VERSIONED EXECUTION IDENTITY (version 3, #504): the
-# requested route, the served build, the resolved tier sampling, the built
-# graph's instruction digest, and the installed versions of the distributions
-# between a node and its provider. `analysis_service.identity` is the one place
-# that payload is spelled.
+# TWO VERSIONS ARE IN PLAY, AND THEY ARE NOT THE SAME NUMBER. The `version`
+# field at the foot of this file is THIS FILE'S format, and it is 3. The
+# fingerprints it holds are sha256 over an EXECUTION IDENTITY, whose payload
+# carries a schema version of its own — `IDENTITY_VERSION` in
+# `analysis_service.identity`, which is the one place that payload is spelled.
 #
-# Version 2 hashed only the served build and the sampling, so a translator that
-# claimed an approved build while the deployment asked for something cheaper
-# produced a blessed hash. Binding the requested route makes a blessing a claim
-# about a *pair*, and the requested half comes from this deployment's config
-# rather than from the provider. A version-2 file is refused rather than read:
-# its hashes describe a different payload.
+# The identity has seven parts. Six decide what a node could answer: the
+# requested route, the served build, how far that served build is trusted, the
+# resolved tier sampling, the built graph's instruction digest, and the
+# installed versions of the distributions between a node and its provider. The
+# seventh is the payload's own schema version.
+#
+# File version 2 held hashes over the served build and the sampling alone, so a
+# translator that claimed an approved build while the deployment asked for
+# something cheaper produced a blessed hash (#504). Binding the requested route
+# makes a blessing a claim about a *pair*, and the requested half comes from
+# this deployment's config rather than from the provider. A version-2 file is
+# refused rather than read: its hashes describe a different payload.
 #
 # EVERY PART RE-BASELINES. A prompt edit, a `litellm` bump or a service release
 # moves every fingerprint here, and runs read as uncertified until a sanctioned
