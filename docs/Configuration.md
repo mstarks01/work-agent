@@ -563,14 +563,15 @@ has to err upward. The reservation is **replaced** by the measured usage the
 moment the job reaches a terminal state, so a job that reserved a lot and cost
 little frees the difference immediately.
 
-**A job nothing measured keeps its reservation.** A completed run settles from
-its report and a rejected one from the nodes that ran before the validity gate
-refused their output, but a job that failed mid-graph returned no measurement at
-all. Freeing its estimate would hand back every call it had already paid for, so
-a caller whose submissions outrun the deadline could spend without limit while
-their window read empty. The reservation over-counts such a job, in the same
-direction and for the same reason the estimate does, and the window rolls past
-it either way.
+A job that nothing measured keeps its reservation. A completed job is settled
+from its report. A rejected job is settled from the nodes that ran before the
+validity gate refused their output. A job that failed part-way through the graph
+returns no measurement at all, so its reservation stands.
+
+This matters because a failed job has already paid for every model call it
+reached. If its reservation were freed, a caller could submit work that outruns
+the deadline, spend on each attempt, and see an empty window afterwards. The
+reservation over-counts such a job. The window clears it when the window rolls.
 
 A window's total is a scan over the records rather than a maintained counter, so
 a job cannot be counted twice and a total cannot fall below zero however a job
