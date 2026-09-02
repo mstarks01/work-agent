@@ -44,7 +44,6 @@ from evals.harness import sitting as sittings
 from evals.harness.reference import (
     MAX_NAME,
     SUBMITTED_FOR_PATTERN,
-    is_submitted_for,
 )
 from evals.harness.sitting import Draft, Mark, SittingError, Store
 
@@ -171,10 +170,6 @@ def read(path: Path) -> Envelope:
             f" reads version {VERSION}; generate the page again and ask for a"
             " fresh read"
         )
-    if not is_submitted_for(envelope.submitted_for):
-        raise EnvelopeError(
-            f"{envelope.submitted_for!r} is not a name a sitting can record"
-        )
     return envelope
 
 
@@ -249,7 +244,8 @@ def apply(envelope: Envelope, root: Path, drafts: Path | None = None) -> list[st
             f"this envelope names cases the corpus does not hold: {unknown}"
         )
 
-    ordered = [case_id for case_id in sorted(envelope.cases) if case_id in offered]
+    # Every case is offered: the check above raised on the difference.
+    ordered = sorted(envelope.cases)
     prepared = {}
     problems: list[str] = []
     for case_id in ordered:

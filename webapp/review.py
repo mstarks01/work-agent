@@ -260,7 +260,6 @@ def create_app(session: Session) -> FastAPI:
     def summary() -> JSONResponse:
         remaining = session.remaining()
         payload = review_queue.summarise(remaining, load(session.ledger_path))
-        payload["voter"] = session.voter
         return JSONResponse(payload)
 
     @app.get("/api/next")

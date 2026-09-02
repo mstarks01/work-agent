@@ -38,7 +38,6 @@ from evals.harness import ledger
 from evals.harness.fingerprint import Components, key_claim
 from evals.harness.identity import FlowMap
 from evals.harness.ledger import Ledger
-from evals.harness.verbs import GLOSS, family_of
 
 
 @dataclass(frozen=True)
@@ -87,23 +86,23 @@ class QueueItem:
         return 0 < self.finding.seen_in < self.finding.runs
 
     def to_json(self) -> dict[str, Any]:
+        """What the review page reads, and nothing else.
+
+        Every key here is one the page renders. The fields it does not render
+        stay on the dataclass, where the server reads them: the vote route takes
+        `components` from the session rather than from the browser, and the
+        question is picked from `finding.framework` here rather than sent. A key
+        the page ignores is a field a reviewer's browser holds for no reason,
+        and this payload is the one the queue's blindness rests on.
+        """
         return {
             "fingerprint": self.fingerprint,
-            "components": self.components.to_json(),
             "case": self.finding.case,
-            "framework": self.finding.framework,
             "lane": self.finding.lane,
             "title": self.finding.title,
             "description": self.finding.description,
             "element_ids": list(self.finding.element_ids),
             "quotes": list(self.finding.quotes),
-            "verb": self.finding.verb,
-            "identifier": self.finding.identifier,
-            "verb_gloss": GLOSS.get(self.finding.verb or "", ""),
-            "verb_family": (family_of(self.finding.verb) if self.finding.verb else ""),
-            "seen_in": self.finding.seen_in,
-            "runs": self.finding.runs,
-            "priority": self.priority,
             "why": self.why,
         }
 

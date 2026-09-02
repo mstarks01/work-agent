@@ -506,13 +506,11 @@ class AsvsAnalysis(FrameworkAnalysis):
             requirement = requirement_of(claim.id)
             if not requirement:
                 continue
-            expected = CHAPTER_NUMBERS.get(claim.chapter)
-            if expected is None:
-                issues.append(
-                    f"claim {claim.id!r} names chapter {claim.chapter!r},"
-                    " which this package does not declare"
-                )
-                continue
+            # Indexed rather than fetched with a default: `chapter` is a
+            # closed Literal, and this module refuses to import unless it names
+            # exactly the catalog's lanes, so a miss here is impossible and a
+            # branch for one was unreachable.
+            expected = CHAPTER_NUMBERS[claim.chapter]
             if requirement.split(".")[0] != f"V{expected}":
                 issues.append(
                     f"claim {claim.id!r} resolves to {requirement} but its"

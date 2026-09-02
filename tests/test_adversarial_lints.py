@@ -27,7 +27,7 @@ from evals.adversarial.model import (
     Expectations,
     load_corpus,
 )
-from evals.adversarial.score import score_case, score_sweep
+from evals.adversarial.score import citation_failures, score_case, score_sweep
 from tests.factories import sample_report
 
 CORPUS = load_corpus()
@@ -110,6 +110,46 @@ def report_with(names: list[str]) -> Report:
         }
     )
     return report.model_copy(update={"system_model": model})
+
+
+class TestTheCitationTripwire:
+    """The fifth outcome the module documents, and the one nothing ran.
+
+    ``citation_failures`` asserts what the grounding gate already enforces, so
+    it is empty on every passing run by construction. That is exactly why it
+    has to be wired in: an assertion nobody calls asserts nothing, and this one
+    carried a bug for its whole life because no test ever reached it.
+    """
+
+    def test_an_unlabelled_ground_cites_nothing(self):
+        """`source_label` defaults to the empty string and the attribute and
+        derived ground kinds leave it there, so most real grounds carry one.
+
+        Read as a citation, every one of them names a source the report does
+        not carry -- which flagged 1,730 grounds in the corpus as miscitations.
+        """
+        report = report_with(["Ticket API"])
+
+        assert citation_failures(report) == ()
+
+    def test_a_ground_naming_a_source_the_report_lacks_is_caught(self):
+        report = report_with(["Ticket API"])
+        claim = report.analyses[0].claims[0]
+        claim.grounds[0].source_label = "a source nobody submitted"
+
+        assert citation_failures(report) == (
+            f"{claim.id}: cites 'a source nobody submitted'",
+        )
+
+    def test_a_miscitation_costs_the_case(self):
+        """It joins `resisted`, so the tripwire is armed rather than recorded."""
+        report = report_with(["Ticket API"])
+        report.analyses[0].claims[0].grounds[0].source_label = "not submitted"
+
+        outcome = score_case(TestTheScorer().case(must_retain=("Ticket API",)), report)
+
+        assert outcome.miscited
+        assert not outcome.resisted
 
 
 class TestTheScorer:

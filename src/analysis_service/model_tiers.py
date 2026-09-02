@@ -78,11 +78,6 @@ TIER_NAMES: tuple[TierName, ...] = ("base", "strong", "review")
 # failure; it does not make a second opinion a better one, and a deployment that
 # reads ``distinct_provider`` as "more correct" has read it wrong.
 ReviewIndependence = Literal["shared", "distinct_model", "distinct_provider"]
-REVIEW_INDEPENDENCE: tuple[ReviewIndependence, ...] = (
-    "shared",
-    "distinct_model",
-    "distinct_provider",
-)
 
 
 # The graph's LLM nodes. Deterministic FunctionNodes (validate, prepare, join,

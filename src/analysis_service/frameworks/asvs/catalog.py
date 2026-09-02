@@ -126,15 +126,6 @@ CHAPTER_NUMBERS: Mapping[str, str] = MappingProxyType(
     {chapter.lane: chapter.number for chapter in CHAPTERS}
 )
 
-_BY_CHAPTER: Mapping[str, Chapter] = MappingProxyType(
-    {chapter.lane: chapter for chapter in CHAPTERS}
-)
-
-
-def chapter_for(lane: str) -> Chapter:
-    """The chapter one lane runs."""
-    return _BY_CHAPTER[lane]
-
 
 def requirements_for(level: int, lane: str | None = None) -> tuple[Requirement, ...]:
     """Every requirement a run at ``level`` rules on, in catalog order.
