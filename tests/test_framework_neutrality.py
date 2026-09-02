@@ -75,7 +75,16 @@ SEARCHED = ("src", "evals", "webapp")
 #: A string literal naming a framework. Import paths and module names are not
 #: matched — ``analysis_service`` is this distribution's name, not a package
 #: selection, and ``frameworks.stride.record`` is a module.
-LITERAL = re.compile(r'"(?:stride|asvs)"')
+#:
+#: **The name may sit anywhere inside the string, and in any case.** The pattern
+#: used to be ``"(?:stride|asvs)"`` — the exact quoted token — which is a
+#: framework selection and nothing else. That read past every framework name
+#: embedded in a sentence, and one of them was served:
+#: ``FastAPI(title="STRIDE Threat-Modeling Service")`` put a package's name in
+#: the OpenAPI document every caller reads, on an install carrying two. This is
+#: the third blind spot in this scan, after the two #284 found, and each one was
+#: a way of naming a framework the pattern could not spell.
+LITERAL = re.compile(r'"[^"]*\b(?:stride|asvs)\b[^"]*"', re.IGNORECASE)
 
 #: A framework's name anywhere inside a word, which is what :data:`LITERAL`
 #: cannot see. ``Engine`` and ``analysis_pipeline`` are both a framework
@@ -113,6 +122,13 @@ DECLARED: dict[str, str] = {
     "src/analysis_service/engine.py": (
         "A module-level demo entry point selecting one framework to run, the"
         " way a caller does. Not a code path any job takes."
+    ),
+    "evals/calibration_labels/build_pairs.py": (
+        "This code is that framework's. Labelled candidate pairs exist only for"
+        " a package whose claim set is open prose, because only a labelled pair"
+        " can say whether two spellings name one action — `IDENTITY_VALIDATION`"
+        " carries that as `needs_candidate_pairs`. A package matching by catalog"
+        " identifier contributes no pair, so there is nothing here to key."
     ),
     "evals/harness/reference.py": (
         "REFERENCE_TYPES is a table keyed by framework. `stride_claims()` is a"
