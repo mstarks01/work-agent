@@ -168,27 +168,49 @@ def priority_of(finding: Finding) -> tuple[int, str]:
     raise AssertionError("'new' is unconditional, so this cannot be reached")
 
 
+def _answered(ledger: Ledger, *, voter: str, sitting: str) -> frozenset[str]:
+    """The fingerprints this queue skips, and the one answer that does not count.
+
+    ``needs-evidence`` is not an answer about the finding. The reviewer said
+    they could not judge it from what they were shown, and the button says
+    "Needs more evidence" -- so treating it as answered took the finding out of
+    their queue for good, which is the opposite of what they asked for. It was
+    the one input that guaranteed they would never see the finding again.
+
+    So it holds for the sitting it was cast in and no longer: enough to stop the
+    finding coming straight back in the same session, and not enough to lose it.
+    A later sitting asks again, over whatever evidence exists by then, which is
+    what the reviewer was asking for.
+    """
+    return frozenset(
+        value
+        for (value, who), vote in ledger.current().items()
+        if (not voter or who == voter)
+        and (vote.verdict != "needs-evidence" or vote.sitting == sitting)
+    )
+
+
 def build(
     findings: Iterable[Finding],
     flows_by_case: Mapping[str, FlowMap],
     ledger: Ledger,
     voter: str = "",
+    sitting: str = "",
 ) -> list[QueueItem]:
     """The queue: unanswered findings, most informative first.
 
     ``voter`` narrows "already answered" to *this* reviewer, which is what makes
     a second opinion possible: leaving it empty skips everything anybody
     answered, and naming a reviewer skips only what they answered themselves.
+    ``sitting`` is this session's id, which decides how long a ``needs-evidence``
+    answer holds -- see :func:`_answered`.
 
     Deduplicated by fingerprint, keeping the first occurrence. Two runs
     producing one finding is the normal case and is one question, not two.
     :func:`_keyed` is where a finding gets its fingerprint, under its own
     framework's rule.
     """
-    if voter:
-        answered = frozenset(key[0] for key in ledger.current() if key[1] == voter)
-    else:
-        answered = ledger.voted_fingerprints()
+    answered = _answered(ledger, voter=voter, sitting=sitting)
 
     items: dict[str, QueueItem] = {}
     for value, components, finding in _keyed(findings, flows_by_case):

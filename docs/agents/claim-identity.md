@@ -202,8 +202,10 @@ That split is mechanical, not a request in a guide. `Vote.counts_against_analysi
 and `Vote.joins_the_pool` are the two booleans that carry it.
 
 `needs-evidence` is not a verdict about the finding at all. It says the reviewer
-cannot answer from what they were shown, and it routes to a re-ask rather than
-to a score — an ungrounded finding demands more evidence, not a vote.
+cannot answer from what they were shown — an ungrounded finding demands more
+evidence, not a vote. So it moves no number and it is not spent: it holds for
+its own sitting, and a later one asks again over whatever evidence exists by
+then. Every other verdict is spent once and kept for ever.
 
 ## What this buys, in reviewer minutes
 
