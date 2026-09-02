@@ -638,10 +638,12 @@ front of the agents.
 - **`instruction_sha256`** digests every LLM node's composed instruction with the
   `{placeholders}` still unexpanded, so it identifies the repo-authored text —
   prompts, category skills, the shared rubric — and carries no submitted bytes.
-  The submission's own digest is `input.source_sha256` and stays separate. A
-  generation-identity fingerprint says nothing about the instructions, so
-  without this two runs with identical fingerprints and completely different
-  prompts are indistinguishable.
+  The submission's own digest is `input.source_sha256` and stays separate,
+  because "which instructions ran" and "which text was analysed" are different
+  questions. This digest is one of the seven parts of the **Execution
+  Identity**, so a prompt edit moves every fingerprint the run produced, and
+  this field is what lets a reader recompute one and see which instruction set
+  stood behind it.
 - **`domain_packs`** are selected per job from the model's own technology fields,
   so the same deployment gives two submissions different reference material.
 - **`fired_rules`** names the deterministic triggers that matched, where

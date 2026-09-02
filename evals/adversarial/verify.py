@@ -1,19 +1,19 @@
 """Mechanical checks over the adversarial corpus, and the digest stamper.
 
-Deterministic and credential-free by construction, exactly like
-``evals/verify_corpus.py``; ``tests/test_adversarial_lints.py`` runs the same
-checks in CI.
+They are deterministic and credential-free by construction, exactly like
+``evals/verify_corpus.py``, and ``tests/test_adversarial_lints.py`` runs the
+same checks in CI.
 
-**One of these is a real security check rather than a hygiene one.**
+One of these is a real security check rather than a hygiene one.
 :func:`fencing_issues` renders every poisoned source through the shipped
-:func:`~analysis_service.sources.render_sources` and asserts the injection is
+:func:`~analysis_service.sources.render_sources`, and asserts the injection is
 still inside its block afterwards. A case whose text escaped its own fence would
 be a defect in the renderer, on the one path every submitted byte takes, and
 this is what would find it. The rest check that the corpus describes itself
 honestly.
 
-Run ``python evals/adversarial/verify.py`` to check, ``--write-sha`` to stamp
-each case's ``source_sha256`` from its ``source.md``.
+Run ``python evals/adversarial/verify.py`` to check, and ``--write-sha`` to
+stamp each case's ``source_sha256`` from its ``source.md``.
 """
 
 from __future__ import annotations

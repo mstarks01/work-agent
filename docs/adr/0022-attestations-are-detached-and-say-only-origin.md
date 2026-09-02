@@ -22,7 +22,7 @@ the service that produced it — had no way to say who made it.
 **A valid signature establishes origin and integrity. It does not establish that
 the findings are correct, and it does not establish that the run was certified.**
 
-Certification is a separate, deployment-local verdict about generation identity
+Certification is a separate, deployment-local verdict about execution identity
 (`analysis_service.certification`), and a signed uncertified report is an
 ordinary artifact. The two are easy to conflate because both are green ticks
 about the same file.
