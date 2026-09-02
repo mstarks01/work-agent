@@ -35,11 +35,14 @@
 # dispatches `vertex_ai/claude-*` and `vertex_ai/gemini-*` to different config
 # classes). The prefix lives in exactly one place: the vendor registry.
 #
-# TIER NAMES are a capability axis, not a vendor's product line: `base` is the
-# workhorse (extraction, repair), `strong` is judgement (the six category
-# agents, the critic, the re-ask). The old `flash`/`pro` were Gemini product names and would
-# be an active lie under a Claude or GPT model string. The two tiers select
-# independently, so mixed-vendor pairs are ordinary, not a special case.
+# TIER NAMES: `base` and `strong` are a capability axis, not a vendor's product
+# line. `base` is the workhorse (extraction, repair); `strong` is judgement
+# (every framework's lane agents, its critic and its re-ask). The old
+# `flash`/`pro` were Gemini product names and would be an active lie under a
+# Claude or GPT model string. `review` is the third tier and the exception: it
+# names a place rather than a capability, and exists so criticism can be moved
+# off the model it checks. All three select independently, so mixed-vendor sets
+# are ordinary, not a special case.
 #
 # PINNING is per model family and deliberately weak — an open-world denylist of
 # floating forms (`-latest`, `-preview`, `-exp`), plus a canonical shape where
@@ -134,7 +137,13 @@ review_independence = "shared"
 #   openai      base "gpt-4o"                strong "gpt-5.6"
 #   vertex      base "gemini-2.5-flash"      strong "gemini-2.5-pro"
 #
-# The Anthropic pin is 4.6 on both tiers because that is the pair this project
+# `review` needs a pair of its own as well, and the loader refuses a file that
+# names only these two. Under the shipped `review_independence = "shared"`
+# nothing runs on it, so repeating the `strong` pair there is the ordinary
+# answer; a deployment that wants an independent critic names a different one.
+#
+# The Anthropic pin is 4.6 on both of the tiers above because that is the pair
+# this project
 # has profiled, and it is free choice: no generation is refused here, and a
 # newer Claude is a one-line edit. What a generation still decides is which
 # params it accepts — 4.7 onward rejects `temperature`, which the shipped
