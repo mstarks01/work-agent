@@ -65,6 +65,7 @@ from pathlib import Path
 import pytest
 
 from analysis_service.frameworks import CONTENT_LICENSE, PACKAGES, SCHEMAS
+from analysis_service.report import FRAMEWORK_NAMES
 from evals.harness.calibration import IDENTITY_VALIDATION
 from evals.harness.instruments import INSTRUMENTS, PACKAGE_SCORERS
 from tests.factories import SCRIPTED_FRAMEWORKS
@@ -952,3 +953,147 @@ def test_the_hook_table_names_only_real_hooks():
     for hook, attribute in NEUTRAL_HOOKS.items():
         base = Claim if attribute == "record" else FrameworkAnalysis
         assert hasattr(base, hook), f"{hook} is not a neutral hook on {base.__name__}"
+
+
+# ---------------------------------------------------------------------------
+# The shared instruction surface.
+#
+# Everything above reads ``*.py``. That left 93,546 tokens of prompt and skill
+# text unscanned — the one surface where naming a framework does not merely
+# mislead a reader but instructs a model. ``prompts/critic.md`` told every
+# package's critic it was reviewing "Six category agents" and ruling on "draft
+# threats" for the life of the ASVS package, and nothing here could see it.
+#
+# ``prompts/`` and ``domains/`` are shared: one copy reaches every framework, so
+# neither may name one. ``frameworks/<name>/`` is that package's own text and is
+# exempt for the same reason its modules are.
+
+SHARED_MARKDOWN = ("prompts", "domains")
+
+#: A word that turns a mention into a classification. A pack may say what a
+#: technology does; it may not file the result under somebody's lane.
+FINDING_WORD = r"(?:finding|threat|claim|category|lane|verdict)"
+
+#: How a lane count gets written. Derived from the packages, so a package with a
+#: new lane count is covered on the day it registers.
+COUNT_WORDS = {
+    1: "one",
+    2: "two",
+    3: "three",
+    4: "four",
+    5: "five",
+    6: "six",
+    7: "seven",
+    8: "eight",
+    9: "nine",
+    10: "ten",
+    17: "seventeen",
+}
+
+#: What a lane count is counting, where one appears.
+COUNTED_UNIT = r"(?:lane|agent|categor|chapter)"
+
+
+def shared_markdown() -> list[Path]:
+    """Every shared instruction file: one copy, read by every framework."""
+    found = [
+        path
+        for root in SHARED_MARKDOWN
+        for path in sorted((REPO_ROOT / root).rglob("*.md"))
+    ]
+    assert found, "the shared-markdown scan found no files, so it proves nothing"
+    return found
+
+
+def lane_names() -> list[str]:
+    return sorted({lane for package in PACKAGES.values() for lane in package.lanes})
+
+
+def lane_counts() -> set[str]:
+    spellings = set()
+    for package in PACKAGES.values():
+        count = len(package.lanes)
+        spellings.add(str(count))
+        if count in COUNT_WORDS:
+            spellings.add(COUNT_WORDS[count])
+    return spellings
+
+
+def test_no_shared_instruction_file_names_a_framework():
+    """A framework's name in text every framework reads.
+
+    Self-completing: the names come from ``FRAMEWORK_NAMES``, so a package
+    registered tomorrow is covered with no edit here.
+    """
+    pattern = re.compile(rf"\b(?:{'|'.join(FRAMEWORK_NAMES)})\b", re.IGNORECASE)
+    named = [
+        f"{path.relative_to(REPO_ROOT)}:{number}"
+        for path in shared_markdown()
+        for number, line in enumerate(path.read_text(encoding="utf-8").splitlines(), 1)
+        if pattern.search(line)
+    ]
+    assert not named, (
+        f"these shared instruction lines name a framework: {named}. One copy of"
+        " this text reaches every framework, so a sentence naming one is false"
+        " in the others. Move it to that package's own text under frameworks/."
+    )
+
+
+def test_no_shared_instruction_file_files_a_finding_under_a_lane():
+    """A shared pack may not assign a technology's failure to somebody's lane.
+
+    This is the check ``analysis_service.skills`` has always described and
+    nothing implemented. Its word list comes from the packages' own ``lanes``
+    members rather than from a list somebody maintains, so a package that
+    declares a new lane is covered on the day it registers.
+
+    A lane name on its own is not the fault — ``authentication`` is an ordinary
+    word and four packs say it. The fault is a lane name doing the work of a
+    classification, which is what the adjacent finding word catches.
+    """
+    filed = []
+    for lane in lane_names():
+        word = lane.replace("-", "[- ]")
+        near = re.compile(
+            rf"\b{word}\b[^.]{{0,40}}\b{FINDING_WORD}\b"
+            rf"|\b{FINDING_WORD}\b[^.]{{0,40}}\b{word}\b",
+            re.IGNORECASE,
+        )
+        filed += [
+            f"{path.relative_to(REPO_ROOT)}:{number} ({lane})"
+            for path in shared_markdown()
+            for number, line in enumerate(
+                path.read_text(encoding="utf-8").splitlines(), 1
+            )
+            if near.search(line)
+        ]
+    assert not filed, (
+        f"these shared instruction lines file something under a package's lane:"
+        f" {filed}. State what the technology does and let each framework file"
+        " it, or move the sentence into that package's own text."
+    )
+
+
+def test_no_shared_instruction_file_counts_a_packages_lanes():
+    """A lane count in shared text is one package's shape stated as everyone's.
+
+    This is the check that would have caught the defect: ``prompts/critic.md``
+    said "Six category agents worked in parallel" to a package that runs 17
+    chapters. A count is derived from ``PACKAGES``, so it moves when a package's
+    lane list does.
+    """
+    pattern = re.compile(
+        rf"\b(?:{'|'.join(sorted(lane_counts()))})\b[^.]{{0,30}}\b{COUNTED_UNIT}",
+        re.IGNORECASE,
+    )
+    counted = [
+        f"{path.relative_to(REPO_ROOT)}:{number}"
+        for path in shared_markdown()
+        for number, line in enumerate(path.read_text(encoding="utf-8").splitlines(), 1)
+        if pattern.search(line)
+    ]
+    assert not counted, (
+        f"these shared instruction lines count one package's lanes: {counted}."
+        " Every framework reads this text and they declare different numbers of"
+        " lanes. Say what the agents do, not how many there are."
+    )
