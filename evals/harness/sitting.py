@@ -966,6 +966,21 @@ def _unreviewed_table(source: str) -> tuple[list[tuple[str, int, int]], int]:
         raise SittingError(
             f"{UNREVIEWED_FILE}: UNREVIEWED holds a key that is not a string"
         )
+    # A dict value is an arbitrary expression, and this table is a module
+    # `pytest` imports: importing it evaluates every value. A reason is prose,
+    # so anything but a string literal here is something other than a reason,
+    # and a submission may not carry it. Refused at the one place that reads the
+    # table, because a check that read it some other way is a second opinion
+    # about what an entry is -- and a disagreement between two readers of this
+    # file is exactly what lets a value through.
+    if any(
+        not (isinstance(value, ast.Constant) and isinstance(value.value, str))
+        for value in table.values
+    ):
+        raise SittingError(
+            f"{UNREVIEWED_FILE}: UNREVIEWED holds a value that is not a string"
+            " literal, and importing this module would evaluate it"
+        )
     close = (table.end_lineno or 0) - 1
     # An empty table names no case and bounds nothing. It is the day the last
     # case is read, and the pairing below has no entry to close.

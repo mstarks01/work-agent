@@ -12,6 +12,7 @@ holds what the tree owes the operator.
 
 from __future__ import annotations
 
+import argparse
 import json
 from pathlib import Path
 
@@ -242,3 +243,84 @@ class TestReadingTheFile:
 
         with pytest.raises(EnvelopeError, match="ceiling"):
             envelopes.read(path)
+
+
+class TestTheImportChecksWhoTheEnvelopeClaimsToBe:
+    """Both identity fields ride back inside a file the reader holds.
+
+    So what arrives is a claim, not the stamp the page put there, and a sitting
+    record says who read a case. The operator names the account and the envelope
+    has to agree -- checked before ``apply``, because apply writes the corpus,
+    the reading document, the unreviewed list and the draft store, and a refusal
+    after them leaves a tree only ``git checkout`` puts back.
+    """
+
+    def _args(self, tree, path, **fields):
+        base = {
+            "envelope": str(path),
+            "submitted_by": "ada",
+            "submitted_for": None,
+            "root": str(tree),
+        }
+        return argparse.Namespace(**{**base, **fields})
+
+    def _written(self, tree, path, monkeypatch, **fields):
+        monkeypatch.setattr(sittings, "draft_root", lambda: drafts_root(tree))
+        code = envelopes.command_import(self._args(tree, path, **fields))
+        return code, reviews(tree)
+
+    def _file(self, tree, tmp_path, **fields):
+        path = tmp_path / "sitting.json"
+        env = envelope(tree, submitted_for="ada", **fields)
+        path.write_text(env.model_dump_json(), encoding="utf-8")
+        return path
+
+    def test_an_envelope_naming_another_account_writes_nothing(
+        self, tree, tmp_path, monkeypatch, capsys
+    ):
+        path = self._file(tree, tmp_path, submitted_by="mallory")
+
+        code, recorded = self._written(tree, path, monkeypatch)
+
+        assert code == 1
+        assert recorded == [], "the tree was written before the identity check"
+        assert "mallory" in capsys.readouterr().out
+
+    def test_a_forged_proxy_read_writes_nothing(
+        self, tree, tmp_path, monkeypatch, capsys
+    ):
+        """``submitted_for`` is the field that says a read was carried for
+        somebody. Nothing downstream checks it, so the import is where it has
+        to be checked."""
+        path = self._file(tree, tmp_path)
+        body = json.loads(path.read_text(encoding="utf-8"))
+        body["submitted_for"] = "maintainer"
+        path.write_text(json.dumps(body), encoding="utf-8")
+
+        code, recorded = self._written(tree, path, monkeypatch)
+
+        assert code == 1
+        assert recorded == []
+        assert "--submitted-for" in capsys.readouterr().out
+
+    def test_the_account_the_operator_names_is_recorded(
+        self, tree, tmp_path, monkeypatch
+    ):
+        path = self._file(tree, tmp_path)
+
+        code, recorded = self._written(tree, path, monkeypatch)
+
+        assert code == 0
+        assert recorded and recorded[-1]["submitted_by"] == "ada"
+
+    def test_a_carried_read_is_recorded_when_the_operator_names_it(
+        self, tree, tmp_path, monkeypatch
+    ):
+        path = tmp_path / "sitting.json"
+        env = envelope(tree, submitted_by="ada", submitted_for=ANONYMOUS)
+        path.write_text(env.model_dump_json(), encoding="utf-8")
+
+        code, recorded = self._written(tree, path, monkeypatch, submitted_for=ANONYMOUS)
+
+        assert code == 0
+        assert recorded and recorded[-1]["submitted_for"] == ANONYMOUS

@@ -21,6 +21,7 @@ from evals.harness import submit
 from evals.harness.fingerprint import Components
 from evals.harness.ledger import cast
 from evals.harness.run import main
+from evals.harness.sitting import unreviewed_cases
 
 ROSTER_BASE = """version = 1
 
@@ -341,6 +342,35 @@ class TestTheSittingChecks:
         check = submit._check_sitting_clears_unreviewed(repo, "ada")
         assert not check.passed
         assert "UNREVIEWED" in check.problems[0]
+
+    def test_a_respelled_key_does_not_pass_for_a_cleared_line(self, repo):
+        """The two checks over this file used to key an entry two ways: one on
+        the literal text ``"<case>":`` and one on what :mod:`ast` reads.
+
+        A key whose first character is written as an escape is absent from the
+        text and present to the parser, so the clears check called the line gone
+        while the edits-only check removed the entry's whole span from both
+        sides -- and whatever the entry carried rode in unread. Both read the
+        parsed table now, so there is no second opinion to play off.
+        """
+        prepare_sitting(repo, clear_unreviewed=False)
+        listing = repo / "tests" / "test_case_review.py"
+        source = listing.read_text("utf-8")
+        case = submit._sitting_cases(repo)[0]
+        respelled = f'"\\x{ord(case[0]):02x}{case[1:]}":'
+        listing.write_text(source.replace(f'"{case}":', respelled), "utf-8")
+        git(repo, "fetch", "origin")
+        assert f'"{case}":' not in listing.read_text("utf-8"), (
+            "the premise: a text reader finds no line to complain about"
+        )
+        assert case in unreviewed_cases(repo), "and the parser still reads it"
+
+        check = submit._check_sitting_clears_unreviewed(repo, "ada")
+
+        assert not check.passed, (
+            "the entry is still there under a different spelling, and the check"
+            " read the text rather than the table"
+        )
 
 
 class TestASittingCarriesNCases:

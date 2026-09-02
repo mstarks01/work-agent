@@ -120,10 +120,11 @@ class CaseAnswers(BaseModel):
 class Envelope(BaseModel):
     """One reader's session, however many days it took, as one file.
 
-    ``submitted_by`` and ``submitted_for`` are stamped when the page is built
-    rather than typed by the reader, so an envelope cannot claim an account
-    the operator did not offer it — and ``submit sitting`` re-checks
-    ``submitted_by`` against the authenticated login regardless.
+    ``submitted_by`` and ``submitted_for`` are stamped when the page is built,
+    but they ride back inside a file the reader holds, so what arrives is a
+    claim rather than a stamp. :func:`command_import` checks both against the
+    account the operator names before anything is written, and ``submit
+    sitting`` re-checks ``submitted_by`` against the authenticated login.
     """
 
     model_config = ConfigDict(extra="forbid", frozen=True)
@@ -284,10 +285,34 @@ def apply(envelope: Envelope, root: Path, drafts: Path | None = None) -> list[st
 
 
 def command_import(args: argparse.Namespace) -> int:
-    """``run sitting-import <file>``: one envelope into this working tree."""
+    """``run sitting-import <file> --submitted-by <login>``: one envelope in.
+
+    The operator names the account, and the envelope has to agree with them.
+    Both identity fields arrive inside a file a reader mailed back, so neither
+    is a fact this command may take on the file's word: the reader is the one
+    party here who is not the operator, and a sitting record says who read a
+    case.
+
+    Checked **before** :func:`apply`, because apply writes the corpus, the
+    reading document, the unreviewed list and the draft store. A refusal that
+    came after them would leave a tree only ``git checkout`` puts back.
+    """
     root = Path(args.root).resolve() if args.root else sittings.REPO_ROOT
+    submitted_for = args.submitted_for or args.submitted_by
     try:
         envelope = read(Path(args.envelope))
+        if envelope.submitted_by != args.submitted_by:
+            raise EnvelopeError(
+                f"this envelope reads as {envelope.submitted_by!r} and you named"
+                f" {args.submitted_by!r}. Import it under the account it was"
+                " built for, or ask the reader for one built for this account."
+            )
+        if envelope.submitted_for != submitted_for:
+            raise EnvelopeError(
+                f"this envelope says it was read for {envelope.submitted_for!r}"
+                f" and you named {submitted_for!r}. Pass --submitted-for to"
+                " record a read somebody carried for another account."
+            )
         written = apply(envelope, root)
     except EnvelopeError as exc:
         print(f"this envelope was not applied:\n{exc}")
@@ -306,6 +331,17 @@ def command_import(args: argparse.Namespace) -> int:
 
 def import_arguments(parser: argparse.ArgumentParser) -> None:
     parser.add_argument("envelope", help="the JSON file the reader sent back")
+    parser.add_argument(
+        "--submitted-by",
+        required=True,
+        help="the account this sitting binds to. The envelope must agree, and"
+        " nothing is written if it does not.",
+    )
+    parser.add_argument(
+        "--submitted-for",
+        help="who the case was read for, where somebody carried the read for"
+        " another account. Defaults to --submitted-by.",
+    )
     parser.add_argument(
         "--root",
         help="the clone to write into. Defaults to this one; a test points it"
