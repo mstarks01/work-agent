@@ -166,9 +166,10 @@ class SmokeResult:
     """What one lane learned about one deployment's providers.
 
     ``tiers`` records the ``(vendor, model)`` each tier selected rather than a
-    single vendor name: a deployment may run its two tiers on two vendors, and a
-    result that flattened that would name the wrong one in half the cases it is
-    most worth reading.
+    single vendor name: a deployment may run its tiers on different vendors, and
+    a result that flattened that would name the wrong one wherever they differ.
+    Only a tier the node map binds appears, so a deployment that has selected
+    ``review`` without running anything on it reports the two it exercised.
 
     ``failure`` is the run's own error, when there was one — the adapters that
     would not build, the provider that refused, the graph that raised. It is
@@ -318,7 +319,7 @@ def _selected_routes(deployment: Deployment) -> dict[str, str]:
 
 
 def _check_binding(report: Report, deployment: Deployment) -> Check:
-    """Every node asked for the route its tier selects, and both tiers ran.
+    """Every node asked for the route its tier selects, and every bound tier ran.
 
     The live counterpart of the offline binding assertions: those prove the
     adapters *build*, this proves the built adapter is the one the node reached
