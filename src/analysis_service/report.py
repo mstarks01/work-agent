@@ -448,6 +448,26 @@ class UnknownRef(BaseModel):
 GROUND_TERM_MAX_CHARS = 100
 
 
+# How long the lists a model fills may get (OWASP LLM10). Every scalar a lane
+# emits already carries a bound; these are the counts, and without them the only
+# limit on an emission is the tier's output ceiling — tens of thousands of
+# tokens, every one of which the service then does deterministic work over. The
+# grounding rung is the expensive one: it searches the submitted source once per
+# quote a claim carries, so the product of these two numbers is the work one
+# lane can buy.
+#
+# The figures are the observed maxima across the 77 corpus and sweep artifacts
+# in the tree, with headroom: 84 claims in a batch, 13 grounds on a claim and 14
+# affected elements. They bound an emission that is not a lane's work at all,
+# and none of them constrains what the service has actually produced.
+MAX_CLAIMS_PER_BATCH = 400
+MAX_GROUNDS_PER_CLAIM = 60
+MAX_QUOTES_PER_PROPOSAL = 20
+MAX_REFS_PER_PROPOSAL = 20
+MAX_ABSENT_PER_PROPOSAL = 20
+MAX_ELEMENTS_PER_PROPOSAL = 60
+
+
 class Ground(BaseModel):
     """What justifies one finding: a quote, an attribute's state, or a derived fact.
 
@@ -741,7 +761,7 @@ class Claim(BaseModel):
     # claim set narrows this to required, because for those claims the action is
     # half of what makes two of them the same finding.
     verb: ActionVerb | None = None
-    grounds: list[Ground] = Field(min_length=1)
+    grounds: list[Ground] = Field(min_length=1, max_length=MAX_GROUNDS_PER_CLAIM)
 
     @classmethod
     def claim_marks(cls, drafts: Sequence[Claim]) -> AnalysisMarks:
@@ -1044,19 +1064,27 @@ class Proposal(BaseModel):
     # Unconstrained here and narrowed by the packages that need it, exactly as
     # :class:`Claim`'s own is: a proposal that validates must be resolvable into
     # a claim that validates, so the two sides of that pair move together.
-    affected_element_ids: list[str] = Field(default_factory=list)
+    affected_element_ids: list[str] = Field(
+        default_factory=list, max_length=MAX_ELEMENTS_PER_PROPOSAL
+    )
     # Unconstrained here and narrowed by the packages that need it, for the
     # reason the line above gives: a proposal that validates must resolve into a
     # claim that validates, so the two sides of that pair move together.
     verb: ActionVerb | None = None
-    evidence_refs: list[str] = Field(default_factory=list)
-    quotes: list[QuoteCandidate] = Field(default_factory=list)
+    evidence_refs: list[str] = Field(
+        default_factory=list, max_length=MAX_REFS_PER_PROPOSAL
+    )
+    quotes: list[QuoteCandidate] = Field(
+        default_factory=list, max_length=MAX_QUOTES_PER_PROPOSAL
+    )
     # The third list, and the one whose referent is the model as a whole. A
     # catalog can enumerate what a model contains; it cannot enumerate what a
     # model lacks, so an absence is named rather than selected. Each entry is
     # one lowercase term, and the service checks it against every element's
     # text before building the ground.
-    absent_elements: list[str] = Field(default_factory=list)
+    absent_elements: list[str] = Field(
+        default_factory=list, max_length=MAX_ABSENT_PER_PROPOSAL
+    )
 
     @model_validator(mode="after")
     def _check_shape(self) -> Self:
@@ -1144,7 +1172,7 @@ class ProposalBatch(BaseModel):
 
     model_config = ConfigDict(extra="forbid")
 
-    claims: list[Proposal]
+    claims: list[Proposal] = Field(max_length=MAX_CLAIMS_PER_BATCH)
     invalid: SkipJsonSchema[list[InvalidProposal]] = Field(default_factory=list)
 
     @model_validator(mode="wrap")

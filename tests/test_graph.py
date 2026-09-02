@@ -2311,3 +2311,74 @@ class TestTheInstructionDigest:
         )
         assert "{system_model}" in instructions
         assert "{input_text}" in instructions
+
+
+class TestTheFunctionNodesStayOffTheEventLoop:
+    """ADK runs a synchronous node body inline in the coroutine driving the
+    workflow, so that body's CPU time is the event loop's.
+
+    These bodies are not cheap. The merge node fuzzy-matches every quote a model
+    emitted against the whole submitted source, and both terms come from the
+    submitted text. Run inline, one job's merge stops the process answering
+    anything -- other jobs, the health check, the event streams -- and the job
+    deadline cannot fire either, because a cooperative timeout has no thread to
+    run on. Wrapping each body in a coroutine function is what moves it to a
+    worker thread, because a coroutine function is what ADK awaits.
+    """
+
+    def test_every_function_node_body_is_awaited(self, pipeline):
+        """Checked over the whole built graph rather than the four nodes named
+        in the fix, so a node added later is covered by construction."""
+        import inspect
+
+        bodies = {
+            node.name: node._func
+            for node in pipeline.workflow.graph.nodes
+            if isinstance(node, FunctionNode)
+        }
+        assert bodies, "no FunctionNodes in the built graph; this test is blind"
+
+        inline = sorted(
+            name
+            for name, func in bodies.items()
+            if not inspect.iscoroutinefunction(func)
+        )
+        assert not inline, (
+            f"{inline} would run on the event loop. Build them with graph._node,"
+            " which wraps the body so ADK awaits it in a worker thread."
+        )
+
+    def test_the_wrapper_keeps_the_signature_adk_binds_from(self):
+        """ADK binds a node's parameters by name off the signature, so a
+        wrapper that hid it behind ``**kwargs`` would bind nothing and every
+        node would receive an empty state."""
+        import inspect
+
+        def body(valid_model: dict, ctx, source_texts: dict | None = None):
+            return valid_model
+
+        node = graph._node(body, "some_node")
+
+        assert list(inspect.signature(node._func).parameters) == [
+            "valid_model",
+            "ctx",
+            "source_texts",
+        ]
+
+    def test_the_body_runs_and_returns_its_value(self):
+        """The offload is a thread hop, not a change of answer."""
+        import asyncio
+
+        seen = {}
+
+        def body(valid_model: dict, ctx):
+            seen["state"] = ctx.state
+            return {"claims": valid_model["n"] + 1}
+
+        node = graph._node(body, "some_node")
+        ctx = type("Ctx", (), {"state": {"a": 1}})()
+
+        result = asyncio.run(node._func(valid_model={"n": 1}, ctx=ctx))
+
+        assert result == {"claims": 2}
+        assert seen["state"] == {"a": 1}

@@ -48,6 +48,7 @@ from analysis_service.frameworks.asvs.catalog import (
 )
 from analysis_service.frameworks.asvs.rules import ruled_out_requirements
 from analysis_service.report import (
+    MAX_CLAIMS_PER_BATCH,
     BlockSummary,
     Claim,
     FrameworkAnalysis,
@@ -302,7 +303,9 @@ class RequirementProposals(ProposalBatch):
     # A narrowing, which is the point of the wrapper; `list` is invariant, so
     # mypy reports the override. Sound here for the reason STRIDE's is: these
     # models are built by validation and read, never appended to.
-    claims: list[RequirementProposal]  # type: ignore[assignment]
+    claims: list[RequirementProposal] = Field(  # type: ignore[assignment]
+        max_length=MAX_CLAIMS_PER_BATCH
+    )
 
 
 class RequirementRulingProposal(Ruling):

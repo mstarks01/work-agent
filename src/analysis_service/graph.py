@@ -109,6 +109,7 @@ critic seams here.
 
 from __future__ import annotations
 
+import functools
 import hashlib
 import json
 import logging
@@ -118,6 +119,7 @@ from dataclasses import dataclass
 from types import MappingProxyType
 from typing import TYPE_CHECKING, Any, Literal
 
+import anyio.to_thread
 from google.adk.agents import LlmAgent
 from google.adk.events.event import Event
 from google.adk.models.base_llm import BaseLlm
@@ -975,6 +977,32 @@ def render_fenced(value: Any) -> str:
 # become the session's state delta.
 
 
+def _node(func: Callable[..., Any], name: str) -> FunctionNode:
+    """Wrap a node body in a FunctionNode that runs it off the event loop.
+
+    ADK calls a synchronous node body inline in the coroutine that drives the
+    workflow, so its CPU time is the event loop's: while it runs, the process
+    serves no other job, no health check and no event stream, and the job
+    deadline's timer cannot fire either, because a cooperative timeout cannot
+    interrupt a synchronous call. These bodies are not cheap — one of them
+    fuzzy-matches every quote a model emitted against the whole submitted
+    source — so the loop is the wrong thread for them.
+
+    ADK awaits a body that is a coroutine function, so wrapping it in one moves
+    the work to a worker thread and makes the deadline enforceable again. The
+    wrapper keeps the wrapped signature, which is what ADK binds parameters
+    from, and touches nothing else: a node reaches the session only through
+    :class:`SessionState`, whose writes are plain dict writes, and only one
+    node of a run is in flight at a time.
+    """
+
+    @functools.wraps(func)
+    async def offloaded(**kwargs: Any) -> Any:
+        return await anyio.to_thread.run_sync(functools.partial(func, **kwargs))
+
+    return FunctionNode(func=offloaded, name=name)
+
+
 def validate_extraction(
     ctx,
     keys: GraphKeys,
@@ -1297,7 +1325,7 @@ def prepare_node(
             valid_model, ctx, keys, frameworks, domain_loader, package_loaders
         )
 
-    return FunctionNode(func=prepare_analysis_node, name=PREPARE_NODE)
+    return _node(prepare_analysis_node, PREPARE_NODE)
 
 
 def _claims_of(payload: object) -> list[Any]:
@@ -2191,10 +2219,10 @@ def _framework_subgraph(
             resilience=resilience,
         ),
         join=JoinNode(name=nodes.node(JOIN_ROLE)),
-        merge=FunctionNode(func=merge, name=nodes.node(MERGE_ROLE)),
-        router=FunctionNode(func=route, name=nodes.node(ROUTER_ROLE)),
-        rereview=FunctionNode(func=route, name=nodes.node(REREVIEW_ROLE)),
-        critic_failed=FunctionNode(func=failed, name=nodes.node(CRITIC_FAILED_ROLE)),
+        merge=_node(merge, nodes.node(MERGE_ROLE)),
+        router=_node(route, nodes.node(ROUTER_ROLE)),
+        rereview=_node(route, nodes.node(REREVIEW_ROLE)),
+        critic_failed=_node(failed, nodes.node(CRITIC_FAILED_ROLE)),
     )
 
 
@@ -2270,9 +2298,7 @@ def build_pipeline(
         for framework in frameworks
     }
     prepare = prepare_node(keys, frameworks, domain_loader, package_loaders)
-    assemble = FunctionNode(
-        func=_assemble_node_func(keys, frameworks, disclaimers), name=ASSEMBLE_NODE
-    )
+    assemble = _node(_assemble_node_func(keys, frameworks, disclaimers), ASSEMBLE_NODE)
 
     subgraphs = [
         _framework_subgraph(
@@ -2303,9 +2329,9 @@ def build_pipeline(
             resolve_sampling=resolve_sampling,
             resilience=resilience,
         )
-        validate = FunctionNode(func=_validate_node_func(keys), name=VALIDATE_NODE)
-        revalidate = FunctionNode(func=_validate_node_func(keys), name=REVALIDATE_NODE)
-        reject = FunctionNode(func=_reject_node_func(keys), name=REJECT_NODE)
+        validate = _node(_validate_node_func(keys), VALIDATE_NODE)
+        revalidate = _node(_validate_node_func(keys), REVALIDATE_NODE)
+        reject = _node(_reject_node_func(keys), REJECT_NODE)
         extraction_nodes = [extract, repair]
         # ``list[tuple[Any, ...]]`` because ADK does not export the alias for
         # a chain element, and a routing-map literal only infers its declared
