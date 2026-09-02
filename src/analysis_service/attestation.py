@@ -83,6 +83,40 @@ class KeyringError(ConfigError):
     """The verification keyring is missing or unusable."""
 
 
+class DuplicateKeyError(ValueError):
+    """A JSON object naming one key twice, which two parsers may read apart."""
+
+
+def _no_duplicate_keys(pairs: list[tuple[str, Any]]) -> dict[str, Any]:
+    """``object_pairs_hook`` that refuses an object naming a key twice.
+
+    A signature covers the canonical form of the *parsed* document, which is
+    what lets a verifier check a report without this project's models. The cost
+    is that parsing is where two readers can disagree: ``json`` keeps the last
+    of a repeated key, other parsers keep the first, and a file carrying both
+    ``"summary": "critical"`` and ``"summary": "none"`` verifies here while
+    reading the other way somewhere else.
+
+    Nothing this service produces has a repeated key, so refusing one costs a
+    real report nothing and takes the disagreement away.
+    """
+    seen: dict[str, Any] = {}
+    for key, value in pairs:
+        if key in seen:
+            raise DuplicateKeyError(f"{key!r} appears twice in one object")
+        seen[key] = value
+    return seen
+
+
+def load_report(text: str) -> Mapping[str, Any]:
+    """One report from JSON text, refusing what two parsers could read apart.
+
+    The reader a verifier should use. ``json.loads`` on its own is not enough:
+    see :func:`_no_duplicate_keys`.
+    """
+    return json.loads(text, object_pairs_hook=_no_duplicate_keys)
+
+
 def canonicalize(report: Mapping[str, Any]) -> bytes:
     """The exact bytes a signature covers.
 
@@ -95,6 +129,12 @@ def canonicalize(report: Mapping[str, Any]) -> bytes:
     so a verifier can work from the JSON file alone — it must not need this
     project's models to check a signature, which is most of what "operates
     independently of the producing service" means.
+
+    **What is covered is the canonical form of the parsed document, not the
+    file's bytes.** Two files that parse alike verify alike, which is the point:
+    a re-serialized report is the same report. It also means parsing is where a
+    forgery would live, so :func:`load_report` is the reader that closes the one
+    way two parsers can disagree about what a file says.
     """
     return json.dumps(
         report, sort_keys=True, separators=(",", ":"), ensure_ascii=False

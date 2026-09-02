@@ -63,12 +63,6 @@ from evals.harness.verbs import check_verb
 #: cheap one, because :func:`~evals.harness.ledger.rekey` recomputes the whole
 #: ledger from stored components with no re-vote and no provider.
 #:
-#: **Version 2 since the record carried the field.** Version 1 was the default
-#: only while :class:`~analysis_service.report.Claim` had no verb, which made a
-#: finding out of a live run unfingerprintable at version 2. It has one now, so
-#: the default is the rule that measures better.
-DEFAULT_VERSION = 2
-
 #: Which rule keys each framework's findings. **Keyed, never branched**, and
 #: checked against ``PACKAGES`` by ``tests/test_evals_fingerprint.py`` — a table
 #: nobody compares to its registry fails as quietly as the ``if`` it replaced.
@@ -241,9 +235,11 @@ def version_for(framework: FrameworkName) -> int:
     """Which fingerprint version keys this framework's findings.
 
     Raises on a framework the table does not name, rather than falling back to
-    :data:`DEFAULT_VERSION` — a package quietly keyed under the weaker rule
-    would produce a ledger whose rows nobody could tell apart from the stronger
-    one's, and the version in the value would say the wrong thing.
+    a default — a package quietly keyed under another's rule would produce a
+    ledger whose rows nobody could tell apart, and the version in the value
+    would say the wrong thing. There is no default to fall back to: this table
+    is the only answer to which rule keys a package, and a single value standing
+    in for it is what made every ASVS vote fail while STRIDE's passed.
     """
     try:
         return VERSION_FOR[framework]
@@ -283,7 +279,7 @@ def components_for(
     )
 
 
-def fingerprint(components: Components, version: int = DEFAULT_VERSION) -> str:
+def fingerprint(components: Components, version: int) -> str:
     """The identity of a claim, as ``v<version>:<16 hex>``.
 
     The version rides in the value rather than beside it, so a ledger holding

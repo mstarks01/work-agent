@@ -14,12 +14,14 @@ from analysis_service.attestation import (
     CANONICAL_VERSION,
     PAYLOAD_TYPE,
     Attestation,
+    DuplicateKeyError,
     Keyring,
     KeyringError,
     VerificationKey,
     canonicalize,
     digest,
     load_keyring,
+    load_report,
     sign,
     verify,
 )
@@ -384,3 +386,41 @@ def test_the_signed_payload_binds_everything_it_must():
         "report_sha256",
         "signed_at",
     }
+
+
+class TestTwoParsersCannotDisagreeAboutTheFile:
+    """A signature covers the canonical form of the *parsed* document.
+
+    That is what lets a verifier check a report without this project's models,
+    and it is the right trade. Its cost is that parsing is where two readers can
+    disagree: ``json`` keeps the last of a repeated key and other parsers keep
+    the first, so one file can say two things and verify as the harmless one.
+    """
+
+    def test_a_repeated_key_is_refused_rather_than_resolved(self):
+        forged = (
+            '{"id": "r1", "summary": "CRITICAL RCE, unauthenticated",'
+            ' "summary": "no issues found"}'
+        )
+
+        with pytest.raises(DuplicateKeyError, match="'summary' appears twice"):
+            load_report(forged)
+
+    def test_a_repeated_key_deeper_in_the_document_is_refused_too(self):
+        forged = '{"analyses": [{"framework": "stride", "framework": "asvs"}]}'
+
+        with pytest.raises(DuplicateKeyError, match="'framework' appears twice"):
+            load_report(forged)
+
+    def test_an_ordinary_report_still_loads(self):
+        report = sample_report().model_dump(mode="json")
+
+        assert load_report(json.dumps(report)) == report
+
+    def test_an_escape_is_the_same_document_and_still_verifies(self):
+        """The other half of this class is not a forgery: `\\u0041` and `A` are
+        one string, so they canonicalize alike and mean the same thing."""
+        assert load_report('{"id": "\\u0041"}') == {"id": "A"}
+        assert canonicalize({"id": "A"}) == canonicalize(
+            load_report('{"id": "\\u0041"}')
+        )
