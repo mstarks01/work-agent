@@ -1,12 +1,11 @@
 """OIDC JWT verifier and provider registry: verification, config, selection."""
 
 from datetime import UTC, datetime, timedelta
-from types import SimpleNamespace
 
 import jwt
 import pytest
 from cryptography.hazmat.primitives import serialization
-from cryptography.hazmat.primitives.asymmetric import rsa
+from cryptography.hazmat.primitives.asymmetric import ec, rsa
 from pydantic import ValidationError
 
 from analysis_service.auth import (
@@ -33,11 +32,26 @@ _PRIVATE_PEM = _PRIVATE_KEY.private_bytes(
 _PUBLIC_KEY = _PRIVATE_KEY.public_key()
 
 
+def _jwk(public_key, algorithm: str) -> jwt.PyJWK:
+    """The public key as a PyJWK, which is what a real JWKS client returns.
+
+    A stand-in that answered a bare key would let the verifier be tested against
+    a contract the live client does not honour, and the difference is the one
+    that matters here: PyJWT binds an algorithm to a PyJWK and not to a bare
+    key.
+    """
+    if algorithm == "RS256":
+        jwk = jwt.algorithms.RSAAlgorithm.to_jwk(public_key, as_dict=True)
+    else:
+        jwk = jwt.algorithms.ECAlgorithm.to_jwk(public_key, as_dict=True)
+    return jwt.PyJWK({**jwk, "alg": algorithm, "use": "sig"})
+
+
 class StaticJwksClient:
     """Serves the test public key regardless of the token's kid."""
 
-    def get_signing_key_from_jwt(self, token: str):
-        return SimpleNamespace(key=_PUBLIC_KEY)
+    def get_signing_key_from_jwt(self, token: str) -> jwt.PyJWK:
+        return _jwk(_PUBLIC_KEY, "RS256")
 
 
 def settings() -> OidcSettings:
@@ -376,3 +390,47 @@ class TestRefreshCooldown:
         key = client.get_signing_key_from_jwt(self._token("known"))
         assert key.key_id == "known"
         assert counting.refreshes == 0
+
+
+class TestAKeyOfTheWrongFamily:
+    """A JWKS carrying two key families while two algorithms are configured is
+    an ordinary state during a rotation, and the docs describe it.
+
+    The verifier looks a key up by ``kid`` alone, so a token can name the EC
+    key's ``kid`` and the RS256 algorithm. That has to be one more rejected
+    token. Handed a bare key, PyJWT raised ``TypeError`` out of ``prepare_key``
+    instead, which is not a ``PyJWTError``: it escaped the verifier, reached the
+    500 handler, and made one ``kid`` answer differently from another -- the
+    oracle the single generic message exists to prevent.
+    """
+
+    def _ec_verifier(self) -> OidcJwtVerifier:
+        ec_key = ec.generate_private_key(ec.SECP256R1())
+
+        class MixedJwksClient:
+            """Answers with an EC key whatever algorithm the token names."""
+
+            def get_signing_key_from_jwt(self, token: str) -> jwt.PyJWK:
+                return _jwk(ec_key.public_key(), "ES256")
+
+        configured = OidcSettings(
+            issuer=ISSUER,
+            audience=AUDIENCE,
+            jwks_url="https://idp.example.com/jwks",
+            algorithms=("RS256", "ES256"),
+        )
+        return OidcJwtVerifier(configured, jwks_client=MixedJwksClient())
+
+    def test_it_is_a_rejected_token_and_not_an_internal_error(self):
+        with pytest.raises(AuthenticationError):
+            self._ec_verifier().verify(make_token())
+
+    def test_the_message_is_the_same_one_every_other_refusal_gives(self):
+        """The whole point: this ``kid`` must be indistinguishable from any
+        other rejected token."""
+        try:
+            self._ec_verifier().verify(make_token())
+        except AuthenticationError as exc:
+            assert str(exc) == "invalid or expired credentials"
+        else:
+            pytest.fail("expected AuthenticationError")
