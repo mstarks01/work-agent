@@ -1,31 +1,31 @@
 """Bearer-token verification for the `/v1` API.
 
 Every `/v1` route requires a valid bearer token, and verification returns only
-the token subject — that subject is what job ownership binds to.
+the token subject. That subject is what job ownership binds to.
 
-The default ``oidc`` backend verifies OIDC JWTs (signature via JWKS, issuer,
-audience, expiry), which covers any standard OIDC identity provider. Backends
-are selected at deploy time by ``ANALYSIS_AUTH_PROVIDER`` and constructed through
-:func:`build_verifier`, so a new backend is one registry entry — another OIDC
-instance, or a new :class:`TokenVerifier` implementation for a different
-mechanism entirely.
+The default ``oidc`` backend verifies OIDC JWTs. It checks the signature through
+JWKS, and the issuer, audience and expiry, which covers any standard OIDC
+identity provider. A deployment selects a backend with
+``ANALYSIS_AUTH_PROVIDER``, and :func:`build_verifier` constructs it, so a new
+backend is one registry entry: another OIDC instance, or a new
+:class:`TokenVerifier` implementation for a different mechanism.
 
 Everything configurable here is spelled in OIDC's own vocabulary — issuer,
-audience, JWKS endpoint, accepted signing algorithms — and nothing in this
+audience, JWKS endpoint, and accepted signing algorithms — and nothing in this
 module knows the name of an identity provider. Ping, Auth0, Entra and Okta are
-all *deployments of the same four variables*; where one appears in this
-repository it is as an example value, never as a branch.
+all deployments of the same four variables. Where one appears in this
+repository, it appears as an example value rather than as a branch.
 
-Failure detail is asymmetric on purpose: the *reason* a token was rejected is
-logged, while callers see one generic :class:`AuthenticationError` — token
-errors must not become an oracle for probing the verifier.
+Failure detail is asymmetric on purpose. The service logs the reason a token was
+rejected, and callers see one generic :class:`AuthenticationError`, because
+token errors must not become an oracle for probing the verifier.
 
-The JWKS endpoint is held to two bounds the library does not impose: it must be
-``https`` (see :meth:`OidcSettings._https_jwks`), and its fetch may not stall a
-request past :data:`JWKS_TIMEOUT_SECONDS`. A fetch that fails or times out
-raises ``PyJWKClientConnectionError``, which is a ``PyJWTError`` and so lands on
-the same fail-closed path as a bad token: the request is refused rather than
-served on an unverified subject.
+The service holds the JWKS endpoint to two bounds the library does not impose.
+It must be ``https``; see :meth:`OidcSettings._https_jwks`. Its fetch may not
+stall a request past :data:`JWKS_TIMEOUT_SECONDS`. A fetch that fails or times
+out raises ``PyJWKClientConnectionError``, which is a ``PyJWTError``, so it
+lands on the same fail-closed path as a bad token: the service refuses the
+request rather than serving it on an unverified subject.
 """
 
 from __future__ import annotations

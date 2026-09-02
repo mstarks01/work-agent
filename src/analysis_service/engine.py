@@ -1,37 +1,37 @@
 """In-process entry point for the analysis pipeline: text in, report out.
 
 The HTTP ``/v1`` API (:mod:`analysis_service.api`) is one caller of the analysis
-pipeline; this module is the other. An application that wants to run an
-analysis in process — swapping this pipeline in behind its own analysis-engine
-interface — reaches for :class:`Engine` instead of fabricating a
-:class:`~analysis_service.jobs.JobRecord`, an auth subject, and a node callback by
+pipeline, and this module is the other. An application that wants to run an
+analysis in process, and to swap this pipeline in behind its own analysis-engine
+interface, reaches for :class:`Engine`. The alternative is to fabricate a
+:class:`~analysis_service.jobs.JobRecord`, an auth subject and a node callback by
 hand.
 
-The engine carries none of the HTTP contract's ceremony: no bearer token, no
-job store, no polling. It builds the pipeline once — the expensive
-shared-prefix composition is amortised across jobs — and runs each submission
-to a terminal state. Success returns a :class:`~analysis_service.report.Report`,
-an input the validity gate rejects returns its
-:class:`~analysis_service.validation.ValidationIssue`s, and an internal failure
-raises. That trichotomy is the job lifecycle's ``completed | rejected | failed``
-with the transport removed.
+The engine carries none of the HTTP contract's ceremony. There is no bearer
+token, no job store and no polling. It builds the pipeline once, so the
+expensive shared-prefix composition is amortised across jobs, and it runs each
+submission to a terminal state. Success returns a
+:class:`~analysis_service.report.Report`. An input the validity gate rejects
+returns its :class:`~analysis_service.validation.ValidationIssue`s. An internal
+failure raises. Those three outcomes are the job lifecycle's ``completed``,
+``rejected`` and ``failed`` with the transport removed.
 
-**An engine is built for one framework selection**, because a graph is. The
-selection is stated once, at construction, rather than per call: building it
-per call would compose a graph per call and throw away the whole reason this
-class exists. An embedder that runs two selections holds two engines, which is
-the in-process spelling of what the HTTP path does per submission.
+An engine is built for one framework selection, because a graph is. The
+selection is stated once, at construction, rather than per call. Building it per
+call would compose a graph per call, and throw away the whole reason this class
+exists. An embedder that runs two selections holds two engines, which is the
+in-process spelling of what the HTTP path does per submission.
 
-The submitted sources are untrusted text (OWASP LLM01): the engine bounds them
+The submitted sources are untrusted text (OWASP LLM01). The engine bounds them
 and hands them to the pipeline, which places them in session state as fenced
-data for the extraction prompt and never concatenates them into an instruction.
-The engine adds no new trust surface — it re-asserts, for the in-process path,
+data for the extraction prompt, and never concatenates them into an instruction.
+The engine adds no new trust surface. It re-asserts, for the in-process path,
 the bounds the HTTP layer already enforces, from the same deployment config and
 in the same order: what one submission may carry, and how long one run may take.
-Both halves matter and only the first used to be here. ``execute_job`` bounded
-the job route's duration while :meth:`Engine.analyze` handed straight to
-the runner, so the first-run app and every library embedder ran with no time
-budget at all — the state ``job_deadline_ms`` exists to end.
+Both halves matter, and only the first used to be here. ``execute_job`` bounded
+the job route's duration while :meth:`Engine.analyze` handed straight to the
+runner, so the first-run app and every library embedder ran with no time budget
+at all. That is the state ``job_deadline_ms`` exists to end.
 """
 
 from __future__ import annotations

@@ -1,16 +1,16 @@
 """The standalone report verifier: ``python -m analysis_service.verify_report``.
 
-**It reads JSON, never a model.** The report is loaded as a plain mapping and
-canonicalized as bytes, so verification never depends on this project's pydantic
-schema. That is most of what "operates independently of the producing service"
-means: a report from a build whose schema has since moved still verifies, and a
-verifier written in another language can follow the same rules from
+It reads JSON and never a model. The verifier loads the report as a plain
+mapping and canonicalizes it as bytes, so verification never depends on this
+project's pydantic schema. That is most of what "operates independently of the
+producing service" means. A report from a build whose schema has since moved
+still verifies, and somebody can write a verifier in another language from
 :mod:`analysis_service.attestation`'s docstring alone.
 
-**The exit code is the verdict, and there are six of them.** Zero means the
-origin is established; every other state gets its own non-zero code, so a script
-can tell an unsigned report from a revoked one without parsing prose. Collapsing
-them into 0/1 would make "we do not sign" and "this key was compromised" the
+The exit code is the verdict, and there are six of them. Zero means the origin
+is established. Every other state gets its own non-zero code, so a script can
+tell an unsigned report from a revoked one without parsing prose. Collapsing
+them into 0 and 1 would make "we do not sign" and "this key was compromised" the
 same event to anything automated.
 """
 

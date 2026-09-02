@@ -1,50 +1,49 @@
-"""Certifying a run's generation identities against a deployment's manifest.
+"""Certifying a run's execution identities against a deployment's manifest.
 
-The pure check lives in the **service**, not the eval harness, because
-``evals/`` does not ship — ``pyproject.toml`` builds only
-``src/analysis_service`` — so the production image could not import an eval-side
-gate. The **write** path stays in evals: ``promote()`` and the
-certification-bar verification import
-*this* module.
+The pure check lives in the service rather than in the eval harness, because
+``evals/`` does not ship: ``pyproject.toml`` builds only ``src/analysis_service``,
+so the production image could not import an eval-side gate. The write path stays
+in evals, and ``promote()`` and the certification-bar verification import this
+module.
 
-**The manifest keys by tier, not by node.** A fingerprint's payload contains no
-node name — it is the versioned execution identity in
-:mod:`analysis_service.identity` — and the
-tier map puts ``critic/<framework>`` and ``recritic/<framework>`` both on
-``strong`` (the tier loader *requires* that pairing), ``extract`` and ``repair``
-both on ``base``, and every one of a framework's lane agents on its single
-``analyze/<framework>`` key. So a framework's recritic presents a
-*byte-identical* hash to its critic, and its lane agents present one hash
-between them however many it declares; per-node keying would call the same hash blessed under one key and
-unblessed under another, reporting the production revise path uncertified on a
+The manifest keys by tier rather than by node. A fingerprint's payload contains
+no node name, because it is the versioned execution identity in
+:mod:`analysis_service.identity`. The tier map puts ``critic/<framework>`` and
+``recritic/<framework>`` both on ``strong``, and the tier loader requires that
+pairing. It puts ``extract`` and ``repair`` both on ``base``, and every one of a
+framework's lane agents on its single ``analyze/<framework>`` key. A framework's
+recritic therefore presents a byte-identical hash to its critic, and its lane
+agents present one hash between them, however many the framework declares.
+Keying per node would call the same hash blessed under one key and unblessed
+under another, and report the production revise path uncertified on a
 technicality.
 
-**Keying by tier is also what makes the map survive N frameworks.** Graph node
-names carry their framework, so they multiply with the selection while the tiers
-do not — a manifest keyed by node would need a new blessing for every framework
-added, over generation identities that had not changed.
+Keying by tier is also what makes the map survive N frameworks. Graph node names
+carry their framework, so they multiply with the selection while the tiers do
+not. A manifest keyed by node would need a new blessing for every framework
+added, over execution identities that had not changed.
 
-**A provider's word cannot select a blessed entry on its own (#504).** The
-identity binds the *requested* route beside the served one, so blessing is over
-a pair. A translator that returns an approved build string while the deployment
-asked for something cheaper produces a fingerprint no manifest holds, and the
-run reports uncertified. That is the manipulation this gate can actually refuse;
-what it still cannot do is *verify* a served build, which is why the report
-labels it ``provider_reported`` rather than leaving a reader to assume better.
+A provider's word cannot select a blessed entry on its own (#504). The identity
+binds the requested route beside the served one, so a blessing is over a pair. A
+translator that returns an approved build string while the deployment asked for
+something cheaper produces a fingerprint no manifest holds, and the run reports
+uncertified. That is the manipulation this gate can refuse. What it still cannot
+do is verify a served build, which is why the report labels it
+``provider_reported`` rather than leaving a reader to assume better.
 
-**Three states, and the third is a separate field.** ``certified`` keeps its
-narrow meaning — every observed fingerprint is blessed — because callers consume
-it as "trust these aggregates", and a tier that contributed to no number has not
-made them untrustworthy. Folding "unexercised" into the boolean would mark an
-ordinary run untrusted, which is how a gate teaches people to bypass it.
+There are three states, and the third is a separate field. ``certified`` keeps
+its narrow meaning, that every observed fingerprint is blessed, because callers
+consume it as "trust these aggregates" and a tier that contributed to no number
+has not made them untrustworthy. Folding "unexercised" into the boolean would
+mark an ordinary run untrusted, which is how a gate teaches people to bypass it.
 
-A node that never ran is **absent**, not present-with-an-empty-set: absence is
-the sole encoding, never one of two drifting synonyms. An explicitly empty
-observation set is therefore illegal.
+A node that never ran is absent, rather than present with an empty set. Absence
+is the sole encoding, and never one of two synonyms that could drift apart. An
+explicitly empty observation set is therefore illegal.
 
-Loading fails closed (OWASP A02/A10): a malformed manifest, an unknown key, a
-non-hex fingerprint, or an unsupported version raises rather than certifying
-against a silently-empty set.
+Loading fails closed (OWASP A02 and A10). A malformed manifest, an unknown key,
+a non-hex fingerprint, or an unsupported version raises, rather than certifying
+against a silently empty set.
 """
 
 from __future__ import annotations

@@ -1,54 +1,55 @@
 """Binding a tier's ``(vendor, model, sampling, resilience)`` to one adapter.
 
-**One ``LiteLlm`` per tier**, shared by that tier's nodes — ten LLM nodes, two
-adapters — owning every parameter ADK will not carry for us.
+There is one ``LiteLlm`` per tier, shared by that tier's nodes, so ten LLM nodes
+use two adapters. It owns every parameter ADK will not carry for the service.
 
-Three things ride the constructor rather than the generate-content config,
-each for the same underlying reason — ADK's request map forwards them nowhere,
-and a param LiteLLM is never told cannot be caught by its fail-closed
-``drop_params``:
+Three things ride the constructor rather than the generate-content config, for
+one underlying reason: ADK's request map forwards them nowhere, and LiteLLM's
+fail-closed ``drop_params`` cannot catch a param it is never told about.
 
-* **``seed``** and **``reasoning_effort``**. Put on the config instead, they
-  would vanish silently while ``sampling_fingerprint`` went on attesting to a
-  seed the request never carried.
-* **``num_retries``**, pinned at **zero**. Not because retry is off — it is one
-  layer up, in :mod:`analysis_service.retry` — but because this is the kwarg that
-  keeps the library's own retry layer, and the provider SDK's beneath it, down
-  to exactly one request per call. Left at ``attempts - 1`` it multiplied to
+* ``seed`` and ``reasoning_effort``. On the config instead, they would vanish
+  silently, while ``sampling_fingerprint`` went on attesting to a seed the
+  request never carried.
+* ``num_retries``, pinned at zero. That is not because retry is off. Retry is
+  one layer up, in :mod:`analysis_service.retry`. It is because this kwarg keeps
+  the library's own retry layer, and the provider SDK's beneath it, down to
+  exactly one request per call. Left at ``attempts - 1``, it multiplied to
   ``2 * attempts - 1`` requests per node, uncoordinated across every lane agent
-  the job fanned out, which is the burst that turns one 429 into a storm. The adapters this module
-  builds are :func:`~analysis_service.retry.retrying_llm_class` subclasses sharing
-  one process-wide budget.
+  the job fanned out. That is the burst that turns one 429 into a storm. The
+  adapters this module builds are
+  :func:`~analysis_service.retry.retrying_llm_class` subclasses that share one
+  process-wide budget.
 
-Constructor kwargs reach ``acompletion`` via ``_additional_args`` *before*
-``generation_params``, so the value survives. ``drop_params`` is never set —
-neither here nor via ``LITELLM_DROP_PARAMS`` — because LiteLLM's default is
-fail-closed and the sampling fingerprint's honesty depends on it.
+Constructor kwargs reach ``acompletion`` through ``_additional_args`` before
+``generation_params``, so the value survives. The service never sets
+``drop_params``, here or through ``LITELLM_DROP_PARAMS``, because LiteLLM's
+default is fail-closed and the sampling fingerprint's honesty depends on it.
 
 Six build-time gates fire per tier, so a misconfiguration costs nothing rather
 than dying on node one of a paid-for job:
 
-* the **supported-param check** (:mod:`analysis_service.model_gate`);
-* the **output-ceiling check** below, which the supported-param check cannot
-  make: every vendor *accepts* ``max_output_tokens``, and only the serving model
-  objects to a value above what it will produce;
-* the **removed-``temperature`` check** below, which covers that check's
-  documented blind spot on Claude;
-* the **pinned-``temperature`` check** below, which covers the same blind spot
-  on OpenAI's reasoning families, where the parameter survives but only at its
-  own default. Both are inert under the shipped sampling, which sets no
-  temperature at all, and fire for a deployment that states one;
-* the **native-structured-output check** below. Every LLM node binds an
+* the supported-param check (:mod:`analysis_service.model_gate`);
+* the output-ceiling check below, which the supported-param check cannot make.
+  Every vendor accepts ``max_output_tokens``, and only the serving model objects
+  to a value above what it will produce;
+* the removed-``temperature`` check below, which covers that check's documented
+  blind spot on Claude;
+* the pinned-``temperature`` check below, which covers the same blind spot on
+  OpenAI's reasoning families, where the parameter survives but holds only its
+  own default. Both checks are inert under the shipped sampling, which sets no
+  temperature at all, and both fire for a deployment that states one;
+* the native-structured-output check below. Every LLM node binds an
   ``output_schema``, and a model the provider library cannot constrain natively
-  gets that constraint *emulated* — which sends an unresolved schema and fails
-  at output validation mid-job, the one failure shape the other gates cannot
-  see because both the request and the response are well-formed;
-* the **credential check** (:meth:`Vendor.credential_kwargs`), which fires once
-  per tier and fails closed under :class:`ProviderAuthError`.
+  gets that constraint emulated. Emulation sends an unresolved schema and fails
+  at output validation mid-job, which is the one failure shape the other gates
+  cannot see, because both the request and the response are well-formed;
+* the credential check (:meth:`Vendor.credential_kwargs`), which fires once per
+  tier and fails closed under :class:`ProviderAuthError`.
 
-No vendor is privileged: every model reaches its provider through ``LiteLlm``.
-ADK emits a warning when a Gemini model is used through LiteLLM; that warning
-is the visible cost of no privileged default, not a misconfiguration.
+No vendor is privileged, and every model reaches its provider through
+``LiteLlm``. ADK emits a warning when a Gemini model runs through LiteLLM. That
+warning is the visible cost of having no privileged default, rather than a
+misconfiguration.
 """
 
 from __future__ import annotations

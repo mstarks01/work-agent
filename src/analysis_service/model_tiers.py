@@ -1,38 +1,37 @@
 """Model-tier configuration for the graph's LLM nodes.
 
-Three vendor-neutral tiers: ``base`` runs extraction and repair, ``strong`` runs
-a framework's lane agents, and ``review`` exists so that criticism can be bound
-away from the analysis it checks. Each tier independently selects a ``(vendor,
-model)`` **pair**, so the three may run different vendors at once, and no vendor
-is privileged.
+There are three vendor-neutral tiers. ``base`` runs extraction and repair.
+``strong`` runs a framework's lane agents. ``review`` exists so a deployment can
+bind criticism away from the analysis it checks. Each tier selects its own
+``(vendor, model)`` pair, so the three may run different vendors at once, and no
+vendor is privileged.
 
-**``review`` is a place, not a policy.** Which nodes sit on it is the node map's
-business, and the shipped map puts ``critic/<name>`` and ``recritic/<name>`` on
-``strong`` — the same domain as the analysis, which is cheaper and is what most
-deployments want. What the tier buys is that a deployment *can* move them, and
-:data:`REVIEW_INDEPENDENCE` is where it says how far apart they have to be. With
-two tiers the only way to make criticism distinct was to run it on ``base``,
-which is a re-ask on a cheaper model than the pass it corrects — the failure
-:func:`critic_pairing_issues` exists to refuse.
+``review`` is a place rather than a policy. Which nodes sit on it is the node
+map's business, and the shipped map puts ``critic/<name>`` and
+``recritic/<name>`` on ``strong``. That is the same domain as the analysis,
+which is cheaper and is what most deployments want. What the tier buys is that a
+deployment can move them, and :data:`REVIEW_INDEPENDENCE` is where it says how
+far apart they have to be. With two tiers, the only way to make criticism
+distinct was to run it on ``base``, which is a re-ask on a cheaper model than
+the pass it corrects. :func:`critic_pairing_issues` exists to refuse that.
 
-Vendor and model are two keys, never one router string. Three consumers need
-the vendor as a *key* — the credential mode it implies, the family-branching
-floating-form rule, and the two-argument build-time sampling gate — and
-``vertex_ai/`` is not one provider, so a joined string would have to be parsed
-back apart by all three. The prefix exists in exactly one place,
-:attr:`Vendor.prefix`.
+Vendor and model are two keys rather than one router string. Three consumers
+need the vendor as a key: the credential mode it implies, the family-branching
+floating-form rule, and the two-argument build-time sampling gate. ``vertex_ai/``
+is also not one provider, so a joined string would have to be parsed back apart
+by all three. The prefix exists in exactly one place, :attr:`Vendor.prefix`.
 
-**No vendor is selected by default.** The shipped config names no ``(vendor,
-model)`` pair for either tier, so a first run stops with
-:func:`_require_selected_tiers`' message rather than reaching a vendor nobody
-chose. "No privileged default" is therefore a property of the shipped values,
-not only of the mechanism: every vendor is reached the same way, and none of
-them is what you get by doing nothing.
+No vendor is selected by default. The shipped config names no ``(vendor, model)``
+pair for any tier, so a first run stops with :func:`_require_selected_tiers`'
+message rather than reaching a vendor nobody chose. "No privileged default" is
+therefore a property of the shipped values as well as of the mechanism: every
+vendor is reached the same way, and none of them is what an operator gets by
+doing nothing.
 
-Loading fails closed: an unselected tier, an unknown tier, vendor or node name,
-a floating model identifier (from the file *or* an env var), a node missing from
-the mapping, or a config version other than :data:`SUPPORTED_VERSION` raises
-:class:`ModelConfigError` rather than degrading. There is no cross-tier
+Loading fails closed. An unselected tier, an unknown tier, vendor or node name,
+a floating model identifier from the file or from an env var, a node missing
+from the mapping, or a config version other than :data:`SUPPORTED_VERSION`
+raises :class:`ModelConfigError` rather than degrading. There is no cross-tier
 fallback and no compatibility shim for other schema versions.
 """
 

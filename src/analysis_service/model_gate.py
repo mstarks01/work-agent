@@ -1,35 +1,35 @@
-"""The build-time supported-param gate: ask LiteLLM, don't mirror it.
+"""The build-time supported-param gate: ask LiteLLM, do not mirror it.
 
-An unsupported sampling param must fail the *build*, not the first request:
+An unsupported sampling param must fail the build rather than the first request.
 LiteLLM's ``drop_params`` default is fail-closed, so an unsupported param
-otherwise raises mid-job after earlier nodes have already been paid for.
+otherwise raises mid-job, after earlier nodes have already been paid for.
 
-The gate is a **call**, not a table: ``litellm.utils.get_optional_params`` run
-for raise / no-raise with its output discarded. A table cannot express what the
-answer depends on. Supportedness is a function of ``(vendor, model)`` rather
-than vendor — ``vertex_ai/`` is not one provider, since LiteLLM dispatches on
-the model-string prefix to four config classes, so ``vertex_ai/claude-*`` (no
-``seed``, it subclasses ``AnthropicConfig``) and ``vertex_ai/gemini-*``
-(``seed`` fine) disagree — and some constraints are on a *value*, such as
-o-series ``temperature`` being exactly ``1``. That entry point, rather than
-``get_supported_openai_params`` which is merely the gate's input, runs both
-``_check_valid_arg`` *and* ``_map_openai_params``, so the value constraints are
-caught by the same call.
+The gate is a call rather than a table. It runs
+``litellm.utils.get_optional_params`` for raise or no-raise, and discards its
+output. A table cannot express what the answer depends on. Supportedness is a
+function of ``(vendor, model)`` rather than of vendor, because ``vertex_ai/`` is
+not one provider: LiteLLM dispatches on the model-string prefix to four config
+classes, so ``vertex_ai/claude-*`` and ``vertex_ai/gemini-*`` disagree. The
+first has no ``seed``, because it subclasses ``AnthropicConfig``, and the second
+takes one. Some constraints are on a value instead, such as o-series
+``temperature`` having to be exactly ``1``. That entry point runs both
+``_check_valid_arg`` and ``_map_openai_params``, so one call catches the value
+constraints too. ``get_supported_openai_params`` is merely the gate's input.
 
-Two things the gate provably cannot do, both handled elsewhere:
+Two things the gate cannot do, both handled elsewhere:
 
-* ``top_k`` is absent from its signature entirely, which is why ``top_k`` is
-  not part of the sampling config surface at all;
-* ``reasoning_effort="banana"`` *passes* on ``o3``, so the enum's value check
-  is a pydantic ``Literal`` in :mod:`analysis_service.sampling`.
+* ``top_k`` is absent from its signature entirely, which is why ``top_k`` is not
+  part of the sampling config surface at all;
+* ``reasoning_effort="banana"`` passes on ``o3``, so the enum's value check is a
+  pydantic ``Literal`` in :mod:`analysis_service.sampling`.
 
-It is also **not** a de-facto existence check: an unrecognised model falls back
-to the provider's base config rather than raising. The narrow residual is that
-a future o-series under an unrecognised naming pattern would pass the build.
+It is also not a de-facto existence check. An unrecognised model falls back to
+the provider's base config rather than raising. The narrow residual is that a
+future o-series under an unrecognised naming pattern would pass the build.
 
-``get_optional_params`` is not a documented public API. It is exercised
-directly by this module's tests, which is what makes a ``litellm`` version bump
-a change that must re-run the probe rather than a silent dependency bump.
+``get_optional_params`` is not a documented public API. This module's tests
+exercise it directly, which is what makes a ``litellm`` version bump a change
+that must re-run the probe, rather than a silent dependency bump.
 """
 
 from __future__ import annotations

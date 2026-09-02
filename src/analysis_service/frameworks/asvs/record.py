@@ -1,10 +1,10 @@
 """ASVS's own record: a ruling on applicability, on top of a neutral Claim.
 
-**An ASVS claim never reports a pass.** The standard's own verification needs
-access to documentation, source code, configuration and the development team. A
-job here carries prose about a system, so the pass half of the pass/fail decision
+An ASVS claim never reports a pass. The standard's own verification needs access
+to documentation, source code, configuration and the development team. A job
+here carries prose about a system, so the pass half of the pass-or-fail decision
 is not reachable from the input. The three neutral **Verdict** states carry the
-question this package *can* answer:
+question this package can answer:
 
 ``confirmed``
     the requirement applies to this system, and the input does not show it
@@ -14,19 +14,19 @@ question this package *can* answer:
 ``rejected``
     the critic rules that the requirement does not apply.
 
-No fourth state is added to reach for a pass. That is a decision the package
-states rather than a defect it hides, and ``disclaimer.md`` states it to the
-reader of every report.
+There is no fourth state reaching for a pass. The package states that decision
+rather than hiding a defect, and ``disclaimer.md`` states it to the reader of
+every report.
 
 The record grades nothing: no severity, no confidence and no mitigations. Two
-consequences follow from the package contract. The package carries **no
-``severity_rubric.md``** — the gate refuses a rubric beside a record that grades
-nothing. And ``affected_element_ids`` stays empty on the many claims that address
-a coding practice, which is legal on the neutral
-:class:`~analysis_service.report.Claim` and is the reason the base widened it.
+consequences follow from the package contract. The package carries no
+``severity_rubric.md``, because the gate refuses a rubric beside a record that
+grades nothing. And ``affected_element_ids`` stays empty on the many claims that
+address a coding practice, which is legal on the neutral
+:class:`~analysis_service.report.Claim`, and is the reason the base widened it.
 
-The layering is ``Claim`` -> :class:`DraftRequirementRuling` ->
-:class:`RequirementRuling`, the same shape STRIDE's record uses.
+The layering is ``Claim``, then :class:`DraftRequirementRuling`, then
+:class:`RequirementRuling`, which is the same shape STRIDE's record uses.
 """
 
 from __future__ import annotations

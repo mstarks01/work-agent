@@ -1,22 +1,22 @@
 """Is a quoted span actually in the source it names?
 
-One question, answered mechanically: a ``quote`` **Ground** claims a verbatim
-span from a named **Source**, and this module decides whether that span is
-there. It is deliberately the whole of the check — it proves a quote is
-*present*, never that it *supports* the finding. Nothing here can tell a
-verbatim, irrelevant quote from a load-bearing one; that judgement is the
-critic's, and the prompt's states-it-not-mentions-it rule is the only thing
-that ever addresses it.
+This module answers one question mechanically. A ``quote`` **Ground** claims a
+verbatim span from a named **Source**, and this module decides whether that span
+is there. That is deliberately the whole of the check. It proves a quote is
+present, and never that it supports the finding. Nothing here can tell a
+verbatim but irrelevant quote from a load-bearing one. That judgement is the
+critic's, and the prompt's rule about stating rather than mentioning is the only
+thing that addresses it.
 
-Model output is untrusted input (OWASP LLM05): a quote is bytes a model chose,
-matched against bytes a caller submitted, and neither is interpreted as
-anything but text here — no regular expression is compiled from either side, so
-a hostile quote cannot cost more than its length.
+Model output is untrusted input (OWASP LLM05). A quote is bytes a model chose,
+matched against bytes a caller submitted, and this module interprets neither as
+anything but text. It compiles no regular expression from either side, so a
+hostile quote cannot cost more than its length.
 
-THE LADDER IS PINNED, and each rung is a policy decision rather than a
-convenience. Measured over the 12 corpus cases' 206 element excerpts — produced
-by the same "quote verbatim" instruction against the same kind of input, so the
-closest proxy available:
+The ladder is pinned, and each rung is a policy decision rather than a
+convenience. The figures below are measured over the 12 corpus cases' 206
+element excerpts, which the same "quote verbatim" instruction produced against
+the same kind of input, and are the closest proxy available:
 
 ===============  ========  =============  ===================================
 policy           verified  false-reject   concession
@@ -30,46 +30,44 @@ exact                  45         78.2%   none — byte-identical substring
 +punctuation          205          0.5%   all punctuation ignored
 ===============  ========  =============  ===================================
 
-Two facts govern the shape. **Exact equality is catastrophically wrong, and not
-because models are sloppy**: sources are hard-wrapped, so a quote of two
-consecutive words routinely straddles a newline the submitter never sees and
-the model did not invent. Collapsing whitespace runs takes 78.2% to 1.0% and is
-carrying the entire result — typography, case and fragment handling each
-recovered *nothing*, and stay in only because each is a real permission the
-prompt grants or a real substitution models make. Nobody should believe they
-are load-bearing.
+Two facts govern the shape. Exact equality is catastrophically wrong, and not
+because models are sloppy. Sources are hard-wrapped, so a quote of two
+consecutive words routinely straddles a newline the submitter never sees and the
+model did not invent. Collapsing whitespace runs takes 78.2% to 1.0%, and it
+carries the entire result. Typography, case and fragment handling each recovered
+nothing. They stay only because each is a real permission the prompt grants or a
+real substitution models make, and nobody should believe they are load-bearing.
 
-And **punctuation-blindness is refused**: it recovers nothing the markdown rung
-does not, so it is a concession that buys zero precision and spends real
-precision. The ladder stops at ``+markdown``, where the measured false-rejection
-rate is 0 in 206 with one true rejection — a quote that excised a span and
+Punctuation-blindness is refused. It recovers nothing the markdown rung does
+not, so it is a concession that buys no precision and spends real precision. The
+ladder stops at ``+markdown``, where the measured false-rejection rate is 0 in
+206, with one true rejection. That rejection was a quote that excised a span and
 stitched a subject onto a predicate, unmarked, producing a sentence the source
-never contains. That is exactly the manufactured citation this check exists to
-catch.
+never contains. That is the manufactured citation this check exists to catch.
 
-NOT A SIMILARITY THRESHOLD. Best-window similarity puts the lowest accepted
-quote at 0.986 and the highest rejected one at 0.963 — separable in principle,
-by 2.3 points, fitted to a single negative example. Any threshold a human would
-pick by intuition (0.90, 0.95) accepts the fabricated stitch. A deterministic
-ladder is also explainable to a submitter — "this word is not in your document"
-— and a threshold is not.
+This is not a similarity threshold. Best-window similarity puts the lowest
+accepted quote at 0.986 and the highest rejected one at 0.963. They are
+separable in principle, by 2.3 points, fitted to a single negative example. Any
+threshold a person would pick by intuition, such as 0.90 or 0.95, accepts the
+fabricated stitch. A deterministic ladder is also explainable to a submitter —
+"this word is not in your document" — and a threshold is not.
 
-THE REPAIR RUNG IS A DIFFERENT THING. :func:`repair_quote` runs only after the
-ladder refused a quote, and it does not accept the quote: it finds the source's
-own span nearest to it and hands that span back, so what the report carries is
-the submitter's words and never the model's. The agent's words survive beside
-it as a mark. Its candidates are windows of the source whose word count is
-the quote's or up to two more, which is what keeps the fabricated stitch out —
+The repair rung is a different thing. :func:`repair_quote` runs only after the
+ladder refused a quote, and it does not accept the quote. It finds the source's
+own span nearest to it and hands that span back, so the report carries the
+submitter's words and never the model's. The agent's words survive beside it as
+a mark. Its candidates are windows of the source whose word count is the
+quote's, or up to two words more, which is what keeps the fabricated stitch out:
 a stitch is short and the span it was cut from is long, so the two are never
-compared. The threshold, :data:`REPAIR_THRESHOLD`, decides only how far a
-window may differ from the quote before the rung gives up and the quote stays
+compared. The threshold, :data:`REPAIR_THRESHOLD`, decides only how far a window
+may differ from the quote before the rung gives up and the quote stays
 unverified.
 
-False acceptance is not a problem at these lengths: every corpus quote matched
-against all 11 sources it did *not* come from gave 0 spurious matches in 2,266
-wrong-source pairs. Quotes run 29-229 characters, median 80 — long enough that
-the text check independently discriminates the source rather than leaning on
-the label check to do it.
+False acceptance is not a problem at these lengths. Every corpus quote matched
+against all 11 sources it did not come from gave 0 spurious matches in 2,266
+wrong-source pairs. Quotes run from 29 to 229 characters, with a median of 80.
+That is long enough for the text check to discriminate the source on its own,
+rather than leaning on the label check to do it.
 """
 
 from __future__ import annotations

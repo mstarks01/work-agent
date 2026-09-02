@@ -1,21 +1,22 @@
 """Driving a built graph, and recording what each node execution presented.
 
 A **Graph Run** is one drive of a :class:`~analysis_service.graph.Pipeline` to
-completion: the final session state, plus one :class:`~analysis_service.report.NodeRun`
-per node execution. It is deliberately *not* a report — job identity, the input
-digest and certification belong to whoever asked for the run, not to the graph.
+completion. It is the final session state, plus one
+:class:`~analysis_service.report.NodeRun` per node execution. It is deliberately
+not a report: job identity, the input digest and certification belong to whoever
+asked for the run, rather than to the graph.
 
-The graph has two drivers — :class:`~analysis_service.pipeline.AdkPipelineRunner`
-and the eval harness — and both stamp their node runs here. One implementation,
-so a sweep cannot certify against fingerprints it never recorded.
+The graph has two drivers, :class:`~analysis_service.pipeline.AdkPipelineRunner`
+and the eval harness, and both stamp their node runs here. There is one
+implementation, so a sweep cannot certify against fingerprints it never
+recorded.
 
 What the graph cannot know stays with the caller. What only the driver can
-observe — which node an ADK event is the output for, what build answered it,
-when its last predecessor finished — is here.
+observe is here: which node an ADK event is the output for, what build answered
+it, and when its last predecessor finished.
 
-Rendering the job's sources is here for the same reason: both drivers cross
-this seam, so a render that happened one level up would be two renders that
-have to agree.
+Rendering the job's sources is here for the same reason. Both drivers cross this
+seam, so a render one level up would be two renders that have to agree.
 """
 
 from __future__ import annotations

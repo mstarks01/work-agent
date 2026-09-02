@@ -1,47 +1,49 @@
 """One installation's configuration, resolved once and shared by everything.
 
-A **Deployment** is the five config files plus the three text roots — the shared
+A **Deployment** is the five config files plus the three text roots: the shared
 prompt bodies, the domain packs, and one **Framework Package** per framework
-this install carries — located by ``ANALYSIS_*`` variables that pick *which* file
-is read. Every consumer — the HTTP service, the in-process engine, the first-run
-web app, the eval harness's pipeline builder and the eval CLI — assembles its
-configuration through this one object, so each file is read once per process, a
-deployment that redirects ``ANALYSIS_SAMPLING`` has its sweeps grading the
-configuration it actually runs, and the node -> tier walk is written in a single
-place.
+this install carries. ``ANALYSIS_*`` variables locate them, and each variable
+picks which file the service reads. Every consumer assembles its configuration
+through this one object — the HTTP service, the in-process engine, the first-run
+web app, the eval harness's pipeline builder and the eval CLI. Each file is
+therefore read once per process, a deployment that redirects
+``ANALYSIS_SAMPLING`` has its sweeps grading the configuration it runs, and the
+node-to-tier walk is written in one place.
 
-**Configs load eagerly, adapters and the graph do not.** Reading five TOML files
-is cheap, needs no credentials, and is where fail-closed belongs: a deployment
-either has a usable configuration or refuses to be constructed. The package gate
-runs here too, for the same reason and at the same moment — a package that
-declares a lane with no prompt must not reach a model call, and
+Configs load eagerly, and adapters and the graph do not. Reading five TOML files
+is cheap and needs no credentials, and it is where fail-closed belongs: a
+deployment either has a usable configuration or refuses to be constructed. The
+package gate runs here too, for the same reason and at the same moment. A
+package that declares a lane with no prompt must not reach a model call, and
 ``config/frameworks.toml`` naming a framework this build does not carry is a
 deploy mistake rather than a job's problem. Building the tier adapters is the
-expensive, credential-requiring step, so it waits for :meth:`pipeline`. That
-split is what lets the first-run app report a *credential* failure while still
-naming the vendor the config selected — it holds a valid Deployment whose
+expensive step that needs credentials, so it waits for :meth:`pipeline`. That
+split is what lets the first-run app report a credential failure while still
+naming the vendor the config selected, because it holds a valid Deployment whose
 ``runner()`` raised.
 
-**A graph is built for one framework selection, so a runner is too.** A job
-names its frameworks, and the nodes, the state keys and the instruction digest
-are all functions of that selection (:func:`~analysis_service.graph.build_pipeline`
-says why). :meth:`runner` therefore takes the selection and memoizes on it: an
-install carrying two frameworks serves three selections and builds at most three
-graphs, each one composed the first time a job asks for it rather than all of
-them at startup. The expensive shared-prefix composition is still paid once per
-selection rather than once per job, which is the property the memo exists for.
+The service builds a graph for one framework selection, so it builds a runner
+for one too. A job names its frameworks, and the nodes, the state keys and the
+instruction digest are all functions of that selection;
+:func:`~analysis_service.graph.build_pipeline` says why. :meth:`runner`
+therefore takes the selection and memoizes on it. An install that carries two
+frameworks serves three selections and builds at most three graphs, each
+composed the first time a job asks for it rather than all of them at startup.
+The expensive shared-prefix composition is still paid once per selection rather
+than once per job, which is the property the memo exists for.
 
-**One manifest, one gate.** :meth:`gate` is memoized across every selection and
-:meth:`runner` consumes it, so the manifest a job is certified against and the
-one the report route enforces are the same object rather than two loads that
-happen to agree. It survives per-selection graphs because a graph node name
-carries its framework: the node -> tier map is built over everything this
-install *carries*, which is a superset of any one selection's nodes and cannot
-collide across them.
+There is one manifest and one gate. :meth:`gate` is memoized across every
+selection, and :meth:`runner` consumes it, so the manifest a job is certified
+against and the one the report route enforces are the same object rather than
+two loads that happen to agree. It survives per-selection graphs because a graph
+node name carries its framework: the node-to-tier map is built over everything
+this install carries, which is a superset of any one selection's nodes and
+cannot collide across them.
 
-The environment is held for one purpose — deriving each vendor's credentials at
-adapter-build time — and is kept out of ``repr`` and equality so a deployment
-that lands in a log or a traceback cannot carry an API key with it (OWASP A09).
+The service holds the environment for one purpose, which is deriving each
+vendor's credentials at adapter-build time. It keeps the environment out of
+``repr`` and equality, so a deployment that lands in a log or a traceback cannot
+carry an API key with it (OWASP A09).
 """
 
 from __future__ import annotations

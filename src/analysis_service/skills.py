@@ -1,40 +1,40 @@
 """Skill composition: the static text an LLM node is given, per package.
 
 A skill is subject-matter expertise a node is given. Under **Framework
-Packages** every piece of it belongs to one package and is composed from that
-package's own text root: a lane's skill, the lane-boundary digest its critic
-dedupes against, the critic text saying what that framework's verdict states
-assert, and the severity rubric — which exists exactly when the package's record
-grades harm.
+Packages**, every piece of it belongs to one package and is composed from that
+package's own text root. That covers a lane's skill, the lane-boundary digest
+its critic dedupes against, the critic text saying what that framework's verdict
+states assert, and the severity rubric, which exists exactly when the package's
+record grades harm.
 
-**One loader per package.** A :class:`~analysis_service.markdown_loader.
-MarkdownLoader` rooted at ``frameworks/<name>/`` is what every function here
-reads, so a deployment that redirects ``ANALYSIS_FRAMEWORKS_DIR`` redirects the
-whole of a package's text and none of another's.
+There is one loader per package. Every function here reads a
+:class:`~analysis_service.markdown_loader.MarkdownLoader` rooted at
+``frameworks/<name>/``, so a deployment that redirects
+``ANALYSIS_FRAMEWORKS_DIR`` redirects the whole of a package's text and none of
+another's.
 
-Domain packs compose separately (:func:`compose_domain_skills`) from the one
-shared ``domains/`` root, because they arrive at a different time and belong to
-nobody in particular. Which packs a job earns is a fact about *that job's*
-System Model (:mod:`analysis_service.domains`), which #162 ruled one extraction
-fills for every framework, so their key is neutral by construction and the
-graph is built once at startup — pack text cannot sit in the instruction the way
-a lane skill does. It rides in the job-varying block instead — see
-:func:`~analysis_service.graph.prepare_analysis` — which is also what keeps the
-cacheable prefix intact: everything before the first templated placeholder is
-identical across jobs, and the packs sit after it.
+Domain packs compose separately, through :func:`compose_domain_skills`, from the
+one shared ``domains/`` root. They arrive at a different time and belong to
+nobody in particular. Which packs a job earns is a fact about that job's System
+Model (:mod:`analysis_service.domains`), which #162 ruled one extraction fills
+for every framework, so their key is neutral by construction. The graph is built
+once at startup, so pack text cannot sit in the instruction the way a lane skill
+does. It rides in the job-varying block instead, which keeps the instruction
+identical across jobs, with the packs after it.
 
-**A shared pack may not name any package's lane.** A pack states a technology's
-facts, its failure modes and the questions to ask; a sentence assigning those to
-a STRIDE category is a sentence that is false in another framework's prompt, and
-asking a model to disregard it is worse than not sending it. The lint over
-``domains/*.md`` derives its word list from the registered packages' own
-``lanes`` members rather than from a hand-maintained list.
+A shared pack may not name any package's lane. A pack states a technology's
+facts, its failure modes and the questions to ask. A sentence that assigns those
+to a STRIDE category is false in another framework's prompt, and asking a model
+to disregard it is worse than not sending it. The lint over ``domains/*.md``
+derives its word list from the registered packages' own ``lanes`` members,
+rather than from a list somebody maintains by hand.
 
 Loading itself lives in :mod:`analysis_service.markdown_loader`, shared with
-prompt loading. The fixed section headings are checked by the package gate
-(:func:`~analysis_service.frameworks.validate_package`) because the code reads
-them; the token caps stay CI lints, because a cap is a drift alarm rather
-than a thing the service reads. They live in :mod:`analysis_service.token_caps`.
+prompt loading. The package gate,
+:func:`~analysis_service.frameworks.validate_package`, checks the fixed section
+headings, because the code reads them. The token caps stay CI lints, because a
+cap is a drift alarm rather than something the service reads. They live in
+:mod:`analysis_service.token_caps`.
 """
 
 from __future__ import annotations

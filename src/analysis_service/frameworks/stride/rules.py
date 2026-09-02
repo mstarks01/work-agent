@@ -1,41 +1,43 @@
 """STRIDE's eleven deterministic candidate rules.
 
-A **Candidate** is not a finding. It is a mechanically-evaluated condition over
+A **Candidate** is not a finding. It is a mechanically evaluated condition over
 the validated System Model — "this flow crosses a trust boundary and its
-``authentication`` is unverified" — handed to the lane agent as something to
-*look at*. Whether it is a threat, and what the attacker actually achieves, is
-the agent's judgement and stays there.
+``authentication`` is unverified" — handed to the lane agent as something to look
+at. Whether it is a threat, and what the attacker achieves, is the agent's
+judgement and stays there.
 
-**These rules are STRIDE's, which is why they live in STRIDE's package.** A rule
-decides which lane sees a lead, and a lane is a framework's own unit; the
-machinery that fires a rule and groups the results is neutral and stays in
-:mod:`analysis_service.candidates`. The retrieval tables that select a **Reference
-Note** or a **Worked Case** key on the IDs below, and they are this package's
-for the same reason.
+These rules are STRIDE's, which is why they live in STRIDE's package. A rule
+decides which lane sees a lead, and a lane is a framework's own unit. The
+machinery that fires a rule and groups the results is neutral, and stays in
+:mod:`analysis_service.candidates`. The retrieval tables that select a
+**Reference Note** or a **Worked Case** key on the IDs below, and they are this
+package's for the same reason.
 
-The line this module does not cross: **a candidate is never evidence.** It
-carries no severity, no attacker story, no claim that anything is wrong, and it
-cannot become a :class:`~analysis_service.frameworks.stride.record.Threat` —
-nothing downstream of the prompt reads a candidate at all. What grounds a
-finding is still the submitter's words, an ``unknown`` attribute, or a derived
-crossing. A rule's whole contribution is *attention*.
+There is a line this module does not cross: a candidate is never evidence. It
+carries no severity, no attacker story and no claim that anything is wrong, and
+it cannot become a
+:class:`~analysis_service.frameworks.stride.record.Threat`. Nothing downstream
+of the prompt reads a candidate at all. What grounds a finding is still the
+submitter's words, an ``unknown`` attribute, or a derived crossing. A rule's
+whole contribution is attention.
 
-The representation is deliberately small: a tuple of
-:class:`~analysis_service.candidates.Rule` values, each a rule ID, the lane it
-belongs to, the question it puts to that agent, and a plain function from model
-to matches. There is no rule DSL, no condition tree and no engine, because the
-thing a maintainer needs to do most often is read one rule and decide whether it
-is right — and a table of eleven functions is the representation that makes that
-cheapest. Adding a rule is writing a function and appending to :data:`RULES`.
+The representation is deliberately small. It is a tuple of
+:class:`~analysis_service.candidates.Rule` values, each holding a rule ID, the
+lane it belongs to, the question it puts to that agent, and a plain function
+from model to matches. There is no rule DSL, no condition tree and no engine,
+because the thing a maintainer needs to do most often is read one rule and
+decide whether it is right, and a table of eleven functions is the
+representation that makes that cheapest. Adding a rule means writing a function
+and appending to :data:`RULES`.
 
-Rules fire on **structure**, never on prose. The attribute predicates come from
-:mod:`analysis_service.analysis`, which reads a control attribute's leading token
-and nothing else, so no rule here is a natural-language classifier wearing a
-rule's clothes. A rule that needed to understand what ``"company SSO"`` implies
-would be a rule that belongs in the lane skill text instead.
+Rules fire on structure, never on prose. The attribute predicates come from
+:mod:`analysis_service.analysis`, which reads a control attribute's leading
+token and nothing else, so no rule here is a natural-language classifier wearing
+a rule's clothes. A rule that needed to understand what ``"company SSO"`` implies
+is a rule that belongs in the lane skill text instead.
 
-Two rules may fire on one attribute from different lanes, and that is correct:
-an unverified ``authentication`` on a boundary-crossing flow is a spoofing
+Two rules may fire on one attribute from different lanes, and that is correct.
+An unverified ``authentication`` on a boundary-crossing flow is a spoofing
 question and an attribution question, and the two agents answer differently.
 """
 

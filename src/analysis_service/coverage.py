@@ -2,32 +2,32 @@
 
 A claim count says how much an agent found. It cannot say whether a lane that
 found nothing had examined the system and cleared it, or had never looked at
-half of it — and those two are the difference between a report and a
-misleading one. This module computes the second number.
+half of it. Those two are the difference between a report and a misleading one.
+This module computes the second number.
 
 Everything here is derived in code from three artifacts that already exist: the
 validated System Model, the deterministic candidates one package's rules raised
 (:mod:`analysis_service.candidates`), and the drafts that package's lane agents
-actually filed. Nothing is asserted by a model, and nothing here can change a
-finding — coverage is recorded beside the analysis, never fed back into it.
+filed. No model asserts any of it, and nothing here can change a finding.
+Coverage is recorded beside the analysis, and never fed back into it.
 
-**Per framework, and it sits inside that framework's block for the same
-reason.** A lane belongs to the package that declared it, the denominators are
+It is per framework, and it sits inside that framework's block for the same
+reason. A lane belongs to the package that declared it, the denominators are
 counted from that package's own rules, and a coverage table pooled across
 frameworks would divide one framework's citations by another's leads.
 
-**The honest limit, stated once here and again on
-:class:`~analysis_service.report.LaneCoverage`.** What is measured is
-*citation*, not attention: an agent that read a flow and rightly concluded it
-was harmless cites nothing, and looks from here exactly like one that skipped
-it. There is no observable that separates them — a model's own claim to have
-examined something is precisely the assertion this design refuses to trust. So
-the fields are named for citation, and the number that means something is the
-aggregate across a corpus rather than any one lane on any one case.
+The honest limit is stated once here, and again on
+:class:`~analysis_service.report.LaneCoverage`. What is measured is citation
+rather than attention. An agent that read a flow and rightly concluded it was
+harmless cites nothing, and from here it looks exactly like one that skipped it.
+No observable separates them: a model's own claim to have examined something is
+the assertion this design refuses to trust. The fields are therefore named for
+citation, and the number that means something is the aggregate across a corpus
+rather than any one lane on any one case.
 
-Computed at the fan-in, over the drafts rather than the ruled claims: coverage
-is a fact about what the agents did with the system, and a draft the critic
-later rejects was still a part of the system being examined.
+The service computes it at the fan-in, over the drafts rather than the ruled
+claims. Coverage is a fact about what the agents did with the system, and a
+draft the critic later rejects was still part of the system being examined.
 """
 
 from __future__ import annotations

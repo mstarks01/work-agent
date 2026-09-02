@@ -1,27 +1,28 @@
 """The report: the structured JSON payload the front-end retrieves for a job.
 
-**One envelope, many frameworks.** A :class:`Report` carries the facts about one
-job — its identity, its inputs, the nodes that ran, and the single **Valid
-System Model** every framework analysed — plus one :class:`FrameworkAnalysis`
-block per framework the job selected. A field sits where the thing it describes
-sits: nine fields describe the job or the shared model and stay on the
-envelope, and everything one framework produced rides in that framework's own
-block.
+There is one envelope and many frameworks. A :class:`Report` carries the facts
+about one job — its identity, its inputs, the nodes that ran, and the single
+**Valid System Model** every framework analysed — plus one
+:class:`FrameworkAnalysis` block per framework the job selected. A field sits
+where the thing it describes sits. Nine fields describe the job or the shared
+model and stay on the envelope, and everything one framework produced rides in
+that framework's own block.
 
-The neutral shape every block's checks read is :class:`Claim` — an ID, the
-``(framework, version)`` pair naming what the conclusion is *of*, a title and
-description, the elements it affects, and the **Grounds** that justify it. It
-carries no judgement: a severity, a mitigation and a ruling all belong to the
-framework that makes them, and STRIDE's live on :class:`~analysis_service.
-frameworks.stride.record.Threat`.
+The neutral shape every block's checks read is :class:`Claim`. It holds an ID,
+the ``(framework, version)`` pair that names what the conclusion is of, a title
+and description, the elements it affects, and the **Grounds** that justify it.
+It carries no judgement. A severity, a mitigation and a ruling all belong to the
+framework that makes them, and STRIDE's live on
+:class:`~analysis_service.frameworks.stride.record.Threat`.
 
-Severity is qualitative likelihood x impact with the band **derived by a fixed
-matrix, never asserted** by a model — the critic calibrates two narrow
-judgments and evals check the arithmetic. Rejected claims ride in their own
-``rejected_claims`` array as an audit trail. The report embeds the full
-validated System Model plus derived boundary crossings once, so it is
-self-contained: every element reference in every block resolves inside one
-payload.
+Severity is qualitative likelihood times impact. A fixed matrix derives the
+band, and a model never asserts it: the critic calibrates two narrow judgements,
+and evals check the arithmetic. Rejected claims ride in their own
+``rejected_claims`` array, as an audit trail.
+
+The report embeds the full validated System Model plus derived boundary
+crossings once, so it is self-contained: every element reference in every block
+resolves inside one payload.
 """
 
 from __future__ import annotations

@@ -1,22 +1,24 @@
 """The ASVS framework package: a published standard, as a package.
 
-Nine members and a text root at ``frameworks/asvs/``, exactly like STRIDE. What
-differs is what stands behind them. STRIDE is a method, so its ``version`` names
-this repo's ruleset and it carries no catalog. ASVS is a published standard, so
-``version`` names the standard's own release and the 345 requirements live in
-:mod:`analysis_service.frameworks.asvs.catalog` as this package's private data.
+It has nine members and a text root at ``frameworks/asvs/``, exactly as STRIDE
+does. What differs is what stands behind them. STRIDE is a method, so its
+``version`` names this repository's ruleset and it carries no catalog. ASVS is a
+published standard, so ``version`` names the standard's own release, and the 345
+requirements live in :mod:`analysis_service.frameworks.asvs.catalog` as this
+package's private data.
 
-**One lane is one chapter.** The standard's own applicability guidance operates
-on a chapter — "for a machine-to-machine API, the requirements in chapter V3
-related to web frontends will not be relevant" — so a lane that is a chapter puts
-the standard's unit and this service's unit in the same place. The cost is real:
-one lane is one **Model Tier** call, so an ASVS job runs 17 ``strong``-tier calls
+One lane is one chapter. The standard's own applicability guidance operates on a
+chapter — "for a machine-to-machine API, the requirements in chapter V3 related
+to web frontends will not be relevant" — so a lane that is a chapter puts the
+standard's unit and this service's unit in the same place. The cost is real: one
+lane is one **Model Tier** call, so an ASVS job runs 17 ``strong``-tier calls
 against STRIDE's 6.
 
-**This package reports no pass.** ASVS verification needs source code,
-configuration and the development team, and a job here carries prose. See
+This package reports no pass. ASVS verification needs source code, configuration
+and the development team, and a job here carries prose. See
 :mod:`analysis_service.frameworks.asvs.record` for what the three **Verdict**
-states carry instead, and ``disclaimer.md`` for what the report's reader is told.
+states carry instead, and ``disclaimer.md`` for what the report's reader is
+told.
 """
 
 from __future__ import annotations

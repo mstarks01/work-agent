@@ -1,14 +1,9 @@
 """What a ``(vendor, model)`` can be asked for, as three answers rather than two.
 
-Every gate in :mod:`analysis_service.binding` is a *raise*: it decides whether one
+Every gate in :mod:`analysis_service.binding` is a raise. It decides whether one
 tier's configuration may bind, and a question it cannot answer is not its
 problem, because letting an unmapped model through is the right call for a gate.
-This module asks the same questions for a different purpose — to **report** —
-and reporting is where that fallback becomes a lie. "LiteLLM's map has no entry
-for this model" and "this provider rejects this parameter" reach a raise/no-raise
-gate as the same non-raise, and they are not the same fact about a deployment.
-
-So the answer here is :class:`Capability`, which has a third value:
+This module asks the same questions for a different purpose, which is to report::
 
     SUPPORTED    the provider accepts it, and the map is what says so
     UNSUPPORTED  the provider rejects it
@@ -16,19 +11,20 @@ So the answer here is :class:`Capability`, which has a third value:
 
 ``UNKNOWN`` is the whole reason the module exists. A capability matrix that
 renders it as ``UNSUPPORTED`` invents a fact, and one that renders it as
-``SUPPORTED`` invents a worse one; the honest cell is the one that says the
-question went unanswered. Vendor neutrality is *equivalent application behaviour
-given equivalent provider capabilities*, and that is a claim nobody can check
-without being able to see which capabilities differ.
+``SUPPORTED`` invents a worse one. The honest cell is the one that says the
+question went unanswered. Vendor neutrality is equivalent application behaviour
+given equivalent provider capabilities, and nobody can check that claim without
+being able to see which capabilities differ.
 
-**Credential-free by construction.** Every probe here is a call into the pinned
-``litellm``'s local model-cost map (see
-:func:`~analysis_service.model_gate._import_litellm_hermetically`), so a full
-matrix for all three vendors is computable in the offline CI lane, with no key,
-no ADC and no egress. That is what makes this suite runnable on every PR rather
-than in a live sweep nobody has provisioned — and it is also the limit of what
-it proves: this module reports what a provider *would accept*, never what a
-model returns. Nothing here is evidence that a vendor has ever served a request.
+The module is credential-free by construction. Every probe here is a call into
+the pinned ``litellm``'s local model-cost map; see
+:func:`~analysis_service.model_gate._import_litellm_hermetically`. A full matrix
+for all three vendors is therefore computable in the offline CI lane, with no
+key, no ADC and no egress. That is what makes this suite runnable on every pull
+request, rather than in a live sweep nobody has provisioned. It is also the
+limit of what it proves: this module reports what a provider would accept, and
+never what a model returns. Nothing here is evidence that a vendor has served a
+request.
 """
 
 from __future__ import annotations

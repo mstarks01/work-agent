@@ -1,16 +1,16 @@
 """The live half of the provider contract: did this vendor actually serve the graph.
 
-:mod:`analysis_service.conformance` answers what a provider *would be asked for*
-— from the pinned model map, for all three vendors at once, with no credential
-and no egress. That is what lets it run on every pull request, and it is also
-the exact limit of what it can claim: nothing in it is evidence that any vendor
-has ever served a request.
+:mod:`analysis_service.conformance` answers what a provider would be asked for,
+from the pinned model map, for all three vendors at once, with no credential and
+no egress. That is what lets it run on every pull request, and it is also the
+exact limit of what it can claim: nothing in it is evidence that any vendor has
+served a request.
 
-This module is the other half. It is deliberately the **cheapest** thing that
-can produce that evidence: one small system, once, through the shipped graph,
-on whichever pair this deployment selects. Eight answers come back — the eight
-[#116](https://github.com/mstarks01/work-agent/issues/116) names as the minimum
-a provider must satisfy before its coverage counts as exercised:
+This module is the other half. It is deliberately the cheapest thing that can
+produce that evidence: one small system, once, through the shipped graph, on
+whichever pair this deployment selects. Eight answers come back, and they are
+the eight [#116](https://github.com/mstarks01/work-agent/issues/116) names as
+the minimum a provider must satisfy before its coverage counts as exercised::
 
     model binding                    the routes each node asked for
     structured extraction            a schema-valid model came back
@@ -18,40 +18,23 @@ a provider must satisfy before its coverage counts as exercised:
     critic structured output         each framework's ruling parsed
     sampling parameter validation    the provider took this tier's params
     served-model capture             what actually answered
-    execution fingerprint            the generation identity that implies
+    execution fingerprint            the execution identity that implies
     provenance                       the record, recomputable from itself
 
-**Every framework this deployment carries that a smoke run can select.** A
+It runs every framework this deployment carries that a smoke run can select. A
 framework's lane agents and its critic run on their own ``analyze/<name>``,
 ``critic/<name>`` and ``recritic/<name>`` tier keys, which an operator may point
-at different tiers and so at different vendors. Smoking one framework and
-reporting green would leave another's binding unexercised while reading exactly
-like a lane that had checked it — the failure this module exists to rule out.
+at different tiers, and so at different vendors. Smoking one framework and
+reporting green would leave another's binding unexercised, while reading exactly
+like a lane that had checked it. That is the failure this module exists to rule
+out.
 
-**One framework can still be left out, and the run says so rather than hiding
-it.** A package whose options carry a required field cannot be selected here:
-ASVS needs a level, that level is a choice an organization makes, and a smoke run
-has nobody to ask. Every result names what it could not exercise, and an install
-carrying nothing else reports eight ``unknown`` checks with the reason attached —
-never a traceback.
-
-**Not an eval.** Nothing here scores threat-model quality, and nothing here
-fails because one model writes weaker threats than another — that split is the
-whole of this repository's answer to vendor neutrality, and collapsing it is
-what produced the imbalance #116 was filed about. Quality lives in ``evals/``
-and is expected to differ. What this asks is whether the *application* works on
-this provider, which every supported provider must answer the same way.
-
-**The tri-state is the same one, and for the same reason.** A check whose
-question the provider left unanswered — no served build on the response, so no
-fingerprint to verify — reports ``unknown`` and does not fail the run. Grading
-it as a failure would invent a defect; grading it as a pass would invent an
-assurance. Only a check the *application* got wrong is a failure.
-
-Runnable wherever the service is: ``python -m analysis_service.smoke`` builds the
-deployment from the environment like every other entry point, so an operator
-with a fresh key can ask "does my provider actually work here" for the price of
-one small job, and CI asks the same question with the same command.
+One framework can still be left out, and the run says so rather than hiding it.
+A package whose options carry a required field cannot be selected here. ASVS
+needs a level, that level is a choice an organization makes, and a smoke run has
+nobody to ask. Every result names what it could not exercise, and an install
+that carries nothing else reports eight ``unknown`` checks with the reason
+attached, rather than a traceback.
 """
 
 from __future__ import annotations

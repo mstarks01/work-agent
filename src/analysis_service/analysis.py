@@ -1,35 +1,36 @@
 """Deterministic traversal of a validated System Model.
 
-Exhaustive enumeration is mechanical work, and mechanical work belongs in
-code. Everything here answers a *structural* question — what flows touch this
-element, what does it reach, which controls are unverified — from the
-validated :class:`~analysis_service.system_model.SystemModel` and nothing else.
-No source text is read, no security claim is introduced, and identical input
-gives identical output down to list order.
+Exhaustive enumeration is mechanical work, and mechanical work belongs in code.
+Everything here answers a structural question — what flows touch this element,
+what it reaches, which controls are unverified — from the validated
+:class:`~analysis_service.system_model.SystemModel` and nothing else. It reads
+no source text, introduces no security claim, and gives identical output for
+identical input, down to list order.
 
 That last property is the point rather than a nicety. These results become
-:mod:`analysis_service.candidates` triggers, which become prompt bytes; a helper
+:mod:`analysis_service.candidates` triggers, which become prompt bytes. A helper
 that reordered its output between runs would make two otherwise identical jobs
-send two different instructions and would break the cacheable prefix for
+send two different instructions, and would break the cacheable prefix for
 nothing.
 
-**What a helper may not do.** It may not decide that a control is *absent*.
-The System Model's security attributes are free-form strings whose one
-reserved value is ``unknown``, so this module reads only the leading token of
-an attribute (:func:`control_state`) and classifies it as ``unverified``,
-``absent`` or ``stated``. ``"none; accepted by network position"`` is absent
-because it says so; ``"company SSO"`` is stated and this module has nothing
-further to say about whether SSO is any good. That judgement is the category
-agent's, and pushing it here would be the thing this design exists to avoid.
+A helper may not decide that a control is absent. The System Model's security
+attributes are free-form strings whose one reserved value is ``unknown``, so
+this module reads only the leading token of an attribute
+(:func:`control_state`) and classifies it as ``unverified``, ``absent`` or
+``stated``. ``"none; accepted by network position"`` is absent because it says
+so. ``"company SSO"`` is stated, and this module has nothing further to say
+about whether that SSO is any good. That judgement is the category agent's, and
+pushing it here would be the thing this design exists to avoid.
 
 Reachability is over Data Flows in their stated direction, which is who
-*initiates* — see :class:`~analysis_service.system_model.DataFlow`. A flow is
+initiates; see :class:`~analysis_service.system_model.DataFlow`. A flow is
 therefore not a channel an attacker can only ride forwards, and the second-order
 reach a category agent reasons about is wider than what :func:`reachable_from`
-returns. The helper answers the narrow structural question; the prompt says so.
+returns. The helper answers the narrow structural question, and the prompt says
+so.
 
 Every function takes the model as its first argument rather than living on
-:class:`SystemModel`, because the model is a schema shared with the report and
+:class:`SystemModel`, because the model is a schema shared with the report, and
 this is analysis over it.
 """
 

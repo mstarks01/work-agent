@@ -1,51 +1,52 @@
 """The retry loop, moved up to where it can be bounded.
 
-LiteLLM retries beneath the adapter, and that is the problem. Its ``num_retries``
-sets the provider SDK's own ``max_retries`` on the way to the client, so the
-worst case is ``2 * attempts - 1`` requests per node — five times the fan-out in
-the seconds the lane agents go out together — and none of it is visible above
-``generate_content_async``. Nothing above can pace it, count it, or decide it
-has gone on long enough, because by the time the call returns the requests have
-already been made. ``tests/test_model_gate.py`` probes that coupling; it is a
-fact about the installed library, not a thing to argue with.
+LiteLLM retries beneath the adapter, and that is the problem. Its
+``num_retries`` sets the provider SDK's own ``max_retries`` on the way to the
+client, so the worst case is ``2 * attempts - 1`` requests per node, which is
+five times the fan-out in the seconds the lane agents go out together. None of
+it is visible above ``generate_content_async``. Nothing above can pace it, count
+it, or decide it has gone on long enough, because the requests are already made
+by the time the call returns. ``tests/test_model_gate.py`` probes that coupling.
+It is a fact about the installed library rather than something to argue with.
 
-So the library's retry layer is switched **off** (``num_retries=0``, which that
-same probe shows is exactly one request per call) and re-implemented here, where
-two bounds become expressible that could not exist below:
+The library's retry layer is therefore switched off, at ``num_retries=0``, which
+that same probe shows is exactly one request per call. This module re-implements
+it, where two bounds become expressible that could not exist below:
 
-* **A shared budget.** :class:`RetryBudget` is one token bucket for the whole
-  process. A retry costs a token; a success credits a fraction of one. Retries
-  are therefore capped at a *ratio of successful traffic* rather than at a count
-  per node, which is the difference between a retry policy and a storm. When a
-  provider is genuinely down every node fails at once, the bucket empties, and
-  the service stops retrying instead of multiplying one outage by five. When a
-  single call fails in isolation the bucket is full and nothing changes.
+* A shared budget. :class:`RetryBudget` is one token bucket for the whole
+  process. A retry costs a token, and a success credits a fraction of one. The
+  service therefore caps retries at a ratio of successful traffic rather than at
+  a count per node, which is the difference between a retry policy and a storm.
+  When a provider is genuinely down, every node fails at once, the bucket
+  empties, and the service stops retrying instead of multiplying one outage by
+  five. When a single call fails in isolation, the bucket is full and nothing
+  changes.
 
-* **Decorrelated timing.** Lane agents that start together fail together and,
-  on any fixed backoff curve, retry together — reconverging on the quota they
-  just tripped. Full jitter (:func:`_backoff_seconds`, a uniform draw over the
-  whole interval rather than a fixed delay plus noise) spreads them out. This is
-  the half of the storm that survives even a perfectly sized budget.
+* Decorrelated timing. Lane agents that start together fail together, and on any
+  fixed backoff curve they retry together, reconverging on the quota they just
+  tripped. Full jitter spreads them out: :func:`_backoff_seconds` draws
+  uniformly over the whole interval, rather than adding noise to a fixed delay.
+  This is the half of the storm that survives even a perfectly sized budget.
 
-Where the provider says when to come back — a ``Retry-After`` on a 429 — that
+Where the provider says when to come back, in a ``Retry-After`` on a 429, that
 wins over any curve computed here. It is the one authoritative number in the
-exchange, and it is not capped: a deliberately long ``Retry-After`` is the
-provider asking for room, and the job deadline is what bounds the wait.
+exchange, and the service does not cap it. A deliberately long ``Retry-After``
+is the provider asking for room, and the job deadline is what bounds the wait.
 
-**This reverses version 2's removal of the backoff knobs, and only because the
-premise changed.** They were removed for connecting to nothing — LiteLLM picked
-its own curve internally and the config surface was decoration. With the loop
-here, a curve exists to describe. It is pinned in this module rather than
-re-opened as configuration: it does not vary by deployment, and the one number
-that does — how much retrying a deployment will tolerate — is
+This reverses version 2's removal of the backoff knobs, and only because the
+premise changed. They went because they connected to nothing: LiteLLM picked its
+own curve internally, and the config surface was decoration. With the loop here,
+a curve exists to describe. This module pins it rather than re-opening it as
+configuration, because it does not vary by deployment. The one number that does
+vary is how much retrying a deployment will tolerate, and that is
 ``retry_budget_ratio`` in ``config/resilience.toml``.
 
-Retrying is not quite all this module does any more, and the exception is
+Retrying is no longer quite all this module does, and the exception is
 deliberate. :class:`RetryingLlm` is the one object this service owns that sees
-every raw response from every provider for every node, which makes it the only
-place a **length-stopped completion** can be caught uniformly — see
-:func:`_reject_truncated`. Nothing here can change an answer; it can now refuse
-one that the provider already told us is incomplete.
+every raw response from every provider for every node. That makes it the only
+place a length-stopped completion can be caught uniformly; see
+:func:`_reject_truncated`. Nothing here can change an answer. It can refuse one
+the provider has already said is incomplete.
 """
 
 from __future__ import annotations
