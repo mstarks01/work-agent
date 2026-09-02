@@ -1,21 +1,21 @@
 """The candidate machinery: how a rule fires and how its hits are grouped.
 
 A **Candidate** is a structural condition a deterministic rule found in the
-validated System Model and handed to one lane agent as something to
-investigate: a rule ID, the elements it is about, and the model facts that made
-it fire.
+validated System Model and handed to one lane agent to investigate. It carries a
+rule ID, the elements it is about, and the model facts that made it fire.
 
-**Neutral by design, and empty of rules.** The rules themselves belong to a
-**Framework Package** — a rule decides which lane sees a lead, and a lane is a
-framework's own unit — so STRIDE's eleven live in
+This module is neutral by design, and holds no rules. The rules belong to a
+**Framework Package**, because a rule decides which lane sees a lead and a lane
+is a framework's own unit. STRIDE's eleven therefore live in
 :mod:`analysis_service.frameworks.stride.rules`. What is here is the shape a rule
 takes, the shape a hit takes, and the fold that evaluates a package's whole
 table against one model.
 
-The line this module does not cross: **a candidate is never evidence.** It
-carries no severity, no attacker story, no claim that anything is wrong, and it
-cannot become a :class:`~analysis_service.report.Claim` — nothing downstream of
-the prompt reads a candidate at all. A rule's whole contribution is *attention*.
+There is a line this module does not cross: a candidate is never evidence. It
+carries no severity, no attacker story and no claim that anything is wrong, and
+it cannot become a :class:`~analysis_service.report.Claim`. Nothing downstream
+of the prompt reads a candidate at all. A rule's whole contribution is
+attention.
 """
 
 from __future__ import annotations

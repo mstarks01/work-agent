@@ -1,96 +1,97 @@
 """Operational bounds that cannot change an answer.
 
-Seven knobs. Three — attempts, timeout and the retry budget — are applied to
-every LLM call: on library defaults the nodes never retry and never time out, so
-a single 429 on any node would kill a paid-for job on first contact, and a
-stalled call would park a job in ``running`` forever. Two more bound the job's
-*input*: how many sources one job may carry, and how many UTF-8 bytes they may
-total. The sixth bounds the job's *duration*, and the seventh bounds how many
-jobs one caller may have running at once.
+There are seven knobs. Three of them — attempts, timeout and the retry budget —
+apply to every LLM call. On library defaults the nodes never retry and never
+time out, so one 429 on any node would kill a paid-for job on first contact, and
+a stalled call would park a job in ``running`` for ever. Two more bound the
+job's input: how many sources one job may carry, and how many UTF-8 bytes they
+may total. The sixth bounds the job's duration. The seventh bounds how many jobs
+one caller may run at once.
 
-``job_deadline_ms`` is the only one of the seven that bounds a *single* job as a
-whole, and it exists because the per-call knobs provably cannot. ``timeout_ms``
-bounds one HTTP request; ``attempts`` multiplies it; the retry arithmetic below
-multiplies it again; and the graph runs five LLM stages in series on its
-longest path. Those compose to a worst case in the *hours* while every
-individual bound is respected — so before this knob, a job's tail was set by a
-product of four numbers nobody chose, and a wedged run held a ``running`` job
-until the process died. A deadline is the one bound whose worst case is the
-number written down.
+``job_deadline_ms`` is the only one of the seven that bounds a single job as a
+whole, and it exists because the per-call knobs cannot. ``timeout_ms`` bounds
+one HTTP request. ``attempts`` multiplies it. The retry arithmetic below
+multiplies it again. The graph then runs five LLM stages in series on its
+longest path. Those compose to a worst case in hours, while every individual
+bound still holds. Before this knob, a product of four numbers nobody chose set
+a job's tail, and a wedged run held a ``running`` job until the process died. A
+deadline is the one bound whose worst case is the number somebody wrote down.
 
-``max_active_jobs`` and the four ``*_per_window`` knobs bound a *caller* rather
-than a job, and the six per-job knobs are why they have to exist. Every one of
-those is per job, so a caller who respects all six and simply submits a thousand
-submissions is inside the contract while spending the service's whole provider
-quota: each accepted job fans one lane agent per lane of every framework it names
-out on the ``strong`` tier —
+``max_active_jobs`` and the four ``*_per_window`` knobs bound a caller rather
+than a job. The six per-job knobs are why they have to exist. Every one of those
+is per job, so a caller who respects all six and submits a thousand submissions
+stays inside the contract while spending the service's whole provider quota.
+Each accepted job fans one lane agent per lane of every framework it names out
+on the ``strong`` tier — see
 :func:`~analysis_service.frameworks.widest_fan_out` — so ten concurrent
-submissions is ten times that against one shared per-minute quota. Per-job
+submissions are ten times that against one shared per-minute quota. Per-job
 budgets are not a per-caller budget, and the unbounded-consumption half of OWASP
-LLM10 is the latter.
+LLM10 is the second one.
 
-``max_active_jobs`` bounds jobs *in flight*, not jobs per interval. A ceiling on
-concurrency is self-clearing — finishing a job is what buys the next one — so it
-needs no window, no timer and no state beyond the records the store already
-holds, and it bounds the thing that actually costs money: simultaneous provider
-calls. A submission rate says nothing about that on its own.
+``max_active_jobs`` bounds jobs in flight rather than jobs per interval. A
+ceiling on concurrency is self-clearing, because finishing a job is what buys
+the next one. It therefore needs no window, no timer and no state beyond the
+records the store already holds, and it bounds the thing that costs money:
+simultaneous provider calls. A submission rate says nothing about that on its
+own.
 
-**Which is also why a ceiling alone closes nothing cumulative.** A caller who
-submits serially, letting each job finish before the next, stays inside any
-ceiling forever. The four window knobs are the other half:
+A ceiling alone therefore closes nothing cumulative. A caller who submits
+serially, and lets each job finish before the next, stays inside any ceiling for
+ever. The four window knobs are the other half.
 :mod:`analysis_service.budgets` bounds how many jobs one subject may start per
-window, how many tokens one subject may commit, and how many every subject may
-commit together. All of them are decided inside the same atomic reservation the
-ceiling is, so no two of them can be raced apart.
+window, how many tokens one subject may commit, and how many tokens every
+subject may commit together. The service decides all of them inside the same
+atomic reservation the ceiling uses, so no two of them can be raced apart.
 
-The input bounds are in **bytes, not tokens**. A token budget would make the
-public contract depend on which vendor a deployment's tiers happen to select,
-so what a caller may submit would change under them without the contract
-changing. Bytes are something the caller can measure themselves. There is
-deliberately no *per-source* cap: it would forbid only shapes the total already
-permits, and it would let the service blame one source for a budget the whole
-submission overspent.
+The input bounds are in bytes rather than tokens. A token budget would make the
+public contract depend on which vendor a deployment's tiers select, so what a
+caller may submit would change under them while the contract did not. A caller
+can measure bytes for themselves. There is deliberately no per-source cap. It
+would forbid only shapes the total already permits, and it would let the service
+blame one source for a budget the whole submission overspent.
 
-Unlike :mod:`analysis_service.sampling`, every value here **is** env-overridable.
-The split that settles it: sampling decides *what* the model produces, so an
-eval-only value there is how a suite goes green while production drifts. Nothing in this file can move an eval score — attempts and
-timeout change only *how hard we try*, and the input bounds decide only whether
-a submission is accepted at all, never which answer it gets — so these are
-exactly the knobs to turn down mid-incident without a redeploy.
+Every value here is env-overridable, which is not true of
+:mod:`analysis_service.sampling`. The split that settles it is what each file
+decides. Sampling decides what the model produces, so an eval-only value there
+is how a suite goes green while production drifts. Nothing in this file can move
+an eval score: attempts and timeout change only how hard the service tries, and
+the input bounds decide only whether a submission is accepted, never which
+answer it gets. These are therefore the knobs to turn down during an incident,
+without a redeploy.
 
-``attempts`` is a *total* count, and with the library's retry layer switched off
-it is now literally the request count per node. It did not used to be. LiteLLM's
-``num_retries`` counts retries *after* the first try, and worse, sets the
-provider SDK's own ``max_retries`` **from** that same value on the way to the
-client — so the first attempt carried its own SDK-level retries underneath, and
-the worst case per node was ``2 * attempts - 1`` requests: five at the shipped
-three, and five times the fan-out in the seconds the lane agents go out
-together. Against a
-per-minute quota that burst is what turns one 429 into a run spending its budget
-on retried 429s (OWASP LLM10). Passing ``max_retries`` did not close it —
-``num_retries`` overwrites it on the way to the client — which is what
-``tests/test_model_gate.py`` probes.
+``attempts`` is a total count. With the library's retry layer switched off it is
+literally the request count per node. It did not used to be. LiteLLM's
+``num_retries`` counts retries after the first try, and it also sets the
+provider SDK's own ``max_retries`` from that same value on the way to the
+client. The first attempt therefore carried its own SDK-level retries
+underneath, and the worst case per node was ``2 * attempts - 1`` requests: five
+at the shipped three, and five times the fan-out in the seconds the lane agents
+go out together. Against a per-minute quota, that burst is what turns one 429
+into a run that spends its budget on retried 429s, which is OWASP LLM10. Passing
+``max_retries`` did not close it, because ``num_retries`` overwrites it on the
+way to the client. ``tests/test_model_gate.py`` probes exactly that.
 
-So the layer is off (``num_retries=0``, one request per call) and the loop lives
-in :mod:`analysis_service.retry`, above the adapter where it can be bounded.
-``retry_budget_ratio`` is the knob that bounds it: retries draw from one
-process-wide token bucket credited by successful requests, so they are capped at
-a *share of working traffic* instead of at a count per node. Correlated failure
-— the only kind that storms — empties the bucket once for everyone and the
-service stops retrying, while an isolated failure sees a full bucket and is
-retried as before. Turning ``attempts`` down mid-incident still works and is
-still the blunt instrument; the budget is what makes it rarely necessary.
+So the layer is off, at ``num_retries=0`` and one request per call, and the loop
+lives in :mod:`analysis_service.retry`, above the adapter where it can be
+bounded. ``retry_budget_ratio`` is the knob that bounds it. Retries draw from
+one process-wide token bucket that successful requests credit, so the service
+caps them at a share of working traffic rather than at a count per node.
+Correlated failure is the only kind that storms, and it empties the bucket once
+for everyone, after which the service stops retrying. An isolated failure sees a
+full bucket and is retried as before. Turning ``attempts`` down during an
+incident still works and is still the blunt instrument. The budget is what makes
+that rarely necessary.
 
-The backoff knobs version 2 removed stay removed, but the reasoning has changed
-and is worth keeping straight. They went because LiteLLM picked its own curve
-internally and the config surface connected to nothing. A curve now exists to
-describe — full jitter, with a provider's ``Retry-After`` overriding it — and it
-is pinned in :mod:`analysis_service.retry` rather than re-opened here, because it
-does not vary by deployment. What varies is how much retrying a deployment will
-tolerate, and that is the one number this file carries.
+The backoff knobs that version 2 removed stay removed, and the reasoning has
+changed. They went because LiteLLM picked its own curve internally, so the
+config surface connected to nothing. A curve now exists to describe: full
+jitter, with a provider's ``Retry-After`` overriding it.
+:mod:`analysis_service.retry` pins it rather than this file re-opening it,
+because the curve does not vary by deployment. What varies is how much retrying
+a deployment will tolerate, and that is the one number this file carries.
 
-Loading fails closed: a malformed file, an out-of-range value, an unknown key or
-a stale version raises :class:`ResilienceConfigError` rather than silently
+Loading fails closed. A malformed file, an out-of-range value, an unknown key or
+a stale version raises :class:`ResilienceConfigError`, rather than silently
 reverting a node to never-retry, no-timeout behaviour.
 """
 

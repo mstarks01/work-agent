@@ -11,16 +11,18 @@ The topology, for a job selecting frameworks F1..Fn::
                                     invalid-> reject                           v
                                                                             assemble
 
-``prepare`` is also the **run-time precondition gate**. It runs each selected
-framework's precondition over the one **Valid System Model** and emits one route
-per framework: ``run_<F>`` reaches that framework's lane agents, ``skip_<F>``
-reaches ``assemble`` directly. A refused framework still produces a block — it
-carries no claims and its ``scope`` states why each lane did not run — because
-the envelope checks that the analyses answer the job's frameworks in order with
-none dropped. A refusal is therefore not a job failure: a job naming two
-frameworks, one of them refused, still serves the other's analysis.
+``prepare`` is also the run-time precondition gate. It runs each selected
+framework's precondition over the one **Valid System Model**, and emits one
+route per framework. ``run_<F>`` reaches that framework's lane agents, and
+``skip_<F>`` reaches ``assemble`` directly. A refused framework still produces a
+block. That block carries no claims, and its ``scope`` states why each lane did
+not run, because the envelope checks that the analyses answer the job's
+frameworks in order with none dropped. A refusal is therefore not a job failure:
+a job that names two frameworks, one of them refused, still serves the other's
+analysis.
 
-and one subgraph per framework, all of them converging on the one ``assemble``::
+There is one subgraph per framework, and all of them converge on the one
+``assemble``::
 
     prepare -> lane agents -> join_<F> -> merge_<F> -> critic_<F> -> router_<F>
                                                                         |
@@ -32,75 +34,77 @@ and one subgraph per framework, all of them converging on the one ``assemble``::
                                    |           revise v
                                    +---(none)  critic_failed_<F> (raises)
 
-**The shared half runs once and the framework half runs N times**, which is
-#162's ruling drawn as a graph: one extraction, one validity gate, one prepared
-view and one assembly, because one **Valid System Model** serves every framework
-a job selects. Everything between fans out per framework, because a critic rules
-its own framework's drafts against its own framework's question, and no node
-between ``prepare`` and ``assemble`` ever sees two frameworks' claims together.
+The shared half runs once and the framework half runs N times, which is #162's
+ruling drawn as a graph. There is one extraction, one validity gate, one
+prepared view and one assembly, because one **Valid System Model** serves every
+framework a job selects. Everything between fans out per framework, because a
+critic rules its own framework's drafts against its own framework's question,
+and no node between ``prepare`` and ``assemble`` ever sees two frameworks'
+claims together.
 
-A graph is built for one selection. The node names, the state keys and the
-instruction digest are all functions of it, so a graph carrying nodes a job did
-not select would leave them unfired and their keys unwritten.
+The service builds a graph for one selection. The node names, the state keys and
+the instruction digest are all functions of it, so a graph that carried nodes a
+job did not select would leave them unfired and their keys unwritten.
 
 Six of the per-framework nodes are structural rather than analytical:
 
-* ``revalidate`` is the second run of the *same* validate function after the
-  one repair pass. Two nodes instead of a back-edge because the repair budget
-  is exactly one: the graph cannot loop, so it cannot spend a second pass, and
-  "one repair then reject" is visible in the topology rather than enforced by a
+* ``revalidate`` is the second run of the same validate function, after the one
+  repair pass. It is two nodes rather than a back-edge because the repair budget
+  is exactly one. The graph cannot loop, so it cannot spend a second pass, and
+  "one repair, then reject" is visible in the topology rather than enforced by a
   counter.
-* ``reject`` is where the second failure lands — a terminal node that parks the
-  validator's issues in state for the runner to return as a rejection.
-* ``join`` is ADK's ``JoinNode``, a pure barrier with no user code of its own;
+* ``reject`` is where the second failure lands. It is a terminal node that parks
+  the validator's issues in state, for the runner to return as a rejection.
+* ``join`` is ADK's ``JoinNode``, a pure barrier with no user code of its own.
   ``merge`` runs :func:`analysis_service.critic.join_drafts` behind it.
-* ``router`` and ``rereview`` are the critic's ``validate``/``revalidate``: one
-  ``route_review`` function run twice, keeping the mechanical check outside
-  ``assemble`` so a malformed critic output can be re-asked before assembly.
-  Clean output accepts to ``assemble``; a malformed one revises — to
-  ``recritic`` the first time, to ``critic_failed`` the second.
-* ``recritic`` is the one bounded critic re-ask, the ``repair`` of the review
-  half. A structural pass, not a counted one — the graph cannot loop back for a
-  third.
-* ``critic_failed`` is where a still-malformed re-ask lands: it *raises* rather
+* ``router`` and ``rereview`` are the critic's ``validate`` and ``revalidate``.
+  They are one ``route_review`` function run twice, which keeps the mechanical
+  check outside ``assemble``, so the graph can re-ask a malformed critic output
+  before assembly. Clean output accepts to ``assemble``. A malformed one revises:
+  to ``recritic`` the first time, and to ``critic_failed`` the second.
+* ``recritic`` is the one bounded critic re-ask, and the review half's
+  ``repair``. It is a structural pass rather than a counted one, because the
+  graph cannot loop back for a third.
+* ``critic_failed`` is where a still-malformed re-ask lands. It raises rather
   than parking issues, because a critic that will not return its own drafts
-  whole is our defect (a ``failed`` job), not the input's (a ``rejected`` one,
-  which carries ``ValidationIssue``s).
+  whole is this service's defect, which is a ``failed`` job, rather than the
+  input's, which is a ``rejected`` one carrying ``ValidationIssue``s.
 
-Every LLM node binds its model through the caller's ``resolve_model`` (the
-canonical names in :data:`analysis_service.model_tiers.LLM_NODES`), its skills
-through :mod:`analysis_service.skills`, and its prompt through
+Every LLM node binds its model through the caller's ``resolve_model``, whose
+canonical names are in :data:`analysis_service.model_tiers.LLM_NODES`. It binds
+its skills through :mod:`analysis_service.skills`, and its prompt through
 :mod:`analysis_service.prompts`. Graph node names must be Python identifiers, so
-``analyze/stride`` in the tier config is ``analyze_stride_spoofing`` and its five
-siblings here; :func:`tier_node_by_graph_node` is the only place that
+``analyze/stride`` in the tier config becomes ``analyze_stride_spoofing`` and its
+five siblings here. :func:`tier_node_by_graph_node` is the only place that
 correspondence lives. The tier config keys one ``analyze/<framework>`` where the
 graph builds one node per lane, which is ``model_tiers.toml`` v5's own rule: a
-lane is a framework's internal fact and all of them run the same judgement on the
-same tier. The graph names carry the framework too, and that is the bump report
-schema 3.0 earned — a consumer keying on ``analyze_spoofing`` in ``nodes[].node``
-does not error, it matches nothing, silently.
+lane is a framework's internal fact, and all of them run the same judgement on
+the same tier. The graph names carry the framework as well, and that is the bump
+report schema 3.0 earned. A consumer that keys on ``analyze_spoofing`` in
+``nodes[].node`` does not error; it matches nothing, silently.
 
 The bookends are deliberately deterministic, because mechanical work belongs in
-code: lane agents cannot receive a malformed view, the report cannot cite an
+code. Lane agents cannot receive a malformed view, the report cannot cite an
 element the model does not contain, and a quote a finding rests on is matched
 against the submitter's own bytes rather than taken on trust. Every check in
-this module fails closed — a raising FunctionNode aborts the workflow, which
+this module fails closed: a FunctionNode that raises aborts the workflow, which
 the runner turns into a failed job.
 
-One of those checks is for **silence** rather than for malformed content. An
-LLM node that emits no text writes no ``output_key``, so the absence arrives
-where the next node reads state, not as anything that raised. ``validate`` and
-each framework's ``merge`` name it (:class:`SilentNodeError`) instead of reading
-it as an empty value, which is what keeps a truncated lane agent from deleting a
-lane from a report that still finishes green.
+One of those checks is for silence rather than for malformed content. An LLM
+node that emits no text writes no ``output_key``, so the absence arrives where
+the next node reads state, rather than as anything that raised. ``validate`` and
+each framework's ``merge`` name it, as :class:`SilentNodeError`, instead of
+reading it as an empty value. That is what stops a truncated lane agent deleting
+a lane from a report that still finishes green.
 
-Security: the submitted text is untrusted and reaches the extraction prompt
-**and every lane agent's prompt** inside a fenced block that names it as data
-(OWASP LLM01) — the agents read it so they can quote it, which is the whole of
-finding-level attribution and is why ``analyze.md`` carries the same
-data-not-instruction paragraph ``extract.md`` does. Everything a model emits is
-untrusted output validated before use (LLM05) — by ``output_schema`` at the node
-boundary, then by the System Model gate and the critic seams here.
+On security: the submitted text is untrusted, and it reaches the extraction
+prompt and every lane agent's prompt inside a fenced block that names it as data
+(OWASP LLM01). The agents read it so they can quote it, which is the whole of
+finding-level attribution, and is why ``analyze.md`` carries the same
+data-not-instruction paragraph that ``extract.md`` does. Everything a model
+emits is untrusted output, and the service validates it before use (LLM05): by
+``output_schema`` at the node boundary, then by the System Model gate and the
+critic seams here.
 """
 
 from __future__ import annotations

@@ -1,13 +1,13 @@
 """``config/frameworks.toml``: the set of frameworks one install carries.
 
-The fifth config file, and the thinnest. It holds one list, it fails closed on a
-wrong version like the other four, and it says nothing about which job runs
-what: the **Deployment** carries the set and the job selects from it.
+This is the fifth config file, and the thinnest. It holds one list. It fails
+closed on a wrong version, as the other four do. It says nothing about which job
+runs what: the **Deployment** carries the set, and the job selects from it.
 
-It holds **no default**. A default set would make one submission mean different
-things on two installs, and the caller would read no sign of it — which is worse
-than the vendor-dependence this repo already refused when it bounded a job in
-UTF-8 bytes rather than tokens, because it changes what the answer *is* rather
+It holds no default. A default set would make one submission mean different
+things on two installs, and the caller would read no sign of it. That is worse
+than the vendor-dependence this repository already refused when it bounded a job
+in UTF-8 bytes rather than tokens, because it changes what the answer is rather
 than whether the request is accepted.
 """
 

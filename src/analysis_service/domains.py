@@ -1,28 +1,28 @@
 """Which domain packs a System Model earns, decided deterministically.
 
-``skills/domains/`` holds subject-matter packs — HTTP APIs, OAuth/OIDC,
+``skills/domains/`` holds subject-matter packs — HTTP APIs, OAuth and OIDC,
 multi-tenancy, data stores — that sharpen a category agent on architectures it
 would otherwise reason about generically. Loading all of them into every
-analysis is the failure this module exists to prevent: it is the largest block
-of text in the longest prompt the graph sends, and most of it would be about a
-system nobody submitted.
+analysis is the failure this module exists to prevent. They are the largest
+block of text in the longest prompt the graph sends, and most of that text would
+be about a system nobody submitted.
 
-Selection is **structural and keyword-based, and it is deliberately shallow.**
-A detector reads a handful of the model's own free-text fields for terms that
-name a technology, and that is all it does. It is not deciding anything about
-security; it is deciding which reference material is on the desk. A false
-positive costs tokens, a false negative costs a sharper prompt, and neither
-can produce, suppress or ground a finding — the pack text is repo-authored and
-identical for every job that selects it.
+Selection is structural and keyword-based, and it is deliberately shallow. A
+detector reads a handful of the model's own free-text fields for terms that name
+a technology, and that is all it does. It decides nothing about security. It
+decides which reference material is on the desk. A false positive costs tokens,
+and a false negative costs a sharper prompt. Neither can produce, suppress or
+ground a finding, because the pack text is repo-authored and identical for every
+job that selects it.
 
 That last point is the security argument too (OWASP LLM01). Caller text
-influences *which* pack loads and never *what a pack says*: names are matched
-against a closed set defined here, the loader only ever reads
-``skills/domains/<name>.md`` for a name in :data:`DETECTORS`, and no caller
-byte reaches the composed skill text through this path.
+influences which pack loads, and never what a pack says. The service matches
+names against a closed set defined here, the loader only ever reads
+``skills/domains/<name>.md`` for a name in :data:`DETECTORS`, and no caller byte
+reaches the composed skill text through this path.
 
-:data:`MAX_PACKS` caps the selection. When more packs match than that, the ones
-with the most matching elements win — the ranking is by evidence in the model,
+:data:`MAX_PACKS` caps the selection. Where more packs match than that, the ones
+with the most matching elements win. The ranking is by evidence in the model,
 with declaration order as the tie-break, so the choice is stable across runs.
 """
 

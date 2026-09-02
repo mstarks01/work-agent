@@ -1,23 +1,23 @@
 """The ASVS 5.0.0 requirement catalog, as this package's own private data.
 
-**A package is a catalog it does not own plus a profile it does.** ASVS
-publishes a machine-readable requirement set, so this package carries it. No
-contract member names it, no service module reads it, and no other package sees
-it. That is the rule :mod:`analysis_service.frameworks` states, and it is why the
-catalog is a module here rather than a tenth member on
+A package is a catalog it does not own plus a profile it does. ASVS publishes a
+machine-readable requirement set, so this package carries it. No contract member
+names it, no service module reads it, and no other package sees it. That is the
+rule :mod:`analysis_service.frameworks` states, and it is why the catalog is a
+module here rather than a tenth member on
 :class:`~analysis_service.frameworks.FrameworkPackage`.
 
 The data sits beside this module in ``catalog.json``, copied from the flat JSON
-the ASVS project publishes at tag ``v5.0.0``. Five fields per requirement, which
-is every field the standard publishes: chapter, section, identifier, description
-and level. There is no applies-when field, no tag and no technology list, so the
-applicability rules in :mod:`analysis_service.frameworks.asvs.rules` are this
-repo's own.
+the ASVS project publishes at tag ``v5.0.0``. There are five fields per
+requirement, which is every field the standard publishes: chapter, section,
+identifier, description and level. There is no applies-when field, no tag and no
+technology list, so the applicability rules in
+:mod:`analysis_service.frameworks.asvs.rules` are this repository's own.
 
-**The catalog checks itself at import.** A truncated file or a chapter with no
-requirements would otherwise reach a ``strong``-tier prompt, and the package gate
-cannot see a catalog no contract member names. So the check runs where the data
-is read, and it raises the same error a malformed package raises.
+The catalog checks itself at import. A truncated file, or a chapter with no
+requirements, would otherwise reach a ``strong``-tier prompt, and the package
+gate cannot see a catalog no contract member names. The check therefore runs
+where the data is read, and it raises the same error a malformed package raises.
 """
 
 from __future__ import annotations

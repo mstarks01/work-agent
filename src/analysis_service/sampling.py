@@ -1,69 +1,70 @@
 """Per-tier sampling configuration for the graph's LLM nodes.
 
-Decoding parameters are pinned per tier in a versioned TOML file that **eval
-and production read from the same place**. ``base`` and ``strong`` carry their
-own params; the node -> tier map lives once in ``model_tiers.toml`` and is
-reused via :meth:`ModelTierConfig.resolve_tier`, never duplicated here.
+Decoding parameters are pinned per tier in a versioned TOML file, and eval and
+production read it from the same place. ``base`` and ``strong`` carry their own
+params. The node-to-tier map lives once in ``model_tiers.toml``, and this module
+reuses it through :meth:`ModelTierConfig.resolve_tier` rather than duplicating
+it.
 
-Three things about the surface:
+Four things about the surface:
 
-* **``top_k`` is not on it.** It is absent from
+* ``top_k`` is not on it. It is absent from
   ``litellm.utils.get_optional_params``'s signature, so it is the one param the
-  build-time gate provably cannot cover — LiteLLM re-injects it raw into the
-  request body after the check — and its wrongness would be *silent* while the
-  fingerprint attests to it.
-* **``thinking`` is a uniform ``low``/``medium``/``high`` enum**, not a
-  per-tier integer budget. ``reasoning_effort`` reaches every vendor (Anthropic
-  → adaptive ``thinking`` plus ``output_config.effort``, identically via Vertex;
-  Gemini → ``thinkingConfig``; OpenAI → passthrough), so no per-vendor budget
-  range is mirrored here.
-  ``auto`` and ``off`` are excluded: ``auto`` raises on two vendors, and
-  ``off`` is worse than unportable — ``gemini-2.5-pro`` + ``none`` *passes* the
-  gate as ``thinkingBudget: 0`` and then 400s at request time.
-* **``max_output_tokens`` is pinned**, because the default is vendor-dependent:
-  Anthropic derives a 5,120–8,192 cap only when the caller is silent. It is
-  pinned per tier at a value sized against *measured* output — the tiers emit
-  different things, and the strong tier, which rules on every draft in one pass
-  and reasons against the same cap, needs several times what one extraction
-  does. Undersizing it does not
-  truncate visibly: the completion returns no text, the node writes no output
-  key, and the next FunctionNode fails to bind. ``binding.py`` checks each
-  tier's value against its model's published ceiling, which
-  :func:`~analysis_service.model_gate.check_supported` cannot — every provider
-  accepts the param, and only the serving model objects to the value.
-* **``constrain_output`` decides whether the node's schema is sent at all.**
+  build-time gate cannot cover: LiteLLM re-injects it raw into the request body
+  after the check. A wrong value would then be silent, while the fingerprint
+  went on attesting to it.
+* ``thinking`` is a uniform ``low``/``medium``/``high`` enum rather than a
+  per-tier integer budget. ``reasoning_effort`` reaches every vendor — Anthropic
+  through adaptive ``thinking`` plus ``output_config.effort``, identically
+  through Vertex; Gemini through ``thinkingConfig``; OpenAI by passthrough — so
+  no per-vendor budget range is mirrored here. ``auto`` and ``off`` are
+  excluded. ``auto`` raises on two vendors. ``off`` is worse than unportable:
+  ``gemini-2.5-pro`` with ``none`` passes the gate as ``thinkingBudget: 0`` and
+  then returns a 400 at request time.
+* ``max_output_tokens`` is pinned, because the default is vendor-dependent.
+  Anthropic derives a 5,120 to 8,192 cap only when the caller is silent. The
+  file pins it per tier, at a value sized against measured output: the tiers
+  emit different things, and the strong tier rules on every draft in one pass
+  and reasons against the same cap, so it needs several times what one
+  extraction does. Undersizing it does not truncate visibly. The completion
+  returns no text, the node writes no output key, and the next FunctionNode
+  fails to bind. ``binding.py`` checks each tier's value against its model's
+  published ceiling, which :func:`~analysis_service.model_gate.check_supported`
+  cannot: every provider accepts the param, and only the serving model objects
+  to the value.
+* ``constrain_output`` decides whether the node's schema is sent at all.
   Constrained generation is the default and the better answer where a provider
-  will take it, but "will take it" is a property of the schema *and* the
-  provider's own limits — a grammar compiler can reject a schema it is
-  perfectly willing to honour in principle — and nothing computes that offline.
-  So it is a per-tier choice a deployment makes, not one derived from the
-  vendor. Every LLM node carries a schema the adapter can convert, so this is
-  the only thing that decides whether one is sent.
+  will take it. Whether a provider will take it is a property of the schema and
+  of the provider's own limits, because a grammar compiler can reject a schema
+  it would otherwise honour, and nothing computes that offline. It is therefore
+  a per-tier choice a deployment makes rather than one derived from the vendor.
+  Every LLM node carries a schema the adapter can convert, so this field is the
+  only thing that decides whether one is sent.
 
-  **Turning it off is not currently a working configuration**, and the earlier
-  claim here that it gives up constrained *generation* only was wrong. Measured
-  against Claude Sonnet 4.6 with the extraction schema suppressed, the model
-  fenced its JSON in a ```` ```json ```` block — which ADK hands to validation
-  unstripped, so it fails before anything reads it — and omitted required
-  fields (every ``trust_boundaries[*].kind``). The repair node sits on the same
-  tier and is equally unconstrained, so the repair loop does not rescue it. The
-  field is kept because the *mechanism* is right, but a tier that turns it off
-  needs the graph to tolerate a fenced response first.
+  Turning it off is not currently a working configuration. An earlier version of
+  this note claimed it gives up constrained generation only, and that was wrong.
+  Measured against Claude Sonnet 4.6 with the extraction schema suppressed, the
+  model fenced its JSON in a ```` ```json ```` block, which ADK hands to
+  validation unstripped, so it fails before anything reads it. The model also
+  omitted required fields, including every ``trust_boundaries[*].kind``. The
+  repair node sits on the same tier and is equally unconstrained, so the repair
+  loop does not rescue it. The field stays because the mechanism is right, but a
+  tier that turns it off needs the graph to tolerate a fenced response first.
 
-Loading fails closed (OWASP A02/A10): an unsupported version, an unknown key or
-tier, an out-of-range value, or a ``candidate_count`` other than 1 raises
-:class:`SamplingConfigError` rather than falling back to a library default — a
-node quietly running on different sampling than the config records invalidates
-every eval result taken against it.
+Loading fails closed (OWASP A02 and A10). An unsupported version, an unknown key
+or tier, an out-of-range value, or a ``candidate_count`` other than 1 raises
+:class:`SamplingConfigError`, rather than falling back to a library default. A
+node that quietly runs on different sampling from what the config records
+invalidates every eval result taken against it.
 
-The **value** check on ``thinking`` is ours, not the gate's: ``reasoning_effort
-= "banana"`` passes ``get_optional_params`` on ``o3``, which would be another
-silently-wrong param. A pydantic ``Literal`` catches it here.
+The value check on ``thinking`` is this module's rather than the gate's.
+``reasoning_effort = "banana"`` passes ``get_optional_params`` on ``o3``, which
+would be another silently wrong param. A pydantic ``Literal`` catches it here.
 
-``ANALYSIS_SAMPLING_{TIER}_{PARAM}`` env overrides retune the *offered* params at
-deploy time, validated identically to the file value; an env var naming a
-reserved or forbidden param raises, so the live-knob surface is exactly the
-offered surface — no wider.
+``ANALYSIS_SAMPLING_{TIER}_{PARAM}`` env overrides retune the offered params at
+deploy time, and the service validates them exactly as it validates a file
+value. An env var that names a reserved or forbidden param raises, so the live
+knob surface is exactly the offered surface and no wider.
 """
 
 from __future__ import annotations

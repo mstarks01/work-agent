@@ -3,23 +3,26 @@
 A **Source** is one piece of untrusted input text: a ``kind``, a caller-supplied
 ``label``, and the ``text`` itself. A job carries an ordered, non-empty list of
 them. A transcript-only job is a one-element list with no special case, and so
-is a description-only job — there is no separate single-text path.
+is a description-only job. There is no separate single-text path.
 
-``kind`` is a closed vocabulary and is **load-bearing**: it selects the register
-:func:`render_sources` names around that source's text, so adding a kind means
-changing the extraction prompt and this enum together. ``label`` is the key a
-``source_excerpt`` cites, which is what keeps the traceability chain — threat to
-element to the user's own words to *which source spoke them* — intact across N
-sources; it is therefore **unique within a job**, since a citation naming two
-sources at once resolves while pointing nowhere. Order is presentation order
-only: the contract makes no authority claim, so an earlier source does not
-override a later one.
+``kind`` is a closed vocabulary, and it is load-bearing: it selects the register
+:func:`render_sources` names around that source's text, so a new kind means a
+change to the extraction prompt and this enum together.
+
+``label`` is the key a ``source_excerpt`` cites, which is what keeps the
+traceability chain intact across any number of sources — threat, then element,
+then the user's own words, then which source spoke them. It is therefore unique
+within a job, because a citation that named two sources at once would resolve
+while pointing nowhere.
+
+Order is presentation order only. The contract makes no authority claim, so an
+earlier source does not override a later one.
 
 Rendering is the whole untrusted-input surface (OWASP LLM01). Every caller byte
-lands inside a fenced block, and the fence is sized to its own content so a
+lands inside a fenced block, and the fence is sized to its own content, so a
 submitted transcript cannot close the block it sits in and continue in
-instruction position. The label rides *inside* the fence for the same reason:
-it is caller-controlled, so it can never sit on the marker line. What is left
+instruction position. The label rides inside the fence for the same reason: it
+is caller-controlled, so it must never sit on the marker line. What is left
 outside carries only this module's own bytes — an index, a count, and the
 register.
 

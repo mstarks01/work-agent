@@ -4,40 +4,40 @@ An **Execution Identity** is everything that decided what a node's answer could
 be. It is versioned, it is canonical, and its sha256 is the fingerprint a
 deployment's manifest blesses.
 
-**Seven inputs, and the reason each is here is that changing it can change the
-answer.** The requested route and the served build; the resolved decoding params;
+There are seven inputs, and each is here because changing it can change the
+answer: the requested route and the served build; the resolved decoding params;
 the digest of every instruction the built graph carries; and the versions of the
-three distributions that sit between a node and its provider — this service, the
-agent runtime, and the model translator. A hash over fewer of them certifies a
-run whose behaviour a blessed run never had.
+three distributions that sit between a node and its provider, which are this
+service, the agent runtime and the model translator. A hash over fewer of them
+certifies a run whose behaviour a blessed run never had.
 
-**BOTH MODEL IDENTITIES ARE BOUND, NOT JUST THE SERVED ONE.** The served build
-is what the provider *said* answered, read off its own event stream, and nothing
-here verifies it: a compromised translator can return any string. With the
-served build alone in the payload, such a translator picks a build the manifest
-already blesses and certifies whatever it liked — the deployment asked for a
-cheap model, the translator claimed an approved one, and the fingerprint matched.
-Binding the requested route as well makes the manifest bless a *pair*, and the
-requested half comes from the deployment's own configuration where the translator
-has no say. The provider's claim can no longer select an approved entry by
-itself. It still cannot be *verified* by itself either, which is why
+Both model identities are bound, rather than the served one alone. The served
+build is what the provider said answered, read off its own event stream, and
+nothing here verifies it: a compromised translator can return any string. With
+the served build alone in the payload, such a translator picks a build the
+manifest already blesses and certifies whatever it likes — the deployment asked
+for a cheap model, the translator claimed an approved one, and the fingerprint
+matched. Binding the requested route as well makes the manifest bless a pair,
+and the requested half comes from the deployment's own configuration, where the
+translator has no say. The provider's claim can no longer select an approved
+entry by itself. It still cannot be verified by itself either, which is why
 :data:`SERVED_TRUST` is in the payload rather than in a comment.
 
-**No endpoint or region is here yet**, and that is deliberate rather than
-overlooked. Whether a region scope belongs in a generation identity is
-[#496](https://github.com/mstarks01/work-agent/issues/496)'s question — Bedrock
+No endpoint or region is here yet, and that is deliberate rather than
+overlooked. Whether a region scope belongs in an execution identity is
+[#496](https://github.com/mstarks01/work-agent/issues/496)'s question. Bedrock
 gives one set of weights two spellings, and Vertex's location has never been in
-the payload. Answering it here would decide that ticket by accident. It is a
-version 2 field when #496 rules, and :data:`IDENTITY_VERSION` is what makes
+the payload. Answering it here would decide that ticket by accident. It becomes
+a version 2 field when #496 rules, and :data:`IDENTITY_VERSION` is what makes
 adding it a re-key rather than a silent widening.
 
-**Widening the identity re-baselines every blessed fingerprint.** A prompt edit,
-a ``litellm`` bump or a service release now moves every hash, so a deployment's
+Widening the identity re-baselines every blessed fingerprint. A prompt edit, a
+``litellm`` bump or a service release now moves every hash, so a deployment's
 manifest goes stale and its runs report uncertified until a sanctioned sweep
 blesses the new ones. That is the cost, and it is the point: a run on edited
 prompts is not the run that was sanctioned, and reporting it as certified was
-the defect. It is also why the manifest is versioned — a file blessed against
-the old two-part hash fails closed rather than certifying against a payload it
+the defect. It is also why the manifest is versioned. A file blessed against the
+old two-part hash fails closed, rather than certifying against a payload it
 never saw.
 """
 

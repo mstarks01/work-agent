@@ -1,43 +1,44 @@
 """Signing a report so a reader can tell who produced it, and that it is intact.
 
-**A report already carries hashes, and they are not this.** ``source_sha256``,
-``instruction_sha256`` and every ``execution_fingerprint`` are unkeyed digests:
-they let a reader recompute a value from the artifact and notice that the two
+A report already carries hashes, and they are not this. ``source_sha256``,
+``instruction_sha256`` and every ``execution_fingerprint`` are unkeyed digests.
+They let a reader recompute a value from the artifact and notice that the two
 disagree. Anyone who edits the report can recompute them too. They establish
 internal consistency, and nothing about origin.
 
 An attestation is a signature over the whole report by a key a deployment holds.
-It answers two questions the digests cannot: **which deployment produced this**,
-and **has any covered byte moved since**. It answers no others, and the one it is
-most likely to be misread as answering is the one it must not:
+It answers two questions the digests cannot: which deployment produced this, and
+whether any covered byte has moved since. It answers no others, and the one it
+is most likely to be misread as answering is the one it must not.
 
-    **A valid signature says a report is authentic. It does not say the findings
-    are correct, and it does not say the run was certified.** Certification is a
-    separate, deployment-local verdict about generation identity — see
-    :mod:`analysis_service.certification` — and a signed uncertified report is an
-    ordinary thing. Anyone reading a green signature as an endorsement of the
-    analysis has read it backwards.
+A valid signature says a report is authentic. It does not say the findings are
+correct, and it does not say the run was certified. Certification is a separate,
+deployment-local verdict about execution identity; see
+:mod:`analysis_service.certification`. A signed uncertified report is an
+ordinary thing, and anyone who reads a green signature as an endorsement of the
+analysis has read it backwards.
 
-**The canonical form is versioned, and versioning it is the whole design.** A
-signature is over bytes, so "the report" has to mean exactly one byte string. The
-report is a pydantic model whose JSON serialization is stable but not guaranteed
-across schema changes, so :func:`canonicalize` pins the rules — JSON, sorted
-keys, no insignificant whitespace, UTF-8 — and :data:`CANONICAL_VERSION` names
-them. A verifier that meets an envelope on a version it does not implement
-**fails**; it does not guess, because a guess that produced the same bytes by
-luck would validate a report nobody signed.
+The canonical form is versioned, and versioning it is the whole design. A
+signature is over bytes, so "the report" has to mean exactly one byte string.
+The report is a pydantic model whose JSON serialization is stable but not
+guaranteed across schema changes, so :func:`canonicalize` pins the rules — JSON,
+sorted keys, no insignificant whitespace, UTF-8 — and :data:`CANONICAL_VERSION`
+names them. A verifier that meets an envelope on a version it does not implement
+fails. It does not guess, because a guess that produced the same bytes by luck
+would validate a report nobody signed.
 
-**Detached, not enveloped.** The signature lives beside the report rather than
-inside it, because a field inside the report would have to be excluded from its
-own coverage, and "everything except this one field" is a rule that grows
-exceptions. Detached keeps the covered set equal to the whole artifact.
+The signature is detached rather than enveloped. It lives beside the report
+rather than inside it, because a field inside the report would have to be
+excluded from its own coverage, and "everything except this one field" is a rule
+that grows exceptions. Detached keeps the covered set equal to the whole
+artifact.
 
-**Ed25519**, because it needs no parameter choices: no curve to pick, no hash to
-pair, no padding mode. The scheme with fewest ways to be configured wrongly is
-the right one for a signature nobody will tune.
+The scheme is Ed25519, because it needs no parameter choices: no curve to pick,
+no hash to pair, no padding mode. The scheme with fewest ways to be configured
+wrongly is the right one for a signature nobody will tune.
 
 Key material never enters this module's return values, never reaches a log, and
-never reaches a report. Only key *identifiers* do.
+never reaches a report. Only key identifiers do.
 """
 
 from __future__ import annotations
