@@ -553,6 +553,12 @@ defect.
 source and write your own threat list *before* opening the recorded one, or the
 sitting measures nothing.
 
+Take the shape from it and the mark names from a generated `REVIEW.md`. That
+document is a merged reader's own words, so a vocabulary sweep stops at it, and
+it still spells the marks `doubt` and `dup`. The set is now `agree`, `reject`
+and `duplicate` — `MARKS` in `evals/harness/sitting.py` — and the app and the
+import both refuse anything else.
+
 Merge checklist:
 
 - [ ] `python evals/verify_corpus.py` is green
