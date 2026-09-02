@@ -2474,9 +2474,6 @@ class InstructionSize:
     tokens: int
     sha256: str
 
-    def to_json(self) -> dict[str, Any]:
-        return {"tokens": self.tokens, "sha256": self.sha256}
-
 
 def instruction_sizes(llm_nodes: Sequence[LlmAgent]) -> dict[str, InstructionSize]:
     """Every LLM node's instruction, measured and digested, keyed by node name.

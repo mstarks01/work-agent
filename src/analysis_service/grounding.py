@@ -135,12 +135,10 @@ _TYPOGRAPHIC_FOLDS = {
     "”": '"',
     "„": '"',
     "‐": "-",
-    "‑": "-",
     "‒": "-",
     "–": "-",
     "—": "-",
     "―": "-",
-    " ": " ",
 }
 
 # A cut, however the model spelled it. Both forms are in play: the prompt asks

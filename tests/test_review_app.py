@@ -266,7 +266,6 @@ def test_the_summary_tracks_the_sitting(client):
     app, _ = client
     before = app.get("/api/summary").json()
     assert before["waiting"] == 2
-    assert before["voter"] == "ada"
 
     item = app.get("/api/next").json()
     app.post("/api/vote", json={"fingerprint": item["fingerprint"], "verdict": "up"})

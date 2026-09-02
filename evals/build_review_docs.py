@@ -257,11 +257,6 @@ def model_markdown(blocks: list[dict]) -> str:
     return "\n\n".join(chunks)
 
 
-def model_tables(model: dict) -> str:
-    """One model, as the reading document prints it."""
-    return model_markdown(model_blocks(model))
-
-
 def _fields(*rows: list[dict] | None) -> list[list[dict]]:
     """The named fields of one record, one printed line per row.
 
