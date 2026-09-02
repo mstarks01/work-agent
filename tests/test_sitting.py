@@ -427,6 +427,42 @@ class TestTheUnreviewedEntryIsChecked:
             sittings._one_entry(case, "".join(lines[start:end]))
 
 
+class TestTheTableReaderRefusesAnExecutableValue:
+    """``restore_unreviewed`` checked an entry's shape; the table reader did not.
+
+    A submission does not travel through ``restore_unreviewed`` -- a
+    contributor edits the file and opens a pull request -- so the check that
+    mattered for a *submitted* entry is the one the submission checks read the
+    table through. It validated that every key was a string and said nothing
+    about the values, and a dict value is an arbitrary expression that runs when
+    ``pytest`` imports the module.
+    """
+
+    def _table(self, value: str) -> str:
+        return (
+            "UNREVIEWED: dict[str, str] = {\n"
+            f'    "01-payments-checkout": {value},\n'
+            "}\n"
+        )
+
+    def test_a_value_that_is_not_a_string_literal_is_refused(self):
+        for value in ('__import__("os").system("id")', "open", 'f"{1}"', "1"):
+            with pytest.raises(sittings.SittingError, match="not a string literal"):
+                sittings._unreviewed_table(self._table(value))
+
+    def test_a_string_literal_is_still_read(self):
+        entries, _ = sittings._unreviewed_table(self._table('"unread"'))
+        assert [case for case, _, _ in entries] == ["01-payments-checkout"]
+
+    def test_the_real_list_reads(self):
+        """Its entries are parenthesised implicit concatenations, which parse
+        to one constant -- so the check must not refuse the shape in the tree."""
+        root = Path(__file__).resolve().parents[1]
+        source = (root / sittings.UNREVIEWED_FILE).read_text("utf-8")
+        entries, _ = sittings._unreviewed_table(source)
+        assert entries
+
+
 class TestASittingCarriedForSomebodyElse:
     """The proxy shape: one account submits a read it did not do.
 

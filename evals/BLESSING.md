@@ -495,9 +495,15 @@ afterwards would be evidence of an order that did not happen.
 When the file comes back:
 
 ```sh
-python -m evals.harness.run sitting-import sitting-<login>.json
+python -m evals.harness.run sitting-import sitting-<login>.json --submitted-by <login>
 python -m evals.harness.run submit sitting
 ```
+
+You name the account; the envelope has to agree with you. Both identity fields
+travel back inside the file the reader holds, so what arrives is a claim rather
+than a stamp, and a sitting record says who read a case. Add `--submitted-for`
+where somebody carried the read for another account. A mismatch is refused
+before anything is written.
 
 The import treats the file as untrusted. It resolves every case id against the
 corpus, re-checks the own list against the same `MIN_OWN_LIST`, refuses a mark
