@@ -4,195 +4,190 @@ Run it from a clone, with no credentials of any kind::
 
     uv run python webapp/sitting.py
 
-**The app offers the whole corpus.** A rail on the left lists every case with
-a status dot, the case number and the title, and it never leaves — so it is
-both how a reader starts and how they get back, and no control returns to a
-list that never went away. A row carries no claim count and no reason the case
-waits, because either would tell the reader how long to make their own list
-before they have written it. ``--case`` preselects where the rail opens and
-grants nothing.
+The app offers the whole corpus. A rail on the left lists every case with a
+status dot, the case number and the title, and it never leaves. It is therefore
+both how a reader starts and how they get back, and no control returns to a list
+that never went away. A row carries no claim count and no reason the case waits,
+because either would tell the reader how long to make their own list before they
+have written it. ``--case`` preselects where the rail opens, and grants nothing.
 
-**A case a sitting already clears is greyed and off the offered list once no
-draft of it is left, whoever signed it.** The draft is what re-opens a case,
-so a reader who records one still presses their own row and records it again.
-:func:`_open` resolves every case id that arrives in a request against that
-list, so the refusal a signed case needs is the same rule that refuses a case
-id nobody wrote. The status reads
-:func:`evals.harness.sitting.clears` and never the presence of an entry in
-``reviews``: a drifted digest leaves an entry that clears nothing, and a rail
-keyed on the entry would grey a case CI asks somebody to read.
+A case a sitting already clears is greyed and off the offered list once no draft
+of it is left, whoever signed it. The draft is what re-opens a case, so a reader
+who records one still presses their own row and records it again. :func:`_open`
+resolves every case id that arrives in a request against that list, so the
+refusal a signed case needs is the same rule that refuses a case id nobody
+wrote. The status reads :func:`evals.harness.sitting.clears`, and never the
+presence of an entry in ``reviews``: a drifted digest leaves an entry that
+clears nothing, and a rail keyed on the entry would grey a case CI asks somebody
+to read.
 
-It is **eval-side tooling and not the product**, and it is the browser half of
-a path that also works entirely from the shell: everything it writes is what
-``evals/BLESSING.md`` step 6 asks a person to write by hand, and
-``submit sitting`` checks the result the same way either way. It prepares your
-working tree, and then offers three ways out — run the command yourself, paste
-the text into a pull request you open, or press the button.
+It is eval-side tooling rather than the product, and it is the browser half of a
+path that also works entirely from the shell. Everything it writes is what
+``evals/BLESSING.md`` step 6 asks a person to write by hand, and ``submit
+sitting`` checks the result the same way either way. It prepares your working
+tree, and then offers three ways out: run the command yourself, paste the text
+into a pull request you open, or press the button.
 
-**The button opens a pull request, through your own authenticated ``gh``.**
-That reverses map #319's "the web app never gains a network write", on the
-maintainer's instruction and recorded in ``docs/agents/issue-tracker.md``.
-It is not a hosted service: nothing is hosted, no credential is held here, and
-the app still binds to loopback. What it does mean is that a request reaching
-:func:`create_app`'s submit endpoint can act on GitHub as you, so that one
-endpoint carries five controls rather than the app's usual none:
+The button opens a pull request, through your own authenticated ``gh``. That
+reverses map #319's "the web app never gains a network write", on the
+maintainer's instruction, and ``docs/agents/issue-tracker.md`` records it. It is
+not a hosted service: nothing is hosted, no credential is held here, and the app
+still binds to loopback. What it does mean is that a request reaching
+:func:`create_app`'s submit endpoint can act on GitHub as you. That one endpoint
+therefore carries five controls, where the app's usual number is none:
 
-* the **Host** check every loopback app here runs, which is what stops DNS
+* the Host check every loopback app here runs, which is what stops DNS
   rebinding making an attacker's page same-origin with this one;
-* **``frame-ancestors 'none'``**, which is what makes the next two mean
-  anything. A press inside somebody else's frame arrives same-origin and
-  carries the page token, because the page it comes from really is this one.
-  So framing is the way past both, and refusing to be framed is the answer;
-* **``Sec-Fetch-Site: same-origin``**, the check every local app here runs on
-  its own write endpoints, through the one
+* ``frame-ancestors 'none'``, which is what makes the next two mean anything. A
+  press inside somebody else's frame arrives same-origin and carries the page
+  token, because the page it comes from really is this one. Framing is therefore
+  the way past both, and refusing to be framed is the answer;
+* ``Sec-Fetch-Site: same-origin``, the check every local app here runs on its
+  own write endpoints, through the one
   :func:`~webapp.page.refuse_cross_origin` they share;
-* a **one-time token** minted per process and embedded in the page, so a
-  request that never read the page cannot carry it;
-* **no request-controlled arguments at all** — the endpoint opens whatever
-  the working tree holds, and takes neither a kind nor a path. A drop is
-  what changes that, and it is a write of its own with its own controls.
+* a one-time token, minted per process and embedded in the page, so a request
+  that never read the page cannot carry it;
+* no request-controlled arguments at all. The endpoint opens whatever the
+  working tree holds, and takes neither a kind nor a path. A drop is what
+  changes that, and a drop is a write of its own with its own controls.
 
-**Every writing endpoint carries the origin check, not only the submit one.**
+Every writing endpoint carries the origin check, and not only the submit one.
 ``/api/finish`` writes the reading document, appends to ``case.json`` and puts
 the case on the list the press carries, so a foreign page that reaches it
-decides what a later press publishes — and it writes the draft too, so it
-carries the page token for all the reasons below.
-``/api/own-list`` satisfies the method's one rule, so
-a foreign page that reaches it opens the recorded sets for whoever asks next.
-It carries the page token too, because it names a case: one such page would
-post an empty list for every case in the offered list and open the whole
-corpus in one pass. ``/api/draft`` and ``/api/discard`` carry both for those
-two reasons and one more: they write under ``~/.local/state/``, so their
-effect outlives the process. ``/api/drop`` and ``/api/put-back`` carry both
-for all three, and for a fourth: they decide what the next press publishes.
-``/api/part-two`` gains no token — it is a read, it serves only what a passed
+decides what a later press publishes. It writes the draft too, so it carries the
+page token for all the reasons below. ``/api/own-list`` satisfies the method's
+one rule, so a foreign page that reaches it opens the recorded sets for whoever
+asks next. It carries the page token as well, because it names a case: one such
+page would post an empty list for every case in the offered list, and open the
+whole corpus in one pass. ``/api/draft`` and ``/api/discard`` carry both for
+those two reasons and one more: they write under ``~/.local/state/``, so their
+effect outlives the process. ``/api/drop`` and ``/api/put-back`` carry both for
+all three, and for a fourth: they decide what the next press publishes.
+``/api/part-two`` gains no token. It is a read, it serves only what a passed
 gate already opened, and the frame rule covers the page that would read it.
 
-**One press submits every finished case, and the page names what stays
-behind.** A pinned rail footer reads ``Submit — N cases ready``, counts the
-finished drafts and is off at a count of zero, so the count and the way to
-the press are one control. The submit stage lists each finished draft the
-press will carry, one row each, with a **Drop** — and a dropped case moves to
-a held-back group with a **Put back**, so the drop is visible and reversible
-on the same page. The stage also says how many cases stay unfinished, which
-stops the failure a read that survives the process invites: a reader who
-believes they submitted five cases when they submitted four.
+One press submits every finished case, and the page names what stays behind. A
+pinned rail footer reads ``Submit — N cases ready``, counts the finished drafts,
+and is off at a count of zero, so the count and the way to the press are one
+control. The submit stage lists each finished draft the press will carry, one
+row each, with a **Drop**. A dropped case moves to a held-back group with a
+**Put back**, so the drop is visible and reversible on the same page. The stage
+also says how many cases stay unfinished, which stops the failure a read that
+survives the process invites: a reader who believes they submitted five cases
+when they submitted four.
 
-**The list on the page is the submission, rather than a description of it.**
+The list on the page is the submission rather than a description of it.
 ``submit sitting`` builds itself from the working tree, so a drop takes the
-filled document, the appended entry and the cleared line back out and puts
-the case to *draft in progress*. The reader keeps every word they wrote, and
-a put back writes the same record again from the same draft. Nothing here
-reads a draft file from the terminal: a second reader of that file would be a
+filled document, the appended entry and the cleared line back out, and puts the
+case to *draft in progress*. The reader keeps every word they wrote, and a put
+back writes the same record again from the same draft. Nothing here reads a
+draft file from the terminal, because a second reader of that file would be a
 second surface over these rules.
 
-**The own list comes first, and the server enforces it.** ``/api/part-two``
-refuses until the reader has posted their own threat list for that case, so
-the recorded sets are not in the page at all. **What the gate protects is the
-evidence in the filled document.** That document prints the reader's own list
-above the recorded sets, and a later reader takes the order on trust. The gate
-makes the order true by construction, so the trust is earned rather than
-asked for. It is enforced the way the review app enforces
-configuration-blindness — by the payload not carrying it — rather than by
-asking.
+The own list comes first, and the server enforces it. ``/api/part-two`` refuses
+until the reader has posted their own threat list for that case, so the recorded
+sets are not in the page at all. What the gate protects is the evidence in the
+filled document. That document prints the reader's own list above the recorded
+sets, and a later reader takes the order on trust. The gate makes the order true
+by construction, so the trust is earned rather than asked for. It is enforced
+the way the review app enforces configuration-blindness, by the payload not
+carrying it, rather than by asking.
 
-**The list has to say something.** ``MIN_OWN_LIST`` characters of the
-reader's own words, counted with the blank lines and the padding taken out.
-The press was a click before this: an empty box opened the recorded sets, and
-the sitting then measured a list nobody wrote against the list it is supposed
-to test. The page disables the press below the same count, but the endpoint is
-where the rule lives, because the press is a request and the request is what
-opens the sets.
+The list has to say something: ``MIN_OWN_LIST`` characters of the reader's own
+words, counted with the blank lines and the padding taken out. The press was a
+click before this. An empty box opened the recorded sets, and the sitting then
+measured a list nobody wrote against the list it is supposed to test. The page
+disables the press below the same count, but the endpoint is where the rule
+lives, because the press is a request and the request is what opens the sets.
 
-**The page counts and says nothing about the count.** A reader writing their
-own list is the one moment of this method that has to be theirs, and a running
-total sets the length they write to.
+The page counts and says nothing about the count. A reader writing their own
+list is the one moment of this method that has to be theirs, and a running total
+sets the length they write to.
 
-**The gate re-arms per case, and a case takes one own list.** Both halves are
-the same rule read two ways: a case's sets open once that case's own list
-exists. So a reader who reaches a case they have not written for reaches it
-blind, and a case they already wrote for re-opens with the list they wrote and
-refuses a second one. Without that refusal the reader could open a case's
-sets, come back to it, and post a list the document would then print above
-them — evidence of an order that did not happen.
+The gate re-arms per case, and a case takes one own list. Both halves are the
+same rule read two ways: a case's sets open once that case's own list exists. A
+reader who reaches a case they have not written for therefore reaches it blind,
+and a case they already wrote for re-opens with the list they wrote and refuses
+a second one. Without that refusal the reader could open a case's sets, come
+back to it, and post a list the document would then print above them, which
+would be evidence of an order that did not happen.
 
-**The case is laid out rather than printed flat.** ``evals/build_review_docs``
-describes part one and each recorded set as blocks, and the reading document
-and this page render those same blocks — one description of a case, two
-surfaces, so neither can drift into describing a different system. Each
-recorded finding is a card that carries the mark answering it, rather than a
-wall of text above a list of selects.
+The case is laid out rather than printed flat. ``evals/build_review_docs``
+describes part one and each recorded set as blocks, and the reading document and
+this page render those same blocks. That is one description of a case and two
+surfaces, so neither can drift into describing a different system. Each recorded
+finding is a card that carries the mark answering it, rather than a wall of text
+above a list of selects.
 
-**The reader walks the corpus, and Previous and Next sit in the stage header.**
-They step in the rail's order over the cases the reader may open, and the last
-Next lands on the submit stage. The rail never leaves, so the walk reloads no
+The reader walks the corpus, and Previous and Next sit in the stage header. They
+step in the rail's order over the cases the reader may open, and the last Next
+lands on the submit stage. The rail never leaves, so the walk reloads no
 document: every arrival reads the case back from the server.
 
-**A successful submit deletes every draft it carried.** That work is in a
-pull request by then, and a store that only grows is a store nobody trusts.
+A successful submit deletes every draft it carried. That work is in a pull
+request by then, and a store that only grows is a store nobody trusts.
 
-**A part-finished read survives the browser and the process.** It lives in a
-**Draft Sitting**, one file per case under the reader's own GitHub login,
-outside the repository, and it never merges — which is what keeps an unsigned
-own list out of a pull request. The own list creates it, so a reader who reads
-part one of ten cases and writes nothing leaves no trace. The page holds no
-copy of what they wrote: the own list, the marks, the missing list and the
-notes go to the draft as they are written, and a case comes back saying what
-the file on disk says. The reader stops the app, runs it again tomorrow, and
-finds the case where they left it. They may also throw one draft away, which
-puts that case back on the list to do and changes nothing in the repository.
+A part-finished read survives the browser and the process. It lives in a **Draft
+Sitting**, one file per case under the reader's own GitHub login, outside the
+repository, and it never merges. That is what keeps an unsigned own list out of
+a pull request. The own list creates it, so a reader who reads part one of ten
+cases and writes nothing leaves no trace. The page holds no copy of what they
+wrote: the own list, the marks, the missing list and the notes go to the draft
+as they are written, and a case comes back saying what the file on disk says.
+The reader stops the app, runs it again tomorrow, and finds the case where they
+left it. They may also throw one draft away, which puts that case back on the
+list to do and changes nothing in the repository.
 
-**The app says so when the text moved under an open draft.** The draft pins
-the digest of every required file as the reader opened it, and that pin is
-what makes the warning honest: without it the app could say only that a file
-differs from what a recorded sitting signed, which answers a different
-question. The check runs at open, because a reader needs to know before they
-spend an hour on the case, and again at finish, because a file can move while
-the tab sits open. The recorded entry signs the digests taken at finish, so it
-signs the bytes that will merge. The reader keeps their own list either way,
-and judges whether it still answers the text; nothing here judges that for
-them.
+The app says so when the text moved under an open draft. The draft pins the
+digest of every required file as the reader opened it, and that pin is what
+makes the warning honest. Without it, the app could say only that a file differs
+from what a recorded sitting signed, which answers a different question. The
+check runs at open, because a reader needs to know before they spend an hour on
+the case, and again at finish, because a file can move while the tab sits open.
+The recorded entry signs the digests taken at finish, so it signs the bytes that
+will merge. The reader keeps their own list either way, and judges whether it
+still answers the text. Nothing here judges that for them.
 
-**A hand-edited draft costs nothing this project can price, and nothing
-notices it.** A reader who types their own list into that file by hand wrote a
-list, which is the whole of what the filled document claims. A timestamp pair
-on the draft is rejected for the same reason: the reader owns the file, so
-they can write the timestamps too. The gate's job is to make the ordinary path
-the correct path, not to police the person at the keyboard.
+A hand-edited draft costs nothing this project can price, and nothing notices
+it. A reader who types their own list into that file by hand wrote a list, which
+is the whole of what the filled document claims. A timestamp pair on the draft
+is rejected for the same reason: the reader owns the file, so they can write the
+timestamps too. The gate's job is to make the ordinary path the correct path,
+rather than to police the person at the keyboard.
 
-**A draft the app cannot read refuses its own case, names the file, and
-changes nothing on disk** (A10). The rail shows that one row in an error
-state, and every other case still walks. Two alternatives are rejected. To
-treat it as absent throws the reader's own list away and re-arms the gate, so
-they retype a list they already wrote and never learn the first one existed.
-To repair it writes a guess into the one file the reader owns.
+A draft the app cannot read refuses its own case, names the file, and changes
+nothing on disk (A10). The rail shows that one row in an error state, and every
+other case still walks. Two alternatives are rejected. Treating it as absent
+throws the reader's own list away and re-arms the gate, so they retype a list
+they already wrote and never learn the first one existed. Repairing it writes a
+guess into the one file the reader owns.
 
-Security posture, inherited from ``webapp/review.py`` rather than re-derived:
+The security posture is inherited from ``webapp/review.py`` rather than
+re-derived:
 
-* **Loopback only, and a checked ``Host``** (A01). Binding alone does not stop
-  a rebound page in the operator's own browser, and this app writes to the
-  corpus.
-* **Both names come from the command line, never from the request** (A01).
-  A browser field naming the submitting account would let one person file a
-  sitting as another, and #320's binding rests on that name being true. The
-  same rule covers ``--submitted-for``, which grants nothing but is evidence:
-  a request that could set it could write a read onto somebody's name.
-* **Case prose reaches the page as data** (LLM05, A05). The case and each
-  recorded claim arrive as JSON blocks. The page builds its own markup around
-  them and puts every word inside it through ``textContent``, so a sentence
-  that spells a tag arrives as those characters.
-* **A mark is an allow-list, checked here** (A05). The value is the method's
-  closed set of three, and the key must name a recorded finding of this case,
-  so a request cannot write a sentence of its own into the evidence.
-* **Every write lands inside one offered case's directory** (A01), plus the
-  unreviewed list. A request names a case id and never a path, and the id is
-  resolved against the offered list by allow-list, so a case the rail greys
-  and a case nobody wrote refuse the same way.
-* **A draft is filed under a login and a case id, and both are checked as
-  path segments** (A01). The case id arrives in a request, and a value
-  carrying a separator would write outside the store.
-* **The submit endpoint is off unless ``gh`` is authenticated** — with no
-  login there is nothing to act as, so the button is never offered.
+* Loopback only, and a checked ``Host`` (A01). Binding alone does not stop a
+  rebound page in the operator's own browser, and this app writes to the corpus.
+* Both names come from the command line, never from the request (A01). A browser
+  field naming the submitting account would let one person file a sitting as
+  another, and #320's binding rests on that name being true. The same rule
+  covers ``--submitted-for``, which grants nothing but is evidence: a request
+  that could set it could write a read onto somebody's name.
+* Case prose reaches the page as data (LLM05, A05). The case and each recorded
+  claim arrive as JSON blocks. The page builds its own markup around them and
+  puts every word inside it through ``textContent``, so a sentence that spells a
+  tag arrives as those characters.
+* A mark is an allowlist, checked here (A05). The value is the method's closed
+  set of three, and the key must name a recorded finding of this case, so a
+  request cannot write a sentence of its own into the evidence.
+* Every write lands inside one offered case's directory (A01), plus the
+  unreviewed list. A request names a case id and never a path, and the id
+  resolves against the offered list by allowlist, so a case the rail greys and a
+  case nobody wrote refuse the same way.
+* A draft is filed under a login and a case id, and both are checked as path
+  segments (A01). The case id arrives in a request, and a value carrying a
+  separator would write outside the store.
+* The submit endpoint is off unless ``gh`` is authenticated. With no login there
+  is nothing to act as, so the button is never offered.
 """
 
 from __future__ import annotations
