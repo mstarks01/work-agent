@@ -1,6 +1,7 @@
 """OIDC JWT verifier and provider registry: verification, config, selection."""
 
 from datetime import UTC, datetime, timedelta
+from types import SimpleNamespace
 
 import jwt
 import pytest
@@ -340,9 +341,12 @@ class TestJwksTransport:
 
 
 class _FakeKey:
-    def __init__(self, kid: str):
+    """A PyJWK stand-in, carrying the two fields the matcher reads."""
+
+    def __init__(self, kid: str, use: str | None = None):
         self.key_id = kid
         self.key = _PUBLIC_KEY
+        self.public_key_use = use
 
 
 class _FakeJwkSet:
@@ -434,3 +438,37 @@ class TestAKeyOfTheWrongFamily:
             assert str(exc) == "invalid or expired credentials"
         else:
             pytest.fail("expected AuthenticationError")
+
+
+class TestAKeyIsUsedForWhatTheIssuerSaysItIsFor:
+    """A JWKS entry's ``use`` is the issuer declaring what a key is for.
+
+    The matcher read only ``kid``, so an encryption key published in the same
+    set verified signatures — using a key against its stated purpose. PyJWT's
+    own client filters this way; this one did not.
+    """
+
+    def _client(self, *keys):
+        class Client:
+            def get_jwk_set(self, refresh: bool = False):
+                return SimpleNamespace(keys=list(keys))
+
+        return _CooldownSigningKeyClient(Client(), cooldown_seconds=0)
+
+    def test_an_encryption_key_is_not_a_signing_key(self):
+        client = self._client(_FakeKey("enc-1", use="enc"))
+
+        with pytest.raises(jwt.PyJWKClientError):
+            client.get_signing_key_from_jwt(make_token())
+
+    def test_a_key_that_states_sig_is_used(self):
+        client = self._client(_FakeKey("sig-1", use="sig"))
+
+        assert client.get_signing_key_from_jwt(make_token()).key_id == "sig-1"
+
+    def test_a_key_that_states_nothing_is_still_used(self):
+        """``use`` is optional in a JWK, and an issuer that omits it has not
+        said the key is for something else."""
+        client = self._client(_FakeKey("quiet-1"))
+
+        assert client.get_signing_key_from_jwt(make_token()).key_id == "quiet-1"
