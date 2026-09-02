@@ -70,6 +70,7 @@ from analysis_service.report import (
     Severity,
     Verdict,
 )
+from analysis_service.retry import ATTEMPTS_METADATA_KEY
 from analysis_service.sampling import SamplingConfig, load_sampling
 from analysis_service.sources import DEFAULT_DESCRIPTION_LABEL, Source
 from analysis_service.system_model import (
@@ -725,6 +726,21 @@ class UnmeteredLlm(ScriptedLlm):
             content=types.Content(role="model", parts=[types.Part(text=self.reply)]),
             model_version=served_build(self.model),
         )
+
+
+class RetriedLlm(ScriptedLlm):
+    """A stand-in whose answer says two attempts failed before it.
+
+    The stamp is what the retry driver writes on a response it had to retry,
+    so this stands for a node that cost three prompts and metered one.
+    """
+
+    async def generate_content_async(
+        self, llm_request, stream: bool = False
+    ) -> AsyncGenerator[LlmResponse, None]:
+        async for response in super().generate_content_async(llm_request, stream):
+            response.custom_metadata = {ATTEMPTS_METADATA_KEY: 3}
+            yield response
 
 
 #: The tier keys the *base* tier serves. Spelled as tier node names rather than
