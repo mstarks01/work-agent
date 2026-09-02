@@ -884,3 +884,84 @@ def test_the_prompt_carries_the_rule_that_prevents_each_failure(code, phrase):
         f"extract.md carries no rule against {code!r}. A model that trips it "
         f"kills the job and spends its one repair pass."
     )
+
+
+# ---------------------------------------------------------------------------
+# An exemplar has to demonstrate what the prompt asks for.
+#
+# Everything above checks that an exemplar is well formed: it parses as its
+# package's proposal, its references resolve, its quotes verify. All of that
+# passed while six ASVS lanes demonstrated the one thing ``analyze.md`` forbids
+# in as many words — "Do not reach for an unrelated quote to justify a claim
+# about something the system does not have."
+#
+# `absent-element` arrived in #463, which updated the prompt and the output
+# contract and left the worked drafts alone. Nothing could see that, because no
+# lint reads an exemplar for whether it teaches the behaviour the instruction
+# demands. Instruction and demonstration disagreed, and a model reads both.
+
+
+#: How a draft says the requirement has nothing to rule on in this system. It is
+#: the chapter-exclusion idiom, and it is deliberately not a guess at the title:
+#: "no session timeout is stated" is an *unknown*, catalogued and grounded as
+#: one, while "it does not apply here" is a claim that the subject is absent.
+#: Matching the first would flag eleven correctly grounded drafts.
+EXCLUSION = re.compile(
+    r"does not apply here|has no subject in this system", re.IGNORECASE
+)
+
+
+def _exemplar_drafts(framework, lane):
+    """Every worked draft in one lane's exemplars, as parsed objects."""
+    text = PACKAGE_LOADERS[framework].load(lane_exemplars_doc(lane))
+    return [json.loads(block) for block in json_blocks(text)]
+
+
+@pytest.mark.parametrize("framework,lane", EXEMPLAR_LANES)
+def test_an_exemplar_grounds_an_absence_in_absent_elements(framework, lane):
+    """A draft whose claim is that something is not there names the thing.
+
+    The rule is ``analyze.md``'s and this only holds the exemplars to it: an
+    absence is grounded by naming the missing thing in ``absent_elements``,
+    because every other ground kind can name only something present. A quote
+    borrowed from an unrelated part of the model justifies nothing, and an
+    exemplar that borrows one teaches a model to do the same.
+
+    Scoped by the chapter-exclusion idiom in the draft's own description, not
+    by its title. "No session timeout is stated" is an unknown the catalog
+    carries; "it does not apply here" is a claim that the subject is absent.
+    Only the second needs a term, and a draft that rules a requirement out on a
+    stated fact may still carry the quote that states it.
+    """
+    ungrounded = [
+        draft.get("title", "?")
+        for draft in _exemplar_drafts(framework, lane)
+        if EXCLUSION.search(draft.get("description", ""))
+        and not draft.get("absent_elements")
+    ]
+    assert not ungrounded, (
+        f"{framework}/{lane}: these exemplar drafts claim something is absent"
+        f" and name nothing in `absent_elements`: {ungrounded}. Name the missing"
+        " thing — `upload`, `websocket`, `oauth` — as analyze.md requires. A"
+        " quote about what the model does have grounds nothing about what it"
+        " does not."
+    )
+
+
+def test_some_exemplar_exercises_absent_elements():
+    """The other half: a rule no shipped draft demonstrates teaches nobody.
+
+    ``absent_elements`` was reachable and unexercised by all 23 exemplar files
+    for the life of the field. A check that only forbids the wrong shape would
+    pass just as happily on that state.
+    """
+    exercised = [
+        f"{framework}/{lane}"
+        for framework, lane in EXEMPLAR_LANES
+        for draft in _exemplar_drafts(framework, lane)
+        if draft.get("absent_elements")
+    ]
+    assert exercised, (
+        "no shipped exemplar uses `absent_elements`, so nothing demonstrates the"
+        " one ground kind that can justify a claim about what a system lacks."
+    )

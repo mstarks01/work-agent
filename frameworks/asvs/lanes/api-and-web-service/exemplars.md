@@ -36,11 +36,9 @@ The WebSocket requirement, ruled out on the stated protocols. Note what the draf
   "description": "V4.4.1 governs the WebSocket handshake and the transport under it. It does not apply here. The model carries five flows and their stated protocols are HTTPS, HTTPS POST, gRPC, the PostgreSQL wire protocol and an HTTPS append; none of them is a WebSocket, and no element's technology names one. The requirement has no subject in this system.",
   "affected_element_ids": [],
   "evidence_refs": [],
-  "quotes": [
-    {
-      "text": "The web API hands each transfer to the ledger service over gRPC",
-      "source_label": "Payments platform notes"
-    }
-  ]
+  "absent_elements": [
+    "websocket"
+  ],
+  "quotes": []
 }
 ```

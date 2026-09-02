@@ -14,6 +14,10 @@ The exclusion, resting on the authentication mechanisms the model states across 
   "description": "V10.4.1 governs the handling of an authorization code between a client and an authorization server. It does not apply here. No element in this model is an authorization server: the four elements are a web API, a ledger service, an accounts database and an audit bucket. The authentication mechanisms the flows state are a session cookie after a password login, an unstated webhook credential, network position, a shared static password and a service account. None of them is a delegated grant, so the requirement has no subject in this system.",
   "affected_element_ids": [],
   "evidence_refs": [],
+  "absent_elements": [
+    "oauth",
+    "oidc"
+  ],
   "quotes": [
     {
       "text": "Customers sign in with an email and password and get a session cookie",
@@ -37,6 +41,9 @@ A second requirement in the chapter, excluded on the absence of the party it is 
     "entity:payments-provider"
   ],
   "evidence_refs": [],
+  "absent_elements": [
+    "oauth"
+  ],
   "quotes": [
     {
       "text": "Customers sign in with an email and password and get a session cookie",

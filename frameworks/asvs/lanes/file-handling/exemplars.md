@@ -1,6 +1,6 @@
 # File Handling Exemplars
 
-Two drafts against exemplar system A. This chapter's precondition fails for this system, so the first draft is the chapter-wide exclusion and the second shows how a second requirement rests on the same stated fact without restating it.
+Two drafts against exemplar system A. This chapter's precondition fails for this system, so the first draft is the chapter-wide exclusion and the second shows how a second requirement rests on the same absence without restating it. Both name the missing thing in `absent_elements`. That is the whole of what grounds an exclusion: the other ground kinds can only name something present, so a quote borrowed from an unrelated part of the model would justify nothing.
 
 ## V5.2.1 — This system accepts no uploaded file
 
@@ -14,12 +14,12 @@ The chapter needs an upload path. The model has none — no flow carries a file 
   "description": "V5.2.1 governs the validation of an uploaded file's content and type. It does not apply here. The five flows in this model carry payment instructions, settlement confirmations, transfer instructions, balances and audit records; none carries a file from an untrusted source, and no element is described as receiving an attachment or a multipart body. `store:audit-log` is an append-only bucket written by `process:ledger-service`, which is an internal writer rather than an upload path. The requirement has no subject in this system.",
   "affected_element_ids": [],
   "evidence_refs": [],
-  "quotes": [
-    {
-      "text": "Every transfer is written to the audit bucket, but the entry names the ledger service and never the customer.",
-      "source_label": "Payments platform notes"
-    }
-  ]
+  "absent_elements": [
+    "upload",
+    "multipart",
+    "attachment"
+  ],
+  "quotes": []
 }
 ```
 
@@ -35,11 +35,9 @@ The same absence decides a second requirement, and the draft says so in one clau
   "description": "V5.3.1 governs how stored files are served back, so that an uploaded document cannot be executed or interpreted by the browser that fetches it. It does not apply here, on the same stated fact that rules out V5.2.1: no flow in this model carries a file from an untrusted source, and no element serves stored file content to a caller. The requirement has no subject in this system.",
   "affected_element_ids": [],
   "evidence_refs": [],
-  "quotes": [
-    {
-      "text": "Every transfer is written to the audit bucket",
-      "source_label": "Payments platform notes"
-    }
-  ]
+  "absent_elements": [
+    "upload"
+  ],
+  "quotes": []
 }
 ```
