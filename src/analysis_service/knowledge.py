@@ -1,52 +1,52 @@
 """The local corpus: reference notes and worked cases, retrieved by what fired.
 
 A package's corpus is a version-controlled security library this service ships
-and reads locally — no web access, no vector store, no embedding model, and no
-retrieval that could return different text tomorrow for the same input. It holds
-two kinds of document, different in standing rather than in subject:
+and reads locally. There is no web access, no vector store, no embedding model,
+and no retrieval that could return different text tomorrow for the same input.
+It holds two kinds of document, which differ in standing rather than in subject:
 
 * **notes** (``frameworks/<name>/notes/``) — security reference on one
-  condition: what it means, what to ask about it, and what it is not. Analysis
-  knowledge, of the same standing as a **Domain Pack**.
+  condition: what it means, what to ask about it, and what it is not. This is
+  analysis knowledge, of the same standing as a **Domain Pack**.
 * **cases** (``frameworks/<name>/cases/``) — a worked judgement: a pattern, the
-  threat considered, whether it was accepted or rejected, and what decided it.
-  These are the reasoning the exemplars cannot carry, because an exemplar is a
+  threat considered, whether somebody accepted or rejected it, and what decided
+  it. These carry the reasoning an exemplar cannot, because an exemplar is a
   finished draft and half of these end in a rejection.
 
-**Both belong to a Framework Package, and the retrieval key is why.** Selection
-is a set intersection over the **Candidate** rules that fired, and a package owns
-its rules — so a document the service stored would be a service-owned file that
-only a package could select. A **Domain Pack** goes the other way for the same
-test: it reads the **Valid System Model**'s own technology fields, which one
-extraction fills for every framework, so its key is neutral and it stays in one
-shared root.
+Both belong to a **Framework Package**, and the retrieval key is why. Selection
+is a set intersection over the **Candidate** rules that fired, and a package
+owns its rules. A document the service stored would therefore be a
+service-owned file that only a package could select. A **Domain Pack** goes the
+other way under the same test: it reads the **Valid System Model**'s own
+technology fields, which one extraction fills for every framework, so its key
+is neutral and it stays in one shared root.
 
-The cost of that split, stated: a second package **re-authors any note it
-wants**. It is smaller than it looks — a note's *"What to look for"* questions
-are written for one framework's reading of the condition, and 7 of the 10 notes
-here end by assigning a STRIDE lane.
+The cost of that split is that a second package re-authors any note it wants.
+That cost is smaller than it looks. A note's "What to look for" questions are
+written for one framework's reading of the condition, and 7 of the 10 notes here
+end by assigning a STRIDE lane.
 
-**Retrieval is by fired rule, and that is the whole mechanism.** A lane agent's
-leads are the deterministic candidates whose rules matched this model; the
-documents it is given are the ones those same rules name. So a lane that
-triggered nothing receives nothing, a lane looking at an unverified boundary
-gets the note about identity at a boundary, and no job carries reference
-material about a technology or a condition nobody's model exhibits. That is the
-progressive disclosure the alternative — every document in every prompt — exists
-to avoid, and it needs no scoring function, no index and no query: the model's
-own structure selected it.
+Retrieval is by fired rule, and that is the whole mechanism. A lane agent's
+leads are the deterministic candidates whose rules matched this model, and the
+documents it receives are the ones those same rules name. A lane that triggered
+nothing therefore receives nothing. A lane that looks at an unverified boundary
+gets the note about identity at a boundary. No job carries reference material
+about a technology or a condition nobody's model exhibits. That is the
+progressive disclosure the alternative avoids, where every document goes into
+every prompt. It needs no scoring function, no index and no query, because the
+model's own structure selected it.
 
-**The corpus is knowledge, never evidence, and nothing here can change that.**
-A note explains what to ask; a case shows how someone reasoned. Neither is a
+The corpus is knowledge and never evidence, and nothing here can change that. A
+note explains what to ask, and a case shows how somebody reasoned. Neither is a
 fact about the system under review, neither is in the evidence catalog, and
-neither can be cited — the prompt says so and the resolution seam has no branch
-that could accept one. What grounds a finding is unchanged: the submitter's
-words, an ``unknown`` attribute, or a derived crossing.
+nothing can cite either. The prompt says so, and the resolution seam has no
+branch that could accept one. What grounds a finding is unchanged: the
+submitter's words, an ``unknown`` attribute, or a derived crossing.
 
-**Caller text selects nothing** (OWASP LLM01). Selection reads rule IDs, which
-come from code; a package's tables are closed; and a name outside them is never
-loaded. As with :mod:`analysis_service.domains`, no submitted byte reaches the
-composed text through this path.
+Caller text selects nothing (OWASP LLM01). Selection reads rule IDs, which come
+from code. A package's tables are closed, and the service never loads a name
+outside them. As in :mod:`analysis_service.domains`, no submitted byte reaches
+the composed text through this path.
 """
 
 from __future__ import annotations

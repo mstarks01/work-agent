@@ -2,22 +2,24 @@
 
 * ``POST /v1/jobs`` — submit an ordered list of sources, bounded in UTF-8 bytes
   and in count by this deployment's config, together with the frameworks to
-  analyse them under — required, non-empty, and drawn from what this install
-  carries, with no default on any path; returns a job handle. A subject may
-  hold only ``max_active_jobs`` jobs in flight at once; a submission past that
-  is refused with 429 rather than queued, because a queued job still holds the
-  caller's place in the provider quota and a refusal is the only answer that
-  actually sheds the load (OWASP LLM10).
-* ``GET /v1/jobs/{id}`` — canonical poll: status, per-node progress,
-  timestamps, error info; never the report.
-* ``GET /v1/jobs/{id}/events`` — the same progression as SSE, resumable via
+  analyse them under. The framework list is required and non-empty, is drawn
+  from what this install carries, and has no default on any path. The route
+  returns a job handle. A subject may hold only ``max_active_jobs`` jobs in
+  flight at once. The service refuses a submission past that with a 429 rather
+  than queueing it, because a queued job still holds the caller's place in the
+  provider quota, and a refusal is the only answer that sheds the load (OWASP
+  LLM10).
+* ``GET /v1/jobs/{id}`` — the canonical poll: status, per-node progress,
+  timestamps and error info. Never the report.
+* ``GET /v1/jobs/{id}/events`` — the same progression as SSE, resumable through
   ``Last-Event-ID``.
-* ``GET /v1/jobs/{id}/report`` — the full report once completed; 409 before.
+* ``GET /v1/jobs/{id}/report`` — the full report once the job completes, and a
+  409 before that.
 * ``GET /healthz`` — unauthenticated, for Cloud Run probes.
 
 Every error body is RFC 9457 ``application/problem+json``. Every `/v1` route
-requires a verified bearer token; job reads are owner-only and return 404 — not
-403 — for non-owners, so job IDs cannot be enumerated.
+requires a verified bearer token. Job reads are owner-only, and return 404
+rather than 403 for a non-owner, so nobody can enumerate job IDs.
 """
 
 from __future__ import annotations

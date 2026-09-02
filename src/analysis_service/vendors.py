@@ -1,25 +1,25 @@
 """The vendor registry: the per-provider facts nothing else will carry.
 
 Every model reaches the graph through ADK's ``LiteLlm``, so what varies per
-provider is not *how* to call it but three facts the adapter cannot supply:
+provider is not how to call it. It is three facts the adapter cannot supply:
 
-* the **router prefix** LiteLLM dispatches on (``vertex_ai/``, ``anthropic/``,
-  ``openai/``), which is also the vendor half of a generation-identity
+* the router prefix LiteLLM dispatches on — ``vertex_ai/``, ``anthropic/`` or
+  ``openai/`` — which is also the vendor half of an **Execution Identity**
   fingerprint;
-* the **credential mode**, which the vendor *implies* rather than the config
-  choosing: Vertex admits no raw-API-key path under any adapter
+* the credential mode, which the vendor implies rather than the config choosing.
+  Vertex admits no raw-API-key path under any adapter
   (``BerriAI/litellm#21036``), so ``vertex + api_key`` must be unrepresentable
   rather than validated against;
-* the **floating-form rule** for model identifiers, which differs by model
-  *family* rather than by vendor — Claude carries a canonical identifier of its
-  own shape, and both vendors that serve it spell that shape the same way.
+* the floating-form rule for model identifiers, which differs by model family
+  rather than by vendor. Claude carries a canonical identifier of its own shape,
+  and both vendors that serve it spell that shape the same way.
 
-Deliberately **not** here: the per-``(vendor, model)`` sampling support set.
-``vertex_ai/`` is not one provider and the real answer lives in LiteLLM's own
-config classes, so the check is a call to ``litellm`` at build time — see
+The per-``(vendor, model)`` sampling support set is deliberately not here.
+``vertex_ai/`` is not one provider, and the real answer lives in LiteLLM's own
+config classes, so the check is a call to ``litellm`` at build time; see
 :mod:`analysis_service.model_gate`.
 
-Reasoning effort is likewise *not* per-vendor data: one uniform
+Reasoning effort is likewise not per-vendor data. One uniform
 ``reasoning_effort`` surface reaches every vendor, so the kwarg is a module
 constant rather than a registry field whose value is the same everywhere.
 """

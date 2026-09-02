@@ -1,24 +1,10 @@
 """Every token cap over the static instruction text, in one table.
 
-A cap here is a **drift alarm**, not a budget. It rations nothing: it makes a
+A cap here is a drift alarm rather than a budget. It rations nothing. It makes a
 size change visible in review, and it fails the lint when one file grows past
 what the alarm allows. Raising a cap costs a one-line edit and needs no
-argument, because no measurement in this repo says a shorter instruction finds
-more threats. ADR 0016 is where that reasoning sits.
-
-**One table rather than a constant per file.** The machinery grew one entry per
-prompt body and one per skill kind, which is the shape ``CLAUDE.md`` says to
-key. A constant per asset is a constant somebody forgets: ``LANE_SKILL_TOKEN_CAP``
-existed while ASVS's seventeen lane skills went unchecked, because the lint that
-read it walked one package's tree. :func:`covered_assets` is what stops that
-returning — it walks every registered package and asserts each file it finds
-resolves to a key here.
-
-**Static text only.** ``notes/`` and ``cases/`` carry their own caps in
-``tests/test_knowledge_lints.py``, and they belong there: those files ride in
-the job-varying block, so their cap answers *how much a lane may retrieve*
-rather than how far one file has drifted. :data:`JOB_VARYING_DIRS` names them so
-the exclusion is a line of code rather than a silence.
+argument, because no measurement in this repository says a shorter instruction
+finds more threats. ADR 0016 holds that reasoning.
 """
 
 from __future__ import annotations

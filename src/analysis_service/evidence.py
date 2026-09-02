@@ -3,50 +3,50 @@
 A finding's justification is a :class:`~analysis_service.report.Ground`, and the
 three non-quote branches of one are pure functions of the System Model: an
 attribute the input never settled, a control attribute the input says is not
-there, and a Data Flow whose endpoints sit in different trust zones. None
-requires judgement to construct, and none is anything an agent knows that the
-service does not. So the service constructs them, once, and hands the agent a
-list of IDs.
+there, and a Data Flow whose endpoints sit in different trust zones. None of
+them requires judgement to construct, and none is anything an agent knows that
+the service does not. The service therefore constructs them once, and hands the
+agent a list of IDs.
 
-**The LLM decides which evidence supports a finding; this module decides how
-that evidence is represented.** An agent answers with
-``evidence_refs`` — IDs copied out of the catalog — and
-:func:`resolve_proposals` turns each back into the ground it came from. An
-agent that picks the right fact can no longer file it under the wrong branch,
-omit the field that branch requires, or invent an element ID, because it
-supplies none of those things: it supplies a choice from a closed set.
+The LLM decides which evidence supports a finding, and this module decides how
+that evidence is represented. An agent answers with ``evidence_refs``, which are
+IDs copied out of the catalog, and :func:`resolve_proposals` turns each back
+into the ground it came from. An agent that picks the right fact can no longer
+file it under the wrong branch, omit the field that branch requires, or invent
+an element ID, because it supplies none of those things. It supplies a choice
+from a closed set.
 
-WHAT THIS IS NOT. A catalog entry says *this fact is in the validated system
-representation* and nothing more. ``authentication`` being unknown on a flow is
-not a spoofing threat, and a crossing is not a vulnerability; whether either
-participates in a credible attack stays the agent's judgement and the critic's
-to rule on. The catalog is deliberately incapable of expressing a conclusion —
-every entry is derived by the two rules above, so there is no seam through
-which "the authentication is weak" could enter it.
+A catalog entry says that this fact is in the validated system representation,
+and nothing more. ``authentication`` being unknown on a flow is not a spoofing
+threat, and a crossing is not a vulnerability. Whether either takes part in a
+credible attack stays the agent's judgement and the critic's to rule on. The
+catalog is deliberately incapable of expressing a conclusion: the two rules
+above derive every entry, so there is no seam through which "the authentication
+is weak" could enter it.
 
-Quotes are not catalogued, and could not be: a quote is a span of the
-submitter's own words chosen for what it states, which is exactly the
-judgement no enumeration can make. An agent proposes one as a
-:class:`~analysis_service.report.QuoteCandidate` — the span and the source it
-came from — and :func:`resolve_proposals` assembles the ground. What it does
-not do is *check* it; presence in the named source stays
+Quotes are not catalogued, and could not be. A quote is a span of the
+submitter's own words chosen for what it states, which is the judgement no
+enumeration can make. An agent proposes one as a
+:class:`~analysis_service.report.QuoteCandidate`, which is the span and the
+source it came from, and :func:`resolve_proposals` assembles the ground. It does
+not check the quote. Presence in the named source stays
 :func:`~analysis_service.critic.join_drafts`'s question, answered by the pinned
-ladder in :mod:`analysis_service.grounding` against the job's actual bytes, which
-this module does not hold.
+ladder in :mod:`analysis_service.grounding` against the job's actual bytes,
+which this module does not hold.
 
-IDs ARE STABLE AND MEAN SOMETHING. ``unknown:<element-id>:<attribute>``,
-``absent:<element-id>:<attribute>`` and ``crossing:<flow-id>``, all built from
-IDs the model already carries, so the same System Model yields the same catalog
-on every run and a ref in a log or a diff is readable without a lookup. Opaque
-IDs would cost that for nothing: there is no secret here, only facts the agent
-is being shown anyway.
+The IDs are stable and mean something: ``unknown:<element-id>:<attribute>``,
+``absent:<element-id>:<attribute>`` and ``crossing:<flow-id>``. All three are
+built from IDs the model already carries, so the same System Model yields the
+same catalog on every run, and a ref in a log or a diff is readable without a
+lookup. Opaque IDs would cost that for nothing, because there is no secret here.
+There are only facts the agent is being shown anyway.
 
-Model output is untrusted input (OWASP LLM05). A ref is used as a dictionary
-key and never parsed, interpolated, or matched by a pattern compiled from it,
-so the only thing an agent can do with the field is name an entry or fail to.
-There is no fuzzy match and no repair: a ref that is not in the catalog is
-reported as itself, because the alternative — inferring which fact an agent
-*meant* — is the class of guess this module exists to remove.
+Model output is untrusted input (OWASP LLM05). A ref is used as a dictionary key
+and never parsed, interpolated, or matched by a pattern compiled from it, so the
+only thing an agent can do with the field is name an entry or fail to. There is
+no fuzzy match and no repair. A ref that is not in the catalog is reported as
+itself, because the alternative — inferring which fact an agent meant — is the
+class of guess this module exists to remove.
 """
 
 from __future__ import annotations

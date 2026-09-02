@@ -1,36 +1,37 @@
 """Mechanical checks at the join and assemble seams around a framework's critic.
 
-The deterministic half of the critic step: mechanical checks belong in code,
-prompts carry only judgement. Everything here is a check no model should be
-asked to perform — that a framework's lane agents' drafts cite elements the
-System Model actually contains, that claim IDs are unique, that every grounds
-entry resolves and every quote ground is really in the source it names, and that
-the critic ruled on exactly the drafts it was given, each ruling carrying a
-well-formed verdict. A package's critic prompt names these as already done so its
-judgement is spent on evidence, lanes, duplicates and whatever else that
-framework grades — and, for grounds, on the one question code cannot answer:
-whether a quote that is verbatim actually *supports* the finding it was filed
-under.
+This is the deterministic half of the critic step. Mechanical checks belong in
+code, and prompts carry only judgement. Everything here is a check no model
+should be asked to perform: that a framework's lane agents' drafts cite elements
+the System Model contains, that claim IDs are unique, that every grounds entry
+resolves, that every quote ground is really in the source it names, and that the
+critic ruled on exactly the drafts it was given, each ruling carrying a
+well-formed verdict. A package's critic prompt names these as already done, so
+its judgement is spent on evidence, lanes, duplicates and whatever else that
+framework grades. For grounds, it is spent on the one question code cannot
+answer: whether a quote that is verbatim actually supports the finding it was
+filed under.
 
-**Neutral, and one seam per framework rather than one across frameworks.** Every
-check here reads :class:`~analysis_service.report.Claim`,
+The checks are neutral, and there is one seam per framework rather than one
+across frameworks. Every check here reads
+:class:`~analysis_service.report.Claim`,
 :class:`~analysis_service.report.Ruling` and the package contract, so a second
 framework's output goes through the same code. What it never does is merge two
-frameworks' drafts: the join runs per package, in that package's own declared
+frameworks' drafts. The join runs per package, in that package's own declared
 lane order, because two frameworks' claims are not comparable and a duplicate
 across them is not a duplicate.
 
 The assemble seam is also where a ruling becomes a claim. A critic emits
-judgements keyed by draft ID rather than the drafts themselves
-(:class:`~analysis_service.report.Ruling`), so the agent's own fields reach the
-report from the copy this service already holds — not round-tripped through a
-model that was never asked to change them.
+judgements keyed by draft ID rather than the drafts themselves, as a
+:class:`~analysis_service.report.Ruling`. The agent's own fields therefore reach
+the report from the copy this service already holds, rather than round-tripping
+through a model that was never asked to change them.
 
-Model output is untrusted input (OWASP LLM05): it is validated here, before
-anything reaches the report. Both seams fail closed with every issue listed
-at once — an agent that hallucinates an element ID or a critic that drops
-claims is a defect to surface loudly, never to paper over by discarding the
-offending entries.
+Model output is untrusted input (OWASP LLM05), and the service validates it here
+before anything reaches the report. Both seams fail closed, and list every issue
+at once. An agent that hallucinates an element ID, or a critic that drops
+claims, is a defect to surface loudly rather than to paper over by discarding
+the offending entries.
 """
 
 from __future__ import annotations

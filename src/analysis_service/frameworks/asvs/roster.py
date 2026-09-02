@@ -1,29 +1,17 @@
 """The chapter roster inside a lane skill, composed from the catalog.
 
-**The roster is derived text that lives in a hand-written file.** Each lane
-skill states every requirement of its chapter — the identifier, the level and
-the published description — because that is how the requirements reach a
-``strong``-tier prompt. Written by hand, that is a second copy of the standard
-sitting beside the one in ``catalog.json``, and the copy nobody generates is
-the copy that drifts.
+The roster is derived text that lives in a hand-written file. Each lane skill
+states every requirement of its chapter — the identifier, the level and the
+published description — because that is how the requirements reach a
+``strong``-tier prompt. Written by hand, that would be a second copy of the
+standard sitting beside the one in ``catalog.json``, and the copy nobody
+generates is the copy that drifts.
 
-So it is generated. :func:`roster_block` composes the block and
-:func:`write_rosters` writes it into each skill in place, between the heading
-it owns and the next ``##``. Everything else in a skill — the scope, the
-applicability reasoning, the threat patterns, the guardrails — stays
-hand-written, because none of it is derivable and all of it is judgement.
-
-``tests/test_asvs.py`` asserts the file on disk equals what this composes, so
-a hand edit to the roster fails the suite rather than shipping. That is the
-whole point: the earlier checks caught a *wrong* roster, and this makes a
-divergent one unrepresentable.
-
-Regenerate after a catalog change::
-
-    python -m analysis_service.frameworks.asvs.roster
-
-Build-time only. Nothing in a run imports this; the graph reads the finished
-skill off disk like every other prompt document.
+It is therefore generated. :func:`roster_block` composes the block, and
+:func:`write_rosters` writes it into each skill in place, between the heading it
+owns and the next ``##``. Everything else in a skill stays hand-written: the
+scope, the applicability reasoning, the threat patterns and the guardrails. None
+of it is derivable, and all of it is judgement.
 """
 
 from __future__ import annotations

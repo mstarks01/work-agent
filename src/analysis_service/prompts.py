@@ -1,33 +1,35 @@
 """Prompt composition for the five LLM node kinds.
 
-Prompt content lives in ``prompts/`` as Markdown and loads through the same
-:class:`~analysis_service.markdown_loader.MarkdownLoader` the skills use — a
-skill is *what to know*, a prompt is *what to do with this job's input*.
-Composition here is concatenation only: the ``{lane}``, ``{system_model}``,
+Prompt content lives in ``prompts/`` as Markdown, and loads through the same
+:class:`~analysis_service.markdown_loader.MarkdownLoader` the skills use. A
+skill is what to know, and a prompt is what to do with this job's input.
+
+Composition here is concatenation only. The ``{lane}``, ``{system_model}``,
 ``{boundary_crossings}``, ``{evidence_catalog}``, ``{candidates}``,
 ``{domain_skills}``, ``{drafts}``, ``{input_text}``, ``{previous_model}`` and
-``{validation_issues}`` placeholders stay untouched for ADK state templating to
+``{validation_issues}`` placeholders stay untouched, for ADK state templating to
 fill at run time.
 
-**The five bodies are the service's and are framework-neutral.** A prompt says
+The five bodies are the service's, and they are framework-neutral. A prompt says
 what to do with this job's input, and every registered framework's lane agent
 does the same thing with it: read the model, work the leads, cite from the
-catalog, emit an object holding ``claims``. What differs is *what to look for*,
-and that is a skill — the lane skill, the exemplars, the critic text — which is
-package text under ``frameworks/<name>/`` and is composed by
-:mod:`analysis_service.skills`. Two frameworks reading two copies of ``analyze.md``
-would be two places for the output contract to drift.
+catalog, and emit an object holding ``claims``. What differs is what to look
+for, and that is a skill — the lane skill, the exemplars, the critic text — which
+is package text under ``frameworks/<name>/`` that
+:mod:`analysis_service.skills` composes. Two frameworks reading two copies of
+``analyze.md`` would be two places for the output contract to drift.
 
-Two blocks are the exception, and both are package text. The **output contract**
-(``output.md``) says what one claim is and which fields carry it, which a record
-that grades nothing cannot share with one that does. The **exemplars**
-(``lanes/<lane>/exemplars.md``) are worked drafts in that record's own shape.
+Two blocks are the exception, and both are package text. The output contract,
+``output.md``, says what one claim is and which fields carry it, which a record
+that grades nothing cannot share with one that does. The exemplars,
+``lanes/<lane>/exemplars.md``, are worked drafts in that record's own shape.
 :func:`compose_analyze_prompt` takes the package's loader for exactly those two.
 
 Order is stable-first: the one shared ``analyze.md`` body, then the package's
-output contract, then the per-lane exemplar file, so a framework's lane agents
-share the longest possible cacheable prefix. ``tests/test_prompt_lints.py``
-enforces the token caps in :mod:`analysis_service.token_caps` over this text.
+output contract, then the per-lane exemplar file. A framework's lane agents
+therefore share the longest possible cacheable prefix.
+``tests/test_prompt_lints.py`` enforces the token caps in
+:mod:`analysis_service.token_caps` over this text.
 """
 
 from __future__ import annotations

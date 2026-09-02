@@ -1,46 +1,46 @@
 """ASVS's applicability rules, and the tier-0 test the standard never states.
 
-**These rules are this repo's own, and all of them.** ASVS publishes a
+These rules are this repository's own, and all of them are. ASVS publishes a
 requirement's chapter, section, identifier, description and level, and nothing
-else: no applies-when field, no tag and no technology list. The CWE and NIST
-mappings of 4.x are gone in 5.0. So nothing selects a requirement for a system
-unless this repo writes it.
+else. There is no applies-when field, no tag and no technology list, and the CWE
+and NIST mappings of 4.x are gone in 5.0. Nothing therefore selects a
+requirement for a system unless this repository writes it.
 
-**Most rules are presence tests.** The #160 research derived 16 predicates across
-the 70 level 1 requirements, and all 16 ask whether the application *has* a thing
-— a browser frontend, cookies, a database, OAuth, a file upload, a session. Six
-more were added afterwards to reach the six chapters that had none, and they ask
-the same shape of question. Five more (``STRUCTURAL_RULES``) read what the
+Most rules are presence tests. The #160 research derived 16 predicates across
+the 70 level 1 requirements, and all 16 ask whether the application has a thing:
+a browser frontend, cookies, a database, OAuth, a file upload, a session. Six
+more were added afterwards, to reach the six chapters that had none, and they
+ask the same shape of question. Five more, in ``STRUCTURAL_RULES``, read what the
 corpus's own reference claims read: a stated credential on one attribute, a
 classification, a write with no record named anywhere, a crossing from an
-external entity, a channel with no stated protection. Those are the leads a term cannot raise.
+external entity, and a channel with no stated protection. Those are the leads a
+term cannot raise.
 
-**Each rule reads free text by string match**, because no attribute in the
-**System Model** is a closed enum an ASVS predicate can test. #162 ruled that
-controls stay string attributes, so this is the mechanism the model offers.
+Each rule reads free text by string match, because no attribute in the **System
+Model** is a closed enum an ASVS predicate can test. #162 ruled that controls
+stay string attributes, so this is the mechanism the model offers.
 
-A **Candidate** is a lead rather than a gate: a lane agent still analyses its
+A **Candidate** is a lead rather than a gate. A lane agent still analyses its
 chapter when no rule fires. Rules are authored for the level 1 requirements
 first, so a requirement at level 2 or 3 with no rule reaches its lane agent
-without a candidate, which is a weaker lead and not an absent one.
+without a candidate. That is a weaker lead rather than an absent one.
 
-**Every lane carries at least one rule, and that is load-bearing beyond the
-lead.** Retrieval is keyed by *fired rule*, so a lane with no rule received no
-reference note and no worked case either, whatever the knowledge tables held.
-The six chapters that had no rule were therefore the six the corpus could not
-reach.
+Every lane carries at least one rule, and that is load-bearing beyond the lead.
+Retrieval is keyed by fired rule, so a lane with no rule received no reference
+note and no worked case either, whatever the knowledge tables held. The six
+chapters that had no rule were therefore the six the corpus could not reach.
 
-**A term is chosen against what a submitter writes, and checked for what it
-also matches.** #189 found the OAuth terms were product names where submitters
-write "SSO". The opposite failure is as easy: bare ``log`` matches ``login``,
-bare ``audit`` matches a food safety audit, and bare ``build`` matches building
-a weekly rota. Where a single word is ambiguous the term here is the phrase.
+A term is chosen against what a submitter writes, and checked for what it also
+matches. #189 found the OAuth terms were product names where submitters write
+"SSO". The opposite failure is as easy: bare ``log`` matches ``login``, bare
+``audit`` matches a food safety audit, and bare ``build`` matches building a
+weekly rota. Where a single word is ambiguous, the term here is the phrase.
 
-**A term table rather than 17 functions.** STRIDE writes one function per rule
-because each reads a different structure. Every rule here runs one matcher over
-one attribute list, so 17 copies of that matcher would be 17 places for it to
-drift, and what a maintainer edits is the term list. The matcher is written once
-below and the table is the whole of what is authored.
+This is a term table rather than 17 functions. STRIDE writes one function per
+rule, because each reads a different structure. Every rule here runs one matcher
+over one attribute list, so 17 copies of that matcher would be 17 places for it
+to drift. What a maintainer edits is the term list. The matcher is written once
+below, and the table is the whole of what is authored.
 """
 
 from __future__ import annotations

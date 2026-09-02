@@ -1,29 +1,29 @@
 """Framework packages: what a security framework declares, and what checks it.
 
-**A package declares what its framework judges and what selects its text. The
-service keeps what it constructs and what it checks.** That one line decided
-every row of this contract. Building a **Ground** from an agent's selection is
-construction, so it stays service code; deciding which lane sees a lead is
+A package declares what its framework judges and what selects its text. The
+service keeps what it constructs and what it checks. That one line decided every
+row of this contract. Building a **Ground** from an agent's selection is
+construction, so it stays in service code. Deciding which lane sees a lead is
 judgement about a framework's own method, so the **Candidate** rules moved into
-the package. The **Evidence Catalog** enumerates the **Valid System Model** and
-not the framework, so it stayed.
+the package. The **Evidence Catalog** enumerates the **Valid System Model**
+rather than the framework, so it stayed.
 
-A package is **a catalog it does not own plus a profile it does**. Every member
-below is profile — the tailoring this service applies. No member names a
-catalog: a framework that publishes a machine-readable requirement set carries
+A package is a catalog it does not own plus a profile it does. Every member
+below is profile, which is the tailoring this service applies. No member names a
+catalog. A framework that publishes a machine-readable requirement set carries
 it as its own private data and checks it in its own module, because a contract
-that *required* one would exclude the frameworks that publish none.
+that required one would exclude the frameworks that publish none.
 
-**Registration is a table edit and an import**, exactly like the vendor
+Registration is a table edit and an import, exactly as it is for the vendor
 registry. There is no entry point, no import by name from config, and no path in
-a config file: a package writes into a ``strong``-tier prompt, and external
+a config file, because a package writes into a ``strong``-tier prompt. External
 plugin loading is out of scope for this architecture.
 
 Three sets must agree. :data:`~analysis_service.report.FrameworkName` names what
-this repo can spell, :data:`PACKAGES` names what this repo carries, and
+this repository can spell. :data:`PACKAGES` names what this repository carries.
 ``config/frameworks.toml`` names what this install runs. The first two agree at
-import; the third agrees at :func:`validate_package`, which a **Deployment**
-runs **before an adapter binds and before an instruction composes**.
+import. The third agrees at :func:`validate_package`, which a **Deployment**
+runs before an adapter binds and before an instruction composes.
 """
 
 from __future__ import annotations

@@ -1,14 +1,14 @@
 """Loading Markdown content — skills and prompts — from a directory of files.
 
-One implementation serves both content roots: the loader takes a directory in
+One implementation serves both content roots. The loader takes a directory in
 and hands named Markdown text out, with no templating and no caching.
 
-Loading fails closed. Repo Markdown is trusted content baked into the image,
-but a missing file, a heading that deviates from the fixed set, or a name
-escaping the root raises instead of degrading silently — content that
-silently drops out of an agent's context is a recall loss no one would
-notice. Section structure and token caps are enforced by the CI lints over
-``skills/**/*.md`` and ``prompts/**/*.md``.
+Loading fails closed. Repo Markdown is trusted content baked into the image, but
+a missing file, a heading that deviates from the fixed set, or a name that
+escapes the root raises rather than degrading silently. Content that drops out
+of an agent's context silently is a recall loss nobody would notice. The CI
+lints over ``skills/**/*.md`` and ``prompts/**/*.md`` enforce section structure
+and token caps.
 """
 
 from __future__ import annotations

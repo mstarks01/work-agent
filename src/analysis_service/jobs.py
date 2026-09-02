@@ -1,23 +1,25 @@
 """Job lifecycle, persistence interface, and pipeline-runner interface.
 
-The job side of the front-end API contract: the ``queued -> running ->
-completed | failed | rejected`` state machine with illegal transitions refused,
-an append-only per-job event log that backs both the poll response and the SSE
-stream, and two open seams:
+This is the job side of the front-end API contract. It holds the ``queued ->
+running -> completed | failed | rejected`` state machine, which refuses illegal
+transitions, and an append-only per-job event log that backs both the poll
+response and the SSE stream. It also holds two open seams:
 
-* :class:`JobStore` — the API only ever talks to this interface. Backends are
-  selected at deploy time by ``ANALYSIS_JOB_STORE`` and constructed through
-  :func:`build_store`, so a durable or shared backend is one registry entry.
-  :class:`InMemoryJobStore` is the ``memory`` backend — the only one registered,
-  non-durable and per-instance. There is no default: :func:`build_store` fails
-  closed rather than choosing it for a deployment that did not.
-* :class:`PipelineRunner` — the API runs jobs through this interface, never
-  against a graph directly. :class:`analysis_service.pipeline.AdkPipelineRunner`
-  is the implementation; :class:`StubPipelineRunner` is the no-model stand-in
-  that exercises the contract end to end.
+* :class:`JobStore`. The API only ever talks to this interface. A deployment
+  selects a backend with ``ANALYSIS_JOB_STORE``, and :func:`build_store`
+  constructs it, so a durable or shared backend is one registry entry.
+  :class:`InMemoryJobStore` is the ``memory`` backend, which is the only one
+  registered, and is non-durable and per-instance. There is no default:
+  :func:`build_store` fails closed rather than choosing one for a deployment
+  that did not.
+* :class:`PipelineRunner`. The API runs jobs through this interface, and never
+  against a graph directly.
+  :class:`analysis_service.pipeline.AdkPipelineRunner` is the implementation,
+  and :class:`StubPipelineRunner` is the no-model stand-in that exercises the
+  contract end to end.
 
-A ``failed`` job stores only a generic error message — internal detail is
-logged, never surfaced.
+A ``failed`` job stores only a generic error message. The service logs the
+internal detail and never surfaces it.
 """
 
 from __future__ import annotations

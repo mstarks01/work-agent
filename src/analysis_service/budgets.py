@@ -1,56 +1,58 @@
 """Per-subject and global consumption budgets over a rolling window.
 
-The concurrency ceiling bounds how many jobs a caller may run **at once**. It is
-self-clearing by design — finishing a job buys the next one — which is exactly
-why it bounds no spend at all: a caller who submits serially, letting each job
-finish before sending the next, stays inside the ceiling forever while running
+The concurrency ceiling bounds how many jobs a caller may run at once. It is
+self-clearing by design, because finishing a job buys the next one, and that is
+why it bounds no spend at all. A caller who submits serially, and lets each job
+finish before sending the next, stays inside the ceiling for ever while running
 an unbounded number of paid jobs. That is the unbounded-consumption half of
 OWASP LLM10, and ADR 0007 named it as the integrator's to close. This module is
 where the service closes it instead.
 
-**Two bounds, one window.** A subject gets a job count and a token budget per
-rolling window; the deployment gets a token budget of its own across every
-subject. The count is what stops a burst of trivial submissions; the token
-budget is what stops one large submission doing the same damage in a single job.
-Neither substitutes for the other, and the global one is not the sum of the
-per-subject ones — it is the provider quota's share, which a deployment with ten
-subjects has to divide rather than multiply.
+There are two bounds over one window. A subject gets a job count and a token
+budget per rolling window, and the deployment gets a token budget of its own
+across every subject. The count stops a burst of trivial submissions. The token
+budget stops one large submission doing the same damage in a single job. Neither
+substitutes for the other. The global bound is not the sum of the per-subject
+ones: it is the provider quota's share, which a deployment with ten subjects
+divides rather than multiplies.
 
-**Tokens, not dollars, and the difference is not a shortcut.** A price is vendor
-data with an expiry date. `evals/` carries a price table because a sweep reports
-what it *spent*, after the fact, and can be re-priced when the table moves; a
-gate that refuses a submission cannot be re-priced after it has refused one.
-Pinning prices in the service would put a number that drifts into a decision
-that is final. Tokens are the thing this service can count exactly, and a
-deployment that wants a dollar bound converts once, at the knob, where it can
-see the rate it used. The provider's own spend limit is the backstop behind
-both, and `docs/Configuration.md` says so.
+The bounds are in tokens rather than dollars, and the difference is not a
+shortcut. A price is vendor data with an expiry date. ``evals/`` carries a price
+table because a sweep reports what it spent, after the fact, and can be re-priced
+when the table moves. A gate that refuses a submission cannot be re-priced after
+it has refused one, so pinning prices in the service would put a number that
+drifts into a decision that is final. Tokens are what this service can count
+exactly. A deployment that wants a dollar bound converts once, at the knob,
+where it can see the rate it used. The provider's own spend limit is the
+backstop behind both, and ``docs/Configuration.md`` says so.
 
-**The estimate is deliberately coarse and deliberately high.** :func:`estimate`
+The estimate is deliberately coarse and deliberately high. :func:`estimate`
 multiplies the submission's own token count by every LLM call the selection
 implies, which over-counts: not every call carries the whole input, and a repair
 node often does not run. Over-counting is the right direction for a bound that
-must hold before anything is spent — the alternative is a gate that admits a job
-it cannot afford and discovers this at node nine. The reservation is replaced by
-the measured usage the moment the job reaches a terminal state, so a window's
-accounting converges on what actually happened rather than on what was feared.
+must hold before anything is spent. The alternative is a gate that admits a job
+it cannot afford and discovers this at node nine. The service replaces the
+reservation with the measured usage the moment the job reaches a terminal state,
+so a window's accounting converges on what happened rather than on what was
+feared.
 
-**A job nothing measured keeps its reservation, and that is the direction that
-matters.** A completed run settles from its report and a rejected one from the
-nodes that ran before the validity gate refused their output. A job that failed
-mid-graph returned no measurement — and it is the one case where getting this
-wrong is unbounded: it had already paid for every node it reached, so freeing
-its estimate would make this whole module a bound that any failing job clears,
-and a caller whose submissions outrun the deadline would spend without limit
-while their window read empty.
+A job that nothing measured keeps its reservation, and that is the direction
+that matters. A completed run settles from its report, and a rejected one
+settles from the nodes that ran before the validity gate refused their output. A
+job that failed part-way through the graph returned no measurement. It is also
+the one case where getting this wrong is unbounded: it had already paid for
+every node it reached, so freeing its estimate would make this whole module a
+bound that any failing job clears, and a caller whose submissions outrun the
+deadline would spend without limit while their window read empty.
 
-**Reconciliation is a scan, not a ledger.** :func:`spent_tokens` reads the
-records: a terminal job contributes what it measured, a live one — or one
-nothing measured — contributes what it reserved. That is the same choice the concurrency count makes and for the same
-reason — a maintained counter is a second copy of the truth, and the path that
-forgets to decrement leaks budget until the process restarts. It also makes
-double-credit and negative-credit unrepresentable rather than merely tested for,
-because nothing is ever added to or subtracted from anything.
+Reconciliation is a scan rather than a ledger. :func:`spent_tokens` reads the
+records: a terminal job contributes what it measured, and a live one, or one
+nothing measured, contributes what it reserved. That is the same choice the
+concurrency count makes, and for the same reason. A maintained counter is a
+second copy of the truth, and the path that forgets to decrement leaks budget
+until the process restarts. It also makes double credit and negative credit
+unrepresentable rather than merely tested for, because nothing is ever added to
+or subtracted from anything.
 """
 
 from __future__ import annotations
