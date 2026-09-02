@@ -333,7 +333,7 @@ def build_tier_adapters(
 
     assert_kwarg_supported(_NUM_RETRIES_KWARG)
 
-    # One policy, so one budget, shared by both tiers and every node on them.
+    # One policy, so one budget, shared by every tier and every node on them.
     # A per-tier budget would let the lane agents storm the strong tier while
     # the base tier's untouched allowance sat beside it; a storm is a property
     # of the process, not of a tier. Capacity is one retry per LLM node in the
