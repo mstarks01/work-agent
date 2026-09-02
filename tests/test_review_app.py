@@ -94,7 +94,7 @@ def client(runs, tmp_path):
         TestClient(
             create_app(session),
             base_url="http://127.0.0.1:8010",
-            headers=SAME_ORIGIN,
+            headers={**SAME_ORIGIN, "X-Review-Token": session.token},
         ),
         session,
     )
@@ -463,3 +463,34 @@ def test_the_question_is_the_finding_s_own_framework(tmp_path):
     assert questions["asvs"] == QUESTIONS["asvs"]
     assert "attack" in questions["stride"]["ask"]
     assert "requirement" in questions["asvs"]["ask"]
+
+
+def test_a_vote_without_the_page_token_is_refused(runs, tmp_path):
+    """The origin check and the token refuse different things.
+
+    The origin check refuses a page on another origin; this refuses a request
+    that never read this one. The ledger is the supply chain of every published
+    quality number, and the sitting app's writes have carried both from the
+    start — this one carried only the first.
+    """
+    session = build_session(runs, voter="ada", ledger_path=tmp_path / "votes")
+    app = TestClient(
+        create_app(session), base_url="http://127.0.0.1:8010", headers=SAME_ORIGIN
+    )
+    item = app.get("/api/next").json()
+
+    response = app.post(
+        "/api/vote", json={"fingerprint": item["fingerprint"], "verdict": "up"}
+    )
+
+    assert response.status_code == 403
+    assert load(session.ledger_path).votes == [], "a refused vote wrote nothing"
+
+
+def test_the_page_carries_the_token_the_vote_needs(runs, tmp_path):
+    session = build_session(runs, voter="ada", ledger_path=tmp_path / "votes")
+    app = TestClient(create_app(session), base_url="http://127.0.0.1:8010")
+
+    page = app.get("/review").text
+
+    assert session.token in page, "the page cannot vote without it"
