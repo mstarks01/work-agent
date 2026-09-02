@@ -15,8 +15,8 @@ from dataclasses import replace
 import pytest
 
 from analysis_service.frameworks import PACKAGES
+from evals.harness import fingerprint as fingerprint_module
 from evals.harness.fingerprint import (
-    DEFAULT_VERSION,
     EXTRA_COMPONENT,
     IDENTIFIER_OF,
     LANE_FIELD,
@@ -46,7 +46,7 @@ def test_element_order_does_not_change_the_value():
     """``affected_element_ids`` is a list whose order no rule reads."""
     one = Components("stride", "spoofing", ("process:a", "store:b"), verb="read")
     other = Components("stride", "spoofing", ("store:b", "process:a"), verb="read")
-    assert fingerprint(one) == fingerprint(other)
+    assert fingerprint(one, version=2) == fingerprint(other, version=2)
 
 
 def test_a_flow_and_its_endpoints_fingerprint_alike():
@@ -65,7 +65,7 @@ def test_a_flow_and_its_endpoints_fingerprint_alike():
         FLOWS,
         verb="replay",
     )
-    assert fingerprint(as_flow) == fingerprint(as_endpoints)
+    assert fingerprint(as_flow, version=2) == fingerprint(as_endpoints, version=2)
 
 
 def test_a_trust_boundary_citation_is_dropped():
@@ -74,22 +74,22 @@ def test_a_trust_boundary_citation_is_dropped():
         "stride", "spoofing", ["process:a", "boundary:dmz"], FLOWS, verb="read"
     )
     without = components_for("stride", "spoofing", ["process:a"], FLOWS, verb="read")
-    assert fingerprint(with_zone) == fingerprint(without)
+    assert fingerprint(with_zone, version=2) == fingerprint(without, version=2)
 
 
 def test_a_different_lane_target_or_framework_is_a_different_finding():
     base = Components("stride", "spoofing", ("process:a",), verb="read")
-    assert fingerprint(base) != fingerprint(
-        Components("stride", "tampering", ("process:a",), verb="read")
+    assert fingerprint(base, version=2) != fingerprint(
+        Components("stride", "tampering", ("process:a",), verb="read"), version=2
     )
-    assert fingerprint(base) != fingerprint(
-        Components("stride", "spoofing", ("process:b",), verb="read")
+    assert fingerprint(base, version=2) != fingerprint(
+        Components("stride", "spoofing", ("process:b",), verb="read"), version=2
     )
-    assert fingerprint(base) != fingerprint(
-        Components("asvs", "spoofing", ("process:a",), verb="read")
+    assert fingerprint(base, version=2) != fingerprint(
+        Components("asvs", "spoofing", ("process:a",), verb="read"), version=2
     )
-    assert fingerprint(base) != fingerprint(
-        Components("stride", "spoofing", ("process:a",), verb="alter")
+    assert fingerprint(base, version=2) != fingerprint(
+        Components("stride", "spoofing", ("process:a",), verb="alter"), version=2
     ), "the verb is what version 2 adds; two actions are two findings"
 
 
@@ -263,7 +263,6 @@ def test_version_two_without_a_verb_fails_closed():
 def test_an_unknown_version_raises_rather_than_falling_back():
     with pytest.raises(FingerprintError, match="not one this build computes"):
         fingerprint(Components("stride", "spoofing", ("process:a",)), version=99)
-    assert DEFAULT_VERSION in SUPPORTED_VERSIONS
 
 
 def test_an_unknown_verb_fails_where_the_claim_is_built():
@@ -283,3 +282,41 @@ def test_components_round_trip_so_a_version_bump_is_a_recompute():
 def test_malformed_components_are_refused_by_name():
     with pytest.raises(FingerprintError, match="malformed components"):
         Components.from_json({"framework": "stride", "lane": "spoofing"})
+
+
+def test_no_entry_point_defaults_the_version_a_package_is_keyed_under():
+    """The rule that keys a package is a table, so nothing may stand in for it.
+
+    `VERSION_FOR` was already a table, already complete, and already checked
+    against `PACKAGES` -- and every ASVS vote still failed, because `cast` took
+    its version from a constant instead of asking the table. A complete table a
+    caller can bypass is the same defect as the `if` it replaced, one level
+    down, and a default is how a caller bypasses one silently: the call site
+    that forgets looks exactly like the call site that meant it.
+
+    So a version parameter has no default anywhere. A caller that omits it fails
+    at the call, which is where somebody can see it.
+    """
+    import inspect
+
+    from evals.harness import ledger
+
+    defaulted = []
+    for module in (fingerprint_module, ledger):
+        for name, function in vars(module).items():
+            if not inspect.isfunction(function):
+                continue
+            parameter = inspect.signature(function).parameters.get("version")
+            if (
+                parameter is not None
+                and parameter.default is not inspect.Parameter.empty
+            ):
+                if parameter.default is None:
+                    continue  # an explicit "ask the table for me"
+                defaulted.append(f"{module.__name__}.{name}")
+
+    assert not defaulted, (
+        f"{defaulted} default the fingerprint version. Which rule keys a package"
+        " is VERSION_FOR's answer, and a default is a single rule standing in"
+        " for a table with one row per package."
+    )

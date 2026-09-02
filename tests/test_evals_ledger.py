@@ -13,7 +13,7 @@ import json
 
 import pytest
 
-from evals.harness.fingerprint import Components, fingerprint
+from evals.harness.fingerprint import Components, fingerprint, version_for
 from evals.harness.ledger import (
     REASON_GLOSS,
     REASONS,
@@ -102,7 +102,7 @@ def test_a_correction_is_a_new_event_and_the_old_one_survives(tmp_path):
 
     ledger = load(path)
     assert len(ledger) == 2, "the first vote was overwritten"
-    key = (fingerprint(components()), "sam")
+    key = (fingerprint(components(), version=version_for("stride")), "sam")
     assert ledger.current()[key].verdict == "down"
     assert [vote.verdict for vote in ledger.for_fingerprint(key[0])] == ["up", "down"]
 
@@ -117,9 +117,13 @@ def test_the_pool_is_derived_from_the_live_verdicts(tmp_path):
     )
 
     pool = load(path).pool()
-    assert fingerprint(components("process:a")) in pool
-    assert fingerprint(components("process:b")) in pool, "style down left the pool"
-    assert fingerprint(components("process:c")) not in pool
+    assert fingerprint(components("process:a"), version=version_for("stride")) in pool
+    assert (
+        fingerprint(components("process:b"), version=version_for("stride")) in pool
+    ), "style down left the pool"
+    assert (
+        fingerprint(components("process:c"), version=version_for("stride")) not in pool
+    )
 
 
 def test_a_retracted_upvote_leaves_the_pool(tmp_path):
@@ -140,7 +144,9 @@ def test_double_voted_findings_are_the_agreement_sample(tmp_path):
     append(cast(components("process:b"), "01", "up", "sam"), path)
 
     ledger = load(path)
-    assert ledger.double_voted() == (fingerprint(components("process:a")),)
+    assert ledger.double_voted() == (
+        fingerprint(components("process:a"), version=version_for("stride")),
+    )
     assert ledger.voters() == ("ada", "sam")
 
 

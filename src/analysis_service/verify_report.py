@@ -23,10 +23,12 @@ from pathlib import Path
 
 from analysis_service.attestation import (
     Attestation,
+    DuplicateKeyError,
     KeyringError,
     Verdict,
     Verification,
     load_keyring,
+    load_report,
     verify,
 )
 
@@ -80,8 +82,8 @@ def main(argv: list[str] | None = None) -> int:
         return 2
 
     try:
-        report = json.loads(args.report.read_text(encoding="utf-8"))
-    except (OSError, json.JSONDecodeError) as error:
+        report = load_report(args.report.read_text(encoding="utf-8"))
+    except (OSError, json.JSONDecodeError, DuplicateKeyError) as error:
         print(f"report: {error}", file=sys.stderr)
         return 2
 

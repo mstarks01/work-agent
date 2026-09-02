@@ -1,8 +1,8 @@
 # Report attestations
 
-**What a signature says: this report came from that deployment, and no covered
-byte has moved since. What it does not say: that the findings are correct, or
-that the run was certified.**
+**What a signature says: this report came from that deployment, and the document
+it covers has not changed since. What it does not say: that the findings are
+correct, or that the run was certified.**
 
 That distinction is the whole reason this document exists. A green signature is
 the easiest thing in a report to over-read, and reading it as an endorsement of
@@ -42,6 +42,14 @@ bound to the canonicalization version, the payload type, the key id and the
 signing time, so a signature cannot be lifted onto another document, replayed
 under a different canonicalization, re-attributed to another key, or moved in
 time to predate a retirement.
+
+What is digested is the canonical form of the **parsed** document, which is what
+lets a verifier check a report without this project's models: a re-serialized
+report is the same report. That puts the one remaining disagreement in the
+parser rather than in the signature, so the verifier refuses a file that names a
+key twice. `json` keeps the last of a repeated key and other parsers keep the
+first, so such a file can say two things and verify as the harmless one. Nothing
+this service produces repeats a key, so refusing costs a real report nothing.
 
 `signed_at` is when the deployment signed. It is **not evidence of when**: a
 machine's clock is not a trusted timestamp and nothing countersigns it. It is
