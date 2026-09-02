@@ -476,8 +476,8 @@ beside the finding.
 When the identity rule changes, the ledger moves with it and costs no re-vote:
 
 ```sh
-python -m evals.harness.run rekey --to-version 2        # preview, writes nothing
-python -m evals.harness.run rekey --to-version 2 --yes  # rewrite
+python -m evals.harness.run rekey        # preview, writes nothing
+python -m evals.harness.run rekey --yes  # rewrite
 ```
 
 A vote stores the fields its fingerprint was computed from, so re-keying is
