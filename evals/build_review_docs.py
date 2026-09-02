@@ -10,8 +10,12 @@ sitting is pure reading time.
 The template is ``corpus/01-payments-checkout/REVIEW-02.md``, the first such
 document and the record of what a sitting needs: the sources verbatim, the model
 as tables, the reader's own list before the recorded sets, one mark per record,
-and the exact ``reviews`` entry to paste at the end. Case 01 keeps its
-hand-written document. This writes ``REVIEW.md`` for every other case, and
+and the exact ``reviews`` entry to paste at the end. It is a template for the
+shape and not for the mark names: it is a merged reader's own words, which a
+vocabulary sweep does not edit, so it still spells ``doubt`` and ``dup`` where
+:data:`~evals.harness.sitting.MARKS` now reads ``agree``, ``reject`` and
+``duplicate``. What this module writes carries the current set. Case 01 keeps
+its hand-written document. This writes ``REVIEW.md`` for every other case, and
 refreshes it as reference sets change. The document is derived, so editing it by
 hand is editing the wrong file.
 

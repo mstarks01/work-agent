@@ -56,7 +56,8 @@ recommendation. `vertex`, `anthropic`, and `openai` are the registered vendors.
 
 `_MODEL` on its own retunes a tier whose vendor the file already names. Nothing
 is selected by default, so where the file names none — as it ships — both halves
-have to be passed, for both tiers.
+have to be passed, for every one of the three tiers: `base`, `strong` and
+`review`.
 
 One engine holds no cross-call state, so it is safe to share across concurrent
 tasks.

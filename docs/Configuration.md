@@ -29,7 +29,10 @@ Both [`Engine.from_config(frameworks, env=...)`](Integration-Guide.md) and the
 
 The code has registry entries for Vertex AI, Anthropic, and OpenAI. It reaches
 all three through ADK's LiteLLM adapter. `model_tiers.toml` selects **nothing**:
-both tier tables are absent, so startup fails until both tiers are configured.
+all three tier tables are absent, so startup fails until `base`, `strong` and
+`review` each name a vendor and a model. `review` is required even though the
+shipped node map points criticism at `strong`, because a tier a file may omit is
+a tier nobody has chosen a model for.
 
 “Supported vendor” does not mean every model from that vendor is usable. The
 selected model must also pass the model-name, sampling, output-capacity, native
