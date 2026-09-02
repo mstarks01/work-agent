@@ -5,42 +5,43 @@ voted on can be recognised again in a later run, whose wording moves and whose
 claim IDs are fresh every time. That recogniser is this module: a fingerprint
 over the fields a claim carries, never over its prose.
 
-**Versioned, and the version is the point.** A fingerprint is a hash, so
+It is versioned, and the version is the point. A fingerprint is a hash, so
 improving the recogniser changes every key. That would be fatal if a vote stored
-only the hash — so a vote stores its :class:`Components`, and re-keying the whole
-ledger under a new version is a pure recompute over stored fields, offline, with
-no provider and no re-vote. The problem a model-scored history has — a new
-scorer silently re-scores everything, with no way to recompute the old numbers —
-is answered here by making the
-re-score explicit, total and free.
+only the hash, so a vote stores its :class:`Components` instead. Re-keying the
+whole ledger under a new version is then a pure recompute over stored fields:
+offline, with no provider and no re-vote. A model-scored history has the problem
+that a new scorer silently re-scores everything, with no way to recompute the
+old numbers. This module answers it by making the re-score explicit, total and
+free.
 
-**Version 1 reads what a claim carries today.** Framework, lane and the
-endpoint-resolved **Element** IDs. It has a measured cost:
+Version 1 reads what a claim carries today: framework, lane, and the
+endpoint-resolved **Element** IDs. It has a measured cost.
 ``tests/test_evals_identity.py``'s ``endpoint subset`` row prices element
 agreement alone at 14 false splits of 200, 85 false merges of 115 candidate
-negatives and 23 false merges of 287 reference pairs.
+negatives, and 23 false merges of 287 reference pairs.
 
-**Version 2 adds the action verb**, which is what closes most of that gap: it
-costs one more false split and takes the candidate merges from 85 to 5. Read
-the candidate column rather than the reference one — on reference pairs alone
-the verb removes twenty of 23 and version 1 looks survivable, and on the
-paraphrases a live run actually emits it removes eighty of 85.
+Version 2 adds the action verb, which closes most of that gap. It costs one more
+false split, and it takes the candidate merges from 85 to 5. Read the candidate
+column rather than the reference one: on reference pairs alone the verb removes
+twenty of 23 and version 1 looks survivable, and on the paraphrases a live run
+emits it removes eighty of 85.
 :class:`~evals.harness.identity.SubsetVerbIdentity` scores 295/315 against the
-recorded labels where element agreement alone scores 200/315.
+recorded labels, where element agreement alone scores 200/315.
 
-It is the default. :class:`~analysis_service.report.Claim` carries the verb and
-:class:`~analysis_service.frameworks.stride.record.DraftThreat` requires it, so a
-finding out of a live run fingerprints at version 2 like a reference claim does.
+Version 2 is the default. :class:`~analysis_service.report.Claim` carries the
+verb, and :class:`~analysis_service.frameworks.stride.record.DraftThreat`
+requires it, so a finding out of a live run fingerprints at version 2 as a
+reference claim does.
 
-**Version 3 reads a catalog identifier instead of an action.** A package whose
+Version 3 reads a catalog identifier instead of an action. A package whose
 claims name a requirement in a published catalog is already identified, so the
-rule that keys it is place plus that identifier: ASVS's ``V6.2.1`` in the
+rule that keys it is place plus that identifier: ASVS's ``V6.2.1``, in the
 chapter it was ruled in, over the elements it names. Version 1 keyed such a
 claim by place alone, which made two requirements ruled on one element in one
-chapter a single fingerprint — and one vote answered for both.
+chapter a single fingerprint, and let one vote answer for both.
 
-**Every version stays computable, and that is not a compatibility shim.** Which
-rule keys a package is :data:`VERSION_FOR`, and the entries follow from what a
+Every version stays computable, and that is not a compatibility shim. Which rule
+keys a package is :data:`VERSION_FOR`, and the entries follow from what a
 package's claims are. A ledger row written under an older rule re-keys by
 recomputation rather than by a re-vote.
 """

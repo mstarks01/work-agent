@@ -2,21 +2,23 @@
 
 Human attention is the scarce resource in this whole design, so the order is a
 budget rather than a convenience. A finding twenty runs already agree on buys
-nothing; a finding that appears in one run of five, or that two configurations
+nothing. A finding that appears in one run of five, or that two configurations
 disagree about, buys the most information a single click can.
 
-**Built from finished artifacts and the ledger, and nothing else.** No provider,
-no credentials, no engine. That is what lets a sitting happen on a laptop with
-the repository checked out, and it is what makes the queue reproducible: the
-same artifacts and the same ledger produce the same queue in the same order.
+It is built from finished artifacts and the ledger, and nothing else. There is
+no provider, no credential and no engine. That is what lets a sitting happen on
+a laptop with the repository checked out, and it is what makes the queue
+reproducible: the same artifacts and the same ledger produce the same queue in
+the same order.
 
-**Blind by construction.** :class:`QueueItem` carries no model name, no tier and
-no configuration label — those live on the :class:`~evals.harness.ledger.Vote`
-and are stamped after the answer. A reviewer who can see which configuration
-produced a finding is a reviewer whose vote can encode a preference about the
-configuration, which is exactly the bias the vote exists to escape.
+It is blind by construction. :class:`QueueItem` carries no model name, no tier
+and no configuration label. Those live on the
+:class:`~evals.harness.ledger.Vote`, and are stamped after the answer. A
+reviewer who can see which configuration produced a finding is a reviewer whose
+vote can encode a preference about the configuration, which is exactly the bias
+the vote exists to escape.
 
-**Skips what is already answered.** A vote is spent once and kept forever
+It skips what is already answered. A vote is spent once and kept for ever,
 because it hangs on a fingerprint, so the second sitting over a corpus sees only
 what the first did not: new findings from a changed configuration, and
 disagreements. That is the whole economic argument for the fingerprint.

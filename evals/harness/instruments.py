@@ -2,37 +2,37 @@
 
 ## Why a table
 
-An **instrument** is one reading over a finished sweep: a per-case row, a fold
-over those rows, a rendering, and the artifact keys it owns. Eight of them
-exist, and each one already had all four parts — but nothing named the shape,
-so each was wired by hand into four places in :mod:`evals.harness.run`: a field
-on ``ModeRun``, an accumulator in ``_run_mode``, a ``_print_*`` function, and a
-literal in the artifact. Adding ASVS's two instruments cost six artifact keys
-and two renderers, written one at a time.
+An instrument is one reading over a finished sweep: a per-case row, a fold over
+those rows, a rendering, and the artifact keys it owns. Eight of them exist, and
+each one already had all four parts. Nothing named the shape, so each was wired
+by hand into four places in :mod:`evals.harness.run`: a field on ``ModeRun``, an
+accumulator in ``_run_mode``, a ``_print_*`` function, and a literal in the
+artifact. Adding ASVS's two instruments cost six artifact keys and two
+renderers, written one at a time.
 
 This is the rule ``docs/agents/framework-parity.md`` states for frameworks,
-applied to the other axis: **prefer a table over a constant or a branch.** A
-missing entry here raises at the first call; a forgotten ``_print_*`` call
-quietly reported one measurement fewer.
+applied to the other axis: prefer a table over a constant or a branch. A missing
+entry here raises at the first call. A forgotten ``_print_*`` call quietly
+reported one measurement fewer.
 
 ## What is not an instrument
 
 Certification, token usage and latency are the sweep's envelope rather than
-readings over its claims: they carry no per-framework dimension, no fold that
+readings over its claims. They carry no per-framework dimension, no fold that
 could disagree with a printed line, and no promotion feed. They stay in
 :mod:`evals.harness.run`.
 
 ## The two fields that decide when an entry runs
 
-``frameworks`` names the packages whose record the instrument reads. Empty
-means neutral — it reads whatever blocks the sweep produced. A non-empty tuple
-means the instrument only applies to a sweep that ran one of those packages,
-which is what lets a sweep of one framework skip another framework's scorer
-rather than fail in it.
+``frameworks`` names the packages whose record the instrument reads. Empty means
+neutral, so it reads whatever blocks the sweep produced. A non-empty tuple means
+the instrument applies only to a sweep that ran one of those packages, which is
+what lets a sweep of one framework skip another framework's scorer rather than
+fail inside it.
 
 ``scored`` says the reading needs the sweep's scores. The run-level instruments
-render first, so a sweep whose scoring path fails still prints
-the numbers that cost no provider call.
+render first, so a sweep whose scoring path fails still prints the numbers that
+cost no provider call.
 """
 
 from __future__ import annotations

@@ -3,47 +3,48 @@
 A lane agent learns its verb from the worked drafts in
 ``frameworks/<name>/lanes/<lane>/exemplars.md``. The reference sets under
 ``evals/corpus/`` grade it against a verb somebody else chose. Where those two
-disagree, :class:`~evals.harness.identity.SubsetVerbIdentity` splits a pair whose
-elements match, and the finding is scored as a miss and an over-report at once.
+disagree, :class:`~evals.harness.identity.SubsetVerbIdentity` splits a pair
+whose elements match, and the scorer counts the finding as a miss and an
+over-report at once.
 
 ## The measurement, over STRIDE's 18 exemplars and 243 reference claims
 
-**47 of 243 reference claims (19%) name a verb no exemplar in their lane
-demonstrates.** 23 are ``must-find``. All 13 cases carry at least one.
+47 of 243 reference claims, which is 19%, name a verb no exemplar in their lane
+demonstrates. 23 of those are ``must-find``. All 13 cases carry at least one.
 
 They split into two populations, and each wants a different answer:
 
-* **32 near misses** — the lane demonstrates the verb's *family* but not the
-  member, so the agent has a wrong neighbour to reach for. ``use-credential``
-  x9 against ``guess-credential``, ``disable`` x9 against ``flood``, ``plant``
-  x6 against ``alter``.
-* **15 with no neighbour** — the lane never demonstrates that family at all.
+* 32 near misses. The lane demonstrates the verb's family but not the member, so
+  the agent has a wrong neighbour to reach for. ``use-credential`` appears nine
+  times against ``guess-credential``, ``disable`` nine times against ``flood``,
+  and ``plant`` six times against ``alter``.
+* 15 with no neighbour. The lane never demonstrates that family at all.
   ``denial-of-service`` holds most of them: its three exemplars all demonstrate
   ``flood``, and the corpus asks for four integrity verbs in that lane.
 
 One further reading is over the exemplars alone. STRIDE ships exactly one
-:class:`Collision`: the ``elevation-of-privilege`` canonical draft says
-``abuse-grant`` and the unknown-conditional draft says ``escalate``, and the
+:class:`Collision`. The ``elevation-of-privilege`` canonical draft says
+``abuse-grant``, the unknown-conditional draft says ``escalate``, and the
 second's element set is contained in the first's. That is the identity rule's
 own split condition, sitting inside the shipped prompt text.
 
 ## Why this is a harness module and not a script
 
-The numbers above move whenever either side is edited, and both sides are
-edited often. A count nobody can regenerate is a claim about a tree that no
-longer exists.
+The numbers above move whenever either side is edited, and both sides are edited
+often. A count nobody can regenerate is a claim about a tree that no longer
+exists.
 
 ## Per framework, over each package's own exemplars and its own reference set
 
-Read off :data:`~evals.harness.fingerprint.IDENTIFIER_OF` rather than named: a
-package whose claims carry a catalog requirement identifier is identified by
-that identifier, composes no verb, and has nothing here to compare. A package
-that composes its identity from an action and a place is swept. So a package
-added to ``PACKAGES`` is swept or skipped by its own declaration, and neither
-answer needs an edit here.
+The sweep reads :data:`~evals.harness.fingerprint.IDENTIFIER_OF` rather than
+naming a package. A package whose claims carry a catalog requirement identifier
+is identified by that identifier, composes no verb, and has nothing here to
+compare. A package that composes its identity from an action and a place is
+swept. A package added to ``PACKAGES`` is therefore swept or skipped by its own
+declaration, and neither answer needs an edit here.
 
 Nothing here needs a provider. It reads shipped text and blessed reference sets,
-which is why it can run on every PR.
+which is why it can run on every pull request.
 """
 
 from __future__ import annotations

@@ -1,20 +1,20 @@
 """Mechanical checks over the golden corpus and the calibration-label fixtures.
 
-Everything here is deterministic and credential-free by construction;
+Everything here is deterministic and credential-free by construction, and
 ``tests/test_corpus_lints.py`` runs the same checks in CI.
 
-**This module is also the merge bar.** A deployment cannot read ``evals/`` —
-``pyproject.toml`` packages ``src/analysis_service`` alone — so no load-time gate
-can check that a framework was ever measured, and a package that *asserted* it
-had been would be the shape Promotion already rejects. The floor sits here
-instead, and it draws the same line the package gate does: the gate checks what
-the code reads, CI checks what the budget allows. Three checks
-(:func:`framework_issues`, :func:`lane_coverage_issues`) say a framework is
-**gradeable**; none of them says it grades *well*, and no number stands behind
-either claim until a live sweep runs.
+This module is also the merge bar. A deployment cannot read ``evals/``, because
+``pyproject.toml`` packages ``src/analysis_service`` alone, so no load-time gate
+can check that a framework was ever measured. A package that asserted it had
+been would be the shape Promotion already rejects. The floor sits here instead,
+and it draws the same line the package gate does: the gate checks what the code
+reads, and CI checks what the budget allows. Three checks, in
+:func:`framework_issues` and :func:`lane_coverage_issues`, say a framework is
+gradeable. None of them says it grades well, and no number stands behind either
+claim until a live sweep runs.
 
-Run ``python evals/verify_corpus.py`` to check, ``--write-sha`` to stamp each
-case's ``source_sha256`` from its ``source.md``.
+Run ``python evals/verify_corpus.py`` to check, and ``--write-sha`` to stamp
+each case's ``source_sha256`` from its ``source.md``.
 """
 
 from __future__ import annotations

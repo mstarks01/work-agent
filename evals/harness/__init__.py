@@ -1,9 +1,9 @@
 """The golden-case eval harness.
 
-Nothing here ships in the production image: the wheel builds only
+Nothing here ships in the production image, because the wheel builds only
 ``src/analysis_service``.
 
-Modules, in the order a run uses them:
+The modules, in the order a run uses them:
 
 * :mod:`evals.harness.reference` — ``ReferenceThreat`` and the corpus loader.
 * :mod:`evals.harness.structural` — the Tier 1 gates, the only ones that block.

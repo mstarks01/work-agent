@@ -1,38 +1,40 @@
 """``ReferenceClaim``, its STRIDE narrowing, and the loader for the golden corpus.
 
-``ReferenceClaim`` is an eval-side model, deliberately **not**
-:class:`~analysis_service.report.Claim`. A produced claim carries fields that must
-not be graded — a 4000-character ``description`` nobody asked the model to
-reproduce verbatim — and lacks ``tier``, the field that makes a recall threshold
-mean anything. Its ``id`` would be actively misleading: a reference ``S-01`` and
-a produced ``S-01`` are the same string for no reason at all.
+``ReferenceClaim`` is an eval-side model, and deliberately not
+:class:`~analysis_service.report.Claim`. A produced claim carries fields that
+must not be graded, such as a 4000-character ``description`` nobody asked the
+model to reproduce verbatim. It also lacks ``tier``, which is the field that
+makes a recall threshold mean anything. Its ``id`` would be actively misleading:
+a reference ``S-01`` and a produced ``S-01`` are the same string for no reason
+at all.
 
-It layers the way the service's own records do (:class:`ReferenceClaim` ->
-:class:`ReferenceThreat`), and for the same reason: what every framework's
+It layers the way the service's own records do, from :class:`ReferenceClaim` to
+:class:`ReferenceThreat`, and for the same reason. What every framework's
 reference set has in common is a claim string, a tier and the elements it is
-about, while the category and the two rated severity axes are STRIDE's. A
-framework whose records cite no element is expressible on the base, which is
-what stops the neutral half of the harness from assuming one.
+about. The category and the two rated severity axes are STRIDE's. A framework
+whose records cite no element is expressible on the base, which is what stops
+the neutral half of the harness assuming one.
 
-What *is* shared with the service is imported rather than restated —
-``StrideCategory``, ``Rating`` and the severity matrix — so the corpus cannot
-drift from the shipped vocabulary.
+What is shared with the service is imported rather than restated:
+``StrideCategory``, ``Rating`` and the severity matrix. The corpus therefore
+cannot drift from the shipped vocabulary.
 
-**One corpus, split by framework inside each case.** ``source.md``,
+There is one corpus, split by framework inside each case. ``source.md``,
 ``model.json``, ``corrections.md`` and ``case.json`` are shared and single,
-because #162 ruled that one extraction serves every framework and the blessed
+because #162 ruled that one extraction serves every framework, and the blessed
 model is the one artifact two frameworks must agree on. A second corpus tree
 would copy twelve sources and twelve blessed models, and two copies of one
-blessed model rot apart. The records split instead: ``claims/<framework>.json``,
-one file per framework the case carries records for.
+blessed model rot apart. The records split instead, into
+``claims/<framework>.json``, one file per framework the case carries records
+for.
 
-Loading fails closed in the shape
-:class:`~analysis_service.markdown_loader.MarkdownLoader` established — a missing
+Loading fails closed, in the shape
+:class:`~analysis_service.markdown_loader.MarkdownLoader` established. A missing
 file, a malformed case, a model that fails the shipped validity gate, or a
 reference citing an element the blessed model does not contain raises
 :class:`CorpusError`. The last of those mirrors the exemplar lint: a reference
-claim pointing at a nonexistent element is unscoreable, and silently dropping it
-would quietly lower the recall denominator.
+claim that points at a nonexistent element is unscoreable, and silently dropping
+it would quietly lower the recall denominator.
 """
 
 from __future__ import annotations

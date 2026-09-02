@@ -1,28 +1,28 @@
 """One command opens every contribution PR: ``submit <kind>``.
 
-The spine is #325's, and it is the same four steps for every kind: bind the
-authenticated ``gh`` login, run this kind's CI checks locally as a checklist,
-package the kind's allowlist on a fresh branch cut from ``origin/main``, and
-open the PR through ``gh``. ``--dry-run`` stops after the checklist, which is
-the contributor's local CI — a red PR should be rare because the same checks
-already ran on their machine.
+The spine is #325's, and it is the same four steps for every kind. Bind the
+authenticated ``gh`` login. Run this kind's CI checks locally as a checklist.
+Package the kind's allowlist on a fresh branch cut from ``origin/main``. Open
+the pull request through ``gh``. ``--dry-run`` stops after the checklist, which
+is the contributor's local CI, so a red pull request should be rare: the same
+checks already ran on their machine.
 
-**Which kinds exist is a table**, :data:`KINDS`, never a branch: the baseline
-kind arrives by adding an entry (#337), and the CLI offers exactly the
-table's keys. A kind that is not in the table is not a choice, rather than a
-stub that refuses.
+Which kinds exist is a table, :data:`KINDS`, and never a branch. The baseline
+kind arrives by adding an entry (#337), and the CLI offers exactly the table's
+keys. A kind that is not in the table is not a choice, rather than a stub that
+refuses.
 
-**The binding is strict — no proxy** (#320). The vote kind refuses to open a
-PR whose ledger delta names any voter other than the authenticated login, and
-it refuses a roster edit that raises the author's own standing. CI re-checks
-both; running them here just fails them early, at the machine where the fix
-is.
+The binding is strict, and there is no proxy (#320). The vote kind refuses to
+open a pull request whose ledger delta names any voter other than the
+authenticated login, and it refuses a roster edit that raises the author's own
+standing. CI re-checks both. Running them here fails them early, at the machine
+where the fix is.
 
-Security: everything this module runs is an argument list with
-``shell=False`` (A05), and every path it stages comes from the kind's
-allowlist rather than from the command line (A01). The packaging happens in a
-throwaway git worktree cut from ``origin/main``, so nothing the contributor's
-checkout carries beyond the allowlist can ride into the PR.
+On security: everything this module runs is an argument list with
+``shell=False`` (A05), and every path it stages comes from the kind's allowlist
+rather than from the command line (A01). The packaging happens in a throwaway
+git worktree cut from ``origin/main``, so nothing the contributor's checkout
+carries beyond the allowlist can ride into the pull request.
 """
 
 from __future__ import annotations

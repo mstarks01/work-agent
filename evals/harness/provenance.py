@@ -1,44 +1,44 @@
-"""What a sweep's generation identities were, serialized so promotion can reuse them.
+"""What a sweep's execution identities were, serialized so promotion can reuse them.
 
-A blessed fingerprint is the sha256 of a versioned **Execution Identity** —
-see :mod:`analysis_service.identity`. Its parts are observations: the served
-build is read back off each response, the sampling is what the deployment
-resolved after env overrides, the instruction digest is what the built graph
-carried, and the build map is what was installed. None of them is recoverable
-from the configured tier strings, so an artifact recording only what the run
-*asked* for cannot support a promotion — the operator would have to rediscover
-the served builds by hand, and blessing the requested model instead would
-certify a route rather than a build
-([#117](https://github.com/mstarks01/work-agent/issues/117)).
+A blessed fingerprint is the sha256 of a versioned **Execution Identity**; see
+:mod:`analysis_service.identity`. Its parts are observations. The served build
+is read back off each response. The sampling is what the deployment resolved
+after env overrides. The instruction digest is what the built graph carried. The
+build map is what was installed. None of them is recoverable from the configured
+tier strings, so an artifact that recorded only what the run asked for cannot
+support a promotion: the operator would have to rediscover the served builds by
+hand, and blessing the requested model instead would certify a route rather than
+a build ([#117](https://github.com/mstarks01/work-agent/issues/117)).
 
-**The artifact records the identity's non-sampling halves too (#504).** The
-build map is a per-sweep fact — one process, one install — so it sits beside the
-per-tier sampling. The instruction digest is not: a sweep builds one graph per
-framework selection its corpus declares, so it rides on each execution.
-:meth:`RunProvenance.verify` recomputes from *those recorded* values and never
-from the machine reading the file. An artifact swept on ``litellm`` 1.97.0 has
-to keep verifying after the reader upgrades, or every stored sweep would fail
-for drift in the reader rather than in the run.
+The artifact records the identity's non-sampling halves too (#504). The build
+map is a per-sweep fact, because there is one process and one install, so it
+sits beside the per-tier sampling. The instruction digest is not: a sweep builds
+one graph per framework selection its corpus declares, so it rides on each
+execution. :meth:`RunProvenance.verify` recomputes from those recorded values,
+and never from the machine reading the file. An artifact swept on ``litellm``
+1.97.0 has to keep verifying after the reader upgrades. Otherwise every stored
+sweep would fail for drift in the reader rather than in the run.
 
-**One record, one derived view.** :attr:`RunProvenance.node_runs` is the record:
-one entry per node *execution*, carrying the tier it ran on, what was requested,
-what answered, and the hash that pair produced. Everything else here is derived
-from it — the per-tier summary a reader greps for, and the node -> fingerprint
-observation map :func:`~analysis_service.certification.certify` rules on. The
-summary is written into the artifact for legibility and **re-derived** rather
-than read back on load; a stored summary that disagrees with the per-node record
-is a corrupted artifact, not a second opinion (OWASP A08).
+There is one record and one derived view. :attr:`RunProvenance.node_runs` is the
+record: one entry per node execution, carrying the tier it ran on, what was
+requested, what answered, and the hash that pair produced. Everything else here
+is derived from it — the per-tier summary a reader greps for, and the
+node-to-fingerprint observation map
+:func:`~analysis_service.certification.certify` rules on. The summary is written
+into the artifact for legibility, and re-derived rather than read back on load.
+A stored summary that disagrees with the per-node record is a corrupted artifact
+rather than a second opinion (OWASP A08).
 
-The resolved sampling is stored **once per tier**, not per execution, mirroring
-the clear block a :class:`~analysis_service.report.Report` already carries:
-a fingerprint is recomputable from a node's two routes plus its tier's block and
-the two per-sweep fields, and repeating any of them on every execution would be
-the same fact twelve times over, free to drift.
+The resolved sampling is stored once per tier rather than per execution, which
+mirrors the clear block a :class:`~analysis_service.report.Report` already
+carries. A fingerprint recomputes from a node's two routes, plus its tier's
+block and the two per-sweep fields. Repeating any of them on every execution
+would be the same fact twelve times over, free to drift.
 
-Loading fails closed (OWASP A02/A10): an unreadable file, invalid JSON, a
+Loading fails closed (OWASP A02 and A10). An unreadable file, invalid JSON, a
 missing or unsupported ``artifact_version``, a malformed record, a tier with no
 sampling block, an identity version this build does not compute, or a
-fingerprint that does not recompute all raise rather than yielding a partial
+fingerprint that does not recompute all raise, rather than yielding a partial
 record that promotion would bless.
 """
 

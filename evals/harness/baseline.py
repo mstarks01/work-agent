@@ -1,33 +1,34 @@
 """A **Baseline**: one directory, one configuration, up to ten sweeps.
 
-Merged baselines live at ``evals/baselines/<derived-name>/`` — the public
-record, beside ``evals/runs/`` the private scratch area (#321). A Baseline's
-**identity is computed from its artifacts and nobody types it**: the clean
-repo commit, the corpus digest, the requested model per tier, the resolved
-sampling per tier, and the framework selection. Two sweeps that agree on all
-five parts belong to one Baseline; the served build is an observation about a
-sweep, never part of the identity, so drifting fingerprints inside one
-Baseline are a finding about the provider rather than a second Baseline.
+Merged baselines live at ``evals/baselines/<derived-name>/``, which is the
+public record, beside ``evals/runs/``, the private scratch area (#321). A
+Baseline's identity is computed from its artifacts, and nobody types it. It has
+five parts: the clean repository commit, the corpus digest, the requested model
+per tier, the resolved sampling per tier, and the framework selection. Two
+sweeps that agree on all five belong to one Baseline. The served build is an
+observation about a sweep rather than part of the identity, so fingerprints that
+drift inside one Baseline are a finding about the provider rather than a second
+Baseline.
 
-The directory name is derived — the short commit, the strong-tier model slug,
-and an 8-hex prefix of the identity hash — so two contributors who sweep one
-configuration collide at one directory, and "same baseline" is enforced by
-the filesystem rather than by review attention. ``baseline.json`` is the
-manifest: the identity, and one entry per sweep. CI re-derives all of it and
-fails a mismatch, on the provenance-summary pattern — a stored view that
-disagrees with the record is corruption, not a second opinion.
+The directory name is derived, from the short commit, the strong-tier model
+slug, and an 8-hex prefix of the identity hash. Two contributors who sweep one
+configuration therefore collide at one directory, and the filesystem enforces
+"same baseline" rather than review attention. ``baseline.json`` is the manifest,
+and holds the identity plus one entry per sweep. CI re-derives all of it and
+fails a mismatch, on the provenance-summary pattern: a stored view that
+disagrees with the record is corruption rather than a second opinion.
 
-What verification can and cannot prove is #323's decision: every check here
-shows the artifact **agrees with itself and with the repository**, never that
-a model ran. A fabricator can compute correct hashes for a fabrication; the
-``submitted_by`` label on each sweep is the disclosure, and the standing
-behind it derives from the one roster at read time. The cost check is pure
-arithmetic over the manifest's own recorded unit prices, so an honest
-artifact never starts failing because the live price map moved.
+What verification can and cannot prove is #323's decision. Every check here
+shows the artifact agrees with itself and with the repository, and never that a
+model ran. A fabricator can compute correct hashes for a fabrication. The
+``submitted_by`` label on each sweep is the disclosure, and the standing behind
+it derives from the one roster at read time. The cost check is pure arithmetic
+over the manifest's own recorded unit prices, so an honest artifact never starts
+failing because the live price map moved.
 
-Security: the digests make silent edits loud (A08), the loads fail closed
-(A10), and nothing here trusts a label it can recompute (A08 again — the
-name, the manifest and every file hash are evidence, not assertions).
+On security: the digests make silent edits loud (A08), the loads fail closed
+(A10), and nothing here trusts a label it can recompute. The name, the manifest
+and every file hash are evidence rather than assertions (A08 again).
 """
 
 from __future__ import annotations

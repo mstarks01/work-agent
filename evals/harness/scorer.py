@@ -1,49 +1,51 @@
 """Scoring produced threats against a golden case's reference set.
 
-Mechanical everywhere; a human answers the one question code cannot:
+It is mechanical everywhere, and a human answers the one question code cannot:
 
-1. **Lane prefilter** (mechanical). A produced threat is only ever a candidate
-   for same-category references. Not a shortcut: misfiled threats are rejected,
-   never recategorized. Cuts pair count ~6x for free.
-2. **Per-pair claim equivalence** (mechanical). The identity rule from
-   :mod:`evals.harness.identity` — endpoint subset plus one action — with one
-   ruling per pair, individually auditable in the run artifact. It refuses a
-   pair it cannot read rather than guessing, so a reference claim without a
-   verb fails the sweep loudly.
-3. **One-to-one assignment** (mechanical). Deterministic maximum bipartite
-   matching, so each produced threat consumes at most one reference; without it
+1. Lane prefilter, mechanical. A produced threat is only ever a candidate for
+   same-category references. That is not a shortcut: the scorer rejects misfiled
+   threats and never recategorizes them. It cuts the pair count about sixfold
+   for free.
+2. Per-pair claim equivalence, mechanical. This is the identity rule from
+   :mod:`evals.harness.identity`, which is endpoint subset plus one action, with
+   one ruling per pair that is individually auditable in the run artifact. It
+   refuses a pair it cannot read rather than guessing, so a reference claim
+   without a verb fails the sweep loudly.
+3. One-to-one assignment, mechanical. This is deterministic maximum bipartite
+   matching, so each produced threat consumes at most one reference. Without it,
    recall is inflatable and stops meaning anything.
-4. **Standing of the unmatched** (voted). Unmatched is *not* a false positive:
-   references are non-exhaustive by construction, so that rule would punish
-   finding real threats and push every tuning cycle toward under-reporting.
-   Each unmatched threat is keyed by its fingerprint and looked up in the vote
-   ledger: a substance down-vote rejects it and gates, a vote that joins the
-   pool marks it real-but-unlisted, and a finding nobody answered is
-   ``unvoted`` — visible, non-gating, and exactly what the review queue serves.
-5. **Severity calibration** (mechanical). ``derive_severity_level`` is shipped
-   arithmetic; comparing bands needs no vote.
+4. Standing of the unmatched, voted. Unmatched is not a false positive.
+   References are non-exhaustive by construction, so that rule would punish
+   finding real threats and push every tuning cycle toward under-reporting. The
+   scorer keys each unmatched threat by its fingerprint and looks it up in the
+   vote ledger. A substance down-vote rejects it and gates. A vote that joins
+   the pool marks it real but unlisted. A finding nobody answered is
+   ``unvoted``, which is visible, non-gating, and exactly what the review queue
+   serves.
+5. Severity calibration, mechanical. ``derive_severity_level`` is shipped
+   arithmetic, and comparing bands needs no vote.
 
-Two things this module deliberately does *not* do. Element agreement at the
-citation level is **scored, never used as a prefilter**: the endpoint resolution
-inside the rule handles the flow-vs-process spelling, and the per-pair Jaccard
-here reports citation quality on matched pairs. And ``needs-info`` threats are
-never false positives — they are the designed behaviour the third exemplar per
-category teaches, and get their own bucket.
+Two things this module deliberately does not do. It scores element agreement at
+the citation level and never uses it as a prefilter: the endpoint resolution
+inside the rule handles the flow-versus-process spelling, and the per-pair
+Jaccard here reports citation quality on matched pairs. It also never treats a
+``needs-info`` threat as a false positive. Those are the designed behaviour the
+third exemplar per category teaches, and they get their own bucket.
 
-Every number here is **rule-and-ledger-relative**. Valid for tracking movement
-and comparing configurations; not an absolute, and not comparable to published
-figures from other tools. The matching half is deterministic, so it cannot move
-between two runs of one configuration; the standing half moves only when a
-person votes.
+Every number here is rule-relative and ledger-relative. It is valid for tracking
+movement and comparing configurations. It is not an absolute, and it is not
+comparable to published figures from other tools. The matching half is
+deterministic, so it cannot move between two runs of one configuration. The
+standing half moves only when a person votes.
 
-The scorer takes :class:`~analysis_service.report.DraftThreat`, not
-:class:`~analysis_service.report.Threat`, so the *same* function scores the
+The scorer takes :class:`~analysis_service.report.DraftThreat` rather than
+:class:`~analysis_service.report.Threat`, so the same function scores the
 pre-critic union and the post-critic report. Nothing is promoted to make that
-work: ``verdict`` and ``confidence`` are the critic's outputs, and synthesizing
+work. ``verdict`` and ``confidence`` are the critic's outputs, and synthesizing
 them to measure the critic would decide the answer by fiat. The one field a
-draft cannot supply — the ``needs-info`` standing bypass — is therefore
-simply inactive before the critic has ruled, which is the honest reading of a
-set nobody has ruled on yet.
+draft cannot supply is the ``needs-info`` standing bypass, and it is simply
+inactive before the critic has ruled, which is the honest reading of a set
+nobody has ruled on yet.
 """
 
 from __future__ import annotations

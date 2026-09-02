@@ -1,34 +1,34 @@
 """Promoting a sweep winner: re-pin the sampling file and bless its fingerprints.
 
-The **write** half of certification. The pure check lives in the service
-(:mod:`analysis_service.certification`), which certifies each job it completes;
-this module is what only a sanctioned sweep does — re-pinning this deployment's
-sampling file in place and recording the fingerprints that pinning implies.
+This is the write half of certification. The pure check lives in the service, at
+:mod:`analysis_service.certification`, which certifies each job it completes.
+This module is what only a sanctioned sweep does: it re-pins this deployment's
+sampling file in place, and records the fingerprints that pinning implies.
 
-*This deployment's*, not the repo's: both files are located through
-:class:`~analysis_service.deployment.Deployment`, so a sweep run against a
-redirected ``ANALYSIS_SAMPLING`` promotes into the file it actually measured.
+It is this deployment's file rather than the repository's. Both files are
+located through :class:`~analysis_service.deployment.Deployment`, so a sweep run
+against a redirected ``ANALYSIS_SAMPLING`` promotes into the file it measured.
 
-The write path is single-sourced: one ``SamplingConfig`` both re-pins the
-file's values *and* derives the fingerprints recorded in the manifest, so the
-two cannot drift — a blessed fingerprint always describes the params the file
-actually holds.
+The write path is single-sourced. One ``SamplingConfig`` both re-pins the file's
+values and derives the fingerprints recorded in the manifest, so the two cannot
+drift, and a blessed fingerprint always describes the params the file holds.
 
-Promotion is keyed by **tier**, following the manifest. ``promote`` recomputes
-the fingerprints from the identity rather than accepting them from the caller;
-that redundancy *is* the no-drift invariant.
+Promotion is keyed by tier, following the manifest. ``promote`` recomputes the
+fingerprints from the identity rather than accepting them from the caller, and
+that redundancy is the no-drift invariant.
 
-**A tier's identity is more than one served build (#504).** The execution
-identity binds the requested route and the built graph's instruction digest
-beside the served build, so a promotion resolves all three.
+A tier's identity is more than one served build (#504). The execution identity
+binds the requested route and the built graph's instruction digest beside the
+served build, so a promotion resolves all three.
 
 The three are not resolved alike, and the difference is which of them an
-operator can reasonably choose between. Two **served builds** on one tier is a
+operator can reasonably choose between. Two served builds on one tier is a
 provider rotation mid-sweep: both produced numbers in the same aggregate, so the
-tool refuses and ``--served`` picks. Two **requested routes** is a configuration
+tool refuses and ``--served`` picks. Two requested routes is a configuration
 that changed mid-sweep, which is a re-run rather than a choice, so there is no
-flag. Two **instruction digests** is a sweep whose corpus declared two framework
-selections and therefore built two graphs — both legitimate, both blessed.
+flag. Two instruction digests is a sweep whose corpus declared two framework
+selections and therefore built two graphs. Both are legitimate, and both are
+blessed.
 """
 
 from __future__ import annotations

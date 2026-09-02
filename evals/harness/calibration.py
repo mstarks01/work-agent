@@ -1,76 +1,76 @@
 """Rule-vs-label agreement over the recorded fixtures.
 
-**The two error directions are the measurement; the ratio is the door.** A
-false split — an equivalent finding the rule calls distinct — costs a reviewer
-one unmatched finding. A false merge — two distinct findings the rule calls
-one — destroys a finding and inflates recall, and no reviewer sees it happen.
-The consequences differ, so the counts are reported apart and never averaged
-into one number. :func:`measure_agreement` answers the split direction over the
-recorded labels; :func:`measure_merges` answers the merge direction over the
-corpus's own distinct claims.
+The two error directions are the measurement, and the ratio is the door. A false
+split is an equivalent finding the rule calls distinct, and it costs a reviewer
+one unmatched finding. A false merge is two distinct findings the rule calls
+one, and it destroys a finding and inflates recall, where no reviewer sees it
+happen. The consequences differ, so this module reports the counts apart and
+never averages them into one number. :func:`measure_agreement` answers the split
+direction over the recorded labels. :func:`measure_merges` answers the merge
+direction over the corpus's own distinct claims.
 
-``evals/calibration_labels/pairs.json`` holds candidate pairs marked match /
-no-match, and a matcher's agreement with those labels must be **>= 90%**
-(comparator: Semgrep's 92-96% on an analogous triage task). The matcher under
-this bar is the identity rule from :mod:`evals.harness.identity` — the model
-judge this scoreboard was built for is retired, and the scoreboard outlived it:
-any future rule version is priced here against the same labels before it ships.
+``evals/calibration_labels/pairs.json`` holds candidate pairs marked match or
+no-match, and a matcher's agreement with those labels must be at least 90%. The
+comparator is Semgrep's 92% to 96% on an analogous triage task. The matcher
+under this bar is the identity rule from :mod:`evals.harness.identity`. The
+model judge this scoreboard was built for is retired, and the scoreboard
+outlived it: any future rule version is priced here against the same labels
+before it ships.
 
-**What the bar is for, and what it is not.** It is the admission gate for a
-*candidate* rule: a rule nobody has measured yet has no pinned counts to
-regress against, and the bar is the only thing that can price it. Once a rule
-ships, its pinned split and merge counts in ``tests/test_evals_identity.py``
-are the regression signal, and they bind harder than the ratio — they are
-asserted exactly, so a rule cannot rot downwards inside the bar's slack. Read a
-passing bar as "this rule is worth measuring properly", never as matcher
-accuracy and never as external validation.
+The bar is the admission gate for a candidate rule. A rule nobody has measured
+has no pinned counts to regress against, and the bar is the only thing that can
+price it. Once a rule ships, its pinned split and merge counts in
+``tests/test_evals_identity.py`` are the regression signal, and they bind harder
+than the ratio: they are asserted exactly, so a rule cannot rot downwards inside
+the bar's slack. Read a passing bar as "this rule is worth measuring properly".
+Never read it as matcher accuracy, and never as external validation.
 
-**The labels are agent-authored, and a person has read 30 of the 339.** Review
-sitting 01 (``evals/calibration_labels/REVIEW-01.md``, 2026-08-18) took the 30
-hardest pairs and relabelled one. So agreement measures whether a rule
-reproduces what an earlier agent wrote down, and not whether either is right;
-the comparator above is a figure from a task with full reviewer agreement, and
-this number is not comparable to it. ``evals/README.md`` states the provenance
-once for the whole directory. Everything below says "the labels" rather than
-"the human" for that reason.
+The labels are agent-authored, and a person has read 30 of the 339. Review
+sitting 01, in ``evals/calibration_labels/REVIEW-01.md`` on 2026-08-18, took the
+30 hardest pairs and relabelled one. Agreement therefore measures whether a rule
+reproduces what an earlier agent wrote down, rather than whether either is
+right. The comparator above is a figure from a task with full reviewer
+agreement, and this number is not comparable to it. ``evals/README.md`` states
+the provenance once for the whole directory. Everything below says "the labels"
+rather than "the human" for that reason.
 
-**A rule may refuse a pair, and a refusal is not a miss.** The identity rule
-refuses a pair it cannot read — no candidate element IDs, no verb — rather
-than grading half of itself. Refused pairs are counted and reported beside the
-agreement, never inside it: folding them in either direction would let a rule
-buy accuracy by refusing the hard pairs.
+A rule may refuse a pair, and a refusal is not a miss. The identity rule refuses
+a pair it cannot read — one with no candidate element IDs, or no verb — rather
+than grading half of itself. This module counts refused pairs and reports them
+beside the agreement, never inside it. Folding them in either direction would
+let a rule buy accuracy by refusing the hard pairs.
 
-**A label may decline too.** Two dispositions carry no answer an identity rule
-can be graded against, and each sits outside the agreement for the reason a
-refusal does — nobody asked the rule a question it could be wrong about. They
-are counted under their own keys in ``set_aside``, never folded together.
+A label may decline too. Two dispositions carry no answer an identity rule can
+be graded against, and each sits outside the agreement for the reason a refusal
+does: nobody asked the rule a question it could be wrong about. They are counted
+under their own keys in ``set_aside``, and never folded together.
 
-``unclear`` is the reader declining: two write-ups they could not tell apart
-from the sentences alone. No shipped pair carries it. Review sitting 01
-returned four and step 5 of ``evals/BLESSING.md`` now states the test that
-decides them, so each resolved to a binary label; the disposition exists so the
+``unclear`` is the reader declining. It marks two write-ups they could not tell
+apart from the sentences alone. No shipped pair carries it. Review sitting 01
+returned four, and step 5 of ``evals/BLESSING.md`` now states the test that
+decides them, so each resolved to a binary label. The disposition exists so the
 next undecidable pair is recorded rather than forced.
 
-``unsupported`` is a **different axis, not a softer no-match**. The candidate
-names the same place and the same action as the reference and is still not a
-match, because it asserts a fact the **System Model** does not hold — a card
-that never crosses a link, an MFA control nobody wrote down. Whether a claim is
+``unsupported`` is a different axis rather than a softer no-match. The candidate
+names the same place and the same action as the reference, and is still not a
+match, because it asserts a fact the **System Model** does not hold: a card that
+never crosses a link, or an MFA control nobody wrote down. Whether a claim is
 grounded is not decidable from elements and verbs, so scoring an identity rule
 against these measures nothing about identity. ``BLESSING.md`` step 5 asks for
-them deliberately and routes them to the downstream "unsupported" bucket; they
-sat inside this score only while the rule refused the whole ``no-match`` half
-and nobody could see them.
+them deliberately and routes them to the downstream unsupported bucket. They sat
+inside this score only while the rule refused the whole ``no-match`` half and
+nobody could see them.
 
-**The exclusion is stated, not inferred.** Each ``unsupported`` fixture records
-the reason in its note, ``build_pairs.py`` carries the label, and the count
-prints beside every score. The number before the partition is on the record
-too: over all 330 readable pairs the rule has **20** false merges and 89.4%
+The exclusion is stated rather than inferred. Each ``unsupported`` fixture
+records the reason in its note, ``build_pairs.py`` carries the label, and the
+count prints beside every score. The number before the partition is on the
+record too: over all 330 readable pairs the rule has 20 false merges and 89.4%
 agreement, and 15 of those 20 are these fixtures.
 
-The consequence to state plainly, every time these numbers are quoted: recall
-and precision from this suite are **rule-relative**. They are valid for
-tracking movement and comparing configurations, and they are not absolutes
-comparable to published figures from other tools.
+State one consequence plainly, every time these numbers are quoted. Recall and
+precision from this suite are rule-relative. They are valid for tracking
+movement and for comparing configurations. They are not absolutes comparable to
+published figures from other tools.
 
 The same fixtures do double duty as the offline unit-test corpus for
 :mod:`evals.harness.scorer`, where a scripted matcher replays the recorded

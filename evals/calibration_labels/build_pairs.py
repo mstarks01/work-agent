@@ -1,41 +1,41 @@
 """Assemble the calibration fixtures from the recorded label tuples.
 
 ``LABELS`` is the labelling itself: one tuple per candidate pair, each carrying
-the rationale that argued for it. **Agent-authored, and a person has read 30 of
-them** — review sitting 01 (``REVIEW-01.md``, 2026-08-18) took the 30 hardest
-pairs and relabelled one. The other 309 are what the suite scores against rather
-than ground truth, and ``evals/README.md`` states that once for the whole
-directory. Reference claims are pulled verbatim from each case's
-``claims/stride.json`` by index, so a reworded reference cannot silently detach a
-fixture from the claim it was labelled against — ``verify_corpus.py`` fails
+the rationale that argued for it. It is agent-authored, and a person has read 30
+of them. Review sitting 01, in ``REVIEW-01.md`` on 2026-08-18, took the 30
+hardest pairs and relabelled one. The other 309 are what the suite scores
+against rather than ground truth, and ``evals/README.md`` states that once for
+the whole directory. Reference claims are pulled verbatim from each case's
+``claims/stride.json`` by index, so a reworded reference cannot silently detach
+a fixture from the claim it was labelled against. ``verify_corpus.py`` fails
 when it does.
 
-Editing fixtures means editing ``LABELS`` and re-running this; ``pairs.json`` is
-generated and should never be hand-edited.
+Editing fixtures means editing ``LABELS`` and re-running this. ``pairs.json`` is
+generated, and should never be hand-edited.
 
 The sixth field, the candidate's affected element IDs
 -----------------------------------------------------
 
-Every ``match`` tuple carries the elements its candidate claim is about;
-``no-match`` tuples carry ``None`` and are not yet assigned. It exists for
-`#201 <https://github.com/mstarks01/work-agent/issues/201>`_, which proposes
+Every ``match`` tuple carries the elements its candidate claim is about.
+``no-match`` tuples carry ``None`` and are not yet assigned. The field exists
+for `#201 <https://github.com/mstarks01/work-agent/issues/201>`_, which proposes
 comparing two claims on the fields that decide their identity rather than on a
-model call. Without it the pair set can say nothing about mechanical identity at
-all, because a bare claim string has no elements to compare.
+model call. Without it, the pair set can say nothing about mechanical identity
+at all, because a bare claim string has no elements to compare.
 
-**Assigned from the candidate claim's own words, never from the reference's
-element list.** Reading the reference's elements first and copying them would
-make every pair agree by construction and the measurement worthless, so the
-assignment answers one question per candidate: which elements of *this case's*
-blessed model does this sentence name? The corpus's own conventions apply — a
-flow, process, store or entity, one or two of them, and never a boundary, which
-the reference sets cite once in 431.
+It is assigned from the candidate claim's own words, and never from the
+reference's element list. Reading the reference's elements first and copying
+them would make every pair agree by construction, and the measurement
+worthless. The assignment therefore answers one question per candidate: which
+elements of this case's blessed model does this sentence name? The corpus's own
+conventions apply — a flow, process, store or entity, one or two of them, and
+never a boundary, which the reference sets cite once in 431.
 
-**Unreviewed, unlike the labels beside it.** Sitting 01 asked whether two
-write-ups are one threat; it never read an element assignment. ``BLESSING.md``
-step 5 is where a session labels these pairs and step 6 is where it blesses a
-case, and no case carries a ``review`` block yet — so the number this field feeds
-carries the provenance the labels carried before sitting 01.
+It is unreviewed, unlike the labels beside it. Sitting 01 asked whether two
+write-ups are one threat, and never read an element assignment.
+``BLESSING.md`` step 5 is where a session labels these pairs, and step 6 is
+where it blesses a case. No case carries a ``review`` block yet, so the number
+this field feeds carries the provenance the labels carried before sitting 01.
 """
 
 import json
