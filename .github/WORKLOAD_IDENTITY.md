@@ -238,7 +238,7 @@ first run after the setup above:
    `base` tier through the `extract` node.
 2. Read the `provenance` block in the run artifact. Each node execution
    records a `served_model` — the provider's own report of which build
-   answered. An execution with no served build carries no generation
+   answered. An execution with no served build carries no execution-identity
    fingerprint either, which silently removes the record that makes a result
    reproducible.
 
