@@ -46,6 +46,7 @@ import base64
 import hashlib
 import json
 import tomllib
+from collections import Counter
 from collections.abc import Mapping
 from datetime import UTC, datetime
 from pathlib import Path
@@ -246,6 +247,28 @@ class Keyring(BaseModel):
 
     version: int = Field(ge=1)
     keys: tuple[VerificationKey, ...]
+
+    @model_validator(mode="after")
+    def _each_key_is_named_once(self) -> Self:
+        """No key id appears twice, because :meth:`get` would have to pick one.
+
+        **This is the revocation path's fail-open.** An operator who revokes a
+        key by *appending* a ``revoked`` entry rather than editing the existing
+        one leaves two entries under one id; a first-match lookup then returns
+        whichever the file happens to list first, and a revoked key verifies.
+        The keyring cannot decide which entry an operator meant, so it refuses
+        the file rather than resolving the ambiguity in the direction that
+        grants trust.
+        """
+        seen = Counter(key.key_id for key in self.keys)
+        repeated = sorted(key_id for key_id, count in seen.items() if count > 1)
+        if repeated:
+            raise ValueError(
+                f"these key ids are named more than once: {', '.join(repeated)}."
+                " One id is one key: to revoke a key, set status on the entry it"
+                " already has rather than adding a second one."
+            )
+        return self
 
     def get(self, key_id: str) -> VerificationKey | None:
         return next((key for key in self.keys if key.key_id == key_id), None)
