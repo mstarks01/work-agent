@@ -75,10 +75,6 @@ PAYLOAD_TYPE = "application/vnd.work-agent.report+json"
 _SIGNATURE_LENGTH = 64
 
 
-class AttestationError(ValueError):
-    """A report cannot be signed, or an attestation cannot be verified."""
-
-
 class KeyringError(ConfigError):
     """The verification keyring is missing or unusable."""
 
