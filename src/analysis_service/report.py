@@ -1546,6 +1546,11 @@ class Job(BaseModel):
     status: Literal["completed"] = "completed"
     created_at: datetime
     completed_at: datetime
+    #: How many times a critic was asked again, summed across the job's
+    #: frameworks. The graph re-asks a critic whose rulings do not reconcile
+    #: with the drafts, once and bounded, so zero is the ordinary answer and a
+    #: rate that climbs after a prompt edit says the edit made the ruling harder
+    #: to give. Computed by :func:`~analysis_service.graph.revise_rounds`.
     revise_rounds: int = Field(default=0, ge=0)
     frameworks: list[FrameworkSelection] = Field(default_factory=list)
 
@@ -2622,6 +2627,13 @@ class Report(BaseModel):
     block's own ``framework`` field can disagree, and a dropped framework is
     invisible. A list plus one check catches both, and silently dropping a
     framework the caller paid for is the failure this rules out.
+
+    **The blocks are not merged, and nothing here merges them.** The relation an
+    analyst wants between two frameworks' output is *these findings touch one
+    element*, and the **Element ID** is the join key both blocks already cite --
+    so a reader joins on it with no model pass, which is what *deterministic
+    code, models for judgement* asks for. That is why no cross-framework critic
+    node exists to merge them instead.
     """
 
     model_config = ConfigDict(extra="forbid")
@@ -2758,22 +2770,3 @@ class Report(BaseModel):
         if answered == asked:
             return []
         return [f"analyses answer {answered!r}, but the job selected {asked!r}"]
-
-    def claims_by_element(self) -> dict[str, dict[FrameworkName, list[str]]]:
-        """Which claims name each element, grouped by framework.
-
-        The cross-framework view, and the whole of it. The relation an analyst
-        wants between two frameworks' output is *these findings touch one
-        element*, and the **Element ID** is the join key both analyses already
-        cite. Code does that with no model pass, which is what
-        *deterministic code, models for judgement* asks for — and it is why no
-        cross-framework critic node exists to merge them instead.
-        """
-        grouped: dict[str, dict[FrameworkName, list[str]]] = {}
-        for block in self.analyses:
-            for claim in block.all_claims():
-                for element_id in claim.affected_element_ids:
-                    grouped.setdefault(element_id, {}).setdefault(
-                        block.framework, []
-                    ).append(claim.id)
-        return grouped
