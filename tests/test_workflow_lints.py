@@ -210,7 +210,11 @@ TRUSTED_REF_GUARD = "if: github.ref == 'refs/heads/main'"
 #: it is scoped by the workflow's own ``permissions:`` block and every job gets
 #: one whether it asks or not.
 _OIDC_GRANT = "id-token: write"
-_SECRET_REFERENCE = "secrets."
+#: Both ways a workflow names a secret. ``secrets.NAME`` is the common one and
+#: ``secrets[expr]`` is how a matrix leg reads its own, which is the form a
+#: workflow reaches for precisely when it is being careful -- so a scan that saw
+#: only the first went blind on the file that had just been tightened.
+_SECRET_REFERENCES = ("secrets.", "secrets[")
 
 
 def _workflows() -> list[Path]:
@@ -255,7 +259,8 @@ def _credential_grants(workflow: Path) -> set[str]:
     for line in _code_lines(workflow):
         if _OIDC_GRANT in line:
             grants.add(_OIDC_GRANT)
-        if _SECRET_REFERENCE in line and "secrets.GITHUB_TOKEN" not in line:
+        names_a_secret = any(form in line for form in _SECRET_REFERENCES)
+        if names_a_secret and "secrets.GITHUB_TOKEN" not in line:
             grants.add(line.strip())
     return grants
 
