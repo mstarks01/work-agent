@@ -94,7 +94,14 @@ class RepoCommit(BaseModel):
 
     model_config = ConfigDict(extra="forbid", frozen=True)
 
-    commit: str = Field(min_length=1)
+    #: A full or abbreviated hex sha, or :data:`UNRECORDED`. Bounded because a
+    #: recorded commit reaches ``git`` argv in
+    #: option position -- ``git ls-tree -r -z <commit> --`` -- so a value opening
+    #: with ``-`` is read as an option rather than a commit. Every path fails
+    #: closed today, and the result is a silently skipped check rather than an
+    #: injected argument; a shape the field can state is better than a failure
+    #: mode the reader has to work out.
+    commit: str = Field(pattern=rf"^([0-9a-f]{{7,40}}|{UNRECORDED})$")
     #: ``None`` exactly when the commit was never recorded. A recorded sweep
     #: always knows, so a missing answer and "the tree was clean" stay distinct.
     clean: bool | None = None

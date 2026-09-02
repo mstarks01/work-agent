@@ -208,6 +208,43 @@ class TestHealthAndAuth:
         assert response.status_code == 401
 
 
+class TestSystemNameIsBoundedLikeALabel:
+    """It reaches the report a consumer renders, and this was the one entry
+    point to the pipeline that refused it nothing but a length.
+
+    A Source label refuses these categories and the token subject refuses them
+    too; the same value arriving here was checked only for being 1 to 200
+    characters.
+    """
+
+    @pytest.mark.parametrize(
+        "name",
+        [
+            "Orders\nCRITICAL forged",
+            "Orders\u2028second line",
+            "Orders\u202egnirdrO",
+            "Orders\u200bhidden",
+        ],
+    )
+    def test_a_name_a_renderer_reads_as_structure_is_refused(self, name):
+        client, _ = make_client()
+
+        response = client.post(
+            "/v1/jobs", json=submission(system_name=name), headers=auth()
+        )
+
+        assert response.status_code == 422
+
+    def test_an_ordinary_name_still_passes(self):
+        client, _ = make_client()
+
+        response = client.post(
+            "/v1/jobs", json=submission(system_name="Orders API"), headers=auth()
+        )
+
+        assert response.status_code == 201
+
+
 class TestSubmit:
     def test_submit_returns_handle_and_location(self):
         client, _ = make_client()

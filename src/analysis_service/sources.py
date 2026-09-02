@@ -267,6 +267,22 @@ class SourceLimits:
         )
 
 
+def plain_name(value: str) -> str:
+    """A caller-supplied name with nothing a renderer reads as structure.
+
+    The rule :meth:`Source._single_line_label` applies, exported because the
+    same question is asked of a name that arrives at another entry point. A
+    value carried into a report somebody reads must not hold a line break or a
+    bidirectional override: either changes what they see without changing what
+    they are told they are seeing.
+    """
+    if any(char in value for char in _LINE_BREAKS):
+        raise ValueError("carries a line break")
+    if any(unicodedata.category(char) in _FORMATTING_CATEGORIES for char in value):
+        raise ValueError("carries a control or formatting character")
+    return value
+
+
 def fence_for(body: str) -> str:
     """The shortest fence ``body`` cannot close.
 
