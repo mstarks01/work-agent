@@ -10,8 +10,14 @@ thing that addresses it.
 
 Model output is untrusted input (OWASP LLM05). A quote is bytes a model chose,
 matched against bytes a caller submitted, and this module interprets neither as
-anything but text. It compiles no regular expression from either side, so a
-hostile quote cannot cost more than its length.
+anything but text. It compiles no regular expression from either side, so the
+ladder proper cannot cost more than the quote's length times the source's.
+
+The repair rung is where cost has to be bounded on purpose, because it is the
+one place both lengths multiply into a search. :data:`MAX_REPAIR_WORK` is that
+bound, and the constant carries the measurements behind it. Without it a caller
+sizes the rung's work directly — both terms come from the submitted text — and
+one refused quote runs for minutes.
 
 The ladder is pinned, and each rung is a policy decision rather than a
 convenience. The figures below are measured over the 12 corpus cases' 206
@@ -89,6 +95,34 @@ REPAIR_THRESHOLD = 0.9
 #: or longer, and a shorter window that wins on ratio has cut a word the quote
 #: carried.
 _REPAIR_WIDTH_SLACK = 2
+
+#: The largest candidate scan :func:`repair_quote` will run, as the source's
+#: word count times the square of the quote's. Above it the rung gives up and
+#: the quote stays unverified, which is an outcome the report already carries.
+#:
+#: The square is the measured shape, not a guess. The scan walks one window per
+#: source word, and each window that :meth:`~difflib.SequenceMatcher.quick_ratio`
+#: does not prune costs a :meth:`~difflib.SequenceMatcher.ratio` quadratic in
+#: the quote's length. A quote whose characters are the window's — which is what
+#: a reordering of the source's own words produces — prunes nothing, so the
+#: worst case is every window paying it:
+#:
+#: =============  ===========  =========
+#: source words   quote words  seconds
+#: =============  ===========  =========
+#: 2,000                   20      0.11
+#: 2,000                   60      4.23
+#: 1,000                  140     45.76
+#: 2,000                  140     92.30
+#: =============  ===========  =========
+#:
+#: Those hold ``words x width^2 / seconds`` near 426,000, and this bound is
+#: roughly nine seconds of it. The submitted text is what sets both terms, so
+#: without a bound a caller sizes this rung's cost directly: 100 KiB of short
+#: words is 51,200 of them, and a 500-word quote against them ran for minutes.
+#: A quote of the corpus median, 13 words, still repairs against the largest
+#: source the service accepts.
+MAX_REPAIR_WORK = 4_000_000
 
 #: Characters a model routinely substitutes for their ASCII originals when it
 #: believes it is quoting verbatim. NFKC folds most of the width and ligature
@@ -187,6 +221,16 @@ def repair_quote(quote: str, source: str) -> tuple[str, float] | None:
     both sides so the rungs the ladder already forgives cost nothing here. The
     best candidate wins if it reaches :data:`REPAIR_THRESHOLD`.
 
+    Each source word is normalized once rather than once per window that covers
+    it, which is the same comparison for a fraction of the folding: a window's
+    folded form is its folded words joined, because the ladder's rungs are
+    per-character and the last one collapses whitespace.
+
+    A scan over :data:`MAX_REPAIR_WORK` is refused outright rather than run.
+    Answering ``None`` here is the same answer the threshold gives when no
+    window is close enough, and the caller already handles it: the quote stays
+    unverified and the report says so.
+
     A quote marking a cut with ``…`` is not repaired: each fragment is a span of
     its own, and one nearest window for the whole is a span the quote never
     claimed.
@@ -198,16 +242,18 @@ def repair_quote(quote: str, source: str) -> tuple[str, float] | None:
         return None
     words = source.split()
     width = len(quote.split())
+    if len(words) * width * width > MAX_REPAIR_WORK:
+        return None
+    folded = [normalize(word) for word in words]
     best: tuple[str, float] | None = None
     matcher = SequenceMatcher(autojunk=False)
     matcher.set_seq2(needle)
     for count in range(width, width + _REPAIR_WIDTH_SLACK + 1):
         for start in range(len(words) - count + 1):
-            span = " ".join(words[start : start + count])
-            matcher.set_seq1(normalize(span))
+            matcher.set_seq1(" ".join(w for w in folded[start : start + count] if w))
             if matcher.quick_ratio() < REPAIR_THRESHOLD:
                 continue
             ratio = matcher.ratio()
             if ratio >= REPAIR_THRESHOLD and (best is None or ratio > best[1]):
-                best = (span, ratio)
+                best = (" ".join(words[start : start + count]), ratio)
     return best

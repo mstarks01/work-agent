@@ -22,6 +22,8 @@ from pydantic import ConfigDict, Field
 
 from analysis_service.actions import ActionVerb
 from analysis_service.report import (
+    MAX_CLAIMS_PER_BATCH,
+    MAX_ELEMENTS_PER_PROPOSAL,
     AnalysisMarks,
     BlockSummary,
     Claim,
@@ -177,7 +179,9 @@ class DraftThreat(Claim):
     model_config = ConfigDict(extra="forbid")
 
     category: StrideCategory
-    affected_element_ids: list[str] = Field(min_length=1)
+    affected_element_ids: list[str] = Field(
+        min_length=1, max_length=MAX_ELEMENTS_PER_PROPOSAL
+    )
     #: Required here where the base allows ``None``. STRIDE's claims are an open
     #: set with no catalog identifier behind them, so two of them are the same
     #: finding when they name one action against one place — and a threat that
@@ -327,7 +331,9 @@ class ThreatProposal(Proposal):
     # what this removes: ``"1"`` against a ``^\d{2}$`` pattern is a spelling
     # error that fails the node, and a sequence has no spelling.
     sequence: int = Field(ge=1, le=MAX_SEQUENCE)
-    affected_element_ids: list[str] = Field(min_length=1)
+    affected_element_ids: list[str] = Field(
+        min_length=1, max_length=MAX_ELEMENTS_PER_PROPOSAL
+    )
     # Narrowed with :class:`DraftThreat`'s, and for the reason that class gives:
     # a proposal that validates must resolve into a draft that validates. The
     # agent picks from the closed vocabulary; an unrecognised verb is refused by
@@ -358,7 +364,9 @@ class ThreatProposals(ProposalBatch):
     # an incompatible override because `list` is invariant. Sound here: these
     # models are built by validation and read, never handed to base-class code
     # that would append a wider element to them.
-    claims: list[ThreatProposal]  # type: ignore[assignment]
+    claims: list[ThreatProposal] = Field(  # type: ignore[assignment]
+        max_length=MAX_CLAIMS_PER_BATCH
+    )
 
 
 class ThreatRuling(Ruling):
