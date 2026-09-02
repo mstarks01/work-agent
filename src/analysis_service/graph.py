@@ -955,19 +955,46 @@ def render(value: Any) -> str:
 def render_fenced(value: Any) -> str:
     """A rendered value plus a fence it cannot close.
 
-    ``render`` is ``json.dumps``, which escapes quotes, backslashes and
-    newlines but **not** backticks. A System Model carries caller words by rule
-    — ``source_excerpt`` verbatim, and ``notes`` quoting what a speaker said —
-    so a value holding a fence would close a static one in the prompt and land
-    the bytes after it in instruction position. That is the hole
-    :func:`~analysis_service.sources.render_sources` closes one node upstream,
-    with the same technique and the same sizing rule: sized once over the whole
-    rendered document, because this seam renders one JSON blob rather than N
-    caller-controlled blocks.
+    ``render`` is ``json.dumps`` with ``ensure_ascii=False``. It escapes quotes,
+    backslashes, ``\\n`` and ``\\r`` — and **not** backticks, and **not**
+    U+2028, U+2029 or U+0085, which it passes through as themselves. Those three
+    are line terminators to ``str.splitlines`` and to most renderers, so a value
+    holding one plus a backtick run has both halves of a closing fence.
+
+    A System Model carries caller words by rule — ``source_excerpt`` verbatim,
+    and ``notes`` quoting what a speaker said — and a merged draft carries a
+    lane agent's own prose. Against a fence written into the prompt file, such a
+    value closes the block and lands the bytes after it in instruction position.
+    Against this one it cannot, because the fence is sized over the body: a body
+    holding ``` gets a four-backtick fence.
+
+    That is the hole :func:`~analysis_service.sources.render_sources` closes one
+    node upstream, with the same technique and the same sizing rule — sized once
+    over the whole rendered document, because this seam renders one JSON blob
+    rather than N caller-controlled blocks.
+
+    **Every rendered key a prompt interpolates goes through here**, and no
+    prompt file writes a fence of its own. A static fence is only ever as long
+    as itself, so the two cannot be mixed: one written in the file would be the
+    one a body could close.
     """
     body = render(value)
     fence = fence_for(body)
     return f"{fence}\n{body}\n{fence}"
+
+
+def unfence(rendered: str) -> str:
+    """The body back out of :func:`render_fenced`.
+
+    One rendered key is also read back by Python: the parked rejection, which
+    the driver turns into the issues a caller is shown. It still ships fenced,
+    because the same string is interpolated into ``repair.md`` and a key that
+    shipped bare would be the one a body could close.
+    """
+    lines = rendered.splitlines()
+    if len(lines) >= 2 and lines[0].startswith("```") and lines[-1] == lines[0]:
+        return "\n".join(lines[1:-1])
+    return rendered
 
 
 # --- Deterministic node functions -------------------------------------------
@@ -1048,7 +1075,7 @@ def validate_extraction(
         state.prompt(STATE_PREVIOUS_MODEL, render_fenced(parked))
         state.prompt(
             STATE_VALIDATION_ISSUES,
-            render([issue.model_dump(mode="json") for issue in issues]),
+            render_fenced([issue.model_dump(mode="json") for issue in issues]),
         )
         return _routed(ROUTE_INVALID, {"issue_count": len(issues)})
 
@@ -1203,7 +1230,7 @@ def prepare_analysis(
     state.prompt(STATE_SYSTEM_MODEL, render_fenced(_without_source_fields(valid_model)))
     state.prompt(
         STATE_BOUNDARY_CROSSINGS,
-        render([crossing.model_dump(mode="json") for crossing in crossings]),
+        render_fenced([crossing.model_dump(mode="json") for crossing in crossings]),
     )
     state.prompt(STATE_EVIDENCE_CATALOG, render_catalog(catalog))
     # Beside the model rather than instead of it: a lane agent reasons over the
@@ -1551,7 +1578,7 @@ def merge_drafts(
     # pairs it would otherwise hunt for computed onto them. The re-ask builds
     # its own view through the same function, so the two passes cannot disagree
     # about what a critic reads.
-    state.prompt(nodes.key("draft_view"), render(critic_view(merged, model)))
+    state.prompt(nodes.key("draft_view"), render_fenced(critic_view(merged, model)))
     return {
         "framework": nodes.name,
         "draft_count": len(merged),
@@ -1617,10 +1644,12 @@ def route_review(
         # ``previous_review`` is the parked payload itself rather than anything
         # recomputed, because what the re-ask must reconcile with is the bytes
         # the critic actually returned.
-        state.prompt(nodes.key("previous_review"), render(ruled))
-        state.prompt(nodes.key("critic_issues"), render(outcome.messages))
-        state.prompt(nodes.key("draft_roster"), render(outcome.roster))
-        state.prompt(nodes.key("unreconciled_drafts"), render(outcome.unreconciled))
+        state.prompt(nodes.key("previous_review"), render_fenced(ruled))
+        state.prompt(nodes.key("critic_issues"), render_fenced(outcome.messages))
+        state.prompt(nodes.key("draft_roster"), render_fenced(outcome.roster))
+        state.prompt(
+            nodes.key("unreconciled_drafts"), render_fenced(outcome.unreconciled)
+        )
         # Recorded onto this framework's marks before the re-ask runs, so the
         # report says how the first pass failed even when the re-ask repairs it
         # completely. Merged rather than assigned: ``marks`` already holds what
@@ -2522,7 +2551,9 @@ def _node_sampling(
 
 def rejection_issues(rendered: str) -> list[ValidationIssue]:
     """Parse the rejection the graph parked in state back into issues."""
-    return [ValidationIssue.model_validate(issue) for issue in json.loads(rendered)]
+    return [
+        ValidationIssue.model_validate(issue) for issue in json.loads(unfence(rendered))
+    ]
 
 
 @dataclass(frozen=True)

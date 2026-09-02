@@ -10,35 +10,25 @@ The problem is structural, not a matter of judgement. You are not being asked to
 
 Every draft ID the lane agents produced — the exact set your rulings must cover, no more and no less, one ruling each:
 
-```
 {draft_roster}
-```
 
 The drafts you cannot fix without reading — the ones you dropped, and the ones whose `needs-info` unknown does not resolve. Empty when every problem is answerable from the IDs alone. **No other draft's text is here, and none is missing: a draft ID absent from this block is one whose ruling you already made correctly and must carry across unchanged.**
 
-```
 {unreconciled_drafts}
-```
 
 The ruling you returned, which failed the check:
 
-```
 {previous_review}
-```
 
 The problems found in it, each naming the draft ID and what is wrong:
 
-```
 {critic_issues}
-```
 
 The validated System Model and its boundary crossings, so a `needs-info` unknown you must repair points at an element that exists:
 
 {system_model}
 
-```
 {boundary_crossings}
-```
 
 ## Procedure
 
