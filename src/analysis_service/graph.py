@@ -2546,6 +2546,28 @@ def _node_sampling(
     return {node.name: resolve_sampling(tier_nodes[node.name]) for node in llm_nodes}
 
 
+def revise_rounds(
+    node_runs: Sequence[NodeRun], frameworks: Sequence[FrameworkName]
+) -> int:
+    """How many times a critic was asked a second time, across the whole job.
+
+    The graph's ``revise`` edge: a critic whose rulings do not reconcile with
+    the drafts is re-asked once, bounded, and the re-ask is its own node. So the
+    count is how many of those nodes ran, and a job that reconciled first time
+    reports zero.
+
+    Worth recording because it is the cheapest signal that a critic is
+    struggling with a package's question -- a rate that climbs after a prompt
+    edit says the edit made the ruling harder to give, which no other number in
+    the report says.
+
+    Node names are derived per framework rather than matched by prefix, so a
+    package registered tomorrow is counted by the same line.
+    """
+    re_asks = {FrameworkNodes(name).node(RECRITIC_ROLE) for name in frameworks}
+    return sum(1 for run in node_runs if run.node in re_asks)
+
+
 def rejection_issues(rendered: str) -> list[ValidationIssue]:
     """Parse the rejection the graph parked in state back into issues."""
     return [

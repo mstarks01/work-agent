@@ -2450,3 +2450,47 @@ class TestNoPromptWritesItsOwnFence:
             f"{offenders} fence a placeholder in the file. Interpolate the value"
             " on its own line and let render_fenced size the fence over it."
         )
+
+
+class TestTheReviseCount:
+    """`Job.revise_rounds` named a real thing and nothing ever filled it.
+
+    The graph has the edge -- a critic whose rulings do not reconcile with the
+    drafts is re-asked once -- so the number was a measurement the pipeline
+    could produce and did not, and every report the service ever wrote said
+    zero whatever happened.
+    """
+
+    def test_a_job_that_reconciled_first_time_reports_none(self):
+        runs = [
+            NodeRun(node="critic_stride", duration_ms=1),
+            NodeRun(node="assemble", duration_ms=1),
+        ]
+
+        assert graph.revise_rounds(runs, ["stride"]) == 0
+
+    def test_a_re_ask_is_counted(self):
+        runs = [
+            NodeRun(node="critic_stride", duration_ms=1),
+            NodeRun(node="recritic_stride", duration_ms=1),
+        ]
+
+        assert graph.revise_rounds(runs, ["stride"]) == 1
+
+    def test_each_framework_counts_its_own(self):
+        """It is a job-level number over a per-framework edge, so two packages
+        that both re-asked are two rounds."""
+        runs = [
+            NodeRun(node="recritic_stride", duration_ms=1),
+            NodeRun(node="recritic_asvs", duration_ms=1),
+            NodeRun(node="critic_asvs", duration_ms=1),
+        ]
+
+        assert graph.revise_rounds(runs, ["stride", "asvs"]) == 2
+
+    def test_a_frameworks_re_ask_is_not_counted_for_a_job_that_did_not_select_it(self):
+        """The names are derived from the job's own selection, not matched by
+        prefix, so a package registered tomorrow is counted by the same line."""
+        runs = [NodeRun(node="recritic_asvs", duration_ms=1)]
+
+        assert graph.revise_rounds(runs, ["stride"]) == 0

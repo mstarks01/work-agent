@@ -253,7 +253,6 @@ def test_an_empty_ledger_answers_every_question(tmp_path):
     assert ledger.pool() == frozenset()
     assert ledger.voters() == ()
     assert ledger.double_voted() == ()
-    assert ledger.voted_fingerprints() == frozenset()
 
 
 def test_every_package_keys_its_own_votes(tmp_path):

@@ -164,6 +164,13 @@ the artifact counts them per case:
 | `open` | somebody answered `unsure` or `needs-evidence` | Nothing. It waits for a better sitting. |
 | `unvoted` | nobody answered it | Nothing. It is visible in the counts and never counts against the tool. |
 
+Both answers behind `open` move no number, and they part company in your queue.
+`unsure` is a spent answer: you judged the finding and it stays judged. Needing
+more evidence is not a judgement, so it holds for that sitting only, and a later
+sitting asks again over whatever evidence exists by then. Pressing it is how you
+say *not yet*, and it used to be the one answer that removed a finding from your
+queue for good.
+
 Two reviewers can disagree, and then `rejected` wins over `pooled`. A tool must
 not score itself on the answer that flatters it most.
 

@@ -223,11 +223,15 @@ def build_session(
         for case in corpus
     }
     ledger = load(ledger_path)
+    # Minted before the queue rather than with the Session, because the queue
+    # reads it: a `needs-evidence` answer holds for its own sitting only.
+    sitting = f"web-{secrets.token_hex(4)}"
     items = review_queue.build(
         review_queue.merge_runs(runs, flows),
         flows,
         ledger,
         voter=voter,
+        sitting=sitting,
     )
     return Session(
         voter=voter,
@@ -235,7 +239,7 @@ def build_session(
         items=items,
         sources=sources,
         configs=dict(configs or {}),
-        sitting=f"web-{secrets.token_hex(4)}",
+        sitting=sitting,
     )
 
 

@@ -289,3 +289,63 @@ class TestTheRunCountsComeFromTheRuns:
 
         assert items["Sometimes"].volatile is True
         assert "some runs and not others" in items["Sometimes"].why
+
+
+class TestNeedsEvidenceIsNotAnAnswer:
+    """The button says "Needs more evidence". It has to mean that.
+
+    Every other verdict answers the question. This one says the reviewer could
+    not answer it from what they were shown -- so counting it as answered took
+    the finding out of their queue for good, and the one input asking to see
+    more was the one that guaranteed they never would.
+    """
+
+    def _ledger(self, item, *, sitting):
+        led = Ledger()
+        led.votes.append(
+            cast(
+                value_of(item),
+                "01-payments-checkout",
+                "needs-evidence",
+                "ada",
+                sitting=sitting,
+            )
+        )
+        return led
+
+    def test_it_does_not_come_back_in_the_sitting_it_was_cast_in(self):
+        """Otherwise the reviewer is handed it again on the next click."""
+        unanswerable = finding(title="Cannot judge this", target="process:a")
+        led = self._ledger(unanswerable, sitting="web-1")
+
+        queue = build([unanswerable], FLOWS, led, voter="ada", sitting="web-1")
+
+        assert queue == []
+
+    def test_it_comes_back_in_a_later_sitting(self):
+        """Which is what the reviewer asked for: ask again, over whatever
+        evidence exists by then."""
+        unanswerable = finding(title="Cannot judge this", target="process:a")
+        led = self._ledger(unanswerable, sitting="web-1")
+
+        queue = build([unanswerable], FLOWS, led, voter="ada", sitting="web-2")
+
+        assert [item.finding.title for item in queue] == ["Cannot judge this"]
+
+    def test_a_real_answer_still_never_comes_back(self):
+        """The economics the fingerprint buys: a vote is spent once and kept."""
+        answered = finding(title="Judged", target="process:b")
+        led = Ledger()
+        led.votes.append(cast(value_of(answered), "01", "up", "ada", sitting="web-1"))
+
+        assert build([answered], FLOWS, led, voter="ada", sitting="web-2") == []
+
+    def test_another_voter_is_unaffected_by_it(self):
+        """It records what one reviewer could not judge, not a fact about the
+        finding."""
+        unanswerable = finding(title="Cannot judge this", target="process:a")
+        led = self._ledger(unanswerable, sitting="web-1")
+
+        queue = build([unanswerable], FLOWS, led, voter="bob", sitting="web-1")
+
+        assert [item.finding.title for item in queue] == ["Cannot judge this"]
