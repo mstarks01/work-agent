@@ -1,44 +1,44 @@
 """The estimate gate: informed, affirmative consent before a sweep spends.
 
-There is **no spend ceiling** (#334). A contributor may spend any amount; the
-gate's job is to make sure they know what they are accepting, know how good
-that number is, and accept it in a way a rote hand cannot.
+There is no spend ceiling (#334). A contributor may spend any amount. The gate's
+job is to make sure they know what they are accepting, know how good that number
+is, and accept it in a way a rote hand cannot.
 
-**Every amount carries one of three labels, always.**
+Every amount carries one of three labels, always.
 
 ``recorded``
-    A merged Baseline with this exact configuration recorded this actual. A
-    real number, not a guess.
+    A merged Baseline with this exact configuration recorded this actual. It is
+    a real number rather than a guess.
 ``estimated``
     Price-map arithmetic over another Baseline's token counts, repriced with
-    this run's models. A best guess.
+    this run's models. It is a best guess.
 ``unpriced``
-    No number exists — because a tier's model is absent from the price map,
-    or because no merged Baseline exists to calibrate from. Never a zero.
+    No number exists, either because a tier's model is absent from the price
+    map, or because no merged Baseline exists to calibrate from. It is never a
+    zero.
 
-**The estimate says which Baseline it read and what it does not know.** A
-borrowed number rests on somebody else's token counts, so the lender is
-chosen for what it ran rather than for where it sorts (:data:`COMPARABLE_ON`),
-and whatever it still does not share with this run is printed beside the
-figure. Where the price map now disagrees with what that Baseline recorded,
-one line names the model and both prices — #331's whole alarm, and the only
-one, because the repository pins litellm exactly and a CI check would fail
-honest history the day after somebody bumps the pin.
+The estimate says which Baseline it read, and what it does not know. A borrowed
+number rests on somebody else's token counts, so the lender is chosen for what
+it ran rather than for where it sorts; see :data:`COMPARABLE_ON`. Whatever the
+lender still does not share with this run is printed beside the figure. Where
+the price map now disagrees with what that Baseline recorded, one line names the
+model and both prices. That is #331's whole alarm, and the only one, because the
+repository pins litellm exactly and a CI check would fail honest history the day
+after somebody bumps the pin.
 
-**Acceptance is typing the amount back.** An enter or a ``y`` never proceeds.
-The mechanism is rote-proof because the number changes with the
-configuration. A script states its own number with ``--accept-cost <usd>``,
-and the run refuses when the estimate exceeds it; ``--accept-cost unknown``
-is how a script accepts a cost nobody can state. The kinds must match: a
-number does not answer an unpriced estimate, and ``unknown`` does not answer
-a stated one.
+Acceptance is typing the amount back. An enter or a ``y`` never proceeds. The
+mechanism is rote-proof because the number changes with the configuration. A
+script states its own number with ``--accept-cost <usd>``, and the run refuses
+when the estimate exceeds it. ``--accept-cost unknown`` is how a script accepts
+a cost nobody can state. The kinds must match: a number does not answer an
+unpriced estimate, and ``unknown`` does not answer a stated one.
 
-**The run holds the contributor to what they accepted.** Between cases —
-never inside one — :func:`hold` compares the spend so far to the accepted
-amount. A terminal re-prompts with the new number and the sweep continues on
-a fresh typed acceptance; under ``--accept-cost`` no hand is present, so the
-run stops. This is not a ceiling by the back door: the number is the
-contributor's own, and the stop only holds them to it.
+The run holds the contributor to what they accepted. Between cases, and never
+inside one, :func:`hold` compares the spend so far to the accepted amount. A
+terminal re-prompts with the new number, and the sweep continues on a fresh
+typed acceptance. Under ``--accept-cost`` no hand is present, so the run stops.
+This is not a ceiling by the back door: the number is the contributor's own, and
+the stop only holds them to it.
 """
 
 from __future__ import annotations

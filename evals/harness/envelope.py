@@ -5,27 +5,27 @@ a clone and a command line. A reader whose own policy stops them taking part
 under their name is often a reader who cannot install a toolchain either, and
 the two together shut them out of a method that is otherwise free.
 
-So the whole read moves into one file. ``webapp/offline_sitting.py`` writes a
-standalone HTML page carrying every case's sources, blessed **System Model**
-and recorded sets, plus the digest of each file as it stood. The reader opens
-it in whatever browser their machine has, walks as many cases as they choose,
-and downloads one envelope. This module reads that envelope back.
+The whole read therefore moves into one file. ``webapp/offline_sitting.py``
+writes a standalone HTML page carrying every case's sources, blessed **System
+Model** and recorded sets, plus the digest of each file as it stood. The reader
+opens it in whatever browser their machine has, walks as many cases as they
+choose, and downloads one envelope. This module reads that envelope back.
 
-**The envelope is untrusted input, and it is treated as such.** It arrives by
-email from outside the repository, and what it asks for is a write into the
-corpus. So: every field is bounded and typed here (A05); a case id resolves
-against the corpus directory rather than reaching a path join (A01); every
+The envelope is untrusted input, and this module treats it as such. It arrives
+by email from outside the repository, and what it asks for is a write into the
+corpus. So every field is bounded and typed here (A05). A case id resolves
+against the corpus directory rather than reaching a path join (A01). Every
 digest is recomputed from the operator's own tree rather than read out of the
-envelope (A08); and a mark naming no recorded finding refuses its case rather
-than being dropped (A10). Nothing in the file decides anything — it supplies
+envelope (A08). A mark that names no recorded finding refuses its case rather
+than being dropped (A10). Nothing in the file decides anything: it supplies
 answers, and the rules that judge them are the same ones the app runs.
 
-**It applies through :func:`~evals.harness.sitting.finish`, never beside it.**
+It applies through :func:`~evals.harness.sitting.finish`, and never beside it.
 That is what makes an imported sitting indistinguishable from one held in the
-app: the same document, the same appended entry, the same cleared line, and
-the same **Draft Sitting** left behind so the operator can drop a case or put
-it back before the press. A second write path here would be a second set of
-rules, and the looser one would win.
+app: the same document, the same appended entry, the same cleared line, and the
+same **Draft Sitting** left behind, so the operator can drop a case or put it
+back before the press. A second write path here would be a second set of rules,
+and the looser one would win.
 
 The operator runs ``submit sitting`` afterwards. Nothing here opens a pull
 request, and nothing here reaches the network.

@@ -1,14 +1,14 @@
 """The shape of an adversarial case, and the attack classes the corpus covers.
 
-**A case is a fixture, not a golden case.** It declares a poisoned source and
-what a report over it must and must not contain. Every expectation is decidable
-from the report by code — see :mod:`evals.adversarial.score` — because a model
-grading a poisoned report is reading the same poison.
+A case is a fixture rather than a golden case. It declares a poisoned source,
+and what a report over it must and must not contain. Code decides every
+expectation from the report; see :mod:`evals.adversarial.score`. That is because
+a model grading a poisoned report is reading the same poison.
 
-:data:`ATTACK_CLASSES` is a **table, and the lint compares the corpus to it**.
-A class with no case fails, which is what stops the list becoming a statement of
-intent; a case naming a class not in the list fails too, which is what stops the
-corpus growing a class nobody described. This is the same shape
+:data:`ATTACK_CLASSES` is a table, and the lint compares the corpus to it. A
+class with no case fails, which is what stops the list becoming a statement of
+intent. A case that names a class not in the list fails too, which is what stops
+the corpus growing a class nobody described. This is the same shape
 ``CLAUDE.md`` requires of a framework table, for the same reason: machinery that
 grows an entry per anything has to be keyed, and a table nobody compares to its
 registry fails as quietly as the branch it replaced.

@@ -1,29 +1,30 @@
 """ASVS's scorer: an applicability confusion matrix over a finite catalog.
 
 STRIDE's claim set is open, so grading it needs a rule that composes an identity
-from what a claim carries — a lane, an action verb and the elements it names.
-**ASVS's is closed**, and that one difference removes even the rule: the catalog
-is finite, a claim carries the standard's own identifier, and two claims about
-one requirement compare by string. #167 settled that, and this module is what it
-looks like.
+from what a claim carries: a lane, an action verb and the elements it names.
+ASVS's claim set is closed, and that one difference removes even the rule. The
+catalog is finite, a claim carries the standard's own identifier, and two claims
+about one requirement compare by string. #167 settled that, and this module is
+what it looks like.
 
-So the shape of the answer differs too. STRIDE's scorer reports recall against an
-open list and asks a person about whatever else a run produced, because "the
-corpus did not list it" cannot mean "it is wrong". Here it can: a run at level ``L`` rules on
+The shape of the answer differs too. STRIDE's scorer reports recall against an
+open list, and asks a person about whatever else a run produced, because "the
+corpus did not list it" cannot mean "it is wrong". Here it can. A run at level
+``L`` rules on
 :func:`~analysis_service.frameworks.asvs.catalog.requirements_for` and nothing
-else, so the complement of the reference set is a real negative and the four
-cells of a confusion matrix are all reachable.
+else, so the complement of the reference set is a real negative, and all four
+cells of a confusion matrix are reachable.
 
-**What counts as applied.** An ASVS claim never reports a pass — verification
-needs source code and the people who built the system, and a job here carries
-prose. Its three verdicts split two ways for this purpose: ``confirmed`` and
-``needs-info`` both assert the requirement *applies*, and ``rejected`` is the
-critic ruling that it does not. So the matrix is over applicability, which is the
-only question this package answers.
+What counts as applied follows from the package. An ASVS claim never reports a
+pass, because verification needs source code and the people who built the
+system, and a job here carries prose. Its three verdicts split two ways for this
+purpose: ``confirmed`` and ``needs-info`` both assert that the requirement
+applies, and ``rejected`` is the critic ruling that it does not. The matrix is
+therefore over applicability, which is the only question this package answers.
 
-Security: nothing here reads a claim's prose. Every value is an identifier the
-catalog already holds or a verdict from a closed vocabulary, so a claim's text
-cannot steer a number (OWASP LLM01).
+On security: nothing here reads a claim's prose. Every value is an identifier
+the catalog already holds, or a verdict from a closed vocabulary, so a claim's
+text cannot steer a number (OWASP LLM01).
 """
 
 from __future__ import annotations

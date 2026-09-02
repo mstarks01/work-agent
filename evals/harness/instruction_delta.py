@@ -3,9 +3,9 @@
 ## The question this answers
 
 The token caps are drift alarms (ADR 0016). They say how far the static
-instruction moved and claim nothing about how well it works. The claim nobody
-could check was the retired envelope's — that a lane agent analyses worse above
-some length — because a raise that improved findings and a deletion that cost
+instruction moved, and claim nothing about how well it works. The claim nobody
+could check was the retired envelope's, that a lane agent analyses worse above
+some length, because a raise that improved findings and a deletion that cost
 them looked alike to a sweep.
 
 #279 recorded the independent variable: each node's built instruction size and
@@ -16,15 +16,15 @@ beside them.
 
 ## What it does not do
 
-**It does not establish causation, and nothing about two sweeps can.** Two runs
-of one build already disagree — that spread is what
-:mod:`evals.harness.stability` measures, and reading a score change smaller than
-it as an effect of a prompt edit is reading noise. So this prints the
-instruction delta and the measurement delta side by side and draws no
-conclusion; the conclusion needs the stability spread beside it and more than
-one pair.
+It does not establish causation, and nothing about two sweeps can. Two runs of
+one build already disagree, and that spread is what
+:mod:`evals.harness.stability` measures. Reading a score change smaller than the
+spread as an effect of a prompt edit is reading noise. This module therefore
+prints the instruction delta and the measurement delta side by side, and draws
+no conclusion. The conclusion needs the stability spread beside it, and more
+than one pair.
 
-It is **credential-free**. Both artifacts already exist, so the comparison is
+It is credential-free. Both artifacts already exist, so the comparison is
 arithmetic over records rather than a re-run.
 
 ## Keyed by instrument, not by a list of blocks
@@ -32,7 +32,7 @@ arithmetic over records rather than a re-run.
 The measurement half reads :data:`~evals.harness.instruments.INSTRUMENTS` and
 walks each entry's declared ``keys``. An instrument added to that table appears
 here with no edit, and one whose package a sweep did not run is absent from both
-sides rather than reported as a change to zero.
+sides, rather than reported as a change to zero.
 """
 
 from __future__ import annotations

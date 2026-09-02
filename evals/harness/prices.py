@@ -1,31 +1,29 @@
 """Unit prices for a model, from litellm's offline map, and the one cost rule.
 
-The map ships inside the litellm package (#324), so reading it costs no
-network call and pins to the installed version. It serves the **estimate**
-side only: a merged Baseline's manifest records the unit prices it was priced
-with, and CI's check is pure arithmetic over those recorded numbers — an
-honest artifact must not start failing because the package updated its
-prices (#323).
+The map ships inside the litellm package (#324), so reading it costs no network
+call and pins to the installed version. It serves the estimate side only. A
+merged Baseline's manifest records the unit prices it was priced with, and CI's
+check is pure arithmetic over those recorded numbers, because an honest artifact
+must not start failing when the package updates its prices (#323).
 
-**Never a silent zero.** A model the map does not carry prices at ``None``,
-and every caller states that: the manifest lists it under ``unpriced``, and
-the estimate gate refuses without an explicit acceptance (#334). A suffixed
-served build (``gpt-5.6-luna``) is the expected miss; the stated fallback is
+There is never a silent zero. A model the map does not carry prices at ``None``,
+and every caller states that: the manifest lists it under ``unpriced``, and the
+estimate gate refuses without an explicit acceptance (#334). A suffixed served
+build, such as ``gpt-5.6-luna``, is the expected miss. The stated fallback is
 its requested route, and the manifest shows which model each price came from.
 
-That rule reaches the **cache-read rate** too, which is absent from most of
-the map. It is carried as ``None`` rather than zero, and
-:attr:`UnitPrices.cached_rate` bills those tokens at the full input rate —
-an unknown discount priced as no discount, which over-states rather than
-under-states.
+That rule reaches the cache-read rate too, which is absent from most of the map.
+It is carried as ``None`` rather than zero, and :attr:`UnitPrices.cached_rate`
+bills those tokens at the full input rate. An unknown discount priced as no
+discount over-states rather than under-states.
 
-The cost rule, spelled once so submit and CI compute the same number:
-uncached prompt tokens at the input rate, cached prompt tokens at the
-cache-read rate, completion tokens at the output rate. Reasoning tokens are
-not added on top — the vendor that bills them separately reports them inside
-``completion_tokens``, and adding the separate field too would double-count
-exactly there. Where a vendor reports them only outside, the recorded actual
-is a floor, and it says so here rather than pretending otherwise.
+The cost rule is spelled once, so submit and CI compute the same number:
+uncached prompt tokens at the input rate, cached prompt tokens at the cache-read
+rate, and completion tokens at the output rate. Reasoning tokens are not added
+on top. The vendor that bills them separately reports them inside
+``completion_tokens``, and adding the separate field as well would double-count
+exactly there. Where a vendor reports them only outside, the recorded actual is
+a floor, and this module says so rather than pretending otherwise.
 """
 
 from __future__ import annotations

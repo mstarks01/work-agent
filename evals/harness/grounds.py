@@ -1,47 +1,49 @@
 """What the lane agents actually did with ``grounds``, counted.
 
-Three prompt rules govern finding-level attribution and **none of them is
-mechanically enforced**, so this module is the only thing that can say whether
+Three prompt rules govern finding-level attribution, and nothing enforces any of
+them mechanically. This module is therefore the only thing that can say whether
 the agents follow them:
 
-* ``analyze.md``'s branch rule — the branch follows the trigger and is not
-  chosen, so a threat carrying *no quote* is correct rather than defective.
+* ``analyze.md``'s branch rule. The branch follows the trigger and is not
+  chosen, so a threat that carries no quote is correct rather than defective.
   Read :attr:`CaseGrounds.quoteless_rate` against that: the rule predicts a
   real, non-trivial share of quoteless findings, and a rate near zero is
-  evidence the agents are manufacturing quotes to fill a field.
-* **One ground per load-bearing fact, no padding** — read
+  evidence that the agents are manufacturing quotes to fill a field.
+* One ground per load-bearing fact, with no padding. Read
   :attr:`CaseGrounds.grounds_per_threat`, which the rule predicts stays low.
-* The verbatim-quote discipline — read :attr:`CaseGrounds.unverified_rate`,
-  the share of quote grounds the shipped ladder could not find in the source
+* The verbatim-quote discipline. Read :attr:`CaseGrounds.unverified_rate`, which
+  is the share of quote grounds the shipped ladder could not find in the source
   they name.
 
-Credential-free, like :mod:`evals.harness.scorer` and
-:mod:`evals.harness.critic_yield`: it takes plain data — the merged drafts and
-the report's marks — and computes. Nothing here re-implements the ladder; the
-marks it counts are the ones :func:`~analysis_service.critic.join_drafts` already
-produced with the *shipped* checker, so a sweep cannot grade a normalization
-policy the service does not run.
+It is credential-free, like :mod:`evals.harness.scorer` and
+:mod:`evals.harness.critic_yield`. It takes plain data — the merged drafts and
+the report's marks — and computes. Nothing here re-implements the ladder. The
+marks it counts are the ones :func:`~analysis_service.critic.join_drafts`
+already produced with the shipped checker, so a sweep cannot grade a
+normalization policy the service does not run.
 
-* **The repair rung** — read :attr:`CaseGrounds.repaired_count`, the quotes
+Two more readings:
+
+* The repair rung. Read :attr:`CaseGrounds.repaired_count`, which is the quotes
   the ladder refused and :func:`~analysis_service.grounding.repair_quote` then
-  rewrote to the source's nearest span. This is the number that moves
+  rewrote to the source's nearest span. That is the number that moves
   :data:`~analysis_service.grounding.REPAIR_THRESHOLD`.
-* **A claim that lost every ground** — read :attr:`CaseGrounds.dropped_count`,
-  the claims the service dropped and marked because nothing they cited held:
+* A claim that lost every ground. Read :attr:`CaseGrounds.dropped_count`, which
+  is the claims the service dropped and marked because nothing they cited held:
   every quote absent from its source, or every reference outside the catalog.
 
-**One number still exists only on the failure path**, which is why
-:class:`GroundsFailure` sits beside the measurement rather than in it. The
-fan-in still kills a job over a dangling element reference, a duplicate ID or
-an unresolvable source label, so measuring those means surviving them per case
-and counting. A counted case is still a failed case, and the sweep still exits
+One number still exists only on the failure path, which is why
+:class:`GroundsFailure` sits beside the measurement rather than inside it. The
+fan-in still kills a job over a dangling element reference, a duplicate ID or an
+unresolvable source label, so measuring those means surviving them per case and
+counting. A counted case is still a failed case, and the sweep still exits
 non-zero.
 
-A mis-shaped ``Ground`` is the one thing here that is **not** measured, because
-it is not an agent behaviour any more (:class:`GroundMisShape`).
+A mis-shaped ``Ground`` is the one thing here that is not measured, because it
+is no longer an agent behaviour; see :class:`GroundMisShape`.
 
-**Non-gating.** Every rate here is an instrument. No threshold is asserted,
-because none has been observed yet — the whole point is the first sweep.
+Nothing here gates. Every rate is an instrument. No threshold is asserted,
+because none has been observed yet, and the whole point is the first sweep.
 """
 
 from __future__ import annotations

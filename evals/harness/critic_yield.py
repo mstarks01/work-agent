@@ -1,39 +1,38 @@
 """Both sides of the critic, scored from one run.
 
-The critic is the most expensive node in the graph — one strong-tier pass over
-every category agent's output — and this module is the evidence that it earns that
-cost. It is deliberately two-sided: a critic that kills rejected threats is
-earning its cost, and the *same* critic killing threats that matched a
-reference is destroying real findings. Only the pair means anything. A kill
-count alone can be read as either.
+The critic is the most expensive node in the graph, at one strong-tier pass over
+every category agent's output, and this module is the evidence that it earns
+that cost. It is deliberately two-sided. A critic that kills rejected threats is
+earning its cost, and the same critic killing threats that matched a reference
+is destroying real findings. Only the pair means anything, because a kill count
+alone can be read as either.
 
-Comparators, for reading the numbers against something: Semgrep's assistant
-kills ~20% of findings at 92-96% agreement with human triage, and unfiltered
-LLM threat enumeration runs ~86% raw false positives.
+Two comparators help in reading the numbers against something. Semgrep's
+assistant kills about 20% of findings at 92% to 96% agreement with human triage.
+Unfiltered LLM threat enumeration runs at about 86% raw false positives.
 
-**How it works.** The critic returns exactly the drafts it was given
-(:func:`~analysis_service.critic.assemble_claims` enforces it), so a killed
-draft is one carrying a ``rejected`` verdict, and the two sides are a superset
-and its subset. That makes the whole instrument a matter of scoring the same
-case twice through the shipped scorer — no second metric implementation, no
-special-cased matching — and reading the killed drafts' *pre-critic*
-dispositions, which is the state the critic actually faced.
+Here is how it works. The critic returns exactly the drafts it was given, which
+:func:`~analysis_service.critic.assemble_claims` enforces, so a killed draft is
+one carrying a ``rejected`` verdict, and the two sides are a superset and its
+subset. The whole instrument is therefore a matter of scoring the same case
+twice through the shipped scorer, with no second metric implementation and no
+special-cased matching, and then reading the killed drafts' pre-critic
+dispositions, which is the state the critic faced.
 
-Two properties hold this together:
+One property holds this together: the scored task is identical on both sides.
+Both passes go through :func:`~evals.harness.scorer.score_case`, whose claim is
+the threat's ``title`` either way, ruled by the same deterministic matcher
+against the same ledger. Identical questions get identical answers by
+construction, because the rule is a pure function, so nothing has to be memoized
+to guarantee it.
 
-* **The scored task is identical on both sides.** Both passes go through
-  :func:`~evals.harness.scorer.score_case`, whose claim is the threat's
-  ``title`` either way, ruled by the same deterministic matcher against the
-  same ledger. Identical questions get identical answers by construction — the
-  rule is a pure function — so nothing has to be memoized to guarantee it.
-
-Credential-free, like the rest of the scorer: it takes plain data, a
+It is credential-free, like the rest of the scorer. It takes plain data, a
 :class:`~evals.harness.identity.Matcher` and a
 :class:`~evals.harness.ledger.Ledger`.
 
-**Non-gating.** This is an instrument. Any threshold over these numbers comes
-from observed spread across the baseline sweeps, not from a guess here — and
-the number that could *veto* the generator-critic pattern outright is
+Nothing here gates. This is an instrument. Any threshold over these numbers
+comes from observed spread across the baseline sweeps rather than from a guess
+here, and the number that could veto the generator-critic pattern outright is
 ``matched_killed``.
 """
 

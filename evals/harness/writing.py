@@ -1,28 +1,28 @@
 """What reviewers said about how a finding is *written*, kept off the analysis.
 
-A style down-vote moves no analysis number by construction:
+A style down-vote moves no analysis number, by construction.
 :data:`~evals.harness.ledger.STYLE_REASONS` leaves the finding in the reference
 pool, and ``Vote.counts_against_analysis`` is false for every one of them. That
-split is the whole control for a reviewer's taste — it stops "I dislike this
-sentence" from reading as "the tool found a threat that is not there".
+split is the whole control for a reviewer's taste, and it stops "I dislike this
+sentence" reading as "the tool found a threat that is not there".
 
 The split only works if the objection lands somewhere. This module is where it
-lands: the ledger kept the reason, and until this instrument no command read it,
+lands. The ledger kept the reason, and until this instrument no command read it,
 so a reviewer's answer about the prose changed nothing anybody could see.
 
-**Neutral over frameworks.** How a claim reads is not a property of a claim set,
-so this walks whatever blocks the sweep produced and reports one row per
+It is neutral over frameworks. How a claim reads is not a property of a claim
+set, so this walks whatever blocks the sweep produced and reports one row per
 ``(case, framework)`` pair. A package that composes an identity and a package
 that carries a catalog identifier are graded on their prose the same way, and a
 package nobody has written yet needs no entry here.
 
-**The denominator is what a person answered, never what the sweep produced.** A
-sweep of four hundred findings over a ledger holding nine votes has an
-objection rate over those nine. Dividing by the produced count would report a
-number that falls whenever the tool writes more, which is the opposite of what
-this measures. ``answered`` rides beside the rate for the same reason
-``unvoted`` rides beside ``rejected_rate``: a rate over three answers is a
-number to act on only after reading the three.
+The denominator is what a person answered, never what the sweep produced. A
+sweep of four hundred findings over a ledger holding nine votes has an objection
+rate over those nine. Dividing by the produced count would report a number that
+falls whenever the tool writes more, which is the opposite of what this
+measures. ``answered`` rides beside the rate for the same reason ``unvoted``
+rides beside ``rejected_rate``: a rate over three answers is a number to act on
+only after reading the three.
 """
 
 from __future__ import annotations

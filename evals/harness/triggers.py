@@ -1,37 +1,36 @@
 """Candidate-trigger recall: did deterministic analysis see the lead at all?
 
-A separate number from finding recall, and it answers a narrower question. For
-each reference claim the corpus says a working tool must report, this asks
-whether :mod:`analysis_service.candidates` fired a rule *in that claim's lane* on
-*at least one of the elements it is about*. It says nothing about whether the
-agent then found the claim — that is finding recall, and it is scored elsewhere
-over produced reports.
+This is a separate number from finding recall, and it answers a narrower
+question. For each reference claim the corpus says a working tool must report,
+it asks whether :mod:`analysis_service.candidates` fired a rule in that claim's
+lane, on at least one of the elements it is about. It says nothing about whether
+the agent then found the claim. That is finding recall, and the harness scores
+it elsewhere over produced reports.
 
-**Per framework, over each package's own rules and its own reference set.** A
-lane is a package's vocabulary and a rule belongs to whichever package declares
-it, so one pooled figure would divide one package's firings by another's
-references. ASVS's 17 rules matter here more than STRIDE's 11, not less: #160
-measured that its predicates are *presence tests*, which is exactly the kind of
+It runs per framework, over each package's own rules and its own reference set.
+ASVS's 17 rules matter here more than STRIDE's 11 rather than less: #160
+measured that its predicates are presence tests, which is exactly the kind of
 rule that quietly stops firing when extraction changes what it records.
 
-**A claim naming no element is not scoreable and is excluded by name.** Most
-ASVS requirements address a coding practice with no position in the graph, so
-:class:`~evals.harness.reference.ReferenceRequirement` keeps the neutral empty
-default — and "fired on an element it is about" has no answer for one. Counting
-those as misses would report the rules failing at a question nobody asked them;
-counting them as hits would inflate the rate. They are reported as their own
-count, so the exclusion cannot silently shrink a denominator.
+A claim that names no element is not scoreable, and this module excludes it by
+name. Most ASVS requirements address a coding practice with no position in the
+graph, so :class:`~evals.harness.reference.ReferenceRequirement` keeps the
+neutral empty default, and "fired on an element it is about" has no answer for
+one. Counting those as misses would report the rules failing at a question
+nobody asked them. Counting them as hits would inflate the rate. They are
+reported as their own count, so the exclusion cannot silently shrink a
+denominator.
 
-**Full trigger recall is not the target, and chasing it would be a mistake.**
-The candidate layer exists to make structural enumeration cheap, not to encode
-threat scenarios; a threat that turns on what a submitter *said* rather than on
-what the model's shape *is* has no structural trigger by construction, and
-adding one would mean writing a rule that pretends to a judgement it cannot
+Full trigger recall is not the target, and chasing it would be a mistake. The
+candidate layer exists to make structural enumeration cheap rather than to
+encode threat scenarios. A threat that turns on what a submitter said, rather
+than on what the model's shape is, has no structural trigger by construction,
+and adding one would mean writing a rule that pretends to a judgement it cannot
 make. A miss here is a fact about which threats are structural, and the agents
 remain responsible for the rest.
 
 Nothing here needs a provider. It runs over the corpus's blessed models alone,
-which is why it can gate on every PR while the LLM metrics cannot.
+which is why it can gate on every pull request while the LLM metrics cannot.
 """
 
 from __future__ import annotations

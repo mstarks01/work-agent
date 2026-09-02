@@ -2,21 +2,21 @@
 
 Two jobs, one subject, so one module.
 
-**Standing selects which votes a series reads, and does nothing else** (#326).
-It never weighs a vote: inside any series a substance rejection still wins
-over a pooled finding, whoever cast it. So a series is a *filter* over the
-ledger, and :data:`SERIES` is the table of them — a key, and the standings it
-includes. Every sweep computes every series in one pass, and each one names
-its standings, so no flag can quietly move a published number.
+Standing selects which votes a series reads, and does nothing else (#326). It
+never weighs a vote: inside any series a substance rejection still wins over a
+pooled finding, whoever cast it. A series is therefore a filter over the ledger,
+and :data:`SERIES` is the table of them, holding a key and the standings it
+includes. Every sweep computes every series in one pass, and each one names its
+standings, so no flag can quietly move a published number.
 
-**A promotion is a roster edit, and code never makes it.** An agreement
-threshold promotes on noise when the overlap is small, and a time rule
-measures patience rather than judgement. :func:`agreement` is an instrument
-for a maintainer to read before they decide: for each pair of voters it takes
-the findings both answered, maps each live vote to a substance class, and
-reports the share where the two agree. It prints the sample size beside every
-figure and enforces no floor, because a printed sample size lets a maintainer
-weigh a thin number where a code gate would only hide it.
+A promotion is a roster edit, and code never makes it. An agreement threshold
+promotes on noise when the overlap is small, and a time rule measures patience
+rather than judgement. :func:`agreement` is an instrument for a maintainer to
+read before they decide. For each pair of voters it takes the findings both
+answered, maps each live vote to a substance class, and reports the share where
+the two agree. It prints the sample size beside every figure and enforces no
+floor, because a printed sample size lets a maintainer weigh a thin number where
+a code gate would only hide it.
 """
 
 from __future__ import annotations

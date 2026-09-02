@@ -1,35 +1,35 @@
 """The eval CLI: run a mode over the corpus, calibrate the rule, promote a winner.
 
-Gating is **Tier 1 structural only**. A report that does not parse, whose
-references dangle, whose severity bands contradict the matrix or whose summary
-disagrees with its own contents fails the run. Must-find recall is computed,
-printed and written to the artifact, and deliberately **does not block** until
-baseline sweeps have established its normal range: a gate that fires before
-anyone knows that range trains people to bypass it.
+Gating is Tier 1 structural only. A report fails the run when it does not parse,
+when its references dangle, when its severity bands contradict the matrix, or
+when its summary disagrees with its own contents. Must-find recall is computed,
+printed and written to the artifact, and it deliberately does not block until
+baseline sweeps have established its normal range. A gate that fires before
+anybody knows that range trains people to bypass it.
 
-Everything the run measured lands in one JSON artifact: every matching ruling with
-its rationale, every bucket decision, the severity confusion, the near/far
+Everything the run measured lands in one JSON artifact: every matching ruling
+with its rationale, every bucket decision, the severity confusion, the near-far
 exemplar delta, and the ``valid-unlisted`` threats queued for the corpus's next
-blessing pass. The metrics are rule-and-ledger-relative — track movement with them, never
-quote them as absolutes.
+blessing pass. The metrics are relative to the rule and the ledger. Track
+movement with them, and never quote them as absolutes.
 
-Everything the run *produced* lands beside it, one whole report per case, in the
-directory :func:`reports_dir` names. The artifact answers the questions the
-metric set anticipated; the reports answer the rest, offline and for free
+Everything the run produced lands beside it, as one whole report per case, in
+the directory :func:`reports_dir` names. The artifact answers the questions the
+metric set anticipated. The reports answer the rest, offline and for free
 ([#180](https://github.com/mstarks01/work-agent/issues/180)).
 
 ``run`` is the one command here that needs live provider credentials, so it does
-not run on a PR. Every other command — ``score``, ``calibrate``, ``review``,
-``rekey``, ``stability`` and ``promote`` — reads finished artifacts, the corpus
-and the vote ledger, so all of them run offline and free. The credential-free
-lane CI exercises is ``evals/verify_corpus.py``; the live sweep is dispatched by
-hand from ``.github/workflows/evals-live.yml``, which carries no schedule.
+not run on a pull request. Every other command reads finished artifacts, the
+corpus and the vote ledger, so ``score``, ``calibrate``, ``review``, ``rekey``,
+``stability`` and ``promote`` all run offline and free. The credential-free lane
+CI exercises is ``evals/verify_corpus.py``. A person dispatches the live sweep
+by hand from ``.github/workflows/evals-live.yml``, which carries no schedule.
 
-``promote`` is offline for a reason worth naming on its own: it works from a
+``promote`` is offline for a reason worth naming on its own. It works from a
 finished artifact, whose ``provenance`` block records what each node execution
-actually ran on. That is the point of recording it — the served builds are
-observations, made once during the sweep, and rediscovering them afterwards is
-not something an operator should have to do
+ran on. That is the point of recording it: the served builds are observations,
+made once during the sweep, and rediscovering them afterwards is not something
+an operator should have to do
 ([#117](https://github.com/mstarks01/work-agent/issues/117)).
 """
 

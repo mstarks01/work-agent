@@ -1,46 +1,46 @@
 """The vote ledger: what a person decided about a finding, kept forever.
 
-This is the only place in the repository where a **human** judgement is the
-datum. Everything else under ``evals/`` is agent-authored — ``evals/README.md``
-says so once for the whole directory — and this is the directory that changes
-that, one line at a time.
+This is the only place in the repository where a human judgement is the datum.
+Everything else under ``evals/`` is agent-authored, and ``evals/README.md`` says
+so once for the whole directory. This is the directory that changes that, one
+line at a time.
 
-**One file per voter: ``evals/review/votes/<login>.jsonl``.** The filename is
-the GitHub login of the account that submits the votes, and the loader refuses
-a row whose ``voter`` differs from its filename — one voter's history lives in
-one file. Two voters' PRs then merge without conflict, and two PRs from one
-voter may still conflict, by design: one person sequences their own PRs. Order
-between voters carries no meaning; :meth:`Ledger.current` keys by
-``(fingerprint, voter)``, so position is chronology only inside one file,
-which is exactly where the layout keeps it.
+There is one file per voter, at ``evals/review/votes/<login>.jsonl``. The
+filename is the GitHub login of the account that submits the votes, and the
+loader refuses a row whose ``voter`` differs from its filename, so one voter's
+history lives in one file. Two voters' pull requests then merge without
+conflict, and two pull requests from one voter may still conflict, by design:
+one person sequences their own. Order between voters carries no meaning.
+:meth:`Ledger.current` keys by ``(fingerprint, voter)``, so position is
+chronology only inside one file, which is exactly where the layout keeps it.
 
-**Append-only, and a correction is a new event.** No row is ever updated or
-removed. The current verdict for a ``(fingerprint, voter)`` pair is its latest
-event by ``recorded``, which makes the ledger's history reconstructible at any
-past date: a metric computed last month can be recomputed to the same number
-today by ignoring the events after it. A mutable store cannot offer that, and
-the whole defensibility argument rests on it.
+The ledger is append-only, and a correction is a new event. No row is ever
+updated or removed. The current verdict for a ``(fingerprint, voter)`` pair is
+its latest event by ``recorded``, which makes the ledger's history
+reconstructible at any past date: a metric computed last month recomputes to the
+same number today, by ignoring the events after it. A mutable store cannot offer
+that, and the whole defensibility argument rests on it.
 
-**A vote stores its components, not just its key.** A fingerprint improves, and
-improving it changes every key — see :mod:`evals.harness.fingerprint`. Storing
-what the key was computed *from* makes a version bump a pure recompute over
-these files rather than a re-vote, which is what stops the ledger expiring the
-way a model-scored history does.
+A vote stores its components rather than only its key. A fingerprint improves,
+and improving it changes every key; see :mod:`evals.harness.fingerprint`.
+Storing what the key was computed from makes a version bump a pure recompute
+over these files rather than a re-vote, which is what stops the ledger expiring
+the way a model-scored history does.
 
-**One reason code, from a closed set, and it decides where the vote lands.** A
-reviewer who dislikes a finding's writing and a reviewer who says it is not a
-threat are reporting two different facts, and averaging them would let taste
-move a recall number. :data:`SUBSTANCE_REASONS` counts against the analysis;
-:data:`STYLE_REASONS` never does, and lands in
-:mod:`evals.harness.writing` instead. That split is the whole control for personal
-preference, and it is mechanical rather than a request in a guide.
+A vote carries one reason code, from a closed set, and it decides where the vote
+lands. A reviewer who dislikes a finding's writing and a reviewer who says it is
+not a threat are reporting two different facts, and averaging them would let
+taste move a recall number. :data:`SUBSTANCE_REASONS` counts against the
+analysis. :data:`STYLE_REASONS` never does, and lands in
+:mod:`evals.harness.writing` instead. That split is the whole control for
+personal preference, and it is mechanical rather than a request in a guide.
 
-Security: these files are the supply chain of every quality number the tool
-publishes, so ``voter`` is required, is never anonymous, and is recorded on
-every event (A09). It must also hold the GitHub login shape, because the login
-names this voter's file and an unvalidated voter would be a path (A01).
-Nothing here is deleted, so a bad actor's votes are identifiable and
-reversible by appending, never by rewriting (A08).
+On security: these files are the supply chain of every quality number the tool
+publishes. ``voter`` is therefore required, is never anonymous, and is recorded
+on every event (A09). It must also hold the GitHub login shape, because the
+login names this voter's file, and an unvalidated voter would be a path (A01).
+Nothing here is deleted, so a bad actor's votes are identifiable and reversible
+by appending rather than by rewriting (A08).
 """
 
 from __future__ import annotations

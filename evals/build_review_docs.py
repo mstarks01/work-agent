@@ -1,30 +1,29 @@
 """Generate the step-6 reading document for every case with no clearing sitting.
 
-``BLESSING.md`` step 6 is one sitting: a person reads a case's sources, its
+``BLESSING.md`` step 6 is one sitting. A person reads a case's sources, its
 blessed model and every declared framework's reference set together, and asks
 whether the sets describe what could actually go wrong with this system. No
-generator can do the sitting — that is the point of it — but a generator can
-put everything the reader needs in one file, in the order the method requires,
-so a sitting is pure reading time.
+generator can do the sitting, and that is the point of it. A generator can put
+everything the reader needs in one file, in the order the method requires, so a
+sitting is pure reading time.
 
 The template is ``corpus/01-payments-checkout/REVIEW-02.md``, the first such
-document and the record of what a sitting needs: the sources verbatim, the
-model as tables, the reader's own list *before* the recorded sets, one mark
-per record, and the exact ``reviews`` entry to paste at the end. Case 01 keeps
-its hand-written document; this writes ``REVIEW.md`` for every other case and
-refreshes it as reference sets change — the document is derived, so editing it
-by hand is editing the wrong file.
+document and the record of what a sitting needs: the sources verbatim, the model
+as tables, the reader's own list before the recorded sets, one mark per record,
+and the exact ``reviews`` entry to paste at the end. Case 01 keeps its
+hand-written document. This writes ``REVIEW.md`` for every other case, and
+refreshes it as reference sets change. The document is derived, so editing it by
+hand is editing the wrong file.
 
-**A case that records a sitting keeps a current document.** A sitting does not
-retire a case: a second reader may sit the same one, and a change to any file
-a sitting read puts that case back on the unreviewed list. A document this
-skipped would go stale exactly while somebody needed it, and nothing would
-pin it — ``tests/test_corpus_lints.py`` holds every case's document against
-what this writes, and a case it skipped would be a case that check could not
-cover.
+A case that records a sitting keeps a current document. A sitting does not
+retire a case: a second reader may sit the same one, and a change to any file a
+sitting read puts that case back on the unreviewed list. A document this skipped
+would go stale exactly while somebody needed it, and nothing would pin it.
+``tests/test_corpus_lints.py`` holds every case's document against what this
+writes, and a case it skipped would be a case that check could not cover.
 
-Run: ``python evals/build_review_docs.py``. Offline, no dependencies beyond
-the repository.
+Run ``python evals/build_review_docs.py``. It is offline, with no dependencies
+beyond the repository.
 """
 
 from __future__ import annotations

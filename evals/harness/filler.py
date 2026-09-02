@@ -1,50 +1,50 @@
 """Whether a package's required justifications say anything.
 
-**The class of defect this exists to catch.** A mechanical check on model output
-can be satisfiable by construction for one package's claim shape and not for
-another's. The model, required to satisfy it, finds the value that always passes.
-Every check goes green and the output tells a reader nothing.
+This module exists to catch one class of defect. A mechanical check on model
+output can be satisfiable by construction for one package's claim shape and not
+for another's. The model, required to satisfy it, finds the value that always
+passes. Every check goes green, and the output tells a reader nothing.
 
 Two instances reached production before anybody looked:
 
-* A ``needs-info`` verdict had to name an element and one of its attributes.
-  A framework ruling on requirements asks most of its questions about a codebase
-  rather than about an element, so it pointed at ``notes`` — a field every
-  element type carries, which therefore always resolves and never informs.
-* A claim ruling a requirement *not applicable* has to carry grounds, and every
-  ground kind names something that exists. The justifying fact is that the model
-  contains no such component, so the agent cited an arbitrary verified quote:
-  "no LDAP directory query path is identified", grounded on a sentence about
-  the authorization code flow with PKCE.
+* A ``needs-info`` verdict had to name an element and one of its attributes. A
+  framework that rules on requirements asks most of its questions about a
+  codebase rather than about an element, so it pointed at ``notes``. Every
+  element type carries that field, so it always resolves and never informs.
+* A claim that rules a requirement not applicable has to carry grounds, and
+  every ground kind names something that exists. The justifying fact is that the
+  model contains no such component, so the agent cited an arbitrary verified
+  quote: "no LDAP directory query path is identified", grounded on a sentence
+  about the authorization code flow with PKCE.
 
 Neither is visible offline. The suite scripts the agents, so pointers always
 resolve and quotes always verify, and every check here passes against a scripted
 model. This instrument therefore reads finished reports rather than fixtures.
 
-**Two readings, both neutral.** Each reads only the shared
+There are two readings, and both are neutral. Each reads only the shared
 :class:`~analysis_service.report.Claim` and
 :class:`~analysis_service.report.Verdict` shape, so a package nobody has written
-is measured on arrival with no entry added here.
+is measured on arrival, with no entry added here.
 
-*Ineligible pointers* is the crisper of the two, and it is not a threshold. The
-evidence catalog already decides which attributes carry information —
+Ineligible pointers is the crisper of the two, and it is not a threshold. The
+evidence catalog already decides which attributes carry information.
 :func:`~analysis_service.system_model.attribute_names` admits the type-specific
 ones and refuses ``notes``, ``description`` and the rest, on the stated grounds
-that a note "is a sentence, not an unstated control". A ``needs-info`` pointing
-at an attribute that rule refuses is naming a field the repo has already ruled
-says nothing. **The good case is zero**: across fifteen archived STRIDE sweeps
-it is 0 of 378.
+that a note "is a sentence, not an unstated control". A ``needs-info`` that
+points at an attribute that rule refuses is naming a field the repository has
+already ruled says nothing. The good case is zero, and across fifteen archived
+STRIDE sweeps it is 0 of 378.
 
-*Ground concentration* is softer and is reported as a number rather than judged.
-It is the share of a package's claims whose grounds use the single most common
-combination of kinds. A package justifying most of its claims the same way is
-either analysing a very uniform system or reaching for one filler. Across the
-same fifteen sweeps STRIDE sits at 23%; the two ASVS runs that carried the bug
-above sit at 46% and 73%.
+Ground concentration is softer, and this module reports it as a number rather
+than judging it. It is the share of a package's claims whose grounds use the
+single most common combination of kinds. A package that justifies most of its
+claims the same way is either analysing a very uniform system or reaching for
+one filler. Across the same fifteen sweeps STRIDE sits at 23%, and the two ASVS
+runs that carried the bug above sit at 46% and 73%.
 
 Neither reading gates a sweep. An instrument reports, and a person decides
-whether a number is a finding — which is the whole reason both defects are
-described above rather than encoded as a threshold nobody could defend.
+whether a number is a finding. That is the reason both defects are described
+above rather than encoded as a threshold nobody could defend.
 """
 
 from __future__ import annotations
