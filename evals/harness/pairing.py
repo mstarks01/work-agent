@@ -3,29 +3,30 @@
 A score says a case expected a ruling on 17 requirements and the run ruled on
 64. It cannot say which side is wrong, because that is a judgement about what
 "this requirement applies" means for a system of this shape, and only a person
-makes it. What a person needs to make it is the two sides beside each other:
-every requirement the run applied that the case did not expect, with the
-standard's own text and the argument the run made for it, and every requirement
-the case expected that the run did not deliver, with the reason it went missing.
+makes it. What a person needs is the two sides beside each other: every
+requirement the run applied that the case did not expect, with the standard's
+own text and the argument the run made for it, and every requirement the case
+expected that the run did not deliver, with the reason it went missing.
 
-**Nothing here scores anything.** :mod:`evals.harness.applicability` owns the
-four cells and this reads them, so a pairing can never disagree with the number
-it is helping somebody explain.
+Nothing here scores anything. :mod:`evals.harness.applicability` owns the four
+cells and this module reads them, so a pairing can never disagree with the
+number it is helping somebody explain.
 
-**Nothing here rules on anything either.** The claim's own argument is carried
-through verbatim for a reader to weigh; no agent marks a requirement right or
+Nothing here rules on anything either. The claim's own argument is carried
+through verbatim for a reader to weigh. No agent marks a requirement right or
 wrong, because the whole point of the sitting is that no agent has read this
 reference set.
 
-Licensing: a requirement's ``text`` is OWASP ASVS 5.0.0, which OWASP publishes
-under CC BY-SA 4.0, and this module reads it out of the governed catalog at run
-time rather than carrying any of it. A rendered pairing therefore reproduces
-ShareAlike text, so :func:`render_html` stamps the attribution and the licence
-onto the page, and :func:`refuse_path_inside_repo` keeps the output from landing
-in this Apache-2.0 tree — where it would be an undeclared governed file and
-would fail ``test_no_upstream_sentence_appears_in_an_ungoverned_file``.
+On licensing: a requirement's ``text`` is OWASP ASVS 5.0.0, which OWASP
+publishes under CC BY-SA 4.0. This module reads it out of the governed catalog
+at run time rather than carrying any of it. A rendered pairing therefore
+reproduces ShareAlike text, so :func:`render_html` stamps the attribution and
+the licence onto the page, and :func:`refuse_path_inside_repo` keeps the output
+from landing in this Apache-2.0 tree, where it would be an undeclared governed
+file and would fail
+``test_no_upstream_sentence_appears_in_an_ungoverned_file``.
 
-Security: a claim's prose is model output and reaches an HTML page here, so
+On security: a claim's prose is model output and reaches an HTML page here, so
 every interpolated value is escaped (OWASP LLM05, A03). Nothing in a report is
 read as markup.
 """

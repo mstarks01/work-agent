@@ -1,31 +1,29 @@
 """What the lane agents were offered across a sweep, and what they cited.
 
 :class:`~analysis_service.report.LaneCoverage` is computed per job and rides on
-each **Framework Analysis**, one row per lane. One job's
-rows are close to
-unreadable — an agent that examined a flow and correctly found nothing cites
+each **Framework Analysis**, one row per lane. One job's rows are close to
+unreadable: an agent that examined a flow and correctly found nothing cites
 nothing, and no observable separates it from one that never looked. The
-aggregate is where the field was always meant to be read: a lane citing two of
-forty structural leads across twelve cases is a coverage signal in a way that
-one agent's zero on one case never is.
+aggregate is where the field was always meant to be read. A lane that cites two
+of forty structural leads across twelve cases is a coverage signal, in a way
+that one agent's zero on one case never is.
 
-Pooled rather than averaged over cases, for the reason
+The numbers are pooled rather than averaged over cases, for the reason
 :func:`~evals.harness.critic_yield.aggregate_yield` gives: these are small
-per-case counts, and a mean of per-case rates lets a three-element case
-outweigh a forty-element one.
+per-case counts, and a mean of per-case rates lets a three-element case outweigh
+a forty-element one.
 
-**Keyed by ``(framework, lane)``, never by lane alone.** A lane is a
+They are keyed by ``(framework, lane)``, never by lane alone. A lane is a
 **Framework Package**'s own vocabulary rather than a shared one, and two
-packages may legitimately declare a lane of the same name — so a table keyed by
-the slug would pool two unrelated agents' numbers the day that happens. STRIDE's
-six categories and ASVS's 17 chapters do not collide today, and relying on that
-is the one-package assumption ``docs/agents/framework-parity.md`` exists to
-catch.
+packages may declare a lane of the same name, so a table keyed by the slug would
+pool two unrelated agents' numbers the day that happens. STRIDE's six categories
+and ASVS's 17 chapters do not collide today, and relying on that is the
+one-package assumption ``docs/agents/framework-parity.md`` exists to catch.
 
-Credential-free — it folds numbers the service already computed in code — so
-it costs a sweep nothing and is **non-gating**. A citation rate is not a
-quality bar: the rate a healthy lane runs at is a thing the baseline sweeps
-have to establish before anyone writes a threshold over it.
+It is credential-free, because it folds numbers the service already computed in
+code, so it costs a sweep nothing. It does not gate. A citation rate is not a
+quality bar: the rate a healthy lane runs at is a thing the baseline sweeps have
+to establish before anybody writes a threshold over it.
 """
 
 from __future__ import annotations

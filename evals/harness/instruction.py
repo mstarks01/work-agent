@@ -2,35 +2,35 @@
 
 ## Why this is measured
 
-The token caps over the static instruction are **drift alarms** (ADR 0016).
-They say how far the text has moved and claim nothing about how well it works.
-The claim nobody could check was the one the retired 6-8K envelope made — that
-a lane agent analyses worse above some length — because no instrument read
-prompt size, so a raise that improved findings and a deletion that cost them
-looked alike to a sweep.
+The token caps over the static instruction are drift alarms (ADR 0016). They say
+how far the text has moved, and claim nothing about how well it works. The claim
+nobody could check was the one the retired 6-8K envelope made, that a lane agent
+analyses worse above some length. No instrument read prompt size, so a raise
+that improved findings and a deletion that cost them looked alike to a sweep.
 
 This is the instrument that makes the comparison possible. It records, beside
-the scores in the same artifact, **what each node was told**: the size of its
-composed instruction and that instruction's own digest. Two artifacts either
-side of a prompt edit now answer *which node's instruction moved, by how much,
-and what the scores did* — which is what a raise costs instead of a deletion.
+the scores in the same artifact, what each node was told: the size of its
+composed instruction, and that instruction's own digest. Two artifacts either
+side of a prompt edit now answer which node's instruction moved, by how much,
+and what the scores did. That is what a raise costs, as against a deletion.
 
 ## What it does not do
 
 It does not establish that a longer instruction analyses worse, and no single
-sweep can. It records the thing that changed next to the numbers that may have
-moved with it; reading a trend out of that needs sweeps on both sides and more
-than one case. A rate here is **non-gating** for the same reason coverage is: no
-baseline says what size a healthy lane runs at.
+sweep can. It records the thing that changed, next to the numbers that may have
+moved with it. Reading a trend out of that needs sweeps on both sides, and more
+than one case. A rate here does not gate, for the same reason coverage does not:
+no baseline says what size a healthy lane runs at.
 
 ## Keyed by ``(framework, node)``
 
 The framework comes from ``Pipeline.tier_nodes``, which the graph already builds
-per selection and which maps a graph node name to its tier key — ``analyze/asvs``
-rather than a name this module would have to parse. So attribution is read off
-the registry the graph itself used, and a package that names its nodes some new
-way cannot silently land under the wrong heading. ``extract`` and ``repair``
-carry no framework: one extraction serves every framework a job selected.
+per selection, and which maps a graph node name to its tier key — ``analyze/asvs``
+rather than a name this module would have to parse. Attribution is therefore
+read off the registry the graph itself used, and a package that names its nodes
+some new way cannot silently land under the wrong heading. ``extract`` and
+``repair`` carry no framework, because one extraction serves every framework a
+job selected.
 """
 
 from __future__ import annotations

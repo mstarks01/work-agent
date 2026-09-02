@@ -2,26 +2,25 @@
 
 Every other number in this harness comes from one sweep, and a single sweep
 cannot tell a real movement from sampling noise. Two sweeps of the same corpus
-under the same generation identities can: the references that matched in both
-are what the system reliably finds, and the ones that matched in one are the
-spread that any comparison of two other numbers has to clear before it means
-anything.
+under the same execution identities can. The references that matched in both are
+what the system reliably finds. The ones that matched in one are the spread any
+comparison of two other numbers has to clear before it means anything.
 
-The instrument is the **reference index**, not the threat text. A produced
+The instrument is the reference index rather than the threat text. A produced
 threat gets a fresh ID every run and its wording moves, so text can only be
-compared as prose; the reference it was matched to is a corpus
-coordinate that means the same thing in every sweep. So this module measures
-set overlap over ``scores[].matched[].reference_index`` and needs no re-scoring, no
-provider and no credentials — it reads finished artifacts, the way ``promote``
+compared as prose. The reference it was matched to is a corpus coordinate that
+means the same thing in every sweep. This module therefore measures set overlap
+over ``scores[].matched[].reference_index``, and needs no re-scoring, no
+provider and no credentials. It reads finished artifacts, the way ``promote``
 does.
 
-**What it cannot see.** Two runs agreeing on a reference is not two runs
-producing the same threat: the same reference can be matched by threats that
-differ in severity, elements and wording. Stability here is stability *of
-recall*, which is the number the corpus grades and the one worth defending.
+What it cannot see: two runs agreeing on a reference is not two runs producing
+the same threat. The same reference can be matched by threats that differ in
+severity, elements and wording. Stability here is stability of recall, which is
+the number the corpus grades and the one worth defending.
 
-Non-gating, like the rest of the instruments. The spread this reports is the
-input to any future threshold, not a threshold itself.
+It does not gate, like the rest of the instruments. The spread this reports is
+the input to any future threshold rather than a threshold itself.
 """
 
 from __future__ import annotations

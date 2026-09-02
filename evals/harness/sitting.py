@@ -1,42 +1,43 @@
 """Holding a **Case Sitting**: what it reads, and what it writes when it ends.
 
 The act is #327's, and ``evals/BLESSING.md`` step 6 is the method. This module
-is the part a front end does not get to reinvent: which files a sitting must
-read, the digest of each as it stood, what a reader may say about one recorded
-finding and the key that mark files under, the append-only entry that records
-it and the one a surface may take back off, the line it clears in the
+is the part a front end does not get to reinvent. It holds which files a sitting
+must read, the digest of each as it stood, what a reader may say about one
+recorded finding and the key that mark files under, the append-only entry that
+records it and the one a surface may take back off, the line it clears in the
 unreviewed list and puts back, whether a recorded sitting clears its case at
 all, and the rail of every case with the status that rule gives it.
-``webapp/sitting.py`` is one surface over this; the CLI path writes the same
-files by hand and the checks cannot tell them apart, which is the point — one
+
+``webapp/sitting.py`` is one surface over this. The CLI path writes the same
+files by hand, and the checks cannot tell them apart, which is the point: one
 implementation of the rules. CI reads :func:`clears` through
-``tests/test_case_review.py``, so no surface can call a case read while CI
-still asks somebody to read it.
+``tests/test_case_review.py``, so no surface can call a case read while CI still
+asks somebody to read it.
 
-**Recording a sitting is one act, and so is taking it back.** :func:`finish`
-writes the three files and says on the draft what it wrote; :func:`withdraw`
-takes off exactly that. They are a pair rather than two sequences a surface
-assembles, because what makes them correct is that the tree comes back byte for
-byte — a stray byte left under a case directory puts that case in the pull
-request, and a field one of them sets that the other forgets is a case that
-cannot be put back. The primitives they compose stay named, because a reader
-following one of them needs to see what it does.
+Recording a sitting is one act, and so is taking it back. :func:`finish` writes
+the three files and says on the draft what it wrote. :func:`withdraw` takes off
+exactly that. They are a pair rather than two sequences a surface assembles,
+because what makes them correct is that the tree comes back byte for byte. A
+stray byte left under a case directory puts that case in the pull request, and a
+field one of them sets that the other forgets is a case that cannot be put back.
+The primitives they compose stay named, because a reader who follows one of them
+needs to see what it does.
 
-**The own list comes first, and that is a property rather than an
-instruction.** What the order protects is the evidence in the filled
-document: it prints the reader's own list above the recorded sets, and a
-later reader takes that order on trust. So a caller here asks for part
-one and part two separately, and :attr:`Prepared.part_two_blocks` is what a
-surface must withhold until the reader has written their own list down. That
-mirrors the review app's configuration-blindness, which is enforced by the queue item
-having no field for it rather than by asking the reviewer not to peek.
+The own list comes first, and that is a property rather than an instruction.
+What the order protects is the evidence in the filled document: it prints the
+reader's own list above the recorded sets, and a later reader takes that order
+on trust. A caller here therefore asks for part one and part two separately, and
+:attr:`Prepared.part_two_blocks` is what a surface must withhold until the
+reader has written their own list down. That mirrors the review app's
+configuration-blindness, which the queue item enforces by having no field for
+it, rather than by asking the reviewer not to peek.
 
-**A mark is keyed by the finding, never by its position.** The reader answers
-one recorded finding with one of :data:`MARKS`, and
-:func:`~evals.harness.fingerprint.key_claim` computes the key. An insertion
-into a claim file moves every position below it and moves no fingerprint, so a
-mark recorded today still names the same finding after somebody edits the set.
-The same key a vote is filed under, so improving the identity rule re-keys both
+A mark is keyed by the finding, never by its position. The reader answers one
+recorded finding with one of :data:`MARKS`, and
+:func:`~evals.harness.fingerprint.key_claim` computes the key. An insertion into
+a claim file moves every position below it and moves no fingerprint, so a mark
+recorded today still names the same finding after somebody edits the set. It is
+the same key a vote is filed under, so improving the identity rule re-keys both
 by recomputation.
 
 Nothing here talks to a network or a provider. A sitting is reading, and the

@@ -1,23 +1,22 @@
-"""The voter roster: who may vote, hold a sitting or submit a sweep, and with
-what standing.
+"""The voter roster: who may vote, hold a sitting or submit a sweep, and with what standing.
 
-``evals/review/voters.toml`` is one checked-in table — GitHub login →
-**Standing** from the closed set ``maintainer`` / ``contributor`` — and it is
-the only place a standing lives (#320). Standing on a vote row would freeze a
-classification into history; a roster edit re-classes a voter's whole series
-at once, which is what makes a promotion one diff (#326). Any past number
-stays recomputable from the ledger plus the roster at that commit.
+``evals/review/voters.toml`` is one checked-in table, mapping a GitHub login to
+a **Standing** from the closed set ``maintainer`` and ``contributor``. It is the
+only place a standing lives (#320). A standing on a vote row would freeze a
+classification into history. A roster edit re-classes a voter's whole series at
+once, which is what makes a promotion one diff (#326). Any past number stays
+recomputable from the ledger plus the roster at that commit.
 
-**A renamed account keeps one series.** Old rows stay under the old login in
-``evals/review/votes/``; the roster line gains the old login in ``aliases``,
-and :meth:`Roster.resolve` folds the history back onto the current name. No
-row is ever rewritten.
+A renamed account keeps one series. Old rows stay under the old login in
+``evals/review/votes/``, the roster line gains the old login in ``aliases``, and
+:meth:`Roster.resolve` folds the history back onto the current name. No row is
+ever rewritten.
 
-Security: the roster decides which standing series a vote lands in, so the
-loader fails closed on anything it does not recognise (A10) — an unknown
-standing, an alias claimed twice, a key nobody defined. A voter absent from
-the roster is an error at the point of the question, never a silent default
-(A01: deny by default).
+On security: the roster decides which standing series a vote lands in, so the
+loader fails closed on anything it does not recognise (A10). That covers an
+unknown standing, an alias claimed twice, and a key nobody defined. A voter
+absent from the roster is an error at the point of the question, and never a
+silent default (A01, deny by default).
 """
 
 from __future__ import annotations

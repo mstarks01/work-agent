@@ -1,32 +1,33 @@
-"""Tier 1: the structural gates, and the only ones that block.
+r"""Tier 1: the structural gates, and the only ones that block.
 
-Thresholds are split by nature; these are the absolute, per-case,
-zero-tolerance ones — a payload parses as a
+Thresholds are split by nature, and these are the absolute, per-case,
+zero-tolerance ones. A payload parses as a
 :class:`~analysis_service.report.Report`, its references resolve, its claim IDs
 are unique within each block, its severity bands match
 :func:`~analysis_service.report.derive_severity_level`, and each block's summary
 counts match its own contents. They gate from day one because they are
-deterministic, free, and already enforced by shipped validators; must-find
-recall computes and reports but does not block until baselines exist.
+deterministic, free, and already enforced by shipped validators. Must-find
+recall computes and reports, and does not block until baselines exist.
 
-The checks are re-asserted here rather than delegated wholesale to the
-model validator, for two reasons: a raw payload has to be gradeable before it
-is known to parse, and a gate that would silently weaken if someone relaxed
-:class:`Report` is not a gate. Every failure in a report is listed at
-once — a run artifact naming one problem per iteration wastes a live sweep.
+The checks are re-asserted here rather than delegated wholesale to the model
+validator, for two reasons. A raw payload has to be gradeable before it is known
+to parse. And a gate that would silently weaken if somebody relaxed
+:class:`Report` is not a gate. Every failure in a report is listed at once,
+because a run artifact that named one problem per iteration would waste a live
+sweep.
 
-**Per block, and the framework named in every message.** A report carries one
-:class:`~analysis_service.report.FrameworkAnalysis` per framework the job
-selected, so a claim ID is unique only within its own block and a failure that
-did not say whose block it was in would send a reader through N of them. The
-neutral half runs over every block; the severity check is STRIDE's, and runs
-only where the package's record grades harm.
+The checks run per block, and every message names the framework. A report
+carries one :class:`~analysis_service.report.FrameworkAnalysis` per framework
+the job selected, so a claim ID is unique only within its own block, and a
+failure that did not say whose block it was in would send a reader through all
+of them. The neutral half runs over every block. The severity check is STRIDE's,
+and runs only where the package's record grades harm.
 
-One check is deliberately gone. ``^[STRIDE]-\\d{2}$`` and the category-letter
-assertion were deleted with ``schema_version`` 3.0: the ID is composed by the
-service from the package's own ``IdRule`` and the lane is stamped from the same
-call, so the letter and the lane cannot disagree unless the composition itself
-is wrong — which a re-validation of the string would hide rather than catch.
+One check is deliberately gone. ``^[STRIDE]-\d{2}$`` and the category-letter
+assertion were deleted with ``schema_version`` 3.0. The service composes the ID
+from the package's own ``IdRule``, and stamps the lane from the same call, so
+the letter and the lane cannot disagree unless the composition itself is wrong.
+Re-validating the string would hide that rather than catch it.
 """
 
 from __future__ import annotations

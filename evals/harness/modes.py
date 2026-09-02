@@ -1,25 +1,25 @@
 """The three eval modes over one corpus.
 
 Two artifacts per case buy three modes, and the point of the split is
-**attribution**: an end-to-end-only fixture cannot say whether a recall miss
-was a category-agent failure or an element ``extract`` never produced.
+attribution. An end-to-end-only fixture cannot say whether a recall miss was a
+category-agent failure or an element ``extract`` never produced.
 
-* **extraction** — source text vs. the blessed model. Runs the shipped
-  ``extract`` node alone and puts its emission through the same shipped
+* extraction — source text against the blessed model. It runs the shipped
+  ``extract`` node alone, and puts its emission through the same shipped
   validity gate ``validate`` uses.
-* **analysis** — the blessed model injected at ``prepare``, scored against the
-  reference threats. Deterministic input, so every threat number is
-  attributable to the category agents and critic.
-* **end-to-end** — text in, report out. The integration smoke test.
+* analysis — the blessed model injected at ``prepare``, scored against the
+  reference threats. The input is deterministic, so every threat number is
+  attributable to the category agents and the critic.
+* end-to-end — text in, report out. This is the integration smoke test.
 
-All three drive the *shipped* graph via
-:func:`~analysis_service.graph.build_pipeline`, differing only in its ``entry``
+All three drive the shipped graph through
+:func:`~analysis_service.graph.build_pipeline`, and differ only in its ``entry``
 and the state seeded into the session. Nothing about the topology, the prompts,
-the skills, the tier config or the sampling config is eval-specific — grading a
-configuration you do not ship is the failure mode this whole design rejects.
+the skills, the tier config or the sampling config is eval-specific. Grading a
+configuration you do not ship is the failure this whole design rejects.
 
 Every function here needs live provider credentials, and nothing here runs in
-the credential-free PR job: that job scores recorded output through
+the credential-free pull-request job. That job scores recorded output through
 :mod:`evals.harness.scorer` and :mod:`evals.harness.structural`, both of which
 take plain data.
 """

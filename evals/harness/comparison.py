@@ -1,31 +1,30 @@
 """The published comparison over the merged Baselines: one generated file.
 
 ``evals/baselines/README.md`` sits beside the data it summarizes. Code builds
-it, a person commits it, and a test recomputes it and fails on a mismatch —
-the licence-lint shape, so a stale table fails closed rather than drifting.
+it, a person commits it, and a test recomputes it and fails on a mismatch. That
+is the licence-lint shape, so a stale table fails closed rather than drifting.
 CI never pushes a commit, and ``submit baseline`` rebuilds the file as part of
-staging so a contributor never learns the extra step exists (#330).
+staging, so a contributor never learns the extra step exists (#330).
 
-**The generator names no framework and no column.** A row prints one block per
+The generator names no framework and no column. A row prints one block per
 framework in the Baseline's selection, and the columns of each block come from
-:data:`~evals.harness.instruments.INSTRUMENTS` — each entry's ``published``
-tuple, read through the module that owns the block's shape. A future package
-brings its own instrument entry and the table prints it with no edit here.
+:data:`~evals.harness.instruments.INSTRUMENTS`, through each entry's
+``published`` tuple, read through the module that owns the block's shape. A
+future package brings its own instrument entry, and the table prints it with no
+edit here.
 
-**Recognition without rank.** A row names the logins that submitted its
-sweeps, because the manifest records them and hiding them would be a
-pretence. The sort key is the merge date and never a score: a leaderboard over
-a corpus this small rewards overfitting to it, so the credit stays and the
-race does not.
+There is recognition without rank. A row names the logins that submitted its
+sweeps, because the manifest records them and hiding them would be a pretence.
+The sort key is the merge date and never a score. A leaderboard over a corpus
+this small rewards overfitting to it, so the credit stays and the race does not.
 
-**Comparability.** Rows group by ``(commit, corpus digest)``, and the file
-says that numbers across groups do not compare — a reference-set change moves
-every baseline, so the grouping makes the invalid comparison hard to make by
-accident.
+Rows group by ``(commit, corpus digest)``, and the file says that numbers across
+groups do not compare. A reference-set change moves every baseline, so the
+grouping makes the invalid comparison hard to make by accident.
 
-**A spread beside every mean.** ``TUNING.md`` records three findings retracted
-because they rested on single-run numbers, and a published table must not
-repeat that in public: where a Baseline holds more than one sweep, the range
+A spread prints beside every mean. ``TUNING.md`` records three findings
+retracted because they rested on single-run numbers, and a published table must
+not repeat that in public. Where a Baseline holds more than one sweep, the range
 prints beside the mean.
 """
 
