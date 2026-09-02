@@ -151,14 +151,6 @@ DECLARED: dict[str, str] = {
         "This code is STRIDE's. It reads a category and two rated severity axes,"
         " which only that package's record carries (#167)."
     ),
-    "evals/migrations/2026-08-30-asvs-verb.py": (
-        "This code is ASVS's, and it is a one-time repair of archived data"
-        " rather than a rule the service runs. A framework whose claims name a"
-        " catalog requirement composes no action verb, so a stored verb on one"
-        " of its claims is a field nothing reads; the migration nulls exactly"
-        " those, and reads each claim's own `framework` rather than the file it"
-        " sits in, so a package that does compose a verb keeps every one."
-    ),
     "evals/harness/pairing.py": (
         "This code is ASVS's, and reads the same catalog `applicability.py`"
         " scores against. A framework whose claims name a catalog requirement"

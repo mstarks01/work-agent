@@ -71,9 +71,13 @@ class TestThePageCarriesTheWholeMethod:
         assert body["marks"] == list(sittings.MARKS)
 
     def test_the_digests_say_what_each_required_file_held(self, corpus, body):
+        """The page ships the digests, not the file list they were taken over:
+        it renders neither, and the list is what the digests already say."""
         for case in body["cases"]:
             case_dir = corpus / case["case"]
-            assert case["digests"] == sittings.digests(case_dir, case["files"])
+            files = list(case["digests"])
+            assert files, "a case with no digested file proves nothing"
+            assert case["digests"] == sittings.digests(case_dir, files)
 
     def test_the_names_are_stamped_rather_than_typed_by_the_reader(self, body):
         """An envelope cannot claim an account the operator did not offer it."""

@@ -85,7 +85,6 @@ def payload(corpus_dir: Path, submitted_by: str, submitted_for: str) -> dict:
                     {"fingerprint": target.fingerprint, "claims": list(target.claims)}
                     for target in prepared.mark_targets
                 ],
-                "files": prepared.files,
                 "digests": sittings.digests(case_dir, prepared.files),
             }
         )
@@ -141,7 +140,6 @@ background:var(--card);white-space:pre-wrap;font-size:13px;overflow-x:auto}
 table{border-collapse:collapse;margin:8px 0;font-size:13px;display:block;
 overflow-x:auto}
 th,td{border:1px solid var(--line);padding:4px 8px;text-align:left}
-code{font-family:ui-monospace,SFMono-Regular,Menlo,monospace;font-size:12px}
 textarea{width:100%;min-height:150px;font:inherit;padding:9px;
 border:1px solid var(--line);border-radius:6px;background:var(--card);
 color:var(--fg)}
@@ -158,7 +156,6 @@ margin:10px 0;background:var(--card)}
 .bar{position:sticky;bottom:0;background:var(--bg);border-top:1px solid var(--line);
 padding:11px 0;margin-top:26px;display:flex;gap:10px;flex-wrap:wrap;
 align-items:center}
-.note{color:var(--warn);font-size:13px}
 .hint{color:var(--dim);font-size:13px}
 </style></head><body>
 <div id="shell">
