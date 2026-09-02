@@ -12,7 +12,7 @@ from __future__ import annotations
 
 import pytest
 
-from evals.harness.fingerprint import components_for, fingerprint
+from evals.harness.fingerprint import components_for
 from evals.harness.ledger import Ledger, cast
 from evals.harness.queue import (
     PRIORITIES,
@@ -117,19 +117,34 @@ def test_a_volatile_finding_outranks_an_unmatched_one():
     assert not items[1].volatile
 
 
-def test_a_finding_already_in_the_pool_ranks_below_an_unmatched_one():
-    pooled = finding(title="Known good", target="process:p")
-    unmatched = finding(title="Never seen", target="process:n")
-    pool = frozenset({fingerprint(value_of(pooled))})
+def test_a_second_voter_is_not_told_how_the_first_one_voted():
+    """The queue used to rank by the reference pool, which is built from votes.
 
-    items = build([pooled, unmatched], FLOWS, Ledger(), reference_pool=pool)
-    assert [item.finding.title for item in items] == ["Never seen", "Known good"]
+    A finding this voter has not answered can only be in that pool because
+    somebody else put it there, so the weight, the position and the printed
+    reason all carried the earlier voter's verdict into the second opinion --
+    the one pass that has to be independent.
+    """
+    pooled = finding(title="Ada said yes", target="process:p")
+    untouched = finding(title="Nobody voted", target="process:n")
+    ledger = Ledger()
+    ledger.votes.append(cast(value_of(pooled), "01-payments-checkout", "up", "ada"))
+
+    items = build([pooled, untouched], FLOWS, ledger, voter="bob")
+
+    assert {item.finding.title for item in items} == {"Ada said yes", "Nobody voted"}
+    assert len({item.priority for item in items}) == 1, (
+        "one of them was ranked by how ada voted"
+    )
+    assert len({item.why for item in items}) == 1, (
+        "and the reason printed beside it said so"
+    )
 
 
 def test_the_first_reason_wins_rather_than_the_sum():
     """Summing would rank new-and-unmatched above volatile, which is wrong."""
     volatile = finding(seen_in=1, runs=3)
-    weight, why = priority_of(volatile, in_reference_set=True)
+    weight, why = priority_of(volatile)
     assert weight == 30
     assert "some runs and not others" in why
 

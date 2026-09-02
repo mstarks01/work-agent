@@ -157,7 +157,7 @@ def test_a_rekey_needs_no_revote(tmp_path):
     original = load(path)
     assert original.votes[0].fingerprint.startswith("v1:")
 
-    moved = rekey(original.votes, version=2)
+    moved = rekey(original.votes)
     assert [vote.fingerprint for vote in moved] != [
         vote.fingerprint for vote in original.votes
     ]
@@ -248,3 +248,45 @@ def test_an_empty_ledger_answers_every_question(tmp_path):
     assert ledger.voters() == ()
     assert ledger.double_voted() == ()
     assert ledger.voted_fingerprints() == frozenset()
+
+
+def test_every_package_keys_its_own_votes(tmp_path):
+    """``cast`` took its version from a default, which is a single rule for a
+    table that holds one row per package.
+
+    So an ASVS claim was keyed under STRIDE's rule, which reads an action verb
+    an ASVS claim does not carry, and every ASVS vote raised instead of
+    recording. Checked against the registry rather than a fixed pair: a package
+    added to ``VERSION_FOR`` is covered here the day it is added.
+    """
+    from evals.harness.fingerprint import VERSION_FOR
+
+    for framework, version in VERSION_FOR.items():
+        recorded = cast(
+            _components_for(framework),
+            "01-payments-checkout",
+            "up",
+            "ada",
+        )
+        assert recorded.fingerprint.startswith(f"v{version}:"), (
+            f"{framework} keyed under the wrong rule"
+        )
+
+
+def _components_for(framework):
+    """One package's claim components, each satisfying its own version."""
+    if framework == "asvs":
+        return Components("asvs", "V6", ("process:a",), identifier="6.2.1")
+    return Components("stride", "spoofing", ("process:a",), verb="read")
+
+
+def test_a_rekey_moves_each_row_under_its_own_frameworks_rule(tmp_path):
+    """One version for the file stopped being a coherent request when the table
+    grew its second row: either value raised on the other package's rows."""
+    path = tmp_path / "votes"
+    append(cast(_components_for("stride"), "01", "up", "sam"), path)
+    append(cast(_components_for("asvs"), "01", "up", "sam"), path)
+
+    moved = rekey(load(path).votes)
+
+    assert sorted(vote.fingerprint.split(":")[0] for vote in moved) == ["v2", "v3"]
