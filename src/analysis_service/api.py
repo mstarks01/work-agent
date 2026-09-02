@@ -39,7 +39,13 @@ from fastapi import BackgroundTasks, Depends, FastAPI, HTTPException, Request
 from fastapi.exceptions import RequestValidationError
 from fastapi.responses import JSONResponse, StreamingResponse
 from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
-from pydantic import BaseModel, ConfigDict, Field, ValidationError
+from pydantic import (
+    AfterValidator,
+    BaseModel,
+    ConfigDict,
+    Field,
+    ValidationError,
+)
 from starlette._utils import get_route_path
 from starlette.exceptions import HTTPException as StarletteHTTPException
 
@@ -64,7 +70,7 @@ from analysis_service.jobs import (
     execute_job,
 )
 from analysis_service.report import FrameworkName, FrameworkSelection
-from analysis_service.sources import Source, SourceLimits
+from analysis_service.sources import Source, SourceLimits, plain_name
 from analysis_service.validation import ValidationIssue
 
 logger = logging.getLogger(__name__)
@@ -248,7 +254,14 @@ class JobSubmission(BaseModel):
     # route's per-name work runs. The bound tracks the registry, so a new
     # package raises it with no edit here.
     frameworks: list[FrameworkRequest] = Field(min_length=1, max_length=len(PACKAGES))
-    system_name: str | None = Field(default=None, min_length=1, max_length=200)
+    #: Bounded like a Source label rather than merely in length: it reaches the
+    #: report a consumer renders, and this is the one entry point to the
+    #: pipeline that refused it nothing but a length. A control, format or
+    #: bidirectional character in a name has no reading a person wants and one
+    #: a renderer might.
+    system_name: Annotated[str, AfterValidator(plain_name)] | None = Field(
+        default=None, min_length=1, max_length=200
+    )
 
 
 class NodeCompletion(BaseModel):

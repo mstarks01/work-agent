@@ -58,7 +58,14 @@ from cryptography.hazmat.primitives.asymmetric.ed25519 import (
     Ed25519PrivateKey,
     Ed25519PublicKey,
 )
-from pydantic import BaseModel, ConfigDict, Field, ValidationError, model_validator
+from pydantic import (
+    AwareDatetime,
+    BaseModel,
+    ConfigDict,
+    Field,
+    ValidationError,
+    model_validator,
+)
 
 from analysis_service.errors import ConfigError
 
@@ -166,7 +173,13 @@ class Attestation(BaseModel):
     key_id: str = Field(min_length=1, max_length=200)
     #: base64, over the canonical bytes.
     signature: str = Field(min_length=1)
-    signed_at: datetime
+    #: Aware, always. It is compared against a key's retirement, and Python
+    #: refuses to order a naive datetime against an aware one -- so a naive
+    #: value here raised ``TypeError`` out of :func:`verify`, past a handler
+    #: that catches neither, and exited on a code the table does not name. This
+    #: field arrives in the file a caller supplies, so the shape is theirs to
+    #: get wrong and this is where it is refused.
+    signed_at: AwareDatetime
 
     def signed_payload(self) -> bytes:
         """The bytes the signature is actually over. See :func:`signed_payload`."""
@@ -263,7 +276,9 @@ class VerificationKey(BaseModel):
     status: KeyStatus
     #: When this key stopped signing. Required for a retired key and meaningless
     #: for an active one, so it is checked rather than merely typed.
-    retired_at: datetime | None = None
+    #: Aware, for the reason :attr:`Attestation.signed_at` is: the two are
+    #: compared, and TOML's local date-time is naive and perfectly valid TOML.
+    retired_at: AwareDatetime | None = None
 
     @model_validator(mode="after")
     def _retirement_carries_its_date(self) -> Self:

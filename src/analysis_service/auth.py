@@ -314,7 +314,19 @@ class _CooldownSigningKeyClient:
         return key
 
     def _match(self, kid: str | None, *, refresh: bool) -> jwt.PyJWK | None:
-        keys = list(self._client.get_jwk_set(refresh=refresh).keys)
+        """The signing key this token names, or ``None``.
+
+        Narrowed to keys whose ``use`` is ``sig`` or unstated, which is what
+        PyJWT's own client does. An issuer that publishes an encryption key in
+        the same set is saying what that key is for, and verifying a signature
+        with it uses the key against its stated purpose -- so the filter is the
+        issuer's declaration being honoured rather than a guess about it.
+        """
+        keys = [
+            key
+            for key in self._client.get_jwk_set(refresh=refresh).keys
+            if key.public_key_use in ("sig", None)
+        ]
         if kid is None:
             return keys[0] if len(keys) == 1 else None
         return next((key for key in keys if key.key_id == kid), None)

@@ -24,6 +24,7 @@ from evals.harness.artifact import ARTIFACT_VERSION, load_artifact
 from evals.harness.baseline import (
     BaselineError,
     BaselineIdentity,
+    artifact_filename,
     assemble,
     price_sweep,
     verify,
@@ -379,3 +380,32 @@ class TestAnUnknownCacheDiscount:
         """A manifest records what was known, so the hole travels with it."""
         unknown = UnitPrices("m", 2e-6, 8e-6, None)
         assert UnitPrices.from_json(unknown.to_json()) == unknown
+
+
+class TestAnArtifactNameCarriesNoDirectory:
+    """A Baseline manifest is a contributor's file, and both readers of it join
+    the name onto a directory.
+
+    Nothing stopped ``../`` there, so a manifest could name a JSON outside the
+    Baseline it belongs to and have its numbers read as that Baseline's --
+    and ``comparison`` folds those numbers into a published README. Neither
+    reader wants a path: a Baseline's artifacts sit beside its manifest.
+    """
+
+    @pytest.mark.parametrize(
+        "name",
+        [
+            "../other-baseline/sweep.json",
+            "/etc/passwd",
+            "sub/sweep.json",
+            "..",
+            "",
+            ".hidden.json",
+        ],
+    )
+    def test_a_name_that_is_not_a_plain_file_name_is_refused(self, name):
+        with pytest.raises(BaselineError, match="carries no directory"):
+            artifact_filename(name)
+
+    def test_an_ordinary_artifact_name_passes(self):
+        assert artifact_filename("sweep-1.json") == "sweep-1.json"

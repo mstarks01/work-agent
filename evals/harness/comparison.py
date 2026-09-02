@@ -40,6 +40,7 @@ from typing import Any
 from analysis_service.report import FrameworkName
 from evals.harness import standings
 from evals.harness.artifact import REPO_ROOT
+from evals.harness.baseline import BaselineError, artifact_filename
 from evals.harness.instruments import INSTRUMENTS, Column
 from evals.harness.scorer import vote_coverage
 
@@ -144,7 +145,12 @@ def read_baseline(directory: Path, root: Path = REPO_ROOT) -> Row | None:
 
     per_series: dict[str, list[dict[str, Any]]] = {}
     for entry in entries:
-        path = directory / str(entry.get("artifact", ""))
+        try:
+            path = directory / artifact_filename(entry.get("artifact", ""))
+        except BaselineError:
+            # A published table is not the place to explain a malformed
+            # manifest, and `verify-contribution` already refuses one.
+            continue
         if not path.is_file():
             continue
         raw = json.loads(path.read_text(encoding="utf-8"))

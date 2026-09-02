@@ -233,6 +233,27 @@ def _recomputed_cost(artifact: EvalArtifact, recorded: dict[str, Any]) -> float:
     return price_calls(calls, rates=rates).total_usd
 
 
+def artifact_filename(value: object) -> str:
+    """One sweep's artifact name, refused unless it is a plain file name.
+
+    A Baseline manifest is a contributor's file, and both readers of it join the
+    name onto a directory. Nothing stops ``../`` there, so a manifest could name
+    a JSON outside the Baseline it belongs to and have its numbers read as that
+    Baseline's -- and ``comparison`` folds them into a published README.
+
+    Neither reader wants a path: a Baseline's artifacts sit beside its manifest
+    by construction. So the field says so, rather than each reader guarding it
+    and one of them forgetting.
+    """
+    name = str(value)
+    if not name or name != Path(name).name or name.startswith("."):
+        raise BaselineError(
+            f"{name!r} is not an artifact file name; a Baseline's artifacts sit"
+            " beside its manifest, so the name carries no directory"
+        )
+    return name
+
+
 def _file_digests(directory: Path, sweep_stem: str) -> dict[str, str]:
     """Every file one sweep owns, digested, keyed by path inside the Baseline."""
     digests: dict[str, str] = {}
@@ -406,7 +427,7 @@ def verify(
     identities = set()
     artifacts: dict[str, EvalArtifact] = {}
     for entry in sweeps:
-        filename = str(entry.get("artifact", ""))
+        filename = artifact_filename(entry.get("artifact", ""))
         path = directory / filename
         try:
             artifact = load_artifact(path)
