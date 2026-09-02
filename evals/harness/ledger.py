@@ -79,8 +79,10 @@ GITHUB_LOGIN = re.compile(r"(?=.{1,39}\Z)[A-Za-z0-9](?:-?[A-Za-z0-9])*\Z")
 #: button would have thrown it away.
 #:
 #: ``needs-evidence`` is not a verdict about the finding at all — it says the
-#: reviewer cannot answer from what they were shown. It routes to a re-ask
-#: rather than to a score.
+#: reviewer cannot answer from what they were shown. It moves no number, and it
+#: holds only for the sitting it was cast in: a later sitting asks again, over
+#: whatever evidence exists by then. That is what makes it different from
+#: ``unsure``, which is a spent answer like any other.
 Verdict = Literal["up", "down", "unsure", "needs-evidence"]
 
 #: Reasons that speak to whether the finding is *right*. A ``down`` carrying one
@@ -326,10 +328,6 @@ class Ledger:
         for (value, _), vote in self.current().items():
             by_finding.setdefault(value, []).append(vote)
         return by_finding
-
-    def voted_fingerprints(self) -> frozenset[str]:
-        """Every fingerprint anybody has answered, for the queue to skip."""
-        return frozenset(vote.fingerprint for vote in self.votes)
 
     def pool(self) -> frozenset[str]:
         """The reference pool: every fingerprint a live verdict puts in it.
