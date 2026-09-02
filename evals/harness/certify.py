@@ -244,7 +244,7 @@ def plan_promotion(
     identities = provenance.tier_identities()
     if not identities:
         raise ProvenanceError(
-            "the artifact recorded no generation identities: this sweep"
+            "the artifact recorded no execution identities: this sweep"
             " observed no served build, so there is nothing to bless"
         )
 
@@ -445,7 +445,7 @@ def _dump_manifest(manifest: BlessedManifest) -> str:
     file the *service* parses (OWASP A05).
     """
     parts = [
-        "# Blessed generation-identity fingerprints — a machine record.",
+        "# Blessed execution-identity fingerprints — a machine record.",
         "# Written by evals.harness.certify.promote, single-sourced with",
         "# config/sampling.toml. Keyed by TIER: a fingerprint is",
         "# (vendor-prefixed served build, tier sampling) and carries no node",

@@ -2462,12 +2462,13 @@ def instruction_digest(llm_nodes: Sequence[LlmAgent]) -> str:
     swap that gave two nodes each other's instruction moves the hash. Sorted,
     because a dict ordering is not a fact about the graph.
 
-    It is deliberately **not** part of certification. A blessed fingerprint
-    attests to a generation identity — model and decoding params — and widening
-    it to the prompts would re-baseline every blessed pair on any prompt edit,
-    which is a decision about what a deployment sanctions rather than a fact
-    about a run. Recording it is what lets a reader notice; gating on it is a
-    separate choice nobody has made.
+    It is part of certification. The digest is one of the seven parts of the
+    **Execution Identity**, so a prompt edit re-baselines every blessed
+    fingerprint, and runs read as uncertified until a sanctioned sweep blesses
+    the new ones. That cost was once the argument for recording the digest and
+    not gating it. #504 made the opposite call: a run on edited prompts is not
+    the run a deployment sanctioned, and reporting it as certified was the
+    defect.
     """
     payload = json.dumps(
         {node.name: node.instruction for node in llm_nodes},

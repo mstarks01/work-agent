@@ -182,8 +182,9 @@ the output would reveal it.
 
 Those served builds land in the artifact's `provenance` block, one entry per node
 execution, which is what makes promotion a command rather than an archaeology
-exercise: a fingerprint is `sha256(served build, tier sampling)`, and neither half
-is recoverable from the configured tier strings. The block carries an
+exercise: a fingerprint is the sha256 of an **Execution Identity**, whose seven
+parts include the served build and the tier's resolved sampling, and none of
+what it observed is recoverable from the configured tier strings. The block carries an
 `artifact_version` beside it at the artifact's root; a promotion refuses any
 version it does not know rather than interpreting it best-effort.
 

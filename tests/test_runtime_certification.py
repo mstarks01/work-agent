@@ -2,7 +2,7 @@
 
 Covers the runtime half of certification: the runner attaches a verdict to the
 job record, and ``GET /v1/jobs/{id}/report`` withholds a report whose
-generation identity this deployment has not blessed. Nothing here reaches a
+execution identity this deployment has not blessed. Nothing here reaches a
 provider — the runner is a stand-in and the manifests are built in memory.
 """
 

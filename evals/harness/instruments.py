@@ -78,7 +78,7 @@ CaseScorer = Callable[[GoldenCase, FrameworkAnalysis, Sequence[Any]], Mapping[st
 class ModeRun:
     """Everything one sweep of one mode produced.
 
-    ``provenance`` is the sweep's generation identities — per node execution,
+    ``provenance`` is the sweep's execution identities — per node execution,
     what was requested, what answered, and the hash that pair produced. Both
     the certification verdict and the artifact are derived from it, so the
     thing a promotion reads back is the same record the verdict was computed

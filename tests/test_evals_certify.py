@@ -112,7 +112,7 @@ def test_a_pro_override_reprints_only_pro_nodes():
     base = _build_fingerprints(default)
     swept = _build_fingerprints(overridden)
 
-    # Base nodes are untouched; every strong node's generation identity moved.
+    # Base nodes are untouched; every strong node's execution identity moved.
     assert base["extract"] == swept["extract"]
     assert base["critic_stride"] != swept["critic_stride"]
     assert base["analyze_stride_spoofing"] != swept["analyze_stride_spoofing"]

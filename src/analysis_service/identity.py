@@ -4,12 +4,14 @@ An **Execution Identity** is everything that decided what a node's answer could
 be. It is versioned, it is canonical, and its sha256 is the fingerprint a
 deployment's manifest blesses.
 
-There are seven inputs, and each is here because changing it can change the
-answer: the requested route and the served build; the resolved decoding params;
-the digest of every instruction the built graph carries; and the versions of the
-three distributions that sit between a node and its provider, which are this
-service, the agent runtime and the model translator. A hash over fewer of them
-certifies a run whose behaviour a blessed run never had.
+The payload carries seven parts. Six of them decide what a node's answer could
+be: the requested route, the served build, how far that served build is trusted,
+the resolved decoding params, the digest of every instruction the built graph
+carries, and the installed versions of the three distributions that sit between
+a node and its provider — this service, the agent runtime and the model
+translator. The seventh is the payload's own schema version, so a fingerprint
+says which shape it hashed. A hash over fewer of them certifies a run whose
+behaviour a blessed run never had.
 
 Both model identities are bound, rather than the served one alone. The served
 build is what the provider said answered, read off its own event stream, and

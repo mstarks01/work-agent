@@ -179,7 +179,7 @@ class TestArtifactSerialization:
         assert loaded.provenance.tier_identities()["base"].ambiguous
 
     def test_a_deterministic_node_contributes_no_identity(self, sampling):
-        # A FunctionNode has no served build and so no generation identity; it
+        # A FunctionNode has no served build and so no execution identity; it
         # must not appear as a node with an empty one.
         executions = [
             *sweep(sampling),

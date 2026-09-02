@@ -2236,12 +2236,12 @@ class TestIntoReport:
 
 
 class TestTheInstructionDigest:
-    """The half of "what produced this report" a fingerprint cannot reach.
+    """What the graph was told, digested so a reader can tell two runs apart.
 
-    A generation identity attests to the served model and the decoding params.
-    Two runs can share one and have been told completely different things —
-    the prompts, the category skills and the rubric are not in that hash and
-    cannot be, since they are known at build time and the served build is not.
+    The digest is one of the seven parts of an **Execution Identity**, so two
+    runs told completely different things cannot share a fingerprint. It is
+    known at build time where the served build is not, which is why the payload
+    carries both rather than deriving one from the other.
     """
 
     def nodes(self, **instructions: str):
