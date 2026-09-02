@@ -10,6 +10,7 @@ contains.
 import pytest
 
 from analysis_service.grounding import (
+    MAX_REPAIR_WORK,
     REPAIR_THRESHOLD,
     normalize,
     repair_quote,
@@ -148,3 +149,30 @@ class TestTheRepairRung:
 
     def test_an_empty_quote_is_refused(self):
         assert repair_quote("   ", SOURCE) is None
+
+    def test_a_scan_over_the_bound_is_refused_rather_than_run(self):
+        """Both terms come from the submitted text, so the rung's cost is the
+        submitter's to set unless something bounds it. Over the bound the
+        answer is the one the threshold already gives when nothing is close
+        enough, and the caller leaves the quote unverified."""
+        width = 40
+        words = ["word"] * (MAX_REPAIR_WORK // (width * width) + 1)
+        quote = " ".join(reversed(words[:width]))
+
+        assert repair_quote(quote, " ".join(words)) is None
+
+    def test_the_bound_leaves_a_median_quote_on_the_largest_source(self):
+        """100 KiB of ordinary prose is around 15,000 words, and the corpus
+        median quote is 13 of them. The bound has to clear that pair, or it
+        has turned the rung off rather than bounded it."""
+        assert 15_000 * 13 * 13 <= MAX_REPAIR_WORK
+
+    def test_folding_a_window_word_by_word_is_folding_it_whole(self):
+        """The scan folds each source word once instead of once per window
+        covering it. That is only the same comparison because the ladder's
+        rungs are per-character and the last one collapses whitespace."""
+        words = ["The", "`LEDGER`", "*service*", "runs"]
+
+        assert " ".join(w for w in map(normalize, words) if w) == normalize(
+            " ".join(words)
+        )
