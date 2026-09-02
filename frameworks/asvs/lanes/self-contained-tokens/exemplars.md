@@ -14,6 +14,9 @@ A session cookie is an opaque reference, not a self-contained token. That is the
   "description": "V9.1.2 governs the algorithms a verifier accepts when checking a self-contained token's signature. It does not apply here. The credentials this model states are a session cookie issued after a password login on `flow:customer-to-web-api:submit-payment`, a shared static password on `flow:ledger-service-to-accounts-db:read-write-balances`, and a service account on `flow:ledger-service-to-audit-log:append-transfer-record`. None of those carries its own claims, and no element's technology names a JWT, a JWS or an OIDC identity token. The requirement has no subject in this system.",
   "affected_element_ids": [],
   "evidence_refs": [],
+  "absent_elements": [
+    "jwt"
+  ],
   "quotes": [
     {
       "text": "get a session cookie",
@@ -38,6 +41,9 @@ The webhook is the one place a token might have hidden, and its `authentication`
   ],
   "evidence_refs": [
     "unknown:flow:payments-provider-to-web-api:settlement-webhook:authentication"
+  ],
+  "absent_elements": [
+    "jwt"
   ],
   "quotes": []
 }

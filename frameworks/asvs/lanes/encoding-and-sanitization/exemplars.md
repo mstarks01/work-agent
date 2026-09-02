@@ -41,11 +41,9 @@ The opposite ruling. No element in this model parses XML and no flow names SOAP,
   "description": "V1.5.1 governs the configuration of an XML parser against external entity and schema resolution. It does not apply here. The model carries five flows and their stated protocols are HTTPS, gRPC and the PostgreSQL wire protocol; no element's technology names an XML parser, a SOAP endpoint or an XSLT processor, and no data description names an XML document. The requirement has no subject in this system, so it is ruled out on the protocols the flows state rather than on silence.",
   "affected_element_ids": [],
   "evidence_refs": [],
-  "quotes": [
-    {
-      "text": "The web API hands each transfer to the ledger service over gRPC",
-      "source_label": "Payments platform notes"
-    }
-  ]
+  "absent_elements": [
+    "xml"
+  ],
+  "quotes": []
 }
 ```
