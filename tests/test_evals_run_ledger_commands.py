@@ -37,7 +37,7 @@ def test_rekey_previews_without_writing(tmp_path, capsys):
     seed(led)
     before = (led / "ada.jsonl").read_text(encoding="utf-8")
 
-    assert main(["rekey", "--to-version", "2", "--ledger", str(led)]) == 0
+    assert main(["rekey", "--ledger", str(led)]) == 0
 
     assert (led / "ada.jsonl").read_text(encoding="utf-8") == before
     out = capsys.readouterr().out
@@ -51,7 +51,7 @@ def test_rekey_moves_every_key_and_keeps_every_vote(tmp_path):
     seed(led)
     original = load(led)
 
-    assert main(["rekey", "--to-version", "2", "--ledger", str(led), "--yes"]) == 0
+    assert main(["rekey", "--ledger", str(led), "--yes"]) == 0
 
     moved = load(led)
     assert all(vote.fingerprint.startswith("v2:") for vote in moved)
@@ -66,7 +66,7 @@ def test_rekey_refuses_a_move_the_components_cannot_satisfy(tmp_path, capsys):
     led = tmp_path / "votes"
     append(
         cast(
-            Components("asvs", "V1", ("process:a",)),
+            Components("stride", "information-disclosure", ("process:a",)),
             "01-payments-checkout",
             "up",
             "ada",
@@ -76,7 +76,7 @@ def test_rekey_refuses_a_move_the_components_cannot_satisfy(tmp_path, capsys):
     )
     before = (led / "ada.jsonl").read_text(encoding="utf-8")
 
-    assert main(["rekey", "--to-version", "2", "--ledger", str(led), "--yes"]) == 1
+    assert main(["rekey", "--ledger", str(led), "--yes"]) == 1
 
     assert (led / "ada.jsonl").read_text(encoding="utf-8") == before, (
         "a refusal must not write"
@@ -85,7 +85,7 @@ def test_rekey_refuses_a_move_the_components_cannot_satisfy(tmp_path, capsys):
 
 
 def test_rekey_on_an_empty_ledger_is_not_an_error(tmp_path, capsys):
-    assert main(["rekey", "--to-version", "2", "--ledger", str(tmp_path / "nil")]) == 0
+    assert main(["rekey", "--ledger", str(tmp_path / "nil")]) == 0
     assert "no votes to re-key" in capsys.readouterr().out
 
 

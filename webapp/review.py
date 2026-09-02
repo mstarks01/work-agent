@@ -74,7 +74,7 @@ from analysis_service.frameworks import PACKAGES
 from evals import verify_corpus
 from evals.harness import queue as review_queue
 from evals.harness import run
-from evals.harness.fingerprint import identifier_of, lane_field
+from evals.harness.fingerprint import FingerprintError, identifier_of, lane_field
 from evals.harness.ledger import (
     DEFAULT_LEDGER_PATH,
     REASON_GLOSS,
@@ -227,7 +227,6 @@ def build_session(
         review_queue.merge_runs(runs, flows),
         flows,
         ledger,
-        reference_pool=ledger.pool(),
         voter=voter,
     )
     return Session(
@@ -314,6 +313,11 @@ def create_app(session: Session) -> FastAPI:
             append(recorded, session.ledger_path)
         except LedgerError as exc:
             # The message names the closed set the value missed, never a path.
+            raise HTTPException(status_code=422, detail=str(exc)) from exc
+        except FingerprintError as exc:
+            # A claim the keying rule cannot key. It reached here as a 500,
+            # which told the reviewer nothing and re-served the same item on
+            # every reload, so one unkeyable finding stalled a whole sitting.
             raise HTTPException(status_code=422, detail=str(exc)) from exc
         return JSONResponse({"recorded": recorded.fingerprint})
 
