@@ -56,10 +56,10 @@ from pathlib import Path
 from typing import Any, Literal
 
 from evals.harness.fingerprint import (
-    DEFAULT_VERSION,
     Components,
     FingerprintError,
     fingerprint,
+    version_for,
     version_of,
 )
 
@@ -255,9 +255,19 @@ def cast(
     config: str = "",
     note: str = "",
     sitting: str = "",
-    version: int = DEFAULT_VERSION,
+    version: int | None = None,
 ) -> Vote:
-    """Build one validated vote, stamping its fingerprint and the time."""
+    """Build one validated vote, stamping its fingerprint and the time.
+
+    The version comes from :data:`VERSION_FOR` keyed by the claim's own
+    framework, never from a default. A default is a single rule for a table with
+    one row per package: it keyed an ASVS claim under STRIDE's rule, which reads
+    an action verb an ASVS claim does not carry, so every ASVS vote raised
+    instead of recording. ``version`` stays overridable for a caller re-keying a
+    row deliberately.
+    """
+    if version is None:
+        version = version_for(components.framework)
     return Vote(
         fingerprint=fingerprint(components, version=version),
         components=components,
@@ -466,16 +476,28 @@ def _replace_voter_file(path: Path, lines: list[str]) -> None:
         raise LedgerError(f"{path}: cannot be written: {exc}") from exc
 
 
-def rekey(votes: Iterable[Vote], version: int) -> list[Vote]:
-    """Recompute every fingerprint under ``version``, from stored components.
+def rekey(votes: Iterable[Vote]) -> list[Vote]:
+    """Recompute every fingerprint from stored components, under the table.
 
     The operation that makes a better recogniser affordable: no re-vote, no
     provider, no credentials, and the answer is a pure function of the ledger.
-    A vote whose components cannot satisfy the new version — no verb, under
-    version 2 — raises, so a partial re-key is impossible.
+    A vote whose components cannot satisfy its framework's version raises, so a
+    partial re-key is impossible.
+
+    Each row is keyed under :data:`VERSION_FOR` for **its own** framework rather
+    than under one version for the file. One version for the file cannot be
+    right once the table holds two: a ledger carrying a STRIDE row and an ASVS
+    row had no value that re-keyed it, because either choice raised on the other
+    package's rows. So a rule improves by editing its package's entry in the
+    table, and this recomputes what that moved.
     """
     return [
-        replace(vote, fingerprint=fingerprint(vote.components, version=version))
+        replace(
+            vote,
+            fingerprint=fingerprint(
+                vote.components, version=version_for(vote.components.framework)
+            ),
+        )
         for vote in votes
     ]
 
@@ -488,6 +510,11 @@ def command_rekey(args: argparse.Namespace) -> int:
     hash, so moving the ledger is arithmetic over a file. No provider, no
     credentials, no re-vote: the ledger stores each vote's components, so a
     version bump is a pure recomputation over the file.
+
+    Every row is keyed under its own framework's entry in ``VERSION_FOR``, so
+    the way to move a rule is to edit that entry and run this. There is no
+    target version to pass: one version for the whole file stopped being a
+    coherent request when the table grew its second row.
 
     Refuses to write anything unless ``--yes`` is given, like ``promote``: this
     rewrites the only human record in the repository, and a preview that also
@@ -502,7 +529,7 @@ def command_rekey(args: argparse.Namespace) -> int:
         return 0
 
     try:
-        moved = rekey(current.votes, version=args.to_version)
+        moved = rekey(current.votes)
     except FingerprintError as exc:
         print(f"cannot re-key: {exc}")
         return 1
@@ -513,7 +540,8 @@ def command_rekey(args: argparse.Namespace) -> int:
         if before.fingerprint != after.fingerprint
     )
     was = sorted({version_of(v.fingerprint) for v in current.votes})
-    print(f"{len(moved)} votes at version {was} -> {args.to_version}")
+    now = sorted({version_of(v.fingerprint) for v in moved})
+    print(f"{len(moved)} votes at version {was} -> {now}")
     print(f"{changed} fingerprints move, {len(moved) - changed} unchanged")
     print(f"{len(current.pool())} findings in the pool, before and after")
 

@@ -126,14 +126,6 @@ PRIORITIES: tuple[tuple[str, int, str], ...] = (
         ),
     ),
     (
-        "unmatched",
-        20,
-        (
-            "no reference set carries this, so nothing scores it either way until"
-            " somebody says whether it is real"
-        ),
-    ),
-    (
         "new",
         10,
         (
@@ -143,16 +135,32 @@ PRIORITIES: tuple[tuple[str, int, str], ...] = (
     ),
 )
 
+# There was a third row between these two, ``unmatched``, weighing whether the
+# reference pool already carried the finding. It is gone because it could not
+# answer that question without answering a different one.
+#
+# The pool is derived from votes, and this queue skips what is already
+# answered. In an unnamed queue "answered" is every fingerprint anybody voted
+# on, and the pool is a subset of that, so nothing pooled ever survived to be
+# ranked and the row fired on everything. In a queue built for a named voter
+# "answered" is only that voter's, so a pooled finding that survives was pooled
+# by *somebody else* -- and the row's weight, its position in the order and the
+# reason printed beside it then told this reviewer how another reviewer had
+# voted. The second-opinion pass is the one place that must not be told.
+#
+# So the row was dead where it was safe and an oracle where it was live. Ranking
+# by the corpus reference sets would be a different row, honestly answering the
+# question this one's prose claimed; it is not this one.
 
-def priority_of(finding: Finding, in_reference_set: bool) -> tuple[int, str]:
+
+def priority_of(finding: Finding) -> tuple[int, str]:
     """The first reason that applies, with its weight — never the sum.
 
-    Summing would rank a finding that is merely new-and-unmatched above a
-    volatile one, and volatility is the reason worth a person's click.
+    Summing would rank a finding that is merely new above a volatile one, and
+    volatility is the reason worth a person's click.
     """
     reasons = {
         "volatile": 0 < finding.seen_in < finding.runs,
-        "unmatched": not in_reference_set,
         "new": True,
     }
     for name, weight, why in PRIORITIES:
@@ -165,7 +173,6 @@ def build(
     findings: Iterable[Finding],
     flows_by_case: Mapping[str, FlowMap],
     ledger: Ledger,
-    reference_pool: frozenset[str] = frozenset(),
     voter: str = "",
 ) -> list[QueueItem]:
     """The queue: unanswered findings, most informative first.
@@ -188,7 +195,7 @@ def build(
     for value, components, finding in _keyed(findings, flows_by_case):
         if value in answered or value in items:
             continue
-        weight, why = priority_of(finding, value in reference_pool)
+        weight, why = priority_of(finding)
         items[value] = QueueItem(
             fingerprint=value,
             components=components,

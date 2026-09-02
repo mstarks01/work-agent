@@ -1450,13 +1450,6 @@ def _pairing_arguments(parser: argparse.ArgumentParser) -> None:
 
 def _rekey_arguments(parser: argparse.ArgumentParser) -> None:
     parser.add_argument(
-        "--to-version",
-        type=int,
-        required=True,
-        help="the fingerprint version to move to; see VERSION_FOR for which"
-        " rule each framework is keyed under",
-    )
-    parser.add_argument(
         "--ledger", default=str(ledger.DEFAULT_LEDGER_PATH), help="the vote ledger"
     )
     parser.add_argument(
