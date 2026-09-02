@@ -39,6 +39,7 @@ from analysis_service.graph import (
 )
 from analysis_service.identity import build_identity, execution_fingerprint
 from analysis_service.report import NodeRun, TokenUsage
+from analysis_service.retry import ATTEMPTS_METADATA_KEY
 from analysis_service.sources import Source, render_sources
 from analysis_service.vendors import join_served
 
@@ -78,6 +79,7 @@ class _NodeFinish:
     at: float
     served_model: str | None
     usage: TokenUsage | None = None
+    attempts: int = 1
 
 
 @dataclass(frozen=True)
@@ -172,27 +174,39 @@ class GraphExecutor:
         started_at = datetime.now(UTC).timestamp()
         finishes: list[_NodeFinish] = []
 
-        async for event in self._runner.run_async(
-            user_id=user_id,
-            session_id=session.id,
-            new_message=types.Content(role="user", parts=[types.Part(text=rendered)]),
-        ):
-            observed_at = datetime.now(UTC).timestamp()
-            for node in _finished_nodes(event, self._node_names):
-                finishes.append(
-                    _NodeFinish(
-                        node=node,
-                        at=observed_at,
-                        served_model=getattr(event, "model_version", None),
-                        usage=_usage_of(event),
+        # The session holds the rendered submission, every node's output and
+        # the report, so it goes when the run does — completed, failed or
+        # cancelled. A session service that kept them would hold one job's
+        # text per job for the life of the process.
+        try:
+            async for event in self._runner.run_async(
+                user_id=user_id,
+                session_id=session.id,
+                new_message=types.Content(
+                    role="user", parts=[types.Part(text=rendered)]
+                ),
+            ):
+                observed_at = datetime.now(UTC).timestamp()
+                for node in _finished_nodes(event, self._node_names):
+                    finishes.append(
+                        _NodeFinish(
+                            node=node,
+                            at=observed_at,
+                            served_model=getattr(event, "model_version", None),
+                            usage=_usage_of(event),
+                            attempts=_attempts_of(event),
+                        )
                     )
-                )
-                if on_node is not None:
-                    await on_node(node)
+                    if on_node is not None:
+                        await on_node(node)
 
-        final = await self._session_service.get_session(
-            app_name=self._app_name, user_id=user_id, session_id=session.id
-        )
+            final = await self._session_service.get_session(
+                app_name=self._app_name, user_id=user_id, session_id=session.id
+            )
+        finally:
+            await self._session_service.delete_session(
+                app_name=self._app_name, user_id=user_id, session_id=session.id
+            )
         return GraphRun(
             final_state=dict(final.state) if final else {},
             node_runs=self._node_runs(finishes, started_at),
@@ -243,6 +257,7 @@ class GraphExecutor:
                     execution_fingerprint=fingerprint,
                     duration_ms=max(round((finish.at - ready_at) * 1000), 0),
                     usage=finish.usage,
+                    attempts=finish.attempts,
                 )
             )
             finished_at[finish.node] = finish.at
@@ -321,6 +336,15 @@ def _usage_of(event) -> TokenUsage | None:
     if all(count is None for count in counts.values()):
         return None
     return TokenUsage(**{field: count or 0 for field, count in counts.items()})
+
+
+def _attempts_of(event) -> int:
+    """How many provider calls this event's node took, as the retry driver said.
+
+    One where the event carries no stamp: a deterministic node makes no call,
+    and a model that did not pass through the retry driver made exactly one.
+    """
+    return (getattr(event, "custom_metadata", None) or {}).get(ATTEMPTS_METADATA_KEY, 1)
 
 
 def _served_route(requested_route: str | None, served_model: str | None) -> str | None:

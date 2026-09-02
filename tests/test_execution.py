@@ -13,6 +13,7 @@ from __future__ import annotations
 import asyncio
 
 import pytest
+from google.adk.sessions import InMemorySessionService
 
 from analysis_service import graph
 from analysis_service.execution import GraphExecutor, _NodeFinish
@@ -28,6 +29,7 @@ from tests.factories import (
     DESCRIPTION_TEXT,
     PROJECT_ROOT,
     STRONG_MODEL,
+    RetriedLlm,
     SilentLlm,
     SlowLlm,
     UnmeteredLlm,
@@ -170,6 +172,16 @@ def test_usage_is_recorded_even_when_the_served_build_is_not():
     assert extract.execution_fingerprint is None
     assert extract.usage is not None
     assert extract.usage.prompt_tokens == 1100
+
+
+def test_a_retried_node_records_how_many_attempts_it_took():
+    """The count is the only trace the failed attempts' prompts leave."""
+    pipeline, _ = scripted_pipeline(happy_replies(), llm_class=RetriedLlm)
+    runs = by_node(drive(pipeline))
+
+    assert runs[graph.EXTRACT_NODE].attempts == 3
+    assert runs[graph.EXTRACT_NODE].usage.prompt_tokens == 1100
+    assert runs[graph.VALIDATE_NODE].attempts == 1
 
 
 def test_a_provider_that_meters_nothing_yields_no_usage_at_all():
@@ -472,3 +484,49 @@ class TestSourceRendering:
 
         run = asyncio.run(scenario())
         assert graph.STATE_VALID_MODEL in run.final_state
+
+
+class TestSessionCleanup:
+    """A run's session goes when the run does, however the run ends.
+
+    The session holds the rendered submission and every node's output, so a
+    session the service kept would hold one job's text per job for the life of
+    the process.
+    """
+
+    @staticmethod
+    def _sessions(service) -> list[str]:
+        async def scenario():
+            listed = await service.list_sessions(
+                app_name="stride-test", user_id="test-user"
+            )
+            return [session.id for session in listed.sessions]
+
+        return asyncio.run(scenario())
+
+    def test_a_completed_run_leaves_no_session(self):
+        pipeline, _ = scripted_pipeline(happy_replies())
+        service = InMemorySessionService()
+        executor = GraphExecutor(
+            pipeline, app_name="stride-test", session_service=service
+        )
+
+        async def scenario():
+            await executor.run([Source.description(DESCRIPTION)], user_id="test-user")
+
+        asyncio.run(scenario())
+        assert self._sessions(service) == []
+
+    def test_a_failed_run_leaves_no_session(self):
+        pipeline, _ = scripted_pipeline(happy_replies() | {"extract": "not json"})
+        service = InMemorySessionService()
+        executor = GraphExecutor(
+            pipeline, app_name="stride-test", session_service=service
+        )
+
+        async def scenario():
+            await executor.run([Source.description(DESCRIPTION)], user_id="test-user")
+
+        with pytest.raises(ValueError, match="Invalid JSON"):
+            asyncio.run(scenario())
+        assert self._sessions(service) == []

@@ -236,7 +236,7 @@ class JobRecord(BaseModel):
         nodes = self.report.nodes if self.report is not None else self.unreported_nodes
         if not nodes:
             return None
-        return measured_tokens(node.usage for node in nodes)
+        return measured_tokens(nodes)
 
     def record_node(self, node: str) -> None:
         """Log completion of one pipeline node."""
@@ -335,6 +335,10 @@ class JobStore(Protocol):
 
     async def get(self, job_id: str) -> JobRecord | None: ...
 
+    async def events_after(
+        self, job_id: str, seen: int
+    ) -> tuple[JobStatus, list[JobEvent]] | None: ...
+
     async def save(self, record: JobRecord) -> None: ...
 
 
@@ -428,6 +432,22 @@ class InMemoryJobStore:
     async def get(self, job_id: str) -> JobRecord | None:
         record = self._records.get(job_id)
         return None if record is None else record.model_copy(deep=True)
+
+    async def events_after(
+        self, job_id: str, seen: int
+    ) -> tuple[JobStatus, list[JobEvent]] | None:
+        """The job's status and the events past ``seen``, and nothing else.
+
+        The SSE endpoint asks this on every poll, so it copies the events a
+        client has not seen rather than the record they hang off, whose report
+        can be hundreds of kilobytes.
+        """
+        record = self._records.get(job_id)
+        if record is None:
+            return None
+        return record.status, [
+            event.model_copy(deep=True) for event in record.events[seen:]
+        ]
 
     async def save(self, record: JobRecord) -> None:
         if record.id not in self._records:

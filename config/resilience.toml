@@ -210,17 +210,18 @@ max_jobs_per_window = 30
 # count cannot express: one very large submission can cost more than thirty
 # small ones, and a count admits it.
 #
-# A job reserves an estimate at admission -- its own submitted tokens times
-# every LLM call its framework selection implies -- and that reservation is
+# A job reserves an estimate at admission -- one token per submitted byte,
+# times every LLM call its framework selection implies -- and that reservation is
 # replaced by the measured usage the moment the job reaches a terminal state.
 # The estimate deliberately over-counts, because a bound that must hold before
 # anything is spent has to err upward. See `analysis_service.budgets`.
 #
 # 20,000,000 is roughly what the byte cap allows a caller to spend at this
-# ceiling and this rate: 102,400 bytes is on the order of 25,000 tokens, and a
-# job naming every carried framework makes 27 LLM calls of it. Size it against
-# YOUR provider quota and the framework selections you offer, not against this
-# number.
+# ceiling and this rate: 102,400 bytes reserves 102,400 tokens, a job naming
+# every carried framework makes 29 LLM calls of it, and a completed job settles
+# to what it measured, which for prose is about a fifth of that. Size it
+# against YOUR provider quota and the framework selections you offer, not
+# against this number.
 max_tokens_per_window = 20000000
 
 # The same bound across EVERY subject, and it is not the sum of theirs. This is

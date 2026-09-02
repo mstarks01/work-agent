@@ -61,6 +61,10 @@ from typing import ClassVar
 
 logger = logging.getLogger(__name__)
 
+#: The ``custom_metadata`` key under which a response says which attempt
+#: produced it. The executor reads it off the event by this name.
+ATTEMPTS_METADATA_KEY = "attempts"
+
 # Full-jitter bounds, pinned rather than configured (see the module docstring).
 # Conventional values from AWS's "Exponential Backoff and Jitter" — the one pair
 # in this module not derived from something measured. They are the fallback
@@ -267,6 +271,24 @@ class RetryPolicy:
         return self.budget.withdraw()
 
 
+def _stamped(responses: Sequence, attempt: int) -> Sequence:
+    """``responses`` carrying the number of the attempt that produced them.
+
+    A failed attempt yields no response and so meters nothing, and the one
+    that answered meters only itself. The count rides on the response's own
+    metadata, which ADK copies onto the event the executor reads, so a
+    settlement can charge the prompt bytes the failed attempts sent (OWASP
+    LLM10). Stamped on every attempt rather than only a retried one, so a
+    response without the stamp is one that never passed through this driver.
+    """
+    for response in responses:
+        response.custom_metadata = {
+            **(response.custom_metadata or {}),
+            ATTEMPTS_METADATA_KEY: attempt,
+        }
+    return responses
+
+
 def _reject_truncated(responses: Sequence, model: str) -> None:
     """Raise if the provider stopped any of ``responses`` at the token cap.
 
@@ -374,7 +396,7 @@ def retrying_llm_class(litellm_cls: type, policy: RetryPolicy) -> type:
                     await self.retry_policy.sleep_before_retry(attempt, exc)
                 else:
                     self.retry_policy.budget.credit()
-                    return responses
+                    return _stamped(responses, attempt)
             raise AssertionError(f"retry loop fell through: {last_exc!r}")
 
         def _give_up(self, attempt: int, exc: BaseException) -> BaseException:

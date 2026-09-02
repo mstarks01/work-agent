@@ -558,13 +558,18 @@ re-priced after it has refused one. Convert to your own currency once, at the
 knob, where you can see the rate you used — and set the provider's own spend
 limit as the backstop behind both.
 
-A job **reserves** an estimate at admission: its own submitted tokens times
-every model call its framework selection implies, derived from the package
+A job **reserves** an estimate at admission: one token per submitted byte,
+times every model call its framework selection implies, derived from the package
 registry so a framework added later moves it with no edit. The estimate
 over-counts on purpose, because a bound that must hold before anything is spent
-has to err upward. The reservation is **replaced** by the measured usage the
-moment the job reaches a terminal state, so a job that reserved a lot and cost
-little frees the difference immediately.
+has to err upward, and a byte is the one unit a caller cannot shrink: a word
+count would read whitespace-free text as a handful of tokens. The reservation
+is **replaced** by the measured usage the moment the job reaches a terminal
+state, so a job that reserved a lot and cost little frees the difference
+immediately. The measurement is each node's reported usage, plus its prompt
+tokens once more for every retried attempt: a failed attempt sends the prompt
+and reports nothing, so `nodes[].attempts` is what the settlement charges it
+from.
 
 A job that nothing measured keeps its reservation. A completed job is settled
 from its report. A rejected job is settled from the nodes that ran before the

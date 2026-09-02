@@ -38,14 +38,17 @@ inside the report would have to be excluded from its own coverage, and
 ```
 
 The signature is **not** over the report bytes. It is over the report digest
-bound to the canonicalization version, the payload type and the key id, so a
-signature cannot be lifted onto another document, replayed under a different
-canonicalization, or re-attributed to another key.
+bound to the canonicalization version, the payload type, the key id and the
+signing time, so a signature cannot be lifted onto another document, replayed
+under a different canonicalization, re-attributed to another key, or moved in
+time to predate a retirement.
 
 `signed_at` is when the deployment signed. It is **not evidence of when**: a
 machine's clock is not a trusted timestamp and nothing countersigns it. It is
-recorded because a rotation policy is stated in time. A deployment needing a
-trustworthy time needs a timestamping authority, which this is not.
+recorded because a rotation policy is stated in time. Signing it makes it the
+key holder's own claim and nobody else's; it does not make the claim true. A
+deployment needing a trustworthy time needs a timestamping authority, which
+this is not.
 
 ## Canonicalization
 

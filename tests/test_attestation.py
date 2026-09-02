@@ -195,6 +195,19 @@ class TestRotationAndRevocation:
         assert result.verdict == "invalid"
         assert "retired at" in result.detail
 
+    def test_a_backdated_signing_time_breaks_the_signature(self):
+        # The time is inside the signed bytes, so editing it on an existing
+        # attestation cannot move the signature to before a retirement.
+        report = report_json()
+        attestation = sign(report, KEY, key_id=KEY_ID)
+        retired_at = datetime.now(UTC) - timedelta(days=1)
+        backdated = attestation.model_copy(
+            update={"signed_at": retired_at - timedelta(days=1)}
+        )
+        result = verify(report, backdated, keyring("retired", retired_at=retired_at))
+        assert result.verdict == "invalid"
+        assert "retired at" not in result.detail
+
     def test_a_revoked_key_is_refused_even_where_the_signature_is_good(self):
         # A compromised key could backdate, so what it signed before anyone
         # noticed is no safer than what it signed after.
@@ -354,7 +367,7 @@ class TestTheStandaloneVerifier:
 
 
 def test_the_signed_payload_binds_everything_it_must():
-    """A signature covers the digest, the version, the type and the key id."""
+    """A signature covers the digest, the version, the type, the key id and the time."""
     attestation = Attestation(
         canonical_version=CANONICAL_VERSION,
         payload_type=PAYLOAD_TYPE,
@@ -369,4 +382,5 @@ def test_the_signed_payload_binds_everything_it_must():
         "key_id",
         "payload_type",
         "report_sha256",
+        "signed_at",
     }

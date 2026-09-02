@@ -139,19 +139,27 @@ class Attestation(BaseModel):
             key_id=self.key_id,
             payload_type=self.payload_type,
             report_sha256=self.report_sha256,
+            signed_at=self.signed_at,
         )
 
 
 def signed_payload(
-    *, canonical_version: int, key_id: str, payload_type: str, report_sha256: str
+    *,
+    canonical_version: int,
+    key_id: str,
+    payload_type: str,
+    report_sha256: str,
+    signed_at: datetime,
 ) -> bytes:
     """The bytes a signature is over.
 
     **Not the report's own bytes.** It is the report digest bound to the
-    canonicalization version, the payload type and the key id — so a signature
-    cannot be lifted onto a different document, replayed under a different
-    canonicalization, or re-attributed to another key. Signing the report bytes
-    alone would leave all three open.
+    canonicalization version, the payload type, the key id and the signing
+    time — so a signature cannot be lifted onto a different document, replayed
+    under a different canonicalization, re-attributed to another key, or moved
+    in time to predate a retirement. Signing the report bytes alone would leave
+    all four open. The signing time stays a claim by whoever held the key, but
+    it is now that signer's claim and nobody else's.
 
     A free function as well as a method, because :func:`sign` needs it before an
     :class:`Attestation` exists: the signature is one of that model's required
@@ -164,6 +172,7 @@ def signed_payload(
             "key_id": key_id,
             "payload_type": payload_type,
             "report_sha256": report_sha256,
+            "signed_at": signed_at.isoformat(),
         }
     )
 
@@ -173,12 +182,14 @@ def sign(
 ) -> Attestation:
     """Sign one report's canonical form with this deployment's key."""
     report_sha256 = digest(report)
+    signed_at = datetime.now(UTC)
     raw = private_key.sign(
         signed_payload(
             canonical_version=CANONICAL_VERSION,
             key_id=key_id,
             payload_type=PAYLOAD_TYPE,
             report_sha256=report_sha256,
+            signed_at=signed_at,
         )
     )
     return Attestation(
@@ -187,7 +198,7 @@ def sign(
         report_sha256=report_sha256,
         key_id=key_id,
         signature=base64.b64encode(raw).decode("ascii"),
-        signed_at=datetime.now(UTC),
+        signed_at=signed_at,
     )
 
 

@@ -26,6 +26,7 @@ from __future__ import annotations
 
 import asyncio
 import logging
+import re
 from collections import Counter
 from collections.abc import Callable, Mapping, Sequence
 from datetime import datetime
@@ -77,6 +78,13 @@ logger = logging.getLogger(__name__)
 _BODY_SLACK = 2
 
 _SSE_POLL_SECONDS = 0.2
+
+#: What a ``Last-Event-ID`` may spell before ``int`` sees it. ASCII digits
+#: only, because ``str.isdigit`` also passes superscripts ``int`` refuses; and
+#: bounded, because ``int`` refuses a string past 4300 digits by raising. Either
+#: refusal would surface as a 500 on a header the client controls. Anything
+#: else resumes from the start, which is what a missing header does too.
+_LAST_EVENT_ID = re.compile(r"[0-9]{1,18}")
 
 # The rungs of the input ladder, mapped to what HTTP calls them. An empty
 # list is a malformed request rather than an oversized one: a job with no input
@@ -689,19 +697,20 @@ def create_app(
     ) -> StreamingResponse:
         await _owned_job(request, job_id, subject)
         last_event_id = request.headers.get("last-event-id", "")
-        seen = int(last_event_id) if last_event_id.isdigit() else 0
+        seen = int(last_event_id) if _LAST_EVENT_ID.fullmatch(last_event_id) else 0
         store: JobStore = request.app.state.store
 
         async def event_stream():
             nonlocal seen
             while True:
-                record = await store.get(job_id)
-                if record is None:
+                progress = await store.events_after(job_id, seen)
+                if progress is None:
                     return
-                for event in record.events[seen:]:
+                status, events = progress
+                for event in events:
                     seen = event.seq
                     yield _sse_frame(event)
-                if record.status in TERMINAL_STATUSES and seen >= len(record.events):
+                if status in TERMINAL_STATUSES:
                     return
                 await asyncio.sleep(_SSE_POLL_SECONDS)
 

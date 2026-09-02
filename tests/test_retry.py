@@ -34,7 +34,7 @@ def rate_limited(**headers) -> RateLimitError:
     )
 
 
-@dataclass(frozen=True)
+@dataclass
 class FakeResponse:
     """The response shape, minimal but not *less* than a response.
 
@@ -42,11 +42,13 @@ class FakeResponse:
     for a response until the truncation check needed to read one, and that
     substitution is the same shape as the bug it was hiding: what a provider
     says about *how* a completion ended is part of the answer, not metadata
-    around it.
+    around it. ``custom_metadata`` is where the adapter writes the attempt
+    count, so it is mutable as the real response is.
     """
 
     text: str
     finish_reason: str | None = None
+    custom_metadata: dict | None = None
 
 
 def truncated(text: str = "half a doc") -> FakeResponse:
@@ -253,6 +255,17 @@ class TestRetryingAdapter:
         base = FakeLlm(outcomes=[rate_limited(), "ok"])
         assert texts(drive(base, policy())) == ["ok"]
         assert base.calls == 2
+
+    def test_the_answer_says_which_attempt_produced_it(self):
+        # A failed attempt meters nothing, so the count on the answer is what
+        # lets a settlement charge the prompts the failed attempts sent.
+        assert drive(FakeLlm(outcomes=["ok"]), policy())[0].custom_metadata == {
+            "attempts": 1
+        }
+        retried = drive(
+            FakeLlm(outcomes=[rate_limited(), rate_limited(), "ok"]), policy()
+        )
+        assert retried[0].custom_metadata == {"attempts": 3}
 
     def test_success_credits_the_budget(self):
         pol = policy()

@@ -86,6 +86,15 @@ class TestTheEstimate:
         submitted = estimate(sources, selection) / llm_calls_for(selection)
         assert estimate(sources, selection) > submitted
 
+    def test_text_without_whitespace_reserves_by_its_size(self):
+        # A tokenizer meters a whitespace-free blob near one token per byte, so
+        # an estimate that counted words would admit it for almost nothing.
+        selection = [FrameworkSelection(name="stride", options={})]
+        prose = [Source.description("word " * 2000)]
+        dense = [Source.description("aZ9!@#" * 1666 + "aZ9!")]
+        assert estimate(dense, selection) >= estimate(prose, selection)
+        assert estimate(dense, selection) >= 10_000 * llm_calls_for(selection)
+
 
 class TestReconciliation:
     def test_a_live_job_charges_its_reservation(self):
@@ -108,7 +117,8 @@ class TestReconciliation:
     def test_an_unmetered_run_settles_to_zero_not_to_its_reservation(self):
         # Leaving the reservation standing would charge a caller forever for a
         # job whose cost nobody knows, since a terminal job never reports again.
-        assert measured_tokens([None, None]) == 0
+        unmetered = [NodeRun(node="extract", duration_ms=10)] * 2
+        assert measured_tokens(unmetered) == 0
 
     def test_a_terminal_transition_settles_what_the_run_measured(self):
         rec = record(reserved=900)
@@ -320,4 +330,15 @@ def test_a_report_settles_to_what_its_nodes_measured():
         None,
     ]
     runs = [NodeRun(node=f"n{i}", duration_ms=1, usage=u) for i, u in enumerate(usages)]
-    assert measured_tokens(run.usage for run in runs) == 40
+    assert measured_tokens(runs) == 40
+
+
+def test_a_retried_node_is_charged_the_prompt_it_sent_each_failed_attempt():
+    # The provider meters only the attempt that answered, so the two that
+    # failed before it are settled at the prompt they carried: 15 + 2 * 10.
+    from analysis_service.report import NodeRun
+
+    usage = TokenUsage(prompt_tokens=10, completion_tokens=5, total_tokens=15)
+    retried = NodeRun(node="n", duration_ms=1, usage=usage, attempts=3)
+    assert measured_tokens([retried]) == 35
+    assert measured_tokens([NodeRun(node="n", duration_ms=1, attempts=3)]) == 0
