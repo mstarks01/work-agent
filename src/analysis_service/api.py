@@ -497,7 +497,7 @@ def create_app(
     behind their back is how an app comes to enforce bounds its deployment never
     chose.
     """
-    app = FastAPI(title="STRIDE Threat-Modeling Service")
+    app = FastAPI(title="Security Analysis Service")
     app.state.store = store if store is not None else build_store()
     if runner is not None:
         app.state.runner_for = lambda selection: runner

@@ -1,4 +1,4 @@
-"""Agentic STRIDE threat-modeling service."""
+"""Agentic security-analysis service: one system model, many frameworks."""
 
 from analysis_service.api import (
     JobStatusView,
