@@ -143,7 +143,10 @@ class AdkPipelineRunner:
         except GraphProducedNothing as exc:
             raise PipelineError(f"job {job.id}: {exc}") from exc
         if isinstance(result, Rejected):
-            return PipelineRejected(issues=result.issues)
+            # The node runs ride out with the rejection: extraction and repair
+            # ran and were paid for, and this is the only path where that
+            # measurement exists but no report will carry it.
+            return PipelineRejected(issues=result.issues, nodes=graph_run.node_runs)
 
         report = result.into_report(
             job=Job(

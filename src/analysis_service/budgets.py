@@ -35,9 +35,18 @@ it cannot afford and discovers this at node nine. The reservation is replaced by
 the measured usage the moment the job reaches a terminal state, so a window's
 accounting converges on what actually happened rather than on what was feared.
 
+**A job nothing measured keeps its reservation, and that is the direction that
+matters.** A completed run settles from its report and a rejected one from the
+nodes that ran before the validity gate refused their output. A job that failed
+mid-graph returned no measurement — and it is the one case where getting this
+wrong is unbounded: it had already paid for every node it reached, so freeing
+its estimate would make this whole module a bound that any failing job clears,
+and a caller whose submissions outrun the deadline would spend without limit
+while their window read empty.
+
 **Reconciliation is a scan, not a ledger.** :func:`spent_tokens` reads the
-records: a terminal job contributes what it measured, a live one contributes what
-it reserved. That is the same choice the concurrency count makes and for the same
+records: a terminal job contributes what it measured, a live one — or one
+nothing measured — contributes what it reserved. That is the same choice the concurrency count makes and for the same
 reason — a maintained counter is a second copy of the truth, and the path that
 forgets to decrement leaks budget until the process restarts. It also makes
 double-credit and negative-credit unrepresentable rather than merely tested for,
@@ -53,7 +62,7 @@ from pydantic import BaseModel, ConfigDict, Field
 
 from analysis_service.frameworks import PACKAGES
 from analysis_service.markdown_loader import estimate_tokens
-from analysis_service.report import FrameworkSelection
+from analysis_service.report import FrameworkSelection, TokenUsage
 from analysis_service.sources import Source
 
 # Calls every job makes whatever it selects: one extraction, and the repair that
@@ -135,7 +144,7 @@ def spent_tokens(charges: Iterable[tuple[int, int | None]]) -> int:
     )
 
 
-def measured_tokens(usages: Iterable[object]) -> int:
+def measured_tokens(usages: Iterable[TokenUsage | None]) -> int:
     """What a finished job's node runs actually cost, or 0 if nothing metered.
 
     Zero and not ``None`` for an unmetered run, because this is the number that
@@ -143,7 +152,11 @@ def measured_tokens(usages: Iterable[object]) -> int:
     caller for a job whose cost nobody knows, and forever, since a terminal job
     never reports again. Under-charging a run the provider declined to meter is
     the safer error, and the unmetered call is visible in the report either way.
+
+    Typed against :class:`~analysis_service.report.TokenUsage` rather than read
+    off any object that happens to carry the attribute. A ``getattr`` with a
+    zero default answers 0 for a usage record whose field was renamed, which
+    silently undercharges every window and no type checker can see — the number
+    that decides a budget must not have a quiet default behind it.
     """
-    return sum(
-        getattr(usage, "total_tokens", 0) or 0 for usage in usages if usage is not None
-    )
+    return sum(usage.total_tokens for usage in usages if usage is not None)

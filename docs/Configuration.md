@@ -561,7 +561,16 @@ registry so a framework added later moves it with no edit. The estimate
 over-counts on purpose, because a bound that must hold before anything is spent
 has to err upward. The reservation is **replaced** by the measured usage the
 moment the job reaches a terminal state, so a job that reserved a lot and cost
-little frees the difference immediately, and a failed job frees all of it.
+little frees the difference immediately.
+
+**A job nothing measured keeps its reservation.** A completed run settles from
+its report and a rejected one from the nodes that ran before the validity gate
+refused their output, but a job that failed mid-graph returned no measurement at
+all. Freeing its estimate would hand back every call it had already paid for, so
+a caller whose submissions outrun the deadline could spend without limit while
+their window read empty. The reservation over-counts such a job, in the same
+direction and for the same reason the estimate does, and the window rolls past
+it either way.
 
 A window's total is a scan over the records rather than a maintained counter, so
 a job cannot be counted twice and a total cannot fall below zero however a job

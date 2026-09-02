@@ -26,7 +26,7 @@ import asyncio
 import logging
 import os
 from collections.abc import Awaitable, Callable, Mapping, Sequence
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from datetime import UTC, datetime
 from typing import Literal, Protocol, Self
 from uuid import uuid4
@@ -146,6 +146,11 @@ class JobRecord(BaseModel):
     # to remember to decrement. See :mod:`analysis_service.budgets`.
     reserved_tokens: int = Field(default=0, ge=0)
     measured_tokens: int | None = Field(default=None, ge=0)
+    # What the graph ran on a job that finished without a report. A rejected
+    # input still paid for extraction and repair, and the report that would
+    # normally carry that measurement does not exist, so it is kept here and
+    # settled from exactly as a completed job's is.
+    unreported_nodes: list[NodeRun] = Field(default_factory=list)
 
     @classmethod
     def create(
@@ -190,12 +195,18 @@ class JobRecord(BaseModel):
         subject's window shows what happened rather than what was feared. It
         happens here rather than at each of the four terminal call sites because
         this is the single funnel into a terminal state — a reservation a path
-        forgot to settle would hold budget until the window rolled past it, and
-        for a failed job that budget bought nothing at all.
+        forgot to settle would hold budget until the window rolled past it.
 
-        A job carrying no report settles to zero. Failed, rejected and
-        deadline-killed runs all reach here, and none of them has a measurement
-        to keep.
+        **A job nothing measured keeps its reservation.** Settling it to zero
+        would free the whole estimate for a run that had already reached node
+        nine and paid for every call on the way, which turns the token budget
+        into a bound any failing job clears: a caller whose submissions outrun
+        the deadline would spend without limit while their window read empty.
+        The measurement is genuinely unavailable on that path — the graph raised
+        before it returned its node runs — and the reservation is the only
+        figure the service holds. It over-counts, which is the direction a bound
+        that must hold before anything is spent has to err in, and the window
+        rolls past it either way.
         """
         if new_status not in _LEGAL_TRANSITIONS[self.status]:
             raise InvalidTransitionError(
@@ -203,14 +214,27 @@ class JobRecord(BaseModel):
             )
         self.status = new_status
         if new_status in TERMINAL_STATUSES:
-            self.measured_tokens = self.spent_tokens()
+            measured = self.spent_tokens()
+            if measured is not None:
+                self.measured_tokens = measured
         self._append_event(kind="status", status=new_status)
 
-    def spent_tokens(self) -> int:
-        """What this job's node runs measured, or 0 with no report to read."""
-        if self.report is None:
-            return 0
-        return measured_tokens(node.usage for node in self.report.nodes)
+    def spent_tokens(self) -> int | None:
+        """What this job's node runs measured, or ``None`` if nothing measured them.
+
+        A completed job reads its report's node runs; a rejected one reads the
+        runs the graph returned before the validity gate refused its output.
+        Both are a real measurement, so both settle — including to zero, where a
+        provider declined to meter every call.
+
+        ``None`` means no node run reached this record at all, which is a
+        different fact from a measured zero and is why the two are not one value:
+        a job that failed mid-graph is unmeasured rather than free.
+        """
+        nodes = self.report.nodes if self.report is not None else self.unreported_nodes
+        if not nodes:
+            return None
+        return measured_tokens(node.usage for node in nodes)
 
     def record_node(self, node: str) -> None:
         """Log completion of one pipeline node."""
@@ -456,9 +480,16 @@ class PipelineCompleted:
 
 @dataclass(frozen=True)
 class PipelineRejected:
-    """The input failed the validity gate after the repair pass."""
+    """The input failed the validity gate after the repair pass.
+
+    ``nodes`` is what the graph ran before it rejected. A rejected job builds no
+    report, so the measurement the report would have carried is here instead —
+    extraction and repair were paid for whether or not their output validated,
+    and a rejection that settled to zero would hand a caller those calls free.
+    """
 
     issues: list[ValidationIssue]
+    nodes: list[NodeRun] = field(default_factory=list)
 
 
 PipelineOutcome = PipelineCompleted | PipelineRejected
@@ -627,6 +658,11 @@ async def execute_job(
         record.certification = outcome.certification
         record.transition("completed")
     else:
+        # The node runs first, for the reason the report goes first above:
+        # settling reads them, and a transition that ran before they were
+        # attached would settle a rejection to zero and give a caller the
+        # extraction and repair it paid for free.
+        record.unreported_nodes = outcome.nodes
         record.transition("rejected")
         record.validation_issues = outcome.issues
     await store.save(record)

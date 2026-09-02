@@ -265,6 +265,22 @@ class TestTheKeyring:
         with pytest.raises(KeyringError):
             load_keyring(self.write(tmp_path, body))
 
+    def test_revoking_by_appending_a_second_entry_is_refused(self, tmp_path):
+        # The fail-open this closes. An operator who revokes a key by adding a
+        # revoked entry rather than editing the active one leaves two entries
+        # under one id, and a first-match lookup returns whichever the file
+        # lists first — so the revoked key verified. The keyring cannot tell
+        # which entry was meant, so it refuses rather than resolving the
+        # ambiguity in the direction that grants trust.
+        body = self.valid() + (
+            "\n[[keys]]\n"
+            f'key_id = "{KEY_ID}"\n'
+            f'public_key = "{public(KEY)}"\n'
+            'status = "revoked"\n'
+        )
+        with pytest.raises(KeyringError, match="named more than once"):
+            load_keyring(self.write(tmp_path, body))
+
 
 class TestTheStandaloneVerifier:
     def files(self, tmp_path, *, attest=True, status="active"):

@@ -210,6 +210,8 @@ selection implies — and that reservation is replaced by the measured usage the
 moment the job reaches a terminal state. The estimate over-counts on purpose,
 because a bound that must hold before anything is spent has to err upward; a job
 that reserved a lot and cost little frees the difference as soon as it finishes.
+A job that failed before anything measured it keeps its whole reservation, since
+the calls it made up to that point were still paid for.
 
 The window is **rolling**, not aligned to a clock boundary: a fixed hourly window
 would let a caller spend a full allowance at 10:59 and another at 11:00.

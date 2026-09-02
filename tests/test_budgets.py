@@ -16,9 +16,9 @@ from analysis_service.budgets import (
 )
 from analysis_service.frameworks import PACKAGES
 from analysis_service.jobs import Admission, InMemoryJobStore, JobRecord
-from analysis_service.report import FrameworkSelection, TokenUsage
+from analysis_service.report import FrameworkSelection, NodeRun, Report, TokenUsage
 from analysis_service.sources import Source
-from tests.factories import sample_selection
+from tests.factories import sample_report, sample_selection
 
 POLICY = BudgetPolicy(
     window_seconds=3600,
@@ -39,6 +39,20 @@ def record(subject: str = "alice", reserved: int = 0) -> JobRecord:
 
 def reserve(store, rec, *, ceiling: int = 100, budget: BudgetPolicy = POLICY):
     return asyncio.run(store.reserve(rec, ceiling=ceiling, budget=budget))
+
+
+def metered_node(total: int) -> NodeRun:
+    """One node execution the provider metered at ``total`` tokens."""
+    return NodeRun(
+        node="extract",
+        duration_ms=10,
+        usage=TokenUsage(prompt_tokens=total, total_tokens=total),
+    )
+
+
+def report_measuring(total: int) -> Report:
+    """A complete report whose node runs measure ``total`` tokens between them."""
+    return sample_report().model_copy(update={"nodes": [metered_node(total)]})
 
 
 class TestTheEstimate:
@@ -96,22 +110,67 @@ class TestReconciliation:
         # job whose cost nobody knows, since a terminal job never reports again.
         assert measured_tokens([None, None]) == 0
 
-    def test_a_terminal_transition_settles_the_charge(self):
+    def test_a_terminal_transition_settles_what_the_run_measured(self):
         rec = record(reserved=900)
         assert rec.measured_tokens is None
         rec.transition("running")
         assert rec.measured_tokens is None, "a running job still holds its reservation"
-        rec.transition("failed")
-        assert rec.measured_tokens == 0
+        rec.unreported_nodes = [metered_node(120)]
+        rec.transition("rejected")
+        assert rec.measured_tokens == 120
 
-    @pytest.mark.parametrize("terminal", ["completed", "failed", "rejected"])
-    def test_every_terminal_state_settles(self, terminal):
-        # transition() is the single funnel, so no path can forget: a
-        # reservation left standing holds budget the run never spent.
+    @pytest.mark.parametrize("terminal", ["completed", "rejected"])
+    def test_every_measured_terminal_state_settles(self, terminal):
+        # transition() is the single funnel, so no path that has a measurement
+        # can forget to apply it.
         rec = record(reserved=900)
         rec.transition("running")
+        rec.unreported_nodes = [metered_node(70)]
+        if terminal == "completed":
+            rec.report = report_measuring(70)
         rec.transition(terminal)
-        assert rec.measured_tokens is not None
+        assert rec.measured_tokens == 70
+
+    def test_a_job_nothing_measured_keeps_its_reservation(self):
+        # The gap this closes. A job killed on the deadline has already paid for
+        # every node it reached, so settling it to zero would free the whole
+        # estimate and make the token budget a bound any failing job clears.
+        rec = record(reserved=900)
+        rec.transition("running")
+        rec.transition("failed")
+        assert rec.measured_tokens is None
+        assert spent_tokens([(rec.reserved_tokens, rec.measured_tokens)]) == 900
+
+    def test_serial_failing_jobs_cannot_outspend_the_token_budget(self):
+        # The attack the reservation stands against: a caller whose submissions
+        # outrun the deadline, each freeing its estimate on the way out.
+        store = InMemoryJobStore()
+        budget = POLICY.model_copy(update={"max_jobs_per_window": 100})
+        outcomes = []
+        for _ in range(4):
+            rec = record(reserved=400)
+            outcome = reserve(store, rec, budget=budget).outcome
+            outcomes.append(outcome)
+            if outcome != "admitted":
+                continue
+            rec.transition("running")
+            rec.transition("failed")
+            asyncio.run(store.save(rec))
+        assert outcomes == [
+            "admitted",
+            "admitted",
+            "over_subject_budget",
+            "over_subject_budget",
+        ]
+
+    def test_a_rejected_job_still_pays_for_the_nodes_that_ran(self):
+        # Extraction and repair ran before the validity gate refused their
+        # output. A rejection is the submitter's fault and still costs tokens.
+        rec = record(reserved=900)
+        rec.transition("running")
+        rec.unreported_nodes = [metered_node(40), metered_node(35)]
+        rec.transition("rejected")
+        assert rec.measured_tokens == 75
 
 
 class TestTheRateBound:
