@@ -7,3 +7,6 @@ __pycache__/
 .claude/worktrees/
 .claude/settings.local.json.tmp.*
 evals/runs/
+.coverage
+.coverage.*
+htmlcov/
