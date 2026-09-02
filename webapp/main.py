@@ -321,7 +321,7 @@ def create_app(
     """
     state = build_startup() if startup is None else startup
     analyses = Analyses() if analyses is None else analyses
-    app = FastAPI(title="First run", docs_url=None, redoc_url=None)
+    app = FastAPI(title="First run", docs_url=None, redoc_url=None, openapi_url=None)
     app.add_middleware(TrustedHostMiddleware, allowed_hosts=LOOPBACK_HOSTS)
     app.add_middleware(SecurityHeaders)
 

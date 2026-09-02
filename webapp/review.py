@@ -33,10 +33,12 @@ The security posture is deliberate throughout, and inherited from
 * Loopback only, hard-bound with no flag (A01). The ledger is the supply chain
   of every published quality number, so a writable endpoint reachable off the
   host is an unauthenticated way to forge that record.
-* ``POST /api/vote`` refuses a request that is not same-origin, and no page here
-  can be framed (A01). Both are needed, because either alone is a way to the
-  same forged row: a fingerprint is not a secret, so a foreign page can name a
-  real finding, and a framed page votes with the operator's own origin.
+* ``POST /api/vote`` refuses a request that is not same-origin, refuses one
+  that does not carry the page token, and no page here can be framed (A01).
+  All three are needed, because each alone is a way to the same forged row: a
+  fingerprint is not a secret, so a foreign page can name a real finding; a
+  framed page votes with the operator's own origin; and a request that never
+  read the page has no token to send.
 * The voter comes from the command line, never from the request (A01). A browser
   field naming the voter would let one reviewer file votes as another, and the
   double-vote agreement measure rests on the name being true.
@@ -57,7 +59,7 @@ import json
 import secrets
 import sys
 from collections.abc import Mapping, Sequence
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from pathlib import Path
 from typing import get_args
 
@@ -95,6 +97,7 @@ from webapp.page import (
     refuse_cross_origin,
     render,
     response,
+    script_json,
 )
 
 HOST = "127.0.0.1"
@@ -172,6 +175,10 @@ class Session:
     sources: dict[str, str]
     configs: dict[str, str]
     sitting: str
+    #: Minted per process and delivered only in the page. A request that never
+    #: read the page cannot hold it, so it rides beside the origin check on the
+    #: one endpoint that writes -- the same pair the sitting app's writes carry.
+    token: str = field(default_factory=lambda: secrets.token_urlsafe(24))
 
     def remaining(self) -> list[review_queue.QueueItem]:
         """The queue minus anything this voter has answered since it was built.
@@ -245,7 +252,7 @@ def build_session(
 
 def create_app(session: Session) -> FastAPI:
     """The review app over one prepared sitting."""
-    app = FastAPI(title="Review", docs_url=None, redoc_url=None)
+    app = FastAPI(title="Review", docs_url=None, redoc_url=None, openapi_url=None)
     # Before anything else, so a rebound request is refused rather than
     # reaching the one endpoint in this repository that writes a human
     # judgement. See LOOPBACK_HOSTS for what binding alone does not stop.
@@ -258,7 +265,14 @@ def create_app(session: Session) -> FastAPI:
 
     @app.get("/review", response_class=HTMLResponse)
     def review() -> HTMLResponse:
-        return response(render(_REVIEW_PAGE, _PAGE_GRANTS, voter=escape(session.voter)))
+        return response(
+            render(
+                _REVIEW_PAGE,
+                _PAGE_GRANTS,
+                voter=escape(session.voter),
+                token=script_json(session.token),
+            )
+        )
 
     @app.get("/api/summary")
     def summary() -> JSONResponse:
@@ -289,6 +303,7 @@ def create_app(session: Session) -> FastAPI:
         # foreign page can name a real finding, and the only thing standing
         # between it and a forged row under this voter's name is this line.
         refuse_cross_origin(request)
+        _require_token(request, session)
         item = session.find(body.fingerprint)
         # Narrowed here rather than trusted from the body: ``Vote`` refuses an
         # unknown verdict at construction anyway, and checking against the same
@@ -325,6 +340,20 @@ def create_app(session: Session) -> FastAPI:
         return JSONResponse({"recorded": recorded.fingerprint})
 
     return app
+
+
+def _require_token(request: Request, session: Session) -> None:
+    """The page token, on the one endpoint that writes.
+
+    Beside the origin check rather than instead of it, because they refuse
+    different things: the origin check refuses a page on another origin, and
+    this refuses a request that never read this one. The ledger is the supply
+    chain of every published quality number, and the sitting app's writes have
+    carried both since they were written.
+    """
+    sent = request.headers.get("x-review-token", "")
+    if not secrets.compare_digest(sent.encode(), session.token.encode()):
+        raise HTTPException(status_code=403, detail="wrong or missing page token")
 
 
 def _reason_payload() -> list[dict[str, str]]:
@@ -477,6 +506,7 @@ _REVIEW_PAGE = (
   // Every value below is submitter prose or model output, so it reaches the
   // page as a text node and never as markup. There is no escape helper here
   // deliberately: with no innerHTML path there is nothing to forget to call.
+  const TOKEN = <!--token-->;
   let current = null;
 
   const el = id => document.getElementById(id);
@@ -541,7 +571,7 @@ _REVIEW_PAGE = (
     if (!current || current.done) return;
     fetch("/api/vote", {
       method: "POST",
-      headers: {"Content-Type": "application/json"},
+      headers: {"Content-Type": "application/json", "X-Review-Token": TOKEN},
       body: JSON.stringify({
         fingerprint: current.fingerprint,
         verdict: verdict,

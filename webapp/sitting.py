@@ -418,7 +418,7 @@ class Session:
 
 def create_app(session: Session) -> FastAPI:
     """The sitting app: the rail over the whole corpus, one case on the stage."""
-    app = FastAPI(title="Case sitting", docs_url=None, redoc_url=None)
+    app = FastAPI(title="Case sitting", docs_url=None, redoc_url=None, openapi_url=None)
     app.add_middleware(TrustedHostMiddleware, allowed_hosts=LOOPBACK_HOSTS)
     app.add_middleware(SecurityHeaders)
 
@@ -782,14 +782,20 @@ def create_app(session: Session) -> FastAPI:
         rather than swallowed: the pull request is open either way, and the
         reader is the only one who can clear the file.
         """
+        # The two gates first, and in the order every other write here uses.
+        # `can_submit` answers a question about the operator's machine -- is a
+        # `gh` login configured -- and answering it to a request that has not
+        # proved it read the page tells a stranger something about that machine.
+        # Nothing here made that observable, and the ordering was the only
+        # reason it stayed that way.
+        refuse_cross_origin(request)
+        _require_token(request, session)
         if not session.can_submit:
             raise HTTPException(
                 status_code=409,
                 detail="no authenticated gh login, so there is nothing to"
                 " submit as. Run the printed command yourself.",
             )
-        refuse_cross_origin(request)
-        _require_token(request, session)
         carried = [row.case_id for row in session.carried()]
         if not carried:
             raise HTTPException(

@@ -193,6 +193,6 @@ Every response also carries `X-Content-Type-Options: nosniff` and
 `Referrer-Policy: no-referrer` — those are per response rather than per page,
 which is why they are not part of the CSP.
 
-None of this is what makes the app safe to run: **loopback binding is**. On
+Loopback binding is the first of these and not the whole of them: a page you visit can reach a loopback port, and DNS rebinding is how it tries. Three controls stop it, and each refuses something the others do not — the `Host` check refuses a rebound name, the `Sec-Fetch-Site` check refuses a write that did not come from this page, and `frame-ancestors 'none'` refuses a page that would frame this one to borrow its origin. `webapp/page.py` holds all three. On
 `127.0.0.1` the submitter is both attacker and victim. These are the controls
 that keep that from being the only thing standing between the two.

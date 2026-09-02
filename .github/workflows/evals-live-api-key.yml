@@ -242,14 +242,23 @@ jobs:
           github.event_name != 'workflow_dispatch'
           || inputs.vendor == 'both'
           || inputs.vendor == matrix.vendor
+        # The key is exported under the vendor-scoped name the registry reads,
+        # inside this step, from this leg's own secret. `secrets[matrix.secret_name]`
+        # is what keeps a leg from holding the other vendor's key: the env block
+        # names one secret, not both. The preflight above already reads it this
+        # way; this step named both and so ran the anthropic leg holding the
+        # openai key, and the reverse.
         env:
           EVAL_MODE: ${{ inputs.mode || 'end-to-end' }}
-          ANALYSIS_ANTHROPIC_API_KEY: ${{ secrets.ANALYSIS_ANTHROPIC_API_KEY }}
-          ANALYSIS_OPENAI_API_KEY: ${{ secrets.ANALYSIS_OPENAI_API_KEY }}
+          VENDOR: ${{ matrix.vendor }}
+          VENDOR_API_KEY: ${{ secrets[matrix.secret_name] }}
+          SECRET_NAME: ${{ matrix.secret_name }}
         run: |
+          set -euo pipefail
+          export "${SECRET_NAME}=${VENDOR_API_KEY}"
           uv run python -m evals.harness.run run \
             --mode "$EVAL_MODE" \
-            --out "eval-artifact-${{ matrix.vendor }}.json"
+            --out "eval-artifact-${VENDOR}.json"
 
       # always(), so a failed sweep still surfaces whatever it produced. Unlike
       # the Vertex job there is no preflight-skip case to exclude: this workflow
