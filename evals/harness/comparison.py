@@ -263,21 +263,46 @@ def build(root: Path = REPO_ROOT) -> str:
     return "".join(parts)
 
 
+#: Characters that end a cell, a code span or a line in the table this module
+#: writes. A value carrying one stops being a value and becomes structure.
+_MARKDOWN_STRUCTURE = str.maketrans({"`": "'", "|": "/", "\n": " ", "\r": " "})
+
+
+def _inline(value: object) -> str:
+    """One value, safe to put in a cell of a generated table.
+
+    Everything this module renders comes out of a contributor's artifact, and
+    the table it writes is committed, published, and headed "do not edit by
+    hand: a test recomputes this file". So a value that closes its own code
+    span writes the rest of the document with that authority behind it -- a
+    model that never ran, a commit group nobody pushed, a recall of 1.000.
+    A 176-character `requested_model` was enough, inside the field's own
+    200-character bound.
+    ``frameworks`` is the same sink with no bound at all, which is why this
+    escapes at the sink rather than only tightening the sources: the source
+    bound is the half that keeps being forgotten.
+    """
+    return str(value).translate(_MARKDOWN_STRUCTURE)
+
+
 def _render_row(row: Row) -> str:
     models = ", ".join(
-        f"`{tier}`: `{model}`"
+        f"`{_inline(tier)}`: `{_inline(model)}`"
         for tier, model in sorted(row.identity.get("models", {}).items())
     )
-    frameworks = ", ".join(row.identity.get("frameworks", [])) or "none"
+    frameworks = (
+        ", ".join(_inline(name) for name in row.identity.get("frameworks", []))
+        or "none"
+    )
     summary = (
         f"\n{models} · frameworks {frameworks} · {row.sweeps} sweep(s)"
         f" · ${row.cost_usd:.2f} recorded"
-        f" · submitted by {', '.join(row.submitters) or 'nobody'}"
-        f" · merged {row.merged or 'unknown'}\n"
+        f" · submitted by {', '.join(_inline(who) for who in row.submitters) or 'nobody'}"
+        f" · merged {_inline(row.merged) if row.merged else 'unknown'}\n"
         f"\nVote coverage: {row.coverage[0]} of {row.coverage[1]} unmatched"
         f" finding(s) judged by a person.\n"
     )
-    lines = [f"\n### `{row.name}`\n", summary]
+    lines = [f"\n### `{_inline(row.name)}`\n", summary]
     if not row.voted:
         lines.append(
             "\nNobody has voted on this Baseline's findings, so every"

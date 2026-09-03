@@ -899,8 +899,12 @@ def _baseline_closing(root: Path, author: str) -> str:
     manifest = _baseline_manifest(root)
     identity = manifest.get("identity", {})
     sweeps = manifest.get("sweeps", [])
+    # Escaped for the reason `comparison._inline` gives: these come out of the
+    # contributor's own artifact, and this text is the review aid a maintainer
+    # reads before merging it.
     models = ", ".join(
-        f"{tier}: {model}" for tier, model in sorted(identity.get("models", {}).items())
+        f"{comparison._inline(tier)}: {comparison._inline(model)}"
+        for tier, model in sorted(identity.get("models", {}).items())
     )
     costs = [entry.get("cost", {}) for entry in sweeps]
     total = sum(float(cost.get("actual_usd", 0.0)) for cost in costs)
