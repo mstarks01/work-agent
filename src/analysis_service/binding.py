@@ -312,10 +312,12 @@ def build_tier_adapters(
     refuse to start without them. The tier map is what says which tiers are in
     use, and it is read here rather than assumed.
 
-    A tier nothing runs on is still *selected*: the config requires a
-    ``(vendor, model)`` pair for it, so moving a node onto it later is a one-line
-    edit rather than a discovery. What it does not require is a credential for a
-    provider this deployment does not call.
+    A tier nothing runs on needs no selection either. The config requires a
+    ``(vendor, model)`` pair only for the tiers the node map names -- the same
+    rule this loop applies -- so moving a node onto an empty tier is refused at
+    the edit that moves it, by the loader, rather than at a first run that never
+    reaches the tier. What it does not require is a credential for a provider
+    this deployment does not call.
 
     Raises :class:`~analysis_service.model_gate.ModelGateError` if a bound tier's
     sampling is unsupported by its ``(vendor, model)`` — whether LiteLLM says so
