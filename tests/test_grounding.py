@@ -163,9 +163,19 @@ class TestTheRepairRung:
 
     def test_the_bound_leaves_a_median_quote_on_the_largest_source(self):
         """100 KiB of ordinary prose is around 15,000 words, and the corpus
-        median quote is 80 characters. The bound has to clear that pair, or it
-        has turned the rung off rather than bounded it."""
-        assert 15_000 * 80 * 80 <= MAX_REPAIR_WORK
+        median quote is 80 characters. The bound has to clear that pair and
+        still repair it, or it has turned the rung off rather than bounded it.
+
+        Asked of the rung rather than of the arithmetic. Two predictive metrics
+        in a row read the cost of a scan off its inputs and got the order wrong
+        -- English prose at 288M metric ran in 0.39 s while a repetitive source
+        at 112M ran in 5.95 s -- because what costs the time is how many windows
+        survive `quick_ratio`, which no function of the lengths can see.
+        """
+        source = " ".join(f"the {n} quick brown foxes jumped" for n in range(2500))
+        quote = source[9000:9080].strip()
+
+        assert repair_quote(quote.replace("quick", "quikc"), source) is not None
 
     def test_the_bound_counts_the_quote_in_characters(self):
         """A source of few very long words kept the word figure near zero while

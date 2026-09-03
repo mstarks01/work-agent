@@ -35,7 +35,8 @@ from evals import verify_corpus
 from evals.harness.reference import load_corpus
 from evals.harness.roster import DEFAULT_ROSTER_PATH
 from evals.harness.roster import load as load_roster
-from evals.harness.sitting import MIN_OWN_LIST, clears, document_name, drifted
+from evals.harness.sitting import clears, document_name, drifted
+from evals.harness.submit import reads_as_a_reading_document
 
 #: Cases nobody has read, each with what that leaves unchecked. Every entry is
 #: a case nobody read rather than an exemption: unlike the lists in
@@ -203,8 +204,8 @@ def _document_problems(case, sitting) -> list[str]:
     path = verify_corpus.CORPUS_DIR / case.meta.id / expected
     if not path.is_file():
         return [f"{expected} is not committed beside the case"]
-    if len(path.read_text(encoding="utf-8").strip()) < MIN_OWN_LIST:
-        return [f"{expected} is empty, so it evidences nothing"]
+    if not reads_as_a_reading_document(path):
+        return [f"{expected} is not a reading document, so it evidences nothing"]
     return []
 
 

@@ -202,6 +202,17 @@ class Vote:
         # what "a metric computed last month recomputes to the same number
         # today" says cannot happen.
         try:
+            # The version the row names, not the framework's current one.
+            # A ledger written before a rule change has to keep loading: it is
+            # what `rekey` reads, and it is what `current`, `pool` and scoring
+            # read too. Demanding `version_for` here would make one stale row
+            # refuse the whole file for every command, including the one command
+            # that exists to fix it.
+            #
+            # A row keyed under a version its framework has moved past is
+            # refused where it arrives instead -- `_check_your_file_appends`,
+            # on the pull request that adds it -- and `rekey` names any row it
+            # cannot move.
             expected = fingerprint(
                 self.components, version=version_of(self.fingerprint)
             )
@@ -518,15 +529,22 @@ def rekey(votes: Iterable[Vote]) -> list[Vote]:
     package's rows. So a rule improves by editing its package's entry in the
     table, and this recomputes what that moved.
     """
-    return [
-        replace(
-            vote,
-            fingerprint=fingerprint(
+    moved = []
+    for vote in votes:
+        try:
+            key = fingerprint(
                 vote.components, version=version_for(vote.components.framework)
-            ),
-        )
-        for vote in votes
-    ]
+            )
+        except FingerprintError as exc:
+            # Name the row. Refusing the whole ledger is right -- a partial
+            # re-key is worse -- but an audit found the refusal unactionable,
+            # because the message said only that some row somewhere could not
+            # move, over a file that holds thousands.
+            raise FingerprintError(
+                f"{vote.voter}'s vote on {vote.case} ({vote.fingerprint}): {exc}"
+            ) from exc
+        moved.append(replace(vote, fingerprint=key))
+    return moved
 
 
 def command_rekey(args: argparse.Namespace) -> int:
