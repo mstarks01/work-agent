@@ -14,7 +14,9 @@ from __future__ import annotations
 
 import contextlib
 import os
+import re
 import sys
+from pathlib import Path
 
 import pytest
 
@@ -317,3 +319,34 @@ def test_every_documented_vendor_passes_the_gate_on_shipped_sampling(
             sampling.for_tier(tier).gate_params(),
             source=f"tiers.{tier}",
         )
+
+
+def test_every_local_only_switch_litellm_defines_is_set():
+    """The pin does not pin this, so the suite has to.
+
+    Each `LITELLM_LOCAL_*` variable turns off a remote config fetch. The
+    repository set one of the four, and 1.97.0 fetches the Anthropic beta
+    headers behind another of them -- at request time, from a URL whose content
+    chooses an outgoing header, checked only for being a non-empty dict.
+
+    Read out of litellm's own source rather than restated here, so a version
+    bump that adds a fifth switch fails this test instead of opening an egress
+    nobody looked for.
+    """
+    import litellm
+
+    from analysis_service.model_gate import LITELLM_LOCAL_SWITCHES
+
+    root = Path(litellm.__file__).parent
+    defined = set()
+    for source in root.rglob("*.py"):
+        text = source.read_text(encoding="utf-8", errors="ignore")
+        defined |= set(re.findall(r"LITELLM_LOCAL_[A-Z_]+", text))
+
+    assert defined, "found no switches at all; the scan itself is broken"
+    assert defined <= set(LITELLM_LOCAL_SWITCHES), (
+        f"litellm defines switches this service does not set:"
+        f" {sorted(defined - set(LITELLM_LOCAL_SWITCHES))}"
+    )
+    for switch in LITELLM_LOCAL_SWITCHES:
+        assert os.environ.get(switch) == "True"

@@ -377,12 +377,33 @@ def moved(case_dir: Path, digests: Mapping[str, str]) -> list[str]:
     A file that is gone counts as moved, so a deleted source fails closed.
     """
     stale = []
+    root = case_dir.resolve()
     for name, digest in digests.items():
         target = case_dir / name
-        if (
-            not target.is_file()
-            or hashlib.sha256(target.read_bytes()).hexdigest() != digest
-        ):
+        # Resolve before reading, and treat anything outside the case as gone.
+        # `CORPUS_RELATIVE_PATH` bounds the NAME -- it refuses `..`, a leading
+        # slash and a backslash -- and a symlink needs none of those. A
+        # committed `source.md` pointing at `/etc/hostname` matches the pattern
+        # and reopens the whole finding: the digest comparison below answers
+        # whether the attacker guessed a file's bytes, the read is unbounded,
+        # and a file the process may not open raises out of the lint that
+        # `contribution.yml` runs over a stranger's pull request tree.
+        #
+        # The rule is `markdown_loader`'s, which resolves and asks
+        # `is_relative_to` before it reads. A name that leaves the directory is
+        # treated the same as absent: deny, and reveal nothing about outside.
+        try:
+            resolved = target.resolve()
+            outside = not resolved.is_relative_to(root)
+            readable = not outside and resolved.is_file()
+            digests_match = (
+                readable and hashlib.sha256(resolved.read_bytes()).hexdigest() == digest
+            )
+        except OSError:
+            # Unreadable is not stale-or-not; it is a file this process cannot
+            # answer for, and it must not escape as a traceback.
+            digests_match = False
+        if not digests_match:
             stale.append(name)
     return stale
 

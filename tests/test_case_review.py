@@ -29,6 +29,8 @@ gates on every PR.
 
 from __future__ import annotations
 
+import hashlib
+
 import pytest
 from pydantic import ValidationError
 
@@ -36,7 +38,7 @@ from evals import verify_corpus
 from evals.harness.reference import ReadRecord, load_corpus
 from evals.harness.roster import DEFAULT_ROSTER_PATH
 from evals.harness.roster import load as load_roster
-from evals.harness.sitting import clears, document_name, drifted
+from evals.harness.sitting import clears, document_name, drifted, moved
 from evals.harness.submit import reads_as_a_reading_document
 
 #: Cases nobody has read, each with what that leaves unchecked. Every entry is
@@ -281,3 +283,42 @@ class TestAReadRecordNamesAFileInsideItsCase:
         on a file the process may not open."""
         with pytest.raises(ValidationError):
             ReadRecord(file=path, sha256="0" * 64)
+
+
+class TestAReadRecordCannotLeaveItsCaseBySymlink:
+    """`CORPUS_RELATIVE_PATH` bounds the name; a symlink needs no bad name.
+
+    Run-6 closed the string half of this and the docstring, the test and the
+    fix all said it was closed. `source.md` matches the pattern perfectly and
+    can point anywhere, so the digest oracle, the unbounded read and the
+    uncaught `PermissionError` all came back.
+    """
+
+    def _case(self, tmp_path):
+        case = tmp_path / "99-a-case"
+        case.mkdir()
+        (case / "real.md").write_text("genuine\n", encoding="utf-8")
+        return case
+
+    def test_a_symlink_out_of_the_case_is_stale_not_matched(self, tmp_path):
+        case = self._case(tmp_path)
+        outside = tmp_path / "outside.txt"
+        outside.write_text("the secret\n", encoding="utf-8")
+        (case / "source.md").symlink_to(outside)
+        correct = hashlib.sha256(outside.read_bytes()).hexdigest()
+
+        # A correct guess must NOT report "not stale"; that is the oracle.
+        assert moved(case, {"source.md": correct}) == ["source.md"]
+
+    def test_an_unreadable_target_does_not_raise(self, tmp_path):
+        """The lint runs over a stranger's PR tree in CI; it must not crash."""
+        case = self._case(tmp_path)
+        (case / "source.md").symlink_to("/proc/1/mem")
+
+        assert moved(case, {"source.md": "0" * 64}) == ["source.md"]
+
+    def test_an_ordinary_file_still_verifies(self, tmp_path):
+        case = self._case(tmp_path)
+        digest = hashlib.sha256(b"genuine\n").hexdigest()
+
+        assert moved(case, {"real.md": digest}) == []
