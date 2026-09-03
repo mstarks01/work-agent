@@ -24,7 +24,7 @@ from analysis_service.frameworks import (
     run_precondition,
     validate_package,
 )
-from analysis_service.markdown_loader import MarkdownLoader
+from analysis_service.markdown_loader import MarkdownLoader, MarkdownNotFoundError
 from tests.factories import (
     PROJECT_ROOT,
     package_answering,
@@ -133,9 +133,16 @@ def test_the_gate_and_the_loader_answer_the_same_question(tmp_path):
     outside = tmp_path / "elsewhere.md"
     outside.write_text("# elsewhere\n", encoding="utf-8")
     (root / "lanes" / "spoofing" / "exemplars.md").symlink_to(outside)
+    # The third shape: a loop. Python 3.12's `resolve` raises `RuntimeError`
+    # on one, not `OSError`, and both readers must answer "absent" rather
+    # than raise through the startup gate or the first job.
+    (root / "critic.md").symlink_to(root / "critic.md")
 
     loader = MarkdownLoader(root)
-    for name in ("lanes/spoofing/skill", "lanes/spoofing/exemplars"):
+    for name in ("lanes/spoofing/skill", "lanes/spoofing/exemplars", "critic"):
         path = root / f"{name}.md"
 
         assert _readable(root, path) == loader.readable(name), name
+    assert not loader.readable("critic")
+    with pytest.raises(MarkdownNotFoundError):
+        loader.load("critic")

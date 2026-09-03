@@ -58,6 +58,7 @@ from typing import Any, Literal, get_args
 
 from pydantic import BaseModel, ConfigDict, Field, ValidationError
 
+from analysis_service.markdown_loader import RESOLVE_ERRORS
 from analysis_service.report import FrameworkName
 from evals import build_review_docs as docs
 from evals.harness.fingerprint import FingerprintError, key_claim
@@ -399,7 +400,7 @@ def moved(case_dir: Path, digests: Mapping[str, str]) -> list[str]:
             digests_match = (
                 readable and hashlib.sha256(resolved.read_bytes()).hexdigest() == digest
             )
-        except OSError:
+        except RESOLVE_ERRORS:
             # Unreadable is not stale-or-not; it is a file this process cannot
             # answer for, and it must not escape as a traceback.
             digests_match = False
