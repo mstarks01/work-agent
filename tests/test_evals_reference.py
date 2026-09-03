@@ -15,11 +15,13 @@ import pytest
 from analysis_service.frameworks.stride.record import STRIDE_CATEGORIES
 from analysis_service.report import derive_severity_level
 from evals.harness.reference import (
+    MAX_CORPUS_SOURCE_BYTES,
     CorpusError,
     ReferenceThreat,
     load_case,
     load_corpus,
 )
+from evals.harness.sitting import moved
 
 CORPUS_DIR = Path(__file__).resolve().parents[1] / "evals" / "corpus"
 
@@ -156,6 +158,57 @@ def test_invalid_blessed_model_fails_closed(tmp_path):
     (case_dir / "model.json").write_text(json.dumps(model))
 
     with pytest.raises(CorpusError, match="model.json is not valid"):
+        load_case(case_dir)
+
+
+def test_a_source_symlinked_out_of_the_case_is_refused_unread(tmp_path):
+    """A stranger's corpus PR cannot make CI read a file out of the tree.
+
+    `_load_sources` reads over an untrusted pull request tree in CI, so a
+    `source.md` symlinked at `/proc/self/pagemap` -- or any path outside the
+    case -- must be refused rather than followed. `is_file()` alone follows the
+    link; the loader shares `sitting.moved`'s resolve-and-bound rule instead.
+    """
+    outside = tmp_path / "outside.txt"
+    outside.write_text("SECRET\n", encoding="utf-8")
+    case_dir = _copy_case(CORPUS_DIR / "01-payments-checkout", tmp_path)
+    source = case_dir / "source.md"
+    source.unlink()
+    source.symlink_to(outside)
+
+    with pytest.raises(CorpusError, match="inside the case directory"):
+        load_case(case_dir)
+
+
+def test_the_two_readers_agree_the_escaping_source_is_out(tmp_path):
+    """The loader and the digest reader answer "outside" the same way.
+
+    Tested against each other, not each against its own expectation: `moved`
+    treats the escaping symlink as stale, and `load_case` refuses it. A change
+    that relaxes one without the other fails here.
+    """
+    outside = tmp_path / "outside.txt"
+    outside.write_text("SECRET\n", encoding="utf-8")
+    case_dir = _copy_case(CORPUS_DIR / "01-payments-checkout", tmp_path)
+    source = case_dir / "source.md"
+    source.unlink()
+    source.symlink_to(outside)
+
+    assert moved(case_dir, {"source.md": "0" * 64}) == ["source.md"]
+    with pytest.raises(CorpusError):
+        load_case(case_dir)
+
+
+def test_a_source_over_the_ceiling_is_refused_unread(tmp_path):
+    """An oversize source raises rather than buffering the whole file.
+
+    The bound turns a symlink to a very large readable file from an
+    out-of-memory into a clean corpus error.
+    """
+    case_dir = _copy_case(CORPUS_DIR / "01-payments-checkout", tmp_path)
+    (case_dir / "source.md").write_bytes(b"x" * (MAX_CORPUS_SOURCE_BYTES + 1))
+
+    with pytest.raises(CorpusError, match="source ceiling"):
         load_case(case_dir)
 
 

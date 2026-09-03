@@ -51,6 +51,7 @@ from pydantic import BaseModel, ConfigDict, Field, ValidationError, field_valida
 
 from analysis_service.frameworks.asvs.record import AsvsChapter
 from analysis_service.frameworks.stride.record import StrideCategory
+from analysis_service.markdown_loader import RESOLVE_ERRORS
 from analysis_service.report import (
     FrameworkName,
     Rating,
@@ -674,6 +675,11 @@ def load_case(case_dir: Path | str) -> GoldenCase:
     )
 
 
+#: The most a single corpus source may read. The largest source this repository
+#: ships is under 3 KiB; the ceiling exists to bound a symlink, not a document.
+MAX_CORPUS_SOURCE_BYTES = 262_144
+
+
 def _load_sources(case_dir: Path, meta: CaseMetadata) -> tuple[Source, ...]:
     """The case's declared sources, in declared order.
 
@@ -681,19 +687,40 @@ def _load_sources(case_dir: Path, meta: CaseMetadata) -> tuple[Source, ...]:
     source: a case that silently analyses less text than it claims would score
     against a reference set written for the whole of it.
     """
+    root = case_dir.resolve()
     sources = []
     for declared in meta.sources:
         path = case_dir / declared.file
-        if not path.is_file():
+        # A declared name is untrusted: a corpus case can arrive from a
+        # stranger's pull request, and CI reads it over the whole tree. The
+        # rule is `sitting.moved`'s -- resolve the name, treat anything the
+        # process cannot answer for as absent, and refuse a target outside the
+        # case directory -- so a `source.md` symlinked at `/proc/self/pagemap`
+        # or a large file cannot be read out of the tree or exhaust memory
+        # here. `is_file()` alone follows such a link; this reader must not.
+        try:
+            resolved = path.resolve()
+            inside = resolved.is_relative_to(root)
+            readable = inside and resolved.is_file()
+            size = resolved.stat().st_size if readable else 0
+        except RESOLVE_ERRORS:
+            readable = False
+            size = 0
+        if not readable:
             raise CorpusError(
                 f"{case_dir.name}: case.json declares {declared.file!r}, which"
-                " does not exist"
+                " does not resolve to a readable file inside the case directory"
+            )
+        if size > MAX_CORPUS_SOURCE_BYTES:
+            raise CorpusError(
+                f"{case_dir.name}: {declared.file!r} is {size} bytes, over the"
+                f" {MAX_CORPUS_SOURCE_BYTES}-byte source ceiling"
             )
         sources.append(
             Source(
                 kind=declared.kind,
                 label=declared.label,
-                text=path.read_text(encoding="utf-8"),
+                text=resolved.read_text(encoding="utf-8"),
             )
         )
     return tuple(sources)
