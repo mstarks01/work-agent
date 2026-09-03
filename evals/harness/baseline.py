@@ -147,7 +147,7 @@ class BaselineIdentity:
         return f"{self.repo_commit[:7]}-{_slug(strong)}-{self.hash[:8]}"
 
 
-def recorded_usd(cost: Mapping[str, Any]) -> float | None:
+def recorded_usd(cost: Any) -> float | None:
     """A committed manifest's recorded dollars, or ``None`` if it is not money.
 
     One reader for a value four sites read and one site checked. A manifest is a
@@ -156,13 +156,22 @@ def recorded_usd(cost: Mapping[str, Any]) -> float | None:
     as an acceptable offer in the consent gate. `math.isfinite` guarded the
     consent path alone, which left the published table, the contribution summary
     and the baseline re-check reading the same field without it.
+
+    The shape is the one :meth:`SweepCost.to_json` writes: a JSON number. A
+    string is refused even when `float()` would read it -- "1_000" and
+    non-ASCII digits both would -- and so is a boolean, which is an `int` to
+    `float()`. A JSON integer too large for a float raises `OverflowError`,
+    which is not a `ValueError`. ``cost`` itself is whatever the manifest holds
+    under that key, and a scalar there is not a cost.
     """
+    if not isinstance(cost, Mapping):
+        return None
     raw = cost.get("actual_usd")
-    if raw is None:
+    if isinstance(raw, bool) or not isinstance(raw, int | float):
         return None
     try:
         value = float(raw)
-    except (TypeError, ValueError):
+    except OverflowError:
         return None
     return value if math.isfinite(value) and value >= 0 else None
 
@@ -533,11 +542,15 @@ def verify(
                 f"{filename}: no node_usage for {missing_usage}; the actual"
                 " cost is not computable"
             )
+        recorded = entry.get("cost")
+        if not isinstance(recorded, Mapping):
+            problems.append(f"{filename}: cost is {recorded!r}, not a table")
+            continue
         try:
-            recorded = entry.get("cost", {})
             recomputed_cost = _recomputed_cost(artifact, recorded)
-            if not math.isclose(
-                recomputed_cost, float(recorded.get("actual_usd", -1.0)), rel_tol=1e-9
+            actual = recorded_usd(recorded)
+            if actual is None or not math.isclose(
+                recomputed_cost, actual, rel_tol=1e-9
             ):
                 problems.append(
                     f"{filename}: recorded units x recorded unit prices is"

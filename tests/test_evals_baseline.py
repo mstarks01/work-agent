@@ -433,11 +433,23 @@ class TestAFrameworkNameIsASlug:
 class TestOneReaderForRecordedDollars:
     """Four sites read `actual_usd` from a committed manifest; one checked it."""
 
-    @pytest.mark.parametrize("raw", ["inf", "-inf", "nan", -1.0, "abc", None])
+    @pytest.mark.parametrize(
+        "raw",
+        [float("inf"), float("nan"), -1.0, "abc", "2.25", "1_000", True, None, 10**400],
+    )
     def test_a_value_that_is_not_money_reads_as_absent(self, raw):
+        """The writer emits a JSON number. Everything else is not money: a
+        string `float()` would read, a boolean that is an `int`, and an integer
+        too large for a float, which raises `OverflowError` rather than
+        `ValueError`.
+        """
         assert baseline.recorded_usd({"actual_usd": raw}) is None
 
-    @pytest.mark.parametrize("raw", [0.0, 1.5, "2.25"])
+    @pytest.mark.parametrize("cost", ["12.5", 12.5, None, [1]])
+    def test_a_cost_that_is_not_a_table_reads_as_absent(self, cost):
+        assert baseline.recorded_usd(cost) is None
+
+    @pytest.mark.parametrize("raw", [0.0, 1.5, 3])
     def test_a_real_amount_reads_back(self, raw):
         assert baseline.recorded_usd({"actual_usd": raw}) == float(raw)
 

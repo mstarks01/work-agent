@@ -80,6 +80,7 @@ rather than leaning on the label check to do it.
 
 from __future__ import annotations
 
+import math
 import re
 import time
 import unicodedata
@@ -154,9 +155,14 @@ _REPAIR_WIDTH_SLACK = 2
 #: quote chars    worst call
 #: =============  ==========
 #: 300            0.166s
-#: 400            0.400s
+#: 400            0.515s
 #: 1000           6.444s
 #: =============  ==========
+#:
+#: The 400 row is measured at the widest span ``quick_ratio`` still admits, 488
+#: characters, not at a span equal to the quote; the same shape costs 0.400 s at
+#: 400. The deadline check runs before the comparison, so a scan overshoots it
+#: by at most one call of this size.
 #:
 #: Four hundred costs nothing real. Across 784 spans of all 13 corpus sources
 #: the normalized quote length runs to a median of 134, a 99th percentile of 279
@@ -204,6 +210,22 @@ _CERTAIN = 0.9999
 #: window survives the prune, runs 56.72 s with the budget alone, because the
 #: budget prices each of its comparisons at a hundredth of what they cost.
 _REPAIR_DEADLINE_SECONDS = 4.0
+
+#: What every repair in one node body may spend together, in thread CPU
+#: seconds. The three bounds above hold for ONE scan, and a body runs one scan
+#: per quote ground the ladder refused: at 64,000 output tokens a lane emits
+#: about 400 such grounds, so a body of scans that each stop at the deadline
+#: runs 2.9 hours for six lanes and 8.1 for seventeen, on a 440-byte source.
+#: The job deadline settles the job and the thread runs on, and `graph.py`
+#: names this bound as the reason that is harmless.
+#:
+#: A cost that turns on how many inputs survive a filter is bounded where the
+#: work happens, not per input. Thirty seconds is fifteen scans at the slowest
+#: legitimate single scan measured (1.98 s) and three thousand at the corpus's
+#: own 0.01 s; a corpus job repairs under five. Measured against the shape that
+#: reaches every scan's deadline, a body of nine such quotes stops at 30.0 s
+#: where it ran 39 s unbounded, and the overshoot is one comparison.
+MAX_REPAIR_SECONDS_PER_BODY = 30.0
 _PRUNE_COST = 13
 
 #: What one full comparison costs, per character-pair. Five to three, because
@@ -292,7 +314,19 @@ def verify_normalized(quote: str, haystack: str) -> bool:
     return matched
 
 
-def repair_quote(quote: str, source: str) -> tuple[str, float] | None:
+def repair_deadline() -> float:
+    """The one deadline every :func:`repair_quote` in a node body shares.
+
+    An absolute :func:`time.thread_time` value, so it is right only on the
+    thread that runs the scans: the caller builds it once and passes it to each
+    scan of the same body.
+    """
+    return time.thread_time() + MAX_REPAIR_SECONDS_PER_BODY
+
+
+def repair_quote(
+    quote: str, source: str, deadline: float | None = None
+) -> tuple[str, float] | None:
     """The source's own span nearest a refused quote, or ``None``.
 
     Run only after :func:`verify_quote` said no. The answer is a span cut from
@@ -311,8 +345,10 @@ def repair_quote(quote: str, source: str) -> tuple[str, float] | None:
     per-character and the last one collapses whitespace.
 
     A scan that spends :data:`MAX_REPAIR_WORK`, or runs past
-    :data:`_REPAIR_DEADLINE_SECONDS`, stops where it is and answers with the
-    best window it found by then.
+    :data:`_REPAIR_DEADLINE_SECONDS`, or past the body's own ``deadline`` from
+    :func:`repair_deadline`, stops where it is and answers with the best window
+    it found by then. A scan that starts after the body's deadline answers
+    ``None`` without scanning.
 
     **A truncated scan can return a good span where a better one sat later**,
     and the caller cannot tell a truncated answer from a complete one. Both
@@ -346,7 +382,10 @@ def repair_quote(quote: str, source: str) -> tuple[str, float] | None:
     best: tuple[str, float] | None = None
     budget = MAX_REPAIR_WORK
     matcher = SequenceMatcher(autojunk=False)
-    deadline = time.thread_time() + _REPAIR_DEADLINE_SECONDS
+    now = time.thread_time()
+    if deadline is not None and now > deadline:
+        return None
+    deadline = min(now + _REPAIR_DEADLINE_SECONDS, deadline or math.inf)
     matcher.set_seq2(needle)
     for count in range(width, width + _REPAIR_WIDTH_SLACK + 1):
         for start in range(len(words) - count + 1):

@@ -317,6 +317,16 @@ class TestAReadRecordCannotLeaveItsCaseBySymlink:
 
         assert moved(case, {"source.md": "0" * 64}) == ["source.md"]
 
+    def test_a_symlink_loop_does_not_raise(self, tmp_path):
+        """`resolve` raises `RuntimeError` on a loop under 3.12, which an
+        `except OSError` let through as the traceback the lint promises not to
+        leave on a stranger's pull request.
+        """
+        case = self._case(tmp_path)
+        (case / "source.md").symlink_to(case / "source.md")
+
+        assert moved(case, {"source.md": "0" * 64}) == ["source.md"]
+
     def test_an_ordinary_file_still_verifies(self, tmp_path):
         case = self._case(tmp_path)
         digest = hashlib.sha256(b"genuine\n").hexdigest()

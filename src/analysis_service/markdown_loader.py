@@ -30,18 +30,28 @@ def estimate_tokens(text: str) -> int:
     return math.ceil(len(text.split()) * 4 / 3)
 
 
+#: Every way :meth:`pathlib.Path.resolve` fails on Python 3.12: ``OSError``
+#: for a path the process cannot walk, ``RuntimeError`` for a symlink loop,
+#: and ``ValueError`` for an embedded NUL. A handler that lists the first alone
+#: let a committed ``source.md -> source.md`` raise a traceback through the
+#: startup gate, the loader, and the lint that runs over a stranger's pull
+#: request. Every reader that resolves and contains catches this set.
+RESOLVE_ERRORS = (OSError, RuntimeError, ValueError)
+
+
 def _inside(root: Path, path: Path) -> bool:
     """Whether ``path`` resolves to a readable file under ``root``.
 
     One reader for "is this file mine to read". A name resolving outside the
     root -- by traversal or by symlink -- is treated the same as absent: deny,
-    and reveal nothing about what lies outside.
+    and reveal nothing about what lies outside. A name that cannot be resolved
+    at all is absent too.
     """
     try:
         resolved = path.resolve()
-    except OSError:
+        return resolved.is_relative_to(root.resolve()) and resolved.is_file()
+    except RESOLVE_ERRORS:
         return False
-    return resolved.is_relative_to(root.resolve()) and resolved.is_file()
 
 
 def split_sections(text: str) -> dict[str, str]:
@@ -124,11 +134,15 @@ class MarkdownLoader:
         return _inside(self._root, self._root / f"{name}.md")
 
     def load(self, name: str) -> str:
-        path = (self._root / f"{name}.md").resolve()
+        path = self._root / f"{name}.md"
         # A name resolving outside the root (traversal) is treated the same
-        # as absent — deny, don't reveal what lies outside.
+        # as absent — deny, don't reveal what lies outside. `_inside` does the
+        # resolving, so a name that cannot be resolved is refused the same way.
         if not _inside(self._root, path):
             raise MarkdownNotFoundError(
                 f"no markdown named {name!r} under {self._root}"
             )
-        return path.read_text(encoding="utf-8")
+        try:
+            return path.read_text(encoding="utf-8")
+        except UnicodeDecodeError as exc:
+            raise MarkdownFormatError(f"{name}.md is not UTF-8: {exc}") from exc

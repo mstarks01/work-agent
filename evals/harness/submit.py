@@ -33,7 +33,7 @@ import json
 import re
 import subprocess
 import tomllib
-from collections.abc import Callable, Iterator, Sequence
+from collections.abc import Callable, Iterator, Mapping, Sequence
 from contextlib import contextmanager
 from dataclasses import dataclass
 from datetime import UTC, datetime
@@ -1089,7 +1089,11 @@ def _baseline_closing(root: Path, author: str) -> str:
         f"{comparison._inline(tier)}: {comparison._inline(model)}"
         for tier, model in sorted(identity.get("models", {}).items())
     )
-    costs = [entry.get("cost", {}) for entry in sweeps]
+    # A cost that is not a table is not money and names nothing unpriced; the
+    # baseline re-check lists it as a problem, and this summary reads past it.
+    costs = [
+        c for c in (entry.get("cost") for entry in sweeps) if isinstance(c, Mapping)
+    ]
     total = sum(baseline.recorded_usd(cost) or 0.0 for cost in costs)
     unpriced = sorted({model for cost in costs for model in cost.get("unpriced", ())})
     standing = _standing_of(root, author)
