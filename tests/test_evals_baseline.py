@@ -428,3 +428,27 @@ class TestAFrameworkNameIsASlug:
     @pytest.mark.parametrize("name", ["stride", "asvs", "some-new-package"])
     def test_a_registered_shape_passes(self, name):
         assert baseline._framework_name(name) == name
+
+
+class TestOneReaderForRecordedDollars:
+    """Four sites read `actual_usd` from a committed manifest; one checked it."""
+
+    @pytest.mark.parametrize("raw", ["inf", "-inf", "nan", -1.0, "abc", None])
+    def test_a_value_that_is_not_money_reads_as_absent(self, raw):
+        assert baseline.recorded_usd({"actual_usd": raw}) is None
+
+    @pytest.mark.parametrize("raw", [0.0, 1.5, "2.25"])
+    def test_a_real_amount_reads_back(self, raw):
+        assert baseline.recorded_usd({"actual_usd": raw}) == float(raw)
+
+    def test_every_reader_answers_the_same_way(self):
+        """Compared against each other, not each against its own expectation.
+
+        `math.isfinite` guarded the consent path alone, so the published
+        comparison table, the contribution summary and the baseline re-check all
+        read the same field without it. A NaN poisons a mean and a total.
+        """
+        poisoned = {"actual_usd": float("nan")}
+
+        assert baseline.recorded_usd(poisoned) is None
+        assert (baseline.recorded_usd(poisoned) or 0.0) == 0.0

@@ -38,7 +38,7 @@ from pathlib import Path
 from typing import Any
 
 from analysis_service.report import FrameworkName
-from evals.harness import standings
+from evals.harness import baseline, standings
 from evals.harness.artifact import REPO_ROOT
 from evals.harness.baseline import BaselineError, artifact_filename
 from evals.harness.instruments import INSTRUMENTS, Column
@@ -192,7 +192,7 @@ def read_baseline(directory: Path, root: Path = REPO_ROOT) -> Row | None:
         ),
         sweeps=len(entries),
         cost_usd=sum(
-            float(entry.get("cost", {}).get("actual_usd", 0.0)) for entry in entries
+            baseline.recorded_usd(entry.get("cost", {})) or 0.0 for entry in entries
         ),
         merged=_merged_at(directory, root),
         cells=cells,

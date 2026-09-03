@@ -38,6 +38,7 @@ import json
 import math
 import re
 import subprocess
+from collections.abc import Mapping
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
@@ -144,6 +145,26 @@ class BaselineIdentity:
         """``<short-commit>-<strong-model-slug>-<hash8>``, e.g. ``7c3a007-gpt-5.6-3f9a1c2e``."""
         strong = dict(self.models).get(_NAMING_TIER, "unknown")
         return f"{self.repo_commit[:7]}-{_slug(strong)}-{self.hash[:8]}"
+
+
+def recorded_usd(cost: Mapping[str, Any]) -> float | None:
+    """A committed manifest's recorded dollars, or ``None`` if it is not money.
+
+    One reader for a value four sites read and one site checked. A manifest is a
+    contributor's file, and `float()` accepts "inf" and "nan": a non-finite or
+    negative `actual_usd` poisons a mean, a total and a comparison, and renders
+    as an acceptable offer in the consent gate. `math.isfinite` guarded the
+    consent path alone, which left the published table, the contribution summary
+    and the baseline re-check reading the same field without it.
+    """
+    raw = cost.get("actual_usd")
+    if raw is None:
+        return None
+    try:
+        value = float(raw)
+    except (TypeError, ValueError):
+        return None
+    return value if math.isfinite(value) and value >= 0 else None
 
 
 @dataclass(frozen=True)

@@ -191,7 +191,19 @@ MAX_REPAIR_WORK = 250_000_000
 #: so the scan stops rather than ranking the rest of the document.
 _CERTAIN = 0.9999
 
-_REPAIR_DEADLINE_SECONDS = 2.0
+#: The backstop, on a **per-thread** clock. `time.process_time()` sums CPU
+#: across every thread in the process and `graph.py` runs eight node bodies on
+#: one pool, so that spelling made the effective deadline about 0.22 s under a
+#: full pool: one busy caller truncated another job's repairs and the report
+#: became a function of unrelated traffic.
+#:
+#: Four seconds, because legitimate work measured 1.98 s and a backstop that
+#: legitimate work brushes against is not a backstop -- at 2.0 s a slower
+#: machine silently truncated a repair that should have been made. It has to
+#: stay finite: the shape that beats the budget, a small alphabet where every
+#: window survives the prune, runs 56.72 s with the budget alone, because the
+#: budget prices each of its comparisons at a hundredth of what they cost.
+_REPAIR_DEADLINE_SECONDS = 4.0
 _PRUNE_COST = 13
 
 #: What one full comparison costs, per character-pair. Five to three, because
