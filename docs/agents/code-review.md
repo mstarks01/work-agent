@@ -1,8 +1,55 @@
 # Code review checkpoints
 
-**A completed code review ends in an annotated tag named `reviewed/<date>`.**
-That tag is the fixed point the next review starts from, so "review the code
+**A completed checkpoint round ends in an annotated tag named `reviewed/<date>`.**
+That tag is the fixed point the next round starts from, so "review the code
 since the last review" resolves to a command rather than to a question.
+
+## Two instruments, two questions
+
+Review runs twice, at two scales, and each scale sees what the other cannot.
+
+- **A pre-merge review** reads one pull request's diff before the merge. It
+  asks whether this change is correct.
+- **A checkpoint round** reads a range of merged commits. It asks what the tree
+  now holds that no single diff showed.
+
+Run both. Nine audit rounds produced the evidence, and it points both ways at
+once.
+
+| Round | Findings | From the previous round's own fixes |
+|---|---|---|
+| 5 | 6 | 4 |
+| 6 | 6 | 3 |
+| 7 | 11 | 9 shared one rule that a fix gave a second reader |
+| 8 | 3 | 3 |
+| 9 | 2 | 1 |
+
+A defect in a recent fix is the dominant class, and it sits inside one diff, so
+a reader of that diff before the merge is the instrument that fits it. Run-9's
+HIGH is the plainest case: the bound sat on a scan where the caller runs a body,
+and `CLAUDE.md` named that mistake two days before the fix shipped.
+
+The rest of the table is the argument for the round. Run-9's LOW was a
+`RuntimeError` that `Path.resolve` raises on a symlink loop. It was legal in
+every diff that touched it, and it became reachable only when a later pull
+request made the gate resolve a path. No diff carries that fact; the tree does.
+
+### What a pre-merge review reads
+
+The diff, against the three named defect causes in `CLAUDE.md` — a rule with two
+readers, a bound that predicts a cost from its inputs, and a value shape the
+author never listed — and against the two fix habits at the end of this guide.
+
+Put the result in the pull request, so the record sits with the change. A
+pre-merge review cuts no tag.
+
+### What the round reads after that
+
+The same range as before. Its question narrows, because each pull request in the
+range already had a reader: the round hunts across pull requests, over the whole
+tree, and on surfaces no diff touched. The tag message names which pull requests
+in the range got a pre-merge review, so the next round knows which half of the
+range is new ground.
 
 ## Find the last checkpoint
 
@@ -41,6 +88,8 @@ git push origin reviewed/<date>
 The message carries what a later reader cannot recover from the diff:
 
 - the range reviewed, as `<base>...<head>`, with the size at the time
+- which pull requests in the range had a pre-merge review, so the next round
+  knows which half of its own range nobody read before the merge
 - which axes ran, and what each read as its source of truth
 - how many findings each axis produced, and where each was fixed
 - **what was left open by decision**, with the reason — this is the part that
