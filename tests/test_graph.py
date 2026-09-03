@@ -45,6 +45,7 @@ from analysis_service.resilience import load_resilience
 from analysis_service.sampling import load_sampling
 from analysis_service.sources import Source
 from analysis_service.system_model import SystemModel
+from analysis_service.validation import ValidationIssue
 from tests.factories import (
     DEFAULT_FRAMEWORKS,
     carrying,
@@ -2494,3 +2495,45 @@ class TestTheReviseCount:
         runs = [NodeRun(node="recritic_asvs", duration_ms=1)]
 
         assert graph.revise_rounds(runs, ["stride"]) == 0
+
+
+class TestUnfenceIsTheInverseOfTheFence:
+    """One rendered key is read back by Python, so the fence has to come off
+    exactly the way it went on.
+
+    `render_fenced` joins with a literal newline. `str.splitlines` breaks on
+    more than that -- U+2028, U+2029 and U+0085 among them -- and `render`
+    passes all three through as themselves, so taking the fence off that way
+    rewrote a terminator the value carried into a raw newline. A raw newline
+    inside a JSON string is exactly what `json.loads` refuses, which turned a
+    job that should have been rejected with the validator's reasons into one
+    that failed with none.
+    """
+
+    @pytest.mark.parametrize(
+        "carried",
+        ["plain", "a\u2028b", "a\u2029b", "a\u0085b", "a\nb", "a```b", "a\r\nb"],
+    )
+    def test_a_value_survives_the_round_trip(self, carried):
+        payload = [{"code": "invalid-reference", "message": carried}]
+
+        assert json.loads(graph.unfence(graph.render_fenced(payload))) == payload
+
+    def test_an_unfenced_value_is_returned_as_it_stands(self):
+        assert graph.unfence('{"a": 1}') == '{"a": 1}'
+
+    def test_the_parked_rejection_reads_back_with_a_terminator_in_it(self):
+        """The reachable path: an element id is model output bounded only by a
+        length, and a caller's source text carries whatever it likes."""
+        issues = [
+            ValidationIssue(
+                code="invalid-reference",
+                message="element ID 'a\u2028b' is not in the model",
+                element_id="a\u2028b",
+            )
+        ]
+        parked = graph.render_fenced(
+            [issue.model_dump(mode="json") for issue in issues]
+        )
+
+        assert graph.rejection_issues(parked) == issues

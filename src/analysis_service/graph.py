@@ -991,7 +991,13 @@ def unfence(rendered: str) -> str:
     because the same string is interpolated into ``repair.md`` and a key that
     shipped bare would be the one a body could close.
     """
-    lines = rendered.splitlines()
+    # Split on the delimiter `render_fenced` joined with, not on every line
+    # boundary Python knows. `str.splitlines` also breaks on U+2028, U+2029 and
+    # U+0085, which `render` passes through as themselves -- so splitting that
+    # way and re-joining with "\n" rewrites a terminator the value carried into
+    # a raw newline, and a raw newline inside a JSON string is what `json.loads`
+    # refuses. The inverse of a join is a split on the same string.
+    lines = rendered.split("\n")
     if len(lines) >= 2 and lines[0].startswith("```") and lines[-1] == lines[0]:
         return "\n".join(lines[1:-1])
     return rendered
