@@ -1137,3 +1137,20 @@ class TestTheChecklistSurvivesAShapeNobodyListed:
         notes = submit._roster_delta(ROSTER_WITH_ADA, live)
 
         assert notes == ["voters: the roster's own table is not a table"]
+
+    def test_a_vote_file_that_is_not_utf8_is_reported_not_raised(self, repo):
+        """A contributor's own bytes, committed by the same pull request."""
+        votes = prepare_vote(repo)
+        (votes / "ada.jsonl").write_bytes(b'{"voter": "ada", "note": "\xff\xfe"}\n')
+        git(repo, "fetch", "origin")
+
+        check = submit._check_your_file_appends(repo, "ada")
+
+        assert not check.passed
+        assert "not UTF-8" in check.problems[0]
+
+    def test_a_roster_that_is_not_utf8_does_not_raise(self, repo, tmp_path):
+        live = tmp_path / "voters.toml"
+        live.write_bytes(b'version = 1\n[voters.ada]\nstanding = "\xff\xfe"\n')
+
+        assert submit._roster_delta(ROSTER_WITH_ADA, live) == []
