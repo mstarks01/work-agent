@@ -15,9 +15,11 @@ ladder proper cannot cost more than the quote's length times the source's.
 
 The repair rung is where cost has to be bounded on purpose, because it is the
 one place both lengths multiply into a search. :data:`MAX_REPAIR_WORK` is that
-bound, and the constant carries the measurements behind it. Without it a caller
-sizes the rung's work directly — both terms come from the submitted text — and
-one refused quote runs for minutes.
+bound, and the constant carries the measurements behind it. It is a budget the
+scan spends, not a size it is refused for: what costs the time is how many
+windows survive pruning, and no function of the two lengths can see that.
+Without the budget a caller sizes the rung's work directly — both terms come
+from the submitted text — and one quote runs for minutes.
 
 The ladder is pinned, and each rung is a policy decision rather than a
 convenience. The figures below are measured over the 12 corpus cases' 206
@@ -229,7 +231,7 @@ def repair_quote(quote: str, source: str) -> tuple[str, float] | None:
     folded form is its folded words joined, because the ladder's rungs are
     per-character and the last one collapses whitespace.
 
-    A scan over :data:`MAX_REPAIR_WORK` is refused outright rather than run.
+    A scan that spends :data:`MAX_REPAIR_WORK` stops where it is and gives up.
     Answering ``None`` here is the same answer the threshold gives when no
     window is close enough, and the caller already handles it: the quote stays
     unverified and the report says so.
