@@ -373,6 +373,54 @@ class TestTheSittingChecks:
         )
 
 
+class TestTheDocumentIsCheckedForWhatItClaims:
+    """The gate was one `.is_file()` probe on whatever name the entry gave.
+
+    A name is not a path this repository resolves, but it is a claim, and the
+    probe let the claim be any file that happens to exist -- `"source.md"`
+    satisfied it in every case directory, so an entry could clear a case while
+    committing no reading document at all.
+
+    Naming it is only half. `MIN_OWN_LIST` is the floor that tells a filled copy
+    from an empty one, and it was enforced in the app and in the offline
+    envelope and on neither side of a pull request -- so `touch
+    REVIEW-<login>.md` passed every gate under the correct name, and
+    constraining the name alone would have moved the same hole one step.
+    """
+
+    def test_an_entry_naming_another_file_is_refused(self, repo):
+        prepare_sitting(repo)
+        case = submit._sitting_cases(repo)[0]
+        path = repo / "evals" / "corpus" / case / "case.json"
+        meta = json.loads(path.read_text("utf-8"))
+        meta["reviews"][-1]["document"] = "source.md"
+        path.write_text(json.dumps(meta, indent=2), "utf-8")
+        git(repo, "fetch", "origin")
+
+        check = submit._check_sitting_evidence(repo, "ada")
+
+        assert not check.passed
+        assert "another submission's" in check.problems[0]
+
+    def test_an_empty_document_is_refused(self, repo):
+        prepare_sitting(repo)
+        case = submit._sitting_cases(repo)[0]
+        document = repo / "evals" / "corpus" / case / "REVIEW-ada.md"
+        document.write_text("\n\n  \n", "utf-8")
+        git(repo, "fetch", "origin")
+
+        check = submit._check_sitting_evidence(repo, "ada")
+
+        assert not check.passed
+        assert "empty" in check.problems[0]
+
+    def test_an_honest_sitting_still_passes(self, repo):
+        prepare_sitting(repo)
+        git(repo, "fetch", "origin")
+
+        assert submit._check_sitting_evidence(repo, "ada").passed
+
+
 class TestASittingCarriesNCases:
     """ADR 0020: one reader's session is one pull request, whatever N is."""
 

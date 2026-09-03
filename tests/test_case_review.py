@@ -35,7 +35,7 @@ from evals import verify_corpus
 from evals.harness.reference import load_corpus
 from evals.harness.roster import DEFAULT_ROSTER_PATH
 from evals.harness.roster import load as load_roster
-from evals.harness.sitting import clears, drifted
+from evals.harness.sitting import MIN_OWN_LIST, clears, document_name, drifted
 
 #: Cases nobody has read, each with what that leaves unchecked. Every entry is
 #: a case nobody read rather than an exemption: unlike the lists in
@@ -195,13 +195,36 @@ def test_no_recorded_digest_has_drifted(corpus):
     )
 
 
+def _document_problems(case, sitting) -> list[str]:
+    """What is wrong with one sitting's evidence document, if anything."""
+    expected = document_name(sitting.submitted_by)
+    if sitting.document != expected:
+        return [f"names {sitting.document!r}, and its submitter writes {expected!r}"]
+    path = verify_corpus.CORPUS_DIR / case.meta.id / expected
+    if not path.is_file():
+        return [f"{expected} is not committed beside the case"]
+    if len(path.read_text(encoding="utf-8").strip()) < MIN_OWN_LIST:
+        return [f"{expected} is empty, so it evidences nothing"]
+    return []
+
+
 def test_every_sitting_names_an_existing_document(corpus):
-    """Only the filled ``REVIEW-<login>.md`` shows the method ran (#327)."""
+    """Only the filled ``REVIEW-<login>.md`` shows the method ran (#327).
+
+    All three words are checked. The name has to be the one
+    :func:`~evals.harness.sitting.document_name` derives from the submitting
+    login, because a document under another name is another submission's; the
+    file has to be there; and it has to say something, because an empty file is
+    not a filled one and this docstring is the only place that ever said so.
+
+    It used to be one ``.is_file()`` probe on whatever name the entry gave, so
+    ``"source.md"`` satisfied it in every case directory.
+    """
     missing = [
-        f"{case.meta.id}: {sitting.document}"
+        f"{case.meta.id}: {problem}"
         for case in corpus
         for sitting in case.meta.reviews
-        if not (verify_corpus.CORPUS_DIR / case.meta.id / sitting.document).is_file()
+        for problem in _document_problems(case, sitting)
     ]
     assert not missing, (
         f"these sittings name evidence documents that do not exist: {missing}."
