@@ -12,6 +12,7 @@ import time
 import pytest
 
 from analysis_service.grounding import (
+    MAX_REPAIR_QUOTE_CHARS,
     MAX_REPAIR_WORK,
     REPAIR_THRESHOLD,
     normalize,
@@ -212,26 +213,59 @@ class TestTheRepairRung:
         assert repair_quote(quote, source) is None
         assert time.process_time() - started < 3.0
 
-    def test_a_long_quote_still_matches_after_the_junk_heuristic(self):
-        """`autojunk` drops elements appearing in over 1% of a long sequence.
+    @pytest.mark.parametrize(
+        "kind", ["transposition", "dropped word", "removed punctuation"]
+    )
+    def test_every_error_the_rung_exists_for_is_still_repaired(self, kind):
+        """Three mutations, because measuring one of them hid a regression.
 
-        That is what kills the recursion, and it is worth checking it does not
-        also kill an ordinary long quote. Sized at the corpus, whose largest
-        source is 2,197 bytes: a 180-word quote over a 100 KiB source cannot be
-        repaired under any sane bound -- a complete scan of that pair measured
-        32.9 seconds -- so the rung answers `None` there and the report says the
-        quote is unverified.
+        `autojunk=True` was tried as the bound and reverted. It drops elements
+        appearing in more than 1% of a sequence of 200 or more, so on a quote
+        past that length a match can only anchor on a rare character. A
+        transposition keeps an anchor and lost 0.0% of repairs; a stripped
+        comma does not and lost 12.4%. The test written with that fix used a
+        transposition, so it measured the one mutation the change could not
+        break.
+
+        `REPAIR_THRESHOLD`'s own docstring names the errors this rung is for:
+        a dropped article, a changed preposition, a tidied plural.
         """
         source = " ".join(
-            f"the {n} quick brown foxes jumped over a lazy dog near" for n in range(40)
+            f"the {n} quick, brown foxes jumped over a lazy dog." for n in range(60)
         )
         words = source.split()
-        quote = " ".join(words[100:280]).replace("quick", "quikc", 1)
+        true = " ".join(words[100:140])
+        if kind == "transposition":
+            quote = true.replace("quick", "quikc", 1)
+        elif kind == "dropped word":
+            quote = " ".join(words[100:120] + words[121:140])
+        else:
+            quote = true.replace(",", "").replace(".", "")
 
         repair = repair_quote(quote, source)
 
         assert repair is not None
         assert repair[1] >= REPAIR_THRESHOLD
+
+    def test_a_quote_too_long_to_bound_is_refused_rather_than_run(self):
+        """The bound that works, after five that did not.
+
+        A single `difflib` comparison of two 1,000-character strings measured
+        6.44 seconds on an inverted phase, and no statistic computable from the
+        inputs predicts that -- the closest candidate was wrong by 200x. So the
+        input is capped instead, and the worst single call is measured: 0.166 s
+        at 300 characters, 0.400 s at 400.
+
+        It costs nothing real. Across 784 spans of all 13 corpus sources the
+        normalized quote length runs to a maximum of 305.
+        """
+        quote = " ".join(["ab"] * 333)
+        source = " ".join(["ba"] * 341)
+
+        assert len(quote) > MAX_REPAIR_QUOTE_CHARS
+        started = time.process_time()
+        assert repair_quote(quote, source) is None
+        assert time.process_time() - started < 0.5
 
     def test_a_pruned_window_is_charged_for_the_work_it_took_to_prune(self):
         """The input that reads zero on a budget charging only survivors.
