@@ -350,7 +350,7 @@ def tiers_in_use(nodes_raw: object) -> set[str]:
     """The tiers the node map actually runs something on.
 
     A tier is a place a node can sit, and an empty place costs nothing to leave
-    empty: :func:`build_adapters` already skips a tier nothing is bound to, so
+    empty: :func:`~analysis_service.binding.build_tier_adapters` already skips a tier nothing is bound to, so
     a selection for one is a pair no request ever reaches. Requiring it anyway
     made a first run name a vendor and a model for a tier the shipped map does
     not use, which is a choice with no consequence -- and the answer the config

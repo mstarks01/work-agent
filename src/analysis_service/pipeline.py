@@ -1,4 +1,4 @@
-"""Driving the ADK graph for one job: the real :class:`PipelineRunner`.
+"""Driving the ADK graph for one job: the real :class:`~analysis_service.jobs.PipelineRunner`.
 
 The implementation behind :class:`~analysis_service.jobs.PipelineRunner`: the job
 API hands it a :class:`~analysis_service.jobs.JobRecord` and a node callback, and
