@@ -78,8 +78,8 @@ file path explicitly; it does not search the usual gcloud location.
 
 The tiers may use different vendors. In that case, set credentials for each
 vendor a tier the node map binds selects — the shipped map binds `base` and
-`strong`, so a selection for `review` needs no credential until you move
-criticism onto it. You may also select models through the matching
+`strong`, so `review` needs neither a selection nor a credential until you move
+criticism onto it, and the loader asks for both at that edit. You may also select models through the matching
 `ANALYSIS_MODEL_BASE_{VENDOR,MODEL}`, `ANALYSIS_MODEL_STRONG_{VENDOR,MODEL}` and
 `ANALYSIS_MODEL_REVIEW_{VENDOR,MODEL}` environment variables. See
 [Configuration](Configuration.md#model-overrides-deploy-time-no-image-rebuild)

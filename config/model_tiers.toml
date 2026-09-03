@@ -121,10 +121,16 @@ review_independence = "shared"
 # vendor = "<vertex|anthropic|openai>"
 # model = "<model>"
 #
-# `review` is required even while `review_independence = "shared"` leaves the
-# node map pointing criticism at `strong`. A tier a file may omit is a tier no
-# deployment has chosen a model for, and the day somebody moves critic/* onto it
-# is the wrong day to discover that.
+# `review` is NOT required while `review_independence = "shared"` leaves the
+# node map pointing criticism at `strong`, because nothing runs on it and the
+# loader binds no adapter for a tier nothing is bound to. Selecting a pair for
+# an empty place is a choice with no consequence, and the answer this block used
+# to suggest -- repeat the `strong` pair -- is a choice that says nothing.
+#
+# The day somebody moves critic/* onto `review` is still the wrong day to find
+# out no model was chosen for it, and that day is an edit to the [nodes] map
+# below. The loader reads this file on that edit, so it refuses then, with the
+# same message it would have given at a first run.
 #
 # A TEMPLATE RATHER THAN A WORKED PAIR, and that is the same decision as the
 # empty tier tables above. This block used to show a Vertex/Gemini pair, which
@@ -137,10 +143,11 @@ review_independence = "shared"
 #   openai      base "gpt-4o"                strong "gpt-5.6"
 #   vertex      base "gemini-2.5-flash"      strong "gemini-2.5-pro"
 #
-# `review` needs a pair of its own as well, and the loader refuses a file that
-# names only these two. Under the shipped `review_independence = "shared"`
-# nothing runs on it, so repeating the `strong` pair there is the ordinary
-# answer; a deployment that wants an independent critic names a different one.
+# `review` needs a pair only once something sits on it. Under the shipped
+# `review_independence = "shared"` nothing does, so a deployment that wants the
+# shipped arrangement names these two and stops; a deployment that wants an
+# independent critic moves critic/* onto `review` in [nodes] and names a third
+# pair, and the loader asks for it at that edit.
 #
 # The Anthropic pin is 4.6 on both of the tiers above because that is the pair
 # this project

@@ -1,5 +1,6 @@
 """Tests for model-tier config loading, env overrides, and pin validation."""
 
+import tempfile
 from pathlib import Path
 from typing import ClassVar
 
@@ -143,6 +144,47 @@ class TestRepoConfig:
             assert vendor in message
         assert "ANALYSIS_MODEL_BASE_VENDOR" in message
         assert "docs/First-Run.md" in message
+
+    def test_a_tier_the_node_map_does_not_use_needs_no_selection(self):
+        """The shipped map runs criticism on ``strong``, so nothing sits on
+        ``review`` -- and ``build_adapters`` binds no adapter for a tier nothing
+        is bound to.
+
+        Requiring a pair for it anyway made a first run choose a vendor and a
+        model for a tier no request reaches, and the answer the config file
+        suggested was to repeat the ``strong`` pair, which chooses nothing.
+        """
+        selected = {
+            key: value for key, value in self.SELECTED.items() if "REVIEW" not in key
+        }
+
+        config = load_model_tiers(REPO_CONFIG, env=selected)
+
+        assert set(config.tiers) == {"base", "strong"}
+        assert "review" not in set(config.nodes.values())
+
+    def test_a_tier_the_node_map_does_use_is_still_required(self):
+        """The reason the requirement existed, kept: the day somebody moves
+        criticism onto ``review`` is the wrong day to find no model was chosen
+        for it. That day is a node-map edit, and this is read on that edit."""
+        moved = REPO_CONFIG.read_text(encoding="utf-8").replace(
+            '"critic/stride" = "strong"', '"critic/stride" = "review"'
+        )
+        path = self.written(moved)
+        selected = {
+            key: value for key, value in self.SELECTED.items() if "REVIEW" not in key
+        }
+
+        with pytest.raises(ModelConfigError, match="no vendor selected") as excinfo:
+            load_model_tiers(path, env=selected)
+
+        assert "review" in str(excinfo.value)
+
+    def written(self, text: str) -> Path:
+        directory = Path(tempfile.mkdtemp())
+        path = directory / "model_tiers.toml"
+        path.write_text(text, encoding="utf-8")
+        return path
 
     def test_shipped_config_names_no_vendor_anywhere_uncommented(self):
         """A commented example is guidance; an uncommented one is a default."""
