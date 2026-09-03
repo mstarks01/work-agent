@@ -56,3 +56,35 @@ every clone, needs no service, and is what `git diff` already takes.
 `reviewed/*` sits beside the repository's other tag namespaces, `archive/*`
 and `backup/*`, and reads the same way: the branch is gone, the tag is the
 record.
+
+## Two habits that fixes need
+
+Both come from the audit runs that found defects in the previous run's fixes.
+Eight such defects across three runs, and every one passed the tests that
+shipped with it — so these are rules about the fix itself, not about testing
+harder.
+
+### Ship no bound without two measurements
+
+A constant that bounds work needs a measured case it **must admit** and a
+measured case it **must refuse**, and the commit message carries both numbers.
+
+The repair rung took three attempts because the first two bounds computed a
+cost from the input sizes. Measurement showed the metric ordered two real cases
+backwards: English prose at 288M ran 0.39 s, and a repetitive source at 112M
+ran 5.95 s. No reading of the code produces that; only running it does.
+
+If you cannot produce both numbers, the bound is a guess. Say so, or measure.
+
+### When a fix breaks an existing test, suspect the fix
+
+The default assumption is that the test is right and the fix is wrong. Read the
+test and find out what it protects before you touch its premise.
+
+`test_rekey_refuses_a_move_the_components_cannot_satisfy` caught a fix that
+would have made `rekey` impossible to run: it asked a ledger row to prove itself
+against the *current* rule, and a ledger written before a rule change is exactly
+what `rekey` reads. The test failed for that reason and no other.
+
+A test that fails on a correct change is a real thing, and pinned lists move
+that way. It is the second explanation to reach for, not the first.

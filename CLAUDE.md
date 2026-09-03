@@ -69,6 +69,22 @@ Two corollaries, both from the same audits:
   turns on which inputs survive a filter.** Spend a budget where the work
   happens.
 
+### Name the shapes before you read the value
+
+New code that reads a value fails on the shape its author never listed.
+`unfence` split on `"\n"` and missed U+2028, U+2029 and U+0085, so a payload
+carrying one round-tripped corrupted. The roster note called `.get` on an entry
+TOML does not require to be a table, and `ada = "contributor"` — the line a
+first-timer writes — raised `AttributeError` through a whole preflight.
+
+**Write down every shape the value can take, then handle each one.** The
+question is what the *producer* can emit, not what it usually emits: `str` has
+more line terminators than `"\n"`, `tomllib` returns a scalar where you expect a
+table, and a model emits a name that slugs to empty. Ask the parser's
+documentation rather than the sample input.
+
+Two audits, three defects, and each one a shape that was legal all along.
+
 ### Provenance
 
 A fact about how an artifact was made belongs in a **field the code reads**, never a
