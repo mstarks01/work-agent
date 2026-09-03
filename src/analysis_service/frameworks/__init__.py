@@ -868,11 +868,11 @@ def _heading_issues(lane: str, path: Path) -> list[str]:
     extracted from ``## Scope``, so a lane whose headings drifted silently stops
     contributing to the digest its own framework's critic dedupes against.
     """
-    found = [
-        line[3:].strip()
-        for line in path.read_text(encoding="utf-8").splitlines()
-        if line.startswith("## ")
-    ]
+    try:
+        text = path.read_text(encoding="utf-8")
+    except UnicodeDecodeError:
+        return [f"lane {lane!r} skill.md is not UTF-8"]
+    found = [line[3:].strip() for line in text.splitlines() if line.startswith("## ")]
     if found[: len(LANE_SECTION_HEADINGS)] != list(LANE_SECTION_HEADINGS):
         return [
             (

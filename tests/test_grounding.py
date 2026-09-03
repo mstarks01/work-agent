@@ -11,11 +11,13 @@ import time
 
 import pytest
 
+from analysis_service import grounding
 from analysis_service.grounding import (
     MAX_REPAIR_QUOTE_CHARS,
     MAX_REPAIR_WORK,
     REPAIR_THRESHOLD,
     normalize,
+    repair_deadline,
     repair_quote,
     verify_quote,
 )
@@ -341,6 +343,32 @@ class TestTheRepairRung:
         quote = " ".join(["y" * 500] * 2)
 
         assert repair_quote(quote, long_words) is None
+
+    def test_a_scan_that_starts_after_the_body_deadline_does_not_scan(self):
+        """Every scan of one body shares one deadline, and a scan that begins
+        past it answers ``None`` at once rather than running its own four
+        seconds: bounded per scan alone, a body of adversarial quotes ran for
+        hours after its job settled.
+        """
+        quote = " ".join(["ab"] * 133)
+        source = " ".join(["ba"] * 147)
+        started = time.thread_time()
+
+        assert repair_quote(quote, source, deadline=started) is None
+        assert time.thread_time() - started < 0.1
+
+    def test_the_body_deadline_cuts_a_scan_already_running(self, monkeypatch):
+        """The body's deadline binds inside a scan too, not only between scans:
+        one quote whose scan would run to its own four-second deadline stops
+        at the body's instead, overshooting by at most one comparison.
+        """
+        monkeypatch.setattr(grounding, "MAX_REPAIR_SECONDS_PER_BODY", 0.5)
+        quote = " ".join(["ab"] * 133)
+        source = " ".join(["ba"] * 147)
+        started = time.thread_time()
+
+        assert repair_quote(quote, source, repair_deadline()) is None
+        assert time.thread_time() - started < 1.5
 
     def test_folding_a_window_word_by_word_is_folding_it_whole(self):
         """The scan folds each source word once instead of once per window

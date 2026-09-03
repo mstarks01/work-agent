@@ -44,7 +44,12 @@ from types import MappingProxyType
 from typing import NamedTuple, get_args
 
 from analysis_service.frameworks import FrameworkPackage, FrameworkSchemas
-from analysis_service.grounding import normalize, repair_quote, verify_normalized
+from analysis_service.grounding import (
+    normalize,
+    repair_deadline,
+    repair_quote,
+    verify_normalized,
+)
 from analysis_service.references import canonical, snap
 from analysis_service.report import (
     BEYOND_GROUNDS,
@@ -752,6 +757,10 @@ def _verify_quotes(claims: Sequence[Claim], sources: Mapping[str, str]) -> _Quot
     # against the same few submissions, so the per-quote form would re-fold whole
     # documents to reach the same answer.
     folded = {label: normalize(text) for label, text in sources.items()}
+    # One deadline for every repair this body runs. Each scan is bounded on its
+    # own, and a body runs one scan per refused quote: bounded per scan, a body
+    # of four hundred adversarial quotes ran for hours after the job settled.
+    deadline = repair_deadline()
     drafts: list[Claim] = []
     marks: list[UnverifiedGround] = []
     repaired: list[RepairedQuote] = []
@@ -768,7 +777,7 @@ def _verify_quotes(claims: Sequence[Claim], sources: Mapping[str, str]) -> _Quot
             if ground.source_label not in sources:
                 unverified.append(index)
                 continue
-            repair = repair_quote(ground.text, sources[ground.source_label])
+            repair = repair_quote(ground.text, sources[ground.source_label], deadline)
             if repair is None:
                 unverified.append(index)
                 continue

@@ -1055,8 +1055,8 @@ def _node(func: Callable[..., Any], name: str) -> FunctionNode:
         # deadline returns the token, settles the job and frees its subject's
         # slot while the thread runs on. Nothing in-process can stop a running
         # Python call, so what keeps that harmless is that a body is short:
-        # `grounding.MAX_REPAIR_WORK` is the bound that makes it so, and it is
-        # the reason this is a wrapper and not a supervisor.
+        # `grounding.MAX_REPAIR_SECONDS_PER_BODY` is the bound that makes it
+        # so, and it is the reason this is a wrapper and not a supervisor.
         return await anyio.to_thread.run_sync(
             functools.partial(func, **kwargs), limiter=_NODE_THREADS
         )

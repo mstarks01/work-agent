@@ -51,6 +51,7 @@ from pathlib import Path
 from typing import Any, Literal
 
 from analysis_service.budgets import retried_prompt_tokens
+from analysis_service.markdown_loader import RESOLVE_ERRORS
 from analysis_service.report import NodeRun, TokenUsage
 from evals.harness import baseline
 from evals.harness.artifact import load_artifact
@@ -434,7 +435,7 @@ def _reprice(
         if not resolved.is_relative_to(directory.resolve()):
             return None
         artifact = load_artifact(resolved)
-    except (OSError, ValueError):
+    except RESOLVE_ERRORS:
         return None
 
     calls: list[tuple[str, str, TokenUsage]] = []

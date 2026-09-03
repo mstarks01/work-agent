@@ -1,5 +1,7 @@
 """Tests for the mechanical checks around the critic: join and assemble."""
 
+import time
+
 import pytest
 
 from analysis_service import critic
@@ -495,6 +497,36 @@ class TestQuoteVerification:
             ("S-01", 0)
         ]
         assert LABEL in joined.marks.unverified_grounds[0].reason
+
+    def test_a_body_of_adversarial_quotes_stops_at_the_body_deadline(
+        self, model, monkeypatch
+    ):
+        """Tested against the rung, not against its own expectation: each of
+        these quotes alone runs to the per-scan deadline, so the body's cost is
+        the count times that unless one deadline covers them all. Three of
+        them under a half-second body bound must finish in about that, where
+        the per-scan bound alone would let them run for three scans.
+        """
+        from analysis_service import grounding
+
+        monkeypatch.setattr(grounding, "MAX_REPAIR_SECONDS_PER_BODY", 0.5)
+        quote = " ".join(["ab"] * 133)
+        source = " ".join(["ba"] * 147)
+        drafts = {
+            "spoofing": [
+                sample_draft(
+                    f"S-0{i}",
+                    grounds=[Ground(kind="quote", text=quote, source_label=LABEL)],
+                )
+                for i in range(1, 4)
+            ]
+        }
+        started = time.thread_time()
+
+        joined = join_drafts(drafts, STRIDE, model, {LABEL: source})
+
+        assert time.thread_time() - started < 1.5
+        assert len(joined.marks.dropped_claims) == 3
 
     def test_a_refused_quote_near_the_source_is_repaired_and_marked(self, model):
         """The ground now carries the submitter's words, and the mark carries
