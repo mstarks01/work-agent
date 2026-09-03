@@ -369,7 +369,11 @@ def _check_roster_covers(root: Path, author: str) -> Check:
                 f"{author!r} has no roster line; add yourself to"
                 f' {ROSTER_FILE} with standing "contributor"'
             )
-    except roster.RosterError as exc:
+    # LedgerError too: this reads the ledger as well as the roster, and a
+    # malformed row made the checklist exit on a traceback instead of a line a
+    # contributor can act on. Fail-closed either way; only one of them is
+    # readable.
+    except (roster.RosterError, ledger.LedgerError) as exc:
         problems.append(str(exc))
     return _check("every voter has a roster line, including you", problems)
 
