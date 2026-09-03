@@ -43,6 +43,23 @@ CORE_ASSET_TAGS = frozenset(
 _NON_SLUG_CHARS_RE = re.compile(r"[^a-z0-9]+")
 
 
+#: The shape every element ID this service builds already has:
+#: ``<prefix>:<slug>``, or a flow's ``flow:<slug>-to-<slug>:<slug>``, where a
+#: slug is what :func:`normalize_name` produces.
+#:
+#: Stated on the field because :func:`derive_element_id` cannot always be asked.
+#: It raises when an element's *name* slugs to empty -- a name of ``"!!!"`` --
+#: and the ``id-mismatch`` rule that would otherwise pin the ID to the derived
+#: one is skipped exactly then, so the emitted ID survived verbatim with only a
+#: length bound. ``references.py`` records that hole as a reference-resolution
+#: one; it is also a fencing one, because an element ID is rendered into a lane
+#: agent's prompt in a table that carries no fence of its own, and a value with
+#: a newline and a backtick run there opens a block that swallows every fenced
+#: block after it. A self-sized fence is only safe while its neighbours are
+#: fenced too.
+ELEMENT_ID = r"^[a-z_]+:[a-z0-9]+(?:-[a-z0-9]+)*(?::[a-z0-9]+(?:-[a-z0-9]+)*)?$"
+
+
 def normalize_name(name: str) -> str:
     """Normalize a human-readable name into the slug used inside element IDs."""
     slug = _NON_SLUG_CHARS_RE.sub("-", name.lower()).strip("-")
@@ -72,7 +89,7 @@ class _Element(BaseModel):
 
     model_config = ConfigDict(extra="forbid")
 
-    id: str = Field(max_length=300)
+    id: str = Field(max_length=300, pattern=ELEMENT_ID)
     name: str = Field(min_length=1, max_length=200)
     description: str = Field(default="", max_length=2000)
     assets: list[str] = Field(default_factory=list, max_length=len(CORE_ASSET_TAGS) * 4)
