@@ -284,3 +284,23 @@ class TestComposedPromptFencing:
                 if "SYSTEM OVERRIDE" in line
             ]
             assert not escaped, f"{compose.__name__} let caller text escape"
+
+    def test_a_lane_prompt_leaves_no_block_open(self):
+        """`analyze.md` carries `{input_text}` too, and was not in the loop
+        above -- so the one prompt that also interpolates a model-written table
+        beside the caller's sources was the one this never composed.
+
+        `lines_outside_fences` asserts no block is left open, which is the
+        property that matters here: an unfenced value that opens a longer run
+        than any fence after it swallows every fenced block that follows,
+        including the one `render_sources` built. A self-sized fence is only
+        safe while its neighbours are fenced too.
+        """
+        loader = MarkdownLoader(_REPO_PROMPTS)
+        composed = loader.load("analyze").replace("{input_text}", self._rendered())
+
+        escaped = [
+            line for line in lines_outside_fences(composed) if "SYSTEM OVERRIDE" in line
+        ]
+
+        assert not escaped, "analyze.md let caller text escape"
