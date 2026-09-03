@@ -168,7 +168,7 @@ def priority_of(finding: Finding) -> tuple[int, str]:
     raise AssertionError("'new' is unconditional, so this cannot be reached")
 
 
-def _answered(ledger: Ledger, *, voter: str, sitting: str) -> frozenset[str]:
+def answered(ledger: Ledger, *, voter: str, sitting: str) -> frozenset[str]:
     """The fingerprints this queue skips, and the one answer that does not count.
 
     ``needs-evidence`` is not an answer about the finding. The reviewer said
@@ -181,6 +181,12 @@ def _answered(ledger: Ledger, *, voter: str, sitting: str) -> frozenset[str]:
     finding coming straight back in the same session, and not enough to lose it.
     A later sitting asks again, over whatever evidence exists by then, which is
     what the reviewer was asking for.
+
+    **Public because the app re-asks the same question per request.** It builds
+    the queue once and filters it again on every serve, and when that filter was
+    a second copy of this rule it was a copy that did not have this paragraph in
+    it: it counted a `needs-evidence` answer as answered, and dropped what this
+    had just re-offered. One rule needs one reader.
     """
     return frozenset(
         value
@@ -203,18 +209,18 @@ def build(
     a second opinion possible: leaving it empty skips everything anybody
     answered, and naming a reviewer skips only what they answered themselves.
     ``sitting`` is this session's id, which decides how long a ``needs-evidence``
-    answer holds -- see :func:`_answered`.
+    answer holds -- see :func:`answered`.
 
     Deduplicated by fingerprint, keeping the first occurrence. Two runs
     producing one finding is the normal case and is one question, not two.
     :func:`_keyed` is where a finding gets its fingerprint, under its own
     framework's rule.
     """
-    answered = _answered(ledger, voter=voter, sitting=sitting)
+    skip = answered(ledger, voter=voter, sitting=sitting)
 
     items: dict[str, QueueItem] = {}
     for value, components, finding in _keyed(findings, flows_by_case):
-        if value in answered or value in items:
+        if value in skip or value in items:
             continue
         weight, why = priority_of(finding)
         items[value] = QueueItem(

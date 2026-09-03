@@ -19,7 +19,7 @@ from fastapi.testclient import TestClient
 from analysis_service.frameworks import PACKAGES
 from evals.harness import queue as review_queue
 from evals.harness import run as harness_run
-from evals.harness.ledger import load
+from evals.harness.ledger import append, cast, load
 from webapp.review import (
     QUESTIONS,
     build_session,
@@ -494,3 +494,47 @@ def test_the_page_carries_the_token_the_vote_needs(runs, tmp_path):
     page = app.get("/review").text
 
     assert session.token in page, "the page cannot vote without it"
+
+
+def test_a_needs_evidence_finding_comes_back_in_a_later_sitting(runs, tmp_path):
+    """The end of the path #554 only fixed the start of.
+
+    `queue.build` re-offers it, and `Session.remaining()` used to drop it again
+    with a second copy of the rule that had not been changed. Every serving path
+    goes through `remaining()`, so the app never showed what the queue re-offered
+    and `Vote.sitting` reached no reader that decided anything.
+    """
+    ledger_path = tmp_path / "votes"
+    first = build_session(runs, voter="ada", ledger_path=ledger_path)
+    item = first.remaining()[0]
+    append(
+        cast(
+            item.components,
+            item.finding.case,
+            "needs-evidence",
+            "ada",
+            sitting=first.sitting,
+        ),
+        ledger_path,
+    )
+
+    assert item.fingerprint not in {
+        served.fingerprint for served in first.remaining()
+    }, "within its own sitting it stays down"
+
+    later = build_session(runs, voter="ada", ledger_path=ledger_path)
+
+    assert item.fingerprint in {served.fingerprint for served in later.remaining()}, (
+        "a later sitting asks again, which is what the button says"
+    )
+
+
+def test_an_ordinary_answer_is_still_spent(runs, tmp_path):
+    ledger_path = tmp_path / "votes"
+    first = build_session(runs, voter="ada", ledger_path=ledger_path)
+    item = first.remaining()[0]
+    append(cast(item.components, item.finding.case, "up", "ada"), ledger_path)
+
+    later = build_session(runs, voter="ada", ledger_path=ledger_path)
+
+    assert item.fingerprint not in {served.fingerprint for served in later.remaining()}

@@ -186,11 +186,17 @@ class Session:
         Recomputed per request rather than popped from a list: two tabs open on
         one sitting is a thing people do, and a list would let the second tab
         serve a finding the first already answered.
+
+        Asked of :func:`~evals.harness.queue.answered`, which is the same
+        function the queue was built with. It used to be a second copy of that
+        rule here, and the copy went stale the day the rule changed: it counted
+        a `needs-evidence` answer as answered and dropped, on every serve, the
+        finding the queue had just re-offered.
         """
-        answered = frozenset(
-            key[0] for key in load(self.ledger_path).current() if key[1] == self.voter
+        skip = review_queue.answered(
+            load(self.ledger_path), voter=self.voter, sitting=self.sitting
         )
-        return [item for item in self.items if item.fingerprint not in answered]
+        return [item for item in self.items if item.fingerprint not in skip]
 
     def find(self, value: str) -> review_queue.QueueItem:
         """The item a vote names, or a refusal.
