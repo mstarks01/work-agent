@@ -12,7 +12,13 @@ maps under `.wayfinder/` are archived history, not live. See `docs/agents/issue-
 
 ### Code review checkpoints
 
-A finished code review ends in an annotated `reviewed/<date>` tag on the commit
+Review runs at two scales. A **pre-merge review** reads one pull request's diff
+and asks whether the change is correct; a **checkpoint round** reads a range of
+merged commits and asks what the tree holds that no single diff showed. Run both:
+a defect in a recent fix is the dominant class and sits inside one diff, and the
+rest needs the whole tree.
+
+A finished checkpoint round ends in an annotated `reviewed/<date>` tag on the commit
 it covered. Start the next one from `git tag -l 'reviewed/*' --sort=-creatordate
 | head -1` rather than asking for a fixed point. The tag message carries what the
 diff cannot: which axes ran, where each finding was fixed, and **what was left
