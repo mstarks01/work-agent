@@ -191,6 +191,48 @@ class TestTheRepairRung:
 
         assert repair_quote(quote.replace("quick", "quikc"), source) is not None
 
+    def test_an_inverted_phase_does_not_run_for_half_a_minute(self):
+        """`difflib` recursion, not window count, and on a 1 KiB source.
+
+        With `autojunk` off, `SequenceMatcher` recurses on every match it finds,
+        and a quote whose phase is inverted against the source makes that cubic.
+        One comparison of 998 characters against 998 took 6.5 seconds, and the
+        rung took 38 seconds on a source a hundredth of the size ceiling -- so
+        no bound that counts comparisons could have helped, because the first
+        comparison already exceeded it.
+
+        `MAX_GROUNDS_PER_CLAIM` is 60, and `graph.py` names this rung's bound as
+        the reason a node body stays short enough for a cancelled offload to be
+        harmless.
+        """
+        quote = " ".join(["ab"] * 333)
+        source = " ".join(["ba"] * 341)
+
+        started = time.process_time()
+        assert repair_quote(quote, source) is None
+        assert time.process_time() - started < 3.0
+
+    def test_a_long_quote_still_matches_after_the_junk_heuristic(self):
+        """`autojunk` drops elements appearing in over 1% of a long sequence.
+
+        That is what kills the recursion, and it is worth checking it does not
+        also kill an ordinary long quote. Sized at the corpus, whose largest
+        source is 2,197 bytes: a 180-word quote over a 100 KiB source cannot be
+        repaired under any sane bound -- a complete scan of that pair measured
+        32.9 seconds -- so the rung answers `None` there and the report says the
+        quote is unverified.
+        """
+        source = " ".join(
+            f"the {n} quick brown foxes jumped over a lazy dog near" for n in range(40)
+        )
+        words = source.split()
+        quote = " ".join(words[100:280]).replace("quick", "quikc", 1)
+
+        repair = repair_quote(quote, source)
+
+        assert repair is not None
+        assert repair[1] >= REPAIR_THRESHOLD
+
     def test_a_pruned_window_is_charged_for_the_work_it_took_to_prune(self):
         """The input that reads zero on a budget charging only survivors.
 
