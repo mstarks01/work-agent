@@ -2171,7 +2171,7 @@ def test_a_graph_entered_past_prepare_records_an_empty_context():
 
 
 class TestIntoReport:
-    """The one mapping from an :class:`Analysis` to a report.
+    """The one mapping from an :class:`~analysis_service.graph.Analysis` to a report.
 
     Both drivers — the service over a job, the eval harness over a corpus case
     — reach the report through this method, so what these tests hold is what

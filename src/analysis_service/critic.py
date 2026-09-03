@@ -1277,7 +1277,7 @@ def _ruling_view(
     200-character summary plus 2000 characters of detail, and a draft carries a
     list of them, so this is the largest block in the longest prompt the graph
     sends that no judgement is spent on. Same argument as
-    :func:`_without_source_fields`, one node further down.
+    :func:`~analysis_service.graph._without_source_fields`, one node further down.
 
     ``exclude_defaults`` is what drops the empty branches of a
     :class:`~analysis_service.report.Ground`. That model is one flat object

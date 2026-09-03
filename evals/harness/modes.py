@@ -751,7 +751,7 @@ async def run_end_to_end(case: GoldenCase, pipeline: Pipeline) -> AnalysisRun:
 def _run_from_graph(
     case: GoldenCase, graph_run: GraphRun, pipeline: Pipeline
 ) -> AnalysisRun:
-    """Complete the graph's :class:`Analysis` into a report, as production does.
+    """Complete the graph's :class:`~analysis_service.graph.Analysis` into a report, as production does.
 
     The report is built by :meth:`~analysis_service.graph.Analysis.into_report`,
     the same method :class:`~analysis_service.pipeline.AdkPipelineRunner` calls,

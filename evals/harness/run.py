@@ -161,7 +161,7 @@ def stride_block(report: Report) -> FrameworkAnalysis:
 def stride_threats(report: Report) -> list[Threat]:
     """This report's STRIDE claims, at the record type they validate as.
 
-    ``claims`` is annotated at the neutral :class:`RuledClaim` because a block
+    ``claims`` is annotated at the neutral :class:`~analysis_service.report.RuledClaim` because a block
     holds whatever its own package produced; the scorers grade ``category`` and
     ``severity``, which only STRIDE's record carries. The envelope already
     validated this block as its package's own shape, so this re-states that

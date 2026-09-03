@@ -261,7 +261,7 @@ def cast(
 ) -> Vote:
     """Build one validated vote, stamping its fingerprint and the time.
 
-    The version comes from :data:`VERSION_FOR` keyed by the claim's own
+    The version comes from :data:`~evals.harness.fingerprint.VERSION_FOR` keyed by the claim's own
     framework, never from a default. A default is a single rule for a table with
     one row per package: it keyed an ASVS claim under STRIDE's rule, which reads
     an action verb an ASVS claim does not carry, so every ASVS vote raised
@@ -482,7 +482,7 @@ def rekey(votes: Iterable[Vote]) -> list[Vote]:
     A vote whose components cannot satisfy its framework's version raises, so a
     partial re-key is impossible.
 
-    Each row is keyed under :data:`VERSION_FOR` for **its own** framework rather
+    Each row is keyed under :data:`~evals.harness.fingerprint.VERSION_FOR` for **its own** framework rather
     than under one version for the file. One version for the file cannot be
     right once the table holds two: a ledger carrying a STRIDE row and an ASVS
     row had no value that re-keyed it, because either choice raised on the other

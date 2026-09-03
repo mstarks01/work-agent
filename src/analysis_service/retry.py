@@ -42,7 +42,7 @@ vary is how much retrying a deployment will tolerate, and that is
 ``retry_budget_ratio`` in ``config/resilience.toml``.
 
 Retrying is no longer quite all this module does, and the exception is
-deliberate. :class:`RetryingLlm` is the one object this service owns that sees
+deliberate. :func:`retrying_llm_class` is the one object this service owns that sees
 every raw response from every provider for every node. That makes it the only
 place a length-stopped completion can be caught uniformly; see
 :func:`_reject_truncated`. Nothing here can change an answer. It can refuse one
