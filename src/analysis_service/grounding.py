@@ -81,6 +81,7 @@ rather than leaning on the label check to do it.
 from __future__ import annotations
 
 import re
+import time
 import unicodedata
 from difflib import SequenceMatcher
 
@@ -137,30 +138,56 @@ _REPAIR_WIDTH_SLACK = 2
 #: matching blocks degenerated. The weights below are that spread, and the
 #: budget buys about a second and a half of the worst of it.
 #:
-#: Measured at the shipped 102,400-byte source ceiling:
+#: **Four proxies for time were wrong before this one, so this one is not the
+#: only bound.** The last of them priced a comparison at ``len(a) * len(b)``,
+#: which `difflib` does not obey: with ``autojunk`` off it recurses on every
+#: match it finds, and an inverted phase makes that cubic. One comparison of a
+#: 998-character quote against a 998-character window took **6.5 seconds**, and
+#: the whole rung took **38 seconds on a 1 KiB source** -- against a documented
+#: worst case of 1.47 s at a hundred times that size.
+#:
+#: ``autojunk=True`` is what closes that. It drops elements appearing in more
+#: than 1% of a sequence of 200 or more, which is exactly the degenerate shape,
+#: and it costs at most 0.003 of ratio on a legitimate long quote -- every
+#: measured value stays above 0.99 against a threshold of 0.9. With it on, the
+#: comparison rate spans 92 million to 6 billion units a second; with it off the
+#: floor was 151 thousand. The rate became predictable, so the price could be
+#: honest: 13 to 1 is the measured ratio between a character of pruning and a
+#: unit of comparison.
+#:
+#: :data:`_REPAIR_DEADLINE_SECONDS` is the backstop, and it exists because the
+#: record says another proxy will be wrong eventually. The budget is
+#: deterministic and does the work on every ordinary input; the deadline catches
+#: what the budget misprices. Measured at the 102,400-byte ceiling:
 #:
 #: ==============================  ========  ======
 #: input                           CPU       result
 #: ==============================  ========  ======
-#: quote whose span is present     0.10s     1.000
-#: quote with a typo, match early  0.11s     0.987
-#: quote with a typo, match late   0.11s     0.968
-#: 333-word quote, no match        0.85s     none
-#: unprunable, no match            1.47s     none
+#: inverted phase, 1 KiB source    0.01s     none
+#: quote whose span is present     0.04s     1.000
+#: typo, match early               1.80s     0.987
+#: typo, match at the end          1.90s     0.975
+#: 333-word quote, no match        1.62s     none
+#: unprunable, no match            2.03s     none
 #: ==============================  ========  ======
 #:
-#: The corpus itself is nowhere near that ceiling -- its largest source is 2,197
-#: bytes and 377 words, and repairs there run in 0.011 s over a complete scan.
-#: The budget binds on adversarial input and on nothing a real case produces.
-MAX_REPAIR_WORK = 30_000_000
+#: The corpus's own largest source is 2,197 bytes and repairs in 0.01 s over a
+#: complete scan. The budget and the deadline bind on adversarial input and on
+#: nothing a real case produces.
+MAX_REPAIR_WORK = 250_000_000
 
 #: What one pruned window costs, per character of the window. Pruning is the
 #: cheaper work and every window pays it.
-_PRUNE_COST = 3
+#: A ratio at or above this is the span itself; nothing later can beat it,
+#: so the scan stops rather than ranking the rest of the document.
+_CERTAIN = 0.9999
+
+_REPAIR_DEADLINE_SECONDS = 2.0
+_PRUNE_COST = 13
 
 #: What one full comparison costs, per character-pair. Five to three, because
 #: that is the measured spread between the two rates; see MAX_REPAIR_WORK.
-_COMPARE_COST = 5
+_COMPARE_COST = 1
 
 #: Characters a model routinely substitutes for their ASCII originals when it
 #: believes it is quoting verbatim. NFKC folds most of the width and ligature
@@ -262,8 +289,16 @@ def repair_quote(quote: str, source: str) -> tuple[str, float] | None:
     folded form is its folded words joined, because the ladder's rungs are
     per-character and the last one collapses whitespace.
 
-    A scan that spends :data:`MAX_REPAIR_WORK` stops where it is and answers
-    with the best window it found by then. It does not discard that answer: the
+    A scan that spends :data:`MAX_REPAIR_WORK`, or runs past
+    :data:`_REPAIR_DEADLINE_SECONDS`, stops where it is and answers with the
+    best window it found by then.
+
+    **A truncated scan can return a good span where a better one sat later**,
+    and the caller cannot tell a truncated answer from a complete one. Both
+    alternatives are worse: refusing the answer throws away a correct match --
+    measured, the median case finds its span at window 1,500 and is cut off at
+    window 26,445 -- and scanning to the end is what the bound exists to stop.
+    Returning nothing is right only when nothing reached the threshold. It does not discard that answer: the
     budget exists to bound the time, and throwing away a match already above
     :data:`REPAIR_THRESHOLD` spends the time and buys nothing. A truncated scan
     can return a match that is merely good rather than the best one, which is
@@ -287,7 +322,8 @@ def repair_quote(quote: str, source: str) -> tuple[str, float] | None:
     folded = [normalize(word) for word in words]
     best: tuple[str, float] | None = None
     budget = MAX_REPAIR_WORK
-    matcher = SequenceMatcher(autojunk=False)
+    matcher = SequenceMatcher(autojunk=True)
+    deadline = time.process_time() + _REPAIR_DEADLINE_SECONDS
     matcher.set_seq2(needle)
     for count in range(width, width + _REPAIR_WIDTH_SLACK + 1):
         for start in range(len(words) - count + 1):
@@ -299,15 +335,17 @@ def repair_quote(quote: str, source: str) -> tuple[str, float] | None:
             # pruning IS the cost. An English source and a 333-word quote spent
             # 0 of 50,000,000 and ran 8.4 seconds.
             budget -= _PRUNE_COST * len(span)
-            if budget < 0:
+            if budget < 0 or time.process_time() > deadline:
                 return best
             matcher.set_seq1(span)
             if matcher.quick_ratio() < REPAIR_THRESHOLD:
                 continue
             budget -= _COMPARE_COST * len(span) * len(needle)
-            if budget < 0:
+            if budget < 0 or time.process_time() > deadline:
                 return best
             ratio = matcher.ratio()
             if ratio >= REPAIR_THRESHOLD and (best is None or ratio > best[1]):
                 best = (" ".join(words[start : start + count]), ratio)
+                if ratio >= _CERTAIN:
+                    return best
     return best
