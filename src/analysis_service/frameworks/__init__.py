@@ -784,15 +784,22 @@ def _knowledge_issues(package: FrameworkPackage) -> list[str]:
     return []
 
 
-def _readable(path: Path) -> bool:
+def _readable(root: Path, path: Path) -> bool:
     """The loader's question, asked by the gate that runs before it.
 
     `is_file()` follows a symlink out of the package root; `MarkdownLoader.load`
     resolves and refuses one. So a symlinked lane skill passed startup
     validation and failed on the first job of that selection. One rule, and the
     loader owns it.
+
+    **The root is the package's text root**, which is the root the loader uses.
+    An earlier version passed `path.parent`, which made this gate stricter than
+    the loader in the other direction: a lane skill symlinked to another file
+    inside the same package resolves outside its own directory but inside the
+    root, so `load` accepted it and this refused it. A shared reader is only one
+    reader if every caller asks it the same question.
     """
-    return _inside(path.parent, path)
+    return _inside(root, path)
 
 
 def _disk_issues(package: FrameworkPackage, root: Path) -> list[str]:
@@ -804,7 +811,7 @@ def _disk_issues(package: FrameworkPackage, root: Path) -> list[str]:
         for doc in ("skill", "exemplars"):
             path = root / "lanes" / lane / f"{doc}.md"
             expected.add(path)
-            if not _readable(path):
+            if not _readable(root, path):
                 issues.append(f"lane {lane!r} has no {doc}.md")
             elif doc == "skill":
                 issues += _heading_issues(lane, path)
@@ -812,18 +819,18 @@ def _disk_issues(package: FrameworkPackage, root: Path) -> list[str]:
     for doc in (CRITIC_DOC, DISCLAIMER_DOC, OUTPUT_DOC):
         path = root / f"{doc}.md"
         expected.add(path)
-        if not _readable(path):
+        if not _readable(root, path):
             issues.append(f"the package carries no {doc}.md")
 
     rubric = root / f"{SEVERITY_RUBRIC_DOC}.md"
     if package.carries_severity():
         expected.add(rubric)
-        if not _readable(rubric):
+        if not _readable(root, rubric):
             issues.append(
                 "the record carries a severity field but the package carries no"
                 f" {SEVERITY_RUBRIC_DOC}.md"
             )
-    elif _readable(rubric):
+    elif _readable(root, rubric):
         issues.append(
             f"the package carries {SEVERITY_RUBRIC_DOC}.md but its record grades"
             " nothing, so nothing would read it"
@@ -832,7 +839,7 @@ def _disk_issues(package: FrameworkPackage, root: Path) -> list[str]:
     for entry in package.knowledge.documents():
         path = root / f"{entry}.md"
         expected.add(path)
-        if not _readable(path):
+        if not _readable(root, path):
             issues.append(f"the knowledge tables name {entry}, which is not on disk")
 
     # Both directions, as the corpus lints already check: unread Markdown under
