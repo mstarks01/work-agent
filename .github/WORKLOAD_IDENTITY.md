@@ -53,6 +53,16 @@ Two layers close it, and either one closes it alone:
 Two layers rather than one because layer 1 lives in files a collaborator can
 edit in a pull request, and layer 2 does not.
 
+**The `live-providers` environment carries a deployment branch policy naming
+`main`, and it is the third layer.** It is a repository setting rather than a
+line in a file, so a pushed branch cannot edit it — which is exactly what layer
+1 cannot claim and what layer 2 wrongly claimed. `evals-live-api-key.yml` says
+what its absence means: "an environment nobody has configured protection rules
+on protects nothing." It was absent until 2026-09-03, so for the provider-key
+jobs the editable ref guard was the only control. If you ever need to run one of
+those workflows from a branch, this policy is the second thing to change, and
+that is the point of it.
+
 **Layer 2 pins `ref` because a suffix is not a pin.** It read
 `job_workflow_ref.endsWith('@refs/heads/main')`, and the `@` there separates a
 prefix from a ref the attacker names. `git check-ref-format` accepts a branch
