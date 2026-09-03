@@ -44,11 +44,13 @@ the stop only holds them to it.
 from __future__ import annotations
 
 import json
+import math
 from collections.abc import Callable, Sequence
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Any, Literal
 
+from analysis_service.budgets import retried_prompt_tokens
 from analysis_service.report import NodeRun, TokenUsage
 from evals.harness import baseline
 from evals.harness.artifact import load_artifact
@@ -89,12 +91,35 @@ class Estimate:
 
 
 def _calls_of(executions: Sequence[NodeRun]) -> list[tuple[str, str, TokenUsage]]:
-    """The billable calls in a set of node runs, ready for pricing."""
-    return [
-        (run.model, run.requested_model or run.model, run.usage)
-        for run in executions
-        if run.usage is not None and run.model is not None
-    ]
+    """The billable calls in a set of node runs, ready for pricing.
+
+    **A retried node bills more than its usage says**, and this asks
+    :func:`~analysis_service.budgets.retried_prompt_tokens` rather than
+    answering for itself. It used to answer for itself by not asking at all:
+    the failed attempts were priced at nothing while `measured_tokens` charged
+    them, so a sweep offered a contributor $9.75 against a $25.35 bill at the
+    shipped `attempts = 3`. The number a person types back to accept has to be
+    the number they pay.
+
+    The retried prompt is a second call at the same model's prompt rate, with no
+    completion, which is what a failed attempt actually was.
+    """
+    calls = []
+    for run in executions:
+        if run.usage is None or run.model is None:
+            continue
+        requested = run.requested_model or run.model
+        calls.append((run.model, requested, run.usage))
+        retried = retried_prompt_tokens(run)
+        if retried:
+            calls.append(
+                (
+                    run.model,
+                    requested,
+                    TokenUsage(prompt_tokens=retried, total_tokens=retried),
+                )
+            )
+    return calls
 
 
 def spent(executions: Sequence[NodeRun]) -> float:
@@ -253,10 +278,15 @@ def _same_rates(one: UnitPrices, other: UnitPrices) -> bool:
 
 def _recorded_actual(manifest: dict[str, Any]) -> float | None:
     """A Baseline's mean recorded actual across its sweeps."""
+    # A committed manifest is a contributor's file, so its number gets the same
+    # question the flag gets: a non-finite or negative `actual_usd` renders as
+    # an acceptable offer and prices the whole estimate off it.
     actuals = [
-        float(sweep.get("cost", {}).get("actual_usd"))
+        value
         for sweep in manifest.get("sweeps", [])
-        if sweep.get("cost", {}).get("actual_usd") is not None
+        if (raw := sweep.get("cost", {}).get("actual_usd")) is not None
+        and math.isfinite(value := float(raw))
+        and value >= 0
     ]
     return sum(actuals) / len(actuals) if actuals else None
 
@@ -459,6 +489,16 @@ def _accept_from_flag(estimate: Estimate, accept_cost: str) -> float | None:
             f"--accept-cost {accept_cost!r} is neither a number of dollars nor"
             f" the word {UNKNOWN!r}"
         ) from exc
+    # `float()` takes "inf" and "nan", and neither is a number of dollars.
+    # Both satisfy any stated estimate, because `x > inf` and `x > nan` are
+    # False -- so either one turns this gate off and, passed to `hold`, turns
+    # it off for every case boundary the sweep has left. A negative one accepts
+    # a spend by claiming to accept less than nothing.
+    if not math.isfinite(accepted) or accepted < 0:
+        raise Refused(
+            f"--accept-cost {accept_cost!r} is not an amount of money;"
+            " state the dollars you accept"
+        )
     if estimate.amount_usd is None:
         raise Refused(
             f"no amount can be stated, so ${accepted:.2f} answers nothing;"
