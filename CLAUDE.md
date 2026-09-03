@@ -43,6 +43,32 @@ because a table nobody compares to `PACKAGES` fails as quietly as the branch it 
 `tests/test_framework_neutrality.py` holds the decidable half of both. See
 `docs/agents/framework-parity.md` for the post-mortem this is derived from.
 
+### One rule, one reader
+
+When two pieces of code answer the same question, they will eventually answer it
+differently, and the disagreement is invisible because each one's test agrees
+with it. **Give a rule one reader and let every other site call it.**
+
+Where a second reader is unavoidable — an app and an offline gate, a harness
+check and a corpus lint — test the two **against each other**, never each
+against its own expectation.
+
+Six instances in two audits, and every one survived because the readers were
+tested separately: what an UNREVIEWED key is (substring vs `ast`); whether a
+finding is answered (`queue.build` vs `Session.remaining`); which UNREVIEWED
+table is the table (first assignment vs last); which version keys a ledger row
+(`__post_init__` vs `rekey` vs `VERSION_FOR`); what a filled reading document is
+(two copies of one line); when an element ID is checked (the rule and the
+deriver disagreed about the empty-slug case).
+
+Two corollaries, both from the same audits:
+
+- **A self-sized fence is safe only while its neighbours are fenced too.** Ask
+  what sits beside the value, not only what wraps it.
+- **A bound that predicts a cost from its inputs is wrong whenever the cost
+  turns on which inputs survive a filter.** Spend a budget where the work
+  happens.
+
 ### Provenance
 
 A fact about how an artifact was made belongs in a **field the code reads**, never a
