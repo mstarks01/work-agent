@@ -49,6 +49,7 @@ from evals.harness import baseline, comparison, ledger, roster
 from evals.harness.artifact import ProvenanceError
 from evals.harness.reference import CaseSitting
 from evals.harness.sitting import (
+    MIN_OWN_LIST,
     SittingError,
     claim_files,
     document_name,
@@ -638,12 +639,55 @@ def _check_sitting_evidence(root: Path, author: str) -> Check:
                         " file; the entry signs the bytes that merge, so"
                         " recompute it"
                     )
-            if not (case_dir / sitting.document).is_file():
-                problems.append(
-                    f"{case}/{sitting.document}: the filled document is the"
-                    " evidence, and it is not committed beside the case"
-                )
+            problems += _document_problems(case, case_dir, sitting, author)
     return _check("the digests and the document hold", problems)
+
+
+def _document_problems(
+    case: str, case_dir: Path, sitting: CaseSitting, author: str
+) -> list[str]:
+    """Whether the entry names the document this submission may write, and
+    whether that document says anything.
+
+    The old check was one `.is_file()` probe on whatever name the entry gave.
+    A name is not a path this repository resolves, but it is a claim, and the
+    probe let the claim be any file that happens to exist: `"source.md"`
+    satisfied it in every case directory, so an entry could clear a case while
+    committing no reading document at all.
+
+    Naming it is half. `document()` is the evidence that the method ran, and
+    `MIN_OWN_LIST` is the floor that makes a filled copy different from an empty
+    one -- enforced in the app and in the offline envelope, and until now on
+    neither side of a pull request. So `touch REVIEW-<login>.md` passed every
+    gate under the correct name, and constraining only the name would have moved
+    the same hole one step.
+    """
+    expected = document_name(author)
+    if sitting.document != expected:
+        return [
+            (
+                f"{case}: the entry names {sitting.document!r}, and a submission"
+                f" writes {expected!r}. The document carries the submitting"
+                " login, so an entry naming another is another submission's."
+            )
+        ]
+    path = case_dir / expected
+    if not path.is_file():
+        return [
+            (
+                f"{case}/{expected}: the filled document is the evidence, and"
+                " it is not committed beside the case"
+            )
+        ]
+    if len(path.read_text(encoding="utf-8").strip()) < MIN_OWN_LIST:
+        return [
+            (
+                f"{case}/{expected}: the document is empty. It is the evidence"
+                " the method ran, and the app and the offline page both hold a"
+                " filled one to the same floor."
+            )
+        ]
+    return []
 
 
 def _check_sitting_covers(root: Path, author: str) -> Check:
