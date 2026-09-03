@@ -149,6 +149,23 @@ def spent_tokens(charges: Iterable[tuple[int, int | None]]) -> int:
     )
 
 
+def retried_prompt_tokens(node: NodeRun) -> int:
+    """The prompt tokens a node's *failed* attempts sent, and nobody metered.
+
+    One reader for a rule two callers need. `measured_tokens` charges these to
+    a window; `evals.harness.consent` prices them into the figure a contributor
+    is asked to accept. The two disagreed: the budget charged them and the
+    consent price did not, so a sweep offered $9.75 against a $25.35 bill at the
+    shipped `attempts = 3`. Each was tested against its own expectation.
+
+    Only the attempt that answered is metered, and every attempt before it sent
+    the same prompt. `analysis_service.retry` stamps the count for exactly this
+    (OWASP LLM10). This over-counts an attempt the provider refused before
+    reading the prompt, which is the direction a settlement should err in.
+    """
+    return 0 if node.usage is None else node.usage.prompt_tokens * (node.attempts - 1)
+
+
 def measured_tokens(nodes: Iterable[NodeRun]) -> int:
     """What a finished job's node runs actually cost, or 0 if nothing metered.
 
@@ -171,7 +188,7 @@ def measured_tokens(nodes: Iterable[NodeRun]) -> int:
     decides a budget must not have a quiet default behind it.
     """
     return sum(
-        node.usage.total_tokens + node.usage.prompt_tokens * (node.attempts - 1)
+        node.usage.total_tokens + retried_prompt_tokens(node)
         for node in nodes
         if node.usage is not None
     )
