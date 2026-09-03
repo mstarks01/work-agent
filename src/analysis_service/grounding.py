@@ -97,32 +97,36 @@ REPAIR_THRESHOLD = 0.9
 _REPAIR_WIDTH_SLACK = 2
 
 #: The largest candidate scan :func:`repair_quote` will run, as the source's
-#: word count times the square of the quote's. Above it the rung gives up and
-#: the quote stays unverified, which is an outcome the report already carries.
+#: word count times the square of the quote's length **in characters**.
 #:
-#: The square is the measured shape, not a guess. The scan walks one window per
-#: source word, and each window that :meth:`~difflib.SequenceMatcher.quick_ratio`
-#: does not prune costs a :meth:`~difflib.SequenceMatcher.ratio` quadratic in
-#: the quote's length. A quote whose characters are the window's — which is what
-#: a reordering of the source's own words produces — prunes nothing, so the
-#: worst case is every window paying it:
+#: Characters, because that is what the scan costs. It walks one window per
+#: source word, and each window that
+#: :meth:`~difflib.SequenceMatcher.quick_ratio` does not prune pays a
+#: :meth:`~difflib.SequenceMatcher.ratio` quadratic in the two strings'
+#: *character* lengths. The first version of this bound counted the quote in
+#: words, which is the same figure only while words are of ordinary length:
 #:
-#: =============  ===========  =========
-#: source words   quote words  seconds
-#: =============  ===========  =========
-#: 2,000                   20      0.11
-#: 2,000                   60      4.23
-#: 1,000                  140     45.76
-#: 2,000                  140     92.30
-#: =============  ===========  =========
+#: ==========  =========  ==============  ==============  =======
+#: src words   quote      words^2 metric  chars^2 metric  seconds
+#: ==========  =========  ==============  ==============  =======
+#: 60          2 x 500ch             240      60,000,000     0.03
+#: 100         3 x 333ch             900     100,000,000     3.64
+#: 100         5 x 200ch           2,500     100,000,000     6.20
+#: 2,000       60 words        7,200,000     257,762,000    20.17
+#: ==========  =========  ==============  ==============  =======
 #:
-#: Those hold ``words x width^2 / seconds`` near 426,000, and this bound is
-#: roughly nine seconds of it. The submitted text is what sets both terms, so
-#: without a bound a caller sizes this rung's cost directly: 100 KiB of short
-#: words is 51,200 of them, and a 500-word quote against them ran for minutes.
-#: A quote of the corpus median, 13 words, still repairs against the largest
-#: source the service accepts.
-MAX_REPAIR_WORK = 4_000_000
+#: The word figure calls the second row cheaper than the first and is wrong by
+#: three orders of magnitude across the table; the character figure tracks the
+#: time. Under the old constant a caller could hold one body for minutes while
+#: the bound reported thousandths of a percent of its cap, and a body that runs
+#: for minutes is what makes an abandoned worker thread matter -- the deadline
+#: settles the job and cannot stop the body.
+#:
+#: The worst measured rate is about 12.8 million of these units a second, so
+#: this is roughly eight seconds. It admits a corpus-median 80-character quote
+#: against the largest source the service accepts, and refuses every row above
+#: that took twenty.
+MAX_REPAIR_WORK = 100_000_000
 
 #: Characters a model routinely substitutes for their ASCII originals when it
 #: believes it is quoting verbatim. NFKC folds most of the width and ligature
@@ -240,7 +244,7 @@ def repair_quote(quote: str, source: str) -> tuple[str, float] | None:
         return None
     words = source.split()
     width = len(quote.split())
-    if len(words) * width * width > MAX_REPAIR_WORK:
+    if len(words) * len(quote) * len(quote) > MAX_REPAIR_WORK:
         return None
     folded = [normalize(word) for word in words]
     best: tuple[str, float] | None = None
