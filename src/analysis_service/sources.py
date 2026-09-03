@@ -63,7 +63,11 @@ MAX_LABEL_CHARS = 200
 # text below it unreadable as text. Includes the Unicode line separators, which
 # a caller can paste without seeing.
 
-_LINE_BREAKS = ("\n", "\r", "\u2028", "\u2029")
+LINE_BREAKS = ("\n", "\r", "\u2028", "\u2029")
+
+#: The private spelling, kept so this module reads as it did. Callers outside
+#: it take :data:`LINE_BREAKS`; there is one tuple and one rule.
+_LINE_BREAKS = LINE_BREAKS
 
 # Also rejected in a label, by Unicode general category. ``Cc`` is the C0 and C1
 # control characters; ``Cf`` the invisible formatting ones — the bidi overrides

@@ -15,6 +15,7 @@ does not need one.
 from __future__ import annotations
 
 import ast
+import subprocess
 from pathlib import Path
 
 import pytest
@@ -334,4 +335,53 @@ def test_the_offline_suite_still_covers_pull_requests():
     assert not _credential_grants(ci), (
         "ci.yml acquired a credential. It is the lane that runs on pull "
         "requests, so it is the one lane that must never hold one."
+    )
+
+
+SETUP_SCRIPT = REPO_ROOT / ".github" / "scripts" / "setup-workload-identity.sh"
+
+
+def test_the_federation_pins_the_ref_claim_and_not_only_a_suffix():
+    """Layer 2 has to fail for a different reason than layer 1 does.
+
+    The condition read `job_workflow_ref.endsWith('@refs/heads/main')`, and the
+    `@` in that claim separates a prefix from a ref the attacker names. Git
+    accepts a branch called `pwn@refs/heads/main`, whose claim ends
+    `@refs/heads/pwn@refs/heads/main` and satisfies the suffix. Layer 1 is a
+    line in a file that branch can edit, so one push carried both.
+
+    `ref` is the run's ref exactly, with no attacker-chosen tail.
+    """
+    condition = next(
+        line
+        for line in SETUP_SCRIPT.read_text(encoding="utf-8").splitlines()
+        if line.startswith("ATTRIBUTE_CONDITION=")
+    )
+
+    assert "assertion.ref == '${TRUSTED_REF}'" in condition, (
+        "the ref claim must be compared, not matched as a suffix of another claim"
+    )
+
+
+def test_a_branch_name_cannot_satisfy_the_federation_condition():
+    """The exploit input, asked of the shipped condition rather than of a memo.
+
+    `git check-ref-format` decides what a legal branch is, so the test asks it
+    rather than asserting what it believes.
+    """
+    hostile = "pwn@refs/heads/main"
+    legal = (
+        subprocess.run(
+            ["git", "check-ref-format", f"refs/heads/{hostile}"], check=False
+        ).returncode
+        == 0
+    )
+    assert legal, "the premise: git accepts this branch name"
+
+    trusted = "refs/heads/main"
+    claim = f"owner/repo/.github/workflows/x.yml@refs/heads/{hostile}"
+
+    assert claim.endswith(f"@{trusted}"), "the suffix check passes, which is the bug"
+    assert f"refs/heads/{hostile}" != trusted, (
+        "the ref check refuses it, which is the fix"
     )
