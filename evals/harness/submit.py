@@ -47,9 +47,9 @@ from pydantic import ValidationError
 from evals.build_review_docs import GENERATED_DOCUMENT
 from evals.harness import baseline, comparison, ledger, roster
 from evals.harness.artifact import ProvenanceError
+from evals.harness.fingerprint import version_for, version_of
 from evals.harness.reference import CaseSitting
 from evals.harness.sitting import (
-    MIN_OWN_LIST,
     SittingError,
     claim_files,
     document_name,
@@ -393,6 +393,30 @@ def _check_the_delta_is_yours(root: Path, author: str) -> Check:
     return _check("the ledger delta is yours alone", problems)
 
 
+def _stale_keys(rel: str, rows: list[ledger.Vote]) -> list[str]:
+    """Rows this PR adds that are keyed under a version their framework left.
+
+    The loader asks only that a row be self-consistent at the version it names,
+    because a ledger written before a rule change still has to load -- `rekey`
+    is the command that moves it, and it reads the file first. That leaves one
+    gap, and it is here: a row written *today* under a version the table has
+    moved past. It is self-consistent, so it loads and scores under the old
+    rule, and `rekey` then refuses to move it and takes the whole ledger with
+    it. An added row is the only row this repository can insist is current.
+    """
+    problems = []
+    for vote in rows:
+        want = version_for(vote.components.framework)
+        got = version_of(vote.fingerprint)
+        if got != want:
+            problems.append(
+                f"{rel}: a vote on {vote.case} is keyed at version {got}, and"
+                f" {vote.components.framework} keys at {want}; re-key before you"
+                " submit"
+            )
+    return problems
+
+
 def _check_your_file_appends(root: Path, author: str) -> Check:
     """#322's append shape: the base content is a byte prefix of the new."""
     rel = f"evals/review/votes/{author}.jsonl"
@@ -406,8 +430,10 @@ def _check_your_file_appends(root: Path, author: str) -> Check:
         )
     else:
         try:
-            if not _vote_rows(root, author):
+            rows = _vote_rows(root, author)
+            if not rows:
                 problems.append(f"{rel} adds no votes; there is nothing to submit")
+            problems.extend(_stale_keys(rel, rows))
         except (ledger.LedgerError, json.JSONDecodeError) as exc:
             problems.append(f"{rel}: an added row will not parse: {exc}")
     return _check("your file only appends, and adds something", problems)
@@ -440,11 +466,18 @@ def _roster_delta(base_raw: str | None, live: Path) -> list[str]:
         before, after = was.get(login), now.get(login)
         if before == after:
             continue
-        if before is None:
+        # A scalar here is `ada = "contributor"` where `[voters.ada]` was meant,
+        # which is the line a first-timer writes. It is the roster loader's to
+        # report; this one only has to not raise, because it runs after that
+        # check's own handler and is the sole check a roster-only PR runs.
+        if not isinstance(before, dict | None) or not isinstance(after, dict | None):
+            notes.append(f"{login}: changed, and its entry is not a table")
+            continue
+        if before is None and after is not None:
             notes.append(f"{login}: added as {after.get('standing', '?')!r}")
-        elif after is None:
+        elif after is None and before is not None:
             notes.append(f"{login}: removed (was {before.get('standing', '?')!r})")
-        else:
+        elif before is not None and after is not None:
             for key in sorted(set(before) | set(after)):
                 if before.get(key) != after.get(key):
                     notes.append(
@@ -731,15 +764,35 @@ def _document_problems(
                 " it is not committed beside the case"
             )
         ]
-    if len(path.read_text(encoding="utf-8").strip()) < MIN_OWN_LIST:
+    if not reads_as_a_reading_document(path):
         return [
             (
-                f"{case}/{expected}: the document is empty. It is the evidence"
-                " the method ran, and the app and the offline page both hold a"
-                " filled one to the same floor."
+                f"{case}/{expected}: this is not a reading document."
+                " `document()` writes a heading, a title and a byline, and the"
+                " evidence the method ran is that shape rather than any number"
+                " of bytes."
             )
         ]
     return []
+
+
+def reads_as_a_reading_document(path: Path) -> bool:
+    """Whether the committed file is the document `sitting.document()` writes.
+
+    Its shape, not its length. The first version of this check compared the
+    whole file against `MIN_OWN_LIST`, which is a floor the app and the offline
+    envelope apply to *the reader's own list* -- so it read a different thing to
+    the same number, and twelve bytes of anything passed. Every generated
+    document is hundreds of characters, so a length could never see an empty own
+    list either.
+
+    Checking the shape is what a length was reaching for: a file that carries
+    the heading and the byline was produced by the writer, and the writer only
+    produces one after the own list passed `own_list_is_written` at the surface
+    that took it.
+    """
+    text = path.read_text(encoding="utf-8")
+    return "# Case Sitting" in text and "submitted by" in text
 
 
 def _check_sitting_covers(root: Path, author: str) -> Check:

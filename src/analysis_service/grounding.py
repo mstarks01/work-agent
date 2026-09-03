@@ -96,37 +96,38 @@ REPAIR_THRESHOLD = 0.9
 #: carried.
 _REPAIR_WIDTH_SLACK = 2
 
-#: The largest candidate scan :func:`repair_quote` will run, as the source's
-#: word count times the square of the quote's length **in characters**.
+#: How much character comparison the repair rung may do before it gives up,
+#: counted as it happens rather than predicted from the input's shape.
 #:
-#: Characters, because that is what the scan costs. It walks one window per
-#: source word, and each window that
-#: :meth:`~difflib.SequenceMatcher.quick_ratio` does not prune pays a
-#: :meth:`~difflib.SequenceMatcher.ratio` quadratic in the two strings'
-#: *character* lengths. The first version of this bound counted the quote in
-#: words, which is the same figure only while words are of ordinary length:
+#: Counted, because two attempts to predict it were both wrong and wrong in
+#: different directions. The first counted the quote in words while
+#: :meth:`~difflib.SequenceMatcher.ratio` costs characters. The second counted
+#: characters but still predicted, and a prediction cannot order these two:
 #:
-#: ==========  =========  ==============  ==============  =======
-#: src words   quote      words^2 metric  chars^2 metric  seconds
-#: ==========  =========  ==============  ==============  =======
-#: 60          2 x 500ch             240      60,000,000     0.03
-#: 100         3 x 333ch             900     100,000,000     3.64
-#: 100         5 x 200ch           2,500     100,000,000     6.20
-#: 2,000       60 words        7,200,000     257,762,000    20.17
-#: ==========  =========  ==============  ==============  =======
+#: ===================  ==========  ========  =======
+#: source               predicted   real CPU  ratio
+#: ===================  ==========  ========  =======
+#: 100 KiB of English   288,000,000    0.39s   pruned
+#: 100 KiB repetitive   111,974,400    5.95s   unpruned
+#: ===================  ==========  ========  =======
 #:
-#: The word figure calls the second row cheaper than the first and is wrong by
-#: three orders of magnitude across the table; the character figure tracks the
-#: time. Under the old constant a caller could hold one body for minutes while
-#: the bound reported thousandths of a percent of its cap, and a body that runs
-#: for minutes is what makes an abandoned worker thread matter -- the deadline
-#: settles the job and cannot stop the body.
+#: The cheaper case scores higher, by 39x on the rate. The shape decides
+#: everything and the shape is the caller's:
+#: :meth:`~difflib.SequenceMatcher.quick_ratio` prunes almost every window of
+#: ordinary prose and almost none of a source whose windows share the quote's
+#: character multiset. No constant over the input can admit the first and refuse
+#: the second, because the first is the larger number.
 #:
-#: The worst measured rate is about 12.8 million of these units a second, so
-#: this is roughly eight seconds. It admits a corpus-median 80-character quote
-#: against the largest source the service accepts, and refuses every row above
-#: that took twenty.
-MAX_REPAIR_WORK = 100_000_000
+#: So the loop spends this budget as it goes -- ``len(span) * len(needle)`` per
+#: comparison it actually makes -- and stops when it runs out. Pruned windows
+#: cost nothing, which is what makes the honest case cheap and is exactly the
+#: fact a prediction cannot see. At the measured worst rate of about 19 million
+#: of these units a second, this is roughly three seconds; the English case
+#: above spends about seven million of it.
+#:
+#: Giving up answers ``None``, which is what the threshold already answers when
+#: no window is close enough, and the caller leaves the quote unverified.
+MAX_REPAIR_WORK = 50_000_000
 
 #: Characters a model routinely substitutes for their ASCII originals when it
 #: believes it is quoting verbatim. NFKC folds most of the width and ligature
@@ -244,17 +245,20 @@ def repair_quote(quote: str, source: str) -> tuple[str, float] | None:
         return None
     words = source.split()
     width = len(quote.split())
-    if len(words) * len(quote) * len(quote) > MAX_REPAIR_WORK:
-        return None
     folded = [normalize(word) for word in words]
     best: tuple[str, float] | None = None
+    budget = MAX_REPAIR_WORK
     matcher = SequenceMatcher(autojunk=False)
     matcher.set_seq2(needle)
     for count in range(width, width + _REPAIR_WIDTH_SLACK + 1):
         for start in range(len(words) - count + 1):
-            matcher.set_seq1(" ".join(w for w in folded[start : start + count] if w))
+            span = " ".join(w for w in folded[start : start + count] if w)
+            matcher.set_seq1(span)
             if matcher.quick_ratio() < REPAIR_THRESHOLD:
                 continue
+            budget -= len(span) * len(needle)
+            if budget < 0:
+                return None
             ratio = matcher.ratio()
             if ratio >= REPAIR_THRESHOLD and (best is None or ratio > best[1]):
                 best = (" ".join(words[start : start + count]), ratio)
