@@ -38,8 +38,9 @@ import json
 from pathlib import Path
 from typing import Annotated
 
-from pydantic import BaseModel, ConfigDict, Field, ValidationError
+from pydantic import AfterValidator, BaseModel, ConfigDict, Field, ValidationError
 
+from analysis_service.sources import LINE_BREAKS
 from evals.harness import sitting as sittings
 from evals.harness.reference import (
     MAX_NAME,
@@ -74,7 +75,25 @@ MAX_NOTES = 20_000
 #: it reaches a comparison.
 _SHA256 = r"^[0-9a-f]{64}$"
 
-Line = Annotated[str, Field(max_length=MAX_LINE)]
+
+def _one_line(value: str) -> str:
+    """One line, asked of the value rather than of the producer.
+
+    Both pages that write these split their input on newlines, so a break
+    cannot arrive from a browser -- and this type is also the shape of an
+    envelope a reader mails back, which this module's own docstring calls
+    untrusted. A break here forges headings in the committed reading document,
+    because the sink joins these into Markdown with `- ` in front of each.
+
+    The rule is :data:`~analysis_service.sources.LINE_BREAKS`, which already
+    answers this question for a source label. One tuple, two callers.
+    """
+    if any(char in value for char in LINE_BREAKS):
+        raise ValueError("a line holds no line break")
+    return value
+
+
+Line = Annotated[str, Field(max_length=MAX_LINE), AfterValidator(_one_line)]
 
 #: A generous ceiling on one envelope's cases and marks. The corpus is 13
 #: cases with tens of records each; these bound a hostile file rather than a

@@ -346,6 +346,26 @@ class CaseFramework(BaseModel):
     reference_set: Literal["exhaustive", "sampled"] = "sampled"
 
 
+#: A path inside one corpus case directory, and nothing else: slash-joined
+#: segments of ordinary filename characters, each starting with something other
+#: than a dot. So `..` cannot appear, a leading `/` cannot appear, and neither
+#: can a backslash. The corpus holds four shapes today -- `source.md`,
+#: `model.json`, `claims/stride.json` and `claims/asvs.json`.
+#:
+#: Bounded because the value is joined onto a case directory and the result is
+#: read. `Path("/case") / "/etc/hostname"` is `/etc/hostname`, because an
+#: absolute right-hand side replaces the left, and `sitting.moved()` then reads
+#: whatever it names and compares it against the digest the same record carries.
+#: That is a digest oracle over the machine, an unbounded read, and an uncaught
+#: `PermissionError` on a file the process may not open. `contribution.yml` runs
+#: the corpus lint over a stranger's pull request tree, so the reach is any
+#: GitHub account.
+#:
+#: One shape for both models below. They name the same kind of thing, and a
+#: bound on one of them is a bound on half the sinks.
+CORPUS_RELATIVE_PATH = r"^[^./\\][^/\\]*(?:/[^./\\][^/\\]*)*$"
+
+
 class CaseSource(BaseModel):
     """One declared input file, and what it is.
 
@@ -359,7 +379,7 @@ class CaseSource(BaseModel):
 
     kind: SourceKind
     label: str = Field(min_length=1, max_length=MAX_LABEL_CHARS)
-    file: str = Field(min_length=1)
+    file: str = Field(min_length=1, max_length=200, pattern=CORPUS_RELATIVE_PATH)
     sha256: str = Field(pattern=r"^[0-9a-f]{64}$")
 
 
@@ -374,7 +394,7 @@ class ReadRecord(BaseModel):
 
     model_config = ConfigDict(extra="forbid", frozen=True)
 
-    file: str = Field(min_length=1)
+    file: str = Field(min_length=1, max_length=200, pattern=CORPUS_RELATIVE_PATH)
     sha256: str = Field(pattern=r"^[0-9a-f]{64}$")
 
 

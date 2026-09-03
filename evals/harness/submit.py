@@ -47,7 +47,11 @@ from pydantic import ValidationError
 from evals.build_review_docs import GENERATED_DOCUMENT
 from evals.harness import baseline, comparison, ledger, roster
 from evals.harness.artifact import ProvenanceError
-from evals.harness.fingerprint import version_for, version_of
+from evals.harness.fingerprint import (
+    FingerprintError,
+    version_for,
+    version_of,
+)
 from evals.harness.reference import CaseSitting
 from evals.harness.sitting import (
     SittingError,
@@ -436,6 +440,12 @@ def _check_your_file_appends(root: Path, author: str) -> Check:
             problems.extend(_stale_keys(rel, rows))
         except (ledger.LedgerError, json.JSONDecodeError) as exc:
             problems.append(f"{rel}: an added row will not parse: {exc}")
+        except FingerprintError as exc:
+            # `version_for` raises this, and it is neither of the two above. A
+            # row naming a framework outside VERSION_FOR loads fine, because
+            # `fingerprint()` consults no table, and then aborted the whole
+            # preflight with a traceback instead of naming the row.
+            problems.append(f"{rel}: an added row names no known rule: {exc}")
     return _check("your file only appends, and adds something", problems)
 
 
@@ -461,6 +471,12 @@ def _roster_delta(base_raw: str | None, live: Path) -> list[str]:
         now = tomllib.loads(live.read_text(encoding="utf-8")).get("voters", {})
     except (OSError, tomllib.TOMLDecodeError):
         return []  # the check below reports an unreadable roster
+    # The table itself, not only its entries. `voters = "abc"` is legal TOML and
+    # is the same defect one level up from the entry guard below: `set(was)`
+    # would iterate its characters and `was.get` does not exist. The loader
+    # reports it; this note only has to survive it.
+    if not isinstance(was, dict) or not isinstance(now, dict):
+        return ["voters: the roster's own table is not a table"]
     notes = []
     for login in sorted(set(was) | set(now)):
         before, after = was.get(login), now.get(login)

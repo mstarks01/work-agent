@@ -206,6 +206,7 @@ from starlette.middleware.trustedhost import TrustedHostMiddleware
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
+from evals.harness import envelope as envelopes
 from evals.harness import roster as rosters
 from evals.harness import sitting as sittings
 from evals.harness import submit as submit_spine
@@ -248,7 +249,9 @@ _PAGE_GRANTS = Grants(script=True, style=True, connect=True)
 #: no stated length is no bound at all — and every one of them is written into
 #: the reading document, which the submit allow-list then carries into a pull
 #: request. Generous for a line somebody types, and finite.
-Line = Annotated[str, Field(max_length=500)]
+#: Imported, not restated. Two copies of one shape drift, and this one is
+#: the shape a forged reading-document heading arrives in.
+Line = envelopes.Line
 
 #: A case id as it arrives in a request. The bound is here so an oversized
 #: string is refused before anything reads it; which ids exist is not a shape

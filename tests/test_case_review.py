@@ -30,9 +30,10 @@ gates on every PR.
 from __future__ import annotations
 
 import pytest
+from pydantic import ValidationError
 
 from evals import verify_corpus
-from evals.harness.reference import load_corpus
+from evals.harness.reference import ReadRecord, load_corpus
 from evals.harness.roster import DEFAULT_ROSTER_PATH
 from evals.harness.roster import load as load_roster
 from evals.harness.sitting import clears, document_name, drifted
@@ -249,3 +250,34 @@ def test_every_submitting_account_has_a_roster_line(corpus, roster):
         f" {unrostered}. A sitting no rostered account carries clears nothing,"
         " because no published number could state the standing behind it."
     )
+
+
+class TestAReadRecordNamesAFileInsideItsCase:
+    """The value is joined onto a case directory and the result is read."""
+
+    @pytest.mark.parametrize(
+        "path", ["source.md", "model.json", "claims/stride.json", "claims/asvs.json"]
+    )
+    def test_the_shapes_the_corpus_actually_holds_are_accepted(self, path):
+        ReadRecord(file=path, sha256="0" * 64)
+
+    @pytest.mark.parametrize(
+        "path",
+        [
+            "../../../etc/passwd",
+            "/etc/hostname",
+            "a/../b",
+            "..",
+            ".hidden",
+            "a\\b",
+            "claims/../../x",
+        ],
+    )
+    def test_a_path_that_leaves_the_case_directory_is_refused(self, path):
+        """`Path("/case") / "/etc/hostname"` is `/etc/hostname`: an absolute
+        right-hand side replaces the left. `moved()` then reads whatever the
+        record names and compares the digest the same record supplied, which is
+        a digest oracle, an unbounded read, and an uncaught `PermissionError`
+        on a file the process may not open."""
+        with pytest.raises(ValidationError):
+            ReadRecord(file=path, sha256="0" * 64)
