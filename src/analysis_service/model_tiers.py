@@ -10,8 +10,8 @@ vendor is privileged.
 map's business, and the shipped map puts ``critic/<name>`` and
 ``recritic/<name>`` on ``strong``. That is the same domain as the analysis,
 which is cheaper and is what most deployments want. What the tier buys is that a
-deployment can move them, and :data:`REVIEW_INDEPENDENCE` is where it says how
-far apart they have to be. With two tiers, the only way to make criticism
+deployment can move them, and ``review_independence`` in the config file is
+where it says how far apart they have to be. With two tiers, the only way to make criticism
 distinct was to run it on ``base``, which is a re-ask on a cheaper model than
 the pass it corrects. :func:`critic_pairing_issues` exists to refuse that.
 
@@ -189,12 +189,18 @@ class ModelTierConfig(BaseModel):
     #: How far each framework's criticism must sit from its own analysis. No
     #: default: a deployment states it, because inheriting ``shared`` is how a
     #: high-assurance install ends up reviewing itself and reporting nothing
-    #: unusual. See :data:`REVIEW_INDEPENDENCE`.
+    #: unusual. :data:`ReviewIndependence` names the three settings.
     review_independence: ReviewIndependence
 
     @model_validator(mode="after")
     def _check_complete(self) -> Self:
-        missing_tiers = [tier for tier in TIER_NAMES if tier not in self.tiers]
+        # The tiers this map runs something on, not all of them. `build_adapters`
+        # binds no adapter for an unused tier, so demanding a selection for one
+        # asked an operator to choose a model no request reaches.
+        in_use = set(self.nodes.values())
+        missing_tiers = [
+            tier for tier in TIER_NAMES if tier in in_use and tier not in self.tiers
+        ]
         if missing_tiers:
             raise ValueError(f"tiers missing entries for: {missing_tiers}")
         for tier, selection in self.tiers.items():
@@ -340,8 +346,30 @@ def _apply_env_overrides(raw: dict[str, object], env: Mapping[str, str]) -> None
             table[var.rsplit("_", 1)[-1].lower()] = value.strip()
 
 
-def _require_selected_tiers(path: Path | str, tiers_raw: object) -> None:
-    """Stop with an actionable message when a tier names no vendor.
+def tiers_in_use(nodes_raw: object) -> set[str]:
+    """The tiers the node map actually runs something on.
+
+    A tier is a place a node can sit, and an empty place costs nothing to leave
+    empty: :func:`build_adapters` already skips a tier nothing is bound to, so
+    a selection for one is a pair no request ever reaches. Requiring it anyway
+    made a first run name a vendor and a model for a tier the shipped map does
+    not use, which is a choice with no consequence -- and the answer the config
+    file suggested was to repeat the ``strong`` pair, which is a choice that
+    says nothing at all.
+
+    The reason the requirement existed still holds and is kept: the day somebody
+    moves ``critic/*`` onto ``review`` is the wrong day to find out no model was
+    chosen for it. That day is a node-map edit, and this is read on that edit,
+    so the check fires then -- at the same moment, with the same message.
+    """
+    nodes = nodes_raw if isinstance(nodes_raw, dict) else {}
+    return {tier for tier in nodes.values() if tier in TIER_NAMES}
+
+
+def _require_selected_tiers(
+    path: Path | str, tiers_raw: object, nodes_raw: object
+) -> None:
+    """Stop with an actionable message when a tier in use names no vendor.
 
     Separate from :meth:`ModelTierConfig._check_complete`, which catches the
     same gap for a config built in code and reports it as a pydantic validation
@@ -359,10 +387,12 @@ def _require_selected_tiers(path: Path | str, tiers_raw: object) -> None:
     # A *complete* pair, not merely a present table: `_MODEL` alone against an
     # unselected file leaves a tier holding a model and no vendor, which is the
     # same unmade choice and deserves the same instruction.
+    in_use = tiers_in_use(nodes_raw)
     missing = [
         tier
         for tier in TIER_NAMES
-        if not (
+        if tier in in_use
+        and not (
             isinstance(selected.get(tier), dict)
             and {"vendor", "model"} <= set(selected[tier])
         )
@@ -408,7 +438,7 @@ def load_model_tiers(
 
     # After the version check, so a version-2 file reports the schema it is
     # rather than the selection it is missing.
-    _require_selected_tiers(path, raw.get("tiers"))
+    _require_selected_tiers(path, raw.get("tiers"), raw.get("nodes"))
 
     try:
         return ModelTierConfig(**raw)
