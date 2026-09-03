@@ -427,6 +427,37 @@ class TestTheUnreviewedEntryIsChecked:
             sittings._one_entry(case, "".join(lines[start:end]))
 
 
+class TestOneListMeansOneTable:
+    """The reader took the first `UNREVIEWED` assignment; Python binds the last.
+
+    So a decoy empty table above the real one made this answer "no cases listed"
+    about a file that lists them, and the clears check built on that answer
+    passed for a case still on the list. The edits-only check refused the
+    submission anyway, so nothing got through -- but a checker reading a table
+    nobody imports is checking nothing, and that is the same disagreement
+    between two readers of one file that the substring reader was.
+    """
+
+    def test_two_tables_are_refused_rather_than_one_being_picked(self):
+        source = (
+            "UNREVIEWED: dict[str, str] = {}\n"
+            "UNREVIEWED: dict[str, str] = {\n"
+            '    "01-payments-checkout": "unread",\n'
+            "}\n"
+        )
+
+        with pytest.raises(sittings.SittingError, match="UNREVIEWED tables"):
+            sittings._unreviewed_table(source)
+
+    def test_the_one_table_a_real_file_holds_still_reads(self):
+        root = Path(__file__).resolve().parents[1]
+        source = (root / sittings.UNREVIEWED_FILE).read_text("utf-8")
+
+        entries, _ = sittings._unreviewed_table(source)
+
+        assert entries
+
+
 class TestTheTableReaderRefusesAnExecutableValue:
     """``restore_unreviewed`` checked an entry's shape; the table reader did not.
 
