@@ -409,3 +409,22 @@ class TestAnArtifactNameCarriesNoDirectory:
 
     def test_an_ordinary_artifact_name_passes(self):
         assert artifact_filename("sweep-1.json") == "sweep-1.json"
+
+
+class TestAFrameworkNameIsASlug:
+    """`frameworks` was declared as a plain list and validated element by
+    element nowhere, so the value carried into a Baseline's identity -- and from
+    there into the published table -- was whatever a contributor wrote, with no
+    length bound at all while every model name beside it had one."""
+
+    @pytest.mark.parametrize(
+        "name",
+        ["Stride", "a b", "a`b", "x" * 300, "", "a/b", "a.b", "-a", "a-"],
+    )
+    def test_a_name_that_is_not_a_slug_is_refused(self, name):
+        with pytest.raises(BaselineError, match="not a framework name"):
+            baseline._framework_name(name)
+
+    @pytest.mark.parametrize("name", ["stride", "asvs", "some-new-package"])
+    def test_a_registered_shape_passes(self, name):
+        assert baseline._framework_name(name) == name

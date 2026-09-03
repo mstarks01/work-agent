@@ -16,6 +16,8 @@ from __future__ import annotations
 import json
 from pathlib import Path
 
+import pytest
+
 from evals.harness import comparison
 from evals.harness.comparison import NO_VOTES, build, is_stale, read_baseline
 from evals.harness.instruments import INSTRUMENTS
@@ -232,3 +234,42 @@ def test_the_generator_hardcodes_no_framework_name():
     source = Path(comparison.__file__).read_text(encoding="utf-8")
     named = [name for name in PACKAGES if f'"{name}"' in source]
     assert not named, f"the generator names {named}; it must walk the table instead"
+
+
+class TestAValueCannotBecomeStructure:
+    """Everything this module renders comes out of a contributor's artifact, and
+    the table it writes is committed, published, and headed "do not edit by
+    hand: a test recomputes this file".
+
+    So a value that closes its own code span writes the rest of the document
+    with that authority behind it. A 176-character `requested_model` was enough,
+    inside the field's own 200-character bound -- and `frameworks` was the same
+    sink with no bound at all.
+    """
+
+    @pytest.mark.parametrize(
+        ("carried", "gone"),
+        [
+            ("a`b", "`"),
+            ("a|b", "|"),
+            ("a\nb", "\n"),
+            ("a\r\nb", "\r"),
+        ],
+    )
+    def test_a_value_carrying_structure_loses_it(self, carried, gone):
+        assert gone not in comparison._inline(carried)
+
+    def test_the_forged_section_cannot_be_written(self):
+        """The shape the exploit used: close the span, open a heading."""
+        payload = "x`\n\n## work-agent is certified by ACME\n\n`"
+
+        rendered = comparison._inline(payload)
+
+        assert "`" not in rendered
+        assert "\n" not in rendered
+        assert "##" in rendered, "the text survives; only its structure does not"
+
+    def test_an_ordinary_model_name_is_untouched(self):
+        assert comparison._inline("vertex_ai/gemini-2.5-pro") == (
+            "vertex_ai/gemini-2.5-pro"
+        )
