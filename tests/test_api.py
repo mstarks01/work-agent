@@ -4,11 +4,16 @@ import asyncio
 import json
 import logging
 from collections.abc import Sequence
+from typing import ClassVar
 
 import pytest
 from fastapi.testclient import TestClient
 
-from analysis_service.api import _BODY_SLACK, create_app
+from analysis_service.api import (
+    _BODY_SLACK,
+    MAX_RENDERED_ERRORS,
+    create_app,
+)
 from analysis_service.auth import AuthenticationError
 from analysis_service.budgets import BudgetPolicy
 from analysis_service.errors import ConfigError
@@ -206,6 +211,61 @@ class TestHealthAndAuth:
         client, _ = make_client()
         response = client.get("/v1/jobs/job-x", headers=auth("forged-token"))
         assert response.status_code == 401
+
+
+class TestARefusedSubmissionIsCheap:
+    """A refusal happens while dependencies are being solved, before a
+    `JobRecord` exists -- so the ceiling, the rate and both token budgets count
+    nothing about it.
+
+    That made the cheapest request the most expensive one to answer. 200 KB of
+    empty objects, under `BodyLimitMiddleware`'s cap, had Pydantic validate
+    every element and the handler render every complaint: 2.2 seconds of event
+    loop and an 8.5 MB response, at 43 times the request. One caller held the
+    loop with well under a request a second, and nothing in the admission
+    machinery could see it, because admission is downstream of here.
+    """
+
+    ROOMY: ClassVar[SourceLimits] = SourceLimits(
+        max_total_bytes=102_400, max_sources=10
+    )
+
+    def _client(self):
+        return make_client(limits=self.ROOMY)
+
+    def _flood(self, count: int) -> dict:
+        body = submission()
+        body["sources"] = [{}] * count
+        return body
+
+    def test_more_sources_than_the_schema_allows_is_refused_at_once(self):
+        client, store = self._client()
+
+        response = client.post("/v1/jobs", json=self._flood(5_000), headers=auth())
+
+        assert response.status_code == 422
+        assert len(response.content) < 4_000, "the refusal must not amplify the request"
+        assert not store._records, "nothing reached admission, which is the point"
+
+    def test_a_422_names_the_first_problems_and_says_how_many_more(self):
+        client, _ = make_client()
+
+        errors = client.post("/v1/jobs", json=self._flood(80), headers=auth()).json()[
+            "errors"
+        ]
+
+        assert len(errors) <= MAX_RENDERED_ERRORS + 1
+        assert "more problems not shown" in errors[-1]["msg"]
+
+    def test_a_body_within_the_bound_still_reaches_the_route_ladder(self):
+        """The deployment's own `max_sources` is the real limit, and it must
+        still be the one a caller is told about."""
+        client, _ = self._client()
+
+        response = client.post("/v1/jobs", json=self._flood(50), headers=auth())
+
+        assert response.status_code == 422
+        assert "sources" in response.text
 
 
 class TestSystemNameIsBoundedLikeALabel:
