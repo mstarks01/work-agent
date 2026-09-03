@@ -1010,6 +1010,17 @@ def unfence(rendered: str) -> str:
 # become the session's state delta.
 
 
+#: How many node bodies may hold a worker thread at once, across every job in
+#: the process. Separate from anyio's default limiter on purpose: that one is
+#: also what `require_subject` verifies a bearer token through, and a graph that
+#: could fill it would make every arriving caller wait for a node body.
+#:
+#: Small because a node body is CPU-bound, so more threads than cores buys
+#: queueing rather than throughput, and because the point of the bound is to
+#: leave the default limiter's slots for the request path.
+_NODE_THREADS = anyio.CapacityLimiter(8)
+
+
 def _node(func: Callable[..., Any], name: str) -> FunctionNode:
     """Wrap a node body in a FunctionNode that runs it off the event loop.
 
@@ -1022,7 +1033,10 @@ def _node(func: Callable[..., Any], name: str) -> FunctionNode:
     source — so the loop is the wrong thread for them.
 
     ADK awaits a body that is a coroutine function, so wrapping it in one moves
-    the work to a worker thread and makes the deadline enforceable again. The
+    the work to a worker thread and gives the loop back. It does **not** make
+    the deadline able to stop a running body -- nothing can, short of a process
+    boundary -- so the wrapper holds the task until the body ends and the
+    deadline lands between nodes. The
     wrapper keeps the wrapped signature, which is what ADK binds parameters
     from, and touches nothing else: a node reaches the session only through
     :class:`SessionState`, whose writes are plain dict writes, and only one
@@ -1031,7 +1045,21 @@ def _node(func: Callable[..., Any], name: str) -> FunctionNode:
 
     @functools.wraps(func)
     async def offloaded(**kwargs: Any) -> Any:
-        return await anyio.to_thread.run_sync(functools.partial(func, **kwargs))
+        # On a limiter of its own, because the default one is shared and
+        # `require_subject` verifies every bearer token through it: node bodies
+        # filling all forty slots put an arriving caller behind a whole body
+        # before their token was even read.
+        #
+        # A cancelled await here does NOT stop the body. `run_sync` takes its
+        # token outside the scope `abandon_on_cancel=False` shields, so the
+        # deadline returns the token, settles the job and frees its subject's
+        # slot while the thread runs on. Nothing in-process can stop a running
+        # Python call, so what keeps that harmless is that a body is short:
+        # `grounding.MAX_REPAIR_WORK` is the bound that makes it so, and it is
+        # the reason this is a wrapper and not a supervisor.
+        return await anyio.to_thread.run_sync(
+            functools.partial(func, **kwargs), limiter=_NODE_THREADS
+        )
 
     return FunctionNode(func=offloaded, name=name)
 

@@ -163,9 +163,22 @@ class TestTheRepairRung:
 
     def test_the_bound_leaves_a_median_quote_on_the_largest_source(self):
         """100 KiB of ordinary prose is around 15,000 words, and the corpus
-        median quote is 13 of them. The bound has to clear that pair, or it
+        median quote is 80 characters. The bound has to clear that pair, or it
         has turned the rung off rather than bounded it."""
-        assert 15_000 * 13 * 13 <= MAX_REPAIR_WORK
+        assert 15_000 * 80 * 80 <= MAX_REPAIR_WORK
+
+    def test_the_bound_counts_the_quote_in_characters(self):
+        """A source of few very long words kept the word figure near zero while
+        every window stayed thousands of characters wide, so the scan ran for
+        minutes inside a bound reporting thousandths of a percent of its cap.
+
+        Two words of five hundred characters are two words and a thousand
+        characters; only the second figure predicts the time.
+        """
+        long_words = " ".join(["x" * 500] * 200)
+        quote = " ".join(["y" * 500] * 2)
+
+        assert repair_quote(quote, long_words) is None
 
     def test_folding_a_window_word_by_word_is_folding_it_whole(self):
         """The scan folds each source word once instead of once per window
