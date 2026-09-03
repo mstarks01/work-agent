@@ -284,9 +284,7 @@ def _recorded_actual(manifest: dict[str, Any]) -> float | None:
     actuals = [
         value
         for sweep in manifest.get("sweeps", [])
-        if (raw := sweep.get("cost", {}).get("actual_usd")) is not None
-        and math.isfinite(value := float(raw))
-        and value >= 0
+        if (value := baseline.recorded_usd(sweep.get("cost", {}))) is not None
     ]
     return sum(actuals) / len(actuals) if actuals else None
 

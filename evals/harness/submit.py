@@ -1090,7 +1090,7 @@ def _baseline_closing(root: Path, author: str) -> str:
         for tier, model in sorted(identity.get("models", {}).items())
     )
     costs = [entry.get("cost", {}) for entry in sweeps]
-    total = sum(float(cost.get("actual_usd", 0.0)) for cost in costs)
+    total = sum(baseline.recorded_usd(cost) or 0.0 for cost in costs)
     unpriced = sorted({model for cost in costs for model in cost.get("unpriced", ())})
     standing = _standing_of(root, author)
     lines = [
