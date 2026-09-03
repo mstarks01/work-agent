@@ -138,42 +138,51 @@ _REPAIR_WIDTH_SLACK = 2
 #: matching blocks degenerated. The weights below are that spread, and the
 #: budget buys about a second and a half of the worst of it.
 #:
-#: **Four proxies for time were wrong before this one, so this one is not the
-#: only bound.** The last of them priced a comparison at ``len(a) * len(b)``,
-#: which `difflib` does not obey: with ``autojunk`` off it recurses on every
-#: match it finds, and an inverted phase makes that cubic. One comparison of a
-#: 998-character quote against a 998-character window took **6.5 seconds**, and
-#: the whole rung took **38 seconds on a 1 KiB source** -- against a documented
-#: worst case of 1.47 s at a hundred times that size.
+#: The longest quote this rung will try to repair, in normalized characters.
 #:
-#: ``autojunk=True`` is what closes that. It drops elements appearing in more
-#: than 1% of a sequence of 200 or more, which is exactly the degenerate shape,
-#: and it costs at most 0.003 of ratio on a legitimate long quote -- every
-#: measured value stays above 0.99 against a threshold of 0.9. With it on, the
-#: comparison rate spans 92 million to 6 billion units a second; with it off the
-#: floor was 151 thousand. The rate became predictable, so the price could be
-#: honest: 13 to 1 is the measured ratio between a character of pruning and a
-#: unit of comparison.
+#: **The bound that works, after five that did not.** Every earlier attempt
+#: priced a `difflib` comparison from its operands, and six separate models of
+#: that cost were all wrong -- the last by 200x, when 156,976 matching pairs ran
+#: in 0.015 s and 332,002 ran in 6.5 s. `SequenceMatcher` recurses on the blocks
+#: it finds, and nothing computable from the inputs sees how many that will be.
 #:
-#: :data:`_REPAIR_DEADLINE_SECONDS` is the backstop, and it exists because the
-#: record says another proxy will be wrong eventually. The budget is
-#: deterministic and does the work on every ordinary input; the deadline catches
-#: what the budget misprices. Measured at the 102,400-byte ceiling:
+#: So this does not predict the cost. It caps the input, and the worst case is
+#: measured rather than modelled. Against the shape that beats everything else
+#: -- an inverted phase, where the prune passes every window:
 #:
-#: ==============================  ========  ======
-#: input                           CPU       result
-#: ==============================  ========  ======
-#: inverted phase, 1 KiB source    0.01s     none
-#: quote whose span is present     0.04s     1.000
-#: typo, match early               1.80s     0.987
-#: typo, match at the end          1.90s     0.975
-#: 333-word quote, no match        1.62s     none
-#: unprunable, no match            2.03s     none
-#: ==============================  ========  ======
+#: =============  ==========
+#: quote chars    worst call
+#: =============  ==========
+#: 300            0.166s
+#: 400            0.400s
+#: 1000           6.444s
+#: =============  ==========
 #:
-#: The corpus's own largest source is 2,197 bytes and repairs in 0.01 s over a
-#: complete scan. The budget and the deadline bind on adversarial input and on
-#: nothing a real case produces.
+#: Four hundred costs nothing real. Across 784 spans of all 13 corpus sources
+#: the normalized quote length runs to a median of 134, a 99th percentile of 279
+#: and a maximum of 305, so no case in the corpus reaches this and the rung
+#: keeps every repair it makes today. A longer quote answers `None`, which is
+#: what the threshold already answers when no window is close enough.
+MAX_REPAIR_QUOTE_CHARS = 400
+
+
+#: **Five bounds failed before this one, and all five priced the comparison.**
+#: `difflib` recurses on the matching blocks it finds, so its cost is not a
+#: function of the operands: 156,976 matching character pairs ran in 0.015 s
+#: while 332,002 ran in 6.5 s, a 200x spread on the only cheap statistic that
+#: looked promising. Word counts, character products, prune-aware budgets and a
+#: junk heuristic were each tried and each wrong.
+#:
+#: :data:`MAX_REPAIR_QUOTE_CHARS` is what actually bounds a single comparison,
+#: by capping what goes into one. This budget bounds the *number* of them, which
+#: is a count rather than a prediction, and the deadline below catches whatever
+#: both of those still misprice. Three bounds, because the record earned them.
+#:
+#: The weights are the measured ratio between a character of pruning and a unit
+#: of comparison. They are re-derived whenever the comparison changes shape --
+#: `autojunk` moved them once and was then reverted, because it dropped 12.4% of
+#: the repairs a stripped-punctuation quote needs while the transposition the
+#: test happened to use lost 0.0%.
 MAX_REPAIR_WORK = 250_000_000
 
 #: What one pruned window costs, per character of the window. Pruning is the
@@ -317,13 +326,15 @@ def repair_quote(quote: str, source: str) -> tuple[str, float] | None:
     needle = normalize(quote)
     if not needle:
         return None
+    if len(needle) > MAX_REPAIR_QUOTE_CHARS:
+        return None
     words = source.split()
     width = len(quote.split())
     folded = [normalize(word) for word in words]
     best: tuple[str, float] | None = None
     budget = MAX_REPAIR_WORK
-    matcher = SequenceMatcher(autojunk=True)
-    deadline = time.process_time() + _REPAIR_DEADLINE_SECONDS
+    matcher = SequenceMatcher(autojunk=False)
+    deadline = time.thread_time() + _REPAIR_DEADLINE_SECONDS
     matcher.set_seq2(needle)
     for count in range(width, width + _REPAIR_WIDTH_SLACK + 1):
         for start in range(len(words) - count + 1):
@@ -335,13 +346,13 @@ def repair_quote(quote: str, source: str) -> tuple[str, float] | None:
             # pruning IS the cost. An English source and a 333-word quote spent
             # 0 of 50,000,000 and ran 8.4 seconds.
             budget -= _PRUNE_COST * len(span)
-            if budget < 0 or time.process_time() > deadline:
+            if budget < 0 or time.thread_time() > deadline:
                 return best
             matcher.set_seq1(span)
             if matcher.quick_ratio() < REPAIR_THRESHOLD:
                 continue
             budget -= _COMPARE_COST * len(span) * len(needle)
-            if budget < 0 or time.process_time() > deadline:
+            if budget < 0 or time.thread_time() > deadline:
                 return best
             ratio = matcher.ratio()
             if ratio >= REPAIR_THRESHOLD and (best is None or ratio > best[1]):
