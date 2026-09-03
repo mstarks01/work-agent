@@ -120,16 +120,47 @@ _REPAIR_WIDTH_SLACK = 2
 #: character multiset. No constant over the input can admit the first and refuse
 #: the second, because the first is the larger number.
 #:
-#: So the loop spends this budget as it goes -- ``len(span) * len(needle)`` per
-#: comparison it actually makes -- and stops when it runs out. Pruned windows
-#: cost nothing, which is what makes the honest case cheap and is exactly the
-#: fact a prediction cannot see. At the measured worst rate of about 19 million
-#: of these units a second, this is roughly three seconds; the English case
-#: above spends about seven million of it.
+#: So the loop spends this budget as it goes, and it charges for **both** kinds
+#: of work at **different rates**. Two corrections, each from an input that beat
+#: the version before it.
 #:
-#: Giving up answers ``None``, which is what the threshold already answers when
-#: no window is close enough, and the caller leaves the quote unverified.
-MAX_REPAIR_WORK = 50_000_000
+#: Charging only the comparisons that survive the prune reads zero on the input
+#: where the prune itself is the cost: the join and ``quick_ratio`` are each
+#: linear in the span and run on every window, so an English source and a
+#: 333-word quote spent 0 of 50,000,000 units and ran 8.4 seconds. A budget
+#: nothing charges is not a budget.
+#:
+#: And one rate does not serve both, because ``ratio`` is not linear in the
+#: product it is charged by. Pruning moves at roughly 7 million characters a
+#: second. Comparison measured 19 million units a second on one shape and 4
+#: million on another, where every window shared the quote's multiset and the
+#: matching blocks degenerated. The weights below are that spread, and the
+#: budget buys about a second and a half of the worst of it.
+#:
+#: Measured at the shipped 102,400-byte source ceiling:
+#:
+#: ==============================  ========  ======
+#: input                           CPU       result
+#: ==============================  ========  ======
+#: quote whose span is present     0.10s     1.000
+#: quote with a typo, match early  0.11s     0.987
+#: quote with a typo, match late   0.11s     0.968
+#: 333-word quote, no match        0.85s     none
+#: unprunable, no match            1.47s     none
+#: ==============================  ========  ======
+#:
+#: The corpus itself is nowhere near that ceiling -- its largest source is 2,197
+#: bytes and 377 words, and repairs there run in 0.011 s over a complete scan.
+#: The budget binds on adversarial input and on nothing a real case produces.
+MAX_REPAIR_WORK = 30_000_000
+
+#: What one pruned window costs, per character of the window. Pruning is the
+#: cheaper work and every window pays it.
+_PRUNE_COST = 3
+
+#: What one full comparison costs, per character-pair. Five to three, because
+#: that is the measured spread between the two rates; see MAX_REPAIR_WORK.
+_COMPARE_COST = 5
 
 #: Characters a model routinely substitutes for their ASCII originals when it
 #: believes it is quoting verbatim. NFKC folds most of the width and ligature
@@ -231,10 +262,16 @@ def repair_quote(quote: str, source: str) -> tuple[str, float] | None:
     folded form is its folded words joined, because the ladder's rungs are
     per-character and the last one collapses whitespace.
 
-    A scan that spends :data:`MAX_REPAIR_WORK` stops where it is and gives up.
-    Answering ``None`` here is the same answer the threshold gives when no
-    window is close enough, and the caller already handles it: the quote stays
-    unverified and the report says so.
+    A scan that spends :data:`MAX_REPAIR_WORK` stops where it is and answers
+    with the best window it found by then. It does not discard that answer: the
+    budget exists to bound the time, and throwing away a match already above
+    :data:`REPAIR_THRESHOLD` spends the time and buys nothing. A truncated scan
+    can return a match that is merely good rather than the best one, which is
+    the honest cost of the bound.
+
+    Finding nothing still answers ``None``, which is what the threshold already
+    answers when no window is close enough, and the caller already handles it:
+    the quote stays unverified and the report says so.
 
     A quote marking a cut with ``…`` is not repaired: each fragment is a span of
     its own, and one nearest window for the whole is a span the quote never
@@ -255,12 +292,21 @@ def repair_quote(quote: str, source: str) -> tuple[str, float] | None:
     for count in range(width, width + _REPAIR_WIDTH_SLACK + 1):
         for start in range(len(words) - count + 1):
             span = " ".join(w for w in folded[start : start + count] if w)
+            # Charged on EVERY window, before the prune decides anything. The
+            # join above and `quick_ratio` below are both linear in the span,
+            # and they run whether or not the window survives -- so a budget
+            # that charges only survivors reads zero on the input where the
+            # pruning IS the cost. An English source and a 333-word quote spent
+            # 0 of 50,000,000 and ran 8.4 seconds.
+            budget -= _PRUNE_COST * len(span)
+            if budget < 0:
+                return best
             matcher.set_seq1(span)
             if matcher.quick_ratio() < REPAIR_THRESHOLD:
                 continue
-            budget -= len(span) * len(needle)
+            budget -= _COMPARE_COST * len(span) * len(needle)
             if budget < 0:
-                return None
+                return best
             ratio = matcher.ratio()
             if ratio >= REPAIR_THRESHOLD and (best is None or ratio > best[1]):
                 best = (" ".join(words[start : start + count]), ratio)

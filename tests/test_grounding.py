@@ -7,6 +7,8 @@ same failure mode, an unmarked elision stitched into a sentence the source never
 contains.
 """
 
+import time
+
 import pytest
 
 from analysis_service.grounding import (
@@ -150,16 +152,28 @@ class TestTheRepairRung:
     def test_an_empty_quote_is_refused(self):
         assert repair_quote("   ", SOURCE) is None
 
-    def test_a_scan_over_the_bound_is_refused_rather_than_run(self):
+    def test_a_scan_over_the_bound_stops_rather_than_running(self):
         """Both terms come from the submitted text, so the rung's cost is the
-        submitter's to set unless something bounds it. Over the bound the
-        answer is the one the threshold already gives when nothing is close
-        enough, and the caller leaves the quote unverified."""
+        submitter's to set unless something bounds it.
+
+        The quote shares its character multiset with every window and matches
+        none of them, so `quick_ratio` prunes nothing and each window pays the
+        full comparison. Nothing reaches the threshold, so the answer is the
+        one the threshold already gives and the caller leaves the quote
+        unverified.
+
+        The quote must not be a span of the source. An earlier version of this
+        test reversed the source's own words, which for a repeated word is the
+        source's own text -- so the scan found an exact match, and the test
+        passed only because the budget was throwing that match away.
+        """
         width = 40
         words = ["word"] * (MAX_REPAIR_WORK // (width * width) + 1)
-        quote = " ".join(reversed(words[:width]))
+        quote = " ".join(["dorw"] * width)
 
+        started = time.process_time()
         assert repair_quote(quote, " ".join(words)) is None
+        assert time.process_time() - started < 5.0
 
     def test_the_bound_leaves_a_median_quote_on_the_largest_source(self):
         """100 KiB of ordinary prose is around 15,000 words, and the corpus
@@ -176,6 +190,68 @@ class TestTheRepairRung:
         quote = source[9000:9080].strip()
 
         assert repair_quote(quote.replace("quick", "quikc"), source) is not None
+
+    def test_a_pruned_window_is_charged_for_the_work_it_took_to_prune(self):
+        """The input that reads zero on a budget charging only survivors.
+
+        `quick_ratio` prunes every window of ordinary English, so a budget that
+        charges only the comparisons it does not prune never charges at all.
+        The join and the prune are each linear in the span and run on every
+        window, so a 333-word quote against a source at the shipped size
+        ceiling ran 8.4 seconds having spent 0 of 50,000,000 units.
+
+        The ceiling here is generous on purpose: the measured time is about
+        0.7 s, and the defect this pins ran twelve times that.
+        """
+        source = " ".join(
+            f"the {n} quick brown foxes jumped over a lazy dog near"
+            for n in range(6000)
+        )[:102_400]
+        quote = " ".join(["ab"] * 333)
+
+        started = time.process_time()
+        assert repair_quote(quote, source) is None
+        assert time.process_time() - started < 3.0
+
+    def test_a_truncated_scan_returns_the_match_it_already_found(self):
+        """The budget bounds the time; it does not throw away the answer.
+
+        A median quote on a source at the size ceiling finds its match after
+        about 6,000 units and then needs 113,000,000 more to finish ranking
+        every remaining window. Answering `None` there spends the whole budget
+        and buys nothing, and it turns the rung off for exactly the largest
+        source it is meant to serve.
+        """
+        source = " ".join(
+            f"the {n} quick brown foxes jumped over a lazy dog near"
+            for n in range(6000)
+        )[:102_400]
+        words = source.split()
+        quote = " ".join(words[1500:1516]).replace("quick", "quikc")
+
+        repair = repair_quote(quote, source)
+
+        assert repair is not None
+        assert repair[1] >= REPAIR_THRESHOLD
+
+    def test_a_match_late_in_a_large_source_still_wins(self):
+        """The budget must not truncate before the scan reaches the end.
+
+        A pruned window costs `_PRUNE_COST` characters, so the constant decides
+        how much of a large source the scan sees. A match in the last words of
+        a source at the size ceiling is the case that pins it.
+        """
+        source = " ".join(
+            f"the {n} quick brown foxes jumped over a lazy dog near"
+            for n in range(6000)
+        )[:102_400]
+        words = source.split()
+        quote = " ".join(words[-40:-24]).replace("lazy", "lzay")
+
+        repair = repair_quote(quote, source)
+
+        assert repair is not None
+        assert repair[1] >= REPAIR_THRESHOLD
 
     def test_the_bound_counts_the_quote_in_characters(self):
         """A source of few very long words kept the word figure near zero while
