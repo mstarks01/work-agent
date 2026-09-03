@@ -38,8 +38,8 @@ comparable to published figures from other tools. The matching half is
 deterministic, so it cannot move between two runs of one configuration. The
 standing half moves only when a person votes.
 
-The scorer takes :class:`~analysis_service.report.DraftThreat` rather than
-:class:`~analysis_service.report.Threat`, so the same function scores the
+The scorer takes :class:`~analysis_service.frameworks.stride.record.DraftThreat` rather than
+:class:`~analysis_service.frameworks.stride.record.Threat`, so the same function scores the
 pre-critic union and the post-critic report. Nothing is promoted to make that
 work. ``verdict`` and ``confidence`` are the critic's outputs, and synthesizing
 them to measure the critic would decide the answer by fiat. The one field a

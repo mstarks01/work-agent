@@ -223,7 +223,7 @@ class RunProvenance(BaseModel):
         )
 
     def observations(self) -> dict[str, frozenset[str]]:
-        """The node -> fingerprint sets :func:`certify` rules on.
+        """The node -> fingerprint sets :func:`~analysis_service.certification.certify` rules on.
 
         Derived here rather than folded alongside during the sweep, so the
         verdict and the artifact cannot be computed from two different walks of
@@ -321,7 +321,7 @@ class RunProvenance(BaseModel):
         ``generation_identities`` is written for the reader who greps rather
         than walks — "what answered for ``strong``" should not require folding
         ``node_runs`` by hand. It is a rendering, not a second record:
-        :func:`load_artifact` derives it again and refuses an artifact whose
+        :func:`~evals.harness.artifact.load_artifact` derives it again and refuses an artifact whose
         stored copy disagrees.
         """
         return {

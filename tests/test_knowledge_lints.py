@@ -72,7 +72,7 @@ RETRIEVED_CORPUS_CEILING = 4000
 #: text for the whole chapter, so a note restating a requirement would put the
 #: catalog in a second place to drift. That risk did not go away when the corpus
 #: was written — it is now held off by
-#: :func:`test_a_note_does_not_restate_the_catalog` instead of by the absence of
+#: :func:`~tests.test_license_lints.test_no_upstream_sentence_appears_in_an_ungoverned_file` instead of by the absence of
 #: any notes at all. A package added here later needs its own reason, in this
 #: comment, in the same shape.
 EMPTY_CORPUS: set[str] = set()

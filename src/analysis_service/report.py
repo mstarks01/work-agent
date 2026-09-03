@@ -1736,7 +1736,7 @@ class UnresolvedMention(BaseModel):
     mistyped ID in prose trades a whole report for a typo. The mark rides
     beside the threats exactly as an unverified quote does, and the same
     argument applies to why it is service-owned rather than a field on
-    :class:`DraftThreat` — an agent must not be able to report on its own
+    :class:`~analysis_service.frameworks.stride.record.DraftThreat` — an agent must not be able to report on its own
     accuracy.
 
     The most valuable thing it catches is not a typo. The analyze prompt is
@@ -1787,7 +1787,7 @@ class UnresolvedEvidence(BaseModel):
     report for a citation error, which is the trade
     :class:`UnresolvedMention` already refused to make.
 
-    Service-owned rather than a field on :class:`DraftThreat`, for the reason
+    Service-owned rather than a field on :class:`~analysis_service.frameworks.stride.record.DraftThreat`, for the reason
     every mark here is: an agent must not report on its own accuracy.
     """
 
@@ -1856,7 +1856,7 @@ class DroppedClaim(BaseModel):
 
     * the proposal failed its own schema — a verb outside the closed set, a
       severity value the enum does not hold, neither a reference nor a quote
-      (:func:`~analysis_service.evidence.validate_proposals`);
+      (:func:`~analysis_service.evidence.resolve_proposals`);
     * every reference it cited is outside the catalog
       (:func:`~analysis_service.evidence.resolve_proposals`);
     * every element it named is absent from the model, its ID duplicates an

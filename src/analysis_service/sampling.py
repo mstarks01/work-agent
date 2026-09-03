@@ -3,7 +3,7 @@
 Decoding parameters are pinned per tier in a versioned TOML file, and eval and
 production read it from the same place. ``base`` and ``strong`` carry their own
 params. The node-to-tier map lives once in ``model_tiers.toml``, and this module
-reuses it through :meth:`ModelTierConfig.resolve_tier` rather than duplicating
+reuses it through :meth:`~analysis_service.model_tiers.ModelTierConfig.resolve_tier` rather than duplicating
 it.
 
 Four things about the surface:
@@ -299,7 +299,7 @@ def make_resolve_sampling(
 ) -> SamplingResolver:
     """The injected sibling of ``resolve_model``: node -> its tier's sampling.
 
-    ``resolve_tier`` is :meth:`ModelTierConfig.resolve_tier`, so the node -> tier
+    ``resolve_tier`` is :meth:`~analysis_service.model_tiers.ModelTierConfig.resolve_tier`, so the node -> tier
     walk lives once in the tier config and the graph stays purely node-centric.
     """
 

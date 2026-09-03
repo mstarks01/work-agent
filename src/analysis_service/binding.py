@@ -44,7 +44,7 @@ than dying on node one of a paid-for job:
   at output validation mid-job, which is the one failure shape the other gates
   cannot see, because both the request and the response are well-formed;
 * the credential check (:meth:`Vendor.credential_kwargs`), which fires once per
-  tier and fails closed under :class:`ProviderAuthError`.
+  tier and fails closed under :class:`~analysis_service.vendors.ProviderAuthError`.
 
 No vendor is privileged, and every model reaches its provider through
 ``LiteLlm``. ADK emits a warning when a Gemini model runs through LiteLLM. That

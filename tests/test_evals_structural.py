@@ -2,7 +2,7 @@
 
 Each check is exercised against a report deliberately broken in one way. The
 gates are re-asserted in :mod:`evals.harness.structural` rather than delegated
-to :class:`Report`'s own validator, so these tests build the broken
+to :class:`~analysis_service.report.Report`'s own validator, so these tests build the broken
 payloads as raw JSON where the model would refuse to construct them.
 
 **Per block since schema 3.0.** A claim lives in its framework's own analysis
