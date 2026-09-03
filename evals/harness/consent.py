@@ -401,7 +401,7 @@ def _borrow(
     for directory, manifest in ranked:
         priced = []
         for entry in manifest.get("sweeps", []):
-            amount = _reprice(directory / str(entry.get("artifact", "")), routes)
+            amount = _reprice(directory, str(entry.get("artifact", "")), routes)
             if amount is not None:
                 priced.append(amount)
         if priced:
@@ -413,7 +413,9 @@ def _borrow(
     return None
 
 
-def _reprice(path: Path, routes: dict[str, str]) -> float | None:
+def _reprice(
+    directory: Path, artifact_name: str, routes: dict[str, str]
+) -> float | None:
     """One recorded sweep's usage, as if this run's models had served it.
 
     ``None`` rather than a number whenever the answer would rest on a guess:
@@ -421,9 +423,19 @@ def _reprice(path: Path, routes: dict[str, str]) -> float | None:
     this run does not route, or a route the price map misses. The caller
     tries the next Baseline, and states ``unpriced`` when none answers —
     never a zero, which is the one outcome #334 forbids outright.
+
+    The name is joined here rather than by the caller, so the join and the
+    check that it stayed inside the directory sit together. ``artifact`` comes
+    off a committed manifest, and an absolute value replaces the left side of a
+    join rather than extending it — the same shape found in two other places
+    this audit round.
     """
+    path = directory / artifact_name
     try:
-        artifact = load_artifact(path)
+        resolved = path.resolve()
+        if not resolved.is_relative_to(directory.resolve()):
+            return None
+        artifact = load_artifact(resolved)
     except (OSError, ValueError):
         return None
 
