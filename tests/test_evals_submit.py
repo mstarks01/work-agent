@@ -158,7 +158,15 @@ def prepare_sitting(
         json.dumps(meta, indent=2) + "\n", encoding="utf-8"
     )
     if write_document:
-        (case_dir / document).write_text("the filled copy\n", encoding="utf-8")
+        # The shape `sitting.document()` writes. The fixture used to put
+        # fifteen bytes of prose here, which is why no test noticed that the
+        # evidence gate never checked what a reading document is.
+        (case_dir / document).write_text(
+            f"# Case Sitting — `{case}`\n\n**A case.**\n\n"
+            "Read by ada, submitted by ada.\n\n---\n\n## My own list\n\n"
+            "- a spoofed device\n",
+            encoding="utf-8",
+        )
     if clear_unreviewed:
         listing = clone / "tests" / "test_case_review.py"
         listing.write_text(
@@ -227,6 +235,54 @@ class TestTheVoteChecks:
         check = submit._check_the_delta_is_yours(repo, "ada")
         assert not check.passed
         assert "sam.jsonl" in check.problems[0]
+
+    def test_a_scalar_roster_entry_is_noted_and_does_not_raise(self, repo, tmp_path):
+        """`ada = "contributor"` where `[voters.ada]` was meant.
+
+        The line a first-timer writes, and the roster loader's to refuse. This
+        note runs after that check's own handler and is the only check a
+        roster-only PR runs, so it has to survive the shape rather than raise
+        `AttributeError` through the whole preflight.
+        """
+        live = tmp_path / "voters.toml"
+        live.write_text(
+            'version = 1\n\n[voters]\nada = "contributor"\n\n'
+            '[voters.mstarks01]\nstanding = "maintainer"\n',
+            encoding="utf-8",
+        )
+
+        notes = submit._roster_delta(ROSTER_WITH_ADA, live)
+
+        assert notes == ["ada: changed, and its entry is not a table"]
+
+    def test_a_vote_keyed_under_a_version_stride_left_is_refused(self, repo):
+        """The row the loader cannot refuse, caught where it arrives.
+
+        Self-consistent at version 1, because version 1 reads no verb, so it
+        loads and scores under a rule STRIDE has moved past -- and then `rekey`
+        refuses the whole ledger over it. The loader has to keep accepting it,
+        because a ledger written before a rule change is what `rekey` reads.
+        An added row is the one row a pull request can insist is current.
+        """
+        votes = prepare_vote(repo)
+        stale = cast(
+            Components("stride", "information-disclosure", ("process:a",)),
+            "01-payments-checkout",
+            "up",
+            "ada",
+            version=1,
+        )
+        (votes / "ada.jsonl").write_text(
+            json.dumps(stale.to_json(), ensure_ascii=False, sort_keys=True) + "\n",
+            encoding="utf-8",
+        )
+        git(repo, "fetch", "origin")
+
+        check = submit._check_your_file_appends(repo, "ada")
+
+        assert not check.passed
+        assert "keyed at version 1" in check.problems[0]
+        assert "stride keys at" in check.problems[0]
 
     def test_a_rewrite_of_history_is_refused(self, repo):
         """#322's append shape: the base content must be a byte prefix."""
@@ -460,17 +516,31 @@ class TestTheDocumentIsCheckedForWhatItClaims:
         assert not check.passed
         assert "another submission's" in check.problems[0]
 
-    def test_an_empty_document_is_refused(self, repo):
+    @pytest.mark.parametrize(
+        "content",
+        [
+            "\n\n  \n",
+            "nnnnnnnnnnnn",
+            "some prose a contributor typed instead of holding a sitting",
+        ],
+    )
+    def test_a_file_that_is_not_a_reading_document_is_refused(self, repo, content):
+        """The first version of this gate compared the whole file against
+        `MIN_OWN_LIST`, which is the floor the app applies to *the own list* --
+        a different thing measured against the same number, so twelve bytes of
+        anything passed and no length could ever have seen an empty own list.
+        """
         prepare_sitting(repo)
         case = submit._sitting_cases(repo)[0]
-        document = repo / "evals" / "corpus" / case / "REVIEW-ada.md"
-        document.write_text("\n\n  \n", "utf-8")
+        (repo / "evals" / "corpus" / case / "REVIEW-ada.md").write_text(
+            content, "utf-8"
+        )
         git(repo, "fetch", "origin")
 
         check = submit._check_sitting_evidence(repo, "ada")
 
         assert not check.passed
-        assert "empty" in check.problems[0]
+        assert "not a reading document" in check.problems[0]
 
     def test_an_honest_sitting_still_passes(self, repo):
         prepare_sitting(repo)
