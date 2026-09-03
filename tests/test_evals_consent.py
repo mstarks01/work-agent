@@ -803,3 +803,23 @@ class TestAnAcceptedAmountIsAnAmountOfMoney:
         offer = consent.Estimate(label="recorded", amount_usd=50.00, lines=())
 
         assert consent._accept_from_flag(offer, "50.00") == 50.00
+
+
+class TestABorrowedArtifactStaysInsideItsBaseline:
+    """`artifact` comes off a committed manifest, and a join is not a bound."""
+
+    def test_an_absolute_artifact_name_is_refused(self, tmp_path):
+        """`Path("/baselines/x") / "/etc/passwd"` is `/etc/passwd`: an absolute
+        right-hand side replaces the left rather than extending it. The same
+        shape was found in `sitting.moved` and `markdown_loader` this round."""
+        directory = tmp_path / "baseline"
+        directory.mkdir()
+
+        assert consent._reprice(directory, "/etc/hostname", {}) is None
+
+    def test_a_traversing_artifact_name_is_refused(self, tmp_path):
+        directory = tmp_path / "baseline"
+        directory.mkdir()
+        (tmp_path / "elsewhere.json").write_text("{}", encoding="utf-8")
+
+        assert consent._reprice(directory, "../elsewhere.json", {}) is None

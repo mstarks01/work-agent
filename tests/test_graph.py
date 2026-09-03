@@ -12,10 +12,12 @@ import json
 import re
 from dataclasses import fields
 from datetime import UTC, datetime
+from pathlib import Path
 from typing import Any
 
 import pytest
 from google.adk.agents import LlmAgent
+from google.adk.utils import instructions_utils
 from google.adk.workflow import FunctionNode, JoinNode
 
 from analysis_service import graph
@@ -654,12 +656,53 @@ def test_category_placeholder_is_filled_at_build_time(prompt_loader, package_loa
         assert f"**{category}** agent" in instruction
 
 
+def _adk_substitution_pattern() -> str:
+    r"""ADK's own placeholder regex, read out of ADK rather than restated.
+
+    The lint below used `\{([A-Za-z_][A-Za-z0-9_]*)\}` while ADK templates
+    `{+[^{}]*}+` and then strips the name -- so `{ candidates_stride_tampering }`
+    with spaces was invisible to the lint and substituted by ADK. Six spellings
+    passed. Reading the pattern from the installed package means a version bump
+    that widens it fails here instead of opening the same gap again.
+    """
+    source = Path(instructions_utils.__file__).read_text(encoding="utf-8")
+    found = re.search(r"_async_sub\(\s*r'([^']+)'", source)
+    assert found, "ADK's substitution pattern moved; this lint cannot see it"
+    return found.group(1)
+
+
+def _adk_placeholder_names(instruction: str) -> set[str]:
+    """The names ADK would actually substitute, decided by ADK.
+
+    Normalised the way ADK normalises -- strip, drop a trailing `?`, drop an
+    `artifact.` prefix -- and then filtered by ADK's own `_is_valid_state_name`,
+    which is what decides whether a match is looked up at all. A name that fails
+    it is returned untouched, which is why a JSON example in a prompt is inert.
+
+    Calling ADK's function rather than restating its rule: `str.isidentifier()`
+    accepts Unicode, and a valid name may carry an `app:`, `user:` or `temp:`
+    prefix. The lint's own `[A-Za-z_][A-Za-z0-9_]*` matched neither.
+    """
+    names = set()
+    for raw in re.findall(_adk_substitution_pattern(), instruction):
+        name = raw.lstrip("{").rstrip("}").strip().removesuffix("?")
+        name = name.removeprefix("artifact.")
+        if instructions_utils._is_valid_state_name(name):
+            names.add(name)
+    return names
+
+
 def test_only_known_state_keys_remain_as_placeholders(pipeline):
-    """A stray ``{identifier}`` would be a KeyError at the first LLM call."""
+    """A stray ``{identifier}`` would be a KeyError at the first LLM call.
+
+    Asked with ADK's rule, not a narrower one. `graph.py` states that no lane
+    reads another lane's leads, and that property rests on this lint seeing
+    every spelling ADK will substitute.
+    """
     for node in nodes_by_name(pipeline).values():
         if not isinstance(node, LlmAgent):
             continue
-        found = set(re.findall(r"\{([A-Za-z_][A-Za-z0-9_]*)\}", node.instruction))
+        found = _adk_placeholder_names(node.instruction)
         assert found <= RUNTIME_PLACEHOLDERS, (node.name, found - RUNTIME_PLACEHOLDERS)
 
 
