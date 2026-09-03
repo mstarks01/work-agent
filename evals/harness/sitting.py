@@ -939,23 +939,32 @@ def _unreviewed_table(source: str) -> tuple[list[tuple[str, int, int]], int]:
         raise SittingError(
             f"{UNREVIEWED_FILE}: this file will not parse — {exc}"
         ) from exc
-    table = next(
-        (
-            node.value
-            for node in ast.walk(tree)
-            if isinstance(node, ast.AnnAssign | ast.Assign)
-            and isinstance(node.value, ast.Dict)
-            and any(
-                isinstance(target, ast.Name) and target.id == "UNREVIEWED"
-                for target in (
-                    [node.target] if isinstance(node, ast.AnnAssign) else node.targets
-                )
+    tables = [
+        node.value
+        for node in ast.walk(tree)
+        if isinstance(node, ast.AnnAssign | ast.Assign)
+        and isinstance(node.value, ast.Dict)
+        and any(
+            isinstance(target, ast.Name) and target.id == "UNREVIEWED"
+            for target in (
+                [node.target] if isinstance(node, ast.AnnAssign) else node.targets
             )
-        ),
-        None,
-    )
-    if not isinstance(table, ast.Dict):
+        )
+    ]
+    if not tables:
         raise SittingError(f"{UNREVIEWED_FILE}: no UNREVIEWED table to read")
+    # Exactly one, rather than the first of several. Reading the first is a
+    # disagreement with Python, which binds the last -- so a decoy empty table
+    # above the real one makes this answer "no cases listed" about a file that
+    # lists them, and a checker built on that answer is checking a table nobody
+    # imports. There is one list; a file with two is malformed, and saying so is
+    # cheaper than picking a winner and being right by convention.
+    if len(tables) > 1:
+        raise SittingError(
+            f"{UNREVIEWED_FILE}: {len(tables)} UNREVIEWED tables; there is one"
+            " list, and a reader cannot tell which of two a checker meant"
+        )
+    table = tables[0]
 
     starts = [
         (key.value, key.lineno - 1)
