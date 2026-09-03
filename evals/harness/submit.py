@@ -424,9 +424,19 @@ def _stale_keys(rel: str, rows: list[ledger.Vote]) -> list[str]:
 def _check_your_file_appends(root: Path, author: str) -> Check:
     """#322's append shape: the base content is a byte prefix of the new."""
     rel = f"evals/review/votes/{author}.jsonl"
-    new = (root / rel).read_text(encoding="utf-8") if (root / rel).exists() else ""
-    base = _base_text(root, rel)
     problems = []
+    try:
+        new = (root / rel).read_text(encoding="utf-8") if (root / rel).exists() else ""
+    except UnicodeDecodeError as exc:
+        # The same pull request commits this file, so its bytes are a
+        # contributor's and need not be UTF-8. This read sits ahead of every
+        # handler below, so the checklist ended in a traceback rather than in
+        # the sentence that names the file.
+        return _check(
+            "your file only appends, and adds something",
+            [f"{rel}: is not UTF-8 text: {exc}"],
+        )
+    base = _base_text(root, rel)
     if base is not None and not new.startswith(base):
         problems.append(
             f"{rel} rewrites history; a vote submission only appends, and a"
@@ -440,6 +450,10 @@ def _check_your_file_appends(root: Path, author: str) -> Check:
             problems.extend(_stale_keys(rel, rows))
         except (ledger.LedgerError, json.JSONDecodeError) as exc:
             problems.append(f"{rel}: an added row will not parse: {exc}")
+        except UnicodeDecodeError as exc:
+            # The base revision's bytes, which `_vote_rows` reads separately
+            # from the read above.
+            problems.append(f"{rel}: is not UTF-8 text: {exc}")
         except FingerprintError as exc:
             # `version_for` raises this, and it is neither of the two above. A
             # row naming a framework outside VERSION_FOR loads fine, because
@@ -469,7 +483,7 @@ def _roster_delta(base_raw: str | None, live: Path) -> list[str]:
     try:
         was = tomllib.loads(base_raw).get("voters", {})
         now = tomllib.loads(live.read_text(encoding="utf-8")).get("voters", {})
-    except (OSError, tomllib.TOMLDecodeError):
+    except (OSError, tomllib.TOMLDecodeError, UnicodeDecodeError):
         return []  # the check below reports an unreadable roster
     # The table itself, not only its entries. `voters = "abc"` is legal TOML and
     # is the same defect one level up from the entry guard below: `set(was)`

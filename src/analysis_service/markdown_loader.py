@@ -30,11 +30,26 @@ def estimate_tokens(text: str) -> int:
     return math.ceil(len(text.split()) * 4 / 3)
 
 
+def _inside(root: Path, path: Path) -> bool:
+    """Whether ``path`` resolves to a readable file under ``root``.
+
+    One reader for "is this file mine to read". A name resolving outside the
+    root -- by traversal or by symlink -- is treated the same as absent: deny,
+    and reveal nothing about what lies outside.
+    """
+    try:
+        resolved = path.resolve()
+    except OSError:
+        return False
+    return resolved.is_relative_to(root.resolve()) and resolved.is_file()
+
+
 def split_sections(text: str) -> dict[str, str]:
     """Split a Markdown file into its H2 sections, preserving order.
 
-    Headings are taken verbatim (everything after ``## ``) so the lints can
-    enforce exact strings. Duplicate or empty headings raise
+    Headings are everything after ``## ``, with surrounding whitespace removed,
+    which is the same reading the package gate's own heading lint applies. Two
+    readings of one heading is a file that passes the gate and fails the load. Duplicate or empty headings raise
     :class:`MarkdownFormatError`.
     """
     sections: dict[str, str] = {}
@@ -44,7 +59,12 @@ def split_sections(text: str) -> dict[str, str]:
         if line.startswith("## "):
             if heading is not None:
                 sections[heading] = "\n".join(body).strip()
-            heading = line[3:]
+            # Stripped, because the lint that gates these files strips.
+            # `_heading_issues` compared `line[3:].strip()` and this stored
+            # `line[3:]`, so one trailing space after `## Scope` passed the gate
+            # and then raised here -- the critic's lane digest is read out of
+            # that section, so the package started and its first job died.
+            heading = line[3:].strip()
             if not heading.strip():
                 raise MarkdownFormatError("empty H2 heading")
             if heading in sections:
@@ -93,11 +113,21 @@ class MarkdownLoader:
             for path in self._root.rglob("*.md")
         )
 
+    def readable(self, name: str) -> bool:
+        """Whether :meth:`load` would return this name's text.
+
+        Exported so a caller checking a file exists asks the same question the
+        loader will ask. The framework package gate asked ``is_file()``, which
+        follows a symlink out of the root that :meth:`load` refuses -- so a
+        package passed startup validation and failed on its first job.
+        """
+        return _inside(self._root, self._root / f"{name}.md")
+
     def load(self, name: str) -> str:
         path = (self._root / f"{name}.md").resolve()
         # A name resolving outside the root (traversal) is treated the same
         # as absent — deny, don't reveal what lies outside.
-        if not path.is_relative_to(self._root) or not path.is_file():
+        if not _inside(self._root, path):
             raise MarkdownNotFoundError(
                 f"no markdown named {name!r} under {self._root}"
             )

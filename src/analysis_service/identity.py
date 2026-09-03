@@ -68,7 +68,17 @@ SERVED_TRUST: Final = "provider_reported"
 #: rather than three named fields: adding the next one is an entry, and the
 #: payload spells the distribution names it read rather than a shape that has to
 #: be kept in step with them.
-BUILD_DISTRIBUTIONS: Final = ("analysis-service", "google-adk", "litellm")
+#:
+#: ``google-genai`` sits there too, and was missing: it is what ADK hands a
+#: request to, four shipped modules import it, and ``google-adk==2.5.0`` permits
+#: any ``2.x`` -- so it moved while an identity that did not name it hashed the
+#: same before and after, which is the exact drift this table exists to catch.
+BUILD_DISTRIBUTIONS: Final = (
+    "analysis-service",
+    "google-adk",
+    "google-genai",
+    "litellm",
+)
 
 
 class BuildIdentityError(RuntimeError):
