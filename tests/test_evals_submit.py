@@ -373,6 +373,64 @@ class TestTheSittingChecks:
         )
 
 
+class TestTheRosterDeltaIsShownToTheReviewer:
+    """`_check_no_self_raise` reads one line, the author's, which is the
+    contract `contribution.yml` states this job proves.
+
+    Two audits observed that every other roster line goes past unremarked, and
+    both concluded the merge is the control rather than the check. This is the
+    note both of them asked for: a control that is a person reading a diff works
+    better when it is shown the diff. It never fails a submission -- what a
+    roster edit is entitled to do is a judgement about people, and the check
+    cannot make it.
+    """
+
+    def _roster(self, repo, text):
+        (repo / "evals" / "review" / "voters.toml").write_text(text, "utf-8")
+
+    def test_a_standing_raised_for_somebody_else_is_reported(self, repo):
+        prepare_vote(repo)
+        self._roster(
+            repo, ROSTER_WITH_ADA + '\n[voters.sam]\nstanding = "maintainer"\n'
+        )
+        git(repo, "fetch", "origin")
+
+        check = submit._check_no_self_raise(repo, "ada")
+
+        assert check.passed, "it reports, it does not refuse"
+        assert any("sam" in note for note in check.notes)
+
+    def test_an_alias_fold_is_reported(self, repo):
+        """The shape a reviewer greps for `maintainer` would not find: the
+        added line says `aliases`, and the standing it grants is on another."""
+        prepare_vote(repo)
+        self._roster(
+            repo,
+            ROSTER_WITH_ADA.replace(
+                'standing = "maintainer"',
+                'standing = "maintainer"\naliases = ["sam"]',
+                1,
+            ),
+        )
+        git(repo, "fetch", "origin")
+
+        check = submit._check_no_self_raise(repo, "ada")
+
+        assert check.passed
+        assert any("aliases" in note for note in check.notes)
+
+    def test_an_ordinary_submission_reports_only_its_own_line(self, repo):
+        """A first-timer registers in the same PR as their first vote, so the
+        note is never empty in practice -- what matters is that it holds one
+        line, the author's, and that a reviewer can see when it does not."""
+        prepare_vote(repo)
+        git(repo, "fetch", "origin")
+
+        notes = submit._check_no_self_raise(repo, "ada").notes
+
+        assert notes == ("ada: added as 'contributor'",)
+
+
 class TestTheDocumentIsCheckedForWhatItClaims:
     """The gate was one `.is_file()` probe on whatever name the entry gave.
 

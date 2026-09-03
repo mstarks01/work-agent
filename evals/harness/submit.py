@@ -83,6 +83,9 @@ class Check:
 
     name: str
     problems: tuple[str, ...] = ()
+    #: Lines printed beside the result that do not fail it. For a fact the
+    #: reviewer -- not the checklist -- is the one who can judge.
+    notes: tuple[str, ...] = ()
 
     @property
     def passed(self) -> bool:
@@ -246,8 +249,8 @@ def _vote_rows(root: Path, author: str) -> list[ledger.Vote]:
     ]
 
 
-def _check(name: str, problems: list[str]) -> Check:
-    return Check(name=name, problems=tuple(problems))
+def _check(name: str, problems: list[str], notes: list[str] | None = None) -> Check:
+    return Check(name=name, problems=tuple(problems), notes=tuple(notes or ()))
 
 
 # --- the checks every kind shares --------------------------------------------
@@ -410,8 +413,53 @@ def _check_your_file_appends(root: Path, author: str) -> Check:
     return _check("your file only appends, and adds something", problems)
 
 
+def _roster_delta(base_raw: str | None, live: Path) -> list[str]:
+    """Every roster line this PR changes, for the reviewer to read.
+
+    Informational, and deliberately not a refusal. What a roster edit is
+    entitled to do is a judgement about people, and the merge is where this
+    repository makes it -- ``voters.toml`` says a maintainer line is legitimate
+    only because a maintainer merged it. A check cannot make that call.
+
+    What it can do is put the edit where the person making the call will see it.
+    :func:`_check_no_self_raise` looks at one line, the author's, which is the
+    contract ``contribution.yml`` states; an audit twice observed that the other
+    lines go past unremarked, and twice concluded the merge is the control.
+    This is the note that observation asked for both times: the control works
+    better when it is shown the diff.
+    """
+    if base_raw is None:
+        return []
+    try:
+        was = tomllib.loads(base_raw).get("voters", {})
+        now = tomllib.loads(live.read_text(encoding="utf-8")).get("voters", {})
+    except (OSError, tomllib.TOMLDecodeError):
+        return []  # the check below reports an unreadable roster
+    notes = []
+    for login in sorted(set(was) | set(now)):
+        before, after = was.get(login), now.get(login)
+        if before == after:
+            continue
+        if before is None:
+            notes.append(f"{login}: added as {after.get('standing', '?')!r}")
+        elif after is None:
+            notes.append(f"{login}: removed (was {before.get('standing', '?')!r})")
+        else:
+            for key in sorted(set(before) | set(after)):
+                if before.get(key) != after.get(key):
+                    notes.append(
+                        f"{login}.{key}: {before.get(key)!r} -> {after.get(key)!r}"
+                    )
+    return notes
+
+
 def _check_no_self_raise(root: Path, author: str) -> Check:
-    """#320's one dangerous edit: nobody raises their own standing."""
+    """#320's one dangerous edit: nobody raises their own standing.
+
+    One line, the author's, which is what ``contribution.yml`` states this job
+    proves. Every other roster line is reported beside the result rather than
+    refused -- see :func:`_roster_delta`.
+    """
     problems = []
     base_raw = _base_text(root, ROSTER_FILE)
     live = root / ROSTER_FILE
@@ -435,7 +483,11 @@ def _check_no_self_raise(root: Path, author: str) -> Check:
             )
     except (roster.RosterError, tomllib.TOMLDecodeError) as exc:
         problems.append(str(exc))
-    return _check("your roster line does not raise itself", problems)
+    return _check(
+        "your roster line does not raise itself",
+        problems,
+        notes=_roster_delta(base_raw, live) if live.exists() else [],
+    )
 
 
 def _vote_preflight(root: Path, author: str) -> list[Check]:
@@ -1161,6 +1213,8 @@ def command_verify(args: argparse.Namespace) -> int:
         print(f"  {'ok  ' if check.passed else 'FAIL'}  {check.name}")
         for problem in check.problems:
             print(f"        {problem}")
+        for note in check.notes:
+            print(f"        note  {note}")
     if all(check.passed for check in checks):
         return 0
     print(
