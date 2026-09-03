@@ -108,9 +108,21 @@ class TestSectionParsing:
         assert list(sections) == list(LANE_SECTION_HEADINGS)
         assert sections["Guardrails"] == "Guardrails body."
 
-    def test_headings_are_taken_verbatim(self):
+    def test_a_heading_reads_the_same_here_as_it_does_at_the_gate(self):
+        """This test used to pin the disagreement.
+
+        It asserted `split_sections` keeps a trailing space, while the package
+        gate's `_heading_issues` compared `line[3:].strip()`. So `## Scope `
+        passed validation at startup and then raised here, and the critic's
+        lane digest -- which is read out of `## Scope` -- was never built.
+
+        Both readers strip now, so the heading a file declares is the heading
+        both of them see.
+        """
         sections = split_sections("## Scope \n\nbody\n")
-        assert list(sections) == ["Scope "]
+
+        assert list(sections) == ["Scope"]
+        assert extract_section("## Scope \n\nbody\n", "Scope") == "body"
 
     def test_duplicate_heading_raises(self):
         with pytest.raises(MarkdownFormatError, match="duplicate"):

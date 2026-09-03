@@ -2,9 +2,14 @@
 
 from __future__ import annotations
 
+import ast
 import re
+import sys
+from pathlib import Path
 
 import pytest
+
+REPO_ROOT = Path(__file__).resolve().parents[1]
 
 from analysis_service.identity import (
     BUILD_DISTRIBUTIONS,
@@ -160,3 +165,51 @@ class TestBuildIdentity:
         with pytest.raises(BuildIdentityError, match="no-such-distribution"):
             build_identity()
         build_identity.cache_clear()
+
+
+def test_every_distribution_the_package_imports_is_declared():
+    """A dependency you rely on but do not declare is one a bump can remove.
+
+    `pyproject.toml` already records this happening once, to `cryptography`.
+    It had happened twice more by the time an audit looked: `anyio`, `starlette`
+    and `google-genai` were all imported by name and all arrived only
+    transitively.
+
+    The import name is not the distribution name -- `jwt` is PyJWT, `google` is
+    three separate distributions -- so this asks `packages_distributions()`
+    rather than guessing, and accepts a top-level name when ANY distribution
+    providing it is declared.
+    """
+    import tomllib
+    from importlib.metadata import packages_distributions
+
+    project = tomllib.loads((REPO_ROOT / "pyproject.toml").read_text(encoding="utf-8"))
+    declared = {
+        re.split(r"[<>=\[]", spec)[0].strip().lower()
+        for spec in project["project"]["dependencies"]
+    }
+    provides = packages_distributions()
+
+    imported: set[str] = set()
+    for source in (REPO_ROOT / "src" / "analysis_service").rglob("*.py"):
+        tree = ast.parse(source.read_text(encoding="utf-8"))
+        for node in ast.walk(tree):
+            if isinstance(node, ast.Import):
+                imported |= {alias.name.split(".")[0] for alias in node.names}
+            elif isinstance(node, ast.ImportFrom) and node.level == 0 and node.module:
+                imported.add(node.module.split(".")[0])
+
+    assert "litellm" in imported, "the import scan found nothing; it is broken"
+    assert "litellm" in declared, "the dependency read found nothing; it is broken"
+
+    undeclared = sorted(
+        name
+        for name in imported - sys.stdlib_module_names - {"analysis_service"}
+        if name in provides
+        and not any(dist.lower() in declared for dist in provides[name])
+    )
+
+    assert not undeclared, (
+        f"imported but not declared in pyproject.toml: {undeclared}"
+        " — a transitive bump can remove these from under the code that calls them"
+    )

@@ -39,6 +39,16 @@ dependencies = [
     "cryptography>=45",
     "pydantic>=2.7",
     "pyjwt[crypto]>=2.9",
+    # The same rule as `cryptography` above, applied to the rest of what the
+    # package imports. All three arrive transitively today and all three are
+    # imported by name, so a transitive bump can remove one from under code
+    # that calls it. `google-genai` also carries a build identity: ADK permits
+    # any 2.x, so it moves while a fingerprint that does not name it stays
+    # still. `tests/test_identity.py` compares this list against what the
+    # source actually imports.
+    "anyio>=4",
+    "starlette>=0.40",
+    "google-genai>=2.9",
 ]
 
 [dependency-groups]
