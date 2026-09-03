@@ -1096,3 +1096,44 @@ class TestASittingChangesAnAnswerNeverAQuestion:
         allowed = submit._sitting_allowlist(repo, "ada")
         assert all(rel.startswith(("evals/", "tests/")) for rel in allowed)
         assert not [rel for rel in allowed if ".." in rel]
+
+
+class TestTheChecklistSurvivesAShapeNobodyListed:
+    """Both crashes reported by run-6, both fail-closed and both a traceback."""
+
+    def test_a_vote_naming_an_unknown_framework_is_reported_not_raised(self, repo):
+        """`version_for` raises `FingerprintError`, which is neither of the two
+        classes the handler names. The row loads, because `fingerprint()`
+        consults no table, and then aborted the whole preflight."""
+        votes = prepare_vote(repo)
+        # Self-consistent, so `__post_init__` accepts it and `_stale_keys` is
+        # what meets the unknown name. A mismatched fingerprint would be caught
+        # one step earlier and would not exercise this path at all.
+        stray = cast(
+            Components("not-a-package", "information-disclosure", ("process:a",)),
+            "01-payments-checkout",
+            "up",
+            "ada",
+            version=1,
+        )
+        (votes / "ada.jsonl").write_text(
+            json.dumps(stray.to_json(), ensure_ascii=False, sort_keys=True) + "\n",
+            encoding="utf-8",
+        )
+        git(repo, "fetch", "origin")
+
+        check = submit._check_your_file_appends(repo, "ada")
+
+        assert not check.passed
+        assert "no known rule" in check.problems[0]
+
+    def test_a_roster_whose_voters_table_is_a_scalar_is_noted(self, repo, tmp_path):
+        """The same defect one level up from the entry guard: `voters = "abc"`
+        is legal TOML, `set(was)` would iterate its characters, and `was.get`
+        does not exist."""
+        live = tmp_path / "voters.toml"
+        live.write_text('version = 1\nvoters = "abc"\n', encoding="utf-8")
+
+        notes = submit._roster_delta(ROSTER_WITH_ADA, live)
+
+        assert notes == ["voters: the roster's own table is not a table"]

@@ -128,3 +128,31 @@ class TestThePageIsSelfContained:
         for case in body["cases"]:
             assert "own_list" not in case
             assert "marks" not in case
+
+
+def test_a_line_holds_no_line_break():
+    """One `Line`, and it refuses what its name already promised.
+
+    The sink joins these into Markdown with `- ` in front of each, so a break
+    forges headings in the committed reading document. Both producing pages
+    split on newlines, so the shape cannot arrive from a browser -- but this is
+    also the shape of an envelope a reader mails back, which this module calls
+    untrusted.
+    """
+    from pydantic import TypeAdapter, ValidationError
+
+    from evals.harness.envelope import Line
+
+    adapter = TypeAdapter(Line)
+    adapter.validate_python("an ordinary line")
+    for break_char in ("\n", "\r", " ", " "):
+        with pytest.raises(ValidationError):
+            adapter.validate_python(f"forged{break_char}## Heading")
+
+
+def test_the_webapp_and_the_envelope_share_one_line_type():
+    """Two copies of one shape drift. This is the pair that held the defect."""
+    from evals.harness.envelope import Line as EnvelopeLine
+    from webapp.sitting import Line as WebappLine
+
+    assert WebappLine is EnvelopeLine

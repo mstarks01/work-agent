@@ -158,9 +158,19 @@ fi
 #
 # `job_workflow_ref` is the claim that can. It carries the ref of the *workflow
 # definition* that GitHub is running -- `owner/repo/.github/workflows/x.yml@REF`
-# -- so pinning its suffix to the trusted ref admits only workflow files that
-# are already on that ref. It covers a reusable workflow called from elsewhere
-# for the same reason, because the claim names the file that is executing.
+# -- so pinning it to the trusted ref admits only workflow files that are
+# already on that ref. It covers a reusable workflow called from elsewhere for
+# the same reason, because the claim names the file that is executing.
+#
+# PIN IT WITH `ref`, NOT WITH A SUFFIX. `endsWith('@refs/heads/main')` was the
+# spelling here, and the `@` is a separator in the middle of a string whose
+# right half the attacker names. `git check-ref-format` accepts a branch called
+# `pwn@refs/heads/main`, and the claim for it ends
+# `...x.yml@refs/heads/pwn@refs/heads/main`, which satisfies the suffix. The
+# `ref` claim carries the run's ref exactly and has no attacker-chosen tail, so
+# comparing it is the check the suffix was trying to be. Both are kept: `ref`
+# decides, and `job_workflow_ref` still refuses a reusable workflow file that
+# lives on another ref.
 #
 # This is defence in depth behind the workflow files themselves, which no longer
 # carry a `pull_request` trigger on any credential-bearing job and guard
@@ -171,7 +181,7 @@ fi
 # --trusted-ref exists so a repository whose default branch is not `main` can
 # say so. It is a full git ref, not a branch name, because that is what the
 # claim carries.
-ATTRIBUTE_CONDITION="assertion.repository == '${REPO}' && assertion.job_workflow_ref.endsWith('@${TRUSTED_REF}')"
+ATTRIBUTE_CONDITION="assertion.repository == '${REPO}' && assertion.ref == '${TRUSTED_REF}' && assertion.job_workflow_ref.endsWith('@${TRUSTED_REF}')"
 
 note "OIDC provider: ${PROVIDER_ID}"
 if gcloud iam workload-identity-pools providers describe "$PROVIDER_ID" \
