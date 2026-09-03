@@ -243,7 +243,7 @@ def price_sweep(artifact: EvalArtifact) -> SweepCost:
     )
 
 
-def _recomputed_cost(artifact: EvalArtifact, recorded: dict[str, Any]) -> float:
+def _recomputed_cost(artifact: EvalArtifact, recorded: Mapping[str, Any]) -> float:
     """#323 check 5: recorded units × recorded unit prices, and nothing live."""
     rates = {
         entry["model"]: UnitPrices.from_json(entry)
