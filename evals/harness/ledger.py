@@ -185,6 +185,35 @@ class Vote:
                 f"{self.reason!r} is not a reason code; the set is"
                 f" {', '.join(sorted(REASONS))}"
             )
+        # The key is computed, never stated. A row arrives from a contributor's
+        # pull request, and until this ran nothing recomputed it: the stored
+        # string was taken on the row's word, while `components` -- the fields
+        # the key is *made of* -- went unread. So a row could describe one
+        # finding and key another, and every reader keys on the string: `pool`,
+        # `_standing`, `agreement`.
+        #
+        # A maintainer cannot catch that by reading. A roster edit says
+        # `standing = "maintainer"` in a diff; this says sixteen hex characters,
+        # and no eye tells a right hash from a wrong one.
+        #
+        # It also restores the promise the module opens with. `rekey` recomputes
+        # from `components`, so a mismatched row *moves* on a re-key -- the
+        # ledger scored one thing before and another after, which is exactly
+        # what "a metric computed last month recomputes to the same number
+        # today" says cannot happen.
+        try:
+            expected = fingerprint(
+                self.components, version=version_of(self.fingerprint)
+            )
+        except FingerprintError as exc:
+            raise LedgerError(f"vote fingerprint: {exc}") from exc
+        except (TypeError, ValueError) as exc:
+            raise LedgerError(f"malformed vote: {exc}") from exc
+        if self.fingerprint != expected:
+            raise LedgerError(
+                f"{self.fingerprint!r} is not the fingerprint of this vote's"
+                f" components ({expected!r}); the key is computed, never stated"
+            )
 
     @property
     def counts_against_analysis(self) -> bool:
@@ -541,7 +570,20 @@ def command_rekey(args: argparse.Namespace) -> int:
     now = sorted({version_of(v.fingerprint) for v in moved})
     print(f"{len(moved)} votes at version {was} -> {now}")
     print(f"{changed} fingerprints move, {len(moved) - changed} unchanged")
-    print(f"{len(current.pool())} findings in the pool, before and after")
+    # Both pools, computed. This printed one number and asserted it held for
+    # the other, which is a post-condition stated rather than evaluated -- and a
+    # re-key that moved a row to a different finding is exactly what it would
+    # have had to catch.
+    before, after = current.pool(), Ledger(votes=moved).pool()
+    if before == after:
+        print(f"{len(before)} findings in the pool, before and after")
+    else:
+        print(
+            f"POOL MOVED: {len(before)} findings before, {len(after)} after."
+            " A re-key recomputes a key and must not change which findings the"
+            " pool holds; this ledger has a row whose components and key"
+            " disagree."
+        )
 
     if not args.yes:
         print("\npreview only; nothing written. Re-run with --yes to apply.")
