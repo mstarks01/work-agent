@@ -120,7 +120,7 @@ class BaselineIdentity:
             ),
             sampling=sampling,
             frameworks=tuple(
-                sorted(str(name) for name in artifact.block("frameworks"))
+                sorted(_framework_name(name) for name in artifact.block("frameworks"))
             ),
         )
 
@@ -231,6 +231,35 @@ def _recomputed_cost(artifact: EvalArtifact, recorded: dict[str, Any]) -> float:
             " unpriced; a silent zero is never admissible"
         )
     return price_calls(calls, rates=rates).total_usd
+
+
+#: A registered package name, which is the only thing this field ever holds.
+#: The artifact declares ``frameworks`` as a plain list and validates no element,
+#: so before this the value reaching the published table was whatever a
+#: contributor wrote -- unbounded in length, unlike every model name beside it.
+_FRAMEWORK_NAME = re.compile(r"^[a-z0-9]+(?:-[a-z0-9]+)*$")
+
+#: How long one may be. A slug shape alone is not a bound: 300 lowercase
+#: letters are a slug, and the whole point here is that this field had no
+#: length while every model name beside it had one.
+_FRAMEWORK_NAME_MAX = 40
+
+
+def _framework_name(value: object) -> str:
+    """One framework name out of an artifact, or a refusal.
+
+    Shaped rather than merely stringified. It is carried into a Baseline's
+    identity, which is recomputed and compared on every verification and
+    rendered into a committed, published table; a name is a slug, and anything
+    that is not one is not a name.
+    """
+    name = str(value)
+    if len(name) > _FRAMEWORK_NAME_MAX or not _FRAMEWORK_NAME.fullmatch(name):
+        raise BaselineError(
+            f"{name!r} is not a framework name; a Baseline's identity carries"
+            " the packages the sweep ran, and a package name is a slug"
+        )
+    return name
 
 
 def artifact_filename(value: object) -> str:
