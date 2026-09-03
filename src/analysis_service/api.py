@@ -226,13 +226,35 @@ class FrameworkRequest(BaseModel):
     options: dict[str, Any] = Field(default_factory=dict)
 
 
+#: How many sources a body may carry before the schema refuses it, whatever a
+#: deployment's ``max_sources`` says. Far above any configured value — the
+#: shipped one is ten — because it is not that limit: it is the point past
+#: which validating the body costs more than reading it.
+MAX_SOURCES_PER_BODY = 100
+
+#: How many complaints a 422 carries. A body that is wrong in ten thousand
+#: places is wrong; a caller needs to see that and the first few, not all of
+#: them. Rendering every one made the refusal amplify the request 43 times.
+MAX_RENDERED_ERRORS = 20
+
+
 class JobSubmission(BaseModel):
     """Body of ``POST /v1/jobs``.
 
-    ``sources`` is typed but not bounded here. Pydantic answers the first rung
-    of the ladder — is each source well-formed? — and the route answers the
-    rest, because the count and byte budgets are this deployment's config
-    rather than a property of the schema.
+    ``sources`` carries a **structural** bound here and the deployment's real
+    one at the route. Pydantic answers the first rung of the ladder — is each
+    source well-formed? — and the route answers the rest, because the count and
+    byte budgets are this deployment's config rather than a property of the
+    schema.
+
+    The structural bound exists because the first rung is not free. Without it
+    Pydantic validated every element a body held and the error handler rendered
+    every complaint it made, so 200 KB of empty objects — under
+    ``BodyLimitMiddleware``'s cap — cost 2.2 seconds of event loop and an 8.5 MB
+    response, and no admission bound saw any of it: the refusal happens while
+    dependencies are being solved, before a ``JobRecord`` exists, so the
+    ceiling, the rate and both token budgets count nothing. A caller could hold
+    the loop with well under one request a second.
 
     ``frameworks`` is **required and non-empty**, with no default anywhere on
     the path. A submission that names none is refused rather than analysed under
@@ -247,7 +269,10 @@ class JobSubmission(BaseModel):
 
     model_config = ConfigDict(extra="forbid")
 
-    sources: list[Source]
+    # Upper bound only. An empty list is the input ladder's second rung and the
+    # route answers it with a 400 and a sentence; a `min_length` here would take
+    # that refusal off the ladder and give back a schema dump instead.
+    sources: list[Source] = Field(max_length=MAX_SOURCES_PER_BODY)
     # Bounded by the number of frameworks this build knows: a valid selection
     # names each at most once (a repeat is refused downstream), so no legitimate
     # request exceeds it, and the schema refuses an over-long list before the
@@ -581,13 +606,22 @@ def create_app(
 
     @app.exception_handler(RequestValidationError)
     async def _validation_error(request: Request, exc: RequestValidationError):
+        found = exc.errors()
         errors = [
             {
                 "loc": ".".join(str(part) for part in error["loc"]),
                 "msg": error["msg"],
             }
-            for error in exc.errors()
+            for error in found[:MAX_RENDERED_ERRORS]
         ]
+        if len(found) > MAX_RENDERED_ERRORS:
+            errors.append(
+                {
+                    "loc": "",
+                    "msg": f"and {len(found) - MAX_RENDERED_ERRORS} more problems"
+                    " not shown",
+                }
+            )
         return _problem_response(422, "request body is invalid", errors=errors)
 
     @app.exception_handler(Exception)
