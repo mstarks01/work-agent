@@ -115,7 +115,7 @@ target-version = "py311"
 #
 # `extend-exclude` rather than `exclude`, and that is load-bearing: a
 # command-line `--exclude` REPLACES `exclude`, and both CI and `.githooks/`
-# run `ruff format --check . --exclude '*.md'`. Under `exclude` these three
+# run `ruff format --check . --exclude '*.md'`. Under `exclude` these
 # files would be checked in exactly the two places that matter.
 extend-exclude = ["docs/research"]
 
