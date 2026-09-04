@@ -18,6 +18,12 @@ merged commits and asks what the tree holds that no single diff showed. Run both
 a defect in a recent fix is the dominant class and sits inside one diff, and the
 rest needs the whole tree.
 
+**A fix is the riskiest code in the tree.** Across the audit rounds, most findings in
+a round came from the previous round's fixes, and every one of those passed the tests
+that shipped with it. So read your own fix diff against the three causes above, prefer
+one shared reader over a guard copied into a second, and make the harness that proved
+the defect the regression test.
+
 A finished checkpoint round ends in an annotated `reviewed/<date>` tag on the commit
 it covered. Start the next one from `git tag -l 'reviewed/*' --sort=-creatordate
 | head -1` rather than asking for a fixed point. The tag message carries what the
