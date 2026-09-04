@@ -38,7 +38,7 @@ request made the gate resolve a path. No diff carries that fact; the tree does.
 
 The diff, against the three named defect causes in `CLAUDE.md` — a rule with two
 readers, a bound that predicts a cost from its inputs, and a value shape the
-author never listed — and against the two fix habits at the end of this guide.
+author never listed — and against the fix habits at the end of this guide.
 
 Put the result in the pull request, so the record sits with the change. A
 pre-merge review cuts no tag.
@@ -106,12 +106,45 @@ every clone, needs no service, and is what `git diff` already takes.
 and `backup/*`, and reads the same way: the branch is gone, the tag is the
 record.
 
-## Two habits that fixes need
+## Habits that fixes need
 
-Both come from the audit runs that found defects in the previous run's fixes.
-Eight such defects across three runs, and every one passed the tests that
-shipped with it — so these are rules about the fix itself, not about testing
-harder.
+All five come from the audit runs that found defects in the previous run's
+fixes. Run 4 found 4 of its 6 findings in run 3's fixes, run 5 found 4 of 6 in
+run 4's, and all 3 of run 8's came from two fix pull requests. Every one of
+those defects passed the tests that shipped with it, so these are rules about
+the fix itself, not about testing harder.
+
+A fix is the riskiest code in the tree. It is new, it lands fast, and the
+attention that found the defect is spent by the time the repair is written.
+
+### Review your own fix the way you reviewed the defect
+
+Read the fix diff against the three named causes in `CLAUDE.md`, the same way a
+pre-merge review reads anybody else's diff. This includes the fix that closes a
+finding you reported an hour ago. Run 9 shipped a bound with no per-body limit,
+and `CLAUDE.md` carried that corollary two days before the fix merged.
+
+Let a fix to a hot path sit long enough to read it once more. Minutes between
+the last keystroke and the merge is how the previous rounds shipped their
+defects.
+
+### Prefer deleting a reader over adding a guard
+
+When the defect is a rule with two readers, make one reader call the other. A
+guard copied into the second reader contains this defect and leaves the class
+open; one shared helper removes the class.
+
+Run 10 fixed a corpus loader that followed a symlink out of a case directory. It
+inlined the resolve-and-bound rule a third time rather than exporting the one
+`sitting.moved` already held. The two readers are tested against each other, so
+they cannot drift in silence — but that is the fallback, not the fix to reach
+for first.
+
+### Make the harness that proved the bug the regression test
+
+The input that reproduced the defect is the honest one. A simpler test written
+after the repair tends to check the repair rather than the defect, and it passes
+for a reason the author chose.
 
 ### Ship no bound without two measurements
 
@@ -124,6 +157,11 @@ backwards: English prose at 288M ran 0.39 s, and a repetitive source at 112M
 ran 5.95 s. No reading of the code produces that; only running it does.
 
 If you cannot produce both numbers, the bound is a guess. Say so, or measure.
+
+Then name what sits beside the new bound. A ceiling makes the next unbounded
+value the weak one, so the pull request body lists the neighbours and says which
+of them are bounded. Run 9's finding was a bound on one scan beside an unbounded
+count of scans.
 
 ### When a fix breaks an existing test, suspect the fix
 
