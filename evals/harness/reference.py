@@ -83,6 +83,18 @@ class CorpusError(ValueError):
     """A golden case is missing, malformed, or internally inconsistent."""
 
 
+def corpus_refusal(error: CorpusError) -> str:
+    """The one line a command line prints when the corpus does not load.
+
+    Every entry point that reads the corpus refuses the same way, so the
+    sentence is written here once rather than in each ``main``. The error
+    already names the case, the file and the field it stopped on. A traceback
+    in its place names a pydantic frame, which is nothing the reader whose own
+    case carries the bad entry can act on.
+    """
+    return f"cannot read the corpus: {error}"
+
+
 class ReferenceSeverity(BaseModel):
     """The recorded severity for a reference threat: the two rated axes only.
 

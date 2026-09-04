@@ -56,7 +56,12 @@ sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 from evals.harness import sitting as sittings
 from evals.harness import submit as submit_spine
 from evals.harness.envelope import VERSION
-from evals.harness.reference import ANONYMOUS, is_submitted_for
+from evals.harness.reference import (
+    ANONYMOUS,
+    CorpusError,
+    corpus_refusal,
+    is_submitted_for,
+)
 from webapp.page import script_json
 
 REPO_ROOT = Path(__file__).resolve().parents[1]
@@ -455,10 +460,17 @@ def main(argv: list[str] | None = None) -> int:
         )
         return 1
 
+    # Built before the file is opened, for the reason `webapp/sitting.py`
+    # catches the same error: a corpus that does not parse is the operator's
+    # to fix, and it names the case rather than a pydantic frame.
+    try:
+        page = build(sittings.CORPUS_DIR, submitted_by, submitted_for)
+    except CorpusError as exc:
+        print(corpus_refusal(exc), file=sys.stderr)
+        return 1
+
     out = Path(args.out)
-    out.write_text(
-        build(sittings.CORPUS_DIR, submitted_by, submitted_for), encoding="utf-8"
-    )
+    out.write_text(page, encoding="utf-8")
     size = out.stat().st_size
     print(f"wrote {out} ({size // 1024} KB)")
     print(f"read by {submitted_for}, submitted by {submitted_by}")

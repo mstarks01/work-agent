@@ -210,7 +210,12 @@ from evals.harness import envelope as envelopes
 from evals.harness import roster as rosters
 from evals.harness import sitting as sittings
 from evals.harness import submit as submit_spine
-from evals.harness.reference import ANONYMOUS, is_submitted_for
+from evals.harness.reference import (
+    ANONYMOUS,
+    CorpusError,
+    corpus_refusal,
+    is_submitted_for,
+)
 from evals.harness.roster import Roster
 from evals.harness.sitting import MIN_OWN_LIST, own_list_is_written
 from webapp.page import (
@@ -226,6 +231,11 @@ from webapp.page import (
 
 HOST = "127.0.0.1"
 PORT = 8020
+
+#: The clone this app reads, named as :mod:`webapp.offline_sitting` names it.
+#: A constant rather than an expression inside ``main``, so a test can point
+#: the command line at a throwaway tree.
+REPO_ROOT = Path(__file__).resolve().parents[1]
 
 #: What this surface calls itself in the evidence it writes. The offline page
 #: writes its own name into the same line, so the document says which of the
@@ -1877,7 +1887,7 @@ def main(argv: list[str] | None = None) -> int:
     )
     args = parser.parse_args(argv)
 
-    root = Path(__file__).resolve().parents[1]
+    root = REPO_ROOT
     if args.list:
         print("\n".join(sittings.unreviewed_cases(root)))
         return 0
@@ -1917,7 +1927,15 @@ def main(argv: list[str] | None = None) -> int:
     # inviting a red PR. Who the read was *for* does not enter this: it binds
     # nothing, so it loosens nothing.
     can_submit = bool(login) and login == submitted_by and not args.no_submit
-    session = build_session(root, submitted_by, submitted_for, args.case, can_submit)
+    # A corpus that does not parse stops the session, and the reader is still
+    # at their terminal: they get the case and the field, not a traceback.
+    try:
+        session = build_session(
+            root, submitted_by, submitted_for, args.case, can_submit
+        )
+    except CorpusError as exc:
+        print(corpus_refusal(exc), file=sys.stderr)
+        return 1
     import uvicorn
 
     print(f"sitting as {sittings.naming(submitted_by, submitted_for)}")

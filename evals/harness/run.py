@@ -113,7 +113,12 @@ from evals.harness.provenance import (
     RunProvenance,
     provenance_of,
 )
-from evals.harness.reference import GoldenCase, load_corpus
+from evals.harness.reference import (
+    CorpusError,
+    GoldenCase,
+    corpus_refusal,
+    load_corpus,
+)
 from evals.harness.scorer import CaseScore
 from evals.harness.stability import (
     CaseStability,
@@ -1628,7 +1633,14 @@ def main(argv: Sequence[str] | None = None) -> int:
             command.arguments(sub)
         sub.set_defaults(func=command.run)
     args = parser.parse_args(argv)
-    return args.func(args)
+    # Every command that reads the corpus refuses here, through the one
+    # sentence `webapp/sitting.py` and the offline page print: the error names
+    # the case and the field, and a traceback over it names neither.
+    try:
+        return args.func(args)
+    except CorpusError as exc:
+        print(corpus_refusal(exc), file=sys.stderr)
+        return 1
 
 
 if __name__ == "__main__":

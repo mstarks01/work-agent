@@ -21,9 +21,10 @@ import pytest
 
 from evals.harness import sitting as sittings
 from evals.harness.envelope import VERSION
-from evals.harness.reference import ANONYMOUS
+from evals.harness.reference import ANONYMOUS, CorpusError
 from tests.test_sitting_app import CASE, build_tree
 from webapp.offline_sitting import build, payload
+from webapp.offline_sitting import main as offline_main
 
 
 @pytest.fixture
@@ -128,6 +129,26 @@ class TestThePageIsSelfContained:
         for case in body["cases"]:
             assert "own_list" not in case
             assert "marks" not in case
+
+
+class TestACorpusThatDoesNotLoad:
+    def test_the_page_is_never_written(self, tmp_path, monkeypatch, capsys):
+        """The same refusal `webapp/sitting.py` prints, and no half-built page
+        left behind for an operator to send."""
+
+        def refuse(corpus_dir, submitted_by, submitted_for):
+            raise CorpusError("03-batch-data-pipeline: case.json: 1 validation error")
+
+        monkeypatch.setattr("webapp.offline_sitting.build", refuse)
+        monkeypatch.setattr(
+            "webapp.offline_sitting.submit_spine.gh_login", lambda root: "sam"
+        )
+        out = tmp_path / "sitting.html"
+        assert offline_main(["--out", str(out)]) == 1
+        assert not out.exists()
+        printed = capsys.readouterr()
+        assert printed.err.startswith("cannot read the corpus:")
+        assert "03-batch-data-pipeline" in printed.err
 
 
 def test_a_line_holds_no_line_break():
