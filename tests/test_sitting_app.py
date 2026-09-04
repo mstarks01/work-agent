@@ -24,6 +24,7 @@ from fastapi.testclient import TestClient
 
 from evals import verify_corpus
 from evals.harness import sitting as sittings
+from evals.harness.reference import CorpusError
 from webapp.sitting import _PAGE, MIN_OWN_LIST, build_session, create_app
 from webapp.sitting import main as app_main
 
@@ -2271,6 +2272,55 @@ class TestTheTerminalReadsNoDraft:
         )
         assert app_main(["--list"]) == 0
         assert capsys.readouterr().out.splitlines() == list(CASES)
+
+
+class TestACorpusThatDoesNotLoad:
+    """A ``case.json`` the loader refuses stops the session with one line.
+
+    The entry that stops it is often the reader's own. A sitting recorded
+    under a field set the loader has since replaced stays in the working tree,
+    and the reader meets it at the next launch rather than at a commit. So the
+    command line prints the case and the field it stopped on, and the reader
+    is left with something to act on rather than a pydantic frame.
+    """
+
+    def stale(self, tree):
+        """Give one case a sitting entry the loader does not accept."""
+        path = tree / "evals" / "corpus" / OTHER / "case.json"
+        meta = json.loads(path.read_text(encoding="utf-8"))
+        meta["reviews"] = [
+            {
+                "reviewer": "sam",
+                "date": "2026-09-01",
+                "read": [{"file": "source.md", "sha256": "0" * 64}],
+                "document": "REVIEW-sam.md",
+                "notes": "",
+            }
+        ]
+        path.write_text(json.dumps(meta, indent=2) + "\n", encoding="utf-8")
+
+    def test_the_loader_names_the_case_and_the_field(self, tree):
+        self.stale(tree)
+        with pytest.raises(CorpusError) as raised:
+            session_for(tree, "sam")
+        assert OTHER in str(raised.value)
+        assert "submitted_by" in str(raised.value)
+
+    def test_the_command_line_prints_one_line_and_starts_no_server(
+        self, tree, monkeypatch, capsys
+    ):
+        self.stale(tree)
+        monkeypatch.setattr("webapp.sitting.REPO_ROOT", tree)
+        monkeypatch.setattr("webapp.sitting.submit_spine.gh_login", lambda root: "sam")
+        monkeypatch.setattr(
+            "webapp.sitting.sittings.draft_root", lambda: drafts_root(tree)
+        )
+        assert app_main(["--submitted-by", "sam"]) == 1
+        printed = capsys.readouterr()
+        assert printed.err.startswith("cannot read the corpus:")
+        assert OTHER in printed.err
+        assert "Traceback" not in printed.err
+        assert printed.out == ""
 
 
 class TestThePageParses:
