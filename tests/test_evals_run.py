@@ -9,6 +9,7 @@ nothing came to announce "all node fingerprints blessed" and write
 
 from __future__ import annotations
 
+import dataclasses
 import json
 
 import pytest
@@ -25,6 +26,7 @@ from evals.harness import (
     submit,
 )
 from evals.harness.modes import AttributeCheck, ExtractionScore, render_extraction
+from evals.harness.reference import CorpusError
 from evals.harness.run import _models_record, _print_certification
 from tests.factories import TEST_CREDENTIAL_ENV, TEST_TIER_ENV
 
@@ -213,6 +215,30 @@ class TestTheCommandTable:
     def test_a_name_the_table_does_not_hold_is_refused(self):
         with pytest.raises(SystemExit):
             run.main(["not-a-command"])
+
+    def test_a_corpus_that_does_not_load_ends_in_one_line(self, monkeypatch, capsys):
+        """Every command reads the corpus through one loader, so they refuse
+        through one guard: the case and the field, and no traceback."""
+        # A command that declares no arguments of its own, so the line under
+        # test is the guard rather than the parser.
+        name = next(
+            key
+            for key, command in sorted(run.COMMANDS.items())
+            if command.arguments is None
+        )
+
+        def raise_corpus_error(args):
+            raise CorpusError("03-batch-data-pipeline: case.json: 1 validation error")
+
+        monkeypatch.setitem(
+            run.COMMANDS,
+            name,
+            dataclasses.replace(run.COMMANDS[name], run=raise_corpus_error),
+        )
+        assert run.main([name]) == 1
+        printed = capsys.readouterr()
+        assert printed.err.startswith("cannot read the corpus:")
+        assert "03-batch-data-pipeline" in printed.err
 
     @pytest.mark.parametrize("name", sorted(run.COMMANDS))
     def test_each_command_parses_its_own_help(self, name, capsys):
