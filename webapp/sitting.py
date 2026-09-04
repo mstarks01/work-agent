@@ -506,10 +506,11 @@ def _paste(session: Session, cases: list[str]) -> str:
     return (
         f"Sitting: {names}, {len(cases)} cases\n\n"
         f"{listed}\n\n"
-        "Each case above was read whole — the sources, the model and every"
-        " declared framework's reference set. The reader's own threat list for"
-        " a case was written before that case's recorded sets were opened, and"
-        f" the filled document is committed as `{session.document_name}`.\n\n"
+        "Each case above was read from the same source material used by the"
+        " analysis. The reader wrote an independent list before the recorded"
+        " framework findings were opened, then judged the findings they chose"
+        " to assess. The filled document is committed as"
+        f" `{session.document_name}`.\n\n"
         "The `reviews` entry in each `case.json` records the digest of every"
         " file as it stands in this PR, so a later edit to any of them puts"
         " that case back on the list."
@@ -586,7 +587,17 @@ _PAGE = r"""<!doctype html>
   .line { display: flex; gap: 1.25rem; align-items: center;
           justify-content: space-between; padding: .55rem 0; }
   .line > span { flex: 1; min-width: 0; }
-  #submitBox { margin-top: 1.6rem; padding-top: .35rem; }
+  #submitBox { margin: .7rem 0 1.2rem; }
+  .framework-picker { border: 0; margin: 1rem 0; padding: 0; }
+  .framework-picker legend { font-weight: 600; margin-bottom: .35rem; }
+  .framework-picker label { display: inline-flex; align-items: center; gap: .35rem;
+                            margin-right: 1rem; }
+  details.framework { border: 1px solid var(--line); border-radius: 8px;
+                      padding: .75rem 1rem; margin: .8rem 0; }
+  details.framework > summary { cursor: pointer; font-weight: 600; }
+  details.framework[open] > summary { margin-bottom: .9rem; }
+  details.framework .framework-body > h3:first-child { margin-top: .5rem; }
+  .save-status { margin-left: .7rem; color: #777; font-size: .9rem; }
 
   .doc h3 { font-size: .74rem; text-transform: uppercase; letter-spacing: .08em;
             color: #8a8a8a; margin: 1.8rem 0 .6rem; font-weight: 600; }
@@ -644,9 +655,21 @@ _PAGE = r"""<!doctype html>
 <main>
 <details id="guide" open>
   <summary>How to complete a case sitting</summary>
-  <p>Read the system first and write your own list of what could go wrong. Only
-  after you save that list will the recorded findings appear. Then judge each
-  recorded finding independently.</p>
+  <p><b>Thank you for helping to make Work Agent better.</b></p>
+  <p>This exercise gives the project an independent human check on what the
+  analysis produced. Your judgments show where the model is reliably finding
+  real issues, where it overreaches, where it repeats itself, and where it
+  misses something a security reviewer notices. Those results can be measured
+  over time and used to improve prompts, rules, evaluation data, and future
+  analysis quality.</p>
+  <p><b>Part 1</b> asks you to read the system description and write your own
+  concerns before seeing the project's recorded findings. Keeping that step
+  blind makes the comparison meaningful instead of letting the existing answer
+  steer yours.</p>
+  <p><b>Part 2</b> reveals the findings already recorded for the case, grouped by
+  framework. Compare them with the same system description and mark the findings
+  you review. You can review one framework or several; findings you do not mark
+  simply remain unreviewed.</p>
   <ul>
     <li><b>Agree</b> when the underlying finding is real, supported by the case, and worth reporting.</li>
     <li><b>Reject</b> when the finding is unsupported, materially overstated, or simply incorrect.</li>
@@ -693,14 +716,15 @@ _PAGE = r"""<!doctype html>
       <p class="why"><b>Why Duplicate:</b> If both point to the same session invalidation failure, the second is another expression of the first, not a separate finding.</p>
     </div>
   </section>
+  <p><b>Thank you for helping to make the project better.</b></p>
 </details>
 
 <div id="empty">
   <h2>Start a sitting</h2>
-  <p class="note">Choose a case on the left or start with the first case to do.
-  Your own threat list comes first; the recorded findings remain hidden until
-  you save it. Drafts save as you work, and you can return to the Review guide
-  from the left rail at any time.</p>
+  <p class="note">Thank you for helping to make Work Agent better. Choose a case
+  on the left or start with the first case to do. Your independent list comes
+  first; the recorded findings remain hidden until you save it. Your review
+  becomes evidence the project can use to measure and improve analysis quality.</p>
   <p><button id="start">Start with the first case to do</button></p>
 </div>
 
@@ -717,38 +741,45 @@ _PAGE = r"""<!doctype html>
   <p id="moved" class="note hidden"></p>
 
   <section id="one">
-    <h2>Part 1 — the system</h2>
+    <h2>Part 1 — your independent review</h2>
     <div id="partOne" class="doc">loading…</div>
     <h2>Your list, written first</h2>
-    <p class="note">Write what could go wrong: an attack, a missing control, a
-    question the text does not answer. One per line. The recorded sets are not
-    in this page until you submit this — that is the whole method, so the
-    press waits until the list says something.</p>
-    <textarea id="own" placeholder="one per line"></textarea>
-    <p><button id="lock">Save my list and show the recorded sets</button>
+    <p class="note">Before seeing the recorded findings, write the security
+    concerns or unanswered questions you notice in the system description.
+    One per line. This blind first pass gives the project a meaningful human
+    comparison instead of an answer influenced by the model's output.</p>
+    <textarea id="own" placeholder="one concern or question per line"></textarea>
+    <p><button id="lock">Save my list and show Part 2</button>
     <span id="ownHint" class="gate"></span></p>
   </section>
 
   <section id="placeholder">
-    <h2>Part 2 — what is recorded</h2>
-    <p class="frame">The recorded sets open here, once your list is in. Until
-    then they are not in this page at all, so the document can say your list
-    came first and be right.</p>
+    <h2>Part 2 — compare with the recorded findings</h2>
+    <p class="frame">After you save your independent list, the project's
+    recorded findings appear here. They stay hidden until then so the first
+    part remains an independent human check.</p>
   </section>
 
   <section id="two" class="hidden">
-    <h2>Part 2 — what is recorded</h2>
-    <p class="note">Mark each recorded finding: <b>Agree</b> when the underlying
-    finding is supported and worth reporting, <b>Reject</b> when it is unsupported
-    or materially overstated, and <b>Duplicate</b> when another entry already
-    describes the same underlying issue. Judge the issue, not the wording.</p>
+    <h2>Part 2 — compare with the recorded findings</h2>
+    <p class="note">These are findings Work Agent previously recorded for this
+    same case. Review one framework or several. Your Agree, Reject, and Duplicate
+    decisions help measure what the analysis gets right, what it overstates, and
+    where it repeats itself. Unmarked findings remain unreviewed.</p>
+    <div id="frameworkPicker"></div>
     <div id="partTwo" class="doc"></div>
-    <h2>On your list and not on theirs</h2>
-    <p class="note">The finding this sitting exists for. One per line.</p>
-    <textarea id="missing" placeholder="one per line"></textarea>
+    <h2>What did your independent review find that these findings missed?</h2>
+    <p class="note">If something on your original list is not represented by
+    the framework findings you reviewed, enter it here, one per line. These are
+    potential coverage gaps: they help identify issues the analysis may need to
+    learn to find or express more clearly. Leave this blank if nothing is missing.</p>
+    <textarea id="missing" placeholder="one potentially missed issue per line"></textarea>
     <h2>Notes</h2>
-    <textarea id="notes" placeholder="counts, and anything you changed"></textarea>
-    <p><button id="finish">Record the sitting</button></p>
+    <p id="markCounts" class="note"></p>
+    <p class="hint">Counts are calculated automatically. Use notes only for
+    context the structured choices do not capture.</p>
+    <textarea id="notes" placeholder="optional context or explanation"></textarea>
+    <p><button id="finish">Record the sitting</button><span id="saveStatus" class="save-status" role="status"></span></p>
   </section>
 
   <section id="discardBox" class="hidden">
@@ -760,12 +791,13 @@ _PAGE = r"""<!doctype html>
   </section>
 
   <section id="done" class="hidden">
-    <h2>Recorded</h2>
+    <h2 id="doneTitle">Recorded</h2>
     <p id="summary" class="note"></p>
     <p>Written into your working tree:</p>
     <pre id="written"></pre>
-    <p class="note">Continue to the next case. The last Next ends at the submit
-    stage, where one press carries every case you recorded.</p>
+    <p class="note">Thank you for helping to make the project better. Continue
+    to the next case when you are ready. The last Next ends at the submit stage,
+    where one pull request can carry every case you recorded.</p>
   </section>
 
   <p class="walk bottom">
@@ -797,19 +829,16 @@ _PAGE = r"""<!doctype html>
     <h2>Written into your working tree</h2>
     <pre id="stageWritten"></pre>
     <h2>Open the pull request</h2>
-    <p>One command carries every case above:</p>
+    <div id="submitBox">
+      <p><button id="submit">Open pull request as <!--submitter--></button></p>
+      <p id="submitHint" class="hint"></p>
+      <pre id="result" class="hidden"></pre>
+    </div>
+    <p>If you prefer the command line, run:</p>
     <pre id="stageCommand"></pre>
-    <p>Or paste this into one you open yourself:</p>
+    <p>Or paste this into a pull request you open yourself:</p>
     <pre id="stagePaste"></pre>
   </section>
-
-  <div id="submitBox" class="hidden">
-    <p class="note">Or let this open it for you, through the
-    <code>gh</code> you are already signed in to. It runs the same checks
-    first, pushes to your fork, and opens the pull request as you.</p>
-    <p><button id="submit">Open the pull request as <!--submitter--></button></p>
-    <pre id="result" class="hidden"></pre>
-  </div>
 </article>
 </main>
 
@@ -939,6 +968,7 @@ function setMarks(marks) {
   for (const select of document.querySelectorAll("select[data-finding]")) {
     select.value = marks[select.dataset.finding] || "";
   }
+  updateMarkCounts();
 }
 
 async function openCase(caseId) {
@@ -994,7 +1024,10 @@ async function loadStage() {
   $("stageCommand").textContent = d.command;
   $("stagePaste").textContent = d.paste;
   $("waysOut").classList.toggle("hidden", !d.ready.length);
-  $("submitBox").classList.toggle("hidden", !(CAN_SUBMIT && d.ready.length));
+  $("submit").disabled = !(CAN_SUBMIT && d.ready.length);
+  $("submitHint").textContent = CAN_SUBMIT
+    ? "This uses the gh account already authenticated on this machine."
+    : "Button unavailable because this session has no authenticated gh account. The command and manual options below still work.";
 }
 
 function stageRow(row, label, act) {
@@ -1029,9 +1062,13 @@ function blank() {
   $("partOne").textContent = "loading…";
   warn([]);
   $("partTwo").replaceChildren();
+  $("frameworkPicker").replaceChildren();
   for (const id of ["own", "missing", "notes"]) $(id).value = "";
   $("written").textContent = "";
   $("summary").textContent = "";
+  $("markCounts").textContent = "Review summary: 0 agree · 0 reject · 0 duplicate · 0 unmarked";
+  $("saveStatus").textContent = "";
+  $("doneTitle").textContent = "Recorded";
   $("own").readOnly = false;
   gate();
   $("finish").textContent = "Record the sitting";
@@ -1058,10 +1095,23 @@ function gate() {
 $("own").addEventListener("input", gate);
 
 function finishedNow(finished) {
-  $("finish").textContent = finished
-    ? "Re-record this sitting"
-    : "Record the sitting";
+  $("finish").textContent = finished ? "Save changes" : "Record the sitting";
   $("discardBox").classList.toggle("hidden", finished);
+}
+
+function frameworkChoice(name, details) {
+  const label = document.createElement("label");
+  const input = document.createElement("input");
+  input.type = "checkbox";
+  input.checked = true;
+  input.dataset.framework = name;
+  input.addEventListener("change", () => {
+    details.classList.toggle("hidden", !input.checked);
+    if (input.checked) details.open = true;
+    updateMarkCounts();
+  });
+  label.append(input, document.createTextNode(name.toUpperCase()));
+  return label;
 }
 
 async function showSets(caseId) {
@@ -1074,19 +1124,33 @@ async function showSets(caseId) {
     for (const claim of target.claims) byClaim.set(claim, target);
   }
   const box = $("partTwo");
+  const picker = $("frameworkPicker");
   box.replaceChildren();
-  for (const part of Object.values(sets.frameworks)) {
-    box.append(el("h3", "set", part.heading), el("p", "note", part.question));
+  picker.replaceChildren();
+  const fieldset = el("fieldset", "framework-picker");
+  fieldset.append(el("legend", null, "Frameworks to review"));
+  for (const [name, part] of Object.entries(sets.frameworks)) {
+    const details = el("details", "framework");
+    details.open = true;
+    details.dataset.framework = name;
+    details.append(el("summary", null, part.heading));
+    const body = el("div", "framework-body");
+    body.append(el("p", "note", part.question));
     const answered = new Map();
     for (const group of part.groups) {
-      box.append(el("h3", null, group.name));
+      body.append(el("h3", null, group.name));
       for (const record of group.records) {
-        box.append(recordCard(record, byClaim.get(record.title), sets.values, answered));
+        body.append(recordCard(record, byClaim.get(record.title), sets.values, answered, name));
       }
     }
+    details.append(body);
+    box.append(details);
+    fieldset.append(frameworkChoice(name, details));
   }
+  picker.append(fieldset);
   $("placeholder").classList.add("hidden");
   $("two").classList.remove("hidden");
+  updateMarkCounts();
 }
 
 $("helpToggle").addEventListener("click", () => {
@@ -1130,7 +1194,13 @@ $("lock").addEventListener("click", async () => {
   $("two").scrollIntoView({behavior: "smooth"});
 });
 
-for (const name of ["input", "change"]) $("two").addEventListener(name, queueSave);
+for (const name of ["input", "change"]) {
+  $("two").addEventListener(name, () => {
+    updateMarkCounts();
+    queueSave();
+    $("saveStatus").textContent = "";
+  });
+}
 
 $("discard").addEventListener("click", async () => {
   const caseId = current;
@@ -1226,7 +1296,7 @@ function fieldRow(row) {
   return line;
 }
 
-function recordCard(record, target, values, answered) {
+function recordCard(record, target, values, answered, framework) {
   const card = el("div", "card rec");
   const head = el("div", "head");
   head.append(el("span", "num", record.label));
@@ -1252,6 +1322,7 @@ function recordCard(record, target, values, answered) {
   answered.set(target.fingerprint, record.label);
   const select = document.createElement("select");
   select.dataset.finding = target.fingerprint;
+  select.dataset.framework = framework;
   select.id = "mark-" + target.fingerprint;
   for (const value of ["", ...values]) {
     const option = document.createElement("option");
@@ -1267,9 +1338,23 @@ function recordCard(record, target, values, answered) {
   return card;
 }
 
+function selectedFrameworks() {
+  return new Set(
+    [...document.querySelectorAll("input[data-framework]")]
+      .filter(input => input.checked)
+      .map(input => input.dataset.framework)
+  );
+}
+
+function visibleSelects() {
+  const selected = selectedFrameworks();
+  return [...document.querySelectorAll("select[data-finding]")]
+    .filter(select => selected.has(select.dataset.framework));
+}
+
 function marksNow() {
   const marks = {};
-  for (const select of document.querySelectorAll("select[data-finding]")) {
+  for (const select of visibleSelects()) {
     if (select.value) marks[select.dataset.finding] = select.value;
   }
   return marks;
@@ -1277,7 +1362,7 @@ function marksNow() {
 
 function markSummary() {
   const counts = {agree: 0, reject: 0, duplicate: 0};
-  const selects = [...document.querySelectorAll("select[data-finding]")];
+  const selects = visibleSelects();
   for (const select of selects) {
     if (select.value in counts) counts[select.value] += 1;
   }
@@ -1287,8 +1372,15 @@ function markSummary() {
     + (selects.length - marked) + " unmarked";
 }
 
+function updateMarkCounts() {
+  $("markCounts").textContent = markSummary();
+}
+
 $("finish").addEventListener("click", async () => {
   const caseId = current;
+  const wasFinished = $("finish").textContent === "Save changes";
+  $("finish").disabled = true;
+  $("saveStatus").textContent = wasFinished ? "Saving changes…" : "Recording…";
   const res = await fetch("/api/finish", {
     method: "POST",
     headers: {"Content-Type": "application/json", "X-Sitting-Token": TOKEN},
@@ -1298,16 +1390,26 @@ $("finish").addEventListener("click", async () => {
     }),
   });
   const d = await res.json();
-  if (!res.ok) { $("written").textContent = d.detail; $("done").classList.remove("hidden"); return; }
+  $("finish").disabled = false;
+  if (!res.ok) {
+    $("saveStatus").textContent = "Could not save";
+    $("written").textContent = d.detail;
+    $("doneTitle").textContent = "Not recorded";
+    $("done").classList.remove("hidden");
+    return;
+  }
   warn(d.moved);
   $("summary").textContent = markSummary();
   $("written").textContent = d.written.join("\n");
+  $("doneTitle").textContent = wasFinished ? "Changes saved" : "Recorded";
+  $("saveStatus").textContent = wasFinished ? "Changes saved" : "Recorded";
   finishedNow(true);
   $("done").classList.remove("hidden");
   await loadRail();
 });
 
 $("submit").addEventListener("click", async () => {
+  if (!CAN_SUBMIT) return;
   $("submit").disabled = true;
   $("result").classList.remove("hidden");
   $("result").textContent = "running the checks…";
