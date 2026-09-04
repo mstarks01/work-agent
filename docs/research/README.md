@@ -9,7 +9,7 @@ before you rely on it — `pyproject.toml` holds what this repo runs today.
 
 **Do not edit a file here to bring it up to date.** Its value is being the
 record that a decision cites. Supersede it with a new file and a new ticket. The
-three `probe_*.py` scripts are excluded from `ruff` in `pyproject.toml` for the
+`probe_*.py` scripts are excluded from `ruff` in `pyproject.toml` for the
 same reason, so a lint cannot rewrite an artifact an ADR points at.
 
 ## What is here
@@ -23,6 +23,7 @@ same reason, so a lint cannot rewrite an artifact an ADR points at.
 | `litellm-reasoning-surface.md` + two `probe_litellm_reasoning_*.py` | #15 | 2026-07-28 | `litellm==1.93.0` |
 | `transcript-exports.md` | #51 | 2026-07-31 | — |
 | `asvs-representation.md` + `asvs-l1-subjects.csv` | #160 | 2026-08-12 | — |
+| `system-model-evolution.md` + `probe_model_vocabulary.py` | #483 | 2026-09-04 | repo `8729415`, CycloneDX 1.7 |
 
 ## The one staleness you must know about
 
