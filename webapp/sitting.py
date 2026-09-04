@@ -779,7 +779,7 @@ _PAGE = r"""<!doctype html>
     <p class="hint">Counts are calculated automatically. Use notes only for
     context the structured choices do not capture.</p>
     <textarea id="notes" placeholder="optional context or explanation"></textarea>
-    <p><button id="finish">Record the sitting</button><span id="saveStatus" class="save-status" role="status"></span></p>
+    <p><button id="finish" title="Re-record this sitting after it has already been recorded">Record the sitting</button><span id="saveStatus" class="save-status" role="status"></span></p>
   </section>
 
   <section id="discardBox" class="hidden">
