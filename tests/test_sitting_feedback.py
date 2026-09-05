@@ -2,7 +2,6 @@
 
 from __future__ import annotations
 
-import json
 import shutil
 from pathlib import Path
 
@@ -85,7 +84,8 @@ def test_framework_absence_is_not_presented_as_inapplicability():
 def test_reset_keeps_the_blind_list_and_returns_status_to_not_reviewed(tmp_path):
     tree = tree_for(tmp_path)
     app, session, _ = client_for(tree)
-    assert app.post("/api/own-list", json={"case": CASE, "items": OWN_LIST}).status_code == 200
+    opened = app.post("/api/own-list", json={"case": CASE, "items": OWN_LIST})
+    assert opened.status_code == 200
     part_two = app.get(f"/api/part-two?case={CASE}").json()
     fingerprint = part_two["marks"][0]["fingerprint"]
     finished = app.post(
@@ -111,7 +111,8 @@ def test_reset_keeps_the_blind_list_and_returns_status_to_not_reviewed(tmp_path)
     assert part_one["missing"] == []
     assert part_one["notes"] == ""
     assert app.get(f"/api/part-two?case={CASE}").status_code == 200
-    assert app.get("/api/review-states").json()["states"][CASE] == "Not reviewed"
+    states = app.get("/api/review-states").json()["states"]
+    assert states[CASE] == "Not reviewed"
 
     changed = app.post(
         "/api/own-list",
@@ -139,7 +140,8 @@ def test_reviewer_identity_is_chosen_in_the_ui_and_locked_after_start(tmp_path):
     )
     assert restarted.get("/api/rail").json()["submitted_for"] == "anonymous"
 
-    assert app.post("/api/own-list", json={"case": CASE, "items": OWN_LIST}).status_code == 200
+    opened = app.post("/api/own-list", json={"case": CASE, "items": OWN_LIST})
+    assert opened.status_code == 200
     locked = app.post("/api/reviewer", json={"mode": "self"})
     assert locked.status_code == 409
     assert "locked" in locked.json()["detail"]
@@ -148,25 +150,36 @@ def test_reviewer_identity_is_chosen_in_the_ui_and_locked_after_start(tmp_path):
 def test_reset_requires_the_same_write_controls(tmp_path):
     tree = tree_for(tmp_path)
     app, session, _ = client_for(tree)
-    assert app.post("/api/own-list", json={"case": CASE, "items": OWN_LIST}).status_code == 200
+    opened = app.post("/api/own-list", json={"case": CASE, "items": OWN_LIST})
+    assert opened.status_code == 200
 
     foreign = app.post(
         "/api/reset",
         json={"case": CASE},
-        headers={"Sec-Fetch-Site": "cross-site", "X-Sitting-Token": session.token},
+        headers={
+            "Sec-Fetch-Site": "cross-site",
+            "X-Sitting-Token": session.token,
+        },
     )
     assert foreign.status_code == 403
 
     no_token = TestClient(
-        sitting.create_app(session), base_url=LOOPBACK, headers={"Sec-Fetch-Site": "same-origin"}
+        sitting.create_app(session),
+        base_url=LOOPBACK,
+        headers={"Sec-Fetch-Site": "same-origin"},
     )
     assert no_token.post("/api/reset", json={"case": CASE}).status_code == 403
 
 
 def test_no_github_login_no_longer_blocks_launch(monkeypatch):
     seen: dict[str, list[str]] = {}
+
+    def capture(argv: list[str]) -> int:
+        seen["args"] = argv
+        return 0
+
     monkeypatch.setattr(sitting.submit_spine, "gh_login", lambda root: "")
-    monkeypatch.setattr(sitting.base, "main", lambda argv: seen.setdefault("args", argv) or 0)
+    monkeypatch.setattr(sitting.base, "main", capture)
 
     result = sitting.main([])
     assert result == 0
