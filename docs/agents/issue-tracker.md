@@ -55,12 +55,84 @@ gh api --method POST repos/mstarks01/work-agent/issues/<child>/dependencies/bloc
 
 ### The live map
 
-**None.** [#369](https://github.com/mstarks01/work-agent/issues/369) completed 2026-08-28 and has
+**None.** [#491](https://github.com/mstarks01/work-agent/issues/491) completed 2026-09-05 and has
 moved to Completed efforts below. Chart a new one only against the bar at the end of this file.
 
 ### Completed efforts
 
 Completed on GitHub Issues (canonical):
+
+- [#491 — Map: Amazon Bedrock is the fourth vendor row](https://github.com/mstarks01/work-agent/issues/491)
+  — 8 tickets, charted 2026-09-01 and completed 2026-09-05. A **planning** map over the
+  model-provider layer: it settled the spec for a `bedrock` row that is checkable offline from end
+  to end, and stopped at the spec. Four issues carry the build, in this order of dependency:
+  [#602](https://github.com/mstarks01/work-agent/issues/602) reshapes the registry,
+  [#603](https://github.com/mstarks01/work-agent/issues/603) adds the row,
+  [#606](https://github.com/mstarks01/work-agent/issues/606) makes `served_trust` a vendor field, and
+  [#608](https://github.com/mstarks01/work-agent/issues/608) rewrites the floating-marker rule. The
+  last two wait on no vendor row, because each one repairs a live defect that exists today.
+
+  The map ran with **no live call and no AWS account**. Every decision rests on the pinned litellm
+  cost map, which is offline and needs no credential. Each ticket measured the map rather than
+  predicting what it holds, and several answers changed as a result.
+
+  The route in one pass. **A Bedrock credential has two mechanisms, and the rule changed for every
+  vendor** ([#493](https://github.com/mstarks01/work-agent/issues/493)): a deployment declares the
+  mechanism, and the vendor's SDK may then discover the material. `CredentialMode.ADC` became
+  `IAM`, `CREDENTIAL_MODES` keys the allowed modes by vendor, and `model_tiers.toml` moved to
+  version 7 with a `[credentials]` table. An `IAM` mode passes no credential material at all, so
+  `google.auth.default()` and boto3's chain each resolve their own identity.
+  **The project takes `boto3` as an optional extra named `bedrock`**
+  ([#498](https://github.com/mstarks01/work-agent/issues/498)), and ADR 0023 writes the rule as a
+  property of the vendor rather than as Bedrock's name. `botocore` alone is not enough, because
+  litellm resolves AWS credentials before it reads a bearer token, so both credential modes reach a
+  bare `import boto3`.
+  **A Bedrock model identifier is one regex**
+  ([#494](https://github.com/mstarks01/work-agent/issues/494)),
+  `[<scope>.]anthropic.claude-<name>-<major>[-<minor>]` with an optional date and build tail. A
+  broad family decides which rule reads an identifier and a strict shape decides whether it passes,
+  so `_FormRule.family` became a pattern. An ARN is refused, because it hides which model ran and
+  carries an account id into a fingerprint.
+  **The generation parse stays vendor-blind**
+  ([#495](https://github.com/mstarks01/work-agent/issues/495)). The two Claude segment orders became
+  shared atoms that every Claude pattern composes from, so a spelling is written down once.
+  **No region enters the fingerprint, on any vendor**
+  ([#496](https://github.com/mstarks01/work-agent/issues/496)). A field named for a region would
+  state where the request ran, and would be wrong exactly when a cross-region profile is in use.
+  **The conformance pair is `anthropic.claude-sonnet-4-6` and `anthropic.claude-opus-5`**
+  ([#497](https://github.com/mstarks01/work-agent/issues/497)), in the plain spelling. Only Claude
+  can be the pair: Nova and Llama get emulated structured output, so the build-time gate refuses
+  them.
+  **A floating marker is a whole word, never a fragment of one**
+  ([#605](https://github.com/mstarks01/work-agent/issues/605)). One table of `word -> message`
+  replaced the substring denylist and the suffix alias test, which were two readers of one rule.
+
+  Three findings are worth carrying. **A map about one vendor found six defects on another.** #493
+  found two, and #495, #496, #497 and #605 found one each — all on `vertex`, and every one found by
+  a session that was reading Bedrock. Each has a carrier;
+  [#607](https://github.com/mstarks01/work-agent/issues/607) carries the rate itself and asks for an
+  audit of the whole row once the four build issues merge. **A rule that names one spelling of an
+  idea misses the others.** `served_trust` was a constant, the alias test was a suffix, and the
+  pre-GA test was a substring; each was correct for the vendor its author had in front of them.
+  **Measuring the pinned map beat predicting it.** The map's own fog patch waited on whether a
+  Bedrock row would carry an `UNKNOWN` cell. #497 measured it: no cell differs from anthropic-direct.
+
+  **Out of scope and not graduating**: any live Bedrock call, a baseline sweep and a blessed
+  fingerprint, because the maintainer holds no AWS account; the eval price map and baseline naming,
+  which exist to price a sweep that does not run; a registry redesign splitting who bills from who
+  made the weights; re-opening ADR 0003, which a fourth vendor confirms rather than changes; a
+  pinned-form rule for any Bedrock family except Claude, because a rule for a family nobody has
+  profiled is a guess; and the prose edits to `docs/First-Run.md`, `docs/Configuration.md` and the
+  `model_tiers.toml` template comment, which are ordinary follow-up work.
+
+  Two related issues came out of the map and are **not** part of it.
+  [#600](https://github.com/mstarks01/work-agent/issues/600) rules that a Google API key needs a
+  fifth vendor row, `gemini`, rather than a second mode on `vertex` — a separate effort that needs
+  its own answers. [#601](https://github.com/mstarks01/work-agent/issues/601) is the smoke
+  redactor defect, folded into #602.
+
+  The research findings sit at `archive/research/bedrock-credential-paths`, per the tag convention
+  below.
 
 - [#369 — Map: the sitting app walks many cases in one session](https://github.com/mstarks01/work-agent/issues/369)
   — 8 tickets, charted and completed 2026-08-28. A **planning** map over `webapp/sitting.py`: it
@@ -455,7 +527,7 @@ The two archived efforts use the local-markdown convention (`assignee:` frontmat
 as the claim, a `blocked-by:` list for dependencies) rather than the sub-issue and
 dependency operations above; don't take them as a model for how to chart a new one.
 
-Reopening any of the three would be a **fresh map, not a resumption** — including
+Reopening any completed map would be a **fresh map, not a resumption** — including
 #3, whose closed tickets are the *record* of decisions taken, not a backlog. Work
 that merely implements #3's decisions needs no map at all.
 
