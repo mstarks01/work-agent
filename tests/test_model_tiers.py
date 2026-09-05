@@ -20,7 +20,7 @@ from analysis_service.model_tiers import (
     validate_model_string,
 )
 from analysis_service.report import FRAMEWORK_NAMES
-from analysis_service.vendors import VENDOR_NAMES
+from analysis_service.vendors import VENDOR_NAMES, CredentialMode, vendor_for
 
 PROJECT_ROOT = Path(__file__).parents[1]
 REPO_CONFIG = PROJECT_ROOT / "config" / "model_tiers.toml"
@@ -391,6 +391,51 @@ class TestPinValidation:
     def test_alias_in_file_rejected(self, config_path):
         path = config_path(config_toml(strong="gemini-2.5-pro-latest"))
         with pytest.raises(ModelConfigError, match="latest"):
+            load_model_tiers(path, env={})
+
+
+class TestDeclaredCredentialMode:
+    """A deployment declares a mode only where the vendor gives it a choice.
+
+    Both rules read ``CREDENTIAL_MODES``, so they follow the registry rather
+    than a second copy of it. Every vendor allows exactly one mode today, so the
+    shipped table is empty — what version 7 carries is the rule, which is what
+    makes a vendor row that gains a second mode unable to ship silently.
+    """
+
+    def test_a_single_mode_vendor_needs_no_declaration(self, config_path):
+        tiers = load_model_tiers(config_path(config_toml()), env={})
+        assert tiers.credentials == {}
+        assert tiers.credential_mode("vertex") is CredentialMode.IAM
+
+    def test_the_mode_comes_from_the_registry_not_from_a_default(self):
+        # Not "whatever the first vendor uses": each one answers for itself.
+        assert vendor_for("anthropic").sole_credential_mode is CredentialMode.API_KEY
+        assert vendor_for("vertex").sole_credential_mode is CredentialMode.IAM
+
+    def test_declaring_a_mode_for_a_single_mode_vendor_is_an_error(self, config_path):
+        """It is not a choice, so stating it can only go stale.
+
+        A file that names a mode the registry has since replaced would otherwise
+        keep asserting it, and the loader would keep accepting it.
+        """
+        path = config_path(config_toml() + '\n[credentials]\nvertex = "iam"\n')
+        with pytest.raises(ModelConfigError, match="nothing to choose"):
+            load_model_tiers(path, env={})
+
+    def test_a_mode_the_vendor_does_not_allow_is_an_error(self, config_path):
+        path = config_path(config_toml() + '\n[credentials]\nvertex = "api_key"\n')
+        with pytest.raises(ModelConfigError):
+            load_model_tiers(path, env={})
+
+    def test_an_unknown_mode_is_an_error(self, config_path):
+        path = config_path(config_toml() + '\n[credentials]\nvertex = "sudo"\n')
+        with pytest.raises(ModelConfigError):
+            load_model_tiers(path, env={})
+
+    def test_an_unknown_vendor_is_an_error(self, config_path):
+        path = config_path(config_toml() + '\n[credentials]\ncohere = "api_key"\n')
+        with pytest.raises(ModelConfigError):
             load_model_tiers(path, env={})
 
 

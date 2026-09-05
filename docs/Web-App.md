@@ -105,20 +105,31 @@ page instead of the form**. There is no textarea and no Analyze button, so no
 analysis can run on a model nobody chose.
 
 Where the config itself read cleanly — the credential and sampling cases — the
-page names the vendor your config selects and lists **every** environment
-variable that vendor needs, marking the ones that are unset. It reports presence
-only and never prints a value. Vertex is shown because it needs the most
-variables of the three vendors, which is what makes the next point visible:
+page names the vendor your config selects, states the credential mode that
+vendor runs under, and lists **every** environment variable that vendor needs,
+marking the ones that are unset. It reports presence only and never prints a
+value. Vertex is shown because it needs the most variables of the three vendors,
+which is what makes the next point visible:
 
 ```
-ANALYSIS_VERTEX_PROJECT           NOT SET
-ANALYSIS_VERTEX_LOCATION          NOT SET
-GOOGLE_APPLICATION_CREDENTIALS  NOT SET
+vertex
+Credential mode: iam. This vendor passes no credential material. The platform
+supplies the identity, and the vendor's SDK resolves it from the environment
+this process runs in.
+
+ANALYSIS_VERTEX_PROJECT   NOT SET
+ANALYSIS_VERTEX_LOCATION  NOT SET
 ```
 
 All of them at once, rather than one per restart — the underlying check raises on
-the first variable it finds missing, which would otherwise mean three restarts to
-discover three variables.
+the first variable it finds missing, which would otherwise mean two restarts to
+discover two variables.
+
+The mode is **reported, never resolved**. Under `iam` the only way to find out
+whether an identity exists is to ask for one, which is a network call on page
+render and reaches the instance metadata service. So the page says what your
+deployment declared and what the platform has to supply, and leaves the answer
+to a run.
 
 If the tier config is what failed, there is no selected vendor to report and the
 page says so instead: fix the file named in the error first.

@@ -375,7 +375,7 @@ def build_tier_adapters(
             # means requests instead of half of a product with them.
             **{_NUM_RETRIES_KWARG: 0},
             **tier_sampling.constructor_kwargs(),
-            **vendor.credential_kwargs(env),
+            **vendor.credential_kwargs(env, tiers.credential_mode(selection.vendor)),
         )
     return adapters
 

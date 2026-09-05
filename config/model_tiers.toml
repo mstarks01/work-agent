@@ -75,7 +75,7 @@
 # picked. The three vendors are reached through one adapter and differ only in
 # the credential mode each implies; none is cheaper to select than the others.
 
-version = 6
+version = 7
 
 # HOW FAR THE CRITIC MUST SIT FROM THE ANALYSIS IT CHECKS. Required, and there
 # is deliberately no default: inheriting `shared` is how an install that meant
