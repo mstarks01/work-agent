@@ -32,6 +32,7 @@ build_session = base.build_session
 REPO_ROOT = base.REPO_ROOT
 HOST = base.HOST
 PORT = base.PORT
+HELD = base.HELD
 
 LOCAL_SUBMITTER = "local-review"
 UPSTREAM_ISSUES = "https://github.com/mstarks01/work-agent/issues/new"
