@@ -598,6 +598,13 @@ def _sitting_cases(root: Path) -> list[str]:
 #: carrying a separator would name a file outside the case's ``claims``
 #: directory (A01). A package nobody wrote yet still passes it: every package
 #: this repository ships is a lowercase slug.
+#:
+#: Length is part of the shape, and it was missing here while the other reader
+#: of this rule already had it: 300 lowercase letters are a slug, so a slug
+#: shape alone is not a bound. Both bounds are now
+#: :data:`~evals.harness.baseline.FRAMEWORK_NAME_MAX`, so the two readers cannot
+#: disagree about
+#: how long a name may be.
 _FRAMEWORK_NAME = re.compile(r"[a-z0-9]+(?:-[a-z0-9]+)*")
 
 
@@ -621,7 +628,9 @@ def _declared_frameworks(root: Path, case: str) -> list[str]:
     return [
         name
         for name in names
-        if isinstance(name, str) and _FRAMEWORK_NAME.fullmatch(name)
+        if isinstance(name, str)
+        and len(name) <= baseline.FRAMEWORK_NAME_MAX
+        and _FRAMEWORK_NAME.fullmatch(name)
     ]
 
 

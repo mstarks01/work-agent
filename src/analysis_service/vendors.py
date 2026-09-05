@@ -277,7 +277,17 @@ _FLOATING_WORDS: dict[str, str] = {
 # ``claude-3-5-sonnet-20241022``, and that rejection is about its *shape* rather
 # than its age: in that era the bare name was itself a floating alias, so the
 # dated form cannot be told apart from the aliases this rule exists to reject.
-_CLAUDE_ID = re.compile(r"claude-[a-z]+-(?P<major>\d+)(?:-(?P<minor>\d+))?")
+# The minor group is **bounded**, and the major is not. A minor version is one
+# or two digits; a date is eight, and an unbounded group read one as the other.
+# ``claude-opus-4-20250514`` matched as generation 4.20250514, so
+# ``validate_model`` accepted a dated form this comment says it rejects, and
+# ``check_temperature`` then read a generation far above its floor and refused
+# ``temperature`` on a Claude 4.0. One unbounded group caused both halves.
+#
+# ``(?!\d)`` is what makes the bound a bound: without it ``\d{1,2}`` would match
+# the first two digits of a date and leave the rest to the pattern's tail. The
+# major stays ``\d+``, because no generation count is too large to name.
+_CLAUDE_ID = re.compile(r"claude-[a-z]+-(?P<major>\d+)(?:-(?P<minor>\d{1,2})(?!\d))?")
 
 _CLAUDE_RULE = _FormRule(
     family="claude-",
