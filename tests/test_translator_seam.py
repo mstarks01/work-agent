@@ -36,7 +36,7 @@ from pathlib import Path
 import pytest
 
 from analysis_service.sampling import OFFERED_PARAMS, TierSampling
-from analysis_service.vendors import VENDORS
+from analysis_service.vendors import _CREDENTIAL_VARS
 
 REPO_ROOT = Path(__file__).resolve().parents[1]
 PACKAGE = REPO_ROOT / "src" / "analysis_service"
@@ -60,7 +60,8 @@ FORBIDDEN_ENDPOINT_KWARGS = (
 REGISTRY_ONLY_KWARGS = ("custom_llm_provider",)
 
 #: Every kwarg the whole seam may carry, endpoint-ish or not. Deploy-time
-#: credential material (``vertex_credentials`` is an ADC *path*, not an address)
+#: credential material (``vertex_project`` and ``vertex_location`` scope a
+#: request; neither names a host)
 #: belongs to the vendor's credential table and is checked with it.
 CONFIG_FORBIDDEN_KWARGS = (
     *FORBIDDEN_ENDPOINT_KWARGS,
@@ -152,7 +153,7 @@ def test_every_adapter_kwarg_comes_from_a_closed_set():
     body = call.group(1)
     assert "model=selection.route" in body
     assert "**tier_sampling.constructor_kwargs()" in body
-    assert "**vendor.credential_kwargs(env)" in body
+    assert "**vendor.credential_kwargs(env, tiers.credential_mode(" in body
     assert body.count("**") == 3, (
         "a new spread reaches the translator constructor. Every value crossing"
         " this seam has to come from the vendor registry or from deploy-time"
@@ -196,14 +197,18 @@ def test_a_provider_naming_kwarg_takes_its_value_from_the_registry(kwarg):
 
 
 def test_the_credential_table_carries_no_address():
-    """A vendor's credential kwargs authenticate; none of them redirects.
+    """A vendor's credential kwargs authenticate and address; none redirects.
 
-    `vertex_credentials` is in this table and is an ADC *file path*, not an
-    address — which is why it is excluded from the endpoint list and asserted
-    here instead. A table that grew an endpoint entry would move the decision
-    about where a request goes into deploy-time config, and the point of the
-    registry is that it is code.
+    `vertex_project` and `vertex_location` say which Google project and region
+    a request is scoped to. Neither names a host, so neither is an endpoint —
+    which is why they are excluded from the endpoint list and asserted here
+    instead. A table that grew an endpoint entry would move the decision about
+    where a request goes into deploy-time config, and the point of the registry
+    is that it is code.
+
+    Driven over the whole `(vendor, mode)` table rather than over `VENDORS`, so
+    a mode a vendor allows but nobody has selected still answers.
     """
-    for vendor in VENDORS.values():
-        kwargs = {kwarg for kwarg, _ in vendor._credential_vars()}
-        assert not kwargs & set(FORBIDDEN_ENDPOINT_KWARGS), vendor.name
+    for (vendor, mode), entries in _CREDENTIAL_VARS.items():
+        kwargs = {entry.kwarg for entry in entries}
+        assert not kwargs & set(FORBIDDEN_ENDPOINT_KWARGS), (vendor, mode)

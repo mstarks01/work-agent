@@ -536,7 +536,12 @@ def test_a_config_failure_renders_the_diagnostic_instead_of_the_form(broken_clie
     # The raised message, and the vendor's *whole* required set.
     assert "ANALYSIS_VERTEX_PROJECT" in page
     assert "ANALYSIS_VERTEX_LOCATION" in page
-    assert "GOOGLE_APPLICATION_CREDENTIALS" in page
+    # The declared mode, and what the platform has to supply under it. Vertex
+    # passes no credential material, so no credentials file is named: an
+    # operator who sets one still gets it, through ADC's own chain.
+    assert "iam" in page
+    assert "platform supplies the identity" in page
+    assert "GOOGLE_APPLICATION_CREDENTIALS" not in page
     # Recovery is always fix-then-restart; there is no retry affordance.
     assert "restart" in page.lower()
 

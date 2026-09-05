@@ -353,6 +353,24 @@ class TestALaneThatNeverRan:
         assert key not in redacted
         assert "ANALYSIS_OPENAI_API_KEY" in redacted
 
+    def test_a_region_survives_the_redactor(self):
+        """#601: the redactor read the list that answers a different question.
+
+        ``required_env_vars`` says which variables an operator must set;
+        ``ANALYSIS_VERTEX_LOCATION`` belongs there and is not a secret. Reading
+        that list to decide what must not reach a job summary substituted the
+        region out of provider error text — and the region is the one fact that
+        diagnoses a wrong-region request, in the summary whose whole job is to
+        carry it.
+        """
+        region = "us-east5"
+        deployment = Deployment.from_env(
+            env=TEST_TIER_ENV | {"ANALYSIS_VERTEX_LOCATION": region}
+        )
+        text = f"404 Publisher Model not found in region {region}"
+
+        assert _redacted(text, deployment) == text
+
 
 class TestDrivingTheEngine:
     """The assembly the checks hang off: outcome in, result out.

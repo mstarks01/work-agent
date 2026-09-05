@@ -113,17 +113,20 @@ TEST_TIER_ENV: dict[str, str] = {
     "ANALYSIS_MODEL_REVIEW_MODEL": "claude-opus-5",
 }
 
-# What the selection above implies: two API keys and one ADC triple, because the
-# three tiers sit on vendors with different credential modes. Placeholders — the
-# loader checks that a variable is *declared*, never that it authenticates, and
-# no test here reaches a provider. Kept beside the selection so the two cannot
-# drift; a tier moved to another vendor needs its variables added here too.
+# What the selection above implies: two API keys and one addressing pair,
+# because the three tiers sit on vendors with different credential modes.
+# Placeholders — the loader checks that a variable is *declared*, never that it
+# authenticates, and no test here reaches a provider. Kept beside the selection
+# so the two cannot drift; a tier moved to another vendor needs its variables
+# added here too.
+#
+# No Google credentials file. Vertex runs under platform identity and passes no
+# credential material, so the registry names none to declare.
 TEST_CREDENTIAL_ENV: dict[str, str] = {
     "ANALYSIS_ANTHROPIC_API_KEY": "sk-ant-not-a-real-key",
     "ANALYSIS_OPENAI_API_KEY": "sk-not-a-real-key",
     "ANALYSIS_VERTEX_PROJECT": "test-project",
     "ANALYSIS_VERTEX_LOCATION": "us-central1",
-    "GOOGLE_APPLICATION_CREDENTIALS": "/nonexistent/adc.json",
 }
 
 

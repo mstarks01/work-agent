@@ -47,17 +47,23 @@ from pydantic import BaseModel, ConfigDict, Field, ValidationError, model_valida
 
 from analysis_service.errors import ConfigError
 from analysis_service.report import FRAMEWORK_NAMES
-from analysis_service.vendors import VENDOR_NAMES, Vendor, VendorName, vendor_for
+from analysis_service.vendors import (
+    CREDENTIAL_MODES,
+    VENDOR_NAMES,
+    CredentialMode,
+    Vendor,
+    VendorName,
+    vendor_for,
+)
 
 # The only schema version this loader accepts. A file on any other version
 # fails its own check rather than being migrated in place.
 #
-# Version 6 adds the ``review`` tier and ``review_independence``. Both are
-# required in every install: a third tier a file may omit is a third tier no
-# deployment has chosen a model for, and the policy defaults to nothing because
-# "how independent is your critic" is a question a deployment answers rather
-# than inherits.
-SUPPORTED_VERSION = 6
+# Version 7 adds the ``[credentials]`` table: a deployment declares which
+# credential mode it uses for a vendor that allows more than one. No vendor
+# allows more than one today, so every shipped file leaves the table out — what
+# version 7 carries is the loader rule, not a new key anybody fills in.
+SUPPORTED_VERSION = 7
 
 TierName = Literal["base", "strong", "review"]
 TIER_NAMES: tuple[TierName, ...] = ("base", "strong", "review")
@@ -186,6 +192,18 @@ class ModelTierConfig(BaseModel):
     version: int = Field(ge=1)
     tiers: dict[TierName, TierSelection]
     nodes: dict[str, TierName]
+    #: Which credential mode this deployment declares for each vendor. Keyed by
+    #: vendor rather than by tier: a mode describes the deployment's
+    #: relationship with a vendor, and a per-tier key could name two identities
+    #: for one vendor in one process.
+    #:
+    #: Empty in every shipped file, because every vendor in
+    #: :data:`~analysis_service.vendors.CREDENTIAL_MODES` allows exactly one
+    #: mode. :meth:`_credential_mode_problems` is what makes the table
+    #: self-completing: a key for a single-mode vendor is an error, and a
+    #: missing key for a multi-mode vendor is an error, so a vendor row that
+    #: gains a second mode cannot ship without an operator declaring one.
+    credentials: dict[VendorName, CredentialMode] = Field(default_factory=dict)
     #: How far each framework's criticism must sit from its own analysis. No
     #: default: a deployment states it, because inheriting ``shared`` is how a
     #: high-assurance install ends up reviewing itself and reporting nothing
@@ -221,9 +239,65 @@ class ModelTierConfig(BaseModel):
         # a place a critic can move to and leave its re-ask behind.
         problems = critic_pairing_issues(self.nodes.__getitem__)
         problems += self.independence_breaches()
+        problems += self._credential_mode_problems()
         if problems:
             raise ValueError("; ".join(problems))
         return self
+
+    def _credential_mode_problems(self) -> list[str]:
+        """Every vendor whose declared mode is absent, spurious or not allowed.
+
+        Both halves read :data:`~analysis_service.vendors.CREDENTIAL_MODES`, so
+        the rule follows the registry rather than a second copy of it. A key for
+        a single-mode vendor is an error because it is not a choice, and letting
+        it sit there would let a file state a mode the registry has since
+        replaced.
+
+        Only vendors a tier actually selects are required to declare. A
+        multi-mode vendor nobody calls needs no identity.
+        """
+        problems = []
+        selected = {selection.vendor for selection in self.tiers.values()}
+        for vendor, mode in self.credentials.items():
+            allowed = CREDENTIAL_MODES[vendor]
+            if len(allowed) == 1:
+                problems.append(
+                    f"credentials.{vendor} is set, but {vendor!r} allows only"
+                    f" {allowed[0].value!r}, so there is nothing to choose;"
+                    " remove the key"
+                )
+            elif mode not in allowed:
+                names = ", ".join(sorted(m.value for m in allowed))
+                problems.append(
+                    f"credentials.{vendor} is {mode.value!r}, which {vendor!r}"
+                    f" does not allow (it allows: {names})"
+                )
+        for vendor in sorted(selected - set(self.credentials)):
+            allowed = CREDENTIAL_MODES[vendor]
+            if len(allowed) > 1:
+                names = ", ".join(sorted(m.value for m in allowed))
+                problems.append(
+                    f"vendor {vendor!r} allows more than one credential mode"
+                    f" ({names}), so credentials.{vendor} must declare which"
+                    " one this deployment uses"
+                )
+        return problems
+
+    def credential_mode(self, vendor: VendorName) -> CredentialMode:
+        """The credential mode this deployment uses for one vendor.
+
+        The one reader of the declared-mode rule. A vendor with a single mode
+        needs no declaration and gets that mode; a vendor with a choice has
+        already been required to declare one by
+        :meth:`_credential_mode_problems`, so the lookup cannot fall through to
+        a guess.
+        """
+        declared = self.credentials.get(vendor)
+        return (
+            declared
+            if declared is not None
+            else vendor_for(vendor).sole_credential_mode
+        )
 
     def independence_breaches(self) -> list[str]:
         """Every framework whose criticism is closer to its analysis than policy allows.

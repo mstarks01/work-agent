@@ -13,6 +13,9 @@ from dataclasses import FrozenInstanceError
 import pytest
 
 from analysis_service.vendors import (
+    _CREDENTIAL_VARS,
+    CREDENTIAL_MODE_NOTES,
+    CREDENTIAL_MODES,
     REASONING_KWARG,
     VENDOR_NAMES,
     CredentialMode,
@@ -46,76 +49,169 @@ class TestRouting:
             vendor_for("cohere")
 
 
-class TestCredentialMode:
-    """The vendor implies the mode; config never picks it."""
+class TestCredentialModes:
+    """The mechanism is declared; the material may be discovered."""
 
-    def test_vertex_is_adc_because_it_admits_no_api_key_path(self):
-        assert vendor_for("vertex").credential is CredentialMode.ADC
+    def test_every_vendor_declares_its_allowed_modes(self):
+        # A missing key raises, which is the point: no vendor can be silent
+        # about how it authenticates.
+        assert set(CREDENTIAL_MODES) == set(VENDOR_NAMES)
+
+    def test_the_var_table_answers_for_every_allowed_pair(self):
+        """The table is checked against its registry, in both directions.
+
+        A table nobody compares to ``CREDENTIAL_MODES`` fails as quietly as the
+        branch it replaced: an allowed mode with no entry raises at build time
+        on a deployment nobody tested, and an entry for a mode the vendor does
+        not allow is a shape that can never run.
+        """
+        declared = {
+            (vendor, mode)
+            for vendor, modes in CREDENTIAL_MODES.items()
+            for mode in modes
+        }
+        assert set(_CREDENTIAL_VARS) == declared
+
+    def test_every_mode_tells_an_operator_what_to_arrange(self):
+        assert set(CREDENTIAL_MODE_NOTES) == set(CredentialMode)
+
+    def test_vertex_is_platform_identity_because_it_admits_no_api_key_path(self):
+        assert vendor_for("vertex").credential_modes == (CredentialMode.IAM,)
 
     @pytest.mark.parametrize("name", ["anthropic", "openai"])
     def test_the_api_key_vendors_are_api_key(self, name):
-        assert vendor_for(name).credential is CredentialMode.API_KEY
+        assert vendor_for(name).credential_modes == (CredentialMode.API_KEY,)
 
     def test_the_key_var_is_vendor_scoped(self):
         assert vendor_for("anthropic").api_key_var == "ANALYSIS_ANTHROPIC_API_KEY"
         assert vendor_for("openai").api_key_var == "ANALYSIS_OPENAI_API_KEY"
 
+    def test_a_mode_a_vendor_does_not_allow_raises(self):
+        with pytest.raises(ValueError, match="no 'api_key' credential mode"):
+            vendor_for("vertex").credential_kwargs({}, CredentialMode.API_KEY)
+
     def test_the_key_is_read_from_the_vendor_scoped_var(self):
         kwargs = vendor_for("anthropic").credential_kwargs(
-            {"ANALYSIS_ANTHROPIC_API_KEY": API_KEY}
+            {"ANALYSIS_ANTHROPIC_API_KEY": API_KEY}, CredentialMode.API_KEY
         )
         assert kwargs == {"api_key": API_KEY}
 
-    def test_litellms_ambient_key_is_deliberately_not_used(self):
-        # An undeclared credential in the process environment is the ASI03
-        # inherited-credential path; only what this deployment declared may
-        # authenticate a run.
-        with pytest.raises(ProviderAuthError):
-            vendor_for("anthropic").credential_kwargs({"ANTHROPIC_API_KEY": API_KEY})
+    @pytest.mark.parametrize(
+        "name",
+        [
+            name
+            for name in VENDOR_NAMES
+            if CredentialMode.API_KEY in CREDENTIAL_MODES[name]
+        ],
+    )
+    def test_an_ambient_key_authenticates_nothing(self, name):
+        """Every vendor that takes a key, not just the one somebody tested.
+
+        An undeclared credential in the process environment is the ASI03
+        inherited-credential path. LiteLLM picks up ``ANTHROPIC_API_KEY`` and
+        ``OPENAI_API_KEY`` on its own and cannot be told not to, so the refusal
+        has to happen in the registry — which is the same reason the *declared*
+        half of the rule is enforced here rather than in the adapter.
+        """
+        vendor = vendor_for(name)
+        ambient = f"{name.upper()}_API_KEY"
+        with pytest.raises(ProviderAuthError, match=vendor.api_key_var):
+            vendor.credential_kwargs({ambient: API_KEY}, CredentialMode.API_KEY)
 
     def test_a_missing_key_fails_closed_naming_the_var_not_the_value(self):
         with pytest.raises(ProviderAuthError) as excinfo:
-            vendor_for("openai").credential_kwargs({})
+            vendor_for("openai").credential_kwargs({}, CredentialMode.API_KEY)
         assert "ANALYSIS_OPENAI_API_KEY" in str(excinfo.value)
 
     def test_an_empty_key_is_a_deploy_mistake_not_an_absence(self):
         with pytest.raises(ProviderAuthError):
-            vendor_for("openai").credential_kwargs({"ANALYSIS_OPENAI_API_KEY": "   "})
+            vendor_for("openai").credential_kwargs(
+                {"ANALYSIS_OPENAI_API_KEY": "   "}, CredentialMode.API_KEY
+            )
 
     def test_a_key_value_never_appears_in_the_error(self):
         # OWASP A09: a key echoed into a log or a problem+json body has leaked.
         with pytest.raises(ProviderAuthError) as excinfo:
-            vendor_for("openai").credential_kwargs({"ANALYSIS_OPENAI_API_KEY": ""})
+            vendor_for("openai").credential_kwargs(
+                {"ANALYSIS_OPENAI_API_KEY": ""}, CredentialMode.API_KEY
+            )
         assert API_KEY not in str(excinfo.value)
 
-    def test_vertex_needs_project_location_and_adc(self):
+
+class TestPlatformIdentity:
+    """``IAM`` passes no credential material, so the platform's own chain runs."""
+
+    def test_vertex_passes_a_project_and_a_location_and_no_credential(self):
         kwargs = vendor_for("vertex").credential_kwargs(
             {
                 "ANALYSIS_VERTEX_PROJECT": "p",
-                "ANALYSIS_VERTEX_LOCATION": "us-central1",
-                "GOOGLE_APPLICATION_CREDENTIALS": "/adc.json",
-            }
+                "ANALYSIS_VERTEX_LOCATION": "us-east5",
+            },
+            CredentialMode.IAM,
         )
-        assert kwargs["vertex_project"] == "p"
-        assert kwargs["vertex_location"] == "us-central1"
+        assert kwargs == {"vertex_project": "p", "vertex_location": "us-east5"}
+
+    def test_no_google_credentials_file_is_required(self):
+        """The defect this mode fixes: corporate Google IAM could not run.
+
+        ``Vendor._require`` demanded ``GOOGLE_APPLICATION_CREDENTIALS``, so a
+        Workload Identity deployment failed closed before LiteLLM ran — even
+        though ``vertex_llm_base.load_auth`` takes ``credentials=None`` and
+        calls ``google.auth.default()``, which resolves exactly that identity.
+        """
+        env = {"ANALYSIS_VERTEX_PROJECT": "p", "ANALYSIS_VERTEX_LOCATION": "us-east5"}
+        assert "GOOGLE_APPLICATION_CREDENTIALS" not in env
+        assert vendor_for("vertex").credential_kwargs(env, CredentialMode.IAM)
+
+    def test_the_registry_names_no_credentials_file_at_all(self):
+        # An operator who sets it still gets it, through ADC's own chain.
+        # Nothing here names it or requires it.
+        for entries in _CREDENTIAL_VARS.values():
+            for entry in entries:
+                assert entry.var != "GOOGLE_APPLICATION_CREDENTIALS"
 
     @pytest.mark.parametrize(
-        "missing",
-        [
-            "ANALYSIS_VERTEX_PROJECT",
-            "ANALYSIS_VERTEX_LOCATION",
-            "GOOGLE_APPLICATION_CREDENTIALS",
-        ],
+        "missing", ["ANALYSIS_VERTEX_PROJECT", "ANALYSIS_VERTEX_LOCATION"]
     )
-    def test_each_vertex_variable_is_required(self, missing):
-        env = {
-            "ANALYSIS_VERTEX_PROJECT": "p",
-            "ANALYSIS_VERTEX_LOCATION": "us-central1",
-            "GOOGLE_APPLICATION_CREDENTIALS": "/adc.json",
-        }
+    def test_each_addressing_variable_is_still_required(self, missing):
+        env = {"ANALYSIS_VERTEX_PROJECT": "p", "ANALYSIS_VERTEX_LOCATION": "us-east5"}
         del env[missing]
         with pytest.raises(ProviderAuthError, match=missing):
-            vendor_for("vertex").credential_kwargs(env)
+            vendor_for("vertex").credential_kwargs(env, CredentialMode.IAM)
+
+
+class TestWhichVariablesAreSecret:
+    """One table, two questions. Reporting is wider than redacting."""
+
+    def test_every_required_variable_is_reported(self):
+        vertex = vendor_for("vertex")
+        assert vertex.required_env_vars(CredentialMode.IAM) == (
+            "ANALYSIS_VERTEX_PROJECT",
+            "ANALYSIS_VERTEX_LOCATION",
+        )
+
+    def test_a_region_is_required_and_is_not_a_secret(self):
+        """The #601 defect. A redactor reading the wider list took the region
+        out of provider error text, and the region is the one fact that
+        diagnoses a wrong-region request."""
+        vertex = vendor_for("vertex")
+        assert "ANALYSIS_VERTEX_LOCATION" in vertex.required_env_vars(
+            CredentialMode.IAM
+        )
+        assert vertex.secret_env_vars(CredentialMode.IAM) == ()
+
+    def test_an_api_key_is_secret(self):
+        anthropic = vendor_for("anthropic")
+        assert anthropic.secret_env_vars(CredentialMode.API_KEY) == (
+            "ANALYSIS_ANTHROPIC_API_KEY",
+        )
+
+    # Sorted so the parameter ids are stable; ``CredentialMode`` is a
+    # ``StrEnum``, so the pairs order as the strings they spell.
+    @pytest.mark.parametrize(("vendor", "mode"), sorted(_CREDENTIAL_VARS))
+    def test_the_secret_set_is_a_subset_of_the_required_set(self, vendor, mode):
+        entry = vendor_for(vendor)
+        assert set(entry.secret_env_vars(mode)) <= set(entry.required_env_vars(mode))
 
 
 class TestPinnedFormRule:
