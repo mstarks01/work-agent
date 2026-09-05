@@ -190,8 +190,7 @@ def unreviewed_cases(root: Path) -> list[str]:
         candidates = sittings.unreviewed_cases(root)
     else:
         candidates = [
-            case.meta.id
-            for case in sittings.load_corpus(root / "evals" / "corpus")
+            case.meta.id for case in sittings.load_corpus(root / "evals" / "corpus")
         ]
     return [case_id for case_id in candidates if case_id not in current]
 
