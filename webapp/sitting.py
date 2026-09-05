@@ -270,7 +270,7 @@ def _read_only_payload(session: Session, case_id: str) -> dict[str, object]:
     }
 
 
-_PAGE = r'''<!doctype html>
+_PAGE = r"""<!doctype html>
 <html lang="en"><head><meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
 <title>Review</title>
@@ -471,7 +471,7 @@ loadRail().then(d=>{if(!d.preselect)return;const row=rows.find(r=>r.case===d.pre
 </script></body></html>
 <!-- legacy rail-footer contract: "Submit — " + count + " cases ready" -->
 <!-- compatibility: Start with the first case to do · Re-record this sitting -->
-'''
+"""
 
 
 def create_app(session: Session) -> FastAPI:
@@ -497,11 +497,18 @@ def create_app(session: Session) -> FastAPI:
         prepared = base._open(session, body.case)
         held = base._draft(session, body.case)
         if held is None:
-            raise HTTPException(status_code=409, detail="that case has no review to reset")
+            raise HTTPException(
+                status_code=409, detail="that case has no review to reset"
+            )
         if held.state == "finished":
             try:
                 held = sittings.withdraw(session.store, prepared, held)
-            except (sittings.SittingError, sittings.DraftError, OSError, ValueError) as exc:
+            except (
+                sittings.SittingError,
+                sittings.DraftError,
+                OSError,
+                ValueError,
+            ) as exc:
                 raise HTTPException(status_code=409, detail=str(exc)) from exc
         held.marks = {}
         held.missing = []
@@ -516,7 +523,9 @@ def create_app(session: Session) -> FastAPI:
         return JSONResponse({"mode": "direct" if login else "browser", "author": login})
 
     @app.post("/api/contribution-preview")
-    def contribution_preview(request: Request, body: ContributionChoice) -> JSONResponse:
+    def contribution_preview(
+        request: Request, body: ContributionChoice
+    ) -> JSONResponse:
         base.refuse_cross_origin(request)
         base._require_token(request, session)
         author = _choice_author(session, body)
@@ -558,7 +567,9 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("--case", help="the case id the review opens on")
     parser.add_argument("--submitted-by", help=argparse.SUPPRESS)
     parser.add_argument("--submitted-for", help=argparse.SUPPRESS)
-    parser.add_argument("--list", action="store_true", help="print cases that still need a review")
+    parser.add_argument(
+        "--list", action="store_true", help="print cases that still need a review"
+    )
     parser.add_argument("--no-submit", action="store_true", help=argparse.SUPPRESS)
     args = parser.parse_args(sys.argv[1:] if argv is None else argv)
 
