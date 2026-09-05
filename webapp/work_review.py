@@ -11,7 +11,6 @@ from __future__ import annotations
 
 import argparse
 import io
-import json
 import shutil
 import sys
 import tempfile
@@ -84,10 +83,10 @@ def _updated_page(page: str) -> str:
     guide = r'''<article id="guide" class="hidden guide-panel">
   <h2>How the work review works</h2>
   <p><b>Thank you for taking the time to review these cases.</b></p>
-  <p>This work review compares your independent security assessment of each
-  system description with findings previously produced by an analysis agent.
-  Your judgments show which agent findings matched your assessment, which did
-  not, which were duplicates, and which issues you found that the agent missed.</p>
+  <p>This work review compares your independent security assessment of each system
+  description with findings previously produced by an analysis agent. Your
+  judgments show which agent findings matched your assessment, which did not,
+  which were duplicates, and which issues you found that the agent missed.</p>
   <p><b>Part 1</b> is blind. Read the system description and write your own
   concerns before any model findings are shown. When you save this list and
   reveal the model findings, the list is locked for that case. Resetting later
