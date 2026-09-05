@@ -107,8 +107,46 @@ class _FormRule:
 # builds breaks outright the moment a vendor retires one — that risk runs
 # against three catalogs. The reproducibility guarantee does not rest here; it
 # rests on the *served* build read back from every response.
-_ALIAS_SUFFIX = "-latest"
-_PRE_GA_MARKERS = ("-preview", "-exp")
+#
+# A floating marker is a **whole word** in the identifier, never a fragment of
+# one. A word is a run of letters and digits; every other character delimits.
+# There is no delimiter list, and that absence is the decision: the first list
+# written for this rule held ``-``, ``_``, ``/`` and ``.``, and it missed ``@``,
+# which is what Vertex Model Garden spells its alias with — so
+# ``codestral@latest`` reached a run. Testing a fragment failed the other way:
+# ``amazon.titan-text-express-v1`` contains ``exp`` inside ``express``, so a
+# generally available model was refused with no config knob to fix it.
+_WORDS = re.compile(r"[a-z0-9]+", re.IGNORECASE)
+
+#: What an operator is told, by kind of floating form. The two kinds keep two
+#: messages because they name different next actions: an alias has a pinned
+#: counterpart to look up, and a pre-GA build may have none, so the operator
+#: waits for a release rather than searching for a name. Both name the word that
+#: matched, so the reason for the refusal is on the screen.
+_ALIAS = "is a {word!r} alias"
+_PRE_GA = "is a pre-GA {word!r} build"
+
+#: Every word that means the build under this identifier may move, against
+#: which kind of floating form it names. One table, one reader
+#: (:meth:`Vendor.validate_model`), so a second reader cannot disagree.
+#:
+#: ``exp`` and ``experimental`` are both listed because a whole-word test does
+#: not let one match the other. The alternative — matching a word that *starts
+#: with* a marker, with exceptions — re-admits the fragment this table exists to
+#: exclude, and its exception list would grow with English rather than with
+#: vendors.
+#:
+#: ``beta``, ``nightly`` and ``dev`` are deliberately absent. Each reads as
+#: pre-GA in English and each is a shipping GA name in LiteLLM's pinned cost
+#: map: ``xai/grok-3-beta``, ``command-nightly``, ``black_forest_labs/flux-dev``.
+#: The property that admits a word is not that it sounds provisional, but that a
+#: vendor uses it to mean the build may move.
+_FLOATING_WORDS: dict[str, str] = {
+    "latest": _ALIAS,
+    "preview": _PRE_GA,
+    "exp": _PRE_GA,
+    "experimental": _PRE_GA,
+}
 
 # Claude is the family that *does* publish a canonical form, so it gets a closed
 # shape rather than a denylist. From the 4.6 generation on, the identifier is
@@ -235,21 +273,28 @@ class Vendor:
         A **shape** check only: no generation is too old to name here, so a
         build a vendor still serves is one this service will still run.
 
+        A floating word is matched as a whole word rather than as a fragment,
+        and :data:`_FLOATING_WORDS` is the one table this reads. A false
+        refusal is *not* the safe direction here, which is where this differs
+        from :func:`openai_reasoning_model` — that rule records the opposite for
+        itself. A false refusal is a hard stop needing a code change and a
+        release before the operator can run a model their vendor ships. A false
+        acceptance runs a pre-GA build, and the reproducibility guarantee rests
+        on the served build read back from every response rather than on this
+        check.
+
         ``source`` names where the string came from (a config key or an env var)
         so the error points ops at the knob to turn.
         """
         if not model or model != model.strip():
             raise ValueError(f"{source}: {model!r} is not a model identifier")
-        if model.endswith(_ALIAS_SUFFIX):
+        word = next(
+            (w for w in _WORDS.findall(model.lower()) if w in _FLOATING_WORDS), None
+        )
+        if word is not None:
+            reason = _FLOATING_WORDS[word].format(word=word)
             raise ValueError(
-                f"{source}: {model!r} is a '{_ALIAS_SUFFIX}' alias;"
-                " use the pinned model identifier"
-            )
-        marker = next((m for m in _PRE_GA_MARKERS if m in model), None)
-        if marker is not None:
-            raise ValueError(
-                f"{source}: {model!r} is a pre-GA '{marker.lstrip('-')}' build;"
-                " use the pinned model identifier"
+                f"{source}: {model!r} {reason}; use the pinned model identifier"
             )
         rule = self._rule_for(model)
         if rule.pinned is not None and rule.pinned.fullmatch(model) is None:

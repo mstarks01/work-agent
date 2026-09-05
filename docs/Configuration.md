@@ -101,10 +101,14 @@ variable, never its value.
 
 **Pinning** means naming a model specifically enough that it won't quietly
 change under you. The check is per model *family* and deliberately loose: it
-rejects names that openly float (`-latest`, `-preview`, `-exp`) and, where the
-vendor publishes a canonical form, requires that shape. Gemini 2.5 and later
-ship no numbered builds, so there the bare name is the most specific identifier
-available; the same is true of OpenAI's o-series.
+rejects names that openly float and, where the vendor publishes a canonical
+form, requires that shape. A name floats when it carries `latest`, `preview`,
+`exp` or `experimental` as a **whole word** — a run of letters and digits, with
+every other character a delimiter. So `codestral@latest` is refused, and
+`amazon.titan-text-express-v1` is not: `express` merely begins with `exp`.
+
+Gemini 2.5 and later ship no numbered builds, so there the bare name is the most
+specific identifier available; the same is true of OpenAI's o-series.
 
 Claude is the family with a published form:
 

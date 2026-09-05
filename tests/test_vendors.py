@@ -122,11 +122,64 @@ class TestPinnedFormRule:
     """An open-world denylist, plus a closed shape for the one family with one."""
 
     @pytest.mark.parametrize("name", VENDOR_NAMES)
-    def test_aliases_and_pre_ga_builds_are_rejected_everywhere(self, name):
-        vendor = vendor_for(name)
-        for bad in ("model-latest", "model-preview-06-05", "model-exp"):
-            with pytest.raises(ValueError):
-                vendor.validate_model(bad, source="t")
+    @pytest.mark.parametrize(
+        "model",
+        [
+            "model-latest",
+            "model-preview-06-05",
+            "model-exp",
+            # A word the identifier delimits with something other than a
+            # hyphen. ``@`` is Vertex Model Garden's alias spelling, and it is
+            # what a delimiter list missed.
+            "codestral@latest",
+            "mistral-large@latest",
+            # An alias in the middle rather than at the end.
+            "kimi-latest-128k",
+            # Both spellings of the same word, which a whole-word test has to
+            # list separately.
+            "gemini-exp-1206",
+            "gemini-flash-experimental",
+            "gpt-4o-realtime-preview",
+            "gemini-2.5-pro-latest",
+        ],
+    )
+    def test_a_floating_word_is_refused_on_every_vendor(self, name, model):
+        with pytest.raises(ValueError):
+            vendor_for(name).validate_model(model, source="t")
+
+    @pytest.mark.parametrize("name", VENDOR_NAMES)
+    @pytest.mark.parametrize(
+        "model",
+        [
+            # ``express`` begins with ``exp``, and Titan Text Express has been
+            # generally available for years. A fragment test refused it, and an
+            # operator could not fix that from config.
+            "amazon.titan-text-express-v1",
+            "black_forest_labs/flux-pro-1.0-expand",
+        ],
+    )
+    def test_a_word_that_merely_begins_with_a_marker_passes(self, name, model):
+        assert vendor_for(name).validate_model(model, source="t") == model
+
+    def test_an_alias_and_a_pre_ga_build_read_differently(self):
+        """Two messages, because they name two different next actions."""
+        vendor = vendor_for("vertex")
+        with pytest.raises(ValueError, match="'latest' alias"):
+            vendor.validate_model("codestral@latest", source="t")
+        with pytest.raises(ValueError, match="pre-GA 'exp' build"):
+            vendor.validate_model("gemini-exp-1206", source="t")
+
+    @pytest.mark.parametrize(
+        ("model", "word"),
+        [
+            ("kimi-latest-128k", "latest"),
+            ("gemini-flash-experimental", "experimental"),
+            ("gpt-4o-realtime-preview", "preview"),
+        ],
+    )
+    def test_the_message_names_the_word_that_matched(self, model, word):
+        with pytest.raises(ValueError, match=f"'{word}'"):
+            vendor_for("vertex").validate_model(model, source="t")
 
     @pytest.mark.parametrize("bad", ["", "  ", " gemini-2.5-pro"])
     def test_non_identifiers_are_rejected(self, bad):
