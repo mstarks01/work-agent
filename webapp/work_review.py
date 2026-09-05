@@ -736,8 +736,12 @@ def _contribution_files(
         for case in cases:
             source = session.corpus_dir / case
             shutil.copytree(source, root / "evals" / "corpus" / case)
-        _copy_into(root, session.root / sittings.UNREVIEWED_FILE, sittings.UNREVIEWED_FILE)
-        _copy_into(root, session.root / submit_spine.ROSTER_FILE, submit_spine.ROSTER_FILE)
+        _copy_into(
+            root, session.root / sittings.UNREVIEWED_FILE, sittings.UNREVIEWED_FILE
+        )
+        _copy_into(
+            root, session.root / submit_spine.ROSTER_FILE, submit_spine.ROSTER_FILE
+        )
 
         old_store = sittings.Store(
             root=root,
@@ -773,7 +777,12 @@ def _contribution_files(
                     missing=draft.missing,
                     notes=draft.notes,
                 )
-            except (sittings.SittingError, sittings.DraftError, OSError, ValueError) as exc:
+            except (
+                sittings.SittingError,
+                sittings.DraftError,
+                OSError,
+                ValueError,
+            ) as exc:
                 raise HTTPException(status_code=409, detail=str(exc)) from exc
 
         try:
@@ -891,11 +900,18 @@ def create_app(session: Session) -> FastAPI:
         prepared = base._open(session, body.case)
         held = base._draft(session, body.case)
         if held is None:
-            raise HTTPException(status_code=409, detail="that case has no review to reset")
+            raise HTTPException(
+                status_code=409, detail="that case has no review to reset"
+            )
         if held.state == "finished":
             try:
                 held = sittings.withdraw(session.store, prepared, held)
-            except (sittings.SittingError, sittings.DraftError, OSError, ValueError) as exc:
+            except (
+                sittings.SittingError,
+                sittings.DraftError,
+                OSError,
+                ValueError,
+            ) as exc:
                 raise HTTPException(status_code=409, detail=str(exc)) from exc
         held.marks = {}
         held.missing = []
@@ -962,7 +978,9 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("--submitted-by", help=argparse.SUPPRESS)
     parser.add_argument("--submitted-for", help=argparse.SUPPRESS)
     parser.add_argument(
-        "--list", action="store_true", help="print the cases that still need a work review"
+        "--list",
+        action="store_true",
+        help="print the cases that still need a work review",
     )
     parser.add_argument("--no-submit", action="store_true", help=argparse.SUPPRESS)
     args = parser.parse_args(sys.argv[1:] if argv is None else argv)
