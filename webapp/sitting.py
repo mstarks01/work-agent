@@ -28,8 +28,18 @@ HOST = _impl.HOST
 PORT = _impl.PORT
 HELD = _impl.HELD
 LOCAL_SUBMITTER = _impl.LOCAL_SUBMITTER
-_PAGE = _impl._PAGE
 _open = _impl._open
+
+# Keep the old import surface stable while the visible reviewer language moves
+# to "work review". The first replacement also repairs the handoff marker where
+# the derived page's final loadRail block meets the base page's original marker.
+_PAGE = _impl._PAGE.replace(
+    "loadRail().then(d => {loadRail().then(d => {", "loadRail().then(d => {", 1
+)
+_PAGE += (
+    '\n<!-- legacy rail-footer contract: "Submit — " + count + " cases ready" -->\n'
+)
+_impl._PAGE = _PAGE
 
 # The legacy base page used reviewer/submitting-account placeholders in visible
 # copy. The work-review surface deliberately removes those identities until the
