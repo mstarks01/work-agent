@@ -80,7 +80,9 @@ def test_validation_binds_the_pr_author(tmp_path: Path):
     envelope = envelope_for(tree)
     assert reviews.validate(envelope, tree, author="ada") == []
     problems = reviews.validate(envelope, tree, author="mallory")
-    assert any("pull request was opened by 'mallory'" in problem for problem in problems)
+    assert any(
+        "pull request was opened by 'mallory'" in problem for problem in problems
+    )
 
 
 def test_a_merged_review_clears_until_the_case_changes(tmp_path: Path):
@@ -91,7 +93,9 @@ def test_a_merged_review_clears_until_the_case_changes(tmp_path: Path):
     assert CASE not in reviews.unreviewed_cases(tree)
 
     source = tree / "evals" / "corpus" / CASE / "source.md"
-    source.write_text(source.read_text(encoding="utf-8") + "\nchanged\n", encoding="utf-8")
+    source.write_text(
+        source.read_text(encoding="utf-8") + "\nchanged\n", encoding="utf-8"
+    )
     assert CASE not in reviews.current_reviews(tree)
     assert CASE in reviews.unreviewed_cases(tree)
 
@@ -101,7 +105,9 @@ def test_repository_check_does_not_call_old_review_stale_malformed(tmp_path: Pat
     envelope = envelope_for(tree)
     write_review(tree, envelope)
     source = tree / "evals" / "corpus" / CASE / "source.md"
-    source.write_text(source.read_text(encoding="utf-8") + "\nchanged\n", encoding="utf-8")
+    source.write_text(
+        source.read_text(encoding="utf-8") + "\nchanged\n", encoding="utf-8"
+    )
     assert reviews.repository_problems(tree) == []
 
 
