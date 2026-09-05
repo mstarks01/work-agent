@@ -184,11 +184,16 @@ def clearing_signatures(root: Path) -> dict[str, str]:
 
 
 def unreviewed_cases(root: Path) -> list[str]:
-    """The canonical unreviewed list, minus cases cleared by current JSON reviews."""
+    """Cases needing review, preserving the canonical list when it is present."""
     current = current_reviews(root)
-    return [
-        case_id for case_id in sittings.unreviewed_cases(root) if case_id not in current
-    ]
+    if (root / sittings.UNREVIEWED_FILE).is_file():
+        candidates = sittings.unreviewed_cases(root)
+    else:
+        candidates = [
+            case.meta.id
+            for case in sittings.load_corpus(root / "evals" / "corpus")
+        ]
+    return [case_id for case_id in candidates if case_id not in current]
 
 
 def verify_pull_request(root: Path, author: str) -> list[str]:
