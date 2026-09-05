@@ -49,9 +49,7 @@ _impl._PAGE = _PAGE
 _base_render = _impl.base.render
 
 
-def _render_work_review(
-    template: str, grants: Grants, **values: str
-) -> RenderedPage:
+def _render_work_review(template: str, grants: Grants, **values: str) -> RenderedPage:
     if template == _impl._PAGE:
         values = {
             name: value
