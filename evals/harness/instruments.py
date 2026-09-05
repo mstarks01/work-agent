@@ -41,6 +41,7 @@ from collections.abc import Callable, Mapping, Sequence
 from dataclasses import dataclass
 from typing import Any
 
+from analysis_service.identity import IDENTITY_VERSION
 from analysis_service.report import (
     FrameworkAnalysis,
     FrameworkName,
@@ -165,6 +166,7 @@ class ModeRun:
             failures=[],
             runs={},
             provenance=RunProvenance(
+                identity_version=IDENTITY_VERSION,
                 build={},
                 sampling_config_version=1,
                 tiers_config_version=1,

@@ -160,7 +160,7 @@ unless the deployment has blessed that fingerprint.
 
 **The identity binds the requested route as well as the served one.** The served
 build is what the provider *said* answered, read off its own event stream, and
-nothing verifies it — `Report.execution.served_model_trust` says so in the
+nothing verifies it — each `Report.nodes[].served_trust` says so in the
 artifact rather than leaving a reader to assume better. Binding both routes is
 what stops the provider's word from selecting a blessed entry on its own: a
 translator that returns an approved build while the deployment asked for

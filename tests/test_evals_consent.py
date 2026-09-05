@@ -18,7 +18,7 @@ from types import SimpleNamespace
 import pytest
 
 from analysis_service.budgets import measured_tokens
-from analysis_service.identity import build_identity
+from analysis_service.identity import IDENTITY_VERSION, build_identity
 from analysis_service.report import NodeRun, TokenUsage
 from analysis_service.sampling import TierSampling
 from evals.harness import consent, modes, prices, run
@@ -82,6 +82,7 @@ def artifact_document(usage, seed=1):
     }
     provenance = RunProvenance.model_validate(
         {
+            "identity_version": IDENTITY_VERSION,
             "build": dict(build_identity()),
             "sampling_config_version": 1,
             "tiers_config_version": 1,
