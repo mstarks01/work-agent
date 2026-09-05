@@ -62,19 +62,23 @@ def client_for(tree: Path):
 
 
 def record_one(client: TestClient) -> None:
-    assert client.post(
-        "/api/own-list", json={"case": CASE, "items": OWN_LIST}
-    ).status_code == 200
+    assert (
+        client.post("/api/own-list", json={"case": CASE, "items": OWN_LIST}).status_code
+        == 200
+    )
     assert client.get(f"/api/part-two?case={CASE}").status_code == 200
-    assert client.post(
-        "/api/finish",
-        json={
-            "case": CASE,
-            "marks": {},
-            "missing": ["a missed authorization edge"],
-            "notes": "reviewer context",
-        },
-    ).status_code == 200
+    assert (
+        client.post(
+            "/api/finish",
+            json={
+                "case": CASE,
+                "marks": {},
+                "missing": ["a missed authorization edge"],
+                "notes": "reviewer context",
+            },
+        ).status_code
+        == 200
+    )
 
 
 def central_review(tree: Path, author: str = "ada") -> Path:
@@ -122,7 +126,9 @@ def test_page_uses_plain_review_language_and_one_guide():
 def test_thanks_only_appears_after_contribution_control():
     page = sitting._PAGE
     assert page.count("Thank you") == 1
-    assert page.index('id="submit"') < page.index("Thank you for contributing this review")
+    assert page.index('id="submit"') < page.index(
+        "Thank you for contributing this review"
+    )
     guide = page.split('id="guide"', 1)[1].split("</article>", 1)[0]
     assert "Thank you" not in guide
 
@@ -156,7 +162,9 @@ def test_reset_keeps_the_independent_list_locked(tmp_path: Path):
     assert held.notes == ""
     assert held.state == "open"
 
-    refused = client.post("/api/own-list", json={"case": CASE, "items": ["replacement"]})
+    refused = client.post(
+        "/api/own-list", json={"case": CASE, "items": ["replacement"]}
+    )
     assert refused.status_code == 409
 
 
