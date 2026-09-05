@@ -673,7 +673,9 @@ $("submit").addEventListener("click", async () => {
 
 
 _PAGE = _updated_page(base._PAGE)
-_PAGE += '\n<!-- legacy rail-footer contract: "Submit — " + count + " cases ready" -->\n'
+_PAGE += (
+    '\n<!-- legacy rail-footer contract: "Submit — " + count + " cases ready" -->\n'
+)
 
 
 def _status_for(session: Session, row: sittings.Row) -> str:
