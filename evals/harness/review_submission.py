@@ -21,7 +21,6 @@ from pathlib import Path
 from tempfile import TemporaryDirectory
 
 from evals.harness import envelope as envelopes
-from evals.harness import roster as rosters
 from evals.harness import sitting as sittings
 from evals.harness import submit as submit_spine
 from evals.harness.reference import CorpusError
@@ -185,26 +184,15 @@ def clearing_signatures(root: Path) -> dict[str, str]:
 
 
 def unreviewed_cases(root: Path) -> list[str]:
-    """Cases with neither a current JSON review nor a current legacy sitting."""
-    corpus_dir = root / "evals" / "corpus"
-    corpus = sittings.load_corpus(corpus_dir)
+    """The legacy unread list, minus cases a current JSON review clears."""
     central = current_reviews(root)
     try:
-        roster = rosters.load(root / submit_spine.ROSTER_FILE)
-    except rosters.RosterError:
-        roster = None
-    return [
-        case.meta.id
-        for case in corpus
-        if case.meta.id not in central
-        and not (
-            roster is not None
-            and any(
-                sittings.clears(case, recorded, roster, corpus_dir)
-                for recorded in case.meta.reviews
-            )
-        )
-    ]
+        listed = sittings.unreviewed_cases(root)
+    except OSError:
+        listed = [
+            case.meta.id for case in sittings.load_corpus(root / "evals" / "corpus")
+        ]
+    return [case_id for case_id in listed if case_id not in central]
 
 
 def verify_pull_request(root: Path, author: str) -> list[str]:
