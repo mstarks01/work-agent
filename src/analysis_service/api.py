@@ -26,7 +26,6 @@ from __future__ import annotations
 
 import asyncio
 import logging
-import re
 from collections import Counter
 from collections.abc import Callable, Mapping, Sequence
 from datetime import datetime
@@ -69,6 +68,7 @@ from analysis_service.jobs import (
     build_store,
     execute_job,
 )
+from analysis_service.parsing import ascii_int
 from analysis_service.report import FrameworkName, FrameworkSelection
 from analysis_service.sources import Source, SourceLimits, plain_name
 from analysis_service.validation import ValidationIssue
@@ -85,12 +85,17 @@ _BODY_SLACK = 2
 
 _SSE_POLL_SECONDS = 0.2
 
-#: What a ``Last-Event-ID`` may spell before ``int`` sees it. ASCII digits
-#: only, because ``str.isdigit`` also passes superscripts ``int`` refuses; and
-#: bounded, because ``int`` refuses a string past 4300 digits by raising. Either
-#: refusal would surface as a 500 on a header the client controls. Anything
-#: else resumes from the start, which is what a missing header does too.
-_LAST_EVENT_ID = re.compile(r"[0-9]{1,18}")
+#: How long a ``Last-Event-ID`` may be. The shape itself is
+#: :func:`~analysis_service.parsing.ascii_int`'s question, and this is the
+#: caller's own bound: an event sequence is a counter, so 18 digits is past any
+#: run this service could produce. Anything else resumes from the start, which
+#: is what a missing header does too.
+_LAST_EVENT_ID_DIGITS = 18
+
+#: How long a ``Content-Length`` may be. Nineteen digits covers any byte count
+#: an HTTP body can state; a longer one is a client trying something rather
+#: than a request this service could serve.
+_CONTENT_LENGTH_DIGITS = 19
 
 # The rungs of the input ladder, mapped to what HTTP calls them. An empty
 # list is a malformed request rather than an oversized one: a job with no input
@@ -176,8 +181,14 @@ class BodyLimitMiddleware:
     def _declared_over_cap(self, scope) -> bool:
         for name, value in scope.get("headers", ()):
             if name == b"content-length":
-                declared = value.decode("latin-1").strip()
-                return declared.isdigit() and int(declared) > self._max_bytes
+                # ``str.isdigit`` was this test and was wrong twice over: it
+                # passes shapes ``int`` refuses, so a header a client controls
+                # reached a 500 instead of a decision.
+                declared = ascii_int(
+                    value.decode("latin-1").strip(),
+                    max_digits=_CONTENT_LENGTH_DIGITS,
+                )
+                return declared is not None and declared > self._max_bytes
         return False
 
     async def _refuse(self, scope, receive, send) -> None:
@@ -751,7 +762,7 @@ def create_app(
     ) -> StreamingResponse:
         await _owned_job(request, job_id, subject)
         last_event_id = request.headers.get("last-event-id", "")
-        seen = int(last_event_id) if _LAST_EVENT_ID.fullmatch(last_event_id) else 0
+        seen = ascii_int(last_event_id, max_digits=_LAST_EVENT_ID_DIGITS) or 0
         store: JobStore = request.app.state.store
 
         async def event_stream():

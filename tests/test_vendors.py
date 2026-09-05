@@ -23,6 +23,7 @@ from analysis_service.vendors import (
     ProviderAuthError,
     ServedTrust,
     Vendor,
+    claude_generation,
     join_served,
     openai_reasoning_model,
     vendor_for,
@@ -319,6 +320,38 @@ class TestPinnedFormRule:
     def test_pre_generation_forms_are_not_pinned_forms(self, name, model):
         with pytest.raises(ValueError, match="not pinned"):
             vendor_for(name).validate_model(model, source="t")
+
+    @pytest.mark.parametrize("name", ["anthropic", "vertex"])
+    @pytest.mark.parametrize(
+        "model", ["claude-opus-4-20250514", "claude-sonnet-4-20250514"]
+    )
+    def test_a_date_is_not_a_minor_version(self, name, model):
+        """The minor group was ``\\d+``, so it read a date as a version.
+
+        Both halves of the rule were wrong at once. ``validate_model`` accepted
+        a dated form the module's own comment says it rejects, and
+        ``claude_generation`` returned ``(4, 20250514)`` — so the build-time
+        sampling rule read a generation far above its floor and refused
+        ``temperature`` on a Claude 4.0, which accepts it.
+        """
+        with pytest.raises(ValueError, match="not pinned"):
+            vendor_for(name).validate_model(model, source="t")
+        assert claude_generation(model) is None
+
+    @pytest.mark.parametrize(
+        ("model", "generation"),
+        [
+            ("claude-opus-5", (5, 0)),
+            ("claude-sonnet-4-6", (4, 6)),
+            ("claude-opus-4-1", (4, 1)),
+            # Two digits is a minor version and stays one; the bound is on the
+            # minor alone, so no generation count is too large to name.
+            ("claude-opus-4-12", (4, 12)),
+            ("claude-opus-123", (123, 0)),
+        ],
+    )
+    def test_a_minor_version_still_reads_as_one(self, model, generation):
+        assert claude_generation(model) == generation
 
     @pytest.mark.parametrize("name", ["anthropic", "vertex"])
     @pytest.mark.parametrize("model", ["claude-haiku-4-5", "claude-opus-4-1"])

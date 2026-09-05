@@ -33,6 +33,7 @@ from evals.harness.fingerprint import (
 )
 from evals.harness.reference import ReferenceRequirement, ReferenceThreat
 from evals.harness.verbs import VerbError
+from tests.test_parsing import ISDIGIT_TRAPS
 
 FLOWS = {
     "flow:shopper-to-storefront-api:place-order": (
@@ -320,3 +321,24 @@ def test_no_entry_point_defaults_the_version_a_package_is_keyed_under():
         " is VERSION_FOR's answer, and a default is a single rule standing in"
         " for a table with one row per package."
     )
+
+
+class TestReadingAVersionBackOffAValue:
+    """``version_of`` refuses by name; it must not raise on the way there."""
+
+    def test_a_version_reads_as_itself(self):
+        assert version_of("v3:abcdef") == 3
+
+    @pytest.mark.parametrize("head", ISDIGIT_TRAPS)
+    def test_a_shape_isdigit_gets_wrong_is_not_a_fingerprint(self, head):
+        """``str.isdigit`` was the guard and it is wrong twice over.
+
+        It passes ``"²"``, which ``int`` refuses with a ``ValueError``, and a
+        string past 4300 digits, which ``int`` also refuses — so a preflight
+        that meant to name a malformed value raised a traceback instead. It
+        also passes a fullwidth digit that ``int`` *accepts*, which gave one
+        version two spellings.
+        """
+        assert head.isdigit(), "this case only means something while isdigit passes it"
+        with pytest.raises(FingerprintError, match="is not a fingerprint"):
+            version_of(f"v{head}:abcdef")
