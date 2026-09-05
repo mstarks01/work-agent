@@ -186,7 +186,9 @@ def clearing_signatures(root: Path) -> dict[str, str]:
 def unreviewed_cases(root: Path) -> list[str]:
     """The canonical unreviewed list, minus cases cleared by current JSON reviews."""
     current = current_reviews(root)
-    return [case_id for case_id in sittings.unreviewed_cases(root) if case_id not in current]
+    return [
+        case_id for case_id in sittings.unreviewed_cases(root) if case_id not in current
+    ]
 
 
 def verify_pull_request(root: Path, author: str) -> list[str]:
