@@ -61,6 +61,10 @@ def _between(text: str, start: str, end: str, replacement: str) -> str:
     return text[:left] + replacement + text[right:]
 
 
+# These strings match exact HTML/JavaScript fragments in ``sitting_base``.
+# Formatting them changes the match keys without changing behavior, so keep
+# this one composition function formatter-stable.
+# fmt: off
 def _updated_page(page: str) -> str:
     # The project name is intentionally not part of reviewer-facing copy.  It
     # is a working repository name and the sitting method should survive a
@@ -472,6 +476,7 @@ $("resetReview").addEventListener("click", async () => {
     # it no longer exposes the control after model findings have been revealed.
     # The dedicated reset above preserves the blinded Part 1 list.
     return page
+# fmt: on
 
 
 _PAGE = _updated_page(base._PAGE)
@@ -501,7 +506,9 @@ def _restore_identity(session: Session) -> None:
     try:
         data = json.loads(path.read_text(encoding="utf-8"))
     except (OSError, json.JSONDecodeError) as exc:
-        raise RuntimeError(f"cannot read saved reviewer identity {path}: {exc}") from exc
+        raise RuntimeError(
+            f"cannot read saved reviewer identity {path}: {exc}"
+        ) from exc
     value = data.get("submitted_for")
     if not isinstance(value, str) or not is_submitted_for(value):
         raise RuntimeError(f"saved reviewer identity {path} is invalid")
@@ -579,11 +586,18 @@ def create_app(session: Session) -> FastAPI:
         prepared = base._open(session, body.case)
         held = base._draft(session, body.case)
         if held is None:
-            raise HTTPException(status_code=409, detail="that case has no review to reset")
+            raise HTTPException(
+                status_code=409, detail="that case has no review to reset"
+            )
         if held.state == "finished":
             try:
                 held = sittings.withdraw(session.store, prepared, held)
-            except (sittings.SittingError, sittings.DraftError, OSError, ValueError) as exc:
+            except (
+                sittings.SittingError,
+                sittings.DraftError,
+                OSError,
+                ValueError,
+            ) as exc:
                 raise HTTPException(status_code=409, detail=str(exc)) from exc
         held.marks = {}
         held.missing = []
