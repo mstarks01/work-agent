@@ -1,21 +1,23 @@
-"""Regression coverage for the simplified reviewer-facing work-review flow."""
+"""Reviewer-facing regression coverage for the corpus review app."""
 
 from __future__ import annotations
 
-import io
 import json
 import shutil
-import zipfile
 from pathlib import Path
 
 from fastapi.testclient import TestClient
 
-from evals.harness import submit as submit_spine
+from evals.harness import envelope as envelopes
+from evals.harness import review_submission as review_submissions
+from evals.harness import sitting as sittings
 from webapp import sitting
 
 CASE = "02-iot-fleet-telemetry"
-LOOPBACK = "http://127.0.0.1:8020"
+OTHER = "03-batch-data-pipeline"
 OWN_LIST = ["a spoofed device"]
+LOOPBACK = "http://127.0.0.1:8020"
+SAME_ORIGIN = {"Sec-Fetch-Site": "same-origin"}
 ROSTER = """version = 1
 
 [voters.ada]
@@ -25,226 +27,249 @@ standing = "contributor"
 
 def tree_for(tmp_path: Path) -> Path:
     source_root = Path(__file__).resolve().parents[1]
-    tree = tmp_path / "clone"
-    case_dir = tree / "evals" / "corpus" / CASE
-    case_dir.parent.mkdir(parents=True)
-    shutil.copytree(source_root / "evals" / "corpus" / CASE, case_dir)
+    tree = tmp_path / "tree"
+    for case in (CASE, OTHER):
+        source = source_root / "evals" / "corpus" / case
+        shutil.copytree(source, tree / "evals" / "corpus" / case)
     (tree / "evals" / "review").mkdir(parents=True)
     (tree / "evals" / "review" / "voters.toml").write_text(ROSTER, encoding="utf-8")
     (tree / "tests").mkdir()
     (tree / "tests" / "test_case_review.py").write_text(
-        f'UNREVIEWED: dict[str, str] = {{\n    "{CASE}": "unread for this test",\n}}\n',
+        "UNREVIEWED: dict[str, str] = {\n"
+        f'    "{CASE}": "unread for this test",\n'
+        f'    "{OTHER}": "unread for this test",\n'
+        "}\n",
         encoding="utf-8",
     )
     return tree
 
 
-def client_for(tree: Path, reviewer: str = sitting.LOCAL_SUBMITTER):
-    drafts = tree.parent / "state" / "work-reviews"
+def client_for(tree: Path):
+    drafts = tree.parent / "state" / "reviews"
     session = sitting.build_session(
-        tree, reviewer, "anonymous", drafts=drafts, can_submit=False
+        tree,
+        sitting.LOCAL_SUBMITTER,
+        "anonymous",
+        drafts=drafts,
+        can_submit=False,
     )
-    app = TestClient(
+    client = TestClient(
         sitting.create_app(session),
         base_url=LOOPBACK,
-        headers={
-            "Sec-Fetch-Site": "same-origin",
-            "X-Sitting-Token": session.token,
+        headers={**SAME_ORIGIN, "X-Sitting-Token": session.token},
+    )
+    return client, session
+
+
+def record_one(client: TestClient) -> None:
+    assert (
+        client.post("/api/own-list", json={"case": CASE, "items": OWN_LIST}).status_code
+        == 200
+    )
+    assert client.get(f"/api/part-two?case={CASE}").status_code == 200
+    assert (
+        client.post(
+            "/api/finish",
+            json={
+                "case": CASE,
+                "marks": {},
+                "missing": ["a missed authorization edge"],
+                "notes": "reviewer context",
+            },
+        ).status_code
+        == 200
+    )
+
+
+def central_review(tree: Path, author: str = "ada") -> Path:
+    prepared = sittings.prepare(tree / "evals" / "corpus" / CASE)
+    envelope = envelopes.Envelope(
+        envelope=envelopes.VERSION,
+        submitted_by=author,
+        submitted_for=author,
+        generated="2026-09-05",
+        cases={
+            CASE: envelopes.CaseAnswers(
+                own_list=OWN_LIST,
+                marks={},
+                missing=["a missed authorization edge"],
+                notes="reviewer context",
+                opened_digests=sittings.digests(
+                    tree / "evals" / "corpus" / CASE, prepared.files
+                ),
+            )
         },
     )
-    return app, session, drafts
+    path = tree / review_submissions.relative_path(envelope)
+    path.parent.mkdir(parents=True, exist_ok=True)
+    path.write_bytes(review_submissions.serialize(envelope))
+    return path
 
 
-def record_one(app: TestClient) -> None:
-    opened = app.post("/api/own-list", json={"case": CASE, "items": OWN_LIST})
-    assert opened.status_code == 200
-    assert app.get(f"/api/part-two?case={CASE}").status_code == 200
-    recorded = app.post(
-        "/api/finish",
-        json={"case": CASE, "marks": {}, "missing": [], "notes": "reviewed"},
-    )
-    assert recorded.status_code == 200
-
-
-def test_page_uses_one_simple_work_review_guide():
+def test_page_uses_plain_review_language_and_one_guide():
     page = sitting._PAGE
-    assert "Work Agent" not in page
-    assert "<title>Work review</title>" in page
-    assert "<h1>Work review</h1>" in page
-    assert page.count(">Review guide</button>") == 1
-    assert "<summary>Review guide</summary>" not in page
-    assert "How the work review works" in page
+    assert "<title>Review</title>" in page
+    assert "<h1>Review</h1>" in page
+    assert "How the review works" in page
+    assert "How the work review works" not in page
+    assert "Start a work review" not in page
+    assert "Record work review" not in page
+    assert page.count('id="guide"') == 1
     assert page.count('class="example"') == 6
-    assert "20–30 minutes" in page
-    assert ">Begin review</button>" in page
-    assert ">Save and show model findings</button>" in page
-    assert "previously produced by an analysis agent" in page
-    assert "measure → change → re-measure" in page
+    assert "20–30 minute sessions" in page
+    assert "one or several cases" in page
+    assert "Resetting clears your Part 2 answers" in page
+    assert "Resetting later" not in page
+    assert "Not every framework applies to every case" in page
+
+
+def test_thanks_only_appears_after_contribution_control():
+    page = sitting._PAGE
     assert page.count("Thank you") == 1
+    assert page.index('id="submit"') < page.index(
+        "Thank you for contributing this review"
+    )
+    guide = page.split('id="guide"', 1)[1].split("</article>", 1)[0]
+    assert "Thank you" not in guide
 
 
-def test_page_removes_redundant_source_metadata_and_rail_status_text():
-    page = sitting._PAGE
-    assert "block.source_kind" not in page
-    assert "press.append(icon, label)" in page
-    assert 'return ["✓", "complete"]' in page
-    assert 'return ["…", "progressing"]' in page
-    assert 'return ["!", "error"]' in page
-    assert "nav, #cases { overflow-x: hidden; }" in page
-    assert 'status.className = "status"' not in page
+def test_reviewer_copy_hides_repository_transport_details():
+    page = sitting._PAGE.lower()
+    assert "working tree" not in page
+    assert "clone" not in page
+    assert "fork" not in page
+    assert ".zip" not in page
+    assert "show files" in page
+    assert sitting._PAGE.index('id="showFiles"') < sitting._PAGE.index('id="submit"')
 
 
-def test_github_and_attribution_wait_until_contribution_stage():
-    page = sitting._PAGE
-    start = page.split('<div id="empty">', 1)[1].split("</div>", 1)[0]
-    assert "GitHub" not in start
-    assert "reviewerAttribution" not in start
-    assert "Reviewer attribution" in page
-    assert page.count('id="submit">Contribute</button>') == 1
-    assert "contribution issue" not in page.lower()
-    assert "gh auth login" not in page
-    assert "browser-only pull request" in page
+def test_source_header_has_no_redundant_source_kind():
+    assert "block.source_kind" not in sitting._PAGE
 
 
-def test_reset_keeps_blind_part_one_but_returns_case_to_not_reviewed(tmp_path: Path):
+def test_reset_keeps_the_independent_list_locked(tmp_path: Path):
     tree = tree_for(tmp_path)
-    app, session, _ = client_for(tree)
-    record_one(app)
+    client, session = client_for(tree)
+    record_one(client)
 
-    reset = app.post("/api/reset", json={"case": CASE})
+    reset = client.post("/api/reset", json={"case": CASE})
     assert reset.status_code == 200
-    state = app.get("/api/review-states").json()["states"][CASE]
-    assert state == "Not reviewed"
-    part_one = app.get(f"/api/part-one?case={CASE}").json()
-    assert part_one["own_list"] == OWN_LIST
-    assert part_one["marks"] == {}
-    assert part_one["missing"] == []
-    assert part_one["notes"] == ""
+    held = session.draft(CASE)
+    assert held is not None
+    assert held.own_list == OWN_LIST
+    assert held.marks == {}
+    assert held.missing == []
+    assert held.notes == ""
+    assert held.state == "open"
 
-    changed = app.post(
-        "/api/own-list",
-        json={"case": CASE, "items": ["a different answer after seeing findings"]},
+    refused = client.post(
+        "/api/own-list", json={"case": CASE, "items": ["replacement"]}
     )
-    assert changed.status_code == 409
-    assert session.draft(CASE).own_list == OWN_LIST
+    assert refused.status_code == 409
 
 
-def test_no_gh_contribute_falls_back_to_browser_without_mutating_review(
-    tmp_path: Path, monkeypatch
-):
+def test_show_files_is_the_exact_single_json_contribution(tmp_path: Path, monkeypatch):
     tree = tree_for(tmp_path)
-    app, _, _ = client_for(tree)
-    record_one(app)
-    case_path = tree / "evals" / "corpus" / CASE / "case.json"
-    before = case_path.read_bytes()
-
+    client, _ = client_for(tree)
+    record_one(client)
     monkeypatch.setattr(sitting.submit_spine, "gh_login", lambda root: "")
-    answer = app.post("/api/contribute", json={"reviewer": "anonymous"})
-    assert answer.status_code == 200
-    assert answer.json() == {"mode": "browser"}
-    assert case_path.read_bytes() == before
 
-
-def test_browser_bundle_contains_canonical_pr_files_and_is_non_mutating(tmp_path: Path):
-    tree = tree_for(tmp_path)
-    app, _, _ = client_for(tree)
-    record_one(app)
-    local_case = tree / "evals" / "corpus" / CASE / "case.json"
-    local_doc = tree / "evals" / "corpus" / CASE / "REVIEW-local-review.md"
-    local_before = local_case.read_bytes()
-    assert local_doc.is_file()
-
-    answer = app.post(
-        "/api/contribution-bundle",
-        json={"author": "web-reviewer", "reviewer": "anonymous"},
+    preview = client.post(
+        "/api/contribution-preview",
+        json={"reviewer": "anonymous", "author": "web-reviewer"},
     )
-    assert answer.status_code == 200
-    assert answer.headers["content-type"].startswith("application/zip")
-
-    with zipfile.ZipFile(io.BytesIO(answer.content)) as archive:
-        names = set(archive.namelist())
-        expected = {
-            f"evals/corpus/{CASE}/case.json",
-            f"evals/corpus/{CASE}/REVIEW-web-reviewer.md",
-            "tests/test_case_review.py",
-            "evals/review/voters.toml",
-        }
-        assert expected <= names
-        assert f"evals/corpus/{CASE}/REVIEW-local-review.md" not in names
-        case = json.loads(archive.read(f"evals/corpus/{CASE}/case.json"))
-        review = case["reviews"][-1]
-        assert review["submitted_by"] == "web-reviewer"
-        assert review["submitted_for"] == "anonymous"
-        assert review["document"] == "REVIEW-web-reviewer.md"
-        assert CASE not in archive.read("tests/test_case_review.py").decode()
-        roster = archive.read("evals/review/voters.toml").decode()
-        assert "[voters.web-reviewer]" in roster
-        assert 'standing = "contributor"' in roster
-
-    assert local_case.read_bytes() == local_before
-    assert local_doc.is_file(), "browser packaging changed the local work review"
+    assert preview.status_code == 200
+    body = preview.json()
+    assert body["path"].startswith("evals/review/submissions/review-")
+    assert body["path"].endswith(".json")
+    parsed = json.loads(body["content"])
+    assert parsed["submitted_by"] == "web-reviewer"
+    assert parsed["submitted_for"] == "anonymous"
+    assert list(parsed["cases"]) == [CASE]
+    assert parsed["cases"][CASE]["own_list"] == OWN_LIST
+    assert parsed["cases"][CASE]["missing"] == ["a missed authorization edge"]
 
 
-def test_browser_bundle_can_attribute_review_to_pr_author(tmp_path: Path):
-    tree = tree_for(tmp_path)
-    app, _, _ = client_for(tree)
-    record_one(app)
-    answer = app.post(
-        "/api/contribution-bundle",
-        json={"author": "web-reviewer", "reviewer": "self"},
-    )
-    with zipfile.ZipFile(io.BytesIO(answer.content)) as archive:
-        case = json.loads(archive.read(f"evals/corpus/{CASE}/case.json"))
-    assert case["reviews"][-1]["submitted_for"] == "web-reviewer"
-
-
-def test_direct_contribution_rebinds_local_review_to_authenticated_pr_author(
+def test_browser_contribution_returns_the_same_json_without_mutating_local_files(
     tmp_path: Path, monkeypatch
 ):
     tree = tree_for(tmp_path)
-    app, _, drafts = client_for(tree)
-    record_one(app)
-    monkeypatch.setattr(sitting.submit_spine, "gh_login", lambda root: "ada")
-    monkeypatch.setattr(
-        sitting.submit_spine,
-        "submission",
-        lambda root, kind: submit_spine.Outcome(
-            author="ada",
-            url="https://github.com/mstarks01/work-agent/pull/999",
-            closing="ok",
-        ),
+    client, _ = client_for(tree)
+    record_one(client)
+    monkeypatch.setattr(sitting.submit_spine, "gh_login", lambda root: "")
+    case_before = (tree / "evals" / "corpus" / CASE / "case.json").read_bytes()
+    list_before = (tree / "tests" / "test_case_review.py").read_bytes()
+
+    response = client.post(
+        "/api/contribute",
+        json={"reviewer": "self", "author": "web-reviewer"},
     )
-
-    answer = app.post("/api/contribute", json={"reviewer": "self"})
-    assert answer.status_code == 200
-    assert answer.json()["ok"] is True
-    case_dir = tree / "evals" / "corpus" / CASE
-    case = json.loads((case_dir / "case.json").read_text(encoding="utf-8"))
-    review = case["reviews"][-1]
-    assert review["submitted_by"] == "ada"
-    assert review["submitted_for"] == "ada"
-    assert review["document"] == "REVIEW-ada.md"
-    assert (case_dir / "REVIEW-ada.md").is_file()
-    assert not (case_dir / "REVIEW-local-review.md").exists()
-    assert not (drafts / sitting.LOCAL_SUBMITTER / f"{CASE}.json").exists()
+    assert response.status_code == 200
+    body = response.json()
+    assert body["mode"] == "browser"
+    assert body["filename"].endswith(".json")
+    parsed = json.loads(body["content"])
+    assert parsed["submitted_for"] == "web-reviewer"
+    assert (tree / "evals" / "corpus" / CASE / "case.json").read_bytes() == case_before
+    assert (tree / "tests" / "test_case_review.py").read_bytes() == list_before
 
 
-def test_direct_contribution_failure_restores_local_review(tmp_path: Path, monkeypatch):
+def test_direct_contribution_opens_one_json_pr_and_cleans_local_record(
+    tmp_path: Path, monkeypatch
+):
     tree = tree_for(tmp_path)
-    app, _, drafts = client_for(tree)
-    record_one(app)
-    case_dir = tree / "evals" / "corpus" / CASE
-    before = (case_dir / "case.json").read_bytes()
+    client, session = client_for(tree)
+    record_one(client)
     monkeypatch.setattr(sitting.submit_spine, "gh_login", lambda root: "ada")
-    monkeypatch.setattr(
-        sitting.submit_spine,
-        "submission",
-        lambda root, kind: submit_spine.Outcome(author="ada", error="no push"),
-    )
+    captured = {}
 
-    answer = app.post("/api/contribute", json={"reviewer": "self"})
-    assert answer.status_code == 409
-    assert (case_dir / "case.json").read_bytes() == before
-    assert (case_dir / "REVIEW-local-review.md").is_file()
-    assert not (case_dir / "REVIEW-ada.md").exists()
-    assert (drafts / sitting.LOCAL_SUBMITTER / f"{CASE}.json").is_file()
+    def open_pr(root, envelope):
+        captured["root"] = root
+        captured["envelope"] = envelope
+        return "https://github.com/mstarks01/work-agent/pull/999"
+
+    monkeypatch.setattr(sitting.review_submissions, "open_pull_request", open_pr)
+    response = client.post("/api/contribute", json={"reviewer": "anonymous"})
+    assert response.status_code == 200
+    assert response.json()["mode"] == "direct"
+    assert captured["envelope"].submitted_by == "ada"
+    assert captured["envelope"].submitted_for == "anonymous"
+    assert list(captured["envelope"].cases) == [CASE]
+    assert session.draft(CASE) is None
+    assert not (tree / "evals" / "corpus" / CASE / "REVIEW-local-review.md").exists()
+    assert CASE in sittings.unreviewed_cases(tree)
+
+
+def test_direct_failure_preserves_local_review(tmp_path: Path, monkeypatch):
+    tree = tree_for(tmp_path)
+    client, session = client_for(tree)
+    record_one(client)
+    monkeypatch.setattr(sitting.submit_spine, "gh_login", lambda root: "ada")
+
+    def fail(root, envelope):
+        raise review_submissions.ReviewSubmissionError("push failed")
+
+    monkeypatch.setattr(sitting.review_submissions, "open_pull_request", fail)
+    response = client.post("/api/contribute", json={"reviewer": "anonymous"})
+    assert response.status_code == 409
+    assert "push failed" in response.json()["detail"]
+    held = session.draft(CASE)
+    assert held is not None and held.state == "finished"
+
+
+def test_submitted_case_remains_clickable_as_read_only(tmp_path: Path):
+    tree = tree_for(tmp_path)
+    central_review(tree)
+    client, session = client_for(tree)
+    row = next(row for row in session.refresh() if row.case_id == CASE)
+    assert row.state == "signed"
+    assert row.pressable is False, "writes stay protected by the existing allow-list"
+
+    read_only = client.get(f"/api/read-only?case={CASE}")
+    assert read_only.status_code == 200
+    body = read_only.json()
+    assert body["case"] == CASE
+    assert "# Review" in body["document"]
+    assert "a spoofed device" in body["document"]
+    assert client.get(f"/api/part-one?case={CASE}").status_code == 404
+    assert "openReadOnly(row.case)" in sitting._PAGE
