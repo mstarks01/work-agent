@@ -10,12 +10,12 @@ from __future__ import annotations
 
 import sys
 from pathlib import Path
-from typing import Any
 
 if __package__ in {None, ""}:
     sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
 from webapp import work_review as _impl
+from webapp.page import Grants, RenderedPage
 
 sittings = _impl.sittings
 submit_spine = _impl.submit_spine
@@ -49,7 +49,9 @@ _impl._PAGE = _PAGE
 _base_render = _impl.base.render
 
 
-def _render_work_review(template: str, grants: Any, **values: Any) -> str:
+def _render_work_review(
+    template: str, grants: Grants, **values: str
+) -> RenderedPage:
     if template == _impl._PAGE:
         values = {
             name: value
