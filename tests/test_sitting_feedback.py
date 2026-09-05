@@ -1,12 +1,16 @@
-"""Regression coverage for the reviewer-facing case-sitting workflow."""
+"""Regression coverage for the simplified reviewer-facing work-review flow."""
 
 from __future__ import annotations
 
+import io
+import json
 import shutil
+import zipfile
 from pathlib import Path
 
 from fastapi.testclient import TestClient
 
+from evals.harness import submit as submit_spine
 from webapp import sitting
 
 CASE = "02-iot-fleet-telemetry"
@@ -35,9 +39,11 @@ def tree_for(tmp_path: Path) -> Path:
     return tree
 
 
-def client_for(tree: Path):
-    drafts = tree.parent / "state" / "sittings"
-    session = sitting.build_session(tree, "ada", drafts=drafts)
+def client_for(tree: Path, reviewer: str = sitting.LOCAL_SUBMITTER):
+    drafts = tree.parent / "state" / "work-reviews"
+    session = sitting.build_session(
+        tree, reviewer, "anonymous", drafts=drafts, can_submit=False
+    )
     app = TestClient(
         sitting.create_app(session),
         base_url=LOOPBACK,
@@ -49,68 +55,71 @@ def client_for(tree: Path):
     return app, session, drafts
 
 
-def test_reviewer_copy_is_product_neutral_and_explains_the_loop():
+def record_one(app: TestClient) -> None:
+    opened = app.post("/api/own-list", json={"case": CASE, "items": OWN_LIST})
+    assert opened.status_code == 200
+    assert app.get(f"/api/part-two?case={CASE}").status_code == 200
+    recorded = app.post(
+        "/api/finish",
+        json={"case": CASE, "marks": {}, "missing": [], "notes": "reviewed"},
+    )
+    assert recorded.status_code == 200
+
+
+def test_page_uses_one_simple_work_review_guide():
     page = sitting._PAGE
     assert "Work Agent" not in page
-    assert "<summary>Review guide</summary>" in page
-    assert "How to submit a case sitting" not in page
-    assert "How to complete a case sitting" not in page
+    assert "<title>Work review</title>" in page
+    assert "<h1>Work review</h1>" in page
+    assert page.count(">Review guide</button>") == 1
+    assert "<summary>Review guide</summary>" not in page
+    assert "How the work review works" in page
+    assert page.count('class="example"') == 6
+    assert "20–30 minutes" in page
     assert ">Begin review</button>" in page
     assert ">Save and show model findings</button>" in page
     assert "previously produced by an analysis agent" in page
-    assert "Nothing is sent anywhere automatically" in page
-    assert "What happens after the review?" in page
-    assert "run-to-run variation" in page
     assert "measure → change → re-measure" in page
     assert page.count("Thank you") == 1
 
 
-def test_part_one_warns_that_revealing_findings_locks_it():
+def test_page_removes_redundant_source_metadata_and_rail_status_text():
     page = sitting._PAGE
-    assert "After you save and reveal the model findings" in page
-    assert "this list is\n    locked" in page
-    assert "does not\n    allow this independent first pass to be changed" in page
-    assert "Reset review answers" in page
+    assert "block.source_kind" not in page
+    assert "press.append(icon, label)" in page
+    assert 'return ["✓", "complete"]' in page
+    assert 'return ["…", "progressing"]' in page
+    assert 'return ["!", "error"]' in page
+    assert "nav, #cases { overflow-x: hidden; }" in page
+    assert 'status.className = "status"' not in page
 
 
-def test_framework_absence_is_not_presented_as_inapplicability():
+def test_github_and_attribution_wait_until_contribution_stage():
     page = sitting._PAGE
-    assert "Only reference sets carried by this corpus case are shown" in page
-    assert "does not\n    by itself mean that framework is inapplicable" in page
+    start = page.split('<div id="empty">', 1)[1].split("</div>", 1)[0]
+    assert "GitHub" not in start
+    assert "reviewerAttribution" not in start
+    assert "Reviewer attribution" in page
+    assert page.count('id="submit">Contribute</button>') == 1
+    assert "contribution issue" not in page.lower()
+    assert "gh auth login" not in page
+    assert "browser-only pull request" in page
 
 
-def test_reset_keeps_the_blind_list_and_returns_status_to_not_reviewed(tmp_path):
+def test_reset_keeps_blind_part_one_but_returns_case_to_not_reviewed(tmp_path: Path):
     tree = tree_for(tmp_path)
     app, session, _ = client_for(tree)
-    opened = app.post("/api/own-list", json={"case": CASE, "items": OWN_LIST})
-    assert opened.status_code == 200
-    part_two = app.get(f"/api/part-two?case={CASE}").json()
-    fingerprint = part_two["marks"][0]["fingerprint"]
-    finished = app.post(
-        "/api/finish",
-        json={
-            "case": CASE,
-            "marks": {fingerprint: "agree"},
-            "missing": ["a missed concern"],
-            "notes": "context",
-        },
-    )
-    assert finished.status_code == 200
-    assert (tree / "evals" / "corpus" / CASE / "REVIEW-ada.md").is_file()
+    record_one(app)
 
     reset = app.post("/api/reset", json={"case": CASE})
     assert reset.status_code == 200
-    assert reset.json()["reset"] is True
-    assert not (tree / "evals" / "corpus" / CASE / "REVIEW-ada.md").exists()
-
+    state = app.get("/api/review-states").json()["states"][CASE]
+    assert state == "Not reviewed"
     part_one = app.get(f"/api/part-one?case={CASE}").json()
     assert part_one["own_list"] == OWN_LIST
     assert part_one["marks"] == {}
     assert part_one["missing"] == []
     assert part_one["notes"] == ""
-    assert app.get(f"/api/part-two?case={CASE}").status_code == 200
-    states = app.get("/api/review-states").json()["states"]
-    assert states[CASE] == "Not reviewed"
 
     changed = app.post(
         "/api/own-list",
@@ -120,78 +129,122 @@ def test_reset_keeps_the_blind_list_and_returns_status_to_not_reviewed(tmp_path)
     assert session.draft(CASE).own_list == OWN_LIST
 
 
-def test_reviewer_identity_is_chosen_in_the_ui_and_locked_after_start(tmp_path):
+def test_no_gh_contribute_falls_back_to_browser_without_mutating_review(
+    tmp_path: Path, monkeypatch
+):
     tree = tree_for(tmp_path)
-    app, session, drafts = client_for(tree)
-    changed = app.post("/api/reviewer", json={"mode": "anonymous"})
-    assert changed.status_code == 200
-    assert changed.json()["submitted_for"] == "anonymous"
-    assert session.submitted_for == "anonymous"
-
-    # The choice is state beside the drafts, so a restarted browser keeps the
-    # same provenance rather than silently reverting to the submitter.
-    again = sitting.build_session(tree, "ada", drafts=drafts)
-    restarted = TestClient(
-        sitting.create_app(again),
-        base_url=LOOPBACK,
-        headers={"Sec-Fetch-Site": "same-origin", "X-Sitting-Token": again.token},
-    )
-    assert restarted.get("/api/rail").json()["submitted_for"] == "anonymous"
-
-    opened = app.post("/api/own-list", json={"case": CASE, "items": OWN_LIST})
-    assert opened.status_code == 200
-    locked = app.post("/api/reviewer", json={"mode": "self"})
-    assert locked.status_code == 409
-    assert "locked" in locked.json()["detail"]
-
-
-def test_reset_requires_the_same_write_controls(tmp_path):
-    tree = tree_for(tmp_path)
-    app, session, _ = client_for(tree)
-    opened = app.post("/api/own-list", json={"case": CASE, "items": OWN_LIST})
-    assert opened.status_code == 200
-
-    foreign = app.post(
-        "/api/reset",
-        json={"case": CASE},
-        headers={
-            "Sec-Fetch-Site": "cross-site",
-            "X-Sitting-Token": session.token,
-        },
-    )
-    assert foreign.status_code == 403
-
-    no_token = TestClient(
-        sitting.create_app(session),
-        base_url=LOOPBACK,
-        headers={"Sec-Fetch-Site": "same-origin"},
-    )
-    assert no_token.post("/api/reset", json={"case": CASE}).status_code == 403
-
-
-def test_no_github_login_no_longer_blocks_launch(monkeypatch):
-    seen: dict[str, list[str]] = {}
-
-    def capture(argv: list[str]) -> int:
-        seen["args"] = argv
-        return 0
+    app, _, _ = client_for(tree)
+    record_one(app)
+    case_path = tree / "evals" / "corpus" / CASE / "case.json"
+    before = case_path.read_bytes()
 
     monkeypatch.setattr(sitting.submit_spine, "gh_login", lambda root: "")
-    monkeypatch.setattr(sitting.base, "main", capture)
-
-    result = sitting.main([])
-    assert result == 0
-    args = seen["args"]
-    assert args[args.index("--submitted-by") + 1] == sitting.LOCAL_SUBMITTER
-    assert args[args.index("--submitted-for") + 1] == "anonymous"
+    answer = app.post("/api/contribute", json={"reviewer": "anonymous"})
+    assert answer.status_code == 200
+    assert answer.json() == {"mode": "browser"}
+    assert case_path.read_bytes() == before
 
 
-def test_submit_stage_gives_an_actionable_no_gh_path():
-    page = sitting._PAGE
-    assert "Open a contribution issue in GitHub" in page
-    assert "gh auth login" in page
-    assert "keep the review local" in page.lower()
-    assert (
-        "Button unavailable because this session has no authenticated gh account"
-        not in page
+def test_browser_bundle_contains_canonical_pr_files_and_is_non_mutating(tmp_path: Path):
+    tree = tree_for(tmp_path)
+    app, _, _ = client_for(tree)
+    record_one(app)
+    local_case = tree / "evals" / "corpus" / CASE / "case.json"
+    local_doc = tree / "evals" / "corpus" / CASE / "REVIEW-local-review.md"
+    local_before = local_case.read_bytes()
+    assert local_doc.is_file()
+
+    answer = app.post(
+        "/api/contribution-bundle",
+        json={"author": "web-reviewer", "reviewer": "anonymous"},
     )
+    assert answer.status_code == 200
+    assert answer.headers["content-type"].startswith("application/zip")
+
+    with zipfile.ZipFile(io.BytesIO(answer.content)) as archive:
+        names = set(archive.namelist())
+        expected = {
+            f"evals/corpus/{CASE}/case.json",
+            f"evals/corpus/{CASE}/REVIEW-web-reviewer.md",
+            "tests/test_case_review.py",
+            "evals/review/voters.toml",
+        }
+        assert expected <= names
+        assert f"evals/corpus/{CASE}/REVIEW-local-review.md" not in names
+        case = json.loads(archive.read(f"evals/corpus/{CASE}/case.json"))
+        review = case["reviews"][-1]
+        assert review["submitted_by"] == "web-reviewer"
+        assert review["submitted_for"] == "anonymous"
+        assert review["document"] == "REVIEW-web-reviewer.md"
+        assert CASE not in archive.read("tests/test_case_review.py").decode()
+        roster = archive.read("evals/review/voters.toml").decode()
+        assert "[voters.web-reviewer]" in roster
+        assert 'standing = "contributor"' in roster
+
+    assert local_case.read_bytes() == local_before
+    assert local_doc.is_file(), "browser packaging changed the local work review"
+
+
+def test_browser_bundle_can_attribute_review_to_pr_author(tmp_path: Path):
+    tree = tree_for(tmp_path)
+    app, _, _ = client_for(tree)
+    record_one(app)
+    answer = app.post(
+        "/api/contribution-bundle",
+        json={"author": "web-reviewer", "reviewer": "self"},
+    )
+    with zipfile.ZipFile(io.BytesIO(answer.content)) as archive:
+        case = json.loads(archive.read(f"evals/corpus/{CASE}/case.json"))
+    assert case["reviews"][-1]["submitted_for"] == "web-reviewer"
+
+
+def test_direct_contribution_rebinds_local_review_to_authenticated_pr_author(
+    tmp_path: Path, monkeypatch
+):
+    tree = tree_for(tmp_path)
+    app, _, drafts = client_for(tree)
+    record_one(app)
+    monkeypatch.setattr(sitting.submit_spine, "gh_login", lambda root: "ada")
+    monkeypatch.setattr(
+        sitting.submit_spine,
+        "submission",
+        lambda root, kind: submit_spine.Outcome(
+            author="ada",
+            url="https://github.com/mstarks01/work-agent/pull/999",
+            closing="ok",
+        ),
+    )
+
+    answer = app.post("/api/contribute", json={"reviewer": "self"})
+    assert answer.status_code == 200
+    assert answer.json()["ok"] is True
+    case_dir = tree / "evals" / "corpus" / CASE
+    case = json.loads((case_dir / "case.json").read_text(encoding="utf-8"))
+    review = case["reviews"][-1]
+    assert review["submitted_by"] == "ada"
+    assert review["submitted_for"] == "ada"
+    assert review["document"] == "REVIEW-ada.md"
+    assert (case_dir / "REVIEW-ada.md").is_file()
+    assert not (case_dir / "REVIEW-local-review.md").exists()
+    assert not (drafts / sitting.LOCAL_SUBMITTER / f"{CASE}.json").exists()
+
+
+def test_direct_contribution_failure_restores_local_review(tmp_path: Path, monkeypatch):
+    tree = tree_for(tmp_path)
+    app, _, drafts = client_for(tree)
+    record_one(app)
+    case_dir = tree / "evals" / "corpus" / CASE
+    before = (case_dir / "case.json").read_bytes()
+    monkeypatch.setattr(sitting.submit_spine, "gh_login", lambda root: "ada")
+    monkeypatch.setattr(
+        sitting.submit_spine,
+        "submission",
+        lambda root, kind: submit_spine.Outcome(author="ada", error="no push"),
+    )
+
+    answer = app.post("/api/contribute", json={"reviewer": "self"})
+    assert answer.status_code == 409
+    assert (case_dir / "case.json").read_bytes() == before
+    assert (case_dir / "REVIEW-local-review.md").is_file()
+    assert not (case_dir / "REVIEW-ada.md").exists()
+    assert (drafts / sitting.LOCAL_SUBMITTER / f"{CASE}.json").is_file()
