@@ -286,7 +286,7 @@ class TestEnvOverrides:
 
     def test_env_alias_rejected(self, config_path):
         _, model_var = env_vars_for("base")
-        with pytest.raises(ModelConfigError, match="-latest"):
+        with pytest.raises(ModelConfigError, match="latest"):
             load_model_tiers(
                 config_path(config_toml()), env={model_var: "gemini-2.5-flash-latest"}
             )
@@ -325,19 +325,22 @@ class TestPinValidation:
     released tomorrow already satisfies it.
     """
 
-    @pytest.mark.parametrize(
-        "value",
-        [
-            "gemini-2.5-pro-latest",
-            "gemini-2.5-pro-preview-06-05",
-            "gemini-2.0-flash-exp",
-            " gemini-2.5-pro",
-            "",
-        ],
-    )
-    def test_aliases_and_pre_ga_builds_rejected(self, value):
+    @pytest.mark.parametrize("value", [" gemini-2.5-pro", ""])
+    def test_a_non_identifier_is_rejected(self, value):
         with pytest.raises(ModelConfigError):
             validate_model_string(value, "vertex", source="tiers.strong.model")
+
+    def test_the_registrys_refusal_arrives_as_a_config_error(self):
+        """What this seam adds over ``Vendor.validate_model`` is the type.
+
+        Which identifiers float is asserted once, in
+        ``test_vendors.py::TestPinnedFormRule``. Restating that table here
+        would give one rule a second reader that agrees with it by copying.
+        """
+        with pytest.raises(ModelConfigError, match="latest"):
+            validate_model_string(
+                "gemini-2.5-pro-latest", "vertex", source="tiers.strong.model"
+            )
 
     @pytest.mark.parametrize("value", ["gemini-2.5-pro", "gemini-2.5-flash"])
     def test_bare_stable_gemini_accepted(self, value):
@@ -387,7 +390,7 @@ class TestPinValidation:
 
     def test_alias_in_file_rejected(self, config_path):
         path = config_path(config_toml(strong="gemini-2.5-pro-latest"))
-        with pytest.raises(ModelConfigError, match="-latest"):
+        with pytest.raises(ModelConfigError, match="latest"):
             load_model_tiers(path, env={})
 
 
