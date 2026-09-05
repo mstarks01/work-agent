@@ -27,12 +27,14 @@ from webapp import sitting_base as base
 sittings = base.sittings
 submit_spine = base.submit_spine
 Session = base.Session
+Line = base.Line
 MIN_OWN_LIST = base.MIN_OWN_LIST
 build_session = base.build_session
 REPO_ROOT = base.REPO_ROOT
 HOST = base.HOST
 PORT = base.PORT
 HELD = base.HELD
+_open = base._open
 
 LOCAL_SUBMITTER = "local-review"
 UPSTREAM_ISSUES = "https://github.com/mstarks01/work-agent/issues/new"
@@ -453,8 +455,7 @@ $("resetReview").addEventListener("click", async () => {
   $("carrying").replaceChildren(...d.ready.map(row => stageRow(row, "Drop", drop)));
   $("held").replaceChildren(...d.held_back.map(row => stageRow(row, "Put back", putBack)));
   $("heldBox").classList.toggle("hidden", !d.held_back.length);
-  $("stageWritten").textContent = d.written.join("\
-");
+  $("stageWritten").textContent = d.written.join("\n");
   $("stageCommand").textContent = d.command;
   $("stagePaste").textContent = d.paste;
   $("waysOut").classList.toggle("hidden", !d.ready.length);
