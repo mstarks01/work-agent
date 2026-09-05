@@ -14,6 +14,12 @@ import sys
 from pathlib import Path
 from typing import Literal
 
+# Running this file directly puts ``webapp/`` rather than the repository root
+# on ``sys.path``.  Restore the documented ``python webapp/sitting.py`` entry
+# point before importing top-level ``evals`` or ``webapp`` packages.
+if __package__ in {None, ""}:
+    sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
+
 from fastapi import FastAPI, HTTPException, Request
 from fastapi.responses import JSONResponse
 from pydantic import BaseModel, ConfigDict
