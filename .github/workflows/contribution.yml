@@ -74,6 +74,15 @@ jobs:
           PR_AUTHOR: ${{ github.event.pull_request.user.login }}
         run: uv run python -m evals.harness.run verify-contribution --author "$PR_AUTHOR"
 
+      # New human reviews enter as one structured JSON file. This check is a
+      # no-op for legacy contribution shapes and ordinary eval/review changes;
+      # when a JSON review is present it binds submitted_by to the PR author,
+      # limits the PR to that one file, and verifies the recorded corpus bytes.
+      - name: Check review submission
+        env:
+          PR_AUTHOR: ${{ github.event.pull_request.user.login }}
+        run: uv run python -m evals.harness.review_submission --author "$PR_AUTHOR"
+
       # Every merged Baseline still recomputes, and every case sitting's
       # digests still match. These run over the whole tree rather than the
       # diff, so a PR that edits a file some *other* case's sitting signed
