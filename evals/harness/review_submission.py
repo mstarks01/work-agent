@@ -1,17 +1,16 @@
-"""One contributed review is one JSON file.
+"""Canonical JSON contributions for completed corpus reviews.
 
-The browser review keeps drafts local until a reviewer explicitly contributes.
-At that point the structured envelope is the evidence: the independent list,
-marks, missed findings, notes, and the digests of every corpus file the reviewer
-saw.  A pull request therefore needs one file under
-``evals/review/submissions/`` rather than rewritten case metadata, a generated
-Markdown copy, the unreviewed test module, and a roster edit.
+New review contributions are one structured JSON file under
+``evals/review/submissions``. The file carries the independent list, marks,
+missed issues, notes, and digests of the case material the reviewer saw. CI
+binds ``submitted_by`` to the pull-request author and validates the file against
+the corpus before merge.
 
-The file is intentionally useful without the web app.  CI validates it against
-the pull-request author and the corpus bytes in that PR.  Once merged, readers
-can derive whether it still clears a case by comparing the recorded digests with
-the corpus as it exists now.  Old submissions remain historical evidence when a
-case later changes; they simply stop clearing the changed case.
+Existing case-local sittings remain readable for compatibility. New JSON
+submissions do not rewrite case metadata, generated Markdown, the bootstrap
+unreviewed list, or the voter roster. A later corpus edit does not rewrite old
+review evidence; it simply makes that review no longer current for the changed
+case until somebody reviews the new bytes.
 """
 
 from __future__ import annotations
@@ -25,6 +24,7 @@ from evals.harness import envelope as envelopes
 from evals.harness import roster as rosters
 from evals.harness import sitting as sittings
 from evals.harness import submit as submit_spine
+from evals.harness.reference import CorpusError
 
 REPO_ROOT = Path(__file__).resolve().parents[2]
 SUBMISSIONS_DIR = Path("evals/review/submissions")
@@ -37,8 +37,6 @@ class ReviewSubmissionError(RuntimeError):
 
 @dataclass(frozen=True)
 class MergedReview:
-    """One case inside one merged review envelope."""
-
     path: Path
     envelope: envelopes.Envelope
     case_id: str
@@ -50,12 +48,11 @@ class MergedReview:
 
 
 def serialize(envelope: envelopes.Envelope) -> bytes:
-    """The canonical bytes committed for one review."""
+    """Canonical bytes for the committed review file."""
     return (envelope.model_dump_json(indent=2) + "\n").encode("utf-8")
 
 
 def submission_name(envelope: envelopes.Envelope) -> str:
-    """A stable, collision-resistant name derived from the review itself."""
     digest = hashlib.sha256(serialize(envelope)).hexdigest()[:12]
     return f"review-{envelope.generated}-{envelope.submitted_by}-{digest}.json"
 
@@ -67,14 +64,13 @@ def relative_path(envelope: envelopes.Envelope) -> str:
 def _case_problems(
     root: Path, case_id: str, answers: envelopes.CaseAnswers
 ) -> list[str]:
-    corpus_dir = root / "evals" / "corpus"
-    case_dir = corpus_dir / case_id
-    problems: list[str] = []
+    case_dir = root / "evals" / "corpus" / case_id
     try:
         prepared = sittings.prepare(case_dir)
-    except sittings.SittingError as exc:
+    except (CorpusError, sittings.SittingError, OSError, ValueError) as exc:
         return [f"{case_id}: {exc}"]
 
+    problems: list[str] = []
     if not sittings.own_list_is_written(answers.own_list):
         problems.append(
             f"{case_id}: the independent list is shorter than "
@@ -83,17 +79,10 @@ def _case_problems(
 
     expected = set(prepared.files)
     recorded = set(answers.opened_digests)
-    if recorded != expected:
-        missing = sorted(expected - recorded)
-        extra = sorted(recorded - expected)
-        if missing:
-            problems.append(
-                f"{case_id}: the review does not carry digests for {missing}"
-            )
-        if extra:
-            problems.append(
-                f"{case_id}: the review carries unexpected digests for {extra}"
-            )
+    if missing := sorted(expected - recorded):
+        problems.append(f"{case_id}: the review carries no digest for {missing}")
+    if extra := sorted(recorded - expected):
+        problems.append(f"{case_id}: the review carries unexpected digests for {extra}")
 
     stale = sittings.moved(
         case_dir,
@@ -105,8 +94,7 @@ def _case_problems(
         )
 
     known = {target.fingerprint for target in prepared.mark_targets}
-    unknown = sorted(set(answers.marks) - known)
-    if unknown:
+    if unknown := sorted(set(answers.marks) - known):
         problems.append(
             f"{case_id}: {', '.join(unknown)} names no recorded finding in this case"
         )
@@ -116,26 +104,25 @@ def _case_problems(
 def validate(
     envelope: envelopes.Envelope, root: Path, *, author: str | None = None
 ) -> list[str]:
-    """Everything that must hold when a review enters through a pull request."""
+    """Validate a contribution against the corpus and, in CI, the PR author."""
     problems: list[str] = []
     if author is not None and envelope.submitted_by != author:
         problems.append(
-            f"the review is submitted by {envelope.submitted_by!r}, but the pull request "
-            f"was opened by {author!r}"
+            f"the review is submitted by {envelope.submitted_by!r}, but the pull "
+            f"request was opened by {author!r}"
         )
     if not envelope.cases:
-        problems.append("the review contains no completed cases")
-        return problems
+        return [*problems, "the review contains no completed cases"]
 
-    corpus_dir = root / "evals" / "corpus"
     try:
-        offered = {case.meta.id for case in sittings.load_corpus(corpus_dir)}
-    except Exception as exc:  # corpus loaders already provide the useful message
-        return [f"the corpus cannot be read: {exc}"]
+        offered = {
+            case.meta.id for case in sittings.load_corpus(root / "evals" / "corpus")
+        }
+    except (CorpusError, sittings.SittingError, OSError, ValueError) as exc:
+        return [*problems, f"the corpus cannot be read: {exc}"]
 
-    unknown_cases = sorted(set(envelope.cases) - offered)
-    if unknown_cases:
-        problems.append(f"the review names unknown cases: {unknown_cases}")
+    if unknown := sorted(set(envelope.cases) - offered):
+        problems.append(f"the review names unknown cases: {unknown}")
     for case_id, answers in envelope.cases.items():
         if case_id in offered:
             problems.extend(_case_problems(root, case_id, answers))
@@ -150,7 +137,7 @@ def _read(path: Path) -> envelopes.Envelope:
 
 
 def iter_submissions(root: Path):
-    """Every merged review envelope, in stable filename order."""
+    """Yield every merged review file in stable filename order."""
     directory = root / SUBMISSIONS_DIR
     if not directory.is_dir():
         return
@@ -159,12 +146,7 @@ def iter_submissions(root: Path):
 
 
 def repository_problems(root: Path) -> list[str]:
-    """Structural problems in already-merged review files.
-
-    Current corpus digests are deliberately not checked here: a later corpus
-    edit makes an old review historical, not malformed.  Currentness is derived
-    by :func:`current_reviews`.
-    """
+    """Structural errors in merged files, independent of later corpus drift."""
     problems: list[str] = []
     try:
         submissions = list(iter_submissions(root))
@@ -181,7 +163,7 @@ def repository_problems(root: Path) -> list[str]:
 
 
 def current_reviews(root: Path) -> dict[str, MergedReview]:
-    """The newest merged review that still matches each case's current bytes."""
+    """Newest merged review that still matches each case's current bytes."""
     current: dict[str, MergedReview] = {}
     try:
         submissions = list(iter_submissions(root))
@@ -199,78 +181,69 @@ def current_for_case(root: Path, case_id: str) -> MergedReview | None:
 
 
 def clearing_signatures(root: Path) -> dict[str, str]:
-    return {case_id: review.signature for case_id, review in current_reviews(root).items()}
+    return {case: review.signature for case, review in current_reviews(root).items()}
 
 
 def unreviewed_cases(root: Path) -> list[str]:
-    """Cases with neither a current legacy sitting nor a current review file."""
+    """Cases with neither a current JSON review nor a current legacy sitting."""
     corpus_dir = root / "evals" / "corpus"
     corpus = sittings.load_corpus(corpus_dir)
     central = current_reviews(root)
     try:
         roster = rosters.load(root / submit_spine.ROSTER_FILE)
     except rosters.RosterError:
-        roster = rosters.Roster(version=1, voters={})
+        roster = None
     return [
         case.meta.id
         for case in corpus
         if case.meta.id not in central
-        and not any(
-            sittings.clears(case, recorded, roster, corpus_dir)
-            for recorded in case.meta.reviews
+        and not (
+            roster is not None
+            and any(
+                sittings.clears(case, recorded, roster, corpus_dir)
+                for recorded in case.meta.reviews
+            )
         )
     ]
 
 
-def _changed_paths(root: Path) -> list[str]:
-    """Reuse the contribution spine's one definition of the pull-request delta."""
-    return submit_spine._changed_paths(root)  # noqa: SLF001 - same harness package
-
-
 def verify_pull_request(root: Path, author: str) -> list[str]:
-    """Validate a review-only pull request against the GitHub PR author."""
-    changed = _changed_paths(root)
+    """Validate a review-only pull request against its GitHub author."""
+    changed = submit_spine._changed_paths(root)
     under_prefix = [rel for rel in changed if rel.startswith(SUBMISSIONS_PREFIX)]
     if not under_prefix:
         return []
 
-    problems: list[str] = []
     review_files = [rel for rel in under_prefix if rel.endswith(".json")]
-    unexpected = sorted(set(under_prefix) - set(review_files))
-    if unexpected:
+    problems: list[str] = []
+    if unexpected := sorted(set(under_prefix) - set(review_files)):
         problems.append(f"review submissions only add JSON files: {unexpected}")
     if len(review_files) != 1:
         problems.append(
             f"one review pull request carries exactly one JSON file; found {len(review_files)}"
         )
-    strays = sorted(set(changed) - set(review_files))
-    if strays:
+    if strays := sorted(set(changed) - set(review_files)):
         problems.append(f"a review pull request changes nothing else: {strays}")
     if len(review_files) != 1:
         return problems
 
     rel = review_files[0]
-    if submit_spine._base_text(root, rel) is not None:  # noqa: SLF001
-        problems.append(f"{rel}: a contributed review is append-only; add a new file")
-        return problems
+    if submit_spine._base_text(root, rel) is not None:
+        return [*problems, f"{rel}: a contributed review is append-only; add a new file"]
     path = root / rel
     try:
         envelope = _read(path)
     except ReviewSubmissionError as exc:
-        problems.append(str(exc))
-        return problems
+        return [*problems, str(exc)]
     if path.name != submission_name(envelope):
-        problems.append(
-            f"{rel}: expected canonical filename {submission_name(envelope)!r}"
-        )
+        problems.append(f"{rel}: expected filename {submission_name(envelope)!r}")
     problems.extend(validate(envelope, root, author=author))
     return problems
 
 
 def _title(envelope: envelopes.Envelope) -> str:
     count = len(envelope.cases)
-    noun = "case" if count == 1 else "cases"
-    return f"Review: {envelope.submitted_by}, {count} {noun}"
+    return f"Review: {envelope.submitted_by}, {count} {'case' if count == 1 else 'cases'}"
 
 
 def _body(envelope: envelopes.Envelope) -> str:
@@ -286,50 +259,43 @@ def _body(envelope: envelopes.Envelope) -> str:
 
 
 def open_pull_request(root: Path, envelope: envelopes.Envelope) -> str:
-    """Open a PR containing only the canonical review JSON.
-
-    Git authentication, branch creation, and a fork when one is actually needed
-    stay behind the existing contribution spine.  The reviewer-facing app never
-    asks the user to understand those transport details.
-    """
-    problems = validate(envelope, root, author=envelope.submitted_by)
-    if problems:
+    """Open a PR containing only the canonical JSON review file."""
+    if problems := validate(envelope, root, author=envelope.submitted_by):
         raise ReviewSubmissionError("; ".join(problems))
 
     author = envelope.submitted_by
     rel = relative_path(envelope)
-    data = serialize(envelope)
     try:
-        submit_spine._run(["git", "fetch", "origin"], root)  # noqa: SLF001
-        remote = submit_spine._push_remote(root, author)  # noqa: SLF001
-        branch = submit_spine._branch_name(root, "review", author, remote)  # noqa: SLF001
+        submit_spine._run(["git", "fetch", "origin"], root)
+        remote = submit_spine._push_remote(root, author)
+        branch = submit_spine._branch_name(root, "review", author, remote)
         with TemporaryDirectory(prefix="review-submit-") as scratch:
             worktree = Path(scratch) / "worktree"
-            submit_spine._run(  # noqa: SLF001
+            submit_spine._run(
                 ["git", "worktree", "add", "--detach", str(worktree), submit_spine.BASE_REF],
                 root,
             )
             try:
                 target = worktree / rel
                 target.parent.mkdir(parents=True, exist_ok=True)
-                target.write_bytes(data)
-                submit_spine._run(["git", "checkout", "-b", branch], worktree)  # noqa: SLF001
-                submit_spine._run(["git", "add", "--", rel], worktree)  # noqa: SLF001
-                submit_spine._run(["git", "commit", "-m", _title(envelope)], worktree)  # noqa: SLF001
-                submit_spine._run(  # noqa: SLF001
+                target.write_bytes(serialize(envelope))
+                submit_spine._run(["git", "checkout", "-b", branch], worktree)
+                submit_spine._run(["git", "add", "--", rel], worktree)
+                submit_spine._run(["git", "commit", "-m", _title(envelope)], worktree)
+                submit_spine._run(
                     ["git", "push", remote, f"HEAD:refs/heads/{branch}"], worktree
                 )
             finally:
-                submit_spine._run(  # noqa: SLF001
+                submit_spine._run(
                     ["git", "worktree", "remove", "--force", str(worktree)], root
                 )
-        return submit_spine._run(  # noqa: SLF001
+        return submit_spine._run(
             [
                 "gh",
                 "pr",
                 "create",
                 "--head",
-                submit_spine._pr_head(remote, author, branch),  # noqa: SLF001
+                submit_spine._pr_head(remote, author, branch),
                 "--title",
                 _title(envelope),
                 "--body",
@@ -342,14 +308,12 @@ def open_pull_request(root: Path, envelope: envelopes.Envelope) -> str:
 
 
 def main() -> int:
-    """CI entry point: validate a review submission in the current PR."""
     import argparse
 
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--author", required=True, help="GitHub pull-request author")
     args = parser.parse_args()
-    problems = verify_pull_request(REPO_ROOT, args.author.strip())
-    if problems:
+    if problems := verify_pull_request(REPO_ROOT, args.author.strip()):
         for problem in problems:
             print(f"FAIL  {problem}")
         return 1
