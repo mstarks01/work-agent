@@ -16,3 +16,8 @@ The modules, in the order a run uses them:
 * :mod:`evals.harness.modes` — the three eval modes over one corpus.
 * :mod:`evals.harness.run` — the CLI that ties them together.
 """
+
+# Compatibility for code that imported the contribution helper through the
+# harness before it moved to the evals package root. It is contribution plumbing,
+# not a scoring-harness module.
+from evals import review_submission as review_submission
