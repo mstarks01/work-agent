@@ -210,11 +210,15 @@ def unreviewed_cases(root: Path) -> list[str]:
 def verify_pull_request(root: Path, author: str) -> list[str]:
     """Validate a review-only pull request against its GitHub author."""
     changed = submit_spine._changed_paths(root)
-    under_prefix = [rel for rel in changed if rel.startswith(SUBMISSIONS_PREFIX)]
-    if not under_prefix:
+    review_files = [
+        rel
+        for rel in changed
+        if rel.startswith(SUBMISSIONS_PREFIX) and rel.endswith(".json")
+    ]
+    if not review_files:
         return []
 
-    review_files = [rel for rel in under_prefix if rel.endswith(".json")]
+    under_prefix = [rel for rel in changed if rel.startswith(SUBMISSIONS_PREFIX)]
     problems: list[str] = []
     if unexpected := sorted(set(under_prefix) - set(review_files)):
         problems.append(f"review submissions only add JSON files: {unexpected}")
@@ -229,7 +233,10 @@ def verify_pull_request(root: Path, author: str) -> list[str]:
 
     rel = review_files[0]
     if submit_spine._base_text(root, rel) is not None:
-        return [*problems, f"{rel}: a contributed review is append-only; add a new file"]
+        return [
+            *problems,
+            f"{rel}: a contributed review is append-only; add a new file",
+        ]
     path = root / rel
     try:
         envelope = _read(path)
@@ -243,7 +250,9 @@ def verify_pull_request(root: Path, author: str) -> list[str]:
 
 def _title(envelope: envelopes.Envelope) -> str:
     count = len(envelope.cases)
-    return f"Review: {envelope.submitted_by}, {count} {'case' if count == 1 else 'cases'}"
+    return (
+        f"Review: {envelope.submitted_by}, {count} {'case' if count == 1 else 'cases'}"
+    )
 
 
 def _body(envelope: envelopes.Envelope) -> str:
@@ -272,7 +281,14 @@ def open_pull_request(root: Path, envelope: envelopes.Envelope) -> str:
         with TemporaryDirectory(prefix="review-submit-") as scratch:
             worktree = Path(scratch) / "worktree"
             submit_spine._run(
-                ["git", "worktree", "add", "--detach", str(worktree), submit_spine.BASE_REF],
+                [
+                    "git",
+                    "worktree",
+                    "add",
+                    "--detach",
+                    str(worktree),
+                    submit_spine.BASE_REF,
+                ],
                 root,
             )
             try:
